@@ -21,7 +21,13 @@ function createWindow() {
   const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
   if (isDev) {
-    mainWindow.loadURL('http://localhost:3000');
+    const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:3000';
+    const loadDev = () => {
+      mainWindow?.loadURL(devUrl).catch(() => {
+        setTimeout(loadDev, 500);
+      });
+    };
+    loadDev();
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
