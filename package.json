@@ -3,13 +3,13 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "main": "dist-electron/main.js",
+  "main": "dist-electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "lint": "tsc --noEmit",
     "preview": "vite preview",
-    "build:electron": "esbuild electron/main.ts --bundle --platform=node --target=node18 --external:electron --outfile=dist-electron/main.js && esbuild electron/preload.ts --bundle --platform=node --target=node18 --external:electron --outfile=dist-electron/preload.js",
+    "build:electron": "esbuild electron/main.ts --bundle --platform=node --target=node18 --external:electron --outfile=dist-electron/main.cjs && esbuild electron/preload.ts --bundle --platform=node --target=node18 --external:electron --outfile=dist-electron/preload.cjs",
     "electron:dev": "npm run build:electron && concurrently \"vite\" \"electron .\"",
     "electron:build": "npm run build && npm run build:electron && electron-builder"
   },

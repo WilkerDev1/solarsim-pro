@@ -12,7 +12,7 @@ function createWindow() {
     minHeight: 700,
     title: 'Solaris Pro - Simulador Fotovoltaico',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
     },
