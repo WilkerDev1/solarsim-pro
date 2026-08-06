@@ -1,0 +1,410 @@
+<!DOCTYPE html><html class="h-full" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Solaris Pro - Simulations</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-error": "#ffffff",
+                      "on-primary-container": "#00422b",
+                      "inverse-surface": "#213145",
+                      "on-error-container": "#93000a",
+                      "on-tertiary-container": "#622700",
+                      "surface-container-high": "#dce9ff",
+                      "surface-container-low": "#eff4ff",
+                      "surface-dim": "#cbdbf5",
+                      "primary-container": "#10b981",
+                      "secondary-fixed": "#dae2fd",
+                      "surface-variant": "#d3e4fe",
+                      "primary": "#006c49",
+                      "on-primary": "#ffffff",
+                      "secondary": "#565e74",
+                      "on-background": "#0b1c30",
+                      "primary-fixed": "#6ffbbe",
+                      "surface-container-highest": "#d3e4fe",
+                      "error": "#ba1a1a",
+                      "tertiary-fixed": "#ffdbca",
+                      "surface-container-lowest": "#ffffff",
+                      "tertiary-container": "#ff7e2d",
+                      "on-tertiary-fixed": "#341100",
+                      "primary-fixed-dim": "#4edea3",
+                      "on-secondary-fixed": "#131b2e",
+                      "on-secondary-container": "#5c647a",
+                      "inverse-on-surface": "#eaf1ff",
+                      "surface": "#f8f9ff",
+                      "on-surface": "#0b1c30",
+                      "tertiary": "#9d4300",
+                      "surface-bright": "#f8f9ff",
+                      "surface-tint": "#006c49",
+                      "on-surface-variant": "#3c4a42",
+                      "on-tertiary-fixed-variant": "#783200",
+                      "outline": "#6c7a71",
+                      "on-secondary": "#ffffff",
+                      "on-tertiary": "#ffffff",
+                      "tertiary-fixed-dim": "#ffb690",
+                      "outline-variant": "#bbcabf",
+                      "secondary-fixed-dim": "#bec6e0",
+                      "background": "#f8f9ff",
+                      "on-secondary-fixed-variant": "#3f465c",
+                      "secondary-container": "#dae2fd",
+                      "inverse-primary": "#4edea3",
+                      "on-primary-fixed-variant": "#005236",
+                      "surface-container": "#e5eeff",
+                      "on-primary-fixed": "#002113",
+                      "error-container": "#ffdad6"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "stack-gap": "8px",
+                      "container-max": "1440px",
+                      "margin-desktop": "24px",
+                      "base": "4px",
+                      "section-gap": "32px",
+                      "gutter": "16px"
+              },
+              "fontFamily": {
+                      "display-lg": [
+                              "Inter"
+                      ],
+                      "label-caps": [
+                              "Inter"
+                      ],
+                      "body-base": [
+                              "Inter"
+                      ],
+                      "headline-md": [
+                              "Inter"
+                      ],
+                      "title-sm": [
+                              "Inter"
+                      ],
+                      "data-mono": [
+                              "JetBrains Mono"
+                      ],
+                      "body-sm": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "display-lg": [
+                              "36px",
+                              {
+                                      "lineHeight": "44px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-caps": [
+                              "11px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-base": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "title-sm": [
+                              "18px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "data-mono": [
+                              "13px",
+                              {
+                                      "lineHeight": "16px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "body-sm": [
+                              "13px",
+                              {
+                                      "lineHeight": "18px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+      </script>
+</head>
+<body class="bg-background text-on-background h-full font-body-base overflow-hidden flex">
+<!-- SideNavBar -->
+<aside class="bg-surface dark:bg-inverse-surface text-primary dark:text-primary-fixed-dim font-label-caps text-label-caps fixed left-0 top-0 h-screen w-[260px] border-r border-outline-variant dark:border-outline flex flex-col h-full py-6 z-20 hidden md:flex shrink-0">
+<div class="px-6 mb-8">
+<h1 class="font-headline-md text-headline-md text-on-surface dark:text-inverse-on-surface mb-1">Solaris Engine</h1>
+<p class="text-on-secondary-container font-body-sm text-body-sm">Simulation v4.2</p>
+</div>
+<nav class="flex-1 px-4 flex flex-col gap-2">
+<a class="flex items-center gap-3 px-4 py-3 rounded text-on-secondary-container dark:text-secondary-fixed-dim hover:bg-surface-container dark:hover:bg-secondary-fixed-dim/10 transition-all duration-200 ease-in-out cursor-pointer active:opacity-80" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="dashboard">dashboard</span>
+<span class="">Overview</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded text-on-secondary-container dark:text-secondary-fixed-dim hover:bg-surface-container dark:hover:bg-secondary-fixed-dim/10 transition-all duration-200 ease-in-out cursor-pointer active:opacity-80" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="map">map</span>
+<span class="">Live Map</span>
+</a>
+
+<a class="flex items-center gap-3 px-4 py-3 rounded bg-surface-container-high dark:bg-on-secondary-fixed-variant text-primary dark:text-primary-fixed-dim border-l-2 border-primary dark:border-primary-fixed-dim transition-all duration-200 ease-in-out cursor-pointer active:opacity-80" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="history" style="font-variation-settings: &quot;FILL&quot; 1;">history</span>
+<span class="">Project History</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 rounded text-on-secondary-container dark:text-secondary-fixed-dim hover:bg-surface-container dark:hover:bg-secondary-fixed-dim/10 transition-all duration-200 ease-in-out cursor-pointer active:opacity-80" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="help_outline">help_outline</span>
+<span class="">Support</span>
+</a>
+</nav>
+<div class="px-4 mt-auto flex flex-col gap-4">
+<button class="w-full py-2 bg-surface-container text-on-surface-variant font-label-caps text-label-caps rounded border border-outline-variant hover:bg-surface-container-high transition-colors text-center">Upgrade Plan</button>
+<div class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-4 py-2 rounded text-on-secondary-container dark:text-secondary-fixed-dim hover:bg-surface-container dark:hover:bg-secondary-fixed-dim/10 transition-all duration-200 ease-in-out cursor-pointer active:opacity-80" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="account_circle">account_circle</span>
+<span class="">Account</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 rounded text-on-secondary-container dark:text-secondary-fixed-dim hover:bg-surface-container dark:hover:bg-secondary-fixed-dim/10 transition-all duration-200 ease-in-out cursor-pointer active:opacity-80" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="logout">logout</span>
+<span class="">Logout</span>
+</a>
+</div>
+</div>
+</aside>
+<!-- Main Content Area -->
+<div class="flex-1 ml-[260px] flex flex-col h-screen overflow-hidden bg-background">
+<!-- TopAppBar (Modified for context: Focuses on search and primary action within the dashboard workspace) -->
+<header class="bg-surface-container-lowest dark:bg-surface-container-lowest w-full top-0 sticky border-b border-outline-variant dark:border-outline z-10">
+<div class="flex justify-between items-center px-margin-desktop py-4 max-w-container-max mx-auto w-full">
+<!-- Contextual Header Title -->
+<h2 class="font-headline-md text-headline-md text-on-surface">Simulations</h2>
+<!-- Centered Search -->
+<div class="flex-1 max-w-xl mx-8 relative hidden md:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="w-full bg-surface-variant/30 border-outline-variant rounded-full pl-10 pr-4 py-2 text-body-sm font-body-sm text-on-surface focus:bg-surface-bright focus:border-primary focus:ring-1 focus:ring-primary transition-colors placeholder:text-on-surface-variant/70" placeholder="Search projects, clients, or locations..." type="text">
+</div>
+<div class="flex items-center gap-4">
+<button class="w-8 h-8 rounded-full hover:bg-surface-container flex items-center justify-center text-on-surface-variant transition-colors cursor-pointer active:opacity-80">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+</button>
+<button class="w-8 h-8 rounded-full hover:bg-surface-container flex items-center justify-center text-on-surface-variant transition-colors cursor-pointer active:opacity-80">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<button class="bg-primary hover:bg-primary-fixed-dim text-on-primary font-label-caps text-label-caps px-4 py-2 rounded transition-colors flex items-center gap-2 ml-4">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                        New Simulation
+                    </button>
+<img alt="User profile" class="w-8 h-8 rounded-full object-cover ml-2 cursor-pointer border border-outline-variant" data-alt="A small, professional headshot photo of an engineer wearing safety glasses, looking confident in a well-lit office, modern light mode aesthetic, realistic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCr1ZIzghipGKc0fPMNtRn1LTgmVz2ToOjJnR6JaRWuRVmUa70NOAngs5PoqE0hILnM3b9yiEE1JL_eo4FjH7JH728UL85K2PjEaUcZ497QRDinkhWEnRp9y8GSrCV4BV3CHDiI-5sDPirtuADyX28EmZm0R2zEEtYrNqdSoMj6Ebn-qim2KxZIcwCSvM69ztd9u0I16K2bcCUVqK07fD6TyV7Avc46sd6h8xqDI2v-RGA_u-0UFAQ">
+</div>
+</div>
+<!-- Mobile Search (Visible only on small screens) -->
+<div class="px-4 pb-4 md:hidden block w-full">
+<div class="relative w-full">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input class="w-full bg-surface-variant/30 border-outline-variant rounded-full pl-10 pr-4 py-2 text-body-sm font-body-sm text-on-surface focus:bg-surface-bright focus:border-primary focus:ring-1 focus:ring-primary transition-colors placeholder:text-on-surface-variant/70" placeholder="Search projects..." type="text">
+</div>
+</div>
+</header>
+<!-- Canvas -->
+<main class="flex-1 overflow-y-auto p-margin-desktop">
+<div class="max-w-container-max mx-auto">
+<!-- Toolbar Area -->
+<div class="flex justify-between items-end mb-section-gap">
+<div class="flex gap-4">
+<div class="flex flex-col gap-1">
+<label class="font-label-caps text-label-caps text-on-surface-variant">Status Filter</label>
+<select class="bg-surface-container-lowest border-outline-variant rounded text-body-sm font-body-sm text-on-surface py-1.5 pl-3 pr-8 focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer">
+<option>All Projects</option>
+<option>Draft</option>
+<option>Final</option>
+<option>Archived</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-caps text-label-caps text-on-surface-variant">Sort By</label>
+<select class="bg-surface-container-lowest border-outline-variant rounded text-body-sm font-body-sm text-on-surface py-1.5 pl-3 pr-8 focus:border-primary focus:ring-1 focus:ring-primary cursor-pointer">
+<option>Last Edited</option>
+<option>Power (High-Low)</option>
+<option>Alphabetical</option>
+</select>
+</div>
+</div>
+<div class="flex bg-surface-container-lowest border border-outline-variant rounded p-1">
+<button class="p-1 rounded bg-surface-variant text-on-surface flex items-center justify-center"><span class="material-symbols-outlined text-[18px]">grid_view</span></button>
+<button class="p-1 rounded text-on-surface-variant hover:bg-surface-container-low flex items-center justify-center transition-colors"><span class="material-symbols-outlined text-[18px]">format_list_bulleted</span></button>
+</div>
+</div>
+<!-- Simulation Cards Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-gutter">
+<!-- Card 1: Centro Médico Hispánico -->
+<article class="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 flex flex-col hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-shadow duration-200 group relative overflow-hidden">
+<!-- Decorative top accent -->
+<div class="absolute top-0 left-0 w-full h-1 bg-primary"></div>
+<div class="flex justify-between items-start mb-3 mt-1">
+<div>
+<span class="inline-block px-2 py-0.5 rounded-sm bg-surface-container-highest text-on-surface-variant font-label-caps text-[10px] tracking-wider mb-2">Final</span>
+<h3 class="font-title-sm text-title-sm text-on-surface leading-tight mb-1 group-hover:text-primary transition-colors">Centro Médico Hispánico</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Health Solutions Corp.</p>
+</div>
+<button class="text-on-surface-variant hover:text-on-surface p-1 rounded hover:bg-surface-container-low transition-colors"><span class="material-symbols-outlined text-[20px]">more_vert</span></button>
+</div>
+<div class="grid grid-cols-2 gap-2 mb-4 py-3 border-y border-outline-variant/50">
+<div>
+<span class="font-label-caps text-label-caps text-on-surface-variant block mb-0.5">System Size</span>
+<span class="font-data-mono text-data-mono text-primary font-bold">23.56 kWp</span>
+</div>
+<div>
+<span class="font-label-caps text-label-caps text-on-surface-variant block mb-0.5">Panels</span>
+<span class="font-data-mono text-data-mono text-on-surface">54 Modules</span>
+</div>
+</div>
+<div class="mt-auto">
+<p class="font-body-sm text-[12px] text-on-surface-variant mb-4 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">edit_calendar</span>
+                                Edited Oct 24, 2023
+                            </p>
+<div class="flex gap-2 w-full">
+<button class="flex-1 py-1.5 border border-outline-variant rounded text-on-surface font-label-caps text-label-caps hover:bg-surface-container-low transition-colors text-center">Details</button>
+<button class="flex-1 py-1.5 bg-surface-container-high text-primary font-label-caps text-label-caps rounded hover:bg-surface-variant transition-colors text-center flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-[14px]">edit</span>
+                                    Edit
+                                </button>
+</div>
+</div>
+</article>
+<!-- Card 2 -->
+<article class="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 flex flex-col hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-shadow duration-200 group">
+<div class="flex justify-between items-start mb-3">
+<div>
+<span class="inline-block px-2 py-0.5 rounded-sm bg-tertiary-fixed text-on-tertiary-fixed font-label-caps text-[10px] tracking-wider mb-2">Draft</span>
+<h3 class="font-title-sm text-title-sm text-on-surface leading-tight mb-1 group-hover:text-primary transition-colors">Logistics Hub Alpha</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Global Freight Inc.</p>
+</div>
+<button class="text-on-surface-variant hover:text-on-surface p-1 rounded hover:bg-surface-container-low transition-colors"><span class="material-symbols-outlined text-[20px]">more_vert</span></button>
+</div>
+<div class="grid grid-cols-2 gap-2 mb-4 py-3 border-y border-outline-variant/50">
+<div>
+<span class="font-label-caps text-label-caps text-on-surface-variant block mb-0.5">System Size</span>
+<span class="font-data-mono text-data-mono text-on-surface">145.20 kWp</span>
+</div>
+<div>
+<span class="font-label-caps text-label-caps text-on-surface-variant block mb-0.5">Panels</span>
+<span class="font-data-mono text-data-mono text-on-surface">320 Modules</span>
+</div>
+</div>
+<div class="mt-auto">
+<p class="font-body-sm text-[12px] text-on-surface-variant mb-4 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">edit_calendar</span>
+                                Edited Oct 26, 2023
+                            </p>
+<div class="flex gap-2 w-full">
+<button class="flex-1 py-1.5 border border-outline-variant rounded text-on-surface font-label-caps text-label-caps hover:bg-surface-container-low transition-colors text-center">Details</button>
+<button class="flex-1 py-1.5 bg-surface-container-high text-primary font-label-caps text-label-caps rounded hover:bg-surface-variant transition-colors text-center flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-[14px]">edit</span>
+                                    Edit
+                                </button>
+</div>
+</div>
+</article>
+<!-- Card 3 -->
+<article class="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 flex flex-col hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-shadow duration-200 group">
+<div class="flex justify-between items-start mb-3">
+<div>
+<span class="inline-block px-2 py-0.5 rounded-sm bg-surface-container-highest text-on-surface-variant font-label-caps text-[10px] tracking-wider mb-2">Final</span>
+<h3 class="font-title-sm text-title-sm text-on-surface leading-tight mb-1 group-hover:text-primary transition-colors">Residential Array 42</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Smith Household</p>
+</div>
+<button class="text-on-surface-variant hover:text-on-surface p-1 rounded hover:bg-surface-container-low transition-colors"><span class="material-symbols-outlined text-[20px]">more_vert</span></button>
+</div>
+<div class="grid grid-cols-2 gap-2 mb-4 py-3 border-y border-outline-variant/50">
+<div>
+<span class="font-label-caps text-label-caps text-on-surface-variant block mb-0.5">System Size</span>
+<span class="font-data-mono text-data-mono text-on-surface">8.40 kWp</span>
+</div>
+<div>
+<span class="font-label-caps text-label-caps text-on-surface-variant block mb-0.5">Panels</span>
+<span class="font-data-mono text-data-mono text-on-surface">21 Modules</span>
+</div>
+</div>
+<div class="mt-auto">
+<p class="font-body-sm text-[12px] text-on-surface-variant mb-4 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">edit_calendar</span>
+                                Edited Oct 20, 2023
+                            </p>
+<div class="flex gap-2 w-full">
+<button class="flex-1 py-1.5 border border-outline-variant rounded text-on-surface font-label-caps text-label-caps hover:bg-surface-container-low transition-colors text-center">Details</button>
+<button class="flex-1 py-1.5 bg-surface-container-high text-primary font-label-caps text-label-caps rounded hover:bg-surface-variant transition-colors text-center flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-[14px]">edit</span>
+                                    Edit
+                                </button>
+</div>
+</div>
+</article>
+<!-- Card 4 -->
+<article class="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 flex flex-col hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-shadow duration-200 group">
+<div class="flex justify-between items-start mb-3">
+<div>
+<span class="inline-block px-2 py-0.5 rounded-sm bg-surface-container-highest text-on-surface-variant font-label-caps text-[10px] tracking-wider mb-2">Final</span>
+<h3 class="font-title-sm text-title-sm text-on-surface leading-tight mb-1 group-hover:text-primary transition-colors">Tech Campus East</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Innovate LLC</p>
+</div>
+<button class="text-on-surface-variant hover:text-on-surface p-1 rounded hover:bg-surface-container-low transition-colors"><span class="material-symbols-outlined text-[20px]">more_vert</span></button>
+</div>
+<div class="grid grid-cols-2 gap-2 mb-4 py-3 border-y border-outline-variant/50">
+<div>
+<span class="font-label-caps text-label-caps text-on-surface-variant block mb-0.5">System Size</span>
+<span class="font-data-mono text-data-mono text-on-surface">512.80 kWp</span>
+</div>
+<div>
+<span class="font-label-caps text-label-caps text-on-surface-variant block mb-0.5">Panels</span>
+<span class="font-data-mono text-data-mono text-on-surface">1280 Modules</span>
+</div>
+</div>
+<div class="mt-auto">
+<p class="font-body-sm text-[12px] text-on-surface-variant mb-4 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">edit_calendar</span>
+                                Edited Oct 18, 2023
+                            </p>
+<div class="flex gap-2 w-full">
+<button class="flex-1 py-1.5 border border-outline-variant rounded text-on-surface font-label-caps text-label-caps hover:bg-surface-container-low transition-colors text-center">Details</button>
+<button class="flex-1 py-1.5 bg-surface-container-high text-primary font-label-caps text-label-caps rounded hover:bg-surface-variant transition-colors text-center flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-[14px]">edit</span>
+                                    Edit
+                                </button>
+</div>
+</div>
+</article>
+</div>
+</div>
+</main>
+</div>
+
+
+</body></html>
