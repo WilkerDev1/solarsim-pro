@@ -161,60 +161,104 @@ export const SimulatorView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Provincia / Matriz de Radiación</label>
-                <select
-                  value={project.client.province}
-                  onChange={(e) => {
-                    const selected = e.target.value;
-                    updateClient({
-                      province: selected,
-                      customMonthlyHSP: undefined, // Reset to selected province HSP
-                    });
-                    setSolarApiStatus(null);
-                  }}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all cursor-pointer font-semibold"
-                >
-                  {RD_PROVINCES.map((prov) => (
-                    <option key={prov.code} value={prov.name}>
-                      {prov.name} ({prov.avgHSP} HSP/día)
-                    </option>
-                  ))}
-                </select>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Fuente de Radiación Solar</label>
+                <div className="flex bg-slate-200/80 rounded-lg p-1 border border-slate-300/60 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      updateClient({
+                        solarSourceMode: 'province',
+                        customMonthlyHSP: undefined,
+                      });
+                      setSolarApiStatus(null);
+                    }}
+                    className={`flex-1 rounded-md py-1.5 text-[11px] font-semibold transition-all text-center flex items-center justify-center gap-1 cursor-pointer ${
+                      (project.client.solarSourceMode || 'province') === 'province'
+                        ? 'bg-white shadow-xs text-emerald-800 font-bold border border-slate-200'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[15px]">map</span>
+                    Provincia (Offline)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      updateClient({ solarSourceMode: 'gps' });
+                    }}
+                    className={`flex-1 rounded-md py-1.5 text-[11px] font-semibold transition-all text-center flex items-center justify-center gap-1 cursor-pointer ${
+                      project.client.solarSourceMode === 'gps'
+                        ? 'bg-white shadow-xs text-emerald-800 font-bold border border-slate-200'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Globe className="w-3.5 h-3.5" />
+                    GPS Satelital (Online)
+                  </button>
+                </div>
               </div>
 
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="block text-xs font-medium text-slate-600">Coordenadas (Lat, Lng)</label>
+              {/* MODO 1: POR PROVINCIA (OFFLINE) */}
+              {(project.client.solarSourceMode || 'province') === 'province' && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Seleccionar Provincia</label>
+                  <select
+                    value={project.client.province}
+                    onChange={(e) => {
+                      const selected = e.target.value;
+                      updateClient({
+                        province: selected,
+                        customMonthlyHSP: undefined,
+                      });
+                    }}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all cursor-pointer font-semibold"
+                  >
+                    {RD_PROVINCES.map((prov) => (
+                      <option key={prov.code} value={prov.name}>
+                        {prov.name} ({prov.avgHSP} HSP/día)
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <input
-                  type="text"
-                  value={project.client.coordinates || ''}
-                  placeholder="18.4861, -69.9312"
-                  onChange={(e) => updateClient({ coordinates: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={handleFetchSolarApi}
-                  disabled={isFetchingSolar}
-                  className="mt-1.5 w-full text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200 rounded-md py-1 flex items-center justify-center gap-1.5 transition-all"
-                >
-                  {isFetchingSolar ? (
-                    <>
-                      <Loader2 className="w-3 h-3 animate-spin" /> Consultando API Solar NASA...
-                    </>
-                  ) : (
-                    <>
-                      <Globe className="w-3 h-3" /> Obtener Radiación Solar Real (GPS)
-                    </>
+              )}
+
+              {/* MODO 2: GPS SATELITAL (ONLINE) */}
+              {project.client.solarSourceMode === 'gps' && (
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="block text-xs font-medium text-slate-600">Coordenadas (Lat, Lng)</label>
+                  </div>
+                  <input
+                    type="text"
+                    value={project.client.coordinates || ''}
+                    placeholder="18.4861, -69.9312"
+                    onChange={(e) => updateClient({ coordinates: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleFetchSolarApi}
+                    disabled={isFetchingSolar}
+                    className="mt-2 w-full text-[11px] font-semibold text-emerald-800 hover:text-emerald-900 bg-emerald-100/70 hover:bg-emerald-200/80 border border-emerald-300 rounded-md py-1.5 flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                  >
+                    {isFetchingSolar ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Consultando Satélites NASA/GPS...
+                      </>
+                    ) : (
+                      <>
+                        <Globe className="w-3.5 h-3.5" /> Obtener Radiación Satelital Online
+                      </>
+                    )}
+                  </button>
+                  {solarApiStatus && (
+                    <p className="text-[10px] font-medium text-emerald-700 mt-1 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" /> {solarApiStatus}
+                    </p>
                   )}
-                </button>
-                {solarApiStatus && (
-                  <p className="text-[10px] font-medium text-emerald-700 mt-1 flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" /> {solarApiStatus}
-                  </p>
-                )}
-              </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">ID del Proyecto</label>

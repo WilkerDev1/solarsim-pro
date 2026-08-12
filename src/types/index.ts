@@ -3,6 +3,7 @@ export interface ClientInfo {
   company?: string;
   location: string;
   province: string;
+  solarSourceMode?: 'province' | 'gps'; // Selection mode for solar radiation
   coordinates?: string; // e.g. "18.4861, -69.9312"
   customMonthlyHSP?: number[]; // Dynamic 12-month solar radiation vector from GPS satellite API
   projectId: string;
