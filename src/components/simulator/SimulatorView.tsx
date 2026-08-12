@@ -15,17 +15,11 @@ import {
   ReferenceLine,
 } from 'recharts';
 import {
-  User,
-  Zap,
-  Cpu,
-  Sliders,
-  DollarSign,
   Leaf,
   TrendingUp,
   BarChart2,
   Table as TableIcon,
   Sparkles,
-  RotateCcw,
 } from 'lucide-react';
 
 export const SimulatorView: React.FC = () => {
@@ -78,29 +72,29 @@ export const SimulatorView: React.FC = () => {
       <aside className="w-[340px] bg-white border-r border-outline-variant/60 flex flex-col shrink-0 h-full overflow-y-auto shadow-sm z-10">
         <div className="p-6 border-b border-outline-variant/40 bg-slate-50/50 flex justify-between items-center">
           <div>
-            <h2 className="font-headline-md text-headline-md text-on-surface mb-0.5">Parameters</h2>
-            <p className="font-body-sm text-body-sm text-secondary">Configure system constraints</p>
+            <h2 className="font-headline-md text-headline-md text-on-surface mb-0.5">Parámetros</h2>
+            <p className="font-body-sm text-body-sm text-secondary">Configurar restricciones del sistema</p>
           </div>
           <select
             value={project.status}
             onChange={(e) => setProjectStatus(project.id, e.target.value as any)}
-            className="text-xs font-semibold px-2.5 py-1 rounded-md bg-white border border-outline-variant text-on-surface focus:ring-1 focus:ring-primary shadow-xs"
+            className="text-xs font-semibold px-2.5 py-1 rounded-md bg-white border border-outline-variant text-on-surface focus:ring-1 focus:ring-primary shadow-xs cursor-pointer"
           >
-            <option value="Draft">Draft</option>
-            <option value="Final">Final</option>
-            <option value="Archived">Archived</option>
+            <option value="Draft">Borrador</option>
+            <option value="Final">Finalizado</option>
+            <option value="Archived">Archivado</option>
           </select>
         </div>
 
         <div className="p-6 space-y-6">
-          {/* SECTION 1: Project & Client (Imagen 1) */}
+          {/* SECCIÓN 1: Proyecto y Cliente (Imagen 1) */}
           <section className="space-y-3">
             <h3 className="font-label-caps text-label-caps text-primary mb-3 flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
-              <span className="material-symbols-outlined text-[16px]">person</span> Project & Client
+              <span className="material-symbols-outlined text-[16px]">person</span> Proyecto y Cliente
             </h3>
             <div className="space-y-3">
               <div>
-                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Client Name</label>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Nombre del Cliente</label>
                 <input
                   type="text"
                   value={project.client.name}
@@ -110,7 +104,7 @@ export const SimulatorView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Location / Province</label>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Ubicación / Provincia</label>
                 <input
                   type="text"
                   value={project.client.location}
@@ -120,7 +114,7 @@ export const SimulatorView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Coordinates (Lat, Lng)</label>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Coordenadas (Lat, Lng)</label>
                 <input
                   type="text"
                   value={project.client.coordinates || ''}
@@ -131,7 +125,7 @@ export const SimulatorView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Project ID</label>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">ID del Proyecto</label>
                 <input
                   type="text"
                   value={project.client.projectId}
@@ -142,14 +136,14 @@ export const SimulatorView: React.FC = () => {
             </div>
           </section>
 
-          {/* SECTION 2: Utility & Rates (Imagen 2) */}
+          {/* SECCIÓN 2: Tarifas y Distribuidora (Imagen 2) */}
           <section className="space-y-3 pt-2 border-t border-outline-variant/30">
             <h3 className="font-label-caps text-label-caps text-primary mb-3 flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
-              <span className="material-symbols-outlined text-[16px]">payments</span> Utility & Rates
+              <span className="material-symbols-outlined text-[16px]">payments</span> Tarifas y Distribuidora
             </h3>
             <div className="space-y-3">
               <div>
-                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Price per kWh (USD)</label>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Precio por kWh ($ USD)</label>
                 <input
                   type="number"
                   step="0.01"
@@ -160,7 +154,7 @@ export const SimulatorView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Distribution Company</label>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Empresa Distribuidora</label>
                 <select
                   value={project.rates.distributor || 'EDEESTE'}
                   onChange={(e) => updateRates({ distributor: e.target.value as any })}
@@ -174,7 +168,7 @@ export const SimulatorView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Target Coverage (%)</label>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Cobertura Objetivo (%)</label>
                 <input
                   type="number"
                   step="1"
@@ -185,7 +179,7 @@ export const SimulatorView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Tariff Type</label>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Tipo de Tarifa</label>
                 <select
                   value={project.rates.tariffCode || 'BTS1'}
                   onChange={(e) => updateRates({ tariffCode: e.target.value as any })}
@@ -199,7 +193,7 @@ export const SimulatorView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Grid Export Fee (%) (SIE-007-2026-REG)</label>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Cargo Exportación Red (%) (SIE-007-2026-REG)</label>
                 <input
                   type="number"
                   step="1"
@@ -211,13 +205,13 @@ export const SimulatorView: React.FC = () => {
             </div>
           </section>
 
-          {/* SECTION 3: Equipment (Imagen 3) */}
+          {/* SECCIÓN 3: Equipamiento (Imagen 3) */}
           <section className="space-y-3 pt-2 border-t border-outline-variant/30">
             <h3 className="font-label-caps text-label-caps text-primary mb-3 flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
-              <span className="material-symbols-outlined text-[16px]">solar_power</span> Equipment
+              <span className="material-symbols-outlined text-[16px]">solar_power</span> Equipamiento
             </h3>
 
-            {/* Simple / Detailed Pill Switcher */}
+            {/* Selector de modo Simple / Detallado */}
             <div className="flex bg-surface-container rounded-lg p-1 mb-4 border border-outline-variant/40">
               <button
                 type="button"
@@ -239,13 +233,13 @@ export const SimulatorView: React.FC = () => {
                     : 'text-secondary hover:text-on-surface'
                 }`}
               >
-                Detailed
+                Detallado
               </button>
             </div>
 
             <div className="space-y-3">
               <div>
-                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Panel Power (W)</label>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Potencia del Panel (W)</label>
                 <input
                   type="number"
                   step="5"
@@ -255,11 +249,49 @@ export const SimulatorView: React.FC = () => {
                 />
               </div>
 
-              {/* Auto-Calculate Panels Toggle */}
+              {/* CAMPOS ADICIONALES MODO DETALLADO (AVANZADO) */}
+              {project.specs.isDetailed && (
+                <>
+                  <div>
+                    <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Eficiencia del Panel (%)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={project.specs.panelEfficiency || 21.8}
+                      onChange={(e) => updateSpecs({ panelEfficiency: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Coeficiente de Temp. (%/°C)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={project.specs.tempCoeff || -0.35}
+                      onChange={(e) => updateSpecs({ tempCoeff: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Potencia del Inversor (kW AC)</label>
+                    <input
+                      type="number"
+                      step="1"
+                      value={project.specs.inverterPowerKW}
+                      onChange={(e) => updateSpecs({ inverterPowerKW: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Auto-Calcular Paneles Toggle */}
               <div className="pb-1">
                 <label className="flex items-center justify-between cursor-pointer group">
                   <span className="font-body-sm text-body-sm text-on-surface-variant group-hover:text-on-surface transition-colors">
-                    Auto-Calculate Panels
+                    Auto-Calcular Paneles
                   </span>
                   <div className="relative inline-flex items-center cursor-pointer">
                     <input
@@ -275,7 +307,7 @@ export const SimulatorView: React.FC = () => {
 
               <div>
                 <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">
-                  {project.specs.autoCalculatePanels ? 'Quantity (Auto-calculated)' : 'Quantity'}
+                  {project.specs.autoCalculatePanels ? 'Cantidad de Paneles (Auto-calculada)' : 'Cantidad de Paneles'}
                 </label>
                 <input
                   type="number"
@@ -290,7 +322,7 @@ export const SimulatorView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">System Price per Watt (USD/W)</label>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Precio del Sistema por Vatio ($ USD/Wp)</label>
                 <input
                   type="number"
                   step="0.01"
@@ -304,11 +336,11 @@ export const SimulatorView: React.FC = () => {
                 />
               </div>
 
-              {/* Battery Storage Toggle */}
+              {/* Almacenamiento (Batería) Toggle */}
               <div className="pt-1">
                 <label className="flex items-center justify-between cursor-pointer group">
                   <span className="font-body-sm text-body-sm text-on-surface-variant group-hover:text-on-surface transition-colors">
-                    Battery Storage
+                    Almacenamiento (Batería)
                   </span>
                   <div className="relative inline-flex items-center cursor-pointer">
                     <input
@@ -323,19 +355,33 @@ export const SimulatorView: React.FC = () => {
               </div>
 
               {project.specs.hasBattery && (
-                <div>
-                  <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Battery Capacity (kWh)</label>
-                  <input
-                    type="number"
-                    step="1"
-                    value={project.specs.batteryCapacityKWh}
-                    onChange={(e) => updateSpecs({ batteryCapacityKWh: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
-                  />
+                <div className="space-y-2">
+                  <div>
+                    <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Capacidad de Batería (kWh)</label>
+                    <input
+                      type="number"
+                      step="1"
+                      value={project.specs.batteryCapacityKWh}
+                      onChange={(e) => updateSpecs({ batteryCapacityKWh: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
+                    />
+                  </div>
+                  {project.specs.isDetailed && (
+                    <div>
+                      <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Profundidad de Descarga (DOD %)</label>
+                      <input
+                        type="number"
+                        step="1"
+                        value={project.specs.batteryDOD || 80}
+                        onChange={(e) => updateSpecs({ batteryDOD: parseFloat(e.target.value) || 0 })}
+                        className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Live Preview Card (Imagen 3 Bottom) */}
+              {/* Tarjeta de Vista Previa en Vivo (Imagen 3 Bottom) */}
               <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg space-y-1.5">
                 <div className="flex justify-between items-center">
                   <span className="text-[11px] font-medium text-secondary">Potencia Total DC:</span>
@@ -351,15 +397,15 @@ export const SimulatorView: React.FC = () => {
             </div>
           </section>
 
-          {/* SECTION 4: Financials & Technical & Losses (Imagen 4) */}
+          {/* SECCIÓN 4: Finanzas e Incentivos (Imagen 4 Top) */}
           <section className="space-y-3 pt-2 border-t border-outline-variant/30">
             <h3 className="font-label-caps text-label-caps text-primary mb-3 flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
-              <span className="material-symbols-outlined text-[16px]">account_balance</span> Financials
+              <span className="material-symbols-outlined text-[16px]">account_balance</span> Finanzas e Incentivos
             </h3>
             <div className="space-y-3">
               <label className="flex items-center justify-between cursor-pointer group">
                 <span className="font-body-sm text-body-sm text-on-surface-variant group-hover:text-on-surface transition-colors">
-                  Apply Ley 57-07 (40%)
+                  Aplicar Ley 57-07 (Crédito ISR 40%)
                 </span>
                 <div className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -380,7 +426,7 @@ export const SimulatorView: React.FC = () => {
 
               <label className="flex items-center justify-between cursor-pointer group">
                 <span className="font-body-sm text-body-sm text-on-surface-variant group-hover:text-on-surface transition-colors">
-                  Exempt ITBIS (18%)
+                  Exoneración de ITBIS (18%)
                 </span>
                 <div className="relative inline-flex items-center cursor-pointer">
                   <input
@@ -394,7 +440,7 @@ export const SimulatorView: React.FC = () => {
               </label>
 
               <div>
-                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Projection Years</label>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Años de Proyección</label>
                 <input
                   type="number"
                   step="1"
@@ -405,7 +451,7 @@ export const SimulatorView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Discount Rate (%)</label>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Tasa de Descuento (%)</label>
                 <input
                   type="number"
                   step="0.1"
@@ -417,14 +463,14 @@ export const SimulatorView: React.FC = () => {
             </div>
           </section>
 
-          {/* SECTION 5: Technical & Losses (Imagen 4 Bottom) */}
+          {/* SECCIÓN 5: Parámetros Técnicos y Pérdidas (Imagen 4 Bottom) */}
           <section className="space-y-3 pt-2 border-t border-outline-variant/30">
             <h3 className="font-label-caps text-label-caps text-primary mb-3 flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
-              <span className="material-symbols-outlined text-[16px]">settings_suggest</span> Technical & Losses
+              <span className="material-symbols-outlined text-[16px]">settings_suggest</span> Parámetros Técnicos y Pérdidas
             </h3>
             <div className="space-y-3">
               <div>
-                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">System Losses (%)</label>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Pérdidas del Sistema (%)</label>
                 <input
                   type="number"
                   step="0.5"
@@ -435,7 +481,7 @@ export const SimulatorView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Annual Degradation (%)</label>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Degradación Anual (%)</label>
                 <input
                   type="number"
                   step="0.1"
@@ -446,7 +492,7 @@ export const SimulatorView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">CO2 Factor (kg/kWh)</label>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Factor CO₂ (kg/kWh)</label>
                 <input
                   type="number"
                   step="0.001"
@@ -462,13 +508,12 @@ export const SimulatorView: React.FC = () => {
         <div className="mt-auto p-6 border-t border-outline-variant/40 bg-surface-container-low/50">
           <button
             onClick={() => {
-              // Trigger explicit calculation update refresh if needed
               useSimulationStore.setState({ activeProjectId: project.id });
             }}
-            className="w-full bg-surface-container-lowest border border-primary text-primary hover:bg-surface-container transition-colors py-2 rounded-lg font-title-sm text-title-sm flex items-center justify-center gap-2 font-semibold shadow-xs"
+            className="w-full bg-surface-container-lowest border border-primary text-primary hover:bg-surface-container transition-colors py-2 rounded-lg font-title-sm text-title-sm flex items-center justify-center gap-2 font-semibold shadow-xs cursor-pointer"
           >
             <span className="material-symbols-outlined text-[18px]">refresh</span>
-            Update Simulation
+            Actualizar Simulación
           </button>
         </div>
       </aside>
@@ -486,7 +531,7 @@ export const SimulatorView: React.FC = () => {
               {summary.systemCapacityKWp} <span className="text-xs text-secondary">kWp</span>
             </span>
             <span className="text-[11px] text-secondary">
-              {project.specs.panelCount} panels × {project.specs.panelPowerW}W
+              {project.specs.panelCount} módulos × {project.specs.panelPowerW}W
             </span>
           </div>
 
