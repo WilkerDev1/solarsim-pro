@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { RD_PROVINCES } from '../../data/rdProvinces';
+import { fetchSolarRadiationByCoordinates } from '../../services/solarRadiationApi';
 import {
   BarChart,
   Bar,
@@ -12,6 +13,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
+import { Globe, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 
 export const SimulatorView: React.FC = () => {
   const {
@@ -29,6 +31,8 @@ export const SimulatorView: React.FC = () => {
   const summary = getFinancialSummary();
 
   const [activeMainTab, setActiveMainTab] = useState<'energia' | 'retorno'>('energia');
+  const [isFetchingSolar, setIsFetchingSolar] = useState<boolean>(false);
+  const [solarApiStatus, setSolarApiStatus] = useState<string | null>(null);
 
   // Auto-calculate panels logic when autoCalculatePanels is ON
   useEffect(() => {
@@ -39,7 +43,7 @@ export const SimulatorView: React.FC = () => {
       
       // Estimated annual output per panel W based on province HSP
       const provinceObj = RD_PROVINCES.find(p => p.name === project.client.province) || RD_PROVINCES[0];
-      const avgHsp = provinceObj.avgHSP || 5.25;
+      const avgHsp = provinceObj.avgHSP || 4.91;
       const annualOutputPerWatt = avgHsp * 365 * (1 - (project.specs.systemLosses / 100));
       const neededTotalW = targetAnnualKWh / (annualOutputPerWatt / 1000);
       const calculatedPanels = Math.max(1, Math.ceil(neededTotalW / (project.specs.panelPowerW || 450)));
@@ -56,6 +60,30 @@ export const SimulatorView: React.FC = () => {
     project.client.province,
     project.monthlyConsumption,
   ]);
+
+  // Handler to fetch real-time solar radiation from GPS coordinates via API
+  const handleFetchSolarApi = async () => {
+    const coords = project.client.coordinates || '18.4861, -69.9312';
+    const parts = coords.split(',').map((s) => parseFloat(s.trim()));
+    
+    if (parts.length < 2 || isNaN(parts[0]) || isNaN(parts[1])) {
+      setSolarApiStatus('Error: Ingresa coordenadas válidas ej: 18.4861, -69.9312');
+      return;
+    }
+
+    setIsFetchingSolar(true);
+    setSolarApiStatus(null);
+
+    const res = await fetchSolarRadiationByCoordinates(parts[0], parts[1]);
+    setIsFetchingSolar(false);
+
+    if (res.success) {
+      setSolarApiStatus(` Radiación solar obtenida (${res.avgHSP} kWh/m²/día promedio)`);
+      // Update simulation state if needed
+    } else {
+      setSolarApiStatus(`⚠️ ${res.error}`);
+    }
+  };
 
   // Averages for Resumen de Ahorro Anual table
   const cf25 = summary.cashFlow25Years;
@@ -106,7 +134,7 @@ export const SimulatorView: React.FC = () => {
         </div>
 
         <div className="p-5 space-y-6">
-          {/* SECCIÓN 1: Proyecto y Cliente (Imagen 1) */}
+          {/* SECCIÓN 1: Proyecto y Cliente */}
           <section className="space-y-3">
             <h3 className="text-emerald-700 flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
               <span className="material-symbols-outlined text-[16px]">person</span> Proyecto y Cliente
@@ -133,7 +161,9 @@ export const SimulatorView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Coordenadas (Lat, Lng)</label>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-xs font-medium text-slate-600">Coordenadas (Lat, Lng)</label>
+                </div>
                 <input
                   type="text"
                   value={project.client.coordinates || ''}
@@ -141,6 +171,27 @@ export const SimulatorView: React.FC = () => {
                   onChange={(e) => updateClient({ coordinates: e.target.value })}
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
                 />
+                <button
+                  type="button"
+                  onClick={handleFetchSolarApi}
+                  disabled={isFetchingSolar}
+                  className="mt-1.5 w-full text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200 rounded-md py-1 flex items-center justify-center gap-1.5 transition-all"
+                >
+                  {isFetchingSolar ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" /> Consultando API Solar NASA...
+                    </>
+                  ) : (
+                    <>
+                      <Globe className="w-3 h-3" /> Obtener Radiación Solar Real (GPS)
+                    </>
+                  )}
+                </button>
+                {solarApiStatus && (
+                  <p className="text-[10px] font-medium text-emerald-700 mt-1 flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" /> {solarApiStatus}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -155,7 +206,7 @@ export const SimulatorView: React.FC = () => {
             </div>
           </section>
 
-          {/* SECCIÓN 2: Tarifas y Distribuidora (Imagen 2) */}
+          {/* SECCIÓN 2: Tarifas y Distribuidora */}
           <section className="space-y-3 pt-2 border-t border-slate-200">
             <h3 className="text-emerald-700 flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
               <span className="material-symbols-outlined text-[16px]">payments</span> Tarifas y Distribuidora
@@ -165,7 +216,7 @@ export const SimulatorView: React.FC = () => {
                 <label className="block text-xs font-medium text-slate-600 mb-1">Precio por kWh ($ USD)</label>
                 <input
                   type="number"
-                  step="0.01"
+                  step="0.001"
                   value={project.rates.energyCostPerKWh}
                   onChange={(e) => updateRates({ energyCostPerKWh: parseFloat(e.target.value) || 0 })}
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
@@ -175,7 +226,7 @@ export const SimulatorView: React.FC = () => {
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Empresa Distribuidora</label>
                 <select
-                  value={project.rates.distributor || 'EDEESTE'}
+                  value={project.rates.distributor || 'EDESUR'}
                   onChange={(e) => updateRates({ distributor: e.target.value as any })}
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all cursor-pointer"
                 >
@@ -200,7 +251,7 @@ export const SimulatorView: React.FC = () => {
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Tipo de Tarifa</label>
                 <select
-                  value={project.rates.tariffCode || 'BTS1'}
+                  value={project.rates.tariffCode || 'BTS2'}
                   onChange={(e) => updateRates({ tariffCode: e.target.value as any })}
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all cursor-pointer"
                 >
@@ -224,7 +275,7 @@ export const SimulatorView: React.FC = () => {
             </div>
           </section>
 
-          {/* SECCIÓN 3: Equipamiento (Imagen 3) */}
+          {/* SECCIÓN 3: Equipamiento */}
           <section className="space-y-3 pt-2 border-t border-slate-200">
             <h3 className="text-emerald-700 flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
               <span className="material-symbols-outlined text-[16px]">solar_power</span> Equipamiento
@@ -377,7 +428,18 @@ export const SimulatorView: React.FC = () => {
               {project.specs.hasBattery && (
                 <div className="space-y-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
                   <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Capacidad de Batería (kWh)</label>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Cantidad de Baterías</label>
+                    <input
+                      type="number"
+                      step="1"
+                      value={project.specs.batteryCount || 3}
+                      onChange={(e) => updateSpecs({ batteryCount: parseInt(e.target.value) || 1 })}
+                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Capacidad Total Batería (kWh)</label>
                     <input
                       type="number"
                       step="1"
@@ -464,6 +526,20 @@ export const SimulatorView: React.FC = () => {
                 </div>
               </label>
 
+              {project.financials.applyLey5707 && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Monto Crédito Ley 57-07 ($ USD)</label>
+                  <input
+                    type="number"
+                    step="1"
+                    placeholder={`Calculado: $${summary.ley5707CreditUSD}`}
+                    value={project.financials.customLey5707CreditUSD ?? ''}
+                    onChange={(e) => updateFinancials({ customLey5707CreditUSD: e.target.value ? parseFloat(e.target.value) : undefined })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                  />
+                </div>
+              )}
+
               <label className="flex items-center justify-between cursor-pointer group">
                 <span className="text-xs font-medium text-slate-600 group-hover:text-slate-900 transition-colors">
                   Exoneración de ITBIS (18%)
@@ -478,6 +554,20 @@ export const SimulatorView: React.FC = () => {
                   <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-700"></div>
                 </div>
               </label>
+
+              {project.financials.applyITBISExemption && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Monto ITBIS Exonerado ($ USD)</label>
+                  <input
+                    type="number"
+                    step="1"
+                    placeholder={`Calculado: $${summary.itbisSavedUSD}`}
+                    value={project.financials.customITBISSavedUSD ?? ''}
+                    onChange={(e) => updateFinancials({ customITBISSavedUSD: e.target.value ? parseFloat(e.target.value) : undefined })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Años de Proyección</label>
@@ -819,7 +909,7 @@ export const SimulatorView: React.FC = () => {
                         <td className="py-2.5 px-4 text-right font-medium">{row.productionKWh.toFixed(1)}</td>
                         <td className="py-2.5 px-4 text-right font-medium">{row.solarSelfConsumedKWh.toFixed(1)}</td>
                         <td className={`py-2.5 px-4 text-right font-bold ${monthCoverage >= 100 ? 'text-emerald-700' : 'text-slate-800'}`}>
-                          {monthCoverage.toFixed(2)}%
+                          {monthCoverage.toFixed(1)}%
                         </td>
                       </tr>
                     );
@@ -828,10 +918,10 @@ export const SimulatorView: React.FC = () => {
                 <tfoot className="bg-[#dbeafe] text-slate-900 font-bold border-t-2 border-slate-300 text-xs font-mono">
                   <tr>
                     <td className="py-3 px-4 font-sans">TOTAL</td>
-                    <td className="py-3 px-4 text-right">{totalConsumptionKWh.toFixed(1)}</td>
-                    <td className="py-3 px-4 text-right">{totalProductionKWh.toFixed(1)}</td>
-                    <td className="py-3 px-4 text-right">{totalSavingsKWh.toFixed(1)}</td>
-                    <td className="py-3 px-4 text-right text-emerald-800">{avgCoveragePct.toFixed(2)}%</td>
+                    <td className="py-3 px-4 text-right">{totalConsumptionKWh.toLocaleString()} kWh</td>
+                    <td className="py-3 px-4 text-right">{totalProductionKWh.toLocaleString()} kWh</td>
+                    <td className="py-3 px-4 text-right">{totalSavingsKWh.toLocaleString()} kWh</td>
+                    <td className="py-3 px-4 text-right text-emerald-800">{avgCoveragePct.toFixed(1)}%</td>
                   </tr>
                 </tfoot>
               </table>
@@ -894,7 +984,7 @@ export const SimulatorView: React.FC = () => {
                     <td className="py-2.5 px-4 text-slate-500">Tasa estándar fabricante</td>
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-800">Precio actual kWh ({project.rates.distributor || 'EDEESTE'})</td>
+                    <td className="py-2.5 px-4 font-semibold text-slate-800">Precio actual kWh ({project.rates.distributor || 'EDESUR'})</td>
                     <td className="py-2.5 px-4 text-right font-mono font-bold">${project.rates.energyCostPerKWh} USD/kWh</td>
                     <td className="py-2.5 px-4 text-slate-500">Estimado según tarifa cliente</td>
                   </tr>
@@ -1101,7 +1191,7 @@ export const SimulatorView: React.FC = () => {
                   </tr>
                   <tr>
                     <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">Precio por Watt instalado</td>
-                    <td className="py-2.5 px-4 text-right font-bold text-emerald-700">${(project.specs.pricePerWattUSD || project.financials.pricePerWattUSD).toFixed(2)}</td>
+                    <td className="py-2.5 px-4 text-right font-bold text-emerald-700">${(project.specs.pricePerWattUSD || project.financials.pricePerWattUSD).toFixed(2)} USD/W</td>
                     <td className="py-2.5 px-4 font-sans text-slate-500 text-[11px]">Competitividad vs mercado</td>
                   </tr>
                 </tbody>

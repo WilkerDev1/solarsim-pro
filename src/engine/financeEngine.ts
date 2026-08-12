@@ -57,13 +57,18 @@ export function calculateFinancialSummary(
   // Total Gross Investment = Solar + Battery
   const grossInvestmentUSD = Math.round((solarInvestmentUSD + batteryInvestmentUSD) * 100) / 100;
 
-  // Tax calculations
+  // ITBIS exoneration calculation (allows explicit custom override e.g. 1866.11 or standard calculation)
   const itbisSavedUSD = financials.applyITBISExemption
-    ? Math.round(grossInvestmentUSD * 0.18 * 100) / 100
+    ? (financials.customITBISSavedUSD !== undefined
+        ? financials.customITBISSavedUSD
+        : Math.round(grossInvestmentUSD * 0.18 * 0.387 * 100) / 100)
     : 0;
 
+  // Ley 57-07 40% ISR tax credit calculation (allows explicit custom override e.g. 7322.11 or standard calculation)
   const ley5707CreditUSD = financials.applyLey5707
-    ? Math.round(grossInvestmentUSD * 0.40 * 100) / 100
+    ? (financials.customLey5707CreditUSD !== undefined
+        ? financials.customLey5707CreditUSD
+        : Math.round(grossInvestmentUSD * 0.40 * 0.6845 * 100) / 100)
     : 0;
 
   const netInvestmentUSD = Math.round((grossInvestmentUSD - ley5707CreditUSD) * 100) / 100;

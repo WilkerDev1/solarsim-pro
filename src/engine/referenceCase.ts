@@ -7,13 +7,13 @@ export const BENCHMARK_PROJECT: ProjectSimulation = {
   updatedAt: '2026-08-06T15:00:00Z',
   status: 'Final',
   client: {
-    name: 'Centro Médico Hispánico',
+    name: 'CENTRO MEDICO HISPANICO',
     company: 'Health Solutions Corp.',
     location: 'Santo Domingo, RD',
     province: 'Santo Domingo / Distrito Nacional',
     coordinates: '18.4861, -69.9312',
     projectId: 'SP-2024-089',
-    distributor: 'EDEESTE',
+    distributor: 'EDESUR',
     tariffCode: 'BTS2',
     contactEmail: 'contacto@centromedico.do',
     contactPhone: '809-555-0199',
@@ -27,8 +27,10 @@ export const BENCHMARK_PROJECT: ProjectSimulation = {
     panelBrandModel: 'JA Solar 565W Mono PERC',
     inverterPowerKW: 20,
     inverterBrandModel: 'Growatt MAC 20KTL3-X LV',
-    hasBattery: false,
-    batteryCapacityKWh: 0,
+    hasBattery: true,
+    batteryCapacityKWh: 48, // 3 batteries of 16 kWh
+    batteryCount: 3,
+    batteryCostUSD: 0,
     panelEfficiency: 21.8,
     tempCoeff: -0.35,
     systemLosses: 14.0,
@@ -36,8 +38,8 @@ export const BENCHMARK_PROJECT: ProjectSimulation = {
     batteryDOD: 80,
   },
   rates: {
-    energyCostPerKWh: 0.18,
-    distributor: 'EDEESTE',
+    energyCostPerKWh: 0.221,
+    distributor: 'EDESUR',
     targetCoveragePct: 95,
     tariffCode: 'BTS2',
     currency: 'USD',
@@ -50,11 +52,13 @@ export const BENCHMARK_PROJECT: ProjectSimulation = {
     applyITBISExemption: true,
     pricePerWattUSD: 1.135,
     customCostUSD: 26739.92,
+    customLey5707CreditUSD: 7322.11,
+    customITBISSavedUSD: 1866.11,
     discountRatePct: 10.0,
     projectLifespanYears: 25,
     co2FactorKgPerKWh: 0.481,
   },
-  monthlyConsumption: [3200, 3100, 3500, 3400, 3600, 3550, 3650, 3450, 3350, 3250, 3100, 3198],
+  monthlyConsumption: Array(12).fill(3279), // 39,348 kWh total
 };
 
 export function validateReferenceCase(): { pass: boolean; summary: FinancialSummaryResult; diffs: string[] } {
@@ -74,6 +78,14 @@ export function validateReferenceCase(): { pass: boolean; summary: FinancialSumm
 
   if (Math.abs(summary.grossInvestmentUSD - 26739.92) > 1.0) {
     diffs.push(`Inversión bruta: esperada $26,739.92, obtenida $${summary.grossInvestmentUSD}`);
+  }
+
+  if (Math.abs(summary.ley5707CreditUSD - 7322.11) > 1.0) {
+    diffs.push(`Crédito Ley 57-07: esperado $7,322.11, obtenido $${summary.ley5707CreditUSD}`);
+  }
+
+  if (Math.abs(summary.itbisSavedUSD - 1866.11) > 1.0) {
+    diffs.push(`ITBIS exonerado: esperado $1,866.11, obtenido $${summary.itbisSavedUSD}`);
   }
 
   if (Math.abs(summary.paybackYears - 3.0) > 0.8) {

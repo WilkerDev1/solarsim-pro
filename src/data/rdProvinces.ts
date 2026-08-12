@@ -9,8 +9,8 @@ export const RD_PROVINCES: ProvinceHSP[] = [
   {
     name: 'Santo Domingo / Distrito Nacional',
     code: 'SD',
-    monthlyHSP: [4.9, 5.2, 5.6, 5.8, 5.5, 5.6, 5.7, 5.6, 5.2, 4.8, 4.6, 4.7],
-    avgHSP: 5.27,
+    monthlyHSP: [4.54, 4.91, 5.25, 5.30, 5.17, 5.28, 5.20, 4.78, 4.75, 4.79, 4.54, 4.41],
+    avgHSP: 4.91,
   },
   {
     name: 'Santiago',

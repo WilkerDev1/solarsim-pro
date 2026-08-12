@@ -22,6 +22,7 @@ export interface SystemSpecs {
   inverterBrandModel?: string;
   hasBattery: boolean;
   batteryCapacityKWh: number;
+  batteryCount?: number;         // e.g. 3 batteries of 16 kWh
   batteryCostUSD?: number;       // Total battery cost in USD e.g. 3500
   batteryBrandModel?: string;
   // Detailed params
@@ -48,6 +49,8 @@ export interface FinancialParams {
   applyITBISExemption: boolean; // 100% ITBIS exoneration
   pricePerWattUSD: number;       // USD per Wp e.g. 1.13
   customCostUSD?: number;        // Direct cost override
+  customLey5707CreditUSD?: number; // Explicit override for DGII 40% credit (e.g. 7322.11)
+  customITBISSavedUSD?: number;    // Explicit override for ITBIS 18% saved (e.g. 1866.11)
   discountRatePct: number;       // % e.g. 10.0
   projectLifespanYears: number;  // e.g. 25
   co2FactorKgPerKWh: number;     // kg CO2 per kWh e.g. 0.481
