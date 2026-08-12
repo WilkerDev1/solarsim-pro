@@ -8,8 +8,10 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
   Cell,
+  LabelList,
 } from 'recharts';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -265,19 +267,37 @@ export const PDFProposalView: React.FC = () => {
                 <div className="px-10 py-8 flex-1 flex flex-col gap-8">
                   {/* Chart Section */}
                   <div className="space-y-4">
-                    <h2 className="text-lg font-semibold text-gray-800 border-b border-gray-100 pb-2">
-                      Evolución Mensual de Energía
-                    </h2>
-                    <div className="w-full bg-gray-50/70 border border-gray-200 rounded-xl p-4 h-[280px]">
+                    <div className="flex justify-between items-center border-b border-gray-100 pb-2">
+                      <h2 className="text-lg font-semibold text-gray-800">
+                        Evolución Mensual de Energía
+                      </h2>
+                      <div className="flex items-center gap-4 text-xs font-semibold">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-3 h-3 rounded-xs bg-[#14532d]"></span>
+                          <span className="text-slate-700">Consumo (kWh)</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-3 h-3 rounded-xs bg-[#22c55e]"></span>
+                          <span className="text-slate-700">Producción Solar (kWh)</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="w-full bg-gray-50/70 border border-gray-200 rounded-xl p-4 h-[300px]">
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={summary.monthlyBreakdown} margin={{ top: 10, right: 10, left: 0, bottom: 15 }}>
+                        <BarChart data={summary.monthlyBreakdown} margin={{ top: 20, right: 10, left: 0, bottom: 15 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                           <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#475569' }} />
                           <YAxis tick={{ fontSize: 10, fill: '#475569' }} />
-                          <Tooltip formatter={(val: number) => [`${val.toLocaleString()} kWh`, '']} />
-                          <Bar dataKey="consumptionKWh" name="Consumo" fill="#14532d" radius={[2, 2, 0, 0]} />
-                          <Bar dataKey="productionKWh" name="Producción" fill="#22c55e" radius={[2, 2, 0, 0]} />
-                          <Bar dataKey="solarSelfConsumedKWh" name="Ahorro" fill="#bbf7d0" radius={[2, 2, 0, 0]} />
+                          <Tooltip formatter={(val: number) => [`${Math.round(val).toLocaleString()} kWh`, '']} />
+                          <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '11px', fontWeight: '600', paddingTop: '0px' }} />
+                          
+                          <Bar dataKey="consumptionKWh" name="Consumo (kWh)" fill="#14532d" radius={[3, 3, 0, 0]}>
+                            <LabelList dataKey="consumptionKWh" position="top" style={{ fontSize: '8px', fill: '#14532d', fontWeight: 'bold' }} formatter={(val: number) => Math.round(val)} />
+                          </Bar>
+                          <Bar dataKey="productionKWh" name="Producción Solar (kWh)" fill="#22c55e" radius={[3, 3, 0, 0]}>
+                            <LabelList dataKey="productionKWh" position="top" style={{ fontSize: '8px', fill: '#15803d', fontWeight: 'bold' }} formatter={(val: number) => Math.round(val)} />
+                          </Bar>
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
