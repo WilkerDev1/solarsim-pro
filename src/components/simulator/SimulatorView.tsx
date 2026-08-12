@@ -119,7 +119,7 @@ export const SimulatorView: React.FC = () => {
   });
 
   return (
-    <div className="flex-1 flex overflow-hidden w-full h-[calc(100vh-64px)] bg-slate-100">
+    <div className="flex-1 flex overflow-hidden w-full h-[calc(100vh-64px)] bg-slate-100 font-sans">
       {/* Left Sidebar: Parameters */}
       <aside className="w-[340px] bg-white border-r border-slate-200 flex flex-col shrink-0 h-full overflow-y-auto shadow-sm z-10">
         <div className="p-5 border-b border-slate-200 bg-slate-50/70 flex justify-between items-center">
@@ -211,13 +211,12 @@ export const SimulatorView: React.FC = () => {
                   <select
                     value={project.client.province}
                     onChange={(e) => {
-                      const selectedProv = RD_PROVINCES.find((p) => p.name === e.target.value);
                       updateClient({
                         province: e.target.value,
-                        customMonthlyHSP: undefined, // Reset GPS vector when switching to province
+                        customMonthlyHSP: undefined,
                       });
                     }}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all cursor-pointer font-medium"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all cursor-pointer font-semibold"
                   >
                     {RD_PROVINCES.map((prov) => (
                       <option key={prov.code} value={prov.name}>
@@ -237,7 +236,7 @@ export const SimulatorView: React.FC = () => {
                     value={project.client.coordinates || '18.4861, -69.9312'}
                     onChange={(e) => updateClient({ coordinates: e.target.value })}
                     placeholder="18.4861, -69.9312"
-                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
                   />
                   <button
                     type="button"
@@ -270,7 +269,7 @@ export const SimulatorView: React.FC = () => {
                     type="text"
                     value={project.client.projectId}
                     onChange={(e) => updateClient({ projectId: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
                   />
                 </div>
                 <div>
@@ -279,7 +278,7 @@ export const SimulatorView: React.FC = () => {
                     type="text"
                     value={project.client.quoteNumber || 'C-0030'}
                     onChange={(e) => updateClient({ quoteNumber: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
                   />
                 </div>
               </div>
@@ -299,7 +298,7 @@ export const SimulatorView: React.FC = () => {
                   step="0.001"
                   value={project.rates.energyCostPerKWh}
                   onChange={(e) => updateRates({ energyCostPerKWh: parseFloat(e.target.value) || 0 })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
                 />
               </div>
 
@@ -308,7 +307,7 @@ export const SimulatorView: React.FC = () => {
                 <select
                   value={project.rates.distributor || 'EDESUR'}
                   onChange={(e) => updateRates({ distributor: e.target.value as any })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all cursor-pointer"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all cursor-pointer font-semibold"
                 >
                   <option value="EDEESTE">EDEESTE</option>
                   <option value="EDESUR">EDESUR</option>
@@ -324,7 +323,7 @@ export const SimulatorView: React.FC = () => {
                   step="1"
                   value={project.rates.targetCoveragePct ?? 95}
                   onChange={(e) => updateRates({ targetCoveragePct: parseFloat(e.target.value) || 0 })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
                 />
               </div>
 
@@ -333,7 +332,7 @@ export const SimulatorView: React.FC = () => {
                 <select
                   value={project.rates.tariffCode || 'BTS2'}
                   onChange={(e) => updateRates({ tariffCode: e.target.value as any })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all cursor-pointer"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all cursor-pointer font-semibold"
                 >
                   <option value="BTS1">BTS1</option>
                   <option value="BTS2">BTS2</option>
@@ -349,7 +348,7 @@ export const SimulatorView: React.FC = () => {
                   step="1"
                   value={project.rates.gridExportFeePct}
                   onChange={(e) => updateRates({ gridExportFeePct: parseFloat(e.target.value) || 0 })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
                 />
               </div>
             </div>
@@ -368,8 +367,8 @@ export const SimulatorView: React.FC = () => {
                 onClick={() => updateSpecs({ isDetailed: false })}
                 className={`flex-1 rounded-md py-1.5 text-[12px] transition-all text-center ${
                   !project.specs.isDetailed
-                    ? 'bg-white shadow-xs text-slate-900 font-semibold'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-white shadow-xs text-slate-900 font-bold'
+                    : 'text-slate-600 hover:text-slate-900 font-semibold'
                 }`}
               >
                 Simple
@@ -379,8 +378,8 @@ export const SimulatorView: React.FC = () => {
                 onClick={() => updateSpecs({ isDetailed: true })}
                 className={`flex-1 rounded-md py-1.5 text-[12px] transition-all text-center ${
                   project.specs.isDetailed
-                    ? 'bg-white shadow-xs text-slate-900 font-semibold'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-white shadow-xs text-slate-900 font-bold'
+                    : 'text-slate-600 hover:text-slate-900 font-semibold'
                 }`}
               >
                 Detallado
@@ -394,7 +393,7 @@ export const SimulatorView: React.FC = () => {
                   type="text"
                   value={project.specs.panelBrandModel || 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)'}
                   onChange={(e) => updateSpecs({ panelBrandModel: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all font-mono"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all font-semibold"
                 />
               </div>
 
@@ -405,7 +404,7 @@ export const SimulatorView: React.FC = () => {
                   step="5"
                   value={project.specs.panelPowerW}
                   onChange={(e) => updateSpecs({ panelPowerW: parseFloat(e.target.value) || 0 })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
                 />
               </div>
 
@@ -428,7 +427,7 @@ export const SimulatorView: React.FC = () => {
                   disabled={project.specs.autoCalculatePanels}
                   value={project.specs.panelCount}
                   onChange={(e) => updateSpecs({ panelCount: parseInt(e.target.value) || 0 })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all disabled:opacity-50"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all disabled:opacity-50"
                 />
               </div>
 
@@ -438,7 +437,7 @@ export const SimulatorView: React.FC = () => {
                   type="text"
                   value={project.specs.inverterBrandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)'}
                   onChange={(e) => updateSpecs({ inverterBrandModel: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all font-mono"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all font-semibold"
                 />
               </div>
 
@@ -449,7 +448,7 @@ export const SimulatorView: React.FC = () => {
                   step="0.01"
                   value={project.specs.pricePerWattUSD}
                   onChange={(e) => updateSpecs({ pricePerWattUSD: parseFloat(e.target.value) || 0 })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all font-semibold"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
                 />
               </div>
 
@@ -473,7 +472,7 @@ export const SimulatorView: React.FC = () => {
                         type="text"
                         value={project.specs.batteryBrandModel || 'Batería Hinaess 16 KwH-48 vdc.'}
                         onChange={(e) => updateSpecs({ batteryBrandModel: e.target.value })}
-                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
                       />
                     </div>
 
@@ -484,7 +483,7 @@ export const SimulatorView: React.FC = () => {
                         step="1"
                         value={project.specs.batteryCount || 3}
                         onChange={(e) => updateSpecs({ batteryCount: parseInt(e.target.value) || 1 })}
-                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
                       />
                     </div>
 
@@ -495,7 +494,7 @@ export const SimulatorView: React.FC = () => {
                         step="1"
                         value={project.specs.batteryCapacityKWh}
                         onChange={(e) => updateSpecs({ batteryCapacityKWh: parseFloat(e.target.value) || 0 })}
-                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
                       />
                     </div>
                   </div>
@@ -541,7 +540,7 @@ export const SimulatorView: React.FC = () => {
                   step="0.1"
                   value={project.financials.discountRatePct}
                   onChange={(e) => updateFinancials({ discountRatePct: parseFloat(e.target.value) || 0 })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
                 />
               </div>
             </div>
@@ -600,7 +599,7 @@ export const SimulatorView: React.FC = () => {
             </button>
           </div>
 
-          <div className="pb-3 text-xs text-slate-500 flex items-center gap-2">
+          <div className="pb-3 text-xs text-slate-500 flex items-center gap-2 font-semibold">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             <span>Simulador Interactivo Pro</span>
           </div>
@@ -618,7 +617,7 @@ export const SimulatorView: React.FC = () => {
                   CAPACIDAD INSTALADA
                 </span>
                 <div className="flex items-baseline gap-1">
-                  <span className="font-mono text-xl font-bold text-emerald-800">{summary.systemCapacityKWp}</span>
+                  <span className="text-xl font-bold text-emerald-800">{summary.systemCapacityKWp}</span>
                   <span className="text-xs text-slate-500 font-semibold">kWp</span>
                 </div>
                 <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
@@ -632,7 +631,7 @@ export const SimulatorView: React.FC = () => {
                   GENERACIÓN ANUAL
                 </span>
                 <div className="flex items-baseline gap-1">
-                  <span className="font-mono text-xl font-bold text-slate-900">{summary.annualProductionKWh.toLocaleString()}</span>
+                  <span className="text-xl font-bold text-slate-900">{summary.annualProductionKWh.toLocaleString()}</span>
                   <span className="text-xs text-slate-500 font-semibold">kWh</span>
                 </div>
                 <span className="text-[11px] font-semibold text-emerald-700 block mt-0.5">
@@ -646,7 +645,7 @@ export const SimulatorView: React.FC = () => {
                   CONSUMO ANUAL
                 </span>
                 <div className="flex items-baseline gap-1">
-                  <span className="font-mono text-xl font-bold text-slate-900">{summary.annualConsumptionKWh.toLocaleString()}</span>
+                  <span className="text-xl font-bold text-slate-900">{summary.annualConsumptionKWh.toLocaleString()}</span>
                   <span className="text-xs text-slate-500 font-semibold">kWh</span>
                 </div>
                 <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
@@ -660,7 +659,7 @@ export const SimulatorView: React.FC = () => {
                   AHORRO ENERGÉTICO ANUAL
                 </span>
                 <div className="flex items-baseline gap-1">
-                  <span className="font-mono text-xl font-bold text-emerald-700">${summary.year1SavingsUSD.toLocaleString()}</span>
+                  <span className="text-xl font-bold text-emerald-700">${summary.year1SavingsUSD.toLocaleString()}</span>
                   <span className="text-xs text-slate-500 font-semibold">USD</span>
                 </div>
                 <span className="text-[11px] text-emerald-700 font-medium block mt-0.5">
@@ -674,7 +673,7 @@ export const SimulatorView: React.FC = () => {
                   IMPACTO AMBIENTAL
                 </span>
                 <div className="flex items-baseline gap-1">
-                  <span className="font-mono text-xl font-bold text-emerald-800">-{summary.co2AvoidedTonsPerYear}</span>
+                  <span className="text-xl font-bold text-emerald-800">-{summary.co2AvoidedTonsPerYear}</span>
                   <span className="text-xs text-slate-500 font-semibold">Tons CO₂</span>
                 </div>
                 <span className="text-[11px] text-emerald-700 font-medium block mt-0.5">
@@ -705,8 +704,8 @@ export const SimulatorView: React.FC = () => {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={summary.monthlyBreakdown} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#64748b' }} />
-                    <YAxis tick={{ fontSize: 11, fill: '#64748b' }} />
+                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#64748b', fontWeight: 'bold' }} />
+                    <YAxis tick={{ fontSize: 11, fill: '#64748b', fontWeight: 'bold' }} />
                     <Tooltip formatter={(val: number) => [`${Math.round(val).toLocaleString()} kWh`, '']} />
                     <Bar dataKey="consumptionKWh" name="Consumo" fill="#14532d" radius={[2, 2, 0, 0]} />
                     <Bar dataKey="productionKWh" name="Producción" fill="#22c55e" radius={[2, 2, 0, 0]} />
@@ -730,20 +729,20 @@ export const SimulatorView: React.FC = () => {
                     <th className="py-2.5 px-4 text-right">%</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 text-slate-700 font-mono">
+                <tbody className="divide-y divide-slate-200 text-slate-700 font-semibold">
                   {summary.monthlyBreakdown.map((row, idx) => (
                     <tr key={idx} className="hover:bg-slate-50">
-                      <td className="py-2 px-4 font-sans font-semibold text-slate-800">{row.month}</td>
+                      <td className="py-2 px-4 font-bold text-slate-800">{row.month}</td>
                       <td className="py-2 px-4 text-center">
                         <input
                           type="number"
                           value={project.monthlyConsumption[idx]}
                           onChange={(e) => updateMonthlyConsumption(idx, parseFloat(e.target.value) || 0)}
-                          className="w-24 text-center bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs font-mono font-bold text-slate-900 focus:bg-white focus:border-emerald-600 transition-all"
+                          className="w-24 text-center bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs font-bold text-slate-900 focus:bg-white focus:border-emerald-600 transition-all"
                         />
                       </td>
-                      <td className="py-2 px-4 text-right">{row.productionKWh.toFixed(1)}</td>
-                      <td className="py-2 px-4 text-right">{row.solarSelfConsumedKWh.toFixed(1)}</td>
+                      <td className="py-2 px-4 text-right font-semibold">{row.productionKWh.toFixed(1)}</td>
+                      <td className="py-2 px-4 text-right font-semibold">{row.solarSelfConsumedKWh.toFixed(1)}</td>
                       <td className="py-2 px-4 text-right text-emerald-700 font-bold">
                         {row.consumptionKWh > 0 ? Math.min(100, (row.productionKWh / row.consumptionKWh) * 100).toFixed(1) : 0}%
                       </td>
@@ -752,11 +751,11 @@ export const SimulatorView: React.FC = () => {
                 </tbody>
                 <tfoot className="bg-emerald-50/80 font-bold text-slate-900 border-t-2 border-emerald-200">
                   <tr>
-                    <td className="py-3 px-4 font-sans uppercase">TOTAL</td>
-                    <td className="py-3 px-4 text-center font-mono">{totalConsumptionKWh.toLocaleString()} kWh</td>
-                    <td className="py-3 px-4 text-right font-mono text-emerald-800">{totalProductionKWh.toFixed(1)} kWh</td>
-                    <td className="py-3 px-4 text-right font-mono">{totalSavingsKWh.toFixed(1)} kWh</td>
-                    <td className="py-3 px-4 text-right font-mono text-emerald-800">{avgCoveragePct.toFixed(1)}%</td>
+                    <td className="py-3 px-4 uppercase font-extrabold">TOTAL</td>
+                    <td className="py-3 px-4 text-center font-bold">{totalConsumptionKWh.toLocaleString()} kWh</td>
+                    <td className="py-3 px-4 text-right font-bold text-emerald-800">{totalProductionKWh.toFixed(1)} kWh</td>
+                    <td className="py-3 px-4 text-right font-bold">{totalSavingsKWh.toFixed(1)} kWh</td>
+                    <td className="py-3 px-4 text-right font-extrabold text-emerald-800">{avgCoveragePct.toFixed(1)}%</td>
                   </tr>
                 </tfoot>
               </table>
@@ -765,7 +764,7 @@ export const SimulatorView: React.FC = () => {
         )}
 
         {/* ---------------------------------------------------- */}
-        {/* VISTA 2 (NUEVA): COTIZACIÓN Y EQUIPOS (INVOICE PROPOSAL VIEW) */}
+        {/* VISTA 2: COTIZACIÓN Y EQUIPOS */}
         {/* ---------------------------------------------------- */}
         {activeMainTab === 'cotizacion' && (
           <div className="space-y-6">
@@ -773,35 +772,42 @@ export const SimulatorView: React.FC = () => {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">N° COTIZACIÓN</span>
-                <span className="font-mono text-lg font-bold text-slate-900">{project.client.quoteNumber || 'C-0030'}</span>
+                <span className="text-lg font-bold text-slate-900">{project.client.quoteNumber || 'C-0030'}</span>
               </div>
               <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">POTENCIA FOTOVOLTAICA</span>
-                <span className="font-mono text-lg font-bold text-emerald-800">{summary.systemCapacityKWp.toFixed(2)} kWp</span>
+                <span className="text-lg font-bold text-emerald-800">{summary.systemCapacityKWp.toFixed(2)} kWp</span>
               </div>
               <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">INVERSIÓN NETA (LEY 57-07)</span>
-                <span className="font-mono text-lg font-bold text-emerald-700">${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</span>
+                <span className="text-lg font-bold text-emerald-700">${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</span>
               </div>
               <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">VALIDEZ OFERTA</span>
-                <span className="font-mono text-lg font-bold text-amber-700">{project.client.quoteValidityDays || 7} Días</span>
+                <span className="text-lg font-bold text-amber-700">{project.client.quoteValidityDays || 7} Días</span>
               </div>
             </div>
 
             {/* Complete Interactive Invoice Proposal View */}
             <div className="bg-white border border-slate-300 rounded-2xl shadow-xl overflow-hidden font-sans">
-              {/* Header Electsun */}
+              {/* Header Electsun Dark Green Banner */}
               <div className="bg-[#14532d] text-white px-8 py-5 flex justify-between items-center">
                 <div>
-                  <h2 className="text-xs font-mono text-emerald-300 uppercase tracking-widest">PROPUESTA TÉCNICA Y ECONÓMICA</h2>
-                  <h1 className="text-xl font-bold uppercase tracking-tight">{project.client.name} — {summary.systemCapacityKWp.toFixed(2)}kWp</h1>
+                  <h2 className="text-[11px] font-semibold text-emerald-300 uppercase tracking-wider">
+                    PROPUESTA TÉCNICA Y ECONÓMICA • ID: {project.client.projectId || 'SP-2024-089'}
+                  </h2>
+                  <h1 className="text-xl font-bold uppercase tracking-tight text-white mt-0.5">
+                    {project.client.name} — {summary.systemCapacityKWp.toFixed(2)}kWp
+                  </h1>
+                  <p className="text-[11px] text-emerald-200 mt-0.5">
+                    Ubicación: <span className="font-semibold text-white">{project.client.province || project.client.location}</span> | Fecha: <span className="font-semibold text-white">{currentDateStr}</span>
+                  </p>
                 </div>
                 <div className="text-right">
                   <div className="text-2xl font-black tracking-tight text-white flex items-center gap-1.5 justify-end">
                     <span className="w-3.5 h-3.5 bg-emerald-400 rounded-full inline-block"></span> electsun
                   </div>
-                  <p className="text-[10px] text-emerald-200 tracking-wider">EL SOL A TU FAVOR</p>
+                  <p className="text-[10px] text-emerald-200 tracking-wider font-semibold">EL SOL A TU FAVOR</p>
                 </div>
               </div>
 
@@ -815,17 +821,17 @@ export const SimulatorView: React.FC = () => {
                   <h3 className="bg-slate-100 px-3 py-1 text-xs font-bold text-[#14532d] uppercase border-l-4 border-[#14532d] mb-2">
                     DATOS DEL CLIENTE :
                   </h3>
-                  <div className="grid grid-cols-2 gap-4 px-2 font-mono text-xs">
+                  <div className="grid grid-cols-2 gap-4 px-2 text-xs">
                     <div className="space-y-1.5">
-                      <div><span className="font-bold font-sans text-slate-600">Cliente:</span> {project.client.name}</div>
-                      <div><span className="font-bold font-sans text-slate-600">Contacto:</span> {project.client.company || project.client.name}</div>
-                      <div><span className="font-bold font-sans text-slate-600">Teléfono:</span> {project.client.contactPhone || '809-555-0199'}</div>
-                      <div><span className="font-bold font-sans text-slate-600">Dirección:</span> {project.client.address || 'Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.'}</div>
+                      <div><span className="font-bold text-slate-600">Cliente:</span> <span className="font-bold text-slate-900">{project.client.name}</span></div>
+                      <div><span className="font-bold text-slate-600">Contacto:</span> {project.client.company || project.client.name}</div>
+                      <div><span className="font-bold text-slate-600">Teléfono:</span> {project.client.contactPhone || '809-555-0199'}</div>
+                      <div><span className="font-bold text-slate-600">Dirección:</span> {project.client.address || 'Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.'}</div>
                     </div>
                     <div className="space-y-1.5 text-right">
-                      <div><span className="font-bold font-sans text-slate-600">N° Cotización:</span> <span className="font-bold text-slate-900">{project.client.quoteNumber || 'C-0030'}</span></div>
-                      <div><span className="font-bold font-sans text-slate-600">Fecha:</span> {currentDateStr}</div>
-                      <div><span className="font-bold font-sans text-slate-600">Válido por:</span> <span className="font-bold text-emerald-700">{project.client.quoteValidityDays || 7} Días</span></div>
+                      <div><span className="font-bold text-slate-600">N° Cotización:</span> <span className="font-bold text-slate-900">{project.client.quoteNumber || 'C-0030'}</span></div>
+                      <div><span className="font-bold text-slate-600">Fecha:</span> <span className="font-semibold text-slate-800">{currentDateStr}</span></div>
+                      <div><span className="font-bold text-slate-600">Válido por:</span> <span className="font-bold text-emerald-700">{project.client.quoteValidityDays || 7} Días</span></div>
                     </div>
                   </div>
                 </div>
@@ -835,14 +841,14 @@ export const SimulatorView: React.FC = () => {
                   <h3 className="bg-slate-100 px-3 py-1 text-xs font-bold text-[#14532d] uppercase border-l-4 border-[#14532d] mb-2">
                     ESPECIFICACIONES DEL SISTEMA
                   </h3>
-                  <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3.5 rounded-xl border border-slate-200 font-mono text-xs">
+                  <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs">
                     <div className="space-y-1">
-                      <div><span className="font-bold font-sans text-slate-700">Potencia (kW-dc):</span> <span className="font-bold text-slate-900">{summary.systemCapacityKWp.toFixed(2)}</span></div>
-                      <div><span className="font-bold font-sans text-slate-700">Tipo de instalación:</span> Fotovoltaica</div>
+                      <div><span className="font-bold text-slate-700">Potencia (kW-dc):</span> <span className="font-bold text-slate-900">{summary.systemCapacityKWp.toFixed(2)}</span></div>
+                      <div><span className="font-bold text-slate-700">Tipo de instalación:</span> Fotovoltaica</div>
                     </div>
                     <div className="text-right space-y-1">
-                      <div><span className="font-bold font-sans text-slate-700">Consumo mensual estimado (kWh):</span> <span className="font-bold text-slate-900">{Math.round(summary.annualConsumptionKWh / 12).toLocaleString()}</span></div>
-                      <div><span className="font-bold font-sans text-slate-700">EDES / Distribuidor:</span> <span className="font-bold text-[#14532d]">{project.client.distributor || 'EDEESTE'}</span></div>
+                      <div><span className="font-bold text-slate-700">Consumo mensual estimado (kWh):</span> <span className="font-bold text-slate-900">{Math.round(summary.annualConsumptionKWh / 12).toLocaleString()}</span></div>
+                      <div><span className="font-bold text-slate-700">EDES / Distribuidor:</span> <span className="font-bold text-[#14532d]">{project.client.distributor || 'EDEESTE'}</span></div>
                     </div>
                   </div>
                 </div>
@@ -861,28 +867,28 @@ export const SimulatorView: React.FC = () => {
                           <th className="px-4 py-2.5 text-center w-24">UNIDAD</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-200 font-mono text-xs text-slate-800">
+                      <tbody className="divide-y divide-slate-200 text-xs text-slate-800 font-semibold">
                         <tr className="bg-white">
                           <td className="px-4 py-2.5">{project.specs.panelBrandModel || 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)'}</td>
                           <td className="px-4 py-2.5 text-center font-bold">{project.specs.panelCount}</td>
-                          <td className="px-4 py-2.5 text-center text-slate-500">UD</td>
+                          <td className="px-4 py-2.5 text-center text-slate-500 font-normal">UD</td>
                         </tr>
                         <tr className="bg-slate-50/60">
                           <td className="px-4 py-2.5">{project.specs.inverterBrandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)'}</td>
                           <td className="px-4 py-2.5 text-center font-bold">{project.specs.inverterCount || 2}</td>
-                          <td className="px-4 py-2.5 text-center text-slate-500">UD</td>
+                          <td className="px-4 py-2.5 text-center text-slate-500 font-normal">UD</td>
                         </tr>
                         {project.specs.hasBattery && (
                           <tr className="bg-white">
                             <td className="px-4 py-2.5">{project.specs.batteryBrandModel || 'Batería Hinaess 16 KwH-48 vdc.'}</td>
                             <td className="px-4 py-2.5 text-center font-bold">{project.specs.batteryCount || 3}</td>
-                            <td className="px-4 py-2.5 text-center text-slate-500">UD</td>
+                            <td className="px-4 py-2.5 text-center text-slate-500 font-normal">UD</td>
                           </tr>
                         )}
                         <tr className="bg-slate-50/60">
                           <td className="px-4 py-2.5">{project.specs.installationServicesDesc || 'Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).'}</td>
                           <td className="px-4 py-2.5 text-center font-bold">1</td>
-                          <td className="px-4 py-2.5 text-center text-slate-500">UD</td>
+                          <td className="px-4 py-2.5 text-center text-slate-500 font-normal">UD</td>
                         </tr>
                       </tbody>
                     </table>
@@ -891,8 +897,8 @@ export const SimulatorView: React.FC = () => {
 
                 {/* DESGLOSE FINANCIERO */}
                 <div className="flex justify-end">
-                  <div className="w-[420px] bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2 font-mono text-xs">
-                    <div className="flex justify-between text-slate-700">
+                  <div className="w-[420px] bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2 text-xs">
+                    <div className="flex justify-between text-slate-700 font-semibold">
                       <span>SUB-TOTAL (USD) SIN ITBIS :</span>
                       <span className="font-bold">${(summary.grossInvestmentUSD / 1.18).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
@@ -900,7 +906,7 @@ export const SimulatorView: React.FC = () => {
                       <span>TOTAL GENERAL (USD) :</span>
                       <span>${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
-                    <div className="flex justify-between text-emerald-800">
+                    <div className="flex justify-between text-emerald-800 font-semibold">
                       <span>ITBIS A DESCONTAR LEY 57-07 US$ :</span>
                       <span className="font-bold">${summary.itbisSavedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
@@ -909,7 +915,7 @@ export const SimulatorView: React.FC = () => {
                       <span>${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     <div className="flex justify-between text-slate-800 pt-1.5 border-t border-slate-300">
-                      <span className="font-sans font-bold">PRECIO POR WATT (USD/W):</span>
+                      <span className="font-bold">PRECIO POR WATT (USD/W):</span>
                       <span className="font-bold text-[#14532d]">${(project.specs.pricePerWattUSD || project.financials.pricePerWattUSD || 1.13).toFixed(2)}</span>
                     </div>
                   </div>
@@ -932,8 +938,8 @@ export const SimulatorView: React.FC = () => {
                           <th className="px-4 py-2.5 text-right w-24">%</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-200 font-mono text-xs text-slate-800">
-                        <tr className="bg-white font-semibold">
+                      <tbody className="divide-y divide-slate-200 text-xs text-slate-800 font-semibold">
+                        <tr className="bg-white font-bold">
                           <td className="px-4 py-2">TOTAL EQUIPOS ENERGIAS RENOVABLES (PANELES-INVERSORES-BATERIAS)</td>
                           <td className="px-4 py-2 text-right">${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                           <td className="px-4 py-2 text-right">100%</td>
@@ -987,13 +993,13 @@ export const SimulatorView: React.FC = () => {
                 </div>
 
                 {/* LEGAL SUBTEXT */}
-                <div className="text-center text-xs text-slate-500 font-mono italic pt-1">
+                <div className="text-center text-xs text-slate-500 font-semibold italic pt-1">
                   * Equipos según disponibilidad de inventario | * Propuesta válida por {project.client.quoteValidityDays || 7} días | * Precios en USD *
                 </div>
               </div>
 
               {/* Footer Electsun */}
-              <div className="px-8 py-4 bg-slate-100 border-t border-slate-200 flex justify-between items-center text-xs text-slate-600 font-mono">
+              <div className="px-8 py-4 bg-slate-100 border-t border-slate-200 flex justify-between items-center text-xs text-slate-600 font-semibold">
                 <div>Calle Ercilia Pepín #1, Plaza Toledo | Local 307 | Arroyo Manzano | Santo Domingo, RD | electsun.com.do</div>
                 <div className="font-bold text-slate-800">ELECTSUN - EL SOL A TU FAVOR</div>
               </div>
@@ -1013,7 +1019,7 @@ export const SimulatorView: React.FC = () => {
                   CAPACIDAD DC
                 </span>
                 <div className="flex items-baseline gap-1">
-                  <span className="font-mono text-xl font-bold text-emerald-800">{summary.systemCapacityKWp}</span>
+                  <span className="text-xl font-bold text-emerald-800">{summary.systemCapacityKWp}</span>
                   <span className="text-xs text-slate-500 font-semibold">kWp</span>
                 </div>
                 <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
@@ -1027,7 +1033,7 @@ export const SimulatorView: React.FC = () => {
                   GENERACIÓN ANUAL
                 </span>
                 <div className="flex items-baseline gap-1">
-                  <span className="font-mono text-xl font-bold text-slate-900">{summary.annualProductionKWh.toLocaleString()}</span>
+                  <span className="text-xl font-bold text-slate-900">{summary.annualProductionKWh.toLocaleString()}</span>
                   <span className="text-xs text-slate-500 font-semibold">kWh</span>
                 </div>
                 <span className="text-[11px] font-semibold text-emerald-700 block mt-0.5">
@@ -1041,7 +1047,7 @@ export const SimulatorView: React.FC = () => {
                   INVERSIÓN NETA (LEY 57-07)
                 </span>
                 <div className="flex items-baseline gap-1">
-                  <span className="font-mono text-xl font-bold text-emerald-700">${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  <span className="text-xl font-bold text-emerald-700">${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
                 <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
                   Bruta: ${summary.grossInvestmentUSD.toLocaleString()}
@@ -1054,7 +1060,7 @@ export const SimulatorView: React.FC = () => {
                   RETORNO DE INVERSIÓN (PAYBACK)
                 </span>
                 <div className="flex items-baseline gap-1">
-                  <span className="font-mono text-xl font-bold text-emerald-800">{summary.paybackYears}</span>
+                  <span className="text-xl font-bold text-emerald-800">{summary.paybackYears}</span>
                   <span className="text-xs text-slate-500 font-semibold">Años</span>
                 </div>
                 <span className="text-[11px] text-emerald-700 font-medium block mt-0.5">
@@ -1068,7 +1074,7 @@ export const SimulatorView: React.FC = () => {
                   VALOR ACTUAL NETO (VAN @ 10%)
                 </span>
                 <div className="flex items-baseline gap-1">
-                  <span className="font-mono text-xl font-bold text-slate-900">${summary.npvUSD.toLocaleString()}</span>
+                  <span className="text-xl font-bold text-slate-900">${summary.npvUSD.toLocaleString()}</span>
                 </div>
                 <span className="text-[11px] text-emerald-700 font-semibold block mt-0.5">
                   ROI 25 Años: {summary.roi25YrPct}%
@@ -1082,25 +1088,25 @@ export const SimulatorView: React.FC = () => {
                 Cálculo de Ahorro y Retorno de Inversión
               </div>
               <table className="w-full text-left text-xs border-collapse">
-                <tbody className="divide-y divide-slate-200 text-slate-700 font-mono">
+                <tbody className="divide-y divide-slate-200 text-slate-700 font-semibold">
                   <tr className="hover:bg-slate-50">
-                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800 w-[40%]">Cliente / Proyecto</td>
+                    <td className="py-2.5 px-4 font-bold text-slate-800 w-[40%]">Cliente / Proyecto</td>
                     <td className="py-2.5 px-4 font-bold text-slate-900">{project.client.name}</td>
                   </tr>
                   <tr className="hover:bg-slate-50">
-                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">Potencia Instalada (kWp)</td>
+                    <td className="py-2.5 px-4 font-bold text-slate-800">Potencia Instalada (kWp)</td>
                     <td className="py-2.5 px-4 font-bold text-emerald-800">{summary.systemCapacityKWp} kWp</td>
                   </tr>
                   <tr className="hover:bg-slate-50">
-                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">Inversión Inicial Sistema (USD)</td>
+                    <td className="py-2.5 px-4 font-bold text-slate-800">Inversión Inicial Sistema (USD)</td>
                     <td className="py-2.5 px-4 font-bold text-slate-900">${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</td>
                   </tr>
                   <tr className="hover:bg-slate-50">
-                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">Incentivo Fiscal Estimado (Ley 57-07) (USD)</td>
+                    <td className="py-2.5 px-4 font-bold text-slate-800">Incentivo Fiscal Estimado (Ley 57-07) (USD)</td>
                     <td className="py-2.5 px-4 font-bold text-emerald-700">-${summary.ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</td>
                   </tr>
                   <tr className="hover:bg-slate-50 bg-emerald-50/50 font-bold">
-                    <td className="py-2.5 px-4 font-sans text-slate-900">Inversión Neta Final (USD)</td>
+                    <td className="py-2.5 px-4 text-slate-900">Inversión Neta Final (USD)</td>
                     <td className="py-2.5 px-4 text-emerald-800 text-sm">${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</td>
                   </tr>
                 </tbody>
@@ -1122,9 +1128,9 @@ export const SimulatorView: React.FC = () => {
                     <th className="py-2.5 px-4 text-right font-bold">BENEFICIO ACUMULADO (USD)</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 text-slate-700 font-mono">
+                <tbody className="divide-y divide-slate-200 text-slate-700 font-semibold">
                   <tr className="hover:bg-slate-50">
-                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">Año 1</td>
+                    <td className="py-2.5 px-4 font-bold text-slate-800">Año 1</td>
                     <td className="py-2.5 px-4 text-right">${year1Savings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td className="py-2.5 px-4 text-right text-emerald-700">${year1Tax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td className="py-2.5 px-4 text-right font-semibold">${(year1Savings + year1Tax).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
@@ -1132,7 +1138,7 @@ export const SimulatorView: React.FC = () => {
                   </tr>
 
                   <tr className="hover:bg-slate-50 bg-emerald-50/60 font-bold">
-                    <td className="py-2.5 px-4 font-sans text-emerald-900">Año {Math.ceil(summary.paybackYears)} (Retorno Payback)</td>
+                    <td className="py-2.5 px-4 text-emerald-900">Año {Math.ceil(summary.paybackYears)} (Retorno Payback)</td>
                     <td className="py-2.5 px-4 text-right">${(cf25[Math.ceil(summary.paybackYears) - 1]?.savingsUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td className="py-2.5 px-4 text-right text-emerald-700">${(cf25[Math.ceil(summary.paybackYears) - 1]?.taxCreditUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td className="py-2.5 px-4 text-right">${((cf25[Math.ceil(summary.paybackYears) - 1]?.savingsUSD || 0) + (cf25[Math.ceil(summary.paybackYears) - 1]?.taxCreditUSD || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
@@ -1140,7 +1146,7 @@ export const SimulatorView: React.FC = () => {
                   </tr>
 
                   <tr className="hover:bg-slate-50">
-                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">Año 10</td>
+                    <td className="py-2.5 px-4 font-bold text-slate-800">Año 10</td>
                     <td className="py-2.5 px-4 text-right">${avg10Savings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td className="py-2.5 px-4 text-right text-emerald-700">${avg10Tax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td className="py-2.5 px-4 text-right font-semibold">${(avg10Savings + avg10Tax).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
@@ -1148,7 +1154,7 @@ export const SimulatorView: React.FC = () => {
                   </tr>
 
                   <tr className="hover:bg-slate-50 font-bold bg-slate-50">
-                    <td className="py-2.5 px-4 font-sans text-slate-900">Año 25 (Final de Vida Útil)</td>
+                    <td className="py-2.5 px-4 text-slate-900">Año 25 (Final de Vida Útil)</td>
                     <td className="py-2.5 px-4 text-right">${avg25Savings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td className="py-2.5 px-4 text-right text-emerald-700">${avg25Tax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td className="py-2.5 px-4 text-right font-bold text-slate-900">${(avg25Savings + avg25Tax).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
@@ -1180,9 +1186,9 @@ export const SimulatorView: React.FC = () => {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={cumulativeChartData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="yearLabel" tick={{ fontSize: 10, fill: '#64748b' }} />
+                    <XAxis dataKey="yearLabel" tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }} />
                     <YAxis
-                      tick={{ fontSize: 10, fill: '#64748b' }}
+                      tick={{ fontSize: 10, fill: '#64748b', fontWeight: 'bold' }}
                       tickFormatter={(val: number) => `$${(val / 1000).toFixed(0)}k`}
                     />
                     <Tooltip formatter={(val: number) => [`$${val.toLocaleString()} USD`, 'Beneficio Acumulado']} />
@@ -1216,10 +1222,10 @@ export const SimulatorView: React.FC = () => {
                     <th className="py-2.5 px-4 text-right w-[15%]">Beneficio Acumulado (USD)</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 text-slate-700 font-mono">
+                <tbody className="divide-y divide-slate-200 text-slate-700 font-semibold">
                   {/* Fila Año 0 */}
                   <tr className="hover:bg-slate-50 font-bold bg-slate-50/50">
-                    <td className="py-2.5 px-4 text-center font-sans">0</td>
+                    <td className="py-2.5 px-4 text-center">0</td>
                     <td className="py-2.5 px-4 text-right text-slate-400">-</td>
                     <td className="py-2.5 px-4 text-right text-slate-400">-</td>
                     <td className="py-2.5 px-4 text-right text-slate-400">-</td>
@@ -1236,10 +1242,10 @@ export const SimulatorView: React.FC = () => {
 
                     return (
                       <tr key={row.year} className="hover:bg-slate-50">
-                        <td className="py-2 px-4 text-center font-sans font-semibold">{row.year}</td>
-                        <td className="py-2 px-4 text-right">{row.productionKWh.toLocaleString()}</td>
-                        <td className="py-2 px-4 text-right">${row.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                        <td className="py-2 px-4 text-right text-emerald-700">
+                        <td className="py-2 px-4 text-center font-bold">{row.year}</td>
+                        <td className="py-2 px-4 text-right font-medium">{row.productionKWh.toLocaleString()}</td>
+                        <td className="py-2 px-4 text-right font-medium">${row.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        <td className="py-2 px-4 text-right text-emerald-700 font-semibold">
                           {row.taxCreditUSD > 0 ? `$${row.taxCreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '$0.00'}
                         </td>
                         <td className="py-2 px-4 text-right font-semibold">${totalAnnualSavings.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
@@ -1269,41 +1275,41 @@ export const SimulatorView: React.FC = () => {
                     <th className="py-2.5 px-4 w-[40%]">Detalles</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 text-slate-700 font-mono">
+                <tbody className="divide-y divide-slate-200 text-slate-700 font-semibold">
                   <tr>
-                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">Payback (Periodo de Recuperación)</td>
+                    <td className="py-2.5 px-4 font-bold text-slate-800">Payback (Periodo de Recuperación)</td>
                     <td className="py-2.5 px-4 text-right font-bold text-emerald-700">{summary.paybackYears}</td>
-                    <td className="py-2.5 px-4 font-sans text-slate-500 text-[11px]">Años hasta recuperar la inversión inicial</td>
+                    <td className="py-2.5 px-4 text-slate-500 text-[11px] font-normal">Años hasta recuperar la inversión inicial</td>
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">TIR (Tasa Interna de Retorno)</td>
+                    <td className="py-2.5 px-4 font-bold text-slate-800">TIR (Tasa Interna de Retorno)</td>
                     <td className="py-2.5 px-4 text-right font-bold text-emerald-700">{summary.irrPct}%</td>
-                    <td className="py-2.5 px-4 font-sans text-slate-500 text-[11px]">Rendimiento anual del proyecto</td>
+                    <td className="py-2.5 px-4 text-slate-500 text-[11px] font-normal">Rendimiento anual del proyecto</td>
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">VAN a tasa descuento {project.financials.discountRatePct}%</td>
+                    <td className="py-2.5 px-4 font-bold text-slate-800">VAN a tasa descuento {project.financials.discountRatePct}%</td>
                     <td className="py-2.5 px-4 text-right font-bold text-emerald-700">${summary.npvUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td className="py-2.5 px-4 font-sans text-slate-500 text-[11px]">Valor actual neto — positivo = proyecto viable</td>
+                    <td className="py-2.5 px-4 text-slate-500 text-[11px] font-normal">Valor actual neto — positivo = proyecto viable</td>
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">Ahorro Total 25 Años</td>
+                    <td className="py-2.5 px-4 font-bold text-slate-800">Ahorro Total 25 Años</td>
                     <td className="py-2.5 px-4 text-right font-bold text-emerald-700">${summary.total25YearSavingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td className="py-2.5 px-4 font-sans text-slate-500 text-[11px]">Beneficio acumulado al final del periodo</td>
+                    <td className="py-2.5 px-4 text-slate-500 text-[11px] font-normal">Beneficio acumulado al final del periodo</td>
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">ROI Total del Proyecto</td>
+                    <td className="py-2.5 px-4 font-bold text-slate-800">ROI Total del Proyecto</td>
                     <td className="py-2.5 px-4 text-right font-bold text-emerald-700">{summary.roi25YrPct}%</td>
-                    <td className="py-2.5 px-4 font-sans text-slate-500 text-[11px]">Retorno sobre inversión total en 25 años</td>
+                    <td className="py-2.5 px-4 text-slate-500 text-[11px] font-normal">Retorno sobre inversión total en 25 años</td>
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">Reducción CO2 estimada (25 años)</td>
+                    <td className="py-2.5 px-4 font-bold text-slate-800">Reducción CO2 estimada (25 años)</td>
                     <td className="py-2.5 px-4 text-right font-bold text-emerald-700">{(summary.co2AvoidedTonsPerYear * 25).toFixed(2)} Ton</td>
-                    <td className="py-2.5 px-4 font-sans text-slate-500 text-[11px]">Factor emisión red RD: {project.financials.co2FactorKgPerKWh || 0.481} kg CO2/kWh</td>
+                    <td className="py-2.5 px-4 text-slate-500 text-[11px] font-normal">Factor emisión red RD: {project.financials.co2FactorKgPerKWh || 0.481} kg CO2/kWh</td>
                   </tr>
                   <tr>
-                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">Precio por Watt instalado</td>
+                    <td className="py-2.5 px-4 font-bold text-slate-800">Precio por Watt instalado</td>
                     <td className="py-2.5 px-4 text-right font-bold text-emerald-700">${(project.specs.pricePerWattUSD || project.financials.pricePerWattUSD).toFixed(2)} USD/W</td>
-                    <td className="py-2.5 px-4 font-sans text-slate-500 text-[11px]">Competitividad vs mercado</td>
+                    <td className="py-2.5 px-4 text-slate-500 text-[11px] font-normal">Competitividad vs mercado</td>
                   </tr>
                 </tbody>
               </table>
