@@ -13,7 +13,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
-import { Globe, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Globe, CheckCircle2, AlertCircle, Loader2, ShieldCheck, Check, Package, FileText } from 'lucide-react';
 
 export const SimulatorView: React.FC = () => {
   const {
@@ -30,7 +30,7 @@ export const SimulatorView: React.FC = () => {
   const project = getActiveProject();
   const summary = getFinancialSummary();
 
-  const [activeMainTab, setActiveMainTab] = useState<'energia' | 'retorno'>('energia');
+  const [activeMainTab, setActiveMainTab] = useState<'energia' | 'cotizacion' | 'retorno'>('energia');
   const [isFetchingSolar, setIsFetchingSolar] = useState<boolean>(false);
   const [solarApiStatus, setSolarApiStatus] = useState<string | null>(null);
 
@@ -41,7 +41,6 @@ export const SimulatorView: React.FC = () => {
       const targetCoverage = project.rates.targetCoveragePct || 95;
       const targetAnnualKWh = annualConsumption * (targetCoverage / 100);
       
-      // Estimated annual output per panel W based on province HSP
       const provinceObj = RD_PROVINCES.find(p => p.name === project.client.province) || RD_PROVINCES[0];
       const avgHsp = provinceObj.avgHSP || 4.91;
       const annualOutputPerWatt = avgHsp * 365 * (1 - (project.specs.systemLosses / 100));
@@ -113,19 +112,25 @@ export const SimulatorView: React.FC = () => {
   const totalSavingsKWh = summary.monthlyBreakdown.reduce((sum, m) => sum + m.solarSelfConsumedKWh, 0);
   const avgCoveragePct = summary.energyCoveragePct;
 
+  const currentDateStr = new Date().toLocaleDateString('es-DO', {
+    day: '2-digit',
+    month: 'numeric',
+    year: 'numeric',
+  });
+
   return (
     <div className="flex-1 flex overflow-hidden w-full h-[calc(100vh-64px)] bg-slate-100">
       {/* Left Sidebar: Parameters */}
       <aside className="w-[340px] bg-white border-r border-slate-200 flex flex-col shrink-0 h-full overflow-y-auto shadow-sm z-10">
         <div className="p-5 border-b border-slate-200 bg-slate-50/70 flex justify-between items-center">
           <div>
-            <h2 className="font-bold text-slate-800 text-base mb-0.5">Parámetros</h2>
-            <p className="text-xs text-slate-500">Configurar restricciones del sistema</p>
+            <h2 className="font-bold text-sm text-slate-900 uppercase tracking-wider">Parámetros</h2>
+            <p className="text-[11px] text-slate-500 mt-0.5">Configurar restricciones del sistema</p>
           </div>
           <select
             value={project.status}
             onChange={(e) => setProjectStatus(project.id, e.target.value as any)}
-            className="text-xs font-semibold px-2.5 py-1 rounded-md bg-white border border-slate-300 text-slate-700 focus:ring-1 focus:ring-emerald-600 shadow-xs cursor-pointer"
+            className="bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-700 cursor-pointer shadow-xs"
           >
             <option value="Draft">Borrador</option>
             <option value="Final">Finalizado</option>
@@ -133,7 +138,7 @@ export const SimulatorView: React.FC = () => {
           </select>
         </div>
 
-        <div className="p-5 space-y-6">
+        <div className="p-5 space-y-6 flex-1">
           {/* SECCIÓN 1: Proyecto y Cliente */}
           <section className="space-y-3">
             <h3 className="text-emerald-700 flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
@@ -146,7 +151,7 @@ export const SimulatorView: React.FC = () => {
                   type="text"
                   value={project.client.name}
                   onChange={(e) => updateClient({ name: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all font-semibold"
                 />
               </div>
 
@@ -161,90 +166,88 @@ export const SimulatorView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Fuente de Radiación Solar</label>
-                <div className="flex bg-slate-200/80 rounded-lg p-1 border border-slate-300/60 mb-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      updateClient({
-                        solarSourceMode: 'province',
-                        customMonthlyHSP: undefined,
-                      });
-                      setSolarApiStatus(null);
-                    }}
-                    className={`flex-1 rounded-md py-1.5 text-[11px] font-semibold transition-all text-center flex items-center justify-center gap-1 cursor-pointer ${
-                      (project.client.solarSourceMode || 'province') === 'province'
-                        ? 'bg-white shadow-xs text-emerald-800 font-bold border border-slate-200'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[15px]">map</span>
-                    Provincia (Offline)
-                  </button>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Dirección del Cliente</label>
+                <input
+                  type="text"
+                  value={project.client.address || 'Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.'}
+                  onChange={(e) => updateClient({ address: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                />
+              </div>
 
+              {/* Selector de Fuente de Radiación Solar: Provincia vs GPS Satelital */}
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1.5">Fuente de Radiación Solar</label>
+                <div className="flex bg-slate-200/80 rounded-lg p-1 border border-slate-300/60">
                   <button
                     type="button"
-                    onClick={() => {
-                      updateClient({ solarSourceMode: 'gps' });
-                    }}
-                    className={`flex-1 rounded-md py-1.5 text-[11px] font-semibold transition-all text-center flex items-center justify-center gap-1 cursor-pointer ${
-                      project.client.solarSourceMode === 'gps'
-                        ? 'bg-white shadow-xs text-emerald-800 font-bold border border-slate-200'
+                    onClick={() => updateClient({ solarSourceMode: 'province' })}
+                    className={`flex-1 rounded-md py-1 text-[11px] font-semibold transition-all flex items-center justify-center gap-1 ${
+                      (project.client.solarSourceMode || 'province') === 'province'
+                        ? 'bg-white shadow-xs text-emerald-800 font-bold'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <Globe className="w-3.5 h-3.5" />
-                    GPS Satelital (Online)
+                    <span className="material-symbols-outlined text-[14px]">map</span> Provincia (Offline)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateClient({ solarSourceMode: 'gps' })}
+                    className={`flex-1 rounded-md py-1 text-[11px] font-semibold transition-all flex items-center justify-center gap-1 ${
+                      project.client.solarSourceMode === 'gps'
+                        ? 'bg-white shadow-xs text-emerald-800 font-bold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Globe className="w-3.5 h-3.5" /> GPS Satelital (Online)
                   </button>
                 </div>
               </div>
 
-              {/* MODO 1: POR PROVINCIA (OFFLINE) */}
+              {/* Opción 1: Selección por Provincia */}
               {(project.client.solarSourceMode || 'province') === 'province' && (
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Seleccionar Provincia</label>
                   <select
                     value={project.client.province}
                     onChange={(e) => {
-                      const selected = e.target.value;
+                      const selectedProv = RD_PROVINCES.find((p) => p.name === e.target.value);
                       updateClient({
-                        province: selected,
-                        customMonthlyHSP: undefined,
+                        province: e.target.value,
+                        customMonthlyHSP: undefined, // Reset GPS vector when switching to province
                       });
                     }}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all cursor-pointer font-semibold"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all cursor-pointer font-medium"
                   >
                     {RD_PROVINCES.map((prov) => (
                       <option key={prov.code} value={prov.name}>
-                        {prov.name} ({prov.avgHSP} HSP/día)
+                        {prov.name} ({prov.avgHSP} HSP)
                       </option>
                     ))}
                   </select>
                 </div>
               )}
 
-              {/* MODO 2: GPS SATELITAL (ONLINE) */}
+              {/* Opción 2: Obtener por GPS / Coordenadas */}
               {project.client.solarSourceMode === 'gps' && (
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="block text-xs font-medium text-slate-600">Coordenadas (Lat, Lng)</label>
-                  </div>
+                <div className="space-y-2 bg-emerald-50/50 p-3 rounded-lg border border-emerald-200">
+                  <label className="block text-xs font-semibold text-emerald-900">Coordenadas GPS (Latitud, Longitud)</label>
                   <input
                     type="text"
-                    value={project.client.coordinates || ''}
-                    placeholder="18.4861, -69.9312"
+                    value={project.client.coordinates || '18.4861, -69.9312'}
                     onChange={(e) => updateClient({ coordinates: e.target.value })}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                    placeholder="18.4861, -69.9312"
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
                   />
                   <button
                     type="button"
                     onClick={handleFetchSolarApi}
                     disabled={isFetchingSolar}
-                    className="mt-2 w-full text-[11px] font-semibold text-emerald-800 hover:text-emerald-900 bg-emerald-100/70 hover:bg-emerald-200/80 border border-emerald-300 rounded-md py-1.5 flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                    className="w-full py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-md text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
                   >
                     {isFetchingSolar ? (
                       <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Consultando Satélites NASA/GPS...
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Obteniendo de NASA...
                       </>
                     ) : (
                       <>
@@ -260,14 +263,25 @@ export const SimulatorView: React.FC = () => {
                 </div>
               )}
 
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">ID del Proyecto</label>
-                <input
-                  type="text"
-                  value={project.client.projectId}
-                  onChange={(e) => updateClient({ projectId: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
-                />
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">ID del Proyecto</label>
+                  <input
+                    type="text"
+                    value={project.client.projectId}
+                    onChange={(e) => updateClient({ projectId: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">N° Cotización</label>
+                  <input
+                    type="text"
+                    value={project.client.quoteNumber || 'C-0030'}
+                    onChange={(e) => updateClient({ quoteNumber: e.target.value })}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                  />
+                </div>
               </div>
             </div>
           </section>
@@ -344,7 +358,7 @@ export const SimulatorView: React.FC = () => {
           {/* SECCIÓN 3: Equipamiento */}
           <section className="space-y-3 pt-2 border-t border-slate-200">
             <h3 className="text-emerald-700 flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
-              <span className="material-symbols-outlined text-[16px]">solar_power</span> Equipamiento
+              <span className="material-symbols-outlined text-[16px]">solar_power</span> Equipamiento y Marcas
             </h3>
 
             {/* Selector de modo Simple / Detallado */}
@@ -375,192 +389,117 @@ export const SimulatorView: React.FC = () => {
 
             <div className="space-y-3">
               <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Modelo / Marca Módulos</label>
+                <input
+                  type="text"
+                  value={project.specs.panelBrandModel || 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)'}
+                  onChange={(e) => updateSpecs({ panelBrandModel: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all font-mono"
+                />
+              </div>
+
+              <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Potencia del Panel (W)</label>
                 <input
                   type="number"
                   step="5"
                   value={project.specs.panelPowerW}
-                  onChange={(e) => updateSpecs({ panelPowerW: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => updateSpecs({ panelPowerW: parseFloat(e.target.value) || 0 })}
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
                 />
               </div>
 
-              {/* MODO DETALLADO (AVANZADO) */}
-              {project.specs.isDetailed && (
-                <>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Eficiencia del Panel (%)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={project.specs.panelEfficiency || 21.8}
-                      onChange={(e) => updateSpecs({ panelEfficiency: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Coeficiente de Temp. (%/°C)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={project.specs.tempCoeff || -0.35}
-                      onChange={(e) => updateSpecs({ tempCoeff: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Potencia del Inversor (kW AC)</label>
-                    <input
-                      type="number"
-                      step="1"
-                      value={project.specs.inverterPowerKW}
-                      onChange={(e) => updateSpecs({ inverterPowerKW: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* Auto-Calcular Paneles Toggle */}
-              <div className="pb-1">
-                <label className="flex items-center justify-between cursor-pointer group">
-                  <span className="text-xs font-medium text-slate-600 group-hover:text-slate-900 transition-colors">
-                    Auto-Calcular Paneles
-                  </span>
-                  <div className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={project.specs.autoCalculatePanels ?? false}
-                      onChange={(e) => updateSpecs({ autoCalculatePanels: e.target.checked })}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-700"></div>
-                  </div>
-                </label>
+              {/* Toggle Auto-Calcular Paneles */}
+              <div className="flex items-center justify-between p-2.5 bg-emerald-50/60 border border-emerald-200/80 rounded-lg">
+                <span className="text-xs font-semibold text-emerald-950">Auto-Calcular Paneles</span>
+                <input
+                  type="checkbox"
+                  checked={!!project.specs.autoCalculatePanels}
+                  onChange={(e) => updateSpecs({ autoCalculatePanels: e.target.checked })}
+                  className="rounded text-emerald-700 focus:ring-emerald-600 cursor-pointer"
+                />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">
-                  {project.specs.autoCalculatePanels ? 'Cantidad de Paneles (Auto-calculada)' : 'Cantidad de Paneles'}
-                </label>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Cantidad de Paneles</label>
                 <input
                   type="number"
                   step="1"
-                  readOnly={project.specs.autoCalculatePanels}
+                  disabled={project.specs.autoCalculatePanels}
                   value={project.specs.panelCount}
                   onChange={(e) => updateSpecs({ panelCount: parseInt(e.target.value) || 0 })}
-                  className={`w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all ${
-                    project.specs.autoCalculatePanels ? 'opacity-80 bg-slate-100 cursor-not-allowed' : ''
-                  }`}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all disabled:opacity-50"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Precio del Sistema por Vatio ($ USD/Wp)</label>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Modelo / Marca Inversor</label>
                 <input
-                  type="number"
-                  step="0.01"
-                  value={project.specs.pricePerWattUSD || project.financials.pricePerWattUSD}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value) || 0;
-                    updateSpecs({ pricePerWattUSD: val });
-                    updateFinancials({ pricePerWattUSD: val, customCostUSD: undefined });
-                  }}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                  type="text"
+                  value={project.specs.inverterBrandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)'}
+                  onChange={(e) => updateSpecs({ inverterBrandModel: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all font-mono"
                 />
               </div>
 
-              {/* Almacenamiento (Batería) Toggle */}
-              <div className="pt-1">
-                <label className="flex items-center justify-between cursor-pointer group">
-                  <span className="text-xs font-medium text-slate-600 group-hover:text-slate-900 transition-colors">
-                    Almacenamiento (Batería)
-                  </span>
-                  <div className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={project.specs.hasBattery}
-                      onChange={(e) => updateSpecs({ hasBattery: e.target.checked })}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-700"></div>
-                  </div>
-                </label>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Precio Sistema por Vatio ($ USD/Wp)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={project.specs.pricePerWattUSD}
+                  onChange={(e) => updateSpecs({ pricePerWattUSD: parseFloat(e.target.value) || 0 })}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all font-semibold"
+                />
               </div>
 
-              {/* BATERÍA DETAILS */}
-              {project.specs.hasBattery && (
-                <div className="space-y-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Cantidad de Baterías</label>
-                    <input
-                      type="number"
-                      step="1"
-                      value={project.specs.batteryCount || 3}
-                      onChange={(e) => updateSpecs({ batteryCount: parseInt(e.target.value) || 1 })}
-                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
-                    />
-                  </div>
+              {/* Almacenamiento (Batería) Toggle & Campos */}
+              <div className="pt-2 border-t border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-slate-700">Almacenamiento (Batería)</label>
+                  <input
+                    type="checkbox"
+                    checked={project.specs.hasBattery}
+                    onChange={(e) => updateSpecs({ hasBattery: e.target.checked })}
+                    className="rounded text-emerald-700 focus:ring-emerald-600 cursor-pointer"
+                  />
+                </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Capacidad Total Batería (kWh)</label>
-                    <input
-                      type="number"
-                      step="1"
-                      value={project.specs.batteryCapacityKWh}
-                      onChange={(e) => updateSpecs({ batteryCapacityKWh: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Precio de Batería ($ USD)</label>
-                    <input
-                      type="number"
-                      step="50"
-                      value={project.specs.batteryCostUSD || 0}
-                      onChange={(e) => updateSpecs({ batteryCostUSD: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
-                    />
-                  </div>
-
-                  {project.specs.isDetailed && (
+                {project.specs.hasBattery && (
+                  <div className="space-y-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
                     <div>
-                      <label className="block text-xs font-medium text-slate-600 mb-1">Profundidad de Descarga (DOD %)</label>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Modelo / Marca Batería</label>
                       <input
-                        type="number"
-                        step="1"
-                        value={project.specs.batteryDOD || 80}
-                        onChange={(e) => updateSpecs({ batteryDOD: parseFloat(e.target.value) || 0 })}
+                        type="text"
+                        value={project.specs.batteryBrandModel || 'Batería Hinaess 16 KwH-48 vdc.'}
+                        onChange={(e) => updateSpecs({ batteryBrandModel: e.target.value })}
                         className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
                       />
                     </div>
-                  )}
-                </div>
-              )}
 
-              {/* Tarjeta de Vista Previa en Vivo */}
-              <div className="mt-4 p-3 bg-emerald-50/60 border border-emerald-200 rounded-lg space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <span className="text-[11px] font-medium text-slate-600">Potencia Total DC:</span>
-                  <span className="text-[12px] font-bold text-emerald-800">{summary.systemCapacityKWp.toFixed(2)} kWp</span>
-                </div>
-                {project.specs.hasBattery && summary.batteryInvestmentUSD > 0 && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-[11px] font-medium text-slate-600">Costo Batería:</span>
-                    <span className="text-[12px] font-semibold text-emerald-700">
-                      +${summary.batteryInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
-                    </span>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Cantidad de Baterías</label>
+                      <input
+                        type="number"
+                        step="1"
+                        value={project.specs.batteryCount || 3}
+                        onChange={(e) => updateSpecs({ batteryCount: parseInt(e.target.value) || 1 })}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Capacidad Total Batería (kWh)</label>
+                      <input
+                        type="number"
+                        step="1"
+                        value={project.specs.batteryCapacityKWh}
+                        onChange={(e) => updateSpecs({ batteryCapacityKWh: parseFloat(e.target.value) || 0 })}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                      />
+                    </div>
                   </div>
                 )}
-                <div className="flex justify-between items-center border-t border-emerald-200/60 pt-1">
-                  <span className="text-[11px] font-medium text-slate-600">Inversión Estimada:</span>
-                  <span className="text-[12px] font-bold text-emerald-800">
-                    ${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
-                  </span>
-                </div>
               </div>
             </div>
           </section>
@@ -575,76 +514,25 @@ export const SimulatorView: React.FC = () => {
                 <span className="text-xs font-medium text-slate-600 group-hover:text-slate-900 transition-colors">
                   Aplicar Ley 57-07 (Crédito ISR 40%)
                 </span>
-                <div className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={project.financials.applyLey5707}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      updateFinancials({
-                        applyLey5707: checked,
-                        applyITBISExemption: checked ? true : project.financials.applyITBISExemption,
-                      });
-                    }}
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-700"></div>
-                </div>
+                <input
+                  type="checkbox"
+                  checked={project.financials.applyLey5707}
+                  onChange={(e) => updateFinancials({ applyLey5707: e.target.checked })}
+                  className="rounded text-emerald-700 focus:ring-emerald-600 cursor-pointer"
+                />
               </label>
-
-              {project.financials.applyLey5707 && (
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Monto Crédito Ley 57-07 ($ USD)</label>
-                  <input
-                    type="number"
-                    step="1"
-                    placeholder={`Calculado: $${summary.ley5707CreditUSD}`}
-                    value={project.financials.customLey5707CreditUSD ?? ''}
-                    onChange={(e) => updateFinancials({ customLey5707CreditUSD: e.target.value ? parseFloat(e.target.value) : undefined })}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
-                  />
-                </div>
-              )}
 
               <label className="flex items-center justify-between cursor-pointer group">
                 <span className="text-xs font-medium text-slate-600 group-hover:text-slate-900 transition-colors">
-                  Exoneración de ITBIS (18%)
+                  Exoneración ITBIS 100% (18%)
                 </span>
-                <div className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={project.financials.applyITBISExemption}
-                    onChange={(e) => updateFinancials({ applyITBISExemption: e.target.checked })}
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-700"></div>
-                </div>
-              </label>
-
-              {project.financials.applyITBISExemption && (
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Monto ITBIS Exonerado ($ USD)</label>
-                  <input
-                    type="number"
-                    step="1"
-                    placeholder={`Calculado: $${summary.itbisSavedUSD}`}
-                    value={project.financials.customITBISSavedUSD ?? ''}
-                    onChange={(e) => updateFinancials({ customITBISSavedUSD: e.target.value ? parseFloat(e.target.value) : undefined })}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Años de Proyección</label>
                 <input
-                  type="number"
-                  step="1"
-                  value={project.financials.projectLifespanYears}
-                  onChange={(e) => updateFinancials({ projectLifespanYears: parseInt(e.target.value) || 25 })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                  type="checkbox"
+                  checked={project.financials.applyITBISExemption}
+                  onChange={(e) => updateFinancials({ applyITBISExemption: e.target.checked })}
+                  className="rounded text-emerald-700 focus:ring-emerald-600 cursor-pointer"
                 />
-              </div>
+              </label>
 
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Tasa de Descuento (%)</label>
@@ -653,47 +541,6 @@ export const SimulatorView: React.FC = () => {
                   step="0.1"
                   value={project.financials.discountRatePct}
                   onChange={(e) => updateFinancials({ discountRatePct: parseFloat(e.target.value) || 0 })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* SECCIÓN 5: Parámetros Técnicos y Pérdidas */}
-          <section className="space-y-3 pt-2 border-t border-slate-200">
-            <h3 className="text-emerald-700 flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
-              <span className="material-symbols-outlined text-[16px]">settings_suggest</span> Parámetros Técnicos y Pérdidas
-            </h3>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Pérdidas del Sistema (%)</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  value={project.specs.systemLosses}
-                  onChange={(e) => updateSpecs({ systemLosses: parseFloat(e.target.value) || 0 })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Degradación Anual (%)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={project.specs.annualDegradation}
-                  onChange={(e) => updateSpecs({ annualDegradation: parseFloat(e.target.value) || 0 })}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Factor CO₂ (kg/kWh)</label>
-                <input
-                  type="number"
-                  step="0.001"
-                  value={project.financials.co2FactorKgPerKWh}
-                  onChange={(e) => updateFinancials({ co2FactorKgPerKWh: parseFloat(e.target.value) || 0 })}
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
                 />
               </div>
@@ -716,12 +563,12 @@ export const SimulatorView: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-full overflow-y-auto p-6 gap-6">
-        {/* Top View Selector Tabs (Análisis de Energía | Retorno de Inversión) */}
+        {/* Top View Selector Tabs (3 VISTAS: Análisis de Energía | Cotización y Equipos | Retorno de Inversión) */}
         <div className="bg-white border-b border-slate-200 -mx-6 -mt-6 px-6 pt-3 pb-0 sticky top-0 z-20 shadow-xs flex justify-between items-center">
           <div className="flex gap-8">
             <button
               onClick={() => setActiveMainTab('energia')}
-              className={`pb-3 text-sm font-bold transition-all relative ${
+              className={`pb-3 text-sm font-bold transition-all relative cursor-pointer ${
                 activeMainTab === 'energia'
                   ? 'text-emerald-800 font-extrabold border-b-2 border-emerald-700'
                   : 'text-slate-500 hover:text-slate-800'
@@ -731,8 +578,19 @@ export const SimulatorView: React.FC = () => {
             </button>
 
             <button
+              onClick={() => setActiveMainTab('cotizacion')}
+              className={`pb-3 text-sm font-bold transition-all relative cursor-pointer ${
+                activeMainTab === 'cotizacion'
+                  ? 'text-emerald-800 font-extrabold border-b-2 border-emerald-700'
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              Cotización y Equipos
+            </button>
+
+            <button
               onClick={() => setActiveMainTab('retorno')}
-              className={`pb-3 text-sm font-bold transition-all relative ${
+              className={`pb-3 text-sm font-bold transition-all relative cursor-pointer ${
                 activeMainTab === 'retorno'
                   ? 'text-emerald-800 font-extrabold border-b-2 border-emerald-700'
                   : 'text-slate-500 hover:text-slate-800'
@@ -749,336 +607,507 @@ export const SimulatorView: React.FC = () => {
         </div>
 
         {/* ---------------------------------------------------- */}
-        {/* DEDICATED HEADER 1: ANÁLISIS DE ENERGÍA (ENERGY METRICS) */}
-        {/* ---------------------------------------------------- */}
-        {activeMainTab === 'energia' && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {/* Card 1: CAPACIDAD INSTALADA */}
-            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                CAPACIDAD INSTALADA
-              </span>
-              <div className="flex items-baseline gap-1">
-                <span className="font-mono text-xl font-bold text-emerald-800">{summary.systemCapacityKWp}</span>
-                <span className="text-xs text-slate-500 font-semibold">kWp</span>
-              </div>
-              <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
-                {project.specs.panelCount} módulos × {project.specs.panelPowerW}W
-              </span>
-            </div>
-
-            {/* Card 2: GENERACIÓN ANUAL */}
-            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                GENERACIÓN ANUAL
-              </span>
-              <div className="flex items-baseline gap-1">
-                <span className="font-mono text-xl font-bold text-slate-900">{summary.annualProductionKWh.toLocaleString()}</span>
-                <span className="text-xs text-slate-500 font-semibold">kWh</span>
-              </div>
-              <span className="text-[11px] font-semibold text-emerald-700 block mt-0.5">
-                {summary.energyCoveragePct}% Cobertura Solar
-              </span>
-            </div>
-
-            {/* Card 3: CONSUMO ANUAL */}
-            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                CONSUMO ANUAL
-              </span>
-              <div className="flex items-baseline gap-1">
-                <span className="font-mono text-xl font-bold text-slate-900">{summary.annualConsumptionKWh.toLocaleString()}</span>
-                <span className="text-xs text-slate-500 font-semibold">kWh</span>
-              </div>
-              <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
-                Prom: {Math.round(summary.annualConsumptionKWh / 12).toLocaleString()} kWh/mes
-              </span>
-            </div>
-
-            {/* Card 4: AHORRO ENERGÉTICO ANUAL */}
-            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                AHORRO ENERGÉTICO ANUAL
-              </span>
-              <div className="flex items-baseline gap-1">
-                <span className="font-mono text-xl font-bold text-emerald-700">${summary.year1SavingsUSD.toLocaleString()}</span>
-                <span className="text-xs text-slate-500 font-semibold">USD</span>
-              </div>
-              <span className="text-[11px] text-emerald-700 font-medium block mt-0.5">
-                Autoconsumo solar en factura
-              </span>
-            </div>
-
-            {/* Card 5: IMPACTO AMBIENTAL */}
-            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm col-span-2 sm:col-span-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                IMPACTO AMBIENTAL
-              </span>
-              <div className="flex items-baseline gap-1">
-                <span className="font-mono text-xl font-bold text-emerald-800">-{summary.co2AvoidedTonsPerYear}</span>
-                <span className="text-xs text-slate-500 font-semibold">Tons CO₂</span>
-              </div>
-              <span className="text-[11px] text-emerald-700 font-medium block mt-0.5">
-                🌱 Reducción CO₂ por año
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* ---------------------------------------------------- */}
-        {/* DEDICATED HEADER 2: RETORNO DE INVERSIÓN (FINANCIAL & INCENTIVES) */}
-        {/* Exact Match to Imagen 1 format requested by user */}
-        {/* ---------------------------------------------------- */}
-        {activeMainTab === 'retorno' && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {/* Card 1: CAPACIDAD DC */}
-            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                CAPACIDAD DC
-              </span>
-              <div className="flex items-baseline gap-1">
-                <span className="font-mono text-xl font-bold text-emerald-800">{summary.systemCapacityKWp}</span>
-                <span className="text-xs text-slate-500 font-semibold">kWp</span>
-              </div>
-              <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
-                {project.specs.panelCount} módulos × {project.specs.panelPowerW}W
-              </span>
-            </div>
-
-            {/* Card 2: GENERACIÓN ANUAL */}
-            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                GENERACIÓN ANUAL
-              </span>
-              <div className="flex items-baseline gap-1">
-                <span className="font-mono text-xl font-bold text-slate-900">{summary.annualProductionKWh.toLocaleString()}</span>
-                <span className="text-xs text-slate-500 font-semibold">kWh</span>
-              </div>
-              <span className="text-[11px] font-semibold text-emerald-700 block mt-0.5">
-                {summary.energyCoveragePct}% Cobertura
-              </span>
-            </div>
-
-            {/* Card 3: INVERSIÓN TOTAL (NETA) */}
-            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                INVERSIÓN TOTAL (NETA)
-              </span>
-              <div className="flex items-baseline gap-1">
-                <span className="font-mono text-xl font-bold text-emerald-700">${summary.netInvestmentUSD.toLocaleString()}</span>
-                <span className="text-xs text-slate-500 font-semibold">USD</span>
-              </div>
-              <span className="text-[11px] text-amber-700 font-bold block mt-0.5">
-                Ley 57-07: -${summary.ley5707CreditUSD.toLocaleString()} USD
-              </span>
-            </div>
-
-            {/* Card 4: RETORNO (PAYBACK / TIR) */}
-            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                RETORNO (PAYBACK / TIR)
-              </span>
-              <div className="flex items-baseline gap-1">
-                <span className="font-mono text-xl font-bold text-emerald-700">{summary.paybackYears}</span>
-                <span className="text-xs text-slate-500 font-semibold">años</span>
-              </div>
-              <span className="text-[11px] text-emerald-800 font-bold block mt-0.5">
-                TIR: {summary.irrPct}%
-              </span>
-            </div>
-
-            {/* Card 5: VAN (10%) & CO2 */}
-            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm col-span-2 sm:col-span-1">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                VAN ({project.financials.discountRatePct}%) & CO₂
-              </span>
-              <div className="flex items-baseline gap-1">
-                <span className="font-mono text-xl font-bold text-slate-900">${summary.npvUSD.toLocaleString()}</span>
-                <span className="text-xs text-slate-500 font-semibold">USD</span>
-              </div>
-              <span className="text-[11px] text-emerald-700 font-medium block mt-0.5">
-                🌱 -{summary.co2AvoidedTonsPerYear} Tons CO₂/año
-              </span>
-            </div>
-          </div>
-        )}
-
         {/* VISTA 1: ANÁLISIS DE ENERGÍA */}
+        {/* ---------------------------------------------------- */}
         {activeMainTab === 'energia' && (
-          <div className="space-y-6 pb-12">
-            {/* Chart Container: Evolución Mensual de Energía */}
-            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-4">
-              <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-                <h3 className="text-base font-bold text-slate-900">Evolución Mensual de Energía</h3>
-                <div className="flex items-center gap-4 text-xs">
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              {/* Card 1: CAPACIDAD INSTALADA */}
+              <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                  CAPACIDAD INSTALADA
+                </span>
+                <div className="flex items-baseline gap-1">
+                  <span className="font-mono text-xl font-bold text-emerald-800">{summary.systemCapacityKWp}</span>
+                  <span className="text-xs text-slate-500 font-semibold">kWp</span>
+                </div>
+                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
+                  {project.specs.panelCount} módulos × {project.specs.panelPowerW}W
+                </span>
+              </div>
+
+              {/* Card 2: GENERACIÓN ANUAL */}
+              <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                  GENERACIÓN ANUAL
+                </span>
+                <div className="flex items-baseline gap-1">
+                  <span className="font-mono text-xl font-bold text-slate-900">{summary.annualProductionKWh.toLocaleString()}</span>
+                  <span className="text-xs text-slate-500 font-semibold">kWh</span>
+                </div>
+                <span className="text-[11px] font-semibold text-emerald-700 block mt-0.5">
+                  {summary.energyCoveragePct}% Cobertura Solar
+                </span>
+              </div>
+
+              {/* Card 3: CONSUMO ANUAL */}
+              <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                  CONSUMO ANUAL
+                </span>
+                <div className="flex items-baseline gap-1">
+                  <span className="font-mono text-xl font-bold text-slate-900">{summary.annualConsumptionKWh.toLocaleString()}</span>
+                  <span className="text-xs text-slate-500 font-semibold">kWh</span>
+                </div>
+                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
+                  Prom: {Math.round(summary.annualConsumptionKWh / 12).toLocaleString()} kWh/mes
+                </span>
+              </div>
+
+              {/* Card 4: AHORRO ENERGÉTICO ANUAL */}
+              <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                  AHORRO ENERGÉTICO ANUAL
+                </span>
+                <div className="flex items-baseline gap-1">
+                  <span className="font-mono text-xl font-bold text-emerald-700">${summary.year1SavingsUSD.toLocaleString()}</span>
+                  <span className="text-xs text-slate-500 font-semibold">USD</span>
+                </div>
+                <span className="text-[11px] text-emerald-700 font-medium block mt-0.5">
+                  Autoconsumo solar en factura
+                </span>
+              </div>
+
+              {/* Card 5: IMPACTO AMBIENTAL */}
+              <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm col-span-2 sm:col-span-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                  IMPACTO AMBIENTAL
+                </span>
+                <div className="flex items-baseline gap-1">
+                  <span className="font-mono text-xl font-bold text-emerald-800">-{summary.co2AvoidedTonsPerYear}</span>
+                  <span className="text-xs text-slate-500 font-semibold">Tons CO₂</span>
+                </div>
+                <span className="text-[11px] text-emerald-700 font-medium block mt-0.5">
+                  🌱 Reducción CO₂ por año
+                </span>
+              </div>
+            </div>
+
+            {/* GRÁFICA DE ENERGÍA */}
+            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-3">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+                  Evolución Mensual de Energía
+                </h3>
+                <div className="flex items-center gap-4 text-xs font-semibold">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded-xs bg-[#2d5f47]"></span>
-                    <span className="text-slate-600 font-medium">Consumo</span>
+                    <span className="w-3 h-3 rounded-xs bg-[#14532d]"></span>
+                    <span className="text-slate-700">Consumo (kWh)</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded-xs bg-[#38a169]"></span>
-                    <span className="text-slate-600 font-medium">Producción</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded-xs bg-[#a7f3d0]"></span>
-                    <span className="text-slate-600 font-medium">Ahorro</span>
+                    <span className="w-3 h-3 rounded-xs bg-[#22c55e]"></span>
+                    <span className="text-slate-700">Producción Solar (kWh)</span>
                   </div>
                 </div>
               </div>
 
-              <div className="w-full h-[320px]">
+              <div className="h-[300px] w-full pt-2">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={summary.monthlyBreakdown} margin={{ top: 10, right: 10, left: 10, bottom: 25 }}>
+                  <BarChart data={summary.monthlyBreakdown} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                     <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#64748b' }} />
                     <YAxis tick={{ fontSize: 11, fill: '#64748b' }} />
-                    <Tooltip
-                      formatter={(val: number) => [`${val.toLocaleString()} kWh`, '']}
-                      contentStyle={{ backgroundColor: '#ffffff', borderRadius: '8px', border: '1px solid #cbd5e1' }}
-                    />
-                    <Bar dataKey="consumptionKWh" name="Consumo" fill="#2d5f47" radius={[2, 2, 0, 0]} />
-                    <Bar dataKey="productionKWh" name="Producción" fill="#38a169" radius={[2, 2, 0, 0]} />
-                    <Bar dataKey="solarSelfConsumedKWh" name="Ahorro" fill="#a7f3d0" radius={[2, 2, 0, 0]} />
+                    <Tooltip formatter={(val: number) => [`${Math.round(val).toLocaleString()} kWh`, '']} />
+                    <Bar dataKey="consumptionKWh" name="Consumo" fill="#14532d" radius={[2, 2, 0, 0]} />
+                    <Bar dataKey="productionKWh" name="Producción" fill="#22c55e" radius={[2, 2, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            {/* Table Container: Tabla Mensual de Energía (Editable) */}
+            {/* TABLA DE DETALLE MENSUAL EDITABLE */}
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+              <div className="bg-[#14532d] text-white px-4 py-3 font-bold text-xs uppercase tracking-wider">
+                Resumen Mensual de Energía
+              </div>
               <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-[#2d5f47] text-white font-bold tracking-wider uppercase">
+                <thead className="bg-slate-100 font-bold text-slate-700 border-b border-slate-200">
                   <tr>
-                    <th className="py-3 px-4 w-[20%]">MES</th>
-                    <th className="py-3 px-4 text-right w-[20%]">CONSUMO kWh/mes</th>
-                    <th className="py-3 px-4 text-right w-[20%]">PRODUCCIÓN kWh/mes</th>
-                    <th className="py-3 px-4 text-right w-[20%]">AHORRO ENERG. (kWh)</th>
-                    <th className="py-3 px-4 text-right w-[20%]">%</th>
+                    <th className="py-2.5 px-4">MES</th>
+                    <th className="py-2.5 px-4 text-center">CONSUMO KWH/MES</th>
+                    <th className="py-2.5 px-4 text-right">PRODUCCIÓN KWH/MES</th>
+                    <th className="py-2.5 px-4 text-right">AHORRO ENERG. (KWH)</th>
+                    <th className="py-2.5 px-4 text-right">%</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200 font-mono text-slate-700">
-                  {summary.monthlyBreakdown.map((row, idx) => {
-                    const monthCoverage = row.consumptionKWh > 0
-                      ? Math.min(100, (row.productionKWh / row.consumptionKWh) * 100)
-                      : 0;
-                    return (
-                      <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                        <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">{row.month}</td>
-                        <td className="py-2.5 px-4 text-right">
-                          <input
-                            type="number"
-                            value={project.monthlyConsumption[idx]}
-                            onChange={(e) => updateMonthlyConsumption(idx, parseInt(e.target.value) || 0)}
-                            className="w-24 text-right bg-slate-50 border border-slate-300 rounded px-2 py-0.5 text-xs font-mono font-bold text-slate-900 focus:ring-1 focus:ring-emerald-600 focus:bg-white"
-                          />
-                        </td>
-                        <td className="py-2.5 px-4 text-right font-medium">{row.productionKWh.toFixed(1)}</td>
-                        <td className="py-2.5 px-4 text-right font-medium">{row.solarSelfConsumedKWh.toFixed(1)}</td>
-                        <td className={`py-2.5 px-4 text-right font-bold ${monthCoverage >= 100 ? 'text-emerald-700' : 'text-slate-800'}`}>
-                          {monthCoverage.toFixed(1)}%
-                        </td>
-                      </tr>
-                    );
-                  })}
+                <tbody className="divide-y divide-slate-200 text-slate-700 font-mono">
+                  {summary.monthlyBreakdown.map((row, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50">
+                      <td className="py-2 px-4 font-sans font-semibold text-slate-800">{row.month}</td>
+                      <td className="py-2 px-4 text-center">
+                        <input
+                          type="number"
+                          value={project.monthlyConsumption[idx]}
+                          onChange={(e) => updateMonthlyConsumption(idx, parseFloat(e.target.value) || 0)}
+                          className="w-24 text-center bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs font-mono font-bold text-slate-900 focus:bg-white focus:border-emerald-600 transition-all"
+                        />
+                      </td>
+                      <td className="py-2 px-4 text-right">{row.productionKWh.toFixed(1)}</td>
+                      <td className="py-2 px-4 text-right">{row.solarSelfConsumedKWh.toFixed(1)}</td>
+                      <td className="py-2 px-4 text-right text-emerald-700 font-bold">
+                        {row.consumptionKWh > 0 ? Math.min(100, (row.productionKWh / row.consumptionKWh) * 100).toFixed(1) : 0}%
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
-                <tfoot className="bg-[#dbeafe] text-slate-900 font-bold border-t-2 border-slate-300 text-xs font-mono">
+                <tfoot className="bg-emerald-50/80 font-bold text-slate-900 border-t-2 border-emerald-200">
                   <tr>
-                    <td className="py-3 px-4 font-sans">TOTAL</td>
-                    <td className="py-3 px-4 text-right">{totalConsumptionKWh.toLocaleString()} kWh</td>
-                    <td className="py-3 px-4 text-right">{totalProductionKWh.toLocaleString()} kWh</td>
-                    <td className="py-3 px-4 text-right">{totalSavingsKWh.toLocaleString()} kWh</td>
-                    <td className="py-3 px-4 text-right text-emerald-800">{avgCoveragePct.toFixed(1)}%</td>
+                    <td className="py-3 px-4 font-sans uppercase">TOTAL</td>
+                    <td className="py-3 px-4 text-center font-mono">{totalConsumptionKWh.toLocaleString()} kWh</td>
+                    <td className="py-3 px-4 text-right font-mono text-emerald-800">{totalProductionKWh.toFixed(1)} kWh</td>
+                    <td className="py-3 px-4 text-right font-mono">{totalSavingsKWh.toFixed(1)} kWh</td>
+                    <td className="py-3 px-4 text-right font-mono text-emerald-800">{avgCoveragePct.toFixed(1)}%</td>
                   </tr>
                 </tfoot>
               </table>
             </div>
+          </>
+        )}
+
+        {/* ---------------------------------------------------- */}
+        {/* VISTA 2 (NUEVA): COTIZACIÓN Y EQUIPOS (INVOICE PROPOSAL VIEW) */}
+        {/* ---------------------------------------------------- */}
+        {activeMainTab === 'cotizacion' && (
+          <div className="space-y-6">
+            {/* Top Metrics Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">N° COTIZACIÓN</span>
+                <span className="font-mono text-lg font-bold text-slate-900">{project.client.quoteNumber || 'C-0030'}</span>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">POTENCIA FOTOVOLTAICA</span>
+                <span className="font-mono text-lg font-bold text-emerald-800">{summary.systemCapacityKWp.toFixed(2)} kWp</span>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">INVERSIÓN NETA (LEY 57-07)</span>
+                <span className="font-mono text-lg font-bold text-emerald-700">${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</span>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">VALIDEZ OFERTA</span>
+                <span className="font-mono text-lg font-bold text-amber-700">{project.client.quoteValidityDays || 7} Días</span>
+              </div>
+            </div>
+
+            {/* Complete Interactive Invoice Proposal View */}
+            <div className="bg-white border border-slate-300 rounded-2xl shadow-xl overflow-hidden font-sans">
+              {/* Header Electsun */}
+              <div className="bg-[#14532d] text-white px-8 py-5 flex justify-between items-center">
+                <div>
+                  <h2 className="text-xs font-mono text-emerald-300 uppercase tracking-widest">PROPUESTA TÉCNICA Y ECONÓMICA</h2>
+                  <h1 className="text-xl font-bold uppercase tracking-tight">{project.client.name} — {summary.systemCapacityKWp.toFixed(2)}kWp</h1>
+                </div>
+                <div className="text-right">
+                  <div className="text-2xl font-black tracking-tight text-white flex items-center gap-1.5 justify-end">
+                    <span className="w-3.5 h-3.5 bg-emerald-400 rounded-full inline-block"></span> electsun
+                  </div>
+                  <p className="text-[10px] text-emerald-200 tracking-wider">EL SOL A TU FAVOR</p>
+                </div>
+              </div>
+
+              <div className="bg-[#1e6a3b] text-center text-white py-1.5 font-bold text-xs uppercase tracking-wider">
+                COTIZACIÓN DE SISTEMA FOTOVOLTAICO
+              </div>
+
+              <div className="p-8 space-y-6 text-xs text-slate-800">
+                {/* DATOS DEL CLIENTE */}
+                <div>
+                  <h3 className="bg-slate-100 px-3 py-1 text-xs font-bold text-[#14532d] uppercase border-l-4 border-[#14532d] mb-2">
+                    DATOS DEL CLIENTE :
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4 px-2 font-mono text-xs">
+                    <div className="space-y-1.5">
+                      <div><span className="font-bold font-sans text-slate-600">Cliente:</span> {project.client.name}</div>
+                      <div><span className="font-bold font-sans text-slate-600">Contacto:</span> {project.client.company || project.client.name}</div>
+                      <div><span className="font-bold font-sans text-slate-600">Teléfono:</span> {project.client.contactPhone || '809-555-0199'}</div>
+                      <div><span className="font-bold font-sans text-slate-600">Dirección:</span> {project.client.address || 'Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.'}</div>
+                    </div>
+                    <div className="space-y-1.5 text-right">
+                      <div><span className="font-bold font-sans text-slate-600">N° Cotización:</span> <span className="font-bold text-slate-900">{project.client.quoteNumber || 'C-0030'}</span></div>
+                      <div><span className="font-bold font-sans text-slate-600">Fecha:</span> {currentDateStr}</div>
+                      <div><span className="font-bold font-sans text-slate-600">Válido por:</span> <span className="font-bold text-emerald-700">{project.client.quoteValidityDays || 7} Días</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ESPECIFICACIONES DEL SISTEMA */}
+                <div>
+                  <h3 className="bg-slate-100 px-3 py-1 text-xs font-bold text-[#14532d] uppercase border-l-4 border-[#14532d] mb-2">
+                    ESPECIFICACIONES DEL SISTEMA
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3.5 rounded-xl border border-slate-200 font-mono text-xs">
+                    <div className="space-y-1">
+                      <div><span className="font-bold font-sans text-slate-700">Potencia (kW-dc):</span> <span className="font-bold text-slate-900">{summary.systemCapacityKWp.toFixed(2)}</span></div>
+                      <div><span className="font-bold font-sans text-slate-700">Tipo de instalación:</span> Fotovoltaica</div>
+                    </div>
+                    <div className="text-right space-y-1">
+                      <div><span className="font-bold font-sans text-slate-700">Consumo mensual estimado (kWh):</span> <span className="font-bold text-slate-900">{Math.round(summary.annualConsumptionKWh / 12).toLocaleString()}</span></div>
+                      <div><span className="font-bold font-sans text-slate-700">EDES / Distribuidor:</span> <span className="font-bold text-[#14532d]">{project.client.distributor || 'EDEESTE'}</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* EQUIPOS Y MATERIALES */}
+                <div>
+                  <h3 className="bg-slate-100 px-3 py-1 text-xs font-bold text-[#14532d] uppercase border-l-4 border-[#14532d] mb-2">
+                    EQUIPOS Y MATERIALES
+                  </h3>
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-[#14532d] text-white font-bold text-xs uppercase">
+                        <tr>
+                          <th className="px-4 py-2.5">DESCRIPCION</th>
+                          <th className="px-4 py-2.5 text-center w-24">CANT.</th>
+                          <th className="px-4 py-2.5 text-center w-24">UNIDAD</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 font-mono text-xs text-slate-800">
+                        <tr className="bg-white">
+                          <td className="px-4 py-2.5">{project.specs.panelBrandModel || 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)'}</td>
+                          <td className="px-4 py-2.5 text-center font-bold">{project.specs.panelCount}</td>
+                          <td className="px-4 py-2.5 text-center text-slate-500">UD</td>
+                        </tr>
+                        <tr className="bg-slate-50/60">
+                          <td className="px-4 py-2.5">{project.specs.inverterBrandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)'}</td>
+                          <td className="px-4 py-2.5 text-center font-bold">{project.specs.inverterCount || 2}</td>
+                          <td className="px-4 py-2.5 text-center text-slate-500">UD</td>
+                        </tr>
+                        {project.specs.hasBattery && (
+                          <tr className="bg-white">
+                            <td className="px-4 py-2.5">{project.specs.batteryBrandModel || 'Batería Hinaess 16 KwH-48 vdc.'}</td>
+                            <td className="px-4 py-2.5 text-center font-bold">{project.specs.batteryCount || 3}</td>
+                            <td className="px-4 py-2.5 text-center text-slate-500">UD</td>
+                          </tr>
+                        )}
+                        <tr className="bg-slate-50/60">
+                          <td className="px-4 py-2.5">{project.specs.installationServicesDesc || 'Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).'}</td>
+                          <td className="px-4 py-2.5 text-center font-bold">1</td>
+                          <td className="px-4 py-2.5 text-center text-slate-500">UD</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* DESGLOSE FINANCIERO */}
+                <div className="flex justify-end">
+                  <div className="w-[420px] bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2 font-mono text-xs">
+                    <div className="flex justify-between text-slate-700">
+                      <span>SUB-TOTAL (USD) SIN ITBIS :</span>
+                      <span className="font-bold">${(summary.grossInvestmentUSD / 1.18).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-900 bg-slate-200/80 px-3 py-1.5 rounded-md font-bold text-sm">
+                      <span>TOTAL GENERAL (USD) :</span>
+                      <span>${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between text-emerald-800">
+                      <span>ITBIS A DESCONTAR LEY 57-07 US$ :</span>
+                      <span className="font-bold">${summary.itbisSavedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between text-white bg-[#14532d] px-3 py-1.5 rounded-md font-bold text-sm">
+                      <span>TOTAL GENERAL LEY 57-07 :</span>
+                      <span>${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-800 pt-1.5 border-t border-slate-300">
+                      <span className="font-sans font-bold">PRECIO POR WATT (USD/W):</span>
+                      <span className="font-bold text-[#14532d]">${(project.specs.pricePerWattUSD || project.financials.pricePerWattUSD || 1.13).toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* INCENTIVOS DE LEY 57-07 */}
+                <div>
+                  <h3 className="bg-slate-100 px-3 py-1 text-xs font-bold text-[#14532d] uppercase border-l-4 border-[#14532d] mb-1">
+                    INCENTIVOS DE LEY 57-07
+                  </h3>
+                  <p className="text-xs text-amber-800 font-bold bg-amber-50 border border-amber-200 px-3 py-1 rounded-md mb-2">
+                    (Descuento de 40% para equipos energía renovables: Paneles solares, inversores y baterías)
+                  </p>
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-[#14532d] text-white font-bold text-xs uppercase">
+                        <tr>
+                          <th className="px-4 py-2.5">CONCEPTO</th>
+                          <th className="px-4 py-2.5 text-right">VALOR US $</th>
+                          <th className="px-4 py-2.5 text-right w-24">%</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 font-mono text-xs text-slate-800">
+                        <tr className="bg-white font-semibold">
+                          <td className="px-4 py-2">TOTAL EQUIPOS ENERGIAS RENOVABLES (PANELES-INVERSORES-BATERIAS)</td>
+                          <td className="px-4 py-2 text-right">${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-4 py-2 text-right">100%</td>
+                        </tr>
+                        <tr className="bg-slate-50/60">
+                          <td className="px-4 py-2">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 1ER AÑO</td>
+                          <td className="px-4 py-2 text-right text-emerald-700">${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-4 py-2 text-right text-emerald-700">13.33%</td>
+                        </tr>
+                        <tr className="bg-white">
+                          <td className="px-4 py-2">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 2DO AÑO</td>
+                          <td className="px-4 py-2 text-right text-emerald-700">${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-4 py-2 text-right text-emerald-700">13.33%</td>
+                        </tr>
+                        <tr className="bg-slate-50/60">
+                          <td className="px-4 py-2">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 3ER AÑO</td>
+                          <td className="px-4 py-2 text-right text-emerald-700">${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-4 py-2 text-right text-emerald-700">13.33%</td>
+                        </tr>
+                        <tr className="bg-emerald-50 text-[#14532d] font-bold">
+                          <td className="px-4 py-2">TOTAL A DESCONTAR POR LA LEY 57-07 (40% DEL TOTAL)</td>
+                          <td className="px-4 py-2 text-right text-emerald-800">${summary.ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-4 py-2 text-right text-emerald-800">40.00%</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* GARANTÍAS Y NOS ENCARGAMOS DE GESTIONAR */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-1.5 text-xs">
+                    <h4 className="font-bold text-[#14532d] border-b border-slate-200 pb-1.5 mb-1 uppercase tracking-wider flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4" /> GARANTÍAS
+                    </h4>
+                    <div>• <span className="font-bold">Paneles Solares:</span> 25 años (80.7% potencia mínima garantizada)</div>
+                    <div>• <span className="font-bold">Inversor:</span> 5 años</div>
+                    <div>• <span className="font-bold">Estructura de montaje:</span> 10 años</div>
+                    <div>• <span className="font-bold">Batería:</span> 10 años</div>
+                    <div>• <span className="font-bold">Mano de obra:</span> 1 año</div>
+                  </div>
+
+                  <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-4 space-y-1.5 text-xs text-emerald-950">
+                    <h4 className="font-bold text-[#14532d] border-b border-emerald-200 pb-1.5 mb-1 uppercase tracking-wider flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-700" /> NOS ENCARGAMOS DE GESTIONAR
+                    </h4>
+                    <div className="flex items-start gap-1.5"><Check className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" /> <span>Instalación del contador bidireccional en las EDES</span></div>
+                    <div className="flex items-start gap-1.5"><Check className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" /> <span>Aprobación de crédito fiscal (CNE) y el Ministerio de Hacienda</span></div>
+                    <div className="flex items-start gap-1.5"><Check className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" /> <span>Trámites completos ante organismos reguladores</span></div>
+                  </div>
+                </div>
+
+                {/* LEGAL SUBTEXT */}
+                <div className="text-center text-xs text-slate-500 font-mono italic pt-1">
+                  * Equipos según disponibilidad de inventario | * Propuesta válida por {project.client.quoteValidityDays || 7} días | * Precios en USD *
+                </div>
+              </div>
+
+              {/* Footer Electsun */}
+              <div className="px-8 py-4 bg-slate-100 border-t border-slate-200 flex justify-between items-center text-xs text-slate-600 font-mono">
+                <div>Calle Ercilia Pepín #1, Plaza Toledo | Local 307 | Arroyo Manzano | Santo Domingo, RD | electsun.com.do</div>
+                <div className="font-bold text-slate-800">ELECTSUN - EL SOL A TU FAVOR</div>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* VISTA 2: RETORNO DE INVERSIÓN */}
+        {/* ---------------------------------------------------- */}
+        {/* VISTA 3: RETORNO DE INVERSIÓN */}
+        {/* ---------------------------------------------------- */}
         {activeMainTab === 'retorno' && (
-          <div className="space-y-6 pb-12">
-            <h2 className="text-lg font-bold text-slate-900 tracking-tight">Proyección Financiera (25 Años)</h2>
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              {/* Card 1: CAPACIDAD DC */}
+              <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                  CAPACIDAD DC
+                </span>
+                <div className="flex items-baseline gap-1">
+                  <span className="font-mono text-xl font-bold text-emerald-800">{summary.systemCapacityKWp}</span>
+                  <span className="text-xs text-slate-500 font-semibold">kWp</span>
+                </div>
+                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
+                  {project.specs.panelCount} módulos × {project.specs.panelPowerW}W
+                </span>
+              </div>
 
-            {/* TABLA 1: Cálculo de Ahorro y Retorno de Inversión */}
+              {/* Card 2: GENERACIÓN ANUAL */}
+              <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                  GENERACIÓN ANUAL
+                </span>
+                <div className="flex items-baseline gap-1">
+                  <span className="font-mono text-xl font-bold text-slate-900">{summary.annualProductionKWh.toLocaleString()}</span>
+                  <span className="text-xs text-slate-500 font-semibold">kWh</span>
+                </div>
+                <span className="text-[11px] font-semibold text-emerald-700 block mt-0.5">
+                  {summary.energyCoveragePct}% Cobertura Solar
+                </span>
+              </div>
+
+              {/* Card 3: INVERSIÓN NETA LEY 57-07 */}
+              <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                  INVERSIÓN NETA (LEY 57-07)
+                </span>
+                <div className="flex items-baseline gap-1">
+                  <span className="font-mono text-xl font-bold text-emerald-700">${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
+                  Bruta: ${summary.grossInvestmentUSD.toLocaleString()}
+                </span>
+              </div>
+
+              {/* Card 4: PERÍODO DE PAYBACK */}
+              <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                  RETORNO DE INVERSIÓN (PAYBACK)
+                </span>
+                <div className="flex items-baseline gap-1">
+                  <span className="font-mono text-xl font-bold text-emerald-800">{summary.paybackYears}</span>
+                  <span className="text-xs text-slate-500 font-semibold">Años</span>
+                </div>
+                <span className="text-[11px] text-emerald-700 font-medium block mt-0.5">
+                  TIR (IRR): {summary.irrPct}%
+                </span>
+              </div>
+
+              {/* Card 5: VALOR ACTUAL NETO (VAN) */}
+              <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm col-span-2 sm:col-span-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                  VALOR ACTUAL NETO (VAN @ 10%)
+                </span>
+                <div className="flex items-baseline gap-1">
+                  <span className="font-mono text-xl font-bold text-slate-900">${summary.npvUSD.toLocaleString()}</span>
+                </div>
+                <span className="text-[11px] text-emerald-700 font-semibold block mt-0.5">
+                  ROI 25 Años: {summary.roi25YrPct}%
+                </span>
+              </div>
+            </div>
+
+            {/* TABLA 1: Parámetros del Sistema e Inversión Neta */}
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
               <div className="bg-[#2d5f47] text-white px-4 py-3 font-bold text-xs uppercase tracking-wider">
                 Cálculo de Ahorro y Retorno de Inversión
               </div>
               <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-slate-100 font-bold text-slate-700 border-b border-slate-200">
-                  <tr>
-                    <th className="py-2.5 px-4 w-[35%]">Parámetro</th>
-                    <th className="py-2.5 px-4 text-right w-[25%]">Valor</th>
-                    <th className="py-2.5 px-4 w-[40%]">Detalles</th>
+                <tbody className="divide-y divide-slate-200 text-slate-700 font-mono">
+                  <tr className="hover:bg-slate-50">
+                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800 w-[40%]">Cliente / Proyecto</td>
+                    <td className="py-2.5 px-4 font-bold text-slate-900">{project.client.name}</td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 text-slate-700">
-                  <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-800">Cliente</td>
-                    <td className="py-2.5 px-4 text-right font-mono font-bold uppercase">{project.client.name}</td>
-                    <td className="py-2.5 px-4 text-slate-500 font-mono">{project.client.projectId} | {project.client.location}</td>
+                  <tr className="hover:bg-slate-50">
+                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">Potencia Instalada (kWp)</td>
+                    <td className="py-2.5 px-4 font-bold text-emerald-800">{summary.systemCapacityKWp} kWp</td>
                   </tr>
-                  <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-800">Potencia instalada (DC)</td>
-                    <td className="py-2.5 px-4 text-right font-mono font-bold">{summary.systemCapacityKWp.toFixed(2)} kWp</td>
-                    <td className="py-2.5 px-4 text-slate-500">{project.specs.panelCount} paneles {project.specs.panelPowerW}W</td>
+                  <tr className="hover:bg-slate-50">
+                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">Inversión Inicial Sistema (USD)</td>
+                    <td className="py-2.5 px-4 font-bold text-slate-900">${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</td>
                   </tr>
-                  <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-800">Producción Est. Anual</td>
-                    <td className="py-2.5 px-4 text-right font-mono font-bold">{summary.annualProductionKWh.toLocaleString()} kWh/año</td>
-                    <td className="py-2.5 px-4 text-slate-500">Irradiación promedio RD ({project.client.province})</td>
+                  <tr className="hover:bg-slate-50">
+                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">Incentivo Fiscal Estimado (Ley 57-07) (USD)</td>
+                    <td className="py-2.5 px-4 font-bold text-emerald-700">-${summary.ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</td>
                   </tr>
-                  <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-800">Cobertura del consumo</td>
-                    <td className="py-2.5 px-4 text-right font-mono font-bold text-emerald-700">{summary.energyCoveragePct.toFixed(2)}%</td>
-                    <td className="py-2.5 px-4 text-slate-500">Sistema cubre {summary.energyCoveragePct}% del consumo mensual</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-800">Consumo mensual cliente</td>
-                    <td className="py-2.5 px-4 text-right font-mono font-bold">{Math.round(summary.annualConsumptionKWh / 12).toLocaleString()} kWh/mes</td>
-                    <td className="py-2.5 px-4 text-slate-500">Fuente: Historial de facturación</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-800">Vida útil del sistema</td>
-                    <td className="py-2.5 px-4 text-right font-mono font-bold">{project.financials.projectLifespanYears} años</td>
-                    <td className="py-2.5 px-4 text-slate-500">Garantía productiva de paneles</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-800">Degradación anual paneles</td>
-                    <td className="py-2.5 px-4 text-right font-mono font-bold">{project.specs.annualDegradation || 0.5}%</td>
-                    <td className="py-2.5 px-4 text-slate-500">Tasa estándar fabricante</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-800">Precio actual kWh ({project.rates.distributor || 'EDESUR'})</td>
-                    <td className="py-2.5 px-4 text-right font-mono font-bold">${project.rates.energyCostPerKWh} USD/kWh</td>
-                    <td className="py-2.5 px-4 text-slate-500">Estimado según tarifa cliente</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-800">Inversión total del sistema</td>
-                    <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD</td>
-                    <td className="py-2.5 px-4 text-slate-500">Precio con Ley 57-07 aplicada</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-800">ITBIS descontado Ley 57-07</td>
-                    <td className="py-2.5 px-4 text-right font-mono font-bold text-emerald-700">${summary.itbisSavedUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD</td>
-                    <td className="py-2.5 px-4 text-slate-500">Exoneración ITBIS 18%</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-800">Incentivo fiscal DGII (40%)</td>
-                    <td className="py-2.5 px-4 text-right font-mono font-bold text-emerald-700">${summary.ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })} USD</td>
-                    <td className="py-2.5 px-4 text-slate-500">Crédito fiscal 3 años</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2.5 px-4 font-semibold text-slate-800">Precio por Watt instalado</td>
-                    <td className="py-2.5 px-4 text-right font-mono font-bold">${project.specs.pricePerWattUSD || project.financials.pricePerWattUSD} USD/W</td>
-                    <td className="py-2.5 px-4 text-slate-500">Competitividad de precio</td>
+                  <tr className="hover:bg-slate-50 bg-emerald-50/50 font-bold">
+                    <td className="py-2.5 px-4 font-sans text-slate-900">Inversión Neta Final (USD)</td>
+                    <td className="py-2.5 px-4 text-emerald-800 text-sm">${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
-            {/* TABLA 2: Resumen de Ahorro Anual y Retorno de Inversión */}
+            {/* TABLA 2: Resumen de Ahorro Anual y Retorno de Inversión (Años 1, Payback, 10, 25) */}
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
               <div className="bg-[#2d5f47] text-white px-4 py-3 font-bold text-xs uppercase tracking-wider">
                 Resumen de Ahorro Anual y Retorno de Inversión
@@ -1086,58 +1115,74 @@ export const SimulatorView: React.FC = () => {
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="bg-slate-100 font-bold text-slate-700 border-b border-slate-200">
                   <tr>
-                    <th className="py-2.5 px-4 w-[30%]">Descripción</th>
-                    <th className="py-2.5 px-4 text-right w-[14%]">Año 1</th>
-                    <th className="py-2.5 px-4 text-right w-[14%]">Promedio 5 Años</th>
-                    <th className="py-2.5 px-4 text-right w-[14%]">Promedio 10 Años</th>
-                    <th className="py-2.5 px-4 text-right w-[14%]">Promedio 25 Años</th>
-                    <th className="py-2.5 px-4 w-[14%]">Notas</th>
+                    <th className="py-2.5 px-4">AÑO</th>
+                    <th className="py-2.5 px-4 text-right">AHORRO ENERGÉTICO (USD)</th>
+                    <th className="py-2.5 px-4 text-right">INCENTIVO FISCAL (USD)</th>
+                    <th className="py-2.5 px-4 text-right">AHORRO TOTAL ANUAL (USD)</th>
+                    <th className="py-2.5 px-4 text-right font-bold">BENEFICIO ACUMULADO (USD)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 text-slate-700 font-mono">
-                  <tr>
-                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">Energía Generada x Tarifa (USD/año)</td>
+                  <tr className="hover:bg-slate-50">
+                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">Año 1</td>
                     <td className="py-2.5 px-4 text-right">${year1Savings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td className="py-2.5 px-4 text-right">${avg5Savings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td className="py-2.5 px-4 text-right">${avg10Savings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td className="py-2.5 px-4 text-right">${avg25Savings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td className="py-2.5 px-4 font-sans text-slate-500 text-[11px]">Producción año N x tarifa USD/kWh</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">Incentivo Fiscal DGII Ley 57-07 (USD/año)</td>
                     <td className="py-2.5 px-4 text-right text-emerald-700">${year1Tax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td className="py-2.5 px-4 text-right text-emerald-700">${avg5Tax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td className="py-2.5 px-4 text-right text-slate-400">$0.00</td>
-                    <td className="py-2.5 px-4 text-right text-slate-400">$0.00</td>
-                    <td className="py-2.5 px-4 font-sans text-slate-500 text-[11px]">Crédito DGII aplicable primeros 3 años</td>
+                    <td className="py-2.5 px-4 text-right font-semibold">${(year1Savings + year1Tax).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="py-2.5 px-4 text-right font-bold text-red-600">-${(summary.grossInvestmentUSD - year1Savings - year1Tax).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  </tr>
+
+                  <tr className="hover:bg-slate-50 bg-emerald-50/60 font-bold">
+                    <td className="py-2.5 px-4 font-sans text-emerald-900">Año {Math.ceil(summary.paybackYears)} (Retorno Payback)</td>
+                    <td className="py-2.5 px-4 text-right">${(cf25[Math.ceil(summary.paybackYears) - 1]?.savingsUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="py-2.5 px-4 text-right text-emerald-700">${(cf25[Math.ceil(summary.paybackYears) - 1]?.taxCreditUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="py-2.5 px-4 text-right">${((cf25[Math.ceil(summary.paybackYears) - 1]?.savingsUSD || 0) + (cf25[Math.ceil(summary.paybackYears) - 1]?.taxCreditUSD || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="py-2.5 px-4 text-right font-bold text-emerald-800">${(cf25[Math.ceil(summary.paybackYears) - 1]?.cumulativeCashFlowUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  </tr>
+
+                  <tr className="hover:bg-slate-50">
+                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">Año 10</td>
+                    <td className="py-2.5 px-4 text-right">${avg10Savings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="py-2.5 px-4 text-right text-emerald-700">${avg10Tax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="py-2.5 px-4 text-right font-semibold">${(avg10Savings + avg10Tax).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="py-2.5 px-4 text-right font-bold text-emerald-700">${(cf25[9]?.cumulativeCashFlowUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  </tr>
+
+                  <tr className="hover:bg-slate-50 font-bold bg-slate-50">
+                    <td className="py-2.5 px-4 font-sans text-slate-900">Año 25 (Final de Vida Útil)</td>
+                    <td className="py-2.5 px-4 text-right">${avg25Savings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="py-2.5 px-4 text-right text-emerald-700">${avg25Tax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="py-2.5 px-4 text-right font-bold text-slate-900">${(avg25Savings + avg25Tax).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="py-2.5 px-4 text-right font-bold text-emerald-800">${(cf25[cf25.length - 1]?.cumulativeCashFlowUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   </tr>
                 </tbody>
-                <tfoot className="bg-[#dbeafe] text-slate-900 font-bold border-t-2 border-slate-300 text-xs font-mono">
-                  <tr>
-                    <td className="py-3 px-4 font-sans">AHORRO TOTAL ANUAL (USD)</td>
-                    <td className="py-3 px-4 text-right">${(year1Savings + year1Tax).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td className="py-3 px-4 text-right">${(avg5Savings + avg5Tax).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td className="py-3 px-4 text-right">${(avg10Savings + avg10Tax).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td className="py-3 px-4 text-right">${(avg25Savings + avg25Tax).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td className="py-3 px-4 font-sans text-[11px]">Energía + incentivo fiscal</td>
-                  </tr>
-                </tfoot>
               </table>
             </div>
 
-            {/* GRÁFICA: Beneficio Acumulado (USD) */}
-            <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-4">
-              <div className="border-b border-slate-100 pb-3">
-                <h3 className="text-base font-bold text-slate-900">Beneficio Acumulado (USD)</h3>
+            {/* GRÁFICA DE BENEFICIO ACUMULADO (25 AÑOS) */}
+            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-3">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+                  Beneficio Acumulado (25 Años)
+                </h3>
+                <div className="flex items-center gap-4 text-xs font-semibold">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-xs bg-red-500"></span>
+                    <span className="text-slate-700">Inversión Neta Negativa</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-xs bg-emerald-600"></span>
+                    <span className="text-slate-700">Beneficio Acumulado Positivo</span>
+                  </div>
+                </div>
               </div>
 
-              <div className="w-full h-[300px]">
+              <div className="h-[260px] w-full pt-2">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={cumulativeChartData} margin={{ top: 10, right: 10, left: 10, bottom: 25 }}>
+                  <BarChart data={cumulativeChartData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                    <XAxis dataKey="yearLabel" tick={{ fontSize: 11, fill: '#64748b' }} />
+                    <XAxis dataKey="yearLabel" tick={{ fontSize: 10, fill: '#64748b' }} />
                     <YAxis
-                      tick={{ fontSize: 11, fill: '#64748b' }}
+                      tick={{ fontSize: 10, fill: '#64748b' }}
                       tickFormatter={(val: number) => `$${(val / 1000).toFixed(0)}k`}
                     />
                     <Tooltip formatter={(val: number) => [`$${val.toLocaleString()} USD`, 'Beneficio Acumulado']} />
@@ -1145,7 +1190,7 @@ export const SimulatorView: React.FC = () => {
                       {cumulativeChartData.map((entry, index) => (
                         <Cell
                           key={`cell-${index}`}
-                          fill={entry.cumulative < 0 ? '#e53e3e' : '#006c49'}
+                          fill={entry.cumulative < 0 ? '#ef4444' : '#16a34a'}
                         />
                       ))}
                     </Bar>
@@ -1263,7 +1308,7 @@ export const SimulatorView: React.FC = () => {
                 </tbody>
               </table>
             </div>
-          </div>
+          </>
         )}
       </main>
     </div>
