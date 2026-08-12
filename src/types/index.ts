@@ -4,6 +4,7 @@ export interface ClientInfo {
   location: string;
   province: string;
   coordinates?: string; // e.g. "18.4861, -69.9312"
+  customMonthlyHSP?: number[]; // Dynamic 12-month solar radiation vector from GPS satellite API
   projectId: string;
   distributor?: 'EDEESTE' | 'EDESUR' | 'EDENORTE' | 'CEPM';
   tariffCode?: string;

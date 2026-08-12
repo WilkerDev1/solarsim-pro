@@ -78,8 +78,8 @@ export const SimulatorView: React.FC = () => {
     setIsFetchingSolar(false);
 
     if (res.success) {
-      setSolarApiStatus(` Radiación solar obtenida (${res.avgHSP} kWh/m²/día promedio)`);
-      // Update simulation state if needed
+      setSolarApiStatus(` Radiación solar obtenida vía API NASA/GPS (${res.avgHSP} kWh/m²/día promedio)`);
+      updateClient({ customMonthlyHSP: res.monthlyHSP });
     } else {
       setSolarApiStatus(`⚠️ ${res.error}`);
     }
@@ -151,13 +151,35 @@ export const SimulatorView: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Ubicación / Provincia</label>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Ubicación (Ciudad / Proyecto)</label>
                 <input
                   type="text"
                   value={project.client.location}
                   onChange={(e) => updateClient({ location: e.target.value })}
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Provincia / Matriz de Radiación</label>
+                <select
+                  value={project.client.province}
+                  onChange={(e) => {
+                    const selected = e.target.value;
+                    updateClient({
+                      province: selected,
+                      customMonthlyHSP: undefined, // Reset to selected province HSP
+                    });
+                    setSolarApiStatus(null);
+                  }}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all cursor-pointer font-semibold"
+                >
+                  {RD_PROVINCES.map((prov) => (
+                    <option key={prov.code} value={prov.name}>
+                      {prov.name} ({prov.avgHSP} HSP/día)
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>

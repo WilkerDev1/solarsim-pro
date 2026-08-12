@@ -296,7 +296,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       project.specs,
       project.rates,
       project.financials,
-      project.monthlyConsumption
+      project.monthlyConsumption,
+      project.client.customMonthlyHSP
     );
   },
 }));

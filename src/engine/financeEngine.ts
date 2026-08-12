@@ -42,7 +42,8 @@ export function calculateFinancialSummary(
   specs: SystemSpecs,
   rates: UtilityRates,
   financials: FinancialParams,
-  monthlyConsumptionKWh: number[]
+  monthlyConsumptionKWh: number[],
+  customMonthlyHSP?: number[]
 ): FinancialSummaryResult {
   const dcCapacityKWp = calculateDCCapacityKWp(specs.panelPowerW, specs.panelCount);
 
@@ -73,13 +74,14 @@ export function calculateFinancialSummary(
 
   const netInvestmentUSD = Math.round((grossInvestmentUSD - ley5707CreditUSD) * 100) / 100;
 
-  // Monthly energy balance calculation
+  // Monthly energy balance calculation dynamically based on location-specific solar radiation (HSP)
   const monthlyResults = calculateMonthlySolarProduction(
     provinceName,
     specs,
     monthlyConsumptionKWh,
     rates.energyCostPerKWh,
-    rates.gridExportFeePct
+    rates.gridExportFeePct,
+    customMonthlyHSP
   );
 
   const annualConsumptionKWh = monthlyResults.reduce((sum, m) => sum + m.consumptionKWh, 0);

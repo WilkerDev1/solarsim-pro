@@ -12,14 +12,15 @@ export function calculateDCCapacityKWp(panelPowerW: number, panelCount: number):
 }
 
 /**
- * Calculates monthly solar production and energy balance.
+ * Calculates monthly solar production and energy balance dynamically using location-specific solar radiation.
  */
 export function calculateMonthlySolarProduction(
   provinceName: string,
   specs: SystemSpecs,
   monthlyConsumptionKWh: number[],
   energyCostPerKWh: number,
-  gridExportFeePct: number
+  gridExportFeePct: number,
+  customMonthlyHSP?: number[]
 ): MonthlyEnergyResult[] {
   const dcCapacityKWp = calculateDCCapacityKWp(specs.panelPowerW, specs.panelCount);
   const province = getProvinceHSP(provinceName);
@@ -31,25 +32,28 @@ export function calculateMonthlySolarProduction(
   const results: MonthlyEnergyResult[] = [];
 
   for (let i = 0; i < 12; i++) {
-    const hsp = province.monthlyHSP[i];
+    // Dynamic solar radiation (HSP): Uses satellite GPS API custom vector if available, otherwise province database
+    const hsp = (customMonthlyHSP && customMonthlyHSP.length === 12 && customMonthlyHSP[i] > 0)
+      ? customMonthlyHSP[i]
+      : province.monthlyHSP[i];
+
     const days = DAYS_IN_MONTH[i];
     const consumption = monthlyConsumptionKWh[i] || 3000;
 
-    // Monthly solar production calculation: kWp * HSP * days * derateFactor
-    const production = Math.round(dcCapacityKWp * hsp * days * derateFactor);
+    // Dynamic monthly solar production formula: kWp * HSP * days * derateFactor
+    const production = Math.round(dcCapacityKWp * hsp * days * derateFactor * 10) / 10;
 
     // Instant self-consumption vs grid export model
-    // Commercial daytime load fraction (~75% daytime usage for medical/office, ~60% general)
     const daytimeSelfConsumptionRatio = specs.hasBattery ? 0.90 : 0.75;
     
-    let solarSelfConsumed = Math.min(consumption, Math.round(production * daytimeSelfConsumptionRatio));
-    let gridExported = Math.max(0, production - solarSelfConsumed);
+    let solarSelfConsumed = Math.min(consumption, Math.round(production * daytimeSelfConsumptionRatio * 10) / 10);
+    let gridExported = Math.max(0, Math.round((production - solarSelfConsumed) * 10) / 10);
 
     if (solarSelfConsumed + gridExported > production) {
-      gridExported = Math.max(0, production - solarSelfConsumed);
+      gridExported = Math.max(0, Math.round((production - solarSelfConsumed) * 10) / 10);
     }
 
-    // Grid export net metering with SIE-007-2026-REG 25% fee on exported energy
+    // Grid export net metering with SIE-007-2026-REG fee on exported energy
     const netExportCredit = gridExported * (1 - (gridExportFeePct / 100));
 
     // Energy savings = (Self consumed + net export credit) * energy cost
@@ -63,7 +67,7 @@ export function calculateMonthlySolarProduction(
       month: MONTH_NAMES[i],
       monthIndex: i,
       days,
-      hsp,
+      hsp: Math.round(hsp * 100) / 100,
       consumptionKWh: consumption,
       productionKWh: production,
       solarSelfConsumedKWh: solarSelfConsumed,
