@@ -592,70 +592,160 @@ export const SimulatorView: React.FC = () => {
           </div>
         </div>
 
-        {/* TOP 5 KPI SUMMARY CARDS (Displayed on both views) */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {/* Card 1: Payback Period */}
-          <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-sm relative overflow-hidden">
-            <div className="absolute top-2 right-2 w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
-              <span className="material-symbols-outlined text-emerald-700 text-sm">schedule</span>
+        {/* ---------------------------------------------------- */}
+        {/* DEDICATED HEADER 1: ANÁLISIS DE ENERGÍA (ENERGY METRICS) */}
+        {/* ---------------------------------------------------- */}
+        {activeMainTab === 'energia' && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {/* Card 1: CAPACIDAD INSTALADA */}
+            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                CAPACIDAD INSTALADA
+              </span>
+              <div className="flex items-baseline gap-1">
+                <span className="font-mono text-xl font-bold text-emerald-800">{summary.systemCapacityKWp}</span>
+                <span className="text-xs text-slate-500 font-semibold">kWp</span>
+              </div>
+              <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
+                {project.specs.panelCount} módulos × {project.specs.panelPowerW}W
+              </span>
             </div>
-            <span className="text-[11px] font-bold text-slate-500 block mb-1">Payback Period</span>
-            <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-bold font-mono text-slate-900">{summary.paybackYears}</span>
-              <span className="text-xs font-medium text-slate-500">years</span>
-            </div>
-          </div>
 
-          {/* Card 2: IRR */}
-          <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-sm relative overflow-hidden">
-            <div className="absolute top-2 right-2 w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
-              <span className="material-symbols-outlined text-emerald-700 text-sm">trending_up</span>
+            {/* Card 2: GENERACIÓN ANUAL */}
+            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                GENERACIÓN ANUAL
+              </span>
+              <div className="flex items-baseline gap-1">
+                <span className="font-mono text-xl font-bold text-slate-900">{summary.annualProductionKWh.toLocaleString()}</span>
+                <span className="text-xs text-slate-500 font-semibold">kWh</span>
+              </div>
+              <span className="text-[11px] font-semibold text-emerald-700 block mt-0.5">
+                {summary.energyCoveragePct}% Cobertura Solar
+              </span>
             </div>
-            <span className="text-[11px] font-bold text-slate-500 block mb-1">IRR</span>
-            <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-bold font-mono text-emerald-700">{summary.irrPct}</span>
-              <span className="text-xs font-semibold text-emerald-700">%</span>
-            </div>
-          </div>
 
-          {/* Card 3: NPV (10%) */}
-          <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-sm relative overflow-hidden">
-            <div className="absolute top-2 right-2 w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center">
-              <span className="material-symbols-outlined text-indigo-700 text-sm">account_balance</span>
+            {/* Card 3: CONSUMO ANUAL */}
+            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                CONSUMO ANUAL
+              </span>
+              <div className="flex items-baseline gap-1">
+                <span className="font-mono text-xl font-bold text-slate-900">{summary.annualConsumptionKWh.toLocaleString()}</span>
+                <span className="text-xs text-slate-500 font-semibold">kWh</span>
+              </div>
+              <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
+                Prom: {Math.round(summary.annualConsumptionKWh / 12).toLocaleString()} kWh/mes
+              </span>
             </div>
-            <span className="text-[11px] font-bold text-slate-500 block mb-1">NPV ({project.financials.discountRatePct}%)</span>
-            <div className="flex items-baseline gap-1">
-              <span className="text-xl font-bold font-mono text-slate-900">
-                ${summary.npvUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+
+            {/* Card 4: AHORRO ENERGÉTICO ANUAL */}
+            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                AHORRO ENERGÉTICO ANUAL
+              </span>
+              <div className="flex items-baseline gap-1">
+                <span className="font-mono text-xl font-bold text-emerald-700">${summary.year1SavingsUSD.toLocaleString()}</span>
+                <span className="text-xs text-slate-500 font-semibold">USD</span>
+              </div>
+              <span className="text-[11px] text-emerald-700 font-medium block mt-0.5">
+                Autoconsumo solar en factura
+              </span>
+            </div>
+
+            {/* Card 5: IMPACTO AMBIENTAL */}
+            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm col-span-2 sm:col-span-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                IMPACTO AMBIENTAL
+              </span>
+              <div className="flex items-baseline gap-1">
+                <span className="font-mono text-xl font-bold text-emerald-800">-{summary.co2AvoidedTonsPerYear}</span>
+                <span className="text-xs text-slate-500 font-semibold">Tons CO₂</span>
+              </div>
+              <span className="text-[11px] text-emerald-700 font-medium block mt-0.5">
+                🌱 Reducción CO₂ por año
               </span>
             </div>
           </div>
+        )}
 
-          {/* Card 4: Ahorro Total 25 Años */}
-          <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-sm relative overflow-hidden">
-            <div className="absolute top-2 right-2 w-7 h-7 rounded-lg bg-amber-50 flex items-center justify-center">
-              <span className="material-symbols-outlined text-amber-700 text-sm">savings</span>
+        {/* ---------------------------------------------------- */}
+        {/* DEDICATED HEADER 2: RETORNO DE INVERSIÓN (FINANCIAL & INCENTIVES) */}
+        {/* Exact Match to Imagen 1 format requested by user */}
+        {/* ---------------------------------------------------- */}
+        {activeMainTab === 'retorno' && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {/* Card 1: CAPACIDAD DC */}
+            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                CAPACIDAD DC
+              </span>
+              <div className="flex items-baseline gap-1">
+                <span className="font-mono text-xl font-bold text-emerald-800">{summary.systemCapacityKWp}</span>
+                <span className="text-xs text-slate-500 font-semibold">kWp</span>
+              </div>
+              <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
+                {project.specs.panelCount} módulos × {project.specs.panelPowerW}W
+              </span>
             </div>
-            <span className="text-[11px] font-bold text-slate-500 block mb-1">Ahorro Total 25 Años</span>
-            <div className="flex items-baseline gap-1">
-              <span className="text-xl font-bold font-mono text-slate-900">
-                ${summary.total25YearSavingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+
+            {/* Card 2: GENERACIÓN ANUAL */}
+            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                GENERACIÓN ANUAL
+              </span>
+              <div className="flex items-baseline gap-1">
+                <span className="font-mono text-xl font-bold text-slate-900">{summary.annualProductionKWh.toLocaleString()}</span>
+                <span className="text-xs text-slate-500 font-semibold">kWh</span>
+              </div>
+              <span className="text-[11px] font-semibold text-emerald-700 block mt-0.5">
+                {summary.energyCoveragePct}% Cobertura
+              </span>
+            </div>
+
+            {/* Card 3: INVERSIÓN TOTAL (NETA) */}
+            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                INVERSIÓN TOTAL (NETA)
+              </span>
+              <div className="flex items-baseline gap-1">
+                <span className="font-mono text-xl font-bold text-emerald-700">${summary.netInvestmentUSD.toLocaleString()}</span>
+                <span className="text-xs text-slate-500 font-semibold">USD</span>
+              </div>
+              <span className="text-[11px] text-amber-700 font-bold block mt-0.5">
+                Ley 57-07: -${summary.ley5707CreditUSD.toLocaleString()} USD
+              </span>
+            </div>
+
+            {/* Card 4: RETORNO (PAYBACK / TIR) */}
+            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                RETORNO (PAYBACK / TIR)
+              </span>
+              <div className="flex items-baseline gap-1">
+                <span className="font-mono text-xl font-bold text-emerald-700">{summary.paybackYears}</span>
+                <span className="text-xs text-slate-500 font-semibold">años</span>
+              </div>
+              <span className="text-[11px] text-emerald-800 font-bold block mt-0.5">
+                TIR: {summary.irrPct}%
+              </span>
+            </div>
+
+            {/* Card 5: VAN (10%) & CO2 */}
+            <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm col-span-2 sm:col-span-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                VAN ({project.financials.discountRatePct}%) & CO₂
+              </span>
+              <div className="flex items-baseline gap-1">
+                <span className="font-mono text-xl font-bold text-slate-900">${summary.npvUSD.toLocaleString()}</span>
+                <span className="text-xs text-slate-500 font-semibold">USD</span>
+              </div>
+              <span className="text-[11px] text-emerald-700 font-medium block mt-0.5">
+                🌱 -{summary.co2AvoidedTonsPerYear} Tons CO₂/año
               </span>
             </div>
           </div>
-
-          {/* Card 5: ROI (25 years) */}
-          <div className="bg-white border border-slate-200/80 rounded-xl p-4 shadow-sm relative overflow-hidden col-span-2 sm:col-span-1">
-            <div className="absolute top-2 right-2 w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
-              <span className="material-symbols-outlined text-emerald-700 text-sm">finance_chip</span>
-            </div>
-            <span className="text-[11px] font-bold text-slate-500 block mb-1">ROI (25 years)</span>
-            <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-bold font-mono text-emerald-700">{summary.roi25YrPct}</span>
-              <span className="text-xs font-semibold text-emerald-700">%</span>
-            </div>
-          </div>
-        </div>
+        )}
 
         {/* VISTA 1: ANÁLISIS DE ENERGÍA */}
         {activeMainTab === 'energia' && (
