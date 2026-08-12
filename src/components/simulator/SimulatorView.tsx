@@ -1054,6 +1054,59 @@ export const SimulatorView: React.FC = () => {
                 </tbody>
               </table>
             </div>
+
+            {/* TABLA 4: Indicadores Financieros del Proyecto */}
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+              <div className="bg-[#2d5f47] text-white px-4 py-3 font-bold text-xs uppercase tracking-wider">
+                Indicadores Financieros del Proyecto
+              </div>
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-slate-100 font-bold text-slate-700 border-b border-slate-200">
+                  <tr>
+                    <th className="py-2.5 px-4 w-[40%]">Indicador</th>
+                    <th className="py-2.5 px-4 text-right w-[20%]">Valor</th>
+                    <th className="py-2.5 px-4 w-[40%]">Detalles</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 text-slate-700 font-mono">
+                  <tr>
+                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">Payback (Periodo de Recuperación)</td>
+                    <td className="py-2.5 px-4 text-right font-bold text-emerald-700">{summary.paybackYears}</td>
+                    <td className="py-2.5 px-4 font-sans text-slate-500 text-[11px]">Años hasta recuperar la inversión inicial</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">TIR (Tasa Interna de Retorno)</td>
+                    <td className="py-2.5 px-4 text-right font-bold text-emerald-700">{summary.irrPct}%</td>
+                    <td className="py-2.5 px-4 font-sans text-slate-500 text-[11px]">Rendimiento anual del proyecto</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">VAN a tasa descuento {project.financials.discountRatePct}%</td>
+                    <td className="py-2.5 px-4 text-right font-bold text-emerald-700">${summary.npvUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="py-2.5 px-4 font-sans text-slate-500 text-[11px]">Valor actual neto — positivo = proyecto viable</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">Ahorro Total 25 Años</td>
+                    <td className="py-2.5 px-4 text-right font-bold text-emerald-700">${summary.total25YearSavingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="py-2.5 px-4 font-sans text-slate-500 text-[11px]">Beneficio acumulado al final del periodo</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">ROI Total del Proyecto</td>
+                    <td className="py-2.5 px-4 text-right font-bold text-emerald-700">{summary.roi25YrPct}%</td>
+                    <td className="py-2.5 px-4 font-sans text-slate-500 text-[11px]">Retorno sobre inversión total en 25 años</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">Reducción CO2 estimada (25 años)</td>
+                    <td className="py-2.5 px-4 text-right font-bold text-emerald-700">{(summary.co2AvoidedTonsPerYear * 25).toFixed(2)} Ton</td>
+                    <td className="py-2.5 px-4 font-sans text-slate-500 text-[11px]">Factor emisión red RD: {project.financials.co2FactorKgPerKWh || 0.481} kg CO2/kWh</td>
+                  </tr>
+                  <tr>
+                    <td className="py-2.5 px-4 font-sans font-semibold text-slate-800">Precio por Watt instalado</td>
+                    <td className="py-2.5 px-4 text-right font-bold text-emerald-700">${(project.specs.pricePerWattUSD || project.financials.pricePerWattUSD).toFixed(2)}</td>
+                    <td className="py-2.5 px-4 font-sans text-slate-500 text-[11px]">Competitividad vs mercado</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </main>
