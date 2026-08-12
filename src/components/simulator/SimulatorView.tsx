@@ -354,8 +354,9 @@ export const SimulatorView: React.FC = () => {
                 </label>
               </div>
 
+              {/* CAMPOS DE BATERÍA (CAPACIDAD kWh + PRECIO $ USD) */}
               {project.specs.hasBattery && (
-                <div className="space-y-2">
+                <div className="space-y-3 p-3 bg-slate-50 border border-slate-200 rounded-lg">
                   <div>
                     <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Capacidad de Batería (kWh)</label>
                     <input
@@ -363,9 +364,21 @@ export const SimulatorView: React.FC = () => {
                       step="1"
                       value={project.specs.batteryCapacityKWh}
                       onChange={(e) => updateSpecs({ batteryCapacityKWh: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
+                      className="w-full bg-white border border-outline-variant rounded-lg px-3 py-1.5 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
                     />
                   </div>
+
+                  <div>
+                    <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Precio de Batería ($ USD)</label>
+                    <input
+                      type="number"
+                      step="50"
+                      value={project.specs.batteryCostUSD || 0}
+                      onChange={(e) => updateSpecs({ batteryCostUSD: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-white border border-outline-variant rounded-lg px-3 py-1.5 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
+                    />
+                  </div>
+
                   {project.specs.isDetailed && (
                     <div>
                       <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Profundidad de Descarga (DOD %)</label>
@@ -374,7 +387,7 @@ export const SimulatorView: React.FC = () => {
                         step="1"
                         value={project.specs.batteryDOD || 80}
                         onChange={(e) => updateSpecs({ batteryDOD: parseFloat(e.target.value) || 0 })}
-                        className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
+                        className="w-full bg-white border border-outline-variant rounded-lg px-3 py-1.5 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
                       />
                     </div>
                   )}
@@ -387,7 +400,15 @@ export const SimulatorView: React.FC = () => {
                   <span className="text-[11px] font-medium text-secondary">Potencia Total DC:</span>
                   <span className="text-[12px] font-bold text-primary">{summary.systemCapacityKWp.toFixed(2)} kWp</span>
                 </div>
-                <div className="flex justify-between items-center">
+                {project.specs.hasBattery && summary.batteryInvestmentUSD > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-[11px] font-medium text-secondary">Costo Batería:</span>
+                    <span className="text-[12px] font-semibold text-emerald-700">
+                      +${summary.batteryInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center border-t border-primary/10 pt-1">
                   <span className="text-[11px] font-medium text-secondary">Inversión Estimada:</span>
                   <span className="text-[12px] font-bold text-primary">
                     ${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD

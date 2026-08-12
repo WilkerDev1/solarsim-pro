@@ -46,10 +46,16 @@ export function calculateFinancialSummary(
 ): FinancialSummaryResult {
   const dcCapacityKWp = calculateDCCapacityKWp(specs.panelPowerW, specs.panelCount);
 
-  // Calculate gross investment
-  const grossInvestmentUSD = financials.customCostUSD && financials.customCostUSD > 0
+  // Calculate solar system investment
+  const solarInvestmentUSD = financials.customCostUSD && financials.customCostUSD > 0
     ? financials.customCostUSD
     : Math.round(dcCapacityKWp * 1000 * financials.pricePerWattUSD * 100) / 100;
+
+  // Calculate battery storage investment if active
+  const batteryInvestmentUSD = specs.hasBattery ? (specs.batteryCostUSD || 0) : 0;
+
+  // Total Gross Investment = Solar + Battery
+  const grossInvestmentUSD = Math.round((solarInvestmentUSD + batteryInvestmentUSD) * 100) / 100;
 
   // Tax calculations
   const itbisSavedUSD = financials.applyITBISExemption
@@ -79,7 +85,7 @@ export function calculateFinancialSummary(
     : 0;
 
   // 25-Year Cash Flow Projection
-  const annualDegradationPct = specs.isDetailed ? specs.annualDegradation : 0.55;
+  const annualDegradationPct = specs.isDetailed ? specs.annualDegradation : 0.5;
   const annualInflationPct = rates.annualEnergyInflationPct || 3.5;
   const annualTaxCredit = financials.applyLey5707 ? ley5707CreditUSD / 3 : 0;
 
@@ -132,10 +138,12 @@ export function calculateFinancialSummary(
 
   // 25-Year ROI % Calculation
   const totalNetReturns = annualNetCashFlows.reduce((sum, cf) => sum + cf, 0);
-  const roi25YrPct = Math.round(((totalNetReturns - grossInvestmentUSD) / grossInvestmentUSD) * 10000) / 100;
+  const roi25YrPct = grossInvestmentUSD > 0
+    ? Math.round(((totalNetReturns - grossInvestmentUSD) / grossInvestmentUSD) * 10000) / 100
+    : 0;
 
   // CO2 avoided calculation (tons/year)
-  const co2AvoidedTonsPerYear = Math.round((annualProductionKWh * (financials.co2FactorKgPerKWh || 0.65) / 1000) * 10) / 10;
+  const co2AvoidedTonsPerYear = Math.round((annualProductionKWh * (financials.co2FactorKgPerKWh || 0.481) / 1000) * 10) / 10;
 
   return {
     systemCapacityKWp: Math.round(dcCapacityKWp * 100) / 100,
@@ -143,6 +151,8 @@ export function calculateFinancialSummary(
     annualProductionKWh,
     energyCoveragePct,
     grossInvestmentUSD,
+    solarInvestmentUSD,
+    batteryInvestmentUSD,
     itbisSavedUSD,
     ley5707CreditUSD,
     netInvestmentUSD,

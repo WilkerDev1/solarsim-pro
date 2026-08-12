@@ -257,7 +257,17 @@ export const PDFProposalView: React.FC = () => {
                 <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-2">
                   <h4 className="font-bold text-slate-900 border-b pb-1">Desglose Fiscal e Inversión</h4>
                   <div className="flex justify-between py-1 border-b border-slate-200/60">
-                    <span>Inversión Bruta (Turnkey):</span>
+                    <span>Inversión Sistema Solar:</span>
+                    <span className="font-mono font-bold">${summary.solarInvestmentUSD.toLocaleString()} USD</span>
+                  </div>
+                  {project.specs.hasBattery && summary.batteryInvestmentUSD > 0 && (
+                    <div className="flex justify-between py-1 border-b border-slate-200/60 text-emerald-700">
+                      <span>Inversión Almacenamiento (Batería):</span>
+                      <span className="font-mono font-bold">+${summary.batteryInvestmentUSD.toLocaleString()} USD</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between py-1 border-b border-slate-200/60 font-semibold">
+                    <span>Inversión Bruta Total:</span>
                     <span className="font-mono font-bold">${summary.grossInvestmentUSD.toLocaleString()} USD</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-slate-200/60 text-emerald-700">

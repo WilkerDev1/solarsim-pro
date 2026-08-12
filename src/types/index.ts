@@ -22,6 +22,7 @@ export interface SystemSpecs {
   inverterBrandModel?: string;
   hasBattery: boolean;
   batteryCapacityKWh: number;
+  batteryCostUSD?: number;       // Total battery cost in USD e.g. 3500
   batteryBrandModel?: string;
   // Detailed params
   panelEfficiency: number;      // % e.g. 21.8
@@ -81,6 +82,8 @@ export interface FinancialSummaryResult {
   annualProductionKWh: number;
   energyCoveragePct: number;
   grossInvestmentUSD: number;
+  solarInvestmentUSD: number;
+  batteryInvestmentUSD: number;
   itbisSavedUSD: number;
   ley5707CreditUSD: number;
   netInvestmentUSD: number;
