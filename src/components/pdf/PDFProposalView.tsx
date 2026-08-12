@@ -551,9 +551,9 @@ export const PDFProposalView: React.FC = () => {
               <div className="pdf-page w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative font-sans print:shadow-none print:w-full print:min-h-screen">
                 {/* Header */}
                 {showHeadersFooters && (
-                  <div className="px-10 py-8 border-b border-gray-200 flex justify-between items-start">
+                  <div className="px-10 py-6 border-b border-gray-200 flex justify-between items-start">
                     <div>
-                      <h1 className="text-2xl font-bold text-gray-900 mb-1">
+                      <h1 className="text-2xl font-bold text-gray-900 mb-0.5">
                         Flujo de Caja y Beneficios Acumulados (25 Años)
                       </h1>
                       <p className="text-xs text-gray-500 font-mono">
@@ -561,7 +561,7 @@ export const PDFProposalView: React.FC = () => {
                       </p>
                     </div>
                     <div className="flex flex-col items-end">
-                      <div className="px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded text-emerald-800 font-bold text-xs mb-1 uppercase tracking-wider">
+                      <div className="px-3 py-1 bg-emerald-50 border border-emerald-200 rounded text-emerald-800 font-bold text-xs mb-0.5 uppercase tracking-wider">
                         {project.client.name}
                       </div>
                       <p className="text-xs text-gray-500 font-medium">{project.client.location}</p>
@@ -570,29 +570,29 @@ export const PDFProposalView: React.FC = () => {
                 )}
 
                 {/* Body */}
-                <div className="px-10 py-8 flex-1 flex flex-col gap-6">
+                <div className="px-10 py-6 flex-1 flex flex-col justify-between">
                   {/* Detailed Cash Flow Table */}
-                  <div className="border border-gray-200 rounded-lg overflow-hidden text-[10px]">
-                    <table className="w-full text-left leading-snug border-collapse">
-                      <thead className="text-white bg-[#14532d] font-bold uppercase">
+                  <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs text-[11px]">
+                    <table className="w-full text-left leading-tight border-collapse">
+                      <thead className="text-white bg-[#14532d] font-bold uppercase tracking-wider text-[10px]">
                         <tr>
-                          <th className="px-2.5 py-1.5 w-10 text-center">Año</th>
-                          <th className="px-2.5 py-1.5 text-right">Energía Generada (kWh)</th>
-                          <th className="px-2.5 py-1.5 text-right">Ahorro (USD)</th>
-                          <th className="px-2.5 py-1.5 text-right">Incentivo (USD)</th>
-                          <th className="px-2.5 py-1.5 text-right">Flujo de Caja (USD)</th>
-                          <th className="px-2.5 py-1.5 text-right font-bold">Beneficio Acumulado</th>
+                          <th className="px-3.5 py-2.5 w-12 text-center">Año</th>
+                          <th className="px-3.5 py-2.5 text-right">Energía Generada (kWh)</th>
+                          <th className="px-3.5 py-2.5 text-right">Ahorro (USD)</th>
+                          <th className="px-3.5 py-2.5 text-right">Incentivo (USD)</th>
+                          <th className="px-3.5 py-2.5 text-right">Flujo de Caja (USD)</th>
+                          <th className="px-3.5 py-2.5 text-right font-bold">Beneficio Acumulado</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200 font-mono text-gray-700">
+                      <tbody className="divide-y divide-slate-100 font-mono text-slate-700">
                         {/* Year 0 Row */}
-                        <tr className="bg-red-50 text-red-900 font-bold">
-                          <td className="px-2.5 py-1.5 text-center font-sans">0</td>
-                          <td className="px-2.5 py-1.5 text-right text-gray-400">-</td>
-                          <td className="px-2.5 py-1.5 text-right text-gray-400">-</td>
-                          <td className="px-2.5 py-1.5 text-right text-gray-400">-</td>
-                          <td className="px-2.5 py-1.5 text-right text-red-600">-${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                          <td className="px-2.5 py-1.5 text-right text-red-600 font-bold">-${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                        <tr className="bg-red-50/70 text-red-700 font-bold">
+                          <td className="px-3.5 py-[3.5px] text-center font-sans">0</td>
+                          <td className="px-3.5 py-[3.5px] text-right text-slate-400">-</td>
+                          <td className="px-3.5 py-[3.5px] text-right text-slate-400">-</td>
+                          <td className="px-3.5 py-[3.5px] text-right text-slate-400">-</td>
+                          <td className="px-3.5 py-[3.5px] text-right text-red-600">-${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-3.5 py-[3.5px] text-right text-red-600 font-bold">-${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         </tr>
 
                         {/* Years 1 to 25 */}
@@ -605,25 +605,25 @@ export const PDFProposalView: React.FC = () => {
                               key={row.year}
                               className={
                                 isPaybackYear
-                                  ? 'bg-emerald-50/80 font-bold text-[#14532d] border-y border-emerald-300'
+                                  ? 'bg-emerald-50/90 font-bold text-[#14532d] border-y border-emerald-300'
                                   : row.year % 2 === 0
-                                  ? 'bg-gray-50/50'
+                                  ? 'bg-slate-50/60'
                                   : 'bg-white'
                               }
                             >
-                              <td className="px-2.5 py-1.2 text-center font-sans font-semibold">{row.year}</td>
-                              <td className="px-2.5 py-1.2 text-right">{row.productionKWh.toLocaleString()}</td>
-                              <td className="px-2.5 py-1.2 text-right">${row.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                              <td className="px-2.5 py-1.2 text-right text-green-700">
-                                {row.taxCreditUSD > 0 ? `$${row.taxCreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '$0.00'}
+                              <td className="px-3.5 py-[3.5px] text-center font-sans font-semibold">{row.year}</td>
+                              <td className="px-3.5 py-[3.5px] text-right">{row.productionKWh.toLocaleString()}</td>
+                              <td className="px-3.5 py-[3.5px] text-right">${row.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className="px-3.5 py-[3.5px] text-right text-[#16a34a] font-medium">
+                                {row.taxCreditUSD > 0 ? `$${row.taxCreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '$0.00'}
                               </td>
-                              <td className="px-2.5 py-1.2 text-right font-medium">${row.netCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                              <td className="px-3.5 py-[3.5px] text-right font-medium">${row.netCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                               <td
-                                className={`px-2.5 py-1.2 text-right font-bold ${
-                                  isCumulativeNegative ? 'text-red-600' : 'text-green-700'
+                                className={`px-3.5 py-[3.5px] text-right font-bold ${
+                                  isCumulativeNegative ? 'text-red-600' : 'text-[#16a34a]'
                                 }`}
                               >
-                                {isCumulativeNegative ? '-' : ''}${Math.abs(row.cumulativeCashFlowUSD).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                {isCumulativeNegative ? '-' : ''}${Math.abs(row.cumulativeCashFlowUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                             </tr>
                           );
@@ -632,51 +632,34 @@ export const PDFProposalView: React.FC = () => {
                     </table>
                   </div>
 
-                  {/* Summary Indicators Grid Box */}
-                  <div className="mt-auto bg-gray-50/80 border border-gray-200 rounded-xl p-5">
-                    <h3 className="text-gray-800 font-bold text-sm mb-3 border-b border-gray-200 pb-1.5 flex items-center gap-2">
-                      <ShieldCheck className="w-4 h-4 text-[#14532d]" /> Indicadores Financieros del Proyecto
-                    </h3>
-                    <div className="grid grid-cols-4 gap-y-3 gap-x-4 text-xs font-mono">
-                      <div>
-                        <p className="text-gray-500 text-[10px] uppercase tracking-wider font-sans mb-0.5">Payback</p>
-                        <p className="font-bold text-gray-900">{summary.paybackYears} años</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500 text-[10px] uppercase tracking-wider font-sans mb-0.5">TIR</p>
-                        <p className="font-bold text-[#14532d]">{summary.irrPct}%</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500 text-[10px] uppercase tracking-wider font-sans mb-0.5">VAN (10%)</p>
-                        <p className="font-bold text-gray-900">${summary.npvUSD.toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500 text-[10px] uppercase tracking-wider font-sans mb-0.5">Ahorro Total 25 Años</p>
-                        <p className="font-bold text-green-700">${summary.total25YearSavingsUSD.toLocaleString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500 text-[10px] uppercase tracking-wider font-sans mb-0.5">ROI Total</p>
-                        <p className="font-bold text-[#14532d]">{summary.roi25YrPct}%</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500 text-[10px] uppercase tracking-wider font-sans mb-0.5">Reducción CO2</p>
-                        <p className="font-bold text-gray-900">{(summary.co2AvoidedTonsPerYear * 25).toFixed(1)} Ton</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500 text-[10px] uppercase tracking-wider font-sans mb-0.5">Precio por Watt</p>
-                        <p className="font-bold text-gray-900">${project.specs.pricePerWattUSD || project.financials.pricePerWattUSD} USD/W</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500 text-[10px] uppercase tracking-wider font-sans mb-0.5">Capacidad DC</p>
-                        <p className="font-bold text-gray-900">{summary.systemCapacityKWp} kWp</p>
-                      </div>
+                  {/* Sleek 1-Line Summary Footer Box */}
+                  <div className="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex justify-between items-center text-xs font-mono">
+                    <div className="flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-[#14532d]" />
+                      <span className="font-sans font-bold text-slate-800">Resumen Financiero:</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 font-sans">Payback:</span>{' '}
+                      <span className="font-bold text-slate-900">{summary.paybackYears} años</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 font-sans">TIR:</span>{' '}
+                      <span className="font-bold text-[#14532d]">{summary.irrPct}%</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 font-sans">VAN (10%):</span>{' '}
+                      <span className="font-bold text-slate-900">${summary.npvUSD.toLocaleString()} USD</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 font-sans">Ahorro 25 Años:</span>{' '}
+                      <span className="font-bold text-[#16a34a]">${summary.total25YearSavingsUSD.toLocaleString()} USD</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Footer */}
                 {showHeadersFooters && (
-                  <div className="px-10 py-5 border-t border-gray-200 flex justify-between items-center text-xs text-gray-400 mt-auto">
+                  <div className="px-10 py-4 border-t border-gray-200 flex justify-between items-center text-xs text-gray-400 mt-auto">
                     <span>Generado por SolarSim Pro</span>
                     <span>Página {page3Num} de {activePagesCount}</span>
                   </div>
