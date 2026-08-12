@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { RD_PROVINCES } from '../../data/rdProvinces';
 import {
@@ -24,10 +24,8 @@ import {
   TrendingUp,
   BarChart2,
   Table as TableIcon,
-  HelpCircle,
   Sparkles,
-  ShieldCheck,
-  BatteryCharging,
+  RotateCcw,
 } from 'lucide-react';
 
 export const SimulatorView: React.FC = () => {
@@ -47,283 +45,323 @@ export const SimulatorView: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'chart-monthly' | 'chart-cashflow' | 'table-monthly'>('chart-monthly');
 
+  // Auto-calculate panels logic when autoCalculatePanels is ON
+  useEffect(() => {
+    if (project.specs.autoCalculatePanels) {
+      const annualConsumption = project.monthlyConsumption.reduce((a, b) => a + b, 0);
+      const targetCoverage = project.rates.targetCoveragePct || 95;
+      const targetAnnualKWh = annualConsumption * (targetCoverage / 100);
+      
+      // Estimated annual output per panel W based on province HSP
+      const provinceObj = RD_PROVINCES.find(p => p.name === project.client.province) || RD_PROVINCES[0];
+      const avgHsp = provinceObj.avgHSP || 5.25;
+      const annualOutputPerWatt = avgHsp * 365 * (1 - (project.specs.systemLosses / 100));
+      const neededTotalW = targetAnnualKWh / (annualOutputPerWatt / 1000);
+      const calculatedPanels = Math.max(1, Math.ceil(neededTotalW / (project.specs.panelPowerW || 450)));
+
+      if (calculatedPanels !== project.specs.panelCount) {
+        updateSpecs({ panelCount: calculatedPanels });
+      }
+    }
+  }, [
+    project.specs.autoCalculatePanels,
+    project.specs.panelPowerW,
+    project.specs.systemLosses,
+    project.rates.targetCoveragePct,
+    project.client.province,
+    project.monthlyConsumption,
+  ]);
+
   return (
     <div className="flex-1 flex overflow-hidden w-full h-[calc(100vh-64px)] bg-surface">
       {/* Left Sidebar: Parameters */}
       <aside className="w-[340px] bg-white border-r border-outline-variant/60 flex flex-col shrink-0 h-full overflow-y-auto shadow-sm z-10">
-        <div className="p-5 border-b border-outline-variant/40 bg-slate-50/50">
-          <div className="flex justify-between items-center mb-1">
-            <h2 className="text-lg font-bold text-on-surface">Parámetros del Sistema</h2>
-            <select
-              value={project.status}
-              onChange={(e) => setProjectStatus(project.id, e.target.value as any)}
-              className="text-xs font-semibold px-2 py-1 rounded bg-white border border-outline-variant text-on-surface focus:ring-1 focus:ring-primary"
-            >
-              <option value="Draft">Borrador</option>
-              <option value="Final">Finalizado</option>
-              <option value="Archived">Archivado</option>
-            </select>
+        <div className="p-6 border-b border-outline-variant/40 bg-slate-50/50 flex justify-between items-center">
+          <div>
+            <h2 className="font-headline-md text-headline-md text-on-surface mb-0.5">Parameters</h2>
+            <p className="font-body-sm text-body-sm text-secondary">Configure system constraints</p>
           </div>
-          <p className="text-xs text-secondary">Ajustes técnicos, tarifas e incentivos fiscales</p>
+          <select
+            value={project.status}
+            onChange={(e) => setProjectStatus(project.id, e.target.value as any)}
+            className="text-xs font-semibold px-2.5 py-1 rounded-md bg-white border border-outline-variant text-on-surface focus:ring-1 focus:ring-primary shadow-xs"
+          >
+            <option value="Draft">Draft</option>
+            <option value="Final">Final</option>
+            <option value="Archived">Archived</option>
+          </select>
         </div>
 
-        <div className="p-5 space-y-6">
-          {/* Section 1: Client & Project */}
+        <div className="p-6 space-y-6">
+          {/* SECTION 1: Project & Client (Imagen 1) */}
           <section className="space-y-3">
-            <h3 className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5 border-b border-primary/20 pb-1.5">
-              <User className="w-3.5 h-3.5" />
-              Cliente y Ubicación
+            <h3 className="font-label-caps text-label-caps text-primary mb-3 flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
+              <span className="material-symbols-outlined text-[16px]">person</span> Project & Client
             </h3>
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-on-surface-variant mb-1">Nombre del Cliente</label>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Client Name</label>
                 <input
                   type="text"
                   value={project.client.name}
                   onChange={(e) => updateClient({ name: e.target.value })}
-                  className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-xs text-on-surface focus:ring-1 focus:ring-primary focus:border-primary"
+                  className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-body-base text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
                 />
               </div>
+
               <div>
-                <label className="block text-xs font-medium text-on-surface-variant mb-1">Provincia (Irradiación HSP)</label>
-                <select
-                  value={project.client.province}
-                  onChange={(e) => updateClient({ province: e.target.value })}
-                  className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-xs text-on-surface focus:ring-1 focus:ring-primary"
-                >
-                  {RD_PROVINCES.map((prov) => (
-                    <option key={prov.code} value={prov.name}>
-                      {prov.name} (HSP {prov.avgHSP} hrs/día)
-                    </option>
-                  ))}
-                </select>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Location / Province</label>
+                <input
+                  type="text"
+                  value={project.client.location}
+                  onChange={(e) => updateClient({ location: e.target.value })}
+                  className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-body-base text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
+                />
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-medium text-on-surface-variant mb-1">Distribuidora</label>
-                  <select
-                    value={project.client.distributor}
-                    onChange={(e) => updateClient({ distributor: e.target.value as any })}
-                    className="w-full bg-surface border border-outline-variant rounded-lg px-2.5 py-1.5 text-xs text-on-surface focus:ring-1 focus:ring-primary"
-                  >
-                    <option value="EDEESTE">EDEESTE</option>
-                    <option value="EDESUR">EDESUR</option>
-                    <option value="EDENORTE">EDENORTE</option>
-                    <option value="CEPM">CEPM</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-on-surface-variant mb-1">ID Proyecto</label>
-                  <input
-                    type="text"
-                    value={project.client.projectId}
-                    onChange={(e) => updateClient({ projectId: e.target.value })}
-                    className="w-full bg-surface border border-outline-variant rounded-lg px-2.5 py-1.5 text-xs font-mono text-on-surface focus:ring-1 focus:ring-primary"
-                  />
-                </div>
+
+              <div>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Coordinates (Lat, Lng)</label>
+                <input
+                  type="text"
+                  value={project.client.coordinates || ''}
+                  placeholder="18.4861, -69.9312"
+                  onChange={(e) => updateClient({ coordinates: e.target.value })}
+                  className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Project ID</label>
+                <input
+                  type="text"
+                  value={project.client.projectId}
+                  onChange={(e) => updateClient({ projectId: e.target.value })}
+                  className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
+                />
               </div>
             </div>
           </section>
 
-          {/* Section 2: Utility & Rates */}
-          <section className="space-y-3">
-            <h3 className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5 border-b border-primary/20 pb-1.5">
-              <Zap className="w-3.5 h-3.5" />
-              Tarifa y Red Eléctrica
+          {/* SECTION 2: Utility & Rates (Imagen 2) */}
+          <section className="space-y-3 pt-2 border-t border-outline-variant/30">
+            <h3 className="font-label-caps text-label-caps text-primary mb-3 flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
+              <span className="material-symbols-outlined text-[16px]">payments</span> Utility & Rates
             </h3>
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-on-surface-variant mb-1">Tarifa Energía (USD / kWh)</label>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Price per kWh (USD)</label>
                 <input
                   type="number"
                   step="0.01"
                   value={project.rates.energyCostPerKWh}
                   onChange={(e) => updateRates({ energyCostPerKWh: parseFloat(e.target.value) || 0 })}
-                  className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-xs font-mono text-on-surface focus:ring-1 focus:ring-primary"
+                  className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
                 />
               </div>
+
               <div>
-                <label className="block text-xs font-medium text-on-surface-variant mb-1">
-                  Cargo Exportación Red (SIE-007-2026-REG)
-                </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    step="1"
-                    value={project.rates.gridExportFeePct}
-                    onChange={(e) => updateRates({ gridExportFeePct: parseFloat(e.target.value) || 0 })}
-                    className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-xs font-mono text-on-surface focus:ring-1 focus:ring-primary"
-                  />
-                  <span className="text-xs text-secondary">%</span>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Section 3: Hardware System Specs (Simple vs Detailed) */}
-          <section className="space-y-3">
-            <div className="flex justify-between items-center border-b border-primary/20 pb-1.5">
-              <h3 className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
-                <Cpu className="w-3.5 h-3.5" />
-                Equipamiento
-              </h3>
-              {/* Mode Toggle Switch */}
-              <div className="flex items-center gap-1 bg-surface-container p-0.5 rounded-md border border-outline-variant/60">
-                <button
-                  type="button"
-                  onClick={() => updateSpecs({ isDetailed: false })}
-                  className={`px-2 py-0.5 text-[10px] font-bold rounded ${
-                    !project.specs.isDetailed ? 'bg-primary text-white' : 'text-secondary hover:text-on-surface'
-                  }`}
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Distribution Company</label>
+                <select
+                  value={project.rates.distributor || 'EDEESTE'}
+                  onChange={(e) => updateRates({ distributor: e.target.value as any })}
+                  className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-body-base text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs cursor-pointer"
                 >
-                  Simple
-                </button>
-                <button
-                  type="button"
-                  onClick={() => updateSpecs({ isDetailed: true })}
-                  className={`px-2 py-0.5 text-[10px] font-bold rounded ${
-                    project.specs.isDetailed ? 'bg-primary text-white' : 'text-secondary hover:text-on-surface'
-                  }`}
-                >
-                  Detallado
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-2.5">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-medium text-on-surface-variant mb-1">Potencia Panel (W)</label>
-                  <input
-                    type="number"
-                    step="5"
-                    value={project.specs.panelPowerW}
-                    onChange={(e) => updateSpecs({ panelPowerW: parseInt(e.target.value) || 0 })}
-                    className="w-full bg-surface border border-outline-variant rounded-lg px-2.5 py-1.5 text-xs font-mono text-on-surface focus:ring-1 focus:ring-primary"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-on-surface-variant mb-1">Cant. Paneles</label>
-                  <input
-                    type="number"
-                    step="1"
-                    value={project.specs.panelCount}
-                    onChange={(e) => updateSpecs({ panelCount: parseInt(e.target.value) || 0 })}
-                    className="w-full bg-surface border border-outline-variant rounded-lg px-2.5 py-1.5 text-xs font-mono text-on-surface focus:ring-1 focus:ring-primary"
-                  />
-                </div>
+                  <option value="EDEESTE">EDEESTE</option>
+                  <option value="EDESUR">EDESUR</option>
+                  <option value="EDENORTE">EDENORTE</option>
+                  <option value="CEPM">CEPM</option>
+                </select>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-on-surface-variant mb-1">Potencia Inversor (kW AC)</label>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Target Coverage (%)</label>
                 <input
                   type="number"
                   step="1"
-                  value={project.specs.inverterPowerKW}
-                  onChange={(e) => updateSpecs({ inverterPowerKW: parseFloat(e.target.value) || 0 })}
-                  className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-xs font-mono text-on-surface focus:ring-1 focus:ring-primary"
+                  value={project.rates.targetCoveragePct ?? 95}
+                  onChange={(e) => updateRates({ targetCoveragePct: parseFloat(e.target.value) || 0 })}
+                  className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
                 />
               </div>
 
-              {/* Battery Controls */}
-              <div className="pt-1">
-                <label className="flex items-center gap-2 text-xs font-medium text-on-surface cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={project.specs.hasBattery}
-                    onChange={(e) => updateSpecs({ hasBattery: e.target.checked })}
-                    className="rounded text-primary focus:ring-primary"
-                  />
-                  <span>Incluye Almacenamiento (Batería)</span>
-                </label>
-                {project.specs.hasBattery && (
-                  <div className="mt-2 pl-6">
-                    <label className="block text-[11px] font-medium text-on-surface-variant mb-1">Capacidad (kWh)</label>
-                    <input
-                      type="number"
-                      value={project.specs.batteryCapacityKWh}
-                      onChange={(e) => updateSpecs({ batteryCapacityKWh: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-surface border border-outline-variant rounded-lg px-2.5 py-1 text-xs font-mono"
-                    />
-                  </div>
-                )}
+              <div>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Tariff Type</label>
+                <select
+                  value={project.rates.tariffCode || 'BTS1'}
+                  onChange={(e) => updateRates({ tariffCode: e.target.value as any })}
+                  className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-body-base text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs cursor-pointer"
+                >
+                  <option value="BTS1">BTS1</option>
+                  <option value="BTS2">BTS2</option>
+                  <option value="MTD">MTD</option>
+                  <option value="BTD">BTD</option>
+                </select>
               </div>
 
-              {/* Detailed Specs Fields */}
-              {project.specs.isDetailed && (
-                <div className="p-3 bg-amber-50/60 border border-amber-200/70 rounded-lg space-y-2 text-xs mt-3">
-                  <p className="font-semibold text-amber-800 text-[11px] flex items-center gap-1">
-                    <Sliders className="w-3 h-3" /> Parámetros Avanzados de Eficiencia
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] text-amber-900 block">Eficiencia Panel (%)</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={project.specs.panelEfficiency}
-                        onChange={(e) => updateSpecs({ panelEfficiency: parseFloat(e.target.value) || 0 })}
-                        className="w-full bg-white border border-amber-300 rounded px-2 py-1 text-xs font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-amber-900 block">Pérdidas Sistema (%)</label>
-                      <input
-                        type="number"
-                        step="0.5"
-                        value={project.specs.systemLosses}
-                        onChange={(e) => updateSpecs({ systemLosses: parseFloat(e.target.value) || 0 })}
-                        className="w-full bg-white border border-amber-300 rounded px-2 py-1 text-xs font-mono"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[10px] text-amber-900 block">Coeff. Temp. (%/°C)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={project.specs.tempCoeff}
-                        onChange={(e) => updateSpecs({ tempCoeff: parseFloat(e.target.value) || 0 })}
-                        className="w-full bg-white border border-amber-300 rounded px-2 py-1 text-xs font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] text-amber-900 block">Degradación Anual (%)</label>
-                      <input
-                        type="number"
-                        step="0.05"
-                        value={project.specs.annualDegradation}
-                        onChange={(e) => updateSpecs({ annualDegradation: parseFloat(e.target.value) || 0 })}
-                        className="w-full bg-white border border-amber-300 rounded px-2 py-1 text-xs font-mono"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
+              <div>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Grid Export Fee (%) (SIE-007-2026-REG)</label>
+                <input
+                  type="number"
+                  step="1"
+                  value={project.rates.gridExportFeePct}
+                  onChange={(e) => updateRates({ gridExportFeePct: parseFloat(e.target.value) || 0 })}
+                  className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
+                />
+              </div>
             </div>
           </section>
 
-          {/* Section 4: Financials & Ley 57-07 */}
-          <section className="space-y-3">
-            <h3 className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5 border-b border-primary/20 pb-1.5">
-              <DollarSign className="w-3.5 h-3.5" />
-              Incentivos y Costos
+          {/* SECTION 3: Equipment (Imagen 3) */}
+          <section className="space-y-3 pt-2 border-t border-outline-variant/30">
+            <h3 className="font-label-caps text-label-caps text-primary mb-3 flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
+              <span className="material-symbols-outlined text-[16px]">solar_power</span> Equipment
             </h3>
-            <div className="space-y-2.5">
+
+            {/* Simple / Detailed Pill Switcher */}
+            <div className="flex bg-surface-container rounded-lg p-1 mb-4 border border-outline-variant/40">
+              <button
+                type="button"
+                onClick={() => updateSpecs({ isDetailed: false })}
+                className={`flex-1 rounded-md py-1.5 font-title-sm text-[12px] transition-all text-center ${
+                  !project.specs.isDetailed
+                    ? 'bg-surface-container-lowest shadow-sm text-on-surface font-semibold'
+                    : 'text-secondary hover:text-on-surface'
+                }`}
+              >
+                Simple
+              </button>
+              <button
+                type="button"
+                onClick={() => updateSpecs({ isDetailed: true })}
+                className={`flex-1 rounded-md py-1.5 font-title-sm text-[12px] transition-all text-center ${
+                  project.specs.isDetailed
+                    ? 'bg-surface-container-lowest shadow-sm text-on-surface font-semibold'
+                    : 'text-secondary hover:text-on-surface'
+                }`}
+              >
+                Detailed
+              </button>
+            </div>
+
+            <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-on-surface-variant mb-1">Precio por Vatio ($ USD / Wp)</label>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Panel Power (W)</label>
                 <input
                   type="number"
-                  step="0.05"
-                  value={project.financials.pricePerWattUSD}
-                  onChange={(e) => updateFinancials({ pricePerWattUSD: parseFloat(e.target.value) || 0, customCostUSD: undefined })}
-                  className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-1.5 text-xs font-mono text-on-surface focus:ring-1 focus:ring-primary"
+                  step="5"
+                  value={project.specs.panelPowerW}
+                  onChange={(e) => updateSpecs({ panelPowerW: parseInt(e.target.value) || 0 })}
+                  className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
                 />
               </div>
 
-              <div className="space-y-2 pt-1">
-                <label className="flex items-center gap-2 text-xs font-medium text-on-surface cursor-pointer">
+              {/* Auto-Calculate Panels Toggle */}
+              <div className="pb-1">
+                <label className="flex items-center justify-between cursor-pointer group">
+                  <span className="font-body-sm text-body-sm text-on-surface-variant group-hover:text-on-surface transition-colors">
+                    Auto-Calculate Panels
+                  </span>
+                  <div className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={project.specs.autoCalculatePanels ?? false}
+                      onChange={(e) => updateSpecs({ autoCalculatePanels: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                  </div>
+                </label>
+              </div>
+
+              <div>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">
+                  {project.specs.autoCalculatePanels ? 'Quantity (Auto-calculated)' : 'Quantity'}
+                </label>
+                <input
+                  type="number"
+                  step="1"
+                  readOnly={project.specs.autoCalculatePanels}
+                  value={project.specs.panelCount}
+                  onChange={(e) => updateSpecs({ panelCount: parseInt(e.target.value) || 0 })}
+                  className={`w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs ${
+                    project.specs.autoCalculatePanels ? 'opacity-80 bg-slate-100 cursor-not-allowed' : ''
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">System Price per Watt (USD/W)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={project.specs.pricePerWattUSD || project.financials.pricePerWattUSD}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    updateSpecs({ pricePerWattUSD: val });
+                    updateFinancials({ pricePerWattUSD: val, customCostUSD: undefined });
+                  }}
+                  className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
+                />
+              </div>
+
+              {/* Battery Storage Toggle */}
+              <div className="pt-1">
+                <label className="flex items-center justify-between cursor-pointer group">
+                  <span className="font-body-sm text-body-sm text-on-surface-variant group-hover:text-on-surface transition-colors">
+                    Battery Storage
+                  </span>
+                  <div className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={project.specs.hasBattery}
+                      onChange={(e) => updateSpecs({ hasBattery: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                  </div>
+                </label>
+              </div>
+
+              {project.specs.hasBattery && (
+                <div>
+                  <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Battery Capacity (kWh)</label>
+                  <input
+                    type="number"
+                    step="1"
+                    value={project.specs.batteryCapacityKWh}
+                    onChange={(e) => updateSpecs({ batteryCapacityKWh: parseFloat(e.target.value) || 0 })}
+                    className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
+                  />
+                </div>
+              )}
+
+              {/* Live Preview Card (Imagen 3 Bottom) */}
+              <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-lg space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-[11px] font-medium text-secondary">Potencia Total DC:</span>
+                  <span className="text-[12px] font-bold text-primary">{summary.systemCapacityKWp.toFixed(2)} kWp</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[11px] font-medium text-secondary">Inversión Estimada:</span>
+                  <span className="text-[12px] font-bold text-primary">
+                    ${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* SECTION 4: Financials & Technical & Losses (Imagen 4) */}
+          <section className="space-y-3 pt-2 border-t border-outline-variant/30">
+            <h3 className="font-label-caps text-label-caps text-primary mb-3 flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
+              <span className="material-symbols-outlined text-[16px]">account_balance</span> Financials
+            </h3>
+            <div className="space-y-3">
+              <label className="flex items-center justify-between cursor-pointer group">
+                <span className="font-body-sm text-body-sm text-on-surface-variant group-hover:text-on-surface transition-colors">
+                  Apply Ley 57-07 (40%)
+                </span>
+                <div className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
                     checked={project.financials.applyLey5707}
@@ -334,23 +372,104 @@ export const SimulatorView: React.FC = () => {
                         applyITBISExemption: checked ? true : project.financials.applyITBISExemption,
                       });
                     }}
-                    className="rounded text-primary focus:ring-primary"
+                    className="sr-only peer"
                   />
-                  <span>Aplicar Crédito ISR 40% (Ley 57-07)</span>
-                </label>
+                  <div className="w-9 h-5 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                </div>
+              </label>
 
-                <label className="flex items-center gap-2 text-xs font-medium text-on-surface cursor-pointer">
+              <label className="flex items-center justify-between cursor-pointer group">
+                <span className="font-body-sm text-body-sm text-on-surface-variant group-hover:text-on-surface transition-colors">
+                  Exempt ITBIS (18%)
+                </span>
+                <div className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
                     checked={project.financials.applyITBISExemption}
                     onChange={(e) => updateFinancials({ applyITBISExemption: e.target.checked })}
-                    className="rounded text-primary focus:ring-primary"
+                    className="sr-only peer"
                   />
-                  <span>Exoneración 100% ITBIS</span>
-                </label>
+                  <div className="w-9 h-5 bg-outline-variant peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                </div>
+              </label>
+
+              <div>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Projection Years</label>
+                <input
+                  type="number"
+                  step="1"
+                  value={project.financials.projectLifespanYears}
+                  onChange={(e) => updateFinancials({ projectLifespanYears: parseInt(e.target.value) || 25 })}
+                  className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Discount Rate (%)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={project.financials.discountRatePct}
+                  onChange={(e) => updateFinancials({ discountRatePct: parseFloat(e.target.value) || 0 })}
+                  className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
+                />
               </div>
             </div>
           </section>
+
+          {/* SECTION 5: Technical & Losses (Imagen 4 Bottom) */}
+          <section className="space-y-3 pt-2 border-t border-outline-variant/30">
+            <h3 className="font-label-caps text-label-caps text-primary mb-3 flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
+              <span className="material-symbols-outlined text-[16px]">settings_suggest</span> Technical & Losses
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">System Losses (%)</label>
+                <input
+                  type="number"
+                  step="0.5"
+                  value={project.specs.systemLosses}
+                  onChange={(e) => updateSpecs({ systemLosses: parseFloat(e.target.value) || 0 })}
+                  className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">Annual Degradation (%)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={project.specs.annualDegradation}
+                  onChange={(e) => updateSpecs({ annualDegradation: parseFloat(e.target.value) || 0 })}
+                  className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block font-body-sm text-body-sm text-on-surface-variant mb-1">CO2 Factor (kg/kWh)</label>
+                <input
+                  type="number"
+                  step="0.001"
+                  value={project.financials.co2FactorKgPerKWh}
+                  onChange={(e) => updateFinancials({ co2FactorKgPerKWh: parseFloat(e.target.value) || 0 })}
+                  className="w-full bg-surface border border-outline-variant rounded-lg px-3 py-2 font-data-mono text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all text-xs"
+                />
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div className="mt-auto p-6 border-t border-outline-variant/40 bg-surface-container-low/50">
+          <button
+            onClick={() => {
+              // Trigger explicit calculation update refresh if needed
+              useSimulationStore.setState({ activeProjectId: project.id });
+            }}
+            className="w-full bg-surface-container-lowest border border-primary text-primary hover:bg-surface-container transition-colors py-2 rounded-lg font-title-sm text-title-sm flex items-center justify-center gap-2 font-semibold shadow-xs"
+          >
+            <span className="material-symbols-outlined text-[18px]">refresh</span>
+            Update Simulation
+          </button>
         </div>
       </aside>
 

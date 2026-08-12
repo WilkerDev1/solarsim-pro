@@ -9,18 +9,21 @@ export const BENCHMARK_PROJECT: ProjectSimulation = {
   client: {
     name: 'Centro Médico Hispánico',
     company: 'Health Solutions Corp.',
-    location: 'Santo Domingo',
+    location: 'Santo Domingo, RD',
     province: 'Santo Domingo / Distrito Nacional',
+    coordinates: '18.4861, -69.9312',
     projectId: 'SP-2024-089',
     distributor: 'EDEESTE',
-    tariffCode: 'BTS-2',
+    tariffCode: 'BTS2',
     contactEmail: 'contacto@centromedico.do',
     contactPhone: '809-555-0199',
   },
   specs: {
     isDetailed: false,
     panelPowerW: 561,
+    autoCalculatePanels: false,
     panelCount: 42, // 23.56 kWp DC
+    pricePerWattUSD: 1.135,
     panelBrandModel: 'JA Solar 565W Mono PERC',
     inverterPowerKW: 20,
     inverterBrandModel: 'Growatt MAC 20KTL3-X LV',
@@ -29,14 +32,17 @@ export const BENCHMARK_PROJECT: ProjectSimulation = {
     panelEfficiency: 21.8,
     tempCoeff: -0.35,
     systemLosses: 14.0,
-    annualDegradation: 0.55,
+    annualDegradation: 0.5,
     batteryDOD: 80,
   },
   rates: {
-    energyCostPerKWh: 0.22, // ~$13.20 DOP per kWh
+    energyCostPerKWh: 0.18,
+    distributor: 'EDEESTE',
+    targetCoveragePct: 95,
+    tariffCode: 'BTS2',
     currency: 'USD',
     usdExchangeRate: 60.0,
-    gridExportFeePct: 25.0, // SIE-007-2026-REG
+    gridExportFeePct: 25.0,
     annualEnergyInflationPct: 3.5,
   },
   financials: {
@@ -46,7 +52,7 @@ export const BENCHMARK_PROJECT: ProjectSimulation = {
     customCostUSD: 26739.92,
     discountRatePct: 10.0,
     projectLifespanYears: 25,
-    co2FactorKgPerKWh: 0.65,
+    co2FactorKgPerKWh: 0.481,
   },
   monthlyConsumption: [3200, 3100, 3500, 3400, 3600, 3550, 3650, 3450, 3350, 3250, 3100, 3198],
 };

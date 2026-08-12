@@ -3,9 +3,10 @@ export interface ClientInfo {
   company?: string;
   location: string;
   province: string;
+  coordinates?: string; // e.g. "18.4861, -69.9312"
   projectId: string;
-  distributor: 'EDEESTE' | 'EDESUR' | 'EDENORTE' | 'CEPM';
-  tariffCode: string;
+  distributor?: 'EDEESTE' | 'EDESUR' | 'EDENORTE' | 'CEPM';
+  tariffCode?: string;
   contactEmail?: string;
   contactPhone?: string;
 }
@@ -13,7 +14,9 @@ export interface ClientInfo {
 export interface SystemSpecs {
   isDetailed: boolean;
   panelPowerW: number;
+  autoCalculatePanels?: boolean;
   panelCount: number;
+  pricePerWattUSD: number;       // USD per Wp e.g. 1.13
   panelBrandModel?: string;
   inverterPowerKW: number;
   inverterBrandModel?: string;
@@ -24,12 +27,15 @@ export interface SystemSpecs {
   panelEfficiency: number;      // % e.g. 21.8
   tempCoeff: number;            // %/°C e.g. -0.35
   systemLosses: number;         // % e.g. 14
-  annualDegradation: number;    // % e.g. 0.55
+  annualDegradation: number;    // % e.g. 0.5
   batteryDOD: number;           // % e.g. 80
 }
 
 export interface UtilityRates {
-  energyCostPerKWh: number;     // USD per kWh
+  energyCostPerKWh: number;     // USD per kWh e.g. 0.18
+  distributor: 'EDEESTE' | 'EDESUR' | 'EDENORTE' | 'CEPM';
+  targetCoveragePct: number;    // Target Coverage (%) e.g. 95%
+  tariffCode: 'BTS1' | 'BTS2' | 'MTD' | 'BTD' | string;
   currency: 'USD' | 'DOP';
   usdExchangeRate: number;      // RD$ per USD e.g. 60.0
   gridExportFeePct: number;     // SIE-007-2026-REG fee (e.g. 25%)
@@ -39,11 +45,11 @@ export interface UtilityRates {
 export interface FinancialParams {
   applyLey5707: boolean;         // 40% ISR credit over 3 years
   applyITBISExemption: boolean; // 100% ITBIS exoneration
-  pricePerWattUSD: number;       // USD per Wp e.g. 1.15
+  pricePerWattUSD: number;       // USD per Wp e.g. 1.13
   customCostUSD?: number;        // Direct cost override
-  discountRatePct: number;       // % e.g. 10
+  discountRatePct: number;       // % e.g. 10.0
   projectLifespanYears: number;  // e.g. 25
-  co2FactorKgPerKWh: number;     // kg CO2 per kWh e.g. 0.65
+  co2FactorKgPerKWh: number;     // kg CO2 per kWh e.g. 0.481
 }
 
 export interface MonthlyEnergyResult {

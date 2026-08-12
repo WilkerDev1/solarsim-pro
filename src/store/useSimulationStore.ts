@@ -43,14 +43,17 @@ const INITIAL_PROJECTS: ProjectSimulation[] = [
       company: 'Global Freight Inc.',
       location: 'Santiago, RD',
       province: 'Santiago',
+      coordinates: '19.4517, -70.6970',
       projectId: 'SP-2024-092',
       distributor: 'EDENORTE',
-      tariffCode: 'MTH',
+      tariffCode: 'MTD',
     },
     specs: {
       isDetailed: true,
       panelPowerW: 550,
+      autoCalculatePanels: false,
       panelCount: 320, // 176 kWp
+      pricePerWattUSD: 1.05,
       panelBrandModel: 'Trina Solar 550W Vertex',
       inverterPowerKW: 150,
       inverterBrandModel: 'Sungrow 150kW HV',
@@ -64,6 +67,9 @@ const INITIAL_PROJECTS: ProjectSimulation[] = [
     },
     rates: {
       energyCostPerKWh: 0.20,
+      distributor: 'EDENORTE',
+      targetCoveragePct: 95,
+      tariffCode: 'MTD',
       currency: 'USD',
       usdExchangeRate: 60.0,
       gridExportFeePct: 25.0,
@@ -87,16 +93,19 @@ const INITIAL_PROJECTS: ProjectSimulation[] = [
     client: {
       name: 'Residential Array 42',
       company: 'Familia Smith',
-      location: 'Punta Cana',
+      location: 'Punta Cana, RD',
       province: 'La Altagracia (Punta Cana / Higüey)',
+      coordinates: '18.5601, -68.3725',
       projectId: 'SP-2024-095',
       distributor: 'CEPM',
-      tariffCode: 'BTS-1',
+      tariffCode: 'BTS1',
     },
     specs: {
       isDetailed: false,
       panelPowerW: 560,
+      autoCalculatePanels: false,
       panelCount: 21, // 11.76 kWp
+      pricePerWattUSD: 1.25,
       panelBrandModel: 'Canadian Solar 560W',
       inverterPowerKW: 10,
       inverterBrandModel: 'Solis 10kW Hybrid',
@@ -110,6 +119,9 @@ const INITIAL_PROJECTS: ProjectSimulation[] = [
     },
     rates: {
       energyCostPerKWh: 0.25,
+      distributor: 'CEPM',
+      targetCoveragePct: 95,
+      tariffCode: 'BTS1',
       currency: 'USD',
       usdExchangeRate: 60.0,
       gridExportFeePct: 25.0,
@@ -159,10 +171,19 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     set((state) => {
       const projects = state.projects.map((p) => {
         if (p.id === state.activeProjectId) {
+          const updatedSpecs = { ...p.specs, ...specsPartial };
+
+          // Sync pricePerWattUSD between specs and financials if updated
+          let updatedFinancials = { ...p.financials };
+          if (specsPartial.pricePerWattUSD !== undefined) {
+            updatedFinancials.pricePerWattUSD = specsPartial.pricePerWattUSD;
+          }
+
           return {
             ...p,
             updatedAt: new Date().toISOString(),
-            specs: { ...p.specs, ...specsPartial },
+            specs: updatedSpecs,
+            financials: updatedFinancials,
           };
         }
         return p;
@@ -191,10 +212,16 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
     set((state) => {
       const projects = state.projects.map((p) => {
         if (p.id === state.activeProjectId) {
+          const updatedFinancials = { ...p.financials, ...finPartial };
+          let updatedSpecs = { ...p.specs };
+          if (finPartial.pricePerWattUSD !== undefined) {
+            updatedSpecs.pricePerWattUSD = finPartial.pricePerWattUSD;
+          }
           return {
             ...p,
             updatedAt: new Date().toISOString(),
-            financials: { ...p.financials, ...finPartial },
+            financials: updatedFinancials,
+            specs: updatedSpecs,
           };
         }
         return p;
