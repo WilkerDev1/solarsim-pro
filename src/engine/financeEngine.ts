@@ -125,6 +125,8 @@ export function calculateFinancialSummary(
     });
   }
 
+  const total25YearSavingsUSD = Math.round(cashFlow25Years.reduce((sum, cf) => sum + cf.savingsUSD, 0) * 100) / 100;
+
   // NPV (VAN) Calculation
   const discountRate = financials.discountRatePct / 100;
   let npvUSD = -grossInvestmentUSD;
@@ -157,6 +159,7 @@ export function calculateFinancialSummary(
     ley5707CreditUSD,
     netInvestmentUSD,
     year1SavingsUSD: Math.round(year1SavingsUSD * 100) / 100,
+    total25YearSavingsUSD,
     paybackYears,
     irrPct,
     npvUSD,

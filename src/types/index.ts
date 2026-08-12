@@ -88,6 +88,7 @@ export interface FinancialSummaryResult {
   ley5707CreditUSD: number;
   netInvestmentUSD: number;
   year1SavingsUSD: number;
+  total25YearSavingsUSD: number;
   paybackYears: number;
   irrPct: number;
   npvUSD: number;
