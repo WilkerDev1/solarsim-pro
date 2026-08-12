@@ -3,6 +3,7 @@ export interface ClientInfo {
   company?: string;
   location: string;
   province: string;
+  address?: string; // e.g. "Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD."
   solarSourceMode?: 'province' | 'gps'; // Selection mode for solar radiation
   coordinates?: string; // e.g. "18.4861, -69.9312"
   customMonthlyHSP?: number[]; // Dynamic 12-month solar radiation vector from GPS satellite API
@@ -11,6 +12,8 @@ export interface ClientInfo {
   tariffCode?: string;
   contactEmail?: string;
   contactPhone?: string;
+  quoteNumber?: string; // e.g. "C-0030"
+  quoteValidityDays?: number; // e.g. 7
 }
 
 export interface SystemSpecs {
@@ -19,14 +22,16 @@ export interface SystemSpecs {
   autoCalculatePanels?: boolean;
   panelCount: number;
   pricePerWattUSD: number;       // USD per Wp e.g. 1.13
-  panelBrandModel?: string;
+  panelBrandModel?: string;      // e.g. "CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)"
   inverterPowerKW: number;
-  inverterBrandModel?: string;
+  inverterBrandModel?: string;   // e.g. "Lux Power LXP-LB-US 8K (8.0Kw)"
+  inverterCount?: number;        // e.g. 2
   hasBattery: boolean;
   batteryCapacityKWh: number;
-  batteryCount?: number;         // e.g. 3 batteries of 16 kWh
-  batteryCostUSD?: number;       // Total battery cost in USD e.g. 3500
-  batteryBrandModel?: string;
+  batteryCount?: number;         // e.g. 3
+  batteryCostUSD?: number;       // Total battery cost in USD
+  batteryBrandModel?: string;    // e.g. "Hinaess 16 KwH-48 vdc"
+  installationServicesDesc?: string;
   // Detailed params
   panelEfficiency: number;      // % e.g. 21.8
   tempCoeff: number;            // %/°C e.g. -0.35

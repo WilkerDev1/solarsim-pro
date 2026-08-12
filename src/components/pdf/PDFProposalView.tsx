@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
-import { ArrowLeft, Printer, Download, RefreshCw, Leaf, ShieldCheck, FileText, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Printer, Download, RefreshCw, Leaf, ShieldCheck, FileText, CheckCircle2, PackageCheck, Wrench, Building2, Check } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -25,17 +25,21 @@ declare global {
 }
 
 export const PDFProposalView: React.FC = () => {
-  const { getActiveProject, getFinancialSummary, setActiveView } = useSimulationStore();
+  const { getActiveProject, getFinancialSummary, setActiveView, updateClient, updateSpecs } = useSimulationStore();
   const project = getActiveProject();
   const summary = getFinancialSummary();
   const pdfRef = useRef<HTMLDivElement>(null);
 
-  // Document Toggles
-  const [showPage1, setShowPage1] = useState(true); // Análisis de Energía
-  const [showPage2, setShowPage2] = useState(true); // Retorno de Inversión - Resumen
-  const [showPage3, setShowPage3] = useState(true); // Flujo de Caja 25 Años
+  // Document Toggles (4 pages)
+  const [showPage1, setShowPage1] = useState(true); // Pág 1: Análisis de Energía
+  const [showPageQuotation, setShowPageQuotation] = useState(true); // Pág 2: Cotización de Sistema Fotovoltaico
+  const [showPage2, setShowPage2] = useState(true); // Pág 3: Retorno de Inversión - Resumen
+  const [showPage3, setShowPage3] = useState(true); // Pág 4: Flujo de Caja 25 Años
   const [showHeadersFooters, setShowHeadersFooters] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
+
+  // Active Tab in Sidebar (Secciones vs Editar Cotización)
+  const [sidebarTab, setSidebarTab] = useState<'sections' | 'edit'>('sections');
 
   const handlePrint = () => {
     window.print();
@@ -86,18 +90,25 @@ export const PDFProposalView: React.FC = () => {
 
   const currentDateStr = new Date().toLocaleDateString('es-DO', {
     day: '2-digit',
-    month: 'short',
+    month: 'numeric',
     year: 'numeric',
   });
 
   // Calculate total pages for footer dynamically
-  const activePagesCount = (showPage1 ? 1 : 0) + (showPage2 ? 1 : 0) + (showPage3 ? 1 : 0);
+  const activePagesCount =
+    (showPage1 ? 1 : 0) +
+    (showPageQuotation ? 1 : 0) +
+    (showPage2 ? 1 : 0) +
+    (showPage3 ? 1 : 0);
+
   let page1Num = 0;
+  let pageQuotNum = 0;
   let page2Num = 0;
   let page3Num = 0;
   let currentNum = 0;
 
   if (showPage1) { currentNum++; page1Num = currentNum; }
+  if (showPageQuotation) { currentNum++; pageQuotNum = currentNum; }
   if (showPage2) { currentNum++; page2Num = currentNum; }
   if (showPage3) { currentNum++; page3Num = currentNum; }
 
@@ -120,7 +131,7 @@ export const PDFProposalView: React.FC = () => {
   const totalProductionKWh = summary.monthlyBreakdown.reduce((sum, m) => sum + m.productionKWh, 0);
   const totalSavingsKWh = summary.monthlyBreakdown.reduce((sum, m) => sum + m.solarSelfConsumedKWh, 0);
 
-  // Key milestones for Page 2
+  // Key milestones for Page 3
   const paybackYearObj = cf25.find((c) => c.year === Math.ceil(summary.paybackYears)) || cf25[2] || cf25[0];
   const year1Obj = cf25[0];
   const year10Obj = cf25[9] || cf25[0];
@@ -166,61 +177,194 @@ export const PDFProposalView: React.FC = () => {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Side Controls Toolbar */}
-        <aside className="w-[280px] bg-white border-r border-slate-300 flex flex-col h-full shrink-0 shadow-xs">
-          <div className="p-4 border-b border-slate-200 bg-slate-50/60">
-            <h2 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Configuración del Documento</h2>
-            <p className="text-[11px] text-slate-500 mt-0.5">Seleccionar páginas visibles</p>
+        <aside className="w-[300px] bg-white border-r border-slate-300 flex flex-col h-full shrink-0 shadow-xs">
+          {/* Tab Switcher */}
+          <div className="flex border-b border-slate-200 bg-slate-50">
+            <button
+              onClick={() => setSidebarTab('sections')}
+              className={`flex-1 py-3 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+                sidebarTab === 'sections'
+                  ? 'border-[#2D5A27] text-[#2D5A27] bg-white'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Páginas ({activePagesCount})
+            </button>
+            <button
+              onClick={() => setSidebarTab('edit')}
+              className={`flex-1 py-3 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+                sidebarTab === 'edit'
+                  ? 'border-[#2D5A27] text-[#2D5A27] bg-white'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              Datos Cotización
+            </button>
           </div>
 
           <div className="p-4 flex-1 overflow-y-auto space-y-5">
-            <div className="space-y-3">
-              <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Contenido del PDF</h3>
+            {sidebarTab === 'sections' ? (
+              <>
+                <div className="space-y-3">
+                  <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Secciones Incluidas</h3>
 
-              <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
-                <span className="text-xs font-semibold text-slate-800">Pág 1: Análisis de Energía</span>
-                <input
-                  type="checkbox"
-                  checked={showPage1}
-                  onChange={(e) => setShowPage1(e.target.checked)}
-                  className="rounded text-[#2D5A27] focus:ring-[#2D5A27] cursor-pointer"
-                />
-              </label>
+                  <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                    <span className="text-xs font-semibold text-slate-800">Pág 1: Análisis de Energía</span>
+                    <input
+                      type="checkbox"
+                      checked={showPage1}
+                      onChange={(e) => setShowPage1(e.target.checked)}
+                      className="rounded text-[#2D5A27] focus:ring-[#2D5A27] cursor-pointer"
+                    />
+                  </label>
 
-              <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
-                <span className="text-xs font-semibold text-slate-800">Pág 2: Retorno de Inversión</span>
-                <input
-                  type="checkbox"
-                  checked={showPage2}
-                  onChange={(e) => setShowPage2(e.target.checked)}
-                  className="rounded text-[#2D5A27] focus:ring-[#2D5A27] cursor-pointer"
-                />
-              </label>
+                  <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                    <span className="text-xs font-semibold text-slate-800">Pág 2: Cotización de Sistema</span>
+                    <input
+                      type="checkbox"
+                      checked={showPageQuotation}
+                      onChange={(e) => setShowPageQuotation(e.target.checked)}
+                      className="rounded text-[#2D5A27] focus:ring-[#2D5A27] cursor-pointer"
+                    />
+                  </label>
 
-              <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
-                <span className="text-xs font-semibold text-slate-800">Pág 3: Flujo de Caja 25 Años</span>
-                <input
-                  type="checkbox"
-                  checked={showPage3}
-                  onChange={(e) => setShowPage3(e.target.checked)}
-                  className="rounded text-[#2D5A27] focus:ring-[#2D5A27] cursor-pointer"
-                />
-              </label>
-            </div>
+                  <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                    <span className="text-xs font-semibold text-slate-800">Pág 3: Retorno de Inversión</span>
+                    <input
+                      type="checkbox"
+                      checked={showPage2}
+                      onChange={(e) => setShowPage2(e.target.checked)}
+                      className="rounded text-[#2D5A27] focus:ring-[#2D5A27] cursor-pointer"
+                    />
+                  </label>
 
-            <div className="h-px w-full bg-slate-200"></div>
+                  <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                    <span className="text-xs font-semibold text-slate-800">Pág 4: Flujo de Caja 25 Años</span>
+                    <input
+                      type="checkbox"
+                      checked={showPage3}
+                      onChange={(e) => setShowPage3(e.target.checked)}
+                      className="rounded text-[#2D5A27] focus:ring-[#2D5A27] cursor-pointer"
+                    />
+                  </label>
+                </div>
 
-            <div className="space-y-3">
-              <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Opciones de Formato</h3>
-              <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
-                <span className="text-xs font-semibold text-slate-800">Mostrar Encabezados y Pies</span>
-                <input
-                  type="checkbox"
-                  checked={showHeadersFooters}
-                  onChange={(e) => setShowHeadersFooters(e.target.checked)}
-                  className="rounded text-[#2D5A27] focus:ring-[#2D5A27] cursor-pointer"
-                />
-              </label>
-            </div>
+                <div className="h-px w-full bg-slate-200"></div>
+
+                <div className="space-y-3">
+                  <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Opciones de Formato</h3>
+                  <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                    <span className="text-xs font-semibold text-slate-800">Mostrar Encabezados y Pies</span>
+                    <input
+                      type="checkbox"
+                      checked={showHeadersFooters}
+                      onChange={(e) => setShowHeadersFooters(e.target.checked)}
+                      className="rounded text-[#2D5A27] focus:ring-[#2D5A27] cursor-pointer"
+                    />
+                  </label>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-4">
+                <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Detalles de la Cotización</h3>
+                
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">N° Cotización</label>
+                  <input
+                    type="text"
+                    value={project.client.quoteNumber || 'C-0030'}
+                    onChange={(e) => updateClient({ quoteNumber: e.target.value })}
+                    className="w-full text-xs p-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-[#2D5A27] outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Válido por (Días)</label>
+                  <input
+                    type="number"
+                    value={project.client.quoteValidityDays || 7}
+                    onChange={(e) => updateClient({ quoteValidityDays: Number(e.target.value) })}
+                    className="w-full text-xs p-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-[#2D5A27] outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Dirección del Cliente</label>
+                  <textarea
+                    rows={2}
+                    value={project.client.address || 'Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.'}
+                    onChange={(e) => updateClient({ address: e.target.value })}
+                    className="w-full text-xs p-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-[#2D5A27] outline-none"
+                  />
+                </div>
+
+                <div className="h-px w-full bg-slate-200"></div>
+
+                <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Modelos de Equipos</h3>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Módulos Solares (Descripción)</label>
+                  <input
+                    type="text"
+                    value={project.specs.panelBrandModel || 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)'}
+                    onChange={(e) => updateSpecs({ panelBrandModel: e.target.value })}
+                    className="w-full text-xs p-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-[#2D5A27] outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="col-span-2">
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Modelo Inversor</label>
+                    <input
+                      type="text"
+                      value={project.specs.inverterBrandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)'}
+                      onChange={(e) => updateSpecs({ inverterBrandModel: e.target.value })}
+                      className="w-full text-xs p-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-[#2D5A27] outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Cant.</label>
+                    <input
+                      type="number"
+                      value={project.specs.inverterCount || 2}
+                      onChange={(e) => updateSpecs({ inverterCount: Number(e.target.value) })}
+                      className="w-full text-xs p-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-[#2D5A27] outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="col-span-2">
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Modelo Batería</label>
+                    <input
+                      type="text"
+                      value={project.specs.batteryBrandModel || 'Batería Hinaess 16 KwH-48 vdc.'}
+                      onChange={(e) => updateSpecs({ batteryBrandModel: e.target.value })}
+                      className="w-full text-xs p-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-[#2D5A27] outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Cant.</label>
+                    <input
+                      type="number"
+                      value={project.specs.batteryCount || 3}
+                      onChange={(e) => updateSpecs({ batteryCount: Number(e.target.value) })}
+                      className="w-full text-xs p-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-[#2D5A27] outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Servicios e Instalación</label>
+                  <textarea
+                    rows={2}
+                    value={project.specs.installationServicesDesc || 'Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).'}
+                    onChange={(e) => updateSpecs({ installationServicesDesc: e.target.value })}
+                    className="w-full text-xs p-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-[#2D5A27] outline-none"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="p-4 border-t border-slate-200 bg-slate-50">
@@ -374,7 +518,224 @@ export const PDFProposalView: React.FC = () => {
             )}
 
             {/* ---------------------------------------------------- */}
-            {/* PÁGINA 2: RETORNO DE INVERSIÓN - RESUMEN */}
+            {/* PÁGINA 2 (NUEVA): COTIZACIÓN DE SISTEMA FOTOVOLTAICO */}
+            {/* ---------------------------------------------------- */}
+            {showPageQuotation && (
+              <div className="pdf-page w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative font-sans print:shadow-none print:w-full print:min-h-screen">
+                {/* Header */}
+                <div className="bg-[#14532d] text-white px-10 py-5 flex justify-between items-center">
+                  <div>
+                    <h2 className="text-xs font-mono text-emerald-300 uppercase tracking-widest">PROPUESTA TÉCNICA Y ECONÓMICA</h2>
+                    <h1 className="text-xl font-bold uppercase tracking-tight">{project.client.name} — {summary.systemCapacityKWp.toFixed(2)}kWp</h1>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-black tracking-tight text-white flex items-center gap-1.5 justify-end">
+                      <span className="w-3 h-3 bg-emerald-400 rounded-full inline-block"></span> electsun
+                    </div>
+                    <p className="text-[10px] text-emerald-200 tracking-wider">EL SOL A TU FAVOR</p>
+                  </div>
+                </div>
+
+                <div className="bg-[#1e6a3b] text-center text-white py-1.5 font-bold text-xs uppercase tracking-wider">
+                  COTIZACIÓN DE SISTEMA FOTOVOLTAICO
+                </div>
+
+                {/* Body */}
+                <div className="px-10 py-6 flex-1 flex flex-col gap-5 text-xs text-slate-800">
+                  {/* DATOS DEL CLIENTE */}
+                  <div>
+                    <h3 className="bg-slate-100 px-3 py-1 text-[11px] font-bold text-[#14532d] uppercase border-l-4 border-[#14532d] mb-2">
+                      DATOS DEL CLIENTE :
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4 px-2 font-mono text-[11px]">
+                      <div className="space-y-1">
+                        <div><span className="font-bold font-sans text-slate-600">Cliente:</span> {project.client.name}</div>
+                        <div><span className="font-bold font-sans text-slate-600">Contacto:</span> {project.client.company || project.client.name}</div>
+                        <div><span className="font-bold font-sans text-slate-600">Teléfono:</span> {project.client.contactPhone || '809-555-0199'}</div>
+                        <div><span className="font-bold font-sans text-slate-600">Dirección:</span> {project.client.address || 'Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.'}</div>
+                      </div>
+                      <div className="space-y-1 text-right">
+                        <div><span className="font-bold font-sans text-slate-600">N° Cotización:</span> <span className="font-bold text-slate-900">{project.client.quoteNumber || 'C-0030'}</span></div>
+                        <div><span className="font-bold font-sans text-slate-600">Fecha:</span> {currentDateStr}</div>
+                        <div><span className="font-bold font-sans text-slate-600">Válido por:</span> <span className="font-bold text-emerald-700">{project.client.quoteValidityDays || 7} Días</span></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ESPECIFICACIONES DEL SISTEMA */}
+                  <div>
+                    <h3 className="bg-slate-100 px-3 py-1 text-[11px] font-bold text-[#14532d] uppercase border-l-4 border-[#14532d] mb-2">
+                      ESPECIFICACIONES DEL SISTEMA
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200 font-mono text-[11px]">
+                      <div>
+                        <div><span className="font-bold font-sans text-slate-700">Potencia (kW-dc):</span> <span className="font-bold text-slate-900">{summary.systemCapacityKWp.toFixed(2)}</span></div>
+                        <div><span className="font-bold font-sans text-slate-700">Tipo de instalación:</span> Fotovoltaica</div>
+                      </div>
+                      <div className="text-right">
+                        <div><span className="font-bold font-sans text-slate-700">Consumo mensual estimado (kWh):</span> <span className="font-bold text-slate-900">{Math.round(summary.annualConsumptionKWh / 12).toLocaleString()}</span></div>
+                        <div><span className="font-bold font-sans text-slate-700">EDES / Distribuidor:</span> <span className="font-bold text-[#14532d]">{project.client.distributor || 'EDEESTE'}</span></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* EQUIPOS Y MATERIALES */}
+                  <div>
+                    <h3 className="bg-slate-100 px-3 py-1 text-[11px] font-bold text-[#14532d] uppercase border-l-4 border-[#14532d] mb-2">
+                      EQUIPOS Y MATERIALES
+                    </h3>
+                    <div className="border border-slate-200 rounded-lg overflow-hidden">
+                      <table className="w-full text-left border-collapse">
+                        <thead className="bg-[#14532d] text-white font-bold text-[10px] uppercase">
+                          <tr>
+                            <th className="px-3 py-2">DESCRIPCION</th>
+                            <th className="px-3 py-2 text-center w-20">CANT.</th>
+                            <th className="px-3 py-2 text-center w-20">UNIDAD</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 font-mono text-[11px] text-slate-800">
+                          <tr className="bg-white">
+                            <td className="px-3 py-2">{project.specs.panelBrandModel || 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)'}</td>
+                            <td className="px-3 py-2 text-center font-bold">{project.specs.panelCount}</td>
+                            <td className="px-3 py-2 text-center text-slate-500">UD</td>
+                          </tr>
+                          <tr className="bg-slate-50/60">
+                            <td className="px-3 py-2">{project.specs.inverterBrandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)'}</td>
+                            <td className="px-3 py-2 text-center font-bold">{project.specs.inverterCount || 2}</td>
+                            <td className="px-3 py-2 text-center text-slate-500">UD</td>
+                          </tr>
+                          {project.specs.hasBattery && (
+                            <tr className="bg-white">
+                              <td className="px-3 py-2">{project.specs.batteryBrandModel || 'Batería Hinaess 16 KwH-48 vdc.'}</td>
+                              <td className="px-3 py-2 text-center font-bold">{project.specs.batteryCount || 3}</td>
+                              <td className="px-3 py-2 text-center text-slate-500">UD</td>
+                            </tr>
+                          )}
+                          <tr className="bg-slate-50/60">
+                            <td className="px-3 py-2">{project.specs.installationServicesDesc || 'Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).'}</td>
+                            <td className="px-3 py-2 text-center font-bold">1</td>
+                            <td className="px-3 py-2 text-center text-slate-500">UD</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* DESGLOSE FINANCIERO RIGHT ALIGNED */}
+                  <div className="flex justify-end">
+                    <div className="w-[380px] bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1.5 font-mono text-[11px]">
+                      <div className="flex justify-between text-slate-700">
+                        <span>SUB-TOTAL (USD) SIN ITBIS :</span>
+                        <span className="font-bold">${(summary.grossInvestmentUSD / 1.18).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between text-slate-900 bg-slate-200/80 px-2 py-1 rounded font-bold">
+                        <span>TOTAL GENERAL (USD) :</span>
+                        <span>${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between text-emerald-800">
+                        <span>ITBIS A DESCONTAR POR LEY 57-07 US$ :</span>
+                        <span className="font-bold">${summary.itbisSavedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between text-white bg-[#14532d] px-2 py-1 rounded font-bold">
+                        <span>TOTAL GENERAL (USD) LEY 57-07 :</span>
+                        <span>${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between text-slate-800 pt-1 border-t border-slate-300">
+                        <span className="font-sans font-bold">PRECIO POR WATT (USD/W):</span>
+                        <span className="font-bold text-[#14532d]">${(project.specs.pricePerWattUSD || project.financials.pricePerWattUSD || 1.13).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* INCENTIVOS DE LEY 57-07 */}
+                  <div>
+                    <h3 className="bg-slate-100 px-3 py-1 text-[11px] font-bold text-[#14532d] uppercase border-l-4 border-[#14532d] mb-1">
+                      INCENTIVOS DE LEY 57-07
+                    </h3>
+                    <p className="text-[10px] text-amber-800 font-bold bg-amber-50 border border-amber-200 px-3 py-1 rounded mb-2">
+                      (Descuento de 40% para equipos energía renovables: Paneles solares, inversores y baterías)
+                    </p>
+                    <div className="border border-slate-200 rounded-lg overflow-hidden">
+                      <table className="w-full text-left border-collapse">
+                        <thead className="bg-[#14532d] text-white font-bold text-[10px] uppercase">
+                          <tr>
+                            <th className="px-3 py-1.5">CONCEPTO</th>
+                            <th className="px-3 py-1.5 text-right">VALOR US $</th>
+                            <th className="px-3 py-1.5 text-right w-20">%</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 font-mono text-[11px] text-slate-800">
+                          <tr className="bg-white font-semibold">
+                            <td className="px-3 py-1.5">TOTAL EQUIPOS ENERGIAS RENOVABLES (PANELES-INVERSORES-BATERIAS)</td>
+                            <td className="px-3 py-1.5 text-right">${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="px-3 py-1.5 text-right">100%</td>
+                          </tr>
+                          <tr className="bg-slate-50/60">
+                            <td className="px-3 py-1.5">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 1ER AÑO</td>
+                            <td className="px-3 py-1.5 text-right text-emerald-700">${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="px-3 py-1.5 text-right text-emerald-700">13.33%</td>
+                          </tr>
+                          <tr className="bg-white">
+                            <td className="px-3 py-1.5">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 2DO AÑO</td>
+                            <td className="px-3 py-1.5 text-right text-emerald-700">${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="px-3 py-1.5 text-right text-emerald-700">13.33%</td>
+                          </tr>
+                          <tr className="bg-slate-50/60">
+                            <td className="px-3 py-1.5">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 3ER AÑO</td>
+                            <td className="px-3 py-1.5 text-right text-emerald-700">${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="px-3 py-1.5 text-right text-emerald-700">13.33%</td>
+                          </tr>
+                          <tr className="bg-emerald-50 text-[#14532d] font-bold">
+                            <td className="px-3 py-1.5">TOTAL A DESCONTAR POR LA LEY 57-07 (40% DEL TOTAL)</td>
+                            <td className="px-3 py-1.5 text-right text-emerald-800">${summary.ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="px-3 py-1.5 text-right text-emerald-800">40.00%</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* GARANTÍAS Y NOS ENCARGAMOS DE GESTIONAR GRID */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1 text-[11px]">
+                      <h4 className="font-bold text-[#14532d] border-b border-slate-200 pb-1 mb-1 uppercase tracking-wider flex items-center gap-1.5">
+                        <ShieldCheck className="w-3.5 h-3.5" /> GARANTÍAS
+                      </h4>
+                      <div>• <span className="font-bold">Paneles Solares:</span> 25 años (80.7% potencia mínima garantizada)</div>
+                      <div>• <span className="font-bold">Inversor:</span> 5 años</div>
+                      <div>• <span className="font-bold">Estructura de montaje:</span> 10 años</div>
+                      <div>• <span className="font-bold">Batería:</span> 10 años</div>
+                      <div>• <span className="font-bold">Mano de obra:</span> 1 año</div>
+                    </div>
+
+                    <div className="bg-emerald-50/60 border border-emerald-200 rounded-lg p-3 space-y-1 text-[11px] text-emerald-950">
+                      <h4 className="font-bold text-[#14532d] border-b border-emerald-200 pb-1 mb-1 uppercase tracking-wider flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" /> NOS ENCARGAMOS DE GESTIONAR
+                      </h4>
+                      <div className="flex items-start gap-1"><Check className="w-3.5 h-3.5 text-emerald-700 shrink-0 mt-0.5" /> <span>Instalación del contador bidireccional en las EDES</span></div>
+                      <div className="flex items-start gap-1"><Check className="w-3.5 h-3.5 text-emerald-700 shrink-0 mt-0.5" /> <span>Aprobación de crédito fiscal (CNE) y el Ministerio de Hacienda</span></div>
+                      <div className="flex items-start gap-1"><Check className="w-3.5 h-3.5 text-emerald-700 shrink-0 mt-0.5" /> <span>Trámites completos ante organismos reguladores</span></div>
+                    </div>
+                  </div>
+
+                  {/* LEGAL SUBTEXT BETWEEN ASTERISKS */}
+                  <div className="text-center text-[10px] text-slate-500 font-mono italic pt-1">
+                    * Equipos según disponibilidad de inventario | * Propuesta válida por {project.client.quoteValidityDays || 7} días | * Precios en USD *
+                  </div>
+                </div>
+
+                {/* Footer Electsun */}
+                {showHeadersFooters && (
+                  <div className="px-10 py-3 bg-slate-100 border-t border-slate-200 flex justify-between items-center text-[10px] text-slate-600 font-mono mt-auto">
+                    <div>Calle Ercilia Pepín #1, Plaza Toledo | Local 307 | Arroyo Manzano | Santo Domingo, RD | electsun.com.do</div>
+                    <div className="font-bold text-slate-800">Página {pageQuotNum} de {activePagesCount}</div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ---------------------------------------------------- */}
+            {/* PÁGINA 3: RETORNO DE INVERSIÓN - RESUMEN */}
             {/* ---------------------------------------------------- */}
             {showPage2 && (
               <div className="pdf-page w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative font-sans print:shadow-none print:w-full print:min-h-screen">
@@ -564,7 +925,7 @@ export const PDFProposalView: React.FC = () => {
             )}
 
             {/* ---------------------------------------------------- */}
-            {/* PÁGINA 3: FLUJO DE CAJA Y BENEFICIOS ACUMULADOS (25 AÑOS) */}
+            {/* PÁGINA 4: FLUJO DE CAJA Y BENEFICIOS ACUMULADOS (25 AÑOS) */}
             {/* ---------------------------------------------------- */}
             {showPage3 && (
               <div className="pdf-page w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative font-sans print:shadow-none print:w-full print:min-h-screen">
