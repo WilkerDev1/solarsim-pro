@@ -40,43 +40,43 @@ export const PDFProposalView: React.FC = () => {
   };
 
   const handleExportPDF = async () => {
-    if (window.electronAPI && window.electronAPI.printToPDF) {
-      setIsExporting(true);
-      try {
-        await window.electronAPI.printToPDF();
-      } catch (e) {
-        console.error('Electron print error:', e);
-      } finally {
-        setIsExporting(false);
-      }
-      return;
-    }
-
     if (!pdfRef.current) return;
     setIsExporting(true);
+
     try {
-      const canvas = await html2canvas(pdfRef.current, { scale: 2, useCORS: true });
-      const imgData = canvas.toDataURL('image/png');
+      const pageElements = pdfRef.current.querySelectorAll<HTMLElement>('.pdf-page');
+      if (!pageElements || pageElements.length === 0) {
+        setIsExporting(false);
+        return;
+      }
+
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgWidth = 210;
-      const pageHeight = 297;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
+      const pdfWidth = 210;
+      const pdfHeight = 297;
 
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+      for (let i = 0; i < pageElements.length; i++) {
+        const pageEl = pageElements[i];
 
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+        const canvas = await html2canvas(pageEl, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          windowWidth: 1200,
+        });
+
+        const imgData = canvas.toDataURL('image/png');
+        const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+
+        if (i > 0) {
+          pdf.addPage();
+        }
+
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, Math.min(pdfHeight, imgHeight));
       }
 
       pdf.save(`Propuesta_SolarSim_${project.client.name.replace(/\s+/g, '_')}.pdf`);
     } catch (err) {
-      console.error('Error generating PDF:', err);
+      console.error('Error generating multi-page PDF:', err);
     } finally {
       setIsExporting(false);
     }
@@ -87,6 +87,17 @@ export const PDFProposalView: React.FC = () => {
     month: 'short',
     year: 'numeric',
   });
+
+  // Calculate total pages for footer dynamically
+  const activePagesCount = (showPage1 ? 1 : 0) + (showPage2 ? 1 : 0) + (showPage3 ? 1 : 0);
+  let page1Num = 0;
+  let page2Num = 0;
+  let page3Num = 0;
+  let currentNum = 0;
+
+  if (showPage1) { currentNum++; page1Num = currentNum; }
+  if (showPage2) { currentNum++; page2Num = currentNum; }
+  if (showPage3) { currentNum++; page3Num = currentNum; }
 
   // Calculate equivalent trees planted (~16 trees per Ton CO2/yr)
   const treesPlanted = Math.round(summary.co2AvoidedTonsPerYear * 16);
@@ -231,7 +242,7 @@ export const PDFProposalView: React.FC = () => {
             {/* PÁGINA 1: ANÁLISIS DE ENERGÍA */}
             {/* ---------------------------------------------------- */}
             {showPage1 && (
-              <div className="w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative font-sans print:shadow-none print:w-full print:min-h-screen">
+              <div className="pdf-page w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative font-sans print:shadow-none print:w-full print:min-h-screen">
                 {/* Header */}
                 {showHeadersFooters && (
                   <div className="px-10 py-8 border-b border-gray-200 flex justify-between items-start">
@@ -337,7 +348,7 @@ export const PDFProposalView: React.FC = () => {
                 {showHeadersFooters && (
                   <div className="px-10 py-5 border-t border-gray-200 flex justify-between items-center text-xs text-gray-400 mt-auto">
                     <span>Generado por SolarSim Pro</span>
-                    <span>Página 1 de 3</span>
+                    <span>Página {page1Num} de {activePagesCount}</span>
                   </div>
                 )}
               </div>
@@ -347,7 +358,7 @@ export const PDFProposalView: React.FC = () => {
             {/* PÁGINA 2: RETORNO DE INVERSIÓN - RESUMEN */}
             {/* ---------------------------------------------------- */}
             {showPage2 && (
-              <div className="w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative font-sans print:shadow-none print:w-full print:min-h-screen">
+              <div className="pdf-page w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative font-sans print:shadow-none print:w-full print:min-h-screen">
                 {/* Header */}
                 {showHeadersFooters && (
                   <div className="px-10 py-8 border-b border-gray-200 flex justify-between items-start">
@@ -527,7 +538,7 @@ export const PDFProposalView: React.FC = () => {
                 {showHeadersFooters && (
                   <div className="px-10 py-5 border-t border-gray-200 flex justify-between items-center text-xs text-gray-400 mt-auto">
                     <span>Generado por SolarSim Pro</span>
-                    <span>Página 2 de 3</span>
+                    <span>Página {page2Num} de {activePagesCount}</span>
                   </div>
                 )}
               </div>
@@ -537,7 +548,7 @@ export const PDFProposalView: React.FC = () => {
             {/* PÁGINA 3: FLUJO DE CAJA Y BENEFICIOS ACUMULADOS (25 AÑOS) */}
             {/* ---------------------------------------------------- */}
             {showPage3 && (
-              <div className="w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative font-sans print:shadow-none print:w-full print:min-h-screen">
+              <div className="pdf-page w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative font-sans print:shadow-none print:w-full print:min-h-screen">
                 {/* Header */}
                 {showHeadersFooters && (
                   <div className="px-10 py-8 border-b border-gray-200 flex justify-between items-start">
@@ -667,7 +678,7 @@ export const PDFProposalView: React.FC = () => {
                 {showHeadersFooters && (
                   <div className="px-10 py-5 border-t border-gray-200 flex justify-between items-center text-xs text-gray-400 mt-auto">
                     <span>Generado por SolarSim Pro</span>
-                    <span>Página 3 de 3</span>
+                    <span>Página {page3Num} de {activePagesCount}</span>
                   </div>
                 )}
               </div>
