@@ -290,7 +290,6 @@ export const PDFProposalView: React.FC = () => {
                           <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#475569' }} />
                           <YAxis tick={{ fontSize: 10, fill: '#475569' }} />
                           <Tooltip formatter={(val: number) => [`${Math.round(val).toLocaleString()} kWh`, '']} />
-                          <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '11px', fontWeight: '600', paddingTop: '0px' }} />
                           
                           <Bar dataKey="consumptionKWh" name="Consumo (kWh)" fill="#14532d" radius={[3, 3, 0, 0]}>
                             <LabelList dataKey="consumptionKWh" position="top" style={{ fontSize: '8px', fill: '#14532d', fontWeight: 'bold' }} formatter={(val: number) => Math.round(val)} />
