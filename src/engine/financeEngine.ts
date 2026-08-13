@@ -244,6 +244,19 @@ export function calculateFinancialSummary(
     ? Math.min(100, Math.round((annualProductionKWh / annualConsumptionKWh) * 1000) / 10)
     : 0;
 
+  // Battery Usable Capacity & Backup Autonomy calculation
+  const batteryDodPct = specs.batteryDOD || 80;
+  const batteryEffPct = specs.batteryEfficiencyPct || 92;
+  const batteryUsableKWh = specs.hasBattery
+    ? Math.round((specs.batteryCapacityKWh * (batteryDodPct / 100) * (batteryEffPct / 100)) * 10) / 10
+    : 0;
+
+  const avgDailyConsumptionKWh = annualConsumptionKWh > 0 ? annualConsumptionKWh / 365 : 100;
+  const avgHourlyLoadKW = avgDailyConsumptionKWh / 24;
+  const batteryBackupAutonomyHours = (specs.hasBattery && avgHourlyLoadKW > 0)
+    ? Math.round((batteryUsableKWh / avgHourlyLoadKW) * 10) / 10
+    : 0;
+
   // 25-Year Cash Flow Projection
   const annualDegradationPct = specs.isDetailed ? specs.annualDegradation : 0.5;
   const annualInflationPct = rates.annualEnergyInflationPct || 3.5;
@@ -263,7 +276,15 @@ export function calculateFinancialSummary(
     const yearSavings = Math.round(year1SavingsUSD * degradationFactor * inflationFactor * 100) / 100;
     const yearTaxCredit = year <= 3 ? Math.round(annualTaxCredit * 100) / 100 : 0;
 
-    const netCashFlow = Math.round((yearSavings + yearTaxCredit) * 100) / 100;
+    let yearReplacementCost = 0;
+    if (specs.hasBattery && specs.batteryReplacementCostUSD && specs.batteryReplacementCostUSD > 0) {
+      const replacementYear = specs.batteryLifespanYears || 10;
+      if (year === replacementYear) {
+        yearReplacementCost = specs.batteryReplacementCostUSD;
+      }
+    }
+
+    const netCashFlow = Math.round((yearSavings + yearTaxCredit - yearReplacementCost) * 100) / 100;
     annualNetCashFlows.push(netCashFlow);
 
     const prevCumulative = cumulativeCashFlow;
@@ -328,5 +349,7 @@ export function calculateFinancialSummary(
     monthlyBreakdown: monthlyResults,
     cashFlow25Years,
     costMatrix,
+    batteryUsableKWh,
+    batteryBackupAutonomyHours,
   };
 }

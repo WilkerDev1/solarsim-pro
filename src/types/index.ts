@@ -48,6 +48,11 @@ export interface SystemSpecs {
   systemLosses: number;         // % e.g. 14
   annualDegradation: number;    // % e.g. 0.5
   batteryDOD: number;           // % e.g. 80
+  batteryEfficiencyPct?: number;       // % e.g. 92
+  batteryNightLoadSharePct?: number;   // % e.g. 50
+  batteryLifespanYears?: number;       // e.g. 10
+  batteryReplacementCostUSD?: number;  // e.g. 3500 (Optional replacement cost at Year 10)
+  daytimeSelfConsumptionRatio?: number; // % e.g. 75
 }
 
 export interface UtilityRates {
@@ -151,6 +156,8 @@ export interface FinancialSummaryResult {
   monthlyBreakdown: MonthlyEnergyResult[];
   cashFlow25Years: CashFlowYear[];
   costMatrix: CostMatrixSummary;
+  batteryUsableKWh: number;
+  batteryBackupAutonomyHours: number;
 }
 
 export interface ProjectSimulation {

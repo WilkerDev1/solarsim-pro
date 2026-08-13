@@ -497,6 +497,55 @@ export const SimulatorView: React.FC = () => {
                         className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
                       />
                     </div>
+
+                    {/* Parámetros Detallados de Batería (Punto 1 y 2) */}
+                    <div className="pt-2 border-t border-slate-200 space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">DoD Descarga (%)</label>
+                          <input
+                            type="number"
+                            step="5"
+                            value={project.specs.batteryDOD || 80}
+                            onChange={(e) => updateSpecs({ batteryDOD: parseFloat(e.target.value) || 80 })}
+                            className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-semibold text-slate-800"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Eficiencia Carga (%)</label>
+                          <input
+                            type="number"
+                            step="1"
+                            value={project.specs.batteryEfficiencyPct || 92}
+                            onChange={(e) => updateSpecs({ batteryEfficiencyPct: parseFloat(e.target.value) || 92 })}
+                            className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-semibold text-slate-800"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-600 mb-0.5">Costo Reemplazo Año 10 (USD)</label>
+                        <input
+                          type="number"
+                          step="500"
+                          value={project.specs.batteryReplacementCostUSD || 0}
+                          onChange={(e) => updateSpecs({ batteryReplacementCostUSD: parseFloat(e.target.value) || 0 })}
+                          placeholder="Ej. $3,500 USD"
+                          className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-semibold text-slate-800"
+                        />
+                      </div>
+
+                      <div className="bg-emerald-100/80 border border-emerald-300 rounded-lg p-2 text-[10px] font-bold text-emerald-950 space-y-0.5 mt-1">
+                        <div className="flex justify-between">
+                          <span>Energía Útil Batería:</span>
+                          <span className="text-emerald-800 font-extrabold">{summary.batteryUsableKWh} kWh</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Autonomía Anti-Apagones:</span>
+                          <span className="text-emerald-800 font-extrabold">~{summary.batteryBackupAutonomyHours} Horas</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>

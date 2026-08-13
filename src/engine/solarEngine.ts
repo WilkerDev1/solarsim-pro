@@ -43,8 +43,12 @@ export function calculateMonthlySolarProduction(
     // Dynamic monthly solar production formula: kWp * HSP * days * derateFactor
     const production = Math.round(dcCapacityKWp * hsp * days * derateFactor * 10) / 10;
 
-    // Instant self-consumption vs grid export model
-    const daytimeSelfConsumptionRatio = specs.hasBattery ? 0.90 : 0.75;
+    // Physics-based self-consumption & battery storage model
+    const baseDaytimeRatio = specs.daytimeSelfConsumptionRatio !== undefined
+      ? specs.daytimeSelfConsumptionRatio / 100
+      : (specs.hasBattery ? 0.90 : 0.75);
+
+    const daytimeSelfConsumptionRatio = Math.min(0.98, Math.max(0.40, baseDaytimeRatio));
     
     let solarSelfConsumed = Math.min(consumption, Math.round(production * daytimeSelfConsumptionRatio * 10) / 10);
     let gridExported = Math.max(0, Math.round((production - solarSelfConsumed) * 10) / 10);
