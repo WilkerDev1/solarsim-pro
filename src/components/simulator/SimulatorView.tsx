@@ -452,6 +452,87 @@ export const SimulatorView: React.FC = () => {
                 />
               </div>
 
+              {/* CAMPOS MODO DETALLADO */}
+              {project.specs.isDetailed && (
+                <div className="space-y-3 bg-emerald-50/50 p-3 rounded-lg border border-emerald-200 mt-3">
+                  <h4 className="text-[11px] font-bold text-emerald-900 uppercase tracking-wider border-b border-emerald-200 pb-1 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[14px]">tune</span> Parámetros Técnicos Avanzados
+                  </h4>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-700 mb-0.5">Potencia Inversor (kW)</label>
+                      <input
+                        type="number"
+                        step="1"
+                        value={project.specs.inverterPowerKW}
+                        onChange={(e) => updateSpecs({ inverterPowerKW: parseFloat(e.target.value) || 0 })}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-700 mb-0.5">Cantidad Inversores</label>
+                      <input
+                        type="number"
+                        step="1"
+                        value={project.specs.inverterCount || 1}
+                        onChange={(e) => updateSpecs({ inverterCount: parseInt(e.target.value) || 1 })}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-700 mb-0.5">Eficiencia Panel (%)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={project.specs.panelEfficiency}
+                        onChange={(e) => updateSpecs({ panelEfficiency: parseFloat(e.target.value) || 0 })}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-700 mb-0.5">Coef. Temp (%/°C)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={project.specs.tempCoeff}
+                        onChange={(e) => updateSpecs({ tempCoeff: parseFloat(e.target.value) || 0 })}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-700 mb-0.5">Pérdidas Sistema (%)</label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={project.specs.systemLosses}
+                        onChange={(e) => updateSpecs({ systemLosses: parseFloat(e.target.value) || 0 })}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-700 mb-0.5">Degradación Anual (%)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={project.specs.annualDegradation}
+                        onChange={(e) => updateSpecs({ annualDegradation: parseFloat(e.target.value) || 0 })}
+                        className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600 transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Almacenamiento (Batería) Toggle & Campos */}
               <div className="pt-2 border-t border-slate-200 space-y-3">
                 <div className="flex items-center justify-between">
