@@ -119,7 +119,7 @@ export const SimulatorView: React.FC = () => {
   });
 
   return (
-    <div className="flex-1 flex overflow-hidden w-full h-[calc(100vh-64px)] bg-slate-100 font-sans">
+    <div className="flex-1 flex overflow-hidden w-full h-full min-h-0 bg-slate-100 font-sans">
       {/* Left Sidebar: Parameters */}
       <aside className="w-[340px] bg-white border-r border-slate-200 flex flex-col shrink-0 h-full overflow-y-auto shadow-sm z-10">
         <div className="p-5 border-b border-slate-200 bg-slate-50/70 flex justify-between items-center">
@@ -561,7 +561,7 @@ export const SimulatorView: React.FC = () => {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col h-full overflow-y-auto p-6 gap-6">
+      <main className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto p-6 gap-6">
         {/* Top View Selector Tabs (3 VISTAS: Análisis de Energía | Cotización y Equipos | Retorno de Inversión) */}
         <div className="bg-white border-b border-slate-200 -mx-6 -mt-6 px-6 pt-3 pb-0 sticky top-0 z-20 shadow-xs flex justify-between items-center">
           <div className="flex gap-8">

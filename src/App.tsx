@@ -11,7 +11,7 @@ export const App: React.FC = () => {
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-surface text-on-surface">
       <Header />
-      <main className="flex-1 flex overflow-hidden">
+      <main className="flex-1 flex overflow-hidden min-h-0">
         {activeView === 'dashboard' && <DashboardView />}
         {activeView === 'simulator' && <SimulatorView />}
         {activeView === 'pdf-preview' && <PDFProposalView />}
