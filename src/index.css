@@ -29,15 +29,35 @@
 }
 
 @media print {
+  html, body, #root, main, div {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
   body {
     background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
-  header, aside {
+  header, aside, button, .no-print {
     display: none !important;
   }
   main {
     padding: 0 !important;
     margin: 0 !important;
     overflow: visible !important;
+    height: auto !important;
+  }
+  .pdf-page {
+    width: 210mm !important;
+    min-height: 297mm !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    overflow: hidden !important;
   }
 }

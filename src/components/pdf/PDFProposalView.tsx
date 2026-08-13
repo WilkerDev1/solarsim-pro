@@ -123,16 +123,6 @@ export const PDFProposalView: React.FC = () => {
     setIsExporting(true);
 
     try {
-      // 1. If running in Electron desktop app, use Electron native printToPDF
-      if (window.electronAPI && typeof window.electronAPI.printToPDF === 'function') {
-        const res = await window.electronAPI.printToPDF();
-        if (res && res.success) {
-          setIsExporting(false);
-          return;
-        }
-      }
-
-      // 2. Browser multi-page PDF generation via html2canvas & jsPDF
       const pageElements = pdfRef.current.querySelectorAll<HTMLElement>('.pdf-page');
       if (!pageElements || pageElements.length === 0) {
         setIsExporting(false);
@@ -176,7 +166,6 @@ export const PDFProposalView: React.FC = () => {
       pdf.save(`Propuesta_SolarSim_${sanitizedClientName}.pdf`);
     } catch (err) {
       console.error('Error generating multi-page PDF:', err);
-      // Fallback: trigger print dialog if canvas rasterization fails
       window.print();
     } finally {
       setIsExporting(false);
