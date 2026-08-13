@@ -13,7 +13,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
-import { Globe, CheckCircle2, AlertCircle, Loader2, ShieldCheck, Check, Package, FileText } from 'lucide-react';
+import { Globe, CheckCircle2, AlertCircle, Loader2, ShieldCheck, Check, Package, FileText, Save, Clock } from 'lucide-react';
 
 export const SimulatorView: React.FC = () => {
   const {
@@ -24,7 +24,7 @@ export const SimulatorView: React.FC = () => {
     updateRates,
     updateFinancials,
     updateMonthlyConsumption,
-    setProjectStatus,
+    saveActiveProject,
   } = useSimulationStore();
 
   const project = getActiveProject();
@@ -122,20 +122,19 @@ export const SimulatorView: React.FC = () => {
     <div className="flex-1 flex overflow-hidden w-full h-full min-h-0 bg-slate-100 font-sans">
       {/* Left Sidebar: Parameters */}
       <aside className="w-[340px] bg-white border-r border-slate-200 flex flex-col shrink-0 h-full overflow-y-auto shadow-sm z-10">
-        <div className="p-5 border-b border-slate-200 bg-slate-50/70 flex justify-between items-center">
+        <div className="p-4 border-b border-slate-200 bg-slate-50/80 flex justify-between items-center">
           <div>
             <h2 className="font-bold text-sm text-slate-900 uppercase tracking-wider">Parámetros</h2>
             <p className="text-[11px] text-slate-500 mt-0.5">Configurar restricciones del sistema</p>
           </div>
-          <select
-            value={project.status}
-            onChange={(e) => setProjectStatus(project.id, e.target.value as any)}
-            className="bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-700 cursor-pointer shadow-xs"
+          <button
+            onClick={saveActiveProject}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+            title="Guardar cambios de la simulación"
           >
-            <option value="Draft">Borrador</option>
-            <option value="Final">Finalizado</option>
-            <option value="Archived">Archivado</option>
-          </select>
+            <Save className="w-3.5 h-3.5 text-emerald-700" />
+            <span>Guardar</span>
+          </button>
         </div>
 
         <div className="p-5 space-y-6 flex-1">

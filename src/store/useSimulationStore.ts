@@ -1,7 +1,17 @@
 import { create } from 'zustand';
-import { ProjectSimulation, ClientInfo, SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult } from '../types';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import { ProjectSimulation, ClientInfo, SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, UpdateInfo } from '../types';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateFinancialSummary } from '../engine/financeEngine';
+
+export interface NewProjectPayload {
+  name: string;
+  company?: string;
+  province?: string;
+  distributor?: 'EDEESTE' | 'EDESUR' | 'EDENORTE' | 'CEPM';
+  tariffCode?: string;
+  address?: string;
+}
 
 interface SimulationState {
   projects: ProjectSimulation[];
@@ -10,11 +20,23 @@ interface SimulationState {
   searchQuery: string;
   statusFilter: string;
 
+  // Modals & Notifications
+  isNewProjectModalOpen: boolean;
+  isUpdateModalOpen: boolean;
+  updateInfo: UpdateInfo;
+  saveFeedbackMessage: string | null;
+
   // Actions
   setActiveView: (view: 'dashboard' | 'simulator' | 'pdf-preview') => void;
   setActiveProject: (id: string) => void;
   setSearchQuery: (query: string) => void;
   setStatusFilter: (filter: string) => void;
+  
+  openNewProjectModal: () => void;
+  closeNewProjectModal: () => void;
+  openUpdateModal: () => void;
+  closeUpdateModal: () => void;
+  setUpdateInfo: (info: UpdateInfo) => void;
   
   updateClient: (client: Partial<ClientInfo>) => void;
   updateSpecs: (specs: Partial<SystemSpecs>) => void;
@@ -22,9 +44,11 @@ interface SimulationState {
   updateFinancials: (financials: Partial<FinancialParams>) => void;
   updateMonthlyConsumption: (index: number, value: number) => void;
   
-  createNewProject: (clientName?: string) => void;
+  createNewProject: (payload?: string | NewProjectPayload) => void;
+  duplicateProject: (id: string) => void;
   deleteProject: (id: string) => void;
   setProjectStatus: (id: string, status: 'Draft' | 'Final' | 'Archived') => void;
+  saveActiveProject: () => void;
 
   // Computed helper
   getActiveProject: () => ProjectSimulation;
@@ -47,6 +71,8 @@ const INITIAL_PROJECTS: ProjectSimulation[] = [
       projectId: 'SP-2024-092',
       distributor: 'EDENORTE',
       tariffCode: 'MTD',
+      quoteNumber: 'C-0031',
+      quoteValidityDays: 7,
     },
     specs: {
       isDetailed: true,
@@ -99,6 +125,8 @@ const INITIAL_PROJECTS: ProjectSimulation[] = [
       projectId: 'SP-2024-095',
       distributor: 'CEPM',
       tariffCode: 'BTS1',
+      quoteNumber: 'C-0032',
+      quoteValidityDays: 7,
     },
     specs: {
       isDetailed: false,
@@ -139,165 +167,263 @@ const INITIAL_PROJECTS: ProjectSimulation[] = [
   },
 ];
 
-export const useSimulationStore = create<SimulationState>((set, get) => ({
-  projects: INITIAL_PROJECTS,
-  activeProjectId: BENCHMARK_PROJECT.id,
-  activeView: 'simulator',
-  searchQuery: '',
-  statusFilter: 'All Projects',
-
-  setActiveView: (view) => set({ activeView: view }),
-  setActiveProject: (id) => set({ activeProjectId: id, activeView: 'simulator' }),
-  setSearchQuery: (query) => set({ searchQuery: query }),
-  setStatusFilter: (filter) => set({ statusFilter: filter }),
-
-  updateClient: (clientPartial) => {
-    set((state) => {
-      const projects = state.projects.map((p) => {
-        if (p.id === state.activeProjectId) {
-          return {
-            ...p,
-            updatedAt: new Date().toISOString(),
-            client: { ...p.client, ...clientPartial },
-          };
-        }
-        return p;
-      });
-      return { projects };
-    });
-  },
-
-  updateSpecs: (specsPartial) => {
-    set((state) => {
-      const projects = state.projects.map((p) => {
-        if (p.id === state.activeProjectId) {
-          const updatedSpecs = { ...p.specs, ...specsPartial };
-
-          // Sync pricePerWattUSD between specs and financials if updated
-          let updatedFinancials = { ...p.financials };
-          if (specsPartial.pricePerWattUSD !== undefined) {
-            updatedFinancials.pricePerWattUSD = specsPartial.pricePerWattUSD;
-          }
-
-          return {
-            ...p,
-            updatedAt: new Date().toISOString(),
-            specs: updatedSpecs,
-            financials: updatedFinancials,
-          };
-        }
-        return p;
-      });
-      return { projects };
-    });
-  },
-
-  updateRates: (ratesPartial) => {
-    set((state) => {
-      const projects = state.projects.map((p) => {
-        if (p.id === state.activeProjectId) {
-          return {
-            ...p,
-            updatedAt: new Date().toISOString(),
-            rates: { ...p.rates, ...ratesPartial },
-          };
-        }
-        return p;
-      });
-      return { projects };
-    });
-  },
-
-  updateFinancials: (finPartial) => {
-    set((state) => {
-      const projects = state.projects.map((p) => {
-        if (p.id === state.activeProjectId) {
-          const updatedFinancials = { ...p.financials, ...finPartial };
-          let updatedSpecs = { ...p.specs };
-          if (finPartial.pricePerWattUSD !== undefined) {
-            updatedSpecs.pricePerWattUSD = finPartial.pricePerWattUSD;
-          }
-          return {
-            ...p,
-            updatedAt: new Date().toISOString(),
-            financials: updatedFinancials,
-            specs: updatedSpecs,
-          };
-        }
-        return p;
-      });
-      return { projects };
-    });
-  },
-
-  updateMonthlyConsumption: (index, value) => {
-    set((state) => {
-      const projects = state.projects.map((p) => {
-        if (p.id === state.activeProjectId) {
-          const newCons = [...p.monthlyConsumption];
-          newCons[index] = Math.max(0, value);
-          return {
-            ...p,
-            updatedAt: new Date().toISOString(),
-            monthlyConsumption: newCons,
-          };
-        }
-        return p;
-      });
-      return { projects };
-    });
-  },
-
-  createNewProject: (clientName = 'Nuevo Proyecto Solar') => {
-    const id = `proj-${Date.now()}`;
-    const newProj: ProjectSimulation = {
-      ...BENCHMARK_PROJECT,
-      id,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      status: 'Draft',
-      client: {
-        ...BENCHMARK_PROJECT.client,
-        name: clientName,
-        company: 'Cliente Comercial',
-        projectId: `SP-2026-${Math.floor(100 + Math.random() * 900)}`,
-      },
-    };
-    set((state) => ({
-      projects: [newProj, ...state.projects],
-      activeProjectId: id,
+export const useSimulationStore = create<SimulationState>()(
+  persist(
+    (set, get) => ({
+      projects: INITIAL_PROJECTS,
+      activeProjectId: BENCHMARK_PROJECT.id,
       activeView: 'simulator',
-    }));
-  },
+      searchQuery: '',
+      statusFilter: 'All Projects',
 
-  deleteProject: (id) => {
-    set((state) => {
-      const projects = state.projects.filter((p) => p.id !== id);
-      const activeProjectId = projects.length > 0 ? projects[0].id : '';
-      return { projects, activeProjectId };
-    });
-  },
+      isNewProjectModalOpen: false,
+      isUpdateModalOpen: false,
+      updateInfo: { state: 'idle' },
+      saveFeedbackMessage: null,
 
-  setProjectStatus: (id, status) => {
-    set((state) => ({
-      projects: state.projects.map((p) => (p.id === id ? { ...p, status } : p)),
-    }));
-  },
+      setActiveView: (view) => set({ activeView: view }),
+      setActiveProject: (id) => set({ activeProjectId: id, activeView: 'simulator' }),
+      setSearchQuery: (query) => set({ searchQuery: query }),
+      setStatusFilter: (filter) => set({ statusFilter: filter }),
 
-  getActiveProject: () => {
-    const { projects, activeProjectId } = get();
-    return projects.find((p) => p.id === activeProjectId) || projects[0] || BENCHMARK_PROJECT;
-  },
+      openNewProjectModal: () => set({ isNewProjectModalOpen: true }),
+      closeNewProjectModal: () => set({ isNewProjectModalOpen: false }),
+      openUpdateModal: () => set({ isUpdateModalOpen: true }),
+      closeUpdateModal: () => set({ isUpdateModalOpen: false }),
+      setUpdateInfo: (info) => set({ updateInfo: info }),
 
-  getFinancialSummary: () => {
-    const project = get().getActiveProject();
-    return calculateFinancialSummary(
-      project.client.province,
-      project.specs,
-      project.rates,
-      project.financials,
-      project.monthlyConsumption,
-      project.client.customMonthlyHSP
-    );
-  },
-}));
+      updateClient: (clientPartial) => {
+        set((state) => {
+          const projects = state.projects.map((p) => {
+            if (p.id === state.activeProjectId) {
+              return {
+                ...p,
+                updatedAt: new Date().toISOString(),
+                client: { ...p.client, ...clientPartial },
+              };
+            }
+            return p;
+          });
+          return { projects };
+        });
+      },
+
+      updateSpecs: (specsPartial) => {
+        set((state) => {
+          const projects = state.projects.map((p) => {
+            if (p.id === state.activeProjectId) {
+              const updatedSpecs = { ...p.specs, ...specsPartial };
+
+              // Sync pricePerWattUSD between specs and financials if updated
+              let updatedFinancials = { ...p.financials };
+              if (specsPartial.pricePerWattUSD !== undefined) {
+                updatedFinancials.pricePerWattUSD = specsPartial.pricePerWattUSD;
+              }
+
+              return {
+                ...p,
+                updatedAt: new Date().toISOString(),
+                specs: updatedSpecs,
+                financials: updatedFinancials,
+              };
+            }
+            return p;
+          });
+          return { projects };
+        });
+      },
+
+      updateRates: (ratesPartial) => {
+        set((state) => {
+          const projects = state.projects.map((p) => {
+            if (p.id === state.activeProjectId) {
+              return {
+                ...p,
+                updatedAt: new Date().toISOString(),
+                rates: { ...p.rates, ...ratesPartial },
+              };
+            }
+            return p;
+          });
+          return { projects };
+        });
+      },
+
+      updateFinancials: (finPartial) => {
+        set((state) => {
+          const projects = state.projects.map((p) => {
+            if (p.id === state.activeProjectId) {
+              const updatedFinancials = { ...p.financials, ...finPartial };
+              let updatedSpecs = { ...p.specs };
+              if (finPartial.pricePerWattUSD !== undefined) {
+                updatedSpecs.pricePerWattUSD = finPartial.pricePerWattUSD;
+              }
+              return {
+                ...p,
+                updatedAt: new Date().toISOString(),
+                financials: updatedFinancials,
+                specs: updatedSpecs,
+              };
+            }
+            return p;
+          });
+          return { projects };
+        });
+      },
+
+      updateMonthlyConsumption: (index, value) => {
+        set((state) => {
+          const projects = state.projects.map((p) => {
+            if (p.id === state.activeProjectId) {
+              const newCons = [...p.monthlyConsumption];
+              newCons[index] = Math.max(0, value);
+              return {
+                ...p,
+                updatedAt: new Date().toISOString(),
+                monthlyConsumption: newCons,
+              };
+            }
+            return p;
+          });
+          return { projects };
+        });
+      },
+
+      createNewProject: (payload) => {
+        const id = `proj-${Date.now()}`;
+        const name = typeof payload === 'string' ? payload : (payload?.name || 'Nuevo Proyecto Solar');
+        const company = typeof payload === 'object' && payload?.company ? payload.company : 'Cliente Comercial';
+        const province = typeof payload === 'object' && payload?.province ? payload.province : 'Santo Domingo / Distrito Nacional';
+        const distributor = typeof payload === 'object' && payload?.distributor ? payload.distributor : 'EDEESTE';
+        const tariffCode = typeof payload === 'object' && payload?.tariffCode ? payload.tariffCode : 'BTS2';
+        const address = typeof payload === 'object' && payload?.address ? payload.address : `${province}, República Dominicana`;
+
+        const newProj: ProjectSimulation = {
+          ...BENCHMARK_PROJECT,
+          id,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          status: 'Draft',
+          client: {
+            ...BENCHMARK_PROJECT.client,
+            name,
+            company,
+            province,
+            location: province,
+            address,
+            distributor,
+            tariffCode,
+            projectId: `SP-2026-${Math.floor(100 + Math.random() * 900)}`,
+            quoteNumber: `C-${Math.floor(1000 + Math.random() * 9000)}`,
+            quoteValidityDays: 7,
+          },
+          rates: {
+            ...BENCHMARK_PROJECT.rates,
+            distributor,
+            tariffCode,
+          },
+        };
+
+        set((state) => ({
+          projects: [newProj, ...state.projects],
+          activeProjectId: id,
+          activeView: 'simulator',
+          isNewProjectModalOpen: false,
+          saveFeedbackMessage: `¡Proyecto "${name}" creado con éxito!`,
+        }));
+
+        setTimeout(() => {
+          set({ saveFeedbackMessage: null });
+        }, 3500);
+      },
+
+      duplicateProject: (id) => {
+        const target = get().projects.find((p) => p.id === id);
+        if (!target) return;
+
+        const newId = `proj-${Date.now()}`;
+        const cloned: ProjectSimulation = {
+          ...target,
+          id: newId,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          status: 'Draft',
+          client: {
+            ...target.client,
+            name: `${target.client.name} (Copia)`,
+            projectId: `SP-2026-${Math.floor(100 + Math.random() * 900)}`,
+            quoteNumber: `C-${Math.floor(1000 + Math.random() * 9000)}`,
+          },
+        };
+
+        set((state) => ({
+          projects: [cloned, ...state.projects],
+          activeProjectId: newId,
+          activeView: 'simulator',
+          saveFeedbackMessage: `¡Copia creada con éxito!`,
+        }));
+
+        setTimeout(() => {
+          set({ saveFeedbackMessage: null });
+        }, 3500);
+      },
+
+      deleteProject: (id) => {
+        set((state) => {
+          const projects = state.projects.filter((p) => p.id !== id);
+          const activeProjectId = projects.length > 0 ? projects[0].id : '';
+          return { projects, activeProjectId };
+        });
+      },
+
+      setProjectStatus: (id, status) => {
+        set((state) => ({
+          projects: state.projects.map((p) => (p.id === id ? { ...p, status, updatedAt: new Date().toISOString() } : p)),
+        }));
+      },
+
+      saveActiveProject: () => {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+        set((state) => ({
+          projects: state.projects.map((p) =>
+            p.id === state.activeProjectId ? { ...p, updatedAt: now.toISOString() } : p
+          ),
+          saveFeedbackMessage: `Guardado a las ${timeStr}`,
+        }));
+
+        setTimeout(() => {
+          set({ saveFeedbackMessage: null });
+        }, 3000);
+      },
+
+      getActiveProject: () => {
+        const { projects, activeProjectId } = get();
+        return projects.find((p) => p.id === activeProjectId) || projects[0] || BENCHMARK_PROJECT;
+      },
+
+      getFinancialSummary: () => {
+        const project = get().getActiveProject();
+        return calculateFinancialSummary(
+          project.client.province,
+          project.specs,
+          project.rates,
+          project.financials,
+          project.monthlyConsumption,
+          project.client.customMonthlyHSP
+        );
+      },
+    }),
+    {
+      name: 'solarsim_pro_projects_store_v1',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        projects: state.projects,
+        activeProjectId: state.activeProjectId,
+        activeView: state.activeView,
+        searchQuery: state.searchQuery,
+      }),
+    }
+  )
+);

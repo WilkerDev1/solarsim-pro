@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
-import { Search, Plus, Calendar, Edit3, Trash2, CheckCircle2, Clock, Archive } from 'lucide-react';
+import { Search, Plus, Calendar, Edit3, Trash2, Copy, MapPin, Zap } from 'lucide-react';
 import { calculateDCCapacityKWp } from '../../engine/solarEngine';
 
 export const DashboardView: React.FC = () => {
@@ -9,38 +9,33 @@ export const DashboardView: React.FC = () => {
     setActiveProject,
     searchQuery,
     setSearchQuery,
-    statusFilter,
-    setStatusFilter,
-    createNewProject,
+    openNewProjectModal,
+    duplicateProject,
     deleteProject,
   } = useSimulationStore();
 
   const filteredProjects = projects.filter((project) => {
-    const matchesSearch =
+    return (
       project.client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (project.client.company && project.client.company.toLowerCase().includes(searchQuery.toLowerCase())) ||
       project.client.province.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.client.projectId.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesStatus =
-      statusFilter === 'All Projects' || project.status === statusFilter;
-
-    return matchesSearch && matchesStatus;
+      project.client.projectId.toLowerCase().includes(searchQuery.toLowerCase())
+    );
   });
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 bg-surface max-w-[1440px] mx-auto w-full">
+    <div className="flex-1 overflow-y-auto p-6 bg-slate-100 max-w-[1440px] mx-auto w-full font-sans">
       {/* Header Banner */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
-          <h2 className="text-2xl font-bold text-on-surface">Simulaciones de Proyectos</h2>
-          <p className="text-sm text-secondary">
-            Gestión y diseño de propuestas comerciales de energía solar fotovoltaica (República Dominicana)
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight">Catálogo de Proyectos y Simulaciones</h2>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Gestión y diseño de propuestas comerciales de energía solar fotovoltaica en República Dominicana
           </p>
         </div>
         <button
-          onClick={() => createNewProject()}
-          className="bg-primary text-white hover:bg-primary-dark transition-colors px-4 py-2.5 rounded-lg font-semibold text-sm flex items-center gap-2 shadow-sm"
+          onClick={openNewProjectModal}
+          className="bg-emerald-700 hover:bg-emerald-800 text-white transition-all px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-md hover:shadow-lg cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           Nueva Simulación
@@ -48,44 +43,31 @@ export const DashboardView: React.FC = () => {
       </div>
 
       {/* Toolbar Area */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white p-4 rounded-xl border border-outline-variant/60 shadow-sm">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
         {/* Search Input */}
         <div className="relative flex-1 w-full md:max-w-md">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-secondary" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Buscar por cliente, empresa, provincia o ID..."
-            className="w-full bg-surface-container-low border border-outline-variant rounded-lg pl-9 pr-4 py-2 text-sm text-on-surface focus:ring-1 focus:ring-primary focus:border-primary transition-all placeholder:text-secondary/70"
+            className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-4 py-2 text-xs font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 transition-all placeholder:text-slate-400 placeholder:font-normal"
           />
         </div>
 
-        {/* Filters */}
-        <div className="flex items-center gap-4 w-full md:w-auto">
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-semibold text-secondary uppercase tracking-wider">Estado:</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-white border border-outline-variant rounded-lg text-xs font-medium text-on-surface py-2 px-3 focus:ring-1 focus:ring-primary"
-            >
-              <option value="All Projects">Todos los proyectos</option>
-              <option value="Draft">Borrador (Draft)</option>
-              <option value="Final">Finalizado</option>
-              <option value="Archived">Archivado</option>
-            </select>
-          </div>
+        <div className="text-xs font-bold text-slate-500">
+          Total de proyectos guardados: <span className="font-mono text-emerald-800 font-extrabold">{projects.length}</span>
         </div>
       </div>
 
       {/* Projects Grid */}
       {filteredProjects.length === 0 ? (
-        <div className="bg-white border border-outline-variant/60 rounded-xl p-12 text-center my-8">
-          <p className="text-secondary text-base mb-4">No se encontraron proyectos con los criterios seleccionados.</p>
+        <div className="bg-white border border-slate-200 rounded-2xl p-12 text-center my-8 shadow-xs">
+          <p className="text-slate-500 text-sm mb-4 font-semibold">No se encontraron proyectos con los criterios de búsqueda.</p>
           <button
-            onClick={() => createNewProject()}
-            className="bg-primary text-white px-4 py-2 rounded-lg font-semibold text-sm inline-flex items-center gap-2"
+            onClick={openNewProjectModal}
+            className="bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2.5 rounded-xl font-bold text-xs inline-flex items-center gap-2 transition-all shadow-md cursor-pointer"
           >
             <Plus className="w-4 h-4" /> Crear nuevo proyecto
           </button>
@@ -103,82 +85,84 @@ export const DashboardView: React.FC = () => {
             return (
               <article
                 key={project.id}
-                className="bg-white border border-outline-variant/70 rounded-xl p-5 flex flex-col hover:shadow-md transition-shadow group relative overflow-hidden"
+                className="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col hover:shadow-xl hover:border-emerald-300 transition-all group relative overflow-hidden shadow-xs"
               >
-                {/* Status Bar Indicator */}
-                <div
-                  className={`absolute top-0 left-0 w-full h-1.5 ${
-                    project.status === 'Final' ? 'bg-primary' : project.status === 'Draft' ? 'bg-tertiary-container' : 'bg-secondary'
-                  }`}
-                />
-
-                <div className="flex justify-between items-start mb-3 mt-1">
-                  <div>
-                    <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-bold tracking-wide uppercase mb-2 ${
-                        project.status === 'Final'
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : project.status === 'Draft'
-                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                          : 'bg-slate-100 text-slate-700 border border-slate-200'
-                      }`}
-                    >
-                      {project.status === 'Final' && <CheckCircle2 className="w-3 h-3" />}
-                      {project.status === 'Draft' && <Clock className="w-3 h-3" />}
-                      {project.status === 'Archived' && <Archive className="w-3 h-3" />}
-                      {project.status}
+                {/* Top Header */}
+                <div className="flex justify-between items-start mb-3">
+                  <div className="space-y-1">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                      {project.client.projectId || 'SP-2026-001'}
                     </span>
-                    <h3 className="font-semibold text-lg text-on-surface leading-snug group-hover:text-primary transition-colors">
+                    <h3 className="font-bold text-base text-slate-900 leading-snug group-hover:text-emerald-800 transition-colors">
                       {project.client.name}
                     </h3>
-                    <p className="text-xs text-secondary">{project.client.company || project.client.province}</p>
-                  </div>
-                  <button
-                    onClick={() => deleteProject(project.id)}
-                    className="text-slate-400 hover:text-red-600 p-1.5 rounded hover:bg-red-50 transition-colors"
-                    title="Eliminar proyecto"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 mb-4 py-3 border-y border-outline-variant/40 bg-surface/50 rounded-lg px-3">
-                  <div>
-                    <span className="text-[11px] font-semibold text-secondary uppercase tracking-wider block mb-0.5">
-                      Potencia DC
-                    </span>
-                    <span className="font-mono text-base font-bold text-primary">{kwp.toFixed(2)} kWp</span>
-                  </div>
-                  <div>
-                    <span className="text-[11px] font-semibold text-secondary uppercase tracking-wider block mb-0.5">
-                      Módulos
-                    </span>
-                    <span className="font-mono text-sm font-semibold text-on-surface">
-                      {project.specs.panelCount} ({project.specs.panelPowerW}W)
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-auto">
-                  <div className="flex items-center justify-between text-xs text-secondary mb-4">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="w-3.5 h-3.5" />
-                      Actualizado: {dateStr}
-                    </span>
-                    <span className="font-mono text-[11px] bg-slate-100 px-2 py-0.5 rounded text-slate-600">
-                      {project.client.projectId}
-                    </span>
+                    <p className="text-xs text-slate-500 flex items-center gap-1 font-medium">
+                      <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                      <span className="truncate max-w-[220px]">{project.client.province || project.client.location}</span>
+                    </p>
                   </div>
 
-                  <div className="flex gap-2">
+                  {/* Actions (Duplicate & Delete) */}
+                  <div className="flex items-center gap-1">
                     <button
-                      onClick={() => setActiveProject(project.id)}
-                      className="flex-1 py-2 bg-primary text-white font-semibold text-xs rounded-lg hover:bg-primary-dark transition-colors flex items-center justify-center gap-1.5 shadow-sm"
+                      onClick={() => duplicateProject(project.id)}
+                      className="text-slate-400 hover:text-emerald-700 p-1.5 rounded-lg hover:bg-emerald-50 transition-colors cursor-pointer"
+                      title="Duplicar proyecto"
                     >
-                      <Edit3 className="w-3.5 h-3.5" />
-                      Editar / Simular
+                      <Copy className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm(`¿Estás seguro de eliminar el proyecto "${project.client.name}"?`)) {
+                          deleteProject(project.id);
+                        }
+                      }}
+                      className="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                      title="Eliminar proyecto"
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
+                </div>
+
+                {/* Specs Box */}
+                <div className="grid grid-cols-2 gap-3 my-3 py-3 border-y border-slate-100 bg-slate-50/70 rounded-xl px-3 text-xs">
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
+                      Potencia DC
+                    </span>
+                    <span className="font-mono text-base font-black text-emerald-800">{kwp.toFixed(2)} kWp</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
+                      Distribuidora
+                    </span>
+                    <span className="font-bold text-slate-700 flex items-center gap-1">
+                      <Zap className="w-3 h-3 text-amber-500" />
+                      {project.client.distributor || 'EDEESTE'} ({project.client.tariffCode || 'BTS2'})
+                    </span>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="mt-auto pt-2">
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 mb-4 font-medium">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5" />
+                      Guardado: {dateStr}
+                    </span>
+                    <span className="text-slate-500 font-semibold">
+                      {project.specs.panelCount} Paneles ({project.specs.panelPowerW}W)
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() => setActiveProject(project.id)}
+                    className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs hover:shadow-md cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    Abrir Simulación
+                  </button>
                 </div>
               </article>
             );

@@ -1,106 +1,161 @@
 import React from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
-import { Sun, FileText, LayoutDashboard, Settings, Bell, Plus, ArrowLeft } from 'lucide-react';
+import { Sun, FileText, LayoutDashboard, Save, Plus, ArrowLeft, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { NewProjectModal } from './NewProjectModal';
+import { UpdateModal } from './UpdateModal';
 
 export const Header: React.FC = () => {
-  const { activeView, setActiveView, getActiveProject, createNewProject } = useSimulationStore();
+  const {
+    activeView,
+    setActiveView,
+    getActiveProject,
+    openNewProjectModal,
+    openUpdateModal,
+    saveActiveProject,
+    saveFeedbackMessage,
+  } = useSimulationStore();
+
   const activeProject = getActiveProject();
 
   return (
-    <header className="bg-surface border-b border-outline-variant flex justify-between items-center px-6 h-16 w-full shrink-0 z-20 relative shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveView('dashboard')}>
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white shadow-sm">
-            <Sun className="w-5 h-5 animate-pulse" />
-          </div>
-          <h1 className="font-display font-bold text-xl text-primary tracking-tight">SolarSim Pro</h1>
-        </div>
-
-        {/* Active Project Context Badge */}
-        {activeView !== 'dashboard' && activeProject && (
-          <div className="hidden md:flex items-center gap-2.5 bg-surface-container px-3 py-1.5 rounded-full border border-outline-variant/50">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-            </span>
-            <span className="font-medium text-sm text-on-surface truncate max-w-[220px]">
-              {activeProject.client.name}
-            </span>
-            <span className="text-xs px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-mono">
-              {activeProject.client.projectId}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Navigation Buttons */}
-      <div className="flex items-center gap-4">
-        <div className="hidden md:flex items-center gap-1 bg-surface-container-low p-1 rounded-lg border border-outline-variant/40">
-          <button
+    <>
+      <header className="bg-white border-b border-slate-200 flex justify-between items-center px-6 h-16 w-full shrink-0 z-30 relative shadow-xs">
+        <div className="flex items-center gap-6">
+          <div
+            className="flex items-center gap-2.5 cursor-pointer group"
             onClick={() => setActiveView('dashboard')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-              activeView === 'dashboard'
-                ? 'bg-white text-primary shadow-sm'
-                : 'text-secondary hover:text-on-surface'
-            }`}
+            title="Ir al panel de proyectos"
           >
-            <LayoutDashboard className="w-3.5 h-3.5" />
-            <span>Proyectos</span>
-          </button>
+            <div className="w-8 h-8 rounded-xl bg-emerald-800 flex items-center justify-center text-white shadow-xs group-hover:bg-emerald-700 transition-colors">
+              <Sun className="w-5 h-5 text-amber-300 animate-pulse" />
+            </div>
+            <h1 className="font-bold text-xl text-emerald-950 tracking-tight">SolarSim Pro</h1>
+          </div>
 
-          <button
-            onClick={() => setActiveView('simulator')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-              activeView === 'simulator'
-                ? 'bg-white text-primary shadow-sm'
-                : 'text-secondary hover:text-on-surface'
-            }`}
-          >
-            <Sun className="w-3.5 h-3.5" />
-            <span>Simulador</span>
-          </button>
-
-          <button
-            onClick={() => setActiveView('pdf-preview')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-              activeView === 'pdf-preview'
-                ? 'bg-white text-primary shadow-sm'
-                : 'text-secondary hover:text-on-surface'
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5" />
-            <span>Propuesta PDF</span>
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2 border-l border-outline-variant pl-4">
-          {activeView === 'pdf-preview' ? (
-            <button
-              onClick={() => setActiveView('simulator')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface hover:bg-surface-container transition-colors text-xs font-semibold"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Volver a Simulación
-            </button>
-          ) : activeView === 'dashboard' ? (
-            <button
-              onClick={() => createNewProject()}
-              className="bg-primary text-white hover:bg-primary-dark transition-colors px-4 py-2 rounded-lg font-semibold text-xs flex items-center gap-1.5 shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              Nueva Simulación
-            </button>
-          ) : (
-            <button
-              onClick={() => setActiveView('pdf-preview')}
-              className="bg-primary text-white hover:bg-primary-dark transition-colors px-4 py-2 rounded-lg font-semibold text-xs flex items-center gap-2 shadow-sm"
-            >
-              <FileText className="w-4 h-4" />
-              Ver Propuesta PDF
-            </button>
+          {/* Active Project Context Badge */}
+          {activeView !== 'dashboard' && activeProject && (
+            <div className="hidden lg:flex items-center gap-2.5 bg-slate-100/90 px-3.5 py-1.5 rounded-full border border-slate-200">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+              </span>
+              <span className="font-bold text-xs text-slate-800 truncate max-w-[200px]">
+                {activeProject.client.name}
+              </span>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-white text-slate-600 font-mono font-semibold border border-slate-200">
+                {activeProject.client.projectId}
+              </span>
+            </div>
           )}
         </div>
-      </div>
-    </header>
+
+        {/* Navigation & Action Buttons */}
+        <div className="flex items-center gap-3">
+          {/* Main Navigation Tabs */}
+          <div className="hidden md:flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+            <button
+              onClick={() => setActiveView('dashboard')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeView === 'dashboard'
+                  ? 'bg-white text-emerald-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <LayoutDashboard className="w-3.5 h-3.5" />
+              <span>Proyectos</span>
+            </button>
+
+            <button
+              onClick={() => setActiveView('simulator')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeView === 'simulator'
+                  ? 'bg-white text-emerald-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Sun className="w-3.5 h-3.5" />
+              <span>Simulador</span>
+            </button>
+
+            <button
+              onClick={() => setActiveView('pdf-preview')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeView === 'pdf-preview'
+                  ? 'bg-white text-emerald-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Propuesta PDF</span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
+            {/* Button Buscar Actualizaciones */}
+            <button
+              onClick={openUpdateModal}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors shadow-xs cursor-pointer"
+              title="Buscar actualizaciones en GitHub"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-emerald-700" />
+              <span className="hidden sm:inline">Actualizaciones</span>
+            </button>
+
+            {/* Save Button (in Simulator View) */}
+            {activeView === 'simulator' && (
+              <button
+                onClick={saveActiveProject}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                title="Guardar cambios de la simulación"
+              >
+                <Save className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Guardar Cambios</span>
+              </button>
+            )}
+
+            {/* View Specific Actions */}
+            {activeView === 'pdf-preview' ? (
+              <button
+                onClick={() => setActiveView('simulator')}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white transition-colors text-xs font-bold shadow-xs cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Volver a Simulación
+              </button>
+            ) : activeView === 'dashboard' ? (
+              <button
+                onClick={openNewProjectModal}
+                className="bg-emerald-700 text-white hover:bg-emerald-800 transition-all px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                Nueva Simulación
+              </button>
+            ) : (
+              <button
+                onClick={() => setActiveView('pdf-preview')}
+                className="bg-emerald-700 text-white hover:bg-emerald-800 transition-all px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm cursor-pointer"
+              >
+                <FileText className="w-4 h-4" />
+                Ver Propuesta PDF
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Floating Save Feedback Toast */}
+      {saveFeedbackMessage && (
+        <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-5 duration-300">
+          <div className="bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs font-semibold border border-slate-700">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>{saveFeedbackMessage}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Modals */}
+      <NewProjectModal />
+      <UpdateModal />
+    </>
   );
 };

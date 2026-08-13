@@ -171,3 +171,30 @@ export interface ProjectSimulation {
   financials: FinancialParams;
   monthlyConsumption: number[]; // 12 months in kWh
 }
+
+export type UpdateState = 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
+
+export interface UpdateInfo {
+  state: UpdateState;
+  version?: string;
+  releaseDate?: string;
+  releaseNotes?: string | null;
+  progressPct?: number;
+  transferredBytes?: number;
+  totalBytes?: number;
+  error?: string;
+}
+
+declare global {
+  interface Window {
+    electronAPI?: {
+      printToPDF: () => Promise<{ success: boolean; filePath?: string; cancelled?: boolean; error?: string }>;
+      checkForUpdates: () => Promise<{ success: boolean; message?: string; error?: string; updateInfo?: any }>;
+      downloadUpdate: () => Promise<{ success: boolean; error?: string }>;
+      quitAndInstall: () => Promise<void>;
+      onUpdateStatus: (callback: (info: UpdateInfo) => void) => () => void;
+      getAppVersion: () => Promise<string>;
+    };
+  }
+}
+

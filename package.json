@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "clsx": "^2.1.1",
+    "electron-updater": "^6.8.9",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.2",
     "lucide-react": "^0.427.0",
@@ -37,6 +38,26 @@
     "tailwindcss": "^3.4.10",
     "typescript": "^5.5.4",
     "vite": "^5.4.1"
+  },
+  "buildConfig": {
+    "appId": "com.solarsim.pro",
+    "productName": "SolarSim Pro"
+  },
+  "build": {
+    "appId": "com.solarsim.pro",
+    "productName": "SolarSim Pro",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "WilkerDev1",
+      "repo": "solarsim-pro"
+    }
   },
   "allowScripts": {
     "electron@31.7.7": true,

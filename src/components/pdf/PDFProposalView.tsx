@@ -16,14 +16,6 @@ import {
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
-declare global {
-  interface Window {
-    electronAPI?: {
-      printToPDF: () => Promise<{ success: boolean; filePath?: string; cancelled?: boolean; error?: string }>;
-    };
-  }
-}
-
 import { PDFColorTheme, PDF_COLOR_THEMES } from '../../constants/pdfThemes';
 
 export const PDFProposalView: React.FC = () => {
