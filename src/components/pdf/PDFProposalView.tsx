@@ -123,13 +123,29 @@ export const PDFProposalView: React.FC = () => {
     setIsExporting(true);
 
     try {
+      // 1. If running in Electron desktop app, use Electron native printToPDF
+      if (window.electronAPI && typeof window.electronAPI.printToPDF === 'function') {
+        const res = await window.electronAPI.printToPDF();
+        if (res && res.success) {
+          setIsExporting(false);
+          return;
+        }
+      }
+
+      // 2. Browser multi-page PDF generation via html2canvas & jsPDF
       const pageElements = pdfRef.current.querySelectorAll<HTMLElement>('.pdf-page');
       if (!pageElements || pageElements.length === 0) {
         setIsExporting(false);
         return;
       }
 
-      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdf = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: 'a4',
+        compress: true,
+      });
+
       const pdfWidth = 210;
       const pdfHeight = 297;
 
@@ -140,22 +156,28 @@ export const PDFProposalView: React.FC = () => {
           scale: 2,
           useCORS: true,
           logging: false,
-          windowWidth: 1200,
+          allowTaint: true,
+          backgroundColor: '#ffffff',
+          scrollX: 0,
+          scrollY: 0,
         });
 
-        const imgData = canvas.toDataURL('image/png');
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
         const imgHeight = (canvas.height * pdfWidth) / canvas.width;
 
         if (i > 0) {
           pdf.addPage();
         }
 
-        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, Math.min(pdfHeight, imgHeight));
+        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, Math.min(pdfHeight, imgHeight));
       }
 
-      pdf.save(`Propuesta_SolarSim_${project.client.name.replace(/\s+/g, '_')}.pdf`);
+      const sanitizedClientName = (project.client.name || 'Cliente').replace(/[^a-zA-Z0-9_-]/g, '_');
+      pdf.save(`Propuesta_SolarSim_${sanitizedClientName}.pdf`);
     } catch (err) {
       console.error('Error generating multi-page PDF:', err);
+      // Fallback: trigger print dialog if canvas rasterization fails
+      window.print();
     } finally {
       setIsExporting(false);
     }
