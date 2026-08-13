@@ -32,6 +32,16 @@ export interface SystemSpecs {
   batteryCostUSD?: number;       // Total battery cost in USD
   batteryBrandModel?: string;    // e.g. "Hinaess 16 KwH-48 vdc"
   installationServicesDesc?: string;
+  // Cost & Profit Matrix params matching Excel sheet
+  dopExchangeRate?: number;          // RD$ per USD e.g. 60.0
+  saleMarginMultiplier?: number;     // Sales Factor e.g. 1.25 (25% margin)
+  panelUnitPriceUSD?: number;        // e.g. 103.32 USD
+  panelWeightKilos?: number;         // e.g. 30.75
+  inverterUnitPriceUSD?: number;     // e.g. 2300.00 USD
+  inverterWeightKilos?: number;      // e.g. 12
+  batteryUnitPriceUSD?: number;      // e.g. 1990.00 USD
+  batteryWeightKilos?: number;       // e.g. 32
+  installationUnitPriceUSD?: number; // e.g. 170.00 USD per kWp
   // Detailed params
   panelEfficiency: number;      // % e.g. 21.8
   tempCoeff: number;            // %/°C e.g. -0.35
@@ -61,6 +71,40 @@ export interface FinancialParams {
   discountRatePct: number;       // % e.g. 10.0
   projectLifespanYears: number;  // e.g. 25
   co2FactorKgPerKWh: number;     // kg CO2 per kWh e.g. 0.481
+}
+
+export interface CostMatrixItem {
+  name: string;
+  kilos: number;
+  quantity: number;
+  unitPriceUSD: number;
+  unitPriceDOP: number;
+  totalPriceDOP: number;
+  totalPriceUSD: number;
+  itbisDOP: number;
+  itbisUSD: number;
+}
+
+export interface CostMatrixSummary {
+  dopExchangeRate: number;
+  saleMarginMultiplier: number;
+  items: CostMatrixItem[];
+  precioNetoDOP: number;
+  precioNetoUSD: number;
+  itbisDOP: number;
+  itbisUSD: number;
+  totalNetoDOP: number;          // Total Cost DOP
+  totalNetoUSD: number;          // Total Cost USD
+  porcentajeVentaDOP: number;    // Sale Total DOP
+  porcentajeVentaUSD: number;    // Sale Total USD
+  precioKilosCostoDOP: number;
+  precioKilosCostoUSD: number;   // Cost/kWp USD
+  precioKilosVentasDOP: number;
+  precioKilosVentasUSD: number;  // Sale/kWp USD
+  gananciaDOP: number;           // Net Profit DOP
+  gananciaUSD: number;           // Net Profit USD
+  costPerWattUSD: number;        // Cost/W USD (e.g. $0.90)
+  salePricePerWattUSD: number;   // Sale/W USD (e.g. $1.13)
 }
 
 export interface MonthlyEnergyResult {
@@ -106,6 +150,7 @@ export interface FinancialSummaryResult {
   co2AvoidedTonsPerYear: number;
   monthlyBreakdown: MonthlyEnergyResult[];
   cashFlow25Years: CashFlowYear[];
+  costMatrix: CostMatrixSummary;
 }
 
 export interface ProjectSimulation {

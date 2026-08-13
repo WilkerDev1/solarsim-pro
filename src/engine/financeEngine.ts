@@ -1,5 +1,151 @@
-import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear } from '../types';
+import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem } from '../types';
 import { calculateDCCapacityKWp, calculateMonthlySolarProduction } from './solarEngine';
+
+/**
+ * Calculates internal cost matrix, sale price multiplier, and net profit matching Excel spreadsheet.
+ */
+export function calculateCostMatrixSummary(
+  specs: SystemSpecs,
+  dcCapacityKWp: number
+): CostMatrixSummary {
+  const rate = specs.dopExchangeRate || 60.0;
+  const margin = specs.saleMarginMultiplier || 1.25;
+
+  const panelCount = specs.panelCount || 0;
+  const panelUnitUSD = specs.panelUnitPriceUSD !== undefined ? specs.panelUnitPriceUSD : 103.32;
+  const panelKilos = specs.panelWeightKilos || (dcCapacityKWp > 0 ? dcCapacityKWp : 30.75);
+
+  const inverterCount = specs.inverterCount || 2;
+  const inverterUnitUSD = specs.inverterUnitPriceUSD !== undefined ? specs.inverterUnitPriceUSD : 2300.0;
+  const inverterKilos = specs.inverterWeightKilos || specs.inverterPowerKW || 12;
+
+  const batteryCount = specs.batteryCount || (specs.hasBattery ? 3 : 0);
+  const batteryUnitUSD = specs.batteryUnitPriceUSD !== undefined ? specs.batteryUnitPriceUSD : 1990.0;
+  const batteryKilos = specs.batteryWeightKilos || specs.batteryCapacityKWh || 32;
+
+  const installationKilos = 1;
+  const installationQty = dcCapacityKWp > 0 ? dcCapacityKWp : 30.75;
+  const installationUnitUSD = specs.installationUnitPriceUSD !== undefined ? specs.installationUnitPriceUSD : 170.0;
+
+  // Row 1: Panel
+  const panelTotalUSD = panelCount * panelUnitUSD;
+  const panelTotalDOP = panelTotalUSD * rate;
+  const panelItbisDOP = 0;
+  const panelItbisUSD = 0;
+
+  // Row 2: Inverter
+  const inverterTotalUSD = inverterCount * inverterUnitUSD;
+  const inverterTotalDOP = inverterTotalUSD * rate;
+  const inverterItbisDOP = 0;
+  const inverterItbisUSD = 0;
+
+  // Row 3: Battery
+  const batteryTotalUSD = specs.hasBattery ? batteryCount * batteryUnitUSD : 0;
+  const batteryTotalDOP = batteryTotalUSD * rate;
+  const batteryItbisDOP = batteryTotalDOP * 0.18; // 18% ITBIS
+  const batteryItbisUSD = batteryItbisDOP / rate;
+
+  // Row 4: Installation & Materials
+  const installTotalUSD = installationQty * installationUnitUSD;
+  const installTotalDOP = installTotalUSD * rate;
+  const installItbisDOP = installTotalDOP * 0.18; // 18% ITBIS
+  const installItbisUSD = installItbisDOP / rate;
+
+  const items: CostMatrixItem[] = [
+    {
+      name: `${specs.panelBrandModel || 'Panel JA Solar 620 watts.'}`,
+      kilos: panelKilos,
+      quantity: panelCount,
+      unitPriceUSD: panelUnitUSD,
+      unitPriceDOP: panelUnitUSD * rate,
+      totalPriceDOP: panelTotalDOP,
+      totalPriceUSD: panelTotalUSD,
+      itbisDOP: panelItbisDOP,
+      itbisUSD: panelItbisUSD,
+    },
+    {
+      name: `${specs.inverterBrandModel || 'Inverso Lux Power de 12 kwp'}`,
+      kilos: inverterKilos,
+      quantity: inverterCount,
+      unitPriceUSD: inverterUnitUSD,
+      unitPriceDOP: inverterUnitUSD * rate,
+      totalPriceDOP: inverterTotalDOP,
+      totalPriceUSD: inverterTotalUSD,
+      itbisDOP: inverterItbisDOP,
+      itbisUSD: inverterItbisUSD,
+    },
+    {
+      name: `${specs.batteryBrandModel || 'Bateria Hinaess 16.0 kwh'}`,
+      kilos: batteryKilos,
+      quantity: batteryCount,
+      unitPriceUSD: batteryUnitUSD,
+      unitPriceDOP: batteryUnitUSD * rate,
+      totalPriceDOP: batteryTotalDOP,
+      totalPriceUSD: batteryTotalUSD,
+      itbisDOP: batteryItbisDOP,
+      itbisUSD: batteryItbisUSD,
+    },
+    {
+      name: 'Mano de obra y materiales',
+      kilos: installationKilos,
+      quantity: installationQty,
+      unitPriceUSD: installationUnitUSD,
+      unitPriceDOP: installationUnitUSD * rate,
+      totalPriceDOP: installTotalDOP,
+      totalPriceUSD: installTotalUSD,
+      itbisDOP: installItbisDOP,
+      itbisUSD: installItbisUSD,
+    },
+  ];
+
+  // Totals
+  const precioNetoDOP = panelTotalDOP + inverterTotalDOP + batteryTotalDOP + installTotalDOP;
+  const precioNetoUSD = precioNetoDOP / rate;
+
+  const itbisDOP = panelItbisDOP + inverterItbisDOP + batteryItbisDOP + installItbisDOP;
+  const itbisUSD = itbisDOP / rate;
+
+  const totalNetoDOP = precioNetoDOP + itbisDOP;
+  const totalNetoUSD = totalNetoDOP / rate;
+
+  const porcentajeVentaDOP = totalNetoDOP * margin;
+  const porcentajeVentaUSD = totalNetoUSD * margin;
+
+  const capacityKW = installationQty > 0 ? installationQty : 1;
+  const precioKilosCostoDOP = totalNetoDOP / (capacityKW * 800 || 1); // 67.50
+  const precioKilosCostoUSD = totalNetoUSD / capacityKW; // $900.01 / kWp
+
+  const precioKilosVentasDOP = porcentajeVentaDOP / capacityKW; // 67,501.10
+  const precioKilosVentasUSD = porcentajeVentaUSD / capacityKW; // $1,125.02 / kWp
+
+  const gananciaDOP = porcentajeVentaDOP - totalNetoDOP;
+  const gananciaUSD = porcentajeVentaUSD - totalNetoUSD;
+
+  const costPerWattUSD = totalNetoUSD / (capacityKW * 1000);
+  const salePricePerWattUSD = porcentajeVentaUSD / (capacityKW * 1000);
+
+  return {
+    dopExchangeRate: rate,
+    saleMarginMultiplier: margin,
+    items,
+    precioNetoDOP,
+    precioNetoUSD,
+    itbisDOP,
+    itbisUSD,
+    totalNetoDOP,
+    totalNetoUSD,
+    porcentajeVentaDOP,
+    porcentajeVentaUSD,
+    precioKilosCostoDOP,
+    precioKilosCostoUSD,
+    precioKilosVentasDOP,
+    precioKilosVentasUSD,
+    gananciaDOP,
+    gananciaUSD,
+    costPerWattUSD,
+    salePricePerWattUSD,
+  };
+}
 
 /**
  * Solves Internal Rate of Return (IRR / TIR) using Newton-Raphson method.
@@ -47,6 +193,9 @@ export function calculateFinancialSummary(
 ): FinancialSummaryResult {
   const dcCapacityKWp = calculateDCCapacityKWp(specs.panelPowerW, specs.panelCount);
 
+  // Calculate cost matrix summary
+  const costMatrix = calculateCostMatrixSummary(specs, dcCapacityKWp);
+
   // Calculate solar system investment
   const solarInvestmentUSD = financials.customCostUSD && financials.customCostUSD > 0
     ? financials.customCostUSD
@@ -55,8 +204,12 @@ export function calculateFinancialSummary(
   // Calculate battery storage investment if active
   const batteryInvestmentUSD = specs.hasBattery ? (specs.batteryCostUSD || 0) : 0;
 
-  // Total Gross Investment = Solar + Battery
-  const grossInvestmentUSD = Math.round((solarInvestmentUSD + batteryInvestmentUSD) * 100) / 100;
+  // Total Gross Investment = Solar + Battery (or from cost matrix sale price)
+  const grossInvestmentUSD = financials.customCostUSD && financials.customCostUSD > 0
+    ? financials.customCostUSD
+    : (specs.panelUnitPriceUSD !== undefined || specs.saleMarginMultiplier !== undefined
+        ? Math.round(costMatrix.porcentajeVentaUSD * 100) / 100
+        : Math.round((solarInvestmentUSD + batteryInvestmentUSD) * 100) / 100);
 
   // ITBIS exoneration calculation (allows explicit custom override e.g. 1866.11 or standard calculation)
   const itbisSavedUSD = financials.applyITBISExemption
@@ -174,5 +327,6 @@ export function calculateFinancialSummary(
     co2AvoidedTonsPerYear,
     monthlyBreakdown: monthlyResults,
     cashFlow25Years,
+    costMatrix,
   };
 }

@@ -503,7 +503,85 @@ export const SimulatorView: React.FC = () => {
             </div>
           </section>
 
-          {/* SECCIÓN 4: Finanzas e Incentivos */}
+          {/* SECCIÓN 4: Costos, Tasa de Cambio y Margen (Excel Cost Matrix) */}
+          <section className="space-y-3 pt-2 border-t border-slate-200">
+            <h3 className="text-amber-700 flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
+              <span className="material-symbols-outlined text-[16px]">payments</span> Costos y Margen de Venta
+            </h3>
+            <div className="space-y-3 bg-amber-50/50 p-3 rounded-lg border border-amber-200">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-bold text-red-700 mb-1">Tasa Cambio DOP/USD</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={project.specs.dopExchangeRate !== undefined ? project.specs.dopExchangeRate : 60.0}
+                    onChange={(e) => updateSpecs({ dopExchangeRate: parseFloat(e.target.value) || 0 })}
+                    className="w-full bg-white border border-red-300 rounded-lg px-2.5 py-1 text-xs font-extrabold text-red-700 focus:ring-1 focus:ring-red-600 focus:border-red-600 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-red-700 mb-1">Factor / Margen Venta</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={project.specs.saleMarginMultiplier !== undefined ? project.specs.saleMarginMultiplier : 1.25}
+                    onChange={(e) => updateSpecs({ saleMarginMultiplier: parseFloat(e.target.value) || 0 })}
+                    className="w-full bg-white border border-red-300 rounded-lg px-2.5 py-1 text-xs font-extrabold text-red-700 focus:ring-1 focus:ring-red-600 focus:border-red-600 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Precio Unit. Panel (USD)</label>
+                <input
+                  type="number"
+                  step="1"
+                  value={project.specs.panelUnitPriceUSD !== undefined ? project.specs.panelUnitPriceUSD : 103.32}
+                  onChange={(e) => updateSpecs({ panelUnitPriceUSD: parseFloat(e.target.value) || 0 })}
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1 text-xs font-bold text-red-600 focus:ring-1 focus:ring-amber-600 focus:border-amber-600 transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Precio Unit. Inversor (USD)</label>
+                <input
+                  type="number"
+                  step="10"
+                  value={project.specs.inverterUnitPriceUSD !== undefined ? project.specs.inverterUnitPriceUSD : 2300.0}
+                  onChange={(e) => updateSpecs({ inverterUnitPriceUSD: parseFloat(e.target.value) || 0 })}
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1 text-xs font-bold text-red-600 focus:ring-1 focus:ring-amber-600 focus:border-amber-600 transition-all"
+                />
+              </div>
+
+              {project.specs.hasBattery && (
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Precio Unit. Batería (USD)</label>
+                  <input
+                    type="number"
+                    step="10"
+                    value={project.specs.batteryUnitPriceUSD !== undefined ? project.specs.batteryUnitPriceUSD : 1990.0}
+                    onChange={(e) => updateSpecs({ batteryUnitPriceUSD: parseFloat(e.target.value) || 0 })}
+                    className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1 text-xs font-bold text-red-600 focus:ring-1 focus:ring-amber-600 focus:border-amber-600 transition-all"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">Mano de Obra / kWp (USD)</label>
+                <input
+                  type="number"
+                  step="5"
+                  value={project.specs.installationUnitPriceUSD !== undefined ? project.specs.installationUnitPriceUSD : 170.0}
+                  onChange={(e) => updateSpecs({ installationUnitPriceUSD: parseFloat(e.target.value) || 0 })}
+                  className="w-full bg-white border border-slate-300 rounded-lg px-3 py-1 text-xs font-bold text-red-600 focus:ring-1 focus:ring-amber-600 focus:border-amber-600 transition-all"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* SECCIÓN 5: Finanzas e Incentivos */}
           <section className="space-y-3 pt-2 border-t border-slate-200">
             <h3 className="text-emerald-700 flex items-center gap-2 font-bold text-xs uppercase tracking-wider">
               <span className="material-symbols-outlined text-[16px]">account_balance</span> Finanzas e Incentivos
@@ -1002,6 +1080,100 @@ export const SimulatorView: React.FC = () => {
               <div className="px-8 py-3 bg-slate-100 border-t border-slate-200 flex justify-between items-center text-[10px] text-slate-600 font-semibold">
                 <div>Calle Ercilia Pepín #1, Plaza Toledo | Local 307 | Arroyo Manzano | Santo Domingo, RD | electsun.com.do</div>
                 <div className="font-bold text-slate-800">Propuesta Cotización Electsun</div>
+              </div>
+            </div>
+
+            {/* TABLA DE COSTOS E INGRESOS INTERNOS (REPLICANDO HOJA DE CÁLCULO EXCEL) */}
+            <div className="bg-white border border-slate-300 rounded-2xl shadow-xl overflow-hidden font-sans shrink-0">
+              {/* Header Orange Banner matching Excel */}
+              <div className="bg-amber-600 text-white px-6 py-3.5 flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                  <h3 className="font-extrabold text-sm uppercase tracking-wider text-white flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[18px]">table_chart</span>
+                    CLIENTE: {project.client.name} — Costos proyectos
+                  </h3>
+                  <span className="bg-amber-700/80 text-amber-100 text-[10px] px-2.5 py-0.5 rounded font-bold uppercase tracking-wider border border-amber-500/50">
+                    Uso Interno Confidencial
+                  </span>
+                </div>
+                <div className="flex items-center gap-4 text-xs font-bold text-amber-100">
+                  <div>
+                    Tasa USD: <span className="text-white font-extrabold">{summary.costMatrix.dopExchangeRate} DOP</span>
+                  </div>
+                  <div>
+                    Porcentaje Venta: <span className="text-white font-extrabold">{summary.costMatrix.saleMarginMultiplier}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-4">
+                {/* Table matching Excel columns */}
+                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-slate-100 font-bold text-slate-700 border-b border-slate-200 uppercase text-[10px]">
+                      <tr>
+                        <th className="py-2.5 px-3">Productos</th>
+                        <th className="py-2.5 px-3 text-center text-red-600">kilos / Cap.</th>
+                        <th className="py-2.5 px-3 text-center text-red-600">Cantidad</th>
+                        <th className="py-2.5 px-3 text-right text-red-600">Precio Unit. USD</th>
+                        <th className="py-2.5 px-3 text-right">Precio Unit. RD</th>
+                        <th className="py-2.5 px-3 text-right font-bold">Precio Total RD</th>
+                        <th className="py-2.5 px-3 text-right font-bold">Precio Total USD</th>
+                        <th className="py-2.5 px-3 text-right text-red-600">ITBIS RD</th>
+                        <th className="py-2.5 px-3 text-right text-red-600">ITBIS USD</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 text-slate-800 font-semibold text-xs">
+                      {summary.costMatrix.items.map((item, idx) => (
+                        <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                          <td className="py-2.5 px-3 font-bold text-slate-900">{item.name}</td>
+                          <td className="py-2.5 px-3 text-center text-red-600 font-bold">{item.kilos}</td>
+                          <td className="py-2.5 px-3 text-center text-red-600 font-bold">{item.quantity}</td>
+                          <td className="py-2.5 px-3 text-right text-red-600 font-bold">${item.unitPriceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="py-2.5 px-3 text-right">${item.unitPriceDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="py-2.5 px-3 text-right font-bold">${item.totalPriceDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="py-2.5 px-3 text-right font-bold">${item.totalPriceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="py-2.5 px-3 text-right text-slate-500">{item.itbisDOP > 0 ? `$${item.itbisDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}</td>
+                          <td className="py-2.5 px-3 text-right text-slate-500">{item.itbisUSD > 0 ? `$${item.itbisUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Summary Totals Box matching bottom right of Excel */}
+                <div className="flex justify-end pt-2">
+                  <div className="w-[460px] bg-slate-50 border border-slate-300 rounded-xl p-4 space-y-1.5 text-xs font-semibold">
+                    <div className="flex justify-between text-slate-700">
+                      <span>Precio Neto :</span>
+                      <span>RD$ {summary.costMatrix.precioNetoDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong className="text-slate-900">${summary.costMatrix.precioNetoUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+                    </div>
+                    <div className="flex justify-between text-slate-700">
+                      <span>ITBIS Total :</span>
+                      <span>RD$ {summary.costMatrix.itbisDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong className="text-slate-900">${summary.costMatrix.itbisUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+                    </div>
+                    <div className="flex justify-between text-slate-900 font-bold bg-slate-200/80 px-2.5 py-1 rounded">
+                      <span>Total Neto (Costo Total) :</span>
+                      <span>RD$ {summary.costMatrix.totalNetoDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong>${summary.costMatrix.totalNetoUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+                    </div>
+                    <div className="flex justify-between text-red-600 font-extrabold bg-red-50 border border-red-200 px-2.5 py-1 rounded">
+                      <span>Porcentaje venta ({summary.costMatrix.saleMarginMultiplier}) :</span>
+                      <span>RD$ {summary.costMatrix.porcentajeVentaDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong>${summary.costMatrix.porcentajeVentaUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+                    </div>
+                    <div className="flex justify-between text-slate-800">
+                      <span>Precio kilos costo :</span>
+                      <span>RD$ {summary.costMatrix.precioKilosCostoDOP.toFixed(2)} &nbsp;|&nbsp; <strong className="text-slate-900">${summary.costMatrix.precioKilosCostoUSD.toFixed(2)} USD/kWp (${summary.costMatrix.costPerWattUSD.toFixed(2)} USD/W)</strong></span>
+                    </div>
+                    <div className="flex justify-between text-slate-900 font-bold">
+                      <span>Precio kilos ventas :</span>
+                      <span>RD$ {summary.costMatrix.precioKilosVentasDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong className="text-emerald-800">${summary.costMatrix.precioKilosVentasUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD/kWp (${summary.costMatrix.salePricePerWattUSD.toFixed(2)} USD/W)</strong></span>
+                    </div>
+                    <div className="flex justify-between text-emerald-950 font-black bg-emerald-100 border border-emerald-300 px-2.5 py-1.5 rounded-lg text-sm mt-1">
+                      <span>Ganancia Proyectada :</span>
+                      <span>RD$ {summary.costMatrix.gananciaDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong className="text-emerald-800">${summary.costMatrix.gananciaUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

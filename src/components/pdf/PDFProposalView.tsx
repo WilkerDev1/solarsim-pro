@@ -32,11 +32,12 @@ export const PDFProposalView: React.FC = () => {
   const summary = getFinancialSummary();
   const pdfRef = useRef<HTMLDivElement>(null);
 
-  // Document Toggles (4 pages)
+  // Document Toggles (5 pages)
   const [showPage1, setShowPage1] = useState(true); // Pág 1: Análisis de Energía
   const [showPageQuotation, setShowPageQuotation] = useState(true); // Pág 2: Cotización de Sistema Fotovoltaico
   const [showPage2, setShowPage2] = useState(true); // Pág 3: Retorno de Inversión - Resumen
   const [showPage3, setShowPage3] = useState(true); // Pág 4: Flujo de Caja 25 Años
+  const [showPageCostMatrix, setShowPageCostMatrix] = useState(false); // Pág 5: Costos Internos (Confidencial)
   const [showHeadersFooters, setShowHeadersFooters] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -115,18 +116,21 @@ export const PDFProposalView: React.FC = () => {
     (showPage1 ? 1 : 0) +
     (showPageQuotation ? 1 : 0) +
     (showPage2 ? 1 : 0) +
-    (showPage3 ? 1 : 0);
+    (showPage3 ? 1 : 0) +
+    (showPageCostMatrix ? 1 : 0);
 
   let page1Num = 0;
   let pageQuotNum = 0;
   let page2Num = 0;
   let page3Num = 0;
+  let pageCostMatrixNum = 0;
   let currentNum = 0;
 
   if (showPage1) { currentNum++; page1Num = currentNum; }
   if (showPageQuotation) { currentNum++; pageQuotNum = currentNum; }
   if (showPage2) { currentNum++; page2Num = currentNum; }
   if (showPage3) { currentNum++; page3Num = currentNum; }
+  if (showPageCostMatrix) { currentNum++; pageCostMatrixNum = currentNum; }
 
   // Calculate equivalent trees planted (~16 trees per Ton CO2/yr)
   const treesPlanted = Math.round(summary.co2AvoidedTonsPerYear * 16);
@@ -319,6 +323,19 @@ export const PDFProposalView: React.FC = () => {
                       onChange={(e) => setShowPage3(e.target.checked)}
                       className="rounded focus:ring-0 cursor-pointer"
                       style={{ color: activeTheme.primary }}
+                    />
+                  </label>
+
+                  <label className="flex items-center justify-between p-2.5 rounded-lg border border-amber-300 bg-amber-50/60 cursor-pointer hover:bg-amber-100/70 transition-colors">
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-amber-900">Pág 5: Costos Internos</span>
+                      <span className="text-[10px] text-amber-700 font-semibold">(Confidencial)</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={showPageCostMatrix}
+                      onChange={(e) => setShowPageCostMatrix(e.target.checked)}
+                      className="rounded text-amber-600 focus:ring-0 cursor-pointer"
                     />
                   </label>
                 </div>
@@ -1077,6 +1094,110 @@ export const PDFProposalView: React.FC = () => {
                     <span className="font-bold text-gray-700">Página {page3Num} de {activePagesCount}</span>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* PÁGINA 5: ANÁLISIS DE COSTOS Y MARGEN INTERNO (CONFIDENCIAL) */}
+            {showPageCostMatrix && (
+              <div className="pdf-page bg-white w-[850px] min-h-[1100px] shadow-2xl relative flex flex-col font-sans shrink-0 border border-amber-300">
+                {/* Page Header */}
+                {showHeadersFooters && renderHeaderBanner('ANÁLISIS DE COSTOS Y MARGEN DE GANANCIA (INFORMACIÓN CONFIDENCIAL)')}
+
+                <div className="p-8 flex-1 flex flex-col justify-between space-y-6">
+                  <div className="space-y-5">
+                    {/* Banner Confidencial */}
+                    <div className="bg-amber-600 text-white p-4 rounded-xl flex justify-between items-center shadow-sm">
+                      <div>
+                        <h3 className="font-extrabold text-sm uppercase tracking-wider text-white">
+                          CLIENTE: {project.client.name} — Desglose de Costos de Proyecto
+                        </h3>
+                        <p className="text-[11px] text-amber-100 font-medium">
+                          Documento de Control Interno de Precios, ITBIS y Margen de Rentabilidad
+                        </p>
+                      </div>
+                      <div className="text-right text-xs font-bold text-amber-100">
+                        <div>Tasa Cambio: <span className="text-white font-extrabold">{summary.costMatrix.dopExchangeRate} DOP/USD</span></div>
+                        <div>Factor Venta: <span className="text-white font-extrabold">{summary.costMatrix.saleMarginMultiplier}</span></div>
+                      </div>
+                    </div>
+
+                    {/* Matrix Table */}
+                    <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead className="bg-slate-100 font-bold text-slate-700 border-b border-slate-200 uppercase text-[10px]">
+                          <tr>
+                            <th className="py-2.5 px-3">Productos</th>
+                            <th className="py-2.5 px-3 text-center text-red-600">kilos / Cap.</th>
+                            <th className="py-2.5 px-3 text-center text-red-600">Cantidad</th>
+                            <th className="py-2.5 px-3 text-right text-red-600">Precio Unit. USD</th>
+                            <th className="py-2.5 px-3 text-right">Precio Unit. RD</th>
+                            <th className="py-2.5 px-3 text-right font-bold">Precio Total RD</th>
+                            <th className="py-2.5 px-3 text-right font-bold">Precio Total USD</th>
+                            <th className="py-2.5 px-3 text-right text-red-600">ITBIS RD</th>
+                            <th className="py-2.5 px-3 text-right text-red-600">ITBIS USD</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 text-slate-800 font-semibold text-xs">
+                          {summary.costMatrix.items.map((item, idx) => (
+                            <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
+                              <td className="py-2.5 px-3 font-bold text-slate-900">{item.name}</td>
+                              <td className="py-2.5 px-3 text-center text-red-600 font-bold">{item.kilos}</td>
+                              <td className="py-2.5 px-3 text-center text-red-600 font-bold">{item.quantity}</td>
+                              <td className="py-2.5 px-3 text-right text-red-600 font-bold">${item.unitPriceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className="py-2.5 px-3 text-right">${item.unitPriceDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className="py-2.5 px-3 text-right font-bold">${item.totalPriceDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className="py-2.5 px-3 text-right font-bold">${item.totalPriceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className="py-2.5 px-3 text-right text-slate-500">{item.itbisDOP > 0 ? `$${item.itbisDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}</td>
+                              <td className="py-2.5 px-3 text-right text-slate-500">{item.itbisUSD > 0 ? `$${item.itbisUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Summary Box */}
+                    <div className="flex justify-end pt-2">
+                      <div className="w-[480px] bg-slate-50 border border-slate-300 rounded-xl p-4 space-y-1.5 text-xs font-semibold">
+                        <div className="flex justify-between text-slate-700">
+                          <span>Precio Neto :</span>
+                          <span>RD$ {summary.costMatrix.precioNetoDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong className="text-slate-900">${summary.costMatrix.precioNetoUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+                        </div>
+                        <div className="flex justify-between text-slate-700">
+                          <span>ITBIS Total :</span>
+                          <span>RD$ {summary.costMatrix.itbisDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong className="text-slate-900">${summary.costMatrix.itbisUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+                        </div>
+                        <div className="flex justify-between text-slate-900 font-bold bg-slate-200/80 px-2.5 py-1 rounded">
+                          <span>Total Neto (Costo Total) :</span>
+                          <span>RD$ {summary.costMatrix.totalNetoDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong>${summary.costMatrix.totalNetoUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+                        </div>
+                        <div className="flex justify-between text-red-600 font-extrabold bg-red-50 border border-red-200 px-2.5 py-1 rounded">
+                          <span>Porcentaje venta ({summary.costMatrix.saleMarginMultiplier}) :</span>
+                          <span>RD$ {summary.costMatrix.porcentajeVentaDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong>${summary.costMatrix.porcentajeVentaUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+                        </div>
+                        <div className="flex justify-between text-slate-800">
+                          <span>Precio kilos costo :</span>
+                          <span>RD$ {summary.costMatrix.precioKilosCostoDOP.toFixed(2)} &nbsp;|&nbsp; <strong className="text-slate-900">${summary.costMatrix.precioKilosCostoUSD.toFixed(2)} USD/kWp (${summary.costMatrix.costPerWattUSD.toFixed(2)} USD/W)</strong></span>
+                        </div>
+                        <div className="flex justify-between text-slate-900 font-bold">
+                          <span>Precio kilos ventas :</span>
+                          <span>RD$ {summary.costMatrix.precioKilosVentasDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong className="text-emerald-800">${summary.costMatrix.precioKilosVentasUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD/kWp (${summary.costMatrix.salePricePerWattUSD.toFixed(2)} USD/W)</strong></span>
+                        </div>
+                        <div className="flex justify-between text-emerald-950 font-black bg-emerald-100 border border-emerald-300 px-2.5 py-1.5 rounded-lg text-sm mt-1">
+                          <span>Ganancia Proyectada :</span>
+                          <span>RD$ {summary.costMatrix.gananciaDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong className="text-emerald-800">${summary.costMatrix.gananciaUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  {showHeadersFooters && (
+                    <div className="px-10 py-4 border-t border-gray-200 flex justify-between items-center text-xs text-gray-500 font-semibold mt-auto">
+                      <span>Calle Ercilia Pepín #1, Plaza Toledo | Local 307 | Arroyo Manzano | Santo Domingo, RD | electsun.com.do</span>
+                      <span className="font-bold text-amber-800">Página {pageCostMatrixNum} de {activePagesCount} (CONFIDENCIAL)</span>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
