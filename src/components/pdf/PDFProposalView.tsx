@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
-import { ArrowLeft, Printer, Download, RefreshCw, Leaf, ShieldCheck, FileText, CheckCircle2, PackageCheck, Wrench, Building2, Check } from 'lucide-react';
+import { ArrowLeft, Printer, Download, RefreshCw, Leaf, ShieldCheck, FileText, CheckCircle2, PackageCheck, Wrench, Building2, Check, Palette } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -24,6 +24,76 @@ declare global {
   }
 }
 
+export interface PDFColorTheme {
+  id: string;
+  name: string;
+  primary: string;       // Header & Table headers background
+  secondary: string;     // Sub-banner background
+  accent: string;        // Text highlights
+  accentDark: string;    // Dark accent text
+  accentLightBg: string; // Highlight cards background
+  accentBorder: string;  // Highlight border
+  barColor: string;      // Production chart bar color
+}
+
+export const PDF_COLOR_THEMES: PDFColorTheme[] = [
+  {
+    id: 'emerald',
+    name: 'Verde Esmeralda (Clásico)',
+    primary: '#14532d',
+    secondary: '#1e6a3b',
+    accent: '#16a34a',
+    accentDark: '#14532d',
+    accentLightBg: 'bg-emerald-50/80',
+    accentBorder: 'border-emerald-200',
+    barColor: '#22c55e',
+  },
+  {
+    id: 'navy',
+    name: 'Azul Marino Corporativo',
+    primary: '#1e3a8a',
+    secondary: '#1d4ed8',
+    accent: '#2563eb',
+    accentDark: '#1e3a8a',
+    accentLightBg: 'bg-blue-50/80',
+    accentBorder: 'border-blue-200',
+    barColor: '#3b82f6',
+  },
+  {
+    id: 'slate',
+    name: 'Gris Grafito Platinum',
+    primary: '#0f172a',
+    secondary: '#334155',
+    accent: '#475569',
+    accentDark: '#0f172a',
+    accentLightBg: 'bg-slate-100/80',
+    accentBorder: 'border-slate-300',
+    barColor: '#64748b',
+  },
+  {
+    id: 'amber',
+    name: 'Ámbar Bronce Solar',
+    primary: '#78350f',
+    secondary: '#92400e',
+    accent: '#d97706',
+    accentDark: '#78350f',
+    accentLightBg: 'bg-amber-50/80',
+    accentBorder: 'border-amber-200',
+    barColor: '#f59e0b',
+  },
+  {
+    id: 'indigo',
+    name: 'Índigo Moderno',
+    primary: '#312e81',
+    secondary: '#3730a3',
+    accent: '#4f46e5',
+    accentDark: '#312e81',
+    accentLightBg: 'bg-indigo-50/80',
+    accentBorder: 'border-indigo-200',
+    barColor: '#6366f1',
+  },
+];
+
 export const PDFProposalView: React.FC = () => {
   const { getActiveProject, getFinancialSummary, setActiveView, updateClient, updateSpecs } = useSimulationStore();
   const project = getActiveProject();
@@ -37,6 +107,9 @@ export const PDFProposalView: React.FC = () => {
   const [showPage3, setShowPage3] = useState(true); // Pág 4: Flujo de Caja 25 Años
   const [showHeadersFooters, setShowHeadersFooters] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
+
+  // Active Color Theme
+  const [activeTheme, setActiveTheme] = useState<PDFColorTheme>(PDF_COLOR_THEMES[0]);
 
   // Active Tab in Sidebar (Secciones vs Editar Cotización)
   const [sidebarTab, setSidebarTab] = useState<'sections' | 'edit'>('sections');
@@ -140,26 +213,26 @@ export const PDFProposalView: React.FC = () => {
   // Common Header Banner Component for clean consistency across all PDF pages
   const renderHeaderBanner = (pageTitle: string) => (
     <>
-      <div className="bg-[#14532d] text-white px-10 py-5 flex justify-between items-center">
+      <div style={{ backgroundColor: activeTheme.primary }} className="text-white px-10 py-5 flex justify-between items-center transition-colors">
         <div>
-          <h2 className="text-[11px] font-semibold text-emerald-300 uppercase tracking-wider">
+          <h2 className="text-[11px] font-semibold text-white/80 uppercase tracking-wider">
             PROPUESTA TÉCNICA Y ECONÓMICA • ID: {project.client.projectId || 'SP-2024-089'}
           </h2>
           <h1 className="text-xl font-bold uppercase tracking-tight text-white mt-0.5">
             {project.client.name} — {summary.systemCapacityKWp.toFixed(2)}kWp
           </h1>
-          <p className="text-[11px] text-emerald-200 mt-0.5">
+          <p className="text-[11px] text-white/80 mt-0.5">
             Ubicación: <span className="font-semibold text-white">{project.client.province || project.client.location}</span> | Fecha: <span className="font-semibold text-white">{currentDateStr}</span>
           </p>
         </div>
         <div className="text-right">
           <div className="text-2xl font-black tracking-tight text-white flex items-center gap-1.5 justify-end">
-            <span className="w-3.5 h-3.5 bg-emerald-400 rounded-full inline-block"></span> electsun
+            <span className="w-3.5 h-3.5 bg-white/90 rounded-full inline-block"></span> electsun
           </div>
-          <p className="text-[10px] text-emerald-200 tracking-wider font-semibold">EL SOL A TU FAVOR</p>
+          <p className="text-[10px] text-white/80 tracking-wider font-semibold">EL SOL A TU FAVOR</p>
         </div>
       </div>
-      <div className="bg-[#1e6a3b] text-center text-white py-1.5 font-bold text-xs uppercase tracking-wider">
+      <div style={{ backgroundColor: activeTheme.secondary }} className="text-center text-white py-1.5 font-bold text-xs uppercase tracking-wider transition-colors">
         {pageTitle}
       </div>
     </>
@@ -195,7 +268,8 @@ export const PDFProposalView: React.FC = () => {
           <button
             onClick={handleExportPDF}
             disabled={isExporting}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-bold bg-[#2D5A27] text-white hover:bg-[#1f401b] rounded-lg transition-colors shadow-xs cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white rounded-lg transition-colors shadow-xs cursor-pointer"
+            style={{ backgroundColor: activeTheme.primary }}
           >
             <Download className="w-4 h-4" />
             {isExporting ? 'Generando PDF...' : 'Descargar PDF'}
@@ -212,7 +286,7 @@ export const PDFProposalView: React.FC = () => {
               onClick={() => setSidebarTab('sections')}
               className={`flex-1 py-3 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
                 sidebarTab === 'sections'
-                  ? 'border-[#2D5A27] text-[#2D5A27] bg-white'
+                  ? 'border-slate-900 text-slate-900 bg-white'
                   : 'border-transparent text-slate-500 hover:text-slate-700'
               }`}
             >
@@ -222,7 +296,7 @@ export const PDFProposalView: React.FC = () => {
               onClick={() => setSidebarTab('edit')}
               className={`flex-1 py-3 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
                 sidebarTab === 'edit'
-                  ? 'border-[#2D5A27] text-[#2D5A27] bg-white'
+                  ? 'border-slate-900 text-slate-900 bg-white'
                   : 'border-transparent text-slate-500 hover:text-slate-700'
               }`}
             >
@@ -233,6 +307,31 @@ export const PDFProposalView: React.FC = () => {
           <div className="p-4 flex-1 overflow-y-auto space-y-5">
             {sidebarTab === 'sections' ? (
               <>
+                {/* Palette Switcher */}
+                <div className="space-y-3">
+                  <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <Palette className="w-3.5 h-3.5 text-slate-700" /> Paleta de Colores PDF
+                  </h3>
+                  <div className="grid grid-cols-5 gap-2">
+                    {PDF_COLOR_THEMES.map((theme) => (
+                      <button
+                        key={theme.id}
+                        onClick={() => setActiveTheme(theme)}
+                        title={theme.name}
+                        className={`h-9 rounded-lg flex flex-col overflow-hidden border-2 transition-all cursor-pointer ${
+                          activeTheme.id === theme.id ? 'border-slate-900 ring-2 ring-slate-400 scale-105' : 'border-transparent opacity-75 hover:opacity-100'
+                        }`}
+                      >
+                        <span className="h-1/2 w-full" style={{ backgroundColor: theme.primary }}></span>
+                        <span className="h-1/2 w-full" style={{ backgroundColor: theme.barColor }}></span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] font-semibold text-slate-700 text-center">{activeTheme.name}</p>
+                </div>
+
+                <div className="h-px w-full bg-slate-200"></div>
+
                 <div className="space-y-3">
                   <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Secciones Incluidas</h3>
 
@@ -242,7 +341,8 @@ export const PDFProposalView: React.FC = () => {
                       type="checkbox"
                       checked={showPage1}
                       onChange={(e) => setShowPage1(e.target.checked)}
-                      className="rounded text-[#2D5A27] focus:ring-[#2D5A27] cursor-pointer"
+                      className="rounded focus:ring-0 cursor-pointer"
+                      style={{ color: activeTheme.primary }}
                     />
                   </label>
 
@@ -252,7 +352,8 @@ export const PDFProposalView: React.FC = () => {
                       type="checkbox"
                       checked={showPageQuotation}
                       onChange={(e) => setShowPageQuotation(e.target.checked)}
-                      className="rounded text-[#2D5A27] focus:ring-[#2D5A27] cursor-pointer"
+                      className="rounded focus:ring-0 cursor-pointer"
+                      style={{ color: activeTheme.primary }}
                     />
                   </label>
 
@@ -262,7 +363,8 @@ export const PDFProposalView: React.FC = () => {
                       type="checkbox"
                       checked={showPage2}
                       onChange={(e) => setShowPage2(e.target.checked)}
-                      className="rounded text-[#2D5A27] focus:ring-[#2D5A27] cursor-pointer"
+                      className="rounded focus:ring-0 cursor-pointer"
+                      style={{ color: activeTheme.primary }}
                     />
                   </label>
 
@@ -272,7 +374,8 @@ export const PDFProposalView: React.FC = () => {
                       type="checkbox"
                       checked={showPage3}
                       onChange={(e) => setShowPage3(e.target.checked)}
-                      className="rounded text-[#2D5A27] focus:ring-[#2D5A27] cursor-pointer"
+                      className="rounded focus:ring-0 cursor-pointer"
+                      style={{ color: activeTheme.primary }}
                     />
                   </label>
                 </div>
@@ -287,7 +390,8 @@ export const PDFProposalView: React.FC = () => {
                       type="checkbox"
                       checked={showHeadersFooters}
                       onChange={(e) => setShowHeadersFooters(e.target.checked)}
-                      className="rounded text-[#2D5A27] focus:ring-[#2D5A27] cursor-pointer"
+                      className="rounded focus:ring-0 cursor-pointer"
+                      style={{ color: activeTheme.primary }}
                     />
                   </label>
                 </div>
@@ -302,7 +406,7 @@ export const PDFProposalView: React.FC = () => {
                     type="text"
                     value={project.client.quoteNumber || 'C-0030'}
                     onChange={(e) => updateClient({ quoteNumber: e.target.value })}
-                    className="w-full text-xs p-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-[#2D5A27] outline-none font-semibold"
+                    className="w-full text-xs p-2 border border-slate-300 rounded-md outline-none font-semibold"
                   />
                 </div>
 
@@ -312,7 +416,7 @@ export const PDFProposalView: React.FC = () => {
                     type="number"
                     value={project.client.quoteValidityDays || 7}
                     onChange={(e) => updateClient({ quoteValidityDays: Number(e.target.value) })}
-                    className="w-full text-xs p-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-[#2D5A27] outline-none font-semibold"
+                    className="w-full text-xs p-2 border border-slate-300 rounded-md outline-none font-semibold"
                   />
                 </div>
 
@@ -322,7 +426,7 @@ export const PDFProposalView: React.FC = () => {
                     rows={2}
                     value={project.client.address || 'Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.'}
                     onChange={(e) => updateClient({ address: e.target.value })}
-                    className="w-full text-xs p-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-[#2D5A27] outline-none"
+                    className="w-full text-xs p-2 border border-slate-300 rounded-md outline-none"
                   />
                 </div>
 
@@ -336,7 +440,7 @@ export const PDFProposalView: React.FC = () => {
                     type="text"
                     value={project.specs.panelBrandModel || 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)'}
                     onChange={(e) => updateSpecs({ panelBrandModel: e.target.value })}
-                    className="w-full text-xs p-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-[#2D5A27] outline-none"
+                    className="w-full text-xs p-2 border border-slate-300 rounded-md outline-none"
                   />
                 </div>
 
@@ -347,7 +451,7 @@ export const PDFProposalView: React.FC = () => {
                       type="text"
                       value={project.specs.inverterBrandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)'}
                       onChange={(e) => updateSpecs({ inverterBrandModel: e.target.value })}
-                      className="w-full text-xs p-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-[#2D5A27] outline-none"
+                      className="w-full text-xs p-2 border border-slate-300 rounded-md outline-none"
                     />
                   </div>
                   <div>
@@ -356,7 +460,7 @@ export const PDFProposalView: React.FC = () => {
                       type="number"
                       value={project.specs.inverterCount || 2}
                       onChange={(e) => updateSpecs({ inverterCount: Number(e.target.value) })}
-                      className="w-full text-xs p-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-[#2D5A27] outline-none font-semibold"
+                      className="w-full text-xs p-2 border border-slate-300 rounded-md outline-none font-semibold"
                     />
                   </div>
                 </div>
@@ -368,7 +472,7 @@ export const PDFProposalView: React.FC = () => {
                       type="text"
                       value={project.specs.batteryBrandModel || 'Batería Hinaess 16 KwH-48 vdc.'}
                       onChange={(e) => updateSpecs({ batteryBrandModel: e.target.value })}
-                      className="w-full text-xs p-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-[#2D5A27] outline-none"
+                      className="w-full text-xs p-2 border border-slate-300 rounded-md outline-none"
                     />
                   </div>
                   <div>
@@ -377,7 +481,7 @@ export const PDFProposalView: React.FC = () => {
                       type="number"
                       value={project.specs.batteryCount || 3}
                       onChange={(e) => updateSpecs({ batteryCount: Number(e.target.value) })}
-                      className="w-full text-xs p-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-[#2D5A27] outline-none font-semibold"
+                      className="w-full text-xs p-2 border border-slate-300 rounded-md outline-none font-semibold"
                     />
                   </div>
                 </div>
@@ -388,7 +492,7 @@ export const PDFProposalView: React.FC = () => {
                     rows={2}
                     value={project.specs.installationServicesDesc || 'Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).'}
                     onChange={(e) => updateSpecs({ installationServicesDesc: e.target.value })}
-                    className="w-full text-xs p-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-[#2D5A27] outline-none"
+                    className="w-full text-xs p-2 border border-slate-300 rounded-md outline-none"
                   />
                 </div>
               </div>
@@ -430,11 +534,11 @@ export const PDFProposalView: React.FC = () => {
                       </h2>
                       <div className="flex items-center gap-4 text-xs font-semibold">
                         <div className="flex items-center gap-1.5">
-                          <span className="w-3 h-3 rounded-xs bg-[#14532d]"></span>
+                          <span className="w-3 h-3 rounded-xs" style={{ backgroundColor: activeTheme.primary }}></span>
                           <span className="text-slate-700">Consumo (kWh)</span>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <span className="w-3 h-3 rounded-xs bg-[#22c55e]"></span>
+                          <span className="w-3 h-3 rounded-xs" style={{ backgroundColor: activeTheme.barColor }}></span>
                           <span className="text-slate-700">Producción Solar (kWh)</span>
                         </div>
                       </div>
@@ -448,11 +552,11 @@ export const PDFProposalView: React.FC = () => {
                           <YAxis tick={{ fontSize: 10, fill: '#475569', fontWeight: 'bold' }} />
                           <Tooltip formatter={(val: number) => [`${Math.round(val).toLocaleString()} kWh`, '']} />
                           
-                          <Bar dataKey="consumptionKWh" name="Consumo (kWh)" fill="#14532d" radius={[3, 3, 0, 0]}>
-                            <LabelList dataKey="consumptionKWh" position="top" style={{ fontSize: '8px', fill: '#14532d', fontWeight: 'bold' }} formatter={(val: number) => Math.round(val)} />
+                          <Bar dataKey="consumptionKWh" name="Consumo (kWh)" fill={activeTheme.primary} radius={[3, 3, 0, 0]}>
+                            <LabelList dataKey="consumptionKWh" position="top" style={{ fontSize: '8px', fill: activeTheme.primary, fontWeight: 'bold' }} formatter={(val: number) => Math.round(val)} />
                           </Bar>
-                          <Bar dataKey="productionKWh" name="Producción Solar (kWh)" fill="#22c55e" radius={[3, 3, 0, 0]}>
-                            <LabelList dataKey="productionKWh" position="top" style={{ fontSize: '8px', fill: '#15803d', fontWeight: 'bold' }} formatter={(val: number) => Math.round(val)} />
+                          <Bar dataKey="productionKWh" name="Producción Solar (kWh)" fill={activeTheme.barColor} radius={[3, 3, 0, 0]}>
+                            <LabelList dataKey="productionKWh" position="top" style={{ fontSize: '8px', fill: activeTheme.secondary, fontWeight: 'bold' }} formatter={(val: number) => Math.round(val)} />
                           </Bar>
                         </BarChart>
                       </ResponsiveContainer>
@@ -466,7 +570,7 @@ export const PDFProposalView: React.FC = () => {
                     </h2>
                     <div className="border border-gray-200 rounded-lg overflow-hidden shadow-xs">
                       <table className="w-full text-xs text-left">
-                        <thead className="text-white uppercase bg-[#14532d] font-bold">
+                        <thead className="text-white uppercase font-bold" style={{ backgroundColor: activeTheme.primary }}>
                           <tr>
                             <th className="px-4 py-2.5">Mes</th>
                             <th className="px-4 py-2.5 text-right">Consumo (kWh)</th>
@@ -486,7 +590,7 @@ export const PDFProposalView: React.FC = () => {
                                 <td className="px-4 py-2 text-right font-medium">{row.consumptionKWh.toLocaleString()}</td>
                                 <td className="px-4 py-2 text-right font-medium">{row.productionKWh.toFixed(1)}</td>
                                 <td className="px-4 py-2 text-right font-medium">{row.solarSelfConsumedKWh.toFixed(1)}</td>
-                                <td className="px-4 py-2 text-right text-[#15803d] font-bold">
+                                <td className="px-4 py-2 text-right font-bold" style={{ color: activeTheme.secondary }}>
                                   {monthCoverage.toFixed(2)}%
                                 </td>
                               </tr>
@@ -499,7 +603,7 @@ export const PDFProposalView: React.FC = () => {
                             <td className="px-4 py-2.5 text-right">{totalConsumptionKWh.toLocaleString()}</td>
                             <td className="px-4 py-2.5 text-right">{totalProductionKWh.toLocaleString()}</td>
                             <td className="px-4 py-2.5 text-right">{totalSavingsKWh.toLocaleString()}</td>
-                            <td className="px-4 py-2.5 text-right text-[#14532d] font-extrabold">{summary.energyCoveragePct.toFixed(2)}%</td>
+                            <td className="px-4 py-2.5 text-right font-extrabold" style={{ color: activeTheme.primary }}>{summary.energyCoveragePct.toFixed(2)}%</td>
                           </tr>
                         </tfoot>
                       </table>
@@ -507,13 +611,13 @@ export const PDFProposalView: React.FC = () => {
                   </div>
 
                   {/* Impact Section */}
-                  <div className="mt-auto bg-green-50/80 border border-green-200 rounded-xl p-4 flex gap-4 items-center">
-                    <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-green-700 shadow-xs shrink-0">
+                  <div className={`mt-auto border rounded-xl p-4 flex gap-4 items-center ${activeTheme.accentLightBg} ${activeTheme.accentBorder}`}>
+                    <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-xs shrink-0" style={{ color: activeTheme.primary }}>
                       <Leaf className="w-5 h-5" />
                     </div>
                     <div className="text-xs">
-                      <h3 className="text-green-900 font-bold text-sm mb-0.5">Impacto Ambiental</h3>
-                      <p className="text-green-800">
+                      <h3 className="font-bold text-sm mb-0.5" style={{ color: activeTheme.primary }}>Impacto Ambiental</h3>
+                      <p className="text-slate-800">
                         Reducción estimada de CO₂: <span className="font-bold">{summary.co2AvoidedTonsPerYear} Toneladas/año</span>. Esto equivale a plantar aproximadamente <span className="font-bold">{treesPlanted} árboles</span> anuales.
                       </p>
                     </div>
@@ -542,7 +646,7 @@ export const PDFProposalView: React.FC = () => {
                 <div className="px-10 py-6 flex-1 flex flex-col gap-5 text-xs text-slate-800 font-sans">
                   {/* DATOS DEL CLIENTE */}
                   <div>
-                    <h3 className="bg-slate-100 px-3 py-1 text-[11px] font-bold text-[#14532d] uppercase border-l-4 border-[#14532d] mb-2">
+                    <h3 className="bg-slate-100 px-3 py-1 text-[11px] font-bold uppercase border-l-4 mb-2" style={{ color: activeTheme.primary, borderColor: activeTheme.primary }}>
                       DATOS DEL CLIENTE :
                     </h3>
                     <div className="grid grid-cols-2 gap-4 px-2 text-[11px]">
@@ -555,14 +659,14 @@ export const PDFProposalView: React.FC = () => {
                       <div className="space-y-1 text-right">
                         <div><span className="font-bold text-slate-600">N° Cotización:</span> <span className="font-bold text-slate-900">{project.client.quoteNumber || 'C-0030'}</span></div>
                         <div><span className="font-bold text-slate-600">Fecha:</span> <span className="font-semibold text-slate-800">{currentDateStr}</span></div>
-                        <div><span className="font-bold text-slate-600">Válido por:</span> <span className="font-bold text-emerald-700">{project.client.quoteValidityDays || 7} Días</span></div>
+                        <div><span className="font-bold text-slate-600">Válido por:</span> <span className="font-bold" style={{ color: activeTheme.secondary }}>{project.client.quoteValidityDays || 7} Días</span></div>
                       </div>
                     </div>
                   </div>
 
                   {/* ESPECIFICACIONES DEL SISTEMA */}
                   <div>
-                    <h3 className="bg-slate-100 px-3 py-1 text-[11px] font-bold text-[#14532d] uppercase border-l-4 border-[#14532d] mb-2">
+                    <h3 className="bg-slate-100 px-3 py-1 text-[11px] font-bold uppercase border-l-4 mb-2" style={{ color: activeTheme.primary, borderColor: activeTheme.primary }}>
                       ESPECIFICACIONES DEL SISTEMA
                     </h3>
                     <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200 text-[11px]">
@@ -572,19 +676,19 @@ export const PDFProposalView: React.FC = () => {
                       </div>
                       <div className="text-right">
                         <div><span className="font-bold text-slate-700">Consumo mensual estimado (kWh):</span> <span className="font-bold text-slate-900">{Math.round(summary.annualConsumptionKWh / 12).toLocaleString()}</span></div>
-                        <div><span className="font-bold text-slate-700">EDES / Distribuidor:</span> <span className="font-bold text-[#14532d]">{project.client.distributor || 'EDEESTE'}</span></div>
+                        <div><span className="font-bold text-slate-700">EDES / Distribuidor:</span> <span className="font-bold" style={{ color: activeTheme.primary }}>{project.client.distributor || 'EDEESTE'}</span></div>
                       </div>
                     </div>
                   </div>
 
                   {/* EQUIPOS Y MATERIALES */}
                   <div>
-                    <h3 className="bg-slate-100 px-3 py-1 text-[11px] font-bold text-[#14532d] uppercase border-l-4 border-[#14532d] mb-2">
+                    <h3 className="bg-slate-100 px-3 py-1 text-[11px] font-bold uppercase border-l-4 mb-2" style={{ color: activeTheme.primary, borderColor: activeTheme.primary }}>
                       EQUIPOS Y MATERIALES
                     </h3>
                     <div className="border border-slate-200 rounded-lg overflow-hidden">
                       <table className="w-full text-left border-collapse">
-                        <thead className="bg-[#14532d] text-white font-bold text-[10px] uppercase">
+                        <thead className="text-white font-bold text-[10px] uppercase" style={{ backgroundColor: activeTheme.primary }}>
                           <tr>
                             <th className="px-3 py-2">DESCRIPCION</th>
                             <th className="px-3 py-2 text-center w-20">CANT.</th>
@@ -630,32 +734,32 @@ export const PDFProposalView: React.FC = () => {
                         <span>TOTAL GENERAL (USD) :</span>
                         <span>${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
-                      <div className="flex justify-between text-emerald-800 font-semibold">
+                      <div className="flex justify-between font-semibold" style={{ color: activeTheme.secondary }}>
                         <span>ITBIS A DESCONTAR POR LEY 57-07 US$ :</span>
                         <span className="font-bold">${summary.itbisSavedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
-                      <div className="flex justify-between text-white bg-[#14532d] px-2 py-1 rounded font-bold">
+                      <div className="flex justify-between text-white px-2 py-1 rounded font-bold" style={{ backgroundColor: activeTheme.primary }}>
                         <span>TOTAL GENERAL (USD) LEY 57-07 :</span>
                         <span>${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
                       <div className="flex justify-between text-slate-800 pt-1 border-t border-slate-300">
                         <span className="font-bold">PRECIO POR WATT (USD/W):</span>
-                        <span className="font-bold text-[#14532d]">${(project.specs.pricePerWattUSD || project.financials.pricePerWattUSD || 1.13).toFixed(2)}</span>
+                        <span className="font-bold" style={{ color: activeTheme.primary }}>${(project.specs.pricePerWattUSD || project.financials.pricePerWattUSD || 1.13).toFixed(2)}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* INCENTIVOS DE LEY 57-07 */}
                   <div>
-                    <h3 className="bg-slate-100 px-3 py-1 text-[11px] font-bold text-[#14532d] uppercase border-l-4 border-[#14532d] mb-1">
+                    <h3 className="bg-slate-100 px-3 py-1 text-[11px] font-bold uppercase border-l-4 mb-1" style={{ color: activeTheme.primary, borderColor: activeTheme.primary }}>
                       INCENTIVOS DE LEY 57-07
                     </h3>
-                    <p className="text-[10px] text-amber-800 font-bold bg-amber-50 border border-amber-200 px-3 py-1 rounded mb-2">
+                    <p className="text-[10px] font-bold bg-amber-50 border border-amber-200 text-amber-900 px-3 py-1 rounded mb-2">
                       (Descuento de 40% para equipos energía renovables: Paneles solares, inversores y baterías)
                     </p>
                     <div className="border border-slate-200 rounded-lg overflow-hidden">
                       <table className="w-full text-left border-collapse">
-                        <thead className="bg-[#14532d] text-white font-bold text-[10px] uppercase">
+                        <thead className="text-white font-bold text-[10px] uppercase" style={{ backgroundColor: activeTheme.primary }}>
                           <tr>
                             <th className="px-3 py-1.5">CONCEPTO</th>
                             <th className="px-3 py-1.5 text-right">VALOR US $</th>
@@ -670,23 +774,23 @@ export const PDFProposalView: React.FC = () => {
                           </tr>
                           <tr className="bg-slate-50/60">
                             <td className="px-3 py-1.5">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 1ER AÑO</td>
-                            <td className="px-3 py-1.5 text-right text-emerald-700">${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                            <td className="px-3 py-1.5 text-right text-emerald-700">13.33%</td>
+                            <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.secondary }}>${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.secondary }}>13.33%</td>
                           </tr>
                           <tr className="bg-white">
                             <td className="px-3 py-1.5">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 2DO AÑO</td>
-                            <td className="px-3 py-1.5 text-right text-emerald-700">${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                            <td className="px-3 py-1.5 text-right text-emerald-700">13.33%</td>
+                            <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.secondary }}>${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.secondary }}>13.33%</td>
                           </tr>
                           <tr className="bg-slate-50/60">
                             <td className="px-3 py-1.5">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 3ER AÑO</td>
-                            <td className="px-3 py-1.5 text-right text-emerald-700">${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                            <td className="px-3 py-1.5 text-right text-emerald-700">13.33%</td>
+                            <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.secondary }}>${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.secondary }}>13.33%</td>
                           </tr>
-                          <tr className="bg-emerald-50 text-[#14532d] font-bold">
+                          <tr className={`font-bold ${activeTheme.accentLightBg}`} style={{ color: activeTheme.primary }}>
                             <td className="px-3 py-1.5">TOTAL A DESCONTAR POR LA LEY 57-07 (40% DEL TOTAL)</td>
-                            <td className="px-3 py-1.5 text-right text-emerald-800">${summary.ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                            <td className="px-3 py-1.5 text-right text-emerald-800">40.00%</td>
+                            <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.primary }}>${summary.ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.primary }}>40.00%</td>
                           </tr>
                         </tbody>
                       </table>
@@ -696,7 +800,7 @@ export const PDFProposalView: React.FC = () => {
                   {/* GARANTÍAS Y NOS ENCARGAMOS DE GESTIONAR GRID */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1 text-[11px]">
-                      <h4 className="font-bold text-[#14532d] border-b border-slate-200 pb-1 mb-1 uppercase tracking-wider flex items-center gap-1.5">
+                      <h4 className="font-bold border-b border-slate-200 pb-1 mb-1 uppercase tracking-wider flex items-center gap-1.5" style={{ color: activeTheme.primary }}>
                         <ShieldCheck className="w-3.5 h-3.5" /> GARANTÍAS
                       </h4>
                       <div>• <span className="font-bold">Paneles Solares:</span> 25 años (80.7% potencia mínima garantizada)</div>
@@ -706,13 +810,13 @@ export const PDFProposalView: React.FC = () => {
                       <div>• <span className="font-bold">Mano de obra:</span> 1 año</div>
                     </div>
 
-                    <div className="bg-emerald-50/60 border border-emerald-200 rounded-lg p-3 space-y-1 text-[11px] text-emerald-950">
-                      <h4 className="font-bold text-[#14532d] border-b border-emerald-200 pb-1 mb-1 uppercase tracking-wider flex items-center gap-1.5">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" /> NOS ENCARGAMOS DE GESTIONAR
+                    <div className={`border rounded-lg p-3 space-y-1 text-[11px] ${activeTheme.accentLightBg} ${activeTheme.accentBorder}`}>
+                      <h4 className="font-bold border-b pb-1 mb-1 uppercase tracking-wider flex items-center gap-1.5" style={{ color: activeTheme.primary, borderColor: activeTheme.primary }}>
+                        <CheckCircle2 className="w-3.5 h-3.5" style={{ color: activeTheme.primary }} /> NOS ENCARGAMOS DE GESTIONAR
                       </h4>
-                      <div className="flex items-start gap-1"><Check className="w-3.5 h-3.5 text-emerald-700 shrink-0 mt-0.5" /> <span>Instalación del contador bidireccional en las EDES</span></div>
-                      <div className="flex items-start gap-1"><Check className="w-3.5 h-3.5 text-emerald-700 shrink-0 mt-0.5" /> <span>Aprobación de crédito fiscal (CNE) y el Ministerio de Hacienda</span></div>
-                      <div className="flex items-start gap-1"><Check className="w-3.5 h-3.5 text-emerald-700 shrink-0 mt-0.5" /> <span>Trámites completos ante organismos reguladores</span></div>
+                      <div className="flex items-start gap-1"><Check className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: activeTheme.primary }} /> <span>Instalación del contador bidireccional en las EDES</span></div>
+                      <div className="flex items-start gap-1"><Check className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: activeTheme.primary }} /> <span>Aprobación de crédito fiscal (CNE) y el Ministerio de Hacienda</span></div>
+                      <div className="flex items-start gap-1"><Check className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: activeTheme.primary }} /> <span>Trámites completos ante organismos reguladores</span></div>
                     </div>
                   </div>
 
@@ -757,7 +861,7 @@ export const PDFProposalView: React.FC = () => {
 
                       <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-3.5 text-center">
                         <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">TIR</p>
-                        <p className="text-xl font-bold text-[#15803d]">{summary.irrPct}%</p>
+                        <p className="text-xl font-bold" style={{ color: activeTheme.primary }}>{summary.irrPct}%</p>
                       </div>
 
                       <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-3.5 text-center">
@@ -827,7 +931,7 @@ export const PDFProposalView: React.FC = () => {
                     </h2>
                     <div className="border border-gray-200 rounded-lg overflow-hidden text-xs">
                       <table className="w-full text-left">
-                        <thead className="text-white uppercase bg-[#14532d] font-bold">
+                        <thead className="text-white uppercase font-bold" style={{ backgroundColor: activeTheme.primary }}>
                           <tr>
                             <th className="px-4 py-2.5">Año</th>
                             <th className="px-4 py-2.5 text-right">Ahorro Energético (USD)</th>
@@ -842,10 +946,10 @@ export const PDFProposalView: React.FC = () => {
                               ${year1Obj.cumulativeCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                             </td>
                           </tr>
-                          <tr className="bg-emerald-50/70 border-y border-emerald-200 font-bold">
-                            <td className="px-4 py-2.5 text-[#14532d]">Año {paybackYearObj.year} (Payback)</td>
+                          <tr className={`font-bold ${activeTheme.accentLightBg}`}>
+                            <td className="px-4 py-2.5" style={{ color: activeTheme.primary }}>Año {paybackYearObj.year} (Payback)</td>
                             <td className="px-4 py-2.5 text-right">${paybackYearObj.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                            <td className="px-4 py-2.5 text-right text-green-700 font-bold">
+                            <td className="px-4 py-2.5 text-right font-bold" style={{ color: activeTheme.primary }}>
                               ${paybackYearObj.cumulativeCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                             </td>
                           </tr>
@@ -859,7 +963,7 @@ export const PDFProposalView: React.FC = () => {
                           <tr className="font-bold">
                             <td className="px-4 py-2.5 font-bold">Año 25</td>
                             <td className="px-4 py-2.5 text-right">${year25Obj.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                            <td className="px-4 py-2.5 text-right text-green-700 font-bold">
+                            <td className="px-4 py-2.5 text-right font-bold" style={{ color: activeTheme.primary }}>
                               ${year25Obj.cumulativeCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                             </td>
                           </tr>
@@ -887,7 +991,7 @@ export const PDFProposalView: React.FC = () => {
                             {cumulativeChartData.map((entry, index) => (
                               <Cell
                                 key={`cell-${index}`}
-                                fill={entry.cumulative < 0 ? '#ef4444' : '#16a34a'}
+                                fill={entry.cumulative < 0 ? '#ef4444' : activeTheme.barColor}
                               />
                             ))}
                           </Bar>
@@ -920,7 +1024,7 @@ export const PDFProposalView: React.FC = () => {
                   {/* Detailed Cash Flow Table */}
                   <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs text-xs flex-1 flex flex-col">
                     <table className="w-full text-left border-collapse flex-1">
-                      <thead className="text-white bg-[#14532d] font-bold uppercase tracking-wider text-[11px] shrink-0">
+                      <thead className="text-white font-bold uppercase tracking-wider text-[11px] shrink-0" style={{ backgroundColor: activeTheme.primary }}>
                         <tr>
                           <th className="px-4 py-2.5 w-12 text-center">Año</th>
                           <th className="px-4 py-2.5 text-right">Energía Generada (kWh)</th>
@@ -934,6 +1038,7 @@ export const PDFProposalView: React.FC = () => {
                         {/* Year 0 Row */}
                         <tr className="bg-red-50/70 text-red-700 font-bold">
                           <td className="px-4 py-2 text-center">0</td>
+                          <td className="px-4 py-2 text-right text-slate-400">-</td>
                           <td className="px-4 py-2 text-right text-slate-400">-</td>
                           <td className="px-4 py-2 text-right text-slate-400">-</td>
                           <td className="px-4 py-2 text-right text-slate-400">-</td>
@@ -951,7 +1056,7 @@ export const PDFProposalView: React.FC = () => {
                               key={row.year}
                               className={
                                 isPaybackYear
-                                  ? 'bg-emerald-50/90 font-bold text-[#14532d] border-y border-emerald-300'
+                                  ? `${activeTheme.accentLightBg} font-bold border-y border-slate-300`
                                   : row.year % 2 === 0
                                   ? 'bg-slate-50/60'
                                   : 'bg-white'
@@ -960,14 +1065,13 @@ export const PDFProposalView: React.FC = () => {
                               <td className="px-4 py-1.5 text-center font-bold">{row.year}</td>
                               <td className="px-4 py-1.5 text-right font-medium">{row.productionKWh.toLocaleString()}</td>
                               <td className="px-4 py-1.5 text-right font-medium">${row.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                              <td className="px-4 py-1.5 text-right text-[#16a34a] font-semibold">
+                              <td className="px-4 py-1.5 text-right font-semibold" style={{ color: activeTheme.secondary }}>
                                 {row.taxCreditUSD > 0 ? `$${row.taxCreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '$0.00'}
                               </td>
                               <td className="px-4 py-1.5 text-right font-semibold">${row.netCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                               <td
-                                className={`px-4 py-1.5 text-right font-bold ${
-                                  isCumulativeNegative ? 'text-red-600' : 'text-[#16a34a]'
-                                }`}
+                                className={`px-4 py-1.5 text-right font-bold`}
+                                style={{ color: isCumulativeNegative ? '#dc2626' : activeTheme.primary }}
                               >
                                 {isCumulativeNegative ? '-' : ''}${Math.abs(row.cumulativeCashFlowUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
@@ -981,7 +1085,7 @@ export const PDFProposalView: React.FC = () => {
                   {/* Restored Full Summary Indicators Box */}
                   <div className="bg-slate-50/80 border border-slate-200 rounded-xl p-4 shrink-0">
                     <h3 className="text-slate-800 font-bold text-xs mb-2.5 border-b border-slate-200 pb-1.5 flex items-center gap-2">
-                      <ShieldCheck className="w-4 h-4 text-[#14532d]" /> Indicadores Financieros del Proyecto
+                      <ShieldCheck className="w-4 h-4" style={{ color: activeTheme.primary }} /> Indicadores Financieros del Proyecto
                     </h3>
                     <div className="grid grid-cols-4 gap-y-2.5 gap-x-4 text-xs">
                       <div>
@@ -990,7 +1094,7 @@ export const PDFProposalView: React.FC = () => {
                       </div>
                       <div>
                         <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold mb-0.5">TIR</p>
-                        <p className="font-bold text-[#16a34a]">{summary.irrPct}%</p>
+                        <p className="font-bold" style={{ color: activeTheme.primary }}>{summary.irrPct}%</p>
                       </div>
                       <div>
                         <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold mb-0.5">VAN (10%)</p>
@@ -998,11 +1102,11 @@ export const PDFProposalView: React.FC = () => {
                       </div>
                       <div>
                         <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold mb-0.5">Ahorro Total 25 Años</p>
-                        <p className="font-bold text-[#16a34a]">${summary.total25YearSavingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                        <p className="font-bold" style={{ color: activeTheme.primary }}>${summary.total25YearSavingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                       </div>
                       <div>
                         <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold mb-0.5">ROI Total</p>
-                        <p className="font-bold text-[#16a34a]">{summary.roi25YrPct}%</p>
+                        <p className="font-bold" style={{ color: activeTheme.primary }}>{summary.roi25YrPct}%</p>
                       </div>
                       <div>
                         <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold mb-0.5">Reducción CO2</p>
