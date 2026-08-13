@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
-import { Sun, FileText, LayoutDashboard, Save, Plus, ArrowLeft, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Sun, Moon, FileText, LayoutDashboard, Save, Plus, ArrowLeft, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { NewProjectModal } from './NewProjectModal';
 import { UpdateModal } from './UpdateModal';
 
@@ -13,6 +13,8 @@ export const Header: React.FC = () => {
     openUpdateModal,
     saveActiveProject,
     saveFeedbackMessage,
+    sidebarTheme,
+    toggleSidebarTheme,
   } = useSimulationStore();
 
   const activeProject = getActiveProject();
@@ -89,6 +91,29 @@ export const Header: React.FC = () => {
               <span>Propuesta PDF</span>
             </button>
           </div>
+
+          {/* Theme Toggle Button (Selector de Modo Oscuro / Claro para Barra Lateral) */}
+          <button
+            onClick={toggleSidebarTheme}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all cursor-pointer shadow-xs text-xs font-bold ${
+              sidebarTheme === 'dark'
+                ? 'bg-slate-900 border-slate-800 text-slate-100 hover:bg-slate-800'
+                : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+            }`}
+            title={sidebarTheme === 'dark' ? 'Cambiar a modo claro en barra de parámetros' : 'Cambiar a modo oscuro en barra de parámetros'}
+          >
+            {sidebarTheme === 'dark' ? (
+              <>
+                <Moon className="w-3.5 h-3.5 text-indigo-400 fill-indigo-400" />
+                <span className="hidden sm:inline">Barra Oscura</span>
+              </>
+            ) : (
+              <>
+                <Sun className="w-3.5 h-3.5 text-amber-500" />
+                <span className="hidden sm:inline">Barra Clara</span>
+              </>
+            )}
+          </button>
 
           <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
             {/* Button Buscar Actualizaciones */}

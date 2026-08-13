@@ -50,6 +50,11 @@ interface SimulationState {
   setProjectStatus: (id: string, status: 'Draft' | 'Final' | 'Archived') => void;
   saveActiveProject: () => void;
 
+  // Theme & Appearance
+  sidebarTheme: 'dark' | 'light';
+  toggleSidebarTheme: () => void;
+  setSidebarTheme: (theme: 'dark' | 'light') => void;
+
   // Computed helper
   getActiveProject: () => ProjectSimulation;
   getFinancialSummary: () => FinancialSummaryResult;
@@ -382,6 +387,10 @@ export const useSimulationStore = create<SimulationState>()(
         }));
       },
 
+      sidebarTheme: 'dark',
+      toggleSidebarTheme: () => set((state) => ({ sidebarTheme: state.sidebarTheme === 'dark' ? 'light' : 'dark' })),
+      setSidebarTheme: (theme) => set({ sidebarTheme: theme }),
+
       saveActiveProject: () => {
         const now = new Date();
         const timeStr = now.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -423,6 +432,7 @@ export const useSimulationStore = create<SimulationState>()(
         activeProjectId: state.activeProjectId,
         activeView: state.activeView,
         searchQuery: state.searchQuery,
+        sidebarTheme: state.sidebarTheme,
       }),
     }
   )
