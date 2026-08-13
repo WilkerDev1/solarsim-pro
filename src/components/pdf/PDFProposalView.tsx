@@ -1021,34 +1021,36 @@ export const PDFProposalView: React.FC = () => {
 
                 {/* Body */}
                 <div className="px-10 py-6 flex-1 flex flex-col justify-between gap-6">
-                  {/* Detailed Cash Flow Table */}
+                  {/* Detailed Cash Flow Table - 7 Columns matching Reference Image */}
                   <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs text-xs flex-1 flex flex-col">
                     <table className="w-full text-left border-collapse flex-1">
-                      <thead className="text-white font-bold uppercase tracking-wider text-[11px] shrink-0" style={{ backgroundColor: activeTheme.primary }}>
+                      <thead className="text-white font-bold uppercase tracking-wider text-[10px] shrink-0" style={{ backgroundColor: activeTheme.primary }}>
                         <tr>
-                          <th className="px-4 py-2.5 w-12 text-center">Año</th>
-                          <th className="px-4 py-2.5 text-right">Energía Generada (kWh)</th>
-                          <th className="px-4 py-2.5 text-right">Ahorro (USD)</th>
-                          <th className="px-4 py-2.5 text-right">Incentivo (USD)</th>
-                          <th className="px-4 py-2.5 text-right">Flujo de Caja (USD)</th>
-                          <th className="px-4 py-2.5 text-right font-bold">Beneficio Acumulado</th>
+                          <th className="px-2 py-2 w-10 text-center">Año</th>
+                          <th className="px-2 py-2 text-right">Energia Generada (kWh)</th>
+                          <th className="px-2 py-2 text-right">Ahorro Energia (USD)</th>
+                          <th className="px-2 py-2 text-right">Incentivo Fiscal (USD)</th>
+                          <th className="px-2 py-2 text-right">Ahorro Anual Total (USD)</th>
+                          <th className="px-2 py-2 text-right">Cash Flow (USD)</th>
+                          <th className="px-2 py-2 text-right font-bold">CF Beneficio Acumulado (USD)</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100 text-slate-700 font-semibold">
+                      <tbody className="divide-y divide-slate-100 text-slate-700 font-semibold text-[11px]">
                         {/* Year 0 Row */}
                         <tr className="bg-red-50/70 text-red-700 font-bold">
-                          <td className="px-4 py-2 text-center">0</td>
-                          <td className="px-4 py-2 text-right text-slate-400">-</td>
-                          <td className="px-4 py-2 text-right text-slate-400">-</td>
-                          <td className="px-4 py-2 text-right text-slate-400">-</td>
-                          <td className="px-4 py-2 text-right text-slate-400">-</td>
-                          <td className="px-4 py-2 text-right text-red-600">-${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                          <td className="px-4 py-2 text-right text-red-600 font-extrabold">-${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-2 py-1.5 text-center">0</td>
+                          <td className="px-2 py-1.5 text-right text-slate-400">-</td>
+                          <td className="px-2 py-1.5 text-right text-slate-400">-</td>
+                          <td className="px-2 py-1.5 text-right text-slate-400">-</td>
+                          <td className="px-2 py-1.5 text-right text-slate-400">-</td>
+                          <td className="px-2 py-1.5 text-right text-red-600">-${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-2 py-1.5 text-right text-red-600 font-extrabold">-${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         </tr>
 
                         {/* Years 1 to 25 */}
                         {cf25.map((row) => {
                           const isPaybackYear = row.year === Math.ceil(summary.paybackYears);
+                          const totalAnnualSavings = row.savingsUSD + row.taxCreditUSD;
                           const isCumulativeNegative = row.cumulativeCashFlowUSD < 0;
 
                           return (
@@ -1062,15 +1064,16 @@ export const PDFProposalView: React.FC = () => {
                                   : 'bg-white'
                               }
                             >
-                              <td className="px-4 py-1.5 text-center font-bold">{row.year}</td>
-                              <td className="px-4 py-1.5 text-right font-medium">{row.productionKWh.toLocaleString()}</td>
-                              <td className="px-4 py-1.5 text-right font-medium">${row.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                              <td className="px-4 py-1.5 text-right font-semibold" style={{ color: activeTheme.secondary }}>
+                              <td className="px-2 py-1 text-center font-bold">{row.year}</td>
+                              <td className="px-2 py-1 text-right font-medium">{row.productionKWh.toLocaleString()}</td>
+                              <td className="px-2 py-1 text-right font-medium">${row.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className="px-2 py-1 text-right font-semibold" style={{ color: activeTheme.secondary }}>
                                 {row.taxCreditUSD > 0 ? `$${row.taxCreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '$0.00'}
                               </td>
-                              <td className="px-4 py-1.5 text-right font-semibold">${row.netCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className="px-2 py-1 text-right font-semibold text-slate-900">${totalAnnualSavings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td className="px-2 py-1 text-right font-semibold" style={{ color: activeTheme.primary }}>${row.netCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                               <td
-                                className={`px-4 py-1.5 text-right font-bold`}
+                                className="px-2 py-1 text-right font-bold"
                                 style={{ color: isCumulativeNegative ? '#dc2626' : activeTheme.primary }}
                               >
                                 {isCumulativeNegative ? '-' : ''}${Math.abs(row.cumulativeCashFlowUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
