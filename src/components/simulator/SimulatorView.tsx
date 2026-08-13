@@ -610,7 +610,7 @@ export const SimulatorView: React.FC = () => {
         {/* ---------------------------------------------------- */}
         {activeMainTab === 'energia' && (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 shrink-0">
               {/* Card 1: CAPACIDAD INSTALADA */}
               <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
@@ -683,7 +683,7 @@ export const SimulatorView: React.FC = () => {
             </div>
 
             {/* GRÁFICA DE ENERGÍA */}
-            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-3">
+            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-3 shrink-0">
               <div className="flex justify-between items-center border-b border-slate-100 pb-2">
                 <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
                   Evolución Mensual de Energía
@@ -700,7 +700,7 @@ export const SimulatorView: React.FC = () => {
                 </div>
               </div>
 
-              <div className="h-[300px] w-full pt-2">
+              <div className="h-[320px] min-h-[320px] w-full pt-2">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={summary.monthlyBreakdown} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
@@ -715,7 +715,7 @@ export const SimulatorView: React.FC = () => {
             </div>
 
             {/* TABLA DE DETALLE MENSUAL EDITABLE */}
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs shrink-0">
               <div className="bg-[#14532d] text-white px-4 py-3 font-bold text-xs uppercase tracking-wider">
                 Resumen Mensual de Energía
               </div>
@@ -767,9 +767,9 @@ export const SimulatorView: React.FC = () => {
         {/* VISTA 2: COTIZACIÓN Y EQUIPOS */}
         {/* ---------------------------------------------------- */}
         {activeMainTab === 'cotizacion' && (
-          <div className="space-y-6">
+          <div className="space-y-6 shrink-0">
             {/* Top Metrics Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
               <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">N° COTIZACIÓN</span>
                 <span className="text-lg font-bold text-slate-900">{project.client.quoteNumber || 'C-0030'}</span>
@@ -789,7 +789,7 @@ export const SimulatorView: React.FC = () => {
             </div>
 
             {/* Complete Interactive Invoice Proposal View */}
-            <div className="bg-white border border-slate-300 rounded-2xl shadow-xl overflow-hidden font-sans">
+            <div className="bg-white border border-slate-300 rounded-2xl shadow-xl overflow-hidden font-sans shrink-0">
               {/* Header Electsun Dark Green Banner */}
               <div className="bg-[#14532d] text-white px-8 py-5 flex justify-between items-center">
                 <div>
@@ -799,7 +799,7 @@ export const SimulatorView: React.FC = () => {
                   <h1 className="text-xl font-bold uppercase tracking-tight text-white mt-0.5">
                     {project.client.name} — {summary.systemCapacityKWp.toFixed(2)}kWp
                   </h1>
-                  <p className="text-[11px] text-emerald-200 mt-0.5">
+                  <p className="text-[11px] text-emerald-100/90 mt-0.5">
                     Ubicación: <span className="font-semibold text-white">{project.client.province || project.client.location}</span> | Fecha: <span className="font-semibold text-white">{currentDateStr}</span>
                   </p>
                 </div>
@@ -818,17 +818,17 @@ export const SimulatorView: React.FC = () => {
               <div className="p-8 space-y-6 text-xs text-slate-800">
                 {/* DATOS DEL CLIENTE */}
                 <div>
-                  <h3 className="bg-slate-100 px-3 py-1 text-xs font-bold text-[#14532d] uppercase border-l-4 border-[#14532d] mb-2">
+                  <h3 className="bg-slate-100 px-3 py-1 text-[11px] font-bold text-emerald-900 uppercase border-l-4 border-emerald-800 mb-2">
                     DATOS DEL CLIENTE :
                   </h3>
-                  <div className="grid grid-cols-2 gap-4 px-2 text-xs">
-                    <div className="space-y-1.5">
+                  <div className="grid grid-cols-2 gap-4 px-2 text-[11px]">
+                    <div className="space-y-1">
                       <div><span className="font-bold text-slate-600">Cliente:</span> <span className="font-bold text-slate-900">{project.client.name}</span></div>
                       <div><span className="font-bold text-slate-600">Contacto:</span> {project.client.company || project.client.name}</div>
                       <div><span className="font-bold text-slate-600">Teléfono:</span> {project.client.contactPhone || '809-555-0199'}</div>
                       <div><span className="font-bold text-slate-600">Dirección:</span> {project.client.address || 'Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.'}</div>
                     </div>
-                    <div className="space-y-1.5 text-right">
+                    <div className="space-y-1 text-right">
                       <div><span className="font-bold text-slate-600">N° Cotización:</span> <span className="font-bold text-slate-900">{project.client.quoteNumber || 'C-0030'}</span></div>
                       <div><span className="font-bold text-slate-600">Fecha:</span> <span className="font-semibold text-slate-800">{currentDateStr}</span></div>
                       <div><span className="font-bold text-slate-600">Válido por:</span> <span className="font-bold text-emerald-700">{project.client.quoteValidityDays || 7} Días</span></div>
@@ -838,57 +838,57 @@ export const SimulatorView: React.FC = () => {
 
                 {/* ESPECIFICACIONES DEL SISTEMA */}
                 <div>
-                  <h3 className="bg-slate-100 px-3 py-1 text-xs font-bold text-[#14532d] uppercase border-l-4 border-[#14532d] mb-2">
+                  <h3 className="bg-slate-100 px-3 py-1 text-[11px] font-bold text-emerald-900 uppercase border-l-4 border-emerald-800 mb-2">
                     ESPECIFICACIONES DEL SISTEMA
                   </h3>
-                  <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs">
-                    <div className="space-y-1">
+                  <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200 text-[11px]">
+                    <div>
                       <div><span className="font-bold text-slate-700">Potencia (kW-dc):</span> <span className="font-bold text-slate-900">{summary.systemCapacityKWp.toFixed(2)}</span></div>
                       <div><span className="font-bold text-slate-700">Tipo de instalación:</span> Fotovoltaica</div>
                     </div>
-                    <div className="text-right space-y-1">
+                    <div className="text-right">
                       <div><span className="font-bold text-slate-700">Consumo mensual estimado (kWh):</span> <span className="font-bold text-slate-900">{Math.round(summary.annualConsumptionKWh / 12).toLocaleString()}</span></div>
-                      <div><span className="font-bold text-slate-700">EDES / Distribuidor:</span> <span className="font-bold text-[#14532d]">{project.client.distributor || 'EDEESTE'}</span></div>
+                      <div><span className="font-bold text-slate-700">EDES / Distribuidor:</span> <span className="font-bold text-emerald-800">{project.client.distributor || 'EDEESTE'}</span></div>
                     </div>
                   </div>
                 </div>
 
                 {/* EQUIPOS Y MATERIALES */}
                 <div>
-                  <h3 className="bg-slate-100 px-3 py-1 text-xs font-bold text-[#14532d] uppercase border-l-4 border-[#14532d] mb-2">
+                  <h3 className="bg-slate-100 px-3 py-1 text-[11px] font-bold text-emerald-900 uppercase border-l-4 border-emerald-800 mb-2">
                     EQUIPOS Y MATERIALES
                   </h3>
-                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="border border-slate-200 rounded-lg overflow-hidden">
                     <table className="w-full text-left border-collapse">
-                      <thead className="bg-[#14532d] text-white font-bold text-xs uppercase">
+                      <thead className="bg-[#14532d] text-white font-bold text-[10px] uppercase">
                         <tr>
-                          <th className="px-4 py-2.5">DESCRIPCION</th>
-                          <th className="px-4 py-2.5 text-center w-24">CANT.</th>
-                          <th className="px-4 py-2.5 text-center w-24">UNIDAD</th>
+                          <th className="px-3 py-2">DESCRIPCION</th>
+                          <th className="px-3 py-2 text-center w-20">CANT.</th>
+                          <th className="px-3 py-2 text-center w-20">UNIDAD</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-200 text-xs text-slate-800 font-semibold">
+                      <tbody className="divide-y divide-slate-200 text-[11px] text-slate-800 font-semibold">
                         <tr className="bg-white">
-                          <td className="px-4 py-2.5">{project.specs.panelBrandModel || 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)'}</td>
-                          <td className="px-4 py-2.5 text-center font-bold">{project.specs.panelCount}</td>
-                          <td className="px-4 py-2.5 text-center text-slate-500 font-normal">UD</td>
+                          <td className="px-3 py-2">{project.specs.panelBrandModel || 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)'}</td>
+                          <td className="px-3 py-2 text-center font-bold">{project.specs.panelCount}</td>
+                          <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
                         </tr>
                         <tr className="bg-slate-50/60">
-                          <td className="px-4 py-2.5">{project.specs.inverterBrandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)'}</td>
-                          <td className="px-4 py-2.5 text-center font-bold">{project.specs.inverterCount || 2}</td>
-                          <td className="px-4 py-2.5 text-center text-slate-500 font-normal">UD</td>
+                          <td className="px-3 py-2">{project.specs.inverterBrandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)'}</td>
+                          <td className="px-3 py-2 text-center font-bold">{project.specs.inverterCount || 2}</td>
+                          <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
                         </tr>
                         {project.specs.hasBattery && (
                           <tr className="bg-white">
-                            <td className="px-4 py-2.5">{project.specs.batteryBrandModel || 'Batería Hinaess 16 KwH-48 vdc.'}</td>
-                            <td className="px-4 py-2.5 text-center font-bold">{project.specs.batteryCount || 3}</td>
-                            <td className="px-4 py-2.5 text-center text-slate-500 font-normal">UD</td>
+                            <td className="px-3 py-2">{project.specs.batteryBrandModel || 'Batería Hinaess 16 KwH-48 vdc.'}</td>
+                            <td className="px-3 py-2 text-center font-bold">{project.specs.batteryCount || 3}</td>
+                            <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
                           </tr>
                         )}
                         <tr className="bg-slate-50/60">
-                          <td className="px-4 py-2.5">{project.specs.installationServicesDesc || 'Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).'}</td>
-                          <td className="px-4 py-2.5 text-center font-bold">1</td>
-                          <td className="px-4 py-2.5 text-center text-slate-500 font-normal">UD</td>
+                          <td className="px-3 py-2">{project.specs.installationServicesDesc || 'Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).'}</td>
+                          <td className="px-3 py-2 text-center font-bold">1</td>
+                          <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
                         </tr>
                       </tbody>
                     </table>
@@ -897,83 +897,83 @@ export const SimulatorView: React.FC = () => {
 
                 {/* DESGLOSE FINANCIERO */}
                 <div className="flex justify-end">
-                  <div className="w-[420px] bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2 text-xs">
-                    <div className="flex justify-between text-slate-700 font-semibold">
-                      <span>SUB-TOTAL (USD) SIN ITBIS :</span>
+                  <div className="w-[380px] bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1.5 text-[11px]">
+                    <div className="flex justify-between text-slate-700">
+                      <span className="font-semibold">SUB-TOTAL (USD) SIN ITBIS :</span>
                       <span className="font-bold">${(summary.grossInvestmentUSD / 1.18).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
-                    <div className="flex justify-between text-slate-900 bg-slate-200/80 px-3 py-1.5 rounded-md font-bold text-sm">
+                    <div className="flex justify-between text-slate-900 bg-slate-200/80 px-2 py-1 rounded font-bold">
                       <span>TOTAL GENERAL (USD) :</span>
                       <span>${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     <div className="flex justify-between text-emerald-800 font-semibold">
-                      <span>ITBIS A DESCONTAR LEY 57-07 US$ :</span>
+                      <span>ITBIS A DESCONTAR POR LEY 57-07 US$ :</span>
                       <span className="font-bold">${summary.itbisSavedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
-                    <div className="flex justify-between text-white bg-[#14532d] px-3 py-1.5 rounded-md font-bold text-sm">
-                      <span>TOTAL GENERAL LEY 57-07 :</span>
+                    <div className="flex justify-between bg-[#14532d] text-white px-2 py-1 rounded font-bold">
+                      <span>TOTAL GENERAL (USD) LEY 57-07 :</span>
                       <span>${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
-                    <div className="flex justify-between text-slate-800 pt-1.5 border-t border-slate-300">
+                    <div className="flex justify-between text-slate-800 pt-1 border-t border-slate-300">
                       <span className="font-bold">PRECIO POR WATT (USD/W):</span>
-                      <span className="font-bold text-[#14532d]">${(project.specs.pricePerWattUSD || project.financials.pricePerWattUSD || 1.13).toFixed(2)}</span>
+                      <span className="font-bold text-emerald-800">${(project.specs.pricePerWattUSD || project.financials.pricePerWattUSD || 1.13).toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* INCENTIVOS DE LEY 57-07 */}
                 <div>
-                  <h3 className="bg-slate-100 px-3 py-1 text-xs font-bold text-[#14532d] uppercase border-l-4 border-[#14532d] mb-1">
+                  <h3 className="bg-slate-100 px-3 py-1 text-[11px] font-bold text-emerald-900 uppercase border-l-4 border-emerald-800 mb-1">
                     INCENTIVOS DE LEY 57-07
                   </h3>
-                  <p className="text-xs text-amber-800 font-bold bg-amber-50 border border-amber-200 px-3 py-1 rounded-md mb-2">
+                  <p className="text-[10px] font-bold bg-amber-50 border border-amber-200 text-amber-900 px-3 py-1 rounded mb-2">
                     (Descuento de 40% para equipos energía renovables: Paneles solares, inversores y baterías)
                   </p>
-                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="border border-slate-200 rounded-lg overflow-hidden">
                     <table className="w-full text-left border-collapse">
-                      <thead className="bg-[#14532d] text-white font-bold text-xs uppercase">
+                      <thead className="bg-[#14532d] text-white font-bold text-[10px] uppercase">
                         <tr>
-                          <th className="px-4 py-2.5">CONCEPTO</th>
-                          <th className="px-4 py-2.5 text-right">VALOR US $</th>
-                          <th className="px-4 py-2.5 text-right w-24">%</th>
+                          <th className="px-3 py-1.5">CONCEPTO</th>
+                          <th className="px-3 py-1.5 text-right">VALOR US $</th>
+                          <th className="px-3 py-1.5 text-right w-20">%</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-200 text-xs text-slate-800 font-semibold">
+                      <tbody className="divide-y divide-slate-200 text-[11px] text-slate-800 font-semibold">
                         <tr className="bg-white font-bold">
-                          <td className="px-4 py-2">TOTAL EQUIPOS ENERGIAS RENOVABLES (PANELES-INVERSORES-BATERIAS)</td>
-                          <td className="px-4 py-2 text-right">${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                          <td className="px-4 py-2 text-right">100%</td>
+                          <td className="px-3 py-1.5">TOTAL EQUIPOS ENERGIAS RENOVABLES (PANELES-INVERSORES-BATERIAS)</td>
+                          <td className="px-3 py-1.5 text-right">${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-1.5 text-right">100%</td>
                         </tr>
                         <tr className="bg-slate-50/60">
-                          <td className="px-4 py-2">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 1ER AÑO</td>
-                          <td className="px-4 py-2 text-right text-emerald-700">${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                          <td className="px-4 py-2 text-right text-emerald-700">13.33%</td>
+                          <td className="px-3 py-1.5">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 1ER AÑO</td>
+                          <td className="px-3 py-1.5 text-right text-emerald-700">${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-1.5 text-right text-emerald-700">13.33%</td>
                         </tr>
                         <tr className="bg-white">
-                          <td className="px-4 py-2">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 2DO AÑO</td>
-                          <td className="px-4 py-2 text-right text-emerald-700">${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                          <td className="px-4 py-2 text-right text-emerald-700">13.33%</td>
+                          <td className="px-3 py-1.5">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 2DO AÑO</td>
+                          <td className="px-3 py-1.5 text-right text-emerald-700">${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-1.5 text-right text-emerald-700">13.33%</td>
                         </tr>
                         <tr className="bg-slate-50/60">
-                          <td className="px-4 py-2">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 3ER AÑO</td>
-                          <td className="px-4 py-2 text-right text-emerald-700">${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                          <td className="px-4 py-2 text-right text-emerald-700">13.33%</td>
+                          <td className="px-3 py-1.5">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 3ER AÑO</td>
+                          <td className="px-3 py-1.5 text-right text-emerald-700">${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-1.5 text-right text-emerald-700">13.33%</td>
                         </tr>
-                        <tr className="bg-emerald-50 text-[#14532d] font-bold">
-                          <td className="px-4 py-2">TOTAL A DESCONTAR POR LA LEY 57-07 (40% DEL TOTAL)</td>
-                          <td className="px-4 py-2 text-right text-emerald-800">${summary.ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                          <td className="px-4 py-2 text-right text-emerald-800">40.00%</td>
+                        <tr className="bg-emerald-50 text-emerald-900 font-bold">
+                          <td className="px-3 py-1.5">TOTAL A DESCONTAR POR LA LEY 57-07 (40% DEL TOTAL)</td>
+                          <td className="px-3 py-1.5 text-right text-emerald-800">${summary.ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-1.5 text-right text-emerald-800">40.00%</td>
                         </tr>
                       </tbody>
                     </table>
                   </div>
                 </div>
 
-                {/* GARANTÍAS Y NOS ENCARGAMOS DE GESTIONAR */}
+                {/* GARANTÍAS Y NOS ENCARGAMOS DE GESTIONAR GRID */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-1.5 text-xs">
-                    <h4 className="font-bold text-[#14532d] border-b border-slate-200 pb-1.5 mb-1 uppercase tracking-wider flex items-center gap-1.5">
-                      <ShieldCheck className="w-4 h-4" /> GARANTÍAS
+                  <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1 text-[11px]">
+                    <h4 className="font-bold text-emerald-900 border-b border-slate-200 pb-1 mb-1 uppercase tracking-wider flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" /> GARANTÍAS
                     </h4>
                     <div>• <span className="font-bold">Paneles Solares:</span> 25 años (80.7% potencia mínima garantizada)</div>
                     <div>• <span className="font-bold">Inversor:</span> 5 años</div>
@@ -982,26 +982,26 @@ export const SimulatorView: React.FC = () => {
                     <div>• <span className="font-bold">Mano de obra:</span> 1 año</div>
                   </div>
 
-                  <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-4 space-y-1.5 text-xs text-emerald-950">
-                    <h4 className="font-bold text-[#14532d] border-b border-emerald-200 pb-1.5 mb-1 uppercase tracking-wider flex items-center gap-1.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-700" /> NOS ENCARGAMOS DE GESTIONAR
+                  <div className="bg-emerald-50/70 border border-emerald-200 rounded-lg p-3 space-y-1 text-[11px]">
+                    <h4 className="font-bold text-emerald-900 border-b border-emerald-200 pb-1 mb-1 uppercase tracking-wider flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" /> NOS ENCARGAMOS DE GESTIONAR
                     </h4>
-                    <div className="flex items-start gap-1.5"><Check className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" /> <span>Instalación del contador bidireccional en las EDES</span></div>
-                    <div className="flex items-start gap-1.5"><Check className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" /> <span>Aprobación de crédito fiscal (CNE) y el Ministerio de Hacienda</span></div>
-                    <div className="flex items-start gap-1.5"><Check className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" /> <span>Trámites completos ante organismos reguladores</span></div>
+                    <div className="flex items-start gap-1"><Check className="w-3.5 h-3.5 text-emerald-700 shrink-0 mt-0.5" /> <span>Instalación del contador bidireccional en las EDES</span></div>
+                    <div className="flex items-start gap-1"><Check className="w-3.5 h-3.5 text-emerald-700 shrink-0 mt-0.5" /> <span>Aprobación de crédito fiscal (CNE) y el Ministerio de Hacienda</span></div>
+                    <div className="flex items-start gap-1"><Check className="w-3.5 h-3.5 text-emerald-700 shrink-0 mt-0.5" /> <span>Trámites completos ante organismos reguladores</span></div>
                   </div>
                 </div>
 
-                {/* LEGAL SUBTEXT */}
-                <div className="text-center text-xs text-slate-500 font-semibold italic pt-1">
+                {/* LEGAL SUBTEXT BETWEEN ASTERISKS */}
+                <div className="text-center text-[10px] text-slate-500 font-semibold italic pt-1">
                   * Equipos según disponibilidad de inventario | * Propuesta válida por {project.client.quoteValidityDays || 7} días | * Precios en USD *
                 </div>
               </div>
 
               {/* Footer Electsun */}
-              <div className="px-8 py-4 bg-slate-100 border-t border-slate-200 flex justify-between items-center text-xs text-slate-600 font-semibold">
+              <div className="px-8 py-3 bg-slate-100 border-t border-slate-200 flex justify-between items-center text-[10px] text-slate-600 font-semibold">
                 <div>Calle Ercilia Pepín #1, Plaza Toledo | Local 307 | Arroyo Manzano | Santo Domingo, RD | electsun.com.do</div>
-                <div className="font-bold text-slate-800">ELECTSUN - EL SOL A TU FAVOR</div>
+                <div className="font-bold text-slate-800">Propuesta Cotización Electsun</div>
               </div>
             </div>
           </div>
@@ -1011,98 +1011,90 @@ export const SimulatorView: React.FC = () => {
         {/* VISTA 3: RETORNO DE INVERSIÓN */}
         {/* ---------------------------------------------------- */}
         {activeMainTab === 'retorno' && (
-          <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-              {/* Card 1: CAPACIDAD DC */}
-              <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
+          <div className="space-y-6 shrink-0">
+            {/* Indicadores Financieros Principales */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 shrink-0">
+              <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                  CAPACIDAD DC
+                  PERÍODO DE RETORNO (PAYBACK)
                 </span>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-xl font-bold text-emerald-800">{summary.systemCapacityKWp}</span>
-                  <span className="text-xs text-slate-500 font-semibold">kWp</span>
-                </div>
-                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
-                  {project.specs.panelCount} módulos × {project.specs.panelPowerW}W
-                </span>
-              </div>
-
-              {/* Card 2: GENERACIÓN ANUAL */}
-              <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                  GENERACIÓN ANUAL
-                </span>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-xl font-bold text-slate-900">{summary.annualProductionKWh.toLocaleString()}</span>
-                  <span className="text-xs text-slate-500 font-semibold">kWh</span>
-                </div>
-                <span className="text-[11px] font-semibold text-emerald-700 block mt-0.5">
-                  {summary.energyCoveragePct}% Cobertura Solar
-                </span>
-              </div>
-
-              {/* Card 3: INVERSIÓN NETA LEY 57-07 */}
-              <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                  INVERSIÓN NETA (LEY 57-07)
-                </span>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-xl font-bold text-emerald-700">${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                </div>
-                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
-                  Bruta: ${summary.grossInvestmentUSD.toLocaleString()}
-                </span>
-              </div>
-
-              {/* Card 4: PERÍODO DE PAYBACK */}
-              <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                  RETORNO DE INVERSIÓN (PAYBACK)
-                </span>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-xl font-bold text-emerald-800">{summary.paybackYears}</span>
-                  <span className="text-xs text-slate-500 font-semibold">Años</span>
-                </div>
-                <span className="text-[11px] text-emerald-700 font-medium block mt-0.5">
-                  TIR (IRR): {summary.irrPct}%
-                </span>
-              </div>
-
-              {/* Card 5: VALOR ACTUAL NETO (VAN) */}
-              <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm col-span-2 sm:col-span-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                  VALOR ACTUAL NETO (VAN @ 10%)
-                </span>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-xl font-bold text-slate-900">${summary.npvUSD.toLocaleString()}</span>
+                  <span className="text-2xl font-black text-emerald-800">{summary.paybackYears}</span>
+                  <span className="text-xs text-slate-600 font-bold">Años</span>
                 </div>
                 <span className="text-[11px] text-emerald-700 font-semibold block mt-0.5">
-                  ROI 25 Años: {summary.roi25YrPct}%
+                  Recuperación de inversión neta
+                </span>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                  TASA INTERNA DE RETORNO (TIR)
+                </span>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-black text-emerald-700">{summary.irrPct}%</span>
+                </div>
+                <span className="text-[11px] text-emerald-700 font-semibold block mt-0.5">
+                  Rentabilidad anualizada (IRR)
+                </span>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                  VALOR ACTUAL NETO (VAN)
+                </span>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-xl font-bold text-slate-900">${summary.npvUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
+                  Tasa de descuento: 10%
+                </span>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                  AHORRO ACUMULADO 25 AÑOS
+                </span>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-xl font-bold text-emerald-800">${summary.total25YearSavingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <span className="text-[11px] text-emerald-700 font-semibold block mt-0.5">
+                  Beneficio neto proyectado
+                </span>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm col-span-2 sm:col-span-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                  RETORNO DE INVERSIÓN (ROI)
+                </span>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-black text-emerald-800">{summary.roi25YrPct}%</span>
+                </div>
+                <span className="text-[11px] text-emerald-700 font-semibold block mt-0.5">
+                  ROI a 25 años
                 </span>
               </div>
             </div>
 
-            {/* TABLA 1: Parámetros del Sistema e Inversión Neta */}
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+            {/* TABLA 1: Inversión Inicial e Incentivos */}
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs shrink-0">
               <div className="bg-[#2d5f47] text-white px-4 py-3 font-bold text-xs uppercase tracking-wider">
                 Cálculo de Ahorro y Retorno de Inversión
               </div>
               <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-slate-100 font-bold text-slate-700 border-b border-slate-200">
+                  <tr>
+                    <th className="py-2.5 px-4 w-[60%]">CONCEPTO FINANCIERO</th>
+                    <th className="py-2.5 px-4 text-right w-[40%]">VALOR (USD)</th>
+                  </tr>
+                </thead>
                 <tbody className="divide-y divide-slate-200 text-slate-700 font-semibold">
-                  <tr className="hover:bg-slate-50">
-                    <td className="py-2.5 px-4 font-bold text-slate-800 w-[40%]">Cliente / Proyecto</td>
-                    <td className="py-2.5 px-4 font-bold text-slate-900">{project.client.name}</td>
-                  </tr>
-                  <tr className="hover:bg-slate-50">
-                    <td className="py-2.5 px-4 font-bold text-slate-800">Potencia Instalada (kWp)</td>
-                    <td className="py-2.5 px-4 font-bold text-emerald-800">{summary.systemCapacityKWp} kWp</td>
-                  </tr>
                   <tr className="hover:bg-slate-50">
                     <td className="py-2.5 px-4 font-bold text-slate-800">Inversión Inicial Sistema (USD)</td>
                     <td className="py-2.5 px-4 font-bold text-slate-900">${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</td>
                   </tr>
                   <tr className="hover:bg-slate-50">
-                    <td className="py-2.5 px-4 font-bold text-slate-800">Incentivo Fiscal Estimado (Ley 57-07) (USD)</td>
+                    <td className="py-2.5 px-4 font-bold text-slate-800">Incentivo Fiscal (Ley 57-07) (USD)</td>
                     <td className="py-2.5 px-4 font-bold text-emerald-700">-${summary.ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</td>
                   </tr>
                   <tr className="hover:bg-slate-50 bg-emerald-50/50 font-bold">
@@ -1113,8 +1105,8 @@ export const SimulatorView: React.FC = () => {
               </table>
             </div>
 
-            {/* TABLA 2: Resumen de Ahorro Anual y Retorno de Inversión (Años 1, Payback, 10, 25) */}
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+            {/* TABLA 2: Resumen de Ahorro Anual y Retorno de Inversión */}
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs shrink-0">
               <div className="bg-[#2d5f47] text-white px-4 py-3 font-bold text-xs uppercase tracking-wider">
                 Resumen de Ahorro Anual y Retorno de Inversión
               </div>
@@ -1165,7 +1157,7 @@ export const SimulatorView: React.FC = () => {
             </div>
 
             {/* GRÁFICA DE BENEFICIO ACUMULADO (25 AÑOS) */}
-            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-3">
+            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-3 shrink-0">
               <div className="flex justify-between items-center border-b border-slate-100 pb-2">
                 <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
                   Beneficio Acumulado (25 Años)
@@ -1182,7 +1174,7 @@ export const SimulatorView: React.FC = () => {
                 </div>
               </div>
 
-              <div className="h-[260px] w-full pt-2">
+              <div className="h-[320px] min-h-[320px] w-full pt-2">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={cumulativeChartData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
@@ -1205,8 +1197,8 @@ export const SimulatorView: React.FC = () => {
               </div>
             </div>
 
-            {/* TABLA 3: Flujo de Caja y Beneficios Acumulados (25 Años) */}
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+            {/* TABLA 3: Flujo de Caja y Beneficios Acumulados (25 AÑOS) */}
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs shrink-0">
               <div className="bg-[#2d5f47] text-white px-4 py-3 font-bold text-xs uppercase tracking-wider">
                 Flujo de Caja y Beneficios Acumulados (25 Años)
               </div>
@@ -1219,11 +1211,10 @@ export const SimulatorView: React.FC = () => {
                     <th className="py-2.5 px-4 text-right w-[15%]">Incentivo Fiscal (USD)</th>
                     <th className="py-2.5 px-4 text-right w-[15%]">Ahorro Anual Total (USD)</th>
                     <th className="py-2.5 px-4 text-right w-[15%]">Cash Flow (USD)</th>
-                    <th className="py-2.5 px-4 text-right w-[15%]">Beneficio Acumulado (USD)</th>
+                    <th className="py-2.5 px-4 text-right w-[15%]">CF Beneficio Acumulado (USD)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 text-slate-700 font-semibold">
-                  {/* Fila Año 0 */}
                   <tr className="hover:bg-slate-50 font-bold bg-slate-50/50">
                     <td className="py-2.5 px-4 text-center">0</td>
                     <td className="py-2.5 px-4 text-right text-slate-400">-</td>
@@ -1234,7 +1225,6 @@ export const SimulatorView: React.FC = () => {
                     <td className="py-2.5 px-4 text-right text-red-600">-${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                   </tr>
 
-                  {/* Filas Año 1 a 25 */}
                   {cf25.map((row) => {
                     const totalAnnualSavings = row.savingsUSD + row.taxCreditUSD;
                     const isCumulativeNegative = row.cumulativeCashFlowUSD < 0;
@@ -1263,7 +1253,7 @@ export const SimulatorView: React.FC = () => {
             </div>
 
             {/* TABLA 4: Indicadores Financieros del Proyecto */}
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs shrink-0">
               <div className="bg-[#2d5f47] text-white px-4 py-3 font-bold text-xs uppercase tracking-wider">
                 Indicadores Financieros del Proyecto
               </div>
@@ -1314,7 +1304,7 @@ export const SimulatorView: React.FC = () => {
                 </tbody>
               </table>
             </div>
-          </>
+          </div>
         )}
       </main>
     </div>
