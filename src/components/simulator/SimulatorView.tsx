@@ -26,9 +26,46 @@ export const SimulatorView: React.FC = () => {
     updateMonthlyConsumption,
     saveActiveProject,
     sidebarTheme,
+    sidebarWidth,
+    setSidebarWidth,
   } = useSimulationStore();
 
   const isDark = sidebarTheme === 'dark';
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+      const newWidth = Math.max(280, Math.min(650, e.clientX));
+      setSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    } else {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isDragging, setSidebarWidth]);
 
   const project = getActiveProject();
   const summary = getFinancialSummary();
@@ -123,24 +160,25 @@ export const SimulatorView: React.FC = () => {
 
   return (
     <div className="flex-1 flex overflow-hidden w-full h-full min-h-0 bg-slate-100 font-sans">
-      {/* Left Sidebar: Parameters (Modo Oscuro / Claro dinámico) */}
+      {/* Left Sidebar: Parameters (Modo Oscuro Neutral / Claro dinámico) */}
       <aside
-        className={`w-[340px] flex flex-col shrink-0 h-full overflow-y-auto z-10 transition-colors duration-200 ${
+        style={{ width: `${sidebarWidth || 350}px` }}
+        className={`flex flex-col shrink-0 h-full overflow-y-auto z-10 transition-[background-color,border-color,color] duration-200 ${
           isDark
-            ? 'bg-slate-900 border-r border-slate-800 text-slate-100 shadow-xl'
+            ? 'bg-[#18181b] border-r border-[#27272a] text-zinc-100 shadow-xl'
             : 'bg-white border-r border-slate-200 text-slate-800 shadow-sm'
         }`}
       >
         <div
           className={`p-4 border-b flex justify-between items-center transition-colors ${
-            isDark ? 'border-slate-800 bg-slate-950/80' : 'border-slate-200 bg-slate-50/80'
+            isDark ? 'border-[#27272a] bg-[#121214]' : 'border-slate-200 bg-slate-50/80'
           }`}
         >
           <div>
-            <h2 className={`font-bold text-sm uppercase tracking-wider ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+            <h2 className={`font-bold text-sm uppercase tracking-wider ${isDark ? 'text-zinc-100' : 'text-slate-900'}`}>
               Parámetros
             </h2>
-            <p className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            <p className={`text-[11px] mt-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
               Configurar restricciones del sistema
             </p>
           </div>
@@ -148,7 +186,7 @@ export const SimulatorView: React.FC = () => {
             onClick={saveActiveProject}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 ${
               isDark
-                ? 'border-emerald-700 bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300'
+                ? 'border-emerald-700/80 bg-emerald-950/70 hover:bg-emerald-900/90 text-emerald-300'
                 : 'border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900'
             }`}
             title="Guardar cambios de la simulación"
@@ -170,7 +208,7 @@ export const SimulatorView: React.FC = () => {
             </h3>
             <div className="space-y-3">
               <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                   Nombre del Cliente
                 </label>
                 <input
@@ -179,14 +217,14 @@ export const SimulatorView: React.FC = () => {
                   onChange={(e) => updateClient({ name: e.target.value })}
                   className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     isDark
-                      ? 'bg-slate-800 border-slate-700 text-slate-100 focus:bg-slate-750 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500'
+                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:bg-[#202024] focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500'
                       : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600'
                   }`}
                 />
               </div>
 
               <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                   Ubicación (Ciudad / Proyecto)
                 </label>
                 <input
@@ -195,14 +233,14 @@ export const SimulatorView: React.FC = () => {
                   onChange={(e) => updateClient({ location: e.target.value })}
                   className={`w-full border rounded-lg px-3 py-1.5 text-xs transition-all ${
                     isDark
-                      ? 'bg-slate-800 border-slate-700 text-slate-100 focus:ring-1 focus:ring-emerald-500'
+                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:ring-1 focus:ring-emerald-500'
                       : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600'
                   }`}
                 />
               </div>
 
               <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                   Dirección del Cliente
                 </label>
                 <input
@@ -211,7 +249,7 @@ export const SimulatorView: React.FC = () => {
                   onChange={(e) => updateClient({ address: e.target.value })}
                   className={`w-full border rounded-lg px-3 py-1.5 text-xs transition-all ${
                     isDark
-                      ? 'bg-slate-800 border-slate-700 text-slate-100 focus:ring-1 focus:ring-emerald-500'
+                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:ring-1 focus:ring-emerald-500'
                       : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600'
                   }`}
                 />
@@ -219,12 +257,12 @@ export const SimulatorView: React.FC = () => {
 
               {/* Selector de Fuente de Radiación Solar: Provincia vs GPS Satelital */}
               <div>
-                <label className={`block text-xs font-medium mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                <label className={`block text-xs font-medium mb-1.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                   Fuente de Radiación Solar
                 </label>
                 <div
                   className={`flex rounded-lg p-1 border ${
-                    isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-200/80 border-slate-300/60'
+                    isDark ? 'bg-[#121214] border-[#27272a]' : 'bg-slate-200/80 border-slate-300/60'
                   }`}
                 >
                   <button
@@ -233,10 +271,10 @@ export const SimulatorView: React.FC = () => {
                     className={`flex-1 rounded-md py-1 text-[11px] font-semibold transition-all flex items-center justify-center gap-1 ${
                       (project.client.solarSourceMode || 'province') === 'province'
                         ? isDark
-                          ? 'bg-slate-700 shadow-xs text-emerald-300 font-bold'
+                          ? 'bg-[#27272a] shadow-xs text-emerald-400 font-bold'
                           : 'bg-white shadow-xs text-emerald-800 font-bold'
                         : isDark
-                        ? 'text-slate-400 hover:text-slate-200'
+                        ? 'text-zinc-400 hover:text-zinc-200'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -248,10 +286,10 @@ export const SimulatorView: React.FC = () => {
                     className={`flex-1 rounded-md py-1 text-[11px] font-semibold transition-all flex items-center justify-center gap-1 ${
                       project.client.solarSourceMode === 'gps'
                         ? isDark
-                          ? 'bg-slate-700 shadow-xs text-emerald-300 font-bold'
+                          ? 'bg-[#27272a] shadow-xs text-emerald-400 font-bold'
                           : 'bg-white shadow-xs text-emerald-800 font-bold'
                         : isDark
-                        ? 'text-slate-400 hover:text-slate-200'
+                        ? 'text-zinc-400 hover:text-zinc-200'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -263,7 +301,7 @@ export const SimulatorView: React.FC = () => {
               {/* Opción 1: Selección por Provincia */}
               {(project.client.solarSourceMode || 'province') === 'province' && (
                 <div>
-                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                     Seleccionar Provincia
                   </label>
                   <select
@@ -276,7 +314,7 @@ export const SimulatorView: React.FC = () => {
                     }}
                     className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer transition-all ${
                       isDark
-                        ? 'bg-slate-800 border-slate-700 text-slate-100 focus:ring-1 focus:ring-emerald-500'
+                        ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:ring-1 focus:ring-emerald-500'
                         : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600'
                     }`}
                   >
@@ -293,10 +331,10 @@ export const SimulatorView: React.FC = () => {
               {project.client.solarSourceMode === 'gps' && (
                 <div
                   className={`space-y-2 p-3 rounded-lg border ${
-                    isDark ? 'bg-slate-800/80 border-emerald-900/60' : 'bg-emerald-50/50 border-emerald-200'
+                    isDark ? 'bg-[#202024] border-emerald-900/60' : 'bg-emerald-50/50 border-emerald-200'
                   }`}
                 >
-                  <label className={`block text-xs font-semibold ${isDark ? 'text-emerald-300' : 'text-emerald-900'}`}>
+                  <label className={`block text-xs font-semibold ${isDark ? 'text-emerald-400' : 'text-emerald-900'}`}>
                     Coordenadas GPS (Latitud, Longitud)
                   </label>
                   <input
@@ -306,7 +344,7 @@ export const SimulatorView: React.FC = () => {
                     placeholder="18.4861, -69.9312"
                     className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                       isDark
-                        ? 'bg-slate-900 border-slate-700 text-slate-100'
+                        ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100'
                         : 'bg-white border-slate-300 text-slate-800'
                     }`}
                   />
@@ -340,7 +378,7 @@ export const SimulatorView: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                     ID del Proyecto
                   </label>
                   <input
@@ -349,13 +387,13 @@ export const SimulatorView: React.FC = () => {
                     onChange={(e) => updateClient({ projectId: e.target.value })}
                     className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
                       isDark
-                        ? 'bg-slate-800 border-slate-700 text-slate-100'
+                        ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
                         : 'bg-slate-50 border-slate-300 text-slate-800'
                     }`}
                   />
                 </div>
                 <div>
-                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                     N° Cotización
                   </label>
                   <input
@@ -364,7 +402,7 @@ export const SimulatorView: React.FC = () => {
                     onChange={(e) => updateClient({ quoteNumber: e.target.value })}
                     className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
                       isDark
-                        ? 'bg-slate-800 border-slate-700 text-slate-100'
+                        ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
                         : 'bg-slate-50 border-slate-300 text-slate-800'
                     }`}
                   />
@@ -374,7 +412,7 @@ export const SimulatorView: React.FC = () => {
           </section>
 
           {/* SECCIÓN 2: Tarifas y Distribuidora */}
-          <section className={`space-y-3 pt-2 border-t ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+          <section className={`space-y-3 pt-2 border-t ${isDark ? 'border-[#27272a]' : 'border-slate-200'}`}>
             <h3
               className={`flex items-center gap-2 font-bold text-xs uppercase tracking-wider ${
                 isDark ? 'text-emerald-400' : 'text-emerald-700'
@@ -384,7 +422,7 @@ export const SimulatorView: React.FC = () => {
             </h3>
             <div className="space-y-3">
               <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                   Precio por kWh ($ USD)
                 </label>
                 <input
@@ -394,14 +432,14 @@ export const SimulatorView: React.FC = () => {
                   onChange={(e) => updateRates({ energyCostPerKWh: parseFloat(e.target.value) || 0 })}
                   className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     isDark
-                      ? 'bg-slate-800 border-slate-700 text-slate-100'
+                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
                       : 'bg-slate-50 border-slate-300 text-slate-800'
                   }`}
                 />
               </div>
 
               <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                   Empresa Distribuidora
                 </label>
                 <select
@@ -409,7 +447,7 @@ export const SimulatorView: React.FC = () => {
                   onChange={(e) => updateRates({ distributor: e.target.value as any })}
                   className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer transition-all ${
                     isDark
-                      ? 'bg-slate-800 border-slate-700 text-slate-100'
+                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
                       : 'bg-slate-50 border-slate-300 text-slate-800'
                   }`}
                 >
@@ -421,7 +459,7 @@ export const SimulatorView: React.FC = () => {
               </div>
 
               <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                   Cobertura Objetivo (%)
                 </label>
                 <input
@@ -431,14 +469,14 @@ export const SimulatorView: React.FC = () => {
                   onChange={(e) => updateRates({ targetCoveragePct: parseFloat(e.target.value) || 0 })}
                   className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     isDark
-                      ? 'bg-slate-800 border-slate-700 text-slate-100'
+                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
                       : 'bg-slate-50 border-slate-300 text-slate-800'
                   }`}
                 />
               </div>
 
               <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                   Tipo de Tarifa
                 </label>
                 <select
@@ -446,7 +484,7 @@ export const SimulatorView: React.FC = () => {
                   onChange={(e) => updateRates({ tariffCode: e.target.value as any })}
                   className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer transition-all ${
                     isDark
-                      ? 'bg-slate-800 border-slate-700 text-slate-100'
+                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
                       : 'bg-slate-50 border-slate-300 text-slate-800'
                   }`}
                 >
@@ -458,7 +496,7 @@ export const SimulatorView: React.FC = () => {
               </div>
 
               <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                   Cargo Exportación Red (%) (SIE-007-2026-REG)
                 </label>
                 <input
@@ -468,7 +506,7 @@ export const SimulatorView: React.FC = () => {
                   onChange={(e) => updateRates({ gridExportFeePct: parseFloat(e.target.value) || 0 })}
                   className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     isDark
-                      ? 'bg-slate-800 border-slate-700 text-slate-100'
+                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
                       : 'bg-slate-50 border-slate-300 text-slate-800'
                   }`}
                 />
@@ -477,7 +515,7 @@ export const SimulatorView: React.FC = () => {
           </section>
 
           {/* SECCIÓN 3: Equipamiento */}
-          <section className={`space-y-3 pt-2 border-t ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+          <section className={`space-y-3 pt-2 border-t ${isDark ? 'border-[#27272a]' : 'border-slate-200'}`}>
             <h3
               className={`flex items-center gap-2 font-bold text-xs uppercase tracking-wider ${
                 isDark ? 'text-emerald-400' : 'text-emerald-700'
@@ -489,7 +527,7 @@ export const SimulatorView: React.FC = () => {
             {/* Selector de modo Simple / Detallado */}
             <div
               className={`flex rounded-lg p-1 mb-4 border ${
-                isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-200/80 border-slate-300/60'
+                isDark ? 'bg-[#121214] border-[#27272a]' : 'bg-slate-200/80 border-slate-300/60'
               }`}
             >
               <button
@@ -498,10 +536,10 @@ export const SimulatorView: React.FC = () => {
                 className={`flex-1 rounded-md py-1.5 text-[12px] transition-all text-center ${
                   !project.specs.isDetailed
                     ? isDark
-                      ? 'bg-slate-700 shadow-xs text-white font-bold'
+                      ? 'bg-[#27272a] shadow-xs text-white font-bold'
                       : 'bg-white shadow-xs text-slate-900 font-bold'
                     : isDark
-                    ? 'text-slate-400 hover:text-slate-200 font-semibold'
+                    ? 'text-zinc-400 hover:text-zinc-200 font-semibold'
                     : 'text-slate-600 hover:text-slate-900 font-semibold'
                 }`}
               >
@@ -513,10 +551,10 @@ export const SimulatorView: React.FC = () => {
                 className={`flex-1 rounded-md py-1.5 text-[12px] transition-all text-center ${
                   project.specs.isDetailed
                     ? isDark
-                      ? 'bg-slate-700 shadow-xs text-white font-bold'
+                      ? 'bg-[#27272a] shadow-xs text-white font-bold'
                       : 'bg-white shadow-xs text-slate-900 font-bold'
                     : isDark
-                    ? 'text-slate-400 hover:text-slate-200 font-semibold'
+                    ? 'text-zinc-400 hover:text-zinc-200 font-semibold'
                     : 'text-slate-600 hover:text-slate-900 font-semibold'
                 }`}
               >
@@ -526,7 +564,7 @@ export const SimulatorView: React.FC = () => {
 
             <div className="space-y-3">
               <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                   Modelo / Marca Módulos
                 </label>
                 <input
@@ -535,14 +573,14 @@ export const SimulatorView: React.FC = () => {
                   onChange={(e) => updateSpecs({ panelBrandModel: e.target.value })}
                   className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     isDark
-                      ? 'bg-slate-800 border-slate-700 text-slate-100'
+                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
                       : 'bg-slate-50 border-slate-300 text-slate-800'
                   }`}
                 />
               </div>
 
               <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                   Potencia del Panel (W)
                 </label>
                 <input
@@ -552,7 +590,7 @@ export const SimulatorView: React.FC = () => {
                   onChange={(e) => updateSpecs({ panelPowerW: parseFloat(e.target.value) || 0 })}
                   className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
                     isDark
-                      ? 'bg-slate-800 border-slate-700 text-slate-100'
+                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
                       : 'bg-slate-50 border-slate-300 text-slate-800'
                   }`}
                 />
@@ -576,7 +614,7 @@ export const SimulatorView: React.FC = () => {
               </div>
 
               <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                   Cantidad de Paneles
                 </label>
                 <input
@@ -587,14 +625,14 @@ export const SimulatorView: React.FC = () => {
                   onChange={(e) => updateSpecs({ panelCount: parseInt(e.target.value) || 0 })}
                   className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all disabled:opacity-50 ${
                     isDark
-                      ? 'bg-slate-800 border-slate-700 text-slate-100'
+                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
                       : 'bg-slate-50 border-slate-300 text-slate-800'
                   }`}
                 />
               </div>
 
               <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                   Modelo / Marca Inversor
                 </label>
                 <input
@@ -603,14 +641,14 @@ export const SimulatorView: React.FC = () => {
                   onChange={(e) => updateSpecs({ inverterBrandModel: e.target.value })}
                   className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     isDark
-                      ? 'bg-slate-800 border-slate-700 text-slate-100'
+                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
                       : 'bg-slate-50 border-slate-300 text-slate-800'
                   }`}
                 />
               </div>
 
               <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                   Precio Sistema por Vatio ($ USD/Wp)
                 </label>
                 <input
@@ -620,7 +658,7 @@ export const SimulatorView: React.FC = () => {
                   onChange={(e) => updateSpecs({ pricePerWattUSD: parseFloat(e.target.value) || 0 })}
                   className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
                     isDark
-                      ? 'bg-slate-800 border-slate-700 text-slate-100'
+                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
                       : 'bg-slate-50 border-slate-300 text-slate-800'
                   }`}
                 />
@@ -630,12 +668,12 @@ export const SimulatorView: React.FC = () => {
               {project.specs.isDetailed && (
                 <div
                   className={`space-y-3 p-3 rounded-lg border mt-3 ${
-                    isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-emerald-50/50 border-emerald-200'
+                    isDark ? 'bg-[#202024] border-[#2e2e34]' : 'bg-emerald-50/50 border-emerald-200'
                   }`}
                 >
                   <h4
                     className={`text-[11px] font-bold uppercase tracking-wider border-b pb-1 flex items-center gap-1.5 ${
-                      isDark ? 'text-emerald-400 border-slate-700' : 'text-emerald-900 border-emerald-200'
+                      isDark ? 'text-emerald-400 border-[#2e2e34]' : 'text-emerald-900 border-emerald-200'
                     }`}
                   >
                     <span className="material-symbols-outlined text-[14px]">tune</span> Parámetros Técnicos Avanzados
@@ -643,7 +681,7 @@ export const SimulatorView: React.FC = () => {
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
                         Potencia Inversor (kW)
                       </label>
                       <input
@@ -652,13 +690,13 @@ export const SimulatorView: React.FC = () => {
                         value={project.specs.inverterPowerKW}
                         onChange={(e) => updateSpecs({ inverterPowerKW: parseFloat(e.target.value) || 0 })}
                         className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold ${
-                          isDark ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-slate-300 text-slate-800'
+                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
                         }`}
                       />
                     </div>
 
                     <div>
-                      <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
                         Cantidad Inversores
                       </label>
                       <input
@@ -667,7 +705,7 @@ export const SimulatorView: React.FC = () => {
                         value={project.specs.inverterCount || 1}
                         onChange={(e) => updateSpecs({ inverterCount: parseInt(e.target.value) || 1 })}
                         className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold ${
-                          isDark ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-slate-300 text-slate-800'
+                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
                         }`}
                       />
                     </div>
@@ -675,7 +713,7 @@ export const SimulatorView: React.FC = () => {
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
                         Eficiencia Panel (%)
                       </label>
                       <input
@@ -684,13 +722,13 @@ export const SimulatorView: React.FC = () => {
                         value={project.specs.panelEfficiency}
                         onChange={(e) => updateSpecs({ panelEfficiency: parseFloat(e.target.value) || 0 })}
                         className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                          isDark ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-slate-300 text-slate-800'
+                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
                         }`}
                       />
                     </div>
 
                     <div>
-                      <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
                         Coef. Temp (%/°C)
                       </label>
                       <input
@@ -699,7 +737,7 @@ export const SimulatorView: React.FC = () => {
                         value={project.specs.tempCoeff}
                         onChange={(e) => updateSpecs({ tempCoeff: parseFloat(e.target.value) || 0 })}
                         className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                          isDark ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-slate-300 text-slate-800'
+                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
                         }`}
                       />
                     </div>
@@ -707,7 +745,7 @@ export const SimulatorView: React.FC = () => {
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
                         Pérdidas Sistema (%)
                       </label>
                       <input
@@ -716,13 +754,13 @@ export const SimulatorView: React.FC = () => {
                         value={project.specs.systemLosses}
                         onChange={(e) => updateSpecs({ systemLosses: parseFloat(e.target.value) || 0 })}
                         className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                          isDark ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-slate-300 text-slate-800'
+                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
                         }`}
                       />
                     </div>
 
                     <div>
-                      <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
                         Degradación Anual (%)
                       </label>
                       <input
@@ -731,7 +769,7 @@ export const SimulatorView: React.FC = () => {
                         value={project.specs.annualDegradation}
                         onChange={(e) => updateSpecs({ annualDegradation: parseFloat(e.target.value) || 0 })}
                         className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                          isDark ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-slate-300 text-slate-800'
+                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
                         }`}
                       />
                     </div>
@@ -740,9 +778,9 @@ export const SimulatorView: React.FC = () => {
               )}
 
               {/* Almacenamiento (Batería) Toggle & Campos */}
-              <div className={`pt-2 border-t space-y-3 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+              <div className={`pt-2 border-t space-y-3 ${isDark ? 'border-[#27272a]' : 'border-slate-200'}`}>
                 <div className="flex items-center justify-between">
-                  <label className={`text-xs font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                  <label className={`text-xs font-semibold ${isDark ? 'text-zinc-200' : 'text-slate-700'}`}>
                     Almacenamiento (Batería)
                   </label>
                   <input
@@ -756,11 +794,11 @@ export const SimulatorView: React.FC = () => {
                 {project.specs.hasBattery && (
                   <div
                     className={`space-y-3 p-3 rounded-lg border ${
-                      isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-slate-50 border-slate-200'
+                      isDark ? 'bg-[#202024] border-[#2e2e34]' : 'bg-slate-50 border-slate-200'
                     }`}
                   >
                     <div>
-                      <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                      <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                         Modelo / Marca Batería
                       </label>
                       <input
@@ -768,13 +806,13 @@ export const SimulatorView: React.FC = () => {
                         value={project.specs.batteryBrandModel || 'Batería Hinaess 16 KwH-48 vdc.'}
                         onChange={(e) => updateSpecs({ batteryBrandModel: e.target.value })}
                         className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                          isDark ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-slate-300 text-slate-800'
+                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
                         }`}
                       />
                     </div>
 
                     <div>
-                      <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                      <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                         Cantidad de Baterías
                       </label>
                       <input
@@ -783,13 +821,13 @@ export const SimulatorView: React.FC = () => {
                         value={project.specs.batteryCount || 3}
                         onChange={(e) => updateSpecs({ batteryCount: parseInt(e.target.value) || 1 })}
                         className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                          isDark ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-slate-300 text-slate-800'
+                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
                         }`}
                       />
                     </div>
 
                     <div>
-                      <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                      <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                         Capacidad Total Batería (kWh)
                       </label>
                       <input
@@ -798,16 +836,16 @@ export const SimulatorView: React.FC = () => {
                         value={project.specs.batteryCapacityKWh}
                         onChange={(e) => updateSpecs({ batteryCapacityKWh: parseFloat(e.target.value) || 0 })}
                         className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                          isDark ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-slate-300 text-slate-800'
+                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
                         }`}
                       />
                     </div>
 
-                    {/* Parámetros Detallados de Batería (Punto 1 y 2) */}
-                    <div className={`pt-2 border-t space-y-2 ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
+                    {/* Parámetros Detallados de Batería */}
+                    <div className={`pt-2 border-t space-y-2 ${isDark ? 'border-[#2e2e34]' : 'border-slate-200'}`}>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                          <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                             DoD Descarga (%)
                           </label>
                           <input
@@ -816,12 +854,12 @@ export const SimulatorView: React.FC = () => {
                             value={project.specs.batteryDOD || 80}
                             onChange={(e) => updateSpecs({ batteryDOD: parseFloat(e.target.value) || 80 })}
                             className={`w-full border rounded-lg px-2 py-1 text-xs font-semibold ${
-                              isDark ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-slate-300 text-slate-800'
+                              isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
                             }`}
                           />
                         </div>
                         <div>
-                          <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                          <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                             Eficiencia Carga (%)
                           </label>
                           <input
@@ -830,14 +868,14 @@ export const SimulatorView: React.FC = () => {
                             value={project.specs.batteryEfficiencyPct || 92}
                             onChange={(e) => updateSpecs({ batteryEfficiencyPct: parseFloat(e.target.value) || 92 })}
                             className={`w-full border rounded-lg px-2 py-1 text-xs font-semibold ${
-                              isDark ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-slate-300 text-slate-800'
+                              isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
                             }`}
                           />
                         </div>
                       </div>
 
                       <div>
-                        <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                        <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                           Costo Reemplazo Año 10 (USD)
                         </label>
                         <input
@@ -847,7 +885,7 @@ export const SimulatorView: React.FC = () => {
                           onChange={(e) => updateSpecs({ batteryReplacementCostUSD: parseFloat(e.target.value) || 0 })}
                           placeholder="Ej. $3,500 USD"
                           className={`w-full border rounded-lg px-2 py-1 text-xs font-semibold ${
-                            isDark ? 'bg-slate-900 border-slate-700 text-slate-100' : 'bg-white border-slate-300 text-slate-800'
+                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
                           }`}
                         />
                       </div>
@@ -855,7 +893,7 @@ export const SimulatorView: React.FC = () => {
                       <div
                         className={`rounded-lg p-2 text-[10px] font-bold space-y-0.5 mt-1 border ${
                           isDark
-                            ? 'bg-emerald-950/80 border-emerald-800 text-emerald-300'
+                            ? 'bg-emerald-950/80 border-emerald-800/80 text-emerald-300'
                             : 'bg-emerald-100/80 border-emerald-300 text-emerald-950'
                         }`}
                       >
@@ -880,7 +918,7 @@ export const SimulatorView: React.FC = () => {
           </section>
 
           {/* SECCIÓN 4: Costos, Tasa de Cambio y Margen (Excel Cost Matrix) */}
-          <section className={`space-y-3 pt-2 border-t ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+          <section className={`space-y-3 pt-2 border-t ${isDark ? 'border-[#27272a]' : 'border-slate-200'}`}>
             <h3
               className={`flex items-center gap-2 font-bold text-xs uppercase tracking-wider ${
                 isDark ? 'text-amber-400' : 'text-amber-700'
@@ -890,7 +928,7 @@ export const SimulatorView: React.FC = () => {
             </h3>
             <div
               className={`space-y-3 p-3 rounded-lg border ${
-                isDark ? 'bg-amber-950/20 border-amber-900/50' : 'bg-amber-50/50 border-amber-200'
+                isDark ? 'bg-[#27201c] border-amber-900/40' : 'bg-amber-50/50 border-amber-200'
               }`}
             >
               <div className="grid grid-cols-2 gap-2">
@@ -905,7 +943,7 @@ export const SimulatorView: React.FC = () => {
                     onChange={(e) => updateSpecs({ dopExchangeRate: parseFloat(e.target.value) || 0 })}
                     className={`w-full border rounded-lg px-2.5 py-1 text-xs font-extrabold transition-all ${
                       isDark
-                        ? 'bg-slate-900 border-red-900/60 text-amber-300 focus:ring-1 focus:ring-amber-500'
+                        ? 'bg-[#18181b] border-amber-800/60 text-amber-300 focus:ring-1 focus:ring-amber-500'
                         : 'bg-white border-red-300 text-red-700 focus:ring-1 focus:ring-red-600'
                     }`}
                   />
@@ -922,7 +960,7 @@ export const SimulatorView: React.FC = () => {
                     onChange={(e) => updateSpecs({ saleMarginMultiplier: parseFloat(e.target.value) || 0 })}
                     className={`w-full border rounded-lg px-2.5 py-1 text-xs font-extrabold transition-all ${
                       isDark
-                        ? 'bg-slate-900 border-red-900/60 text-amber-300 focus:ring-1 focus:ring-amber-500'
+                        ? 'bg-[#18181b] border-amber-800/60 text-amber-300 focus:ring-1 focus:ring-amber-500'
                         : 'bg-white border-red-300 text-red-700 focus:ring-1 focus:ring-red-600'
                     }`}
                   />
@@ -930,7 +968,7 @@ export const SimulatorView: React.FC = () => {
               </div>
 
               <div>
-                <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
                   Precio Unit. Panel (USD)
                 </label>
                 <input
@@ -940,14 +978,14 @@ export const SimulatorView: React.FC = () => {
                   onChange={(e) => updateSpecs({ panelUnitPriceUSD: parseFloat(e.target.value) || 0 })}
                   className={`w-full border rounded-lg px-3 py-1 text-xs font-bold transition-all ${
                     isDark
-                      ? 'bg-slate-900 border-slate-700 text-amber-300'
+                      ? 'bg-[#18181b] border-[#3f3f46] text-amber-300'
                       : 'bg-white border-slate-300 text-red-600'
                   }`}
                 />
               </div>
 
               <div>
-                <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
                   Precio Unit. Inversor (USD)
                 </label>
                 <input
@@ -957,7 +995,7 @@ export const SimulatorView: React.FC = () => {
                   onChange={(e) => updateSpecs({ inverterUnitPriceUSD: parseFloat(e.target.value) || 0 })}
                   className={`w-full border rounded-lg px-3 py-1 text-xs font-bold transition-all ${
                     isDark
-                      ? 'bg-slate-900 border-slate-700 text-amber-300'
+                      ? 'bg-[#18181b] border-[#3f3f46] text-amber-300'
                       : 'bg-white border-slate-300 text-red-600'
                   }`}
                 />
@@ -965,7 +1003,7 @@ export const SimulatorView: React.FC = () => {
 
               {project.specs.hasBattery && (
                 <div>
-                  <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
                     Precio Unit. Batería (USD)
                   </label>
                   <input
@@ -975,7 +1013,7 @@ export const SimulatorView: React.FC = () => {
                     onChange={(e) => updateSpecs({ batteryUnitPriceUSD: parseFloat(e.target.value) || 0 })}
                     className={`w-full border rounded-lg px-3 py-1 text-xs font-bold transition-all ${
                       isDark
-                        ? 'bg-slate-900 border-slate-700 text-amber-300'
+                        ? 'bg-[#18181b] border-[#3f3f46] text-amber-300'
                         : 'bg-white border-slate-300 text-red-600'
                     }`}
                   />
@@ -983,7 +1021,7 @@ export const SimulatorView: React.FC = () => {
               )}
 
               <div>
-                <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
                   Mano de Obra / kWp (USD)
                 </label>
                 <input
@@ -993,7 +1031,7 @@ export const SimulatorView: React.FC = () => {
                   onChange={(e) => updateSpecs({ installationUnitPriceUSD: parseFloat(e.target.value) || 0 })}
                   className={`w-full border rounded-lg px-3 py-1 text-xs font-bold transition-all ${
                     isDark
-                      ? 'bg-slate-900 border-slate-700 text-amber-300'
+                      ? 'bg-[#18181b] border-[#3f3f46] text-amber-300'
                       : 'bg-white border-slate-300 text-red-600'
                   }`}
                 />
@@ -1002,7 +1040,7 @@ export const SimulatorView: React.FC = () => {
           </section>
 
           {/* SECCIÓN 5: Finanzas e Incentivos */}
-          <section className={`space-y-3 pt-2 border-t ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+          <section className={`space-y-3 pt-2 border-t ${isDark ? 'border-[#27272a]' : 'border-slate-200'}`}>
             <h3
               className={`flex items-center gap-2 font-bold text-xs uppercase tracking-wider ${
                 isDark ? 'text-emerald-400' : 'text-emerald-700'
@@ -1014,7 +1052,7 @@ export const SimulatorView: React.FC = () => {
               <label className="flex items-center justify-between cursor-pointer group">
                 <span
                   className={`text-xs font-medium transition-colors ${
-                    isDark ? 'text-slate-300 group-hover:text-white' : 'text-slate-600 group-hover:text-slate-900'
+                    isDark ? 'text-zinc-300 group-hover:text-white' : 'text-slate-600 group-hover:text-slate-900'
                   }`}
                 >
                   Aplicar Ley 57-07 (Crédito ISR 40%)
@@ -1030,7 +1068,7 @@ export const SimulatorView: React.FC = () => {
               <label className="flex items-center justify-between cursor-pointer group">
                 <span
                   className={`text-xs font-medium transition-colors ${
-                    isDark ? 'text-slate-300 group-hover:text-white' : 'text-slate-600 group-hover:text-slate-900'
+                    isDark ? 'text-zinc-300 group-hover:text-white' : 'text-slate-600 group-hover:text-slate-900'
                   }`}
                 >
                   Exoneración ITBIS 100% (18%)
@@ -1044,7 +1082,7 @@ export const SimulatorView: React.FC = () => {
               </label>
 
               <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                   Tasa de Descuento (%)
                 </label>
                 <input
@@ -1054,7 +1092,7 @@ export const SimulatorView: React.FC = () => {
                   onChange={(e) => updateFinancials({ discountRatePct: parseFloat(e.target.value) || 0 })}
                   className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     isDark
-                      ? 'bg-slate-800 border-slate-700 text-slate-100'
+                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
                       : 'bg-slate-50 border-slate-300 text-slate-800'
                   }`}
                 />
@@ -1065,7 +1103,7 @@ export const SimulatorView: React.FC = () => {
 
         <div
           className={`mt-auto p-4 border-t transition-colors ${
-            isDark ? 'border-slate-800 bg-slate-950/90' : 'border-slate-200 bg-slate-50'
+            isDark ? 'border-[#27272a] bg-[#121214]' : 'border-slate-200 bg-slate-50'
           }`}
         >
           <button
@@ -1074,7 +1112,7 @@ export const SimulatorView: React.FC = () => {
             }}
             className={`w-full border transition-colors py-2 rounded-lg text-xs flex items-center justify-center gap-2 font-semibold shadow-xs cursor-pointer ${
               isDark
-                ? 'bg-slate-900 border-slate-700 text-emerald-400 hover:bg-slate-800'
+                ? 'bg-[#18181b] border-[#27272a] text-emerald-400 hover:bg-[#27272a]'
                 : 'bg-white border-emerald-600 text-emerald-700 hover:bg-emerald-50'
             }`}
           >
@@ -1084,10 +1122,21 @@ export const SimulatorView: React.FC = () => {
         </div>
       </aside>
 
+      {/* Vertical Drag Handle for Sidebar Resizing */}
+      <div
+        onMouseDown={handleMouseDown}
+        className={`w-1.5 hover:w-2 hover:bg-emerald-500 cursor-col-resize shrink-0 transition-all z-20 relative group select-none ${
+          isDragging ? 'bg-emerald-500 w-2' : isDark ? 'bg-[#27272a]' : 'bg-slate-200'
+        }`}
+        title="Arrastra para cambiar el ancho de la barra de parámetros"
+      >
+        <div className="absolute inset-y-0 -left-1 -right-1 cursor-col-resize" />
+      </div>
+
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto p-6 gap-6">
-        {/* Top View Selector Tabs (3 VISTAS: Análisis de Energía | Cotización y Equipos | Retorno de Inversión) */}
-        <div className="bg-white border-b border-slate-200 -mx-6 -mt-6 px-6 pt-3 pb-0 sticky top-0 z-20 shadow-xs flex justify-between items-center">
+      <main className="flex-1 flex flex-col h-full min-h-0 overflow-hidden bg-slate-100">
+        {/* Top Fixed View Selector Tabs (SIN problemas de superposición ni salto al scrolear) */}
+        <div className="bg-white border-b border-slate-200 px-6 pt-3 pb-0 shrink-0 z-20 shadow-xs flex justify-between items-center">
           <div className="flex gap-8">
             <button
               onClick={() => setActiveMainTab('energia')}
@@ -1129,17 +1178,19 @@ export const SimulatorView: React.FC = () => {
           </div>
         </div>
 
-        {/* ---------------------------------------------------- */}
-        {/* VISTA 1: ANÁLISIS DE ENERGÍA */}
-        {/* ---------------------------------------------------- */}
-        {activeMainTab === 'energia' && (
-          <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 shrink-0">
-              {/* Card 1: CAPACIDAD INSTALADA */}
-              <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                  CAPACIDAD INSTALADA
-                </span>
+        {/* Scrollable Container for Tab Contents */}
+        <div className="flex-1 overflow-y-auto p-6 gap-6 flex flex-col min-h-0">
+          {/* ---------------------------------------------------- */}
+          {/* VISTA 1: ANÁLISIS DE ENERGÍA */}
+          {/* ---------------------------------------------------- */}
+          {activeMainTab === 'energia' && (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 shrink-0">
+                {/* Card 1: CAPACIDAD INSTALADA */}
+                <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
+                    CAPACIDAD INSTALADA
+                  </span>
                 <div className="flex items-baseline gap-1">
                   <span className="text-xl font-bold text-emerald-800">{summary.systemCapacityKWp}</span>
                   <span className="text-xs text-slate-500 font-semibold">kWp</span>
@@ -1924,6 +1975,7 @@ export const SimulatorView: React.FC = () => {
             </div>
           </div>
         )}
+        </div>
       </main>
     </div>
   );

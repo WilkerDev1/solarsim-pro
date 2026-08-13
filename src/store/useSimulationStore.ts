@@ -54,6 +54,8 @@ interface SimulationState {
   sidebarTheme: 'dark' | 'light';
   toggleSidebarTheme: () => void;
   setSidebarTheme: (theme: 'dark' | 'light') => void;
+  sidebarWidth: number;
+  setSidebarWidth: (width: number) => void;
 
   // Computed helper
   getActiveProject: () => ProjectSimulation;
@@ -390,6 +392,8 @@ export const useSimulationStore = create<SimulationState>()(
       sidebarTheme: 'dark',
       toggleSidebarTheme: () => set((state) => ({ sidebarTheme: state.sidebarTheme === 'dark' ? 'light' : 'dark' })),
       setSidebarTheme: (theme) => set({ sidebarTheme: theme }),
+      sidebarWidth: 350,
+      setSidebarWidth: (width) => set({ sidebarWidth: Math.max(280, Math.min(650, width)) }),
 
       saveActiveProject: () => {
         const now = new Date();
@@ -433,6 +437,7 @@ export const useSimulationStore = create<SimulationState>()(
         activeView: state.activeView,
         searchQuery: state.searchQuery,
         sidebarTheme: state.sidebarTheme,
+        sidebarWidth: state.sidebarWidth,
       }),
     }
   )

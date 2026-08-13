@@ -19,7 +19,8 @@ import jsPDF from 'jspdf';
 import { PDFColorTheme, PDF_COLOR_THEMES } from '../../constants/pdfThemes';
 
 export const PDFProposalView: React.FC = () => {
-  const { getActiveProject, getFinancialSummary, setActiveView, updateClient, updateSpecs } = useSimulationStore();
+  const { getActiveProject, getFinancialSummary, setActiveView, updateClient, updateSpecs, sidebarTheme } = useSimulationStore();
+  const isDark = sidebarTheme === 'dark';
   const project = getActiveProject();
   const summary = getFinancialSummary();
   const pdfRef = useRef<HTMLDivElement>(null);
@@ -178,20 +179,26 @@ export const PDFProposalView: React.FC = () => {
   );
 
   return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-64px)] overflow-hidden bg-slate-200">
+    <div className={`flex-1 flex flex-col h-[calc(100vh-64px)] overflow-hidden transition-colors duration-200 ${
+      isDark ? 'bg-[#121214]' : 'bg-slate-200'
+    }`}>
       {/* Top Bar Navigation */}
-      <header className="bg-white border-b border-slate-300 px-6 h-16 w-full flex justify-between items-center shrink-0 z-50 shadow-xs">
+      <header className={`px-6 h-16 w-full flex justify-between items-center shrink-0 z-50 transition-colors ${
+        isDark ? 'bg-[#18181b] border-b border-[#27272a] text-zinc-100 shadow-md' : 'bg-white border-b border-slate-300 shadow-xs'
+      }`}>
         <div className="flex items-center gap-4">
           <button
             onClick={() => setActiveView('simulator')}
-            className="p-2 hover:bg-slate-100 rounded-full transition-colors cursor-pointer text-slate-600"
+            className={`p-2 rounded-full transition-colors cursor-pointer ${
+              isDark ? 'hover:bg-[#27272a] text-zinc-300' : 'hover:bg-slate-100 text-slate-600'
+            }`}
             title="Volver al Simulador"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <div className="font-bold text-xl text-[#2D5A27] tracking-tight">SolarSim Pro</div>
-          <div className="h-6 w-px bg-slate-300 mx-1"></div>
-          <h1 className="text-xs font-semibold text-slate-600">
+          <div className="font-bold text-xl text-emerald-500 tracking-tight">SolarSim Pro</div>
+          <div className={`h-6 w-px mx-1 ${isDark ? 'bg-[#27272a]' : 'bg-slate-300'}`}></div>
+          <h1 className={`text-xs font-semibold ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
             {project.client.name} — Vista Previa de Propuesta PDF
           </h1>
         </div>
@@ -199,9 +206,13 @@ export const PDFProposalView: React.FC = () => {
         <div className="flex items-center gap-3">
           <button
             onClick={handlePrint}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg transition-colors shadow-xs cursor-pointer"
+            className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg transition-colors shadow-xs cursor-pointer ${
+              isDark
+                ? 'bg-[#27272a] border border-[#3f3f46] text-zinc-200 hover:bg-[#323238]'
+                : 'text-slate-700 bg-white border border-slate-300 hover:bg-slate-50'
+            }`}
           >
-            <Printer className="w-4 h-4 text-slate-600" />
+            <Printer className="w-4 h-4 text-emerald-500" />
             Imprimir
           </button>
           <button
@@ -218,14 +229,20 @@ export const PDFProposalView: React.FC = () => {
 
       <div className="flex flex-1 overflow-hidden">
         {/* Side Controls Toolbar */}
-        <aside className="w-[300px] bg-white border-r border-slate-300 flex flex-col h-full shrink-0 shadow-xs">
+        <aside className={`w-[300px] flex flex-col h-full shrink-0 transition-colors ${
+          isDark ? 'bg-[#18181b] border-r border-[#27272a] text-zinc-100 shadow-md' : 'bg-white border-r border-slate-300 shadow-xs'
+        }`}>
           {/* Tab Switcher */}
-          <div className="flex border-b border-slate-200 bg-slate-50">
+          <div className={`flex border-b transition-colors ${isDark ? 'border-[#27272a] bg-[#121214]' : 'border-slate-200 bg-slate-50'}`}>
             <button
               onClick={() => setSidebarTab('sections')}
               className={`flex-1 py-3 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
                 sidebarTab === 'sections'
-                  ? 'border-slate-900 text-slate-900 bg-white'
+                  ? isDark
+                    ? 'border-emerald-500 text-white bg-[#18181b]'
+                    : 'border-slate-900 text-slate-900 bg-white'
+                  : isDark
+                  ? 'border-transparent text-zinc-400 hover:text-zinc-200'
                   : 'border-transparent text-slate-500 hover:text-slate-700'
               }`}
             >
@@ -235,7 +252,11 @@ export const PDFProposalView: React.FC = () => {
               onClick={() => setSidebarTab('edit')}
               className={`flex-1 py-3 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
                 sidebarTab === 'edit'
-                  ? 'border-slate-900 text-slate-900 bg-white'
+                  ? isDark
+                    ? 'border-emerald-500 text-white bg-[#18181b]'
+                    : 'border-slate-900 text-slate-900 bg-white'
+                  : isDark
+                  ? 'border-transparent text-zinc-400 hover:text-zinc-200'
                   : 'border-transparent text-slate-500 hover:text-slate-700'
               }`}
             >

@@ -17,11 +17,18 @@ export const Header: React.FC = () => {
     toggleSidebarTheme,
   } = useSimulationStore();
 
+  const isDark = sidebarTheme === 'dark';
   const activeProject = getActiveProject();
 
   return (
     <>
-      <header className="bg-white border-b border-slate-200 flex justify-between items-center px-6 h-16 w-full shrink-0 z-30 relative shadow-xs">
+      <header
+        className={`flex justify-between items-center px-6 h-16 w-full shrink-0 z-30 relative transition-colors duration-200 ${
+          isDark
+            ? 'bg-[#18181b] border-b border-[#27272a] text-zinc-100 shadow-md'
+            : 'bg-white border-b border-slate-200 text-slate-900 shadow-xs'
+        }`}
+      >
         <div className="flex items-center gap-6">
           <div
             className="flex items-center gap-2.5 cursor-pointer group"
@@ -31,20 +38,34 @@ export const Header: React.FC = () => {
             <div className="w-8 h-8 rounded-xl bg-emerald-800 flex items-center justify-center text-white shadow-xs group-hover:bg-emerald-700 transition-colors">
               <Sun className="w-5 h-5 text-amber-300 animate-pulse" />
             </div>
-            <h1 className="font-bold text-xl text-emerald-950 tracking-tight">SolarSim Pro</h1>
+            <h1 className={`font-bold text-xl tracking-tight transition-colors ${isDark ? 'text-white' : 'text-emerald-950'}`}>
+              SolarSim Pro
+            </h1>
           </div>
 
           {/* Active Project Context Badge */}
           {activeView !== 'dashboard' && activeProject && (
-            <div className="hidden lg:flex items-center gap-2.5 bg-slate-100/90 px-3.5 py-1.5 rounded-full border border-slate-200">
+            <div
+              className={`hidden lg:flex items-center gap-2.5 px-3.5 py-1.5 rounded-full border transition-colors ${
+                isDark
+                  ? 'bg-[#27272a]/90 border-[#3f3f46] text-zinc-200'
+                  : 'bg-slate-100/90 border-slate-200 text-slate-800'
+              }`}
+            >
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              <span className="font-bold text-xs text-slate-800 truncate max-w-[200px]">
+              <span className="font-bold text-xs truncate max-w-[200px]">
                 {activeProject.client.name}
               </span>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-white text-slate-600 font-mono font-semibold border border-slate-200">
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded font-mono font-semibold border ${
+                  isDark
+                    ? 'bg-[#18181b] text-zinc-400 border-[#3f3f46]'
+                    : 'bg-white text-slate-600 border-slate-200'
+                }`}
+              >
                 {activeProject.client.projectId}
               </span>
             </div>
@@ -54,12 +75,20 @@ export const Header: React.FC = () => {
         {/* Navigation & Action Buttons */}
         <div className="flex items-center gap-3">
           {/* Main Navigation Tabs */}
-          <div className="hidden md:flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+          <div
+            className={`hidden md:flex items-center gap-1 p-1 rounded-xl border transition-colors ${
+              isDark ? 'bg-[#121214] border-[#27272a]' : 'bg-slate-100 border-slate-200'
+            }`}
+          >
             <button
               onClick={() => setActiveView('dashboard')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 activeView === 'dashboard'
-                  ? 'bg-white text-emerald-900 shadow-xs'
+                  ? isDark
+                    ? 'bg-[#27272a] text-white shadow-xs'
+                    : 'bg-white text-emerald-900 shadow-xs'
+                  : isDark
+                  ? 'text-zinc-400 hover:text-zinc-100'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -71,7 +100,11 @@ export const Header: React.FC = () => {
               onClick={() => setActiveView('simulator')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 activeView === 'simulator'
-                  ? 'bg-white text-emerald-900 shadow-xs'
+                  ? isDark
+                    ? 'bg-[#27272a] text-white shadow-xs'
+                    : 'bg-white text-emerald-900 shadow-xs'
+                  : isDark
+                  ? 'text-zinc-400 hover:text-zinc-100'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -83,7 +116,11 @@ export const Header: React.FC = () => {
               onClick={() => setActiveView('pdf-preview')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 activeView === 'pdf-preview'
-                  ? 'bg-white text-emerald-900 shadow-xs'
+                  ? isDark
+                    ? 'bg-[#27272a] text-white shadow-xs'
+                    : 'bg-white text-emerald-900 shadow-xs'
+                  : isDark
+                  ? 'text-zinc-400 hover:text-zinc-100'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -92,37 +129,41 @@ export const Header: React.FC = () => {
             </button>
           </div>
 
-          {/* Theme Toggle Button (Selector de Modo Oscuro / Claro para Barra Lateral) */}
+          {/* Theme Toggle Button (Selector de Modo Oscuro / Claro) */}
           <button
             onClick={toggleSidebarTheme}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all cursor-pointer shadow-xs text-xs font-bold ${
-              sidebarTheme === 'dark'
-                ? 'bg-slate-900 border-slate-800 text-slate-100 hover:bg-slate-800'
+              isDark
+                ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 hover:bg-[#323238]'
                 : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
             }`}
-            title={sidebarTheme === 'dark' ? 'Cambiar a modo claro en barra de parámetros' : 'Cambiar a modo oscuro en barra de parámetros'}
+            title={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
           >
-            {sidebarTheme === 'dark' ? (
+            {isDark ? (
               <>
                 <Moon className="w-3.5 h-3.5 text-indigo-400 fill-indigo-400" />
-                <span className="hidden sm:inline">Barra Oscura</span>
+                <span className="hidden sm:inline">Modo Oscuro</span>
               </>
             ) : (
               <>
                 <Sun className="w-3.5 h-3.5 text-amber-500" />
-                <span className="hidden sm:inline">Barra Clara</span>
+                <span className="hidden sm:inline">Modo Claro</span>
               </>
             )}
           </button>
 
-          <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
+          <div className={`flex items-center gap-2 border-l pl-3 ${isDark ? 'border-[#27272a]' : 'border-slate-200'}`}>
             {/* Button Buscar Actualizaciones */}
             <button
               onClick={openUpdateModal}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors shadow-xs cursor-pointer"
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors shadow-xs cursor-pointer ${
+                isDark
+                  ? 'border-[#3f3f46] bg-[#27272a] hover:bg-[#323238] text-zinc-200'
+                  : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+              }`}
               title="Buscar actualizaciones en GitHub"
             >
-              <RefreshCw className="w-3.5 h-3.5 text-emerald-700" />
+              <RefreshCw className="w-3.5 h-3.5 text-emerald-500" />
               <span className="hidden sm:inline">Actualizaciones</span>
             </button>
 
@@ -130,10 +171,14 @@ export const Header: React.FC = () => {
             {activeView === 'simulator' && (
               <button
                 onClick={saveActiveProject}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-xs font-bold transition-all shadow-xs cursor-pointer"
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border text-xs font-bold transition-all shadow-xs cursor-pointer ${
+                  isDark
+                    ? 'border-emerald-700/80 bg-emerald-950/70 hover:bg-emerald-900/90 text-emerald-300'
+                    : 'border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900'
+                }`}
                 title="Guardar cambios de la simulación"
               >
-                <Save className="w-3.5 h-3.5 text-emerald-700" />
+                <Save className="w-3.5 h-3.5 text-emerald-500" />
                 <span>Guardar Cambios</span>
               </button>
             )}
