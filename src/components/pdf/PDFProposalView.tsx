@@ -1,6 +1,24 @@
 import React, { useRef, useState } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
-import { ArrowLeft, Printer, Download, RefreshCw, Leaf, ShieldCheck, FileText, CheckCircle2, PackageCheck, Wrench, Building2, Check, Palette } from 'lucide-react';
+import {
+  ArrowLeft,
+  Printer,
+  Download,
+  RefreshCw,
+  Leaf,
+  ShieldCheck,
+  FileText,
+  CheckCircle2,
+  PackageCheck,
+  Wrench,
+  Building2,
+  Check,
+  Palette,
+  Zap,
+  TrendingUp,
+  BarChart3,
+  Lock,
+} from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -179,315 +197,506 @@ export const PDFProposalView: React.FC = () => {
   );
 
   return (
-    <div className={`flex-1 flex flex-col h-[calc(100vh-64px)] overflow-hidden transition-colors duration-200 ${
-      isDark ? 'bg-[#121214]' : 'bg-slate-200'
-    }`}>
-      {/* Top Bar Navigation */}
-      <header className={`px-6 h-16 w-full flex justify-between items-center shrink-0 z-50 transition-colors ${
-        isDark ? 'bg-[#18181b] border-b border-[#27272a] text-zinc-100 shadow-md' : 'bg-white border-b border-slate-300 shadow-xs'
-      }`}>
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setActiveView('simulator')}
-            className={`p-2 rounded-full transition-colors cursor-pointer ${
-              isDark ? 'hover:bg-[#27272a] text-zinc-300' : 'hover:bg-slate-100 text-slate-600'
-            }`}
-            title="Volver al Simulador"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div className="font-bold text-xl text-emerald-500 tracking-tight">SolarSim Pro</div>
-          <div className={`h-6 w-px mx-1 ${isDark ? 'bg-[#27272a]' : 'bg-slate-300'}`}></div>
-          <h1 className={`text-xs font-semibold ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-            {project.client.name} — Vista Previa de Propuesta PDF
-          </h1>
-        </div>
+    <div
+      className={`flex-1 flex h-full overflow-hidden transition-colors duration-200 ${
+        isDark ? 'bg-[#0d0d10]' : 'bg-slate-200'
+      }`}
+    >
+      {/* Side Controls Toolbar */}
+      <aside
+        className={`w-[330px] flex flex-col h-full shrink-0 transition-colors z-20 ${
+          isDark
+            ? 'bg-[#18181f] border-r border-[#2a2a36] text-zinc-100 shadow-2xl'
+            : 'bg-white border-r border-slate-300 shadow-md'
+        }`}
+      >
+        {/* Top Actions in Sidebar */}
+        <div className={`p-4 border-b space-y-2.5 ${isDark ? 'border-[#2a2a36] bg-[#131318]' : 'border-slate-200 bg-slate-50'}`}>
+          <div className="flex items-center justify-between mb-0.5">
+            <span className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+              Exportación PDF
+            </span>
+            <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-950/70 px-2 py-0.5 rounded-full border border-emerald-800/60">
+              {activePagesCount} {activePagesCount === 1 ? 'Página' : 'Páginas'}
+            </span>
+          </div>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handlePrint}
-            className={`flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg transition-colors shadow-xs cursor-pointer ${
-              isDark
-                ? 'bg-[#27272a] border border-[#3f3f46] text-zinc-200 hover:bg-[#323238]'
-                : 'text-slate-700 bg-white border border-slate-300 hover:bg-slate-50'
-            }`}
-          >
-            <Printer className="w-4 h-4 text-emerald-500" />
-            Imprimir
-          </button>
           <button
             onClick={handleExportPDF}
             disabled={isExporting}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white rounded-lg transition-colors shadow-xs cursor-pointer"
+            className="w-full py-2.5 px-4 rounded-xl font-bold text-xs text-white shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] disabled:opacity-50"
             style={{ backgroundColor: activeTheme.primary }}
           >
             <Download className="w-4 h-4" />
-            {isExporting ? 'Generando PDF...' : 'Descargar PDF'}
+            {isExporting ? 'Generando PDF...' : 'Descargar PDF Multi-Página'}
+          </button>
+
+          <button
+            onClick={handlePrint}
+            className={`w-full py-2 px-4 rounded-xl font-semibold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer border ${
+              isDark
+                ? 'bg-[#22222c] border-[#343444] text-zinc-200 hover:bg-[#2a2a38]'
+                : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-xs'
+            }`}
+          >
+            <Printer className="w-3.5 h-3.5 text-emerald-500" />
+            Imprimir / Guardar como PDF
           </button>
         </div>
-      </header>
 
-      <div className="flex flex-1 overflow-hidden">
-        {/* Side Controls Toolbar */}
-        <aside className={`w-[300px] flex flex-col h-full shrink-0 transition-colors ${
-          isDark ? 'bg-[#18181b] border-r border-[#27272a] text-zinc-100 shadow-md' : 'bg-white border-r border-slate-300 shadow-xs'
-        }`}>
-          {/* Tab Switcher */}
-          <div className={`flex border-b transition-colors ${isDark ? 'border-[#27272a] bg-[#121214]' : 'border-slate-200 bg-slate-50'}`}>
+        {/* Tab Switcher */}
+        <div className={`p-3 border-b ${isDark ? 'border-[#2a2a36] bg-[#18181f]' : 'border-slate-200 bg-white'}`}>
+          <div className={`flex p-1 rounded-xl border ${isDark ? 'bg-[#121216] border-[#2a2a36]' : 'bg-slate-100 border-slate-200'}`}>
             <button
               onClick={() => setSidebarTab('sections')}
-              className={`flex-1 py-3 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+              className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 sidebarTab === 'sections'
                   ? isDark
-                    ? 'border-emerald-500 text-white bg-[#18181b]'
-                    : 'border-slate-900 text-slate-900 bg-white'
+                    ? 'bg-[#282836] text-white shadow-xs'
+                    : 'bg-white text-slate-900 shadow-xs'
                   : isDark
-                  ? 'border-transparent text-zinc-400 hover:text-zinc-200'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
+                  ? 'text-zinc-400 hover:text-zinc-200'
+                  : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               Páginas ({activePagesCount})
             </button>
             <button
               onClick={() => setSidebarTab('edit')}
-              className={`flex-1 py-3 text-xs font-bold border-b-2 transition-colors cursor-pointer ${
+              className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                 sidebarTab === 'edit'
                   ? isDark
-                    ? 'border-emerald-500 text-white bg-[#18181b]'
-                    : 'border-slate-900 text-slate-900 bg-white'
+                    ? 'bg-[#282836] text-white shadow-xs'
+                    : 'bg-white text-slate-900 shadow-xs'
                   : isDark
-                  ? 'border-transparent text-zinc-400 hover:text-zinc-200'
-                  : 'border-transparent text-slate-500 hover:text-slate-700'
+                  ? 'text-zinc-400 hover:text-zinc-200'
+                  : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               Datos Cotización
             </button>
           </div>
+        </div>
 
-          <div className="p-4 flex-1 overflow-y-auto space-y-5">
-            {sidebarTab === 'sections' ? (
-              <>
-                {/* Palette Switcher */}
-                <div className="space-y-3">
-                  <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                    <Palette className="w-3.5 h-3.5 text-slate-700" /> Paleta de Colores PDF
+        {/* Tab Content Area */}
+        <div className="p-4 flex-1 overflow-y-auto space-y-5">
+          {sidebarTab === 'sections' ? (
+            <>
+              {/* Palette Switcher */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h3 className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                    <Palette className="w-3.5 h-3.5 text-emerald-500" />
+                    Paleta de Colores
                   </h3>
-                  <div className="grid grid-cols-5 gap-2">
-                    {PDF_COLOR_THEMES.map((theme) => (
+                  <span className={`text-xs font-bold ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                    {activeTheme.name}
+                  </span>
+                </div>
+                <div className="grid grid-cols-5 gap-2">
+                  {PDF_COLOR_THEMES.map((theme) => {
+                    const isActive = activeTheme.id === theme.id;
+                    return (
                       <button
                         key={theme.id}
                         onClick={() => setActiveTheme(theme)}
                         title={theme.name}
-                        className={`h-9 rounded-lg flex flex-col overflow-hidden border-2 transition-all cursor-pointer ${
-                          activeTheme.id === theme.id ? 'border-slate-900 ring-2 ring-slate-400 scale-105' : 'border-transparent opacity-75 hover:opacity-100'
+                        className={`h-11 rounded-xl flex flex-col overflow-hidden border-2 transition-all cursor-pointer relative ${
+                          isActive
+                            ? 'border-emerald-500 ring-2 ring-emerald-500/40 scale-105 shadow-md'
+                            : isDark
+                            ? 'border-[#2e2e3a] opacity-70 hover:opacity-100 hover:border-zinc-500'
+                            : 'border-slate-200 opacity-80 hover:opacity-100 hover:border-slate-400'
                         }`}
                       >
                         <span className="h-1/2 w-full" style={{ backgroundColor: theme.primary }}></span>
                         <span className="h-1/2 w-full" style={{ backgroundColor: theme.barColor }}></span>
+                        {isActive && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-[1px]">
+                            <Check className="w-3.5 h-3.5 text-white drop-shadow" />
+                          </div>
+                        )}
                       </button>
-                    ))}
-                  </div>
-                  <p className="text-[11px] font-semibold text-slate-700 text-center">{activeTheme.name}</p>
+                    );
+                  })}
                 </div>
+              </div>
 
-                <div className="h-px w-full bg-slate-200"></div>
+              <div className={`h-px w-full ${isDark ? 'bg-[#2a2a36]' : 'bg-slate-200'}`}></div>
 
-                <div className="space-y-3">
-                  <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Secciones Incluidas</h3>
+              {/* Secciones Incluidas */}
+              <div className="space-y-2.5">
+                <h3 className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                  Secciones del Documento
+                </h3>
 
-                  <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
-                    <span className="text-xs font-semibold text-slate-800">Pág 1: Análisis de Energía</span>
-                    <input
-                      type="checkbox"
-                      checked={showPage1}
-                      onChange={(e) => setShowPage1(e.target.checked)}
-                      className="rounded focus:ring-0 cursor-pointer"
-                      style={{ color: activeTheme.primary }}
-                    />
-                  </label>
-
-                  <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
-                    <span className="text-xs font-semibold text-slate-800">Pág 2: Cotización de Sistema</span>
-                    <input
-                      type="checkbox"
-                      checked={showPageQuotation}
-                      onChange={(e) => setShowPageQuotation(e.target.checked)}
-                      className="rounded focus:ring-0 cursor-pointer"
-                      style={{ color: activeTheme.primary }}
-                    />
-                  </label>
-
-                  <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
-                    <span className="text-xs font-semibold text-slate-800">Pág 3: Retorno de Inversión</span>
-                    <input
-                      type="checkbox"
-                      checked={showPage2}
-                      onChange={(e) => setShowPage2(e.target.checked)}
-                      className="rounded focus:ring-0 cursor-pointer"
-                      style={{ color: activeTheme.primary }}
-                    />
-                  </label>
-
-                  <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
-                    <span className="text-xs font-semibold text-slate-800">Pág 4: Flujo de Caja 25 Años</span>
-                    <input
-                      type="checkbox"
-                      checked={showPage3}
-                      onChange={(e) => setShowPage3(e.target.checked)}
-                      className="rounded focus:ring-0 cursor-pointer"
-                      style={{ color: activeTheme.primary }}
-                    />
-                  </label>
-
-                  <label className="flex items-center justify-between p-2.5 rounded-lg border border-amber-300 bg-amber-50/60 cursor-pointer hover:bg-amber-100/70 transition-colors">
-                    <div className="flex flex-col">
-                      <span className="text-xs font-bold text-amber-900">Pág 5: Costos Internos</span>
-                      <span className="text-[10px] text-amber-700 font-semibold">(Confidencial)</span>
+                {/* Page 1 */}
+                <label
+                  className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+                    showPage1
+                      ? isDark
+                        ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
+                        : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
+                      : isDark
+                      ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
+                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`p-1.5 rounded-lg shrink-0 ${showPage1 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
+                      <Zap className="w-4 h-4" />
                     </div>
-                    <input
-                      type="checkbox"
-                      checked={showPageCostMatrix}
-                      onChange={(e) => setShowPageCostMatrix(e.target.checked)}
-                      className="rounded text-amber-600 focus:ring-0 cursor-pointer"
-                    />
-                  </label>
-                </div>
+                    <div>
+                      <span className="text-xs font-bold block leading-tight">Pág 1: Análisis de Energía</span>
+                      <span className="text-[10px] opacity-75 block">Generación vs Demanda mensual</span>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={showPage1}
+                    onChange={(e) => setShowPage1(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
+                  />
+                </label>
 
-                <div className="h-px w-full bg-slate-200"></div>
+                {/* Page 2 */}
+                <label
+                  className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+                    showPageQuotation
+                      ? isDark
+                        ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
+                        : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
+                      : isDark
+                      ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
+                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`p-1.5 rounded-lg shrink-0 ${showPageQuotation ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold block leading-tight">Pág 2: Cotización de Sistema</span>
+                      <span className="text-[10px] opacity-75 block">Equipos, inversión y garantías</span>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={showPageQuotation}
+                    onChange={(e) => setShowPageQuotation(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
+                  />
+                </label>
 
-                <div className="space-y-3">
-                  <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Opciones de Formato</h3>
-                  <label className="flex items-center justify-between p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
-                    <span className="text-xs font-semibold text-slate-800">Mostrar Encabezados y Pies</span>
-                    <input
-                      type="checkbox"
-                      checked={showHeadersFooters}
-                      onChange={(e) => setShowHeadersFooters(e.target.checked)}
-                      className="rounded focus:ring-0 cursor-pointer"
-                      style={{ color: activeTheme.primary }}
-                    />
+                {/* Page 3 */}
+                <label
+                  className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+                    showPage2
+                      ? isDark
+                        ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
+                        : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
+                      : isDark
+                      ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
+                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`p-1.5 rounded-lg shrink-0 ${showPage2 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
+                      <TrendingUp className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold block leading-tight">Pág 3: Retorno de Inversión</span>
+                      <span className="text-[10px] opacity-75 block">Payback, VAN, TIR y Ley 57-07</span>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={showPage2}
+                    onChange={(e) => setShowPage2(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
+                  />
+                </label>
+
+                {/* Page 4 */}
+                <label
+                  className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+                    showPage3
+                      ? isDark
+                        ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
+                        : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
+                      : isDark
+                      ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
+                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`p-1.5 rounded-lg shrink-0 ${showPage3 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
+                      <BarChart3 className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold block leading-tight">Pág 4: Flujo de Caja 25 Años</span>
+                      <span className="text-[10px] opacity-75 block">Proyección financiera anual</span>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={showPage3}
+                    onChange={(e) => setShowPage3(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
+                  />
+                </label>
+
+                {/* Page 5: Costos Internos (Confidencial) */}
+                <label
+                  className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+                    showPageCostMatrix
+                      ? isDark
+                        ? 'bg-amber-950/50 border-amber-500/70 text-amber-200 shadow-xs'
+                        : 'bg-amber-50 border-amber-400 text-amber-950 shadow-xs'
+                      : isDark
+                      ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-amber-700/50'
+                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`p-1.5 rounded-lg shrink-0 ${showPageCostMatrix ? 'bg-amber-500/20 text-amber-400' : 'bg-zinc-800 text-zinc-500'}`}>
+                      <Lock className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold block leading-tight">Pág 5: Costos Internos</span>
+                        <span className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded border ${
+                          isDark
+                            ? 'bg-amber-950/90 text-amber-300 border-amber-700/70'
+                            : 'bg-amber-100 text-amber-800 border-amber-300'
+                        }`}>
+                          CONFIDENCIAL
+                        </span>
+                      </div>
+                      <span className="text-[10px] opacity-75 block">Matriz de márgenes y desglose</span>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={showPageCostMatrix}
+                    onChange={(e) => setShowPageCostMatrix(e.target.checked)}
+                    className="w-4 h-4 rounded text-amber-600 focus:ring-0 cursor-pointer shrink-0"
+                  />
+                </label>
+              </div>
+
+              <div className={`h-px w-full ${isDark ? 'bg-[#2a2a36]' : 'bg-slate-200'}`}></div>
+
+              {/* Opciones de Formato */}
+              <div className="space-y-2.5">
+                <h3 className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                  Opciones de Formato
+                </h3>
+                <label
+                  className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+                    showHeadersFooters
+                      ? isDark
+                        ? 'bg-[#22222d] border-[#38384a] text-zinc-100'
+                        : 'bg-white border-slate-300 text-slate-800'
+                      : isDark
+                      ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400'
+                      : 'bg-slate-50 border-slate-200 text-slate-600'
+                  }`}
+                >
+                  <span className="text-xs font-semibold">Mostrar Encabezados y Pies</span>
+                  <input
+                    type="checkbox"
+                    checked={showHeadersFooters}
+                    onChange={(e) => setShowHeadersFooters(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
+                  />
+                </label>
+              </div>
+            </>
+          ) : (
+            <div className="space-y-4">
+              <h3 className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                Detalles de la Cotización
+              </h3>
+
+              <div>
+                <label className={`block text-[11px] font-bold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                  N° Cotización
+                </label>
+                <input
+                  type="text"
+                  value={project.client.quoteNumber || 'C-0030'}
+                  onChange={(e) => updateClient({ quoteNumber: e.target.value })}
+                  className={`w-full text-xs p-2.5 rounded-xl border font-semibold outline-none transition-colors ${
+                    isDark
+                      ? 'bg-[#202028] border-[#343442] text-white focus:border-emerald-500 focus:bg-[#252532]'
+                      : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-emerald-600 focus:bg-white'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`block text-[11px] font-bold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                  Válido por (Días)
+                </label>
+                <input
+                  type="number"
+                  value={project.client.quoteValidityDays || 7}
+                  onChange={(e) => updateClient({ quoteValidityDays: Number(e.target.value) })}
+                  className={`w-full text-xs p-2.5 rounded-xl border font-semibold outline-none transition-colors ${
+                    isDark
+                      ? 'bg-[#202028] border-[#343442] text-white focus:border-emerald-500 focus:bg-[#252532]'
+                      : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-emerald-600 focus:bg-white'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`block text-[11px] font-bold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                  Dirección del Cliente
+                </label>
+                <textarea
+                  rows={2}
+                  value={project.client.address || 'Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.'}
+                  onChange={(e) => updateClient({ address: e.target.value })}
+                  className={`w-full text-xs p-2.5 rounded-xl border font-medium outline-none transition-colors ${
+                    isDark
+                      ? 'bg-[#202028] border-[#343442] text-white focus:border-emerald-500 focus:bg-[#252532]'
+                      : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-emerald-600 focus:bg-white'
+                  }`}
+                />
+              </div>
+
+              <div className={`h-px w-full ${isDark ? 'bg-[#2a2a36]' : 'bg-slate-200'}`}></div>
+
+              <h3 className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                Modelos de Equipos
+              </h3>
+
+              <div>
+                <label className={`block text-[11px] font-bold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                  Módulos Solares (Descripción)
+                </label>
+                <input
+                  type="text"
+                  value={project.specs.panelBrandModel || 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)'}
+                  onChange={(e) => updateSpecs({ panelBrandModel: e.target.value })}
+                  className={`w-full text-xs p-2.5 rounded-xl border font-medium outline-none transition-colors ${
+                    isDark
+                      ? 'bg-[#202028] border-[#343442] text-white focus:border-emerald-500 focus:bg-[#252532]'
+                      : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-emerald-600 focus:bg-white'
+                  }`}
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div className="col-span-2">
+                  <label className={`block text-[11px] font-bold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                    Modelo Inversor
                   </label>
-                </div>
-              </>
-            ) : (
-              <div className="space-y-4">
-                <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Detalles de la Cotización</h3>
-                
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">N° Cotización</label>
                   <input
                     type="text"
-                    value={project.client.quoteNumber || 'C-0030'}
-                    onChange={(e) => updateClient({ quoteNumber: e.target.value })}
-                    className="w-full text-xs p-2 border border-slate-300 rounded-md outline-none font-semibold"
+                    value={project.specs.inverterBrandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)'}
+                    onChange={(e) => updateSpecs({ inverterBrandModel: e.target.value })}
+                    className={`w-full text-xs p-2.5 rounded-xl border font-medium outline-none transition-colors ${
+                      isDark
+                        ? 'bg-[#202028] border-[#343442] text-white focus:border-emerald-500 focus:bg-[#252532]'
+                        : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-emerald-600 focus:bg-white'
+                    }`}
                   />
                 </div>
-
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Válido por (Días)</label>
+                  <label className={`block text-[11px] font-bold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                    Cant.
+                  </label>
                   <input
                     type="number"
-                    value={project.client.quoteValidityDays || 7}
-                    onChange={(e) => updateClient({ quoteValidityDays: Number(e.target.value) })}
-                    className="w-full text-xs p-2 border border-slate-300 rounded-md outline-none font-semibold"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Dirección del Cliente</label>
-                  <textarea
-                    rows={2}
-                    value={project.client.address || 'Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.'}
-                    onChange={(e) => updateClient({ address: e.target.value })}
-                    className="w-full text-xs p-2 border border-slate-300 rounded-md outline-none"
-                  />
-                </div>
-
-                <div className="h-px w-full bg-slate-200"></div>
-
-                <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Modelos de Equipos</h3>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Módulos Solares (Descripción)</label>
-                  <input
-                    type="text"
-                    value={project.specs.panelBrandModel || 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)'}
-                    onChange={(e) => updateSpecs({ panelBrandModel: e.target.value })}
-                    className="w-full text-xs p-2 border border-slate-300 rounded-md outline-none"
-                  />
-                </div>
-
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="col-span-2">
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Modelo Inversor</label>
-                    <input
-                      type="text"
-                      value={project.specs.inverterBrandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)'}
-                      onChange={(e) => updateSpecs({ inverterBrandModel: e.target.value })}
-                      className="w-full text-xs p-2 border border-slate-300 rounded-md outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Cant.</label>
-                    <input
-                      type="number"
-                      value={project.specs.inverterCount || 2}
-                      onChange={(e) => updateSpecs({ inverterCount: Number(e.target.value) })}
-                      className="w-full text-xs p-2 border border-slate-300 rounded-md outline-none font-semibold"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="col-span-2">
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Modelo Batería</label>
-                    <input
-                      type="text"
-                      value={project.specs.batteryBrandModel || 'Batería Hinaess 16 KwH-48 vdc.'}
-                      onChange={(e) => updateSpecs({ batteryBrandModel: e.target.value })}
-                      className="w-full text-xs p-2 border border-slate-300 rounded-md outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Cant.</label>
-                    <input
-                      type="number"
-                      value={project.specs.batteryCount || 3}
-                      onChange={(e) => updateSpecs({ batteryCount: Number(e.target.value) })}
-                      className="w-full text-xs p-2 border border-slate-300 rounded-md outline-none font-semibold"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Servicios e Instalación</label>
-                  <textarea
-                    rows={2}
-                    value={project.specs.installationServicesDesc || 'Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).'}
-                    onChange={(e) => updateSpecs({ installationServicesDesc: e.target.value })}
-                    className="w-full text-xs p-2 border border-slate-300 rounded-md outline-none"
+                    value={project.specs.inverterCount || 2}
+                    onChange={(e) => updateSpecs({ inverterCount: Number(e.target.value) })}
+                    className={`w-full text-xs p-2.5 rounded-xl border font-semibold outline-none transition-colors ${
+                      isDark
+                        ? 'bg-[#202028] border-[#343442] text-white focus:border-emerald-500 focus:bg-[#252532]'
+                        : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-emerald-600 focus:bg-white'
+                    }`}
                   />
                 </div>
               </div>
-            )}
-          </div>
 
-          <div className="p-4 border-t border-slate-200 bg-slate-50">
-            <button
-              onClick={() => {
-                useSimulationStore.setState({ activeProjectId: project.id });
-              }}
-              className="w-full py-2 bg-white border border-slate-300 text-slate-700 hover:bg-slate-100 transition-colors rounded-lg text-xs font-semibold flex items-center justify-center gap-2 shadow-xs cursor-pointer"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              Actualizar Vista Previa
-            </button>
-          </div>
-        </aside>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="col-span-2">
+                  <label className={`block text-[11px] font-bold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                    Modelo Batería
+                  </label>
+                  <input
+                    type="text"
+                    value={project.specs.batteryBrandModel || 'Batería Hinaess 16 KwH-48 vdc.'}
+                    onChange={(e) => updateSpecs({ batteryBrandModel: e.target.value })}
+                    className={`w-full text-xs p-2.5 rounded-xl border font-medium outline-none transition-colors ${
+                      isDark
+                        ? 'bg-[#202028] border-[#343442] text-white focus:border-emerald-500 focus:bg-[#252532]'
+                        : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-emerald-600 focus:bg-white'
+                    }`}
+                  />
+                </div>
+                <div>
+                  <label className={`block text-[11px] font-bold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                    Cant.
+                  </label>
+                  <input
+                    type="number"
+                    value={project.specs.batteryCount || 3}
+                    onChange={(e) => updateSpecs({ batteryCount: Number(e.target.value) })}
+                    className={`w-full text-xs p-2.5 rounded-xl border font-semibold outline-none transition-colors ${
+                      isDark
+                        ? 'bg-[#202028] border-[#343442] text-white focus:border-emerald-500 focus:bg-[#252532]'
+                        : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-emerald-600 focus:bg-white'
+                    }`}
+                  />
+                </div>
+              </div>
 
-        {/* PDF Page Canvas */}
-        <main className="flex-1 overflow-y-auto p-8 flex flex-col items-center gap-8 bg-slate-300/80">
-          <div ref={pdfRef} className="flex flex-col gap-8 print:gap-0">
+              <div>
+                <label className={`block text-[11px] font-bold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                  Servicios e Instalación
+                </label>
+                <textarea
+                  rows={2}
+                  value={project.specs.installationServicesDesc || 'Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).'}
+                  onChange={(e) => updateSpecs({ installationServicesDesc: e.target.value })}
+                  className={`w-full text-xs p-2.5 rounded-xl border font-medium outline-none transition-colors ${
+                    isDark
+                      ? 'bg-[#202028] border-[#343442] text-white focus:border-emerald-500 focus:bg-[#252532]'
+                      : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-emerald-600 focus:bg-white'
+                  }`}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Bottom Bar in Sidebar */}
+        <div className={`p-4 border-t ${isDark ? 'border-[#2a2a36] bg-[#14141a]' : 'border-slate-200 bg-slate-50'}`}>
+          <button
+            onClick={() => {
+              useSimulationStore.setState({ activeProjectId: project.id });
+            }}
+            className={`w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer border ${
+              isDark
+                ? 'bg-[#22222c] border-[#343444] text-zinc-200 hover:bg-[#2a2a38] hover:text-white'
+                : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-xs'
+            }`}
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-emerald-500" />
+            Actualizar Vista Previa
+          </button>
+        </div>
+      </aside>
+
+      {/* PDF Page Canvas */}
+      <main className={`flex-1 overflow-y-auto p-8 flex flex-col items-center gap-8 transition-colors ${
+        isDark ? 'bg-[#0a0a0d]' : 'bg-slate-300/80'
+      }`}>
+        <div ref={pdfRef} className="flex flex-col gap-8 print:gap-0">
             
             {/* ---------------------------------------------------- */}
             {/* PÁGINA 1: ANÁLISIS DE ENERGÍA */}
@@ -1213,10 +1422,8 @@ export const PDFProposalView: React.FC = () => {
                 </div>
               </div>
             )}
-
           </div>
         </main>
-      </div>
     </div>
   );
 };
