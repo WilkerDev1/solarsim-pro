@@ -644,6 +644,95 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
           </div>
         )}
       </div>
+
+      {/* 6. SECCIÓN: QUIÉNES SOMOS Y PRESENTACIÓN INSTITUCIONAL */}
+      <div className={`rounded-xl border overflow-hidden transition-all ${isDark ? 'border-[#2a2a36] bg-[#1a1a24]' : 'border-slate-200 bg-white'}`}>
+        <button
+          type="button"
+          onClick={() => toggleSection('about' as any)}
+          className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors ${
+            isDark ? 'text-zinc-200 hover:bg-[#222230]' : 'text-slate-800 hover:bg-slate-50'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <Building2 className="w-4 h-4 text-emerald-500" />
+            <span>6. Quiénes Somos y Presentación</span>
+          </div>
+          {openSection === ('about' as any) ? <ChevronUp className="w-4 h-4 text-zinc-400" /> : <ChevronDown className="w-4 h-4 text-zinc-400" />}
+        </button>
+
+        {openSection === ('about' as any) && (
+          <div className={`p-3 pt-1 space-y-3 border-t text-xs ${isDark ? 'border-[#2a2a36] bg-[#14141d]' : 'border-slate-200 bg-slate-50/50'}`}>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                  Sitio Web
+                </label>
+                <input
+                  type="text"
+                  value={cust.companyWebsite !== undefined ? cust.companyWebsite : DEFAULT_DOCUMENT_CUSTOMIZATION.companyWebsite}
+                  onChange={(e) => updateDocumentCustomization({ companyWebsite: e.target.value })}
+                  placeholder="www.electsun.do"
+                  className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
+                    isDark
+                      ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
+                      : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                  Usuario Instagram
+                </label>
+                <input
+                  type="text"
+                  value={cust.companyInstagram !== undefined ? cust.companyInstagram : DEFAULT_DOCUMENT_CUSTOMIZATION.companyInstagram}
+                  onChange={(e) => updateDocumentCustomization({ companyInstagram: e.target.value })}
+                  placeholder="Electsunrd"
+                  className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
+                    isDark
+                      ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
+                      : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
+                  }`}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                Texto "¿Quiénes Somos?" (Pág. 1 del Dossier)
+              </label>
+              <textarea
+                rows={3}
+                value={cust.aboutUsIntroText !== undefined ? cust.aboutUsIntroText : DEFAULT_DOCUMENT_CUSTOMIZATION.aboutUsIntroText}
+                onChange={(e) => updateDocumentCustomization({ aboutUsIntroText: e.target.value })}
+                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
+                  isDark
+                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
+                    : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                Texto "¿Por Qué Elegirnos?" / Misión
+              </label>
+              <textarea
+                rows={3}
+                value={cust.whyChooseUsText !== undefined ? cust.whyChooseUsText : DEFAULT_DOCUMENT_CUSTOMIZATION.whyChooseUsText}
+                onChange={(e) => updateDocumentCustomization({ whyChooseUsText: e.target.value })}
+                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
+                  isDark
+                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
+                    : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
+                }`}
+              />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

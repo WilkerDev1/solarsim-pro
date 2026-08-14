@@ -20,4 +20,9 @@ export const DEFAULT_DOCUMENT_CUSTOMIZATION: DocumentCustomization = {
 
   servicesIncludedText: 'Permisos y Tramitación ante CNE y Distribuidora, Medición Neta, Planos Eléctricos, Instalación Certificada y Puesta en Marcha.',
   watermarkOpacity: 0.15,
+
+  companyWebsite: 'electsun.com.do',
+  companyInstagram: 'Electsunrd',
+  aboutUsIntroText: 'En ELECTSUN, transformamos la energía solar en una solución inteligente, sostenible y accesible para todos. Creemos en un futuro más limpio y eficiente, y estamos aquí para hacerlo posible. Descubre cómo nuestros productos y servicios pueden ayudarte a aprovechar al máximo la energía del sol.',
+  whyChooseUsText: 'En ELECTSUN, nuestra misión es brindarte soluciones solares que no solo optimicen tu consumo energético, sino que también te permitan formar parte de la revolución verde del futuro. ¡Haz el cambio hoy y disfruta de los beneficios de una energía limpia y renovable!',
 };

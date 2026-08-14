@@ -6,6 +6,11 @@ import {
   TrendingUp,
   BarChart3,
   Lock,
+  Layout,
+  ListOrdered,
+  Building2,
+  Sun,
+  Cpu,
 } from 'lucide-react';
 import { PDFColorTheme, PDF_COLOR_THEMES } from '../../../constants/pdfThemes';
 
@@ -13,6 +18,18 @@ interface PDFSectionTogglesProps {
   isDark: boolean;
   activeTheme: PDFColorTheme;
   setActiveTheme: (theme: PDFColorTheme) => void;
+  // New Intro Pages
+  showCover: boolean;
+  setShowCover: (val: boolean) => void;
+  showTableOfContents: boolean;
+  setShowTableOfContents: (val: boolean) => void;
+  showAboutUs: boolean;
+  setShowAboutUs: (val: boolean) => void;
+  showBenefits: boolean;
+  setShowBenefits: (val: boolean) => void;
+  showTechIntro: boolean;
+  setShowTechIntro: (val: boolean) => void;
+  // Core Technical & Financial Pages
   showPage1: boolean;
   setShowPage1: (val: boolean) => void;
   showPageQuotation: boolean;
@@ -31,6 +48,16 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
   isDark,
   activeTheme,
   setActiveTheme,
+  showCover,
+  setShowCover,
+  showTableOfContents,
+  setShowTableOfContents,
+  showAboutUs,
+  setShowAboutUs,
+  showBenefits,
+  setShowBenefits,
+  showTechIntro,
+  setShowTechIntro,
   showPage1,
   setShowPage1,
   showPageQuotation,
@@ -82,15 +109,169 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
 
       <div className={`h-px w-full ${isDark ? 'bg-[#2a2a36]' : 'bg-slate-200'}`}></div>
 
-      {/* Secciones Incluidas */}
-      <div className="space-y-2.5">
+      {/* 1. SECCIÓN: PRESENTACIÓN Y MARCO INSTITUCIONAL */}
+      <div className="space-y-2">
         <h3 className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-          Secciones del Documento
+          1. Presentación e Introducción
         </h3>
 
-        {/* Page 1 */}
+        {/* Portada */}
         <label
-          className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
+            showCover
+              ? isDark
+                ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
+                : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
+              : isDark
+              ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
+              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className={`p-1.5 rounded-lg shrink-0 ${showCover ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
+              <Layout className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs font-bold block leading-tight">Portada Ejecutiva</span>
+              <span className="text-[10px] opacity-75 block">Imagen hero, cliente y datos</span>
+            </div>
+          </div>
+          <input
+            type="checkbox"
+            checked={showCover}
+            onChange={(e) => setShowCover(e.target.checked)}
+            className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
+          />
+        </label>
+
+        {/* Índice */}
+        <label
+          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
+            showTableOfContents
+              ? isDark
+                ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
+                : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
+              : isDark
+              ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
+              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className={`p-1.5 rounded-lg shrink-0 ${showTableOfContents ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
+              <ListOrdered className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs font-bold block leading-tight">Índice del Dossier</span>
+              <span className="text-[10px] opacity-75 block">Estructura y números dinámicos</span>
+            </div>
+          </div>
+          <input
+            type="checkbox"
+            checked={showTableOfContents}
+            onChange={(e) => setShowTableOfContents(e.target.checked)}
+            className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
+          />
+        </label>
+
+        {/* Quiénes Somos */}
+        <label
+          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
+            showAboutUs
+              ? isDark
+                ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
+                : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
+              : isDark
+              ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
+              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className={`p-1.5 rounded-lg shrink-0 ${showAboutUs ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
+              <Building2 className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs font-bold block leading-tight">1. ¿Quiénes Somos? & Servicios</span>
+              <span className="text-[10px] opacity-75 block">Visión y 4 tarjetas de servicio</span>
+            </div>
+          </div>
+          <input
+            type="checkbox"
+            checked={showAboutUs}
+            onChange={(e) => setShowAboutUs(e.target.checked)}
+            className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
+          />
+        </label>
+
+        {/* Beneficios Solares & Ley 57-07 */}
+        <label
+          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
+            showBenefits
+              ? isDark
+                ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
+                : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
+              : isDark
+              ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
+              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className={`p-1.5 rounded-lg shrink-0 ${showBenefits ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
+              <Sun className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs font-bold block leading-tight">2. Beneficios Solares & Ley 57-07</span>
+              <span className="text-[10px] opacity-75 block">Pilares y marco fiscal dominicano</span>
+            </div>
+          </div>
+          <input
+            type="checkbox"
+            checked={showBenefits}
+            onChange={(e) => setShowBenefits(e.target.checked)}
+            className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
+          />
+        </label>
+
+        {/* Descripción Técnica */}
+        <label
+          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
+            showTechIntro
+              ? isDark
+                ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
+                : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
+              : isDark
+              ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
+              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className={`p-1.5 rounded-lg shrink-0 ${showTechIntro ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
+              <Cpu className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs font-bold block leading-tight">3. ¿Qué es FV? & Flujo Técnico</span>
+              <span className="text-[10px] opacity-75 block">Render 3D y diagrama de flujo</span>
+            </div>
+          </div>
+          <input
+            type="checkbox"
+            checked={showTechIntro}
+            onChange={(e) => setShowTechIntro(e.target.checked)}
+            className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
+          />
+        </label>
+      </div>
+
+      <div className={`h-px w-full ${isDark ? 'bg-[#2a2a36]' : 'bg-slate-200'}`}></div>
+
+      {/* 2. SECCIÓN: ANÁLISIS TÉCNICO Y ECONÓMICO */}
+      <div className="space-y-2">
+        <h3 className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+          2. Análisis Técnico & Financiero
+        </h3>
+
+        {/* Page 1: Energía */}
+        <label
+          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
             showPage1
               ? isDark
                 ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
@@ -105,7 +286,7 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
               <Zap className="w-4 h-4" />
             </div>
             <div>
-              <span className="text-xs font-bold block leading-tight">Pág 1: Análisis de Energía</span>
+              <span className="text-xs font-bold block leading-tight">Análisis de Energía y Balance</span>
               <span className="text-[10px] opacity-75 block">Generación vs Demanda mensual</span>
             </div>
           </div>
@@ -117,9 +298,9 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
           />
         </label>
 
-        {/* Page 2 */}
+        {/* Page 2: Cotización */}
         <label
-          className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
             showPageQuotation
               ? isDark
                 ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
@@ -134,7 +315,7 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
               <FileText className="w-4 h-4" />
             </div>
             <div>
-              <span className="text-xs font-bold block leading-tight">Pág 2: Cotización de Sistema</span>
+              <span className="text-xs font-bold block leading-tight">Cotización de Sistema</span>
               <span className="text-[10px] opacity-75 block">Equipos, inversión y garantías</span>
             </div>
           </div>
@@ -146,9 +327,9 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
           />
         </label>
 
-        {/* Page 3 */}
+        {/* Page 3: ROI */}
         <label
-          className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
             showPage2
               ? isDark
                 ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
@@ -163,7 +344,7 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
               <TrendingUp className="w-4 h-4" />
             </div>
             <div>
-              <span className="text-xs font-bold block leading-tight">Pág 3: Retorno de Inversión</span>
+              <span className="text-xs font-bold block leading-tight">Retorno de Inversión</span>
               <span className="text-[10px] opacity-75 block">Payback, VAN, TIR y Ley 57-07</span>
             </div>
           </div>
@@ -175,9 +356,9 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
           />
         </label>
 
-        {/* Page 4 */}
+        {/* Page 4: Flujo de Caja */}
         <label
-          className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
             showPage3
               ? isDark
                 ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
@@ -192,8 +373,8 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
               <BarChart3 className="w-4 h-4" />
             </div>
             <div>
-              <span className="text-xs font-bold block leading-tight">Pág 4: Flujo de Caja 25 Años</span>
-              <span className="text-[10px] opacity-75 block">Proyección financiera anual</span>
+              <span className="text-xs font-bold block leading-tight">Flujo de Caja 25 Años</span>
+              <span className="text-[10px] opacity-75 block">Proyección financiera detallada</span>
             </div>
           </div>
           <input
@@ -206,7 +387,7 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
 
         {/* Page 5: Costos Internos (Confidencial) */}
         <label
-          className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
             showPageCostMatrix
               ? isDark
                 ? 'bg-amber-950/50 border-amber-500/70 text-amber-200 shadow-xs'
@@ -222,7 +403,7 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold block leading-tight">Pág 5: Costos Internos</span>
+                <span className="text-xs font-bold block leading-tight">Costos Internos</span>
                 <span
                   className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded border ${
                     isDark
@@ -248,12 +429,12 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
       <div className={`h-px w-full ${isDark ? 'bg-[#2a2a36]' : 'bg-slate-200'}`}></div>
 
       {/* Opciones de Formato */}
-      <div className="space-y-2.5">
+      <div className="space-y-2">
         <h3 className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
           Opciones de Formato
         </h3>
         <label
-          className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
             showHeadersFooters
               ? isDark
                 ? 'bg-[#22222d] border-[#38384a] text-zinc-100'

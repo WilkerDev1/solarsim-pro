@@ -24,6 +24,19 @@ interface PDFSidebarControlsProps {
   handlePrint: () => void;
   onRefresh: () => void;
 
+  // New Intro Pages
+  showCover: boolean;
+  setShowCover: (val: boolean) => void;
+  showTableOfContents: boolean;
+  setShowTableOfContents: (val: boolean) => void;
+  showAboutUs: boolean;
+  setShowAboutUs: (val: boolean) => void;
+  showBenefits: boolean;
+  setShowBenefits: (val: boolean) => void;
+  showTechIntro: boolean;
+  setShowTechIntro: (val: boolean) => void;
+
+  // Core Technical & Financial Pages
   showPage1: boolean;
   setShowPage1: (val: boolean) => void;
   showPageQuotation: boolean;
@@ -54,6 +67,17 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
   handleExportPDF,
   handlePrint,
   onRefresh,
+
+  showCover,
+  setShowCover,
+  showTableOfContents,
+  setShowTableOfContents,
+  showAboutUs,
+  setShowAboutUs,
+  showBenefits,
+  setShowBenefits,
+  showTechIntro,
+  setShowTechIntro,
 
   showPage1,
   setShowPage1,
@@ -157,6 +181,16 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
             isDark={isDark}
             activeTheme={activeTheme}
             setActiveTheme={setActiveTheme}
+            showCover={showCover}
+            setShowCover={setShowCover}
+            showTableOfContents={showTableOfContents}
+            setShowTableOfContents={setShowTableOfContents}
+            showAboutUs={showAboutUs}
+            setShowAboutUs={setShowAboutUs}
+            showBenefits={showBenefits}
+            setShowBenefits={setShowBenefits}
+            showTechIntro={showTechIntro}
+            setShowTechIntro={setShowTechIntro}
             showPage1={showPage1}
             setShowPage1={setShowPage1}
             showPageQuotation={showPageQuotation}

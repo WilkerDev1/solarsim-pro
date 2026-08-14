@@ -6,6 +6,11 @@ import { PDFColorTheme, PDF_COLOR_THEMES } from '../../constants/pdfThemes';
 
 // Modular Page Components
 import { PDFSidebarControls } from './controls/PDFSidebarControls';
+import { PDFCoverPage } from './pages/PDFCoverPage';
+import { PDFTableOfContents, TOCItem } from './pages/PDFTableOfContents';
+import { PDFAboutUsPage } from './pages/PDFAboutUsPage';
+import { PDFSolarBenefitsPage } from './pages/PDFSolarBenefitsPage';
+import { PDFTechnicalIntroPage } from './pages/PDFTechnicalIntroPage';
 import { PDFPage1Energy } from './pages/PDFPage1Energy';
 import { PDFPage2Quotation } from './pages/PDFPage2Quotation';
 import { PDFPage3ROI } from './pages/PDFPage3ROI';
@@ -27,12 +32,19 @@ export const PDFProposalView: React.FC = () => {
   const summary = getFinancialSummary();
   const pdfRef = useRef<HTMLDivElement>(null);
 
-  // Document Toggles (5 pages)
-  const [showPage1, setShowPage1] = useState(true); // Pág 1: Análisis de Energía
-  const [showPageQuotation, setShowPageQuotation] = useState(true); // Pág 2: Cotización de Sistema Fotovoltaico
-  const [showPage2, setShowPage2] = useState(true); // Pág 3: Retorno de Inversión - Resumen
-  const [showPage3, setShowPage3] = useState(true); // Pág 4: Flujo de Caja 25 Años
-  const [showPageCostMatrix, setShowPageCostMatrix] = useState(false); // Pág 5: Costos Internos (Confidencial)
+  // Document Toggles (Intro & Presentation)
+  const [showCover, setShowCover] = useState(true); // Portada Ejecutiva
+  const [showTableOfContents, setShowTableOfContents] = useState(true); // Índice de Contenido
+  const [showAboutUs, setShowAboutUs] = useState(true); // 1. ¿Quiénes Somos? & Servicios
+  const [showBenefits, setShowBenefits] = useState(true); // 2. Beneficios Solares & Ley 57-07
+  const [showTechIntro, setShowTechIntro] = useState(true); // 3. ¿Qué es FV? & Flujo Técnico
+
+  // Document Toggles (Core Technical & Financial)
+  const [showPage1, setShowPage1] = useState(true); // 4. Análisis de Energía y Balance
+  const [showPageQuotation, setShowPageQuotation] = useState(true); // 5. Cotización de Sistema Fotovoltaico
+  const [showPage2, setShowPage2] = useState(true); // 6. Retorno de Inversión y Métricas
+  const [showPage3, setShowPage3] = useState(true); // 7. Flujo de Caja 25 Años
+  const [showPageCostMatrix, setShowPageCostMatrix] = useState(false); // 8. Costos Internos (Confidencial)
   const [showHeadersFooters, setShowHeadersFooters] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -106,21 +118,51 @@ export const PDFProposalView: React.FC = () => {
     year: 'numeric',
   });
 
-  // Calculate dynamic page numbers for footers
+  // Calculate dynamic page numbers
   const activePagesCount =
+    (showCover ? 1 : 0) +
+    (showTableOfContents ? 1 : 0) +
+    (showAboutUs ? 1 : 0) +
+    (showBenefits ? 1 : 0) +
+    (showTechIntro ? 1 : 0) +
     (showPage1 ? 1 : 0) +
     (showPageQuotation ? 1 : 0) +
     (showPage2 ? 1 : 0) +
     (showPage3 ? 1 : 0) +
     (showPageCostMatrix ? 1 : 0);
 
+  let currentNum = 0;
+  let pageCoverNum = 0;
+  let pageTocNum = 0;
+  let pageAboutUsNum = 0;
+  let pageBenefitsNum = 0;
+  let pageTechIntroNum = 0;
   let page1Num = 0;
   let pageQuotNum = 0;
   let page2Num = 0;
   let page3Num = 0;
   let pageCostMatrixNum = 0;
-  let currentNum = 0;
 
+  if (showCover) {
+    currentNum++;
+    pageCoverNum = currentNum;
+  }
+  if (showTableOfContents) {
+    currentNum++;
+    pageTocNum = currentNum;
+  }
+  if (showAboutUs) {
+    currentNum++;
+    pageAboutUsNum = currentNum;
+  }
+  if (showBenefits) {
+    currentNum++;
+    pageBenefitsNum = currentNum;
+  }
+  if (showTechIntro) {
+    currentNum++;
+    pageTechIntroNum = currentNum;
+  }
   if (showPage1) {
     currentNum++;
     page1Num = currentNum;
@@ -140,6 +182,90 @@ export const PDFProposalView: React.FC = () => {
   if (showPageCostMatrix) {
     currentNum++;
     pageCostMatrixNum = currentNum;
+  }
+
+  // Build dynamic TOC items
+  const tocItems: TOCItem[] = [];
+  let sectionIndex = 1;
+
+  if (showAboutUs) {
+    tocItems.push({
+      number: `${sectionIndex}`,
+      title: 'Quiénes Somos & Nuestros Servicios',
+      subtitle: '1.1 Por Qué Elegirnos y Pilares de Servicio',
+      targetPage: pageAboutUsNum,
+    });
+    sectionIndex++;
+  }
+
+  if (showBenefits) {
+    tocItems.push({
+      number: `${sectionIndex}`,
+      title: 'Beneficios de la Energía Solar',
+      subtitle: '2.1 Objetivos e Incentivos Fiscales de la Ley 57-07',
+      targetPage: pageBenefitsNum,
+    });
+    sectionIndex++;
+  }
+
+  if (showTechIntro) {
+    tocItems.push({
+      number: `${sectionIndex}`,
+      title: '¿Qué es un Sistema Fotovoltaico?',
+      subtitle: '3.1 Funcionamiento y Diagrama de Flujo Técnico',
+      targetPage: pageTechIntroNum,
+    });
+    sectionIndex++;
+  }
+
+  if (showPage1) {
+    tocItems.push({
+      number: `${sectionIndex}`,
+      title: 'Análisis de Energía y Balance',
+      subtitle: 'Generación Solar Estimada vs Demanda Mensual',
+      targetPage: page1Num,
+    });
+    sectionIndex++;
+  }
+
+  if (showPageQuotation) {
+    tocItems.push({
+      number: `${sectionIndex}`,
+      title: 'Presupuesto y Cotización de Sistema',
+      subtitle: 'Equipos Tier-1, Inversión y Términos de Garantías',
+      targetPage: pageQuotNum,
+    });
+    sectionIndex++;
+  }
+
+  if (showPage2) {
+    tocItems.push({
+      number: `${sectionIndex}`,
+      title: 'Cálculo de Retorno de Inversión',
+      subtitle: 'Payback, VAN, TIR y Ahorro Estimado',
+      targetPage: page2Num,
+    });
+    sectionIndex++;
+  }
+
+  if (showPage3) {
+    tocItems.push({
+      number: `${sectionIndex}`,
+      title: 'Flujo de Caja y Proyección a 25 Años',
+      subtitle: 'Análisis Financiero Acumulado y Rendimiento Anual',
+      targetPage: page3Num,
+    });
+    sectionIndex++;
+  }
+
+  if (showPageCostMatrix) {
+    tocItems.push({
+      number: `${sectionIndex}`,
+      title: 'Matriz de Costos Internos (Confidencial)',
+      subtitle: 'Desglose Detallado de Proveedores y Margen Comercial',
+      targetPage: pageCostMatrixNum,
+    });
+    sectionIndex++;
   }
 
   return (
@@ -163,6 +289,16 @@ export const PDFProposalView: React.FC = () => {
         onRefresh={() => {
           useSimulationStore.setState({ activeProjectId: project.id });
         }}
+        showCover={showCover}
+        setShowCover={setShowCover}
+        showTableOfContents={showTableOfContents}
+        setShowTableOfContents={setShowTableOfContents}
+        showAboutUs={showAboutUs}
+        setShowAboutUs={setShowAboutUs}
+        showBenefits={showBenefits}
+        setShowBenefits={setShowBenefits}
+        showTechIntro={showTechIntro}
+        setShowTechIntro={setShowTechIntro}
         showPage1={showPage1}
         setShowPage1={setShowPage1}
         showPageQuotation={showPageQuotation}
@@ -187,7 +323,70 @@ export const PDFProposalView: React.FC = () => {
         }`}
       >
         <div ref={pdfRef} className="flex flex-col gap-8 print:gap-0">
-          {/* PÁGINA 1: ANÁLISIS DE ENERGÍA */}
+          {/* PORTADA EJECUTIVA */}
+          {showCover && (
+            <PDFCoverPage
+              project={project}
+              summary={summary}
+              activeTheme={activeTheme}
+              currentDateStr={currentDateStr}
+            />
+          )}
+
+          {/* ÍNDICE DE CONTENIDO */}
+          {showTableOfContents && (
+            <PDFTableOfContents
+              project={project}
+              summary={summary}
+              activeTheme={activeTheme}
+              showHeadersFooters={showHeadersFooters}
+              currentDateStr={currentDateStr}
+              pageNum={pageTocNum}
+              totalPages={activePagesCount}
+              tocItems={tocItems}
+            />
+          )}
+
+          {/* 1. ¿QUIÉNES SOMOS? & SERVICIOS */}
+          {showAboutUs && (
+            <PDFAboutUsPage
+              project={project}
+              summary={summary}
+              activeTheme={activeTheme}
+              showHeadersFooters={showHeadersFooters}
+              currentDateStr={currentDateStr}
+              pageNum={pageAboutUsNum}
+              totalPages={activePagesCount}
+            />
+          )}
+
+          {/* 2. BENEFICIOS SOLARES & LEY 57-07 */}
+          {showBenefits && (
+            <PDFSolarBenefitsPage
+              project={project}
+              summary={summary}
+              activeTheme={activeTheme}
+              showHeadersFooters={showHeadersFooters}
+              currentDateStr={currentDateStr}
+              pageNum={pageBenefitsNum}
+              totalPages={activePagesCount}
+            />
+          )}
+
+          {/* 3. ¿QUÉ ES UN SISTEMA FV? & FLUJO TÉCNICO */}
+          {showTechIntro && (
+            <PDFTechnicalIntroPage
+              project={project}
+              summary={summary}
+              activeTheme={activeTheme}
+              showHeadersFooters={showHeadersFooters}
+              currentDateStr={currentDateStr}
+              pageNum={pageTechIntroNum}
+              totalPages={activePagesCount}
+            />
+          )}
+
+          {/* 4. ANÁLISIS DE ENERGÍA Y BALANCE */}
           {showPage1 && (
             <PDFPage1Energy
               project={project}
@@ -200,7 +399,7 @@ export const PDFProposalView: React.FC = () => {
             />
           )}
 
-          {/* PÁGINA 2: COTIZACIÓN DE SISTEMA FOTOVOLTAICO */}
+          {/* 5. COTIZACIÓN DE SISTEMA FOTOVOLTAICO */}
           {showPageQuotation && (
             <PDFPage2Quotation
               project={project}
@@ -213,7 +412,7 @@ export const PDFProposalView: React.FC = () => {
             />
           )}
 
-          {/* PÁGINA 3: RETORNO DE INVERSIÓN - RESUMEN */}
+          {/* 6. RETORNO DE INVERSIÓN Y MÉTRICAS */}
           {showPage2 && (
             <PDFPage3ROI
               project={project}
@@ -226,7 +425,7 @@ export const PDFProposalView: React.FC = () => {
             />
           )}
 
-          {/* PÁGINA 4: FLUJO DE CAJA 25 AÑOS */}
+          {/* 7. FLUJO DE CAJA 25 AÑOS */}
           {showPage3 && (
             <PDFPage4CashFlow
               project={project}
@@ -239,7 +438,7 @@ export const PDFProposalView: React.FC = () => {
             />
           )}
 
-          {/* PÁGINA 5: MATRIZ DE COSTOS INTERNOS (CONFIDENCIAL) */}
+          {/* 8. MATRIZ DE COSTOS INTERNOS (CONFIDENCIAL) */}
           {showPageCostMatrix && (
             <PDFPage5CostMatrix
               project={project}
