@@ -184,11 +184,11 @@ export const PDFProposalView: React.FC = () => {
             Ubicación: <span className="font-semibold text-white">{project.client.province || project.client.location}</span> | Fecha: <span className="font-semibold text-white">{currentDateStr}</span>
           </p>
         </div>
-        <div className="text-right flex items-center justify-end">
+        <div className="text-right flex items-center justify-end pl-6">
           <img
             src={ELECTSUN_LOGO_WHITE_BASE64}
             alt="electsun - El sol a tu favor"
-            className="h-11 w-auto object-contain drop-shadow-xs"
+            className="h-[62px] max-h-[64px] w-auto object-contain drop-shadow-xs"
           />
         </div>
       </div>
