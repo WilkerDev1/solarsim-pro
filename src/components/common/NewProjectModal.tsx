@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { RD_PROVINCES } from '../../data/rdProvinces';
 import { X, Sun, Building2, MapPin, Zap, ArrowRight, ChevronDown, ChevronUp, SlidersHorizontal } from 'lucide-react';
@@ -7,6 +7,7 @@ export const NewProjectModal: React.FC = () => {
   const { isNewProjectModalOpen, closeNewProjectModal, createNewProject, sidebarTheme } = useSimulationStore();
   const isDark = sidebarTheme === 'dark';
 
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
   const [province, setProvince] = useState(RD_PROVINCES[0].name);
@@ -26,6 +27,15 @@ export const NewProjectModal: React.FC = () => {
       setAddress('');
       setShowAdvanced(false);
       setError('');
+
+      // Auto focus on next tick to ensure input is ready
+      const timer = setTimeout(() => {
+        if (nameInputRef.current) {
+          nameInputRef.current.focus();
+          nameInputRef.current.select();
+        }
+      }, 60);
+      return () => clearTimeout(timer);
     }
   }, [isNewProjectModalOpen]);
 
@@ -59,6 +69,7 @@ export const NewProjectModal: React.FC = () => {
     e.preventDefault();
     if (!name.trim()) {
       setError('Por favor, ingresa el nombre del proyecto o cliente.');
+      nameInputRef.current?.focus();
       return;
     }
 
@@ -73,9 +84,12 @@ export const NewProjectModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200"
+      onClick={closeNewProjectModal}
+    >
       <div
-        className={`border rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col scale-100 animate-in zoom-in-95 duration-200 transition-colors ${
+        className={`border rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col scale-100 animate-in zoom-in-95 duration-200 transition-colors z-50 select-text ${
           isDark
             ? 'bg-[#18181f] border-[#2e2e3a] text-zinc-100'
             : 'bg-white border-slate-200 text-slate-900'
@@ -126,19 +140,24 @@ export const NewProjectModal: React.FC = () => {
 
           {/* Primary Field: Project Name */}
           <div>
-            <label className={`block font-bold mb-1.5 ${isDark ? 'text-zinc-200' : 'text-slate-700'}`}>
+            <label
+              htmlFor="project-name-input"
+              className={`block font-bold mb-1.5 ${isDark ? 'text-zinc-200' : 'text-slate-700'}`}
+            >
               Nombre del Proyecto / Cliente <span className="text-red-500 font-black">*</span>
             </label>
             <input
+              ref={nameInputRef}
+              id="project-name-input"
               type="text"
-              autoFocus
+              autoComplete="off"
               placeholder="Ej. Clínica San Rafael, Res. Las Palmas, etc."
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
                 if (error) setError('');
               }}
-              className={`w-full border rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all ${
+              className={`w-full border rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all select-text cursor-text ${
                 isDark
                   ? 'bg-[#22222c] border-[#383848] text-white placeholder:text-zinc-500 focus:bg-[#282834] focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500'
                   : 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 placeholder:text-slate-400 font-semibold'
@@ -189,7 +208,7 @@ export const NewProjectModal: React.FC = () => {
                     placeholder="Ej. Grupo Ramos SRL"
                     value={company}
                     onChange={(e) => setCompany(e.target.value)}
-                    className={`w-full border rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
+                    className={`w-full border rounded-xl px-3 py-2 text-xs font-semibold transition-all select-text cursor-text ${
                       isDark
                         ? 'bg-[#22222a] border-[#383846] text-white focus:bg-[#282834]'
                         : 'bg-white border-slate-300 text-slate-900'
@@ -270,7 +289,7 @@ export const NewProjectModal: React.FC = () => {
                   placeholder="Ej. Av. 27 de Febrero esq. Winston Churchill"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  className={`w-full border rounded-xl px-3 py-2 text-xs font-medium transition-all ${
+                  className={`w-full border rounded-xl px-3 py-2 text-xs font-medium transition-all select-text cursor-text ${
                     isDark
                       ? 'bg-[#22222a] border-[#383846] text-white placeholder:text-zinc-500 focus:bg-[#282834]'
                       : 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400'

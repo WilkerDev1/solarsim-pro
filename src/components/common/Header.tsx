@@ -1,8 +1,6 @@
 import React from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { Sun, Moon, FileText, LayoutDashboard, Save, Plus, ArrowLeft, RefreshCw, CheckCircle2 } from 'lucide-react';
-import { NewProjectModal } from './NewProjectModal';
-import { UpdateModal } from './UpdateModal';
 
 export const Header: React.FC = () => {
   const {
@@ -222,10 +220,6 @@ export const Header: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* Modals */}
-      <NewProjectModal />
-      <UpdateModal />
     </>
   );
 };

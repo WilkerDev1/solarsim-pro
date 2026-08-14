@@ -4,6 +4,8 @@ import { Header } from './components/common/Header';
 import { DashboardView } from './components/dashboard/DashboardView';
 import { SimulatorView } from './components/simulator/SimulatorView';
 import { PDFProposalView } from './components/pdf/PDFProposalView';
+import { NewProjectModal } from './components/common/NewProjectModal';
+import { UpdateModal } from './components/common/UpdateModal';
 
 export const App: React.FC = () => {
   const { activeView, sidebarTheme } = useSimulationStore();
@@ -21,6 +23,10 @@ export const App: React.FC = () => {
         {activeView === 'simulator' && <SimulatorView />}
         {activeView === 'pdf-preview' && <PDFProposalView />}
       </main>
+
+      {/* Global Modals Mounted at Root Level */}
+      <NewProjectModal />
+      <UpdateModal />
     </div>
   );
 };
