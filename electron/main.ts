@@ -4,6 +4,10 @@ import fs from 'fs';
 import https from 'https';
 import { exec } from 'child_process';
 import { autoUpdater } from 'electron-updater';
+import { registerAIInvoiceHandlers } from './aiInvoiceHandler';
+
+// Register AI Invoice Extractor IPC handlers
+registerAIInvoiceHandlers();
 
 // ============================================================================
 // FIX FOR LINUX / ARCH / GNOME / WAYLAND IBUS KEYBOARD INPUT DROP

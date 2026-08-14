@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { RD_PROVINCES } from '../../data/rdProvinces';
-import { X, Sun, Building2, MapPin, Zap, ArrowRight, ChevronDown, ChevronUp, SlidersHorizontal } from 'lucide-react';
+import { X, Sun, Building2, MapPin, Zap, ArrowRight, ChevronDown, ChevronUp, SlidersHorizontal, Sparkles } from 'lucide-react';
 
 export const NewProjectModal: React.FC = () => {
-  const { isNewProjectModalOpen, closeNewProjectModal, createNewProject, sidebarTheme } = useSimulationStore();
+  const { isNewProjectModalOpen, closeNewProjectModal, createNewProject, openAIInvoiceModal, sidebarTheme } = useSimulationStore();
   const isDark = sidebarTheme === 'dark';
 
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -125,6 +125,43 @@ export const NewProjectModal: React.FC = () => {
 
         {/* Modal Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
+          {/* AI Invoice Scan Shortcut */}
+          <div
+            onClick={() => {
+              closeNewProjectModal();
+              openAIInvoiceModal();
+            }}
+            className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 cursor-pointer transition-all duration-200 group ${
+              isDark
+                ? 'bg-gradient-to-r from-emerald-950/50 to-teal-950/40 border-emerald-700/60 hover:border-emerald-500 text-emerald-200'
+                : 'bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200 hover:border-emerald-400 text-emerald-950 shadow-xs'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
+                <Sparkles className="w-4 h-4 animate-pulse" />
+              </div>
+              <div className="space-y-0.5">
+                <h4 className="font-extrabold text-xs flex items-center gap-1.5">
+                  <span>¿Tienes la factura eléctrica EDE?</span>
+                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 font-mono font-bold text-emerald-300">
+                    IA
+                  </span>
+                </h4>
+                <p className="text-[10px] opacity-80">
+                  Escanéala para autocompletar cliente, distribuidora y 12 meses de consumo.
+                </p>
+              </div>
+            </div>
+            <ArrowRight className="w-4 h-4 text-emerald-400 group-hover:translate-x-1 transition-transform shrink-0" />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="h-px bg-zinc-700/30 flex-1" />
+            <span className="text-[10px] font-bold uppercase text-zinc-500 tracking-wider">o ingresar manualmente</span>
+            <div className="h-px bg-zinc-700/30 flex-1" />
+          </div>
+
           {error && (
             <div
               className={`px-3.5 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 border ${

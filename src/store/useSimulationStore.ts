@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { ProjectSimulation, ClientInfo, SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, UpdateInfo, DocumentCustomization } from '../types';
+import { ProjectSimulation, ClientInfo, SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, UpdateInfo, DocumentCustomization, ExtractedInvoiceData } from '../types';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateFinancialSummary } from '../engine/financeEngine';
 
@@ -23,8 +23,14 @@ interface SimulationState {
   // Modals & Notifications
   isNewProjectModalOpen: boolean;
   isUpdateModalOpen: boolean;
+  isAIInvoiceModalOpen: boolean;
+  isAISettingsModalOpen: boolean;
   updateInfo: UpdateInfo;
   saveFeedbackMessage: string | null;
+
+  // AI Configuration
+  geminiApiKey: string;
+  geminiModel: 'gemini-2.0-flash' | 'gemini-1.5-flash' | 'gemini-1.5-pro';
 
   // Actions
   setActiveView: (view: 'dashboard' | 'simulator' | 'pdf-preview') => void;
@@ -36,6 +42,12 @@ interface SimulationState {
   closeNewProjectModal: () => void;
   openUpdateModal: () => void;
   closeUpdateModal: () => void;
+  openAIInvoiceModal: () => void;
+  closeAIInvoiceModal: () => void;
+  openAISettingsModal: () => void;
+  closeAISettingsModal: () => void;
+  setGeminiApiKey: (key: string) => void;
+  setGeminiModel: (model: 'gemini-2.0-flash' | 'gemini-1.5-flash' | 'gemini-1.5-pro') => void;
   setUpdateInfo: (info: UpdateInfo) => void;
   
   updateClient: (client: Partial<ClientInfo>) => void;
@@ -44,6 +56,7 @@ interface SimulationState {
   updateFinancials: (financials: Partial<FinancialParams>) => void;
   updateMonthlyConsumption: (index: number, value: number) => void;
   updateDocumentCustomization: (customization: Partial<DocumentCustomization>) => void;
+  applyExtractedInvoice: (data: ExtractedInvoiceData, createNewProject?: boolean) => void;
   
   createNewProject: (payload?: string | NewProjectPayload) => void;
   duplicateProject: (id: string) => void;
@@ -186,8 +199,13 @@ export const useSimulationStore = create<SimulationState>()(
 
       isNewProjectModalOpen: false,
       isUpdateModalOpen: false,
+      isAIInvoiceModalOpen: false,
+      isAISettingsModalOpen: false,
       updateInfo: { state: 'idle' },
       saveFeedbackMessage: null,
+
+      geminiApiKey: '',
+      geminiModel: 'gemini-2.0-flash',
 
       setActiveView: (view) => set({ activeView: view }),
       setActiveProject: (id) => set({ activeProjectId: id, activeView: 'simulator' }),
@@ -198,6 +216,12 @@ export const useSimulationStore = create<SimulationState>()(
       closeNewProjectModal: () => set({ isNewProjectModalOpen: false }),
       openUpdateModal: () => set({ isUpdateModalOpen: true }),
       closeUpdateModal: () => set({ isUpdateModalOpen: false }),
+      openAIInvoiceModal: () => set({ isAIInvoiceModalOpen: true }),
+      closeAIInvoiceModal: () => set({ isAIInvoiceModalOpen: false }),
+      openAISettingsModal: () => set({ isAISettingsModalOpen: true }),
+      closeAISettingsModal: () => set({ isAISettingsModalOpen: false }),
+      setGeminiApiKey: (key) => set({ geminiApiKey: key }),
+      setGeminiModel: (model) => set({ geminiModel: model }),
       setUpdateInfo: (info) => set({ updateInfo: info }),
 
       updateClient: (clientPartial) => {
@@ -311,6 +335,112 @@ export const useSimulationStore = create<SimulationState>()(
           });
           return { projects };
         });
+      },
+
+      applyExtractedInvoice: (data: ExtractedInvoiceData, createNewProject = false) => {
+        set((state) => {
+          let targetProjectId = state.activeProjectId;
+          let projects = [...state.projects];
+
+          if (createNewProject) {
+            targetProjectId = `proj-${Date.now()}`;
+            const panelW = BENCHMARK_PROJECT.specs.panelPowerW || 620;
+            const count = data.recommendedPanelCount || Math.max(1, Math.ceil(((data.recommendedCapacityKWp || 10) * 1000) / panelW));
+            
+            const newProj: ProjectSimulation = {
+              ...BENCHMARK_PROJECT,
+              id: targetProjectId,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              status: 'Draft',
+              client: {
+                ...BENCHMARK_PROJECT.client,
+                name: data.clientName || 'Cliente Factura EDE',
+                company: data.companyName || '',
+                location: data.address || `${data.province || 'Santo Domingo'}, RD`,
+                province: data.province || 'Santo Domingo',
+                address: data.address || '',
+                distributor: data.distributor,
+                tariffCode: data.tariffCode,
+                contactPhone: data.phone || '',
+                contactEmail: data.email || '',
+                projectId: `SP-2026-${Math.floor(100 + Math.random() * 900)}`,
+                quoteNumber: `C-${Math.floor(1000 + Math.random() * 9000)}`,
+                quoteValidityDays: 7,
+              },
+              specs: {
+                ...BENCHMARK_PROJECT.specs,
+                panelCount: count,
+              },
+              rates: {
+                ...BENCHMARK_PROJECT.rates,
+                distributor: data.distributor,
+                tariffCode: data.tariffCode,
+                ...(data.energyCostPerKWhDOP ? { energyCostPerKWh: Math.round((data.energyCostPerKWhDOP / 60) * 100) / 100 } : {}),
+              },
+              monthlyConsumption: data.monthlyConsumptionKWh && data.monthlyConsumptionKWh.length === 12
+                ? [...data.monthlyConsumptionKWh]
+                : [...BENCHMARK_PROJECT.monthlyConsumption],
+            };
+
+            projects = [newProj, ...projects];
+            return {
+              projects,
+              activeProjectId: targetProjectId,
+              activeView: 'simulator',
+              isAIInvoiceModalOpen: false,
+              saveFeedbackMessage: '¡Proyecto creado y dimensionado con IA desde la factura EDE! ✨',
+            };
+          }
+
+          // Update active project
+          projects = projects.map((p) => {
+            if (p.id === targetProjectId) {
+              const panelW = p.specs.panelPowerW || 620;
+              const count = data.recommendedPanelCount || Math.max(1, Math.ceil(((data.recommendedCapacityKWp || 10) * 1000) / panelW));
+              return {
+                ...p,
+                updatedAt: new Date().toISOString(),
+                client: {
+                  ...p.client,
+                  name: data.clientName || p.client.name,
+                  company: data.companyName || p.client.company,
+                  location: data.address || p.client.location,
+                  province: data.province || p.client.province,
+                  address: data.address || p.client.address,
+                  distributor: data.distributor || p.client.distributor,
+                  tariffCode: data.tariffCode || p.client.tariffCode,
+                  contactPhone: data.phone || p.client.contactPhone,
+                  contactEmail: data.email || p.client.contactEmail,
+                },
+                specs: {
+                  ...p.specs,
+                  panelCount: count,
+                },
+                rates: {
+                  ...p.rates,
+                  distributor: data.distributor || p.rates.distributor,
+                  tariffCode: data.tariffCode || p.rates.tariffCode,
+                  ...(data.energyCostPerKWhDOP ? { energyCostPerKWh: Math.round((data.energyCostPerKWhDOP / p.rates.usdExchangeRate) * 100) / 100 } : {}),
+                },
+                monthlyConsumption: data.monthlyConsumptionKWh && data.monthlyConsumptionKWh.length === 12
+                  ? [...data.monthlyConsumptionKWh]
+                  : p.monthlyConsumption,
+              };
+            }
+            return p;
+          });
+
+          return {
+            projects,
+            isAIInvoiceModalOpen: false,
+            saveFeedbackMessage: '¡Datos de consumo y cliente aplicados con IA exitosamente! ✨',
+          };
+        });
+
+        setTimeout(() => {
+          set({ saveFeedbackMessage: null });
+        }, 4000);
       },
 
       createNewProject: (payload) => {

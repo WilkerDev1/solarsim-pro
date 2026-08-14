@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
-import { Sun, Moon, FileText, LayoutDashboard, Save, Plus, ArrowLeft, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Sun, Moon, FileText, LayoutDashboard, Save, Plus, ArrowLeft, RefreshCw, CheckCircle2, Sparkles, Bot } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const {
@@ -9,6 +9,7 @@ export const Header: React.FC = () => {
     getActiveProject,
     openNewProjectModal,
     openUpdateModal,
+    openAIInvoiceModal,
     saveActiveProject,
     saveFeedbackMessage,
     sidebarTheme,
@@ -151,6 +152,20 @@ export const Header: React.FC = () => {
           </button>
 
           <div className={`flex items-center gap-2 border-l pl-3 ${isDark ? 'border-[#27272a]' : 'border-slate-200'}`}>
+            {/* Button Escanear Factura con IA */}
+            <button
+              onClick={openAIInvoiceModal}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border text-xs font-extrabold transition-all shadow-xs cursor-pointer active:scale-95 ${
+                isDark
+                  ? 'border-emerald-500/50 bg-gradient-to-r from-emerald-950/80 to-teal-950/80 hover:from-emerald-900 hover:to-teal-900 text-emerald-300 shadow-emerald-950/30'
+                  : 'border-emerald-300 bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 text-emerald-950 shadow-emerald-100/50'
+              }`}
+              title="Extraer datos y consumo desde factura eléctrica EDE con IA"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+              <span>Escanear Factura (IA)</span>
+            </button>
+
             {/* Button Buscar Actualizaciones */}
             <button
               onClick={openUpdateModal}

@@ -10,6 +10,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openExternalUrl: (url: string) => ipcRenderer.invoke('open-external-url', url),
   installLinuxPackage: (packageType: 'pacman' | 'deb', version: string) =>
     ipcRenderer.invoke('install-linux-package', packageType, version),
+  parseInvoiceWithAI: (payload: any) =>
+    ipcRenderer.invoke('parse-invoice-with-ai', payload),
+  validateGeminiApiKey: (apiKey: string) =>
+    ipcRenderer.invoke('validate-gemini-key', apiKey),
   onUpdateStatus: (callback: (info: any) => void) => {
     const subscription = (_event: any, value: any) => callback(value);
     ipcRenderer.on('update-status', subscription);

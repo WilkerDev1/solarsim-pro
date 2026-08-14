@@ -233,6 +233,8 @@ export interface UpdateInfo {
   error?: string;
 }
 
+export * from './aiInvoice';
+
 declare global {
   interface Window {
     electronAPI?: {
@@ -245,6 +247,8 @@ declare global {
       getPlatformInfo: () => Promise<PlatformInfo>;
       openExternalUrl: (url: string) => Promise<void>;
       installLinuxPackage: (packageType: 'pacman' | 'deb', version: string) => Promise<{ success: boolean; error?: string }>;
+      parseInvoiceWithAI?: (payload: { fileBase64: string; mimeType: string; fileName: string; apiKey?: string; model?: string; panelPowerW?: number }) => Promise<{ success: boolean; data?: any; error?: string }>;
+      validateGeminiApiKey?: (apiKey: string) => Promise<{ success: boolean; error?: string; modelName?: string }>;
     };
   }
 }

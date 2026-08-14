@@ -13,7 +13,7 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
-import { Globe, CheckCircle2, AlertCircle, Loader2, ShieldCheck, Check, Package, FileText, Save, Clock } from 'lucide-react';
+import { Globe, CheckCircle2, AlertCircle, Loader2, ShieldCheck, Check, Package, FileText, Save, Clock, Sparkles } from 'lucide-react';
 
 export const SimulatorView: React.FC = () => {
   const {
@@ -25,6 +25,7 @@ export const SimulatorView: React.FC = () => {
     updateFinancials,
     updateMonthlyConsumption,
     saveActiveProject,
+    openAIInvoiceModal,
     sidebarTheme,
     sidebarWidth,
     setSidebarWidth,
@@ -1291,8 +1292,16 @@ export const SimulatorView: React.FC = () => {
 
             {/* TABLA DE DETALLE MENSUAL EDITABLE */}
             <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs shrink-0">
-              <div className="bg-[#14532d] text-white px-4 py-3 font-bold text-xs uppercase tracking-wider">
-                Resumen Mensual de Energía
+              <div className="bg-[#14532d] text-white px-4 py-2.5 font-bold text-xs uppercase tracking-wider flex justify-between items-center">
+                <span>Resumen Mensual de Energía</span>
+                <button
+                  onClick={openAIInvoiceModal}
+                  className="bg-white/10 hover:bg-white/20 border border-white/30 text-amber-300 hover:text-amber-200 px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
+                  title="Escanear factura eléctrica EDE con IA para autocompletar consumo y cliente"
+                >
+                  <Sparkles className="w-3.5 h-3.5 fill-amber-300" />
+                  <span>Autocompletar con Factura EDE (IA)</span>
+                </button>
               </div>
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="bg-slate-100 font-bold text-slate-700 border-b border-slate-200">

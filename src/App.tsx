@@ -6,6 +6,8 @@ import { SimulatorView } from './components/simulator/SimulatorView';
 import { PDFProposalView } from './components/pdf/PDFProposalView';
 import { NewProjectModal } from './components/common/NewProjectModal';
 import { UpdateModal } from './components/common/UpdateModal';
+import { AIInvoiceScannerModal } from './components/common/AIInvoiceScannerModal';
+import { AISettingsModal } from './components/common/AISettingsModal';
 
 export const App: React.FC = () => {
   const { activeView, sidebarTheme } = useSimulationStore();
@@ -27,6 +29,8 @@ export const App: React.FC = () => {
       {/* Global Modals Mounted at Root Level */}
       <NewProjectModal />
       <UpdateModal />
+      <AIInvoiceScannerModal />
+      <AISettingsModal />
     </div>
   );
 };
