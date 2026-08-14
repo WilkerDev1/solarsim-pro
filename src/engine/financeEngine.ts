@@ -229,7 +229,8 @@ export function calculateFinancialSummary(
         : Math.round(grossInvestmentUSD * 0.40 * 0.684568 * 100) / 100)
     : 0;
 
-  const netInvestmentUSD = Math.round((grossInvestmentUSD - ley5707CreditUSD) * 100) / 100;
+  // Total Net Investment after all fiscal incentives of Ley 57-07 (ITBIS exoneration + 40% DGII tax credit)
+  const netInvestmentUSD = Math.round((grossInvestmentUSD - itbisSavedUSD - ley5707CreditUSD) * 100) / 100;
 
   // Monthly energy balance calculation dynamically based on location-specific solar radiation (HSP)
   const monthlyResults = calculateMonthlySolarProduction(
@@ -266,9 +267,13 @@ export function calculateFinancialSummary(
   const annualInflationPct = rates.annualEnergyInflationPct || 3.5;
   const annualTaxCredit = financials.applyLey5707 ? ley5707CreditUSD / 3 : 0;
 
+  // Initial cash outflow for the client at Year 0:
+  // If ITBIS is exempt, the client pays gross minus ITBIS.
+  const initialOutflowUSD = Math.max(0, grossInvestmentUSD - itbisSavedUSD);
+
   const cashFlow25Years: CashFlowYear[] = [];
   const annualNetCashFlows: number[] = [];
-  let cumulativeCashFlow = -grossInvestmentUSD;
+  let cumulativeCashFlow = -initialOutflowUSD;
   let paybackYears = 25.0;
   let paybackFound = false;
 
@@ -296,7 +301,7 @@ export function calculateFinancialSummary(
 
     if (!paybackFound && cumulativeCashFlow >= 0) {
       paybackFound = true;
-      const fraction = Math.abs(prevCumulative) / netCashFlow;
+      const fraction = netCashFlow > 0 ? Math.abs(prevCumulative) / netCashFlow : 0;
       paybackYears = Math.round(((year - 1) + fraction) * 10) / 10;
     }
 
@@ -314,19 +319,19 @@ export function calculateFinancialSummary(
 
   // NPV (VAN) Calculation
   const discountRate = financials.discountRatePct / 100;
-  let npvUSD = -grossInvestmentUSD;
+  let npvUSD = -initialOutflowUSD;
   for (let t = 0; t < annualNetCashFlows.length; t++) {
     npvUSD += annualNetCashFlows[t] / Math.pow(1 + discountRate, t + 1);
   }
   npvUSD = Math.round(npvUSD * 100) / 100;
 
   // IRR (TIR) Calculation
-  const irrPct = calculateIRR(grossInvestmentUSD, annualNetCashFlows);
+  const irrPct = calculateIRR(initialOutflowUSD, annualNetCashFlows);
 
   // 25-Year ROI % Calculation
   const totalNetReturns = annualNetCashFlows.reduce((sum, cf) => sum + cf, 0);
-  const roi25YrPct = grossInvestmentUSD > 0
-    ? Math.round(((totalNetReturns - grossInvestmentUSD) / grossInvestmentUSD) * 10000) / 100
+  const roi25YrPct = initialOutflowUSD > 0
+    ? Math.round(((totalNetReturns - initialOutflowUSD) / initialOutflowUSD) * 10000) / 100
     : 0;
 
   // CO2 avoided calculation (tons/year)

@@ -35,8 +35,9 @@ export const PDFPage3ROI: React.FC<PDFPage3ROIProps> = ({
   totalPages,
 }) => {
   const cf25 = summary.cashFlow25Years;
+  const initialOutflowUSD = summary.grossInvestmentUSD - summary.itbisSavedUSD;
   const cumulativeChartData = [
-    { yearLabel: '0', year: 0, cumulative: -summary.grossInvestmentUSD },
+    { yearLabel: '0', year: 0, cumulative: -initialOutflowUSD },
     ...cf25.map((c) => ({
       yearLabel: `${c.year}`,
       year: c.year,

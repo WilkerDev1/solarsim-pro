@@ -67,19 +67,24 @@ export const PDFPage4CashFlow: React.FC<PDFPage4CashFlowProps> = ({
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700 font-semibold text-[11px]">
               {/* Year 0 Row */}
-              <tr className="bg-red-50/70 text-red-700 font-bold">
-                <td className="px-2 py-1.5 text-center">0</td>
-                <td className="px-2 py-1.5 text-right text-slate-400">-</td>
-                <td className="px-2 py-1.5 text-right text-slate-400">-</td>
-                <td className="px-2 py-1.5 text-right text-slate-400">-</td>
-                <td className="px-2 py-1.5 text-right text-slate-400">-</td>
-                <td className="px-2 py-1.5 text-right text-red-600">
-                  -${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </td>
-                <td className="px-2 py-1.5 text-right text-red-600 font-extrabold">
-                  -${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </td>
-              </tr>
+              {(() => {
+                const initialOutflow = summary.grossInvestmentUSD - summary.itbisSavedUSD;
+                return (
+                  <tr className="bg-red-50/70 text-red-700 font-bold">
+                    <td className="px-2 py-1.5 text-center">0</td>
+                    <td className="px-2 py-1.5 text-right text-slate-400">-</td>
+                    <td className="px-2 py-1.5 text-right text-slate-400">-</td>
+                    <td className="px-2 py-1.5 text-right text-slate-400">-</td>
+                    <td className="px-2 py-1.5 text-right text-slate-400">-</td>
+                    <td className="px-2 py-1.5 text-right text-red-600">
+                      -${initialOutflow.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-2 py-1.5 text-right text-red-600 font-extrabold">
+                      -${initialOutflow.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                );
+              })()}
 
               {/* Years 1 to 25 */}
               {cf25.map((row) => {

@@ -1500,7 +1500,7 @@ export const SimulatorView: React.FC = () => {
                   <div className="w-[380px] bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1.5 text-[11px]">
                     <div className="flex justify-between text-slate-700">
                       <span className="font-semibold">SUB-TOTAL (USD) SIN ITBIS :</span>
-                      <span className="font-bold">${(summary.grossInvestmentUSD / 1.18).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="font-bold">${(summary.itbisSavedUSD > 0 ? (summary.grossInvestmentUSD - summary.itbisSavedUSD) : (summary.grossInvestmentUSD / 1.18)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                     <div className="flex justify-between text-slate-900 bg-slate-200/80 px-2 py-1 rounded font-bold">
                       <span>TOTAL GENERAL (USD) :</span>
@@ -1516,7 +1516,7 @@ export const SimulatorView: React.FC = () => {
                     </div>
                     <div className="flex justify-between text-slate-800 pt-1 border-t border-slate-300">
                       <span className="font-bold">PRECIO POR WATT (USD/W):</span>
-                      <span className="font-bold text-emerald-800">${(project.specs.pricePerWattUSD || project.financials.pricePerWattUSD || 1.13).toFixed(2)}</span>
+                      <span className="font-bold text-emerald-800">${(summary.systemCapacityKWp > 0 ? (summary.grossInvestmentUSD / (summary.systemCapacityKWp * 1000)) : (project.specs.pricePerWattUSD || 1.13)).toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -1784,13 +1784,21 @@ export const SimulatorView: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-200 text-slate-700 font-semibold">
                   <tr className="hover:bg-slate-50">
-                    <td className="py-2.5 px-4 font-bold text-slate-800">Inversión Inicial Sistema (USD)</td>
+                    <td className="py-2.5 px-4 font-bold text-slate-800">Inversión Bruta Sistema (USD)</td>
                     <td className="py-2.5 px-4 font-bold text-slate-900">${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</td>
                   </tr>
-                  <tr className="hover:bg-slate-50">
-                    <td className="py-2.5 px-4 font-bold text-slate-800">Incentivo Fiscal (Ley 57-07) (USD)</td>
-                    <td className="py-2.5 px-4 font-bold text-emerald-700">-${summary.ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</td>
-                  </tr>
+                  {summary.itbisSavedUSD > 0 && (
+                    <tr className="hover:bg-slate-50">
+                      <td className="py-2.5 px-4 font-bold text-slate-800">Exoneración 18% ITBIS (Ley 57-07) (USD)</td>
+                      <td className="py-2.5 px-4 font-bold text-emerald-700">-${summary.itbisSavedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</td>
+                    </tr>
+                  )}
+                  {summary.ley5707CreditUSD > 0 && (
+                    <tr className="hover:bg-slate-50">
+                      <td className="py-2.5 px-4 font-bold text-slate-800">Crédito Fiscal 40% DGII (Ley 57-07) (USD)</td>
+                      <td className="py-2.5 px-4 font-bold text-emerald-700">-${summary.ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</td>
+                    </tr>
+                  )}
                   <tr className="hover:bg-slate-50 bg-emerald-50/50 font-bold">
                     <td className="py-2.5 px-4 text-slate-900">Inversión Neta Final (USD)</td>
                     <td className="py-2.5 px-4 text-emerald-800 text-sm">${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</td>
@@ -1820,7 +1828,7 @@ export const SimulatorView: React.FC = () => {
                     <td className="py-2.5 px-4 text-right">${year1Savings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td className="py-2.5 px-4 text-right text-emerald-700">${year1Tax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                     <td className="py-2.5 px-4 text-right font-semibold">${(year1Savings + year1Tax).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    <td className="py-2.5 px-4 text-right font-bold text-red-600">-${(summary.grossInvestmentUSD - year1Savings - year1Tax).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                    <td className="py-2.5 px-4 text-right font-bold text-red-600">-${((summary.grossInvestmentUSD - summary.itbisSavedUSD) - year1Savings - year1Tax).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   </tr>
 
                   <tr className="hover:bg-slate-50 bg-emerald-50/60 font-bold">
