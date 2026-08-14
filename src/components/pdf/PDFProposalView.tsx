@@ -61,20 +61,10 @@ export const PDFProposalView: React.FC = () => {
   };
 
   const handleExportPDF = async () => {
+    if (!pdfRef.current) return;
     setIsExporting(true);
 
     try {
-      // 1. Si estamos en Electron, usar el motor nativo Chromium printToPDF (máxima fidelidad vectorial, 0 recortes)
-      if (window.electronAPI?.printToPDF) {
-        const result = await window.electronAPI.printToPDF();
-        if (result?.success || result?.cancelled) {
-          setIsExporting(false);
-          return;
-        }
-      }
-
-      // 2. Fallback de navegador web con html2canvas y aislamiento estricto (0,0) por página
-      if (!pdfRef.current) return;
       const pageElements = pdfRef.current.querySelectorAll<HTMLElement>('.pdf-page');
       if (!pageElements || pageElements.length === 0) {
         setIsExporting(false);
@@ -104,32 +94,31 @@ export const PDFProposalView: React.FC = () => {
           height: 1202,
           scrollX: 0,
           scrollY: 0,
-          onclone: (clonedDoc, clonedElement) => {
-            const clonedPages = clonedDoc.querySelectorAll<HTMLElement>('.pdf-page');
-            const targetPage = clonedPages[i] || clonedElement;
+          onclone: (clonedDoc) => {
+            // Ocultar todas las demás páginas para que la página i esté en offsetTop = 0 sin gaps
+            const allClonedPages = clonedDoc.querySelectorAll<HTMLElement>('.pdf-page');
+            allClonedPages.forEach((p, idx) => {
+              if (idx !== i) {
+                p.style.display = 'none';
+              } else {
+                p.style.display = 'flex';
+                p.style.width = '850px';
+                p.style.height = '1202px';
+                p.style.minHeight = '1202px';
+                p.style.maxHeight = '1202px';
+                p.style.boxSizing = 'border-box';
+                p.style.overflow = 'hidden';
+                p.style.margin = '0';
+                p.style.transform = 'none';
+              }
+            });
 
-            // Limpiar y resetear el body clonado para colocar la página exactamente en (0,0)
-            clonedDoc.body.innerHTML = '';
-            clonedDoc.body.style.margin = '0';
-            clonedDoc.body.style.padding = '0';
-            clonedDoc.body.style.background = '#ffffff';
-            clonedDoc.body.style.overflow = 'hidden';
-            clonedDoc.body.style.width = '850px';
-            clonedDoc.body.style.height = '1202px';
-
-            if (targetPage) {
-              targetPage.style.position = 'absolute';
-              targetPage.style.top = '0';
-              targetPage.style.left = '0';
-              targetPage.style.margin = '0';
-              targetPage.style.width = '850px';
-              targetPage.style.height = '1202px';
-              targetPage.style.minHeight = '1202px';
-              targetPage.style.maxHeight = '1202px';
-              targetPage.style.boxSizing = 'border-box';
-              targetPage.style.overflow = 'hidden';
-              targetPage.style.transform = 'none';
-              clonedDoc.body.appendChild(targetPage);
+            // Eliminar gaps o padding del contenedor padre
+            const parentContainer = allClonedPages[i]?.parentElement;
+            if (parentContainer) {
+              parentContainer.style.gap = '0';
+              parentContainer.style.padding = '0';
+              parentContainer.style.margin = '0';
             }
           },
         });
