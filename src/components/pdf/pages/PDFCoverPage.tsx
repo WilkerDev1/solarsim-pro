@@ -2,7 +2,7 @@ import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
 import { Phone, MapPin, Globe, Instagram, MapPinned } from 'lucide-react';
-import { ELECTSUN_LOGO_COLOR_BASE64 } from '../../../assets/electsunLogo';
+import { ELECTSUN_LOGO_COLOR_BASE64, ELECTSUN_LOGO_WHITE_BASE64 } from '../../../assets/electsunLogo';
 import { PDF_COVER_HERO_BASE64 } from '../../../assets/pdfGraphicAssets';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
 
@@ -28,32 +28,33 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
   const companyInstagram = cust.companyInstagram || DEFAULT_DOCUMENT_CUSTOMIZATION.companyInstagram || 'Electsunrd';
 
   const isDefaultElectsun = companyName.toLowerCase().trim() === 'electsun';
+  // Use color or white logo directly without capsule background
   const headerLogoSrc = cust.headerLogoBase64 || ELECTSUN_LOGO_COLOR_BASE64;
 
-  const clientName = project.client.name || 'Centro Médico Hispánico';
+  const clientName = (project.client.name || 'Centro Médico Hispánico').toUpperCase();
   const clientLocation = project.client.province || project.client.location || 'Santo Domingo / Distrito Nacional';
   const panelModelText = `${project.specs.panelCount} Módulos Tier-1 (${project.specs.panelPowerW}W)`;
 
   return (
     <div className="pdf-page w-[850px] min-h-[1100px] bg-white shadow-2xl flex flex-col justify-between shrink-0 relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
-      {/* 1. Header Overlay (Top-Right Floating Brand Card) */}
-      <div className="absolute top-0 right-0 w-full flex justify-end p-8 z-30 pointer-events-none">
-        <div className="flex items-center gap-3 bg-white/95 backdrop-blur-md px-6 py-2.5 rounded-full shadow-lg border border-white/80 pointer-events-auto">
+      {/* 1. Header Overlay (Transparent High-Resolution Logo on Top-Right) */}
+      <div className="absolute top-0 right-0 w-full flex justify-end p-9 z-30 pointer-events-none">
+        <div className="flex items-center gap-3 pointer-events-auto">
           {cust.headerLogoBase64 || isDefaultElectsun ? (
             <img
               src={headerLogoSrc}
               alt={companyName}
-              className="h-10 max-h-11 w-auto object-contain"
+              className="h-16 max-h-[70px] w-auto object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.35)]"
             />
           ) : (
-            <div className="flex flex-col leading-none">
+            <div className="flex flex-col text-right drop-shadow-md">
               <span
-                className="text-2xl font-extrabold tracking-tighter uppercase"
+                className="text-3xl font-black tracking-tight uppercase"
                 style={{ color: activeTheme.primary }}
               >
                 {companyName}
               </span>
-              <span className="text-[9px] text-slate-500 font-medium self-end tracking-wider">
+              <span className="text-xs font-bold text-white uppercase tracking-widest">
                 {companySlogan}
               </span>
             </div>
@@ -61,135 +62,156 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
         </div>
       </div>
 
-      {/* 2. Geometric Hero Section with Polygons & Diagonal Cuts */}
-      <div className="relative h-[560px] w-full z-0 flex flex-col overflow-hidden bg-slate-900">
-        {/* Background Dot-Grid Texture */}
+      {/* 2. Geometric Hero Section with Exact Polygon Clip-paths */}
+      <div className="relative h-[530px] w-full z-0 overflow-hidden bg-slate-900">
+        {/* Subtle dot-grid texture on background */}
         <div
-          className="absolute inset-0 opacity-20 pointer-events-none z-0"
+          className="absolute inset-0 opacity-25 pointer-events-none z-0"
           style={{
-            backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)',
+            backgroundImage: 'radial-gradient(#ffffff 1.2px, transparent 1.2px)',
             backgroundSize: '20px 20px',
           }}
         />
 
-        {/* Main Image with Geometric Clip */}
+        {/* Underlying Colored Polygons (Zero white gaps) */}
+        <div
+          className="absolute right-0 bottom-12 w-2/3 h-1/2 z-0"
+          style={{
+            backgroundColor: activeTheme.primary,
+            clipPath: 'polygon(100% 0, 100% 100%, 18% 100%)',
+            opacity: 0.95,
+          }}
+        />
+
+        <div
+          className="absolute right-0 bottom-0 w-1/2 h-1/3 z-0"
+          style={{
+            backgroundColor: activeTheme.secondary,
+            clipPath: 'polygon(100% 0, 100% 100%, 48% 100%)',
+            opacity: 0.95,
+          }}
+        />
+
+        {/* Main Image Polygon on Top */}
         <div
           className="absolute inset-0 z-10 overflow-hidden"
           style={{
-            clipPath: 'polygon(0 0, 100% 0, 100% 68%, 42% 100%, 0% 100%)',
+            clipPath: 'polygon(0 0, 100% 0, 100% 65%, 40% 100%, 0% 100%)',
           }}
         >
           <img
             src={PDF_COVER_HERO_BASE64}
             alt="Solar rooftop installation at sunset"
-            className="w-full h-full object-cover object-center scale-100"
+            className="w-full h-full object-cover object-center"
           />
-          {/* Subtle Multiply Tint */}
+          {/* Subtle blend overlay */}
           <div
-            className="absolute inset-0 opacity-25 mix-blend-multiply"
+            className="absolute inset-0 opacity-20 mix-blend-multiply"
             style={{ backgroundColor: activeTheme.primary }}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-black/30" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/25" />
         </div>
 
-        {/* Color Accent Polygon 1 (Primary / Theme Color) */}
-        <div
-          className="absolute right-0 bottom-10 w-2/3 h-1/2 opacity-95 z-0 transition-colors"
-          style={{
-            backgroundColor: activeTheme.primary,
-            clipPath: 'polygon(100% 0, 100% 100%, 20% 100%)',
-          }}
-        />
-
-        {/* Color Accent Polygon 2 (Secondary / Accent Color) */}
-        <div
-          className="absolute right-0 bottom-0 w-1/2 h-1/3 z-0 transition-colors"
-          style={{
-            backgroundColor: activeTheme.secondary,
-            clipPath: 'polygon(100% 0, 100% 100%, 45% 100%)',
-          }}
-        />
-
-        {/* Legislative Tag (Top Left) */}
+        {/* Top-Left Project Tag (Directly Relevant to Proposal) */}
         <div className="absolute top-10 left-12 z-20 space-y-2">
           <div className="flex items-center gap-2.5">
             <div
-              className="w-8 h-1 rounded-full shadow-xs"
+              className="w-9 h-1 rounded-full shadow-md"
               style={{ backgroundColor: activeTheme.secondary }}
             />
-            <span className="text-xs font-black tracking-[0.3em] text-white uppercase drop-shadow-md">
-              Dossier Ejecutivo
+            <span className="text-xs font-black tracking-[0.25em] text-white uppercase drop-shadow-md">
+              SISTEMA SOLAR FOTOVOLTAICO
             </span>
           </div>
 
           <div
-            className="backdrop-blur-md text-white px-4 py-1.5 inline-flex items-center gap-2 rounded-sm border-l-4 shadow-lg"
+            className="backdrop-blur-md text-white px-4 py-2 inline-flex items-center gap-2 rounded-sm border-l-4 shadow-xl"
             style={{
-              backgroundColor: `${activeTheme.primary}dd`,
+              backgroundColor: 'rgba(15, 23, 42, 0.85)',
               borderLeftColor: activeTheme.secondary,
             }}
           >
-            <span className="text-[11px] font-bold uppercase tracking-wider">
-              Ingeniería Solar • Ley 57-07
+            <span className="text-xs font-extrabold uppercase tracking-wider text-amber-300">
+              ENERGÍA SOLAR
+            </span>
+            <span className="text-xs font-bold text-white/90 uppercase tracking-wider">
+              • LEY 57-07
             </span>
           </div>
         </div>
       </div>
 
-      {/* 3. Main Content Area */}
-      <main className="flex-1 px-12 pt-6 pb-4 flex flex-col justify-center relative z-10 bg-white">
-        {/* Subtle Dot-Grid Texture */}
+      {/* 3. Main Content Area with Dot-Grid & Dual-Tone Complementary Typography */}
+      <main className="flex-1 px-12 pt-7 pb-4 flex flex-col justify-center relative z-10 bg-white">
+        {/* Dot-Grid Texture */}
         <div
           className="absolute inset-0 opacity-30 pointer-events-none"
           style={{
-            backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)',
+            backgroundImage: 'radial-gradient(#94a3b8 1.2px, transparent 1.2px)',
             backgroundSize: '20px 20px',
           }}
         />
 
-        <div className="flex w-full gap-8 relative z-10 items-center">
-          {/* Left Column: Title & Capacity */}
+        <div className="flex w-full gap-10 relative z-10 items-center">
+          {/* Left Column: Title & Dual-Tone Details */}
           <div className="flex-1 flex flex-col justify-center">
-            <h2 className="text-[11px] font-black tracking-[0.3em] text-slate-400 uppercase mb-3 flex items-center gap-3">
-              <span className="w-12 h-0.5 bg-slate-300 rounded-full inline-block" />
-              PROPUESTA TÉCNICA
-            </h2>
+            {/* Header Dual-Tone Tag */}
+            <div className="flex items-center gap-3 mb-3">
+              <span
+                className="w-12 h-1 rounded-full inline-block"
+                style={{ backgroundColor: activeTheme.secondary }}
+              />
+              <span
+                className="text-xs font-black tracking-[0.3em] uppercase"
+                style={{ color: activeTheme.primary }}
+              >
+                PROPUESTA TÉCNICA Y ECONÓMICA
+              </span>
+            </div>
 
+            {/* Client Name in Large Imposing Typography */}
             <h1
-              className="text-4xl font-extrabold uppercase leading-tight tracking-tight mb-2 drop-shadow-2xs"
+              className="text-5xl font-black uppercase leading-[1.1] tracking-tight mb-3 drop-shadow-xs"
               style={{ color: activeTheme.primary }}
             >
               {clientName}
             </h1>
 
-            <div className="flex items-center gap-2 text-slate-500 text-xs font-semibold mb-6">
-              <MapPinned className="w-4 h-4 text-slate-400 shrink-0" />
+            {/* Location */}
+            <div className="flex items-center gap-2 text-slate-600 text-sm font-bold mb-6">
+              <MapPinned
+                className="w-4 h-4 shrink-0"
+                style={{ color: activeTheme.secondary }}
+              />
               <span>{clientLocation}</span>
             </div>
 
-            {/* Clean Technical Callout for Capacity */}
+            {/* Technical Capacity Callout (Dual-Tone) */}
             <div
-              className="inline-flex items-center gap-5 py-3 border-b-2 max-w-[340px]"
-              style={{ borderBottomColor: `${activeTheme.primary}40` }}
+              className="inline-flex items-center gap-5 py-3.5 border-b-2 max-w-[360px]"
+              style={{ borderBottomColor: activeTheme.primary }}
             >
               <div className="flex items-baseline gap-1.5">
                 <span
-                  className="text-4xl font-light tracking-tight font-mono"
+                  className="text-5xl font-black tracking-tight font-mono"
                   style={{ color: activeTheme.primary }}
                 >
                   {summary.systemCapacityKWp.toFixed(2)}
                 </span>
                 <span
-                  className="text-xl font-black font-sans uppercase"
-                  style={{ color: activeTheme.primary }}
+                  className="text-2xl font-black uppercase font-sans"
+                  style={{ color: activeTheme.secondary }}
                 >
                   kWp
                 </span>
               </div>
 
-              <div className="h-8 w-px bg-slate-300" />
+              <div
+                className="h-10 w-0.5 rounded-full"
+                style={{ backgroundColor: activeTheme.secondary }}
+              />
 
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-tight">
+              <span className="text-[11px] font-black text-slate-600 uppercase tracking-widest leading-tight">
                 Capacidad
                 <br />
                 Instalada
@@ -197,49 +219,65 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
             </div>
           </div>
 
-          {/* Right Column: Sidebar Info Cards */}
-          <div className="w-64 flex flex-col justify-center border-l border-slate-200 pl-8 space-y-4">
+          {/* Right Column: Sidebar Info with Complementary Color Dots */}
+          <div className="w-64 flex flex-col justify-center border-l-2 border-slate-100 pl-8 space-y-4">
+            {/* ID Proyecto */}
             <div className="relative">
               <div
-                className="absolute -left-[37px] w-2.5 h-2.5 rounded-full top-1 shadow-2xs"
+                className="absolute -left-[38px] w-3 h-3 rounded-full top-1 shadow-xs"
                 style={{ backgroundColor: activeTheme.secondary }}
               />
-              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-0.5">
+              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-0.5">
                 ID Proyecto
               </span>
-              <span className="text-sm font-bold font-mono text-slate-900 block">
+              <span
+                className="text-lg font-black font-mono block"
+                style={{ color: activeTheme.primary }}
+              >
                 {project.client.projectId || 'SP-2024-089'}
               </span>
             </div>
 
+            {/* Fecha Emisión */}
             <div className="relative">
               <div
-                className="absolute -left-[37px] w-2.5 h-2.5 rounded-full top-1 shadow-2xs"
+                className="absolute -left-[38px] w-3 h-3 rounded-full top-1 shadow-xs"
                 style={{ backgroundColor: activeTheme.primary }}
               />
-              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-0.5">
+              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-0.5">
                 Fecha Emisión
               </span>
-              <span className="text-sm font-bold text-slate-900 block">
+              <span
+                className="text-lg font-black block"
+                style={{ color: activeTheme.primary }}
+              >
                 {currentDateStr}
               </span>
             </div>
 
+            {/* Validez */}
             <div className="relative">
-              <div className="absolute -left-[37px] w-2.5 h-2.5 rounded-full top-1 bg-slate-700 shadow-2xs" />
-              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-0.5">
+              <div
+                className="absolute -left-[38px] w-3 h-3 rounded-full top-1 shadow-xs"
+                style={{ backgroundColor: activeTheme.secondary }}
+              />
+              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-0.5">
                 Validez
               </span>
-              <span className="text-sm font-bold text-emerald-700 block">
+              <span
+                className="text-lg font-black block"
+                style={{ color: activeTheme.secondary }}
+              >
                 {project.client.quoteValidityDays || 7} Días Laborables
               </span>
             </div>
 
+            {/* Configuración */}
             <div className="relative pt-3 border-t border-slate-200">
-              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-0.5">
+              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-0.5">
                 Configuración
               </span>
-              <span className="text-xs font-semibold text-slate-700 block leading-snug">
+              <span className="text-xs font-bold text-slate-800 block leading-snug">
                 {panelModelText}
               </span>
             </div>
@@ -251,43 +289,52 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
       <footer className="mt-auto px-12 py-5 bg-slate-50 border-t border-slate-200 relative overflow-hidden">
         {/* Subtle Decorative Circle Outline */}
         <div
-          className="absolute right-[-40px] bottom-[-40px] w-40 h-40 rounded-full border-[8px] border-slate-200/60 opacity-60 pointer-events-none"
+          className="absolute right-[-40px] bottom-[-40px] w-44 h-44 rounded-full border-[10px] border-slate-200/70 opacity-60 pointer-events-none"
         />
 
         <div className="flex justify-between items-center relative z-10 text-xs">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-white text-slate-700 flex items-center justify-center border border-slate-200 shadow-2xs">
-                <Phone className="w-3.5 h-3.5 text-slate-600" />
+          <div className="flex items-center gap-7">
+            <div className="flex items-center gap-2.5">
+              <div
+                className="w-8 h-8 rounded-lg text-white flex items-center justify-center shadow-xs"
+                style={{ backgroundColor: activeTheme.primary }}
+              >
+                <Phone className="w-4 h-4" />
               </div>
-              <span className="font-semibold text-slate-800 text-[11px]">{companyPhone}</span>
+              <span className="font-bold text-slate-900 text-xs">{companyPhone}</span>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-white text-slate-700 flex items-center justify-center border border-slate-200 shadow-2xs">
-                <Globe className="w-3.5 h-3.5 text-slate-600" />
+            <div className="flex items-center gap-2.5">
+              <div
+                className="w-8 h-8 rounded-lg text-white flex items-center justify-center shadow-xs"
+                style={{ backgroundColor: activeTheme.primary }}
+              >
+                <Globe className="w-4 h-4" />
               </div>
-              <span className="font-semibold text-slate-800 text-[11px]">{companyWebsite}</span>
+              <span className="font-bold text-slate-900 text-xs">{companyWebsite}</span>
             </div>
 
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-white text-slate-700 flex items-center justify-center border border-slate-200 shadow-2xs">
-                <Instagram className="w-3.5 h-3.5 text-slate-600" />
+            <div className="flex items-center gap-2.5">
+              <div
+                className="w-8 h-8 rounded-lg text-white flex items-center justify-center shadow-xs"
+                style={{ backgroundColor: activeTheme.primary }}
+              >
+                <Instagram className="w-4 h-4" />
               </div>
-              <span className="font-semibold text-slate-800 text-[11px]">@{companyInstagram}</span>
+              <span className="font-bold text-slate-900 text-xs">@{companyInstagram}</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-slate-500 text-[10px] uppercase tracking-wider font-semibold">
-            <MapPin className="w-3.5 h-3.5 text-slate-400" />
-            <span className="truncate max-w-[260px]">
+          <div className="flex items-center gap-2 text-slate-500 text-[10px] uppercase tracking-wider font-extrabold">
+            <MapPin className="w-4 h-4" style={{ color: activeTheme.secondary }} />
+            <span className="truncate max-w-[270px]">
               {companyFooterText.split('|')[0] || companyFooterText}
             </span>
           </div>
         </div>
 
-        {/* Bottom Decorative Two-Tone Colored Bar */}
-        <div className="absolute bottom-0 left-0 w-full flex h-2">
+        {/* Bottom Decorative Dual-Tone Colored Bar */}
+        <div className="absolute bottom-0 left-0 w-full flex h-2.5">
           <div className="w-1/3" style={{ backgroundColor: activeTheme.secondary }} />
           <div className="w-2/3" style={{ backgroundColor: activeTheme.primary }} />
         </div>
