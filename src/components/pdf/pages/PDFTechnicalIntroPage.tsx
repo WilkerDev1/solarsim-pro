@@ -48,7 +48,7 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
       )}
 
       {/* Body */}
-      <div className="px-10 py-3.5 flex-1 flex flex-col justify-start gap-3 text-xs text-slate-800 relative z-10 min-h-0">
+      <div className="px-10 pt-3 pb-14 flex-1 flex flex-col justify-start gap-2.5 text-xs text-slate-800 relative z-10 min-h-0">
         {/* Section 3: ¿Qué es un Sistema Fotovoltaico? */}
         <div className="space-y-1.5">
           <div

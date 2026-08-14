@@ -140,7 +140,7 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
       </div>
 
       {/* 3. Main Body Content (Left: Project & Client | Right: Metadata Timeline) */}
-      <main className="px-12 py-6 flex-1 flex items-center justify-between relative z-10">
+      <main className="px-12 pt-6 pb-20 flex-1 flex items-center justify-between relative z-10">
         {/* Left Column: Big Typographic Hierarchy */}
         <div className="w-[58%] space-y-5">
           {/* Small Top Kicker */}
@@ -204,7 +204,7 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
               <div
                 className="absolute -left-[38px] w-3 h-3 rounded-full top-1 shadow-xs"
                 style={{ backgroundColor: activeTheme.primary }}
-              />
+              ></div>
               <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-0.5">
                 ID Proyecto
               </span>
@@ -218,7 +218,7 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
               <div
                 className="absolute -left-[38px] w-3 h-3 rounded-full top-1 shadow-xs"
                 style={{ backgroundColor: activeTheme.primary }}
-              />
+              ></div>
               <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-0.5">
                 Fecha Emisión
               </span>
@@ -235,7 +235,7 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
               <div
                 className="absolute -left-[38px] w-3 h-3 rounded-full top-1 shadow-xs"
                 style={{ backgroundColor: activeTheme.secondary }}
-              />
+              ></div>
               <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-0.5">
                 Validez
               </span>
@@ -261,7 +261,7 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
       </main>
 
       {/* 4. Minimalist Corporate Footer */}
-      <footer className="mt-auto px-10 pt-3 pb-6 bg-slate-50 border-t border-slate-200 relative overflow-hidden shrink-0">
+      <footer className="absolute bottom-0 left-0 right-0 w-full px-10 py-3 bg-slate-50 border-t border-slate-200 z-30 overflow-hidden box-border">
         {/* Subtle Decorative Circle Outline */}
         <div
           className="absolute right-[-40px] bottom-[-40px] w-44 h-44 rounded-full border-[10px] border-slate-200/70 opacity-60 pointer-events-none"

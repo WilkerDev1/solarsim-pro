@@ -94,17 +94,16 @@ export const PDFProposalView: React.FC = () => {
           height: 1202,
           onclone: (clonedDoc) => {
             const allClonedPages = clonedDoc.querySelectorAll<HTMLElement>('.pdf-page');
-            const clonedPage = allClonedPages[i];
-            if (clonedPage) {
-              clonedPage.style.width = '850px';
-              clonedPage.style.height = '1202px';
-              clonedPage.style.minHeight = '1202px';
-              clonedPage.style.maxHeight = '1202px';
-              clonedPage.style.boxSizing = 'border-box';
-              clonedPage.style.overflow = 'hidden';
-              clonedPage.style.margin = '0';
-              clonedPage.style.transform = 'none';
-            }
+            allClonedPages.forEach((p) => {
+              p.style.width = '850px';
+              p.style.height = '1202px';
+              p.style.minHeight = '1202px';
+              p.style.maxHeight = '1202px';
+              p.style.boxSizing = 'border-box';
+              p.style.overflow = 'hidden';
+              p.style.margin = '0';
+              p.style.transform = 'none';
+            });
           },
         });
 

@@ -50,7 +50,7 @@ export const PDFPage4CashFlow: React.FC<PDFPage4CashFlowProps> = ({
       )}
 
       {/* Body */}
-      <div className="px-10 py-2.5 flex-1 flex flex-col justify-between gap-2.5 relative z-10 min-h-0">
+      <div className="px-10 pt-2.5 pb-14 flex-1 flex flex-col justify-between gap-2.5 relative z-10 min-h-0">
         {/* Detailed Cash Flow Table - 7 Columns */}
         <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs text-xs flex-1 flex flex-col">
           <table className="w-full text-left border-collapse flex-1">

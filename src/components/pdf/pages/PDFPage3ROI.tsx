@@ -73,7 +73,7 @@ export const PDFPage3ROI: React.FC<PDFPage3ROIProps> = ({
       )}
 
       {/* Body */}
-      <div className="px-10 py-3 flex-1 flex flex-col gap-2.5 relative z-10 min-h-0">
+      <div className="px-10 pt-3 pb-14 flex-1 flex flex-col gap-2.5 relative z-10 min-h-0">
         {/* Financial Indicators Grid */}
         <div className="space-y-2">
           <h2 className="text-sm font-bold text-gray-800 border-b border-gray-100 pb-1 uppercase tracking-wider">

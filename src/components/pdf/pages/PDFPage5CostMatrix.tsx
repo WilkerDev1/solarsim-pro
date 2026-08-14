@@ -46,7 +46,7 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
         />
       )}
 
-      <div className="px-8 py-3 flex-1 flex flex-col justify-start gap-2.5 relative z-10 min-h-0">
+      <div className="px-8 pt-3 pb-14 flex-1 flex flex-col justify-start gap-2.5 relative z-10 min-h-0">
         <div className="space-y-2.5">
           {/* Banner Confidencial */}
           <div className="bg-amber-600 text-white p-2.5 rounded-xl flex justify-between items-center shadow-sm">
