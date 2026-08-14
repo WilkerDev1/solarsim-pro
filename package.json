@@ -2,6 +2,8 @@
   "name": "solarsim-pro",
   "private": true,
   "version": "1.0.0",
+  "description": "Simulador Fotovoltaico Técnico-Económico Profesional",
+  "author": "WilkerDev1",
   "type": "module",
   "main": "dist-electron/main.cjs",
   "scripts": {
@@ -12,7 +14,8 @@
     "build:electron": "esbuild electron/main.ts --bundle --platform=node --target=node18 --external:electron --outfile=dist-electron/main.cjs && esbuild electron/preload.ts --bundle --platform=node --target=node18 --external:electron --outfile=dist-electron/preload.cjs",
     "electron:dev": "npm run build:electron && concurrently \"vite\" \"electron .\"",
     "electron:build": "npm run build && npm run build:electron && electron-builder",
-    "build:win": "npm run build && npm run build:electron && electron-builder --win"
+    "build:win": "npm run build && npm run build:electron && electron-builder --win",
+    "build:linux": "npm run build && npm run build:electron && electron-builder --linux"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -76,6 +79,18 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "SolarSim Pro"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "pacman",
+        "tar.gz"
+      ],
+      "category": "Science",
+      "maintainer": "WilkerDev1 <wilkerdev@github.com>",
+      "synopsis": "Simulador Fotovoltaico Profesional",
+      "description": "Simulador de proyectos solares fotovoltaicos con dimensionamiento, análisis financiero y exportación de propuestas PDF."
     },
     "publish": {
       "provider": "github",
