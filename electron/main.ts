@@ -3,6 +3,21 @@ import path from 'path';
 import fs from 'fs';
 import { autoUpdater } from 'electron-updater';
 
+// ============================================================================
+// FIX FOR LINUX / ARCH / GNOME / WAYLAND IBUS KEYBOARD INPUT DROP
+// ============================================================================
+if (process.platform === 'linux') {
+  // Prevent Chromium from blocking on non-existent IBUS sockets in Wayland
+  delete process.env.GTK_IM_MODULE;
+  delete process.env.QT_IM_MODULE;
+  delete process.env.XMODIFIERS;
+  process.env.IBUS_USE_PORTAL = '1';
+
+  // Enable Ozone Wayland auto-detection & window decorations
+  app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
+  app.commandLine.appendSwitch('enable-features', 'UseOzonePlatform,WaylandWindowDecorations');
+}
+
 let mainWindow: BrowserWindow | null = null;
 
 // Configure autoUpdater
@@ -154,7 +169,6 @@ function createWindow() {
       });
     };
     loadDev();
-    // Do NOT open detached DevTools automatically on Linux to avoid IBUS keyboard focus locks
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
