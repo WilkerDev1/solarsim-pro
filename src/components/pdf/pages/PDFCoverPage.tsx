@@ -63,17 +63,17 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
       </div>
 
       {/* 2. Geometric Hero Section with Exact Polygon Clip-paths */}
-      <div className="relative h-[530px] w-full z-0 overflow-hidden bg-slate-900">
-        {/* Subtle dot-grid texture on background */}
+      <div className="relative h-[530px] w-full z-0 overflow-hidden bg-white">
+        {/* Subtle dot-grid texture on clean white background */}
         <div
-          className="absolute inset-0 opacity-25 pointer-events-none z-0"
+          className="absolute inset-0 opacity-35 pointer-events-none z-0"
           style={{
-            backgroundImage: 'radial-gradient(#ffffff 1.2px, transparent 1.2px)',
+            backgroundImage: 'radial-gradient(#94a3b8 1.2px, transparent 1.2px)',
             backgroundSize: '20px 20px',
           }}
         />
 
-        {/* Underlying Colored Polygons (Zero white gaps) */}
+        {/* Underlying Colored Polygons */}
         <div
           className="absolute right-0 bottom-12 w-2/3 h-1/2 z-0"
           style={{
