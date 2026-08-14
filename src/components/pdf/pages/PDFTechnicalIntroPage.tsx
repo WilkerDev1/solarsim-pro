@@ -48,14 +48,14 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
       )}
 
       {/* Body */}
-      <div className="px-10 py-5 flex-1 flex flex-col justify-between text-xs text-slate-800 relative z-10 gap-3">
+      <div className="px-10 py-4 flex-1 flex flex-col justify-start gap-3.5 text-xs text-slate-800 relative z-10">
         {/* Section 3: ¿Qué es un Sistema Fotovoltaico? */}
         <div className="space-y-2">
           <div
-            className="py-1 px-3 rounded-md text-white font-bold text-xs uppercase tracking-wider inline-block shadow-2xs"
+            className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-md text-white font-extrabold text-xs uppercase tracking-wider shadow-xs leading-none"
             style={{ backgroundColor: activeTheme.primary }}
           >
-            3. ¿QUÉ ES UN SISTEMA FOTOVOLTAICO?
+            <span className="leading-none pt-0.5">3. ¿QUÉ ES UN SISTEMA FOTOVOLTAICO?</span>
           </div>
           <p className="text-slate-700 text-xs leading-relaxed text-justify font-medium">
             Un sistema fotovoltaico es el conjunto integrado de equipos diseñados para capturar la energía proveniente del sol y transformarla en electricidad utilizable. Su funcionamiento se fundamenta en la capacidad de las celdas fotovoltaicas para convertir la radiación solar directamente en energía eléctrica.
@@ -74,10 +74,10 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
         {/* Section 3.1: ¿Cómo Funciona? */}
         <div className="space-y-1.5">
           <div
-            className="py-1 px-3 rounded-md text-white font-bold text-xs uppercase tracking-wider inline-block shadow-2xs"
+            className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-md text-white font-extrabold text-xs uppercase tracking-wider shadow-xs leading-none"
             style={{ backgroundColor: activeTheme.primary }}
           >
-            3.1 ¿CÓMO FUNCIONA UN SISTEMA FOTOVOLTAICO?
+            <span className="leading-none pt-0.5">3.1 ¿CÓMO FUNCIONA UN SISTEMA FOTOVOLTAICO?</span>
           </div>
           <p className="text-slate-700 text-[11px] leading-relaxed text-justify font-medium">
             La cantidad de energía eléctrica que produce un sistema fotovoltaico está determinada por múltiples factores: las horas de radiación solar disponibles, la cantidad de módulos instalados, su orientación e inclinación, la intensidad de la radiación recibida, la calidad de la instalación y la potencia nominal del sistema.
@@ -90,10 +90,10 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
         {/* Section 4: Descripción Técnica (Flow Diagram) */}
         <div className="space-y-2">
           <div
-            className="py-1 px-3 rounded-md text-white font-bold text-xs uppercase tracking-wider inline-block shadow-2xs"
+            className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-md text-white font-extrabold text-xs uppercase tracking-wider shadow-xs leading-none"
             style={{ backgroundColor: activeTheme.primary }}
           >
-            4. DESCRIPCIÓN TÉCNICA
+            <span className="leading-none pt-0.5">4. DESCRIPCIÓN TÉCNICA</span>
           </div>
 
           {/* High Quality Flow Diagram */}

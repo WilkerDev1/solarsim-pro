@@ -66,7 +66,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
       )}
 
       {/* Body */}
-      <div className="px-10 py-6 flex-1 flex flex-col gap-5 text-xs text-slate-800 font-sans relative z-10">
+      <div className="px-10 py-4 flex-1 flex flex-col gap-3 text-xs text-slate-800 font-sans relative z-10">
         {/* DATOS DEL CLIENTE */}
         <div>
           <h3

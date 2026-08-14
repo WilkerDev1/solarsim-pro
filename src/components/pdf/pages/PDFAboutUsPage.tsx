@@ -54,14 +54,14 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
       )}
 
       {/* Body */}
-      <div className="px-10 py-5 flex-1 flex flex-col justify-between text-xs text-slate-800 relative z-10 gap-3.5">
+      <div className="px-10 py-4 flex-1 flex flex-col justify-start gap-4 text-xs text-slate-800 relative z-10">
         {/* 1. ¿Quiénes Somos? Section */}
         <div className="space-y-2">
           <div
-            className="py-1 px-3 rounded-md text-white font-bold text-xs uppercase tracking-wider inline-block shadow-2xs"
+            className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-md text-white font-extrabold text-xs uppercase tracking-wider shadow-xs leading-none"
             style={{ backgroundColor: activeTheme.primary }}
           >
-            1. ¿QUIÉNES SOMOS?
+            <span className="leading-none pt-0.5">1. ¿QUIÉNES SOMOS?</span>
           </div>
           <p className="text-slate-700 text-xs leading-relaxed text-justify font-medium">
             {aboutUsIntroText}
@@ -180,12 +180,12 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
         </div>
 
         {/* 1.1 ¿Por Qué Elegirnos? Section */}
-        <div className="space-y-2.5">
+        <div className="space-y-2">
           <div
-            className="py-1 px-3 rounded-md text-white font-bold text-xs uppercase tracking-wider inline-block shadow-2xs"
+            className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-md text-white font-extrabold text-xs uppercase tracking-wider shadow-xs leading-none"
             style={{ backgroundColor: activeTheme.primary }}
           >
-            1.1 ¿POR QUÉ ELEGIRNOS?
+            <span className="leading-none pt-0.5">1.1 ¿POR QUÉ ELEGIRNOS?</span>
           </div>
           <p className="text-slate-700 text-xs leading-relaxed font-medium">
             {whyChooseUsText}

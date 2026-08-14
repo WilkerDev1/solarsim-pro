@@ -63,7 +63,7 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
       )}
 
       {/* Body */}
-      <div className="px-10 py-6 flex-1 flex flex-col gap-6 relative z-10">
+      <div className="px-10 py-4 flex-1 flex flex-col gap-3.5 relative z-10">
         {/* Chart Section */}
         <div className="space-y-3">
           <div className="flex justify-between items-center border-b border-gray-100 pb-2">

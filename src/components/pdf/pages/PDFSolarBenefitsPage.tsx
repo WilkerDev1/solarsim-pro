@@ -5,7 +5,7 @@ import { PDFHeaderBanner } from '../PDFHeaderBanner';
 import { PDFFooter } from '../PDFFooter';
 import { PDFWatermark } from '../PDFWatermark';
 import { PDF_BENEFITS_HOUSE_BASE64 } from '../../../assets/pdfGraphicAssets';
-import { Sun, DollarSign, Leaf, Globe2, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { Sun, DollarSign, Leaf, Globe2, ShieldCheck, CheckCircle2, TrendingUp, Zap } from 'lucide-react';
 
 interface PDFSolarBenefitsPageProps {
   project: ProjectSimulation;
@@ -49,14 +49,14 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
       )}
 
       {/* Body */}
-      <div className="px-10 py-5 flex-1 flex flex-col justify-between text-xs text-slate-800 relative z-10 gap-3.5">
+      <div className="px-10 py-4 flex-1 flex flex-col justify-start gap-4 text-xs text-slate-800 relative z-10">
         {/* Section 2: Beneficios de la Energía Solar */}
-        <div className="space-y-2.5">
+        <div className="space-y-2">
           <div
-            className="py-1 px-3 rounded-md text-white font-bold text-xs uppercase tracking-wider inline-block shadow-2xs"
+            className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-md text-white font-extrabold text-xs uppercase tracking-wider shadow-xs leading-none"
             style={{ backgroundColor: activeTheme.primary }}
           >
-            2. BENEFICIOS DE LA ENERGÍA SOLAR
+            <span className="leading-none pt-0.5">2. BENEFICIOS DE LA ENERGÍA SOLAR</span>
           </div>
 
           {/* Visual House Illustration with 4 Feature Pills */}
@@ -78,17 +78,27 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
                 </div>
                 <h5 className="font-extrabold text-[10px] uppercase text-emerald-950">Ahorro en Factura</h5>
                 <p className="text-[8.5px] text-slate-600 leading-tight">
-                  Reducción drástica del gasto energético mensual desde el primer mes.
+                  Reducción inmediata de hasta un 95% del costo eléctrico mensual.
+                </p>
+              </div>
+
+              <div className="p-2 rounded-xl bg-blue-50/80 border border-blue-200/80 text-center space-y-0.5">
+                <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center mx-auto shadow-2xs">
+                  <TrendingUp className="w-3 h-3" />
+                </div>
+                <h5 className="font-extrabold text-[10px] uppercase text-blue-950">Plusvalía Inmueble</h5>
+                <p className="text-[8.5px] text-slate-600 leading-tight">
+                  Incremento directo del valor comercial del inmueble o negocio.
                 </p>
               </div>
 
               <div className="p-2 rounded-xl bg-amber-50/80 border border-amber-200/80 text-center space-y-0.5">
                 <div className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center mx-auto shadow-2xs">
-                  <Sun className="w-3 h-3" />
+                  <Zap className="w-3 h-3" />
                 </div>
-                <h5 className="font-extrabold text-[10px] uppercase text-amber-950">Recurso Inagotable</h5>
+                <h5 className="font-extrabold text-[10px] uppercase text-amber-950">Independencia</h5>
                 <p className="text-[8.5px] text-slate-600 leading-tight">
-                  Energía abundante y predecible durante todo el año en RD (5.5 HSP).
+                  Protección ante futuros incrementos tarifarios de las distribuidoras.
                 </p>
               </div>
 
@@ -96,19 +106,9 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
                 <div className="w-5 h-5 rounded-full bg-teal-600 text-white flex items-center justify-center mx-auto shadow-2xs">
                   <Leaf className="w-3 h-3" />
                 </div>
-                <h5 className="font-extrabold text-[10px] uppercase text-teal-950">Cero Contaminación</h5>
+                <h5 className="font-extrabold text-[10px] uppercase text-teal-950">Sostenibilidad</h5>
                 <p className="text-[8.5px] text-slate-600 leading-tight">
-                  Operación 100% silenciosa y sin emisión de gases de efecto invernadero.
-                </p>
-              </div>
-
-              <div className="p-2 rounded-xl bg-blue-50/80 border border-blue-200/80 text-center space-y-0.5">
-                <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center mx-auto shadow-2xs">
-                  <Globe2 className="w-3 h-3" />
-                </div>
-                <h5 className="font-extrabold text-[10px] uppercase text-blue-950">Sostenibilidad</h5>
-                <p className="text-[8.5px] text-slate-600 leading-tight">
-                  Revaloriza tu propiedad y protege contra aumentos tarifarios futuros.
+                  Energía 100% limpia sin emisiones contaminantes a la atmósfera.
                 </p>
               </div>
             </div>
@@ -116,12 +116,12 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
         </div>
 
         {/* Section 2.1: Objetivos de la Ley 57-07 */}
-        <div className="space-y-2.5">
+        <div className="space-y-2">
           <div
-            className="py-1 px-3 rounded-md text-white font-bold text-xs uppercase tracking-wider inline-block shadow-2xs"
+            className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-md text-white font-extrabold text-xs uppercase tracking-wider shadow-xs leading-none"
             style={{ backgroundColor: activeTheme.primary }}
           >
-            2.1. OBJETIVOS E INCENTIVOS DE LA LEY 57-07 DE ENERGÍAS RENOVABLES
+            <span className="leading-none pt-0.5">2.1. OBJETIVOS E INCENTIVOS DE LA LEY 57-07 DE ENERGÍAS RENOVABLES</span>
           </div>
 
           <p className="text-slate-700 text-xs leading-relaxed font-medium">
