@@ -648,23 +648,6 @@ export const SimulatorView: React.FC = () => {
                 />
               </div>
 
-              <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                  Precio Sistema por Vatio ($ USD/Wp)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={project.specs.pricePerWattUSD}
-                  onChange={(e) => updateSpecs({ pricePerWattUSD: parseFloat(e.target.value) || 0 })}
-                  className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                    isDark
-                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                      : 'bg-slate-50 border-slate-300 text-slate-800'
-                  }`}
-                />
-              </div>
-
               {/* CAMPOS MODO DETALLADO */}
               {project.specs.isDetailed && (
                 <div
@@ -1052,6 +1035,50 @@ export const SimulatorView: React.FC = () => {
                       : 'bg-white border-slate-300 text-red-600'
                   }`}
                 />
+              </div>
+
+              {/* Precio Sistema por Vatio (USD/Wp) con cálculo automático y sincronización */}
+              <div className={`p-2.5 rounded-lg border mt-2 ${isDark ? 'bg-[#1c1917] border-amber-900/50' : 'bg-white border-amber-300/80 shadow-xs'}`}>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className={`block text-[11px] font-bold ${isDark ? 'text-amber-300' : 'text-amber-900'}`}>
+                    Precio Sistema por Vatio (USD/Wp)
+                  </label>
+                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${isDark ? 'bg-amber-950/80 text-amber-300 border border-amber-800/60' : 'bg-amber-100 text-amber-900 border border-amber-200'}`}>
+                    Margen: ${(summary.costMatrix.salePricePerWattUSD || 1.13).toFixed(2)} Wp
+                  </span>
+                </div>
+                
+                <div className="flex gap-1.5 items-center">
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={project.specs.pricePerWattUSD}
+                    onChange={(e) => updateSpecs({ pricePerWattUSD: parseFloat(e.target.value) || 0 })}
+                    className={`flex-1 border rounded-lg px-2.5 py-1 text-xs font-black transition-all ${
+                      isDark
+                        ? 'bg-[#121214] border-[#3f3f46] text-zinc-100 focus:ring-1 focus:ring-amber-500'
+                        : 'bg-slate-50 border-slate-300 text-slate-900 focus:ring-1 focus:ring-amber-600'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    title="Sincronizar automáticamente con el precio por Watt calculado de la matriz de costos y margen de venta"
+                    onClick={() => {
+                      const autoWp = Math.round((summary.costMatrix.salePricePerWattUSD || 1.13) * 100) / 100;
+                      updateSpecs({ pricePerWattUSD: autoWp });
+                    }}
+                    className={`px-2.5 py-1 text-[11px] rounded-lg font-bold flex items-center gap-1 border transition-all cursor-pointer ${
+                      isDark
+                        ? 'bg-amber-900/40 hover:bg-amber-900/60 border-amber-700/60 text-amber-300'
+                        : 'bg-amber-100 hover:bg-amber-200 border-amber-300 text-amber-900 shadow-xs'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[14px]">auto_fix_high</span> Auto
+                  </button>
+                </div>
+                <p className={`text-[10px] mt-1.5 leading-tight ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                  Resultante de equipos + mano de obra × margen ({project.specs.saleMarginMultiplier || 1.25}x).
+                </p>
               </div>
             </div>
           </section>
