@@ -28,8 +28,9 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
   const companyInstagram = cust.companyInstagram || DEFAULT_DOCUMENT_CUSTOMIZATION.companyInstagram || 'Electsunrd';
 
   const isDefaultElectsun = companyName.toLowerCase().trim() === 'electsun';
-  // Use color or white logo directly without capsule background
-  const headerLogoSrc = cust.headerLogoBase64 || ELECTSUN_LOGO_COLOR_BASE64;
+  // Use dedicated cover logo, fallback to header logo, or default color logo
+  const coverLogoSrc = cust.coverLogoBase64 || cust.headerLogoBase64 || ELECTSUN_LOGO_COLOR_BASE64;
+  const hasLogoImage = Boolean(cust.coverLogoBase64 || cust.headerLogoBase64 || isDefaultElectsun);
 
   const clientName = (project.client.name || 'Centro Médico Hispánico').toUpperCase();
   const clientLocation = project.client.province || project.client.location || 'Santo Domingo / Distrito Nacional';
@@ -40,11 +41,11 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
       {/* 1. Header Overlay (Transparent High-Resolution Logo on Top-Right) */}
       <div className="absolute top-0 right-0 w-full flex justify-end p-9 z-30 pointer-events-none">
         <div className="flex items-center gap-3 pointer-events-auto">
-          {cust.headerLogoBase64 || isDefaultElectsun ? (
+          {hasLogoImage ? (
             <img
-              src={headerLogoSrc}
+              src={coverLogoSrc}
               alt={companyName}
-              className="h-16 max-h-[70px] w-auto object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.35)]"
+              className="h-16 max-h-[72px] w-auto object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.35)]"
             />
           ) : (
             <div className="flex flex-col text-right drop-shadow-md">

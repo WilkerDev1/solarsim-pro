@@ -16,6 +16,7 @@ import { ProjectSimulation, DocumentCustomization } from '../../../types';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
 import {
   ELECTSUN_LOGO_WHITE_BASE64,
+  ELECTSUN_LOGO_COLOR_BASE64,
   ELECTSUN_EMBLEM_WATERMARK_BASE64,
 } from '../../../assets/electsunLogo';
 
@@ -37,6 +38,7 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
   const cust = project.customization || {};
 
   // File input refs
+  const coverLogoInputRef = useRef<HTMLInputElement>(null);
   const headerLogoInputRef = useRef<HTMLInputElement>(null);
   const watermarkInputRef = useRef<HTMLInputElement>(null);
 
@@ -52,10 +54,23 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
       companyName: DEFAULT_DOCUMENT_CUSTOMIZATION.companyName,
       companySlogan: DEFAULT_DOCUMENT_CUSTOMIZATION.companySlogan,
       companyFooterText: DEFAULT_DOCUMENT_CUSTOMIZATION.companyFooterText,
+      coverLogoBase64: undefined,
       headerLogoBase64: undefined,
       watermarkLogoBase64: undefined,
       watermarkOpacity: DEFAULT_DOCUMENT_CUSTOMIZATION.watermarkOpacity,
     });
+  };
+
+  const handleCoverLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        updateDocumentCustomization({ coverLogoBase64: reader.result });
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleHeaderLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -82,6 +97,7 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
     reader.readAsDataURL(file);
   };
 
+  const activeCoverLogo = cust.coverLogoBase64 || cust.headerLogoBase64 || ELECTSUN_LOGO_COLOR_BASE64;
   const activeHeaderLogo = cust.headerLogoBase64 || ELECTSUN_LOGO_WHITE_BASE64;
   const activeWatermarkLogo = cust.watermarkLogoBase64 || ELECTSUN_EMBLEM_WATERMARK_BASE64;
 
@@ -139,6 +155,58 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                       : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
                   }`}
                 />
+              </div>
+            </div>
+
+            {/* Logotipo de Portada */}
+            <div className={`p-2.5 rounded-xl border ${isDark ? 'bg-[#1b1b24] border-[#2e2e3e]' : 'bg-slate-100/70 border-slate-200'}`}>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className={`text-[10px] font-bold uppercase flex items-center gap-1.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                  <ImageIcon className="w-3.5 h-3.5 text-amber-500" />
+                  Logotipo de Portada (Cover)
+                </label>
+                {cust.coverLogoBase64 && (
+                  <button
+                    type="button"
+                    onClick={() => updateDocumentCustomization({ coverLogoBase64: undefined })}
+                    title="Restaurar logo predeterminado de portada"
+                    className="text-[10px] font-semibold text-red-500 hover:text-red-400 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Trash2 className="w-3 h-3" /> Restaurar
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="w-24 h-12 rounded-lg bg-slate-900 border border-slate-700 p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
+                  <img
+                    src={activeCoverLogo}
+                    alt="Cover logo preview"
+                    className="max-h-full max-w-full object-contain"
+                  />
+                </div>
+                <div className="flex-1">
+                  <input
+                    ref={coverLogoInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleCoverLogoUpload}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => coverLogoInputRef.current?.click()}
+                    className={`w-full py-1.5 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
+                      isDark
+                        ? 'bg-[#282836] border-[#3e3e52] text-zinc-200 hover:bg-[#323244] hover:text-white'
+                        : 'bg-white border-slate-300 text-slate-800 hover:bg-slate-50 shadow-xs'
+                    }`}
+                  >
+                    <Upload className="w-3.5 h-3.5 text-amber-500" />
+                    {cust.coverLogoBase64 ? 'Cambiar Logotipo' : 'Subir Logotipo Portada'}
+                  </button>
+                  <p className="text-[9px] text-zinc-500 mt-1">PNG transparente en alta resolución.</p>
+                </div>
               </div>
             </div>
 
