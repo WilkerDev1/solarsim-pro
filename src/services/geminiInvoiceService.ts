@@ -1,4 +1,4 @@
-import { ExtractedInvoiceData } from '../types/aiInvoice';
+import { ExtractedInvoiceData, GeminiModelInfo } from '../types/aiInvoice';
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -150,16 +150,50 @@ const INVOICE_JSON_SCHEMA = {
   ],
 };
 
-export async function validateGeminiApiKey(
-  apiKey: string,
-  model: string = 'gemini-2.0-flash'
-): Promise<{ success: boolean; error?: string; modelName?: string }> {
+export const DEFAULT_POPULAR_MODELS: GeminiModelInfo[] = [
+  {
+    id: 'gemini-3.5-flash-lite',
+    name: 'Gemini 3.5 Flash Lite',
+    description: 'Mayor límite de solicitudes gratuitas en Google AI Studio (500 por día / 15 RPM). Extremadamente veloz.',
+    rateLimitNote: '15 RPM / 500 RPD',
+    isRecommended: true,
+  },
+  {
+    id: 'gemini-3.6-flash',
+    name: 'Gemini 3.6 Flash',
+    description: 'Nueva generación con razonamiento avanzado para tablas y tipografías complejas.',
+    rateLimitNote: '5 RPM / 20 RPD',
+  },
+  {
+    id: 'gemini-3.7-flash',
+    name: 'Gemini 3.7 Flash',
+    description: 'Modelo de vanguardia con máxima fidelidad en visión multimodal.',
+    rateLimitNote: '5 RPM / 20 RPD',
+  },
+  {
+    id: 'gemini-2.0-flash',
+    name: 'Gemini 2.0 Flash',
+    description: 'Modelo estándar de alta velocidad y consistencia en extracción de JSON estructurado.',
+    rateLimitNote: '15 RPM / 1,500 RPD',
+    isRecommended: true,
+  },
+  {
+    id: 'gemini-1.5-flash',
+    name: 'Gemini 1.5 Flash',
+    description: 'Modelo clásico ligero de Google con amplia disponibilidad de cuotas.',
+    rateLimitNote: '15 RPM / 1,500 RPD',
+  },
+];
+
+export async function fetchAvailableGeminiModels(
+  apiKey: string
+): Promise<{ success: boolean; error?: string; models: GeminiModelInfo[] }> {
   if (!apiKey || apiKey.trim().length < 10) {
-    return { success: false, error: 'API Key inválida o vacía.' };
+    return { success: false, error: 'API Key inválida o vacía.', models: DEFAULT_POPULAR_MODELS };
   }
 
   try {
-    const url = `${GEMINI_API_BASE}/models/${model}?key=${apiKey.trim()}`;
+    const url = `${GEMINI_API_BASE}/models?key=${apiKey.trim()}`;
     const response = await fetch(url, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
@@ -168,11 +202,90 @@ export async function validateGeminiApiKey(
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       const msg = errorData?.error?.message || `Error HTTP ${response.status}`;
-      return { success: false, error: `Google AI: ${msg}` };
+      return { success: false, error: msg, models: DEFAULT_POPULAR_MODELS };
     }
 
     const data = await response.json();
-    return { success: true, modelName: data?.displayName || model };
+    const rawModels: any[] = Array.isArray(data?.models) ? data.models : [];
+
+    // Filter only models that support content generation
+    const filtered = rawModels
+      .filter((m: any) => {
+        const methods: string[] = m.supportedGenerationMethods || [];
+        return methods.includes('generateContent') && !m.name?.includes('embedding') && !m.name?.includes('aqa');
+      })
+      .map((m: any) => {
+        const cleanId = m.name?.replace('models/', '') || '';
+        const displayName = m.displayName || cleanId;
+        const isFlashLite = cleanId.includes('flash-lite') || cleanId.includes('3.5-flash-lite');
+        const isFlash = cleanId.includes('flash');
+        
+        return {
+          id: cleanId,
+          name: displayName,
+          description: m.description || `Modelo ${displayName} disponible en tu cuenta.`,
+          rateLimitNote: isFlashLite ? '15 RPM / 500 RPD' : isFlash ? '5-15 RPM' : undefined,
+          isRecommended: cleanId.includes('3.5-flash-lite') || cleanId === 'gemini-2.0-flash' || cleanId === 'gemini-3.6-flash',
+        };
+      });
+
+    // Sort prioritizing recommended and flash models
+    filtered.sort((a, b) => {
+      if (a.isRecommended && !b.isRecommended) return -1;
+      if (!a.isRecommended && b.isRecommended) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
+    return {
+      success: true,
+      models: filtered.length > 0 ? filtered : DEFAULT_POPULAR_MODELS,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Error consultando modelos disponibles.',
+      models: DEFAULT_POPULAR_MODELS,
+    };
+  }
+}
+
+export async function validateGeminiApiKey(
+  apiKey: string,
+  model: string = 'gemini-3.5-flash-lite'
+): Promise<{ success: boolean; error?: string; modelName?: string; models?: GeminiModelInfo[] }> {
+  if (!apiKey || apiKey.trim().length < 10) {
+    return { success: false, error: 'API Key inválida o vacía.' };
+  }
+
+  try {
+    // 1. First fetch available models from account
+    const modelsResult = await fetchAvailableGeminiModels(apiKey);
+    
+    // 2. Validate model access
+    const testModel = model || (modelsResult.models[0]?.id || 'gemini-2.0-flash');
+    const url = `${GEMINI_API_BASE}/models/${testModel}?key=${apiKey.trim()}`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!response.ok) {
+      // Fallback test with gemini-2.0-flash or gemini-1.5-flash if specific model endpoint returned error
+      const fallbackUrl = `${GEMINI_API_BASE}/models/gemini-2.0-flash?key=${apiKey.trim()}`;
+      const fallbackRes = await fetch(fallbackUrl);
+      if (!fallbackRes.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const msg = errorData?.error?.message || `Error HTTP ${response.status}`;
+        return { success: false, error: `Google AI: ${msg}`, models: modelsResult.models };
+      }
+    }
+
+    const matched = modelsResult.models.find((m) => m.id === testModel);
+    return {
+      success: true,
+      modelName: matched?.name || testModel,
+      models: modelsResult.models,
+    };
   } catch (err: any) {
     return { success: false, error: err?.message || 'Error de conexión con Google AI Studio.' };
   }

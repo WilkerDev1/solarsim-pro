@@ -53,8 +53,16 @@ export interface ExtractedInvoiceData {
   aiNotes?: string;
 }
 
+export interface GeminiModelInfo {
+  id: string;          // e.g. "gemini-2.0-flash" or "gemini-3.5-flash-lite"
+  name: string;        // e.g. "Gemini 3.5 Flash Lite"
+  description?: string;
+  isRecommended?: boolean;
+  rateLimitNote?: string;
+}
+
 export interface AISettings {
   apiKey: string;
-  model: 'gemini-2.0-flash' | 'gemini-1.5-flash' | 'gemini-1.5-pro';
+  model: string;
   customInstructions?: string;
 }

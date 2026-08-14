@@ -186,14 +186,61 @@ function httpsGetJson(url: string): Promise<any> {
 }
 
 export function registerAIInvoiceHandlers() {
-  ipcMain.handle('validate-gemini-key', async (_event, apiKey: string) => {
+  ipcMain.handle('list-gemini-models', async (_event, apiKey: string) => {
     if (!apiKey || !apiKey.trim()) {
       return { success: false, error: 'API Key vacía.' };
     }
     try {
-      const url = `${GEMINI_API_BASE}/models/gemini-2.0-flash?key=${apiKey.trim()}`;
+      const url = `${GEMINI_API_BASE}/models?key=${apiKey.trim()}`;
       const data = await httpsGetJson(url);
-      return { success: true, modelName: data?.displayName || 'Gemini 2.0 Flash' };
+      const rawModels: any[] = Array.isArray(data?.models) ? data.models : [];
+      const filtered = rawModels
+        .filter((m: any) => {
+          const methods: string[] = m.supportedGenerationMethods || [];
+          return methods.includes('generateContent') && !m.name?.includes('embedding') && !m.name?.includes('aqa');
+        })
+        .map((m: any) => {
+          const cleanId = m.name?.replace('models/', '') || '';
+          const displayName = m.displayName || cleanId;
+          const isFlashLite = cleanId.includes('flash-lite') || cleanId.includes('3.5-flash-lite');
+          const isFlash = cleanId.includes('flash');
+          return {
+            id: cleanId,
+            name: displayName,
+            description: m.description || `Modelo ${displayName} disponible en tu cuenta.`,
+            rateLimitNote: isFlashLite ? '15 RPM / 500 RPD' : isFlash ? '5-15 RPM' : undefined,
+            isRecommended: cleanId.includes('3.5-flash-lite') || cleanId === 'gemini-2.0-flash' || cleanId === 'gemini-3.6-flash',
+          };
+        });
+
+      return { success: true, models: filtered };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Error consultando modelos disponibles.' };
+    }
+  });
+
+  ipcMain.handle('validate-gemini-key', async (_event, apiKey: string, model: string = 'gemini-3.5-flash-lite') => {
+    if (!apiKey || !apiKey.trim()) {
+      return { success: false, error: 'API Key vacía.' };
+    }
+    try {
+      // First try listing all models
+      const listUrl = `${GEMINI_API_BASE}/models?key=${apiKey.trim()}`;
+      const listData = await httpsGetJson(listUrl);
+      const rawModels: any[] = Array.isArray(listData?.models) ? listData.models : [];
+      const models = rawModels
+        .filter((m: any) => (m.supportedGenerationMethods || []).includes('generateContent') && !m.name?.includes('embedding'))
+        .map((m: any) => {
+          const cleanId = m.name?.replace('models/', '') || '';
+          return {
+            id: cleanId,
+            name: m.displayName || cleanId,
+            isRecommended: cleanId.includes('3.5-flash-lite') || cleanId === 'gemini-2.0-flash' || cleanId === 'gemini-3.6-flash',
+          };
+        });
+
+      const matched = models.find((m) => m.id === model) || models[0];
+      return { success: true, modelName: matched?.name || model, models };
     } catch (err: any) {
       return { success: false, error: err?.message || 'Error validando API Key' };
     }

@@ -30,7 +30,7 @@ interface SimulationState {
 
   // AI Configuration
   geminiApiKey: string;
-  geminiModel: 'gemini-2.0-flash' | 'gemini-1.5-flash' | 'gemini-1.5-pro';
+  geminiModel: string;
 
   // Actions
   setActiveView: (view: 'dashboard' | 'simulator' | 'pdf-preview') => void;
@@ -47,7 +47,7 @@ interface SimulationState {
   openAISettingsModal: () => void;
   closeAISettingsModal: () => void;
   setGeminiApiKey: (key: string) => void;
-  setGeminiModel: (model: 'gemini-2.0-flash' | 'gemini-1.5-flash' | 'gemini-1.5-pro') => void;
+  setGeminiModel: (model: string) => void;
   setUpdateInfo: (info: UpdateInfo) => void;
   
   updateClient: (client: Partial<ClientInfo>) => void;
@@ -205,7 +205,7 @@ export const useSimulationStore = create<SimulationState>()(
       saveFeedbackMessage: null,
 
       geminiApiKey: '',
-      geminiModel: 'gemini-2.0-flash',
+      geminiModel: 'gemini-3.5-flash-lite',
 
       setActiveView: (view) => set({ activeView: view }),
       setActiveProject: (id) => set({ activeProjectId: id, activeView: 'simulator' }),

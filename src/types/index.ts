@@ -248,7 +248,8 @@ declare global {
       openExternalUrl: (url: string) => Promise<void>;
       installLinuxPackage: (packageType: 'pacman' | 'deb', version: string) => Promise<{ success: boolean; error?: string }>;
       parseInvoiceWithAI?: (payload: { fileBase64: string; mimeType: string; fileName: string; apiKey?: string; model?: string; panelPowerW?: number }) => Promise<{ success: boolean; data?: any; error?: string }>;
-      validateGeminiApiKey?: (apiKey: string) => Promise<{ success: boolean; error?: string; modelName?: string }>;
+      validateGeminiApiKey?: (apiKey: string, model?: string) => Promise<{ success: boolean; error?: string; modelName?: string; models?: any[] }>;
+      listGeminiModels?: (apiKey: string) => Promise<{ success: boolean; error?: string; models?: any[] }>;
     };
   }
 }

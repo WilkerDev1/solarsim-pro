@@ -260,7 +260,7 @@ export const AIInvoiceScannerModal: React.FC = () => {
               title="Configurar Google Gemini API Key"
             >
               <Settings className="w-3.5 h-3.5" />
-              <span>{geminiApiKey ? 'IA Configurada' : 'Configurar API Key'}</span>
+              <span>{geminiApiKey ? `IA: ${geminiModel || '3.5-flash-lite'}` : 'Configurar API Key'}</span>
             </button>
 
             <button
