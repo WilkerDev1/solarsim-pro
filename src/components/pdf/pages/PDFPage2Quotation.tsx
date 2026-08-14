@@ -200,20 +200,20 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
             <div className="flex justify-between text-slate-700">
               <span className="font-semibold">SUB-TOTAL (USD) SIN ITBIS :</span>
               <span className="font-bold">
-                ${(summary.itbisSavedUSD > 0 ? (summary.grossInvestmentUSD - summary.itbisSavedUSD) : (summary.grossInvestmentUSD / 1.18)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ${(summary.costMatrix?.precioNetoUSD || (summary.grossInvestmentUSD - summary.itbisSavedUSD)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="flex justify-between text-slate-900 bg-slate-200/80 px-2 py-1 rounded font-bold">
               <span>TOTAL GENERAL (USD) :</span>
-              <span>${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span>${(summary.grossInvestmentUSD + (project.financials.applyITBISExemption ? summary.itbisSavedUSD : 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between font-semibold" style={{ color: activeTheme.secondary }}>
               <span>ITBIS A DESCONTAR POR LEY 57-07 US$ :</span>
               <span className="font-bold">${summary.itbisSavedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between text-white px-2 py-1 rounded font-bold" style={{ backgroundColor: activeTheme.primary }}>
-              <span>TOTAL GENERAL (USD) LEY 57-07 :</span>
-              <span>${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span>TOTAL GENERAL (USD) SI CALIFICA LEY 57-07 :</span>
+              <span>${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between text-slate-800 pt-1 border-t border-slate-300">
               <span className="font-bold">PRECIO POR WATT (USD/W):</span>

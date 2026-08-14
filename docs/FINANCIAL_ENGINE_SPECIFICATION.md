@@ -120,17 +120,32 @@ $$\text{Crédito Anual Años 1 al 3 (USD)} = \frac{\text{Crédito Ley 57-07 Tota
 
 ---
 
-### 3.3 Inversión Neta Final del Proyecto ($I_{neta}$)
-La inversión neta final que representa el costo real para el cliente tras todos los incentivos fiscales es:
+### 3.3 Estructura de Factura Comercial vs Crédito Tributario DGII
 
-$$I_{neta} = I_{bruta} - \text{ITBIS Exonerado} - \text{Crédito Ley 57-07}$$
+Es fundamental distinguir entre **el monto a pagar en la factura comercial** y **el beneficio tributario diferido en la DGII**:
 
-| Configuración de Incentivos | ITBIS Exonerado | Crédito Fiscal 40% DGII | Inversión Neta Final ($I_{neta}$) |
+1. **Monto a Pagar en la Factura Comercial (Desembolso Inmediato)**:
+   * Si el cliente califica para la Ley 57-07, la empresa instaladora le factura directamente con la exoneración del ITBIS:
+   $$\text{TOTAL GENERAL (USD) SI CALIFICA LEY 57-07} = \text{TOTAL GENERAL CON ITBIS} - \text{ITBIS EXONERADO} = \mathbf{\$26,739.92}$$
+   *(Este es el monto exacto que el cliente paga a la empresa instaladora).*
+
+2. **Crédito Fiscal del 40% en Impuesto Sobre la Renta (DGII a 3 Años)**:
+   * El 40% de crédito fiscal ($\$7,322.11$) **NO es un descuento inmediato en la factura comercial del instalador**, sino un crédito tributario que el cliente deduce de su declaración anual de renta ante la **DGII** (formulario IR-1 para personas físicas o IR-2 para empresas) a razón de un $13.33\%$ anual ($\$2,440.70\text{/año}$) durante los primeros 3 años fiscales.
+
+3. **Inversión Neta Final tras los 3 Años de Deducciones Fiscales ($I_{neta}$)**:
+   * Representa el costo real de bolsillo para el cliente una vez completadas las 3 declaraciones de renta ante la DGII:
+   $$I_{neta} = \text{TOTAL FACTURADO LEY 57-07} - \text{Crédito DGII (40%)} = \$26,739.92 - \$7,322.11 = \mathbf{\$19,417.81}$$
+   *(O $\$17,551.70$ si se compara contra el precio de lista con ITBIS de $\$28,606.02$).*
+
+| Concepto | Monto (Centro Médico Hispánico) | Entidad / Destino | Momento de Aplicación |
 | :--- | :---: | :---: | :--- |
-| **Ley 57-07 Completa (Estándar)** | Sí | Sí | $I_{bruta} - \text{ITBIS} - \text{Crédito 40\%}$ |
-| **Solo Crédito 40% (Sin Exención ITBIS)** | No (\$0) | Sí | $I_{bruta} - \text{Crédito 40\%}$ |
-| **Solo Exención ITBIS (Sin Crédito 40%)** | Sí | No (\$0) | $I_{bruta} - \text{ITBIS}$ |
-| **Sin Incentivos Fiscales** | No (\$0) | No (\$0) | $I_{bruta}$ (Precio de lista completo) |
+| **Precio con ITBIS (Sin Ley 57-07)** | $\$28,606.02$ USD | Cotización Bruta | Antes de calificar |
+| **ITBIS Exonerado Ley 57-07** | $-\$1,866.11$ USD | CNE / DGII | Inmediato en Factura |
+| **TOTAL A PAGAR EN FACTURA** | **$\$26,739.92$ USD** | **Empresa Instaladora** | **Año 0 (Firma de Contrato)** |
+| **Crédito Fiscal ISR Año 1** | $-\$2,440.70$ USD | DGII (Declaración Renta) | Año 1 fiscal ($13.33\%$) |
+| **Crédito Fiscal ISR Año 2** | $-\$2,440.70$ USD | DGII (Declaración Renta) | Año 2 fiscal ($13.33\%$) |
+| **Crédito Fiscal ISR Año 3** | $-\$2,440.70$ USD | DGII (Declaración Renta) | Año 3 fiscal ($13.33\%$) |
+| **Inversión Neta Final (Año 3)** | **$\$19,417.81$ USD** | **Costo Real de Bolsillo** | **Tras 3 años fiscales** |
 
 ---
 
