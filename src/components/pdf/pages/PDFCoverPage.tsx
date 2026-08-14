@@ -261,7 +261,7 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
       </main>
 
       {/* 4. Minimalist Corporate Footer */}
-      <footer className="mt-auto px-10 py-3.5 bg-slate-50 border-t border-slate-200 relative overflow-hidden shrink-0">
+      <footer className="mt-auto px-10 pt-3 pb-6 bg-slate-50 border-t border-slate-200 relative overflow-hidden shrink-0">
         {/* Subtle Decorative Circle Outline */}
         <div
           className="absolute right-[-40px] bottom-[-40px] w-44 h-44 rounded-full border-[10px] border-slate-200/70 opacity-60 pointer-events-none"
@@ -309,7 +309,7 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
         </div>
 
         {/* Bottom Decorative Dual-Tone Colored Bar */}
-        <div className="absolute bottom-0 left-0 w-full flex h-2">
+        <div className="absolute bottom-0 left-0 w-full flex h-2.5">
           <div className="w-1/3" style={{ backgroundColor: activeTheme.secondary }} />
           <div className="w-2/3" style={{ backgroundColor: activeTheme.primary }} />
         </div>
