@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "pdf": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/pdf/SKILL.md",
+      "computedHash": "cfbc539377088ca7e44a813b30c306327385bbd973cd7a721e1743f60837dd62"
+    },
+    "react-pdf": {
+      "source": "vercel-labs/json-render",
+      "sourceType": "github",
+      "skillPath": "skills/react-pdf/SKILL.md",
+      "computedHash": "72c5c4c8c70c97659fe978518d12e0835ca61c1c9a1a341d14eb1216bc2c2873"
+    }
+  }
+}
