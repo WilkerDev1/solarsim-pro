@@ -1,6 +1,6 @@
 # Especificación y Auditoría del Motor Financiero (SolarSim Pro)
 
-Este documento detalla exhaustivamente la arquitectura matemática, fórmulas regulatorias, incentivos fiscales dominicanos (Ley 57-07 / DGII) y modelos de flujo de caja proyectado a 25 años implementados en el motor financiero de **SolarSim Pro** (`src/engine/financeEngine.ts` y `src/engine/solarEngine.ts`).
+Este documento detalla exhaustivamente la arquitectura matemática, fórmulas regulatorias, incentivos fiscales dominicanos (Ley 57-07 / DGII), modelos de costeo comercial y proyección de flujo de caja a 25 años implementados en el motor financiero de **SolarSim Pro** (`src/engine/financeEngine.ts` y `src/engine/solarEngine.ts`).
 
 ---
 
@@ -56,36 +56,47 @@ $$S_{yr1} = \sum_{m=1}^{12} S_{m}$$
 
 ---
 
-## 2. Inversión del Sistema y Almacenamiento (Baterías)
+## 2. Inversión del Sistema, Matriz de Costos y Precio por Watt
 
-SolarSim Pro admite dos modos de costeo: **Modo Simple (Llave en Mano)** y **Modo Detallado (Matriz de Costos con Margen Comercial)**.
+El motor financiero implementa un modelo de costeo comercial integral de abajo hacia arriba (*bottom-up*), alineado con las hojas de cálculo operativas de la industria solar en la República Dominicana (ej. *TERDECO PUNTA CANA* y *Centro Médico Hispánico*).
 
-### 2.1 Modo Simple
-En el modo simple, la inversión solar bruta se dimensiona por precio por Watt pico, y el almacenamiento se suma reactivamente:
+### 2.1 Matriz de Costos Detallada (Cost Matrix)
+La estructura de costos desglosa cuatro renglones principales:
 
-$$I_{solar} = P_{dc} \times 1,000 \times P_{watt}$$
-$$I_{baterias} = \begin{cases} N_{bat} \times P_{unit\_bat} & \text{si tiene batería activa} \\ 0 & \text{si no tiene batería} \end{cases}$$
-$$I_{bruta} = I_{solar} + I_{baterias}$$
-
-*Donde:*
-* $P_{watt}$: Precio de venta por Watt instalado (USD/W, ej. $1.13 USD/W$).
-* $N_{bat}$: Cantidad de bancos de baterías.
-* $P_{unit\_bat}$: Costo unitario de cada batería (ej. $1,990 USD).
+1. **Paneles Solares**:
+   $$\text{Costo Paneles (USD)} = N_{pan} \times P_{u,pan} \quad (\text{ITBIS } 0\%)$$
+2. **Inversores**:
+   $$\text{Costo Inversores (USD)} = N_{inv} \times P_{u,inv} \quad (\text{ITBIS } 0\%)$$
+3. **Bancos de Baterías**:
+   $$\text{Costo Baterías (USD)} = \begin{cases} N_{bat} \times P_{u,bat} & \text{si } \text{hasBattery} = \text{true} \\ 0 & \text{si } \text{hasBattery} = \text{false} \end{cases} \quad (\text{ITBIS } 18\%)$$
+4. **Mano de Obra, Estructura y Materiales Locales**:
+   $$\text{Costo Instalación (USD)} = P_{dc} \times P_{u,inst} \quad (\text{ITBIS } 18\%)$$
 
 ---
 
-### 2.2 Modo Detallado (Matriz de Costos con Margen de Venta)
-Para cotizaciones de nivel industrial/comercial, se utiliza la matriz de costos que reproduce la estructura de costos de importación y margen de venta:
+### 2.2 Subtotales, ITBIS y Margen de Venta
 
-$$\text{Costo Neto Equipos (USD)} = (N_{paneles} \times P_{u,pan}) + (N_{inv} \times P_{u,inv}) + (N_{bat} \times P_{u,bat}) + (P_{dc} \times P_{u,inst})$$
+$$\text{Precio Neto Equipos (USD)} = \text{Costo Paneles} + \text{Costo Inversores} + \text{Costo Baterías} + \text{Costo Instalación}$$
+$$\text{ITBIS Total (USD)} = (\text{Costo Baterías} \times 0.18) + (\text{Costo Instalación} \times 0.18)$$
+$$\text{Total Neto con ITBIS (USD)} = \text{Precio Neto Equipos} + \text{ITBIS Total}$$
 
-* **ITBIS en Equipos**: Bajo la ley dominicana, los paneles e inversores están gravados con $0\%$ ITBIS en importación. Las baterías y la mano de obra/accesorios locales pagan $18\%$ ITBIS:
+Aplicando el multiplicador de margen comercial $M_{venta}$ (típicamente $1.25\text{x}$ para $25\%$ de ganancia):
 
-$$\text{ITBIS Total (USD)} = (I_{baterias} \times 0.18) + (I_{inst} \times 0.18)$$
-$$\text{Total Neto con ITBIS (USD)} = \text{Costo Neto Equipos} + \text{ITBIS Total}$$
-$$I_{bruta} = \text{Total Neto con ITBIS} \times M_{venta}$$
+$$I_{bruta} = \text{Porcentaje de Venta Total (USD)} = \text{Total Neto con ITBIS} \times M_{venta}$$
+$$\text{Ganancia Bruta Comercial (USD)} = I_{bruta} - \text{Total Neto con ITBIS}$$
 
-*Donde $M_{venta}$ es el multiplicador de margen comercial (ej. $1.25$ para $25\%$ de ganancia bruta).*
+---
+
+### 2.3 Precio por Watt Llave en Mano ($P_{watt}$) y Reactividad Dinámica
+
+El **Precio por Watt Llave en Mano ($P_{watt}$)** se define como el costo total de venta del sistema entre la potencia pico instalada:
+
+$$P_{watt} \text{ (USD/W)} = \frac{I_{bruta}}{P_{dc} \times 1,000}$$
+
+#### Comportamiento Reactivo del Sistema:
+* **Al agregar almacenamiento ($N_{bat} > 0$)**: La inversión bruta $I_{bruta}$ y el precio por Watt instalado $P_{watt}$ se incrementan automáticamente de manera proporcional.
+* **Al remover almacenamiento ($N_{bat} = 0$)**: El costo de baterías e ITBIS asociado se anula, reduciendo de inmediato tanto $I_{bruta}$ como $P_{watt}$.
+* **Sobreescritura Manual y Sincronización `Auto`**: Si el usuario define un $P_{watt}$ personalizado en la barra lateral, $I_{bruta} = P_{dc} \times 1000 \times P_{watt}$. El botón `✨ Auto` restaura en 1 clic el valor exacto derivado de la matriz de costos.
 
 ---
 
@@ -96,14 +107,12 @@ La **Ley 57-07 sobre Incentivo al Desarrollo de Fuentes Renovables de Energía**
 ### 3.1 Exoneración del 100% de ITBIS (18%)
 Si la opción está activa (`applyITBISExemption: true`), el cliente se ahorra el ITBIS legal aplicable a los equipos gravados:
 
-$$\text{ITBIS Exonerado (USD)} = \begin{cases} I_{bruta} \times 0.18 \times 0.38768 & \text{si } \text{applyITBISExemption} = \text{true} \\ 0 & \text{si } \text{applyITBISExemption} = \text{false} \end{cases}$$
-
-*(En modo detallado, se utiliza exactamente el ITBIS liquidado en la matriz de costos).*
+$$\text{ITBIS Exonerado (USD)} = \begin{cases} \text{ITBIS Total Matriz} \times M_{venta} \approx I_{bruta} \times 0.18 \times 0.38768 & \text{si } \text{applyITBISExemption} = \text{true} \\ 0 & \text{si } \text{applyITBISExemption} = \text{false} \end{cases}$$
 
 ---
 
 ### 3.2 Crédito Fiscal del 40% en Impuesto Sobre la Renta (DGII)
-La Ley 57-07 otorga un **crédito fiscal del 40% sobre el costo de los equipos renovables** (paneles, inversores y baterías), el cual se descuenta del Impuesto Sobre la Renta (ISR) pagadero a la DGII en tres (3) partes iguales durante los primeros 3 años ($13.33\%$ anual):
+La Ley 57-07 otorga un **crédito fiscal del 40% sobre el costo de los equipos renovables**, el cual se descuenta del Impuesto Sobre la Renta (ISR) pagadero a la DGII en tres (3) partes iguales durante los primeros 3 años ($13.33\%$ anual):
 
 $$\text{Crédito Ley 57-07 Total (USD)} = \begin{cases} I_{bruta} \times 0.40 \times 0.684568 & \text{si } \text{applyLey5707} = \text{true} \\ 0 & \text{si } \text{applyLey5707} = \text{false} \end{cases}$$
 
@@ -143,7 +152,7 @@ $$CF_{t} = S_{t} + \text{TaxCredit}_{t} - \text{ReplacementCost}_{t}$$
 1. **Ahorro Energético con Degradación e Inflación**:
    $$S_{t} = S_{yr1} \times (1 - d_{panel})^{t-1} \times (1 + i_{tarifa})^{t-1}$$
    * $d_{panel}$: Tasa de degradación anual de los módulos fotovoltaicos ($0.50\%$ anual).
-   * $i_{tarifa}$: Tasa de inflación anual esperada en la tarifa eléctrica ($3.5\%$ anual).
+   * $i_{tarifa}$: Tasa de inflación anual esperada en la tarifa eléctrica ($3.5\% - 4.0\%$ anual).
 2. **Incentivo Fiscal DGII**:
    $$\text{TaxCredit}_{t} = \begin{cases} \frac{\text{Crédito Ley 57-07}}{3} & \text{si } t \in \{1, 2, 3\} \text{ y applyLey5707} = \text{true} \\ 0 & \text{si } t > 3 \text{ o applyLey5707} = \text{false} \end{cases}$$
 3. **Reemplazo de Baterías**:
@@ -192,9 +201,10 @@ $$\text{CO}_{2, evitado} \text{ (Toneladas/Año)} = \frac{E_{anual} \times F_{co
 
 ---
 
-## 6. Caso de Referencia y Benchmark Oficial
+## 6. Casos de Referencia y Suite de Auditoría Automatizada
 
-Para garantizar la reproducibilidad y auditoría matemática continua, el sistema cuenta con una prueba unitaria basada en el caso real **Centro Médico Hispánico** (38 paneles JA Solar 620W, 2 Inversores 8kW, 3 Baterías Hinaess):
+### 6.1 Benchmark Oficial: Centro Médico Hispánico
+* **Especificaciones**: 38 paneles JA Solar 620W ($23.56\text{ kWp}$), 2 inversores 8kW, 3 baterías Hinaess 16 kWh, $30.75\text{ kWp}$ instalación.
 
 | Métrica Financiera | Valor Esperado (Benchmark) | Tolerancia de Auditoría | Estado |
 | :--- | :---: | :---: | :---: |
@@ -205,11 +215,28 @@ Para garantizar la reproducibilidad y auditoría matemática continua, el sistem
 | **ITBIS Exonerado Ley 57-07** | `$1,866.11 USD` | $\pm \$1.00 \text{ USD}$ | ✅ Aprobado |
 | **Crédito Fiscal 40% DGII** | `$7,322.11 USD` | $\pm \$1.00 \text{ USD}$ | ✅ Aprobado |
 | **Inversión Neta Final ($I_{neta}$)** | `$17,551.70 USD` | $\pm \$1.00 \text{ USD}$ | ✅ Aprobado |
-| **Período de Retorno (Payback)** | `~2.4 - 2.6 Años` | $\pm 0.3 \text{ Años}$ | ✅ Aprobado |
-| **Tasa Interna de Retorno (TIR)** | `37.4% - 40.2%` | $\pm 1.0\%$ | ✅ Aprobado |
+| **Período de Retorno (Payback)** | `~2.4 Años` | $\pm 0.3 \text{ Años}$ | ✅ Aprobado |
+| **Tasa Interna de Retorno (TIR)** | `~40.21%` | $\pm 1.0\%$ | ✅ Aprobado |
 | **Valor Actual Neto (VAN 10%)** | `~$71,225 USD` | $\pm 1.0\%$ | ✅ Aprobado |
 
-### Comando de Verificación Automatizada:
+---
+
+### 6.2 Suite de Pruebas Unitarias Integrada
+El repositorio incluye una suite automatizada con 8 pruebas rigurosas en `src/engine/testFinancialEngineComprehensive.ts`:
+
+1. **Test 1**: Dimensionamiento Solar Simple y deducción exacta de ITBIS e ISR.
+2. **Test 2**: Incorporación dinámica de bancos de baterías y variación del precio de venta.
+3. **Test 3**: Alternancia (*Toggle*) de Exoneración de ITBIS (18%) y su impacto en Payback.
+4. **Test 4**: Alternancia (*Toggle*) de Crédito Fiscal Ley 57-07 (40%).
+5. **Test 5**: Integridad de Flujo de Caja a 25 años y amortización trianual.
+6. **Test 6**: Provisión de costo de reemplazo de batería en el Año 10.
+7. **Test 7**: Consistencia de Matriz de Costos Detallada y cálculo de Ganancia Bruta.
+8. **Test 8**: Resiliencia matemática contra división por cero y valores extremos.
+
 ```bash
+# Ejecutar suite de auditoría financiera
 npx tsx src/engine/testFinancialEngineComprehensive.ts
+
+# Ejecutar validación de benchmark Centro Médico Hispánico
+npx tsx src/engine/testBenchmark.ts
 ```
