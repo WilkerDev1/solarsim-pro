@@ -2,41 +2,46 @@ import { ExtractedInvoiceData } from '../types/aiInvoice';
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
-const INVOICE_EXTRACTION_SYSTEM_INSTRUCTION = `Eres un auditor e ingeniero eléctrico experto en análisis de facturas eléctricas oficiales de la República Dominicana (EDES: EDESUR Dominicana, EDEESTE, EDENORTE y CEPM).
+const INVOICE_EXTRACTION_SYSTEM_INSTRUCTION = `Eres un auditor e ingeniero eléctrico experto en análisis de facturas eléctricas oficiales de la República Dominicana (EDES: EDEESTE, EDESUR Dominicana, EDENORTE y CEPM).
 Tu objetivo es analizar minuciosamente el documento PDF o imagen de la factura provista y extraer de forma estructurada y con máxima precisión matemática los datos comerciales, técnicos, tarifarios y el vector exacto de 12 meses de consumo energético (kWh) de Enero a Diciembre.
 
-REGLAS DE EXTRACCIÓN DETALLADAS PARA FACTURAS DOMINICANAS:
+REGLAS DE EXTRACCIÓN DETALLADAS PARA FACTURAS DOMINICANAS (EDEESTE, EDESUR, EDENORTE, CEPM):
 
 1. DISTRIBUIDORA Y COMPAÑÍA:
-   - Identifica el logo o encabezado: "EDESUR", "EDEESTE", "EDENORTE" o "CEPM".
-   - Identifica el RNC de la empresa emisora y el número e-NCF (Crédito Fiscal Electrónico, B01, E31...) si existe.
+   - Identifica el logo o texto: "EDEESTE" (Empresa Distribuidora de Electricidad del Este), "EDESUR", "EDENORTE" o "CEPM".
+   - Identifica el RNC emisor (ej. 1-01-82021-7 para Edeeste, 1-01-82124-8 para Edesur) y el comprobante fiscal NCF / e-NCF (ej. E320012796466, E310000696268, B01, B02).
 
 2. DATOS DEL CLIENTE Y SUMINISTRO:
-   - Nombre / Titular: Busca "TITULAR DEL CONTRATO", "SRL , ...", "PUNTO DE EMISIÓN" o nombre del cliente.
-   - RNC / Cédula: Busca "RNC - CEDULA" o "RNC:" (ej. 130549682).
-   - NIC (Número de Identificación de Contrato): Es el identificador principal de contrato (ej. 7333529).
-   - NIS: Número de Identificación de Suministro (ej. 4115260).
-   - Medidor / Contador: Número de serie del contador (ej. 10295279).
-   - Dirección: "DIRECCIÓN DEL SUMINISTRO" (calle, número, piso/depto, sector, municipio y provincia como "DISTRITO NACIONAL", "SANTO DOMINGO", "SANTIAGO", etc.).
-   - Teléfono: Teléfono de contacto si figura.
+   - Nombre / Titular: Busca "TITULAR DEL CONTRATO", "SRL , ...", "PUNTO DE EMISIÓN" o nombre del cliente. Corrige signos de interrogación por caracteres correctos (ej. "NU?EZ, MARINO RAMON" -> "NUÑEZ, MARINO RAMON").
+   - NIC (Número de Identificación de Contrato): Es el código numérico destacado en recuadro amarillo o azul (ej. 2250790, 7333529).
+   - Circuito: Si figura (ej. "Circuito: INVI03").
+   - NIS: Número de Identificación de Suministro si existe (ej. 4115260).
+   - RNC / Cédula del cliente: Busca "RNC - CEDULA" o "RNC:" si está presente.
+   - Medidor / No. Contador: ej. 21002764, 10295279.
+   - Dirección: "DIRECCIÓN DEL SUMINISTRO" (calle, número, sector/localidad, municipio y provincia como "SANTO DOMINGO ESTE", "DISTRITO NACIONAL", "SANTO DOMINGO", "SANTIAGO", etc.).
+   - Teléfono / Referencia de Pago: ej. "2250790189-15".
 
 3. DATOS TÉCNICOS Y TARIFARIOS:
-   - Tarifa: Código como "BTD", "BTS1", "BTS2", "MTD", "BTD-1", etc.
-   - Voltaje y Fase: "VOLTAJE" (ej. "Baja 120/208 Trifásica", "Monofásica 120/240V").
-   - Eficiencia / Factor de Potencia: Valor decimal (ej. 0.97).
+   - Tarifa: Código como "BTS1" (residencial simple), "BTS2" (comercial baja tensión), "BTD" (baja tensión con demanda), "MTD" (media tensión con demanda).
+   - Voltaje y Fase: "VOLTAJE" (ej. "Baja 120/240 Doble Monofasica", "Baja 120/208 Trifásica", "Monofásica").
    - Periodo de facturación y Días facturados: ej. 31 días.
+   - Factor de Potencia / Eficiencia: ej. 0.97 si aplica.
 
-4. DESGLOSE ECONÓMICO (CÁLCULO DE LA FACTURA):
-   - Cargo fijo: Valor en RD$ (ej. 210.15).
-   - Costo de Energía por kWh: En "Energia: X kWh x RD$ Y/kWh", extrae el valor Y en DOP (ej. 9.02 DOP/kWh).
-   - Potencia Máxima Facturada: En kW (ej. 6.266 kW) y su costo por kW (ej. RD$ 1,189.16/kW).
-   - Total Facturado: "IMPORTE TOTAL" en RD$ (ej. 17,394.01).
-   - Subsidio Gubernamental: "APORTE TOTAL GOBIERNO RD$" si existe (ej. 14,286.18).
-   - Importe sin Subsidio: "IMPORTE TOTAL SIN SUBSIDIO RD$" si existe (ej. 31,680.19).
+4. DESGLOSE ECONÓMICO Y ESTRUCTURA TARIFARIA:
+   - Cargo fijo: Valor en RD$ (ej. 127.83 o 210.15).
+   - Estructura de Energía (RD$/kWh):
+     * Para tarifa plana (ej. BTD): un solo precio por kWh (ej. RD$ 9.02/kWh).
+     * Para tarifa escalonada (ej. BTS1): bloques como 200 kWh x RD$ 6.17, 100 kWh x RD$ 8.71, 373 kWh x RD$ 13.04.
+     * En 'energyCostPerKWhDOP', calcula el precio medio efectivo ponderado de la energía (Total RD$ Energía / Total kWh).
+     * En 'marginalRateDOP', guarda la tarifa marginal del escalón más alto (ej. 13.04 RD$/kWh).
+   - Potencia Máxima (Demanda en kW) y su costo por kW: si aplica para BTD/MTD (ej. 6.266 kW).
+   - Importe Total: "VALOR TOTAL A PAGAR EN RD$" o "IMPORTE TOTAL" (ej. 7,096.75 o 17,394.01).
+   - Subsidio Estatal: "IMPORTE SUBSIDIADO EN RD$" o "APORTE TOTAL GOBIERNO RD$" (ej. 3,736.69 o 14,286.18).
+   - Importe sin Subsidio: "IMPORTE SIN SUBSIDIO EN RD$" (ej. 10,833.44 o 31,680.19).
 
-5. HISTÓRICO DE CONSUMOS (TABLA MM/AA Y GRÁFICA DE 12 MESES):
-   - Las facturas dominicanas incluyen una tabla "HISTÓRICO DE CONSUMOS" con columnas: "Mes" (formato MM/AA como 05/25, 06/25... 05/26), "Cosm." (Consumo kWh) y "Pot." (kW de potencia).
-   - Debes extraer los consumos (kWh) y ordenarlos en un vector de exactamente 12 posiciones correspondiente al año natural (Índices 0 a 11):
+5. HISTÓRICO DE CONSUMOS (TABLA MM/AA O MM/AAAA Y GRÁFICA DE 12 MESES):
+   - En la tabla "HISTÓRICO DE CONSUMOS", los meses pueden venir en formato MM/AAAA (ej. 04/2025... 04/2026 en Edeeste) o MM/AA (ej. 04/25... 04/26 en Edesur).
+   - Debes extraer los consumos (kWh) de cada mes y asignarlos exactamente al orden cronológico del año natural (Enero a Diciembre):
      Índice 0: Enero (Mes 01)
      Índice 1: Febrero (Mes 02)
      Índice 2: Marzo (Mes 03)
@@ -49,26 +54,27 @@ REGLAS DE EXTRACCIÓN DETALLADAS PARA FACTURAS DOMINICANAS:
      Índice 9: Octubre (Mes 10)
      Índice 10: Noviembre (Mes 11)
      Índice 11: Diciembre (Mes 12)
-   - Si la tabla tiene 13 meses (por ejemplo desde Mayo 2025 hasta Mayo 2026), asigna el valor más reciente para el mes repetido.
-   - Si algún mes no aparece o la factura tiene menos de 12 meses registrados, calcula el promedio de los meses presentes y rellena los faltantes para que SIEMPRE hayan 12 números válidos mayores a 0.
+   - Si la tabla contiene 13 meses (por ejemplo de Abril 2025 a Abril 2026), toma el valor del año más reciente para el mes repetido.
+   - El vector resultante 'monthlyConsumptionKWh' debe tener EXACTAMENTE 12 números válidos mayores a 0.
 
 6. CONFIABILIDAD Y NOTAS:
    - Asigna un puntaje de confianza (0 a 100).
-   - En 'notes', resume la extracción (ej. "Extracción exitosa de Edesur: Tarifa BTD trifásica, NIC 7333529, 13 meses de histórico leídos").`;
+   - En 'notes', resume la extracción detallando distribuidora, NIC, tarifa y desglose.`;
 
 const INVOICE_JSON_SCHEMA = {
   type: 'OBJECT',
   properties: {
-    clientName: { type: 'STRING', description: 'Nombre completo del titular o cliente/empresa' },
-    companyName: { type: 'STRING', description: 'Razón social de la empresa si aplica' },
+    clientName: { type: 'STRING', description: 'Nombre completo del titular o empresa' },
+    companyName: { type: 'STRING', description: 'Razón social si aplica' },
     nic: { type: 'STRING', description: 'Número de Identificación de Contrato / NIC' },
     nis: { type: 'STRING', description: 'Número de Identificación de Suministro / NIS' },
+    circuit: { type: 'STRING', description: 'Nombre o código del circuito eléctrico' },
     rnc: { type: 'STRING', description: 'RNC o Cédula' },
     contractNumber: { type: 'STRING', description: 'Número de contrato o referencia de pago' },
-    eNCF: { type: 'STRING', description: 'Comprobante fiscal electrónico e-NCF' },
+    eNCF: { type: 'STRING', description: 'Comprobante fiscal NCF o e-NCF' },
     address: { type: 'STRING', description: 'Dirección del suministro eléctrico' },
-    province: { type: 'STRING', description: 'Provincia (ej. Distrito Nacional, Santo Domingo, Santiago)' },
-    municipality: { type: 'STRING', description: 'Municipio (ej. Santo Domingo de Guzmán)' },
+    province: { type: 'STRING', description: 'Provincia en República Dominicana' },
+    municipality: { type: 'STRING', description: 'Municipio' },
     phone: { type: 'STRING', description: 'Teléfono si aparece' },
     email: { type: 'STRING', description: 'Correo electrónico si aparece' },
     distributor: {
@@ -78,31 +84,35 @@ const INVOICE_JSON_SCHEMA = {
     },
     tariffCode: {
       type: 'STRING',
-      description: 'Código de tarifa (ej. BTD, BTS1, BTS2, MTD)',
+      description: 'Código de tarifa (ej. BTS1, BTS2, BTD, MTD)',
     },
     energyCostPerKWhDOP: {
       type: 'NUMBER',
-      description: 'Precio de energía en RD$/kWh (ej. 9.02)',
+      description: 'Precio medio efectivo de la energía en RD$/kWh',
+    },
+    marginalRateDOP: {
+      type: 'NUMBER',
+      description: 'Tarifa del bloque superior en RD$/kWh para BTS1',
     },
     fixedChargeDOP: {
       type: 'NUMBER',
-      description: 'Cargo fijo en RD$ (ej. 210.15)',
+      description: 'Cargo fijo en RD$',
     },
     peakDemandKW: {
       type: 'NUMBER',
-      description: 'Potencia máxima o demanda registrada en kW (ej. 6.266)',
+      description: 'Potencia máxima o demanda registrada en kW',
     },
     demandCostPerKWDOP: {
       type: 'NUMBER',
-      description: 'Costo por kW de potencia máxima en RD$ (ej. 1189.16)',
+      description: 'Costo por kW de potencia máxima en RD$',
     },
-    meterNumber: { type: 'STRING', description: 'Número de medidor / contador (ej. 10295279)' },
-    voltagePhase: { type: 'STRING', description: 'Voltaje y fases (ej. Baja 120/208 Trifásica)' },
-    powerFactor: { type: 'NUMBER', description: 'Factor de potencia o eficiencia (ej. 0.97)' },
-    billingDays: { type: 'NUMBER', description: 'Días del periodo de facturación (ej. 31)' },
-    totalBilledAmountDOP: { type: 'NUMBER', description: 'Importe Total a pagar en RD$ (ej. 17394.01)' },
-    totalWithoutSubsidyDOP: { type: 'NUMBER', description: 'Importe Total sin subsidio en RD$ (ej. 31680.19)' },
-    governmentSubsidyDOP: { type: 'NUMBER', description: 'Aporte total del gobierno / subsidio en RD$ (ej. 14286.18)' },
+    meterNumber: { type: 'STRING', description: 'Número de medidor o contador' },
+    voltagePhase: { type: 'STRING', description: 'Voltaje y fases (ej. Doble Monofasica 120/240V, Trifasica 120/208V)' },
+    powerFactor: { type: 'NUMBER', description: 'Factor de potencia o eficiencia' },
+    billingDays: { type: 'NUMBER', description: 'Días del periodo facturado' },
+    totalBilledAmountDOP: { type: 'NUMBER', description: 'Importe Total a pagar en RD$' },
+    totalWithoutSubsidyDOP: { type: 'NUMBER', description: 'Importe Total sin subsidio en RD$' },
+    governmentSubsidyDOP: { type: 'NUMBER', description: 'Monto subsidiado / aporte del gobierno en RD$' },
     monthlyConsumptionKWh: {
       type: 'ARRAY',
       items: { type: 'NUMBER' },
@@ -118,7 +128,7 @@ const INVOICE_JSON_SCHEMA = {
     },
     currentBilledKWh: {
       type: 'NUMBER',
-      description: 'Consumo facturado en el mes actual en kWh (ej. 1079)',
+      description: 'Consumo facturado en el mes actual en kWh',
     },
     confidenceScore: {
       type: 'NUMBER',
@@ -250,6 +260,9 @@ export async function parseInvoiceWithGemini(params: {
     throw new Error(`Error al parsear el JSON de la IA: ${err.message}`);
   }
 
+  // Clean corrupted character encodings (e.g. NU?EZ -> NUÑEZ)
+  let cleanName = (parsed.clientName || 'Cliente Factura EDE').replace(/\?/g, 'Ñ');
+
   // Normalize and validate 12-month array
   let monthlyConsumption: number[] = Array.isArray(parsed.monthlyConsumptionKWh)
     ? parsed.monthlyConsumptionKWh.map((n: any) => Math.max(0, Math.round(Number(n) || 0)))
@@ -277,23 +290,25 @@ export async function parseInvoiceWithGemini(params: {
   const recommendedPanelCount = Math.max(1, Math.ceil((recommendedCapacityKWp * 1000) / panelWatts));
 
   const result: ExtractedInvoiceData = {
-    clientName: parsed.clientName || 'Cliente Factura EDE',
+    clientName: cleanName,
     companyName: parsed.companyName || undefined,
     nic: parsed.nic || undefined,
     nis: parsed.nis || undefined,
+    circuit: parsed.circuit || undefined,
     rnc: parsed.rnc || undefined,
     contractNumber: parsed.contractNumber || undefined,
     eNCF: parsed.eNCF || undefined,
     address: parsed.address || undefined,
-    province: parsed.province || 'Distrito Nacional',
+    province: parsed.province || 'Santo Domingo',
     municipality: parsed.municipality || undefined,
     phone: parsed.phone || undefined,
     email: parsed.email || undefined,
     distributor: (['EDEESTE', 'EDESUR', 'EDENORTE', 'CEPM'].includes(parsed.distributor)
       ? parsed.distributor
-      : 'EDESUR') as any,
-    tariffCode: parsed.tariffCode || 'BTD',
+      : 'EDEESTE') as any,
+    tariffCode: parsed.tariffCode || 'BTS1',
     energyCostPerKWhDOP: parsed.energyCostPerKWhDOP || undefined,
+    marginalRateDOP: parsed.marginalRateDOP || undefined,
     fixedChargeDOP: parsed.fixedChargeDOP || undefined,
     peakDemandKW: parsed.peakDemandKW || undefined,
     demandCostPerKWDOP: parsed.demandCostPerKWDOP || undefined,
@@ -307,7 +322,7 @@ export async function parseInvoiceWithGemini(params: {
     monthlyConsumptionKWh: monthlyConsumption,
     annualConsumptionKWh: totalAnnual,
     averageMonthlyKWh: avgMonthly,
-    currentBilledKWh: parsed.currentBilledKWh || monthlyConsumption[4] || monthlyConsumption[0],
+    currentBilledKWh: parsed.currentBilledKWh || monthlyConsumption[0],
     recommendedCapacityKWp,
     recommendedPanelCount,
     targetCoveragePct: 95,

@@ -1,3 +1,8 @@
+export interface InvoiceTierBlock {
+  kwh: number;
+  rateDOP: number;
+}
+
 export interface ExtractedInvoiceData {
   // Client & Company Identity
   clientName: string;
@@ -6,6 +11,7 @@ export interface ExtractedInvoiceData {
   nis?: string;
   rnc?: string;
   contractNumber?: string;
+  circuit?: string;             // e.g. "INVI03"
   eNCF?: string;
   address?: string;
   province?: string;
@@ -16,17 +22,19 @@ export interface ExtractedInvoiceData {
   // Utility & Tariff Data (Dominican Republic EDES: Edesur, Edeeste, Edenorte, CEPM)
   distributor: 'EDEESTE' | 'EDESUR' | 'EDENORTE' | 'CEPM';
   tariffCode: 'BTS1' | 'BTS2' | 'MTD' | 'BTD' | string;
-  energyCostPerKWhDOP?: number; // e.g. 9.02 DOP/kWh
-  fixedChargeDOP?: number;      // e.g. 210.15 DOP
+  energyCostPerKWhDOP?: number; // e.g. 10.35 DOP/kWh (Effective average or top tier)
+  marginalRateDOP?: number;     // e.g. 13.04 DOP/kWh (Top tier for BTS1 escalonado)
+  energyTiers?: InvoiceTierBlock[];
+  fixedChargeDOP?: number;      // e.g. 127.83 DOP or 210.15 DOP
   peakDemandKW?: number;        // e.g. 6.266 kW
   demandCostPerKWDOP?: number;  // e.g. 1189.16 DOP/kW
   meterNumber?: string;
-  voltagePhase?: string;        // e.g. "Baja 120/208 Trifásica"
-  powerFactor?: number;         // e.g. 0.97 (Eficiencia)
+  voltagePhase?: string;        // e.g. "Baja 120/240 Doble Monofasica", "Baja 120/208 Trifásica"
+  powerFactor?: number;         // e.g. 0.97
   billingDays?: number;         // e.g. 31 días
-  totalBilledAmountDOP?: number;// e.g. 17394.01 DOP
-  totalWithoutSubsidyDOP?: number;// e.g. 31680.19 DOP
-  governmentSubsidyDOP?: number;// e.g. 14286.18 DOP
+  totalBilledAmountDOP?: number;// e.g. 7096.75 DOP or 17394.01 DOP
+  totalWithoutSubsidyDOP?: number;// e.g. 10833.44 DOP
+  governmentSubsidyDOP?: number;// e.g. 3736.69 DOP
 
   // 12-Month Consumption Vector (Jan to Dec in kWh)
   monthlyConsumptionKWh: number[];
