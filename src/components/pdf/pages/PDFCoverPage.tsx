@@ -38,19 +38,19 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
 
   return (
     <div className="pdf-page w-[850px] h-[1202px] min-h-[1202px] max-h-[1202px] bg-white shadow-2xl flex flex-col justify-between shrink-0 relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
-      {/* 1. Header Overlay (Transparent High-Resolution Logo on Top-Right) */}
-      <div className="absolute top-0 right-0 w-full flex justify-end p-8 z-30 pointer-events-none">
+      {/* 1. Header Overlay (Larger High-Resolution Logo on Top-Right) */}
+      <div className="absolute top-0 right-0 w-full flex justify-end p-6 pr-8 z-30 pointer-events-none">
         <div className="flex items-center gap-3 pointer-events-auto">
           {hasLogoImage ? (
             <img
               src={coverLogoSrc}
               alt={companyName}
-              className="h-14 max-h-[64px] w-auto object-contain drop-shadow-[0_4px_12px_rgba(0,0,0,0.35)]"
+              className="h-20 max-h-[85px] w-auto object-contain drop-shadow-[0_4px_16px_rgba(0,0,0,0.4)]"
             />
           ) : (
             <div className="flex flex-col text-right drop-shadow-md">
               <span
-                className="text-3xl font-black tracking-tight uppercase"
+                className="text-4xl font-black tracking-tight uppercase"
                 style={{ color: activeTheme.primary }}
               >
                 {companyName}
@@ -63,49 +63,16 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
         </div>
       </div>
 
-      {/* 2. Geometric Hero Section with Exact Polygon Clip-paths */}
+      {/* 2. Geometric Hero Section with 100% SVG-compatible Triangles */}
       <div className="relative h-[490px] w-full z-0 overflow-hidden bg-white shrink-0">
-        {/* Subtle dot-grid texture on clean white background */}
-        <div
-          className="absolute inset-0 opacity-35 pointer-events-none z-0"
-          style={{
-            backgroundImage: 'radial-gradient(#94a3b8 1.2px, transparent 1.2px)',
-            backgroundSize: '20px 20px',
-          }}
-        />
-
-        {/* Underlying Colored Polygons */}
-        <div
-          className="absolute right-0 bottom-12 w-2/3 h-1/2 z-0"
-          style={{
-            backgroundColor: activeTheme.primary,
-            clipPath: 'polygon(100% 0, 100% 100%, 18% 100%)',
-            opacity: 0.95,
-          }}
-        />
-
-        <div
-          className="absolute right-0 bottom-0 w-1/2 h-1/3 z-0"
-          style={{
-            backgroundColor: activeTheme.secondary,
-            clipPath: 'polygon(100% 0, 100% 100%, 48% 100%)',
-            opacity: 0.95,
-          }}
-        />
-
-        {/* Main Image Polygon on Top */}
-        <div
-          className="absolute inset-0 z-10 overflow-hidden"
-          style={{
-            clipPath: 'polygon(0 0, 100% 0, 100% 65%, 40% 100%, 0% 100%)',
-          }}
-        >
+        {/* Main Background Image */}
+        <div className="absolute inset-0 z-0">
           <img
             src={PDF_COVER_HERO_BASE64}
             alt="Solar rooftop installation at sunset"
             className="w-full h-full object-cover object-center"
           />
-          {/* Subtle blend overlay */}
+          {/* Subtle color blend overlay */}
           <div
             className="absolute inset-0 opacity-20 mix-blend-multiply"
             style={{ backgroundColor: activeTheme.primary }}
@@ -113,8 +80,32 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
           <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/25" />
         </div>
 
-        {/* Top-Left Project Tag (Directly Relevant to Proposal) */}
-        <div className="absolute top-10 left-12 z-20 space-y-2">
+        {/* Native SVG Polygons for Cross-Platform & html2canvas Reliability */}
+        <svg
+          className="absolute inset-0 w-full h-full pointer-events-none z-10"
+          viewBox="0 0 850 490"
+          preserveAspectRatio="none"
+        >
+          {/* 1. White Diagonal Cutout */}
+          <polygon points="340,490 850,318 850,490" fill="#ffffff" />
+
+          {/* 2. Primary Theme Large Geometric Triangle */}
+          <polygon
+            points="620,490 850,318 850,490"
+            fill={activeTheme.primary}
+            opacity="0.95"
+          />
+
+          {/* 3. Secondary Theme Smaller Corner Triangle */}
+          <polygon
+            points="710,490 850,410 850,490"
+            fill={activeTheme.secondary}
+            opacity="0.95"
+          />
+        </svg>
+
+        {/* Top-Left Project Tag with Solid Background and High Contrast */}
+        <div className="absolute top-8 left-10 z-20 space-y-2">
           <div className="flex items-center gap-2.5">
             <div
               className="w-9 h-1 rounded-full shadow-md"
@@ -126,16 +117,16 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
           </div>
 
           <div
-            className="backdrop-blur-md text-white px-4 py-2 inline-flex items-center gap-2 rounded-sm border-l-4 shadow-xl"
+            className="px-3.5 py-1.5 inline-flex items-center gap-2 rounded shadow-lg border-l-4"
             style={{
-              backgroundColor: 'rgba(15, 23, 42, 0.85)',
+              backgroundColor: '#0f172a',
               borderLeftColor: activeTheme.secondary,
             }}
           >
-            <span className="text-xs font-extrabold uppercase tracking-wider text-amber-300">
+            <span className="text-xs font-black uppercase tracking-wider text-amber-400">
               ENERGÍA SOLAR
             </span>
-            <span className="text-xs font-bold text-white/90 uppercase tracking-wider">
+            <span className="text-xs font-bold text-white uppercase tracking-wider">
               • LEY 57-07
             </span>
           </div>
@@ -160,14 +151,14 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
             </span>
           </div>
 
-          {/* Client Name Main Title */}
+          {/* Client Name Main Title & Location with Balanced Spacing */}
           <div>
-            <h1 className="text-4xl font-black text-slate-900 leading-[1.08] tracking-tight uppercase break-words">
+            <h1 className="text-4xl font-black text-slate-900 leading-[1.1] tracking-tight uppercase break-words">
               {clientName}
             </h1>
-            <div className="flex items-center gap-2 text-slate-600 mt-2 text-sm font-semibold">
+            <div className="flex items-center gap-2 text-slate-600 mt-3.5 text-sm font-semibold">
               <MapPin className="w-4 h-4 shrink-0" style={{ color: activeTheme.secondary }} />
-              <span>{clientLocation}</span>
+              <span className="leading-normal">{clientLocation}</span>
             </div>
           </div>
 
