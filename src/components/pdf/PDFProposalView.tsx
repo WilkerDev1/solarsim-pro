@@ -81,10 +81,46 @@ export const PDFProposalView: React.FC = () => {
       const pdfWidth = 210;
       const pdfHeight = 297;
 
+      // Sandbox contenedor aislado fuera del flujo de scroll
+      const sandbox = document.createElement('div');
+      sandbox.style.position = 'fixed';
+      sandbox.style.top = '0px';
+      sandbox.style.left = '0px';
+      sandbox.style.width = '850px';
+      sandbox.style.height = '1202px';
+      sandbox.style.overflow = 'hidden';
+      sandbox.style.zIndex = '99999';
+      sandbox.style.backgroundColor = '#ffffff';
+      sandbox.style.pointerEvents = 'none';
+      sandbox.style.boxSizing = 'border-box';
+      sandbox.style.margin = '0';
+      sandbox.style.padding = '0';
+      document.body.appendChild(sandbox);
+
       for (let i = 0; i < pageElements.length; i++) {
         const pageEl = pageElements[i];
 
-        const canvas = await html2canvas(pageEl, {
+        // Clonar la página y montarla en el sandbox limpio
+        const clone = pageEl.cloneNode(true) as HTMLElement;
+        clone.style.width = '850px';
+        clone.style.height = '1202px';
+        clone.style.minHeight = '1202px';
+        clone.style.maxHeight = '1202px';
+        clone.style.margin = '0';
+        clone.style.padding = '0';
+        clone.style.boxSizing = 'border-box';
+        clone.style.overflow = 'hidden';
+        clone.style.transform = 'none';
+        clone.style.boxShadow = 'none';
+        clone.style.display = 'flex';
+
+        sandbox.innerHTML = '';
+        sandbox.appendChild(clone);
+
+        // Pequeño delay para estabilización de render y fuentes
+        await new Promise((resolve) => setTimeout(resolve, 60));
+
+        const canvas = await html2canvas(clone, {
           scale: 2,
           useCORS: true,
           logging: false,
@@ -92,35 +128,12 @@ export const PDFProposalView: React.FC = () => {
           backgroundColor: '#ffffff',
           width: 850,
           height: 1202,
+          windowWidth: 850,
+          windowHeight: 1202,
+          x: 0,
+          y: 0,
           scrollX: 0,
           scrollY: 0,
-          onclone: (clonedDoc) => {
-            // Ocultar todas las demás páginas para que la página i esté en offsetTop = 0 sin gaps
-            const allClonedPages = clonedDoc.querySelectorAll<HTMLElement>('.pdf-page');
-            allClonedPages.forEach((p, idx) => {
-              if (idx !== i) {
-                p.style.display = 'none';
-              } else {
-                p.style.display = 'flex';
-                p.style.width = '850px';
-                p.style.height = '1202px';
-                p.style.minHeight = '1202px';
-                p.style.maxHeight = '1202px';
-                p.style.boxSizing = 'border-box';
-                p.style.overflow = 'hidden';
-                p.style.margin = '0';
-                p.style.transform = 'none';
-              }
-            });
-
-            // Eliminar gaps o padding del contenedor padre
-            const parentContainer = allClonedPages[i]?.parentElement;
-            if (parentContainer) {
-              parentContainer.style.gap = '0';
-              parentContainer.style.padding = '0';
-              parentContainer.style.margin = '0';
-            }
-          },
         });
 
         const imgData = canvas.toDataURL('image/jpeg', 0.98);
@@ -130,6 +143,11 @@ export const PDFProposalView: React.FC = () => {
         }
 
         pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+      }
+
+      // Limpiar sandbox del DOM
+      if (document.body.contains(sandbox)) {
+        document.body.removeChild(sandbox);
       }
 
       const sanitizedClientName = (project.client.name || 'Cliente').replace(/[^a-zA-Z0-9_-]/g, '_');
