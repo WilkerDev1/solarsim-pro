@@ -111,7 +111,15 @@ export function calculateCostMatrixSummary(
   const porcentajeVentaDOP = totalNetoDOP * margin;
   const porcentajeVentaUSD = totalNetoUSD * margin;
 
-  const capacityKW = installationQty > 0 ? installationQty : 1;
+  // Solar Only Subtotal (Paneles + Inversores + Instalación sin Baterías)
+  const solarOnlyNetDOP = panelTotalDOP + inverterTotalDOP + installTotalDOP;
+  const solarOnlyItbisDOP = panelItbisDOP + inverterItbisDOP + installItbisDOP;
+  const solarOnlyTotalNetDOP = solarOnlyNetDOP + solarOnlyItbisDOP;
+  const solarOnlyTotalNetUSD = solarOnlyTotalNetDOP / rate;
+  const solarOnlyVentaDOP = solarOnlyTotalNetDOP * margin;
+  const solarOnlyVentaUSD = solarOnlyTotalNetUSD * margin;
+
+  const capacityKW = installationQty > 0 ? installationQty : (dcCapacityKWp > 0 ? dcCapacityKWp : 1);
   const precioKilosCostoDOP = totalNetoDOP / (capacityKW * 800 || 1); // 67.50
   const precioKilosCostoUSD = totalNetoUSD / capacityKW; // $900.01 / kWp
 
@@ -123,6 +131,7 @@ export function calculateCostMatrixSummary(
 
   const costPerWattUSD = totalNetoUSD / (capacityKW * 1000);
   const salePricePerWattUSD = porcentajeVentaUSD / (capacityKW * 1000);
+  const solarSalePricePerWattUSD = capacityKW > 0 ? Math.round((solarOnlyVentaUSD / (capacityKW * 1000)) * 100) / 100 : 1.13;
 
   return {
     dopExchangeRate: rate,
@@ -136,6 +145,7 @@ export function calculateCostMatrixSummary(
     totalNetoUSD,
     porcentajeVentaDOP,
     porcentajeVentaUSD,
+    solarOnlyVentaUSD,
     precioKilosCostoDOP,
     precioKilosCostoUSD,
     precioKilosVentasDOP,
@@ -144,6 +154,7 @@ export function calculateCostMatrixSummary(
     gananciaUSD,
     costPerWattUSD,
     salePricePerWattUSD,
+    solarSalePricePerWattUSD,
   };
 }
 

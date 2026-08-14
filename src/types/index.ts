@@ -109,7 +109,9 @@ export interface CostMatrixSummary {
   gananciaDOP: number;           // Net Profit DOP
   gananciaUSD: number;           // Net Profit USD
   costPerWattUSD: number;        // Cost/W USD (e.g. $0.90)
-  salePricePerWattUSD: number;   // Sale/W USD (e.g. $1.13)
+  salePricePerWattUSD: number;   // Total System Sale/W USD (with batteries)
+  solarSalePricePerWattUSD?: number; // Solar Only Sale/W USD (e.g. $1.13)
+  solarOnlyVentaUSD?: number;    // Solar Only Sale USD
 }
 
 export interface MonthlyEnergyResult {

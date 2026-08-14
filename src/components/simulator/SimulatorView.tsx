@@ -1043,9 +1043,16 @@ export const SimulatorView: React.FC = () => {
                   <label className={`block text-[11px] font-bold ${isDark ? 'text-amber-300' : 'text-amber-900'}`}>
                     Precio Sistema por Vatio (USD/Wp)
                   </label>
-                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${isDark ? 'bg-amber-950/80 text-amber-300 border border-amber-800/60' : 'bg-amber-100 text-amber-900 border border-amber-200'}`}>
-                    Margen: ${(summary.costMatrix.salePricePerWattUSD || 1.13).toFixed(2)} Wp
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${isDark ? 'bg-amber-950/80 text-amber-300 border border-amber-800/60' : 'bg-amber-100 text-amber-900 border border-amber-200'}`} title="Precio sugerido por la matriz de costos para paneles + inversores + instalación">
+                      Solar: ${(summary.costMatrix.solarSalePricePerWattUSD || 1.13).toFixed(2)} Wp
+                    </span>
+                    {project.specs.hasBattery && (
+                      <span className={`text-[9px] font-bold px-1 py-0.5 rounded ${isDark ? 'bg-zinc-800 text-zinc-300' : 'bg-slate-100 text-slate-600'}`} title="Precio total llave en mano incluyendo bancos de baterías">
+                        Total: ${(summary.costMatrix.salePricePerWattUSD || 1.13).toFixed(2)} Wp
+                      </span>
+                    )}
+                  </div>
                 </div>
                 
                 <div className="flex gap-1.5 items-center">
@@ -1062,9 +1069,9 @@ export const SimulatorView: React.FC = () => {
                   />
                   <button
                     type="button"
-                    title="Sincronizar automáticamente con el precio por Watt calculado de la matriz de costos y margen de venta"
+                    title="Sincronizar con el precio por Watt solar de la matriz de costos y margen de venta"
                     onClick={() => {
-                      const autoWp = Math.round((summary.costMatrix.salePricePerWattUSD || 1.13) * 100) / 100;
+                      const autoWp = Math.round((summary.costMatrix.solarSalePricePerWattUSD || 1.13) * 100) / 100;
                       updateSpecs({ pricePerWattUSD: autoWp });
                     }}
                     className={`px-2.5 py-1 text-[11px] rounded-lg font-bold flex items-center gap-1 border transition-all cursor-pointer ${
@@ -1543,7 +1550,7 @@ export const SimulatorView: React.FC = () => {
                     </div>
                     <div className="flex justify-between text-slate-800 pt-1 border-t border-slate-300">
                       <span className="font-bold">PRECIO POR WATT (USD/W):</span>
-                      <span className="font-bold text-emerald-800">${(summary.systemCapacityKWp > 0 ? (summary.grossInvestmentUSD / (summary.systemCapacityKWp * 1000)) : (project.specs.pricePerWattUSD || 1.13)).toFixed(2)}</span>
+                      <span className="font-bold text-emerald-800">${(project.specs.pricePerWattUSD || project.financials.pricePerWattUSD || (summary.solarInvestmentUSD / (summary.systemCapacityKWp * 1000)) || 1.13).toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
