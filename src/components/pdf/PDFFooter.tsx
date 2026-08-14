@@ -16,9 +16,20 @@ export const PDFFooter: React.FC<PDFFooterProps> = ({
   const footerText = customization?.companyFooterText || DEFAULT_DOCUMENT_CUSTOMIZATION.companyFooterText || '';
 
   return (
-    <footer className="w-full h-11 px-10 border-t border-slate-200 text-[10px] text-slate-500 flex justify-between items-center bg-slate-50 z-30 box-border shrink-0 mt-auto">
-      <span className="truncate max-w-[560px] font-medium leading-none">{footerText}</span>
-      <span className="font-bold text-slate-700 shrink-0 ml-4 leading-none whitespace-nowrap">
+    <footer
+      className="w-full h-12 px-10 border-t border-slate-200 flex justify-between items-center bg-slate-50 z-30 box-border shrink-0 mt-auto pb-1"
+      style={{ minHeight: '48px', maxHeight: '48px' }}
+    >
+      <span
+        className="truncate max-w-[560px] font-semibold text-[10px]"
+        style={{ color: '#64748b', lineHeight: '1.4' }}
+      >
+        {footerText}
+      </span>
+      <span
+        className="font-bold text-[10px] shrink-0 ml-4 whitespace-nowrap"
+        style={{ color: '#1e293b', lineHeight: '1.4' }}
+      >
         Página {pageNum} de {totalPages}
       </span>
     </footer>

@@ -70,7 +70,7 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
             <img
               src={PDF_ROOF_DETAIL_BASE64}
               alt="3D Solar array on tile roof frontal perspective"
-              className="w-full h-full object-contain"
+              className="max-h-[160px] max-w-[95%] w-auto h-auto mx-auto block"
             />
           </div>
         </div>
@@ -113,7 +113,7 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
             <img
               src={PDF_FLOW_DIAGRAM_BASE64}
               alt="Diagrama de flujo del sistema solar fotovoltaico"
-              className="w-full h-full object-contain"
+              className="max-h-[160px] max-w-[95%] w-auto h-auto mx-auto block"
             />
           </div>
         </div>

@@ -113,12 +113,14 @@ export const PDFProposalView: React.FC = () => {
         clone.style.transform = 'none';
         clone.style.boxShadow = 'none';
         clone.style.display = 'flex';
+        clone.style.flexDirection = 'column';
+        clone.style.justifyContent = 'space-between';
 
         sandbox.innerHTML = '';
         sandbox.appendChild(clone);
 
-        // Pequeño delay para estabilización de render y fuentes
-        await new Promise((resolve) => setTimeout(resolve, 60));
+        // Delay para estabilización completa de layout, imágenes y fuentes
+        await new Promise((resolve) => setTimeout(resolve, 100));
 
         const canvas = await html2canvas(clone, {
           scale: 2,
