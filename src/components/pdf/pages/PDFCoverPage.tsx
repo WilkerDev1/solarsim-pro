@@ -117,16 +117,22 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
           </div>
 
           <div
-            className="px-3.5 py-1.5 inline-flex items-center gap-2 rounded shadow-lg border-l-4"
+            className="px-3.5 py-1.5 inline-flex items-center gap-2 rounded shadow-xl border-l-4"
             style={{
               backgroundColor: '#0f172a',
               borderLeftColor: activeTheme.secondary,
             }}
           >
-            <span className="text-xs font-black uppercase tracking-wider text-amber-400">
+            <span
+              className="text-xs font-black uppercase tracking-wider"
+              style={{ color: '#ffffff' }}
+            >
               ENERGÍA SOLAR
             </span>
-            <span className="text-xs font-bold text-white uppercase tracking-wider">
+            <span
+              className="text-xs font-bold uppercase tracking-wider text-slate-100"
+              style={{ color: '#ffffff' }}
+            >
               • LEY 57-07
             </span>
           </div>
