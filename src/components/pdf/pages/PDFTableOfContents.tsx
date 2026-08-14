@@ -80,35 +80,35 @@ export const PDFTableOfContents: React.FC<PDFTableOfContentsProps> = ({
           <div className="space-y-4">
             {tocItems.map((item, idx) => (
               <div key={idx} className="space-y-1">
-                <div className="flex items-baseline justify-between text-xs group">
-                  <div className="flex items-baseline gap-2 font-bold text-slate-800 shrink-0">
+                <div className="flex items-center justify-between text-xs group">
+                  <div className="flex items-center gap-2.5 font-bold text-slate-800 shrink-0">
                     <span
-                      className="font-mono text-[13px] font-black w-6 text-right"
+                      className="font-mono text-sm font-black w-6 text-right shrink-0"
                       style={{ color: activeTheme.primary }}
                     >
                       {item.number}.
                     </span>
-                    <span className="text-sm font-extrabold text-slate-900 uppercase tracking-tight">
+                    <span className="text-sm font-black text-slate-900 uppercase tracking-tight">
                       {item.title}
                     </span>
                   </div>
 
                   {/* Dotted Leader Line */}
-                  <div className="flex-1 mx-3 border-b border-dotted border-slate-400/80 mb-1" />
+                  <div className="flex-1 mx-4 border-b-2 border-dotted border-slate-300" />
 
-                  {/* Page Number Badge */}
+                  {/* Page Number Badge - Perfectly Centered Circle */}
                   <div
-                    className="w-7 h-7 rounded-lg text-white font-mono font-bold text-xs flex items-center justify-center shrink-0 shadow-2xs"
+                    className="w-8 h-8 rounded-full text-white font-mono font-black text-xs flex items-center justify-center shrink-0 shadow-xs leading-none"
                     style={{ backgroundColor: activeTheme.primary }}
                   >
-                    {item.targetPage}
+                    <span className="leading-none text-center">{item.targetPage}</span>
                   </div>
                 </div>
 
                 {item.subtitle && (
-                  <div className="flex items-baseline justify-between text-[11px] text-slate-600 pl-8 pr-1">
-                    <span className="font-medium text-slate-600 flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block" />
+                  <div className="flex items-center justify-between text-[11px] text-slate-600 pl-8 pr-12">
+                    <span className="font-medium text-slate-600 flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block shrink-0" />
                       {item.subtitle}
                     </span>
                   </div>
