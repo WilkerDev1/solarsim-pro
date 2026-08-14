@@ -285,8 +285,26 @@ function fetchLatestGitHubRelease(): Promise<any> {
 
 // IPC Handlers for Auto-Updater & Platform Info
 ipcMain.handle('get-platform-info', () => {
-  const isArch = fs.existsSync('/etc/arch-release') || fs.existsSync('/etc/manjaro-release') || fs.existsSync('/etc/cachyos-release');
-  const isDebian = fs.existsSync('/etc/debian_version');
+  let isArch = false;
+  let isDebian = false;
+
+  if (process.platform === 'linux') {
+    isArch = fs.existsSync('/usr/bin/pacman') ||
+             fs.existsSync('/etc/arch-release') ||
+             fs.existsSync('/etc/cachyos-release') ||
+             fs.existsSync('/etc/manjaro-release') ||
+             fs.existsSync('/etc/endeavouros-release');
+
+    if (!isArch && fs.existsSync('/etc/os-release')) {
+      try {
+        const osRelease = fs.readFileSync('/etc/os-release', 'utf-8').toLowerCase();
+        isArch = osRelease.includes('arch') || osRelease.includes('cachyos') || osRelease.includes('manjaro');
+      } catch {}
+    }
+
+    isDebian = !isArch && (fs.existsSync('/etc/debian_version') || fs.existsSync('/usr/bin/dpkg'));
+  }
+
   return {
     platform: process.platform,
     isAppImage: !!process.env.APPIMAGE,
