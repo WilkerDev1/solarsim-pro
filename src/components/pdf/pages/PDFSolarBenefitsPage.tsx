@@ -53,10 +53,14 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
         {/* Section 2: Beneficios de la Energía Solar */}
         <div className="space-y-2">
           <div
-            className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-md text-white font-extrabold text-xs uppercase tracking-wider shadow-xs leading-none"
-            style={{ backgroundColor: activeTheme.primary }}
+            className="inline-block px-3.5 py-1.5 rounded-md font-black text-xs uppercase tracking-wider shadow-xs"
+            style={{
+              backgroundColor: activeTheme.primary,
+              color: '#ffffff',
+              lineHeight: '1.3',
+            }}
           >
-            <span className="leading-none pt-0.5">2. BENEFICIOS DE LA ENERGÍA SOLAR</span>
+            2. BENEFICIOS DE LA ENERGÍA SOLAR
           </div>
 
           {/* Visual House Illustration with 4 Feature Pills */}
@@ -118,10 +122,14 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
         {/* Section 2.1: Objetivos de la Ley 57-07 */}
         <div className="space-y-2">
           <div
-            className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-md text-white font-extrabold text-xs uppercase tracking-wider shadow-xs leading-none"
-            style={{ backgroundColor: activeTheme.primary }}
+            className="inline-block px-3.5 py-1.5 rounded-md font-black text-xs uppercase tracking-wider shadow-xs"
+            style={{
+              backgroundColor: activeTheme.primary,
+              color: '#ffffff',
+              lineHeight: '1.3',
+            }}
           >
-            <span className="leading-none pt-0.5">2.1. OBJETIVOS E INCENTIVOS DE LA LEY 57-07 DE ENERGÍAS RENOVABLES</span>
+            2.1. OBJETIVOS E INCENTIVOS DE LA LEY 57-07 DE ENERGÍAS RENOVABLES
           </div>
 
           <p className="text-slate-700 text-xs leading-relaxed font-medium">

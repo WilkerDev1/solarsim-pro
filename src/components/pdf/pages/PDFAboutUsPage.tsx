@@ -58,10 +58,14 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
         {/* 1. ¿Quiénes Somos? Section */}
         <div className="space-y-2">
           <div
-            className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-md text-white font-extrabold text-xs uppercase tracking-wider shadow-xs leading-none"
-            style={{ backgroundColor: activeTheme.primary }}
+            className="inline-block px-3.5 py-1.5 rounded-md font-black text-xs uppercase tracking-wider shadow-xs"
+            style={{
+              backgroundColor: activeTheme.primary,
+              color: '#ffffff',
+              lineHeight: '1.3',
+            }}
           >
-            <span className="leading-none pt-0.5">1. ¿QUIÉNES SOMOS?</span>
+            1. ¿QUIÉNES SOMOS?
           </div>
           <p className="text-slate-700 text-xs leading-relaxed text-justify font-medium">
             {aboutUsIntroText}
@@ -182,10 +186,14 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
         {/* 1.1 ¿Por Qué Elegirnos? Section */}
         <div className="space-y-2">
           <div
-            className="inline-flex items-center justify-center px-3.5 py-1.5 rounded-md text-white font-extrabold text-xs uppercase tracking-wider shadow-xs leading-none"
-            style={{ backgroundColor: activeTheme.primary }}
+            className="inline-block px-3.5 py-1.5 rounded-md font-black text-xs uppercase tracking-wider shadow-xs"
+            style={{
+              backgroundColor: activeTheme.primary,
+              color: '#ffffff',
+              lineHeight: '1.3',
+            }}
           >
-            <span className="leading-none pt-0.5">1.1 ¿POR QUÉ ELEGIRNOS?</span>
+            1.1 ¿POR QUÉ ELEGIRNOS?
           </div>
           <p className="text-slate-700 text-xs leading-relaxed font-medium">
             {whyChooseUsText}
