@@ -205,7 +205,14 @@ export interface ProjectSimulation {
   customization?: DocumentCustomization;
 }
 
-export type UpdateState = 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
+export type UpdateState = 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'installing' | 'error';
+
+export interface PlatformInfo {
+  platform: 'win32' | 'linux' | 'darwin' | string;
+  isAppImage: boolean;
+  isArchLinux: boolean;
+  isDebian: boolean;
+}
 
 export interface UpdateInfo {
   state: UpdateState;
@@ -227,6 +234,9 @@ declare global {
       quitAndInstall: () => Promise<void>;
       onUpdateStatus: (callback: (info: UpdateInfo) => void) => () => void;
       getAppVersion: () => Promise<string>;
+      getPlatformInfo: () => Promise<PlatformInfo>;
+      openExternalUrl: (url: string) => Promise<void>;
+      installLinuxPackage: (packageType: 'pacman' | 'deb', version: string) => Promise<{ success: boolean; error?: string }>;
     };
   }
 }
