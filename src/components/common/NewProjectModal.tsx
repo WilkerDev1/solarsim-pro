@@ -157,6 +157,9 @@ export const NewProjectModal: React.FC = () => {
                 setName(e.target.value);
                 if (error) setError('');
               }}
+              onKeyDown={(e) => e.stopPropagation()}
+              onKeyUp={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
               className={`w-full border rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all select-text cursor-text ${
                 isDark
                   ? 'bg-[#22222c] border-[#383848] text-white placeholder:text-zinc-500 focus:bg-[#282834] focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500'
