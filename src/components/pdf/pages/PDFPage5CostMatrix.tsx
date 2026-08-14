@@ -46,15 +46,15 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
         />
       )}
 
-      <div className="px-8 py-4 flex-1 flex flex-col justify-start gap-4 relative z-10">
-        <div className="space-y-4">
+      <div className="px-8 py-3 flex-1 flex flex-col justify-start gap-2.5 relative z-10 min-h-0">
+        <div className="space-y-2.5">
           {/* Banner Confidencial */}
-          <div className="bg-amber-600 text-white p-3.5 rounded-xl flex justify-between items-center shadow-sm">
+          <div className="bg-amber-600 text-white p-2.5 rounded-xl flex justify-between items-center shadow-sm">
             <div>
-              <h3 className="font-extrabold text-sm uppercase tracking-wider text-white">
+              <h3 className="font-extrabold text-xs uppercase tracking-wider text-white">
                 CLIENTE: {project.client.name} — Desglose de Costos de Proyecto
               </h3>
-              <p className="text-[11px] text-amber-100 font-medium">
+              <p className="text-[10px] text-amber-100 font-medium">
                 Documento de Control Interno de Precios, ITBIS y Margen de Rentabilidad
               </p>
             </div>
@@ -71,41 +71,41 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
           {/* Matrix Table */}
           <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-slate-100 font-bold text-slate-700 border-b border-slate-200 uppercase text-[10px]">
+              <thead className="bg-slate-100 font-bold text-slate-700 border-b border-slate-200 uppercase text-[9.5px]">
                 <tr>
-                  <th className="py-2 px-2.5">Productos</th>
-                  <th className="py-2 px-2 text-center text-red-600">kilos / Cap.</th>
-                  <th className="py-2 px-2 text-center text-red-600">Cantidad</th>
-                  <th className="py-2 px-2.5 text-right text-red-600">Precio Unit. USD</th>
-                  <th className="py-2 px-2.5 text-right">Precio Unit. RD</th>
-                  <th className="py-2 px-2.5 text-right font-bold">Precio Total RD</th>
-                  <th className="py-2 px-2.5 text-right font-bold">Precio Total USD</th>
-                  <th className="py-2 px-2 text-right text-red-600">ITBIS RD</th>
-                  <th className="py-2 px-2 text-right text-red-600">ITBIS USD</th>
+                  <th className="py-1.5 px-2.5">Productos</th>
+                  <th className="py-1.5 px-2 text-center text-red-600">kilos / Cap.</th>
+                  <th className="py-1.5 px-2 text-center text-red-600">Cantidad</th>
+                  <th className="py-1.5 px-2.5 text-right text-red-600">Precio Unit. USD</th>
+                  <th className="py-1.5 px-2.5 text-right">Precio Unit. RD</th>
+                  <th className="py-1.5 px-2.5 text-right font-bold">Precio Total RD</th>
+                  <th className="py-1.5 px-2.5 text-right font-bold">Precio Total USD</th>
+                  <th className="py-1.5 px-2 text-right text-red-600">ITBIS RD</th>
+                  <th className="py-1.5 px-2 text-right text-red-600">ITBIS USD</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 text-slate-800 font-semibold text-xs">
+              <tbody className="divide-y divide-slate-200 text-slate-800 font-semibold text-[11px]">
                 {summary.costMatrix.items.map((item, idx) => (
                   <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
-                    <td className="py-2 px-2.5 font-bold text-slate-900">{item.name}</td>
-                    <td className="py-2 px-2 text-center text-red-600 font-bold">{item.kilos}</td>
-                    <td className="py-2 px-2 text-center text-red-600 font-bold">{item.quantity}</td>
-                    <td className="py-2 px-2.5 text-right text-red-600 font-bold">
+                    <td className="py-1.5 px-2.5 font-bold text-slate-900">{item.name}</td>
+                    <td className="py-1.5 px-2 text-center text-red-600 font-bold">{item.kilos}</td>
+                    <td className="py-1.5 px-2 text-center text-red-600 font-bold">{item.quantity}</td>
+                    <td className="py-1.5 px-2.5 text-right text-red-600 font-bold">
                       ${item.unitPriceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
-                    <td className="py-2 px-2.5 text-right">
+                    <td className="py-1.5 px-2.5 text-right">
                       ${item.unitPriceDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
-                    <td className="py-2 px-2.5 text-right font-bold">
+                    <td className="py-1.5 px-2.5 text-right font-bold">
                       ${item.totalPriceDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
-                    <td className="py-2 px-2.5 text-right font-bold">
+                    <td className="py-1.5 px-2.5 text-right font-bold">
                       ${item.totalPriceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
-                    <td className="py-2 px-2 text-right text-slate-500">
+                    <td className="py-1.5 px-2 text-right text-slate-500">
                       {item.itbisDOP > 0 ? `$${item.itbisDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                     </td>
-                    <td className="py-2 px-2 text-right text-slate-500">
+                    <td className="py-1.5 px-2 text-right text-slate-500">
                       {item.itbisUSD > 0 ? `$${item.itbisUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                     </td>
                   </tr>
@@ -115,30 +115,30 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
           </div>
 
           {/* Resumen Final de Rentabilidad */}
-          <div className="grid grid-cols-2 gap-4 text-xs font-semibold">
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-1.5">
-              <div className="flex justify-between text-slate-700">
+          <div className="grid grid-cols-2 gap-3.5 text-xs font-semibold">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 space-y-1">
+              <div className="flex justify-between text-slate-700 text-[11px]">
                 <span>Precio Neto :</span>
                 <span>
                   RD$ {summary.costMatrix.precioNetoDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp;{' '}
                   <strong className="text-slate-900">${summary.costMatrix.precioNetoUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
                 </span>
               </div>
-              <div className="flex justify-between text-slate-700">
+              <div className="flex justify-between text-slate-700 text-[11px]">
                 <span>ITBIS Total :</span>
                 <span>
                   RD$ {summary.costMatrix.itbisDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp;{' '}
                   <strong className="text-slate-900">${summary.costMatrix.itbisUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
                 </span>
               </div>
-              <div className="flex justify-between text-slate-900 font-bold bg-slate-200/80 px-2.5 py-1 rounded">
+              <div className="flex justify-between text-slate-900 font-bold bg-slate-200/80 px-2 py-0.5 rounded text-[11px]">
                 <span>Total Neto (Costo Total) :</span>
                 <span>
                   RD$ {summary.costMatrix.totalNetoDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp;{' '}
                   <strong>${summary.costMatrix.totalNetoUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
                 </span>
               </div>
-              <div className="flex justify-between text-red-600 font-extrabold bg-red-50 border border-red-200 px-2.5 py-1 rounded">
+              <div className="flex justify-between text-red-600 font-extrabold bg-red-50 border border-red-200 px-2 py-0.5 rounded text-[11px]">
                 <span>Porcentaje venta ({summary.costMatrix.saleMarginMultiplier}) :</span>
                 <span>
                   RD$ {summary.costMatrix.porcentajeVentaDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp;{' '}
@@ -147,8 +147,8 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
               </div>
             </div>
 
-            <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3.5 space-y-1.5">
-              <div className="flex justify-between text-slate-700">
+            <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-2.5 space-y-1">
+              <div className="flex justify-between text-slate-700 text-[11px]">
                 <span>Precio kilos costo :</span>
                 <span>
                   RD$ {summary.costMatrix.precioKilosCostoDOP.toFixed(2)} &nbsp;|&nbsp;{' '}
@@ -157,7 +157,7 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
                   </strong>
                 </span>
               </div>
-              <div className="flex justify-between text-slate-900 font-bold">
+              <div className="flex justify-between text-slate-900 font-bold text-[11px]">
                 <span>Precio kilos ventas :</span>
                 <span>
                   RD$ {summary.costMatrix.precioKilosVentasDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp;{' '}
@@ -166,7 +166,7 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
                   </strong>
                 </span>
               </div>
-              <div className="flex justify-between text-emerald-950 font-black bg-emerald-100 border border-emerald-300 px-2.5 py-1.5 rounded-lg text-sm mt-1">
+              <div className="flex justify-between text-emerald-950 font-black bg-emerald-100 border border-emerald-300 px-2 py-1 rounded-lg text-xs mt-0.5">
                 <span>Ganancia Proyectada :</span>
                 <span>
                   RD$ {summary.costMatrix.gananciaDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp;{' '}

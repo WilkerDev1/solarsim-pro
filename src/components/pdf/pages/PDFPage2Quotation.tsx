@@ -66,17 +66,17 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
       )}
 
       {/* Body */}
-      <div className="px-10 py-4 flex-1 flex flex-col gap-3 text-xs text-slate-800 font-sans relative z-10">
+      <div className="px-10 py-2.5 flex-1 flex flex-col gap-2 text-xs text-slate-800 font-sans relative z-10 min-h-0">
         {/* DATOS DEL CLIENTE */}
         <div>
           <h3
-            className="bg-slate-100 px-3 py-1 text-[11px] font-bold uppercase border-l-4 mb-2"
+            className="bg-slate-100 px-2.5 py-0.5 text-[10.5px] font-bold uppercase border-l-4 mb-1"
             style={{ color: activeTheme.primary, borderColor: activeTheme.primary }}
           >
             DATOS DEL CLIENTE :
           </h3>
-          <div className="grid grid-cols-2 gap-4 px-2 text-[11px]">
-            <div className="space-y-1">
+          <div className="grid grid-cols-2 gap-4 px-2 text-[10.5px]">
+            <div className="space-y-0.5">
               <div>
                 <span className="font-bold text-slate-600">Cliente:</span>{' '}
                 <span className="font-bold text-slate-900">{project.client.name}</span>
@@ -92,7 +92,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                 {project.client.address || 'Santo Domingo, República Dominicana'}
               </div>
             </div>
-            <div className="space-y-1 text-right">
+            <div className="space-y-0.5 text-right">
               <div>
                 <span className="font-bold text-slate-600">N° Cotización:</span>{' '}
                 <span className="font-bold text-slate-900">{project.client.quoteNumber || 'C-0030'}</span>
@@ -114,12 +114,12 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
         {/* ESPECIFICACIONES DEL SISTEMA */}
         <div>
           <h3
-            className="bg-slate-100 px-3 py-1 text-[11px] font-bold uppercase border-l-4 mb-2"
+            className="bg-slate-100 px-2.5 py-0.5 text-[10.5px] font-bold uppercase border-l-4 mb-1"
             style={{ color: activeTheme.primary, borderColor: activeTheme.primary }}
           >
             ESPECIFICACIONES DEL SISTEMA
           </h3>
-          <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200 text-[11px]">
+          <div className="grid grid-cols-2 gap-4 bg-slate-50 p-2 rounded-lg border border-slate-200 text-[10.5px]">
             <div>
               <div>
                 <span className="font-bold text-slate-700">Potencia (kW-dc):</span>{' '}
@@ -149,45 +149,45 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
         {/* EQUIPOS Y MATERIALES */}
         <div>
           <h3
-            className="bg-slate-100 px-3 py-1 text-[11px] font-bold uppercase border-l-4 mb-2"
+            className="bg-slate-100 px-2.5 py-0.5 text-[10.5px] font-bold uppercase border-l-4 mb-1"
             style={{ color: activeTheme.primary, borderColor: activeTheme.primary }}
           >
             EQUIPOS Y MATERIALES
           </h3>
           <div className="border border-slate-200 rounded-lg overflow-hidden">
             <table className="w-full text-left border-collapse">
-              <thead className="text-white font-bold text-[10px] uppercase" style={{ backgroundColor: activeTheme.primary }}>
+              <thead className="text-white font-bold text-[9.5px] uppercase" style={{ backgroundColor: activeTheme.primary }}>
                 <tr>
-                  <th className="px-3 py-2">DESCRIPCIÓN</th>
-                  <th className="px-3 py-2 text-center w-20">CANT.</th>
-                  <th className="px-3 py-2 text-center w-20">UNIDAD</th>
+                  <th className="px-3 py-1.5">DESCRIPCIÓN</th>
+                  <th className="px-3 py-1.5 text-center w-20">CANT.</th>
+                  <th className="px-3 py-1.5 text-center w-20">UNIDAD</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 text-[11px] text-slate-800 font-semibold">
+              <tbody className="divide-y divide-slate-200 text-[10.5px] text-slate-800 font-semibold">
                 <tr className="bg-white">
-                  <td className="px-3 py-2">{project.specs.panelBrandModel || 'Módulos Fotovoltaicos Tier 1'}</td>
-                  <td className="px-3 py-2 text-center font-bold">{project.specs.panelCount}</td>
-                  <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
+                  <td className="px-3 py-1">{project.specs.panelBrandModel || 'Módulos Fotovoltaicos Tier 1'}</td>
+                  <td className="px-3 py-1 text-center font-bold">{project.specs.panelCount}</td>
+                  <td className="px-3 py-1 text-center text-slate-500 font-normal">UD</td>
                 </tr>
                 <tr className="bg-slate-50/60">
-                  <td className="px-3 py-2">{project.specs.inverterBrandModel || 'Inversor Solar On-Grid / Híbrido'}</td>
-                  <td className="px-3 py-2 text-center font-bold">{project.specs.inverterCount || 1}</td>
-                  <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
+                  <td className="px-3 py-1">{project.specs.inverterBrandModel || 'Inversor Solar On-Grid / Híbrido'}</td>
+                  <td className="px-3 py-1 text-center font-bold">{project.specs.inverterCount || 1}</td>
+                  <td className="px-3 py-1 text-center text-slate-500 font-normal">UD</td>
                 </tr>
                 {project.specs.hasBattery && (
                   <tr className="bg-white">
-                    <td className="px-3 py-2">{project.specs.batteryBrandModel || 'Banco de Baterías Litio LiFePO4'}</td>
-                    <td className="px-3 py-2 text-center font-bold">{project.specs.batteryCount || 1}</td>
-                    <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
+                    <td className="px-3 py-1">{project.specs.batteryBrandModel || 'Banco de Baterías Litio LiFePO4'}</td>
+                    <td className="px-3 py-1 text-center font-bold">{project.specs.batteryCount || 1}</td>
+                    <td className="px-3 py-1 text-center text-slate-500 font-normal">UD</td>
                   </tr>
                 )}
                 <tr className="bg-slate-50/60">
-                  <td className="px-3 py-2">
+                  <td className="px-3 py-1">
                     {project.specs.installationServicesDesc ||
                       'Instalación y Accesorios (Estructura de montaje, cableado, fusibles, protecciones AC/DC, desconectivo y puesta en marcha).'}
                   </td>
-                  <td className="px-3 py-2 text-center font-bold">1</td>
-                  <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
+                  <td className="px-3 py-1 text-center font-bold">1</td>
+                  <td className="px-3 py-1 text-center text-slate-500 font-normal">UD</td>
                 </tr>
               </tbody>
             </table>
@@ -196,14 +196,14 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
 
         {/* DESGLOSE FINANCIERO RIGHT ALIGNED */}
         <div className="flex justify-end">
-          <div className="w-[380px] bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1.5 text-[11px]">
+          <div className="w-[380px] bg-slate-50 border border-slate-200 rounded-lg p-2 space-y-1 text-[10.5px]">
             <div className="flex justify-between text-slate-700">
               <span className="font-semibold">SUB-TOTAL (USD) SIN ITBIS :</span>
               <span className="font-bold">
                 ${(summary.costMatrix?.precioNetoUSD || (summary.grossInvestmentUSD - summary.itbisSavedUSD)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
-            <div className="flex justify-between text-slate-900 bg-slate-200/80 px-2 py-1 rounded font-bold">
+            <div className="flex justify-between text-slate-900 bg-slate-200/80 px-2 py-0.5 rounded font-bold">
               <span>TOTAL GENERAL (USD) :</span>
               <span>${(summary.grossInvestmentUSD + (project.financials.applyITBISExemption ? summary.itbisSavedUSD : 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
@@ -211,11 +211,11 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
               <span>ITBIS A DESCONTAR POR LEY 57-07 US$ :</span>
               <span className="font-bold">${summary.itbisSavedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
-            <div className="flex justify-between text-white px-2 py-1 rounded font-bold" style={{ backgroundColor: activeTheme.primary }}>
+            <div className="flex justify-between text-white px-2 py-0.5 rounded font-bold" style={{ backgroundColor: activeTheme.primary }}>
               <span>TOTAL GENERAL (USD) SI CALIFICA LEY 57-07 :</span>
               <span>${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
-            <div className="flex justify-between text-slate-800 pt-1 border-t border-slate-300">
+            <div className="flex justify-between text-slate-800 pt-0.5 border-t border-slate-300">
               <span className="font-bold">PRECIO POR WATT (USD/W):</span>
               <span className="font-bold" style={{ color: activeTheme.primary }}>
                 ${(project.specs.pricePerWattUSD || project.financials.pricePerWattUSD || (summary.solarInvestmentUSD / (summary.systemCapacityKWp * 1000)) || 1.13).toFixed(2)}
@@ -227,56 +227,56 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
         {/* INCENTIVOS DE LEY 57-07 */}
         <div>
           <h3
-            className="bg-slate-100 px-3 py-1 text-[11px] font-bold uppercase border-l-4 mb-1"
+            className="bg-slate-100 px-2.5 py-0.5 text-[10.5px] font-bold uppercase border-l-4 mb-0.5"
             style={{ color: activeTheme.primary, borderColor: activeTheme.primary }}
           >
             INCENTIVOS DE LEY 57-07
           </h3>
-          <p className="text-[10px] font-bold bg-amber-50 border border-amber-200 text-amber-900 px-3 py-1 rounded mb-2">
+          <p className="text-[9.5px] font-bold bg-amber-50 border border-amber-200 text-amber-900 px-2.5 py-0.5 rounded mb-1">
             (Descuento de 40% para equipos energía renovables: Paneles solares, inversores y baterías)
           </p>
           <div className="border border-slate-200 rounded-lg overflow-hidden">
             <table className="w-full text-left border-collapse">
-              <thead className="text-white font-bold text-[10px] uppercase" style={{ backgroundColor: activeTheme.primary }}>
+              <thead className="text-white font-bold text-[9.5px] uppercase" style={{ backgroundColor: activeTheme.primary }}>
                 <tr>
-                  <th className="px-3 py-1.5">CONCEPTO</th>
-                  <th className="px-3 py-1.5 text-right">VALOR US $</th>
-                  <th className="px-3 py-1.5 text-right w-20">%</th>
+                  <th className="px-3 py-1">CONCEPTO</th>
+                  <th className="px-3 py-1 text-right">VALOR US $</th>
+                  <th className="px-3 py-1 text-right w-20">%</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 text-[11px] text-slate-800 font-semibold">
+              <tbody className="divide-y divide-slate-200 text-[10.5px] text-slate-800 font-semibold">
                 <tr className="bg-white font-bold">
-                  <td className="px-3 py-1.5">TOTAL EQUIPOS ENERGÍAS RENOVABLES (PANELES-INVERSORES-BATERÍAS)</td>
-                  <td className="px-3 py-1.5 text-right">${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                  <td className="px-3 py-1.5 text-right">100%</td>
+                  <td className="px-3 py-1">TOTAL EQUIPOS ENERGÍAS RENOVABLES (PANELES-INVERSORES-BATERÍAS)</td>
+                  <td className="px-3 py-1 text-right">${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="px-3 py-1 text-right">100%</td>
                 </tr>
                 <tr className="bg-slate-50/60">
-                  <td className="px-3 py-1.5">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 1ER AÑO</td>
-                  <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.secondary }}>
+                  <td className="px-3 py-1">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 1ER AÑO</td>
+                  <td className="px-3 py-1 text-right" style={{ color: activeTheme.secondary }}>
                     ${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
-                  <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.secondary }}>13.33%</td>
+                  <td className="px-3 py-1 text-right" style={{ color: activeTheme.secondary }}>13.33%</td>
                 </tr>
                 <tr className="bg-white">
-                  <td className="px-3 py-1.5">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 2DO AÑO</td>
-                  <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.secondary }}>
+                  <td className="px-3 py-1">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 2DO AÑO</td>
+                  <td className="px-3 py-1 text-right" style={{ color: activeTheme.secondary }}>
                     ${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
-                  <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.secondary }}>13.33%</td>
+                  <td className="px-3 py-1 text-right" style={{ color: activeTheme.secondary }}>13.33%</td>
                 </tr>
                 <tr className="bg-slate-50/60">
-                  <td className="px-3 py-1.5">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 3ER AÑO</td>
-                  <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.secondary }}>
+                  <td className="px-3 py-1">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 3ER AÑO</td>
+                  <td className="px-3 py-1 text-right" style={{ color: activeTheme.secondary }}>
                     ${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
-                  <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.secondary }}>13.33%</td>
+                  <td className="px-3 py-1 text-right" style={{ color: activeTheme.secondary }}>13.33%</td>
                 </tr>
                 <tr className={`font-bold ${activeTheme.accentLightBg}`} style={{ color: activeTheme.primary }}>
-                  <td className="px-3 py-1.5">TOTAL A DESCONTAR POR LA LEY 57-07 (40% DEL TOTAL)</td>
-                  <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.primary }}>
+                  <td className="px-3 py-1">TOTAL A DESCONTAR POR LA LEY 57-07 (40% DEL TOTAL)</td>
+                  <td className="px-3 py-1 text-right" style={{ color: activeTheme.primary }}>
                     ${summary.ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
-                  <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.primary }}>40.00%</td>
+                  <td className="px-3 py-1 text-right" style={{ color: activeTheme.primary }}>40.00%</td>
                 </tr>
               </tbody>
             </table>
@@ -284,10 +284,10 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
         </div>
 
         {/* GARANTÍAS Y NOS ENCARGAMOS DE GESTIONAR GRID */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1 text-[11px]">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 space-y-0.5 text-[10.5px]">
             <h4
-              className="font-bold border-b border-slate-200 pb-1 mb-1 uppercase tracking-wider flex items-center gap-1.5"
+              className="font-bold border-b border-slate-200 pb-0.5 mb-0.5 uppercase tracking-wider flex items-center gap-1.5"
               style={{ color: activeTheme.primary }}
             >
               <ShieldCheck className="w-3.5 h-3.5" /> GARANTÍAS
@@ -298,9 +298,9 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
             <div>• <span className="font-bold">Mano de Obra y Soporte:</span> {workmanshipWarranty}</div>
           </div>
 
-          <div className={`border rounded-lg p-3 space-y-1 text-[11px] ${activeTheme.accentLightBg} ${activeTheme.accentBorder}`}>
+          <div className={`border rounded-lg p-2 space-y-0.5 text-[10.5px] ${activeTheme.accentLightBg} ${activeTheme.accentBorder}`}>
             <h4
-              className="font-bold border-b pb-1 mb-1 uppercase tracking-wider flex items-center gap-1.5"
+              className="font-bold border-b pb-0.5 mb-0.5 uppercase tracking-wider flex items-center gap-1.5"
               style={{ color: activeTheme.primary, borderColor: activeTheme.primary }}
             >
               <CheckCircle2 className="w-3.5 h-3.5" style={{ color: activeTheme.primary }} /> NOS ENCARGAMOS DE GESTIONAR
@@ -323,7 +323,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
         </div>
 
         {/* LEGAL SUBTEXT */}
-        <div className="text-center text-[10px] text-slate-500 font-semibold italic pt-1">
+        <div className="text-center text-[9.5px] text-slate-500 font-semibold italic pt-0.5">
           {validityNote}
         </div>
       </div>

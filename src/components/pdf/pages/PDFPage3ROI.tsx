@@ -73,77 +73,77 @@ export const PDFPage3ROI: React.FC<PDFPage3ROIProps> = ({
       )}
 
       {/* Body */}
-      <div className="px-10 py-4 flex-1 flex flex-col gap-4 relative z-10">
+      <div className="px-10 py-3 flex-1 flex flex-col gap-2.5 relative z-10 min-h-0">
         {/* Financial Indicators Grid */}
-        <div className="space-y-4">
-          <h2 className="text-base font-bold text-gray-800 border-b border-gray-100 pb-2 uppercase tracking-wider">
+        <div className="space-y-2">
+          <h2 className="text-sm font-bold text-gray-800 border-b border-gray-100 pb-1 uppercase tracking-wider">
             Indicadores Financieros
           </h2>
-          <div className="grid grid-cols-5 gap-3">
-            <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-3.5 text-center">
-              <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Payback</p>
-              <p className="text-xl font-bold text-gray-900">
-                {summary.paybackYears} <span className="text-xs font-medium text-gray-500">Años</span>
+          <div className="grid grid-cols-5 gap-2.5">
+            <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-2.5 text-center">
+              <p className="text-[9.5px] text-gray-500 uppercase font-bold tracking-wider mb-0.5">Payback</p>
+              <p className="text-lg font-bold text-gray-900">
+                {summary.paybackYears} <span className="text-[10px] font-medium text-gray-500">Años</span>
               </p>
             </div>
 
-            <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-3.5 text-center">
-              <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">TIR</p>
-              <p className="text-xl font-bold" style={{ color: activeTheme.primary }}>{summary.irrPct}%</p>
+            <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-2.5 text-center">
+              <p className="text-[9.5px] text-gray-500 uppercase font-bold tracking-wider mb-0.5">TIR</p>
+              <p className="text-lg font-bold" style={{ color: activeTheme.primary }}>{summary.irrPct}%</p>
             </div>
 
-            <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-3.5 text-center">
-              <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">VAN (10%)</p>
-              <p className="text-base font-bold text-gray-900">
+            <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-2.5 text-center">
+              <p className="text-[9.5px] text-gray-500 uppercase font-bold tracking-wider mb-0.5">VAN (10%)</p>
+              <p className="text-sm font-bold text-gray-900">
                 ${summary.npvUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </p>
             </div>
 
-            <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-3.5 text-center">
-              <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Ahorro 25 Años</p>
-              <p className="text-base font-bold text-green-700">
+            <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-2.5 text-center">
+              <p className="text-[9.5px] text-gray-500 uppercase font-bold tracking-wider mb-0.5">Ahorro 25 Años</p>
+              <p className="text-sm font-bold text-green-700">
                 ${summary.total25YearSavingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </p>
             </div>
 
-            <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-3.5 text-center">
-              <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">ROI</p>
-              <p className="text-xl font-bold text-gray-900">{summary.roi25YrPct}%</p>
+            <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-2.5 text-center">
+              <p className="text-[9.5px] text-gray-500 uppercase font-bold tracking-wider mb-0.5">ROI</p>
+              <p className="text-lg font-bold text-gray-900">{summary.roi25YrPct}%</p>
             </div>
           </div>
         </div>
 
         {/* Parameters Table */}
-        <div className="space-y-4">
-          <h2 className="text-base font-bold text-gray-800 border-b border-gray-100 pb-2 uppercase tracking-wider">
+        <div className="space-y-2">
+          <h2 className="text-sm font-bold text-gray-800 border-b border-gray-100 pb-1 uppercase tracking-wider">
             Cálculo de Ahorro y Retorno de Inversión
           </h2>
-          <div className="border border-gray-200 rounded-lg overflow-hidden text-xs">
+          <div className="border border-gray-200 rounded-lg overflow-hidden text-[11px]">
             <table className="w-full text-left">
               <tbody className="divide-y divide-gray-200 text-gray-700 font-semibold">
                 <tr className="bg-gray-50/60">
-                  <td className="px-4 py-2.5 text-gray-800 w-1/2">Cliente</td>
-                  <td className="px-4 py-2.5 text-right font-bold uppercase text-gray-900">{project.client.name}</td>
+                  <td className="px-4 py-1.5 text-gray-800 w-1/2">Cliente</td>
+                  <td className="px-4 py-1.5 text-right font-bold uppercase text-gray-900">{project.client.name}</td>
                 </tr>
                 <tr>
-                  <td className="px-4 py-2.5 text-gray-800">Potencia Instalada (kWp)</td>
-                  <td className="px-4 py-2.5 text-right font-bold">{summary.systemCapacityKWp.toFixed(2)} kWp</td>
+                  <td className="px-4 py-1.5 text-gray-800">Potencia Instalada (kWp)</td>
+                  <td className="px-4 py-1.5 text-right font-bold">{summary.systemCapacityKWp.toFixed(2)} kWp</td>
                 </tr>
                 <tr className="bg-gray-50/60">
-                  <td className="px-4 py-2.5 text-gray-800">Inversión Inicial</td>
-                  <td className="px-4 py-2.5 text-right font-bold text-gray-900">
+                  <td className="px-4 py-1.5 text-gray-800">Inversión Inicial</td>
+                  <td className="px-4 py-1.5 text-right font-bold text-gray-900">
                     ${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </td>
                 </tr>
                 <tr>
-                  <td className="px-4 py-2.5 text-gray-800">Incentivo Fiscal Estimado (Ley 57-07)</td>
-                  <td className="px-4 py-2.5 text-right font-bold text-green-700">
+                  <td className="px-4 py-1.5 text-gray-800">Incentivo Fiscal Estimado (Ley 57-07)</td>
+                  <td className="px-4 py-1.5 text-right font-bold text-green-700">
                     -${summary.ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </td>
                 </tr>
                 <tr className="bg-gray-50/60">
-                  <td className="px-4 py-2.5 text-gray-800">Inversión Neta</td>
-                  <td className="px-4 py-2.5 text-right font-bold text-gray-900">
+                  <td className="px-4 py-1.5 text-gray-800">Inversión Neta</td>
+                  <td className="px-4 py-1.5 text-right font-bold text-gray-900">
                     ${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </td>
                 </tr>
@@ -153,45 +153,45 @@ export const PDFPage3ROI: React.FC<PDFPage3ROIProps> = ({
         </div>
 
         {/* Milestones Table */}
-        <div className="space-y-4">
-          <h2 className="text-base font-bold text-gray-800 border-b border-gray-100 pb-2 uppercase tracking-wider">
+        <div className="space-y-2">
+          <h2 className="text-sm font-bold text-gray-800 border-b border-gray-100 pb-1 uppercase tracking-wider">
             Resumen de Ahorro Anual y Retorno de Inversión
           </h2>
-          <div className="border border-gray-200 rounded-lg overflow-hidden text-xs">
+          <div className="border border-gray-200 rounded-lg overflow-hidden text-[11px]">
             <table className="w-full text-left">
-              <thead className="text-white uppercase font-bold" style={{ backgroundColor: activeTheme.primary }}>
+              <thead className="text-white uppercase font-bold text-[10px]" style={{ backgroundColor: activeTheme.primary }}>
                 <tr>
-                  <th className="px-4 py-2.5">Año</th>
-                  <th className="px-4 py-2.5 text-right">Ahorro Energético (USD)</th>
-                  <th className="px-4 py-2.5 text-right">Beneficio Acumulado (USD)</th>
+                  <th className="px-4 py-1.5">Año</th>
+                  <th className="px-4 py-1.5 text-right">Ahorro Energético (USD)</th>
+                  <th className="px-4 py-1.5 text-right">Beneficio Acumulado (USD)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 text-gray-700 font-semibold">
                 <tr className="bg-gray-50/60">
-                  <td className="px-4 py-2.5 font-bold">Año 1</td>
-                  <td className="px-4 py-2.5 text-right">${year1Obj.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                  <td className="px-4 py-2.5 text-right text-red-600 font-bold">
+                  <td className="px-4 py-1.5 font-bold">Año 1</td>
+                  <td className="px-4 py-1.5 text-right">${year1Obj.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                  <td className="px-4 py-1.5 text-right text-red-600 font-bold">
                     ${year1Obj.cumulativeCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </td>
                 </tr>
                 <tr className={`font-bold ${activeTheme.accentLightBg}`}>
-                  <td className="px-4 py-2.5" style={{ color: activeTheme.primary }}>Año {paybackYearObj.year} (Payback)</td>
-                  <td className="px-4 py-2.5 text-right">${paybackYearObj.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                  <td className="px-4 py-2.5 text-right font-bold" style={{ color: activeTheme.primary }}>
+                  <td className="px-4 py-1.5" style={{ color: activeTheme.primary }}>Año {paybackYearObj.year} (Payback)</td>
+                  <td className="px-4 py-1.5 text-right">${paybackYearObj.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                  <td className="px-4 py-1.5 text-right font-bold" style={{ color: activeTheme.primary }}>
                     ${paybackYearObj.cumulativeCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </td>
                 </tr>
                 <tr className="bg-gray-50/60">
-                  <td className="px-4 py-2.5 font-bold">Año 10</td>
-                  <td className="px-4 py-2.5 text-right">${year10Obj.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                  <td className="px-4 py-2.5 text-right text-green-700 font-bold">
+                  <td className="px-4 py-1.5 font-bold">Año 10</td>
+                  <td className="px-4 py-1.5 text-right">${year10Obj.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                  <td className="px-4 py-1.5 text-right text-green-700 font-bold">
                     ${year10Obj.cumulativeCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </td>
                 </tr>
                 <tr className="font-bold">
-                  <td className="px-4 py-2.5 font-bold">Año 25</td>
-                  <td className="px-4 py-2.5 text-right">${year25Obj.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                  <td className="px-4 py-2.5 text-right font-bold" style={{ color: activeTheme.primary }}>
+                  <td className="px-4 py-1.5 font-bold">Año 25</td>
+                  <td className="px-4 py-1.5 text-right">${year25Obj.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                  <td className="px-4 py-1.5 text-right font-bold" style={{ color: activeTheme.primary }}>
                     ${year25Obj.cumulativeCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </td>
                 </tr>
@@ -201,11 +201,11 @@ export const PDFPage3ROI: React.FC<PDFPage3ROIProps> = ({
         </div>
 
         {/* Accumulated Benefit Chart */}
-        <div className="space-y-3 mt-auto">
-          <h2 className="text-base font-bold text-gray-800 border-b border-gray-100 pb-2 uppercase tracking-wider">
+        <div className="space-y-2 mt-auto">
+          <h2 className="text-sm font-bold text-gray-800 border-b border-gray-100 pb-1 uppercase tracking-wider">
             Beneficio Acumulado (25 Años)
           </h2>
-          <div className="h-[200px] w-full bg-gray-50/70 border border-gray-200 rounded-xl p-3">
+          <div className="h-[180px] w-full bg-gray-50/70 border border-gray-200 rounded-xl p-2.5">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={cumulativeChartData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />

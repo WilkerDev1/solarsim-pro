@@ -92,13 +92,23 @@ export const PDFProposalView: React.FC = () => {
           backgroundColor: '#ffffff',
           width: 850,
           height: 1202,
-          windowWidth: 850,
-          windowHeight: 1202,
-          scrollX: 0,
-          scrollY: 0,
+          onclone: (clonedDoc) => {
+            const allClonedPages = clonedDoc.querySelectorAll<HTMLElement>('.pdf-page');
+            const clonedPage = allClonedPages[i];
+            if (clonedPage) {
+              clonedPage.style.width = '850px';
+              clonedPage.style.height = '1202px';
+              clonedPage.style.minHeight = '1202px';
+              clonedPage.style.maxHeight = '1202px';
+              clonedPage.style.boxSizing = 'border-box';
+              clonedPage.style.overflow = 'hidden';
+              clonedPage.style.margin = '0';
+              clonedPage.style.transform = 'none';
+            }
+          },
         });
 
-        const imgData = canvas.toDataURL('image/jpeg', 0.96);
+        const imgData = canvas.toDataURL('image/jpeg', 0.98);
 
         if (i > 0) {
           pdf.addPage('a4', 'portrait');

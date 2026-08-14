@@ -63,11 +63,11 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
       )}
 
       {/* Body */}
-      <div className="px-10 py-4 flex-1 flex flex-col gap-3.5 relative z-10">
+      <div className="px-10 py-3 flex-1 flex flex-col gap-2.5 relative z-10 min-h-0">
         {/* Chart Section */}
-        <div className="space-y-3">
-          <div className="flex justify-between items-center border-b border-gray-100 pb-2">
-            <h2 className="text-base font-bold text-gray-800 uppercase tracking-wider">
+        <div className="space-y-2">
+          <div className="flex justify-between items-center border-b border-gray-100 pb-1.5">
+            <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wider">
               Evolución Mensual de Energía
             </h2>
             <div className="flex items-center gap-4 text-xs font-semibold">
@@ -82,12 +82,12 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
             </div>
           </div>
 
-          <div className="w-full bg-gray-50/70 border border-gray-200 rounded-xl p-4 h-[280px]">
+          <div className="w-full bg-gray-50/70 border border-gray-200 rounded-xl p-3 h-[255px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={summary.monthlyBreakdown} margin={{ top: 20, right: 10, left: 0, bottom: 15 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#475569', fontWeight: 'bold' }} />
-                <YAxis tick={{ fontSize: 10, fill: '#475569', fontWeight: 'bold' }} />
+                <XAxis dataKey="month" tick={{ fontSize: 9.5, fill: '#475569', fontWeight: 'bold' }} />
+                <YAxis tick={{ fontSize: 9.5, fill: '#475569', fontWeight: 'bold' }} />
                 <Tooltip formatter={(val: number) => [`${Math.round(val).toLocaleString()} kWh`, '']} />
 
                 <Bar dataKey="consumptionKWh" name="Consumo (kWh)" fill={activeTheme.primary} radius={[3, 3, 0, 0]}>
@@ -112,33 +112,33 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
         </div>
 
         {/* Table Section */}
-        <div className="space-y-3">
-          <h2 className="text-base font-bold text-gray-800 border-b border-gray-100 pb-2 uppercase tracking-wider">
+        <div className="space-y-2">
+          <h2 className="text-sm font-bold text-gray-800 border-b border-gray-100 pb-1.5 uppercase tracking-wider">
             Resumen Mensual de Energía
           </h2>
           <div className="border border-gray-200 rounded-lg overflow-hidden shadow-xs">
             <table className="w-full text-xs text-left">
-              <thead className="text-white uppercase font-bold" style={{ backgroundColor: activeTheme.primary }}>
+              <thead className="text-white uppercase font-bold text-[10.5px]" style={{ backgroundColor: activeTheme.primary }}>
                 <tr>
-                  <th className="px-4 py-2.5">Mes</th>
-                  <th className="px-4 py-2.5 text-right">Consumo (kWh)</th>
-                  <th className="px-4 py-2.5 text-right">Producción (kWh)</th>
-                  <th className="px-4 py-2.5 text-right">Ahorro Energ. (kWh)</th>
-                  <th className="px-4 py-2.5 text-right">%</th>
+                  <th className="px-4 py-1.5">Mes</th>
+                  <th className="px-4 py-1.5 text-right">Consumo (kWh)</th>
+                  <th className="px-4 py-1.5 text-right">Producción (kWh)</th>
+                  <th className="px-4 py-1.5 text-right">Ahorro Energ. (kWh)</th>
+                  <th className="px-4 py-1.5 text-right">%</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 font-semibold text-gray-700">
+              <tbody className="divide-y divide-gray-200 font-semibold text-gray-700 text-[11px]">
                 {summary.monthlyBreakdown.map((row, idx) => {
                   const monthCoverage = row.consumptionKWh > 0
                     ? Math.min(100, (row.productionKWh / row.consumptionKWh) * 100)
                     : 0;
                   return (
                     <tr key={idx} className={idx % 2 === 0 ? 'bg-gray-50/60' : 'bg-white'}>
-                      <td className="px-4 py-2 font-bold text-gray-800">{row.month}</td>
-                      <td className="px-4 py-2 text-right font-medium">{row.consumptionKWh.toLocaleString()}</td>
-                      <td className="px-4 py-2 text-right font-medium">{row.productionKWh.toFixed(1)}</td>
-                      <td className="px-4 py-2 text-right font-medium">{row.solarSelfConsumedKWh.toFixed(1)}</td>
-                      <td className="px-4 py-2 text-right font-bold" style={{ color: activeTheme.secondary }}>
+                      <td className="px-4 py-1 font-bold text-gray-800">{row.month}</td>
+                      <td className="px-4 py-1 text-right font-medium">{row.consumptionKWh.toLocaleString()}</td>
+                      <td className="px-4 py-1 text-right font-medium">{row.productionKWh.toFixed(1)}</td>
+                      <td className="px-4 py-1 text-right font-medium">{row.solarSelfConsumedKWh.toFixed(1)}</td>
+                      <td className="px-4 py-1 text-right font-bold" style={{ color: activeTheme.secondary }}>
                         {monthCoverage.toFixed(2)}%
                       </td>
                     </tr>
@@ -147,11 +147,11 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
               </tbody>
               <tfoot className="font-bold bg-gray-100 text-gray-900 border-t-2 border-gray-300 text-xs">
                 <tr>
-                  <td className="px-4 py-2.5 uppercase font-extrabold">TOTAL</td>
-                  <td className="px-4 py-2.5 text-right">{totalConsumptionKWh.toLocaleString()}</td>
-                  <td className="px-4 py-2.5 text-right">{totalProductionKWh.toLocaleString()}</td>
-                  <td className="px-4 py-2.5 text-right">{totalSavingsKWh.toLocaleString()}</td>
-                  <td className="px-4 py-2.5 text-right font-extrabold" style={{ color: activeTheme.primary }}>
+                  <td className="px-4 py-1.5 uppercase font-extrabold">TOTAL</td>
+                  <td className="px-4 py-1.5 text-right">{totalConsumptionKWh.toLocaleString()}</td>
+                  <td className="px-4 py-1.5 text-right">{totalProductionKWh.toLocaleString()}</td>
+                  <td className="px-4 py-1.5 text-right">{totalSavingsKWh.toLocaleString()}</td>
+                  <td className="px-4 py-1.5 text-right font-extrabold" style={{ color: activeTheme.primary }}>
                     {summary.energyCoveragePct.toFixed(2)}%
                   </td>
                 </tr>
@@ -161,13 +161,13 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
         </div>
 
         {/* Impact Section */}
-        <div className={`mt-auto border rounded-xl p-4 flex gap-4 items-center ${activeTheme.accentLightBg} ${activeTheme.accentBorder}`}>
-          <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-xs shrink-0" style={{ color: activeTheme.primary }}>
-            <Leaf className="w-5 h-5" />
+        <div className={`mt-auto border rounded-xl p-3 flex gap-3.5 items-center ${activeTheme.accentLightBg} ${activeTheme.accentBorder}`}>
+          <div className="w-9 h-9 bg-white rounded-full flex items-center justify-center shadow-xs shrink-0" style={{ color: activeTheme.primary }}>
+            <Leaf className="w-4 h-4" />
           </div>
           <div className="text-xs">
-            <h3 className="font-bold text-sm mb-0.5" style={{ color: activeTheme.primary }}>Impacto Ambiental</h3>
-            <p className="text-slate-800">
+            <h3 className="font-bold text-xs mb-0.5" style={{ color: activeTheme.primary }}>Impacto Ambiental</h3>
+            <p className="text-slate-800 text-[11px]">
               Reducción estimada de CO₂: <span className="font-bold">{summary.co2AvoidedTonsPerYear} Toneladas/año</span>. Esto equivale a plantar aproximadamente <span className="font-bold">{treesPlanted} árboles</span> anuales.
             </p>
           </div>
