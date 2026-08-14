@@ -48,11 +48,11 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
       )}
 
       {/* Body */}
-      <div className="px-10 pt-3 pb-14 flex-1 flex flex-col justify-start gap-2.5 text-xs text-slate-800 relative z-10 min-h-0">
+      <div className="px-10 py-5 flex-1 flex flex-col justify-between text-xs text-slate-800 relative z-10 gap-3 min-h-0">
         {/* Section 3: ¿Qué es un Sistema Fotovoltaico? */}
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <div
-            className="inline-block px-3 py-1 rounded-md font-black text-xs uppercase tracking-wider shadow-xs"
+            className="inline-block px-3.5 py-1.5 rounded-md font-black text-xs uppercase tracking-wider shadow-xs"
             style={{
               backgroundColor: activeTheme.primary,
               color: '#ffffff',
@@ -66,7 +66,7 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
           </p>
 
           {/* 3D Roof Tile Solar Array Render (Frontal / Wide View) */}
-          <div className="w-full h-32 rounded-2xl border border-slate-200 overflow-hidden bg-slate-50/60 shadow-xs flex items-center justify-center p-1.5">
+          <div className="w-full h-44 rounded-2xl border border-slate-200 overflow-hidden bg-slate-50/60 shadow-xs flex items-center justify-center p-2">
             <img
               src={PDF_ROOF_DETAIL_BASE64}
               alt="3D Solar array on tile roof frontal perspective"
@@ -76,9 +76,9 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
         </div>
 
         {/* Section 3.1: ¿Cómo Funciona? */}
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <div
-            className="inline-block px-3 py-1 rounded-md font-black text-xs uppercase tracking-wider shadow-xs"
+            className="inline-block px-3.5 py-1.5 rounded-md font-black text-xs uppercase tracking-wider shadow-xs"
             style={{
               backgroundColor: activeTheme.primary,
               color: '#ffffff',
@@ -87,18 +87,18 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
           >
             3.1 ¿CÓMO FUNCIONA UN SISTEMA FOTOVOLTAICO?
           </div>
-          <p className="text-slate-700 text-[11px] leading-relaxed text-justify font-medium">
+          <p className="text-slate-700 text-xs leading-relaxed text-justify font-medium">
             La cantidad de energía eléctrica que produce un sistema fotovoltaico está determinada por múltiples factores: las horas de radiación solar disponibles, la cantidad de módulos instalados, su orientación e inclinación, la intensidad de la radiación recibida, la calidad de la instalación y la potencia nominal del sistema.
           </p>
-          <p className="text-slate-700 text-[11px] leading-relaxed text-justify font-medium">
+          <p className="text-slate-700 text-xs leading-relaxed text-justify font-medium">
             Las celdas fotovoltaicas absorben la energía solar, actuando como convertidores que generan corriente eléctrica continua (CC), la cual luego se transforma en corriente alterna (CA) aprovechable para el consumo diario.
           </p>
         </div>
 
         {/* Section 4: Descripción Técnica (Flow Diagram) */}
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <div
-            className="inline-block px-3 py-1 rounded-md font-black text-xs uppercase tracking-wider shadow-xs"
+            className="inline-block px-3.5 py-1.5 rounded-md font-black text-xs uppercase tracking-wider shadow-xs"
             style={{
               backgroundColor: activeTheme.primary,
               color: '#ffffff',
@@ -109,11 +109,11 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
           </div>
 
           {/* High Quality Flow Diagram */}
-          <div className="p-2 rounded-2xl border border-slate-200 bg-white shadow-xs flex items-center justify-center">
+          <div className="p-3 rounded-2xl border border-slate-200 bg-white shadow-xs flex items-center justify-center h-44">
             <img
               src={PDF_FLOW_DIAGRAM_BASE64}
               alt="Diagrama de flujo del sistema solar fotovoltaico"
-              className="w-full h-auto max-h-[135px] object-contain"
+              className="w-full h-full object-contain"
             />
           </div>
         </div>

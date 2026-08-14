@@ -81,7 +81,7 @@ export const PDFProposalView: React.FC = () => {
       const pdfWidth = 210;
       const pdfHeight = 297;
 
-      // Sandbox contenedor aislado fuera del flujo de scroll
+      // Sandbox contenedor aislado fuera del flujo de scroll e invisible al usuario
       const sandbox = document.createElement('div');
       sandbox.style.position = 'fixed';
       sandbox.style.top = '0px';
@@ -89,7 +89,7 @@ export const PDFProposalView: React.FC = () => {
       sandbox.style.width = '850px';
       sandbox.style.height = '1202px';
       sandbox.style.overflow = 'hidden';
-      sandbox.style.zIndex = '99999';
+      sandbox.style.zIndex = '-9999'; // Invisible detrás del UI
       sandbox.style.backgroundColor = '#ffffff';
       sandbox.style.pointerEvents = 'none';
       sandbox.style.boxSizing = 'border-box';
