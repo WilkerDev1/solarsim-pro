@@ -338,6 +338,31 @@ export const useSimulationStore = create<SimulationState>()(
       },
 
       applyExtractedInvoice: (data: ExtractedInvoiceData, createNewProject = false) => {
+        const normalizeProvinceName = (raw?: string): string => {
+          if (!raw) return 'Santo Domingo / Distrito Nacional';
+          const lower = raw.toLowerCase();
+          if (lower.includes('distrito') || lower.includes('nacional') || lower.includes('santo domingo')) {
+            return 'Santo Domingo / Distrito Nacional';
+          }
+          if (lower.includes('santiago')) return 'Santiago';
+          if (lower.includes('altagracia') || lower.includes('punta cana') || lower.includes('higüey')) return 'La Altagracia (Punta Cana / Higüey)';
+          if (lower.includes('puerto plata')) return 'Puerto Plata';
+          if (lower.includes('cristóbal') || lower.includes('cristobal')) return 'San Cristóbal';
+          if (lower.includes('vega')) return 'La Vega';
+          if (lower.includes('duarte') || lower.includes('francisco')) return 'Duarte (San Fco. de Macorís)';
+          if (lower.includes('romana')) return 'La Romana';
+          if (lower.includes('san pedro')) return 'San Pedro de Macorís';
+          if (lower.includes('monseñor') || lower.includes('bonao')) return 'Monseñor Nouel (Bonao)';
+          if (lower.includes('peravia') || lower.includes('baní') || lower.includes('bani')) return 'Peravia (Baní)';
+          if (lower.includes('azua')) return 'Azua';
+          if (lower.includes('barahona')) return 'Barahona';
+          if (lower.includes('samana') || lower.includes('samaná')) return 'Samaná';
+          if (lower.includes('monte cristi')) return 'Monte Cristi';
+          return 'Santo Domingo / Distrito Nacional';
+        };
+
+        const resolvedProvince = normalizeProvinceName(data.province || data.municipality);
+
         set((state) => {
           let targetProjectId = state.activeProjectId;
           let projects = [...state.projects];
@@ -357,8 +382,8 @@ export const useSimulationStore = create<SimulationState>()(
                 ...BENCHMARK_PROJECT.client,
                 name: data.clientName || 'Cliente Factura EDE',
                 company: data.companyName || '',
-                location: data.address || `${data.province || 'Santo Domingo'}, RD`,
-                province: data.province || 'Santo Domingo',
+                location: data.address || `${resolvedProvince}, RD`,
+                province: resolvedProvince,
                 address: data.address || '',
                 distributor: data.distributor,
                 tariffCode: data.tariffCode,
@@ -406,7 +431,7 @@ export const useSimulationStore = create<SimulationState>()(
                   name: data.clientName || p.client.name,
                   company: data.companyName || p.client.company,
                   location: data.address || p.client.location,
-                  province: data.province || p.client.province,
+                  province: resolvedProvince,
                   address: data.address || p.client.address,
                   distributor: data.distributor || p.client.distributor,
                   tariffCode: data.tariffCode || p.client.tariffCode,

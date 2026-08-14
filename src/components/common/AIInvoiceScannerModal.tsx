@@ -536,13 +536,13 @@ export const AIInvoiceScannerModal: React.FC = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div className="space-y-1 md:col-span-2">
                           <label className="text-[10px] font-bold uppercase text-zinc-400">
-                            Nombre del Cliente / Razón Social
+                            Nombre del Titular / Razón Social
                           </label>
                           <input
                             type="text"
                             value={extractedData.clientName}
                             onChange={(e) => setExtractedData({ ...extractedData, clientName: e.target.value })}
-                            className={`w-full px-3 py-2 rounded-xl border text-xs font-semibold outline-none focus:ring-2 focus:ring-emerald-500 ${
+                            className={`w-full px-3 py-2 rounded-xl border text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500 ${
                               isDark ? 'bg-[#181822] border-[#2e2e40] text-white' : 'bg-white border-slate-300 text-slate-900'
                             }`}
                           />
@@ -550,13 +550,28 @@ export const AIInvoiceScannerModal: React.FC = () => {
 
                         <div className="space-y-1">
                           <label className="text-[10px] font-bold uppercase text-zinc-400">
-                            NIC / No. Contrato
+                            NIC (No. Contrato)
                           </label>
                           <input
                             type="text"
                             value={extractedData.nic || ''}
                             onChange={(e) => setExtractedData({ ...extractedData, nic: e.target.value })}
-                            placeholder="Ej. 1029482"
+                            placeholder="Ej. 7333529"
+                            className={`w-full px-3 py-2 rounded-xl border text-xs font-mono font-bold text-emerald-400 outline-none focus:ring-2 focus:ring-emerald-500 ${
+                              isDark ? 'bg-[#181822] border-[#2e2e40]' : 'bg-white border-slate-300 text-emerald-800'
+                            }`}
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase text-zinc-400">
+                            NIS / Suministro
+                          </label>
+                          <input
+                            type="text"
+                            value={extractedData.nis || ''}
+                            onChange={(e) => setExtractedData({ ...extractedData, nis: e.target.value })}
+                            placeholder="Ej. 4115260"
                             className={`w-full px-3 py-2 rounded-xl border text-xs font-mono font-semibold outline-none focus:ring-2 focus:ring-emerald-500 ${
                               isDark ? 'bg-[#181822] border-[#2e2e40] text-white' : 'bg-white border-slate-300 text-slate-900'
                             }`}
@@ -571,7 +586,22 @@ export const AIInvoiceScannerModal: React.FC = () => {
                             type="text"
                             value={extractedData.rnc || ''}
                             onChange={(e) => setExtractedData({ ...extractedData, rnc: e.target.value })}
-                            placeholder="Ej. 1-31-09823-1"
+                            placeholder="Ej. 130549682"
+                            className={`w-full px-3 py-2 rounded-xl border text-xs font-mono font-semibold outline-none focus:ring-2 focus:ring-emerald-500 ${
+                              isDark ? 'bg-[#181822] border-[#2e2e40] text-white' : 'bg-white border-slate-300 text-slate-900'
+                            }`}
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase text-zinc-400">
+                            No. Medidor / Contador
+                          </label>
+                          <input
+                            type="text"
+                            value={extractedData.meterNumber || ''}
+                            onChange={(e) => setExtractedData({ ...extractedData, meterNumber: e.target.value })}
+                            placeholder="Ej. 10295279"
                             className={`w-full px-3 py-2 rounded-xl border text-xs font-mono font-semibold outline-none focus:ring-2 focus:ring-emerald-500 ${
                               isDark ? 'bg-[#181822] border-[#2e2e40] text-white' : 'bg-white border-slate-300 text-slate-900'
                             }`}
@@ -604,7 +634,38 @@ export const AIInvoiceScannerModal: React.FC = () => {
                             type="text"
                             value={extractedData.tariffCode}
                             onChange={(e) => setExtractedData({ ...extractedData, tariffCode: e.target.value })}
+                            placeholder="Ej. BTD, BTS1, BTS2, MTD"
                             className={`w-full px-3 py-2 rounded-xl border text-xs font-mono font-bold outline-none focus:ring-2 focus:ring-emerald-500 ${
+                              isDark ? 'bg-[#181822] border-[#2e2e40] text-white' : 'bg-white border-slate-300 text-slate-900'
+                            }`}
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase text-zinc-400">
+                            Voltaje / Fases
+                          </label>
+                          <input
+                            type="text"
+                            value={extractedData.voltagePhase || ''}
+                            onChange={(e) => setExtractedData({ ...extractedData, voltagePhase: e.target.value })}
+                            placeholder="Ej. Baja 120/208 Trifásica"
+                            className={`w-full px-3 py-2 rounded-xl border text-xs font-semibold outline-none focus:ring-2 focus:ring-emerald-500 ${
+                              isDark ? 'bg-[#181822] border-[#2e2e40] text-white' : 'bg-white border-slate-300 text-slate-900'
+                            }`}
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold uppercase text-zinc-400">
+                            Comprobante e-NCF
+                          </label>
+                          <input
+                            type="text"
+                            value={extractedData.eNCF || ''}
+                            onChange={(e) => setExtractedData({ ...extractedData, eNCF: e.target.value })}
+                            placeholder="Ej. E310000696268"
+                            className={`w-full px-3 py-2 rounded-xl border text-xs font-mono font-semibold outline-none focus:ring-2 focus:ring-emerald-500 ${
                               isDark ? 'bg-[#181822] border-[#2e2e40] text-white' : 'bg-white border-slate-300 text-slate-900'
                             }`}
                           />
@@ -615,7 +676,7 @@ export const AIInvoiceScannerModal: React.FC = () => {
                             Provincia (Irradiación Solar)
                           </label>
                           <select
-                            value={extractedData.province || 'Santo Domingo'}
+                            value={extractedData.province || 'Distrito Nacional'}
                             onChange={(e) => setExtractedData({ ...extractedData, province: e.target.value })}
                             className={`w-full px-3 py-2 rounded-xl border text-xs font-semibold outline-none focus:ring-2 focus:ring-emerald-500 ${
                               isDark ? 'bg-[#181822] border-[#2e2e40] text-white' : 'bg-white border-slate-300 text-slate-900'
@@ -652,7 +713,7 @@ export const AIInvoiceScannerModal: React.FC = () => {
                         >
                           <Bot className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                           <div>
-                            <span className="font-bold">Observación de la IA: </span>
+                            <span className="font-bold">Análisis de la IA: </span>
                             {extractedData.aiNotes}
                           </div>
                         </div>
@@ -660,19 +721,19 @@ export const AIInvoiceScannerModal: React.FC = () => {
                     </div>
                   )}
 
-                  {/* TAB 2: 12-Month Consumption */}
+                  {/* TAB 2: 12-Month Consumption & Billing */}
                   {activeTab === 'consumption' && (
                     <div className="space-y-4">
                       {/* Summary Cards */}
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                         <div
                           className={`p-3 rounded-xl border ${
                             isDark ? 'bg-[#1a1a26] border-[#2e2e44]' : 'bg-white border-slate-200'
                           }`}
                         >
-                          <span className="text-[10px] uppercase font-bold text-zinc-400">Consumo Anual Total</span>
-                          <p className="text-lg font-extrabold text-emerald-400 font-mono">
-                            {extractedData.annualConsumptionKWh.toLocaleString()} <span className="text-xs font-normal">kWh/año</span>
+                          <span className="text-[9px] uppercase font-bold text-zinc-400 block">Consumo Anual Total</span>
+                          <p className="text-base font-extrabold text-emerald-400 font-mono">
+                            {extractedData.annualConsumptionKWh.toLocaleString()} <span className="text-[10px] font-normal">kWh/a</span>
                           </p>
                         </div>
                         <div
@@ -680,12 +741,60 @@ export const AIInvoiceScannerModal: React.FC = () => {
                             isDark ? 'bg-[#1a1a26] border-[#2e2e44]' : 'bg-white border-slate-200'
                           }`}
                         >
-                          <span className="text-[10px] uppercase font-bold text-zinc-400">Promedio Mensual</span>
-                          <p className="text-lg font-extrabold text-amber-400 font-mono">
-                            {extractedData.averageMonthlyKWh.toLocaleString()} <span className="text-xs font-normal">kWh/mes</span>
+                          <span className="text-[9px] uppercase font-bold text-zinc-400 block">Promedio Mensual</span>
+                          <p className="text-base font-extrabold text-amber-400 font-mono">
+                            {extractedData.averageMonthlyKWh.toLocaleString()} <span className="text-[10px] font-normal">kWh/m</span>
+                          </p>
+                        </div>
+                        <div
+                          className={`p-3 rounded-xl border ${
+                            isDark ? 'bg-[#1a1a26] border-[#2e2e44]' : 'bg-white border-slate-200'
+                          }`}
+                        >
+                          <span className="text-[9px] uppercase font-bold text-zinc-400 block">Precio Energía</span>
+                          <p className="text-base font-extrabold text-cyan-400 font-mono">
+                            {extractedData.energyCostPerKWhDOP ? `RD$ ${extractedData.energyCostPerKWhDOP.toFixed(2)}` : 'N/D'}
+                          </p>
+                        </div>
+                        <div
+                          className={`p-3 rounded-xl border ${
+                            isDark ? 'bg-[#1a1a26] border-[#2e2e44]' : 'bg-white border-slate-200'
+                          }`}
+                        >
+                          <span className="text-[9px] uppercase font-bold text-zinc-400 block">Total Facturado</span>
+                          <p className="text-base font-extrabold text-rose-400 font-mono">
+                            {extractedData.totalBilledAmountDOP ? `RD$ ${extractedData.totalBilledAmountDOP.toLocaleString()}` : 'N/D'}
                           </p>
                         </div>
                       </div>
+
+                      {/* Financial & Technical Details Pill Banner */}
+                      {(extractedData.peakDemandKW || extractedData.governmentSubsidyDOP || extractedData.powerFactor) && (
+                        <div
+                          className={`p-3 rounded-xl border text-[11px] grid grid-cols-2 sm:grid-cols-3 gap-2 ${
+                            isDark ? 'bg-[#161622] border-[#2a2a3c] text-zinc-300' : 'bg-slate-100 border-slate-200 text-slate-800'
+                          }`}
+                        >
+                          {extractedData.peakDemandKW && (
+                            <div>
+                              <span className="text-zinc-500 font-bold block text-[10px]">POTENCIA MÁXIMA (DEMANDA):</span>
+                              <span className="font-mono font-bold text-emerald-400">{extractedData.peakDemandKW} kW</span>
+                            </div>
+                          )}
+                          {extractedData.powerFactor && (
+                            <div>
+                              <span className="text-zinc-500 font-bold block text-[10px]">FACTOR DE POTENCIA / EFIC.:</span>
+                              <span className="font-mono font-bold text-amber-400">{extractedData.powerFactor}</span>
+                            </div>
+                          )}
+                          {extractedData.governmentSubsidyDOP && (
+                            <div>
+                              <span className="text-zinc-500 font-bold block text-[10px]">SUBSIDIO GOBIERNO RD$:</span>
+                              <span className="font-mono font-bold text-cyan-400">RD$ {extractedData.governmentSubsidyDOP.toLocaleString()}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* Visual Mini Bar Chart */}
                       <div
@@ -693,9 +802,14 @@ export const AIInvoiceScannerModal: React.FC = () => {
                           isDark ? 'bg-[#13131a] border-[#2a2a38]' : 'bg-white border-slate-200'
                         }`}
                       >
-                        <span className="text-[10px] uppercase font-bold text-zinc-400 block">
-                          Perfil de Consumo Mensual (kWh)
-                        </span>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] uppercase font-bold text-zinc-400 block">
+                            Histórico de 12 Meses (kWh)
+                          </span>
+                          <span className="text-[9px] text-emerald-400 font-mono font-semibold">
+                            Ene a Dic (Año Natural)
+                          </span>
+                        </div>
                         <div className="h-24 flex items-end gap-1.5 pt-2">
                           {extractedData.monthlyConsumptionKWh.map((val, idx) => {
                             const pct = Math.min(100, Math.round((val / maxConsumptionVal) * 100));
