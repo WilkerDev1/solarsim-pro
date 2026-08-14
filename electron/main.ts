@@ -10,8 +10,13 @@ import { registerAIInvoiceHandlers } from './aiInvoiceHandler';
 registerAIInvoiceHandlers();
 
 // ============================================================================
-// FIX FOR LINUX / ARCH / GNOME / WAYLAND IBUS KEYBOARD INPUT DROP
+// FIX FOR LINUX / ARCH / GNOME / WAYLAND IBUS KEYBOARD INPUT DROP & LOGS
 // ============================================================================
+// Suprimir logs de bajo nivel de Chromium (VSync parameters, fontconfig parser warnings)
+app.commandLine.appendSwitch('log-level', '3');
+process.env.FONTCONFIG_DEBUG = '0';
+process.env.FC_SILENT = '1';
+
 if (process.platform === 'linux') {
   // Prevent Chromium from blocking on non-existent IBUS sockets in Wayland
   delete process.env.GTK_IM_MODULE;
