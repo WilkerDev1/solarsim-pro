@@ -194,8 +194,9 @@ export interface DocumentCustomization {
   // Institutional Presentation & About Us
   companyWebsite?: string;        // Default: 'electsun.com.do'
   companyInstagram?: string;      // Default: 'Electsunrd'
-  aboutUsIntroText?: string;      // Default: 'En ELECTSUN, transformamos la energía solar en una solución inteligente, sostenible y accesible para todos. Creemos en un futuro más limpio y eficiente, y estamos aquí para hacerlo posible.'
-  whyChooseUsText?: string;       // Default: 'En ELECTSUN, nuestra misión es brindarte soluciones solares que no solo optimicen tu consumo energético, sino que también te permitan formar parte de la revolución verde del futuro.'
+  aboutUsIntroText?: string;      // Default: 'En ELECTSUN, transformamos la energía solar en una solución inteligente, sostenible y accesible para todos...'
+  whyChooseUsText?: string;       // Default: 'En ELECTSUN, nuestra misión es brindarte soluciones solares...'
+  regulatoryNote?: string;        // Default: Resolucion SIE-007-2026-REG & BTS1/BTS2 net metering notes
 }
 
 export interface ProjectSimulation {

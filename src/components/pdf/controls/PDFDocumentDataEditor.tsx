@@ -730,6 +730,22 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                 }`}
               />
             </div>
+
+            <div>
+              <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                Nota Regulatoria & Normativa SIE (Pág. Descripción del Proyecto)
+              </label>
+              <textarea
+                rows={4}
+                value={cust.regulatoryNote !== undefined ? cust.regulatoryNote : DEFAULT_DOCUMENT_CUSTOMIZATION.regulatoryNote}
+                onChange={(e) => updateDocumentCustomization({ regulatoryNote: e.target.value })}
+                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
+                  isDark
+                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
+                    : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
+                }`}
+              />
+            </div>
           </div>
         )}
       </div>

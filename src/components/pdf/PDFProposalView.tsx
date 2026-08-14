@@ -11,6 +11,7 @@ import { PDFTableOfContents, TOCItem } from './pages/PDFTableOfContents';
 import { PDFAboutUsPage } from './pages/PDFAboutUsPage';
 import { PDFSolarBenefitsPage } from './pages/PDFSolarBenefitsPage';
 import { PDFTechnicalIntroPage } from './pages/PDFTechnicalIntroPage';
+import { PDFProjectDescriptionPage } from './pages/PDFProjectDescriptionPage';
 import { PDFPage1Energy } from './pages/PDFPage1Energy';
 import { PDFPage2Quotation } from './pages/PDFPage2Quotation';
 import { PDFPage3ROI } from './pages/PDFPage3ROI';
@@ -38,13 +39,14 @@ export const PDFProposalView: React.FC = () => {
   const [showAboutUs, setShowAboutUs] = useState(true); // 1. ¿Quiénes Somos? & Servicios
   const [showBenefits, setShowBenefits] = useState(true); // 2. Beneficios Solares & Ley 57-07
   const [showTechIntro, setShowTechIntro] = useState(true); // 3. ¿Qué es FV? & Flujo Técnico
+  const [showProjectDescription, setShowProjectDescription] = useState(true); // 4. Resumen & Normativa SIE
 
   // Document Toggles (Core Technical & Financial)
-  const [showPage1, setShowPage1] = useState(true); // 4. Análisis de Energía y Balance
-  const [showPageQuotation, setShowPageQuotation] = useState(true); // 5. Cotización de Sistema Fotovoltaico
-  const [showPage2, setShowPage2] = useState(true); // 6. Retorno de Inversión y Métricas
-  const [showPage3, setShowPage3] = useState(true); // 7. Flujo de Caja 25 Años
-  const [showPageCostMatrix, setShowPageCostMatrix] = useState(false); // 8. Costos Internos (Confidencial)
+  const [showPage1, setShowPage1] = useState(true); // 5. Análisis de Energía y Balance
+  const [showPageQuotation, setShowPageQuotation] = useState(true); // 6. Cotización de Sistema Fotovoltaico
+  const [showPage2, setShowPage2] = useState(true); // 7. Retorno de Inversión y Métricas
+  const [showPage3, setShowPage3] = useState(true); // 8. Flujo de Caja 25 Años
+  const [showPageCostMatrix, setShowPageCostMatrix] = useState(false); // 9. Costos Internos (Confidencial)
   const [showHeadersFooters, setShowHeadersFooters] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -125,6 +127,7 @@ export const PDFProposalView: React.FC = () => {
     (showAboutUs ? 1 : 0) +
     (showBenefits ? 1 : 0) +
     (showTechIntro ? 1 : 0) +
+    (showProjectDescription ? 1 : 0) +
     (showPage1 ? 1 : 0) +
     (showPageQuotation ? 1 : 0) +
     (showPage2 ? 1 : 0) +
@@ -137,6 +140,7 @@ export const PDFProposalView: React.FC = () => {
   let pageAboutUsNum = 0;
   let pageBenefitsNum = 0;
   let pageTechIntroNum = 0;
+  let pageProjectDescNum = 0;
   let page1Num = 0;
   let pageQuotNum = 0;
   let page2Num = 0;
@@ -162,6 +166,10 @@ export const PDFProposalView: React.FC = () => {
   if (showTechIntro) {
     currentNum++;
     pageTechIntroNum = currentNum;
+  }
+  if (showProjectDescription) {
+    currentNum++;
+    pageProjectDescNum = currentNum;
   }
   if (showPage1) {
     currentNum++;
@@ -214,6 +222,16 @@ export const PDFProposalView: React.FC = () => {
       title: '¿Qué es un Sistema Fotovoltaico?',
       subtitle: '3.1 Funcionamiento y Diagrama de Flujo Técnico',
       targetPage: pageTechIntroNum,
+    });
+    sectionIndex++;
+  }
+
+  if (showProjectDescription) {
+    tocItems.push({
+      number: `${sectionIndex}`,
+      title: 'Descripción del Proyecto & Normativa SIE',
+      subtitle: 'Criterios de Dimensionamiento y Resolución SIE-007',
+      targetPage: pageProjectDescNum,
     });
     sectionIndex++;
   }
@@ -299,6 +317,8 @@ export const PDFProposalView: React.FC = () => {
         setShowBenefits={setShowBenefits}
         showTechIntro={showTechIntro}
         setShowTechIntro={setShowTechIntro}
+        showProjectDescription={showProjectDescription}
+        setShowProjectDescription={setShowProjectDescription}
         showPage1={showPage1}
         setShowPage1={setShowPage1}
         showPageQuotation={showPageQuotation}
@@ -386,7 +406,20 @@ export const PDFProposalView: React.FC = () => {
             />
           )}
 
-          {/* 4. ANÁLISIS DE ENERGÍA Y BALANCE */}
+          {/* 4. DESCRIPCIÓN DEL PROYECTO & NORMATIVA SIE */}
+          {showProjectDescription && (
+            <PDFProjectDescriptionPage
+              project={project}
+              summary={summary}
+              activeTheme={activeTheme}
+              showHeadersFooters={showHeadersFooters}
+              currentDateStr={currentDateStr}
+              pageNum={pageProjectDescNum}
+              totalPages={activePagesCount}
+            />
+          )}
+
+          {/* 5. ANÁLISIS DE ENERGÍA Y BALANCE */}
           {showPage1 && (
             <PDFPage1Energy
               project={project}
@@ -399,7 +432,7 @@ export const PDFProposalView: React.FC = () => {
             />
           )}
 
-          {/* 5. COTIZACIÓN DE SISTEMA FOTOVOLTAICO */}
+          {/* 6. COTIZACIÓN DE SISTEMA FOTOVOLTAICO */}
           {showPageQuotation && (
             <PDFPage2Quotation
               project={project}
@@ -412,7 +445,7 @@ export const PDFProposalView: React.FC = () => {
             />
           )}
 
-          {/* 6. RETORNO DE INVERSIÓN Y MÉTRICAS */}
+          {/* 7. RETORNO DE INVERSIÓN Y MÉTRICAS */}
           {showPage2 && (
             <PDFPage3ROI
               project={project}
@@ -425,7 +458,7 @@ export const PDFProposalView: React.FC = () => {
             />
           )}
 
-          {/* 7. FLUJO DE CAJA 25 AÑOS */}
+          {/* 8. FLUJO DE CAJA 25 AÑOS */}
           {showPage3 && (
             <PDFPage4CashFlow
               project={project}
@@ -438,7 +471,7 @@ export const PDFProposalView: React.FC = () => {
             />
           )}
 
-          {/* 8. MATRIZ DE COSTOS INTERNOS (CONFIDENCIAL) */}
+          {/* 9. MATRIZ DE COSTOS INTERNOS (CONFIDENCIAL) */}
           {showPageCostMatrix && (
             <PDFPage5CostMatrix
               project={project}

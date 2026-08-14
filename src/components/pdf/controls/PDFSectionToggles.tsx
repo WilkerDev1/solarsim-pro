@@ -29,6 +29,8 @@ interface PDFSectionTogglesProps {
   setShowBenefits: (val: boolean) => void;
   showTechIntro: boolean;
   setShowTechIntro: (val: boolean) => void;
+  showProjectDescription: boolean;
+  setShowProjectDescription: (val: boolean) => void;
   // Core Technical & Financial Pages
   showPage1: boolean;
   setShowPage1: (val: boolean) => void;
@@ -58,6 +60,8 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
   setShowBenefits,
   showTechIntro,
   setShowTechIntro,
+  showProjectDescription,
+  setShowProjectDescription,
   showPage1,
   setShowPage1,
   showPageQuotation,
@@ -256,6 +260,35 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
             type="checkbox"
             checked={showTechIntro}
             onChange={(e) => setShowTechIntro(e.target.checked)}
+            className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
+          />
+        </label>
+
+        {/* Descripción del Proyecto & Normativa SIE */}
+        <label
+          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
+            showProjectDescription
+              ? isDark
+                ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
+                : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
+              : isDark
+              ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
+              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className={`p-1.5 rounded-lg shrink-0 ${showProjectDescription ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
+              <FileText className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs font-bold block leading-tight">4. Resumen & Normativa SIE</span>
+              <span className="text-[10px] opacity-75 block">Narrativa técnica y Res. SIE-007</span>
+            </div>
+          </div>
+          <input
+            type="checkbox"
+            checked={showProjectDescription}
+            onChange={(e) => setShowProjectDescription(e.target.checked)}
             className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
           />
         </label>

@@ -35,6 +35,8 @@ interface PDFSidebarControlsProps {
   setShowBenefits: (val: boolean) => void;
   showTechIntro: boolean;
   setShowTechIntro: (val: boolean) => void;
+  showProjectDescription: boolean;
+  setShowProjectDescription: (val: boolean) => void;
 
   // Core Technical & Financial Pages
   showPage1: boolean;
@@ -78,6 +80,8 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
   setShowBenefits,
   showTechIntro,
   setShowTechIntro,
+  showProjectDescription,
+  setShowProjectDescription,
 
   showPage1,
   setShowPage1,
@@ -191,6 +195,8 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
             setShowBenefits={setShowBenefits}
             showTechIntro={showTechIntro}
             setShowTechIntro={setShowTechIntro}
+            showProjectDescription={showProjectDescription}
+            setShowProjectDescription={setShowProjectDescription}
             showPage1={showPage1}
             setShowPage1={setShowPage1}
             showPageQuotation={showPageQuotation}
