@@ -430,7 +430,22 @@ export const useSimulationStore = create<SimulationState>()(
     }),
     {
       name: 'solarsim_pro_projects_store_v1',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          return window.localStorage;
+        }
+        // In-memory fallback for non-browser/test environments
+        const memStore: Record<string, string> = {};
+        return {
+          getItem: (key: string) => memStore[key] ?? null,
+          setItem: (key: string, value: string) => {
+            memStore[key] = value;
+          },
+          removeItem: (key: string) => {
+            delete memStore[key];
+          },
+        };
+      }),
       partialize: (state) => ({
         projects: state.projects,
         activeProjectId: state.activeProjectId,
