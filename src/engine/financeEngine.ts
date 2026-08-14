@@ -24,7 +24,7 @@ export function calculateCostMatrixSummary(
   const batteryKilos = specs.batteryWeightKilos || specs.batteryCapacityKWh || 32;
 
   const installationKilos = 1;
-  const installationQty = dcCapacityKWp > 0 ? dcCapacityKWp : 30.75;
+  const installationQty = specs.panelWeightKilos !== undefined ? specs.panelWeightKilos : (dcCapacityKWp > 0 ? dcCapacityKWp : 30.75);
   const installationUnitUSD = specs.installationUnitPriceUSD !== undefined ? specs.installationUnitPriceUSD : 170.0;
 
   // Row 1: Panel
@@ -197,17 +197,21 @@ export function calculateFinancialSummary(
   const costMatrix = calculateCostMatrixSummary(specs, dcCapacityKWp);
 
   // Calculate solar system investment
-  const solarInvestmentUSD = financials.customCostUSD && financials.customCostUSD > 0
-    ? financials.customCostUSD
-    : Math.round(dcCapacityKWp * 1000 * financials.pricePerWattUSD * 100) / 100;
+  const solarInvestmentUSD = Math.round(dcCapacityKWp * 1000 * financials.pricePerWattUSD * 100) / 100;
 
   // Calculate battery storage investment if active
-  const batteryInvestmentUSD = specs.hasBattery ? (specs.batteryCostUSD || 0) : 0;
+  const batteryCount = specs.batteryCount !== undefined && specs.batteryCount > 0 ? specs.batteryCount : 1;
+  const batteryUnitUSD = specs.batteryUnitPriceUSD !== undefined ? specs.batteryUnitPriceUSD : 1990.0;
+  const batteryInvestmentUSD = specs.hasBattery
+    ? (specs.batteryCostUSD !== undefined && specs.batteryCostUSD > 0
+        ? specs.batteryCostUSD
+        : batteryCount * batteryUnitUSD)
+    : 0;
 
   // Total Gross Investment = Solar + Battery (or from cost matrix sale price)
   const grossInvestmentUSD = financials.customCostUSD && financials.customCostUSD > 0
     ? financials.customCostUSD
-    : (specs.panelUnitPriceUSD !== undefined || specs.saleMarginMultiplier !== undefined
+    : (specs.isDetailed
         ? Math.round(costMatrix.porcentajeVentaUSD * 100) / 100
         : Math.round((solarInvestmentUSD + batteryInvestmentUSD) * 100) / 100);
 
@@ -215,14 +219,14 @@ export function calculateFinancialSummary(
   const itbisSavedUSD = financials.applyITBISExemption
     ? (financials.customITBISSavedUSD !== undefined
         ? financials.customITBISSavedUSD
-        : Math.round(grossInvestmentUSD * 0.18 * 0.387 * 100) / 100)
+        : Math.round(grossInvestmentUSD * 0.18 * 0.38768 * 100) / 100)
     : 0;
 
   // Ley 57-07 40% ISR tax credit calculation (allows explicit custom override e.g. 7322.11 or standard calculation)
   const ley5707CreditUSD = financials.applyLey5707
     ? (financials.customLey5707CreditUSD !== undefined
         ? financials.customLey5707CreditUSD
-        : Math.round(grossInvestmentUSD * 0.40 * 0.6845 * 100) / 100)
+        : Math.round(grossInvestmentUSD * 0.40 * 0.684568 * 100) / 100)
     : 0;
 
   const netInvestmentUSD = Math.round((grossInvestmentUSD - ley5707CreditUSD) * 100) / 100;

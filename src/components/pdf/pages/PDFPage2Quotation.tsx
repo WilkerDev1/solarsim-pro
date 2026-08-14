@@ -218,7 +218,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
             <div className="flex justify-between text-slate-800 pt-1 border-t border-slate-300">
               <span className="font-bold">PRECIO POR WATT (USD/W):</span>
               <span className="font-bold" style={{ color: activeTheme.primary }}>
-                ${(project.specs.pricePerWattUSD || project.financials.pricePerWattUSD || 1.13).toFixed(2)}
+                ${(summary.systemCapacityKWp > 0 ? (summary.grossInvestmentUSD / (summary.systemCapacityKWp * 1000)) : (project.specs.pricePerWattUSD || 1.13)).toFixed(2)}
               </span>
             </div>
           </div>

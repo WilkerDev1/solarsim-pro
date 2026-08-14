@@ -252,6 +252,20 @@ export const useSimulationStore = create<SimulationState>()(
                 updatedFinancials.pricePerWattUSD = specsPartial.pricePerWattUSD;
               }
 
+              // Clear hardcoded cost overrides on spec change to allow dynamic recalculation
+              if (
+                specsPartial.hasBattery !== undefined ||
+                specsPartial.batteryCount !== undefined ||
+                specsPartial.batteryCapacityKWh !== undefined ||
+                specsPartial.panelCount !== undefined ||
+                specsPartial.panelPowerW !== undefined ||
+                specsPartial.inverterCount !== undefined
+              ) {
+                delete updatedFinancials.customCostUSD;
+                delete updatedFinancials.customLey5707CreditUSD;
+                delete updatedFinancials.customITBISSavedUSD;
+              }
+
               return {
                 ...p,
                 updatedAt: new Date().toISOString(),
