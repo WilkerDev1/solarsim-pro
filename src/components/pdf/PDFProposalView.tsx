@@ -35,6 +35,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
 import { PDFColorTheme, PDF_COLOR_THEMES } from '../../constants/pdfThemes';
+import { ELECTSUN_LOGO_WHITE_BASE64 } from '../../assets/electsunLogo';
 
 export const PDFProposalView: React.FC = () => {
   const { getActiveProject, getFinancialSummary, setActiveView, updateClient, updateSpecs, sidebarTheme } = useSimulationStore();
@@ -183,11 +184,12 @@ export const PDFProposalView: React.FC = () => {
             Ubicación: <span className="font-semibold text-white">{project.client.province || project.client.location}</span> | Fecha: <span className="font-semibold text-white">{currentDateStr}</span>
           </p>
         </div>
-        <div className="text-right">
-          <div className="text-2xl font-black tracking-tight text-white flex items-center gap-1.5 justify-end">
-            <span className="w-3.5 h-3.5 bg-white/90 rounded-full inline-block"></span> electsun
-          </div>
-          <p className="text-[10px] text-white/80 tracking-wider font-semibold">EL SOL A TU FAVOR</p>
+        <div className="text-right flex items-center justify-end">
+          <img
+            src={ELECTSUN_LOGO_WHITE_BASE64}
+            alt="electsun - El sol a tu favor"
+            className="h-11 w-auto object-contain drop-shadow-xs"
+          />
         </div>
       </div>
       <div style={{ backgroundColor: activeTheme.secondary }} className="text-center text-white py-1.5 font-bold text-xs uppercase tracking-wider transition-colors">
