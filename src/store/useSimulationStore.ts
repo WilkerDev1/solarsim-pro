@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { ProjectSimulation, ClientInfo, SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, UpdateInfo, DocumentCustomization, ExtractedInvoiceData } from '../types';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
-import { calculateFinancialSummary } from '../engine/financeEngine';
+import { calculateFinancialSummary, calculateCostMatrixSummary } from '../engine/financeEngine';
 
 export interface NewProjectPayload {
   name: string;
@@ -259,11 +259,28 @@ export const useSimulationStore = create<SimulationState>()(
                 specsPartial.batteryCapacityKWh !== undefined ||
                 specsPartial.panelCount !== undefined ||
                 specsPartial.panelPowerW !== undefined ||
-                specsPartial.inverterCount !== undefined
+                specsPartial.inverterCount !== undefined ||
+                specsPartial.panelUnitPriceUSD !== undefined ||
+                specsPartial.inverterUnitPriceUSD !== undefined ||
+                specsPartial.batteryUnitPriceUSD !== undefined ||
+                specsPartial.installationUnitPriceUSD !== undefined ||
+                specsPartial.saleMarginMultiplier !== undefined ||
+                specsPartial.dopExchangeRate !== undefined
               ) {
                 delete updatedFinancials.customCostUSD;
                 delete updatedFinancials.customLey5707CreditUSD;
                 delete updatedFinancials.customITBISSavedUSD;
+
+                // If user didn't explicitly customize pricePerWattUSD in this change, auto-sync from cost matrix
+                if (specsPartial.pricePerWattUSD === undefined) {
+                  const dcKWp = (updatedSpecs.panelPowerW * updatedSpecs.panelCount) / 1000;
+                  const cm = calculateCostMatrixSummary(updatedSpecs, dcKWp);
+                  const autoPrice = Math.round(cm.salePricePerWattUSD * 100) / 100;
+                  if (autoPrice > 0) {
+                    updatedSpecs.pricePerWattUSD = autoPrice;
+                    updatedFinancials.pricePerWattUSD = autoPrice;
+                  }
+                }
               }
 
               return {

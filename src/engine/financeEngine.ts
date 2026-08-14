@@ -207,24 +207,23 @@ export function calculateFinancialSummary(
   // Calculate cost matrix summary
   const costMatrix = calculateCostMatrixSummary(specs, dcCapacityKWp);
 
-  // Calculate solar system investment
-  const solarInvestmentUSD = Math.round(dcCapacityKWp * 1000 * financials.pricePerWattUSD * 100) / 100;
-
-  // Calculate battery storage investment if active
-  const batteryCount = specs.batteryCount !== undefined && specs.batteryCount > 0 ? specs.batteryCount : 1;
-  const batteryUnitUSD = specs.batteryUnitPriceUSD !== undefined ? specs.batteryUnitPriceUSD : 1990.0;
-  const batteryInvestmentUSD = specs.hasBattery
-    ? (specs.batteryCostUSD !== undefined && specs.batteryCostUSD > 0
-        ? specs.batteryCostUSD
-        : batteryCount * batteryUnitUSD)
-    : 0;
-
-  // Total Gross Investment = Solar + Battery (or from cost matrix sale price)
+  // Total Gross Investment:
+  // 1. If explicit custom override is set, use it.
+  // 2. If pricePerWattUSD is provided, grossInvestment is (dcCapacityKWp * 1000 * pricePerWattUSD).
+  // 3. Otherwise, use exact turnkey total sale price from the Cost Matrix (costMatrix.porcentajeVentaUSD).
   const grossInvestmentUSD = financials.customCostUSD && financials.customCostUSD > 0
     ? financials.customCostUSD
     : (specs.isDetailed
         ? Math.round(costMatrix.porcentajeVentaUSD * 100) / 100
-        : Math.round((solarInvestmentUSD + batteryInvestmentUSD) * 100) / 100);
+        : (financials.pricePerWattUSD !== undefined && financials.pricePerWattUSD > 0
+            ? Math.round(dcCapacityKWp * 1000 * financials.pricePerWattUSD * 100) / 100
+            : Math.round(costMatrix.porcentajeVentaUSD * 100) / 100));
+
+  // Solar and Battery investment components breakdown
+  const solarInvestmentUSD = Math.round((costMatrix.solarOnlyVentaUSD || (dcCapacityKWp * 1000 * (financials.pricePerWattUSD || 1.13))) * 100) / 100;
+  const batteryInvestmentUSD = specs.hasBattery
+    ? Math.max(0, Math.round((grossInvestmentUSD - solarInvestmentUSD) * 100) / 100)
+    : 0;
 
   // ITBIS exoneration calculation (allows explicit custom override e.g. 1866.11 or standard calculation)
   const itbisSavedUSD = financials.applyITBISExemption
