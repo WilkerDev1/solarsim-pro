@@ -1,6 +1,6 @@
 import { DocumentCustomization } from '../types';
 
-export const DEFAULT_DOCUMENT_CUSTOMIZATION: Required<DocumentCustomization> = {
+export const DEFAULT_DOCUMENT_CUSTOMIZATION: DocumentCustomization = {
   companyName: 'electsun',
   companySlogan: 'El sol a tu favor',
   companyFooterText: 'Calle Ercilia Pepín #1, Plaza Toledo | Local 307 | Arroyo Manzano | Santo Domingo, RD | electsun.com.do',

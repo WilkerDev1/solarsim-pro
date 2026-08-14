@@ -13,7 +13,7 @@ export const PDFFooter: React.FC<PDFFooterProps> = ({
   totalPages,
   customization,
 }) => {
-  const footerText = customization?.companyFooterText || DEFAULT_DOCUMENT_CUSTOMIZATION.companyFooterText;
+  const footerText = customization?.companyFooterText || DEFAULT_DOCUMENT_CUSTOMIZATION.companyFooterText || '';
 
   return (
     <footer className="mt-auto px-10 py-3 border-t border-slate-200 text-[10px] text-slate-500 flex justify-between items-center bg-slate-50 shrink-0">

@@ -186,6 +186,10 @@ export interface DocumentCustomization {
   
   // Watermark Settings
   watermarkOpacity?: number;      // Default: 0.15 (15% opacity)
+  
+  // Custom Images (Base64 data URLs)
+  headerLogoBase64?: string;      // Custom header logo (overrides default)
+  watermarkLogoBase64?: string;   // Custom watermark image (overrides default)
 }
 
 export interface ProjectSimulation {

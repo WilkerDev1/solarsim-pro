@@ -52,7 +52,10 @@ export const PDFPage3ROI: React.FC<PDFPage3ROIProps> = ({
   return (
     <div className="pdf-page w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
       {/* Background Watermark */}
-      <PDFWatermark opacity={project.customization?.watermarkOpacity ?? 0.15} />
+      <PDFWatermark
+        opacity={project.customization?.watermarkOpacity ?? 0.15}
+        customWatermarkBase64={project.customization?.watermarkLogoBase64}
+      />
 
       {/* Header Banner */}
       {showHeadersFooters && (

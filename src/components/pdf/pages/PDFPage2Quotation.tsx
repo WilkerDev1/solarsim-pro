@@ -30,11 +30,11 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
 
   const contactName = cust.contactName || project.client.name || 'Contacto';
   const clientPhone = cust.clientPhone || project.client.contactPhone || '809-555-0199';
-  const panelWarranty = cust.panelWarrantyText || DEFAULT_DOCUMENT_CUSTOMIZATION.panelWarrantyText;
-  const inverterWarranty = cust.inverterWarrantyText || DEFAULT_DOCUMENT_CUSTOMIZATION.inverterWarrantyText;
-  const batteryWarranty = cust.batteryWarrantyText || DEFAULT_DOCUMENT_CUSTOMIZATION.batteryWarrantyText;
-  const workmanshipWarranty = cust.workmanshipWarrantyText || DEFAULT_DOCUMENT_CUSTOMIZATION.workmanshipWarrantyText;
-  const servicesText = cust.servicesIncludedText || DEFAULT_DOCUMENT_CUSTOMIZATION.servicesIncludedText;
+  const panelWarranty = cust.panelWarrantyText || DEFAULT_DOCUMENT_CUSTOMIZATION.panelWarrantyText || '25 Años';
+  const inverterWarranty = cust.inverterWarrantyText || DEFAULT_DOCUMENT_CUSTOMIZATION.inverterWarrantyText || '5 a 10 Años';
+  const batteryWarranty = cust.batteryWarrantyText || DEFAULT_DOCUMENT_CUSTOMIZATION.batteryWarrantyText || '5 a 10 Años';
+  const workmanshipWarranty = cust.workmanshipWarrantyText || DEFAULT_DOCUMENT_CUSTOMIZATION.workmanshipWarrantyText || '1 Año';
+  const servicesText = cust.servicesIncludedText || DEFAULT_DOCUMENT_CUSTOMIZATION.servicesIncludedText || '';
   const validityNote = cust.validityNote || `* Equipos según disponibilidad de inventario | * Propuesta válida por ${project.client.quoteValidityDays || 7} días | * Precios en USD *`;
 
   // Split services text into bullets if separated by comma or semicolon
@@ -46,7 +46,10 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
   return (
     <div className="pdf-page w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
       {/* Background Watermark */}
-      <PDFWatermark opacity={project.customization?.watermarkOpacity ?? 0.15} />
+      <PDFWatermark
+        opacity={project.customization?.watermarkOpacity ?? 0.15}
+        customWatermarkBase64={project.customization?.watermarkLogoBase64}
+      />
 
       {/* Header Banner */}
       {showHeadersFooters && (

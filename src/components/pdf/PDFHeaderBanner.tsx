@@ -25,8 +25,8 @@ export const PDFHeaderBanner: React.FC<PDFHeaderBannerProps> = ({
   pageTitle,
   customization,
 }) => {
-  const companyName = customization?.companyName || DEFAULT_DOCUMENT_CUSTOMIZATION.companyName;
-  const companySlogan = customization?.companySlogan || DEFAULT_DOCUMENT_CUSTOMIZATION.companySlogan;
+  const companyName = customization?.companyName || DEFAULT_DOCUMENT_CUSTOMIZATION.companyName || 'electsun';
+  const companySlogan = customization?.companySlogan || DEFAULT_DOCUMENT_CUSTOMIZATION.companySlogan || 'El sol a tu favor';
   const isDefaultElectsun = companyName.toLowerCase().trim() === 'electsun';
 
   return (
@@ -49,7 +49,13 @@ export const PDFHeaderBanner: React.FC<PDFHeaderBannerProps> = ({
         </div>
 
         <div className="text-right flex items-center justify-end pl-6">
-          {isDefaultElectsun ? (
+          {customization?.headerLogoBase64 ? (
+            <img
+              src={customization.headerLogoBase64}
+              alt={companyName}
+              className="h-[62px] max-h-[64px] w-auto object-contain drop-shadow-xs"
+            />
+          ) : isDefaultElectsun ? (
             <img
               src={ELECTSUN_LOGO_WHITE_BASE64}
               alt="electsun - El sol a tu favor"
