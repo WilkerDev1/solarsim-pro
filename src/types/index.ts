@@ -160,6 +160,31 @@ export interface FinancialSummaryResult {
   batteryBackupAutonomyHours: number;
 }
 
+export interface DocumentCustomization {
+  // Company / Issuer Info
+  companyName?: string;            // Default: 'electsun'
+  companySlogan?: string;          // Default: 'El sol a tu favor'
+  companyFooterText?: string;      // Default: 'Calle Ercilia Pepín #1, Plaza Toledo | Local 307 | Arroyo Manzano | Santo Domingo, RD | electsun.com.do'
+  companyPhone?: string;          // e.g. '+1 (809) 555-0199'
+  companyEmail?: string;          // e.g. 'info@electsun.com.do'
+  companyRnc?: string;            // e.g. '1-31-12345-6'
+  
+  // Client & Proposal Presentation
+  contactName?: string;           // Default: project.client.name
+  clientPhone?: string;           // Default: project.client.contactPhone
+  clientEmail?: string;           // Default: project.client.contactEmail
+  validityNote?: string;          // Default: 'Precios sujetos a disponibilidad de inventario. Cotización válida por 7 días laborables.'
+  
+  // Warranties & Guarantees
+  panelWarrantyText?: string;     // Default: '25 Años de Producción Lineal'
+  inverterWarrantyText?: string;  // Default: '5 a 10 Años de Fábrica'
+  batteryWarrantyText?: string;   // Default: '5 a 10 Años (según fabricante)'
+  workmanshipWarrantyText?: string; // Default: '1 Año en Instalación y Soporte'
+  
+  // Management & Turnkey Services ("Nos encargamos de gestionar")
+  servicesIncludedText?: string;  // Default: 'Permisos y Tramitación ante CNE y Distribuidora, Medición Neta, Planos Eléctricos, Instalación Certificada y Puesta en Marcha.'
+}
+
 export interface ProjectSimulation {
   id: string;
   createdAt: string;
@@ -170,6 +195,7 @@ export interface ProjectSimulation {
   rates: UtilityRates;
   financials: FinancialParams;
   monthlyConsumption: number[]; // 12 months in kWh
+  customization?: DocumentCustomization;
 }
 
 export type UpdateState = 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';

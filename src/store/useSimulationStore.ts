@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { ProjectSimulation, ClientInfo, SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, UpdateInfo } from '../types';
+import { ProjectSimulation, ClientInfo, SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, UpdateInfo, DocumentCustomization } from '../types';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateFinancialSummary } from '../engine/financeEngine';
 
@@ -43,6 +43,7 @@ interface SimulationState {
   updateRates: (rates: Partial<UtilityRates>) => void;
   updateFinancials: (financials: Partial<FinancialParams>) => void;
   updateMonthlyConsumption: (index: number, value: number) => void;
+  updateDocumentCustomization: (customization: Partial<DocumentCustomization>) => void;
   
   createNewProject: (payload?: string | NewProjectPayload) => void;
   duplicateProject: (id: string) => void;
@@ -288,6 +289,22 @@ export const useSimulationStore = create<SimulationState>()(
                 ...p,
                 updatedAt: new Date().toISOString(),
                 monthlyConsumption: newCons,
+              };
+            }
+            return p;
+          });
+          return { projects };
+        });
+      },
+
+      updateDocumentCustomization: (customizationPartial) => {
+        set((state) => {
+          const projects = state.projects.map((p) => {
+            if (p.id === state.activeProjectId) {
+              return {
+                ...p,
+                updatedAt: new Date().toISOString(),
+                customization: { ...(p.customization || {}), ...customizationPartial },
               };
             }
             return p;

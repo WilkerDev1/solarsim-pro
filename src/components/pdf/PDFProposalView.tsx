@@ -1,44 +1,27 @@
 import React, { useRef, useState } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
-import {
-  ArrowLeft,
-  Printer,
-  Download,
-  RefreshCw,
-  Leaf,
-  ShieldCheck,
-  FileText,
-  CheckCircle2,
-  PackageCheck,
-  Wrench,
-  Building2,
-  Check,
-  Palette,
-  Zap,
-  TrendingUp,
-  BarChart3,
-  Lock,
-} from 'lucide-react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Cell,
-  LabelList,
-} from 'recharts';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-
 import { PDFColorTheme, PDF_COLOR_THEMES } from '../../constants/pdfThemes';
-import { ELECTSUN_LOGO_WHITE_BASE64 } from '../../assets/electsunLogo';
+
+// Modular Page Components
+import { PDFSidebarControls } from './controls/PDFSidebarControls';
+import { PDFPage1Energy } from './pages/PDFPage1Energy';
+import { PDFPage2Quotation } from './pages/PDFPage2Quotation';
+import { PDFPage3ROI } from './pages/PDFPage3ROI';
+import { PDFPage4CashFlow } from './pages/PDFPage4CashFlow';
+import { PDFPage5CostMatrix } from './pages/PDFPage5CostMatrix';
 
 export const PDFProposalView: React.FC = () => {
-  const { getActiveProject, getFinancialSummary, setActiveView, updateClient, updateSpecs, sidebarTheme } = useSimulationStore();
+  const {
+    getActiveProject,
+    getFinancialSummary,
+    updateClient,
+    updateSpecs,
+    updateDocumentCustomization,
+    sidebarTheme,
+  } = useSimulationStore();
+
   const isDark = sidebarTheme === 'dark';
   const project = getActiveProject();
   const summary = getFinancialSummary();
@@ -56,7 +39,7 @@ export const PDFProposalView: React.FC = () => {
   // Active Color Theme
   const [activeTheme, setActiveTheme] = useState<PDFColorTheme>(PDF_COLOR_THEMES[0]);
 
-  // Active Tab in Sidebar (Secciones vs Editar Cotización)
+  // Active Tab in Sidebar ("Secciones" vs "Datos del Documento")
   const [sidebarTab, setSidebarTab] = useState<'sections' | 'edit'>('sections');
 
   const handlePrint = () => {
@@ -123,7 +106,7 @@ export const PDFProposalView: React.FC = () => {
     year: 'numeric',
   });
 
-  // Calculate total pages for footer dynamically
+  // Calculate dynamic page numbers for footers
   const activePagesCount =
     (showPage1 ? 1 : 0) +
     (showPageQuotation ? 1 : 0) +
@@ -138,65 +121,26 @@ export const PDFProposalView: React.FC = () => {
   let pageCostMatrixNum = 0;
   let currentNum = 0;
 
-  if (showPage1) { currentNum++; page1Num = currentNum; }
-  if (showPageQuotation) { currentNum++; pageQuotNum = currentNum; }
-  if (showPage2) { currentNum++; page2Num = currentNum; }
-  if (showPage3) { currentNum++; page3Num = currentNum; }
-  if (showPageCostMatrix) { currentNum++; pageCostMatrixNum = currentNum; }
-
-  // Calculate equivalent trees planted (~16 trees per Ton CO2/yr)
-  const treesPlanted = Math.round(summary.co2AvoidedTonsPerYear * 16);
-
-  // Prepare data for Beneficio Acumulado chart (Year 0 to 25)
-  const cf25 = summary.cashFlow25Years;
-  const cumulativeChartData = [
-    { yearLabel: '0', year: 0, cumulative: -summary.grossInvestmentUSD },
-    ...cf25.map((c) => ({
-      yearLabel: `${c.year}`,
-      year: c.year,
-      cumulative: c.cumulativeCashFlowUSD,
-    })),
-  ];
-
-  // Totals for monthly energy table
-  const totalConsumptionKWh = summary.monthlyBreakdown.reduce((sum, m) => sum + m.consumptionKWh, 0);
-  const totalProductionKWh = summary.monthlyBreakdown.reduce((sum, m) => sum + m.productionKWh, 0);
-  const totalSavingsKWh = summary.monthlyBreakdown.reduce((sum, m) => sum + m.solarSelfConsumedKWh, 0);
-
-  // Key milestones for Page 3
-  const paybackYearObj = cf25.find((c) => c.year === Math.ceil(summary.paybackYears)) || cf25[2] || cf25[0];
-  const year1Obj = cf25[0];
-  const year10Obj = cf25[9] || cf25[0];
-  const year25Obj = cf25[cf25.length - 1] || cf25[0];
-
-  // Common Header Banner Component for clean consistency across all PDF pages
-  const renderHeaderBanner = (pageTitle: string) => (
-    <>
-      <div style={{ backgroundColor: activeTheme.primary }} className="text-white px-10 py-5 flex justify-between items-center transition-colors">
-        <div>
-          <h2 className="text-[11px] font-semibold text-white/80 uppercase tracking-wider">
-            PROPUESTA TÉCNICA Y ECONÓMICA • ID: {project.client.projectId || 'SP-2024-089'}
-          </h2>
-          <h1 className="text-xl font-bold uppercase tracking-tight text-white mt-0.5">
-            {project.client.name} — {summary.systemCapacityKWp.toFixed(2)}kWp
-          </h1>
-          <p className="text-[11px] text-white/80 mt-0.5">
-            Ubicación: <span className="font-semibold text-white">{project.client.province || project.client.location}</span> | Fecha: <span className="font-semibold text-white">{currentDateStr}</span>
-          </p>
-        </div>
-        <div className="text-right flex items-center justify-end pl-6">
-          <img
-            src={ELECTSUN_LOGO_WHITE_BASE64}
-            alt="electsun - El sol a tu favor"
-            className="h-[62px] max-h-[64px] w-auto object-contain drop-shadow-xs"
-          />
-        </div>
-      </div>
-      <div style={{ backgroundColor: activeTheme.secondary }} className="text-center text-white py-1.5 font-bold text-xs uppercase tracking-wider transition-colors">
-        {pageTitle}
-      </div>
-    </>
-  );
+  if (showPage1) {
+    currentNum++;
+    page1Num = currentNum;
+  }
+  if (showPageQuotation) {
+    currentNum++;
+    pageQuotNum = currentNum;
+  }
+  if (showPage2) {
+    currentNum++;
+    page2Num = currentNum;
+  }
+  if (showPage3) {
+    currentNum++;
+    page3Num = currentNum;
+  }
+  if (showPageCostMatrix) {
+    currentNum++;
+    pageCostMatrixNum = currentNum;
+  }
 
   return (
     <div
@@ -205,1227 +149,110 @@ export const PDFProposalView: React.FC = () => {
       }`}
     >
       {/* Side Controls Toolbar */}
-      <aside
-        className={`w-[330px] flex flex-col h-full shrink-0 transition-colors z-20 ${
-          isDark
-            ? 'bg-[#18181f] border-r border-[#2a2a36] text-zinc-100 shadow-2xl'
-            : 'bg-white border-r border-slate-300 shadow-md'
-        }`}
-      >
-        {/* Top Actions in Sidebar */}
-        <div className={`p-4 border-b space-y-2.5 ${isDark ? 'border-[#2a2a36] bg-[#131318]' : 'border-slate-200 bg-slate-50'}`}>
-          <div className="flex items-center justify-between mb-0.5">
-            <span className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-              Exportación PDF
-            </span>
-            <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-950/70 px-2 py-0.5 rounded-full border border-emerald-800/60">
-              {activePagesCount} {activePagesCount === 1 ? 'Página' : 'Páginas'}
-            </span>
-          </div>
-
-          <button
-            onClick={handleExportPDF}
-            disabled={isExporting}
-            className="w-full py-2.5 px-4 rounded-xl font-bold text-xs text-white shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] disabled:opacity-50"
-            style={{ backgroundColor: activeTheme.primary }}
-          >
-            <Download className="w-4 h-4" />
-            {isExporting ? 'Generando PDF...' : 'Descargar PDF Multi-Página'}
-          </button>
-
-          <button
-            onClick={handlePrint}
-            className={`w-full py-2 px-4 rounded-xl font-semibold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer border ${
-              isDark
-                ? 'bg-[#22222c] border-[#343444] text-zinc-200 hover:bg-[#2a2a38]'
-                : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-xs'
-            }`}
-          >
-            <Printer className="w-3.5 h-3.5 text-emerald-500" />
-            Imprimir / Guardar como PDF
-          </button>
-        </div>
-
-        {/* Tab Switcher */}
-        <div className={`p-3 border-b ${isDark ? 'border-[#2a2a36] bg-[#18181f]' : 'border-slate-200 bg-white'}`}>
-          <div className={`flex p-1 rounded-xl border ${isDark ? 'bg-[#121216] border-[#2a2a36]' : 'bg-slate-100 border-slate-200'}`}>
-            <button
-              onClick={() => setSidebarTab('sections')}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                sidebarTab === 'sections'
-                  ? isDark
-                    ? 'bg-[#282836] text-white shadow-xs'
-                    : 'bg-white text-slate-900 shadow-xs'
-                  : isDark
-                  ? 'text-zinc-400 hover:text-zinc-200'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              Páginas ({activePagesCount})
-            </button>
-            <button
-              onClick={() => setSidebarTab('edit')}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                sidebarTab === 'edit'
-                  ? isDark
-                    ? 'bg-[#282836] text-white shadow-xs'
-                    : 'bg-white text-slate-900 shadow-xs'
-                  : isDark
-                  ? 'text-zinc-400 hover:text-zinc-200'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              Datos Cotización
-            </button>
-          </div>
-        </div>
-
-        {/* Tab Content Area */}
-        <div className="p-4 flex-1 overflow-y-auto space-y-5">
-          {sidebarTab === 'sections' ? (
-            <>
-              {/* Palette Switcher */}
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <h3 className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-                    <Palette className="w-3.5 h-3.5 text-emerald-500" />
-                    Paleta de Colores
-                  </h3>
-                  <span className={`text-xs font-bold ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                    {activeTheme.name}
-                  </span>
-                </div>
-                <div className="grid grid-cols-5 gap-2">
-                  {PDF_COLOR_THEMES.map((theme) => {
-                    const isActive = activeTheme.id === theme.id;
-                    return (
-                      <button
-                        key={theme.id}
-                        onClick={() => setActiveTheme(theme)}
-                        title={theme.name}
-                        className={`h-11 rounded-xl flex flex-col overflow-hidden border-2 transition-all cursor-pointer relative ${
-                          isActive
-                            ? 'border-emerald-500 ring-2 ring-emerald-500/40 scale-105 shadow-md'
-                            : isDark
-                            ? 'border-[#2e2e3a] opacity-70 hover:opacity-100 hover:border-zinc-500'
-                            : 'border-slate-200 opacity-80 hover:opacity-100 hover:border-slate-400'
-                        }`}
-                      >
-                        <span className="h-1/2 w-full" style={{ backgroundColor: theme.primary }}></span>
-                        <span className="h-1/2 w-full" style={{ backgroundColor: theme.barColor }}></span>
-                        {isActive && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-[1px]">
-                            <Check className="w-3.5 h-3.5 text-white drop-shadow" />
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className={`h-px w-full ${isDark ? 'bg-[#2a2a36]' : 'bg-slate-200'}`}></div>
-
-              {/* Secciones Incluidas */}
-              <div className="space-y-2.5">
-                <h3 className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-                  Secciones del Documento
-                </h3>
-
-                {/* Page 1 */}
-                <label
-                  className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
-                    showPage1
-                      ? isDark
-                        ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
-                        : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
-                      : isDark
-                      ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
-                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`p-1.5 rounded-lg shrink-0 ${showPage1 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
-                      <Zap className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold block leading-tight">Pág 1: Análisis de Energía</span>
-                      <span className="text-[10px] opacity-75 block">Generación vs Demanda mensual</span>
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={showPage1}
-                    onChange={(e) => setShowPage1(e.target.checked)}
-                    className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
-                  />
-                </label>
-
-                {/* Page 2 */}
-                <label
-                  className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
-                    showPageQuotation
-                      ? isDark
-                        ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
-                        : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
-                      : isDark
-                      ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
-                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`p-1.5 rounded-lg shrink-0 ${showPageQuotation ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
-                      <FileText className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold block leading-tight">Pág 2: Cotización de Sistema</span>
-                      <span className="text-[10px] opacity-75 block">Equipos, inversión y garantías</span>
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={showPageQuotation}
-                    onChange={(e) => setShowPageQuotation(e.target.checked)}
-                    className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
-                  />
-                </label>
-
-                {/* Page 3 */}
-                <label
-                  className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
-                    showPage2
-                      ? isDark
-                        ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
-                        : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
-                      : isDark
-                      ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
-                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`p-1.5 rounded-lg shrink-0 ${showPage2 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
-                      <TrendingUp className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold block leading-tight">Pág 3: Retorno de Inversión</span>
-                      <span className="text-[10px] opacity-75 block">Payback, VAN, TIR y Ley 57-07</span>
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={showPage2}
-                    onChange={(e) => setShowPage2(e.target.checked)}
-                    className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
-                  />
-                </label>
-
-                {/* Page 4 */}
-                <label
-                  className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
-                    showPage3
-                      ? isDark
-                        ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
-                        : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
-                      : isDark
-                      ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
-                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`p-1.5 rounded-lg shrink-0 ${showPage3 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
-                      <BarChart3 className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <span className="text-xs font-bold block leading-tight">Pág 4: Flujo de Caja 25 Años</span>
-                      <span className="text-[10px] opacity-75 block">Proyección financiera anual</span>
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={showPage3}
-                    onChange={(e) => setShowPage3(e.target.checked)}
-                    className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
-                  />
-                </label>
-
-                {/* Page 5: Costos Internos (Confidencial) */}
-                <label
-                  className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
-                    showPageCostMatrix
-                      ? isDark
-                        ? 'bg-amber-950/50 border-amber-500/70 text-amber-200 shadow-xs'
-                        : 'bg-amber-50 border-amber-400 text-amber-950 shadow-xs'
-                      : isDark
-                      ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-amber-700/50'
-                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`p-1.5 rounded-lg shrink-0 ${showPageCostMatrix ? 'bg-amber-500/20 text-amber-400' : 'bg-zinc-800 text-zinc-500'}`}>
-                      <Lock className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-bold block leading-tight">Pág 5: Costos Internos</span>
-                        <span className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded border ${
-                          isDark
-                            ? 'bg-amber-950/90 text-amber-300 border-amber-700/70'
-                            : 'bg-amber-100 text-amber-800 border-amber-300'
-                        }`}>
-                          CONFIDENCIAL
-                        </span>
-                      </div>
-                      <span className="text-[10px] opacity-75 block">Matriz de márgenes y desglose</span>
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={showPageCostMatrix}
-                    onChange={(e) => setShowPageCostMatrix(e.target.checked)}
-                    className="w-4 h-4 rounded text-amber-600 focus:ring-0 cursor-pointer shrink-0"
-                  />
-                </label>
-              </div>
-
-              <div className={`h-px w-full ${isDark ? 'bg-[#2a2a36]' : 'bg-slate-200'}`}></div>
-
-              {/* Opciones de Formato */}
-              <div className="space-y-2.5">
-                <h3 className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-                  Opciones de Formato
-                </h3>
-                <label
-                  className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
-                    showHeadersFooters
-                      ? isDark
-                        ? 'bg-[#22222d] border-[#38384a] text-zinc-100'
-                        : 'bg-white border-slate-300 text-slate-800'
-                      : isDark
-                      ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400'
-                      : 'bg-slate-50 border-slate-200 text-slate-600'
-                  }`}
-                >
-                  <span className="text-xs font-semibold">Mostrar Encabezados y Pies</span>
-                  <input
-                    type="checkbox"
-                    checked={showHeadersFooters}
-                    onChange={(e) => setShowHeadersFooters(e.target.checked)}
-                    className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
-                  />
-                </label>
-              </div>
-            </>
-          ) : (
-            <div className="space-y-4">
-              <h3 className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-                Detalles de la Cotización
-              </h3>
-
-              <div>
-                <label className={`block text-[11px] font-bold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                  N° Cotización
-                </label>
-                <input
-                  type="text"
-                  value={project.client.quoteNumber || 'C-0030'}
-                  onChange={(e) => updateClient({ quoteNumber: e.target.value })}
-                  className={`w-full text-xs p-2.5 rounded-xl border font-semibold outline-none transition-colors ${
-                    isDark
-                      ? 'bg-[#202028] border-[#343442] text-white focus:border-emerald-500 focus:bg-[#252532]'
-                      : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-emerald-600 focus:bg-white'
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className={`block text-[11px] font-bold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                  Válido por (Días)
-                </label>
-                <input
-                  type="number"
-                  value={project.client.quoteValidityDays || 7}
-                  onChange={(e) => updateClient({ quoteValidityDays: Number(e.target.value) })}
-                  className={`w-full text-xs p-2.5 rounded-xl border font-semibold outline-none transition-colors ${
-                    isDark
-                      ? 'bg-[#202028] border-[#343442] text-white focus:border-emerald-500 focus:bg-[#252532]'
-                      : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-emerald-600 focus:bg-white'
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className={`block text-[11px] font-bold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                  Dirección del Cliente
-                </label>
-                <textarea
-                  rows={2}
-                  value={project.client.address || 'Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.'}
-                  onChange={(e) => updateClient({ address: e.target.value })}
-                  className={`w-full text-xs p-2.5 rounded-xl border font-medium outline-none transition-colors ${
-                    isDark
-                      ? 'bg-[#202028] border-[#343442] text-white focus:border-emerald-500 focus:bg-[#252532]'
-                      : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-emerald-600 focus:bg-white'
-                  }`}
-                />
-              </div>
-
-              <div className={`h-px w-full ${isDark ? 'bg-[#2a2a36]' : 'bg-slate-200'}`}></div>
-
-              <h3 className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-                Modelos de Equipos
-              </h3>
-
-              <div>
-                <label className={`block text-[11px] font-bold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                  Módulos Solares (Descripción)
-                </label>
-                <input
-                  type="text"
-                  value={project.specs.panelBrandModel || 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)'}
-                  onChange={(e) => updateSpecs({ panelBrandModel: e.target.value })}
-                  className={`w-full text-xs p-2.5 rounded-xl border font-medium outline-none transition-colors ${
-                    isDark
-                      ? 'bg-[#202028] border-[#343442] text-white focus:border-emerald-500 focus:bg-[#252532]'
-                      : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-emerald-600 focus:bg-white'
-                  }`}
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div className="col-span-2">
-                  <label className={`block text-[11px] font-bold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                    Modelo Inversor
-                  </label>
-                  <input
-                    type="text"
-                    value={project.specs.inverterBrandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)'}
-                    onChange={(e) => updateSpecs({ inverterBrandModel: e.target.value })}
-                    className={`w-full text-xs p-2.5 rounded-xl border font-medium outline-none transition-colors ${
-                      isDark
-                        ? 'bg-[#202028] border-[#343442] text-white focus:border-emerald-500 focus:bg-[#252532]'
-                        : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-emerald-600 focus:bg-white'
-                    }`}
-                  />
-                </div>
-                <div>
-                  <label className={`block text-[11px] font-bold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                    Cant.
-                  </label>
-                  <input
-                    type="number"
-                    value={project.specs.inverterCount || 2}
-                    onChange={(e) => updateSpecs({ inverterCount: Number(e.target.value) })}
-                    className={`w-full text-xs p-2.5 rounded-xl border font-semibold outline-none transition-colors ${
-                      isDark
-                        ? 'bg-[#202028] border-[#343442] text-white focus:border-emerald-500 focus:bg-[#252532]'
-                        : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-emerald-600 focus:bg-white'
-                    }`}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div className="col-span-2">
-                  <label className={`block text-[11px] font-bold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                    Modelo Batería
-                  </label>
-                  <input
-                    type="text"
-                    value={project.specs.batteryBrandModel || 'Batería Hinaess 16 KwH-48 vdc.'}
-                    onChange={(e) => updateSpecs({ batteryBrandModel: e.target.value })}
-                    className={`w-full text-xs p-2.5 rounded-xl border font-medium outline-none transition-colors ${
-                      isDark
-                        ? 'bg-[#202028] border-[#343442] text-white focus:border-emerald-500 focus:bg-[#252532]'
-                        : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-emerald-600 focus:bg-white'
-                    }`}
-                  />
-                </div>
-                <div>
-                  <label className={`block text-[11px] font-bold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                    Cant.
-                  </label>
-                  <input
-                    type="number"
-                    value={project.specs.batteryCount || 3}
-                    onChange={(e) => updateSpecs({ batteryCount: Number(e.target.value) })}
-                    className={`w-full text-xs p-2.5 rounded-xl border font-semibold outline-none transition-colors ${
-                      isDark
-                        ? 'bg-[#202028] border-[#343442] text-white focus:border-emerald-500 focus:bg-[#252532]'
-                        : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-emerald-600 focus:bg-white'
-                    }`}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className={`block text-[11px] font-bold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                  Servicios e Instalación
-                </label>
-                <textarea
-                  rows={2}
-                  value={project.specs.installationServicesDesc || 'Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).'}
-                  onChange={(e) => updateSpecs({ installationServicesDesc: e.target.value })}
-                  className={`w-full text-xs p-2.5 rounded-xl border font-medium outline-none transition-colors ${
-                    isDark
-                      ? 'bg-[#202028] border-[#343442] text-white focus:border-emerald-500 focus:bg-[#252532]'
-                      : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-emerald-600 focus:bg-white'
-                  }`}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Bottom Bar in Sidebar */}
-        <div className={`p-4 border-t ${isDark ? 'border-[#2a2a36] bg-[#14141a]' : 'border-slate-200 bg-slate-50'}`}>
-          <button
-            onClick={() => {
-              useSimulationStore.setState({ activeProjectId: project.id });
-            }}
-            className={`w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer border ${
-              isDark
-                ? 'bg-[#22222c] border-[#343444] text-zinc-200 hover:bg-[#2a2a38] hover:text-white'
-                : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-xs'
-            }`}
-          >
-            <RefreshCw className="w-3.5 h-3.5 text-emerald-500" />
-            Actualizar Vista Previa
-          </button>
-        </div>
-      </aside>
+      <PDFSidebarControls
+        isDark={isDark}
+        project={project}
+        activeTheme={activeTheme}
+        setActiveTheme={setActiveTheme}
+        activePagesCount={activePagesCount}
+        sidebarTab={sidebarTab}
+        setSidebarTab={setSidebarTab}
+        isExporting={isExporting}
+        handleExportPDF={handleExportPDF}
+        handlePrint={handlePrint}
+        onRefresh={() => {
+          useSimulationStore.setState({ activeProjectId: project.id });
+        }}
+        showPage1={showPage1}
+        setShowPage1={setShowPage1}
+        showPageQuotation={showPageQuotation}
+        setShowPageQuotation={setShowPageQuotation}
+        showPage2={showPage2}
+        setShowPage2={setShowPage2}
+        showPage3={showPage3}
+        setShowPage3={setShowPage3}
+        showPageCostMatrix={showPageCostMatrix}
+        setShowPageCostMatrix={setShowPageCostMatrix}
+        showHeadersFooters={showHeadersFooters}
+        setShowHeadersFooters={setShowHeadersFooters}
+        updateClient={updateClient}
+        updateSpecs={updateSpecs}
+        updateDocumentCustomization={updateDocumentCustomization}
+      />
 
       {/* PDF Page Canvas */}
-      <main className={`flex-1 overflow-y-auto p-8 flex flex-col items-center gap-8 transition-colors ${
-        isDark ? 'bg-[#0a0a0d]' : 'bg-slate-300/80'
-      }`}>
+      <main
+        className={`flex-1 overflow-y-auto p-8 flex flex-col items-center gap-8 transition-colors ${
+          isDark ? 'bg-[#0a0a0d]' : 'bg-slate-300/80'
+        }`}
+      >
         <div ref={pdfRef} className="flex flex-col gap-8 print:gap-0">
-            
-            {/* ---------------------------------------------------- */}
-            {/* PÁGINA 1: ANÁLISIS DE ENERGÍA */}
-            {/* ---------------------------------------------------- */}
-            {showPage1 && (
-              <div className="pdf-page w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative font-sans print:shadow-none print:w-full print:min-h-screen">
-                {/* Header Electsun Banner */}
-                {renderHeaderBanner('ANÁLISIS DE ENERGÍA Y CONSUMO')}
+          {/* PÁGINA 1: ANÁLISIS DE ENERGÍA */}
+          {showPage1 && (
+            <PDFPage1Energy
+              project={project}
+              summary={summary}
+              activeTheme={activeTheme}
+              showHeadersFooters={showHeadersFooters}
+              currentDateStr={currentDateStr}
+              pageNum={page1Num}
+              totalPages={activePagesCount}
+            />
+          )}
 
-                {/* Body */}
-                <div className="px-10 py-6 flex-1 flex flex-col gap-6">
-                  {/* Chart Section */}
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center border-b border-gray-100 pb-2">
-                      <h2 className="text-base font-bold text-gray-800 uppercase tracking-wider">
-                        Evolución Mensual de Energía
-                      </h2>
-                      <div className="flex items-center gap-4 text-xs font-semibold">
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-3 h-3 rounded-xs" style={{ backgroundColor: activeTheme.primary }}></span>
-                          <span className="text-slate-700">Consumo (kWh)</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-3 h-3 rounded-xs" style={{ backgroundColor: activeTheme.barColor }}></span>
-                          <span className="text-slate-700">Producción Solar (kWh)</span>
-                        </div>
-                      </div>
-                    </div>
+          {/* PÁGINA 2: COTIZACIÓN DE SISTEMA FOTOVOLTAICO */}
+          {showPageQuotation && (
+            <PDFPage2Quotation
+              project={project}
+              summary={summary}
+              activeTheme={activeTheme}
+              showHeadersFooters={showHeadersFooters}
+              currentDateStr={currentDateStr}
+              pageNum={pageQuotNum}
+              totalPages={activePagesCount}
+            />
+          )}
 
-                    <div className="w-full bg-gray-50/70 border border-gray-200 rounded-xl p-4 h-[280px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={summary.monthlyBreakdown} margin={{ top: 20, right: 10, left: 0, bottom: 15 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                          <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#475569', fontWeight: 'bold' }} />
-                          <YAxis tick={{ fontSize: 10, fill: '#475569', fontWeight: 'bold' }} />
-                          <Tooltip formatter={(val: number) => [`${Math.round(val).toLocaleString()} kWh`, '']} />
-                          
-                          <Bar dataKey="consumptionKWh" name="Consumo (kWh)" fill={activeTheme.primary} radius={[3, 3, 0, 0]}>
-                            <LabelList dataKey="consumptionKWh" position="top" style={{ fontSize: '8px', fill: activeTheme.primary, fontWeight: 'bold' }} formatter={(val: number) => Math.round(val)} />
-                          </Bar>
-                          <Bar dataKey="productionKWh" name="Producción Solar (kWh)" fill={activeTheme.barColor} radius={[3, 3, 0, 0]}>
-                            <LabelList dataKey="productionKWh" position="top" style={{ fontSize: '8px', fill: activeTheme.secondary, fontWeight: 'bold' }} formatter={(val: number) => Math.round(val)} />
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
+          {/* PÁGINA 3: RETORNO DE INVERSIÓN - RESUMEN */}
+          {showPage2 && (
+            <PDFPage3ROI
+              project={project}
+              summary={summary}
+              activeTheme={activeTheme}
+              showHeadersFooters={showHeadersFooters}
+              currentDateStr={currentDateStr}
+              pageNum={page2Num}
+              totalPages={activePagesCount}
+            />
+          )}
 
-                  {/* Table Section */}
-                  <div className="space-y-3">
-                    <h2 className="text-base font-bold text-gray-800 border-b border-gray-100 pb-2 uppercase tracking-wider">
-                      Resumen Mensual de Energía
-                    </h2>
-                    <div className="border border-gray-200 rounded-lg overflow-hidden shadow-xs">
-                      <table className="w-full text-xs text-left">
-                        <thead className="text-white uppercase font-bold" style={{ backgroundColor: activeTheme.primary }}>
-                          <tr>
-                            <th className="px-4 py-2.5">Mes</th>
-                            <th className="px-4 py-2.5 text-right">Consumo (kWh)</th>
-                            <th className="px-4 py-2.5 text-right">Producción (kWh)</th>
-                            <th className="px-4 py-2.5 text-right">Ahorro Energ. (kWh)</th>
-                            <th className="px-4 py-2.5 text-right">%</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200 font-semibold text-gray-700">
-                          {summary.monthlyBreakdown.map((row, idx) => {
-                            const monthCoverage = row.consumptionKWh > 0
-                              ? Math.min(100, (row.productionKWh / row.consumptionKWh) * 100)
-                              : 0;
-                            return (
-                              <tr key={idx} className={idx % 2 === 0 ? 'bg-gray-50/60' : 'bg-white'}>
-                                <td className="px-4 py-2 font-bold text-gray-800">{row.month}</td>
-                                <td className="px-4 py-2 text-right font-medium">{row.consumptionKWh.toLocaleString()}</td>
-                                <td className="px-4 py-2 text-right font-medium">{row.productionKWh.toFixed(1)}</td>
-                                <td className="px-4 py-2 text-right font-medium">{row.solarSelfConsumedKWh.toFixed(1)}</td>
-                                <td className="px-4 py-2 text-right font-bold" style={{ color: activeTheme.secondary }}>
-                                  {monthCoverage.toFixed(2)}%
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                        <tfoot className="font-bold bg-gray-100 text-gray-900 border-t-2 border-gray-300 text-xs">
-                          <tr>
-                            <td className="px-4 py-2.5 uppercase font-extrabold">TOTAL</td>
-                            <td className="px-4 py-2.5 text-right">{totalConsumptionKWh.toLocaleString()}</td>
-                            <td className="px-4 py-2.5 text-right">{totalProductionKWh.toLocaleString()}</td>
-                            <td className="px-4 py-2.5 text-right">{totalSavingsKWh.toLocaleString()}</td>
-                            <td className="px-4 py-2.5 text-right font-extrabold" style={{ color: activeTheme.primary }}>{summary.energyCoveragePct.toFixed(2)}%</td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  </div>
+          {/* PÁGINA 4: FLUJO DE CAJA 25 AÑOS */}
+          {showPage3 && (
+            <PDFPage4CashFlow
+              project={project}
+              summary={summary}
+              activeTheme={activeTheme}
+              showHeadersFooters={showHeadersFooters}
+              currentDateStr={currentDateStr}
+              pageNum={page3Num}
+              totalPages={activePagesCount}
+            />
+          )}
 
-                  {/* Impact Section */}
-                  <div className={`mt-auto border rounded-xl p-4 flex gap-4 items-center ${activeTheme.accentLightBg} ${activeTheme.accentBorder}`}>
-                    <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-xs shrink-0" style={{ color: activeTheme.primary }}>
-                      <Leaf className="w-5 h-5" />
-                    </div>
-                    <div className="text-xs">
-                      <h3 className="font-bold text-sm mb-0.5" style={{ color: activeTheme.primary }}>Impacto Ambiental</h3>
-                      <p className="text-slate-800">
-                        Reducción estimada de CO₂: <span className="font-bold">{summary.co2AvoidedTonsPerYear} Toneladas/año</span>. Esto equivale a plantar aproximadamente <span className="font-bold">{treesPlanted} árboles</span> anuales.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                {showHeadersFooters && (
-                  <div className="px-10 py-4 border-t border-gray-200 flex justify-between items-center text-xs text-gray-500 mt-auto font-semibold">
-                    <span>Calle Ercilia Pepín #1, Plaza Toledo | Local 307 | Arroyo Manzano | Santo Domingo, RD | electsun.com.do</span>
-                    <span className="font-bold text-gray-700">Página {page1Num} de {activePagesCount}</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ---------------------------------------------------- */}
-            {/* PÁGINA 2: COTIZACIÓN DE SISTEMA FOTOVOLTAICO */}
-            {/* ---------------------------------------------------- */}
-            {showPageQuotation && (
-              <div className="pdf-page w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative font-sans print:shadow-none print:w-full print:min-h-screen">
-                {/* Header Electsun Banner */}
-                {renderHeaderBanner('COTIZACIÓN DE SISTEMA FOTOVOLTAICO')}
-
-                {/* Body */}
-                <div className="px-10 py-6 flex-1 flex flex-col gap-5 text-xs text-slate-800 font-sans">
-                  {/* DATOS DEL CLIENTE */}
-                  <div>
-                    <h3 className="bg-slate-100 px-3 py-1 text-[11px] font-bold uppercase border-l-4 mb-2" style={{ color: activeTheme.primary, borderColor: activeTheme.primary }}>
-                      DATOS DEL CLIENTE :
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4 px-2 text-[11px]">
-                      <div className="space-y-1">
-                        <div><span className="font-bold text-slate-600">Cliente:</span> <span className="font-bold text-slate-900">{project.client.name}</span></div>
-                        <div><span className="font-bold text-slate-600">Contacto:</span> {project.client.company || project.client.name}</div>
-                        <div><span className="font-bold text-slate-600">Teléfono:</span> {project.client.contactPhone || '809-555-0199'}</div>
-                        <div><span className="font-bold text-slate-600">Dirección:</span> {project.client.address || 'Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.'}</div>
-                      </div>
-                      <div className="space-y-1 text-right">
-                        <div><span className="font-bold text-slate-600">N° Cotización:</span> <span className="font-bold text-slate-900">{project.client.quoteNumber || 'C-0030'}</span></div>
-                        <div><span className="font-bold text-slate-600">Fecha:</span> <span className="font-semibold text-slate-800">{currentDateStr}</span></div>
-                        <div><span className="font-bold text-slate-600">Válido por:</span> <span className="font-bold" style={{ color: activeTheme.secondary }}>{project.client.quoteValidityDays || 7} Días</span></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ESPECIFICACIONES DEL SISTEMA */}
-                  <div>
-                    <h3 className="bg-slate-100 px-3 py-1 text-[11px] font-bold uppercase border-l-4 mb-2" style={{ color: activeTheme.primary, borderColor: activeTheme.primary }}>
-                      ESPECIFICACIONES DEL SISTEMA
-                    </h3>
-                    <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200 text-[11px]">
-                      <div>
-                        <div><span className="font-bold text-slate-700">Potencia (kW-dc):</span> <span className="font-bold text-slate-900">{summary.systemCapacityKWp.toFixed(2)}</span></div>
-                        <div><span className="font-bold text-slate-700">Tipo de instalación:</span> Fotovoltaica</div>
-                      </div>
-                      <div className="text-right">
-                        <div><span className="font-bold text-slate-700">Consumo mensual estimado (kWh):</span> <span className="font-bold text-slate-900">{Math.round(summary.annualConsumptionKWh / 12).toLocaleString()}</span></div>
-                        <div><span className="font-bold text-slate-700">EDES / Distribuidor:</span> <span className="font-bold" style={{ color: activeTheme.primary }}>{project.client.distributor || 'EDEESTE'}</span></div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* EQUIPOS Y MATERIALES */}
-                  <div>
-                    <h3 className="bg-slate-100 px-3 py-1 text-[11px] font-bold uppercase border-l-4 mb-2" style={{ color: activeTheme.primary, borderColor: activeTheme.primary }}>
-                      EQUIPOS Y MATERIALES
-                    </h3>
-                    <div className="border border-slate-200 rounded-lg overflow-hidden">
-                      <table className="w-full text-left border-collapse">
-                        <thead className="text-white font-bold text-[10px] uppercase" style={{ backgroundColor: activeTheme.primary }}>
-                          <tr>
-                            <th className="px-3 py-2">DESCRIPCION</th>
-                            <th className="px-3 py-2 text-center w-20">CANT.</th>
-                            <th className="px-3 py-2 text-center w-20">UNIDAD</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200 text-[11px] text-slate-800 font-semibold">
-                          <tr className="bg-white">
-                            <td className="px-3 py-2">{project.specs.panelBrandModel || 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)'}</td>
-                            <td className="px-3 py-2 text-center font-bold">{project.specs.panelCount}</td>
-                            <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
-                          </tr>
-                          <tr className="bg-slate-50/60">
-                            <td className="px-3 py-2">{project.specs.inverterBrandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)'}</td>
-                            <td className="px-3 py-2 text-center font-bold">{project.specs.inverterCount || 2}</td>
-                            <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
-                          </tr>
-                          {project.specs.hasBattery && (
-                            <tr className="bg-white">
-                              <td className="px-3 py-2">{project.specs.batteryBrandModel || 'Batería Hinaess 16 KwH-48 vdc.'}</td>
-                              <td className="px-3 py-2 text-center font-bold">{project.specs.batteryCount || 3}</td>
-                              <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
-                            </tr>
-                          )}
-                          <tr className="bg-slate-50/60">
-                            <td className="px-3 py-2">{project.specs.installationServicesDesc || 'Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).'}</td>
-                            <td className="px-3 py-2 text-center font-bold">1</td>
-                            <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* DESGLOSE FINANCIERO RIGHT ALIGNED */}
-                  <div className="flex justify-end">
-                    <div className="w-[380px] bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1.5 text-[11px]">
-                      <div className="flex justify-between text-slate-700">
-                        <span className="font-semibold">SUB-TOTAL (USD) SIN ITBIS :</span>
-                        <span className="font-bold">${(summary.grossInvestmentUSD / 1.18).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                      </div>
-                      <div className="flex justify-between text-slate-900 bg-slate-200/80 px-2 py-1 rounded font-bold">
-                        <span>TOTAL GENERAL (USD) :</span>
-                        <span>${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                      </div>
-                      <div className="flex justify-between font-semibold" style={{ color: activeTheme.secondary }}>
-                        <span>ITBIS A DESCONTAR POR LEY 57-07 US$ :</span>
-                        <span className="font-bold">${summary.itbisSavedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                      </div>
-                      <div className="flex justify-between text-white px-2 py-1 rounded font-bold" style={{ backgroundColor: activeTheme.primary }}>
-                        <span>TOTAL GENERAL (USD) LEY 57-07 :</span>
-                        <span>${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                      </div>
-                      <div className="flex justify-between text-slate-800 pt-1 border-t border-slate-300">
-                        <span className="font-bold">PRECIO POR WATT (USD/W):</span>
-                        <span className="font-bold" style={{ color: activeTheme.primary }}>${(project.specs.pricePerWattUSD || project.financials.pricePerWattUSD || 1.13).toFixed(2)}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* INCENTIVOS DE LEY 57-07 */}
-                  <div>
-                    <h3 className="bg-slate-100 px-3 py-1 text-[11px] font-bold uppercase border-l-4 mb-1" style={{ color: activeTheme.primary, borderColor: activeTheme.primary }}>
-                      INCENTIVOS DE LEY 57-07
-                    </h3>
-                    <p className="text-[10px] font-bold bg-amber-50 border border-amber-200 text-amber-900 px-3 py-1 rounded mb-2">
-                      (Descuento de 40% para equipos energía renovables: Paneles solares, inversores y baterías)
-                    </p>
-                    <div className="border border-slate-200 rounded-lg overflow-hidden">
-                      <table className="w-full text-left border-collapse">
-                        <thead className="text-white font-bold text-[10px] uppercase" style={{ backgroundColor: activeTheme.primary }}>
-                          <tr>
-                            <th className="px-3 py-1.5">CONCEPTO</th>
-                            <th className="px-3 py-1.5 text-right">VALOR US $</th>
-                            <th className="px-3 py-1.5 text-right w-20">%</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200 text-[11px] text-slate-800 font-semibold">
-                          <tr className="bg-white font-bold">
-                            <td className="px-3 py-1.5">TOTAL EQUIPOS ENERGIAS RENOVABLES (PANELES-INVERSORES-BATERIAS)</td>
-                            <td className="px-3 py-1.5 text-right">${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                            <td className="px-3 py-1.5 text-right">100%</td>
-                          </tr>
-                          <tr className="bg-slate-50/60">
-                            <td className="px-3 py-1.5">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 1ER AÑO</td>
-                            <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.secondary }}>${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                            <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.secondary }}>13.33%</td>
-                          </tr>
-                          <tr className="bg-white">
-                            <td className="px-3 py-1.5">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 2DO AÑO</td>
-                            <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.secondary }}>${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                            <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.secondary }}>13.33%</td>
-                          </tr>
-                          <tr className="bg-slate-50/60">
-                            <td className="px-3 py-1.5">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 3ER AÑO</td>
-                            <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.secondary }}>${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                            <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.secondary }}>13.33%</td>
-                          </tr>
-                          <tr className={`font-bold ${activeTheme.accentLightBg}`} style={{ color: activeTheme.primary }}>
-                            <td className="px-3 py-1.5">TOTAL A DESCONTAR POR LA LEY 57-07 (40% DEL TOTAL)</td>
-                            <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.primary }}>${summary.ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                            <td className="px-3 py-1.5 text-right" style={{ color: activeTheme.primary }}>40.00%</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* GARANTÍAS Y NOS ENCARGAMOS DE GESTIONAR GRID */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1 text-[11px]">
-                      <h4 className="font-bold border-b border-slate-200 pb-1 mb-1 uppercase tracking-wider flex items-center gap-1.5" style={{ color: activeTheme.primary }}>
-                        <ShieldCheck className="w-3.5 h-3.5" /> GARANTÍAS
-                      </h4>
-                      <div>• <span className="font-bold">Paneles Solares:</span> 25 años (80.7% potencia mínima garantizada)</div>
-                      <div>• <span className="font-bold">Inversor:</span> 5 años</div>
-                      <div>• <span className="font-bold">Estructura de montaje:</span> 10 años</div>
-                      <div>• <span className="font-bold">Batería:</span> 10 años</div>
-                      <div>• <span className="font-bold">Mano de obra:</span> 1 año</div>
-                    </div>
-
-                    <div className={`border rounded-lg p-3 space-y-1 text-[11px] ${activeTheme.accentLightBg} ${activeTheme.accentBorder}`}>
-                      <h4 className="font-bold border-b pb-1 mb-1 uppercase tracking-wider flex items-center gap-1.5" style={{ color: activeTheme.primary, borderColor: activeTheme.primary }}>
-                        <CheckCircle2 className="w-3.5 h-3.5" style={{ color: activeTheme.primary }} /> NOS ENCARGAMOS DE GESTIONAR
-                      </h4>
-                      <div className="flex items-start gap-1"><Check className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: activeTheme.primary }} /> <span>Instalación del contador bidireccional en las EDES</span></div>
-                      <div className="flex items-start gap-1"><Check className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: activeTheme.primary }} /> <span>Aprobación de crédito fiscal (CNE) y el Ministerio de Hacienda</span></div>
-                      <div className="flex items-start gap-1"><Check className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: activeTheme.primary }} /> <span>Trámites completos ante organismos reguladores</span></div>
-                    </div>
-                  </div>
-
-                  {/* LEGAL SUBTEXT BETWEEN ASTERISKS */}
-                  <div className="text-center text-[10px] text-slate-500 font-semibold italic pt-1">
-                    * Equipos según disponibilidad de inventario | * Propuesta válida por {project.client.quoteValidityDays || 7} días | * Precios en USD *
-                  </div>
-                </div>
-
-                {/* Footer Electsun */}
-                {showHeadersFooters && (
-                  <div className="px-10 py-3 bg-slate-100 border-t border-slate-200 flex justify-between items-center text-[10px] text-slate-600 font-semibold mt-auto">
-                    <div>Calle Ercilia Pepín #1, Plaza Toledo | Local 307 | Arroyo Manzano | Santo Domingo, RD | electsun.com.do</div>
-                    <div className="font-bold text-slate-800">Página {pageQuotNum} de {activePagesCount}</div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ---------------------------------------------------- */}
-            {/* PÁGINA 3: RETORNO DE INVERSIÓN - RESUMEN */}
-            {/* ---------------------------------------------------- */}
-            {showPage2 && (
-              <div className="pdf-page w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative font-sans print:shadow-none print:w-full print:min-h-screen">
-                {/* Header Electsun Banner */}
-                {renderHeaderBanner('RETORNO DE INVERSIÓN - RESUMEN')}
-
-                {/* Body */}
-                <div className="px-10 py-8 flex-1 flex flex-col gap-8">
-                  {/* Financial Indicators Grid */}
-                  <div className="space-y-4">
-                    <h2 className="text-base font-bold text-gray-800 border-b border-gray-100 pb-2 uppercase tracking-wider">
-                      Indicadores Financieros
-                    </h2>
-                    <div className="grid grid-cols-5 gap-3">
-                      <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-3.5 text-center">
-                        <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Payback</p>
-                        <p className="text-xl font-bold text-gray-900">
-                          {summary.paybackYears} <span className="text-xs font-medium text-gray-500">Años</span>
-                        </p>
-                      </div>
-
-                      <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-3.5 text-center">
-                        <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">TIR</p>
-                        <p className="text-xl font-bold" style={{ color: activeTheme.primary }}>{summary.irrPct}%</p>
-                      </div>
-
-                      <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-3.5 text-center">
-                        <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">VAN (10%)</p>
-                        <p className="text-base font-bold text-gray-900">
-                          ${summary.npvUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </p>
-                      </div>
-
-                      <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-3.5 text-center">
-                        <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">Ahorro 25 Años</p>
-                        <p className="text-base font-bold text-green-700">
-                          ${summary.total25YearSavingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </p>
-                      </div>
-
-                      <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-3.5 text-center">
-                        <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-1">ROI</p>
-                        <p className="text-xl font-bold text-gray-900">{summary.roi25YrPct}%</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Parameters Table */}
-                  <div className="space-y-4">
-                    <h2 className="text-base font-bold text-gray-800 border-b border-gray-100 pb-2 uppercase tracking-wider">
-                      Cálculo de Ahorro y Retorno de Inversión
-                    </h2>
-                    <div className="border border-gray-200 rounded-lg overflow-hidden text-xs">
-                      <table className="w-full text-left">
-                        <tbody className="divide-y divide-gray-200 text-gray-700 font-semibold">
-                          <tr className="bg-gray-50/60">
-                            <td className="px-4 py-2.5 text-gray-800 w-1/2">Cliente</td>
-                            <td className="px-4 py-2.5 text-right font-bold uppercase text-gray-900">{project.client.name}</td>
-                          </tr>
-                          <tr>
-                            <td className="px-4 py-2.5 text-gray-800">Potencia Instalada (kWp)</td>
-                            <td className="px-4 py-2.5 text-right font-bold">{summary.systemCapacityKWp.toFixed(2)} kWp</td>
-                          </tr>
-                          <tr className="bg-gray-50/60">
-                            <td className="px-4 py-2.5 text-gray-800">Inversión Inicial</td>
-                            <td className="px-4 py-2.5 text-right font-bold text-gray-900">
-                              ${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                            </td>
-                          </tr>
-                          <tr>
-                            <td className="px-4 py-2.5 text-gray-800">Incentivo Fiscal Estimado (Ley 57-07)</td>
-                            <td className="px-4 py-2.5 text-right font-bold text-green-700">
-                              -${summary.ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                            </td>
-                          </tr>
-                          <tr className="bg-gray-50/60">
-                            <td className="px-4 py-2.5 text-gray-800">Inversión Neta</td>
-                            <td className="px-4 py-2.5 text-right font-bold text-gray-900">
-                              ${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Milestones Table */}
-                  <div className="space-y-4">
-                    <h2 className="text-base font-bold text-gray-800 border-b border-gray-100 pb-2 uppercase tracking-wider">
-                      Resumen de Ahorro Anual y Retorno de Inversión
-                    </h2>
-                    <div className="border border-gray-200 rounded-lg overflow-hidden text-xs">
-                      <table className="w-full text-left">
-                        <thead className="text-white uppercase font-bold" style={{ backgroundColor: activeTheme.primary }}>
-                          <tr>
-                            <th className="px-4 py-2.5">Año</th>
-                            <th className="px-4 py-2.5 text-right">Ahorro Energético (USD)</th>
-                            <th className="px-4 py-2.5 text-right">Beneficio Acumulado (USD)</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200 text-gray-700 font-semibold">
-                          <tr className="bg-gray-50/60">
-                            <td className="px-4 py-2.5 font-bold">Año 1</td>
-                            <td className="px-4 py-2.5 text-right">${year1Obj.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                            <td className="px-4 py-2.5 text-right text-red-600 font-bold">
-                              ${year1Obj.cumulativeCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                            </td>
-                          </tr>
-                          <tr className={`font-bold ${activeTheme.accentLightBg}`}>
-                            <td className="px-4 py-2.5" style={{ color: activeTheme.primary }}>Año {paybackYearObj.year} (Payback)</td>
-                            <td className="px-4 py-2.5 text-right">${paybackYearObj.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                            <td className="px-4 py-2.5 text-right font-bold" style={{ color: activeTheme.primary }}>
-                              ${paybackYearObj.cumulativeCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                            </td>
-                          </tr>
-                          <tr className="bg-gray-50/60">
-                            <td className="px-4 py-2.5 font-bold">Año 10</td>
-                            <td className="px-4 py-2.5 text-right">${year10Obj.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                            <td className="px-4 py-2.5 text-right text-green-700 font-bold">
-                              ${year10Obj.cumulativeCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                            </td>
-                          </tr>
-                          <tr className="font-bold">
-                            <td className="px-4 py-2.5 font-bold">Año 25</td>
-                            <td className="px-4 py-2.5 text-right">${year25Obj.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                            <td className="px-4 py-2.5 text-right font-bold" style={{ color: activeTheme.primary }}>
-                              ${year25Obj.cumulativeCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Accumulated Benefit Chart */}
-                  <div className="space-y-3 mt-auto">
-                    <h2 className="text-base font-bold text-gray-800 border-b border-gray-100 pb-2 uppercase tracking-wider">
-                      Beneficio Acumulado (25 Años)
-                    </h2>
-                    <div className="h-[200px] w-full bg-gray-50/70 border border-gray-200 rounded-xl p-3">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={cumulativeChartData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                          <XAxis dataKey="yearLabel" tick={{ fontSize: 9, fill: '#64748b', fontWeight: 'bold' }} />
-                          <YAxis
-                            tick={{ fontSize: 9, fill: '#64748b', fontWeight: 'bold' }}
-                            tickFormatter={(val: number) => `$${(val / 1000).toFixed(0)}k`}
-                          />
-                          <Tooltip formatter={(val: number) => [`$${val.toLocaleString()} USD`, 'Beneficio Acumulado']} />
-                          <Bar dataKey="cumulative" radius={[2, 2, 0, 0]}>
-                            {cumulativeChartData.map((entry, index) => (
-                              <Cell
-                                key={`cell-${index}`}
-                                fill={entry.cumulative < 0 ? '#ef4444' : activeTheme.barColor}
-                              />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                {showHeadersFooters && (
-                  <div className="px-10 py-4 border-t border-gray-200 flex justify-between items-center text-xs text-gray-500 font-semibold mt-auto">
-                    <span>Calle Ercilia Pepín #1, Plaza Toledo | Local 307 | Arroyo Manzano | Santo Domingo, RD | electsun.com.do</span>
-                    <span className="font-bold text-gray-700">Página {page2Num} de {activePagesCount}</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ---------------------------------------------------- */}
-            {/* PÁGINA 4: FLUJO DE CAJA Y BENEFICIOS ACUMULADOS (25 AÑOS) */}
-            {/* ---------------------------------------------------- */}
-            {showPage3 && (
-              <div className="pdf-page w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative font-sans print:shadow-none print:w-full print:min-h-screen">
-                {/* Header Electsun Banner */}
-                {renderHeaderBanner('FLUJO DE CAJA Y BENEFICIOS ACUMULADOS (25 AÑOS)')}
-
-                {/* Body */}
-                <div className="px-10 py-6 flex-1 flex flex-col justify-between gap-6">
-                  {/* Detailed Cash Flow Table - 7 Columns matching Reference Image */}
-                  <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs text-xs flex-1 flex flex-col">
-                    <table className="w-full text-left border-collapse flex-1">
-                      <thead className="text-white font-bold uppercase tracking-wider text-[10px] shrink-0" style={{ backgroundColor: activeTheme.primary }}>
-                        <tr>
-                          <th className="px-2 py-2 w-10 text-center">Año</th>
-                          <th className="px-2 py-2 text-right">Energia Generada (kWh)</th>
-                          <th className="px-2 py-2 text-right">Ahorro Energia (USD)</th>
-                          <th className="px-2 py-2 text-right">Incentivo Fiscal (USD)</th>
-                          <th className="px-2 py-2 text-right">Ahorro Anual Total (USD)</th>
-                          <th className="px-2 py-2 text-right">Cash Flow (USD)</th>
-                          <th className="px-2 py-2 text-right font-bold">CF Beneficio Acumulado (USD)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-slate-700 font-semibold text-[11px]">
-                        {/* Year 0 Row */}
-                        <tr className="bg-red-50/70 text-red-700 font-bold">
-                          <td className="px-2 py-1.5 text-center">0</td>
-                          <td className="px-2 py-1.5 text-right text-slate-400">-</td>
-                          <td className="px-2 py-1.5 text-right text-slate-400">-</td>
-                          <td className="px-2 py-1.5 text-right text-slate-400">-</td>
-                          <td className="px-2 py-1.5 text-right text-slate-400">-</td>
-                          <td className="px-2 py-1.5 text-right text-red-600">-${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                          <td className="px-2 py-1.5 text-right text-red-600 font-extrabold">-${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        </tr>
-
-                        {/* Years 1 to 25 */}
-                        {cf25.map((row) => {
-                          const isPaybackYear = row.year === Math.ceil(summary.paybackYears);
-                          const totalAnnualSavings = row.savingsUSD + row.taxCreditUSD;
-                          const isCumulativeNegative = row.cumulativeCashFlowUSD < 0;
-
-                          return (
-                            <tr
-                              key={row.year}
-                              className={
-                                isPaybackYear
-                                  ? `${activeTheme.accentLightBg} font-bold border-y border-slate-300`
-                                  : row.year % 2 === 0
-                                  ? 'bg-slate-50/60'
-                                  : 'bg-white'
-                              }
-                            >
-                              <td className="px-2 py-1 text-center font-bold">{row.year}</td>
-                              <td className="px-2 py-1 text-right font-medium">{row.productionKWh.toLocaleString()}</td>
-                              <td className="px-2 py-1 text-right font-medium">${row.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                              <td className="px-2 py-1 text-right font-semibold" style={{ color: activeTheme.secondary }}>
-                                {row.taxCreditUSD > 0 ? `$${row.taxCreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '$0.00'}
-                              </td>
-                              <td className="px-2 py-1 text-right font-semibold text-slate-900">${totalAnnualSavings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                              <td className="px-2 py-1 text-right font-semibold" style={{ color: activeTheme.primary }}>${row.netCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                              <td
-                                className="px-2 py-1 text-right font-bold"
-                                style={{ color: isCumulativeNegative ? '#dc2626' : activeTheme.primary }}
-                              >
-                                {isCumulativeNegative ? '-' : ''}${Math.abs(row.cumulativeCashFlowUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Restored Full Summary Indicators Box */}
-                  <div className="bg-slate-50/80 border border-slate-200 rounded-xl p-4 shrink-0">
-                    <h3 className="text-slate-800 font-bold text-xs mb-2.5 border-b border-slate-200 pb-1.5 flex items-center gap-2">
-                      <ShieldCheck className="w-4 h-4" style={{ color: activeTheme.primary }} /> Indicadores Financieros del Proyecto
-                    </h3>
-                    <div className="grid grid-cols-4 gap-y-2.5 gap-x-4 text-xs">
-                      <div>
-                        <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold mb-0.5">Payback</p>
-                        <p className="font-bold text-slate-900">{summary.paybackYears} años</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold mb-0.5">TIR</p>
-                        <p className="font-bold" style={{ color: activeTheme.primary }}>{summary.irrPct}%</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold mb-0.5">VAN (10%)</p>
-                        <p className="font-bold text-slate-900">${summary.npvUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold mb-0.5">Ahorro Total 25 Años</p>
-                        <p className="font-bold" style={{ color: activeTheme.primary }}>${summary.total25YearSavingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold mb-0.5">ROI Total</p>
-                        <p className="font-bold" style={{ color: activeTheme.primary }}>{summary.roi25YrPct}%</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold mb-0.5">Reducción CO2</p>
-                        <p className="font-bold text-slate-900">{(summary.co2AvoidedTonsPerYear * 25).toFixed(1)} Ton</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold mb-0.5">Precio por Watt</p>
-                        <p className="font-bold text-slate-900">${(project.specs.pricePerWattUSD || project.financials.pricePerWattUSD).toFixed(3)} USD/W</p>
-                      </div>
-                      <div>
-                        <p className="text-slate-400 text-[10px] uppercase tracking-wider font-bold mb-0.5">Capacidad DC</p>
-                        <p className="font-bold text-slate-900">{summary.systemCapacityKWp.toFixed(2)} kWp</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                {showHeadersFooters && (
-                  <div className="px-10 py-4 border-t border-gray-200 flex justify-between items-center text-xs text-gray-500 font-semibold mt-auto">
-                    <span>Calle Ercilia Pepín #1, Plaza Toledo | Local 307 | Arroyo Manzano | Santo Domingo, RD | electsun.com.do</span>
-                    <span className="font-bold text-gray-700">Página {page3Num} de {activePagesCount}</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* PÁGINA 5: ANÁLISIS DE COSTOS Y MARGEN INTERNO (CONFIDENCIAL) */}
-            {showPageCostMatrix && (
-              <div className="pdf-page bg-white w-[850px] min-h-[1100px] shadow-2xl relative flex flex-col font-sans shrink-0 border border-amber-300">
-                {/* Page Header */}
-                {showHeadersFooters && renderHeaderBanner('ANÁLISIS DE COSTOS Y MARGEN DE GANANCIA (INFORMACIÓN CONFIDENCIAL)')}
-
-                <div className="p-8 flex-1 flex flex-col justify-between space-y-6">
-                  <div className="space-y-5">
-                    {/* Banner Confidencial */}
-                    <div className="bg-amber-600 text-white p-4 rounded-xl flex justify-between items-center shadow-sm">
-                      <div>
-                        <h3 className="font-extrabold text-sm uppercase tracking-wider text-white">
-                          CLIENTE: {project.client.name} — Desglose de Costos de Proyecto
-                        </h3>
-                        <p className="text-[11px] text-amber-100 font-medium">
-                          Documento de Control Interno de Precios, ITBIS y Margen de Rentabilidad
-                        </p>
-                      </div>
-                      <div className="text-right text-xs font-bold text-amber-100">
-                        <div>Tasa Cambio: <span className="text-white font-extrabold">{summary.costMatrix.dopExchangeRate} DOP/USD</span></div>
-                        <div>Factor Venta: <span className="text-white font-extrabold">{summary.costMatrix.saleMarginMultiplier}</span></div>
-                      </div>
-                    </div>
-
-                    {/* Matrix Table */}
-                    <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead className="bg-slate-100 font-bold text-slate-700 border-b border-slate-200 uppercase text-[10px]">
-                          <tr>
-                            <th className="py-2.5 px-3">Productos</th>
-                            <th className="py-2.5 px-3 text-center text-red-600">kilos / Cap.</th>
-                            <th className="py-2.5 px-3 text-center text-red-600">Cantidad</th>
-                            <th className="py-2.5 px-3 text-right text-red-600">Precio Unit. USD</th>
-                            <th className="py-2.5 px-3 text-right">Precio Unit. RD</th>
-                            <th className="py-2.5 px-3 text-right font-bold">Precio Total RD</th>
-                            <th className="py-2.5 px-3 text-right font-bold">Precio Total USD</th>
-                            <th className="py-2.5 px-3 text-right text-red-600">ITBIS RD</th>
-                            <th className="py-2.5 px-3 text-right text-red-600">ITBIS USD</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200 text-slate-800 font-semibold text-xs">
-                          {summary.costMatrix.items.map((item, idx) => (
-                            <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}>
-                              <td className="py-2.5 px-3 font-bold text-slate-900">{item.name}</td>
-                              <td className="py-2.5 px-3 text-center text-red-600 font-bold">{item.kilos}</td>
-                              <td className="py-2.5 px-3 text-center text-red-600 font-bold">{item.quantity}</td>
-                              <td className="py-2.5 px-3 text-right text-red-600 font-bold">${item.unitPriceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                              <td className="py-2.5 px-3 text-right">${item.unitPriceDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                              <td className="py-2.5 px-3 text-right font-bold">${item.totalPriceDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                              <td className="py-2.5 px-3 text-right font-bold">${item.totalPriceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                              <td className="py-2.5 px-3 text-right text-slate-500">{item.itbisDOP > 0 ? `$${item.itbisDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}</td>
-                              <td className="py-2.5 px-3 text-right text-slate-500">{item.itbisUSD > 0 ? `$${item.itbisUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Summary Box */}
-                    <div className="flex justify-end pt-2">
-                      <div className="w-[480px] bg-slate-50 border border-slate-300 rounded-xl p-4 space-y-1.5 text-xs font-semibold">
-                        <div className="flex justify-between text-slate-700">
-                          <span>Precio Neto :</span>
-                          <span>RD$ {summary.costMatrix.precioNetoDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong className="text-slate-900">${summary.costMatrix.precioNetoUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
-                        </div>
-                        <div className="flex justify-between text-slate-700">
-                          <span>ITBIS Total :</span>
-                          <span>RD$ {summary.costMatrix.itbisDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong className="text-slate-900">${summary.costMatrix.itbisUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
-                        </div>
-                        <div className="flex justify-between text-slate-900 font-bold bg-slate-200/80 px-2.5 py-1 rounded">
-                          <span>Total Neto (Costo Total) :</span>
-                          <span>RD$ {summary.costMatrix.totalNetoDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong>${summary.costMatrix.totalNetoUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
-                        </div>
-                        <div className="flex justify-between text-red-600 font-extrabold bg-red-50 border border-red-200 px-2.5 py-1 rounded">
-                          <span>Porcentaje venta ({summary.costMatrix.saleMarginMultiplier}) :</span>
-                          <span>RD$ {summary.costMatrix.porcentajeVentaDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong>${summary.costMatrix.porcentajeVentaUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
-                        </div>
-                        <div className="flex justify-between text-slate-800">
-                          <span>Precio kilos costo :</span>
-                          <span>RD$ {summary.costMatrix.precioKilosCostoDOP.toFixed(2)} &nbsp;|&nbsp; <strong className="text-slate-900">${summary.costMatrix.precioKilosCostoUSD.toFixed(2)} USD/kWp (${summary.costMatrix.costPerWattUSD.toFixed(2)} USD/W)</strong></span>
-                        </div>
-                        <div className="flex justify-between text-slate-900 font-bold">
-                          <span>Precio kilos ventas :</span>
-                          <span>RD$ {summary.costMatrix.precioKilosVentasDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong className="text-emerald-800">${summary.costMatrix.precioKilosVentasUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD/kWp (${summary.costMatrix.salePricePerWattUSD.toFixed(2)} USD/W)</strong></span>
-                        </div>
-                        <div className="flex justify-between text-emerald-950 font-black bg-emerald-100 border border-emerald-300 px-2.5 py-1.5 rounded-lg text-sm mt-1">
-                          <span>Ganancia Proyectada :</span>
-                          <span>RD$ {summary.costMatrix.gananciaDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong className="text-emerald-800">${summary.costMatrix.gananciaUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Footer */}
-                  {showHeadersFooters && (
-                    <div className="px-10 py-4 border-t border-gray-200 flex justify-between items-center text-xs text-gray-500 font-semibold mt-auto">
-                      <span>Calle Ercilia Pepín #1, Plaza Toledo | Local 307 | Arroyo Manzano | Santo Domingo, RD | electsun.com.do</span>
-                      <span className="font-bold text-amber-800">Página {pageCostMatrixNum} de {activePagesCount} (CONFIDENCIAL)</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </main>
+          {/* PÁGINA 5: MATRIZ DE COSTOS INTERNOS (CONFIDENCIAL) */}
+          {showPageCostMatrix && (
+            <PDFPage5CostMatrix
+              project={project}
+              summary={summary}
+              activeTheme={activeTheme}
+              showHeadersFooters={showHeadersFooters}
+              currentDateStr={currentDateStr}
+              pageNum={pageCostMatrixNum}
+              totalPages={activePagesCount}
+            />
+          )}
+        </div>
+      </main>
     </div>
   );
 };
