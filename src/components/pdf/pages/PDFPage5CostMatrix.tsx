@@ -3,6 +3,7 @@ import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
 import { PDFHeaderBanner } from '../PDFHeaderBanner';
 import { PDFFooter } from '../PDFFooter';
+import { PDFWatermark } from '../PDFWatermark';
 
 interface PDFPage5CostMatrixProps {
   project: ProjectSimulation;
@@ -24,7 +25,10 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
   totalPages,
 }) => {
   return (
-    <div className="pdf-page bg-white w-[850px] min-h-[1100px] shadow-2xl relative flex flex-col font-sans shrink-0 border border-amber-300 print:shadow-none print:w-full print:min-h-screen">
+    <div className="pdf-page bg-white w-[850px] min-h-[1100px] shadow-2xl relative overflow-hidden flex flex-col font-sans shrink-0 border border-amber-300 print:shadow-none print:w-full print:min-h-screen">
+      {/* Background Watermark */}
+      <PDFWatermark opacity={0.045} />
+
       {/* Page Header */}
       {showHeadersFooters && (
         <PDFHeaderBanner
@@ -39,7 +43,7 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
         />
       )}
 
-      <div className="p-8 flex-1 flex flex-col justify-between space-y-6">
+      <div className="p-8 flex-1 flex flex-col justify-between space-y-6 relative z-10">
         <div className="space-y-5">
           {/* Banner Confidencial */}
           <div className="bg-amber-600 text-white p-4 rounded-xl flex justify-between items-center shadow-sm">

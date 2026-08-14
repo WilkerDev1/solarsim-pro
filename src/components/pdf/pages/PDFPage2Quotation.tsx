@@ -4,6 +4,7 @@ import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
 import { PDFHeaderBanner } from '../PDFHeaderBanner';
 import { PDFFooter } from '../PDFFooter';
+import { PDFWatermark } from '../PDFWatermark';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
 
 interface PDFPage2QuotationProps {
@@ -43,7 +44,10 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
     .filter((s) => s.length > 0);
 
   return (
-    <div className="pdf-page w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative font-sans print:shadow-none print:w-full print:min-h-screen">
+    <div className="pdf-page w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
+      {/* Background Watermark */}
+      <PDFWatermark opacity={0.045} />
+
       {/* Header Banner */}
       {showHeadersFooters && (
         <PDFHeaderBanner
@@ -59,7 +63,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
       )}
 
       {/* Body */}
-      <div className="px-10 py-6 flex-1 flex flex-col gap-5 text-xs text-slate-800 font-sans">
+      <div className="px-10 py-6 flex-1 flex flex-col gap-5 text-xs text-slate-800 font-sans relative z-10">
         {/* DATOS DEL CLIENTE */}
         <div>
           <h3

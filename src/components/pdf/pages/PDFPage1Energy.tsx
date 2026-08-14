@@ -14,6 +14,7 @@ import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
 import { PDFHeaderBanner } from '../PDFHeaderBanner';
 import { PDFFooter } from '../PDFFooter';
+import { PDFWatermark } from '../PDFWatermark';
 
 interface PDFPage1EnergyProps {
   project: ProjectSimulation;
@@ -40,7 +41,10 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
   const totalSavingsKWh = summary.monthlyBreakdown.reduce((sum, m) => sum + m.solarSelfConsumedKWh, 0);
 
   return (
-    <div className="pdf-page w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative font-sans print:shadow-none print:w-full print:min-h-screen">
+    <div className="pdf-page w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
+      {/* Background Watermark */}
+      <PDFWatermark opacity={0.045} />
+
       {/* Header Banner */}
       {showHeadersFooters && (
         <PDFHeaderBanner
@@ -56,7 +60,7 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
       )}
 
       {/* Body */}
-      <div className="px-10 py-6 flex-1 flex flex-col gap-6">
+      <div className="px-10 py-6 flex-1 flex flex-col gap-6 relative z-10">
         {/* Chart Section */}
         <div className="space-y-3">
           <div className="flex justify-between items-center border-b border-gray-100 pb-2">

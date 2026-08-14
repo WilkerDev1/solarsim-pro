@@ -4,6 +4,7 @@ import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
 import { PDFHeaderBanner } from '../PDFHeaderBanner';
 import { PDFFooter } from '../PDFFooter';
+import { PDFWatermark } from '../PDFWatermark';
 
 interface PDFPage4CashFlowProps {
   project: ProjectSimulation;
@@ -27,7 +28,10 @@ export const PDFPage4CashFlow: React.FC<PDFPage4CashFlowProps> = ({
   const cf25 = summary.cashFlow25Years;
 
   return (
-    <div className="pdf-page w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative font-sans print:shadow-none print:w-full print:min-h-screen">
+    <div className="pdf-page w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
+      {/* Background Watermark */}
+      <PDFWatermark opacity={0.045} />
+
       {/* Header Banner */}
       {showHeadersFooters && (
         <PDFHeaderBanner
@@ -43,7 +47,7 @@ export const PDFPage4CashFlow: React.FC<PDFPage4CashFlowProps> = ({
       )}
 
       {/* Body */}
-      <div className="px-10 py-6 flex-1 flex flex-col justify-between gap-6">
+      <div className="px-10 py-6 flex-1 flex flex-col justify-between gap-6 relative z-10">
         {/* Detailed Cash Flow Table - 7 Columns */}
         <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs text-xs flex-1 flex flex-col">
           <table className="w-full text-left border-collapse flex-1">
