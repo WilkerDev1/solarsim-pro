@@ -35,7 +35,7 @@ export const PDFTableOfContents: React.FC<PDFTableOfContentsProps> = ({
   tocItems,
 }) => {
   return (
-    <div className="pdf-page w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
+    <div className="pdf-page w-[850px] h-[1202px] min-h-[1202px] max-h-[1202px] bg-white shadow-xl flex flex-col shrink-0 relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
       {/* Background Watermark */}
       <PDFWatermark
         opacity={project.customization?.watermarkOpacity ?? 0.15}

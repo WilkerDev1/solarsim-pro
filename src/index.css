@@ -28,6 +28,18 @@
   background: #6c7a71;
 }
 
+/* PDF Page Standard A4 Dimensions (210mm x 297mm @ standard screen aspect ratio 850px x 1202px) */
+.pdf-page {
+  width: 850px !important;
+  height: 1202px !important;
+  min-height: 1202px !important;
+  max-height: 1202px !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  overflow: hidden !important;
+  background-color: #ffffff !important;
+}
+
 @media print {
   html, body, #root, main, div {
     overflow: visible !important;
@@ -50,7 +62,9 @@
   }
   .pdf-page {
     width: 210mm !important;
+    height: 297mm !important;
     min-height: 297mm !important;
+    max-height: 297mm !important;
     padding: 0 !important;
     margin: 0 !important;
     box-shadow: none !important;

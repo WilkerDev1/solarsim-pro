@@ -90,18 +90,21 @@ export const PDFProposalView: React.FC = () => {
           logging: false,
           allowTaint: true,
           backgroundColor: '#ffffff',
+          width: 850,
+          height: 1202,
+          windowWidth: 850,
+          windowHeight: 1202,
           scrollX: 0,
           scrollY: 0,
         });
 
-        const imgData = canvas.toDataURL('image/jpeg', 0.95);
-        const imgHeight = (canvas.height * pdfWidth) / canvas.width;
+        const imgData = canvas.toDataURL('image/jpeg', 0.96);
 
         if (i > 0) {
-          pdf.addPage();
+          pdf.addPage('a4', 'portrait');
         }
 
-        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, Math.min(pdfHeight, imgHeight));
+        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
       }
 
       const sanitizedClientName = (project.client.name || 'Cliente').replace(/[^a-zA-Z0-9_-]/g, '_');

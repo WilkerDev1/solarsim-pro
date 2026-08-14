@@ -36,7 +36,7 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
   const batteryModel = project.specs.batteryBrandModel || `Batería de Litio LiFePO4 (${project.specs.batteryCapacityKWh} kWh)`;
 
   return (
-    <div className="pdf-page w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
+    <div className="pdf-page w-[850px] h-[1202px] min-h-[1202px] max-h-[1202px] bg-white shadow-xl flex flex-col shrink-0 relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
       {/* Background Watermark */}
       <PDFWatermark
         opacity={project.customization?.watermarkOpacity ?? 0.15}
@@ -58,7 +58,7 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
       )}
 
       {/* Body */}
-      <div className="px-12 py-8 flex-1 flex flex-col justify-between text-xs text-slate-800 relative z-10 gap-6">
+      <div className="px-10 py-5 flex-1 flex flex-col justify-between text-xs text-slate-800 relative z-10 gap-4">
         {/* Top Section: Technical Proposal Narrative */}
         <div className="space-y-4">
           <div className="flex items-center gap-2.5 border-b pb-2.5" style={{ borderColor: activeTheme.primary }}>

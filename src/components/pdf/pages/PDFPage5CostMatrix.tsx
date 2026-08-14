@@ -25,7 +25,7 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
   totalPages,
 }) => {
   return (
-    <div className="pdf-page bg-white w-[850px] min-h-[1100px] shadow-2xl relative overflow-hidden flex flex-col font-sans shrink-0 border border-amber-300 print:shadow-none print:w-full print:min-h-screen">
+    <div className="pdf-page bg-white w-[850px] h-[1202px] min-h-[1202px] max-h-[1202px] shadow-2xl relative overflow-hidden flex flex-col font-sans shrink-0 border border-amber-300 print:shadow-none print:w-full print:min-h-screen">
       {/* Background Watermark */}
       <PDFWatermark
         opacity={project.customization?.watermarkOpacity ?? 0.15}
