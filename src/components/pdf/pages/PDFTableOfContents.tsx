@@ -96,13 +96,28 @@ export const PDFTableOfContents: React.FC<PDFTableOfContentsProps> = ({
                   {/* Dotted Leader Line */}
                   <div className="flex-1 mx-4 border-b-2 border-dotted border-slate-300" />
 
-                  {/* Page Number Badge - Perfectly Centered Circle */}
-                  <div
-                    className="w-8 h-8 rounded-full text-white font-mono font-black text-xs flex items-center justify-center shrink-0 shadow-xs leading-none"
-                    style={{ backgroundColor: activeTheme.primary }}
+                  {/* Page Number Badge - Pixel-Perfect SVG Circle & Centered Number */}
+                  <svg
+                    width="32"
+                    height="32"
+                    viewBox="0 0 32 32"
+                    className="shrink-0 drop-shadow-2xs"
                   >
-                    <span className="leading-none text-center">{item.targetPage}</span>
-                  </div>
+                    <circle cx="16" cy="16" r="15" fill={activeTheme.primary} />
+                    <text
+                      x="16"
+                      y="16"
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      alignmentBaseline="central"
+                      fill="#ffffff"
+                      fontFamily="Inter, ui-sans-serif, system-ui, sans-serif"
+                      fontSize="12.5"
+                      fontWeight="900"
+                    >
+                      {item.targetPage}
+                    </text>
+                  </svg>
                 </div>
 
                 {item.subtitle && (
