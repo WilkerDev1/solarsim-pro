@@ -19,4 +19,5 @@ export const DEFAULT_DOCUMENT_CUSTOMIZATION: Required<DocumentCustomization> = {
   workmanshipWarrantyText: '1 Año en Instalación y Soporte Técnico',
 
   servicesIncludedText: 'Permisos y Tramitación ante CNE y Distribuidora, Medición Neta, Planos Eléctricos, Instalación Certificada y Puesta en Marcha.',
+  watermarkOpacity: 0.15,
 };

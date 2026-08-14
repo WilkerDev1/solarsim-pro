@@ -114,6 +114,31 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
               />
             </div>
 
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <label className={`text-[10px] font-bold uppercase ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                  Opacidad de Marca de Agua
+                </label>
+                <span className="text-[10px] font-bold font-mono text-emerald-500">
+                  {Math.round((cust.watermarkOpacity !== undefined ? cust.watermarkOpacity : 0.15) * 100)}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min="0"
+                max="0.60"
+                step="0.01"
+                value={cust.watermarkOpacity !== undefined ? cust.watermarkOpacity : 0.15}
+                onChange={(e) => updateDocumentCustomization({ watermarkOpacity: parseFloat(e.target.value) })}
+                className="w-full accent-emerald-500 cursor-pointer h-1.5 bg-slate-200 rounded-lg appearance-none"
+              />
+              <div className="flex justify-between text-[9px] text-zinc-500 font-medium mt-0.5">
+                <span>0% (Oculto)</span>
+                <span>15% (Recomendado)</span>
+                <span>60% (Intenso)</span>
+              </div>
+            </div>
+
             <button
               type="button"
               onClick={handleResetCompanyDefaults}

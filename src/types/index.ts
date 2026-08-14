@@ -183,6 +183,9 @@ export interface DocumentCustomization {
   
   // Management & Turnkey Services ("Nos encargamos de gestionar")
   servicesIncludedText?: string;  // Default: 'Permisos y Tramitación ante CNE y Distribuidora, Medición Neta, Planos Eléctricos, Instalación Certificada y Puesta en Marcha.'
+  
+  // Watermark Settings
+  watermarkOpacity?: number;      // Default: 0.15 (15% opacity)
 }
 
 export interface ProjectSimulation {

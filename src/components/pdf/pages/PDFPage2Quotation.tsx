@@ -46,7 +46,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
   return (
     <div className="pdf-page w-[850px] bg-white shadow-xl flex flex-col shrink-0 min-h-[1100px] relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
       {/* Background Watermark */}
-      <PDFWatermark opacity={0.045} />
+      <PDFWatermark opacity={project.customization?.watermarkOpacity ?? 0.15} />
 
       {/* Header Banner */}
       {showHeadersFooters && (

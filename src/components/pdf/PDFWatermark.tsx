@@ -5,7 +5,7 @@ interface PDFWatermarkProps {
   opacity?: number;
 }
 
-export const PDFWatermark: React.FC<PDFWatermarkProps> = ({ opacity = 0.045 }) => {
+export const PDFWatermark: React.FC<PDFWatermarkProps> = ({ opacity = 0.15 }) => {
   return (
     <div
       className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0 overflow-hidden"
