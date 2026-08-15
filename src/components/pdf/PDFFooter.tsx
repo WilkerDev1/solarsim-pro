@@ -17,18 +17,18 @@ export const PDFFooter: React.FC<PDFFooterProps> = ({
 
   return (
     <footer
-      className="w-full h-12 px-10 border-t border-slate-200 flex justify-between items-center bg-slate-50 z-30 box-border shrink-0 mt-auto pb-1"
-      style={{ minHeight: '48px', maxHeight: '48px' }}
+      className="w-full px-10 border-t border-slate-200 flex justify-between items-start bg-slate-50 z-30 box-border shrink-0 mt-auto pt-3 pb-6"
+      style={{ height: '64px', minHeight: '64px', maxHeight: '64px' }}
     >
       <span
-        className="truncate max-w-[560px] font-semibold text-[10px]"
-        style={{ color: '#64748b', lineHeight: '1.4' }}
+        className="truncate max-w-[560px] font-semibold text-[10.5px]"
+        style={{ color: '#475569', lineHeight: '1.4' }}
       >
         {footerText}
       </span>
       <span
-        className="font-bold text-[10px] shrink-0 ml-4 whitespace-nowrap"
-        style={{ color: '#1e293b', lineHeight: '1.4' }}
+        className="font-bold text-[10.5px] shrink-0 ml-4 whitespace-nowrap"
+        style={{ color: '#0f172a', lineHeight: '1.4' }}
       >
         Página {pageNum} de {totalPages}
       </span>

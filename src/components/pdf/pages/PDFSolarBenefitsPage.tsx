@@ -65,13 +65,13 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
 
           {/* Visual House Illustration with 4 Feature Pills */}
           <div className="rounded-2xl border border-slate-200 overflow-hidden bg-slate-900 relative shadow-sm">
-            <div className="h-44 w-full relative">
+            <div className="h-48 w-full relative overflow-hidden flex items-center justify-center">
               <img
                 src={PDF_BENEFITS_HOUSE_BASE64}
                 alt="Modern luxury home with rooftop solar panels"
-                className="w-full h-full object-cover object-center opacity-90"
+                className="max-h-[200px] max-w-[98%] w-auto h-auto mx-auto block object-contain"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/30 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent pointer-events-none" />
             </div>
 
             {/* 4 Pillars Grid inside card */}
