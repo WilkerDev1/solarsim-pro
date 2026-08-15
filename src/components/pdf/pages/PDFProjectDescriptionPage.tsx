@@ -58,7 +58,7 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
       )}
 
       {/* Body */}
-      <div className="px-10 pt-3.5 pb-14 flex-1 flex flex-col justify-start text-xs text-slate-800 relative z-10 gap-3 min-h-0">
+      <div className="px-10 pt-3.5 pb-3 flex-1 flex flex-col justify-start text-xs text-slate-800 relative z-10 gap-3 min-h-0">
         {/* Top Section: Technical Proposal Narrative */}
         <div className="space-y-3">
           <div className="flex items-center gap-2 border-b pb-2" style={{ borderColor: activeTheme.primary }}>

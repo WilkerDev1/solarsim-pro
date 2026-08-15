@@ -13,22 +13,25 @@ export const PDFFooter: React.FC<PDFFooterProps> = ({
   totalPages,
   customization,
 }) => {
-  const footerText = customization?.companyFooterText || DEFAULT_DOCUMENT_CUSTOMIZATION.companyFooterText || '';
+  const footerText =
+    customization?.companyFooterText ||
+    DEFAULT_DOCUMENT_CUSTOMIZATION.companyFooterText ||
+    '';
 
   return (
     <footer
-      className="w-full px-10 border-t border-slate-200 flex justify-between items-start bg-slate-50 z-30 box-border shrink-0 mt-auto pt-3 pb-9"
-      style={{ height: '76px', minHeight: '76px', maxHeight: '76px' }}
+      className="w-full px-10 border-t border-slate-200 flex justify-between items-center bg-slate-50 z-30 box-border shrink-0 mt-auto"
+      style={{ height: '42px', minHeight: '42px', maxHeight: '42px' }}
     >
       <span
-        className="truncate max-w-[560px] font-semibold text-[11px]"
-        style={{ color: '#334155', lineHeight: '1.4' }}
+        className="truncate max-w-[560px] font-semibold text-[10px]"
+        style={{ color: '#475569', lineHeight: '1.2' }}
       >
         {footerText}
       </span>
       <span
-        className="font-bold text-[11px] shrink-0 ml-4 whitespace-nowrap"
-        style={{ color: '#0f172a', lineHeight: '1.4' }}
+        className="font-bold text-[10px] shrink-0 ml-4 whitespace-nowrap"
+        style={{ color: '#0f172a', lineHeight: '1.2' }}
       >
         Página {pageNum} de {totalPages}
       </span>

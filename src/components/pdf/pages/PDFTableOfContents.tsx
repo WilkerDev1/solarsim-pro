@@ -57,7 +57,7 @@ export const PDFTableOfContents: React.FC<PDFTableOfContentsProps> = ({
       )}
 
       {/* Body */}
-      <div className="px-12 pt-6 pb-14 flex-1 flex flex-col justify-between relative z-10 min-h-0">
+      <div className="px-12 pt-6 pb-3 flex-1 flex flex-col justify-between relative z-10 min-h-0">
         <div>
           <div className="flex items-center gap-3 border-b-2 pb-2.5 mb-5" style={{ borderColor: activeTheme.primary }}>
             <div
