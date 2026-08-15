@@ -104,8 +104,8 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
           />
         </svg>
 
-        {/* Top-Left Project Tag with Solid Background and High Contrast */}
-        <div className="absolute top-8 left-10 z-20 space-y-2">
+        {/* Top-Left Project Tag */}
+        <div className="absolute top-8 left-10 z-20">
           <div className="flex items-center gap-2.5">
             <div
               className="w-9 h-1 rounded-full shadow-md"
@@ -113,27 +113,6 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
             />
             <span className="text-xs font-black tracking-[0.25em] text-white uppercase drop-shadow-md">
               SISTEMA SOLAR FOTOVOLTAICO
-            </span>
-          </div>
-
-          <div
-            className="px-3.5 py-1.5 inline-flex items-center gap-2 rounded shadow-xl border-l-4"
-            style={{
-              backgroundColor: '#0f172a',
-              borderLeftColor: activeTheme.secondary,
-            }}
-          >
-            <span
-              className="text-xs font-black uppercase tracking-wider"
-              style={{ color: '#ffffff' }}
-            >
-              ENERGÍA SOLAR
-            </span>
-            <span
-              className="text-xs font-bold uppercase tracking-wider text-slate-100"
-              style={{ color: '#ffffff' }}
-            >
-              • LEY 57-07
             </span>
           </div>
         </div>
