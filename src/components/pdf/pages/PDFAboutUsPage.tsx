@@ -54,7 +54,7 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
       )}
 
       {/* Body */}
-      <div className="px-10 py-5 flex-1 flex flex-col justify-between text-xs text-slate-800 relative z-10 gap-3 min-h-0">
+      <div className="px-10 pt-3 pb-3 flex-1 flex flex-col justify-between text-xs text-slate-800 relative z-10 gap-3 min-h-0">
         {/* 1. ¿Quiénes Somos? Section */}
         <div className="space-y-2">
           <div

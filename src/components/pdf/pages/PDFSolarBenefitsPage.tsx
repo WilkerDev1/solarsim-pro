@@ -48,7 +48,7 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
         />
       )}
       {/* Body */}
-      <div className="px-10 py-5 flex-1 flex flex-col justify-between text-xs text-slate-800 relative z-10 gap-4 min-h-0">
+      <div className="px-10 pt-3 pb-3 flex-1 flex flex-col justify-between text-xs text-slate-800 relative z-10 gap-3 min-h-0">
         {/* Section 2: Beneficios de la Energía Solar */}
         <div className="space-y-3">
           <div
