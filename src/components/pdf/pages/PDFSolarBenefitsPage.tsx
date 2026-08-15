@@ -47,11 +47,10 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
           customization={project.customization}
         />
       )}
-
       {/* Body */}
-      <div className="px-10 py-5 flex-1 flex flex-col justify-between text-xs text-slate-800 relative z-10 gap-3 min-h-0">
+      <div className="px-10 py-5 flex-1 flex flex-col justify-between text-xs text-slate-800 relative z-10 gap-4 min-h-0">
         {/* Section 2: Beneficios de la Energía Solar */}
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div
             className="inline-block px-3.5 py-1.5 rounded-md font-black text-xs uppercase tracking-wider shadow-xs"
             style={{
@@ -63,55 +62,60 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
             2. BENEFICIOS DE LA ENERGÍA SOLAR
           </div>
 
-          {/* Visual House Illustration with 4 Feature Pills */}
-          <div className="rounded-2xl border border-slate-200 overflow-hidden bg-slate-900 relative shadow-sm">
-            <div className="h-48 w-full relative overflow-hidden flex items-center justify-center">
+          {/* Visual House Illustration with Full Width and 4 Feature Pills */}
+          <div className="rounded-2xl border border-slate-200 overflow-hidden bg-white relative shadow-sm">
+            <div className="h-60 w-full relative overflow-hidden">
               <img
                 src={PDF_BENEFITS_HOUSE_BASE64}
                 alt="Modern luxury home with rooftop solar panels"
-                className="max-h-[200px] max-w-[98%] w-auto h-auto mx-auto block object-contain"
+                className="w-full h-full object-cover object-center block"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent pointer-events-none" />
+              <div className="absolute bottom-3 left-4 text-white">
+                <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-600/90 backdrop-blur-xs px-2.5 py-1 rounded-md">
+                  Energía Limpia y Autonomía Residencial
+                </span>
+              </div>
             </div>
 
             {/* 4 Pillars Grid inside card */}
-            <div className="p-2.5 bg-white grid grid-cols-4 gap-2 border-t border-slate-100">
-              <div className="p-2 rounded-xl bg-emerald-50/80 border border-emerald-200/80 text-center space-y-0.5">
-                <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center mx-auto shadow-2xs">
-                  <DollarSign className="w-3 h-3" />
+            <div className="p-3 bg-white grid grid-cols-4 gap-2.5 border-t border-slate-100">
+              <div className="p-2.5 rounded-xl bg-emerald-50/90 border border-emerald-200/80 text-center space-y-1">
+                <div className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center mx-auto shadow-2xs">
+                  <DollarSign className="w-3.5 h-3.5" />
                 </div>
-                <h5 className="font-extrabold text-[10px] uppercase text-emerald-950">Ahorro en Factura</h5>
-                <p className="text-[8.5px] text-slate-600 leading-tight">
+                <h5 className="font-extrabold text-[10.5px] uppercase text-emerald-950">Ahorro en Factura</h5>
+                <p className="text-[9px] text-slate-600 leading-tight">
                   Reducción inmediata de hasta un 95% del costo eléctrico mensual.
                 </p>
               </div>
 
-              <div className="p-2 rounded-xl bg-blue-50/80 border border-blue-200/80 text-center space-y-0.5">
-                <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center mx-auto shadow-2xs">
-                  <TrendingUp className="w-3 h-3" />
+              <div className="p-2.5 rounded-xl bg-blue-50/90 border border-blue-200/80 text-center space-y-1">
+                <div className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center mx-auto shadow-2xs">
+                  <TrendingUp className="w-3.5 h-3.5" />
                 </div>
-                <h5 className="font-extrabold text-[10px] uppercase text-blue-950">Plusvalía Inmueble</h5>
-                <p className="text-[8.5px] text-slate-600 leading-tight">
+                <h5 className="font-extrabold text-[10.5px] uppercase text-blue-950">Plusvalía Inmueble</h5>
+                <p className="text-[9px] text-slate-600 leading-tight">
                   Incremento directo del valor comercial del inmueble o negocio.
                 </p>
               </div>
 
-              <div className="p-2 rounded-xl bg-amber-50/80 border border-amber-200/80 text-center space-y-0.5">
-                <div className="w-5 h-5 rounded-full bg-amber-500 text-white flex items-center justify-center mx-auto shadow-2xs">
-                  <Zap className="w-3 h-3" />
+              <div className="p-2.5 rounded-xl bg-amber-50/90 border border-amber-200/80 text-center space-y-1">
+                <div className="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center mx-auto shadow-2xs">
+                  <Zap className="w-3.5 h-3.5" />
                 </div>
-                <h5 className="font-extrabold text-[10px] uppercase text-amber-950">Independencia</h5>
-                <p className="text-[8.5px] text-slate-600 leading-tight">
+                <h5 className="font-extrabold text-[10.5px] uppercase text-amber-950">Independencia</h5>
+                <p className="text-[9px] text-slate-600 leading-tight">
                   Protección ante futuros incrementos tarifarios de las distribuidoras.
                 </p>
               </div>
 
-              <div className="p-2 rounded-xl bg-teal-50/80 border border-teal-200/80 text-center space-y-0.5">
-                <div className="w-5 h-5 rounded-full bg-teal-600 text-white flex items-center justify-center mx-auto shadow-2xs">
-                  <Leaf className="w-3 h-3" />
+              <div className="p-2.5 rounded-xl bg-teal-50/90 border border-teal-200/80 text-center space-y-1">
+                <div className="w-6 h-6 rounded-full bg-teal-600 text-white flex items-center justify-center mx-auto shadow-2xs">
+                  <Leaf className="w-3.5 h-3.5" />
                 </div>
-                <h5 className="font-extrabold text-[10px] uppercase text-teal-950">Sostenibilidad</h5>
-                <p className="text-[8.5px] text-slate-600 leading-tight">
+                <h5 className="font-extrabold text-[10.5px] uppercase text-teal-950">Sostenibilidad</h5>
+                <p className="text-[9px] text-slate-600 leading-tight">
                   Energía 100% limpia sin emisiones contaminantes a la atmósfera.
                 </p>
               </div>
@@ -120,7 +124,7 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
         </div>
 
         {/* Section 2.1: Objetivos de la Ley 57-07 */}
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           <div
             className="inline-block px-3.5 py-1.5 rounded-md font-black text-xs uppercase tracking-wider shadow-xs"
             style={{
@@ -136,42 +140,42 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
             La <strong>Ley 57-07 sobre Incentivo al Desarrollo de Fuentes Renovables de Energía</strong> fue promulgada para transformar la matriz energética nacional y acelerar la transición hacia un modelo sostenible y soberano. Sus principales objetivos y beneficios son:
           </p>
 
-          <div className="grid grid-cols-2 gap-2.5">
-            <div className="p-2.5 rounded-xl border border-slate-200 bg-slate-50/90 flex items-start gap-2.5">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/90 flex items-start gap-2.5 shadow-2xs">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <div>
                 <h5 className="font-bold text-xs text-slate-900 mb-0.5">Fortalecer la Diversidad Energética</h5>
-                <p className="text-[10px] text-slate-600 leading-snug">
+                <p className="text-[10px] text-slate-600 leading-relaxed">
                   Ampliar la capacidad de generación eléctrica distribuida mediante fuentes no convencionales técnica y económicamente viables.
                 </p>
               </div>
             </div>
 
-            <div className="p-2.5 rounded-xl border border-slate-200 bg-slate-50/90 flex items-start gap-2.5">
+            <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/90 flex items-start gap-2.5 shadow-2xs">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <div>
                 <h5 className="font-bold text-xs text-slate-900 mb-0.5">Disminuir Dependencia de Fósiles</h5>
-                <p className="text-[10px] text-slate-600 leading-snug">
+                <p className="text-[10px] text-slate-600 leading-relaxed">
                   Reducir la vulnerabilidad económica del país ante fluctuaciones de precios internacionales de hidrocarburos.
                 </p>
               </div>
             </div>
 
-            <div className="p-2.5 rounded-xl border border-slate-200 bg-slate-50/90 flex items-start gap-2.5">
+            <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/90 flex items-start gap-2.5 shadow-2xs">
               <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <div>
                 <h5 className="font-bold text-xs text-slate-900 mb-0.5">Crédito Fiscal al Impuesto Sobre la Renta</h5>
-                <p className="text-[10px] text-slate-600 leading-snug">
+                <p className="text-[10px] text-slate-600 leading-relaxed">
                   Permite deducir hasta un <strong>40% de la inversión en equipos</strong> del Impuesto Sobre la Renta (ISR), acelerando el retorno del capital invertido.
                 </p>
               </div>
             </div>
 
-            <div className="p-2.5 rounded-xl border border-slate-200 bg-slate-50/90 flex items-start gap-2.5">
+            <div className="p-3 rounded-xl border border-slate-200 bg-slate-50/90 flex items-start gap-2.5 shadow-2xs">
               <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <div>
                 <h5 className="font-bold text-xs text-slate-900 mb-0.5">Exención Arancelaria y de ITBIS</h5>
-                <p className="text-[10px] text-slate-600 leading-snug">
+                <p className="text-[10px] text-slate-600 leading-relaxed">
                   Exención del 100% de impuestos a la importación y aranceles sobre equipos solares certificados para proyectos residenciales e industriales.
                 </p>
               </div>
