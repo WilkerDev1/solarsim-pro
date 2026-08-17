@@ -240,55 +240,60 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
       </main>
 
       {/* 4. Minimalist Corporate Footer */}
-      <footer className="absolute bottom-0 left-0 right-0 w-full px-10 py-3 bg-slate-50 border-t border-slate-200 z-30 overflow-hidden box-border">
+      <footer className="absolute bottom-0 left-0 right-0 w-full px-10 pt-2 pb-3.5 bg-slate-50 border-t border-slate-200 z-30 overflow-hidden box-border h-[48px] flex items-center">
         {/* Subtle Decorative Circle Outline */}
         <div
           className="absolute right-[-40px] bottom-[-40px] w-44 h-44 rounded-full border-[10px] border-slate-200/70 opacity-60 pointer-events-none"
         />
 
-        <div className="flex justify-between items-center relative z-10 text-xs">
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
+        <div className="flex justify-between items-center w-full relative z-10 text-xs">
+          <div className="flex items-center gap-5">
+            <div className="flex items-center gap-1.5">
               <div
-                className="w-7 h-7 rounded-lg text-white flex items-center justify-center shadow-xs shrink-0"
+                className="w-6 h-6 rounded-md text-white flex items-center justify-center shadow-xs shrink-0"
                 style={{ backgroundColor: activeTheme.primary }}
               >
-                <Phone className="w-3.5 h-3.5" />
+                <Phone className="w-3 h-3" />
               </div>
-              <span className="font-bold text-slate-900 text-xs whitespace-nowrap">{companyPhone}</span>
+              <span className="font-bold text-slate-900 text-[11px] whitespace-nowrap leading-none">{companyPhone}</span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <div
-                className="w-7 h-7 rounded-lg text-white flex items-center justify-center shadow-xs shrink-0"
+                className="w-6 h-6 rounded-md text-white flex items-center justify-center shadow-xs shrink-0"
                 style={{ backgroundColor: activeTheme.primary }}
               >
-                <Globe className="w-3.5 h-3.5" />
+                <Globe className="w-3 h-3" />
               </div>
-              <span className="font-bold text-slate-900 text-xs whitespace-nowrap">{companyWebsite}</span>
+              <span className="font-bold text-slate-900 text-[11px] whitespace-nowrap leading-none">{companyWebsite}</span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <div
-                className="w-7 h-7 rounded-lg text-white flex items-center justify-center shadow-xs shrink-0"
+                className="w-6 h-6 rounded-md text-white flex items-center justify-center shadow-xs shrink-0"
                 style={{ backgroundColor: activeTheme.primary }}
               >
-                <Instagram className="w-3.5 h-3.5" />
+                <Instagram className="w-3 h-3" />
               </div>
-              <span className="font-bold text-slate-900 text-xs whitespace-nowrap">@{companyInstagram}</span>
+              <span className="font-bold text-slate-900 text-[11px] whitespace-nowrap leading-none">@{companyInstagram}</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-slate-600 text-[10px] font-bold max-w-[300px] text-right">
-            <MapPin className="w-3.5 h-3.5 shrink-0" style={{ color: activeTheme.secondary }} />
-            <span className="truncate">
+          <div className="flex items-center gap-1.5 text-slate-700">
+            <div
+              className="w-6 h-6 rounded-md text-white flex items-center justify-center shadow-xs shrink-0"
+              style={{ backgroundColor: activeTheme.secondary }}
+            >
+              <MapPin className="w-3 h-3" />
+            </div>
+            <span className="font-bold text-slate-800 text-[11px] whitespace-nowrap leading-none">
               {companyFooterText.split('|')[0] || companyFooterText}
             </span>
           </div>
         </div>
 
         {/* Bottom Decorative Dual-Tone Colored Bar */}
-        <div className="absolute bottom-0 left-0 w-full flex h-2.5">
+        <div className="absolute bottom-0 left-0 w-full flex h-2">
           <div className="w-1/3" style={{ backgroundColor: activeTheme.secondary }} />
           <div className="w-2/3" style={{ backgroundColor: activeTheme.primary }} />
         </div>
