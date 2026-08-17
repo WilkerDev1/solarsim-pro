@@ -8,6 +8,7 @@ import { NewProjectModal } from './components/common/NewProjectModal';
 import { UpdateModal } from './components/common/UpdateModal';
 import { AIInvoiceScannerModal } from './components/common/AIInvoiceScannerModal';
 import { AISettingsModal } from './components/common/AISettingsModal';
+import { SplashScreen } from './components/common/SplashScreen';
 
 export const App: React.FC = () => {
   const { activeView, sidebarTheme } = useSimulationStore();
@@ -19,6 +20,9 @@ export const App: React.FC = () => {
         isDark ? 'bg-[#121214] text-zinc-100' : 'bg-slate-100 text-slate-900'
       }`}
     >
+      {/* App Launch Splash Screen */}
+      <SplashScreen />
+
       <Header />
       <main className="flex-1 flex overflow-hidden min-h-0 w-full">
         {activeView === 'dashboard' && <DashboardView />}
