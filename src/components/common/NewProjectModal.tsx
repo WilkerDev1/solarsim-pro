@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { RD_PROVINCES } from '../../data/rdProvinces';
-import { X, Sun, Building2, MapPin, Zap, ArrowRight, ChevronDown, ChevronUp, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { X, Building2, MapPin, Zap, ArrowRight, ChevronDown, ChevronUp, SlidersHorizontal, Sparkles } from 'lucide-react';
+import electsunEmblem from '../../assets/electsun-emblem-transparent.png';
 
 export const NewProjectModal: React.FC = () => {
   const { isNewProjectModalOpen, closeNewProjectModal, createNewProject, openAIInvoiceModal, sidebarTheme } = useSimulationStore();
@@ -105,9 +106,11 @@ export const NewProjectModal: React.FC = () => {
           }`}
         >
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center border border-white/20">
-              <Sun className="w-5 h-5 text-amber-300" />
-            </div>
+            <img
+              src={electsunEmblem}
+              alt="Electsun Logo"
+              className="w-9 h-9 object-contain drop-shadow-sm shrink-0"
+            />
             <div>
               <h3 className="font-bold text-base tracking-tight text-white">Nueva Simulación Solar</h3>
               <p className={`text-xs ${isDark ? 'text-zinc-300' : 'text-emerald-100'}`}>

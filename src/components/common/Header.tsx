@@ -1,6 +1,7 @@
 import React from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { Sun, Moon, FileText, LayoutDashboard, Save, Plus, ArrowLeft, RefreshCw, CheckCircle2, Sparkles, Bot } from 'lucide-react';
+import electsunEmblem from '../../assets/electsun-emblem-transparent.png';
 
 export const Header: React.FC = () => {
   const {
@@ -34,9 +35,11 @@ export const Header: React.FC = () => {
             onClick={() => setActiveView('dashboard')}
             title="Ir al panel de proyectos"
           >
-            <div className="w-8 h-8 rounded-xl bg-emerald-800 flex items-center justify-center text-white shadow-xs group-hover:bg-emerald-700 transition-colors">
-              <Sun className="w-5 h-5 text-amber-300 animate-pulse" />
-            </div>
+            <img
+              src={electsunEmblem}
+              alt="Electsun Logo"
+              className="w-8 h-8 object-contain transition-transform duration-200 group-hover:scale-105 select-none shrink-0"
+            />
             <h1 className={`font-bold text-xl tracking-tight transition-colors ${isDark ? 'text-white' : 'text-emerald-950'}`}>
               SolarSim Pro
             </h1>
