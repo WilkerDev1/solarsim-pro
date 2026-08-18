@@ -1,6 +1,21 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
-import { Search, Plus, Calendar, Edit3, Trash2, Copy, MapPin, Zap } from 'lucide-react';
+import {
+  Search,
+  Plus,
+  Calendar,
+  Edit3,
+  Trash2,
+  Copy,
+  MapPin,
+  Zap,
+  Upload,
+  Download,
+  Share2,
+  FileJson,
+  CheckCircle2,
+  AlertCircle,
+} from 'lucide-react';
 import { calculateDCCapacityKWp } from '../../engine/solarEngine';
 
 export const DashboardView: React.FC = () => {
@@ -12,10 +27,48 @@ export const DashboardView: React.FC = () => {
     openNewProjectModal,
     duplicateProject,
     deleteProject,
+    exportProjectAsJSON,
+    exportAllProjectsAsJSON,
+    importProjectsFromJSON,
     sidebarTheme,
   } = useSimulationStore();
 
   const isDark = sidebarTheme === 'dark';
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importNotification, setImportNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const parsed = JSON.parse(text);
+        const result = importProjectsFromJSON(parsed);
+
+        if (result.success) {
+          setImportNotification({ type: 'success', message: result.message });
+        } else {
+          setImportNotification({ type: 'error', message: result.message });
+        }
+      } catch (err: any) {
+        setImportNotification({
+          type: 'error',
+          message: 'Error al leer el archivo JSON: formato corrupto o inválido.',
+        });
+      }
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+
+      setTimeout(() => setImportNotification(null), 5000);
+    };
+
+    reader.readAsText(file);
+  };
 
   const filteredProjects = projects.filter((project) => {
     return (
@@ -33,6 +86,34 @@ export const DashboardView: React.FC = () => {
       }`}
     >
       <div className="max-w-[1400px] mx-auto w-full space-y-6">
+        {/* Import Notification Banner */}
+        {importNotification && (
+          <div
+            className={`p-4 rounded-2xl border flex items-center gap-3 transition-all animate-in fade-in slide-in-from-top-2 shadow-md ${
+              importNotification.type === 'success'
+                ? isDark
+                  ? 'bg-emerald-950/80 border-emerald-700/80 text-emerald-200'
+                  : 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                : isDark
+                ? 'bg-red-950/80 border-red-700/80 text-red-200'
+                : 'bg-red-50 border-red-300 text-red-900'
+            }`}
+          >
+            {importNotification.type === 'success' ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+            ) : (
+              <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
+            )}
+            <span className="text-xs sm:text-sm font-bold flex-1">{importNotification.message}</span>
+            <button
+              onClick={() => setImportNotification(null)}
+              className="text-xs font-black uppercase opacity-70 hover:opacity-100 cursor-pointer"
+            >
+              Cerrar
+            </button>
+          </div>
+        )}
+
         {/* Header Banner */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
@@ -43,13 +124,54 @@ export const DashboardView: React.FC = () => {
               Gestión y diseño de propuestas comerciales de energía solar fotovoltaica en República Dominicana
             </p>
           </div>
-          <button
-            onClick={openNewProjectModal}
-            className="bg-emerald-700 hover:bg-emerald-600 text-white transition-all px-5 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 shadow-md hover:shadow-lg cursor-pointer active:scale-95 shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            Nueva Simulación
-          </button>
+
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            {/* Input Oculto de Archivo JSON */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept=".json,application/json"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+
+            {/* Botón Importar JSON */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className={`px-3.5 py-2.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95 ${
+                isDark
+                  ? 'bg-[#1e1e28] border-[#343446] text-zinc-200 hover:bg-[#282836] hover:border-amber-500/70 hover:text-amber-300'
+                  : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-amber-400 hover:text-amber-800'
+              }`}
+              title="Importar proyecto o respaldo completo desde un archivo JSON"
+            >
+              <Upload className="w-4 h-4 text-amber-500" />
+              <span>Importar JSON</span>
+            </button>
+
+            {/* Botón Exportar Respaldo Completo */}
+            <button
+              onClick={exportAllProjectsAsJSON}
+              className={`px-3.5 py-2.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95 ${
+                isDark
+                  ? 'bg-[#1e1e28] border-[#343446] text-zinc-200 hover:bg-[#282836] hover:border-emerald-500/70 hover:text-emerald-300'
+                  : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-emerald-400 hover:text-emerald-800'
+              }`}
+              title="Exportar todos los proyectos en un archivo JSON de respaldo"
+            >
+              <Download className="w-4 h-4 text-emerald-500" />
+              <span>Exportar Todo</span>
+            </button>
+
+            {/* Botón Nueva Simulación */}
+            <button
+              onClick={openNewProjectModal}
+              className="bg-emerald-700 hover:bg-emerald-600 text-white transition-all px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 shadow-md hover:shadow-lg cursor-pointer active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Nueva Simulación</span>
+            </button>
+          </div>
         </div>
 
         {/* Toolbar Area */}
@@ -142,8 +264,19 @@ export const DashboardView: React.FC = () => {
                       </p>
                     </div>
 
-                    {/* Actions (Duplicate & Delete) */}
+                    {/* Actions (Export JSON, Duplicate & Delete) */}
                     <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => exportProjectAsJSON(project.id)}
+                        className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                          isDark
+                            ? 'text-zinc-400 hover:text-amber-400 hover:bg-[#2a2a36]'
+                            : 'text-slate-400 hover:text-amber-700 hover:bg-amber-50'
+                        }`}
+                        title="Compartir / Exportar proyecto en JSON"
+                      >
+                        <Share2 className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => duplicateProject(project.id)}
                         className={`p-2 rounded-lg transition-colors cursor-pointer ${

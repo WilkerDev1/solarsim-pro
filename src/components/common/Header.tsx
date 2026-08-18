@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
-import { Sun, Moon, FileText, LayoutDashboard, Save, Plus, ArrowLeft, RefreshCw, CheckCircle2, Sparkles, Bot } from 'lucide-react';
+import { Sun, Moon, FileText, LayoutDashboard, Save, Plus, ArrowLeft, RefreshCw, CheckCircle2, Sparkles, Bot, Share2 } from 'lucide-react';
 import electsunEmblem from '../../assets/electsun-emblem-transparent.png';
 
 export const Header: React.FC = () => {
@@ -12,6 +12,7 @@ export const Header: React.FC = () => {
     openUpdateModal,
     openAIInvoiceModal,
     saveActiveProject,
+    exportProjectAsJSON,
     saveFeedbackMessage,
     sidebarTheme,
     toggleSidebarTheme,
@@ -182,6 +183,22 @@ export const Header: React.FC = () => {
               <RefreshCw className="w-3.5 h-3.5 text-emerald-500" />
               <span className="hidden sm:inline">Actualizaciones</span>
             </button>
+
+            {/* Export JSON Button (in Simulator View) */}
+            {activeView === 'simulator' && (
+              <button
+                onClick={() => exportProjectAsJSON()}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all shadow-xs cursor-pointer ${
+                  isDark
+                    ? 'border-[#3f3f46] bg-[#27272a] hover:bg-[#323238] text-amber-300'
+                    : 'border-slate-200 bg-white hover:bg-slate-50 text-amber-800'
+                }`}
+                title="Compartir / Exportar este proyecto como archivo JSON"
+              >
+                <Share2 className="w-3.5 h-3.5 text-amber-500" />
+                <span className="hidden sm:inline">Exportar JSON</span>
+              </button>
+            )}
 
             {/* Save Button (in Simulator View) */}
             {activeView === 'simulator' && (

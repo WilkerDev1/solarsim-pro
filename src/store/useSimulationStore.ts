@@ -64,6 +64,11 @@ interface SimulationState {
   setProjectStatus: (id: string, status: 'Draft' | 'Final' | 'Archived') => void;
   saveActiveProject: () => void;
 
+  // JSON Import & Export (Database Sharing)
+  exportProjectAsJSON: (id?: string) => void;
+  exportAllProjectsAsJSON: () => void;
+  importProjectsFromJSON: (jsonData: any) => { success: boolean; message: string; count: number };
+
   // Theme & Appearance
   sidebarTheme: 'dark' | 'light';
   toggleSidebarTheme: () => void;
@@ -612,6 +617,147 @@ export const useSimulationStore = create<SimulationState>()(
         setTimeout(() => {
           set({ saveFeedbackMessage: null });
         }, 3000);
+      },
+
+      exportProjectAsJSON: (id?: string) => {
+        const targetId = id || get().activeProjectId;
+        const project = get().projects.find((p) => p.id === targetId) || get().getActiveProject();
+        if (!project) return;
+
+        const exportPayload = {
+          app: 'SolarSim Pro',
+          version: '1.3.9',
+          exportedAt: new Date().toISOString(),
+          type: 'single_project',
+          project,
+        };
+
+        const clientNameSanitized = (project.client.name || 'Proyecto')
+          .replace(/[^a-zA-Z0-9_\-]/g, '_')
+          .substring(0, 40);
+        const projId = project.client.projectId || 'SP-2026';
+        const filename = `SolarSim_${clientNameSanitized}_${projId}.json`;
+
+        const jsonStr = JSON.stringify(exportPayload, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        set({ saveFeedbackMessage: `¡Proyecto "${project.client.name}" exportado como JSON!` });
+        setTimeout(() => set({ saveFeedbackMessage: null }), 3500);
+      },
+
+      exportAllProjectsAsJSON: () => {
+        const { projects } = get();
+        const exportPayload = {
+          app: 'SolarSim Pro',
+          version: '1.3.9',
+          exportedAt: new Date().toISOString(),
+          type: 'projects_backup',
+          totalProjects: projects.length,
+          projects,
+        };
+
+        const dateStr = new Date().toISOString().split('T')[0];
+        const filename = `SolarSim_Pro_Backup_Proyectos_${dateStr}.json`;
+
+        const jsonStr = JSON.stringify(exportPayload, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        set({ saveFeedbackMessage: `¡Respaldo de ${projects.length} proyectos exportado!` });
+        setTimeout(() => set({ saveFeedbackMessage: null }), 3500);
+      },
+
+      importProjectsFromJSON: (jsonData: any) => {
+        try {
+          let importedList: ProjectSimulation[] = [];
+
+          // Case 1: Direct single project object
+          if (jsonData && typeof jsonData === 'object' && jsonData.client && jsonData.specs && jsonData.rates) {
+            importedList = [jsonData as ProjectSimulation];
+          }
+          // Case 2: Wrapped single project { project: { ... } }
+          else if (jsonData && typeof jsonData === 'object' && jsonData.project && jsonData.project.client) {
+            importedList = [jsonData.project as ProjectSimulation];
+          }
+          // Case 3: Array of projects
+          else if (Array.isArray(jsonData)) {
+            importedList = jsonData.filter((p) => p && typeof p === 'object' && p.client && p.specs && p.rates);
+          }
+          // Case 4: Backup object { projects: [ ... ] }
+          else if (jsonData && typeof jsonData === 'object' && Array.isArray(jsonData.projects)) {
+            importedList = jsonData.projects.filter((p: any) => p && typeof p === 'object' && p.client && p.specs && p.rates);
+          }
+
+          if (importedList.length === 0) {
+            return {
+              success: false,
+              message: 'El archivo JSON no contiene una estructura de proyecto válida de SolarSim Pro.',
+              count: 0,
+            };
+          }
+
+          const currentProjects = get().projects;
+          const existingIds = new Set(currentProjects.map((p) => p.id));
+          const processedProjects: ProjectSimulation[] = [];
+
+          for (const proj of importedList) {
+            let finalId = proj.id;
+            // Generate a unique ID if already present or invalid
+            if (!finalId || existingIds.has(finalId)) {
+              finalId = `proj-imported-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+            }
+            existingIds.add(finalId);
+
+            processedProjects.push({
+              ...proj,
+              id: finalId,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+
+          // Prepend newly imported projects
+          const newProjectsList = [...processedProjects, ...currentProjects];
+          const firstImportedId = processedProjects[0].id;
+
+          set({
+            projects: newProjectsList,
+            activeProjectId: firstImportedId,
+            activeView: 'simulator',
+            saveFeedbackMessage: `¡${processedProjects.length} ${
+              processedProjects.length === 1 ? 'proyecto importado' : 'proyectos importados'
+            } con éxito!`,
+          });
+
+          setTimeout(() => set({ saveFeedbackMessage: null }), 4000);
+
+          return {
+            success: true,
+            message: `Se importaron ${processedProjects.length} proyecto(s) correctamente.`,
+            count: processedProjects.length,
+          };
+        } catch (err: any) {
+          console.error('Error importing project JSON:', err);
+          return {
+            success: false,
+            message: `Error al procesar el archivo: ${err?.message || 'Formato inválido'}`,
+            count: 0,
+          };
+        }
       },
 
       getActiveProject: () => {
