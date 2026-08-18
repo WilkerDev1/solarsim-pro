@@ -122,6 +122,14 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
     });
   };
 
+  const handleUpdatePageCount = (id: string, newCount: number) => {
+    if (!updateDocumentCustomization) return;
+    const clamped = Math.max(1, Math.min(99, newCount));
+    updateDocumentCustomization({
+      extraTocItems: extraTocItems.map((it) => (it.id === id ? { ...it, pageCount: clamped } : it)),
+    });
+  };
+
   const handleRemoveExtraItem = (id: string) => {
     if (!updateDocumentCustomization) return;
     updateDocumentCustomization({
@@ -568,14 +576,30 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <span
-                    className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border ${
-                      isDark ? 'bg-zinc-800 text-zinc-300 border-zinc-700' : 'bg-slate-100 text-slate-700 border-slate-200'
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <div
+                    className={`flex items-center rounded-lg border px-1.5 py-0.5 transition-all ${
+                      isDark
+                        ? 'bg-[#242432] border-[#38384a] focus-within:border-amber-500'
+                        : 'bg-slate-100 border-slate-300 focus-within:border-amber-600 focus-within:bg-white'
                     }`}
+                    title="Haz clic para modificar la cantidad de páginas de este anexo"
                   >
-                    {item.pageCount && item.pageCount > 1 ? `${item.pageCount} págs` : '1 pág'}
-                  </span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="99"
+                      value={item.pageCount || 1}
+                      onChange={(e) => handleUpdatePageCount(item.id, parseInt(e.target.value) || 1)}
+                      className={`w-6 text-center font-mono font-black text-xs bg-transparent outline-none p-0 cursor-text ${
+                        isDark ? 'text-amber-400' : 'text-amber-900'
+                      }`}
+                    />
+                    <span className={`text-[10px] font-bold select-none pl-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                      {(item.pageCount || 1) === 1 ? 'pág' : 'págs'}
+                    </span>
+                  </div>
+
                   <button
                     type="button"
                     onClick={() => handleRemoveExtraItem(item.id)}
