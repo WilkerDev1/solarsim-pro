@@ -201,6 +201,16 @@ export interface DocumentCustomization {
   aboutUsIntroText?: string;      // Default: 'En ELECTSUN, transformamos la energía solar en una solución inteligente, sostenible y accesible para todos...'
   whyChooseUsText?: string;       // Default: 'En ELECTSUN, nuestra misión es brindarte soluciones solares...'
   regulatoryNote?: string;        // Default: Resolucion SIE-007-2026-REG & BTS1/BTS2 net metering notes
+
+  // Custom Extra Table of Contents Items (Appended Annexes / Extra Pages)
+  extraTocItems?: ExtraTOCItem[];
+}
+
+export interface ExtraTOCItem {
+  id: string;
+  title: string;
+  subtitle?: string;
+  pageCount?: number; // Number of pages this extra section occupies (default: 1)
 }
 
 export interface ProjectSimulation {

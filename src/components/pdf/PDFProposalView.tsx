@@ -334,6 +334,26 @@ export const PDFProposalView: React.FC = () => {
     sectionIndex++;
   }
 
+  // Append Custom Extra Table of Contents Items (Appended Annexes / Extra Pages)
+  const extraTocItems = project.customization?.extraTocItems || [];
+  let nextExtraPageNum = currentNum + 1;
+
+  extraTocItems.forEach((extra) => {
+    if (extra.title && extra.title.trim()) {
+      tocItems.push({
+        number: `${sectionIndex}`,
+        title: extra.title.trim(),
+        subtitle: extra.subtitle ? extra.subtitle.trim() : undefined,
+        targetPage: nextExtraPageNum,
+      });
+      sectionIndex++;
+      const pCount = typeof extra.pageCount === 'number' && extra.pageCount > 0 ? extra.pageCount : 1;
+      nextExtraPageNum += pCount;
+    }
+  });
+
+  const totalCalculatedPages = nextExtraPageNum - 1;
+
   return (
     <div
       className={`flex-1 flex h-full overflow-hidden transition-colors duration-200 ${
@@ -410,7 +430,7 @@ export const PDFProposalView: React.FC = () => {
               showHeadersFooters={showHeadersFooters}
               currentDateStr={currentDateStr}
               pageNum={pageTocNum}
-              totalPages={activePagesCount}
+              totalPages={totalCalculatedPages > 0 ? totalCalculatedPages : activePagesCount}
               tocItems={tocItems}
             />
           )}

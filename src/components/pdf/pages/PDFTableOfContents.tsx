@@ -77,18 +77,18 @@ export const PDFTableOfContents: React.FC<PDFTableOfContentsProps> = ({
           </div>
 
           {/* Dotted TOC List */}
-          <div className="space-y-3">
+          <div className={tocItems.length > 10 ? 'space-y-1.5' : tocItems.length > 8 ? 'space-y-2' : 'space-y-3'}>
             {tocItems.map((item, idx) => (
-              <div key={idx} className="space-y-1">
+              <div key={idx} className="space-y-0.5">
                 <div className="flex items-center justify-between text-xs group">
                   <div className="flex items-center gap-2.5 font-bold text-slate-800 shrink-0">
                     <span
-                      className="font-mono text-sm font-black w-6 text-right shrink-0"
+                      className={`font-mono font-black w-6 text-right shrink-0 ${tocItems.length > 10 ? 'text-xs' : 'text-sm'}`}
                       style={{ color: activeTheme.primary }}
                     >
                       {item.number}.
                     </span>
-                    <span className="text-sm font-black text-slate-900 uppercase tracking-tight">
+                    <span className={`font-black text-slate-900 uppercase tracking-tight ${tocItems.length > 10 ? 'text-xs' : 'text-sm'}`}>
                       {item.title}
                     </span>
                   </div>
