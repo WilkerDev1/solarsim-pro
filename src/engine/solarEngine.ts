@@ -20,7 +20,9 @@ export function calculateMonthlySolarProduction(
   monthlyConsumptionKWh: number[],
   energyCostPerKWh: number,
   gridExportFeePct: number,
-  customMonthlyHSP?: number[]
+  customMonthlyHSP?: number[],
+  tariffCode?: string,
+  isZeroExport?: boolean
 ): MonthlyEnergyResult[] {
   const dcCapacityKWp = calculateDCCapacityKWp(specs.panelPowerW, specs.panelCount);
   const province = getProvinceHSP(provinceName);
@@ -28,6 +30,13 @@ export function calculateMonthlySolarProduction(
   // Losses factor: total efficiency percentage (e.g. 14% losses -> 0.86 efficiency factor)
   const systemLossesPct = specs.isDetailed ? specs.systemLosses : 14.0;
   const derateFactor = 1 - (systemLossesPct / 100);
+
+  // SIE-007-2026-REG Tariff-Specific Rules:
+  // - Monomic low-voltage tariffs (BTS1, BTS2) are subject to network export retention (~25%).
+  // - Binomial tariffs (BTD, MTD, etc.) pay demand charges and receive 1:1 net metering (0% export retention).
+  // - Zero-Export systems (antivertido) do not inject to grid, resulting in 0 exported kWh and 0 export fees.
+  const isMonomicTariff = !tariffCode || tariffCode === 'BTS1' || tariffCode === 'BTS2';
+  const effectiveGridExportFeePct = (isMonomicTariff && !isZeroExport) ? (gridExportFeePct || 0) : 0;
 
   const results: MonthlyEnergyResult[] = [];
 
@@ -51,14 +60,20 @@ export function calculateMonthlySolarProduction(
     const daytimeSelfConsumptionRatio = Math.min(0.98, Math.max(0.40, baseDaytimeRatio));
     
     let solarSelfConsumed = Math.min(consumption, Math.round(production * daytimeSelfConsumptionRatio * 10) / 10);
-    let gridExported = Math.max(0, Math.round((production - solarSelfConsumed) * 10) / 10);
-
-    if (solarSelfConsumed + gridExported > production) {
+    
+    let gridExported = 0;
+    if (isZeroExport) {
+      // In Zero-Export mode (with anti-feed limiter), energy is only used on-site; no grid injection occurs
+      gridExported = 0;
+    } else {
       gridExported = Math.max(0, Math.round((production - solarSelfConsumed) * 10) / 10);
+      if (solarSelfConsumed + gridExported > production) {
+        gridExported = Math.max(0, Math.round((production - solarSelfConsumed) * 10) / 10);
+      }
     }
 
     // Grid export net metering with SIE-007-2026-REG fee on exported energy
-    const netExportCredit = gridExported * (1 - (gridExportFeePct / 100));
+    const netExportCredit = gridExported * (1 - (effectiveGridExportFeePct / 100));
 
     // Energy savings = (Self consumed + net export credit) * energy cost
     const effectiveSavedKWh = solarSelfConsumed + netExportCredit;

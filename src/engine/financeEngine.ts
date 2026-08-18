@@ -249,7 +249,9 @@ export function calculateFinancialSummary(
     monthlyConsumptionKWh,
     rates.energyCostPerKWh,
     rates.gridExportFeePct,
-    customMonthlyHSP
+    customMonthlyHSP,
+    rates.tariffCode,
+    rates.isZeroExport
   );
 
   const annualConsumptionKWh = monthlyResults.reduce((sum, m) => sum + m.consumptionKWh, 0);

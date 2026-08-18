@@ -63,6 +63,7 @@ export interface UtilityRates {
   currency: 'USD' | 'DOP';
   usdExchangeRate: number;      // RD$ per USD e.g. 60.0
   gridExportFeePct: number;     // SIE-007-2026-REG fee (e.g. 25%)
+  isZeroExport?: boolean;       // Inyección Cero / Antivertido (Zero-Export)
   annualEnergyInflationPct: number; // e.g. 3.5%
 }
 

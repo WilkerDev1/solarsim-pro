@@ -27,8 +27,39 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
   totalPages,
 }) => {
   const cust = project.customization || {};
-  const regulatoryText = cust.regulatoryNote || DEFAULT_DOCUMENT_CUSTOMIZATION.regulatoryNote || '';
-  const paragraphs = regulatoryText.split('\n\n').filter(Boolean);
+
+  // Compute regulatory note paragraphs dynamically based on project conditions (tariff, export fee, zero-export)
+  const getRegulatoryParagraphs = (): string[] => {
+    if (cust.regulatoryNote && cust.regulatoryNote !== DEFAULT_DOCUMENT_CUSTOMIZATION.regulatoryNote) {
+      return cust.regulatoryNote.split('\n\n').filter(Boolean);
+    }
+
+    const isZeroExport = !!project.rates.isZeroExport;
+    const tariff = project.rates.tariffCode || 'BTS2';
+    const isMonomic = tariff === 'BTS1' || tariff === 'BTS2';
+    const exportFee = project.rates.gridExportFeePct ?? 25;
+
+    const p1 = isZeroExport
+      ? 'El sistema fotovoltaico operará bajo la modalidad de Inyección Cero (Zero-Export con limitador antivertido), suministrando energía prioritariamente a los consumos internos del inmueble y evitando cualquier inyección de excedentes hacia la red eléctrica de distribución.'
+      : 'La energía generada mensualmente se descontará del consumo tomado de la red pública (EDES) o de la planta eléctrica. Cuando la producción supere el consumo, el excedente se acreditará como descuento en su factura eléctrica bajo el régimen de Medición Neta.';
+
+    const p2 = 'La presente propuesta ha sido elaborada conforme a la Resolución SIE-007-2026-REG y se basa en criterios técnicos y el historial de consumo del cliente.';
+
+    const p3 = 'Los ahorros indicados son estimados y pueden variar según los hábitos de consumo, el perfil de carga y las condiciones reales de operación del sistema.';
+
+    let p4 = '';
+    if (isZeroExport) {
+      p4 = `Al operar con limitador antivertido (inyección cero)${project.specs.hasBattery ? ' y almacenamiento en baterías de litio' : ''}, la totalidad de la energía solar se aprovecha internamente, por lo que el proyecto no genera cargos por derecho de uso de la red bajo la normativa vigente.`;
+    } else if (isMonomic) {
+      p4 = `Para los clientes con tarifas ${tariff}, el análisis económico considera el cargo por derecho de uso de la red, equivalente al ${exportFee} % del valor de la energía excedente exportada, conforme a la normativa vigente (Resolución SIE-007-2026-REG). Por esta razón, el sistema se diseña para maximizar el autoconsumo y minimizar la exportación de energía, obteniendo así el mayor beneficio económico posible.${project.specs.hasBattery ? '' : ' Cuando resulte conveniente, se recomendará la incorporación de baterías de litio para incrementar el aprovechamiento de la energía generada.'}`;
+    } else {
+      p4 = `Para clientes con tarifa binómica (${tariff}), el análisis económico contempla el régimen de Medición Neta con compensación 1:1 de energía activa, dado que los costos de capacidad y disponibilidad de red se remuneran formalmente a través del cargo fijo por potencia contratada y demanda máxima, no aplicando retención por uso de red conforme a la regulación vigente.`;
+    }
+
+    return [p1, p2, p3, p4];
+  };
+
+  const paragraphs = getRegulatoryParagraphs();
 
   const clientName = project.client.name || 'Cliente';
   const panelModel = project.specs.panelBrandModel || `Módulos Monocristalinos TOPCon (${project.specs.panelPowerW}W)`;
