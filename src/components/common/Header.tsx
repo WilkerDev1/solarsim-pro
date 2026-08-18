@@ -77,60 +77,63 @@ export const Header: React.FC = () => {
 
         {/* Navigation & Action Buttons */}
         <div className="flex items-center gap-3">
-          {/* Main Navigation Tabs */}
-          <div
-            className={`hidden md:flex items-center gap-1 p-1 rounded-xl border transition-colors ${
-              isDark ? 'bg-[#121214] border-[#27272a]' : 'bg-slate-100 border-slate-200'
-            }`}
-          >
-            <button
-              onClick={() => setActiveView('dashboard')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeView === 'dashboard'
-                  ? isDark
-                    ? 'bg-[#27272a] text-white shadow-xs'
-                    : 'bg-white text-emerald-900 shadow-xs'
-                  : isDark
-                  ? 'text-zinc-400 hover:text-zinc-100'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <LayoutDashboard className="w-3.5 h-3.5" />
-              <span>Proyectos</span>
-            </button>
+          {/* Project Navigation (Only shown when inside a project) */}
+          {activeView !== 'dashboard' && (
+            <div className="flex items-center gap-2">
+              {/* Back to Projects Button */}
+              <button
+                onClick={() => setActiveView('dashboard')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-xs ${
+                  isDark
+                    ? 'bg-[#27272a] border-[#3f3f46] text-zinc-200 hover:bg-[#323238] hover:text-white'
+                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+                title="Volver al catálogo de proyectos"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Proyectos</span>
+              </button>
 
-            <button
-              onClick={() => setActiveView('simulator')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeView === 'simulator'
-                  ? isDark
-                    ? 'bg-[#27272a] text-white shadow-xs'
-                    : 'bg-white text-emerald-900 shadow-xs'
-                  : isDark
-                  ? 'text-zinc-400 hover:text-zinc-100'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Sun className="w-3.5 h-3.5" />
-              <span>Simulador</span>
-            </button>
+              {/* View Mode Toggle (Simulador vs Propuesta PDF) */}
+              <div
+                className={`flex items-center gap-1 p-1 rounded-xl border transition-colors ${
+                  isDark ? 'bg-[#121214] border-[#27272a]' : 'bg-slate-100 border-slate-200'
+                }`}
+              >
+                <button
+                  onClick={() => setActiveView('simulator')}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    activeView === 'simulator'
+                      ? isDark
+                        ? 'bg-[#27272a] text-white shadow-xs'
+                        : 'bg-white text-emerald-900 shadow-xs'
+                      : isDark
+                      ? 'text-zinc-400 hover:text-zinc-100'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Sun className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Simulador</span>
+                </button>
 
-            <button
-              onClick={() => setActiveView('pdf-preview')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                activeView === 'pdf-preview'
-                  ? isDark
-                    ? 'bg-[#27272a] text-white shadow-xs'
-                    : 'bg-white text-emerald-900 shadow-xs'
-                  : isDark
-                  ? 'text-zinc-400 hover:text-zinc-100'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>Propuesta PDF</span>
-            </button>
-          </div>
+                <button
+                  onClick={() => setActiveView('pdf-preview')}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    activeView === 'pdf-preview'
+                      ? isDark
+                        ? 'bg-[#27272a] text-white shadow-xs'
+                        : 'bg-white text-emerald-900 shadow-xs'
+                      : isDark
+                      ? 'text-zinc-400 hover:text-zinc-100'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <FileText className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Propuesta PDF</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Theme Toggle Button (Selector de Modo Oscuro / Claro) */}
           <button
@@ -184,8 +187,8 @@ export const Header: React.FC = () => {
               <span className="hidden sm:inline">Actualizaciones</span>
             </button>
 
-            {/* Export JSON Button (in Simulator View) */}
-            {activeView === 'simulator' && (
+            {/* Export JSON Button (when inside a Project) */}
+            {activeView !== 'dashboard' && (
               <button
                 onClick={() => exportProjectAsJSON()}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all shadow-xs cursor-pointer ${
@@ -213,33 +216,6 @@ export const Header: React.FC = () => {
               >
                 <Save className="w-3.5 h-3.5 text-emerald-500" />
                 <span>Guardar Cambios</span>
-              </button>
-            )}
-
-            {/* View Specific Actions */}
-            {activeView === 'pdf-preview' ? (
-              <button
-                onClick={() => setActiveView('simulator')}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white transition-colors text-xs font-bold shadow-xs cursor-pointer"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Volver a Simulación
-              </button>
-            ) : activeView === 'dashboard' ? (
-              <button
-                onClick={openNewProjectModal}
-                className="bg-emerald-700 text-white hover:bg-emerald-800 transition-all px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                Nueva Simulación
-              </button>
-            ) : (
-              <button
-                onClick={() => setActiveView('pdf-preview')}
-                className="bg-emerald-700 text-white hover:bg-emerald-800 transition-all px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm cursor-pointer"
-              >
-                <FileText className="w-4 h-4" />
-                Ver Propuesta PDF
               </button>
             )}
           </div>

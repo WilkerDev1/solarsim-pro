@@ -802,6 +802,8 @@ export const useSimulationStore = create<SimulationState>()(
         searchQuery: state.searchQuery,
         sidebarTheme: state.sidebarTheme,
         sidebarWidth: state.sidebarWidth,
+        geminiApiKey: state.geminiApiKey,
+        geminiModel: state.geminiModel,
       }),
     }
   )

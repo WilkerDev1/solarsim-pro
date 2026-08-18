@@ -918,12 +918,12 @@ export const AIInvoiceScannerModal: React.FC = () => {
                           isDark ? 'bg-[#181822] border-[#2a2a38] text-zinc-300' : 'bg-white border-slate-200 text-slate-700'
                         }`}
                       >
-                        <span className="font-bold block text-emerald-400">¿Qué sucederá al aplicar?</span>
+                        <span className="font-bold block text-emerald-400">¿Qué sucederá al crear el proyecto?</span>
                         <ul className="space-y-1 text-[11px] list-disc list-inside opacity-90">
-                          <li>Se inyectarán los 12 meses de consumo en el simulador.</li>
-                          <li>Se actualizarán los datos de cliente, distribuidora y tarifa.</li>
-                          <li>Se ajustará automáticamente la cantidad de paneles para coincidir con la potencia requerida.</li>
-                          <li>Se recalcularán al instante el Payback, VAN, TIR y las 9 páginas de la propuesta PDF.</li>
+                          <li>Se creará un nuevo proyecto en tu catálogo con el cliente, distribuidora y tarifa detectados.</li>
+                          <li>Se inyectará el historial completo de 12 meses de consumo (kWh) en el simulador.</li>
+                          <li>Se pre-dimensionará la potencia recomendada y la cantidad exacta de paneles Tier-1.</li>
+                          <li>Se generarán automáticamente las 11 páginas de la propuesta técnica y financiera.</li>
                         </ul>
                       </div>
                     </div>
@@ -948,17 +948,10 @@ export const AIInvoiceScannerModal: React.FC = () => {
                   <div className="w-full sm:w-auto flex items-center gap-2">
                     <button
                       onClick={handleApplyAsNew}
-                      className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
-                    >
-                      <span>Crear Nuevo Proyecto</span>
-                    </button>
-
-                    <button
-                      onClick={handleApplyToActive}
-                      className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                      className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95"
                     >
                       <Check className="w-4 h-4" />
-                      <span>Aplicar a Proyecto Activo</span>
+                      <span>Crear Nuevo Proyecto</span>
                     </button>
                   </div>
                 </div>
