@@ -115,10 +115,13 @@ npm run build && npm run build:electron
 ```
 
 ### Herramientas de Control de Versiones y Repositorio:
+* **Estrategia de Ramas Dual (`main` vs `beta`)**:
+  - `main`: **Rama Estable / Producción**. Contiene las versiones publicadas a los clientes. Solo recibe parches de estabilidad críticos (hotfixes) y merges finales de `beta`.
+  - `beta`: **Rama de Desarrollo Activo / Nuevas Funciones**. Aquí se implementan todas las nuevas características, mejoras visuales y refactorizaciones antes de ser publicadas en producción.
 * **Git**:
   - `git status` / `git diff`: Inspección de cambios.
   - `git add . && git commit -m "tipo(alcance): Mensaje descriptivo"`: Confirmación de cambios estructurados (siguiendo Conventional Commits: `fix`, `feat`, `docs`, `refactor`).
-  - `git push origin main`: Envío directo a la rama principal de GitHub (`WilkerDev1/solarsim-pro`).
+  - `git push origin beta` o `git push origin main`: Envío a la rama correspondiente.
 * **GitHub CLI (`gh`)**:
   - Para crear y publicar releases con binarios adjuntos:
     ```bash
@@ -127,29 +130,50 @@ npm run build && npm run build:electron
 
 ---
 
-## 4. 🚀 Flujo Paso a Paso para Lanzar una Nueva Versión (Release)
+## 4. 🔀 Flujo de Trabajo en Paralelo y Lanzamiento de Versiones
 
-Cuando el usuario pida lanzar una nueva versión (ej. `v1.3.8`):
+### A. Desarrollo de Nuevas Funciones (Flujo habitual en `beta`):
+1. Asegurar estar en `beta`: `git checkout beta && git pull origin beta`.
+2. Desarrollar la funcionalidad y validar: `npm run lint && npx tsx src/engine/testBenchmark.ts`.
+3. Confirmar cambios: `git commit -m "feat(modulo): descripción"` y enviar: `git push origin beta`.
 
-1. **Actualizar la versión en `package.json`**:
-   - Cambiar `"version": "1.3.8"`.
-2. **Compilar los instaladores de escritorio**:
-   - Para Linux: `npm run build:linux` (genera `.AppImage`, `.pacman`, `.deb`, `.tar.gz` en `release/`).
-   - Para Windows: `npm run build:win` (genera instalador `.exe` NSIS y portable en `release/`).
-3. **Crear notas de la versión**:
-   - Crear el archivo `release/release-notes-v1.3.8.md` detallando las novedades.
-4. **Confirmar cambios y crear Tag en Git**:
+### B. Parches Críticos / Hotfixes en Producción (`main`):
+1. Cambiar a `main`: `git checkout main && git pull origin main`.
+2. Aplicar el parche y validar.
+3. Confirmar en `main` y publicar versión de parche (ej. `v1.3.10`).
+4. **Sincronizar hacia `beta`** para que el fix esté en desarrollo:
+   ```bash
+   git checkout beta
+   git merge main
+   git push origin beta
+   ```
+
+### C. Lanzamiento de Nueva Versión Estable (Merge de `beta` a `main`):
+Cuando las nuevas funciones en `beta` estén listas para producción (ej. `v1.4.0`):
+1. Validar en `beta`: `npm run lint && npx tsx src/engine/testBenchmark.ts && npm run build`.
+2. Fusionar `beta` en `main`:
+   ```bash
+   git checkout main
+   git merge beta
+   ```
+3. Incrementar versión en `package.json` (`"version": "1.4.0"`).
+4. Compilar instaladores: `npm run build:linux` y/o `npm run build:win`.
+5. Crear notas de versión: `release/release-notes-v1.4.0.md`.
+6. Confirmar, etiquetar y publicar:
    ```bash
    git add .
-   git commit -m "chore(release): Bump version to 1.3.8 and generate binaries"
-   git tag v1.3.8
+   git commit -m "chore(release): Bump version to 1.4.0 and generate binaries"
+   git tag v1.4.0
    git push origin main --tags
+   gh release create v1.4.0 release/SolarSim* release/solarsim* release/latest* \
+     --title "⚡ SolarSim Pro v1.4.0" \
+     --notes-file release/release-notes-v1.4.0.md
    ```
-5. **Crear la Release en GitHub con `gh`**:
+7. Sincronizar de vuelta a `beta` para mantener versionado alineado:
    ```bash
-   gh release create v1.3.8 release/SolarSim* release/solarsim* release/latest* \
-     --title "⚡ SolarSim Pro v1.3.8" \
-     --notes-file release/release-notes-v1.3.8.md
+   git checkout beta
+   git merge main
+   git push origin beta
    ```
 
 ---
