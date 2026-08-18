@@ -130,46 +130,52 @@ npm run build && npm run build:electron
 
 ---
 
-## 4. 🔀 Flujo de Trabajo en Paralelo y Lanzamiento de Versiones
+## 4. 🔀 Flujo de Trabajo en Paralelo (`main` vs `beta`)
 
-### A. Desarrollo de Nuevas Funciones (Flujo habitual en `beta`):
-1. Asegurar estar en `beta`: `git checkout beta && git pull origin beta`.
-2. Desarrollar la funcionalidad y validar: `npm run lint && npx tsx src/engine/testBenchmark.ts`.
-3. Confirmar cambios: `git commit -m "feat(modulo): descripción"` y enviar: `git push origin beta`.
+Para mantener el código ordenado y evitar romper la versión en producción de los clientes:
 
-### B. Parches Críticos / Hotfixes en Producción (`main`):
-1. Cambiar a `main`: `git checkout main && git pull origin main`.
-2. Aplicar el parche y validar.
-3. Confirmar en `main` y publicar versión de parche (ej. `v1.3.10`).
-4. **Sincronizar hacia `beta`** para que el fix esté en desarrollo:
+### A. Desarrollo de Nuevas Funciones (En rama `beta`):
+1. Todo nuevo desarrollo se realiza en `beta`:
+   ```bash
+   git checkout beta && git pull origin beta
+   ```
+2. Desarrollar la funcionalidad y validar:
+   ```bash
+   npm run lint && npx tsx src/engine/testBenchmark.ts
+   ```
+3. Confirmar cambios con commits semánticos y subir:
+   ```bash
+   git add . && git commit -m "feat(modulo): Descripción de la nueva función"
+   git push origin beta
+   ```
+
+### B. Parches Críticos / Hotfixes en Producción (En rama `main`):
+1. Si surge un bug urgente en producción, cambiar a `main`:
+   ```bash
+   git checkout main && git pull origin main
+   ```
+2. Aplicar la corrección y validar.
+3. Crear el release de parche (ej. `v1.3.10`) siguiendo el protocolo de la Sección 5.
+4. **Sincronizar hacia `beta`** inmediatamente para que desarrollo no pierda el arreglo:
    ```bash
    git checkout beta
    git merge main
    git push origin beta
    ```
 
-### C. Lanzamiento de Nueva Versión Estable (Merge de `beta` a `main`):
-Cuando las nuevas funciones en `beta` estén listas para producción (ej. `v1.4.0`):
-1. Validar en `beta`: `npm run lint && npx tsx src/engine/testBenchmark.ts && npm run build`.
+### C. Fusión / Merge de Beta hacia Main (Cierre de Versión):
+Cuando un conjunto de funciones en `beta` esté completamente listo y probado para salir al público:
+1. Validar suite completa en `beta`:
+   ```bash
+   npm run lint && npx tsx src/engine/testBenchmark.ts && npm run build
+   ```
 2. Fusionar `beta` en `main`:
    ```bash
    git checkout main
    git merge beta
    ```
-3. Incrementar versión en `package.json` (`"version": "1.4.0"`).
-4. Compilar instaladores: `npm run build:linux` y/o `npm run build:win`.
-5. Crear notas de versión: `release/release-notes-v1.4.0.md`.
-6. Confirmar, etiquetar y publicar:
-   ```bash
-   git add .
-   git commit -m "chore(release): Bump version to 1.4.0 and generate binaries"
-   git tag v1.4.0
-   git push origin main --tags
-   gh release create v1.4.0 release/SolarSim* release/solarsim* release/latest* \
-     --title "⚡ SolarSim Pro v1.4.0" \
-     --notes-file release/release-notes-v1.4.0.md
-   ```
-7. Sincronizar de vuelta a `beta` para mantener versionado alineado:
+3. Ejecutar el **Protocolo de Lanzamiento de Release (Sección 5)** para compilar y publicar la nueva versión mayor/menor (ej. `v1.4.0`).
+4. Sincronizar de vuelta a `beta`:
    ```bash
    git checkout beta
    git merge main
@@ -178,7 +184,76 @@ Cuando las nuevas funciones en `beta` estén listas para producción (ej. `v1.4.
 
 ---
 
-## 5. ⚠️ Invariantes Críticas y Reglas Inquebrantables
+## 5. 🚀 Protocolo Maestro de Lanzamiento de Releases (Release Runbook)
+
+Este es el procedimiento exacto que ejecuto cuando solicitas publicar una actualización (ya sea un hotfix o una nueva versión estable):
+
+### Paso 1: Actualizar la versión en `package.json`
+Modificar `"version"` (ejemplo: `"1.4.0"` o `"1.3.10"`).
+
+### Paso 2: Validación de Tipos y Motores
+```bash
+npm run lint                  # tsc --noEmit (Cero errores)
+npx tsx src/engine/testBenchmark.ts   # Validación matemática de Ley 57-07, VAN, TIR, Payback
+```
+
+### Paso 3: Compilación del Frontend y Runtime de Electron
+```bash
+npm run build && npm run build:electron
+```
+
+### Paso 4: Empaquetar Binarios para Windows y Linux
+```bash
+npx electron-builder --win --linux
+```
+*(Genera `.exe`, `.AppImage`, `.pacman`, `.deb`, `.tar.gz`, `latest.yml` y `latest-linux.yml` en la carpeta `release/`).*
+
+### Paso 5: Preparación de Nombres y Firmas Criptográficas GPG (Linux)
+```bash
+python3 -c "
+import shutil, os, subprocess
+
+v = '1.4.0' # Versión a lanzar
+
+# Copias de compatibilidad para electron-updater
+shutil.copyfile(f'release/SolarSim Pro Setup {v}.exe', f'release/SolarSim-Pro-Setup-{v}.exe')
+shutil.copyfile(f'release/SolarSim Pro Setup {v}.exe.blockmap', f'release/SolarSim-Pro-Setup-{v}.exe.blockmap')
+shutil.copyfile(f'release/SolarSim Pro {v}.exe', f'release/SolarSim-Pro-{v}.exe')
+shutil.copyfile(f'release/SolarSim Pro-{v}.AppImage', f'release/SolarSim-Pro-{v}.AppImage')
+
+# Exportar clave pública GPG
+subprocess.run(['gpg', '--armor', '--export', 'C22D550C3A2C8FAF'], stdout=open('release/solarsim-public-key.asc', 'w'), check=True)
+
+# Firmar paquetes de Linux
+for target in [f'release/solarsim-pro-{v}.pacman', f'release/solarsim-pro-{v}.tar.gz', f'release/SolarSim-Pro-{v}.AppImage']:
+    sig = target + '.sig'
+    if os.path.exists(sig):
+        os.remove(sig)
+    subprocess.run(['gpg', '--detach-sign', '--yes', target], check=True)
+"
+```
+
+### Paso 6: Crear Notas de la Versión
+Crear el archivo `release/release-notes-v1.4.0.md` detallando las novedades y mejoras.
+
+### Paso 7: Commit, Tag y Push a GitHub
+```bash
+git add .
+git commit -m "chore(release): Bump version to 1.4.0 and generate binaries"
+git tag v1.4.0
+git push origin main --tags
+```
+
+### Paso 8: Publicar la Release Oficial en GitHub vía CLI (`gh`)
+```bash
+gh release create v1.4.0 release/SolarSim* release/solarsim* release/latest* \
+  --title "⚡ SolarSim Pro v1.4.0" \
+  --notes-file release/release-notes-v1.4.0.md
+```
+
+---
+
+## 6. ⚠️ Invariantes Críticas y Reglas Inquebrantables
 
 ### 📄 Exportación a PDF con `html2canvas` & `jsPDF`:
 1. **NUNCA usar `truncate` o `overflow: hidden` en etiquetas de texto**:
