@@ -8,6 +8,7 @@ import { NewProjectModal } from './components/common/NewProjectModal';
 import { UpdateModal } from './components/common/UpdateModal';
 import { AIInvoiceScannerModal } from './components/common/AIInvoiceScannerModal';
 import { AISettingsModal } from './components/common/AISettingsModal';
+import { ImportConflictModal } from './components/common/ImportConflictModal';
 import { SplashScreen } from './components/common/SplashScreen';
 
 export const App: React.FC = () => {
@@ -35,6 +36,7 @@ export const App: React.FC = () => {
       <UpdateModal />
       <AIInvoiceScannerModal />
       <AISettingsModal />
+      <ImportConflictModal />
     </div>
   );
 };

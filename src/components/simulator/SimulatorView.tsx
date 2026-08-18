@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSimulationStore } from '../../store/useSimulationStore';
+import { useSimulationStore, generateNextProjectSequence, findDuplicateProjectInfo } from '../../store/useSimulationStore';
 import { RD_PROVINCES } from '../../data/rdProvinces';
 import { fetchSolarRadiationByCoordinates } from '../../services/solarRadiationApi';
 import {
@@ -31,10 +31,15 @@ import {
   Sun,
   DollarSign,
   Landmark,
+  Lock,
+  Unlock,
+  AlertTriangle,
+  Hash,
 } from 'lucide-react';
 
 export const SimulatorView: React.FC = () => {
   const {
+    projects,
     getActiveProject,
     getFinancialSummary,
     updateClient,
@@ -51,6 +56,7 @@ export const SimulatorView: React.FC = () => {
 
   const isDark = sidebarTheme === 'dark';
   const [isDragging, setIsDragging] = useState(false);
+  const [isIdUnlocked, setIsIdUnlocked] = useState(false);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -459,38 +465,117 @@ export const SimulatorView: React.FC = () => {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                      ID del Proyecto
-                    </label>
-                    <input
-                      type="text"
-                      value={project.client.projectId}
-                      onChange={(e) => updateClient({ projectId: e.target.value })}
-                      className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                        isDark
-                          ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                          : 'bg-slate-50 border-slate-300 text-slate-800'
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                      N° Cotización
-                    </label>
-                    <input
-                      type="text"
-                      value={project.client.quoteNumber || 'C-0030'}
-                      onChange={(e) => updateClient({ quoteNumber: e.target.value })}
-                      className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                        isDark
-                          ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                          : 'bg-slate-50 border-slate-300 text-slate-800'
-                      }`}
-                    />
-                  </div>
-                </div>
+                {/* ID del Proyecto & N° Cotización con Bloqueo/Auto y Validación */}
+                {(() => {
+                  const duplicateCheck = findDuplicateProjectInfo(
+                    project.client.projectId,
+                    project.client.quoteNumber || '',
+                    project.id,
+                    projects
+                  );
+
+                  return (
+                    <div className="space-y-2 pt-1">
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                          <span>Código & Cotización</span>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold border ${
+                            isDark ? 'bg-emerald-950/60 text-emerald-300 border-emerald-700/50' : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                          }`}>
+                            Auto
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsIdUnlocked(!isIdUnlocked)}
+                          className={`text-[11px] font-bold flex items-center gap-1 px-2 py-0.5 rounded-lg border transition-colors cursor-pointer ${
+                            isIdUnlocked
+                              ? 'border-amber-500/50 text-amber-400 bg-amber-500/10'
+                              : isDark
+                              ? 'border-[#3f3f46] text-zinc-400 hover:text-zinc-200 bg-[#24242e]'
+                              : 'border-slate-300 text-slate-600 hover:text-slate-900 bg-slate-100'
+                          }`}
+                          title={isIdUnlocked ? 'Bloquear identificadores automáticos' : 'Desbloquear para editar manualmente el ID o cotización'}
+                        >
+                          {isIdUnlocked ? <Unlock className="w-3 h-3 text-amber-400" /> : <Lock className="w-3 h-3" />}
+                          <span>{isIdUnlocked ? 'Editable' : 'Bloqueado'}</span>
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                            ID del Proyecto
+                          </label>
+                          <input
+                            type="text"
+                            value={project.client.projectId}
+                            disabled={!isIdUnlocked}
+                            onChange={(e) => updateClient({ projectId: e.target.value })}
+                            className={`w-full border rounded-lg px-3 py-1.5 text-xs font-mono font-bold transition-all ${
+                              !isIdUnlocked
+                                ? 'opacity-80 cursor-not-allowed ' + (isDark ? 'bg-[#18181f] border-[#2f2f3c] text-emerald-400' : 'bg-slate-100 border-slate-200 text-emerald-800')
+                                : duplicateCheck.isProjectIdDuplicate
+                                ? 'border-red-500 bg-red-500/10 text-red-300 ring-1 ring-red-500'
+                                : isDark
+                                ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:border-emerald-500'
+                                : 'bg-white border-slate-300 text-slate-800 focus:border-emerald-600'
+                            }`}
+                          />
+                        </div>
+                        <div>
+                          <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                            N° Cotización
+                          </label>
+                          <input
+                            type="text"
+                            value={project.client.quoteNumber || 'C-0030'}
+                            disabled={!isIdUnlocked}
+                            onChange={(e) => updateClient({ quoteNumber: e.target.value })}
+                            className={`w-full border rounded-lg px-3 py-1.5 text-xs font-mono font-bold transition-all ${
+                              !isIdUnlocked
+                                ? 'opacity-80 cursor-not-allowed ' + (isDark ? 'bg-[#18181f] border-[#2f2f3c] text-emerald-400' : 'bg-slate-100 border-slate-200 text-emerald-800')
+                                : duplicateCheck.isQuoteDuplicate
+                                ? 'border-red-500 bg-red-500/10 text-red-300 ring-1 ring-red-500'
+                                : isDark
+                                ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:border-emerald-500'
+                                : 'bg-white border-slate-300 text-slate-800 focus:border-emerald-600'
+                            }`}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Warning if Duplicate */}
+                      {(duplicateCheck.isProjectIdDuplicate || duplicateCheck.isQuoteDuplicate) && (
+                        <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/30 flex items-start gap-2 text-red-400 text-[11px] animate-in fade-in">
+                          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                          <div className="flex-1 min-w-0">
+                            <span>
+                              {duplicateCheck.isProjectIdDuplicate && duplicateCheck.isQuoteDuplicate
+                                ? `Este ID y cotización ya pertenecen a "${duplicateCheck.duplicateProjectName}".`
+                                : duplicateCheck.isProjectIdDuplicate
+                                ? `El ID "${project.client.projectId}" ya está registrado en "${duplicateCheck.duplicateProjectName}".`
+                                : `La cotización "${project.client.quoteNumber}" ya está en uso por "${duplicateCheck.duplicateProjectName}".`}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextSeq = generateNextProjectSequence(projects);
+                                updateClient({
+                                  projectId: nextSeq.projectId,
+                                  quoteNumber: nextSeq.quoteNumber,
+                                });
+                              }}
+                              className="block text-emerald-400 hover:text-emerald-300 underline font-bold mt-1 cursor-pointer"
+                            >
+                              🪄 Asignar siguiente código libre automáticamente
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>

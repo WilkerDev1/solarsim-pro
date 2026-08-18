@@ -68,6 +68,13 @@ interface SimulationState {
   exportProjectAsJSON: (id?: string) => void;
   exportAllProjectsAsJSON: () => void;
   importProjectsFromJSON: (jsonData: any) => { success: boolean; message: string; count: number };
+  pendingImportConflict: {
+    incomingProject: ProjectSimulation;
+    conflictingProject: ProjectSimulation;
+    reason: string;
+  } | null;
+  resolveImportConflict: (strategy: 'next_sequence' | 'overwrite' | 'copy_version') => void;
+  cancelImportConflict: () => void;
 
   // Theme & Appearance
   sidebarTheme: 'dark' | 'light';
@@ -193,6 +200,73 @@ const INITIAL_PROJECTS: ProjectSimulation[] = [
   },
 ];
 
+export function generateNextProjectSequence(existingProjects: ProjectSimulation[], targetYear?: number): { projectId: string; quoteNumber: string } {
+  const currentYear = targetYear || new Date().getFullYear();
+  let maxSeq = 0;
+
+  for (const p of existingProjects) {
+    if (!p.client) continue;
+
+    if (p.client.projectId) {
+      const match = p.client.projectId.match(/\d+$/);
+      if (match) {
+        const num = parseInt(match[0], 10);
+        if (!isNaN(num) && num > maxSeq) {
+          maxSeq = num;
+        }
+      }
+    }
+
+    if (p.client.quoteNumber) {
+      const match = p.client.quoteNumber.match(/\d+$/);
+      if (match) {
+        const num = parseInt(match[0], 10);
+        if (!isNaN(num) && num > maxSeq) {
+          maxSeq = num;
+        }
+      }
+    }
+  }
+
+  const nextNum = maxSeq + 1;
+  const formattedProj = `SP-${currentYear}-${nextNum.toString().padStart(3, '0')}`;
+  const formattedQuote = `C-${nextNum.toString().padStart(4, '0')}`;
+
+  return {
+    projectId: formattedProj,
+    quoteNumber: formattedQuote,
+  };
+}
+
+export function findDuplicateProjectInfo(
+  projectId: string,
+  quoteNumber: string,
+  currentInternalId: string,
+  projects: ProjectSimulation[]
+): { isProjectIdDuplicate: boolean; isQuoteDuplicate: boolean; duplicateProjectName?: string } {
+  const normalizedProjId = projectId?.trim().toLowerCase();
+  const normalizedQuote = quoteNumber?.trim().toLowerCase();
+
+  let isProjectIdDuplicate = false;
+  let isQuoteDuplicate = false;
+  let duplicateProjectName: string | undefined;
+
+  for (const p of projects) {
+    if (p.id === currentInternalId) continue;
+
+    if (normalizedProjId && p.client?.projectId?.trim().toLowerCase() === normalizedProjId) {
+      isProjectIdDuplicate = true;
+      duplicateProjectName = p.client.name;
+    }
+    if (normalizedQuote && p.client?.quoteNumber?.trim().toLowerCase() === normalizedQuote) {
+      isQuoteDuplicate = true;
+      if (!duplicateProjectName) duplicateProjectName = p.client.name;
+    }
+  }
+
+  return { isProjectIdDuplicate, isQuoteDuplicate, duplicateProjectName };
+}
+
 export const useSimulationStore = create<SimulationState>()(
   persist(
     (set, get) => ({
@@ -208,6 +282,7 @@ export const useSimulationStore = create<SimulationState>()(
       isAISettingsModalOpen: false,
       updateInfo: { state: 'idle' },
       saveFeedbackMessage: null,
+      pendingImportConflict: null,
 
       geminiApiKey: '',
       geminiModel: 'gemini-3.5-flash-lite',
@@ -407,6 +482,7 @@ export const useSimulationStore = create<SimulationState>()(
             targetProjectId = `proj-${Date.now()}`;
             const panelW = BENCHMARK_PROJECT.specs.panelPowerW || 620;
             const count = data.recommendedPanelCount || Math.max(1, Math.ceil(((data.recommendedCapacityKWp || 10) * 1000) / panelW));
+            const seq = generateNextProjectSequence(projects);
             
             const newProj: ProjectSimulation = {
               ...BENCHMARK_PROJECT,
@@ -425,8 +501,8 @@ export const useSimulationStore = create<SimulationState>()(
                 tariffCode: data.tariffCode,
                 contactPhone: data.phone || '',
                 contactEmail: data.email || '',
-                projectId: `SP-2026-${Math.floor(100 + Math.random() * 900)}`,
-                quoteNumber: `C-${Math.floor(1000 + Math.random() * 9000)}`,
+                projectId: seq.projectId,
+                quoteNumber: seq.quoteNumber,
                 quoteValidityDays: 7,
               },
               specs: {
@@ -512,6 +588,7 @@ export const useSimulationStore = create<SimulationState>()(
         const distributor = typeof payload === 'object' && payload?.distributor ? payload.distributor : 'EDEESTE';
         const tariffCode = typeof payload === 'object' && payload?.tariffCode ? payload.tariffCode : 'BTS2';
         const address = typeof payload === 'object' && payload?.address ? payload.address : `${province}, República Dominicana`;
+        const seq = generateNextProjectSequence(get().projects);
 
         const newProj: ProjectSimulation = {
           ...BENCHMARK_PROJECT,
@@ -528,8 +605,8 @@ export const useSimulationStore = create<SimulationState>()(
             address,
             distributor,
             tariffCode,
-            projectId: `SP-2026-${Math.floor(100 + Math.random() * 900)}`,
-            quoteNumber: `C-${Math.floor(1000 + Math.random() * 9000)}`,
+            projectId: seq.projectId,
+            quoteNumber: seq.quoteNumber,
             quoteValidityDays: 7,
           },
           rates: {
@@ -544,7 +621,7 @@ export const useSimulationStore = create<SimulationState>()(
           activeProjectId: id,
           activeView: 'simulator',
           isNewProjectModalOpen: false,
-          saveFeedbackMessage: `¡Proyecto "${name}" creado con éxito!`,
+          saveFeedbackMessage: `¡Proyecto "${name}" (${seq.projectId}) creado con éxito!`,
         }));
 
         setTimeout(() => {
@@ -557,6 +634,7 @@ export const useSimulationStore = create<SimulationState>()(
         if (!target) return;
 
         const newId = `proj-${Date.now()}`;
+        const seq = generateNextProjectSequence(get().projects);
         const cloned: ProjectSimulation = {
           ...target,
           id: newId,
@@ -566,8 +644,8 @@ export const useSimulationStore = create<SimulationState>()(
           client: {
             ...target.client,
             name: `${target.client.name} (Copia)`,
-            projectId: `SP-2026-${Math.floor(100 + Math.random() * 900)}`,
-            quoteNumber: `C-${Math.floor(1000 + Math.random() * 9000)}`,
+            projectId: seq.projectId,
+            quoteNumber: seq.quoteNumber,
           },
         };
 
@@ -575,7 +653,7 @@ export const useSimulationStore = create<SimulationState>()(
           projects: [cloned, ...state.projects],
           activeProjectId: newId,
           activeView: 'simulator',
-          saveFeedbackMessage: `¡Copia creada con éxito!`,
+          saveFeedbackMessage: `¡Copia creada con éxito (${seq.projectId})!`,
         }));
 
         setTimeout(() => {
@@ -712,12 +790,49 @@ export const useSimulationStore = create<SimulationState>()(
           }
 
           const currentProjects = get().projects;
+
+          // If a SINGLE project is imported, check for ID / quote conflict to offer Option C modal
+          if (importedList.length === 1) {
+            const incoming = importedList[0];
+            const conflicting = currentProjects.find(
+              (p) =>
+                p.id === incoming.id ||
+                (p.client?.projectId && incoming.client?.projectId && p.client.projectId.trim().toLowerCase() === incoming.client.projectId.trim().toLowerCase()) ||
+                (p.client?.quoteNumber && incoming.client?.quoteNumber && p.client.quoteNumber.trim().toLowerCase() === incoming.client.quoteNumber.trim().toLowerCase())
+            );
+
+            if (conflicting) {
+              let reason = '';
+              if (conflicting.client?.projectId?.trim().toLowerCase() === incoming.client?.projectId?.trim().toLowerCase()) {
+                reason = `El ID de Proyecto "${incoming.client.projectId}" ya está registrado por "${conflicting.client.name}".`;
+              } else if (conflicting.client?.quoteNumber?.trim().toLowerCase() === incoming.client?.quoteNumber?.trim().toLowerCase()) {
+                reason = `El N° de Cotización "${incoming.client.quoteNumber}" ya está registrado por "${conflicting.client.name}".`;
+              } else {
+                reason = `El proyecto ya existe en tu catálogo ("${conflicting.client.name}").`;
+              }
+
+              set({
+                pendingImportConflict: {
+                  incomingProject: incoming,
+                  conflictingProject: conflicting,
+                  reason,
+                },
+              });
+
+              return {
+                success: true,
+                message: 'Se detectó un conflicto de ID. Selecciona cómo deseas importarlo.',
+                count: 1,
+              };
+            }
+          }
+
+          // If no conflict or multiple projects in backup, process directly with unique IDs
           const existingIds = new Set(currentProjects.map((p) => p.id));
           const processedProjects: ProjectSimulation[] = [];
 
           for (const proj of importedList) {
             let finalId = proj.id;
-            // Generate a unique ID if already present or invalid
             if (!finalId || existingIds.has(finalId)) {
               finalId = `proj-imported-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
             }
@@ -730,7 +845,6 @@ export const useSimulationStore = create<SimulationState>()(
             });
           }
 
-          // Prepend newly imported projects
           const newProjectsList = [...processedProjects, ...currentProjects];
           const firstImportedId = processedProjects[0].id;
 
@@ -758,6 +872,74 @@ export const useSimulationStore = create<SimulationState>()(
             count: 0,
           };
         }
+      },
+
+      resolveImportConflict: (strategy) => {
+        const conflict = get().pendingImportConflict;
+        if (!conflict) return;
+
+        const { incomingProject, conflictingProject } = conflict;
+        const currentProjects = get().projects;
+        let updatedProjects: ProjectSimulation[] = [];
+        let targetActiveId = '';
+        let toastMsg = '';
+
+        if (strategy === 'next_sequence') {
+          const nextSeq = generateNextProjectSequence(currentProjects);
+          const newId = `proj-imported-${Date.now()}`;
+          const newProj: ProjectSimulation = {
+            ...incomingProject,
+            id: newId,
+            updatedAt: new Date().toISOString(),
+            client: {
+              ...incomingProject.client,
+              projectId: nextSeq.projectId,
+              quoteNumber: nextSeq.quoteNumber,
+            },
+          };
+          updatedProjects = [newProj, ...currentProjects];
+          targetActiveId = newId;
+          toastMsg = `¡Proyecto importado con nuevo ID asignado (${nextSeq.projectId})!`;
+        } else if (strategy === 'overwrite') {
+          const updatedProj: ProjectSimulation = {
+            ...incomingProject,
+            id: conflictingProject.id,
+            updatedAt: new Date().toISOString(),
+          };
+          updatedProjects = currentProjects.map((p) => (p.id === conflictingProject.id ? updatedProj : p));
+          targetActiveId = conflictingProject.id;
+          toastMsg = `¡Proyecto "${incomingProject.client.name}" sobrescrito con éxito!`;
+        } else if (strategy === 'copy_version') {
+          const newId = `proj-imported-${Date.now()}`;
+          const newProj: ProjectSimulation = {
+            ...incomingProject,
+            id: newId,
+            updatedAt: new Date().toISOString(),
+            client: {
+              ...incomingProject.client,
+              name: `${incomingProject.client.name} (Copia Importada)`,
+              projectId: `${incomingProject.client.projectId}-B`,
+              quoteNumber: `${incomingProject.client.quoteNumber}-B`,
+            },
+          };
+          updatedProjects = [newProj, ...currentProjects];
+          targetActiveId = newId;
+          toastMsg = `¡Proyecto importado como versión (${newProj.client.projectId})!`;
+        }
+
+        set({
+          projects: updatedProjects,
+          activeProjectId: targetActiveId,
+          activeView: 'simulator',
+          pendingImportConflict: null,
+          saveFeedbackMessage: toastMsg,
+        });
+
+        setTimeout(() => set({ saveFeedbackMessage: null }), 4000);
+      },
+
+      cancelImportConflict: () => {
+        set({ pendingImportConflict: null });
       },
 
       getActiveProject: () => {
