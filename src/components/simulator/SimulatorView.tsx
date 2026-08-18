@@ -13,7 +13,25 @@ import {
   ResponsiveContainer,
   Cell,
 } from 'recharts';
-import { Globe, CheckCircle2, AlertCircle, Loader2, ShieldCheck, Check, Package, FileText, Save, Clock, Sparkles } from 'lucide-react';
+import {
+  Globe,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  ShieldCheck,
+  Check,
+  Package,
+  FileText,
+  Save,
+  Clock,
+  Sparkles,
+  ChevronDown,
+  User,
+  Receipt,
+  Sun,
+  DollarSign,
+  Landmark,
+} from 'lucide-react';
 
 export const SimulatorView: React.FC = () => {
   const {
@@ -74,6 +92,34 @@ export const SimulatorView: React.FC = () => {
   const [activeMainTab, setActiveMainTab] = useState<'energia' | 'cotizacion' | 'retorno'>('energia');
   const [isFetchingSolar, setIsFetchingSolar] = useState<boolean>(false);
   const [solarApiStatus, setSolarApiStatus] = useState<string | null>(null);
+
+  // Accordion state for sidebar parameter categories (default: all collapsed)
+  const [openSections, setOpenSections] = useState<{ [key: string]: boolean }>({
+    client: false,
+    rates: false,
+    equipment: false,
+    costs: false,
+    financials: false,
+  });
+
+  const toggleSection = (sectionKey: string) => {
+    setOpenSections((prev) => ({
+      ...prev,
+      [sectionKey]: !prev[sectionKey],
+    }));
+  };
+
+  const allSectionsOpen = Object.values(openSections).every(Boolean);
+  const toggleAllSections = () => {
+    const nextState = !allSectionsOpen;
+    setOpenSections({
+      client: nextState,
+      rates: nextState,
+      equipment: nextState,
+      costs: nextState,
+      financials: nextState,
+    });
+  };
 
   // Auto-calculate panels logic when autoCalculatePanels is ON
   useEffect(() => {
@@ -197,195 +243,475 @@ export const SimulatorView: React.FC = () => {
           </button>
         </div>
 
-        <div className="p-5 space-y-6 flex-1">
-          {/* SECCIÓN 1: Proyecto y Cliente */}
-          <section className="space-y-3">
-            <h3
-              className={`flex items-center gap-2 font-bold text-xs uppercase tracking-wider ${
-                isDark ? 'text-emerald-400' : 'text-emerald-700'
+        <div className="p-4 space-y-3 flex-1 overflow-y-auto">
+          {/* Barra de control rápido: Expandir / Colapsar Todo */}
+          <div className="flex justify-between items-center px-1 pb-0.5">
+            <span className={`text-[11px] font-semibold ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+              Categorías de Configuración
+            </span>
+            <button
+              type="button"
+              onClick={toggleAllSections}
+              className={`text-[10px] font-bold px-2 py-0.5 rounded transition-colors cursor-pointer ${
+                isDark ? 'text-emerald-400 hover:bg-[#27272a]' : 'text-emerald-700 hover:bg-emerald-50'
               }`}
             >
-              <span className="material-symbols-outlined text-[16px]">person</span> Proyecto y Cliente
-            </h3>
-            <div className="space-y-3">
-              <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                  Nombre del Cliente
-                </label>
-                <input
-                  type="text"
-                  value={project.client.name}
-                  onChange={(e) => updateClient({ name: e.target.value })}
-                  className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    isDark
-                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:bg-[#202024] focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500'
-                      : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600'
-                  }`}
-                />
-              </div>
+              {allSectionsOpen ? 'Colapsar Todo' : 'Expandir Todo'}
+            </button>
+          </div>
 
-              <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                  Ubicación (Ciudad / Proyecto)
-                </label>
-                <input
-                  type="text"
-                  value={project.client.location}
-                  onChange={(e) => updateClient({ location: e.target.value })}
-                  className={`w-full border rounded-lg px-3 py-1.5 text-xs transition-all ${
-                    isDark
-                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:ring-1 focus:ring-emerald-500'
-                      : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600'
-                  }`}
-                />
+          {/* 1. SECCIÓN: Proyecto y Cliente */}
+          <div
+            className={`rounded-xl border overflow-hidden transition-all ${
+              isDark ? 'border-[#27272a] bg-[#1a1a24]' : 'border-slate-200 bg-white shadow-xs'
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => toggleSection('client')}
+              className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors ${
+                isDark ? 'text-zinc-200 hover:bg-[#222230]' : 'text-slate-800 hover:bg-slate-50'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <User className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span>1. Proyecto y Cliente</span>
               </div>
+              <ChevronDown
+                className={`w-4 h-4 text-zinc-400 transition-transform duration-200 ${
+                  openSections.client ? 'rotate-180 text-emerald-500' : ''
+                }`}
+              />
+            </button>
 
-              <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                  Dirección del Cliente
-                </label>
-                <input
-                  type="text"
-                  value={project.client.address || 'Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.'}
-                  onChange={(e) => updateClient({ address: e.target.value })}
-                  className={`w-full border rounded-lg px-3 py-1.5 text-xs transition-all ${
-                    isDark
-                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:ring-1 focus:ring-emerald-500'
-                      : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600'
-                  }`}
-                />
+            {openSections.client && (
+              <div
+                className={`p-3.5 pt-2 space-y-3 border-t ${
+                  isDark ? 'border-[#27272a] bg-[#14141c]/50' : 'border-slate-100 bg-slate-50/50'
+                }`}
+              >
+                <div>
+                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                    Nombre del Cliente
+                  </label>
+                  <input
+                    type="text"
+                    value={project.client.name}
+                    onChange={(e) => updateClient({ name: e.target.value })}
+                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                      isDark
+                        ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:bg-[#202024] focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500'
+                        : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                    Ubicación (Ciudad / Proyecto)
+                  </label>
+                  <input
+                    type="text"
+                    value={project.client.location}
+                    onChange={(e) => updateClient({ location: e.target.value })}
+                    className={`w-full border rounded-lg px-3 py-1.5 text-xs transition-all ${
+                      isDark
+                        ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:ring-1 focus:ring-emerald-500'
+                        : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                    Dirección del Cliente
+                  </label>
+                  <input
+                    type="text"
+                    value={project.client.address || 'Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.'}
+                    onChange={(e) => updateClient({ address: e.target.value })}
+                    className={`w-full border rounded-lg px-3 py-1.5 text-xs transition-all ${
+                      isDark
+                        ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:ring-1 focus:ring-emerald-500'
+                        : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600'
+                    }`}
+                  />
+                </div>
+
+                {/* Selector de Fuente de Radiación Solar: Provincia vs GPS Satelital */}
+                <div>
+                  <label className={`block text-xs font-medium mb-1.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                    Fuente de Radiación Solar
+                  </label>
+                  <div
+                    className={`flex rounded-lg p-1 border ${
+                      isDark ? 'bg-[#121214] border-[#27272a]' : 'bg-slate-200/80 border-slate-300/60'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => updateClient({ solarSourceMode: 'province' })}
+                      className={`flex-1 rounded-md py-1 text-[11px] font-semibold transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                        (project.client.solarSourceMode || 'province') === 'province'
+                          ? isDark
+                            ? 'bg-[#27272a] shadow-xs text-emerald-400 font-bold'
+                            : 'bg-white shadow-xs text-emerald-800 font-bold'
+                          : isDark
+                          ? 'text-zinc-400 hover:text-zinc-200'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[14px]">map</span> Provincia (Offline)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateClient({ solarSourceMode: 'gps' })}
+                      className={`flex-1 rounded-md py-1 text-[11px] font-semibold transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                        project.client.solarSourceMode === 'gps'
+                          ? isDark
+                            ? 'bg-[#27272a] shadow-xs text-emerald-400 font-bold'
+                            : 'bg-white shadow-xs text-emerald-800 font-bold'
+                          : isDark
+                          ? 'text-zinc-400 hover:text-zinc-200'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <Globe className="w-3.5 h-3.5" /> GPS Satelital (Online)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Opción 1: Selección por Provincia */}
+                {(project.client.solarSourceMode || 'province') === 'province' && (
+                  <div>
+                    <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                      Seleccionar Provincia
+                    </label>
+                    <select
+                      value={project.client.province}
+                      onChange={(e) => {
+                        updateClient({
+                          province: e.target.value,
+                          customMonthlyHSP: undefined,
+                        });
+                      }}
+                      className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer transition-all ${
+                        isDark
+                          ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:ring-1 focus:ring-emerald-500'
+                          : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600'
+                      }`}
+                    >
+                      {RD_PROVINCES.map((prov) => (
+                        <option key={prov.code} value={prov.name}>
+                          {prov.name} ({prov.avgHSP} HSP)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Opción 2: Obtener por GPS / Coordenadas */}
+                {project.client.solarSourceMode === 'gps' && (
+                  <div
+                    className={`space-y-2 p-3 rounded-lg border ${
+                      isDark ? 'bg-[#202024] border-emerald-900/60' : 'bg-emerald-50/50 border-emerald-200'
+                    }`}
+                  >
+                    <label className={`block text-xs font-semibold ${isDark ? 'text-emerald-400' : 'text-emerald-900'}`}>
+                      Coordenadas GPS (Latitud, Longitud)
+                    </label>
+                    <input
+                      type="text"
+                      value={project.client.coordinates || '18.4861, -69.9312'}
+                      onChange={(e) => updateClient({ coordinates: e.target.value })}
+                      placeholder="18.4861, -69.9312"
+                      className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                        isDark
+                          ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100'
+                          : 'bg-white border-slate-300 text-slate-800'
+                      }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleFetchSolarApi}
+                      disabled={isFetchingSolar}
+                      className="w-full py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-md text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      {isFetchingSolar ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Obteniendo de NASA...
+                        </>
+                      ) : (
+                        <>
+                          <Globe className="w-3.5 h-3.5" /> Obtener Radiación Satelital Online
+                        </>
+                      )}
+                    </button>
+                    {solarApiStatus && (
+                      <p
+                        className={`text-[10px] font-medium mt-1 flex items-center gap-1 ${
+                          isDark ? 'text-emerald-300' : 'text-emerald-700'
+                        }`}
+                      >
+                        <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" /> {solarApiStatus}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                      ID del Proyecto
+                    </label>
+                    <input
+                      type="text"
+                      value={project.client.projectId}
+                      onChange={(e) => updateClient({ projectId: e.target.value })}
+                      className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                        isDark
+                          ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
+                          : 'bg-slate-50 border-slate-300 text-slate-800'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                      N° Cotización
+                    </label>
+                    <input
+                      type="text"
+                      value={project.client.quoteNumber || 'C-0030'}
+                      onChange={(e) => updateClient({ quoteNumber: e.target.value })}
+                      className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                        isDark
+                          ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
+                          : 'bg-slate-50 border-slate-300 text-slate-800'
+                      }`}
+                    />
+                  </div>
+                </div>
               </div>
+            )}
+          </div>
 
-              {/* Selector de Fuente de Radiación Solar: Provincia vs GPS Satelital */}
-              <div>
-                <label className={`block text-xs font-medium mb-1.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                  Fuente de Radiación Solar
-                </label>
+          {/* 2. SECCIÓN: Tarifas y Distribuidora */}
+          <div
+            className={`rounded-xl border overflow-hidden transition-all ${
+              isDark ? 'border-[#27272a] bg-[#1a1a24]' : 'border-slate-200 bg-white shadow-xs'
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => toggleSection('rates')}
+              className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors ${
+                isDark ? 'text-zinc-200 hover:bg-[#222230]' : 'text-slate-800 hover:bg-slate-50'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span>2. Tarifas y Distribuidora</span>
+              </div>
+              <ChevronDown
+                className={`w-4 h-4 text-zinc-400 transition-transform duration-200 ${
+                  openSections.rates ? 'rotate-180 text-emerald-500' : ''
+                }`}
+              />
+            </button>
+
+            {openSections.rates && (
+              <div
+                className={`p-3.5 pt-2 space-y-3 border-t ${
+                  isDark ? 'border-[#27272a] bg-[#14141c]/50' : 'border-slate-100 bg-slate-50/50'
+                }`}
+              >
+                <div>
+                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                    Precio por kWh ($ USD)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.001"
+                    value={project.rates.energyCostPerKWh}
+                    onChange={(e) => updateRates({ energyCostPerKWh: parseFloat(e.target.value) || 0 })}
+                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                      isDark
+                        ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
+                        : 'bg-slate-50 border-slate-300 text-slate-800'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                    Empresa Distribuidora
+                  </label>
+                  <select
+                    value={project.rates.distributor || 'EDESUR'}
+                    onChange={(e) => updateRates({ distributor: e.target.value as any })}
+                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer transition-all ${
+                      isDark
+                        ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
+                        : 'bg-slate-50 border-slate-300 text-slate-800'
+                    }`}
+                  >
+                    <option value="EDEESTE">EDEESTE</option>
+                    <option value="EDESUR">EDESUR</option>
+                    <option value="EDENORTE">EDENORTE</option>
+                    <option value="CEPM">CEPM</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                    Cobertura Objetivo (%)
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    value={project.rates.targetCoveragePct ?? 95}
+                    onChange={(e) => updateRates({ targetCoveragePct: parseFloat(e.target.value) || 0 })}
+                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                      isDark
+                        ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
+                        : 'bg-slate-50 border-slate-300 text-slate-800'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                    Tipo de Tarifa
+                  </label>
+                  <select
+                    value={project.rates.tariffCode || 'BTS2'}
+                    onChange={(e) => updateRates({ tariffCode: e.target.value as any })}
+                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer transition-all ${
+                      isDark
+                        ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
+                        : 'bg-slate-50 border-slate-300 text-slate-800'
+                    }`}
+                  >
+                    <option value="BTS1">BTS1</option>
+                    <option value="BTS2">BTS2</option>
+                    <option value="MTD">MTD</option>
+                    <option value="BTD">BTD</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                    Cargo Exportación Red (%) (SIE-007-2026-REG)
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    value={project.rates.gridExportFeePct}
+                    onChange={(e) => updateRates({ gridExportFeePct: parseFloat(e.target.value) || 0 })}
+                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                      isDark
+                        ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
+                        : 'bg-slate-50 border-slate-300 text-slate-800'
+                    }`}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 3. SECCIÓN: Equipamiento y Sistema */}
+          <div
+            className={`rounded-xl border overflow-hidden transition-all ${
+              isDark ? 'border-[#27272a] bg-[#1a1a24]' : 'border-slate-200 bg-white shadow-xs'
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => toggleSection('equipment')}
+              className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors ${
+                isDark ? 'text-zinc-200 hover:bg-[#222230]' : 'text-slate-800 hover:bg-slate-50'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Sun className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span>3. Equipamiento y Sistema</span>
+              </div>
+              <ChevronDown
+                className={`w-4 h-4 text-zinc-400 transition-transform duration-200 ${
+                  openSections.equipment ? 'rotate-180 text-emerald-500' : ''
+                }`}
+              />
+            </button>
+
+            {openSections.equipment && (
+              <div
+                className={`p-3.5 pt-2 space-y-3 border-t ${
+                  isDark ? 'border-[#27272a] bg-[#14141c]/50' : 'border-slate-100 bg-slate-50/50'
+                }`}
+              >
+                {/* Selector de modo Simple / Detallado */}
                 <div
-                  className={`flex rounded-lg p-1 border ${
+                  className={`flex rounded-lg p-1 mb-2 border ${
                     isDark ? 'bg-[#121214] border-[#27272a]' : 'bg-slate-200/80 border-slate-300/60'
                   }`}
                 >
                   <button
                     type="button"
-                    onClick={() => updateClient({ solarSourceMode: 'province' })}
-                    className={`flex-1 rounded-md py-1 text-[11px] font-semibold transition-all flex items-center justify-center gap-1 ${
-                      (project.client.solarSourceMode || 'province') === 'province'
+                    onClick={() => updateSpecs({ isDetailed: false })}
+                    className={`flex-1 rounded-md py-1.5 text-[12px] transition-all text-center cursor-pointer ${
+                      !project.specs.isDetailed
                         ? isDark
-                          ? 'bg-[#27272a] shadow-xs text-emerald-400 font-bold'
-                          : 'bg-white shadow-xs text-emerald-800 font-bold'
+                          ? 'bg-[#27272a] shadow-xs text-white font-bold'
+                          : 'bg-white shadow-xs text-slate-900 font-bold'
                         : isDark
-                        ? 'text-zinc-400 hover:text-zinc-200'
-                        : 'text-slate-600 hover:text-slate-900'
+                        ? 'text-zinc-400 hover:text-zinc-200 font-semibold'
+                        : 'text-slate-600 hover:text-slate-900 font-semibold'
                     }`}
                   >
-                    <span className="material-symbols-outlined text-[14px]">map</span> Provincia (Offline)
+                    Simple
                   </button>
                   <button
                     type="button"
-                    onClick={() => updateClient({ solarSourceMode: 'gps' })}
-                    className={`flex-1 rounded-md py-1 text-[11px] font-semibold transition-all flex items-center justify-center gap-1 ${
-                      project.client.solarSourceMode === 'gps'
+                    onClick={() => updateSpecs({ isDetailed: true })}
+                    className={`flex-1 rounded-md py-1.5 text-[12px] transition-all text-center cursor-pointer ${
+                      project.specs.isDetailed
                         ? isDark
-                          ? 'bg-[#27272a] shadow-xs text-emerald-400 font-bold'
-                          : 'bg-white shadow-xs text-emerald-800 font-bold'
+                          ? 'bg-[#27272a] shadow-xs text-white font-bold'
+                          : 'bg-white shadow-xs text-slate-900 font-bold'
                         : isDark
-                        ? 'text-zinc-400 hover:text-zinc-200'
-                        : 'text-slate-600 hover:text-slate-900'
+                        ? 'text-zinc-400 hover:text-zinc-200 font-semibold'
+                        : 'text-slate-600 hover:text-slate-900 font-semibold'
                     }`}
                   >
-                    <Globe className="w-3.5 h-3.5" /> GPS Satelital (Online)
+                    Detallado
                   </button>
                 </div>
-              </div>
 
-              {/* Opción 1: Selección por Provincia */}
-              {(project.client.solarSourceMode || 'province') === 'province' && (
                 <div>
                   <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                    Seleccionar Provincia
-                  </label>
-                  <select
-                    value={project.client.province}
-                    onChange={(e) => {
-                      updateClient({
-                        province: e.target.value,
-                        customMonthlyHSP: undefined,
-                      });
-                    }}
-                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer transition-all ${
-                      isDark
-                        ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:ring-1 focus:ring-emerald-500'
-                        : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600'
-                    }`}
-                  >
-                    {RD_PROVINCES.map((prov) => (
-                      <option key={prov.code} value={prov.name}>
-                        {prov.name} ({prov.avgHSP} HSP)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Opción 2: Obtener por GPS / Coordenadas */}
-              {project.client.solarSourceMode === 'gps' && (
-                <div
-                  className={`space-y-2 p-3 rounded-lg border ${
-                    isDark ? 'bg-[#202024] border-emerald-900/60' : 'bg-emerald-50/50 border-emerald-200'
-                  }`}
-                >
-                  <label className={`block text-xs font-semibold ${isDark ? 'text-emerald-400' : 'text-emerald-900'}`}>
-                    Coordenadas GPS (Latitud, Longitud)
+                    Modelo / Marca Módulos
                   </label>
                   <input
                     type="text"
-                    value={project.client.coordinates || '18.4861, -69.9312'}
-                    onChange={(e) => updateClient({ coordinates: e.target.value })}
-                    placeholder="18.4861, -69.9312"
+                    value={project.specs.panelBrandModel || 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)'}
+                    onChange={(e) => updateSpecs({ panelBrandModel: e.target.value })}
                     className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                       isDark
-                        ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100'
-                        : 'bg-white border-slate-300 text-slate-800'
+                        ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
+                        : 'bg-slate-50 border-slate-300 text-slate-800'
                     }`}
                   />
-                  <button
-                    type="button"
-                    onClick={handleFetchSolarApi}
-                    disabled={isFetchingSolar}
-                    className="w-full py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-md text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
-                  >
-                    {isFetchingSolar ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Obteniendo de NASA...
-                      </>
-                    ) : (
-                      <>
-                        <Globe className="w-3.5 h-3.5" /> Obtener Radiación Satelital Online
-                      </>
-                    )}
-                  </button>
-                  {solarApiStatus && (
-                    <p
-                      className={`text-[10px] font-medium mt-1 flex items-center gap-1 ${
-                        isDark ? 'text-emerald-300' : 'text-emerald-700'
-                      }`}
-                    >
-                      <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" /> {solarApiStatus}
-                    </p>
-                  )}
                 </div>
-              )}
 
-              <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                    ID del Proyecto
+                    Potencia del Panel (W)
                   </label>
                   <input
-                    type="text"
-                    value={project.client.projectId}
-                    onChange={(e) => updateClient({ projectId: e.target.value })}
+                    type="number"
+                    step="5"
+                    value={project.specs.panelPowerW}
+                    onChange={(e) => updateSpecs({ panelPowerW: parseFloat(e.target.value) || 0 })}
                     className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
                       isDark
                         ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
@@ -393,756 +719,598 @@ export const SimulatorView: React.FC = () => {
                     }`}
                   />
                 </div>
-                <div>
-                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                    N° Cotización
-                  </label>
-                  <input
-                    type="text"
-                    value={project.client.quoteNumber || 'C-0030'}
-                    onChange={(e) => updateClient({ quoteNumber: e.target.value })}
-                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                      isDark
-                        ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                        : 'bg-slate-50 border-slate-300 text-slate-800'
-                    }`}
-                  />
-                </div>
-              </div>
-            </div>
-          </section>
 
-          {/* SECCIÓN 2: Tarifas y Distribuidora */}
-          <section className={`space-y-3 pt-2 border-t ${isDark ? 'border-[#27272a]' : 'border-slate-200'}`}>
-            <h3
-              className={`flex items-center gap-2 font-bold text-xs uppercase tracking-wider ${
-                isDark ? 'text-emerald-400' : 'text-emerald-700'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[16px]">payments</span> Tarifas y Distribuidora
-            </h3>
-            <div className="space-y-3">
-              <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                  Precio por kWh ($ USD)
-                </label>
-                <input
-                  type="number"
-                  step="0.001"
-                  value={project.rates.energyCostPerKWh}
-                  onChange={(e) => updateRates({ energyCostPerKWh: parseFloat(e.target.value) || 0 })}
-                  className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    isDark
-                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                      : 'bg-slate-50 border-slate-300 text-slate-800'
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                  Empresa Distribuidora
-                </label>
-                <select
-                  value={project.rates.distributor || 'EDESUR'}
-                  onChange={(e) => updateRates({ distributor: e.target.value as any })}
-                  className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer transition-all ${
-                    isDark
-                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                      : 'bg-slate-50 border-slate-300 text-slate-800'
-                  }`}
-                >
-                  <option value="EDEESTE">EDEESTE</option>
-                  <option value="EDESUR">EDESUR</option>
-                  <option value="EDENORTE">EDENORTE</option>
-                  <option value="CEPM">CEPM</option>
-                </select>
-              </div>
-
-              <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                  Cobertura Objetivo (%)
-                </label>
-                <input
-                  type="number"
-                  step="1"
-                  value={project.rates.targetCoveragePct ?? 95}
-                  onChange={(e) => updateRates({ targetCoveragePct: parseFloat(e.target.value) || 0 })}
-                  className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    isDark
-                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                      : 'bg-slate-50 border-slate-300 text-slate-800'
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                  Tipo de Tarifa
-                </label>
-                <select
-                  value={project.rates.tariffCode || 'BTS2'}
-                  onChange={(e) => updateRates({ tariffCode: e.target.value as any })}
-                  className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer transition-all ${
-                    isDark
-                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                      : 'bg-slate-50 border-slate-300 text-slate-800'
-                  }`}
-                >
-                  <option value="BTS1">BTS1</option>
-                  <option value="BTS2">BTS2</option>
-                  <option value="MTD">MTD</option>
-                  <option value="BTD">BTD</option>
-                </select>
-              </div>
-
-              <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                  Cargo Exportación Red (%) (SIE-007-2026-REG)
-                </label>
-                <input
-                  type="number"
-                  step="1"
-                  value={project.rates.gridExportFeePct}
-                  onChange={(e) => updateRates({ gridExportFeePct: parseFloat(e.target.value) || 0 })}
-                  className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    isDark
-                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                      : 'bg-slate-50 border-slate-300 text-slate-800'
-                  }`}
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* SECCIÓN 3: Equipamiento */}
-          <section className={`space-y-3 pt-2 border-t ${isDark ? 'border-[#27272a]' : 'border-slate-200'}`}>
-            <h3
-              className={`flex items-center gap-2 font-bold text-xs uppercase tracking-wider ${
-                isDark ? 'text-emerald-400' : 'text-emerald-700'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[16px]">solar_power</span> Equipamiento y Marcas
-            </h3>
-
-            {/* Selector de modo Simple / Detallado */}
-            <div
-              className={`flex rounded-lg p-1 mb-4 border ${
-                isDark ? 'bg-[#121214] border-[#27272a]' : 'bg-slate-200/80 border-slate-300/60'
-              }`}
-            >
-              <button
-                type="button"
-                onClick={() => updateSpecs({ isDetailed: false })}
-                className={`flex-1 rounded-md py-1.5 text-[12px] transition-all text-center ${
-                  !project.specs.isDetailed
-                    ? isDark
-                      ? 'bg-[#27272a] shadow-xs text-white font-bold'
-                      : 'bg-white shadow-xs text-slate-900 font-bold'
-                    : isDark
-                    ? 'text-zinc-400 hover:text-zinc-200 font-semibold'
-                    : 'text-slate-600 hover:text-slate-900 font-semibold'
-                }`}
-              >
-                Simple
-              </button>
-              <button
-                type="button"
-                onClick={() => updateSpecs({ isDetailed: true })}
-                className={`flex-1 rounded-md py-1.5 text-[12px] transition-all text-center ${
-                  project.specs.isDetailed
-                    ? isDark
-                      ? 'bg-[#27272a] shadow-xs text-white font-bold'
-                      : 'bg-white shadow-xs text-slate-900 font-bold'
-                    : isDark
-                    ? 'text-zinc-400 hover:text-zinc-200 font-semibold'
-                    : 'text-slate-600 hover:text-slate-900 font-semibold'
-                }`}
-              >
-                Detallado
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                  Modelo / Marca Módulos
-                </label>
-                <input
-                  type="text"
-                  value={project.specs.panelBrandModel || 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)'}
-                  onChange={(e) => updateSpecs({ panelBrandModel: e.target.value })}
-                  className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    isDark
-                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                      : 'bg-slate-50 border-slate-300 text-slate-800'
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                  Potencia del Panel (W)
-                </label>
-                <input
-                  type="number"
-                  step="5"
-                  value={project.specs.panelPowerW}
-                  onChange={(e) => updateSpecs({ panelPowerW: parseFloat(e.target.value) || 0 })}
-                  className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                    isDark
-                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                      : 'bg-slate-50 border-slate-300 text-slate-800'
-                  }`}
-                />
-              </div>
-
-              {/* Toggle Auto-Calcular Paneles */}
-              <div
-                className={`flex items-center justify-between p-2.5 rounded-lg border ${
-                  isDark ? 'bg-emerald-950/40 border-emerald-800/60' : 'bg-emerald-50/60 border-emerald-200/80'
-                }`}
-              >
-                <span className={`text-xs font-semibold ${isDark ? 'text-emerald-300' : 'text-emerald-950'}`}>
-                  Auto-Calcular Paneles
-                </span>
-                <input
-                  type="checkbox"
-                  checked={!!project.specs.autoCalculatePanels}
-                  onChange={(e) => updateSpecs({ autoCalculatePanels: e.target.checked })}
-                  className="rounded text-emerald-700 focus:ring-emerald-600 cursor-pointer"
-                />
-              </div>
-
-              <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                  Cantidad de Paneles
-                </label>
-                <input
-                  type="number"
-                  step="1"
-                  disabled={project.specs.autoCalculatePanels}
-                  value={project.specs.panelCount}
-                  onChange={(e) => updateSpecs({ panelCount: parseInt(e.target.value) || 0 })}
-                  className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all disabled:opacity-50 ${
-                    isDark
-                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                      : 'bg-slate-50 border-slate-300 text-slate-800'
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                  Modelo / Marca Inversor
-                </label>
-                <input
-                  type="text"
-                  value={project.specs.inverterBrandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)'}
-                  onChange={(e) => updateSpecs({ inverterBrandModel: e.target.value })}
-                  className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    isDark
-                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                      : 'bg-slate-50 border-slate-300 text-slate-800'
-                  }`}
-                />
-              </div>
-
-              {/* CAMPOS MODO DETALLADO */}
-              {project.specs.isDetailed && (
+                {/* Toggle Auto-Calcular Paneles */}
                 <div
-                  className={`space-y-3 p-3 rounded-lg border mt-3 ${
-                    isDark ? 'bg-[#202024] border-[#2e2e34]' : 'bg-emerald-50/50 border-emerald-200'
+                  className={`flex items-center justify-between p-2.5 rounded-lg border ${
+                    isDark ? 'bg-emerald-950/40 border-emerald-800/60' : 'bg-emerald-50/60 border-emerald-200/80'
                   }`}
                 >
-                  <h4
-                    className={`text-[11px] font-bold uppercase tracking-wider border-b pb-1 flex items-center gap-1.5 ${
-                      isDark ? 'text-emerald-400 border-[#2e2e34]' : 'text-emerald-900 border-emerald-200'
-                    }`}
-                  >
-                    <span className="material-symbols-outlined text-[14px]">tune</span> Parámetros Técnicos Avanzados
-                  </h4>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                        Potencia Inversor (kW)
-                      </label>
-                      <input
-                        type="number"
-                        step="1"
-                        value={project.specs.inverterPowerKW}
-                        onChange={(e) => updateSpecs({ inverterPowerKW: parseFloat(e.target.value) || 0 })}
-                        className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold ${
-                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                        }`}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                        Cantidad Inversores
-                      </label>
-                      <input
-                        type="number"
-                        step="1"
-                        value={project.specs.inverterCount || 1}
-                        onChange={(e) => updateSpecs({ inverterCount: parseInt(e.target.value) || 1 })}
-                        className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold ${
-                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                        }`}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                        Eficiencia Panel (%)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={project.specs.panelEfficiency}
-                        onChange={(e) => updateSpecs({ panelEfficiency: parseFloat(e.target.value) || 0 })}
-                        className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                        }`}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                        Coef. Temp (%/°C)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={project.specs.tempCoeff}
-                        onChange={(e) => updateSpecs({ tempCoeff: parseFloat(e.target.value) || 0 })}
-                        className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                        }`}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                        Pérdidas Sistema (%)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.5"
-                        value={project.specs.systemLosses}
-                        onChange={(e) => updateSpecs({ systemLosses: parseFloat(e.target.value) || 0 })}
-                        className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                        }`}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                        Degradación Anual (%)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        value={project.specs.annualDegradation}
-                        onChange={(e) => updateSpecs({ annualDegradation: parseFloat(e.target.value) || 0 })}
-                        className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                        }`}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Almacenamiento (Batería) Toggle & Campos */}
-              <div className={`pt-2 border-t space-y-3 ${isDark ? 'border-[#27272a]' : 'border-slate-200'}`}>
-                <div className="flex items-center justify-between">
-                  <label className={`text-xs font-semibold ${isDark ? 'text-zinc-200' : 'text-slate-700'}`}>
-                    Almacenamiento (Batería)
-                  </label>
+                  <span className={`text-xs font-semibold ${isDark ? 'text-emerald-300' : 'text-emerald-950'}`}>
+                    Auto-Calcular Paneles
+                  </span>
                   <input
                     type="checkbox"
-                    checked={project.specs.hasBattery}
-                    onChange={(e) => updateSpecs({ hasBattery: e.target.checked })}
+                    checked={!!project.specs.autoCalculatePanels}
+                    onChange={(e) => updateSpecs({ autoCalculatePanels: e.target.checked })}
                     className="rounded text-emerald-700 focus:ring-emerald-600 cursor-pointer"
                   />
                 </div>
 
-                {project.specs.hasBattery && (
+                <div>
+                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                    Cantidad de Paneles
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    disabled={project.specs.autoCalculatePanels}
+                    value={project.specs.panelCount}
+                    onChange={(e) => updateSpecs({ panelCount: parseInt(e.target.value) || 0 })}
+                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all disabled:opacity-50 ${
+                      isDark
+                        ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
+                        : 'bg-slate-50 border-slate-300 text-slate-800'
+                    }`}
+                  />
+                </div>
+
+                <div>
+                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                    Modelo / Marca Inversor
+                  </label>
+                  <input
+                    type="text"
+                    value={project.specs.inverterBrandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)'}
+                    onChange={(e) => updateSpecs({ inverterBrandModel: e.target.value })}
+                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                      isDark
+                        ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
+                        : 'bg-slate-50 border-slate-300 text-slate-800'
+                    }`}
+                  />
+                </div>
+
+                {/* CAMPOS MODO DETALLADO */}
+                {project.specs.isDetailed && (
                   <div
-                    className={`space-y-3 p-3 rounded-lg border ${
-                      isDark ? 'bg-[#202024] border-[#2e2e34]' : 'bg-slate-50 border-slate-200'
+                    className={`space-y-3 p-3 rounded-lg border mt-3 ${
+                      isDark ? 'bg-[#202024] border-[#2e2e34]' : 'bg-emerald-50/50 border-emerald-200'
                     }`}
                   >
-                    <div>
-                      <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                        Modelo / Marca Batería
-                      </label>
-                      <input
-                        type="text"
-                        value={project.specs.batteryBrandModel || 'Batería Hinaess 16 KwH-48 vdc.'}
-                        onChange={(e) => updateSpecs({ batteryBrandModel: e.target.value })}
-                        className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                        }`}
-                      />
-                    </div>
+                    <h4
+                      className={`text-[11px] font-bold uppercase tracking-wider border-b pb-1 flex items-center gap-1.5 ${
+                        isDark ? 'text-emerald-400 border-[#2e2e34]' : 'text-emerald-900 border-emerald-200'
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[14px]">tune</span> Parámetros Técnicos Avanzados
+                    </h4>
 
-                    <div>
-                      <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                        Cantidad de Baterías
-                      </label>
-                      <input
-                        type="number"
-                        step="1"
-                        min="1"
-                        value={project.specs.batteryCount || 1}
-                        onChange={(e) => updateSpecs({ batteryCount: parseInt(e.target.value) || 1 })}
-                        className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                        }`}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                        Precio Unitario Batería (USD)
-                      </label>
-                      <input
-                        type="number"
-                        step="50"
-                        value={project.specs.batteryUnitPriceUSD !== undefined ? project.specs.batteryUnitPriceUSD : 1990.0}
-                        onChange={(e) => updateSpecs({ batteryUnitPriceUSD: parseFloat(e.target.value) || 0 })}
-                        className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-amber-300' : 'bg-white border-slate-300 text-emerald-800'
-                        }`}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                        Capacidad Total Batería (kWh)
-                      </label>
-                      <input
-                        type="number"
-                        step="1"
-                        value={project.specs.batteryCapacityKWh}
-                        onChange={(e) => updateSpecs({ batteryCapacityKWh: parseFloat(e.target.value) || 0 })}
-                        className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                        }`}
-                      />
-                    </div>
-
-                    {/* Parámetros Detallados de Batería */}
-                    <div className={`pt-2 border-t space-y-2 ${isDark ? 'border-[#2e2e34]' : 'border-slate-200'}`}>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                            DoD Descarga (%)
-                          </label>
-                          <input
-                            type="number"
-                            step="5"
-                            value={project.specs.batteryDOD || 80}
-                            onChange={(e) => updateSpecs({ batteryDOD: parseFloat(e.target.value) || 80 })}
-                            className={`w-full border rounded-lg px-2 py-1 text-xs font-semibold ${
-                              isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                            }`}
-                          />
-                        </div>
-                        <div>
-                          <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                            Eficiencia Carga (%)
-                          </label>
-                          <input
-                            type="number"
-                            step="1"
-                            value={project.specs.batteryEfficiencyPct || 92}
-                            onChange={(e) => updateSpecs({ batteryEfficiencyPct: parseFloat(e.target.value) || 92 })}
-                            className={`w-full border rounded-lg px-2 py-1 text-xs font-semibold ${
-                              isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                            }`}
-                          />
-                        </div>
-                      </div>
-
+                    <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                          Costo Reemplazo Año 10 (USD)
+                        <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                          Potencia Inversor (kW)
                         </label>
                         <input
                           type="number"
-                          step="500"
-                          value={project.specs.batteryReplacementCostUSD || 0}
-                          onChange={(e) => updateSpecs({ batteryReplacementCostUSD: parseFloat(e.target.value) || 0 })}
-                          placeholder="Ej. $3,500 USD"
-                          className={`w-full border rounded-lg px-2 py-1 text-xs font-semibold ${
+                          step="1"
+                          value={project.specs.inverterPowerKW}
+                          onChange={(e) => updateSpecs({ inverterPowerKW: parseFloat(e.target.value) || 0 })}
+                          className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold ${
                             isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
                           }`}
                         />
                       </div>
 
-                      <div
-                        className={`rounded-lg p-2 text-[10px] font-bold space-y-0.5 mt-1 border ${
-                          isDark
-                            ? 'bg-emerald-950/80 border-emerald-800/80 text-emerald-300'
-                            : 'bg-emerald-100/80 border-emerald-300 text-emerald-950'
-                        }`}
-                      >
-                        <div className="flex justify-between">
-                          <span>Energía Útil Batería:</span>
-                          <span className={`font-extrabold ${isDark ? 'text-emerald-200' : 'text-emerald-800'}`}>
-                            {summary.batteryUsableKWh} kWh
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Autonomía Anti-Apagones:</span>
-                          <span className={`font-extrabold ${isDark ? 'text-emerald-200' : 'text-emerald-800'}`}>
-                            ~{summary.batteryBackupAutonomyHours} Horas
-                          </span>
-                        </div>
+                      <div>
+                        <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                          Cantidad Inversores
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          value={project.specs.inverterCount || 1}
+                          onChange={(e) => updateSpecs({ inverterCount: parseInt(e.target.value) || 1 })}
+                          className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold ${
+                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                          }`}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                          Eficiencia Panel (%)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={project.specs.panelEfficiency}
+                          onChange={(e) => updateSpecs({ panelEfficiency: parseFloat(e.target.value) || 0 })}
+                          className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
+                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                          }`}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                          Coef. Temp (%/°C)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={project.specs.tempCoeff}
+                          onChange={(e) => updateSpecs({ tempCoeff: parseFloat(e.target.value) || 0 })}
+                          className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
+                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                          }`}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                          Pérdidas Sistema (%)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.5"
+                          value={project.specs.systemLosses}
+                          onChange={(e) => updateSpecs({ systemLosses: parseFloat(e.target.value) || 0 })}
+                          className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
+                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                          }`}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                          Degradación Anual (%)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={project.specs.annualDegradation}
+                          onChange={(e) => updateSpecs({ annualDegradation: parseFloat(e.target.value) || 0 })}
+                          className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
+                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                          }`}
+                        />
                       </div>
                     </div>
                   </div>
                 )}
-              </div>
-            </div>
-          </section>
 
-          {/* SECCIÓN 4: Costos, Tasa de Cambio y Margen (Excel Cost Matrix) */}
-          <section className={`space-y-3 pt-2 border-t ${isDark ? 'border-[#27272a]' : 'border-slate-200'}`}>
-            <h3
-              className={`flex items-center gap-2 font-bold text-xs uppercase tracking-wider ${
-                isDark ? 'text-amber-400' : 'text-amber-700'
+                {/* Almacenamiento (Batería) Toggle & Campos */}
+                <div className={`pt-2 border-t space-y-3 ${isDark ? 'border-[#27272a]' : 'border-slate-200'}`}>
+                  <div className="flex items-center justify-between">
+                    <label className={`text-xs font-semibold ${isDark ? 'text-zinc-200' : 'text-slate-700'}`}>
+                      Almacenamiento (Batería)
+                    </label>
+                    <input
+                      type="checkbox"
+                      checked={project.specs.hasBattery}
+                      onChange={(e) => updateSpecs({ hasBattery: e.target.checked })}
+                      className="rounded text-emerald-700 focus:ring-emerald-600 cursor-pointer"
+                    />
+                  </div>
+
+                  {project.specs.hasBattery && (
+                    <div
+                      className={`space-y-3 p-3 rounded-lg border ${
+                        isDark ? 'bg-[#202024] border-[#2e2e34]' : 'bg-slate-50 border-slate-200'
+                      }`}
+                    >
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                          Modelo / Marca Batería
+                        </label>
+                        <input
+                          type="text"
+                          value={project.specs.batteryBrandModel || 'Batería Hinaess 16 KwH-48 vdc.'}
+                          onChange={(e) => updateSpecs({ batteryBrandModel: e.target.value })}
+                          className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                          }`}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                          Cantidad de Baterías
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          min="1"
+                          value={project.specs.batteryCount || 1}
+                          onChange={(e) => updateSpecs({ batteryCount: parseInt(e.target.value) || 1 })}
+                          className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                          }`}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                          Precio Unitario Batería (USD)
+                        </label>
+                        <input
+                          type="number"
+                          step="50"
+                          value={project.specs.batteryUnitPriceUSD !== undefined ? project.specs.batteryUnitPriceUSD : 1990.0}
+                          onChange={(e) => updateSpecs({ batteryUnitPriceUSD: parseFloat(e.target.value) || 0 })}
+                          className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-amber-300' : 'bg-white border-slate-300 text-emerald-800'
+                          }`}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                          Capacidad Total Batería (kWh)
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          value={project.specs.batteryCapacityKWh}
+                          onChange={(e) => updateSpecs({ batteryCapacityKWh: parseFloat(e.target.value) || 0 })}
+                          className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                          }`}
+                        />
+                      </div>
+
+                      {/* Parámetros Detallados de Batería */}
+                      <div className={`pt-2 border-t space-y-2 ${isDark ? 'border-[#2e2e34]' : 'border-slate-200'}`}>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                              DoD Descarga (%)
+                            </label>
+                            <input
+                              type="number"
+                              step="5"
+                              value={project.specs.batteryDOD || 80}
+                              onChange={(e) => updateSpecs({ batteryDOD: parseFloat(e.target.value) || 80 })}
+                              className={`w-full border rounded-lg px-2 py-1 text-xs font-semibold ${
+                                isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                              }`}
+                            />
+                          </div>
+                          <div>
+                            <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                              Eficiencia Carga (%)
+                            </label>
+                            <input
+                              type="number"
+                              step="1"
+                              value={project.specs.batteryEfficiencyPct || 92}
+                              onChange={(e) => updateSpecs({ batteryEfficiencyPct: parseFloat(e.target.value) || 92 })}
+                              className={`w-full border rounded-lg px-2 py-1 text-xs font-semibold ${
+                                isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                              }`}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                            Costo Reemplazo Año 10 (USD)
+                          </label>
+                          <input
+                            type="number"
+                            step="500"
+                            value={project.specs.batteryReplacementCostUSD || 0}
+                            onChange={(e) => updateSpecs({ batteryReplacementCostUSD: parseFloat(e.target.value) || 0 })}
+                            placeholder="Ej. $3,500 USD"
+                            className={`w-full border rounded-lg px-2 py-1 text-xs font-semibold ${
+                              isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                            }`}
+                          />
+                        </div>
+
+                        <div
+                          className={`rounded-lg p-2 text-[10px] font-bold space-y-0.5 mt-1 border ${
+                            isDark
+                              ? 'bg-emerald-950/80 border-emerald-800/80 text-emerald-300'
+                              : 'bg-emerald-100/80 border-emerald-300 text-emerald-950'
+                          }`}
+                        >
+                          <div className="flex justify-between">
+                            <span>Energía Útil Batería:</span>
+                            <span className={`font-extrabold ${isDark ? 'text-emerald-200' : 'text-emerald-800'}`}>
+                              {summary.batteryUsableKWh} kWh
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Autonomía Anti-Apagones:</span>
+                            <span className={`font-extrabold ${isDark ? 'text-emerald-200' : 'text-emerald-800'}`}>
+                              ~{summary.batteryBackupAutonomyHours} Horas
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 4. SECCIÓN: Costos y Margen de Venta */}
+          <div
+            className={`rounded-xl border overflow-hidden transition-all ${
+              isDark ? 'border-[#27272a] bg-[#1a1a24]' : 'border-slate-200 bg-white shadow-xs'
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => toggleSection('costs')}
+              className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors ${
+                isDark ? 'text-zinc-200 hover:bg-[#222230]' : 'text-slate-800 hover:bg-slate-50'
               }`}
             >
-              <span className="material-symbols-outlined text-[16px]">payments</span> Costos y Margen de Venta
-            </h3>
-            <div
-              className={`space-y-3 p-3 rounded-lg border ${
-                isDark ? 'bg-[#27201c] border-amber-900/40' : 'bg-amber-50/50 border-amber-200'
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span>4. Costos y Margen de Venta</span>
+              </div>
+              <ChevronDown
+                className={`w-4 h-4 text-zinc-400 transition-transform duration-200 ${
+                  openSections.costs ? 'rotate-180 text-emerald-500' : ''
+                }`}
+              />
+            </button>
+
+            {openSections.costs && (
+              <div
+                className={`p-3.5 pt-2 space-y-3 border-t ${
+                  isDark ? 'border-[#27272a] bg-[#14141c]/50' : 'border-slate-100 bg-slate-50/50'
+                }`}
+              >
+                <div
+                  className={`space-y-3 p-3 rounded-lg border ${
+                    isDark ? 'bg-[#27201c] border-amber-900/40' : 'bg-amber-50/50 border-amber-200'
+                  }`}
+                >
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className={`block text-[11px] font-bold mb-1 ${isDark ? 'text-amber-400' : 'text-red-700'}`}>
+                        Tasa Cambio DOP/USD
+                      </label>
+                      <input
+                        type="number"
+                        step="0.5"
+                        value={project.specs.dopExchangeRate !== undefined ? project.specs.dopExchangeRate : 60.0}
+                        onChange={(e) => updateSpecs({ dopExchangeRate: parseFloat(e.target.value) || 0 })}
+                        className={`w-full border rounded-lg px-2.5 py-1 text-xs font-extrabold transition-all ${
+                          isDark
+                            ? 'bg-[#18181b] border-amber-800/60 text-amber-300 focus:ring-1 focus:ring-amber-500'
+                            : 'bg-white border-red-300 text-red-700 focus:ring-1 focus:ring-red-600'
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className={`block text-[11px] font-bold mb-1 ${isDark ? 'text-amber-400' : 'text-red-700'}`}>
+                        Factor / Margen Venta
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={project.specs.saleMarginMultiplier !== undefined ? project.specs.saleMarginMultiplier : 1.25}
+                        onChange={(e) => updateSpecs({ saleMarginMultiplier: parseFloat(e.target.value) || 0 })}
+                        className={`w-full border rounded-lg px-2.5 py-1 text-xs font-extrabold transition-all ${
+                          isDark
+                            ? 'bg-[#18181b] border-amber-800/60 text-amber-300 focus:ring-1 focus:ring-amber-500'
+                            : 'bg-white border-red-300 text-red-700 focus:ring-1 focus:ring-red-600'
+                        }`}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                      Precio Unit. Panel (USD)
+                    </label>
+                    <input
+                      type="number"
+                      step="1"
+                      value={project.specs.panelUnitPriceUSD !== undefined ? project.specs.panelUnitPriceUSD : 103.32}
+                      onChange={(e) => updateSpecs({ panelUnitPriceUSD: parseFloat(e.target.value) || 0 })}
+                      className={`w-full border rounded-lg px-3 py-1 text-xs font-bold transition-all ${
+                        isDark
+                          ? 'bg-[#18181b] border-[#3f3f46] text-amber-300'
+                          : 'bg-white border-slate-300 text-red-600'
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                      Precio Unit. Inversor (USD)
+                    </label>
+                    <input
+                      type="number"
+                      step="10"
+                      value={project.specs.inverterUnitPriceUSD !== undefined ? project.specs.inverterUnitPriceUSD : 2300.0}
+                      onChange={(e) => updateSpecs({ inverterUnitPriceUSD: parseFloat(e.target.value) || 0 })}
+                      className={`w-full border rounded-lg px-3 py-1 text-xs font-bold transition-all ${
+                        isDark
+                          ? 'bg-[#18181b] border-[#3f3f46] text-amber-300'
+                          : 'bg-white border-slate-300 text-red-600'
+                      }`}
+                    />
+                  </div>
+
+                  {project.specs.hasBattery && (
+                    <div>
+                      <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                        Precio Unit. Batería (USD)
+                      </label>
+                      <input
+                        type="number"
+                        step="10"
+                        value={project.specs.batteryUnitPriceUSD !== undefined ? project.specs.batteryUnitPriceUSD : 1990.0}
+                        onChange={(e) => updateSpecs({ batteryUnitPriceUSD: parseFloat(e.target.value) || 0 })}
+                        className={`w-full border rounded-lg px-3 py-1 text-xs font-bold transition-all ${
+                          isDark
+                            ? 'bg-[#18181b] border-[#3f3f46] text-amber-300'
+                            : 'bg-white border-slate-300 text-red-600'
+                        }`}
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                      Mano de Obra / kWp (USD)
+                    </label>
+                    <input
+                      type="number"
+                      step="5"
+                      value={project.specs.installationUnitPriceUSD !== undefined ? project.specs.installationUnitPriceUSD : 170.0}
+                      onChange={(e) => updateSpecs({ installationUnitPriceUSD: parseFloat(e.target.value) || 0 })}
+                      className={`w-full border rounded-lg px-3 py-1 text-xs font-bold transition-all ${
+                        isDark
+                          ? 'bg-[#18181b] border-[#3f3f46] text-amber-300'
+                          : 'bg-white border-slate-300 text-red-600'
+                      }`}
+                    />
+                  </div>
+
+                  {/* Precio Sistema por Vatio (USD/Wp) con cálculo automático y sincronización */}
+                  <div className={`p-2.5 rounded-lg border mt-2 ${isDark ? 'bg-[#1c1917] border-amber-900/50' : 'bg-white border-amber-300/80 shadow-xs'}`}>
+                    <div className="flex justify-between items-center mb-1.5">
+                      <label className={`block text-[11px] font-bold ${isDark ? 'text-amber-300' : 'text-amber-900'}`}>
+                        Precio Sistema por Vatio (USD/Wp)
+                      </label>
+                      <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${isDark ? 'bg-amber-950/80 text-amber-300 border border-amber-800/60' : 'bg-amber-100 text-amber-900 border border-amber-200'}`} title="Precio por Watt resultante de la suma de equipos, mano de obra e ITBIS con margen">
+                        Margen: ${(summary.costMatrix.salePricePerWattUSD || 1.13).toFixed(2)} Wp
+                      </span>
+                    </div>
+                    
+                    <div className="flex gap-1.5 items-center">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={project.specs.pricePerWattUSD}
+                        onChange={(e) => updateSpecs({ pricePerWattUSD: parseFloat(e.target.value) || 0 })}
+                        className={`flex-1 border rounded-lg px-2.5 py-1 text-xs font-black transition-all ${
+                          isDark
+                            ? 'bg-[#121214] border-[#3f3f46] text-zinc-100 focus:ring-1 focus:ring-amber-500'
+                            : 'bg-slate-50 border-slate-300 text-slate-900 focus:ring-1 focus:ring-amber-600'
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        title="Sincronizar automáticamente con el precio por Watt calculado de la matriz de costos y margen de venta"
+                        onClick={() => {
+                          const autoWp = Math.round((summary.costMatrix.salePricePerWattUSD || 1.13) * 100) / 100;
+                          updateSpecs({ pricePerWattUSD: autoWp });
+                        }}
+                        className={`px-2.5 py-1 text-[11px] rounded-lg font-bold flex items-center gap-1 border transition-all cursor-pointer ${
+                          isDark
+                            ? 'bg-amber-900/40 hover:bg-amber-900/60 border-amber-700/60 text-amber-300'
+                            : 'bg-amber-100 hover:bg-amber-200 border-amber-300 text-amber-900 shadow-xs'
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[14px]">auto_fix_high</span> Auto
+                      </button>
+                    </div>
+                    <p className={`text-[10px] mt-1.5 leading-tight ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                      Resultante de equipos + mano de obra × margen ({project.specs.saleMarginMultiplier || 1.25}x).
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 5. SECCIÓN: Finanzas e Incentivos */}
+          <div
+            className={`rounded-xl border overflow-hidden transition-all ${
+              isDark ? 'border-[#27272a] bg-[#1a1a24]' : 'border-slate-200 bg-white shadow-xs'
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => toggleSection('financials')}
+              className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors ${
+                isDark ? 'text-zinc-200 hover:bg-[#222230]' : 'text-slate-800 hover:bg-slate-50'
               }`}
             >
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className={`block text-[11px] font-bold mb-1 ${isDark ? 'text-amber-400' : 'text-red-700'}`}>
-                    Tasa Cambio DOP/USD
-                  </label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={project.specs.dopExchangeRate !== undefined ? project.specs.dopExchangeRate : 60.0}
-                    onChange={(e) => updateSpecs({ dopExchangeRate: parseFloat(e.target.value) || 0 })}
-                    className={`w-full border rounded-lg px-2.5 py-1 text-xs font-extrabold transition-all ${
-                      isDark
-                        ? 'bg-[#18181b] border-amber-800/60 text-amber-300 focus:ring-1 focus:ring-amber-500'
-                        : 'bg-white border-red-300 text-red-700 focus:ring-1 focus:ring-red-600'
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className={`block text-[11px] font-bold mb-1 ${isDark ? 'text-amber-400' : 'text-red-700'}`}>
-                    Factor / Margen Venta
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={project.specs.saleMarginMultiplier !== undefined ? project.specs.saleMarginMultiplier : 1.25}
-                    onChange={(e) => updateSpecs({ saleMarginMultiplier: parseFloat(e.target.value) || 0 })}
-                    className={`w-full border rounded-lg px-2.5 py-1 text-xs font-extrabold transition-all ${
-                      isDark
-                        ? 'bg-[#18181b] border-amber-800/60 text-amber-300 focus:ring-1 focus:ring-amber-500'
-                        : 'bg-white border-red-300 text-red-700 focus:ring-1 focus:ring-red-600'
-                    }`}
-                  />
-                </div>
+              <div className="flex items-center gap-2">
+                <Landmark className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span>5. Finanzas e Incentivos (Ley 57-07)</span>
               </div>
+              <ChevronDown
+                className={`w-4 h-4 text-zinc-400 transition-transform duration-200 ${
+                  openSections.financials ? 'rotate-180 text-emerald-500' : ''
+                }`}
+              />
+            </button>
 
-              <div>
-                <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                  Precio Unit. Panel (USD)
-                </label>
-                <input
-                  type="number"
-                  step="1"
-                  value={project.specs.panelUnitPriceUSD !== undefined ? project.specs.panelUnitPriceUSD : 103.32}
-                  onChange={(e) => updateSpecs({ panelUnitPriceUSD: parseFloat(e.target.value) || 0 })}
-                  className={`w-full border rounded-lg px-3 py-1 text-xs font-bold transition-all ${
-                    isDark
-                      ? 'bg-[#18181b] border-[#3f3f46] text-amber-300'
-                      : 'bg-white border-slate-300 text-red-600'
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                  Precio Unit. Inversor (USD)
-                </label>
-                <input
-                  type="number"
-                  step="10"
-                  value={project.specs.inverterUnitPriceUSD !== undefined ? project.specs.inverterUnitPriceUSD : 2300.0}
-                  onChange={(e) => updateSpecs({ inverterUnitPriceUSD: parseFloat(e.target.value) || 0 })}
-                  className={`w-full border rounded-lg px-3 py-1 text-xs font-bold transition-all ${
-                    isDark
-                      ? 'bg-[#18181b] border-[#3f3f46] text-amber-300'
-                      : 'bg-white border-slate-300 text-red-600'
-                  }`}
-                />
-              </div>
-
-              {project.specs.hasBattery && (
-                <div>
-                  <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                    Precio Unit. Batería (USD)
-                  </label>
-                  <input
-                    type="number"
-                    step="10"
-                    value={project.specs.batteryUnitPriceUSD !== undefined ? project.specs.batteryUnitPriceUSD : 1990.0}
-                    onChange={(e) => updateSpecs({ batteryUnitPriceUSD: parseFloat(e.target.value) || 0 })}
-                    className={`w-full border rounded-lg px-3 py-1 text-xs font-bold transition-all ${
-                      isDark
-                        ? 'bg-[#18181b] border-[#3f3f46] text-amber-300'
-                        : 'bg-white border-slate-300 text-red-600'
-                    }`}
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                  Mano de Obra / kWp (USD)
-                </label>
-                <input
-                  type="number"
-                  step="5"
-                  value={project.specs.installationUnitPriceUSD !== undefined ? project.specs.installationUnitPriceUSD : 170.0}
-                  onChange={(e) => updateSpecs({ installationUnitPriceUSD: parseFloat(e.target.value) || 0 })}
-                  className={`w-full border rounded-lg px-3 py-1 text-xs font-bold transition-all ${
-                    isDark
-                      ? 'bg-[#18181b] border-[#3f3f46] text-amber-300'
-                      : 'bg-white border-slate-300 text-red-600'
-                  }`}
-                />
-              </div>
-
-              {/* Precio Sistema por Vatio (USD/Wp) con cálculo automático y sincronización */}
-              <div className={`p-2.5 rounded-lg border mt-2 ${isDark ? 'bg-[#1c1917] border-amber-900/50' : 'bg-white border-amber-300/80 shadow-xs'}`}>
-                <div className="flex justify-between items-center mb-1.5">
-                  <label className={`block text-[11px] font-bold ${isDark ? 'text-amber-300' : 'text-amber-900'}`}>
-                    Precio Sistema por Vatio (USD/Wp)
-                  </label>
-                  <span className={`text-[10px] font-black px-1.5 py-0.5 rounded ${isDark ? 'bg-amber-950/80 text-amber-300 border border-amber-800/60' : 'bg-amber-100 text-amber-900 border border-amber-200'}`} title="Precio por Watt resultante de la suma de equipos, mano de obra e ITBIS con margen">
-                    Margen: ${(summary.costMatrix.salePricePerWattUSD || 1.13).toFixed(2)} Wp
-                  </span>
-                </div>
-                
-                <div className="flex gap-1.5 items-center">
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={project.specs.pricePerWattUSD}
-                    onChange={(e) => updateSpecs({ pricePerWattUSD: parseFloat(e.target.value) || 0 })}
-                    className={`flex-1 border rounded-lg px-2.5 py-1 text-xs font-black transition-all ${
-                      isDark
-                        ? 'bg-[#121214] border-[#3f3f46] text-zinc-100 focus:ring-1 focus:ring-amber-500'
-                        : 'bg-slate-50 border-slate-300 text-slate-900 focus:ring-1 focus:ring-amber-600'
-                    }`}
-                  />
-                  <button
-                    type="button"
-                    title="Sincronizar automáticamente con el precio por Watt calculado de la matriz de costos y margen de venta"
-                    onClick={() => {
-                      const autoWp = Math.round((summary.costMatrix.salePricePerWattUSD || 1.13) * 100) / 100;
-                      updateSpecs({ pricePerWattUSD: autoWp });
-                    }}
-                    className={`px-2.5 py-1 text-[11px] rounded-lg font-bold flex items-center gap-1 border transition-all cursor-pointer ${
-                      isDark
-                        ? 'bg-amber-900/40 hover:bg-amber-900/60 border-amber-700/60 text-amber-300'
-                        : 'bg-amber-100 hover:bg-amber-200 border-amber-300 text-amber-900 shadow-xs'
+            {openSections.financials && (
+              <div
+                className={`p-3.5 pt-2 space-y-3 border-t ${
+                  isDark ? 'border-[#27272a] bg-[#14141c]/50' : 'border-slate-100 bg-slate-50/50'
+                }`}
+              >
+                <label className="flex items-center justify-between cursor-pointer group">
+                  <span
+                    className={`text-xs font-medium transition-colors ${
+                      isDark ? 'text-zinc-300 group-hover:text-white' : 'text-slate-600 group-hover:text-slate-900'
                     }`}
                   >
-                    <span className="material-symbols-outlined text-[14px]">auto_fix_high</span> Auto
-                  </button>
-                </div>
-                <p className={`text-[10px] mt-1.5 leading-tight ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-                  Resultante de equipos + mano de obra × margen ({project.specs.saleMarginMultiplier || 1.25}x).
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {/* SECCIÓN 5: Finanzas e Incentivos */}
-          <section className={`space-y-3 pt-2 border-t ${isDark ? 'border-[#27272a]' : 'border-slate-200'}`}>
-            <h3
-              className={`flex items-center gap-2 font-bold text-xs uppercase tracking-wider ${
-                isDark ? 'text-emerald-400' : 'text-emerald-700'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[16px]">account_balance</span> Finanzas e Incentivos
-            </h3>
-            <div className="space-y-3">
-              <label className="flex items-center justify-between cursor-pointer group">
-                <span
-                  className={`text-xs font-medium transition-colors ${
-                    isDark ? 'text-zinc-300 group-hover:text-white' : 'text-slate-600 group-hover:text-slate-900'
-                  }`}
-                >
-                  Aplicar Ley 57-07 (Crédito ISR 40%)
-                </span>
-                <input
-                  type="checkbox"
-                  checked={project.financials.applyLey5707}
-                  onChange={(e) => updateFinancials({ applyLey5707: e.target.checked })}
-                  className="rounded text-emerald-700 focus:ring-emerald-600 cursor-pointer"
-                />
-              </label>
-
-              <label className="flex items-center justify-between cursor-pointer group">
-                <span
-                  className={`text-xs font-medium transition-colors ${
-                    isDark ? 'text-zinc-300 group-hover:text-white' : 'text-slate-600 group-hover:text-slate-900'
-                  }`}
-                >
-                  Exoneración ITBIS 100% (18%)
-                </span>
-                <input
-                  type="checkbox"
-                  checked={project.financials.applyITBISExemption}
-                  onChange={(e) => updateFinancials({ applyITBISExemption: e.target.checked })}
-                  className="rounded text-emerald-700 focus:ring-emerald-600 cursor-pointer"
-                />
-              </label>
-
-              <div>
-                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                  Tasa de Descuento (%)
+                    Aplicar Ley 57-07 (Crédito ISR 40%)
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={project.financials.applyLey5707}
+                    onChange={(e) => updateFinancials({ applyLey5707: e.target.checked })}
+                    className="rounded text-emerald-700 focus:ring-emerald-600 cursor-pointer"
+                  />
                 </label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={project.financials.discountRatePct}
-                  onChange={(e) => updateFinancials({ discountRatePct: parseFloat(e.target.value) || 0 })}
-                  className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                    isDark
-                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                      : 'bg-slate-50 border-slate-300 text-slate-800'
-                  }`}
-                />
+
+                <label className="flex items-center justify-between cursor-pointer group">
+                  <span
+                    className={`text-xs font-medium transition-colors ${
+                      isDark ? 'text-zinc-300 group-hover:text-white' : 'text-slate-600 group-hover:text-slate-900'
+                    }`}
+                  >
+                    Exoneración ITBIS 100% (18%)
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={project.financials.applyITBISExemption}
+                    onChange={(e) => updateFinancials({ applyITBISExemption: e.target.checked })}
+                    className="rounded text-emerald-700 focus:ring-emerald-600 cursor-pointer"
+                  />
+                </label>
+
+                <div>
+                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                    Tasa de Descuento (%)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={project.financials.discountRatePct}
+                    onChange={(e) => updateFinancials({ discountRatePct: parseFloat(e.target.value) || 0 })}
+                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                      isDark
+                        ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
+                        : 'bg-slate-50 border-slate-300 text-slate-800'
+                    }`}
+                  />
+                </div>
               </div>
-            </div>
-          </section>
+            )}
+          </div>
         </div>
 
         <div
