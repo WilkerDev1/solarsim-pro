@@ -1086,21 +1086,6 @@ export const SimulatorView: React.FC = () => {
 
                       <div>
                         <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                          Precio Unitario Batería (USD)
-                        </label>
-                        <input
-                          type="number"
-                          step="50"
-                          value={project.specs.batteryUnitPriceUSD !== undefined ? project.specs.batteryUnitPriceUSD : 1990.0}
-                          onChange={(e) => updateSpecs({ batteryUnitPriceUSD: parseFloat(e.target.value) || 0 })}
-                          className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-amber-300' : 'bg-white border-slate-300 text-emerald-800'
-                          }`}
-                        />
-                      </div>
-
-                      <div>
-                        <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                           Capacidad Total Batería (kWh)
                         </label>
                         <input
