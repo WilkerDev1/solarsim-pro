@@ -64,7 +64,7 @@ export function calculateCostMatrixSummary(
       itbisUSD: panelItbisUSD,
     },
     {
-      name: `${specs.inverterBrandModel || 'Inverso Lux Power de 12 kwp'}`,
+      name: `${specs.inverterBrandModel || 'Inversor Lux Power de 12 kwp'}`,
       kilos: inverterKilos,
       quantity: inverterCount,
       unitPriceUSD: inverterUnitUSD,
@@ -74,17 +74,21 @@ export function calculateCostMatrixSummary(
       itbisDOP: inverterItbisDOP,
       itbisUSD: inverterItbisUSD,
     },
-    {
-      name: `${specs.batteryBrandModel || 'Bateria Hinaess 16.0 kwh'}`,
-      kilos: batteryKilos,
-      quantity: batteryCount,
-      unitPriceUSD: batteryUnitUSD,
-      unitPriceDOP: batteryUnitUSD * rate,
-      totalPriceDOP: batteryTotalDOP,
-      totalPriceUSD: batteryTotalUSD,
-      itbisDOP: batteryItbisDOP,
-      itbisUSD: batteryItbisUSD,
-    },
+    ...(specs.hasBattery
+      ? [
+          {
+            name: `${specs.batteryBrandModel || 'Bateria Hinaess 16.0 kwh'}`,
+            kilos: batteryKilos,
+            quantity: batteryCount,
+            unitPriceUSD: batteryUnitUSD,
+            unitPriceDOP: batteryUnitUSD * rate,
+            totalPriceDOP: batteryTotalDOP,
+            totalPriceUSD: batteryTotalUSD,
+            itbisDOP: batteryItbisDOP,
+            itbisUSD: batteryItbisUSD,
+          },
+        ]
+      : []),
     {
       name: 'Mano de obra y materiales',
       kilos: installationKilos,

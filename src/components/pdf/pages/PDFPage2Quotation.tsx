@@ -294,7 +294,9 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
             </h4>
             <div>• <span className="font-bold">Paneles Solares:</span> {panelWarranty}</div>
             <div>• <span className="font-bold">Inversor:</span> {inverterWarranty}</div>
-            <div>• <span className="font-bold">Batería:</span> {batteryWarranty}</div>
+            {project.specs.hasBattery && (
+              <div>• <span className="font-bold">Batería:</span> {batteryWarranty}</div>
+            )}
             <div>• <span className="font-bold">Mano de Obra y Soporte:</span> {workmanshipWarranty}</div>
           </div>
 

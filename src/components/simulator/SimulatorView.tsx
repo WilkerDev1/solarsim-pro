@@ -2021,7 +2021,9 @@ export const SimulatorView: React.FC = () => {
                     <div>• <span className="font-bold">Paneles Solares:</span> 25 años (80.7% potencia mínima garantizada)</div>
                     <div>• <span className="font-bold">Inversor:</span> 5 años</div>
                     <div>• <span className="font-bold">Estructura de montaje:</span> 10 años</div>
-                    <div>• <span className="font-bold">Batería:</span> 10 años</div>
+                    {project.specs.hasBattery && (
+                      <div>• <span className="font-bold">Batería:</span> 10 años</div>
+                    )}
                     <div>• <span className="font-bold">Mano de obra:</span> 1 año</div>
                   </div>
 
