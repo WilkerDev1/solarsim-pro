@@ -96,8 +96,10 @@ export function renderProposalPage(stored: StoredProposal): string {
   const monthlyAvgConsumption = Math.round(annualConsumptionKWh / 12);
 
   const grossInvestmentUSD = Number(summary?.grossInvestmentUSD || 0);
+  const laborPortionUSD = Number(summary?.laborPortionUSD || summary?.costMatrix?.laborVentaUSD || 0);
+  const equipmentPortionUSD = Number(summary?.equipmentPortionUSD || summary?.costMatrix?.equipmentVentaUSD || Math.max(0, grossInvestmentUSD - laborPortionUSD) || grossInvestmentUSD);
   const itbisSavedUSD = Number(summary?.itbisSavedUSD || 0);
-  const ley5707CreditUSD = Number(summary?.ley5707CreditUSD || 0);
+  const ley5707CreditUSD = Number(summary?.ley5707CreditUSD || (equipmentPortionUSD * 0.40));
   const subTotalSinITBIS = Number(summary?.costMatrix?.precioNetoUSD || (grossInvestmentUSD - itbisSavedUSD));
   const pricePerWattUSD = Number(specs.pricePerWattUSD || financials.pricePerWattUSD || (grossInvestmentUSD / (Number(systemCapacityKWp) * 1000)) || 1.13).toFixed(2);
 
@@ -477,8 +479,8 @@ export function renderProposalPage(stored: StoredProposal): string {
             </thead>
             <tbody class="divide-y divide-slate-200 text-[11px] font-semibold text-slate-800">
               <tr class="bg-white font-bold">
-                <td class="px-4 py-1.5">Inversión Elegible en Equipos Renovables</td>
-                <td class="px-4 py-1.5 text-right font-mono font-bold">US$ ${grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="px-4 py-1.5">Inversión Elegible en Equipos Renovables (Paneles-Inversores-Baterías)</td>
+                <td class="px-4 py-1.5 text-right font-mono font-bold">US$ ${equipmentPortionUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td class="px-4 py-1.5 text-right font-mono">100%</td>
               </tr>
               <tr class="bg-sky-50/30">
