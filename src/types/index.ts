@@ -115,6 +115,12 @@ export interface CostMatrixSummary {
   salePricePerWattUSD: number;   // Total System Sale/W USD (with batteries)
   solarSalePricePerWattUSD?: number; // Solar Only Sale/W USD (e.g. $1.13)
   solarOnlyVentaUSD?: number;    // Solar Only Sale USD
+  equipmentCostUSD?: number;     // Equipment Cost USD (Panels + Inverters + Batteries)
+  equipmentTotalUSD?: number;    // Equipment Total USD (with ITBIS)
+  equipmentVentaUSD?: number;    // Equipment Sale USD (Base for Ley 57-07)
+  laborCostUSD?: number;         // Labor Cost USD
+  laborTotalUSD?: number;        // Labor Total USD (with ITBIS)
+  laborVentaUSD?: number;        // Labor Sale USD
 }
 
 export interface MonthlyEnergyResult {
@@ -148,6 +154,8 @@ export interface FinancialSummaryResult {
   grossInvestmentUSD: number;
   solarInvestmentUSD: number;
   batteryInvestmentUSD: number;
+  equipmentPortionUSD: number;   // Base de Equipos para Ley 57-07 (sin mano de obra)
+  laborPortionUSD: number;       // Porción de Mano de Obra y Materiales
   itbisSavedUSD: number;
   ley5707CreditUSD: number;
   netInvestmentUSD: number;

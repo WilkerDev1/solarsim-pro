@@ -139,6 +139,15 @@ export function calculateCostMatrixSummary(
   const salePricePerWattUSD = porcentajeVentaUSD / (capacityKW * 1000);
   const solarSalePricePerWattUSD = capacityKW > 0 ? Math.round((solarOnlyVentaUSD / (capacityKW * 1000)) * 100) / 100 : 1.13;
 
+  // Equipment vs Labor Breakdown for Ley 57-07
+  const equipmentCostUSD = panelTotalUSD + inverterTotalUSD + batteryTotalUSD;
+  const equipmentTotalUSD = (panelTotalDOP + inverterTotalDOP + batteryTotalDOP + batteryItbisDOP) / rate;
+  const equipmentVentaUSD = equipmentTotalUSD * margin;
+
+  const laborCostUSD = installTotalUSD;
+  const laborTotalUSD = (installTotalDOP + installItbisDOP) / rate;
+  const laborVentaUSD = laborTotalUSD * margin;
+
   return {
     dopExchangeRate: rate,
     saleMarginMultiplier: margin,
@@ -161,6 +170,12 @@ export function calculateCostMatrixSummary(
     costPerWattUSD,
     salePricePerWattUSD,
     solarSalePricePerWattUSD,
+    equipmentCostUSD,
+    equipmentTotalUSD,
+    equipmentVentaUSD,
+    laborCostUSD,
+    laborTotalUSD,
+    laborVentaUSD,
   };
 }
 
@@ -229,6 +244,14 @@ export function calculateFinancialSummary(
         ? Math.round(dcCapacityKWp * 1000 * effectivePricePerWatt * 100) / 100
         : Math.round(costMatrix.porcentajeVentaUSD * 100) / 100);
 
+  // Labor Portion (Mano de obra y materiales con margen e ITBIS)
+  const laborPortionUSD = Math.round((costMatrix.laborVentaUSD || 0) * 100) / 100;
+
+  // Equipment Portion (Paneles, Inversores y Baterías con margen) - Base estricta para Ley 57-07 (excluye mano de obra)
+  const equipmentPortionUSD = isDirectWatt
+    ? Math.max(0, Math.round((grossInvestmentUSD - laborPortionUSD) * 100) / 100)
+    : Math.round((costMatrix.equipmentVentaUSD || (grossInvestmentUSD - laborPortionUSD)) * 100) / 100;
+
   // Solar and Battery investment components breakdown
   const batteryInvestmentUSD = specs.hasBattery
     ? (isDirectWatt
@@ -247,11 +270,11 @@ export function calculateFinancialSummary(
         : Math.round(grossInvestmentUSD * 0.18 * 0.38768 * 100) / 100)
     : 0;
 
-  // Ley 57-07 40% ISR tax credit calculation (allows explicit custom override e.g. 7322.11 or standard calculation)
+  // Ley 57-07 40% ISR tax credit: APPLIES STRICTLY TO RENEWABLE EQUIPMENT (Panels, Inverters, Batteries) - EXCLUDES LABOR
   const ley5707CreditUSD = financials.applyLey5707
     ? (financials.customLey5707CreditUSD !== undefined
         ? financials.customLey5707CreditUSD
-        : Math.round(grossInvestmentUSD * 0.40 * 0.684568 * 100) / 100)
+        : Math.round(equipmentPortionUSD * 0.40 * 100) / 100)
     : 0;
 
   // Total Net Investment after all fiscal incentives of Ley 57-07 (ITBIS exoneration + 40% DGII tax credit)
@@ -372,6 +395,8 @@ export function calculateFinancialSummary(
     grossInvestmentUSD,
     solarInvestmentUSD,
     batteryInvestmentUSD,
+    equipmentPortionUSD,
+    laborPortionUSD,
     itbisSavedUSD,
     ley5707CreditUSD,
     netInvestmentUSD,

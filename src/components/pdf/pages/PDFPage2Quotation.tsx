@@ -260,7 +260,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
               <tbody className="divide-y divide-slate-200 text-[10.5px] text-slate-800 font-semibold">
                 <tr className="bg-white font-bold">
                   <td className="px-3 py-1">TOTAL EQUIPOS ENERGÍAS RENOVABLES (PANELES-INVERSORES-BATERÍAS)</td>
-                  <td className="px-3 py-1 text-right">${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td className="px-3 py-1 text-right">${(summary.equipmentPortionUSD || summary.grossInvestmentUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td className="px-3 py-1 text-right">100%</td>
                 </tr>
                 <tr className="bg-slate-50/60">

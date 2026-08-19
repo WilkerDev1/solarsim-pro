@@ -90,8 +90,8 @@ export function validateReferenceCase(): { pass: boolean; summary: FinancialSumm
     diffs.push(`Inversión bruta: esperada $25,371.12, obtenida $${summary.grossInvestmentUSD}`);
   }
 
-  if (Math.abs(summary.ley5707CreditUSD - 6947.30) > 1.0) {
-    diffs.push(`Crédito Ley 57-07: esperado $6,947.30, obtenido $${summary.ley5707CreditUSD}`);
+  if (Math.abs(summary.ley5707CreditUSD - 7785.38) > 1.0) {
+    diffs.push(`Crédito Ley 57-07: esperado $7,785.38, obtenido $${summary.ley5707CreditUSD}`);
   }
 
   if (Math.abs(summary.itbisSavedUSD - 1770.46) > 1.0) {

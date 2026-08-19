@@ -2173,7 +2173,7 @@ export const SimulatorView: React.FC = () => {
                       <tbody className="divide-y divide-slate-200 text-[11px] text-slate-800 font-semibold">
                         <tr className="bg-white font-bold">
                           <td className="px-3 py-1.5">TOTAL EQUIPOS ENERGIAS RENOVABLES (PANELES-INVERSORES-BATERIAS)</td>
-                          <td className="px-3 py-1.5 text-right">${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-1.5 text-right">${(summary.equipmentPortionUSD || summary.grossInvestmentUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                           <td className="px-3 py-1.5 text-right">100%</td>
                         </tr>
                         <tr className="bg-slate-50/60">
