@@ -77,10 +77,11 @@ assert(
   'netInvestmentUSD = Gross - ITBIS - Ley5707'
 );
 
-// TEST 2: Adding Storage (3 Batteries)
+// TEST 2: Dynamic Storage Addition (3 Batteries)
 console.log('\n--- TEST 2: Dynamic Storage Addition (3 Batteries) ---');
 const specsWithBattery: SystemSpecs = {
   ...defaultSpecs,
+  pricingMode: 'cost_matrix',
   hasBattery: true,
   batteryCount: 3,
   batteryCapacityKWh: 48,
@@ -100,10 +101,28 @@ const resWithBattery = calculateFinancialSummary(
   monthlyConsumption
 );
 
-assert(resWithBattery.batteryInvestmentUSD > 0, 'Inversión Baterías > 0 cuando hasBattery es true');
+assert(resWithBattery.batteryInvestmentUSD > 0, 'Inversión Baterías > 0 en modo matriz de costos');
 assert(
   resWithBattery.grossInvestmentUSD > resSolarOnly.grossInvestmentUSD,
-  'Inversión con baterías es mayor que sin baterías'
+  'Inversión con baterías en matriz de costos es mayor que sin baterías'
+);
+
+// In direct_watt mode, the price per watt is all-inclusive (turnkey)
+const specsDirectWattWithBattery: SystemSpecs = {
+  ...specsWithBattery,
+  pricingMode: 'direct_watt',
+  pricePerWattUSD: 1.38,
+};
+const resDirectWatt = calculateFinancialSummary(
+  'Santo Domingo / Distrito Nacional',
+  specsDirectWattWithBattery,
+  defaultRates,
+  financialsWithBattery,
+  monthlyConsumption
+);
+assert(
+  Math.abs(resDirectWatt.grossInvestmentUSD - (6.82 * 1000 * 1.38)) < 0.1,
+  'Inversión en modo Precio Directo es exactamente Capacidad * $/Wp (todo incluido sin sumar batería por fuera)'
 );
 
 // TEST 3: ITBIS Exemption Toggle

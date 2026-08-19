@@ -1344,22 +1344,22 @@ export const SimulatorView: React.FC = () => {
                         <span className={`font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{summary.systemCapacityKWp.toFixed(2)} kWp</span>
                       </div>
                       <div className="flex justify-between text-slate-400">
-                        <span>Inversión Solar Base:</span>
-                        <span className="font-bold text-emerald-600">
-                          ${(summary.solarInvestmentUSD || (summary.systemCapacityKWp * 1000 * (project.specs.pricePerWattUSD || 1.15))).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                        <span>Precio Unitario Llave en Mano:</span>
+                        <span className={`font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                          ${(project.specs.pricePerWattUSD !== undefined ? project.specs.pricePerWattUSD : 1.15).toFixed(2)} /Wp (${((project.specs.pricePerWattUSD !== undefined ? project.specs.pricePerWattUSD : 1.15) * 1000).toLocaleString('en-US')} /kWp)
                         </span>
                       </div>
                       {project.specs.hasBattery && (
-                        <div className="flex justify-between text-slate-400">
-                          <span>Adicional Baterías ({project.specs.batteryCount || 1} ud):</span>
-                          <span className="font-bold text-amber-500">
-                            +${(summary.batteryInvestmentUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                        <div className="flex justify-between text-slate-400 text-[11px]">
+                          <span>Almacenamiento Incluido:</span>
+                          <span className="font-semibold text-emerald-500">
+                            {project.specs.batteryCount || 1} ud ({((project.specs.batteryCapacityKWh || 5) * (project.specs.batteryCount || 1)).toFixed(1)} kWh)
                           </span>
                         </div>
                       )}
                       <div className={`flex justify-between font-bold pt-1 border-t ${isDark ? 'text-white border-slate-700' : 'text-slate-900 border-slate-200'}`}>
                         <span>Total Venta Proyecto:</span>
-                        <span className="text-emerald-500 font-extrabold">
+                        <span className="text-emerald-500 font-extrabold text-sm">
                           ${(summary.grossInvestmentUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
                         </span>
                       </div>
