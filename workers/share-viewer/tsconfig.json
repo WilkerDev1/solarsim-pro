@@ -3,12 +3,18 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": ["ESNext"],
-    "types": ["./worker-configuration.d.ts"],
+    "lib": [
+      "ESNext"
+    ],
+    "types": [
+      "./worker-configuration.d.ts"
+    ],
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src/**/*", "worker-configuration.d.ts"]
+  "include": [
+    "src/**/*",
+    "worker-configuration.d.ts"
+  ]
 }
-
