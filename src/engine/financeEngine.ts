@@ -15,7 +15,7 @@ export function calculateCostMatrixSummary(
 
   const panelCount = specs.panelCount || 0;
   const panelUnitUSD = specs.panelUnitPriceUSD !== undefined ? specs.panelUnitPriceUSD : 103.32;
-  const panelKilos = specs.panelWeightKilos !== undefined && specs.panelWeightKilos > 0 ? specs.panelWeightKilos : (specs.panelPowerW ? Math.round(specs.panelPowerW * 0.047 * 100) / 100 : 29.0);
+  const panelKilos = Math.round(realDCKWp * 1000) / 1000;
 
   const inverterCount = specs.inverterCount || (realDCKWp > 0 ? Math.max(1, Math.ceil(realDCKWp / (specs.inverterPowerKW || 8))) : 1);
   const inverterUnitUSD = specs.inverterUnitPriceUSD !== undefined ? specs.inverterUnitPriceUSD : 2300.0;

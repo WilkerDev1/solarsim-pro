@@ -6,9 +6,6 @@
     "lib": [
       "ESNext"
     ],
-    "types": [
-      "./worker-configuration.d.ts"
-    ],
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true
