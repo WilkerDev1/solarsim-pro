@@ -835,6 +835,22 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
 
             <div>
               <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                Texto de Transición (Debajo de Servicios y antes de "¿Por Qué Elegirnos?")
+              </label>
+              <textarea
+                rows={2}
+                value={cust.aboutUsTransitionText !== undefined ? cust.aboutUsTransitionText : (DEFAULT_DOCUMENT_CUSTOMIZATION.aboutUsTransitionText || 'Descubre cómo nuestros productos y servicios pueden ayudarte a aprovechar al máximo la energía del sol.')}
+                onChange={(e) => updateDocumentCustomization({ aboutUsTransitionText: e.target.value })}
+                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
+                  isDark
+                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
+                    : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
                 Texto "¿Por Qué Elegirnos?" / Misión
               </label>
               <textarea

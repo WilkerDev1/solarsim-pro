@@ -28,7 +28,19 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
 }) => {
   const cust = project.customization || {};
   const companyName = cust.companyName || DEFAULT_DOCUMENT_CUSTOMIZATION.companyName || 'ELECTSUN';
-  const aboutUsIntroText = cust.aboutUsIntroText || DEFAULT_DOCUMENT_CUSTOMIZATION.aboutUsIntroText || '';
+  
+  // Clean intro text if it previously contained the transition paragraph
+  const transitionPhrase = 'Descubre cómo nuestros productos y servicios pueden ayudarte a aprovechar al máximo la energía del sol.';
+  let rawIntroText = cust.aboutUsIntroText !== undefined ? cust.aboutUsIntroText : (DEFAULT_DOCUMENT_CUSTOMIZATION.aboutUsIntroText || '');
+  if (rawIntroText.includes(transitionPhrase)) {
+    rawIntroText = rawIntroText.replace(transitionPhrase, '').trim();
+  }
+  const aboutUsIntroText = rawIntroText || `En ${companyName.toUpperCase()}, transformamos la energía solar en una solución inteligente, sostenible y accesible para todos. Creemos en un futuro más limpio y eficiente, y estamos aquí para hacerlo posible.`;
+
+  const aboutUsTransitionText = cust.aboutUsTransitionText !== undefined 
+    ? cust.aboutUsTransitionText 
+    : (DEFAULT_DOCUMENT_CUSTOMIZATION.aboutUsTransitionText || transitionPhrase);
+
   const whyChooseUsText = cust.whyChooseUsText || DEFAULT_DOCUMENT_CUSTOMIZATION.whyChooseUsText || '';
 
   return (
@@ -182,6 +194,11 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Párrafo de Transición entre Servicios y Por Qué Elegirnos */}
+        <p className="text-slate-700 text-[11.5px] leading-relaxed text-left font-medium">
+          {aboutUsTransitionText}
+        </p>
 
         {/* 1.1 ¿Por Qué Elegirnos? Section */}
         <div className="space-y-2">
