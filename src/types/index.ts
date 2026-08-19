@@ -170,7 +170,7 @@ export interface DocumentCustomization {
   companyName?: string;            // Default: 'electsun'
   companySlogan?: string;          // Default: 'El sol a tu favor'
   companyFooterText?: string;      // Default: 'Calle Ercilia Pepín #1, Plaza Toledo | Local 307 | Arroyo Manzano | Santo Domingo, RD | electsun.com.do'
-  companyPhone?: string;          // e.g. '+1 (809) 555-0199'
+  companyPhone?: string;          // e.g. '+1 (809) 378-6590'
   companyEmail?: string;          // e.g. 'info@electsun.com.do'
   companyRnc?: string;            // e.g. '1-31-12345-6'
   

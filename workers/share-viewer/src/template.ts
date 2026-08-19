@@ -1,7 +1,7 @@
 import { StoredProposal } from './types';
 import { ELECTSUN_LOGO_COLOR_BASE64 } from './electsunLogo';
 
-export function renderExpiredPage(companyName = 'electsun', companyPhone = ''): string {
+export function renderExpiredPage(companyName = 'electsun', companyPhone = '+1 (809) 378-6590'): string {
   return `<!DOCTYPE html>
 <html lang="es" class="h-full bg-slate-100 text-slate-900">
 <head>
@@ -55,12 +55,14 @@ export function renderProposalPage(stored: StoredProposal): string {
 
   const companyName = custom.companyName || 'electsun';
   const companySlogan = custom.companySlogan || 'El sol a tu favor';
-  const companyPhone = custom.companyPhone || '+1 (809) 555-0199';
+  const rawCompanyPhone = custom.companyPhone || '+1 (809) 378-6590';
+  const companyPhone = (rawCompanyPhone.includes('555-0199') || rawCompanyPhone.includes('5550199')) ? '+1 (809) 378-6590' : rawCompanyPhone;
   const companyEmail = custom.companyEmail || 'info@electsun.com.do';
   const companyRnc = custom.companyRnc || '';
   const companyWebsite = custom.companyWebsite || 'electsun.com.do';
   const contactName = custom.contactName || client.name || 'Contacto';
-  const clientPhone = custom.clientPhone || client.contactPhone || '809-555-0199';
+  const rawClientPhone = custom.clientPhone || client.contactPhone || '809-378-6590';
+  const clientPhone = (rawClientPhone.includes('555-0199') || rawClientPhone.includes('5550199')) ? '809-378-6590' : rawClientPhone;
 
   const logoBase64 = custom.headerLogoBase64 || custom.coverLogoBase64 || ELECTSUN_LOGO_COLOR_BASE64;
 

@@ -206,6 +206,53 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                   }`}
                 />
               </div>
+
+              <div>
+                <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                  Teléfono Empresa (Portada / Web)
+                </label>
+                <input
+                  type="text"
+                  value={cust.companyPhone !== undefined ? cust.companyPhone : DEFAULT_DOCUMENT_CUSTOMIZATION.companyPhone}
+                  onChange={(e) => updateDocumentCustomization({ companyPhone: e.target.value })}
+                  placeholder="+1 (809) 378-6590"
+                  className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
+                    isDark
+                      ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
+                      : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                  Sitio Web / Instagram
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={cust.companyWebsite !== undefined ? cust.companyWebsite : DEFAULT_DOCUMENT_CUSTOMIZATION.companyWebsite}
+                    onChange={(e) => updateDocumentCustomization({ companyWebsite: e.target.value })}
+                    placeholder="electsun.com.do"
+                    className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
+                      isDark
+                        ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
+                        : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
+                    }`}
+                  />
+                  <input
+                    type="text"
+                    value={cust.companyInstagram !== undefined ? cust.companyInstagram : DEFAULT_DOCUMENT_CUSTOMIZATION.companyInstagram}
+                    onChange={(e) => updateDocumentCustomization({ companyInstagram: e.target.value })}
+                    placeholder="Electsunrd"
+                    className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
+                      isDark
+                        ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
+                        : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
+                    }`}
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Logotipo de Portada */}
@@ -462,7 +509,7 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                 </label>
                 <input
                   type="text"
-                  value={cust.clientPhone !== undefined ? cust.clientPhone : (project.client.contactPhone || '809-555-0199')}
+                  value={cust.clientPhone !== undefined ? cust.clientPhone : (project.client.contactPhone || '809-378-6590')}
                   onChange={(e) => {
                     updateDocumentCustomization({ clientPhone: e.target.value });
                     updateClient({ contactPhone: e.target.value });

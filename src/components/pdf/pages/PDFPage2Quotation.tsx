@@ -29,7 +29,8 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
   const cust = project.customization || {};
 
   const contactName = cust.contactName || project.client.name || 'Contacto';
-  const clientPhone = cust.clientPhone || project.client.contactPhone || '809-555-0199';
+  const rawClientPhone = cust.clientPhone || project.client.contactPhone || '809-378-6590';
+  const clientPhone = (rawClientPhone.includes('555-0199') || rawClientPhone.includes('5550199')) ? (project.client.contactPhone || '809-378-6590') : rawClientPhone;
   const panelWarranty = cust.panelWarrantyText || DEFAULT_DOCUMENT_CUSTOMIZATION.panelWarrantyText || '25 Años';
   const inverterWarranty = cust.inverterWarrantyText || DEFAULT_DOCUMENT_CUSTOMIZATION.inverterWarrantyText || '5 a 10 Años';
   const batteryWarranty = cust.batteryWarrantyText || DEFAULT_DOCUMENT_CUSTOMIZATION.batteryWarrantyText || '5 a 10 Años';

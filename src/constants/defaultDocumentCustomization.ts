@@ -4,7 +4,7 @@ export const DEFAULT_DOCUMENT_CUSTOMIZATION: DocumentCustomization = {
   companyName: 'electsun',
   companySlogan: 'El sol a tu favor',
   companyFooterText: 'Calle Ercilia Pepín #1, Plaza Toledo | Local 307 | Arroyo Manzano | Santo Domingo, RD | electsun.com.do',
-  companyPhone: '+1 (809) 555-0199',
+  companyPhone: '+1 (809) 378-6590',
   companyEmail: 'info@electsun.com.do',
   companyRnc: '1-31-12345-6',
 

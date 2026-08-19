@@ -2057,7 +2057,7 @@ export const SimulatorView: React.FC = () => {
                     <div className="space-y-1">
                       <div><span className="font-bold text-slate-600">Cliente:</span> <span className="font-bold text-slate-900">{project.client.name}</span></div>
                       <div><span className="font-bold text-slate-600">Contacto:</span> {project.client.company || project.client.name}</div>
-                      <div><span className="font-bold text-slate-600">Teléfono:</span> {project.client.contactPhone || '809-555-0199'}</div>
+                      <div><span className="font-bold text-slate-600">Teléfono:</span> {project.client.contactPhone || '809-378-6590'}</div>
                       <div><span className="font-bold text-slate-600">Dirección:</span> {project.client.address || 'Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.'}</div>
                     </div>
                     <div className="space-y-1 text-right">
