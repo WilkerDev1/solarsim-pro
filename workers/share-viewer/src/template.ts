@@ -66,7 +66,8 @@ export function renderProposalPage(stored: StoredProposal): string {
 
   const logoBase64 = custom.headerLogoBase64 || custom.coverLogoBase64 || ELECTSUN_LOGO_COLOR_BASE64;
 
-  const clientName = client.name || 'Cliente Estimado';
+  const rawClientName = client.name || 'Cliente Estimado';
+  const clientName = rawClientName.replace(/\s*\((?:Copia|Copia Importada|COPIA|V\d+|C\d+)\)\s*/gi, '').trim();
   const projectId = client.projectId || 'SP-2026-001';
   const quoteNumber = client.quoteNumber || 'C-0001';
   const quoteValidityDays = client.quoteValidityDays || stored.validityDays || 7;

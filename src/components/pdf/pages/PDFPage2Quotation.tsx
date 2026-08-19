@@ -28,7 +28,8 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
 }) => {
   const cust = project.customization || {};
 
-  const contactName = cust.contactName || project.client.name || 'Contacto';
+  const cleanClientName = (project.client.name || 'Cliente').replace(/\s*\((?:Copia|Copia Importada|COPIA|V\d+|C\d+)\)\s*/gi, '').trim();
+  const contactName = cust.contactName || cleanClientName || 'Contacto';
   const rawClientPhone = cust.clientPhone || project.client.contactPhone || '809-378-6590';
   const clientPhone = (rawClientPhone.includes('555-0199') || rawClientPhone.includes('5550199')) ? (project.client.contactPhone || '809-378-6590') : rawClientPhone;
   const panelWarranty = cust.panelWarrantyText || DEFAULT_DOCUMENT_CUSTOMIZATION.panelWarrantyText || '25 Años';
@@ -84,7 +85,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
             <div className="space-y-0.5">
               <div>
                 <span className="font-bold text-slate-600">Cliente:</span>{' '}
-                <span className="font-bold text-slate-900">{project.client.name}</span>
+                <span className="font-bold text-slate-900">{cleanClientName}</span>
               </div>
               <div>
                 <span className="font-bold text-slate-600">Contacto:</span> {contactName}

@@ -61,7 +61,8 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
 
   const paragraphs = getRegulatoryParagraphs();
 
-  const clientName = project.client.name || 'Cliente';
+  const rawClientName = project.client.name || 'Cliente';
+  const clientName = rawClientName.replace(/\s*\((?:Copia|Copia Importada|COPIA|V\d+|C\d+)\)\s*/gi, '').trim();
   const panelModel = project.specs.panelBrandModel || `Módulos Monocristalinos TOPCon (${project.specs.panelPowerW}W)`;
   const inverterModel = project.specs.inverterBrandModel || `Inversor Solar Inteligente (${project.specs.inverterPowerKW || (summary.systemCapacityKWp * 0.9).toFixed(1)} kW)`;
   const batteryModel = project.specs.batteryBrandModel || `Batería de Litio LiFePO4 (${project.specs.batteryCapacityKWh} kWh)`;

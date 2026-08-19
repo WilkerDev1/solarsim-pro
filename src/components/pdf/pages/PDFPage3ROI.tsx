@@ -123,7 +123,7 @@ export const PDFPage3ROI: React.FC<PDFPage3ROIProps> = ({
               <tbody className="divide-y divide-gray-200 text-gray-700 font-semibold">
                 <tr className="bg-gray-50/60">
                   <td className="px-4 py-1.5 text-gray-800 w-1/2">Cliente</td>
-                  <td className="px-4 py-1.5 text-right font-bold uppercase text-gray-900">{project.client.name}</td>
+                  <td className="px-4 py-1.5 text-right font-bold uppercase text-gray-900">{(project.client.name || 'Cliente').replace(/\s*\((?:Copia|Copia Importada|COPIA|V\d+|C\d+)\)\s*/gi, '').trim()}</td>
                 </tr>
                 <tr>
                   <td className="px-4 py-1.5 text-gray-800">Potencia Instalada (kWp)</td>

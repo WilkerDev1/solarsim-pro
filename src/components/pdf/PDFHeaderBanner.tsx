@@ -29,6 +29,8 @@ export const PDFHeaderBanner: React.FC<PDFHeaderBannerProps> = ({
   const companySlogan = customization?.companySlogan || DEFAULT_DOCUMENT_CUSTOMIZATION.companySlogan || 'El sol a tu favor';
   const isDefaultElectsun = companyName.toLowerCase().trim() === 'electsun';
 
+  const cleanClientName = (clientName || 'Cliente').replace(/\s*\((?:Copia|Copia Importada|COPIA|V\d+|C\d+)\)\s*/gi, '').trim();
+
   return (
     <>
       <div
@@ -40,7 +42,7 @@ export const PDFHeaderBanner: React.FC<PDFHeaderBannerProps> = ({
             PROPUESTA TÉCNICA Y ECONÓMICA • ID: {projectId || 'SP-2024-089'}
           </h2>
           <h1 className="text-xl font-bold uppercase tracking-tight text-white mt-0.5">
-            {clientName} — {systemCapacityKWp.toFixed(2)}kWp
+            {cleanClientName} — {systemCapacityKWp.toFixed(2)}kWp
           </h1>
           <p className="text-[11px] text-white/80 mt-0.5">
             Ubicación: <span className="font-semibold text-white">{location}</span> | Fecha:{' '}

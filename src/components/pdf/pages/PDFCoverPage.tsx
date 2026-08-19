@@ -33,7 +33,8 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
   const coverLogoSrc = cust.coverLogoBase64 || cust.headerLogoBase64 || ELECTSUN_LOGO_COLOR_BASE64;
   const hasLogoImage = Boolean(cust.coverLogoBase64 || cust.headerLogoBase64 || isDefaultElectsun);
 
-  const clientName = (project.client.name || 'Centro Médico Hispánico').toUpperCase();
+  const rawClientName = project.client.name || 'Centro Médico Hispánico';
+  const clientName = rawClientName.replace(/\s*\((?:Copia|Copia Importada|COPIA|V\d+|C\d+)\)\s*/gi, '').trim().toUpperCase();
   const clientLocation = project.client.province || project.client.location || 'Santo Domingo / Distrito Nacional';
   const panelModelText = `${project.specs.panelCount} Módulos Tier-1 (${project.specs.panelPowerW}W)`;
 

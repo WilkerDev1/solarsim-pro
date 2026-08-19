@@ -241,6 +241,55 @@ export function generateNextProjectSequence(existingProjects: ProjectSimulation[
   };
 }
 
+export function generateDuplicateProjectIdentifiers(
+  target: ProjectSimulation,
+  existingProjects: ProjectSimulation[]
+): { cleanName: string; projectId: string; quoteNumber: string; versionSuffix: string } {
+  const rawName = target.client?.name || 'Cliente';
+  const cleanName = rawName.replace(/\s*\((?:Copia|Copia Importada|COPIA|V\d+|C\d+)\)\s*/gi, '').trim();
+
+  const rawProjId = target.client?.projectId || 'SP-2026-001';
+  const baseProjId = rawProjId.replace(/-(?:V|C)\d+$/i, '').trim();
+
+  const rawQuote = target.client?.quoteNumber || 'C-0001';
+  const baseQuote = rawQuote.replace(/-(?:V|C)\d+$/i, '').trim();
+
+  let maxVersion = 1;
+  for (const p of existingProjects) {
+    if (!p.client?.projectId) continue;
+    if (p.client.projectId.startsWith(baseProjId)) {
+      const match = p.client.projectId.match(/-(?:V|C)(\d+)$/i);
+      if (match) {
+        const v = parseInt(match[1], 10);
+        if (!isNaN(v) && v > maxVersion) {
+          maxVersion = v;
+        }
+      }
+    }
+    if (p.client?.quoteNumber && p.client.quoteNumber.startsWith(baseQuote)) {
+      const matchQ = p.client.quoteNumber.match(/-(?:V|C)(\d+)$/i);
+      if (matchQ) {
+        const vq = parseInt(matchQ[1], 10);
+        if (!isNaN(vq) && vq > maxVersion) {
+          maxVersion = vq;
+        }
+      }
+    }
+  }
+
+  const nextVersion = maxVersion + 1;
+  const versionSuffix = `-V${nextVersion}`;
+  const newProjectId = `${baseProjId}${versionSuffix}`;
+  const newQuoteNumber = `${baseQuote}${versionSuffix}`;
+
+  return {
+    cleanName,
+    projectId: newProjectId,
+    quoteNumber: newQuoteNumber,
+    versionSuffix,
+  };
+}
+
 export function findDuplicateProjectInfo(
   projectId: string,
   quoteNumber: string,
@@ -646,7 +695,7 @@ export const useSimulationStore = create<SimulationState>()(
         if (!target) return;
 
         const newId = `proj-${Date.now()}`;
-        const seq = generateNextProjectSequence(get().projects);
+        const dupIdentifiers = generateDuplicateProjectIdentifiers(target, get().projects);
         const cloned: ProjectSimulation = {
           ...target,
           id: newId,
@@ -655,9 +704,9 @@ export const useSimulationStore = create<SimulationState>()(
           status: 'Draft',
           client: {
             ...target.client,
-            name: `${target.client.name} (Copia)`,
-            projectId: seq.projectId,
-            quoteNumber: seq.quoteNumber,
+            name: dupIdentifiers.cleanName,
+            projectId: dupIdentifiers.projectId,
+            quoteNumber: dupIdentifiers.quoteNumber,
           },
         };
 
@@ -665,7 +714,7 @@ export const useSimulationStore = create<SimulationState>()(
           projects: [cloned, ...state.projects],
           activeProjectId: newId,
           activeView: 'simulator',
-          saveFeedbackMessage: `¡Copia creada con éxito (${seq.projectId})!`,
+          saveFeedbackMessage: `¡Versión ${dupIdentifiers.projectId} creada con éxito!`,
         }));
 
         setTimeout(() => {
@@ -923,15 +972,16 @@ export const useSimulationStore = create<SimulationState>()(
           toastMsg = `¡Proyecto "${incomingProject.client.name}" sobrescrito con éxito!`;
         } else if (strategy === 'copy_version') {
           const newId = `proj-imported-${Date.now()}`;
+          const dupIdentifiers = generateDuplicateProjectIdentifiers(incomingProject, currentProjects);
           const newProj: ProjectSimulation = {
             ...incomingProject,
             id: newId,
             updatedAt: new Date().toISOString(),
             client: {
               ...incomingProject.client,
-              name: `${incomingProject.client.name} (Copia Importada)`,
-              projectId: `${incomingProject.client.projectId}-B`,
-              quoteNumber: `${incomingProject.client.quoteNumber}-B`,
+              name: dupIdentifiers.cleanName,
+              projectId: dupIdentifiers.projectId,
+              quoteNumber: dupIdentifiers.quoteNumber,
             },
           };
           updatedProjects = [newProj, ...currentProjects];
@@ -989,6 +1039,34 @@ export const useSimulationStore = create<SimulationState>()(
           },
         };
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state && state.projects && Array.isArray(state.projects)) {
+          // Clean legacy projects that had '(Copia)' embedded in client.name
+          let hasChanges = false;
+          const cleaned = state.projects.map((p) => {
+            if (p.client?.name && /\((?:Copia|Copia Importada|COPIA)\)/i.test(p.client.name)) {
+              hasChanges = true;
+              const clean = p.client.name.replace(/\s*\((?:Copia|Copia Importada|COPIA)\)\s*/gi, '').trim();
+              const baseProjId = (p.client.projectId || 'SP-2026-001').replace(/-(?:V|C)\d+$/i, '');
+              const newProjId = p.client.projectId && (p.client.projectId.includes('-V') || p.client.projectId.includes('-C'))
+                ? p.client.projectId
+                : `${baseProjId}-V2`;
+              return {
+                ...p,
+                client: {
+                  ...p.client,
+                  name: clean,
+                  projectId: newProjId,
+                },
+              };
+            }
+            return p;
+          });
+          if (hasChanges) {
+            state.projects = cleaned;
+          }
+        }
+      },
       partialize: (state) => ({
         projects: state.projects,
         activeProjectId: state.activeProjectId,

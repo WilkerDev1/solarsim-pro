@@ -52,7 +52,7 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
           <div className="bg-amber-600 text-white p-2.5 rounded-xl flex justify-between items-center shadow-sm">
             <div>
               <h3 className="font-extrabold text-xs uppercase tracking-wider text-white">
-                CLIENTE: {project.client.name} — Desglose de Costos de Proyecto
+                CLIENTE: {(project.client.name || 'Cliente').replace(/\s*\((?:Copia|Copia Importada|COPIA|V\d+|C\d+)\)\s*/gi, '').trim()} — Desglose de Costos de Proyecto
               </h3>
               <p className="text-[10px] text-amber-100 font-medium">
                 Documento de Control Interno de Precios, ITBIS y Margen de Rentabilidad
