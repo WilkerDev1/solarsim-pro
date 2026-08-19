@@ -332,9 +332,14 @@ export const useSimulationStore = create<SimulationState>()(
             if (p.id === state.activeProjectId) {
               const updatedSpecs = { ...p.specs, ...specsPartial };
 
-              // Sync pricePerWattUSD between specs and financials if updated
+              // Sync pricePerWattUSD and pricePerKWpUSD bidirectionally
               let updatedFinancials = { ...p.financials };
-              if (specsPartial.pricePerWattUSD !== undefined) {
+              if (specsPartial.pricePerKWpUSD !== undefined && specsPartial.pricePerKWpUSD > 0) {
+                const wPrice = Math.round((specsPartial.pricePerKWpUSD / 1000) * 1000) / 1000;
+                updatedSpecs.pricePerWattUSD = wPrice;
+                updatedFinancials.pricePerWattUSD = wPrice;
+              } else if (specsPartial.pricePerWattUSD !== undefined) {
+                updatedSpecs.pricePerKWpUSD = Math.round(specsPartial.pricePerWattUSD * 1000 * 100) / 100;
                 updatedFinancials.pricePerWattUSD = specsPartial.pricePerWattUSD;
               }
 
@@ -357,13 +362,14 @@ export const useSimulationStore = create<SimulationState>()(
                 delete updatedFinancials.customLey5707CreditUSD;
                 delete updatedFinancials.customITBISSavedUSD;
 
-                // If user didn't explicitly customize pricePerWattUSD in this change, auto-sync from cost matrix
-                if (specsPartial.pricePerWattUSD === undefined) {
+                // If in 'cost_matrix' mode (default) and user didn't explicitly customize pricePerWattUSD in this change, auto-sync from cost matrix
+                if (updatedSpecs.pricingMode !== 'direct_watt' && specsPartial.pricePerWattUSD === undefined && specsPartial.pricePerKWpUSD === undefined) {
                   const dcKWp = (updatedSpecs.panelPowerW * updatedSpecs.panelCount) / 1000;
                   const cm = calculateCostMatrixSummary(updatedSpecs, dcKWp);
                   const autoPrice = Math.round(cm.salePricePerWattUSD * 100) / 100;
                   if (autoPrice > 0) {
                     updatedSpecs.pricePerWattUSD = autoPrice;
+                    updatedSpecs.pricePerKWpUSD = Math.round(autoPrice * 1000 * 100) / 100;
                     updatedFinancials.pricePerWattUSD = autoPrice;
                   }
                 }

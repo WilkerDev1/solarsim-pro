@@ -18,10 +18,12 @@ export interface ClientInfo {
 
 export interface SystemSpecs {
   isDetailed: boolean;
+  pricingMode?: 'cost_matrix' | 'direct_watt'; // 'cost_matrix' (default) or 'direct_watt' (manual $/W or $/kW)
   panelPowerW: number;
   autoCalculatePanels?: boolean;
   panelCount: number;
   pricePerWattUSD: number;       // USD per Wp e.g. 1.13
+  pricePerKWpUSD?: number;       // USD per kWp e.g. 1130.00
   panelBrandModel?: string;      // e.g. "CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)"
   inverterPowerKW: number;
   inverterBrandModel?: string;   // e.g. "Lux Power LXP-LB-US 8K (8.0Kw)"

@@ -211,23 +211,30 @@ export function calculateFinancialSummary(
   // Calculate cost matrix summary
   const costMatrix = calculateCostMatrixSummary(specs, dcCapacityKWp);
 
+  // Pricing Mode: 'cost_matrix' (default) vs 'direct_watt' (manual $/W or $/kW base price)
+  const isDirectWatt = specs.pricingMode === 'direct_watt' || (!specs.isDetailed && specs.pricingMode !== 'cost_matrix');
+  const effectivePricePerWatt = specs.pricePerWattUSD !== undefined && specs.pricePerWattUSD > 0
+    ? specs.pricePerWattUSD
+    : (financials.pricePerWattUSD !== undefined && financials.pricePerWattUSD > 0 ? financials.pricePerWattUSD : 1.13);
+
+  // Solar and Battery investment components breakdown
+  const solarInvestmentUSD = isDirectWatt
+    ? Math.round(dcCapacityKWp * 1000 * effectivePricePerWatt * 100) / 100
+    : Math.round((costMatrix.solarOnlyVentaUSD || (dcCapacityKWp * 1000 * effectivePricePerWatt)) * 100) / 100;
+
+  const batteryInvestmentUSD = specs.hasBattery
+    ? Math.max(0, Math.round((costMatrix.porcentajeVentaUSD - (costMatrix.solarOnlyVentaUSD || costMatrix.porcentajeVentaUSD)) * 100) / 100)
+    : 0;
+
   // Total Gross Investment:
   // 1. If explicit custom override is set, use it.
-  // 2. If pricePerWattUSD is provided, grossInvestment is (dcCapacityKWp * 1000 * pricePerWattUSD).
+  // 2. If direct_watt mode, use exact (solarInvestmentUSD + batteryInvestmentUSD).
   // 3. Otherwise, use exact turnkey total sale price from the Cost Matrix (costMatrix.porcentajeVentaUSD).
   const grossInvestmentUSD = financials.customCostUSD && financials.customCostUSD > 0
     ? financials.customCostUSD
-    : (specs.isDetailed
-        ? Math.round(costMatrix.porcentajeVentaUSD * 100) / 100
-        : (financials.pricePerWattUSD !== undefined && financials.pricePerWattUSD > 0
-            ? Math.round(dcCapacityKWp * 1000 * financials.pricePerWattUSD * 100) / 100
-            : Math.round(costMatrix.porcentajeVentaUSD * 100) / 100));
-
-  // Solar and Battery investment components breakdown
-  const solarInvestmentUSD = Math.round((costMatrix.solarOnlyVentaUSD || (dcCapacityKWp * 1000 * (financials.pricePerWattUSD || 1.13))) * 100) / 100;
-  const batteryInvestmentUSD = specs.hasBattery
-    ? Math.max(0, Math.round((grossInvestmentUSD - solarInvestmentUSD) * 100) / 100)
-    : 0;
+    : (isDirectWatt
+        ? Math.round((solarInvestmentUSD + batteryInvestmentUSD) * 100) / 100
+        : Math.round(costMatrix.porcentajeVentaUSD * 100) / 100);
 
   // ITBIS exoneration calculation (allows explicit custom override e.g. 1866.11 or standard calculation)
   const itbisSavedUSD = financials.applyITBISExemption
