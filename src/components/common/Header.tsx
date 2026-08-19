@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
-import { Sun, Moon, FileText, LayoutDashboard, Save, Plus, ArrowLeft, RefreshCw, CheckCircle2, Sparkles, Bot, Share2 } from 'lucide-react';
+import { Sun, Moon, FileText, LayoutDashboard, Save, Plus, ArrowLeft, RefreshCw, CheckCircle2, Sparkles, Bot, Share2, Globe } from 'lucide-react';
 import electsunEmblem from '../../assets/electsun-emblem-transparent.png';
 
 export const Header: React.FC = () => {
@@ -11,6 +11,7 @@ export const Header: React.FC = () => {
     openNewProjectModal,
     openUpdateModal,
     openAIInvoiceModal,
+    openShareModal,
     saveActiveProject,
     exportProjectAsJSON,
     saveFeedbackMessage,
@@ -179,6 +180,22 @@ export const Header: React.FC = () => {
               <RefreshCw className="w-3.5 h-3.5 text-emerald-500" />
               <span className="hidden sm:inline">Actualizaciones</span>
             </button>
+
+            {/* Share Web Proposal Button (when inside a Project) */}
+            {activeView !== 'dashboard' && (
+              <button
+                onClick={openShareModal}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all shadow-xs cursor-pointer ${
+                  isDark
+                    ? 'border-emerald-700/60 bg-emerald-950/50 hover:bg-emerald-900/70 text-emerald-300'
+                    : 'border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900'
+                }`}
+                title="Compartir propuesta web interactiva y temporal (Cloudflare)"
+              >
+                <Globe className="w-3.5 h-3.5 text-emerald-500" />
+                <span className="hidden sm:inline">Compartir Web</span>
+              </button>
+            )}
 
             {/* Export JSON Button (when inside a Project) */}
             {activeView !== 'dashboard' && (

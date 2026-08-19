@@ -26,6 +26,7 @@ export const PDFProposalView: React.FC = () => {
     updateSpecs,
     updateDocumentCustomization,
     sidebarTheme,
+    openShareModal,
   } = useSimulationStore();
 
   const isDark = sidebarTheme === 'dark';
@@ -372,6 +373,7 @@ export const PDFProposalView: React.FC = () => {
         isExporting={isExporting}
         handleExportPDF={handleExportPDF}
         handlePrint={handlePrint}
+        onOpenShareModal={openShareModal}
         onRefresh={() => {
           useSimulationStore.setState({ activeProjectId: project.id });
         }}

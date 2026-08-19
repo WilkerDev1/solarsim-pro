@@ -25,6 +25,7 @@ interface SimulationState {
   isUpdateModalOpen: boolean;
   isAIInvoiceModalOpen: boolean;
   isAISettingsModalOpen: boolean;
+  isShareModalOpen: boolean;
   updateInfo: UpdateInfo;
   saveFeedbackMessage: string | null;
 
@@ -46,6 +47,8 @@ interface SimulationState {
   closeAIInvoiceModal: () => void;
   openAISettingsModal: () => void;
   closeAISettingsModal: () => void;
+  openShareModal: () => void;
+  closeShareModal: () => void;
   setGeminiApiKey: (key: string) => void;
   setGeminiModel: (model: string) => void;
   setUpdateInfo: (info: UpdateInfo) => void;
@@ -280,6 +283,7 @@ export const useSimulationStore = create<SimulationState>()(
       isUpdateModalOpen: false,
       isAIInvoiceModalOpen: false,
       isAISettingsModalOpen: false,
+      isShareModalOpen: false,
       updateInfo: { state: 'idle' },
       saveFeedbackMessage: null,
       pendingImportConflict: null,
@@ -300,6 +304,8 @@ export const useSimulationStore = create<SimulationState>()(
       closeAIInvoiceModal: () => set({ isAIInvoiceModalOpen: false }),
       openAISettingsModal: () => set({ isAISettingsModalOpen: true }),
       closeAISettingsModal: () => set({ isAISettingsModalOpen: false }),
+      openShareModal: () => set({ isShareModalOpen: true }),
+      closeShareModal: () => set({ isShareModalOpen: false }),
       setGeminiApiKey: (key) => set({ geminiApiKey: key }),
       setGeminiModel: (model) => set({ geminiModel: model }),
       setUpdateInfo: (info) => set({ updateInfo: info }),

@@ -5,6 +5,7 @@ import {
   FileText,
   SlidersHorizontal,
   RefreshCw,
+  Globe,
 } from 'lucide-react';
 import { ProjectSimulation, DocumentCustomization } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
@@ -22,6 +23,7 @@ interface PDFSidebarControlsProps {
   isExporting: boolean;
   handleExportPDF: () => void;
   handlePrint: () => void;
+  onOpenShareModal?: () => void;
   onRefresh: () => void;
 
   // New Intro Pages
@@ -68,6 +70,7 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
   isExporting,
   handleExportPDF,
   handlePrint,
+  onOpenShareModal,
   onRefresh,
 
   showCover,
@@ -112,7 +115,7 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
       <div className={`p-4 border-b space-y-2.5 ${isDark ? 'border-[#2a2a36] bg-[#131318]' : 'border-slate-200 bg-slate-50'}`}>
         <div className="flex items-center justify-between mb-0.5">
           <span className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-            Exportación PDF
+            Exportación y Enlaces
           </span>
           <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-950/70 px-2 py-0.5 rounded-full border border-emerald-800/60">
             {activePagesCount} {activePagesCount === 1 ? 'Página' : 'Páginas'}
@@ -128,6 +131,22 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
           <Download className="w-4 h-4" />
           {isExporting ? 'Generando Documento...' : 'Descargar Propuesta PDF'}
         </button>
+
+        {onOpenShareModal && (
+          <button
+            type="button"
+            onClick={onOpenShareModal}
+            className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer border shadow-xs active:scale-[0.98] ${
+              isDark
+                ? 'bg-gradient-to-r from-emerald-950/70 via-teal-950/50 to-emerald-950/70 border-emerald-700/60 text-emerald-300 hover:border-emerald-500 hover:text-white hover:shadow-emerald-950/50'
+                : 'bg-emerald-50 border-emerald-300 text-emerald-900 hover:bg-emerald-100 hover:border-emerald-400'
+            }`}
+            title="Compartir propuesta web interactiva y temporal (Cloudflare)"
+          >
+            <Globe className="w-4 h-4 text-emerald-400" />
+            <span>Compartir Propuesta Web</span>
+          </button>
+        )}
 
         <button
           onClick={handlePrint}

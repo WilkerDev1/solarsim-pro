@@ -36,6 +36,11 @@ solarsim/
 ├── electron/                                # Runtime de Escritorio (Node / Chromium)
 │   ├── main.ts                              # Proceso principal de Electron, IPC handlers, auto-updater
 │   └── preload.ts                           # Puente seguro contextBridge entre Electron y React
+├── workers/                                 # ☁️ MICROSERVICIOS SERVERLESS (Cloudflare)
+│   └── share-viewer/                        # Cloudflare Worker & Visor Web de Propuestas Temporales
+│       ├── wrangler.toml                    # Configuración KV y despliegue del worker
+│       ├── package.json                     # Hono framework y dependencias de Cloudflare
+│       └── src/                             # API (/api/share) y Plantilla Web (/p/:id)
 ├── src/
 │   ├── main.tsx                             # Punto de entrada de React
 │   ├── App.tsx                              # Enrutador y vista principal (Simulador vs Propuesta PDF)
@@ -43,6 +48,8 @@ solarsim/
 │   ├── types/
 │   │   ├── index.ts                         # Tipos TypeScript de simulación, cliente, finanzas y PDF
 │   │   └── defaultDocumentCustomization.ts  # Valores por defecto de personalización empresarial
+│   ├── services/
+│   │   └── shareProposalService.ts          # Servicio de publicación de propuestas web en Cloudflare
 │   ├── store/
 │   │   └── useSimulationStore.ts            # Estado global Zustand con persistencia en localStorage
 │   ├── data/
@@ -58,7 +65,8 @@ solarsim/
 │   └── components/
 │       ├── common/                          # Modales, cabeceras y utilidades compartidas
 │       │   ├── Header.tsx                   # Barra superior de la app con navegación y botones
-│       │   └── AIInvoiceScannerModal.tsx    # Modal de escáner de facturas con Gemini Vision
+│       │   ├── AIInvoiceScannerModal.tsx    # Modal de escáner de facturas con Gemini Vision
+│       │   └── ShareProposalModal.tsx       # Modal de compartir propuesta web interactiva y QR
 │       ├── simulator/                       # 🎛️ VISTA DEL SIMULADOR INTERACTIVO
 │       │   ├── SimulatorView.tsx            # Vista unificada del simulador
 │       │   ├── ParameterSidebar.tsx         # Barra lateral de parámetros técnicos y financieros
@@ -86,6 +94,7 @@ solarsim/
 │               └── PDFPage5CostMatrix.tsx   # Hoja 11: 9. Matriz de Costos Interna (Confidencial)
 ├── release/                                 # Binarios generados (.exe, .AppImage, .pacman, .deb)
 ├── docs/                                    # Documentación técnica y especificaciones
+│   ├── CLOUDFLARE_WORKER_GUIDE.md           # Guía de despliegue de Cloudflare Workers & KV
 │   ├── FINANCIAL_ENGINE_SPECIFICATION.md    # Auditoría matemática de fórmulas
 │   └── MAINTENANCE_AND_UPDATES.md           # Guía de actualizaciones y dependencias
 └── .agents/rules/                           # 🛡️ REGLAS DEL WORKSPACE
