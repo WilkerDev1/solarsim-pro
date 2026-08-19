@@ -159,8 +159,9 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
                     : 'border-slate-200 opacity-80 hover:opacity-100 hover:border-slate-400'
                 }`}
               >
-                <span className="h-1/2 w-full" style={{ backgroundColor: theme.primary }}></span>
-                <span className="h-1/2 w-full" style={{ backgroundColor: theme.barColor }}></span>
+                <span className="flex-1 w-full" style={{ backgroundColor: theme.primary }}></span>
+                <span className="flex-1 w-full" style={{ backgroundColor: theme.secondary }}></span>
+                <span className="flex-1 w-full" style={{ backgroundColor: theme.tertiary || theme.barColor }}></span>
                 {isActive && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-[1px]">
                     <Check className="w-3.5 h-3.5 text-white drop-shadow" />

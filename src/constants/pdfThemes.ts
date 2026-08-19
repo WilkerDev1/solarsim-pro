@@ -8,9 +8,22 @@ export interface PDFColorTheme {
   accentLightBg: string; // Highlight cards background
   accentBorder: string;  // Highlight border
   barColor: string;      // Production chart bar color
+  tertiary?: string;     // Accent tertiary brand color (e.g. Cyan / Sky Blue)
 }
 
 export const PDF_COLOR_THEMES: PDFColorTheme[] = [
+  {
+    id: 'electsun',
+    name: 'Electsun Oficial (Azul Real, Naranja & Celeste)',
+    primary: '#225bc9',
+    secondary: '#f59e0b',
+    accent: '#0284c7',
+    accentDark: '#1e40af',
+    accentLightBg: 'bg-sky-50/80',
+    accentBorder: 'border-sky-200',
+    barColor: '#f59e0b',
+    tertiary: '#0ea5e9',
+  },
   {
     id: 'emerald',
     name: 'Verde Esmeralda (Clásico)',

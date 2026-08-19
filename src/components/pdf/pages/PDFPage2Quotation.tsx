@@ -71,8 +71,12 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
         {/* DATOS DEL CLIENTE */}
         <div>
           <h3
-            className="bg-slate-100 px-2.5 py-0.5 text-[10.5px] font-bold uppercase border-l-4 mb-1"
-            style={{ color: activeTheme.primary, borderColor: activeTheme.primary }}
+            className="px-2.5 py-0.5 text-[10.5px] font-bold uppercase mb-1 rounded-xs"
+            style={{
+              backgroundColor: activeTheme.tertiary ? activeTheme.tertiary : '#f1f5f9',
+              color: activeTheme.tertiary ? '#ffffff' : activeTheme.primary,
+              borderLeft: activeTheme.tertiary ? undefined : `4px solid ${activeTheme.primary}`,
+            }}
           >
             DATOS DEL CLIENTE :
           </h3>
@@ -115,8 +119,12 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
         {/* ESPECIFICACIONES DEL SISTEMA */}
         <div>
           <h3
-            className="bg-slate-100 px-2.5 py-0.5 text-[10.5px] font-bold uppercase border-l-4 mb-1"
-            style={{ color: activeTheme.primary, borderColor: activeTheme.primary }}
+            className="px-2.5 py-0.5 text-[10.5px] font-bold uppercase mb-1 rounded-xs"
+            style={{
+              backgroundColor: activeTheme.tertiary ? activeTheme.tertiary : '#f1f5f9',
+              color: activeTheme.tertiary ? '#ffffff' : activeTheme.primary,
+              borderLeft: activeTheme.tertiary ? undefined : `4px solid ${activeTheme.primary}`,
+            }}
           >
             ESPECIFICACIONES DEL SISTEMA
           </h3>
@@ -150,8 +158,12 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
         {/* EQUIPOS Y MATERIALES */}
         <div>
           <h3
-            className="bg-slate-100 px-2.5 py-0.5 text-[10.5px] font-bold uppercase border-l-4 mb-1"
-            style={{ color: activeTheme.primary, borderColor: activeTheme.primary }}
+            className="px-2.5 py-0.5 text-[10.5px] font-bold uppercase mb-1 rounded-xs"
+            style={{
+              backgroundColor: activeTheme.tertiary ? activeTheme.tertiary : '#f1f5f9',
+              color: activeTheme.tertiary ? '#ffffff' : activeTheme.primary,
+              borderLeft: activeTheme.tertiary ? undefined : `4px solid ${activeTheme.primary}`,
+            }}
           >
             EQUIPOS Y MATERIALES
           </h3>
