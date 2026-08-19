@@ -86,20 +86,20 @@ export function validateReferenceCase(): { pass: boolean; summary: FinancialSumm
     diffs.push(`Capacidad DC: esperado 23.56 kWp, obtenido ${summary.systemCapacityKWp} kWp`);
   }
 
-  if (Math.abs(summary.grossInvestmentUSD - 26739.92) > 1.0) {
-    diffs.push(`Inversión bruta: esperada $26,739.92, obtenida $${summary.grossInvestmentUSD}`);
+  if (Math.abs(summary.grossInvestmentUSD - 25371.12) > 1.0) {
+    diffs.push(`Inversión bruta: esperada $25,371.12, obtenida $${summary.grossInvestmentUSD}`);
   }
 
-  if (Math.abs(summary.ley5707CreditUSD - 7322.11) > 1.0) {
-    diffs.push(`Crédito Ley 57-07: esperado $7,322.11, obtenido $${summary.ley5707CreditUSD}`);
+  if (Math.abs(summary.ley5707CreditUSD - 6947.30) > 1.0) {
+    diffs.push(`Crédito Ley 57-07: esperado $6,947.30, obtenido $${summary.ley5707CreditUSD}`);
   }
 
-  if (Math.abs(summary.itbisSavedUSD - 1866.11) > 1.0) {
-    diffs.push(`ITBIS exonerado: esperado $1,866.11, obtenido $${summary.itbisSavedUSD}`);
+  if (Math.abs(summary.itbisSavedUSD - 1770.46) > 1.0) {
+    diffs.push(`ITBIS exonerado: esperado $1,770.46, obtenido $${summary.itbisSavedUSD}`);
   }
 
-  if (Math.abs(summary.paybackYears - 3.0) > 0.8) {
-    diffs.push(`Payback: esperado ~3.0 años, obtenido ${summary.paybackYears} años`);
+  if (Math.abs(summary.paybackYears - 2.3) > 0.8) {
+    diffs.push(`Payback: esperado ~2.3 años, obtenido ${summary.paybackYears} años`);
   }
 
   return {

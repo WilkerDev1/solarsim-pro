@@ -11,20 +11,22 @@ export function calculateCostMatrixSummary(
   const rate = specs.dopExchangeRate || 60.0;
   const margin = specs.saleMarginMultiplier || 1.25;
 
+  const realDCKWp = dcCapacityKWp > 0 ? dcCapacityKWp : ((specs.panelCount || 0) * (specs.panelPowerW || 620)) / 1000;
+
   const panelCount = specs.panelCount || 0;
   const panelUnitUSD = specs.panelUnitPriceUSD !== undefined ? specs.panelUnitPriceUSD : 103.32;
-  const panelKilos = specs.panelWeightKilos || (dcCapacityKWp > 0 ? dcCapacityKWp : 30.75);
+  const panelKilos = specs.panelWeightKilos !== undefined && specs.panelWeightKilos > 0 ? specs.panelWeightKilos : (specs.panelPowerW ? Math.round(specs.panelPowerW * 0.047 * 100) / 100 : 29.0);
 
-  const inverterCount = specs.inverterCount || 2;
+  const inverterCount = specs.inverterCount || (realDCKWp > 0 ? Math.max(1, Math.ceil(realDCKWp / (specs.inverterPowerKW || 8))) : 1);
   const inverterUnitUSD = specs.inverterUnitPriceUSD !== undefined ? specs.inverterUnitPriceUSD : 2300.0;
   const inverterKilos = specs.inverterWeightKilos || specs.inverterPowerKW || 12;
 
-  const batteryCount = specs.batteryCount || (specs.hasBattery ? 3 : 0);
+  const batteryCount = specs.hasBattery ? (specs.batteryCount || 3) : 0;
   const batteryUnitUSD = specs.batteryUnitPriceUSD !== undefined ? specs.batteryUnitPriceUSD : 1990.0;
   const batteryKilos = specs.batteryWeightKilos || specs.batteryCapacityKWh || 32;
 
   const installationKilos = 1;
-  const installationQty = specs.panelWeightKilos !== undefined ? specs.panelWeightKilos : (dcCapacityKWp > 0 ? dcCapacityKWp : 30.75);
+  const installationQty = Math.round(realDCKWp * 1000) / 1000;
   const installationUnitUSD = specs.installationUnitPriceUSD !== undefined ? specs.installationUnitPriceUSD : 170.0;
 
   // Row 1: Panel
