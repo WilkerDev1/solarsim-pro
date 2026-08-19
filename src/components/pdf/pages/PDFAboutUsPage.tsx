@@ -195,56 +195,57 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
           </div>
         </div>
 
-        {/* Párrafo de Transición entre Servicios y Por Qué Elegirnos */}
-        <p className="text-slate-700 text-[11.5px] leading-relaxed text-left font-medium">
-          {aboutUsTransitionText}
-        </p>
-
-        {/* 1.1 ¿Por Qué Elegirnos? Section */}
-        <div className="space-y-2">
-          <div
-            className="inline-block px-3.5 py-1.5 rounded-md font-black text-xs uppercase tracking-wider shadow-xs"
-            style={{
-              backgroundColor: activeTheme.primary,
-              color: '#ffffff',
-              lineHeight: '1.3',
-            }}
-          >
-            1.1 ¿POR QUÉ ELEGIRNOS?
-          </div>
-          <p className="text-slate-700 text-[11.5px] leading-relaxed font-medium pt-0.5">
-            {whyChooseUsText}
+        {/* Bloque Inferior: Transición + 1.1 ¿Por Qué Elegirnos? */}
+        <div className="space-y-2.5">
+          <p className="text-slate-700 text-[11.5px] leading-relaxed text-left font-medium">
+            {aboutUsTransitionText}
           </p>
 
-          <div className="grid grid-cols-3 gap-3 pt-1">
-            <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/90 space-y-1.5 shadow-xs">
-              <div className="flex items-center gap-2">
-                <Award className="w-4.5 h-4.5 text-emerald-600 shrink-0" />
-                <h5 className="font-extrabold text-xs text-slate-900">Innovación Constante</h5>
-              </div>
-              <p className="text-[10px] text-slate-600 leading-relaxed font-medium">
-                Utilizamos exclusivamente tecnología Tier-1 de última generación (N-Type TOPCon, microinversores y baterías LiFePO4).
-              </p>
+          <div className="space-y-2">
+            <div
+              className="inline-block px-3.5 py-1.5 rounded-md font-black text-xs uppercase tracking-wider shadow-xs"
+              style={{
+                backgroundColor: activeTheme.primary,
+                color: '#ffffff',
+                lineHeight: '1.3',
+              }}
+            >
+              1.1 ¿POR QUÉ ELEGIRNOS?
             </div>
+            <p className="text-slate-700 text-[11.5px] leading-relaxed font-medium pt-0.5">
+              {whyChooseUsText}
+            </p>
 
-            <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/90 space-y-1.5 shadow-xs">
-              <div className="flex items-center gap-2">
-                <Shield className="w-4.5 h-4.5 text-emerald-600 shrink-0" />
-                <h5 className="font-extrabold text-xs text-slate-900">Compromiso Ambiental</h5>
+            <div className="grid grid-cols-3 gap-3 pt-1">
+              <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/90 space-y-1.5 shadow-xs">
+                <div className="flex items-center gap-2">
+                  <Award className="w-4.5 h-4.5 text-emerald-600 shrink-0" />
+                  <h5 className="font-extrabold text-xs text-slate-900">Innovación Constante</h5>
+                </div>
+                <p className="text-[10px] text-slate-600 leading-relaxed font-medium">
+                  Utilizamos exclusivamente tecnología Tier-1 de última generación (N-Type TOPCon, microinversores y baterías LiFePO4).
+                </p>
               </div>
-              <p className="text-[10px] text-slate-600 leading-relaxed font-medium">
-                Cada proyecto reduce de manera verificable miles de toneladas de CO2 y fomenta la transición energética nacional.
-              </p>
-            </div>
 
-            <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/90 space-y-1.5 shadow-xs">
-              <div className="flex items-center gap-2">
-                <Users className="w-4.5 h-4.5 text-emerald-600 shrink-0" />
-                <h5 className="font-extrabold text-xs text-slate-900">Soporte Cercano</h5>
+              <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/90 space-y-1.5 shadow-xs">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4.5 h-4.5 text-emerald-600 shrink-0" />
+                  <h5 className="font-extrabold text-xs text-slate-900">Compromiso Ambiental</h5>
+                </div>
+                <p className="text-[10px] text-slate-600 leading-relaxed font-medium">
+                  Cada proyecto reduce de manera verificable miles de toneladas de CO2 y fomenta la transición energética nacional.
+                </p>
               </div>
-              <p className="text-[10px] text-slate-600 leading-relaxed font-medium">
-                Asistencia personalizada y gestión integral de permisos, medición neta y garantías durante toda la vida del sistema.
-              </p>
+
+              <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/90 space-y-1.5 shadow-xs">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4.5 h-4.5 text-emerald-600 shrink-0" />
+                  <h5 className="font-extrabold text-xs text-slate-900">Soporte Cercano</h5>
+                </div>
+                <p className="text-[10px] text-slate-600 leading-relaxed font-medium">
+                  Asistencia personalizada y gestión integral de permisos, medición neta y garantías durante toda la vida del sistema.
+                </p>
+              </div>
             </div>
           </div>
         </div>
