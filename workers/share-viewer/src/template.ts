@@ -163,6 +163,28 @@ export function renderProposalPage(stored: StoredProposal): string {
     ? `Para los clientes con tarifas ${tariffCode}, el análisis económico considera el cargo por derecho de uso de la red, equivalente al ${exportFee}% del valor de la energía excedente exportada, conforme a la normativa vigente (Resolución SIE-007-2026-REG). Por esta razón, el sistema se diseña para maximizar el autoconsumo y minimizar la exportación de energía.${hasBattery ? '' : ' Cuando resulte conveniente, se recomendará la incorporación de baterías de litio para incrementar el aprovechamiento de la energía generada.'}`
     : `Para clientes con tarifa binómica (${tariffCode}), el análisis económico contempla el régimen de Medición Neta con compensación 1:1 de energía activa, no aplicando retención por uso de red conforme a la regulación vigente.`;
 
+  // Custom Executive Summary & Page 6 fields
+  const projectSummarySubtitle = custom.projectSummarySubtitle && custom.projectSummarySubtitle.trim()
+    ? custom.projectSummarySubtitle.trim()
+    : `Criterios de dimensionamiento técnico y solar para ${clientName}`;
+
+  const customP1 = custom.customProjectSummaryParagraph1 && custom.customProjectSummaryParagraph1.trim()
+    ? custom.customProjectSummaryParagraph1.trim()
+    : '';
+
+  const customP2 = custom.customProjectSummaryParagraph2 && custom.customProjectSummaryParagraph2.trim()
+    ? custom.customProjectSummaryParagraph2.trim()
+    : '';
+
+  const engineeringScopeText = custom.projectEngineeringScopeText !== undefined && custom.projectEngineeringScopeText.trim() !== ''
+    ? custom.projectEngineeringScopeText.trim()
+    : (specs.installationServicesDesc || 'junto con todos los componentes de ingeniería complementarios (estructuras de montaje en aluminio anodizado de alta resistencia, cableado fotovoltaico resistente a rayos UV, protecciones en CC/CA, interruptores de desconexión y supresores de sobretensión) para garantizar un funcionamiento seguro, eficiente y duradero del sistema.');
+
+  const customRegNote = custom.regulatoryNote;
+  const regParagraphs: string[] = (customRegNote && customRegNote.trim() !== '')
+    ? customRegNote.split('\n\n').filter(Boolean)
+    : [regP1, regP2, regP3, regP4];
+
   const cleanPhone = companyPhone.replace(/[^0-9]/g, '');
   const whatsappMessage = encodeURIComponent(
     `☀️ *Propuesta Solar Fotovoltaica (${systemCapacityKWp} kWp)*\n` +
@@ -668,19 +690,24 @@ export function renderProposalPage(stored: StoredProposal): string {
             <!-- Years 1 to 25 -->
             ${cf25.map((row: any) => {
               const isPayback = row.year === paybackCeil;
-              const isNegative = row.cumulativeCashFlowUSD < 0;
-              const totalAnnualSavings = row.savingsUSD + row.taxCreditUSD;
+              const cumulative = Number(row.cumulativeCashFlowUSD || 0);
+              const isNegative = cumulative < 0;
+              const savings = Number(row.savingsUSD || 0);
+              const taxCredit = Number(row.taxCreditUSD || 0);
+              const netCashFlow = Number(row.netCashFlowUSD || (savings + taxCredit));
+              const totalAnnualSavings = savings + taxCredit;
+              const prod = Number(row.productionKWh || 0);
 
               return `
               <tr class="${isPayback ? 'bg-orange-100 text-orange-950 font-bold border-y-2 border-orange-300' : row.year % 2 === 0 ? 'bg-sky-50/30' : 'bg-white'}">
                 <td class="px-3 py-1 text-center font-bold font-mono">${row.year} ${isPayback ? '⭐' : ''}</td>
-                <td class="px-3 py-1 text-right font-mono font-medium">${Math.round(row.productionKWh).toLocaleString()}</td>
-                <td class="px-3 py-1 text-right font-mono font-medium">US$ ${row.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td class="px-3 py-1 text-right font-mono ${row.taxCreditUSD > 0 ? 'text-sky-700 font-bold' : 'text-slate-400'}">${row.taxCreditUSD > 0 ? 'US$ ' + row.taxCreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '$0.00'}</td>
+                <td class="px-3 py-1 text-right font-mono font-medium">${Math.round(prod).toLocaleString()}</td>
+                <td class="px-3 py-1 text-right font-mono font-medium">US$ ${savings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="px-3 py-1 text-right font-mono ${taxCredit > 0 ? 'text-sky-700 font-bold' : 'text-slate-400'}">${taxCredit > 0 ? 'US$ ' + taxCredit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '$0.00'}</td>
                 <td class="px-3 py-1 text-right font-mono font-bold text-slate-900">US$ ${totalAnnualSavings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td class="px-3 py-1 text-right font-mono font-bold text-orange-600">US$ ${row.netCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="px-3 py-1 text-right font-mono font-bold text-orange-600">US$ ${netCashFlow.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td class="px-3 py-1 text-right font-mono font-black ${isNegative ? 'text-red-600' : 'text-sky-700'}">
-                  ${isNegative ? '-' : ''}US$ ${Math.abs(row.cumulativeCashFlowUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ${isNegative ? '-' : ''}US$ ${Math.abs(cumulative).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </td>
               </tr>`;
             }).join('')}
