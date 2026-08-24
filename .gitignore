@@ -9,3 +9,5 @@ build
 release
 release/
 .wrangler
+repomix-output.xml
+repomix-output.txt

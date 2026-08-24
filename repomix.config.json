@@ -1,0 +1,46 @@
+{
+  "$schema": "https://repomix.com/schemas/config.json",
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml",
+    "compress": true,
+    "removeComments": false,
+    "showLineNumbers": true,
+    "topFilesLength": 10
+  },
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "src/assets/**/*.{png,jpg,jpeg,svg,ico,webp}",
+      "release/**",
+      "dist/**",
+      "dist-electron/**",
+      "node_modules/**",
+      "package-lock.json",
+      "skills-lock.json",
+      "**/*.pyc",
+      "**/__pycache__/**",
+      "repomix-output.xml",
+      "repomix-output.txt",
+      "workers/share-viewer/node_modules/**",
+      "workers/share-viewer/package-lock.json",
+      "workers/share-viewer/worker-configuration.d.ts",
+      ".wrangler/**"
+    ]
+  },
+  "include": [
+    "src/**/*.{ts,tsx}",
+    "electron/**/*.ts",
+    "workers/share-viewer/src/**/*.ts",
+    "workers/share-viewer/wrangler.toml",
+    "docs/**/*.md",
+    ".agents/**/*.md",
+    "AGENTS.md",
+    "package.json",
+    "tsconfig*.json",
+    "vite.config.ts",
+    "tailwind.config.js",
+    "index.html"
+  ]
+}

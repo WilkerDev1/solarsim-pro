@@ -116,11 +116,14 @@ npm run electron:dev
 # Comprobación de tipos TypeScript (sin emitir código)
 npm run lint
 
-# Validar matemáticas del motor financiero
+# Validar matemáticas del motor financiero contra benchmarks
 npx tsx src/engine/testBenchmark.ts
 
 # Compilar frontend y electron para producción
 npm run build && npm run build:electron
+
+# Generar snapshot de contexto empaquetado del repositorio para asistentes IA (Repomix)
+npm run context:pack
 ```
 
 ### Herramientas de Control de Versiones y Repositorio:
@@ -139,18 +142,25 @@ npm run build && npm run build:electron
 
 ---
 
-## 4. 🔀 Flujo de Trabajo en Paralelo (`main` vs `beta`)
+## 4. 🔀 Flujo de Trabajo en Paralelo & Ciclo Obligatorio de Verificación
 
-Para mantener el código ordenado y evitar romper la versión en producción de los clientes:
+### 🔄 Ciclo Obligatorio de Verificación (Verification Loop):
+**NO dar ninguna tarea por completada sin ejecutar previamente:**
+1. **Verificación de Tipos**: `npm run lint` (`npx tsc --noEmit` — Cero errores de tipo).
+2. **Validación de Motores Matemáticos**: `npx tsx src/engine/testBenchmark.ts` y `npx tsx src/engine/testFinancialEngineComprehensive.ts`.
+3. **Build de Producción**: `npm run build` (confirmar bundling sin fallos).
+4. **Snapshot de Contexto**: Si se introducen nuevos módulos, refactorizaciones grandes o cambios estructurales, regenerar el contexto empaquetado con `npm run context:pack`.
+
+---
 
 ### A. Desarrollo de Nuevas Funciones (En rama `beta`):
 1. Todo nuevo desarrollo se realiza en `beta`:
    ```bash
    git checkout beta && git pull origin beta
    ```
-2. Desarrollar la funcionalidad y validar:
+2. Desarrollar la funcionalidad y validar el Ciclo de Verificación:
    ```bash
-   npm run lint && npx tsx src/engine/testBenchmark.ts
+   npm run lint && npx tsx src/engine/testBenchmark.ts && npm run build
    ```
 3. Confirmar cambios con commits semánticos y subir:
    ```bash
@@ -163,7 +173,7 @@ Para mantener el código ordenado y evitar romper la versión en producción de 
    ```bash
    git checkout main && git pull origin main
    ```
-2. Aplicar la corrección y validar.
+2. Aplicar la corrección y validar con el Ciclo de Verificación.
 3. Crear el release de parche (ej. `v1.3.10`) siguiendo el protocolo de la Sección 5.
 4. **Sincronizar hacia `beta`** inmediatamente para que desarrollo no pierda el arreglo:
    ```bash
@@ -264,29 +274,42 @@ gh release create v1.4.0 release/SolarSim* release/solarsim* release/latest* \
 
 ## 6. ⚠️ Invariantes Críticas y Reglas Inquebrantables
 
-### 📄 Exportación a PDF con `html2canvas` & `jsPDF`:
-1. **NUNCA usar `truncate` o `overflow: hidden` en etiquetas de texto**:
-   - `html2canvas` recorta los trazos inferiores (*descenders*) de letras como 'p', 'g', 'q', 'y' cuando hay `overflow: hidden` en un elemento de texto. Usar `whitespace-nowrap font-bold` sin truncate.
-2. **Dimensionamiento de Imágenes**:
-   - `html2canvas` ignora `object-fit: contain/cover` en `<img>` si se coloca `w-full h-full`.
-   - **Regla**: Usar siempre dimensionamiento intrínseco auto-proporcional: `className="max-h-[Xpx] max-w-[Y%] w-auto h-auto mx-auto block object-contain"`.
-3. **Presupuesto de Altura A4 ($850\text{px} \times 1202\text{px}$)**:
-   - Header: 76px. Footer: 42px (`items-center`).
-   - Cuerpo de la página: `<div className="px-10 pt-3 pb-3 flex-1 flex flex-col justify-between min-h-0">`.
-   - **Prohibido `pb-14`**: Cualquier padding inferior grande empuja el footer por debajo de los 1,202px causando que se corte.
-4. **Sandbox de Captura**:
-   - En `PDFProposalView.tsx`, el sandbox debe tener `position: fixed; zIndex: -9999; pointerEvents: none; background: #ffffff;` para evitar parpadeos visuales al exportar.
+### 🖥️ Arquitectura y Seguridad en Electron (Aislamiento de Procesos):
+1. **Aislamiento Estricto del Renderizador (`src/`)**:
+   - El código en `src/` corre en el contexto de Chromium y **NUNCA** debe importar módulos nativos de Node.js (`fs`, `path`, `child_process`, `os`, etc.).
+2. **Puente Seguro IPC**:
+   - Toda comunicación entre la interfaz (React) y las capacidades del sistema operativo (guardar archivos, auto-actualizaciones, diálogos nativos) debe realizarse **exclusivamente** a través de la API segura expuesta en `electron/preload.ts` (`window.electronAPI`) y manejada en `electron/main.ts` con `ipcMain.handle`.
 
-### 💰 Motor Financiero y Ley 57-07:
-1. **Inversión Neta**:
+### 🧠 Integridad del Motor Financiero y Solar:
+1. **Contrato de Fórmulas Oficiales**:
+   - Antes de modificar o refactorizar cálculos solares o financieros, es obligatorio consultar `docs/FINANCIAL_ENGINE_SPECIFICATION.md`.
+2. **Inversión Neta y Deducción Ley 57-07**:
    $$\text{netInvestmentUSD} = \text{grossInvestmentUSD} - \text{itbisSavedUSD} - \text{ley5707CreditUSD}$$
-2. **Amortización Fiscal Ley 57-07**:
-   - El crédito fiscal del 40% se divide estrictamente en 3 cuotas anuales iguales (Años 1, 2 y 3).
-3. **Parámetros Estándar**:
+   - **Base Estricta de Equipos**: El crédito fiscal del 40% para el ISR aplica **exclusivamente sobre equipos fotovoltaicos y de almacenamiento** (paneles, inversores y baterías), deduciendo la mano de obra del cálculo.
+3. **Amortización Fiscal Ley 57-07**:
+   - El crédito fiscal del 40% se divide estrictamente en 3 cuotas anuales iguales (Años 1, 2 y 3: $13.33\%$ anual).
+4. **Parámetros Estándar Auditados**:
    - Degradación de paneles: 0.5% anual.
    - Aumento tarifario eléctrico: 4.0% anual.
    - Costo O&M: 1.0% anual de la inversión inicial con inflación del 3.0%.
    - Provisión de reemplazo de baterías: Año 10 (50% del costo inicial de baterías).
 
+### 📄 Exportación a PDF con `html2canvas` & `jsPDF`:
+1. **Reglas del Workspace**: Consultar `.agents/rules/html2canvas_pdf_export_rules.md` antes de crear o editar hojas del PDF.
+2. **NUNCA usar `truncate` o `overflow: hidden` en etiquetas de texto**:
+   - `html2canvas` recorta los trazos inferiores (*descenders*) de letras como 'p', 'g', 'q', 'y' cuando hay `overflow: hidden` en un elemento de texto. Usar `whitespace-nowrap font-bold` sin truncate.
+3. **Dimensionamiento de Imágenes**:
+   - `html2canvas` ignora `object-fit: contain/cover` en `<img>` si se coloca `w-full h-full`. Usar siempre dimensionamiento intrínseco auto-proporcional: `className="max-h-[Xpx] max-w-[Y%] w-auto h-auto mx-auto block object-contain"`.
+4. **Presupuesto de Altura A4 ($850\text{px} \times 1202\text{px}$)**:
+   - Header: 76px. Footer: 42px (`items-center`).
+   - Cuerpo de la página: `<div className="px-10 pt-3 pb-3 flex-1 flex flex-col justify-between min-h-0">`.
+   - **Prohibido `pb-14`**: Cualquier padding inferior grande empuja el footer por debajo de los 1,202px causando que se corte.
+5. **Sandbox de Captura**:
+   - En `PDFProposalView.tsx`, el sandbox debe tener `position: fixed; zIndex: -9999; pointerEvents: none; background: #ffffff;` para evitar parpadeos visuales al exportar.
+
+### 📦 Sistema de Empaquetado de Contexto (Repomix):
+- La configuración reside en `repomix.config.json`.
+- El comando `npm run context:pack` empaqueta toda la arquitectura de código y documentación en un snapshot XML optimizado (`repomix-output.xml`) excluyendo binarios, imágenes y dependencias pesadas.
+
 ---
-*Este documento garantiza continuidad total de desarrollo y consistencia técnica en cualquier sesión futura.*
+*Este documento garantiza continuidad total de desarrollo, gobernanza y consistencia técnica en cualquier sesión futura.*
