@@ -385,10 +385,19 @@ ipcMain.handle('quit-and-install', async () => {
 
 ipcMain.handle('install-linux-package', async (_event, packageType: 'pacman' | 'deb', version: string) => {
   try {
+    if (packageType !== 'pacman' && packageType !== 'deb') {
+      throw new Error('Tipo de paquete Linux no soportado.');
+    }
+
+    const cleanVersion = (version || '').replace(/[^0-9a-zA-Z._-]/g, '').trim();
+    if (!cleanVersion || !/^[0-9]+\.[0-9]+\.[0-9]+/.test(cleanVersion)) {
+      throw new Error('Formato de versión semántica inválido.');
+    }
+
     const filename = packageType === 'pacman'
-      ? `solarsim-pro-${version}.pacman`
-      : `solarsim-pro_${version}_amd64.deb`;
-    const downloadUrl = `https://github.com/WilkerDev1/solarsim-pro/releases/download/v${version}/${filename}`;
+      ? `solarsim-pro-${cleanVersion}.pacman`
+      : `solarsim-pro_${cleanVersion}_amd64.deb`;
+    const downloadUrl = `https://github.com/WilkerDev1/solarsim-pro/releases/download/v${cleanVersion}/${filename}`;
     const tmpDest = path.join('/tmp', filename);
 
     sendUpdateStatus({ state: 'downloading', progressPct: 0, transferredBytes: 0, totalBytes: 0 });

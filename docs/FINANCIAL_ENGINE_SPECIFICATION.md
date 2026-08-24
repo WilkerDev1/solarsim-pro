@@ -133,11 +133,12 @@ $$\text{ITBIS Exonerado (USD)} = \begin{cases} \text{ITBIS Matriz} \times M_{ven
 ---
 
 ### 4.2 Crédito Fiscal del 40% en Impuesto Sobre la Renta (DGII)
-La Ley 57-07 otorga un **crédito fiscal del 40% sobre el costo de los equipos renovables**, el cual se deduce del Impuesto Sobre la Renta (ISR) pagadero a la DGII en tres (3) cuotas anuales iguales durante los primeros 3 años ($13.33\%$ anual):
+La Ley 57-07 otorga un **crédito fiscal del 40% sobre el costo de los equipos renovables** (paneles, inversores y almacenamiento en baterías), **excluyendo la mano de obra de instalación**. Se deduce del Impuesto Sobre la Renta (ISR) pagadero a la DGII en tres (3) cuotas anuales iguales durante los primeros 3 años ($13.33\%$ anual):
 
-$$\text{Crédito Ley 57-07 Total (USD)} = \begin{cases} I_{bruta} \times 0.40 \times 0.684568 & \text{si } \text{applyLey5707} = \text{true} \\ 0 & \text{si } \text{applyLey5707} = \text{false} \end{cases}$$
+$$\text{Base Equipos (USD)} = \text{Costo Equipos Venta} = I_{bruta} - \text{Mano de Obra Venta}$$
+$$\text{Crédito Ley 57-07 Total (USD)} = \begin{cases} \text{Base Equipos (USD)} \times 0.40 & \text{si } \text{applyLey5707} = \text{true} \\ 0 & \text{si } \text{applyLey5707} = \text{false} \end{cases}$$
 
-$$\text{Crédito Fiscal Anual Años 1 al 3 (USD)} = \frac{\text{Crédito Ley 57-07 Total}}{3}$$
+$$\text{Crédito Fiscal Anual Años 1 al 3 (USD)} = \frac{\text{Crédito Ley 57-07 Total}}{3} \quad (13.33\% \text{ anual})$$
 
 ---
 

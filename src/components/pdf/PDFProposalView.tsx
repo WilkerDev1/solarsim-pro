@@ -146,6 +146,10 @@ export const PDFProposalView: React.FC = () => {
         }
 
         pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+
+        // Explicitly release canvas pixel buffer from memory
+        canvas.width = 0;
+        canvas.height = 0;
       }
 
       // Limpiar sandbox del DOM

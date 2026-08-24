@@ -850,6 +850,45 @@ export const useSimulationStore = create<SimulationState>()(
             };
           }
 
+          // Sanitize each project to guarantee complete numeric integrity and valid defaults
+          importedList = importedList.map((raw) => ({
+            ...BENCHMARK_PROJECT,
+            ...raw,
+            id: typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : `proj-${Date.now()}`,
+            createdAt: raw.createdAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            status: raw.status || 'Draft',
+            client: {
+              ...BENCHMARK_PROJECT.client,
+              ...(raw.client || {}),
+              name: typeof raw.client?.name === 'string' ? raw.client.name.trim() : 'Cliente Importado',
+              projectId: raw.client?.projectId || 'SP-2026-001',
+              quoteNumber: raw.client?.quoteNumber || 'C-0001',
+            },
+            specs: {
+              ...BENCHMARK_PROJECT.specs,
+              ...(raw.specs || {}),
+              panelCount: typeof raw.specs?.panelCount === 'number' && raw.specs.panelCount > 0 ? raw.specs.panelCount : 10,
+              panelPowerW: typeof raw.specs?.panelPowerW === 'number' && raw.specs.panelPowerW > 0 ? raw.specs.panelPowerW : 620,
+            },
+            rates: {
+              ...BENCHMARK_PROJECT.rates,
+              ...(raw.rates || {}),
+              energyCostPerKWh: typeof raw.rates?.energyCostPerKWh === 'number' && raw.rates.energyCostPerKWh > 0 ? raw.rates.energyCostPerKWh : 0.20,
+            },
+            financials: {
+              ...BENCHMARK_PROJECT.financials,
+              ...(raw.financials || {}),
+            },
+            monthlyConsumption: Array.isArray(raw.monthlyConsumption) && raw.monthlyConsumption.length === 12
+              ? raw.monthlyConsumption.map((v: any) => typeof v === 'number' && !isNaN(v) && v >= 0 ? v : 1000)
+              : [...BENCHMARK_PROJECT.monthlyConsumption],
+            customization: {
+              ...BENCHMARK_PROJECT.customization,
+              ...(raw.customization || {}),
+            },
+          }));
+
           const currentProjects = get().projects;
 
           // If a SINGLE project is imported, check for ID / quote conflict to offer Option C modal

@@ -1,3 +1,5 @@
+import type { ExtractedInvoiceData, GeminiModelInfo } from './aiInvoice';
+
 export interface ClientInfo {
   name: string;
   company?: string;
@@ -263,7 +265,7 @@ declare global {
   interface Window {
     electronAPI?: {
       printToPDF: () => Promise<{ success: boolean; filePath?: string; cancelled?: boolean; error?: string }>;
-      checkForUpdates: () => Promise<{ success: boolean; message?: string; error?: string; updateInfo?: any }>;
+      checkForUpdates: () => Promise<{ success: boolean; message?: string; error?: string; updateInfo?: UpdateInfo }>;
       downloadUpdate: () => Promise<{ success: boolean; error?: string }>;
       quitAndInstall: () => Promise<void>;
       onUpdateStatus: (callback: (info: UpdateInfo) => void) => () => void;
@@ -271,9 +273,9 @@ declare global {
       getPlatformInfo: () => Promise<PlatformInfo>;
       openExternalUrl: (url: string) => Promise<void>;
       installLinuxPackage: (packageType: 'pacman' | 'deb', version: string) => Promise<{ success: boolean; error?: string }>;
-      parseInvoiceWithAI?: (payload: { fileBase64: string; mimeType: string; fileName: string; apiKey?: string; model?: string; panelPowerW?: number }) => Promise<{ success: boolean; data?: any; error?: string }>;
-      validateGeminiApiKey?: (apiKey: string, model?: string) => Promise<{ success: boolean; error?: string; modelName?: string; models?: any[] }>;
-      listGeminiModels?: (apiKey: string) => Promise<{ success: boolean; error?: string; models?: any[] }>;
+      parseInvoiceWithAI?: (payload: { fileBase64: string; mimeType: string; fileName: string; apiKey?: string; model?: string; panelPowerW?: number }) => Promise<{ success: boolean; data?: ExtractedInvoiceData; error?: string }>;
+      validateGeminiApiKey?: (apiKey: string, model?: string) => Promise<{ success: boolean; error?: string; modelName?: string; models?: GeminiModelInfo[] }>;
+      listGeminiModels?: (apiKey: string) => Promise<{ success: boolean; error?: string; models?: GeminiModelInfo[] }>;
     };
   }
 }
