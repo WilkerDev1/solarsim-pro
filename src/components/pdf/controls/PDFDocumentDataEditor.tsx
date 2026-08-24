@@ -2,9 +2,6 @@ import React, { useState, useRef } from 'react';
 import {
   Building2,
   User,
-  ShieldCheck,
-  CheckCircle2,
-  PackageCheck,
   ChevronDown,
   ChevronUp,
   RotateCcw,
@@ -13,7 +10,6 @@ import {
   Trash2,
   ListPlus,
   PlusCircle,
-  FileText,
   Pencil,
 } from 'lucide-react';
 import { ProjectSimulation, DocumentCustomization, ExtraTOCItem } from '../../../types';
@@ -28,7 +24,7 @@ interface PDFDocumentDataEditorProps {
   isDark: boolean;
   project: ProjectSimulation;
   updateClient: (client: Partial<ProjectSimulation['client']>) => void;
-  updateSpecs: (specs: Partial<ProjectSimulation['specs']>) => void;
+  updateSpecs?: (specs: Partial<ProjectSimulation['specs']>) => void;
   updateDocumentCustomization: (customization: Partial<DocumentCustomization>) => void;
   isEditMode: boolean;
   setIsEditMode: (val: boolean) => void;
@@ -38,7 +34,6 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
   isDark,
   project,
   updateClient,
-  updateSpecs,
   updateDocumentCustomization,
   isEditMode,
   setIsEditMode,
@@ -50,10 +45,8 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
   const headerLogoInputRef = useRef<HTMLInputElement>(null);
   const watermarkInputRef = useRef<HTMLInputElement>(null);
 
-  // Accordion state
-  const [openSection, setOpenSection] = useState<
-    'company' | 'contact' | 'warranties' | 'services' | 'hardware' | 'about' | 'projectDescription' | 'annexes'
-  >('company');
+  // Accordion state (Sections 1, 2 and 3)
+  const [openSection, setOpenSection] = useState<'company' | 'contact' | 'annexes'>('company');
 
   // Extra TOC Item Form State
   const [newExtraTitle, setNewExtraTitle] = useState('');
@@ -103,9 +96,7 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
     });
   };
 
-  const toggleSection = (
-    section: 'company' | 'contact' | 'warranties' | 'services' | 'hardware' | 'about' | 'projectDescription' | 'annexes'
-  ) => {
+  const toggleSection = (section: 'company' | 'contact' | 'annexes') => {
     setOpenSection(openSection === section ? ('' as any) : section);
   };
 
@@ -621,549 +612,7 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
         )}
       </div>
 
-      {/* 3. SECCIÓN: TÉRMINOS DE GARANTÍAS */}
-      <div className={`rounded-xl border overflow-hidden transition-all ${isDark ? 'border-[#2a2a36] bg-[#1a1a24]' : 'border-slate-200 bg-white'}`}>
-        <button
-          type="button"
-          onClick={() => toggleSection('warranties')}
-          className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors ${
-            isDark ? 'text-zinc-200 hover:bg-[#222230]' : 'text-slate-800 hover:bg-slate-50'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-500" />
-            <span>3. Términos de Garantías</span>
-          </div>
-          {openSection === 'warranties' ? <ChevronUp className="w-4 h-4 text-zinc-400" /> : <ChevronDown className="w-4 h-4 text-zinc-400" />}
-        </button>
-
-        {openSection === 'warranties' && (
-          <div className={`p-3 pt-1 space-y-2.5 border-t text-xs ${isDark ? 'border-[#2a2a36] bg-[#14141d]' : 'border-slate-200 bg-slate-50/50'}`}>
-            <div>
-              <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                Garantía Paneles Solares
-              </label>
-              <input
-                type="text"
-                value={cust.panelWarrantyText !== undefined ? cust.panelWarrantyText : DEFAULT_DOCUMENT_CUSTOMIZATION.panelWarrantyText}
-                onChange={(e) => updateDocumentCustomization({ panelWarrantyText: e.target.value })}
-                placeholder="25 Años de Producción Lineal"
-                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                  isDark
-                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                    : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                }`}
-              />
-            </div>
-
-            <div>
-              <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                Garantía Inversores
-              </label>
-              <input
-                type="text"
-                value={cust.inverterWarrantyText !== undefined ? cust.inverterWarrantyText : DEFAULT_DOCUMENT_CUSTOMIZATION.inverterWarrantyText}
-                onChange={(e) => updateDocumentCustomization({ inverterWarrantyText: e.target.value })}
-                placeholder="5 a 10 Años de Fábrica"
-                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                  isDark
-                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                    : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                }`}
-              />
-            </div>
-
-            <div>
-              <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                Garantía Baterías (si aplica)
-              </label>
-              <input
-                type="text"
-                value={cust.batteryWarrantyText !== undefined ? cust.batteryWarrantyText : DEFAULT_DOCUMENT_CUSTOMIZATION.batteryWarrantyText}
-                onChange={(e) => updateDocumentCustomization({ batteryWarrantyText: e.target.value })}
-                placeholder="5 a 10 Años (según fabricante)"
-                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                  isDark
-                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                    : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                }`}
-              />
-            </div>
-
-            <div>
-              <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                Garantía Mano de Obra y Soporte
-              </label>
-              <input
-                type="text"
-                value={cust.workmanshipWarrantyText !== undefined ? cust.workmanshipWarrantyText : DEFAULT_DOCUMENT_CUSTOMIZATION.workmanshipWarrantyText}
-                onChange={(e) => updateDocumentCustomization({ workmanshipWarrantyText: e.target.value })}
-                placeholder="1 Año en Instalación y Soporte Técnico"
-                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                  isDark
-                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                    : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                }`}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 4. SECCIÓN: GESTIÓN Y SERVICIOS INCLUIDOS */}
-      <div className={`rounded-xl border overflow-hidden transition-all ${isDark ? 'border-[#2a2a36] bg-[#1a1a24]' : 'border-slate-200 bg-white'}`}>
-        <button
-          type="button"
-          onClick={() => toggleSection('services')}
-          className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors ${
-            isDark ? 'text-zinc-200 hover:bg-[#222230]' : 'text-slate-800 hover:bg-slate-50'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-            <span>4. Servicios y Gestiones Incluidas</span>
-          </div>
-          {openSection === 'services' ? <ChevronUp className="w-4 h-4 text-zinc-400" /> : <ChevronDown className="w-4 h-4 text-zinc-400" />}
-        </button>
-
-        {openSection === 'services' && (
-          <div className={`p-3 pt-1 space-y-3 border-t text-xs ${isDark ? 'border-[#2a2a36] bg-[#14141d]' : 'border-slate-200 bg-slate-50/50'}`}>
-            <div>
-              <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                Trámites y Gestiones (Separar con comas o saltos de línea)
-              </label>
-              <textarea
-                rows={3}
-                value={cust.servicesIncludedText !== undefined ? cust.servicesIncludedText : DEFAULT_DOCUMENT_CUSTOMIZATION.servicesIncludedText}
-                onChange={(e) => updateDocumentCustomization({ servicesIncludedText: e.target.value })}
-                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                  isDark
-                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                    : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                }`}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 5. SECCIÓN: HARDWARE Y EQUIPOS DEL SISTEMA */}
-      <div className={`rounded-xl border overflow-hidden transition-all ${isDark ? 'border-[#2a2a36] bg-[#1a1a24]' : 'border-slate-200 bg-white'}`}>
-        <button
-          type="button"
-          onClick={() => toggleSection('hardware')}
-          className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors ${
-            isDark ? 'text-zinc-200 hover:bg-[#222230]' : 'text-slate-800 hover:bg-slate-50'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <PackageCheck className="w-4 h-4 text-emerald-500" />
-            <span>5. Hardware y Equipos del Sistema</span>
-          </div>
-          {openSection === 'hardware' ? <ChevronUp className="w-4 h-4 text-zinc-400" /> : <ChevronDown className="w-4 h-4 text-zinc-400" />}
-        </button>
-
-        {openSection === 'hardware' && (
-          <div className={`p-3 pt-1 space-y-3 border-t text-xs ${isDark ? 'border-[#2a2a36] bg-[#14141d]' : 'border-slate-200 bg-slate-50/50'}`}>
-            <div>
-              <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                Módulos Solares (Marca y Modelo)
-              </label>
-              <input
-                type="text"
-                value={project.specs.panelBrandModel || 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)'}
-                onChange={(e) => updateSpecs({ panelBrandModel: e.target.value })}
-                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                  isDark
-                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                    : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                }`}
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              <div className="col-span-2">
-                <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                  Modelo Inversor
-                </label>
-                <input
-                  type="text"
-                  value={project.specs.inverterBrandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)'}
-                  onChange={(e) => updateSpecs({ inverterBrandModel: e.target.value })}
-                  className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                    isDark
-                      ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                      : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                  }`}
-                />
-              </div>
-              <div>
-                <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                  Cant.
-                </label>
-                <input
-                  type="number"
-                  value={project.specs.inverterCount || 2}
-                  onChange={(e) => updateSpecs({ inverterCount: Number(e.target.value) })}
-                  className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                    isDark
-                      ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                      : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                  }`}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              <div className="col-span-2">
-                <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                  Modelo Batería
-                </label>
-                <input
-                  type="text"
-                  value={project.specs.batteryBrandModel || 'Batería Hinaess 16 KwH-48 vdc.'}
-                  onChange={(e) => updateSpecs({ batteryBrandModel: e.target.value })}
-                  className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                    isDark
-                      ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                      : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                  }`}
-                />
-              </div>
-              <div>
-                <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                  Cant.
-                </label>
-                <input
-                  type="number"
-                  value={project.specs.batteryCount || 3}
-                  onChange={(e) => updateSpecs({ batteryCount: Number(e.target.value) })}
-                  className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                    isDark
-                      ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                      : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                  }`}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                Descripción de Servicios e Instalación
-              </label>
-              <textarea
-                rows={2}
-                value={
-                  project.specs.installationServicesDesc ||
-                  'Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).'
-                }
-                onChange={(e) => updateSpecs({ installationServicesDesc: e.target.value })}
-                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                  isDark
-                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                    : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                }`}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 6. SECCIÓN: QUIÉNES SOMOS Y PRESENTACIÓN INSTITUCIONAL */}
-      <div className={`rounded-xl border overflow-hidden transition-all ${isDark ? 'border-[#2a2a36] bg-[#1a1a24]' : 'border-slate-200 bg-white'}`}>
-        <button
-          type="button"
-          onClick={() => toggleSection('about' as any)}
-          className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors ${
-            isDark ? 'text-zinc-200 hover:bg-[#222230]' : 'text-slate-800 hover:bg-slate-50'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-emerald-500" />
-            <span>6. Quiénes Somos y Presentación</span>
-          </div>
-          {openSection === ('about' as any) ? <ChevronUp className="w-4 h-4 text-zinc-400" /> : <ChevronDown className="w-4 h-4 text-zinc-400" />}
-        </button>
-
-        {openSection === ('about' as any) && (
-          <div className={`p-3 pt-1 space-y-3 border-t text-xs ${isDark ? 'border-[#2a2a36] bg-[#14141d]' : 'border-slate-200 bg-slate-50/50'}`}>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                  Sitio Web
-                </label>
-                <input
-                  type="text"
-                  value={cust.companyWebsite !== undefined ? cust.companyWebsite : DEFAULT_DOCUMENT_CUSTOMIZATION.companyWebsite}
-                  onChange={(e) => updateDocumentCustomization({ companyWebsite: e.target.value })}
-                  placeholder="www.electsun.do"
-                  className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                    isDark
-                      ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                      : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                  Usuario Instagram
-                </label>
-                <input
-                  type="text"
-                  value={cust.companyInstagram !== undefined ? cust.companyInstagram : DEFAULT_DOCUMENT_CUSTOMIZATION.companyInstagram}
-                  onChange={(e) => updateDocumentCustomization({ companyInstagram: e.target.value })}
-                  placeholder="Electsunrd"
-                  className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                    isDark
-                      ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                      : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                  }`}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                Texto "¿Quiénes Somos?" (Pág. 1 del Dossier)
-              </label>
-              <textarea
-                rows={3}
-                value={cust.aboutUsIntroText !== undefined ? cust.aboutUsIntroText : DEFAULT_DOCUMENT_CUSTOMIZATION.aboutUsIntroText}
-                onChange={(e) => updateDocumentCustomization({ aboutUsIntroText: e.target.value })}
-                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                  isDark
-                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                    : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                }`}
-              />
-            </div>
-
-            <div>
-              <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                Texto de Transición (Debajo de Servicios y antes de "¿Por Qué Elegirnos?")
-              </label>
-              <textarea
-                rows={2}
-                value={cust.aboutUsTransitionText !== undefined ? cust.aboutUsTransitionText : (DEFAULT_DOCUMENT_CUSTOMIZATION.aboutUsTransitionText || 'Descubre cómo nuestros productos y servicios pueden ayudarte a aprovechar al máximo la energía del sol.')}
-                onChange={(e) => updateDocumentCustomization({ aboutUsTransitionText: e.target.value })}
-                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                  isDark
-                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                    : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                }`}
-              />
-            </div>
-
-            <div>
-              <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                Texto "¿Por Qué Elegirnos?" / Misión
-              </label>
-              <textarea
-                rows={3}
-                value={cust.whyChooseUsText !== undefined ? cust.whyChooseUsText : DEFAULT_DOCUMENT_CUSTOMIZATION.whyChooseUsText}
-                onChange={(e) => updateDocumentCustomization({ whyChooseUsText: e.target.value })}
-                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                  isDark
-                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                    : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                }`}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 7. SECCIÓN: DESCRIPCIÓN DEL PROYECTO & NORMATIVA SIE (PÁGINA 6) */}
-      <div className={`rounded-xl border overflow-hidden transition-all ${isDark ? 'border-[#2a2a36] bg-[#1a1a24]' : 'border-slate-200 bg-white'}`}>
-        <button
-          type="button"
-          onClick={() => toggleSection('projectDescription')}
-          className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors ${
-            isDark ? 'text-zinc-200 hover:bg-[#222230]' : 'text-slate-800 hover:bg-slate-50'
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-blue-500 shrink-0" />
-            <span>7. Descripción del Proyecto & Normativa (Pág. 6)</span>
-          </div>
-          {openSection === 'projectDescription' ? (
-            <ChevronUp className="w-4 h-4 text-zinc-400" />
-          ) : (
-            <ChevronDown className="w-4 h-4 text-zinc-400" />
-          )}
-        </button>
-
-        {openSection === 'projectDescription' && (
-          <div className={`p-3 pt-1 space-y-3 border-t text-xs ${isDark ? 'border-[#2a2a36] bg-[#14141d]' : 'border-slate-200 bg-slate-50/50'}`}>
-            <p className={`text-[11px] leading-relaxed ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-              Personaliza los textos explicativos y el alcance técnico de ingeniería que complementan a los equipos y cálculos automáticos en la <strong className={isDark ? 'text-zinc-200' : 'text-slate-800'}>Página 6 (4. Descripción del Proyecto)</strong>.
-            </p>
-
-            <div className={`p-2 rounded-lg border text-[10.5px] flex items-center gap-2 ${isDark ? 'bg-blue-950/30 border-blue-800/50 text-blue-300' : 'bg-blue-50 border-blue-200 text-blue-800'}`}>
-              <span className="text-sm">💡</span>
-              <span>
-                <strong>Formato en Negrita:</strong> Puedes encerrar cualquier palabra o cifra entre <code>**asteriscos**</code> (ej. <code>**8,532 kWh**</code> o <code>**10 Módulos**</code>) para resaltarla en negrita en el PDF.
-              </span>
-            </div>
-
-            {/* Subtítulo de Resumen Técnico */}
-            <div>
-              <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                Subtítulo del Resumen Técnico
-              </label>
-              <input
-                type="text"
-                value={cust.projectSummarySubtitle || ''}
-                onChange={(e) => updateDocumentCustomization({ projectSummarySubtitle: e.target.value })}
-                placeholder={`Criterios de dimensionamiento técnico para ${project.client.name || 'Cliente'}`}
-                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                  isDark
-                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-blue-500'
-                    : 'bg-white border-slate-300 text-slate-900 focus:border-blue-600'
-                }`}
-              />
-              <span className="text-[10px] text-zinc-500 block mt-0.5">
-                Si se deja en blanco, usa el valor automático con el nombre del cliente.
-              </span>
-            </div>
-
-            {/* Componentes de Ingeniería y Alcance Técnico (Párrafo 2) */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className={`block text-[10px] font-bold uppercase ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                  Componentes de Ingeniería y Estructuras (Párrafo 2)
-                </label>
-                <button
-                  type="button"
-                  onClick={() =>
-                    updateDocumentCustomization({
-                      projectEngineeringScopeText: DEFAULT_DOCUMENT_CUSTOMIZATION.projectEngineeringScopeText,
-                    })
-                  }
-                  className="text-[10px] text-blue-500 hover:text-blue-400 font-semibold flex items-center gap-1 cursor-pointer"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  Restablecer
-                </button>
-              </div>
-              <textarea
-                rows={4}
-                value={
-                  cust.projectEngineeringScopeText !== undefined
-                    ? cust.projectEngineeringScopeText
-                    : DEFAULT_DOCUMENT_CUSTOMIZATION.projectEngineeringScopeText
-                }
-                onChange={(e) => updateDocumentCustomization({ projectEngineeringScopeText: e.target.value })}
-                placeholder="junto con todos los componentes de ingeniería complementarios..."
-                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors leading-relaxed ${
-                  isDark
-                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-blue-500'
-                    : 'bg-white border-slate-300 text-slate-900 focus:border-blue-600'
-                }`}
-              />
-              <span className="text-[10px] text-zinc-500 block mt-0.5">
-                Texto explicativo que se concatena después de los inversores y baterías (ej. estructuras, cableado, protecciones CC/CA).
-              </span>
-            </div>
-
-            {/* Marco Regulatorio y Normativa SIE (Caja Amarilla) */}
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className={`block text-[10px] font-bold uppercase ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                  Marco Regulatorio & Normativa SIE (Caja Informativa)
-                </label>
-                <button
-                  type="button"
-                  onClick={() =>
-                    updateDocumentCustomization({
-                      regulatoryNote: DEFAULT_DOCUMENT_CUSTOMIZATION.regulatoryNote,
-                    })
-                  }
-                  className="text-[10px] text-blue-500 hover:text-blue-400 font-semibold flex items-center gap-1 cursor-pointer"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  Restablecer
-                </button>
-              </div>
-              <textarea
-                rows={5}
-                value={cust.regulatoryNote !== undefined ? cust.regulatoryNote : DEFAULT_DOCUMENT_CUSTOMIZATION.regulatoryNote}
-                onChange={(e) => updateDocumentCustomization({ regulatoryNote: e.target.value })}
-                placeholder="Párrafos de la resolución SIE-007 y condiciones de medición neta..."
-                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors leading-relaxed ${
-                  isDark
-                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-blue-500'
-                    : 'bg-white border-slate-300 text-slate-900 focus:border-blue-600'
-                }`}
-              />
-              <span className="text-[10px] text-zinc-500 block mt-0.5">
-                Separa los párrafos con un salto de línea doble para mostrarlos como párrafos independientes en la caja informativa.
-              </span>
-            </div>
-
-            {/* Párrafos Personalizados Completos (Modo Libre / Avanzado) */}
-            <div className={`p-2.5 rounded-lg border ${isDark ? 'bg-[#181824] border-[#2c2c3e]' : 'bg-slate-100 border-slate-200'} space-y-2`}>
-              <div className="flex items-center justify-between">
-                <span className={`text-[10px] font-bold uppercase ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
-                  ✍️ Sobreescritura Libre de Párrafos (Opcional)
-                </span>
-                {(cust.customProjectSummaryParagraph1 || cust.customProjectSummaryParagraph2) && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      updateDocumentCustomization({
-                        customProjectSummaryParagraph1: '',
-                        customProjectSummaryParagraph2: '',
-                      })
-                    }
-                    className="text-[10px] text-amber-500 hover:text-amber-400 font-semibold flex items-center gap-1 cursor-pointer"
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    Limpiar
-                  </button>
-                )}
-              </div>
-
-              <div>
-                <label className={`block text-[10px] font-bold mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                  Sobreescribir Párrafo 1 (Resumen de Consumo y Producción):
-                </label>
-                <textarea
-                  rows={3}
-                  value={cust.customProjectSummaryParagraph1 || ''}
-                  onChange={(e) => updateDocumentCustomization({ customProjectSummaryParagraph1: e.target.value })}
-                  placeholder="Si deseas redactar tu propio Párrafo 1 completo en lugar del generado automáticamente..."
-                  className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                    isDark
-                      ? 'bg-[#20202c] border-[#343446] text-white focus:border-amber-500'
-                      : 'bg-white border-slate-300 text-slate-900 focus:border-amber-600'
-                  }`}
-                />
-              </div>
-
-              <div>
-                <label className={`block text-[10px] font-bold mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                  Sobreescribir Párrafo 2 (Equipos y Alcance de Instalación):
-                </label>
-                <textarea
-                  rows={3}
-                  value={cust.customProjectSummaryParagraph2 || ''}
-                  onChange={(e) => updateDocumentCustomization({ customProjectSummaryParagraph2: e.target.value })}
-                  placeholder="Si deseas redactar tu propio Párrafo 2 completo en lugar del generado automáticamente..."
-                  className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                    isDark
-                      ? 'bg-[#20202c] border-[#343446] text-white focus:border-amber-500'
-                      : 'bg-white border-slate-300 text-slate-900 focus:border-amber-600'
-                  }`}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 8. SECCIÓN: Puntos Extra del Índice / Anexos */}
+      {/* 3. SECCIÓN: Puntos Extra del Índice / Anexos */}
       <div
         className={`rounded-xl border overflow-hidden transition-all ${
           isDark ? 'border-[#27272a] bg-[#16161e]' : 'border-slate-200 bg-white shadow-xs'
@@ -1178,7 +627,7 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
         >
           <div className="flex items-center gap-2">
             <ListPlus className="w-4 h-4 text-amber-500 shrink-0" />
-            <span>8. Anexos y Puntos Extra del Índice</span>
+            <span>3. Anexos y Puntos Extra del Índice</span>
           </div>
           <div className="flex items-center gap-2">
             <span
