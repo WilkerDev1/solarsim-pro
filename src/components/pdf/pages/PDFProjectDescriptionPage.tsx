@@ -6,6 +6,7 @@ import { PDFFooter } from '../PDFFooter';
 import { PDFWatermark } from '../PDFWatermark';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
 import { FileText, ShieldAlert, Sparkles, Zap, BatteryCharging } from 'lucide-react';
+import { renderFormattedMarkdown } from '../../../utils/textFormatter';
 
 interface PDFProjectDescriptionPageProps {
   project: ProjectSimulation;
@@ -105,9 +106,12 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
                 Resumen Ejecutivo de la Solución Propuesta
               </h2>
               <span className="text-[10px] text-slate-500 font-semibold">
-                {cust.projectSummarySubtitle && cust.projectSummarySubtitle.trim()
-                  ? cust.projectSummarySubtitle.trim()
-                  : `Criterios de dimensionamiento técnico para ${clientName}`}
+                {renderFormattedMarkdown(
+                  cust.projectSummarySubtitle && cust.projectSummarySubtitle.trim()
+                    ? cust.projectSummarySubtitle.trim()
+                    : `Criterios de dimensionamiento técnico para ${clientName}`,
+                  'text-slate-800 font-bold'
+                )}
               </span>
             </div>
           </div>
@@ -115,7 +119,7 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
           <div className="p-4 rounded-2xl border border-slate-200 bg-white shadow-xs space-y-3 leading-relaxed text-justify">
             {cust.customProjectSummaryParagraph1 && cust.customProjectSummaryParagraph1.trim() ? (
               <p className="text-slate-700 text-[11.5px] font-medium whitespace-pre-line">
-                {cust.customProjectSummaryParagraph1.trim()}
+                {renderFormattedMarkdown(cust.customProjectSummaryParagraph1.trim(), 'text-slate-950 font-bold')}
               </p>
             ) : (
               <p className="text-slate-700 text-[11.5px] font-medium">
@@ -132,7 +136,7 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
 
             {cust.customProjectSummaryParagraph2 && cust.customProjectSummaryParagraph2.trim() ? (
               <p className="text-slate-700 text-[11.5px] font-medium whitespace-pre-line">
-                {cust.customProjectSummaryParagraph2.trim()}
+                {renderFormattedMarkdown(cust.customProjectSummaryParagraph2.trim(), 'text-slate-950 font-bold')}
               </p>
             ) : (
               <p className="text-slate-700 text-[11.5px] font-medium">
@@ -142,9 +146,12 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
                     {' '}y <strong className="text-slate-950 font-bold">{project.specs.batteryCount || 1} {batteryModel}</strong>
                   </>
                 ) : ''}{' '}
-                {cust.projectEngineeringScopeText !== undefined && cust.projectEngineeringScopeText.trim() !== ''
-                  ? cust.projectEngineeringScopeText.trim()
-                  : DEFAULT_DOCUMENT_CUSTOMIZATION.projectEngineeringScopeText}
+                {renderFormattedMarkdown(
+                  cust.projectEngineeringScopeText !== undefined && cust.projectEngineeringScopeText.trim() !== ''
+                    ? cust.projectEngineeringScopeText.trim()
+                    : DEFAULT_DOCUMENT_CUSTOMIZATION.projectEngineeringScopeText,
+                  'text-slate-950 font-bold'
+                )}
               </p>
             )}
           </div>
@@ -199,9 +206,9 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
             <span>Marco Regulatorio y Condiciones de Operación (SIE / EDES)</span>
           </div>
 
-          <div className="space-y-2 text-amber-950/90 text-[11px] leading-relaxed text-justify font-medium">
+          <div className="space-y-2 text-amber-950/90 text-[11.5px] leading-relaxed text-justify font-medium">
             {paragraphs.map((p, idx) => (
-              <p key={idx}>{p}</p>
+              <p key={idx}>{renderFormattedMarkdown(p, 'font-bold text-amber-950')}</p>
             ))}
           </div>
         </div>

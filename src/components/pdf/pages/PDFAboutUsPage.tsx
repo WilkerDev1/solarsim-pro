@@ -6,6 +6,7 @@ import { PDFFooter } from '../PDFFooter';
 import { PDFWatermark } from '../PDFWatermark';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
 import { Wrench, Activity, LineChart, Sparkles, Award, Shield, Users } from 'lucide-react';
+import { renderFormattedMarkdown } from '../../../utils/textFormatter';
 
 interface PDFAboutUsPageProps {
   project: ProjectSimulation;
@@ -80,7 +81,7 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
             1. ¿QUIÉNES SOMOS?
           </div>
           <p className="text-slate-700 text-[11.5px] leading-relaxed text-justify font-medium pt-0.5">
-            {aboutUsIntroText}
+            {renderFormattedMarkdown(aboutUsIntroText, 'text-slate-950 font-bold')}
           </p>
         </div>
 
@@ -198,7 +199,7 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
         {/* Bloque Inferior: Transición + 1.1 ¿Por Qué Elegirnos? */}
         <div className="space-y-2.5">
           <p className="text-slate-700 text-[11.5px] leading-relaxed text-left font-medium">
-            {aboutUsTransitionText}
+            {renderFormattedMarkdown(aboutUsTransitionText, 'text-slate-950 font-bold')}
           </p>
 
           <div className="space-y-2">
@@ -213,7 +214,7 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
               1.1 ¿POR QUÉ ELEGIRNOS?
             </div>
             <p className="text-slate-700 text-[11.5px] leading-relaxed font-medium pt-0.5">
-              {whyChooseUsText}
+              {renderFormattedMarkdown(whyChooseUsText, 'text-slate-950 font-bold')}
             </p>
 
             <div className="grid grid-cols-3 gap-3 pt-1">

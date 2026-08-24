@@ -946,6 +946,13 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
               Personaliza los textos explicativos y el alcance técnico de ingeniería que complementan a los equipos y cálculos automáticos en la <strong className={isDark ? 'text-zinc-200' : 'text-slate-800'}>Página 6 (4. Descripción del Proyecto)</strong>.
             </p>
 
+            <div className={`p-2 rounded-lg border text-[10.5px] flex items-center gap-2 ${isDark ? 'bg-blue-950/30 border-blue-800/50 text-blue-300' : 'bg-blue-50 border-blue-200 text-blue-800'}`}>
+              <span className="text-sm">💡</span>
+              <span>
+                <strong>Formato en Negrita:</strong> Puedes encerrar cualquier palabra o cifra entre <code>**asteriscos**</code> (ej. <code>**8,532 kWh**</code> o <code>**10 Módulos**</code>) para resaltarla en negrita en el PDF.
+              </span>
+            </div>
+
             {/* Subtítulo de Resumen Técnico */}
             <div>
               <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
