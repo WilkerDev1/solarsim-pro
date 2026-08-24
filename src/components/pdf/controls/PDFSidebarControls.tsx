@@ -6,6 +6,7 @@ import {
   SlidersHorizontal,
   RefreshCw,
   Globe,
+  Pencil,
 } from 'lucide-react';
 import { ProjectSimulation, DocumentCustomization } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
@@ -57,6 +58,8 @@ interface PDFSidebarControlsProps {
   updateClient: (client: Partial<ProjectSimulation['client']>) => void;
   updateSpecs: (specs: Partial<ProjectSimulation['specs']>) => void;
   updateDocumentCustomization: (customization: Partial<DocumentCustomization>) => void;
+  isEditMode: boolean;
+  setIsEditMode: (val: boolean) => void;
 }
 
 export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
@@ -102,6 +105,8 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
   updateClient,
   updateSpecs,
   updateDocumentCustomization,
+  isEditMode,
+  setIsEditMode,
 }) => {
   return (
     <aside
@@ -161,7 +166,7 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
         </button>
       </div>
 
-      {/* Tabs Header: "Secciones" vs "Datos del Documento" */}
+      {/* Tabs Header: "Secciones" vs "Modo Edición" */}
       <div className={`grid grid-cols-2 p-1.5 m-3 rounded-xl border ${isDark ? 'bg-[#14141a] border-[#2a2a36]' : 'bg-slate-100 border-slate-200'}`}>
         <button
           type="button"
@@ -181,8 +186,11 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
         </button>
         <button
           type="button"
-          onClick={() => setSidebarTab('edit')}
-          className={`py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+          onClick={() => {
+            setSidebarTab('edit');
+            setIsEditMode(true);
+          }}
+          className={`py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer relative ${
             sidebarTab === 'edit'
               ? isDark
                 ? 'bg-[#242432] text-white shadow-xs'
@@ -192,8 +200,11 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <FileText className="w-3.5 h-3.5 text-emerald-500" />
-          Datos del Documento
+          <Pencil className="w-3.5 h-3.5 text-blue-500" />
+          <span>Modo Edición</span>
+          {isEditMode && (
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+          )}
         </button>
       </div>
 
@@ -238,6 +249,8 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
             updateClient={updateClient}
             updateSpecs={updateSpecs}
             updateDocumentCustomization={updateDocumentCustomization}
+            isEditMode={isEditMode}
+            setIsEditMode={setIsEditMode}
           />
         )}
       </div>

@@ -54,8 +54,11 @@ export const PDFProposalView: React.FC = () => {
   // Active Color Theme
   const [activeTheme, setActiveTheme] = useState<PDFColorTheme>(PDF_COLOR_THEMES[0]);
 
-  // Active Tab in Sidebar ("Secciones" vs "Datos del Documento")
+  // Active Tab in Sidebar ("Secciones" vs "Modo Edición")
   const [sidebarTab, setSidebarTab] = useState<'sections' | 'edit'>('sections');
+
+  // Live Inline Editing Mode
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const handlePrint = () => {
     window.print();
@@ -408,6 +411,8 @@ export const PDFProposalView: React.FC = () => {
         updateClient={updateClient}
         updateSpecs={updateSpecs}
         updateDocumentCustomization={updateDocumentCustomization}
+        isEditMode={isEditMode}
+        setIsEditMode={setIsEditMode}
       />
 
       {/* PDF Page Canvas */}
@@ -416,6 +421,35 @@ export const PDFProposalView: React.FC = () => {
           isDark ? 'bg-[#0a0a0d]' : 'bg-slate-300/80'
         }`}
       >
+        {/* Live Edit Mode Floating Banner */}
+        {isEditMode && (
+          <div className="w-[850px] bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center justify-between gap-4 border border-blue-400/40 animate-in fade-in slide-in-from-top-2 sticky top-0 z-40">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-white shrink-0 shadow-xs">
+                <span className="text-sm animate-bounce">✏️</span>
+              </div>
+              <div>
+                <h4 className="text-xs font-black tracking-wide flex items-center gap-2">
+                  MODO EDICIÓN EN VIVO ACTIVO
+                  <span className="text-[9.5px] bg-amber-400 text-slate-950 font-extrabold px-2 py-0.5 rounded-full">
+                    Tiempo Real
+                  </span>
+                </h4>
+                <p className="text-[11px] text-blue-100 font-medium">
+                  Haz clic sobre cualquier párrafo o subtítulo para modificarlo. Usa <code className="bg-blue-900/60 px-1 py-0.5 rounded text-[10px] text-amber-200">**texto**</code> o <kbd className="bg-blue-900/60 px-1 py-0.5 rounded text-[10px] text-amber-200">Ctrl+B</kbd> para negritas.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsEditMode(false)}
+              className="px-4 py-2 rounded-xl bg-white hover:bg-blue-50 text-blue-950 font-black text-xs shadow-md transition-all cursor-pointer active:scale-95 shrink-0"
+            >
+              Listo / Finalizar
+            </button>
+          </div>
+        )}
+
         <div ref={pdfRef} className="flex flex-col gap-8 print:gap-0">
           {/* PORTADA EJECUTIVA */}
           {showCover && (
@@ -451,6 +485,8 @@ export const PDFProposalView: React.FC = () => {
               currentDateStr={currentDateStr}
               pageNum={pageAboutUsNum}
               totalPages={activePagesCount}
+              isEditMode={isEditMode}
+              updateDocumentCustomization={updateDocumentCustomization}
             />
           )}
 
@@ -490,6 +526,8 @@ export const PDFProposalView: React.FC = () => {
               currentDateStr={currentDateStr}
               pageNum={pageProjectDescNum}
               totalPages={activePagesCount}
+              isEditMode={isEditMode}
+              updateDocumentCustomization={updateDocumentCustomization}
             />
           )}
 
@@ -516,6 +554,8 @@ export const PDFProposalView: React.FC = () => {
               currentDateStr={currentDateStr}
               pageNum={pageQuotNum}
               totalPages={activePagesCount}
+              isEditMode={isEditMode}
+              updateDocumentCustomization={updateDocumentCustomization}
             />
           )}
 

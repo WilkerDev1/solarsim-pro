@@ -1,11 +1,12 @@
 import React from 'react';
 import { ShieldCheck, CheckCircle2, Check } from 'lucide-react';
-import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
+import { ProjectSimulation, FinancialSummaryResult, DocumentCustomization } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
 import { PDFHeaderBanner } from '../PDFHeaderBanner';
 import { PDFFooter } from '../PDFFooter';
 import { PDFWatermark } from '../PDFWatermark';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
+import { InlineEditableText } from '../common/InlineEditableText';
 
 interface PDFPage2QuotationProps {
   project: ProjectSimulation;
@@ -15,6 +16,8 @@ interface PDFPage2QuotationProps {
   currentDateStr: string;
   pageNum: number;
   totalPages: number;
+  isEditMode?: boolean;
+  updateDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
 }
 
 export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
@@ -25,6 +28,8 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
   currentDateStr,
   pageNum,
   totalPages,
+  isEditMode = false,
+  updateDocumentCustomization,
 }) => {
   const cust = project.customization || {};
 
@@ -37,7 +42,8 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
   const batteryWarranty = cust.batteryWarrantyText || DEFAULT_DOCUMENT_CUSTOMIZATION.batteryWarrantyText || '5 a 10 Años';
   const workmanshipWarranty = cust.workmanshipWarrantyText || DEFAULT_DOCUMENT_CUSTOMIZATION.workmanshipWarrantyText || '1 Año';
   const servicesText = cust.servicesIncludedText || DEFAULT_DOCUMENT_CUSTOMIZATION.servicesIncludedText || '';
-  const validityNote = cust.validityNote || `* Equipos según disponibilidad de inventario | * Propuesta válida por ${project.client.quoteValidityDays || 7} días | * Precios en USD *`;
+  const defaultValidityNote = `* Equipos según disponibilidad de inventario | * Propuesta válida por ${project.client.quoteValidityDays || 7} días | * Precios en USD *`;
+  const validityNote = cust.validityNote || defaultValidityNote;
 
   // Split services text into bullets if separated by comma or semicolon
   const serviceItems = servicesText
@@ -100,24 +106,25 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
             </div>
             <div className="space-y-0.5 text-right">
               <div>
+                <span className="font-bold text-slate-600">Fecha de Emisión:</span> {currentDateStr}
+              </div>
+              <div>
                 <span className="font-bold text-slate-600">N° Cotización:</span>{' '}
-                <span className="font-bold text-slate-900">{project.client.quoteNumber || 'C-0030'}</span>
+                <span className="font-bold font-mono text-slate-900">{project.client.quoteNumber || 'C-0001'}</span>
               </div>
               <div>
-                <span className="font-bold text-slate-600">Fecha:</span>{' '}
-                <span className="font-semibold text-slate-800">{currentDateStr}</span>
+                <span className="font-bold text-slate-600">ID Proyecto:</span>{' '}
+                <span className="font-bold font-mono text-slate-900">{project.client.projectId || 'SP-2026-001'}</span>
               </div>
               <div>
-                <span className="font-bold text-slate-600">Válido por:</span>{' '}
-                <span className="font-bold" style={{ color: activeTheme.secondary }}>
-                  {project.client.quoteValidityDays || 7} Días
-                </span>
+                <span className="font-bold text-slate-600">Distribuidora / Tarifa:</span>{' '}
+                <span className="font-bold text-slate-900">{project.rates.distributor || 'EDES'} • {project.rates.tariffCode}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* ESPECIFICACIONES DEL SISTEMA */}
+        {/* DETALLE TÉCNICO Y SUMINISTRO PRINCIPAL */}
         <div>
           <h3
             className="px-2.5 py-0.5 text-[10.5px] font-bold uppercase mb-1 rounded-xs"
@@ -127,126 +134,79 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
               borderLeft: activeTheme.tertiary ? undefined : `4px solid ${activeTheme.primary}`,
             }}
           >
-            ESPECIFICACIONES DEL SISTEMA
-          </h3>
-          <div className="grid grid-cols-2 gap-4 bg-slate-50 p-2 rounded-lg border border-slate-200 text-[10.5px]">
-            <div>
-              <div>
-                <span className="font-bold text-slate-700">Potencia (kW-dc):</span>{' '}
-                <span className="font-bold text-slate-900">{summary.systemCapacityKWp.toFixed(2)} kWp</span>
-              </div>
-              <div>
-                <span className="font-bold text-slate-700">Tipo de instalación:</span> Fotovoltaica
-              </div>
-            </div>
-            <div className="text-right">
-              <div>
-                <span className="font-bold text-slate-700">Consumo mensual estimado:</span>{' '}
-                <span className="font-bold text-slate-900">
-                  {Math.round(summary.annualConsumptionKWh / 12).toLocaleString()} kWh
-                </span>
-              </div>
-              <div>
-                <span className="font-bold text-slate-700">Distribuidor Eléctrico:</span>{' '}
-                <span className="font-bold" style={{ color: activeTheme.primary }}>
-                  {project.client.distributor || 'EDEESTE'}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* EQUIPOS Y MATERIALES */}
-        <div>
-          <h3
-            className="px-2.5 py-0.5 text-[10.5px] font-bold uppercase mb-1 rounded-xs"
-            style={{
-              backgroundColor: activeTheme.tertiary ? activeTheme.tertiary : '#f1f5f9',
-              color: activeTheme.tertiary ? '#ffffff' : activeTheme.primary,
-              borderLeft: activeTheme.tertiary ? undefined : `4px solid ${activeTheme.primary}`,
-            }}
-          >
-            EQUIPOS Y MATERIALES
+            DESCRIPCIÓN DEL SISTEMA FOTOVOLTAICO :
           </h3>
           <div className="border border-slate-200 rounded-lg overflow-hidden">
             <table className="w-full text-left border-collapse">
               <thead className="text-white font-bold text-[9.5px] uppercase" style={{ backgroundColor: activeTheme.primary }}>
                 <tr>
-                  <th className="px-3 py-1.5">DESCRIPCIÓN</th>
-                  <th className="px-3 py-1.5 text-center w-20">CANT.</th>
-                  <th className="px-3 py-1.5 text-center w-20">UNIDAD</th>
+                  <th className="px-3 py-1">ÍTEM</th>
+                  <th className="px-3 py-1">DESCRIPCIÓN DE EQUIPOS Y SERVICIOS</th>
+                  <th className="px-3 py-1 text-center w-14">CANT.</th>
+                  <th className="px-3 py-1 text-right w-24">POTENCIA</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 text-[10.5px] text-slate-800 font-semibold">
+              <tbody className="divide-y divide-slate-200 text-[10.5px] text-slate-800">
                 <tr className="bg-white">
-                  <td className="px-3 py-1">{project.specs.panelBrandModel || 'Módulos Fotovoltaicos Tier 1'}</td>
-                  <td className="px-3 py-1 text-center font-bold">{project.specs.panelCount}</td>
-                  <td className="px-3 py-1 text-center text-slate-500 font-normal">UD</td>
+                  <td className="px-3 py-1 font-bold text-slate-500">1</td>
+                  <td className="px-3 py-1 font-medium">
+                    <span className="font-bold text-slate-900">Módulos Solares Fotovoltaicos:</span>{' '}
+                    {project.specs.panelBrandModel || 'Módulos Tier-1 Monocristalinos'} ({project.specs.panelPowerW}W)
+                  </td>
+                  <td className="px-3 py-1 text-center font-bold font-mono">{project.specs.panelCount}</td>
+                  <td className="px-3 py-1 text-right font-bold font-mono">{summary.systemCapacityKWp.toFixed(2)} kWp</td>
                 </tr>
                 <tr className="bg-slate-50/60">
-                  <td className="px-3 py-1">{project.specs.inverterBrandModel || 'Inversor Solar On-Grid / Híbrido'}</td>
-                  <td className="px-3 py-1 text-center font-bold">{project.specs.inverterCount || 1}</td>
-                  <td className="px-3 py-1 text-center text-slate-500 font-normal">UD</td>
+                  <td className="px-3 py-1 font-bold text-slate-500">2</td>
+                  <td className="px-3 py-1 font-medium">
+                    <span className="font-bold text-slate-900">Inversor Solar Inteligente:</span>{' '}
+                    {project.specs.inverterBrandModel || 'Inversor On-Grid / Híbrido'}
+                  </td>
+                  <td className="px-3 py-1 text-center font-bold font-mono">{project.specs.inverterCount || 1}</td>
+                  <td className="px-3 py-1 text-right font-bold font-mono">
+                    {project.specs.inverterPowerKW || (summary.systemCapacityKWp * 0.9).toFixed(1)} kW
+                  </td>
                 </tr>
-                {project.specs.hasBattery && (
+                {project.specs.hasBattery && project.specs.batteryCapacityKWh > 0 && (
                   <tr className="bg-white">
-                    <td className="px-3 py-1">{project.specs.batteryBrandModel || 'Banco de Baterías Litio LiFePO4'}</td>
-                    <td className="px-3 py-1 text-center font-bold">{project.specs.batteryCount || 1}</td>
-                    <td className="px-3 py-1 text-center text-slate-500 font-normal">UD</td>
+                    <td className="px-3 py-1 font-bold text-slate-500">3</td>
+                    <td className="px-3 py-1 font-medium">
+                      <span className="font-bold text-slate-900">Almacenamiento en Baterías LiFePO4:</span>{' '}
+                      {project.specs.batteryBrandModel || 'Batería de Litio Solar'}
+                    </td>
+                    <td className="px-3 py-1 text-center font-bold font-mono">{project.specs.batteryCount || 1}</td>
+                    <td className="px-3 py-1 text-right font-bold font-mono">{project.specs.batteryCapacityKWh} kWh</td>
                   </tr>
                 )}
-                <tr className="bg-slate-50/60">
-                  <td className="px-3 py-1">
-                    {project.specs.installationServicesDesc ||
-                      'Instalación y Accesorios (Estructura de montaje, cableado, fusibles, protecciones AC/DC, desconectivo y puesta en marcha).'}
+                <tr className={project.specs.hasBattery && project.specs.batteryCapacityKWh > 0 ? 'bg-slate-50/60' : 'bg-white'}>
+                  <td className="px-3 py-1 font-bold text-slate-500">
+                    {project.specs.hasBattery && project.specs.batteryCapacityKWh > 0 ? '4' : '3'}
                   </td>
-                  <td className="px-3 py-1 text-center font-bold">1</td>
-                  <td className="px-3 py-1 text-center text-slate-500 font-normal">UD</td>
+                  <td className="px-3 py-1 font-medium text-slate-700" colSpan={3}>
+                    <span className="font-bold text-slate-900">Estructura y Materiales Eléctricos:</span>{' '}
+                    {cust.projectEngineeringScopeText !== undefined && cust.projectEngineeringScopeText.trim() !== ''
+                      ? cust.projectEngineeringScopeText.trim()
+                      : DEFAULT_DOCUMENT_CUSTOMIZATION.projectEngineeringScopeText}
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
         </div>
 
-        {/* DESGLOSE FINANCIERO RIGHT ALIGNED */}
-        <div className="flex justify-end">
-          <div className="w-[380px] bg-slate-50 border border-slate-200 rounded-lg p-2 space-y-1 text-[10.5px]">
-            <div className="flex justify-between text-slate-700">
-              <span className="font-semibold">SUB-TOTAL (USD) SIN ITBIS :</span>
-              <span className="font-bold">
-                ${(summary.costMatrix?.precioNetoUSD || (summary.grossInvestmentUSD - summary.itbisSavedUSD)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-            <div className="flex justify-between text-slate-900 bg-slate-200/80 px-2 py-0.5 rounded font-bold">
-              <span>TOTAL GENERAL (USD) :</span>
-              <span>${(summary.grossInvestmentUSD + (project.financials.applyITBISExemption ? summary.itbisSavedUSD : 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
-            <div className="flex justify-between font-semibold" style={{ color: activeTheme.secondary }}>
-              <span>ITBIS A DESCONTAR POR LEY 57-07 US$ :</span>
-              <span className="font-bold">${summary.itbisSavedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
-            <div className="flex justify-between text-white px-2 py-0.5 rounded font-bold" style={{ backgroundColor: activeTheme.primary }}>
-              <span>TOTAL GENERAL (USD) SI CALIFICA LEY 57-07 :</span>
-              <span>${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
-            <div className="flex justify-between text-slate-800 pt-0.5 border-t border-slate-300">
-              <span className="font-bold">PRECIO POR WATT (USD/W):</span>
-              <span className="font-bold" style={{ color: activeTheme.primary }}>
-                ${(project.specs.pricePerWattUSD || project.financials.pricePerWattUSD || (summary.solarInvestmentUSD / (summary.systemCapacityKWp * 1000)) || 1.13).toFixed(2)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* INCENTIVOS DE LEY 57-07 */}
+        {/* CONDICIONES ECONÓMICAS Y BENEFICIOS LEY 57-07 */}
         <div>
           <h3
-            className="bg-slate-100 px-2.5 py-0.5 text-[10.5px] font-bold uppercase border-l-4 mb-0.5"
-            style={{ color: activeTheme.primary, borderColor: activeTheme.primary }}
+            className="px-2.5 py-0.5 text-[10.5px] font-bold uppercase mb-0.5 rounded-xs"
+            style={{
+              backgroundColor: activeTheme.tertiary ? activeTheme.tertiary : '#f1f5f9',
+              color: activeTheme.tertiary ? '#ffffff' : activeTheme.primary,
+              borderLeft: activeTheme.tertiary ? undefined : `4px solid ${activeTheme.primary}`,
+            }}
           >
-            INCENTIVOS DE LEY 57-07
+            INVERSIÓN Y APLICACIÓN DE INCENTIVOS FISCALES LEY 57-07 :
           </h3>
-          <p className="text-[9.5px] font-bold bg-amber-50 border border-amber-200 text-amber-900 px-2.5 py-0.5 rounded mb-1">
+          <p className="text-[9.5px] text-slate-500 mb-1 px-1 font-medium">
             (Descuento de 40% para equipos energía renovables: Paneles solares, inversores y baterías)
           </p>
           <div className="border border-slate-200 rounded-lg overflow-hidden">
@@ -340,7 +300,18 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
 
         {/* LEGAL SUBTEXT */}
         <div className="text-center text-[9.5px] text-slate-500 font-semibold italic pt-0.5">
-          {validityNote}
+          <InlineEditableText
+            value={cust.validityNote}
+            defaultValue={defaultValidityNote}
+            onSave={(val) => updateDocumentCustomization?.({ validityNote: val })}
+            isEditMode={isEditMode}
+            multiline={false}
+            label="Nota Legal y Términos"
+            className="text-center text-[9.5px] text-slate-500 font-semibold italic block pt-0.5"
+            boldClassName="font-bold text-slate-700"
+            isCustomized={!!cust.validityNote}
+            onReset={() => updateDocumentCustomization?.({ validityNote: '' })}
+          />
         </div>
       </div>
 

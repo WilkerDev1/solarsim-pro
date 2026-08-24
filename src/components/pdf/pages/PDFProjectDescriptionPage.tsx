@@ -1,5 +1,5 @@
 import React from 'react';
-import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
+import { ProjectSimulation, FinancialSummaryResult, DocumentCustomization } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
 import { PDFHeaderBanner } from '../PDFHeaderBanner';
 import { PDFFooter } from '../PDFFooter';
@@ -7,6 +7,8 @@ import { PDFWatermark } from '../PDFWatermark';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
 import { FileText, ShieldAlert, Sparkles, Zap, BatteryCharging } from 'lucide-react';
 import { renderFormattedMarkdown } from '../../../utils/textFormatter';
+
+import { InlineEditableText } from '../common/InlineEditableText';
 
 interface PDFProjectDescriptionPageProps {
   project: ProjectSimulation;
@@ -16,6 +18,8 @@ interface PDFProjectDescriptionPageProps {
   currentDateStr: string;
   pageNum: number;
   totalPages: number;
+  isEditMode?: boolean;
+  updateDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
 }
 
 export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps> = ({
@@ -26,6 +30,8 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
   currentDateStr,
   pageNum,
   totalPages,
+  isEditMode = false,
+  updateDocumentCustomization,
 }) => {
   const cust = project.customization || {};
 
@@ -68,6 +74,12 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
   const inverterModel = project.specs.inverterBrandModel || `Inversor Solar Inteligente (${project.specs.inverterPowerKW || (summary.systemCapacityKWp * 0.9).toFixed(1)} kW)`;
   const batteryModel = project.specs.batteryBrandModel || `Batería de Litio LiFePO4 (${project.specs.batteryCapacityKWh} kWh)`;
 
+  const defaultParagraph1 = `El consumo promedio anual de **${clientName}** es de **${summary.annualConsumptionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh**, por lo que se le propone la instalación de **${project.specs.panelCount} ${panelModel}**, alcanzando una potencia DC instalada de **${summary.systemCapacityKWp.toFixed(2)} kWp**. La producción energética estimada para este sistema es de **${summary.annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh anuales**, representando el **${summary.energyCoveragePct.toFixed(1)}%** del consumo total del cliente.`;
+
+  const defaultParagraph2 = `Adicionalmente, se contempla la instalación de **${project.specs.inverterCount || 1} ${inverterModel}**${project.specs.hasBattery && project.specs.batteryCapacityKWh > 0 ? ` y **${project.specs.batteryCount || 1} ${batteryModel}**` : ''} ${cust.projectEngineeringScopeText !== undefined && cust.projectEngineeringScopeText.trim() !== '' ? cust.projectEngineeringScopeText.trim() : DEFAULT_DOCUMENT_CUSTOMIZATION.projectEngineeringScopeText}`;
+
+  const defaultRegulatoryText = paragraphs.join('\n\n');
+
   return (
     <div className="pdf-page w-[850px] h-[1202px] min-h-[1202px] max-h-[1202px] bg-white shadow-xl flex flex-col shrink-0 relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
       {/* Background Watermark */}
@@ -101,59 +113,51 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
             >
               <FileText className="w-4 h-4" />
             </div>
-            <div>
+            <div className="flex-1">
               <h2 className="text-xs font-black uppercase tracking-tight text-slate-900">
                 Resumen Ejecutivo de la Solución Propuesta
               </h2>
-              <span className="text-[10px] text-slate-500 font-semibold">
-                {renderFormattedMarkdown(
-                  cust.projectSummarySubtitle && cust.projectSummarySubtitle.trim()
-                    ? cust.projectSummarySubtitle.trim()
-                    : `Criterios de dimensionamiento técnico para ${clientName}`,
-                  'text-slate-800 font-bold'
-                )}
-              </span>
+              <InlineEditableText
+                value={cust.projectSummarySubtitle}
+                defaultValue={`Criterios de dimensionamiento técnico para ${clientName}`}
+                onSave={(val) => updateDocumentCustomization?.({ projectSummarySubtitle: val })}
+                isEditMode={isEditMode}
+                multiline={false}
+                label="Subtítulo del Resumen Técnico"
+                className="text-[10px] text-slate-500 font-semibold block"
+                boldClassName="text-slate-800 font-bold"
+                isCustomized={!!cust.projectSummarySubtitle}
+                onReset={() => updateDocumentCustomization?.({ projectSummarySubtitle: '' })}
+              />
             </div>
           </div>
 
           <div className="p-4 rounded-2xl border border-slate-200 bg-white shadow-xs space-y-3 leading-relaxed text-justify">
-            {cust.customProjectSummaryParagraph1 && cust.customProjectSummaryParagraph1.trim() ? (
-              <p className="text-slate-700 text-[11.5px] font-medium whitespace-pre-line">
-                {renderFormattedMarkdown(cust.customProjectSummaryParagraph1.trim(), 'text-slate-950 font-bold')}
-              </p>
-            ) : (
-              <p className="text-slate-700 text-[11.5px] font-medium">
-                El consumo promedio anual de <strong className="text-slate-950 font-bold">{clientName}</strong> es de{' '}
-                <strong className="text-slate-950 font-mono font-bold">{summary.annualConsumptionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh</strong>, por lo que se le propone la instalación de{' '}
-                <strong className="font-bold text-slate-950">{project.specs.panelCount} {panelModel}</strong>, alcanzando una potencia DC instalada de{' '}
-                <strong className="font-bold font-mono text-slate-950" style={{ color: activeTheme.primary }}>
-                  {summary.systemCapacityKWp.toFixed(2)} kWp
-                </strong>. La producción energética estimada para este sistema es de{' '}
-                <strong className="font-bold font-mono text-slate-950">{summary.annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh anuales</strong>, representando el{' '}
-                <strong className="font-bold text-emerald-700">{summary.energyCoveragePct.toFixed(1)}%</strong> del consumo total del cliente.
-              </p>
-            )}
+            <InlineEditableText
+              value={cust.customProjectSummaryParagraph1}
+              defaultValue={defaultParagraph1}
+              onSave={(val) => updateDocumentCustomization?.({ customProjectSummaryParagraph1: val })}
+              isEditMode={isEditMode}
+              multiline={true}
+              label="Párrafo 1 (Consumo y Producción)"
+              className="text-slate-700 text-[11.5px] font-medium block whitespace-pre-line leading-relaxed text-justify"
+              boldClassName="text-slate-950 font-bold"
+              isCustomized={!!cust.customProjectSummaryParagraph1}
+              onReset={() => updateDocumentCustomization?.({ customProjectSummaryParagraph1: '' })}
+            />
 
-            {cust.customProjectSummaryParagraph2 && cust.customProjectSummaryParagraph2.trim() ? (
-              <p className="text-slate-700 text-[11.5px] font-medium whitespace-pre-line">
-                {renderFormattedMarkdown(cust.customProjectSummaryParagraph2.trim(), 'text-slate-950 font-bold')}
-              </p>
-            ) : (
-              <p className="text-slate-700 text-[11.5px] font-medium">
-                Adicionalmente, se contempla la instalación de <strong className="text-slate-950 font-bold">{project.specs.inverterCount || 1} {inverterModel}</strong>
-                {project.specs.hasBattery && project.specs.batteryCapacityKWh > 0 ? (
-                  <>
-                    {' '}y <strong className="text-slate-950 font-bold">{project.specs.batteryCount || 1} {batteryModel}</strong>
-                  </>
-                ) : ''}{' '}
-                {renderFormattedMarkdown(
-                  cust.projectEngineeringScopeText !== undefined && cust.projectEngineeringScopeText.trim() !== ''
-                    ? cust.projectEngineeringScopeText.trim()
-                    : DEFAULT_DOCUMENT_CUSTOMIZATION.projectEngineeringScopeText,
-                  'text-slate-950 font-bold'
-                )}
-              </p>
-            )}
+            <InlineEditableText
+              value={cust.customProjectSummaryParagraph2}
+              defaultValue={defaultParagraph2}
+              onSave={(val) => updateDocumentCustomization?.({ customProjectSummaryParagraph2: val })}
+              isEditMode={isEditMode}
+              multiline={true}
+              label="Párrafo 2 (Equipos y Alcance de Instalación)"
+              className="text-slate-700 text-[11.5px] font-medium block whitespace-pre-line leading-relaxed text-justify"
+              boldClassName="text-slate-950 font-bold"
+              isCustomized={!!cust.customProjectSummaryParagraph2}
+              onReset={() => updateDocumentCustomization?.({ customProjectSummaryParagraph2: '' })}
+            />
           </div>
 
           {/* Quick Metrics Cards */}
@@ -207,9 +211,18 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
           </div>
 
           <div className="space-y-2 text-amber-950/90 text-[11.5px] leading-relaxed text-justify font-medium">
-            {paragraphs.map((p, idx) => (
-              <p key={idx}>{renderFormattedMarkdown(p, 'font-bold text-amber-950')}</p>
-            ))}
+            <InlineEditableText
+              value={cust.regulatoryNote}
+              defaultValue={defaultRegulatoryText}
+              onSave={(val) => updateDocumentCustomization?.({ regulatoryNote: val })}
+              isEditMode={isEditMode}
+              multiline={true}
+              label="Marco Regulatorio SIE (Párrafos)"
+              className="text-amber-950/90 text-[11.5px] leading-relaxed text-justify font-medium block whitespace-pre-line"
+              boldClassName="font-bold text-amber-950"
+              isCustomized={!!(cust.regulatoryNote && cust.regulatoryNote !== DEFAULT_DOCUMENT_CUSTOMIZATION.regulatoryNote)}
+              onReset={() => updateDocumentCustomization?.({ regulatoryNote: DEFAULT_DOCUMENT_CUSTOMIZATION.regulatoryNote })}
+            />
           </div>
         </div>
       </div>

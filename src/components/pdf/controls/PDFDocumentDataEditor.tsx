@@ -14,6 +14,7 @@ import {
   ListPlus,
   PlusCircle,
   FileText,
+  Pencil,
 } from 'lucide-react';
 import { ProjectSimulation, DocumentCustomization, ExtraTOCItem } from '../../../types';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
@@ -29,6 +30,8 @@ interface PDFDocumentDataEditorProps {
   updateClient: (client: Partial<ProjectSimulation['client']>) => void;
   updateSpecs: (specs: Partial<ProjectSimulation['specs']>) => void;
   updateDocumentCustomization: (customization: Partial<DocumentCustomization>) => void;
+  isEditMode: boolean;
+  setIsEditMode: (val: boolean) => void;
 }
 
 export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
@@ -37,6 +40,8 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
   updateClient,
   updateSpecs,
   updateDocumentCustomization,
+  isEditMode,
+  setIsEditMode,
 }) => {
   const cust = project.customization || {};
 
@@ -158,6 +163,55 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
 
   return (
     <div className="space-y-3">
+      {/* MASTER TOGGLE: MODO EDICIÓN EN VIVO */}
+      <div className={`p-3.5 rounded-2xl border shadow-sm transition-all ${
+        isEditMode
+          ? 'bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 text-white border-blue-400/50 shadow-blue-900/20'
+          : isDark
+          ? 'bg-[#1e1e2a] border-[#2e2e40] text-zinc-200'
+          : 'bg-gradient-to-br from-slate-50 to-blue-50/50 border-blue-200 text-slate-800'
+      }`}>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className={`w-7 h-7 rounded-xl flex items-center justify-center shadow-xs ${isEditMode ? 'bg-white/20 text-amber-300' : 'bg-blue-600 text-white'}`}>
+              <Pencil className="w-3.5 h-3.5" />
+            </div>
+            <div>
+              <span className={`text-xs font-black uppercase tracking-tight block ${isEditMode ? 'text-white' : isDark ? 'text-white' : 'text-slate-900'}`}>
+                Modo Edición en Vivo
+              </span>
+              <span className={`text-[10px] font-semibold block ${isEditMode ? 'text-blue-100' : isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                {isEditMode ? '🟢 Edición directa en la preview' : '⚪ Edición directa inactiva'}
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsEditMode(!isEditMode)}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+              isEditMode ? 'bg-emerald-400' : isDark ? 'bg-[#323242]' : 'bg-slate-300'
+            }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                isEditMode ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
+
+        <p className={`text-[11px] mt-2.5 leading-relaxed ${isEditMode ? 'text-blue-100' : isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+          {isEditMode ? (
+            <>
+              ✨ <strong>¡Haz clic en cualquier texto de la preview!</strong> Edita subtítulos, párrafos de ingeniería y notas directamente sobre la hoja A4.
+            </>
+          ) : (
+            'Activa este modo para hacer clic sobre cualquier párrafo o título del PDF y editarlo en tiempo real.'
+          )}
+        </p>
+      </div>
+
       {/* 1. SECCIÓN: IDENTIDAD DE LA EMPRESA EMISORA Y LOGOS */}
       <div className={`rounded-xl border overflow-hidden transition-all ${isDark ? 'border-[#2a2a36] bg-[#1a1a24]' : 'border-slate-200 bg-white'}`}>
         <button

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
+import { ProjectSimulation, FinancialSummaryResult, DocumentCustomization } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
 import { PDFHeaderBanner } from '../PDFHeaderBanner';
 import { PDFFooter } from '../PDFFooter';
@@ -7,6 +7,8 @@ import { PDFWatermark } from '../PDFWatermark';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
 import { Wrench, Activity, LineChart, Sparkles, Award, Shield, Users } from 'lucide-react';
 import { renderFormattedMarkdown } from '../../../utils/textFormatter';
+
+import { InlineEditableText } from '../common/InlineEditableText';
 
 interface PDFAboutUsPageProps {
   project: ProjectSimulation;
@@ -16,6 +18,8 @@ interface PDFAboutUsPageProps {
   currentDateStr: string;
   pageNum: number;
   totalPages: number;
+  isEditMode?: boolean;
+  updateDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
 }
 
 export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
@@ -26,6 +30,8 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
   currentDateStr,
   pageNum,
   totalPages,
+  isEditMode = false,
+  updateDocumentCustomization,
 }) => {
   const cust = project.customization || {};
   const companyName = cust.companyName || DEFAULT_DOCUMENT_CUSTOMIZATION.companyName || 'ELECTSUN';
@@ -80,9 +86,20 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
           >
             1. ¿QUIÉNES SOMOS?
           </div>
-          <p className="text-slate-700 text-[11.5px] leading-relaxed text-justify font-medium pt-0.5">
-            {renderFormattedMarkdown(aboutUsIntroText, 'text-slate-950 font-bold')}
-          </p>
+          <div className="pt-0.5">
+            <InlineEditableText
+              value={cust.aboutUsIntroText}
+              defaultValue={aboutUsIntroText}
+              onSave={(val) => updateDocumentCustomization?.({ aboutUsIntroText: val })}
+              isEditMode={isEditMode}
+              multiline={true}
+              label="Texto ¿Quiénes Somos?"
+              className="text-slate-700 text-[11.5px] leading-relaxed text-justify font-medium block whitespace-pre-line"
+              boldClassName="text-slate-950 font-bold"
+              isCustomized={!!cust.aboutUsIntroText}
+              onReset={() => updateDocumentCustomization?.({ aboutUsIntroText: '' })}
+            />
+          </div>
         </div>
 
         {/* NUESTROS SERVICIOS Grid */}
@@ -198,9 +215,18 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
 
         {/* Bloque Inferior: Transición + 1.1 ¿Por Qué Elegirnos? */}
         <div className="space-y-2.5">
-          <p className="text-slate-700 text-[11.5px] leading-relaxed text-left font-medium">
-            {renderFormattedMarkdown(aboutUsTransitionText, 'text-slate-950 font-bold')}
-          </p>
+          <InlineEditableText
+            value={cust.aboutUsTransitionText}
+            defaultValue={aboutUsTransitionText}
+            onSave={(val) => updateDocumentCustomization?.({ aboutUsTransitionText: val })}
+            isEditMode={isEditMode}
+            multiline={true}
+            label="Texto de Transición"
+            className="text-slate-700 text-[11.5px] leading-relaxed text-left font-medium block whitespace-pre-line"
+            boldClassName="text-slate-950 font-bold"
+            isCustomized={!!cust.aboutUsTransitionText}
+            onReset={() => updateDocumentCustomization?.({ aboutUsTransitionText: '' })}
+          />
 
           <div className="space-y-2">
             <div
@@ -213,9 +239,18 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
             >
               1.1 ¿POR QUÉ ELEGIRNOS?
             </div>
-            <p className="text-slate-700 text-[11.5px] leading-relaxed font-medium pt-0.5">
-              {renderFormattedMarkdown(whyChooseUsText, 'text-slate-950 font-bold')}
-            </p>
+            <InlineEditableText
+              value={cust.whyChooseUsText}
+              defaultValue={whyChooseUsText}
+              onSave={(val) => updateDocumentCustomization?.({ whyChooseUsText: val })}
+              isEditMode={isEditMode}
+              multiline={true}
+              label="Texto ¿Por Qué Elegirnos?"
+              className="text-slate-700 text-[11.5px] leading-relaxed font-medium block whitespace-pre-line pt-0.5"
+              boldClassName="text-slate-950 font-bold"
+              isCustomized={!!cust.whyChooseUsText}
+              onReset={() => updateDocumentCustomization?.({ whyChooseUsText: '' })}
+            />
 
             <div className="grid grid-cols-3 gap-3 pt-1">
               <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/90 space-y-1.5 shadow-xs">
