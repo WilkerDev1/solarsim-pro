@@ -500,6 +500,8 @@ export const PDFProposalView: React.FC = () => {
               currentDateStr={currentDateStr}
               pageNum={pageBenefitsNum}
               totalPages={activePagesCount}
+              isEditMode={isEditMode}
+              updateDocumentCustomization={updateDocumentCustomization}
             />
           )}
 
@@ -513,6 +515,8 @@ export const PDFProposalView: React.FC = () => {
               currentDateStr={currentDateStr}
               pageNum={pageTechIntroNum}
               totalPages={activePagesCount}
+              isEditMode={isEditMode}
+              updateDocumentCustomization={updateDocumentCustomization}
             />
           )}
 

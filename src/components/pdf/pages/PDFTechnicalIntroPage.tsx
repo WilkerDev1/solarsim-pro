@@ -1,10 +1,12 @@
 import React from 'react';
-import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
+import { ProjectSimulation, FinancialSummaryResult, DocumentCustomization } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
 import { PDFHeaderBanner } from '../PDFHeaderBanner';
 import { PDFFooter } from '../PDFFooter';
 import { PDFWatermark } from '../PDFWatermark';
 import { PDF_ROOF_DETAIL_BASE64, PDF_FLOW_DIAGRAM_BASE64 } from '../../../assets/pdfGraphicAssets';
+import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
+import { InlineEditableText } from '../common/InlineEditableText';
 
 interface PDFTechnicalIntroPageProps {
   project: ProjectSimulation;
@@ -14,6 +16,8 @@ interface PDFTechnicalIntroPageProps {
   currentDateStr: string;
   pageNum: number;
   totalPages: number;
+  isEditMode?: boolean;
+  updateDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
 }
 
 export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
@@ -24,7 +28,11 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
   currentDateStr,
   pageNum,
   totalPages,
+  isEditMode = false,
+  updateDocumentCustomization,
 }) => {
+  const cust = project.customization || {};
+
   return (
     <div className="pdf-page w-[850px] h-[1202px] min-h-[1202px] max-h-[1202px] bg-white shadow-xl flex flex-col shrink-0 relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
       {/* Background Watermark */}
@@ -61,9 +69,18 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
           >
             3. ¿QUÉ ES UN SISTEMA FOTOVOLTAICO?
           </div>
-          <p className="text-slate-700 text-[11.5px] leading-relaxed text-justify font-medium">
-            Un sistema fotovoltaico es el conjunto integrado de equipos diseñados para capturar la energía proveniente del sol y transformarla en electricidad utilizable. Su funcionamiento se fundamenta en la capacidad de las celdas fotovoltaicas para convertir la radiación solar directamente en energía eléctrica.
-          </p>
+          <InlineEditableText
+            value={cust.techIntroWhatIsText}
+            defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.techIntroWhatIsText}
+            onSave={(val) => updateDocumentCustomization?.({ techIntroWhatIsText: val })}
+            isEditMode={isEditMode}
+            multiline={true}
+            label="¿Qué es un Sistema FV? (Párrafo)"
+            className="text-slate-700 text-[11.5px] leading-relaxed text-justify font-medium block whitespace-pre-line"
+            boldClassName="text-slate-950 font-bold"
+            isCustomized={!!cust.techIntroWhatIsText}
+            onReset={() => updateDocumentCustomization?.({ techIntroWhatIsText: '' })}
+          />
 
           {/* 3D Roof Tile Solar Array Render (Frontal / Wide View) - Larger & Clearer */}
           <div className="w-full h-52 rounded-2xl border border-slate-200 overflow-hidden bg-slate-50/60 shadow-xs flex items-center justify-center p-3">
@@ -87,12 +104,30 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
           >
             3.1 ¿CÓMO FUNCIONA UN SISTEMA FOTOVOLTAICO?
           </div>
-          <p className="text-slate-700 text-[11.5px] leading-relaxed text-justify font-medium">
-            La cantidad de energía eléctrica producida está determinada por las horas de radiación solar disponibles, la cantidad e inclinación de los módulos fotovoltaicos instalados, la calidad de los componentes de ingeniería y la potencia nominal del inversor central o microinversores.
-          </p>
-          <p className="text-slate-700 text-[11.5px] leading-relaxed text-justify font-medium">
-            Las celdas fotovoltaicas absorben la radiación lumínica y generan corriente continua (CC), la cual es procesada instantáneamente por el inversor para convertirla en corriente alterna (CA) sincronizada con la red eléctrica y apta para todo el consumo de la propiedad.
-          </p>
+          <InlineEditableText
+            value={cust.techIntroHowItWorksParagraph1}
+            defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.techIntroHowItWorksParagraph1}
+            onSave={(val) => updateDocumentCustomization?.({ techIntroHowItWorksParagraph1: val })}
+            isEditMode={isEditMode}
+            multiline={true}
+            label="¿Cómo Funciona? (Párrafo 1)"
+            className="text-slate-700 text-[11.5px] leading-relaxed text-justify font-medium block whitespace-pre-line"
+            boldClassName="text-slate-950 font-bold"
+            isCustomized={!!cust.techIntroHowItWorksParagraph1}
+            onReset={() => updateDocumentCustomization?.({ techIntroHowItWorksParagraph1: '' })}
+          />
+          <InlineEditableText
+            value={cust.techIntroHowItWorksParagraph2}
+            defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.techIntroHowItWorksParagraph2}
+            onSave={(val) => updateDocumentCustomization?.({ techIntroHowItWorksParagraph2: val })}
+            isEditMode={isEditMode}
+            multiline={true}
+            label="¿Cómo Funciona? (Párrafo 2)"
+            className="text-slate-700 text-[11.5px] leading-relaxed text-justify font-medium block whitespace-pre-line"
+            boldClassName="text-slate-950 font-bold"
+            isCustomized={!!cust.techIntroHowItWorksParagraph2}
+            onReset={() => updateDocumentCustomization?.({ techIntroHowItWorksParagraph2: '' })}
+          />
         </div>
 
         {/* Section 4: Descripción Técnica (Flow Diagram) */}

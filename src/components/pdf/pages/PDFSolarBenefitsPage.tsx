@@ -1,11 +1,13 @@
 import React from 'react';
-import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
+import { ProjectSimulation, FinancialSummaryResult, DocumentCustomization } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
 import { PDFHeaderBanner } from '../PDFHeaderBanner';
 import { PDFFooter } from '../PDFFooter';
 import { PDFWatermark } from '../PDFWatermark';
 import { PDF_BENEFITS_HOUSE_BASE64 } from '../../../assets/pdfGraphicAssets';
 import { Sun, DollarSign, Leaf, Globe2, ShieldCheck, CheckCircle2, TrendingUp, Zap } from 'lucide-react';
+import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
+import { InlineEditableText } from '../common/InlineEditableText';
 
 interface PDFSolarBenefitsPageProps {
   project: ProjectSimulation;
@@ -15,6 +17,8 @@ interface PDFSolarBenefitsPageProps {
   currentDateStr: string;
   pageNum: number;
   totalPages: number;
+  isEditMode?: boolean;
+  updateDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
 }
 
 export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
@@ -25,7 +29,10 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
   currentDateStr,
   pageNum,
   totalPages,
+  isEditMode = false,
+  updateDocumentCustomization,
 }) => {
+  const cust = project.customization || {};
   return (
     <div className="pdf-page w-[850px] h-[1202px] min-h-[1202px] max-h-[1202px] bg-white shadow-xl flex flex-col shrink-0 relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
       {/* Background Watermark */}
@@ -136,9 +143,18 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
             2.1. OBJETIVOS E INCENTIVOS DE LA LEY 57-07 DE ENERGÍAS RENOVABLES
           </div>
 
-          <p className="text-slate-700 text-[11.5px] leading-relaxed font-medium">
-            La <strong>Ley 57-07 sobre Incentivo al Desarrollo de Fuentes Renovables de Energía</strong> fue promulgada para transformar la matriz energética nacional y acelerar la transición hacia un modelo sostenible y soberano. Sus principales objetivos y beneficios son:
-          </p>
+          <InlineEditableText
+            value={cust.ley5707ObjectivesIntroText}
+            defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.ley5707ObjectivesIntroText}
+            onSave={(val) => updateDocumentCustomization?.({ ley5707ObjectivesIntroText: val })}
+            isEditMode={isEditMode}
+            multiline={true}
+            label="Objetivos Ley 57-07 (Intro)"
+            className="text-slate-700 text-[11.5px] leading-relaxed font-medium block whitespace-pre-line"
+            boldClassName="text-slate-950 font-bold"
+            isCustomized={!!cust.ley5707ObjectivesIntroText}
+            onReset={() => updateDocumentCustomization?.({ ley5707ObjectivesIntroText: '' })}
+          />
 
           <div className="grid grid-cols-2 gap-3.5">
             <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/90 flex items-start gap-3 shadow-xs">
