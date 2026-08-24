@@ -215,6 +215,12 @@ export interface DocumentCustomization {
   whyChooseUsText?: string;       // Default: 'En ELECTSUN, nuestra misión es brindarte soluciones solares...'
   regulatoryNote?: string;        // Default: Resolucion SIE-007-2026-REG & BTS1/BTS2 net metering notes
 
+  // Project Description & Technical Proposal (Page 4 / 6)
+  projectSummarySubtitle?: string;           // Default: 'Criterios de dimensionamiento técnico para {client}'
+  projectEngineeringScopeText?: string;      // Default: 'junto con todos los componentes de ingeniería complementarios (estructuras de montaje en aluminio anodizado de alta resistencia, cableado fotovoltaico resistente a rayos UV, protecciones en CC/CA, interruptores de desconexión y supresores de sobretensión) para garantizar un funcionamiento seguro, eficiente y duradero del sistema.'
+  customProjectSummaryParagraph1?: string;   // Optional full override for paragraph 1
+  customProjectSummaryParagraph2?: string;   // Optional full override for paragraph 2
+
   // Custom Extra Table of Contents Items (Appended Annexes / Extra Pages)
   extraTocItems?: ExtraTOCItem[];
 }

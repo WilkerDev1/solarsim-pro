@@ -13,6 +13,7 @@ import {
   Trash2,
   ListPlus,
   PlusCircle,
+  FileText,
 } from 'lucide-react';
 import { ProjectSimulation, DocumentCustomization, ExtraTOCItem } from '../../../types';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
@@ -45,7 +46,9 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
   const watermarkInputRef = useRef<HTMLInputElement>(null);
 
   // Accordion state
-  const [openSection, setOpenSection] = useState<'company' | 'contact' | 'warranties' | 'services' | 'hardware' | 'annexes'>('company');
+  const [openSection, setOpenSection] = useState<
+    'company' | 'contact' | 'warranties' | 'services' | 'hardware' | 'about' | 'projectDescription' | 'annexes'
+  >('company');
 
   // Extra TOC Item Form State
   const [newExtraTitle, setNewExtraTitle] = useState('');
@@ -95,7 +98,9 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
     });
   };
 
-  const toggleSection = (section: 'company' | 'contact' | 'warranties' | 'services' | 'hardware' | 'annexes') => {
+  const toggleSection = (
+    section: 'company' | 'contact' | 'warranties' | 'services' | 'hardware' | 'about' | 'projectDescription' | 'annexes'
+  ) => {
     setOpenSection(openSection === section ? ('' as any) : section);
   };
 
@@ -911,27 +916,193 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                 }`}
               />
             </div>
+          </div>
+        )}
+      </div>
 
+      {/* 7. SECCIÓN: DESCRIPCIÓN DEL PROYECTO & NORMATIVA SIE (PÁGINA 6) */}
+      <div className={`rounded-xl border overflow-hidden transition-all ${isDark ? 'border-[#2a2a36] bg-[#1a1a24]' : 'border-slate-200 bg-white'}`}>
+        <button
+          type="button"
+          onClick={() => toggleSection('projectDescription')}
+          className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors ${
+            isDark ? 'text-zinc-200 hover:bg-[#222230]' : 'text-slate-800 hover:bg-slate-50'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-blue-500 shrink-0" />
+            <span>7. Descripción del Proyecto & Normativa (Pág. 6)</span>
+          </div>
+          {openSection === 'projectDescription' ? (
+            <ChevronUp className="w-4 h-4 text-zinc-400" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-zinc-400" />
+          )}
+        </button>
+
+        {openSection === 'projectDescription' && (
+          <div className={`p-3 pt-1 space-y-3 border-t text-xs ${isDark ? 'border-[#2a2a36] bg-[#14141d]' : 'border-slate-200 bg-slate-50/50'}`}>
+            <p className={`text-[11px] leading-relaxed ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+              Personaliza los textos explicativos y el alcance técnico de ingeniería que complementan a los equipos y cálculos automáticos en la <strong className={isDark ? 'text-zinc-200' : 'text-slate-800'}>Página 6 (4. Descripción del Proyecto)</strong>.
+            </p>
+
+            {/* Subtítulo de Resumen Técnico */}
             <div>
               <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                Nota Regulatoria & Normativa SIE (Pág. Descripción del Proyecto)
+                Subtítulo del Resumen Técnico
               </label>
-              <textarea
-                rows={4}
-                value={cust.regulatoryNote !== undefined ? cust.regulatoryNote : DEFAULT_DOCUMENT_CUSTOMIZATION.regulatoryNote}
-                onChange={(e) => updateDocumentCustomization({ regulatoryNote: e.target.value })}
+              <input
+                type="text"
+                value={cust.projectSummarySubtitle || ''}
+                onChange={(e) => updateDocumentCustomization({ projectSummarySubtitle: e.target.value })}
+                placeholder={`Criterios de dimensionamiento técnico para ${project.client.name || 'Cliente'}`}
                 className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
                   isDark
-                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                    : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
+                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-blue-500'
+                    : 'bg-white border-slate-300 text-slate-900 focus:border-blue-600'
                 }`}
               />
+              <span className="text-[10px] text-zinc-500 block mt-0.5">
+                Si se deja en blanco, usa el valor automático con el nombre del cliente.
+              </span>
+            </div>
+
+            {/* Componentes de Ingeniería y Alcance Técnico (Párrafo 2) */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className={`block text-[10px] font-bold uppercase ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                  Componentes de Ingeniería y Estructuras (Párrafo 2)
+                </label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateDocumentCustomization({
+                      projectEngineeringScopeText: DEFAULT_DOCUMENT_CUSTOMIZATION.projectEngineeringScopeText,
+                    })
+                  }
+                  className="text-[10px] text-blue-500 hover:text-blue-400 font-semibold flex items-center gap-1 cursor-pointer"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Restablecer
+                </button>
+              </div>
+              <textarea
+                rows={4}
+                value={
+                  cust.projectEngineeringScopeText !== undefined
+                    ? cust.projectEngineeringScopeText
+                    : DEFAULT_DOCUMENT_CUSTOMIZATION.projectEngineeringScopeText
+                }
+                onChange={(e) => updateDocumentCustomization({ projectEngineeringScopeText: e.target.value })}
+                placeholder="junto con todos los componentes de ingeniería complementarios..."
+                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors leading-relaxed ${
+                  isDark
+                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-blue-500'
+                    : 'bg-white border-slate-300 text-slate-900 focus:border-blue-600'
+                }`}
+              />
+              <span className="text-[10px] text-zinc-500 block mt-0.5">
+                Texto explicativo que se concatena después de los inversores y baterías (ej. estructuras, cableado, protecciones CC/CA).
+              </span>
+            </div>
+
+            {/* Marco Regulatorio y Normativa SIE (Caja Amarilla) */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className={`block text-[10px] font-bold uppercase ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                  Marco Regulatorio & Normativa SIE (Caja Informativa)
+                </label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateDocumentCustomization({
+                      regulatoryNote: DEFAULT_DOCUMENT_CUSTOMIZATION.regulatoryNote,
+                    })
+                  }
+                  className="text-[10px] text-blue-500 hover:text-blue-400 font-semibold flex items-center gap-1 cursor-pointer"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Restablecer
+                </button>
+              </div>
+              <textarea
+                rows={5}
+                value={cust.regulatoryNote !== undefined ? cust.regulatoryNote : DEFAULT_DOCUMENT_CUSTOMIZATION.regulatoryNote}
+                onChange={(e) => updateDocumentCustomization({ regulatoryNote: e.target.value })}
+                placeholder="Párrafos de la resolución SIE-007 y condiciones de medición neta..."
+                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors leading-relaxed ${
+                  isDark
+                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-blue-500'
+                    : 'bg-white border-slate-300 text-slate-900 focus:border-blue-600'
+                }`}
+              />
+              <span className="text-[10px] text-zinc-500 block mt-0.5">
+                Separa los párrafos con un salto de línea doble para mostrarlos como párrafos independientes en la caja informativa.
+              </span>
+            </div>
+
+            {/* Párrafos Personalizados Completos (Modo Libre / Avanzado) */}
+            <div className={`p-2.5 rounded-lg border ${isDark ? 'bg-[#181824] border-[#2c2c3e]' : 'bg-slate-100 border-slate-200'} space-y-2`}>
+              <div className="flex items-center justify-between">
+                <span className={`text-[10px] font-bold uppercase ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
+                  ✍️ Sobreescritura Libre de Párrafos (Opcional)
+                </span>
+                {(cust.customProjectSummaryParagraph1 || cust.customProjectSummaryParagraph2) && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateDocumentCustomization({
+                        customProjectSummaryParagraph1: '',
+                        customProjectSummaryParagraph2: '',
+                      })
+                    }
+                    className="text-[10px] text-amber-500 hover:text-amber-400 font-semibold flex items-center gap-1 cursor-pointer"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    Limpiar
+                  </button>
+                )}
+              </div>
+
+              <div>
+                <label className={`block text-[10px] font-bold mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                  Sobreescribir Párrafo 1 (Resumen de Consumo y Producción):
+                </label>
+                <textarea
+                  rows={3}
+                  value={cust.customProjectSummaryParagraph1 || ''}
+                  onChange={(e) => updateDocumentCustomization({ customProjectSummaryParagraph1: e.target.value })}
+                  placeholder="Si deseas redactar tu propio Párrafo 1 completo en lugar del generado automáticamente..."
+                  className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
+                    isDark
+                      ? 'bg-[#20202c] border-[#343446] text-white focus:border-amber-500'
+                      : 'bg-white border-slate-300 text-slate-900 focus:border-amber-600'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`block text-[10px] font-bold mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                  Sobreescribir Párrafo 2 (Equipos y Alcance de Instalación):
+                </label>
+                <textarea
+                  rows={3}
+                  value={cust.customProjectSummaryParagraph2 || ''}
+                  onChange={(e) => updateDocumentCustomization({ customProjectSummaryParagraph2: e.target.value })}
+                  placeholder="Si deseas redactar tu propio Párrafo 2 completo en lugar del generado automáticamente..."
+                  className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
+                    isDark
+                      ? 'bg-[#20202c] border-[#343446] text-white focus:border-amber-500'
+                      : 'bg-white border-slate-300 text-slate-900 focus:border-amber-600'
+                  }`}
+                />
+              </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* 6. SECCIÓN: Puntos Extra del Índice / Anexos */}
+      {/* 8. SECCIÓN: Puntos Extra del Índice / Anexos */}
       <div
         className={`rounded-xl border overflow-hidden transition-all ${
           isDark ? 'border-[#27272a] bg-[#16161e]' : 'border-slate-200 bg-white shadow-xs'
@@ -946,7 +1117,7 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
         >
           <div className="flex items-center gap-2">
             <ListPlus className="w-4 h-4 text-amber-500 shrink-0" />
-            <span>6. Anexos y Puntos Extra del Índice</span>
+            <span>8. Anexos y Puntos Extra del Índice</span>
           </div>
           <div className="flex items-center gap-2">
             <span

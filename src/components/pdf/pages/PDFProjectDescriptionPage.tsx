@@ -105,31 +105,48 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
                 Resumen Ejecutivo de la Solución Propuesta
               </h2>
               <span className="text-[10px] text-slate-500 font-semibold">
-                Criterios de dimensionamiento técnico para {clientName}
+                {cust.projectSummarySubtitle && cust.projectSummarySubtitle.trim()
+                  ? cust.projectSummarySubtitle.trim()
+                  : `Criterios de dimensionamiento técnico para ${clientName}`}
               </span>
             </div>
           </div>
 
           <div className="p-4 rounded-2xl border border-slate-200 bg-white shadow-xs space-y-3 leading-relaxed text-justify">
-            <p className="text-slate-700 text-[11.5px] font-medium">
-              El consumo promedio anual de <strong className="text-slate-950 font-bold">{clientName}</strong> es de{' '}
-              <strong className="text-slate-950 font-mono font-bold">{summary.annualConsumptionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh</strong>, por lo que se le propone la instalación de{' '}
-              <strong className="font-bold text-slate-950">{project.specs.panelCount} {panelModel}</strong>, alcanzando una potencia DC instalada de{' '}
-              <strong className="font-bold font-mono text-slate-950" style={{ color: activeTheme.primary }}>
-                {summary.systemCapacityKWp.toFixed(2)} kWp
-              </strong>. La producción energética estimada para este sistema es de{' '}
-              <strong className="font-bold font-mono text-slate-950">{summary.annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh anuales</strong>, representando el{' '}
-              <strong className="font-bold text-emerald-700">{summary.energyCoveragePct.toFixed(1)}%</strong> del consumo total del cliente.
-            </p>
+            {cust.customProjectSummaryParagraph1 && cust.customProjectSummaryParagraph1.trim() ? (
+              <p className="text-slate-700 text-[11.5px] font-medium whitespace-pre-line">
+                {cust.customProjectSummaryParagraph1.trim()}
+              </p>
+            ) : (
+              <p className="text-slate-700 text-[11.5px] font-medium">
+                El consumo promedio anual de <strong className="text-slate-950 font-bold">{clientName}</strong> es de{' '}
+                <strong className="text-slate-950 font-mono font-bold">{summary.annualConsumptionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh</strong>, por lo que se le propone la instalación de{' '}
+                <strong className="font-bold text-slate-950">{project.specs.panelCount} {panelModel}</strong>, alcanzando una potencia DC instalada de{' '}
+                <strong className="font-bold font-mono text-slate-950" style={{ color: activeTheme.primary }}>
+                  {summary.systemCapacityKWp.toFixed(2)} kWp
+                </strong>. La producción energética estimada para este sistema es de{' '}
+                <strong className="font-bold font-mono text-slate-950">{summary.annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh anuales</strong>, representando el{' '}
+                <strong className="font-bold text-emerald-700">{summary.energyCoveragePct.toFixed(1)}%</strong> del consumo total del cliente.
+              </p>
+            )}
 
-            <p className="text-slate-700 text-[11.5px] font-medium">
-              Adicionalmente, se contempla la instalación de <strong className="text-slate-950 font-bold">{project.specs.inverterCount || 1} {inverterModel}</strong>
-              {project.specs.hasBattery && project.specs.batteryCapacityKWh > 0 ? (
-                <>
-                  {' '}y <strong className="text-slate-950 font-bold">{project.specs.batteryCount || 1} {batteryModel}</strong>
-                </>
-              ) : ''}, junto con todos los componentes de ingeniería complementarios (estructuras de montaje en aluminio anodizado de alta resistencia, cableado fotovoltaico resistente a rayos UV, protecciones en CC/CA, interruptores de desconexión y supresores de sobretensión) para garantizar un funcionamiento seguro, eficiente y duradero del sistema.
-            </p>
+            {cust.customProjectSummaryParagraph2 && cust.customProjectSummaryParagraph2.trim() ? (
+              <p className="text-slate-700 text-[11.5px] font-medium whitespace-pre-line">
+                {cust.customProjectSummaryParagraph2.trim()}
+              </p>
+            ) : (
+              <p className="text-slate-700 text-[11.5px] font-medium">
+                Adicionalmente, se contempla la instalación de <strong className="text-slate-950 font-bold">{project.specs.inverterCount || 1} {inverterModel}</strong>
+                {project.specs.hasBattery && project.specs.batteryCapacityKWh > 0 ? (
+                  <>
+                    {' '}y <strong className="text-slate-950 font-bold">{project.specs.batteryCount || 1} {batteryModel}</strong>
+                  </>
+                ) : ''}{' '}
+                {cust.projectEngineeringScopeText !== undefined && cust.projectEngineeringScopeText.trim() !== ''
+                  ? cust.projectEngineeringScopeText.trim()
+                  : DEFAULT_DOCUMENT_CUSTOMIZATION.projectEngineeringScopeText}
+              </p>
+            )}
           </div>
 
           {/* Quick Metrics Cards */}
