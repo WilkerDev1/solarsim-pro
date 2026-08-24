@@ -71,6 +71,14 @@ export class ShareProposalService {
           batteryWarrantyText: project.customization?.batteryWarrantyText,
           workmanshipWarrantyText: project.customization?.workmanshipWarrantyText,
           servicesIncludedText: project.customization?.servicesIncludedText,
+          // Page 6 & Custom engineering descriptions
+          projectSummarySubtitle: project.customization?.projectSummarySubtitle,
+          projectEngineeringScopeText: project.customization?.projectEngineeringScopeText,
+          customProjectSummaryParagraph1: project.customization?.customProjectSummaryParagraph1,
+          customProjectSummaryParagraph2: project.customization?.customProjectSummaryParagraph2,
+          aboutUsIntroText: project.customization?.aboutUsIntroText,
+          aboutUsTransitionText: project.customization?.aboutUsTransitionText,
+          whyChooseUsText: project.customization?.whyChooseUsText,
         },
       };
 

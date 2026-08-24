@@ -1,6 +1,11 @@
 import { StoredProposal } from './types';
 import { ELECTSUN_LOGO_COLOR_BASE64 } from './electsunLogo';
 
+function formatMarkdown(text?: string | null, boldClass = 'font-bold text-slate-950'): string {
+  if (!text) return '';
+  return text.replace(/\*\*([^*]+)\*\*/g, `<strong class="${boldClass}">$1</strong>`);
+}
+
 export function renderExpiredPage(companyName = 'electsun', companyPhone = '+1 (809) 378-6590'): string {
   return `<!DOCTYPE html>
 <html lang="es" class="h-full bg-slate-100 text-slate-900">
@@ -242,11 +247,8 @@ export function renderProposalPage(stored: StoredProposal): string {
           <div><span class="font-bold text-slate-500">Teléfono:</span> <span class="font-semibold text-slate-800">${clientPhone}</span></div>
           <div><span class="font-bold text-slate-500">Ubicación:</span> <span class="font-semibold text-slate-800">${clientAddress}</span></div>
         </div>
-
         <div class="space-y-1.5 md:text-right">
-          <div class="text-[11px] font-black uppercase text-orange-600 tracking-wider flex items-center justify-start md:justify-end gap-1.5">
-            <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span> Detalles de la Cotización
-          </div>
+          <div class="text-[11px] font-black uppercase text-orange-600 tracking-wider flex items-center justify-start md:justify-end gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span> Detalles de la Cotización</div>
           <div><span class="font-bold text-slate-500">N° Cotización:</span> <span class="font-mono font-bold text-slate-950">${quoteNumber}</span></div>
           <div><span class="font-bold text-slate-500">ID Proyecto:</span> <span class="font-mono font-bold text-slate-950">${projectId}</span></div>
           <div><span class="font-bold text-slate-500">Distribuidora / Tarifa:</span> <span class="font-bold text-sky-900">${distributor} • ${tariffCode}</span></div>
@@ -255,7 +257,6 @@ export function renderProposalPage(stored: StoredProposal): string {
       </div>
     </header>
 
-    <!-- 2. RESUMEN EJECUTIVO & DESCRIPCIÓN TÉCNICA DEL PROYECTO -->
     <section class="bg-white border border-sky-100 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
       <div class="border-b border-slate-100 pb-3 flex items-center justify-between">
         <div>
@@ -263,24 +264,28 @@ export function renderProposalPage(stored: StoredProposal): string {
             <span class="w-2.5 h-2.5 rounded-sm bg-orange-500"></span>
             1. Resumen Ejecutivo de la Solución Propuesta
           </h2>
-          <p class="text-xs text-slate-500 font-medium">Criterios de dimensionamiento técnico y solar para ${clientName}</p>
+          <p class="text-xs text-slate-500 font-medium">${formatMarkdown(projectSummarySubtitle, 'font-bold text-slate-700')}</p>
         </div>
-        <span class="hidden sm:inline-block px-3 py-1 rounded-full bg-sky-50 text-sky-800 text-[10px] font-bold uppercase tracking-wider border border-sky-200">
-          Ingeniería Certificada
-        </span>
+        <span class="hidden sm:inline-block px-3 py-1 rounded-full bg-sky-50 text-sky-800 text-[10px] font-bold uppercase tracking-wider border border-sky-200">Ingeniería Certificada</span>
       </div>
 
-      <!-- Narrative Technical Paragraphs (Identical to PDF Page 6) -->
       <div class="space-y-3.5 text-xs text-slate-700 leading-relaxed text-justify">
+        ${customP1 ? `
+        <p class="whitespace-pre-line">${formatMarkdown(customP1)}</p>
+        ` : `
         <p>
           El consumo promedio anual de <strong class="text-slate-950 font-bold">${clientName}</strong> es de <strong class="text-slate-950 font-mono font-bold">${annualConsumptionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh</strong> (aprox. ${monthlyAvgConsumption.toLocaleString()} kWh/mes), por lo que se le propone la instalación de <strong class="font-bold text-slate-950">${panelCount} ${panelBrandModel} (${panelPowerW}W)</strong>, alcanzando una potencia DC instalada de <strong class="font-black font-mono text-orange-600">${systemCapacityKWp} kWp</strong>. La producción energética estimada para este sistema es de <strong class="font-bold font-mono text-slate-950">${annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh anuales</strong>, representando el <strong class="font-black text-sky-700">${coveragePct.toFixed(1)}%</strong> de cobertura del consumo total.
         </p>
+        `}
+        ${customP2 ? `
+        <p class="whitespace-pre-line">${formatMarkdown(customP2)}</p>
+        ` : `
         <p>
-          Adicionalmente, se contempla la instalación de <strong class="text-slate-950 font-bold">${inverterCount} ${inverterBrandModel} (${inverterPowerKW} kW)</strong>${hasBattery && batteryCapacityKWh > 0 ? ` y <strong class="text-slate-950 font-bold">${batteryCount} ${batteryBrandModel} (${batteryCapacityKWh} kWh)</strong>` : ''}, junto con todos los componentes de ingeniería complementarios (${installationServicesDesc}).
+          Adicionalmente, se contempla la instalación de <strong class="text-slate-950 font-bold">${inverterCount} ${inverterBrandModel} (${inverterPowerKW} kW)</strong>${hasBattery && batteryCapacityKWh > 0 ? ` y <strong class="text-slate-950 font-bold">${batteryCount} ${batteryBrandModel} (${batteryCapacityKWh} kWh)</strong>` : ''}, ${formatMarkdown(engineeringScopeText)}.
         </p>
+        `}
       </div>
 
-      <!-- 3 Key Metric Highlights Cards (Azul Claro + Naranja Solar) -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-2">
         <div class="bg-orange-50/70 border border-orange-200/90 rounded-2xl p-4 flex items-center gap-3.5">
           <div class="w-11 h-11 rounded-2xl bg-orange-500 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-orange-500/20 shrink-0">⚡</div>
@@ -289,7 +294,6 @@ export function renderProposalPage(stored: StoredProposal): string {
             <span class="text-base font-black font-mono text-slate-900">${systemCapacityKWp} kWp</span>
           </div>
         </div>
-
         <div class="bg-sky-50/80 border border-sky-200 rounded-2xl p-4 flex items-center gap-3.5">
           <div class="w-11 h-11 rounded-2xl bg-sky-600 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-sky-600/20 shrink-0">📈</div>
           <div>
@@ -297,7 +301,6 @@ export function renderProposalPage(stored: StoredProposal): string {
             <span class="text-base font-black font-mono text-sky-700">${coveragePct.toFixed(1)}% Anual</span>
           </div>
         </div>
-
         <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center gap-3.5">
           <div class="w-11 h-11 rounded-2xl bg-slate-800 text-white flex items-center justify-center font-bold text-lg shadow-md shrink-0">☀️</div>
           <div>
@@ -307,17 +310,13 @@ export function renderProposalPage(stored: StoredProposal): string {
         </div>
       </div>
 
-      <!-- Regulatory & SIE Callout Box (Yellow/Orange Tint) -->
       <div class="rounded-2xl border-2 border-orange-200 bg-orange-50/90 p-4 space-y-2 text-xs text-orange-950">
         <div class="font-black uppercase tracking-wider text-[11px] flex items-center gap-2 text-orange-900">
           <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
           Marco Regulatorio y Condiciones de Operación (SIE / EDES)
         </div>
         <div class="space-y-1.5 text-[11px] leading-relaxed text-justify">
-          <p>${regP1}</p>
-          <p>${regP2}</p>
-          <p>${regP3}</p>
-          <p>${regP4}</p>
+          ${regParagraphs.map((p) => `<p>${formatMarkdown(p, 'font-bold text-orange-950')}</p>`).join('\n')}
         </div>
       </div>
     </section>
