@@ -259,19 +259,75 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
 
         {/* GARANTÍAS Y NOS ENCARGAMOS DE GESTIONAR GRID */}
         <div className="grid grid-cols-2 gap-3">
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 space-y-0.5 text-[10.5px]">
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 space-y-1 text-[10.5px]">
             <h4
               className="font-bold border-b border-slate-200 pb-0.5 mb-0.5 uppercase tracking-wider flex items-center gap-1.5"
               style={{ color: activeTheme.primary }}
             >
               <ShieldCheck className="w-3.5 h-3.5" /> GARANTÍAS
             </h4>
-            <div>• <span className="font-bold">Paneles Solares:</span> {panelWarranty}</div>
-            <div>• <span className="font-bold">Inversor:</span> {inverterWarranty}</div>
+            <div className="flex items-center gap-1 leading-snug">
+              <span className="font-bold text-slate-800 shrink-0">• Paneles Solares:</span>
+              <InlineEditableText
+                value={cust.panelWarrantyText}
+                defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.panelWarrantyText}
+                onSave={(val) => updateDocumentCustomization?.({ panelWarrantyText: val })}
+                isEditMode={isEditMode}
+                multiline={false}
+                label="Garantía Paneles"
+                className="font-medium inline-block"
+                boldClassName="font-bold text-slate-950"
+                isCustomized={!!cust.panelWarrantyText}
+                onReset={() => updateDocumentCustomization?.({ panelWarrantyText: '' })}
+              />
+            </div>
+            <div className="flex items-center gap-1 leading-snug">
+              <span className="font-bold text-slate-800 shrink-0">• Inversor:</span>
+              <InlineEditableText
+                value={cust.inverterWarrantyText}
+                defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.inverterWarrantyText}
+                onSave={(val) => updateDocumentCustomization?.({ inverterWarrantyText: val })}
+                isEditMode={isEditMode}
+                multiline={false}
+                label="Garantía Inversor"
+                className="font-medium inline-block"
+                boldClassName="font-bold text-slate-950"
+                isCustomized={!!cust.inverterWarrantyText}
+                onReset={() => updateDocumentCustomization?.({ inverterWarrantyText: '' })}
+              />
+            </div>
             {project.specs.hasBattery && (
-              <div>• <span className="font-bold">Batería:</span> {batteryWarranty}</div>
+              <div className="flex items-center gap-1 leading-snug">
+                <span className="font-bold text-slate-800 shrink-0">• Batería:</span>
+                <InlineEditableText
+                  value={cust.batteryWarrantyText}
+                  defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.batteryWarrantyText}
+                  onSave={(val) => updateDocumentCustomization?.({ batteryWarrantyText: val })}
+                  isEditMode={isEditMode}
+                  multiline={false}
+                  label="Garantía Batería"
+                  className="font-medium inline-block"
+                  boldClassName="font-bold text-slate-950"
+                  isCustomized={!!cust.batteryWarrantyText}
+                  onReset={() => updateDocumentCustomization?.({ batteryWarrantyText: '' })}
+                />
+              </div>
             )}
-            <div>• <span className="font-bold">Mano de Obra y Soporte:</span> {workmanshipWarranty}</div>
+            <div className="flex items-center gap-1 leading-snug">
+              <span className="font-bold text-slate-800 shrink-0">• Mano de Obra:</span>
+              <InlineEditableText
+                value={cust.workmanshipWarrantyText}
+                defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.workmanshipWarrantyText}
+                onSave={(val) => updateDocumentCustomization?.({ workmanshipWarrantyText: val })}
+                isEditMode={isEditMode}
+                multiline={false}
+                label="Garantía Mano de Obra"
+                className="font-medium inline-block"
+                boldClassName="font-bold text-slate-950"
+                isCustomized={!!cust.workmanshipWarrantyText}
+                onReset={() => updateDocumentCustomization?.({ workmanshipWarrantyText: '' })}
+              />
+            </div>
           </div>
 
           <div className={`border rounded-lg p-2 space-y-0.5 text-[10.5px] ${activeTheme.accentLightBg} ${activeTheme.accentBorder}`}>
@@ -281,20 +337,18 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
             >
               <CheckCircle2 className="w-3.5 h-3.5" style={{ color: activeTheme.primary }} /> NOS ENCARGAMOS DE GESTIONAR
             </h4>
-            {serviceItems.length > 0 ? (
-              serviceItems.map((item, idx) => (
-                <div key={idx} className="flex items-start gap-1">
-                  <Check className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: activeTheme.primary }} />
-                  <span>{item}</span>
-                </div>
-              ))
-            ) : (
-              <>
-                <div className="flex items-start gap-1"><Check className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: activeTheme.primary }} /> <span>Instalación del contador bidireccional en las EDES</span></div>
-                <div className="flex items-start gap-1"><Check className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: activeTheme.primary }} /> <span>Aprobación de crédito fiscal (CNE) y el Ministerio de Hacienda</span></div>
-                <div className="flex items-start gap-1"><Check className="w-3.5 h-3.5 shrink-0 mt-0.5" style={{ color: activeTheme.primary }} /> <span>Trámites completos ante organismos reguladores</span></div>
-              </>
-            )}
+            <InlineEditableText
+              value={cust.servicesIncludedText}
+              defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.servicesIncludedText}
+              onSave={(val) => updateDocumentCustomization?.({ servicesIncludedText: val })}
+              isEditMode={isEditMode}
+              multiline={true}
+              label="Servicios Gestionados"
+              className="text-[10.5px] leading-relaxed block"
+              boldClassName="font-bold text-slate-950"
+              isCustomized={!!cust.servicesIncludedText}
+              onReset={() => updateDocumentCustomization?.({ servicesIncludedText: '' })}
+            />
           </div>
         </div>
 
