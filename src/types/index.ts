@@ -46,6 +46,7 @@ export interface SystemSpecs {
   batteryUnitPriceUSD?: number;      // e.g. 1990.00 USD
   batteryWeightKilos?: number;       // e.g. 32
   installationUnitPriceUSD?: number; // e.g. 170.00 USD per kWp
+  directPriceSurplusTarget?: 'margin' | 'labor'; // Where excess direct price goes: profit margin (default) or installation labor
   // Detailed params
   panelEfficiency: number;      // % e.g. 21.8
   tempCoeff: number;            // %/°C e.g. -0.35
@@ -113,6 +114,8 @@ export interface CostMatrixSummary {
   precioKilosVentasUSD: number;  // Sale/kWp USD
   gananciaDOP: number;           // Net Profit DOP
   gananciaUSD: number;           // Net Profit USD
+  marginOnSalePct?: number;      // % Profit Margin on Sales (e.g. 38.65%)
+  markupOnCostPct?: number;      // % Markup on Costs (e.g. 63.00%)
   costPerWattUSD: number;        // Cost/W USD (e.g. $0.90)
   salePricePerWattUSD: number;   // Total System Sale/W USD (with batteries)
   solarSalePricePerWattUSD?: number; // Solar Only Sale/W USD (e.g. $1.13)

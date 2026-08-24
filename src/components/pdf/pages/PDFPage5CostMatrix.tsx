@@ -162,8 +162,15 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
                 <span>
                   RD$ {summary.costMatrix.precioKilosVentasDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp;{' '}
                   <strong className="text-emerald-800">
-                    ${summary.costMatrix.precioKilosVentasUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD/kWp (${summary.costMatrix.salePricePerWattUSD.toFixed(2)} USD/W)
+                    ${summary.costMatrix.precioKilosVentasUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD/kWp (${(summary.costMatrix.salePricePerWattUSD || 0).toFixed(2)} USD/W)
                   </strong>
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-amber-950 font-bold bg-amber-100/70 border border-amber-300/80 px-2 py-0.5 rounded text-[10px]">
+                <span>Margen Rentabilidad :</span>
+                <span>
+                  +{summary.costMatrix.markupOnCostPct !== undefined ? summary.costMatrix.markupOnCostPct.toFixed(1) : ((summary.costMatrix.saleMarginMultiplier - 1) * 100).toFixed(1)}% s/costo (Markup) &nbsp;|&nbsp;{' '}
+                  {summary.costMatrix.marginOnSalePct !== undefined ? summary.costMatrix.marginOnSalePct.toFixed(1) : ((summary.costMatrix.gananciaUSD / (summary.costMatrix.porcentajeVentaUSD || 1)) * 100).toFixed(1)}% s/venta
                 </span>
               </div>
               <div className="flex justify-between text-emerald-950 font-black bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-lg text-xs mt-0.5">

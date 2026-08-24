@@ -139,6 +139,9 @@ export function calculateCostMatrixSummary(
   const salePricePerWattUSD = porcentajeVentaUSD / (capacityKW * 1000);
   const solarSalePricePerWattUSD = capacityKW > 0 ? Math.round((solarOnlyVentaUSD / (capacityKW * 1000)) * 100) / 100 : 1.13;
 
+  const marginOnSalePct = porcentajeVentaUSD > 0 ? Math.round((gananciaUSD / porcentajeVentaUSD) * 10000) / 100 : 0;
+  const markupOnCostPct = totalNetoUSD > 0 ? Math.round((gananciaUSD / totalNetoUSD) * 10000) / 100 : 0;
+
   // Equipment vs Labor Breakdown for Ley 57-07
   const equipmentCostUSD = panelTotalUSD + inverterTotalUSD + batteryTotalUSD;
   const equipmentTotalUSD = (panelTotalDOP + inverterTotalDOP + batteryTotalDOP + batteryItbisDOP) / rate;
@@ -167,6 +170,8 @@ export function calculateCostMatrixSummary(
     precioKilosVentasUSD,
     gananciaDOP,
     gananciaUSD,
+    marginOnSalePct,
+    markupOnCostPct,
     costPerWattUSD,
     salePricePerWattUSD,
     solarSalePricePerWattUSD,
@@ -244,13 +249,47 @@ export function calculateFinancialSummary(
         ? Math.round(dcCapacityKWp * 1000 * effectivePricePerWatt * 100) / 100
         : Math.round(costMatrix.porcentajeVentaUSD * 100) / 100);
 
+  // Synchronize Cost Matrix with Direct Price in direct_watt mode
+  if (isDirectWatt) {
+    if (specs.directPriceSurplusTarget === 'labor') {
+      // Equipment portion stays with base margin multiplier
+      const baseEquipmentVenta = Math.round((costMatrix.equipmentVentaUSD || 0) * 100) / 100;
+      const surplusLaborVenta = Math.max(0, Math.round((grossInvestmentUSD - baseEquipmentVenta) * 100) / 100);
+
+      costMatrix.porcentajeVentaUSD = grossInvestmentUSD;
+      costMatrix.porcentajeVentaDOP = Math.round(grossInvestmentUSD * costMatrix.dopExchangeRate * 100) / 100;
+      costMatrix.gananciaUSD = Math.round((grossInvestmentUSD - costMatrix.totalNetoUSD) * 100) / 100;
+      costMatrix.gananciaDOP = Math.round(costMatrix.gananciaUSD * costMatrix.dopExchangeRate * 100) / 100;
+      costMatrix.marginOnSalePct = grossInvestmentUSD > 0 ? Math.round((costMatrix.gananciaUSD / grossInvestmentUSD) * 10000) / 100 : 0;
+      costMatrix.markupOnCostPct = costMatrix.totalNetoUSD > 0 ? Math.round((costMatrix.gananciaUSD / costMatrix.totalNetoUSD) * 10000) / 100 : 0;
+      costMatrix.precioKilosVentasUSD = dcCapacityKWp > 0 ? Math.round((grossInvestmentUSD / dcCapacityKWp) * 100) / 100 : 0;
+      costMatrix.precioKilosVentasDOP = Math.round(costMatrix.precioKilosVentasUSD * costMatrix.dopExchangeRate * 100) / 100;
+      costMatrix.salePricePerWattUSD = effectivePricePerWatt;
+      costMatrix.laborVentaUSD = surplusLaborVenta;
+      costMatrix.equipmentVentaUSD = Math.min(grossInvestmentUSD, baseEquipmentVenta);
+    } else {
+      // Default: 'margin' -> Implied margin multiplier across the board
+      const impliedMargin = costMatrix.totalNetoUSD > 0 ? Math.round((grossInvestmentUSD / costMatrix.totalNetoUSD) * 10000) / 10000 : costMatrix.saleMarginMultiplier;
+      costMatrix.saleMarginMultiplier = impliedMargin;
+      costMatrix.porcentajeVentaUSD = grossInvestmentUSD;
+      costMatrix.porcentajeVentaDOP = Math.round(grossInvestmentUSD * costMatrix.dopExchangeRate * 100) / 100;
+      costMatrix.gananciaUSD = Math.round((grossInvestmentUSD - costMatrix.totalNetoUSD) * 100) / 100;
+      costMatrix.gananciaDOP = Math.round(costMatrix.gananciaUSD * costMatrix.dopExchangeRate * 100) / 100;
+      costMatrix.marginOnSalePct = grossInvestmentUSD > 0 ? Math.round((costMatrix.gananciaUSD / grossInvestmentUSD) * 10000) / 100 : 0;
+      costMatrix.markupOnCostPct = costMatrix.totalNetoUSD > 0 ? Math.round((costMatrix.gananciaUSD / costMatrix.totalNetoUSD) * 10000) / 100 : 0;
+      costMatrix.precioKilosVentasUSD = dcCapacityKWp > 0 ? Math.round((grossInvestmentUSD / dcCapacityKWp) * 100) / 100 : 0;
+      costMatrix.precioKilosVentasDOP = Math.round(costMatrix.precioKilosVentasUSD * costMatrix.dopExchangeRate * 100) / 100;
+      costMatrix.salePricePerWattUSD = effectivePricePerWatt;
+      costMatrix.equipmentVentaUSD = Math.round((costMatrix.equipmentTotalUSD || 0) * impliedMargin * 100) / 100;
+      costMatrix.laborVentaUSD = Math.round((costMatrix.laborTotalUSD || 0) * impliedMargin * 100) / 100;
+    }
+  }
+
   // Labor Portion (Mano de obra y materiales con margen e ITBIS)
   const laborPortionUSD = Math.round((costMatrix.laborVentaUSD || 0) * 100) / 100;
 
   // Equipment Portion (Paneles, Inversores y Baterías con margen) - Base estricta para Ley 57-07 (excluye mano de obra)
-  const equipmentPortionUSD = isDirectWatt
-    ? Math.max(0, Math.round((grossInvestmentUSD - laborPortionUSD) * 100) / 100)
-    : Math.round((costMatrix.equipmentVentaUSD || (grossInvestmentUSD - laborPortionUSD)) * 100) / 100;
+  const equipmentPortionUSD = Math.round((costMatrix.equipmentVentaUSD || (grossInvestmentUSD - laborPortionUSD)) * 100) / 100;
 
   // Solar and Battery investment components breakdown
   const batteryInvestmentUSD = specs.hasBattery

@@ -99,6 +99,7 @@ export const SimulatorView: React.FC = () => {
   const summary = getFinancialSummary();
 
   const [activeMainTab, setActiveMainTab] = useState<'energia' | 'cotizacion' | 'retorno'>('energia');
+  const [costTableCurrency, setCostTableCurrency] = useState<'ALL' | 'USD' | 'DOP'>('ALL');
   const [isFetchingSolar, setIsFetchingSolar] = useState<boolean>(false);
   const [solarApiStatus, setSolarApiStatus] = useState<string | null>(null);
 
@@ -1363,6 +1364,55 @@ export const SimulatorView: React.FC = () => {
                           ${(summary.grossInvestmentUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
                         </span>
                       </div>
+
+                      {/* Sincronización Bidireccional de Margen y Ganancia */}
+                      <div className={`pt-2 mt-1 border-t space-y-1.5 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className={`font-semibold ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                            Destino Excedente:
+                          </span>
+                          <div className="flex gap-1">
+                            <button
+                              type="button"
+                              onClick={() => updateSpecs({ directPriceSurplusTarget: 'margin' })}
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-all cursor-pointer ${
+                                (project.specs.directPriceSurplusTarget || 'margin') === 'margin'
+                                  ? isDark ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-xs' : 'bg-amber-100 text-amber-900 border-amber-300 shadow-xs'
+                                  : isDark ? 'bg-zinc-800/80 text-zinc-400 border-zinc-700 hover:text-zinc-200' : 'bg-slate-100 text-slate-500 border-slate-200 hover:text-slate-800'
+                              }`}
+                              title="Asignar el excedente comercial directamente a la ganancia / margen de utilidad"
+                            >
+                              Ganancia
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => updateSpecs({ directPriceSurplusTarget: 'labor' })}
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-all cursor-pointer ${
+                                project.specs.directPriceSurplusTarget === 'labor'
+                                  ? isDark ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-xs' : 'bg-amber-100 text-amber-900 border-amber-300 shadow-xs'
+                                  : isDark ? 'bg-zinc-800/80 text-zinc-400 border-zinc-700 hover:text-zinc-200' : 'bg-slate-100 text-slate-500 border-slate-200 hover:text-slate-800'
+                              }`}
+                              title="Asignar el excedente a mano de obra, ingeniería e instalación"
+                            >
+                              Mano de Obra
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between text-[11px]">
+                          <span className={isDark ? 'text-zinc-400' : 'text-slate-500'}>Margen Multiplicador:</span>
+                          <span className="font-bold text-amber-500">
+                            {(summary.costMatrix.saleMarginMultiplier || 1.25).toFixed(2)}x (+{(summary.costMatrix.markupOnCostPct || 0).toFixed(1)}% s/costo)
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between text-[11px]">
+                          <span className={isDark ? 'text-zinc-400' : 'text-slate-500'}>Ganancia Neta:</span>
+                          <span className="font-extrabold text-emerald-500">
+                            +${(summary.costMatrix.gananciaUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="flex items-center justify-between pt-1">
@@ -2242,7 +2292,7 @@ export const SimulatorView: React.FC = () => {
             {/* TABLA DE COSTOS E INGRESOS INTERNOS (REPLICANDO HOJA DE CÁLCULO EXCEL) */}
             <div className="bg-white border border-slate-300 rounded-2xl shadow-xl overflow-hidden font-sans shrink-0">
               {/* Header Orange Banner matching Excel */}
-              <div className="bg-amber-600 text-white px-6 py-3.5 flex justify-between items-center">
+              <div className="bg-amber-600 text-white px-6 py-3.5 flex flex-wrap gap-3 justify-between items-center">
                 <div className="flex items-center gap-3">
                   <h3 className="font-extrabold text-sm uppercase tracking-wider text-white flex items-center gap-2">
                     <span className="material-symbols-outlined text-[18px]">table_chart</span>
@@ -2252,18 +2302,61 @@ export const SimulatorView: React.FC = () => {
                     Uso Interno Confidencial
                   </span>
                 </div>
-                <div className="flex items-center gap-4 text-xs font-bold text-amber-100">
-                  <div>
-                    Tasa USD: <span className="text-white font-extrabold">{summary.costMatrix.dopExchangeRate} DOP</span>
+
+                {/* Selector de Moneda (USD / DOP / Dual) */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center bg-amber-800/60 p-0.5 rounded-lg border border-amber-400/40 shadow-inner">
+                    <button
+                      type="button"
+                      onClick={() => setCostTableCurrency('USD')}
+                      className={`px-2.5 py-1 rounded-md text-[10.5px] font-extrabold transition-all cursor-pointer ${
+                        costTableCurrency === 'USD'
+                          ? 'bg-white text-amber-900 shadow-xs'
+                          : 'text-amber-100 hover:text-white hover:bg-amber-700/50'
+                      }`}
+                      title="Ver tabla y totales en Dólares Estadounidenses (USD)"
+                    >
+                      💵 USD ($)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCostTableCurrency('DOP')}
+                      className={`px-2.5 py-1 rounded-md text-[10.5px] font-extrabold transition-all cursor-pointer ${
+                        costTableCurrency === 'DOP'
+                          ? 'bg-white text-amber-900 shadow-xs'
+                          : 'text-amber-100 hover:text-white hover:bg-amber-700/50'
+                      }`}
+                      title="Ver tabla y totales en Pesos Dominicanos (RD$)"
+                    >
+                      🇩🇴 DOP (RD$)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCostTableCurrency('ALL')}
+                      className={`px-2.5 py-1 rounded-md text-[10.5px] font-extrabold transition-all cursor-pointer ${
+                        costTableCurrency === 'ALL'
+                          ? 'bg-white text-amber-900 shadow-xs'
+                          : 'text-amber-100 hover:text-white hover:bg-amber-700/50'
+                      }`}
+                      title="Ver desglose completo dual en ambas monedas"
+                    >
+                      🌐 Dual (Ambas)
+                    </button>
                   </div>
-                  <div>
-                    Porcentaje Venta: <span className="text-white font-extrabold">{summary.costMatrix.saleMarginMultiplier}</span>
+
+                  <div className="flex items-center gap-3 text-xs font-bold text-amber-100 border-l border-amber-500/50 pl-3">
+                    <div>
+                      Tasa USD: <span className="text-white font-extrabold">{summary.costMatrix.dopExchangeRate} DOP</span>
+                    </div>
+                    <div>
+                      Factor Venta: <span className="text-white font-extrabold">{(summary.costMatrix.saleMarginMultiplier || 1.25).toFixed(2)}x</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
               <div className="p-6 space-y-4">
-                {/* Table matching Excel columns */}
+                {/* Table matching Excel columns and Currency Filter */}
                 <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead className="bg-slate-100 font-bold text-slate-700 border-b border-slate-200 uppercase text-[10px]">
@@ -2271,12 +2364,25 @@ export const SimulatorView: React.FC = () => {
                         <th className="py-2.5 px-3">Productos</th>
                         <th className="py-2.5 px-3 text-center text-red-600">kilos / Cap.</th>
                         <th className="py-2.5 px-3 text-center text-red-600">Cantidad</th>
-                        <th className="py-2.5 px-3 text-right text-red-600">Precio Unit. USD</th>
-                        <th className="py-2.5 px-3 text-right">Precio Unit. RD</th>
-                        <th className="py-2.5 px-3 text-right font-bold">Precio Total RD</th>
-                        <th className="py-2.5 px-3 text-right font-bold">Precio Total USD</th>
-                        <th className="py-2.5 px-3 text-right text-red-600">ITBIS RD</th>
-                        <th className="py-2.5 px-3 text-right text-red-600">ITBIS USD</th>
+                        
+                        {(costTableCurrency === 'USD' || costTableCurrency === 'ALL') && (
+                          <th className="py-2.5 px-3 text-right text-red-600">Precio Unit. USD</th>
+                        )}
+                        {(costTableCurrency === 'DOP' || costTableCurrency === 'ALL') && (
+                          <th className="py-2.5 px-3 text-right">Precio Unit. RD</th>
+                        )}
+                        {(costTableCurrency === 'DOP' || costTableCurrency === 'ALL') && (
+                          <th className="py-2.5 px-3 text-right font-bold">Precio Total RD</th>
+                        )}
+                        {(costTableCurrency === 'USD' || costTableCurrency === 'ALL') && (
+                          <th className="py-2.5 px-3 text-right font-bold">Precio Total USD</th>
+                        )}
+                        {(costTableCurrency === 'DOP' || costTableCurrency === 'ALL') && (
+                          <th className="py-2.5 px-3 text-right text-red-600">ITBIS RD</th>
+                        )}
+                        {(costTableCurrency === 'USD' || costTableCurrency === 'ALL') && (
+                          <th className="py-2.5 px-3 text-right text-red-600">ITBIS USD</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 text-slate-800 font-semibold text-xs">
@@ -2285,12 +2391,37 @@ export const SimulatorView: React.FC = () => {
                           <td className="py-2.5 px-3 font-bold text-slate-900">{item.name}</td>
                           <td className="py-2.5 px-3 text-center text-red-600 font-bold">{item.kilos}</td>
                           <td className="py-2.5 px-3 text-center text-red-600 font-bold">{item.quantity}</td>
-                          <td className="py-2.5 px-3 text-right text-red-600 font-bold">${item.unitPriceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                          <td className="py-2.5 px-3 text-right">${item.unitPriceDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                          <td className="py-2.5 px-3 text-right font-bold">${item.totalPriceDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                          <td className="py-2.5 px-3 text-right font-bold">${item.totalPriceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                          <td className="py-2.5 px-3 text-right text-slate-500">{item.itbisDOP > 0 ? `$${item.itbisDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}</td>
-                          <td className="py-2.5 px-3 text-right text-slate-500">{item.itbisUSD > 0 ? `$${item.itbisUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}</td>
+                          
+                          {(costTableCurrency === 'USD' || costTableCurrency === 'ALL') && (
+                            <td className="py-2.5 px-3 text-right text-red-600 font-bold">
+                              ${item.unitPriceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                          )}
+                          {(costTableCurrency === 'DOP' || costTableCurrency === 'ALL') && (
+                            <td className="py-2.5 px-3 text-right">
+                              ${item.unitPriceDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                          )}
+                          {(costTableCurrency === 'DOP' || costTableCurrency === 'ALL') && (
+                            <td className="py-2.5 px-3 text-right font-bold">
+                              ${item.totalPriceDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                          )}
+                          {(costTableCurrency === 'USD' || costTableCurrency === 'ALL') && (
+                            <td className="py-2.5 px-3 text-right font-bold">
+                              ${item.totalPriceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </td>
+                          )}
+                          {(costTableCurrency === 'DOP' || costTableCurrency === 'ALL') && (
+                            <td className="py-2.5 px-3 text-right text-slate-500">
+                              {item.itbisDOP > 0 ? `$${item.itbisDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                            </td>
+                          )}
+                          {(costTableCurrency === 'USD' || costTableCurrency === 'ALL') && (
+                            <td className="py-2.5 px-3 text-right text-slate-500">
+                              {item.itbisUSD > 0 ? `$${item.itbisUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -2299,34 +2430,116 @@ export const SimulatorView: React.FC = () => {
 
                 {/* Summary Totals Box matching bottom right of Excel */}
                 <div className="flex justify-end pt-2">
-                  <div className="w-[460px] bg-slate-50 border border-slate-300 rounded-xl p-4 space-y-1.5 text-xs font-semibold">
+                  <div className="w-[500px] bg-slate-50 border border-slate-300 rounded-xl p-4 space-y-1.5 text-xs font-semibold shadow-xs">
+                    {/* Precio Neto */}
                     <div className="flex justify-between text-slate-700">
                       <span>Precio Neto :</span>
-                      <span>RD$ {summary.costMatrix.precioNetoDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong className="text-slate-900">${summary.costMatrix.precioNetoUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+                      <span>
+                        {costTableCurrency === 'USD' ? (
+                          <strong className="text-slate-900">${summary.costMatrix.precioNetoUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</strong>
+                        ) : costTableCurrency === 'DOP' ? (
+                          <strong className="text-slate-900">RD$ {summary.costMatrix.precioNetoDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                        ) : (
+                          <>RD$ {summary.costMatrix.precioNetoDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong className="text-slate-900">${summary.costMatrix.precioNetoUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></>
+                        )}
+                      </span>
                     </div>
+
+                    {/* ITBIS Total */}
                     <div className="flex justify-between text-slate-700">
                       <span>ITBIS Total :</span>
-                      <span>RD$ {summary.costMatrix.itbisDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong className="text-slate-900">${summary.costMatrix.itbisUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+                      <span>
+                        {costTableCurrency === 'USD' ? (
+                          <strong className="text-slate-900">${summary.costMatrix.itbisUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</strong>
+                        ) : costTableCurrency === 'DOP' ? (
+                          <strong className="text-slate-900">RD$ {summary.costMatrix.itbisDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                        ) : (
+                          <>RD$ {summary.costMatrix.itbisDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong className="text-slate-900">${summary.costMatrix.itbisUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></>
+                        )}
+                      </span>
                     </div>
+
+                    {/* Total Neto (Costo Total) */}
                     <div className="flex justify-between text-slate-900 font-bold bg-slate-200/80 px-2.5 py-1 rounded">
                       <span>Total Neto (Costo Total) :</span>
-                      <span>RD$ {summary.costMatrix.totalNetoDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong>${summary.costMatrix.totalNetoUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+                      <span>
+                        {costTableCurrency === 'USD' ? (
+                          <strong>${summary.costMatrix.totalNetoUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</strong>
+                        ) : costTableCurrency === 'DOP' ? (
+                          <strong>RD$ {summary.costMatrix.totalNetoDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                        ) : (
+                          <>RD$ {summary.costMatrix.totalNetoDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong>${summary.costMatrix.totalNetoUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></>
+                        )}
+                      </span>
                     </div>
+
+                    {/* Porcentaje de Venta */}
                     <div className="flex justify-between text-red-600 font-extrabold bg-red-50 border border-red-200 px-2.5 py-1 rounded">
-                      <span>Porcentaje venta ({summary.costMatrix.saleMarginMultiplier}) :</span>
-                      <span>RD$ {summary.costMatrix.porcentajeVentaDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong>${summary.costMatrix.porcentajeVentaUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+                      <span>Porcentaje venta ({(summary.costMatrix.saleMarginMultiplier || 1.25).toFixed(2)}) :</span>
+                      <span>
+                        {costTableCurrency === 'USD' ? (
+                          <strong>${summary.costMatrix.porcentajeVentaUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</strong>
+                        ) : costTableCurrency === 'DOP' ? (
+                          <strong>RD$ {summary.costMatrix.porcentajeVentaDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                        ) : (
+                          <>RD$ {summary.costMatrix.porcentajeVentaDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong>${summary.costMatrix.porcentajeVentaUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></>
+                        )}
+                      </span>
                     </div>
+
+                    {/* Precio Kilos Costo */}
                     <div className="flex justify-between text-slate-800">
                       <span>Precio kilos costo :</span>
-                      <span>RD$ {summary.costMatrix.precioKilosCostoDOP.toFixed(2)} &nbsp;|&nbsp; <strong className="text-slate-900">${summary.costMatrix.precioKilosCostoUSD.toFixed(2)} USD/kWp (${summary.costMatrix.costPerWattUSD.toFixed(2)} USD/W)</strong></span>
+                      <span>
+                        {costTableCurrency === 'USD' ? (
+                          <strong className="text-slate-900">${summary.costMatrix.precioKilosCostoUSD.toFixed(2)} USD/kWp (${summary.costMatrix.costPerWattUSD.toFixed(2)} USD/W)</strong>
+                        ) : costTableCurrency === 'DOP' ? (
+                          <strong className="text-slate-900">RD$ {summary.costMatrix.precioKilosCostoDOP.toFixed(2)} /kWp</strong>
+                        ) : (
+                          <>RD$ {summary.costMatrix.precioKilosCostoDOP.toFixed(2)} &nbsp;|&nbsp; <strong className="text-slate-900">${summary.costMatrix.precioKilosCostoUSD.toFixed(2)} USD/kWp (${summary.costMatrix.costPerWattUSD.toFixed(2)} USD/W)</strong></>
+                        )}
+                      </span>
                     </div>
+
+                    {/* Precio Kilos Ventas */}
                     <div className="flex justify-between text-slate-900 font-bold">
                       <span>Precio kilos ventas :</span>
-                      <span>RD$ {summary.costMatrix.precioKilosVentasDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong className="text-emerald-800">${summary.costMatrix.precioKilosVentasUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD/kWp (${summary.costMatrix.salePricePerWattUSD.toFixed(2)} USD/W)</strong></span>
+                      <span>
+                        {costTableCurrency === 'USD' ? (
+                          <strong className="text-emerald-800">${summary.costMatrix.precioKilosVentasUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD/kWp (${(summary.costMatrix.salePricePerWattUSD || 0).toFixed(2)} USD/W)</strong>
+                        ) : costTableCurrency === 'DOP' ? (
+                          <strong className="text-emerald-800">RD$ {summary.costMatrix.precioKilosVentasDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} /kWp</strong>
+                        ) : (
+                          <>RD$ {summary.costMatrix.precioKilosVentasDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong className="text-emerald-800">${summary.costMatrix.precioKilosVentasUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD/kWp (${(summary.costMatrix.salePricePerWattUSD || 0).toFixed(2)} USD/W)</strong></>
+                        )}
+                      </span>
                     </div>
+
+                    {/* DATOS DE MARGEN DE GANANCIA Y RENTABILIDAD */}
+                    <div className="flex justify-between items-center text-amber-950 font-bold bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-lg text-xs">
+                      <span>Métricas de Margen :</span>
+                      <div className="flex items-center gap-2">
+                        <span className="bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded text-[11px] font-extrabold">
+                          +{summary.costMatrix.markupOnCostPct !== undefined ? summary.costMatrix.markupOnCostPct.toFixed(1) : ((summary.costMatrix.saleMarginMultiplier - 1) * 100).toFixed(1)}% s/costo (Markup)
+                        </span>
+                        <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-[11px] font-extrabold border border-amber-300/60">
+                          {summary.costMatrix.marginOnSalePct !== undefined ? summary.costMatrix.marginOnSalePct.toFixed(1) : ((summary.costMatrix.gananciaUSD / (summary.costMatrix.porcentajeVentaUSD || 1)) * 100).toFixed(1)}% s/venta (Margen)
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Ganancia Proyectada */}
                     <div className="flex justify-between text-emerald-950 font-black bg-emerald-100 border border-emerald-300 px-2.5 py-1.5 rounded-lg text-sm mt-1">
                       <span>Ganancia Proyectada :</span>
-                      <span>RD$ {summary.costMatrix.gananciaDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong className="text-emerald-800">${summary.costMatrix.gananciaUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+                      <span>
+                        {costTableCurrency === 'USD' ? (
+                          <strong className="text-emerald-800">${summary.costMatrix.gananciaUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</strong>
+                        ) : costTableCurrency === 'DOP' ? (
+                          <strong className="text-emerald-800">RD$ {summary.costMatrix.gananciaDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                        ) : (
+                          <>RD$ {summary.costMatrix.gananciaDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong className="text-emerald-800">${summary.costMatrix.gananciaUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></>
+                        )}
+                      </span>
                     </div>
                   </div>
                 </div>
