@@ -333,8 +333,8 @@ ipcMain.handle('check-for-updates', async () => {
   try {
     sendUpdateStatus({ state: 'checking' });
 
-    // In Linux non-AppImage (e.g. pacman or deb), query GitHub API directly to get clean release info
-    if (process.platform === 'linux' && !process.env.APPIMAGE) {
+    // In development mode, or in Linux non-AppImage (e.g. pacman or deb), query GitHub API directly
+    if (!app.isPackaged || (process.platform === 'linux' && !process.env.APPIMAGE)) {
       const release = await fetchLatestGitHubRelease();
       const latestTag = (release.tag_name || '').replace(/^v/, '');
       const currentVer = app.getVersion().replace(/^v/, '');
@@ -356,7 +356,7 @@ ipcMain.handle('check-for-updates', async () => {
       }
     }
 
-    // Windows or Linux AppImage
+    // Windows or Linux AppImage (Packaged Production)
     const result = await autoUpdater.checkForUpdates();
     return { success: true, updateInfo: result?.updateInfo };
   } catch (err: any) {
