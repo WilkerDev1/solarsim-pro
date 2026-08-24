@@ -6,8 +6,8 @@ build
 *.log
 .env
 .env.local
-release
-release/
+release/*
+!release/*.md
 .wrangler
 repomix-output.xml
 repomix-output.txt
