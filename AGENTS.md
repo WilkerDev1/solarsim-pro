@@ -67,20 +67,28 @@ solarsim/
 │       │   ├── Header.tsx                   # Barra superior de la app con navegación y botones
 │       │   ├── AIInvoiceScannerModal.tsx    # Modal de escáner de facturas con Gemini Vision
 │       │   └── ShareProposalModal.tsx       # Modal de compartir propuesta web interactiva y QR
-│       ├── simulator/                       # 🎛️ VISTA DEL SIMULADOR INTERACTIVO
-│       │   ├── SimulatorView.tsx            # Vista unificada del simulador
-│       │   ├── ParameterSidebar.tsx         # Barra lateral de parámetros técnicos y financieros
-│       │   ├── EnergyBalanceCard.tsx        # Gráfico de generación vs consumo (Recharts)
-│       │   └── FinancialSummaryCard.tsx     # Tarjetas de VAN, TIR, Payback e inversión
+│       ├── simulator/                       # 🎛️ VISTA DEL SIMULADOR INTERACTIVO (Modular)
+│       │   ├── SimulatorView.tsx            # Orquestador conciso y limpio (<150 líneas)
+│       │   ├── sidebar/                     # 📂 Barra Lateral de Parámetros
+│       │   │   ├── ParameterSidebar.tsx     # Contenedor con drawer redimensionable, acordeones y temas
+│       │   │   ├── ClientParamsSection.tsx  # Sección 1: Cliente, Provincia, GPS NASA SSE
+│       │   │   ├── RatesParamsSection.tsx   # Sección 2: Tarifas, Distribuidora, Inyección Cero, SIE-007
+│       │   │   ├── EquipmentParamsSection.tsx# Sección 3: Paneles, Inversores, Baterías y Avanzados
+│       │   │   ├── PricingParamsSection.tsx # Sección 4: Precio Directo, Destino Excedente y Margen
+│       │   │   └── FinancialsParamsSection.tsx# Sección 5: Financiamiento, ITBIS 100% y Ley 57-07 40%
+│       │   └── tabs/                        # 📂 Pestañas de Análisis y Resultados
+│       │       ├── EnergyAnalysisTab.tsx    # Pestaña 1: Métricas de Energía, Gráfico y Factura IA
+│       │       ├── QuotationEquipmentsTab.tsx# Pestaña 2: Cotización, Equipos y Matriz con Selector USD/DOP
+│       │       └── FinancialReturnTab.tsx   # Pestaña 3: KPIs VAN, TIR, Payback y Flujo 25 Años
 │       └── pdf/                             # 📄 VISTA Y GENERADOR DE PROPUESTAS PDF
-│           ├── PDFProposalView.tsx          # Visor de propuesta con renderizado y botón de exportar
+│           ├── PDFProposalView.tsx          # Visor de propuesta con modo edición in-situ y exportación
 │           ├── PDFHeaderBanner.tsx          # Cabecera estándar de hojas interiores (76px)
 │           ├── PDFFooter.tsx                # Pie de página estándar (42px, centrado, sin truncate)
 │           ├── PDFWatermark.tsx             # Marca de agua central vectorial / base64
 │           ├── controls/
 │           │   ├── PDFSidebarControls.tsx   # Panel de control de páginas, temas y personalización
-│           │   └── PDFCustomizationModal.tsx# Modal "Datos del Documento" (logos, lemas, firmas)
-│           └── pages/                       # 📑 PLANTILLAS DE HOJAS INDIVIDUALES (A4)
+│           │   └── PDFCustomizationModal.tsx# Modal "Modo Edición" (logos, marcas de agua, anexos)
+│           └── pages/                       # 📑 PLANTILLAS DE HOJAS INDIVIDUALES (A4 Con Edición In-Situ)
 │               ├── PDFCoverPage.tsx         # Hoja 1: Portada ejecutiva con diseño geométrico
 │               ├── PDFTableOfContents.tsx   # Hoja 2: Índice de contenido dinámico con badges
 │               ├── PDFAboutUsPage.tsx       # Hoja 3: 1. ¿Quiénes Somos? & Servicios Principales
