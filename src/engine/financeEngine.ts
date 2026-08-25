@@ -242,12 +242,24 @@ export function calculateFinancialSummary(
   // Custom Quotation Items calculation (Additional Equipment, Materials, and Services)
   const customItems = financials.customItems || [];
   const customItemsTotalUSD = Math.round(customItems.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPriceUSD || 0)), 0) * 100) / 100;
-  const customItemsITBISUSD = Math.round(customItems.reduce((sum, item) => {
-    if (item.applyITBIS) {
-      return sum + ((item.quantity || 0) * (item.unitPriceUSD || 0) * 0.18);
+  
+  // ITBIS differentiation: Exonerated by Ley 57-07 vs Charged to Client
+  let exoneratedCustomITBISUSD = 0;
+  let nonExoneratedCustomITBISUSD = 0;
+
+  for (const item of customItems) {
+    const itemTotal = (item.quantity || 0) * (item.unitPriceUSD || 0);
+    const isExonerated = item.exonerateITBIS !== undefined ? item.exonerateITBIS : (item.applyITBIS ?? true);
+    if (isExonerated) {
+      exoneratedCustomITBISUSD += itemTotal * 0.18;
+    } else {
+      nonExoneratedCustomITBISUSD += itemTotal * 0.18;
     }
-    return sum;
-  }, 0) * 100) / 100;
+  }
+
+  exoneratedCustomITBISUSD = Math.round(exoneratedCustomITBISUSD * 100) / 100;
+  nonExoneratedCustomITBISUSD = Math.round(nonExoneratedCustomITBISUSD * 100) / 100;
+  const customItemsITBISUSD = exoneratedCustomITBISUSD;
 
   // Base Gross Investment:
   // 1. If explicit custom override is set, use it.
@@ -259,7 +271,8 @@ export function calculateFinancialSummary(
         ? Math.round(dcCapacityKWp * 1000 * effectivePricePerWatt * 100) / 100
         : Math.round(costMatrix.porcentajeVentaUSD * 100) / 100);
 
-  const grossInvestmentUSD = Math.round((baseGrossInvestmentUSD + customItemsTotalUSD) * 100) / 100;
+  // If item is not exonerated, ITBIS is charged to the client in the final gross price
+  const grossInvestmentUSD = Math.round((baseGrossInvestmentUSD + customItemsTotalUSD + nonExoneratedCustomITBISUSD) * 100) / 100;
 
   // Synchronize Cost Matrix with Direct Price in direct_watt mode
   if (isDirectWatt) {

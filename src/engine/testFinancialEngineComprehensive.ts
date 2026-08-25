@@ -237,8 +237,8 @@ const zeroSpecs: SystemSpecs = {
   ...defaultSpecs,
   panelCount: 0,
 };
-// TEST 9: Custom Quotation Items with ITBIS
-console.log('\n--- TEST 9: Custom Quotation Items with ITBIS ---');
+// TEST 9: Custom Quotation Items with Exonerar ITBIS (Ley 57-07)
+console.log('\n--- TEST 9: Custom Quotation Items with Exonerar ITBIS (Ley 57-07) ---');
 const financialsWithCustomItems: FinancialParams = {
   ...defaultFinancials,
   customItems: [
@@ -248,15 +248,15 @@ const financialsWithCustomItems: FinancialParams = {
       quantity: 1,
       unit: 'UD',
       unitPriceUSD: 500.0,
-      applyITBIS: true, // ITBIS = 500 * 0.18 = $90
+      exonerateITBIS: true, // ITBIS $90 exonerado por Ley 57-07
     },
     {
       id: 'custom_2',
-      description: 'Gestión Permisología Especial',
+      description: 'Herrajes Generales No Renovables',
       quantity: 1,
       unit: 'GL',
       unitPriceUSD: 300.0,
-      applyITBIS: false, // 0% ITBIS
+      exonerateITBIS: false, // NO exonerado: se cobra ITBIS 18% ($54) al cliente
     },
   ],
 };
@@ -277,21 +277,22 @@ const baseRes = calculateFinancialSummary(
   monthlyConsumption
 );
 
+// Base investment should increase by $500 (exonerated base) + $300 (non-exonerated base) + $54 (non-exonerated ITBIS charged to client) = $854.00
 assert(
-  Math.abs(resCustom.grossInvestmentUSD - (baseRes.grossInvestmentUSD + 800.0)) < 0.01,
-  `Inversión bruta incrementa exactamente $800 con los ítems adicionales ($${resCustom.grossInvestmentUSD} vs $${baseRes.grossInvestmentUSD + 800})`
+  Math.abs(resCustom.grossInvestmentUSD - (baseRes.grossInvestmentUSD + 854.0)) < 0.01,
+  `Inversión bruta incluye $800 de ítems + $54 de ITBIS no exonerado ($${resCustom.grossInvestmentUSD} vs $${baseRes.grossInvestmentUSD + 854.0})`
 );
 assert(
   Math.abs(resCustom.itbisSavedUSD - (baseRes.itbisSavedUSD + 90.0)) < 0.01,
-  `ITBIS ahorrado incluye los $90 del ítem con ITBIS ($${resCustom.itbisSavedUSD} vs $${baseRes.itbisSavedUSD + 90})`
+  `ITBIS exonerado por Ley 57-07 incluye los $90 del ítem exonerado ($${resCustom.itbisSavedUSD} vs $${baseRes.itbisSavedUSD + 90})`
 );
 assert(
   resCustom.customItemsTotalUSD === 800.0,
-  `customItemsTotalUSD reporta $800.00`
+  `customItemsTotalUSD reporta base de $800.00`
 );
 assert(
   resCustom.customItemsITBISUSD === 90.0,
-  `customItemsITBISUSD reporta $90.00`
+  `customItemsITBISUSD reporta $90.00 de ITBIS exonerado`
 );
 
 console.log('\n=====================================================');

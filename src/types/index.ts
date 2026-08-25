@@ -76,9 +76,10 @@ export interface CustomQuotationItem {
   id: string;
   description: string;
   quantity: number;
-  unit?: string;         // e.g. 'UD', 'GL', 'M', 'PZA' (Default: 'UD')
+  unit?: string;           // e.g. 'UD', 'GL', 'M', 'PZA' (Default: 'UD')
   unitPriceUSD: number;
-  applyITBIS: boolean;   // true = 18% ITBIS | false = 0%
+  exonerateITBIS: boolean; // true = Exonerar ITBIS (18%) por Ley 57-07 | false = Cobrar ITBIS (18%) en la cotización final
+  applyITBIS?: boolean;    // Backwards compatibility alias
 }
 
 export interface FinancialParams {

@@ -26,6 +26,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
       quantity: 1,
       unit: 'UD',
       unitPriceUSD: 0,
+      exonerateITBIS: true,
       applyITBIS: true,
     };
     updateFinancials({ customItems: [...customItems, newItem] });
@@ -51,10 +52,15 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
     0
   );
 
-  const customItemsITBISTotalUSD = customItems.reduce(
-    (sum, it) => (it.applyITBIS ? sum + (it.quantity || 0) * (it.unitPriceUSD || 0) * 0.18 : sum),
-    0
-  );
+  const customItemsExoneratedITBISUSD = customItems.reduce((sum, it) => {
+    const isExonerated = it.exonerateITBIS !== undefined ? it.exonerateITBIS : (it.applyITBIS ?? true);
+    return isExonerated ? sum + ((it.quantity || 0) * (it.unitPriceUSD || 0) * 0.18) : sum;
+  }, 0);
+
+  const customItemsNonExoneratedITBISUSD = customItems.reduce((sum, it) => {
+    const isExonerated = it.exonerateITBIS !== undefined ? it.exonerateITBIS : (it.applyITBIS ?? true);
+    return !isExonerated ? sum + ((it.quantity || 0) * (it.unitPriceUSD || 0) * 0.18) : sum;
+  }, 0);
 
   return (
     <div
@@ -178,6 +184,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
               <div className="space-y-2.5">
                 {customItems.map((item, index) => {
                   const itemTotalUSD = (item.quantity || 0) * (item.unitPriceUSD || 0);
+                  const isExonerated = item.exonerateITBIS !== undefined ? item.exonerateITBIS : (item.applyITBIS ?? true);
                   return (
                     <div
                       key={item.id || index}
@@ -211,7 +218,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
                         </button>
                       </div>
 
-                      {/* Fila 2: Cantidad, Unidad, Precio Unitario y Checkbox ITBIS */}
+                      {/* Fila 2: Cantidad, Unidad, Precio Unitario y Total */}
                       <div className="grid grid-cols-12 gap-1.5 items-center text-[11px]">
                         {/* Cantidad */}
                         <div className="col-span-3">
@@ -273,21 +280,23 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
                         </div>
                       </div>
 
-                      {/* Fila 3: Toggle Aplica ITBIS (18%) */}
+                      {/* Fila 3: Toggle Exonerar ITBIS (18%) por Ley 57-07 */}
                       <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-zinc-800/80">
                         <label className="flex items-center gap-1.5 cursor-pointer">
                           <input
                             type="checkbox"
-                            checked={item.applyITBIS}
-                            onChange={(e) => handleUpdateItem(item.id, { applyITBIS: e.target.checked })}
+                            checked={isExonerated}
+                            onChange={(e) => handleUpdateItem(item.id, { exonerateITBIS: e.target.checked, applyITBIS: e.target.checked })}
                             className="rounded text-emerald-700 focus:ring-emerald-600 cursor-pointer"
                           />
                           <span className="text-[10.5px] font-medium text-slate-600 dark:text-zinc-300">
-                            Aplica ITBIS (18%)
+                            Exonerar ITBIS (18%)
                           </span>
                         </label>
-                        <span className="text-[10px] font-semibold text-slate-400 dark:text-zinc-500">
-                          {item.applyITBIS ? `ITBIS: +$${(itemTotalUSD * 0.18).toFixed(2)}` : 'Exento (0% ITBIS)'}
+                        <span className={`text-[10px] font-semibold ${isExonerated ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                          {isExonerated
+                            ? `Exonerado: -$${(itemTotalUSD * 0.18).toFixed(2)} (Ley 57-07)`
+                            : `Se cobra ITBIS: +$${(itemTotalUSD * 0.18).toFixed(2)}`}
                         </span>
                       </div>
                     </div>
@@ -303,9 +312,14 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
                   <span>Subtotal Ítems Extra:</span>
                   <div className="text-right">
                     <span className="font-mono text-emerald-700 dark:text-emerald-400">${customItemsSubtotalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</span>
-                    {customItemsITBISTotalUSD > 0 && (
-                      <span className="block text-[10px] font-normal text-slate-500 dark:text-zinc-400">
-                        (ITBIS aplicable: ${customItemsITBISTotalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                    {customItemsNonExoneratedITBISUSD > 0 && (
+                      <span className="block text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                        (+${customItemsNonExoneratedITBISUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ITBIS cobrado al cliente)
+                      </span>
+                    )}
+                    {customItemsExoneratedITBISUSD > 0 && (
+                      <span className="block text-[10px] font-normal text-emerald-600 dark:text-emerald-400">
+                        (${customItemsExoneratedITBISUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ITBIS exonerado por Ley 57-07)
                       </span>
                     )}
                   </div>
