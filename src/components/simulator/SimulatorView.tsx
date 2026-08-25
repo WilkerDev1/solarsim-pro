@@ -17,6 +17,7 @@ export const SimulatorView: React.FC = () => {
     updateRates,
     updateFinancials,
     updateMonthlyConsumption,
+    updateAllMonthlyConsumption,
     saveActiveProject,
     openAIInvoiceModal,
     sidebarWidth,
@@ -167,6 +168,7 @@ export const SimulatorView: React.FC = () => {
               summary={summary}
               openAIInvoiceModal={openAIInvoiceModal}
               updateMonthlyConsumption={updateMonthlyConsumption}
+              updateAllMonthlyConsumption={updateAllMonthlyConsumption}
             />
           )}
 

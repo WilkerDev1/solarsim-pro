@@ -9,13 +9,14 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, ArrowDownToLine } from 'lucide-react';
 
 interface EnergyAnalysisTabProps {
   project: ProjectSimulation;
   summary: FinancialSummaryResult;
   openAIInvoiceModal: () => void;
   updateMonthlyConsumption: (index: number, value: number) => void;
+  updateAllMonthlyConsumption?: (value: number) => void;
 }
 
 export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
@@ -23,11 +24,23 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
   summary,
   openAIInvoiceModal,
   updateMonthlyConsumption,
+  updateAllMonthlyConsumption,
 }) => {
   const totalConsumptionKWh = summary.monthlyBreakdown.reduce((sum, m) => sum + m.consumptionKWh, 0);
   const totalProductionKWh = summary.monthlyBreakdown.reduce((sum, m) => sum + m.productionKWh, 0);
   const totalSavingsKWh = summary.monthlyBreakdown.reduce((sum, m) => sum + m.solarSelfConsumedKWh, 0);
   const avgCoveragePct = summary.energyCoveragePct;
+
+  const handleApplyToAllMonths = () => {
+    const val = project.monthlyConsumption[0] || 0;
+    if (updateAllMonthlyConsumption) {
+      updateAllMonthlyConsumption(val);
+    } else {
+      for (let i = 0; i < 12; i++) {
+        updateMonthlyConsumption(i, val);
+      }
+    }
+  };
 
   return (
     <>
@@ -163,12 +176,27 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
               <tr key={idx} className="hover:bg-slate-50">
                 <td className="py-2 px-4 font-bold text-slate-800">{row.month}</td>
                 <td className="py-2 px-4 text-center">
-                  <input
-                    type="number"
-                    value={project.monthlyConsumption[idx]}
-                    onChange={(e) => updateMonthlyConsumption(idx, parseFloat(e.target.value) || 0)}
-                    className="w-24 text-center bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs font-bold text-slate-900 focus:bg-white focus:border-emerald-600 transition-all"
-                  />
+                  <div className="flex items-center justify-center gap-1.5">
+                    <input
+                      type="number"
+                      value={project.monthlyConsumption[idx]}
+                      onChange={(e) => updateMonthlyConsumption(idx, parseFloat(e.target.value) || 0)}
+                      className="w-24 text-center bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs font-bold text-slate-900 focus:bg-white focus:border-emerald-600 transition-all shadow-2xs"
+                    />
+                    {idx === 0 ? (
+                      <button
+                        type="button"
+                        onClick={handleApplyToAllMonths}
+                        className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-md text-[10.5px] font-bold flex items-center gap-1 transition-all shadow-2xs hover:shadow-xs active:scale-95 cursor-pointer shrink-0"
+                        title="Aplicar este consumo de Enero a los 12 meses (Consumo promedio uniforme)"
+                      >
+                        <ArrowDownToLine className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>A todos</span>
+                      </button>
+                    ) : (
+                      <div className="w-[74px] hidden sm:block pointer-events-none" />
+                    )}
+                  </div>
                 </td>
                 <td className="py-2 px-4 text-right font-semibold">{row.productionKWh.toFixed(1)}</td>
                 <td className="py-2 px-4 text-right font-semibold">{row.solarSelfConsumedKWh.toFixed(1)}</td>

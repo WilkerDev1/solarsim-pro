@@ -58,6 +58,7 @@ interface SimulationState {
   updateRates: (rates: Partial<UtilityRates>) => void;
   updateFinancials: (financials: Partial<FinancialParams>) => void;
   updateMonthlyConsumption: (index: number, value: number) => void;
+  updateAllMonthlyConsumption: (value: number) => void;
   updateDocumentCustomization: (customization: Partial<DocumentCustomization>) => void;
   applyExtractedInvoice: (data: ExtractedInvoiceData, createNewProject?: boolean) => void;
   
@@ -485,6 +486,23 @@ export const useSimulationStore = create<SimulationState>()(
                 ...p,
                 updatedAt: new Date().toISOString(),
                 monthlyConsumption: newCons,
+              };
+            }
+            return p;
+          });
+          return { projects };
+        });
+      },
+
+      updateAllMonthlyConsumption: (value) => {
+        set((state) => {
+          const safeVal = Math.max(0, value);
+          const projects = state.projects.map((p) => {
+            if (p.id === state.activeProjectId) {
+              return {
+                ...p,
+                updatedAt: new Date().toISOString(),
+                monthlyConsumption: Array(12).fill(safeVal),
               };
             }
             return p;
