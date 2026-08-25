@@ -455,15 +455,18 @@ export function renderProposalPage(stored: StoredProposal): string {
               <td class="px-4 py-2 text-center font-mono font-bold">1</td>
               <td class="px-4 py-2 text-center text-slate-500 font-normal">UD</td>
             </tr>
-            ${(Array.isArray(financials.customItems) ? financials.customItems : []).map((cItem: any, idx: number) => `
-            <tr class="${idx % 2 === 0 ? 'bg-white' : 'bg-sky-50/30'}">
+            ${(Array.isArray(financials.customItems) ? financials.customItems : []).map((cItem: any, idx: number) => {
+              const isEven = (idx + (hasBattery ? 1 : 0)) % 2 === 0;
+              return `
+            <tr class="${isEven ? 'bg-white' : 'bg-sky-50/30'}">
               <td class="px-4 py-2 font-medium">
                 <span class="font-bold text-slate-900">${cItem.description || `Ítem Adicional #${idx + 1}`}</span>
               </td>
               <td class="px-4 py-2 text-center font-mono font-bold">${cItem.quantity || 1}</td>
               <td class="px-4 py-2 text-center text-slate-500 font-normal">${cItem.unit || 'UD'}</td>
             </tr>
-            `).join('')}
+            `;
+            }).join('')}
           </tbody>
         </table>
       </div>
