@@ -189,6 +189,29 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                       : DEFAULT_DOCUMENT_CUSTOMIZATION.projectEngineeringScopeText}
                   </td>
                 </tr>
+                {(project.financials.customItems || []).map((cItem, cIdx) => {
+                  const itemNumber = (project.specs.hasBattery && project.specs.batteryCapacityKWh > 0 ? 5 : 4) + cIdx;
+                  const isEven = itemNumber % 2 === 0;
+                  return (
+                    <tr key={cItem.id || cIdx} className={isEven ? 'bg-slate-50/60' : 'bg-white'}>
+                      <td className="px-3 py-1 font-bold text-slate-500">{itemNumber}</td>
+                      <td className="px-3 py-1 font-medium">
+                        <span className="font-bold text-slate-900">{cItem.description || `Ítem Adicional #${cIdx + 1}`}</span>
+                        {cItem.applyITBIS ? (
+                          <span className="ml-1.5 text-[9px] text-emerald-700 font-semibold bg-emerald-50 px-1 py-0.2 rounded border border-emerald-200">
+                            ITBIS 18%
+                          </span>
+                        ) : (
+                          <span className="ml-1.5 text-[9px] text-slate-600 font-semibold bg-slate-100 px-1 py-0.2 rounded border border-slate-200">
+                            Exento ITBIS
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-1 text-center font-bold font-mono">{cItem.quantity || 1}</td>
+                      <td className="px-3 py-1 text-right font-bold font-mono">{cItem.unit || 'UD'}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

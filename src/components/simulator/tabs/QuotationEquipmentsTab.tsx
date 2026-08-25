@@ -145,6 +145,29 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
                     <td className="px-3 py-2 text-center font-bold">1</td>
                     <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
                   </tr>
+                  {(project.financials.customItems || []).map((cItem, cIdx) => (
+                    <tr
+                      key={cItem.id || cIdx}
+                      className={cIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}
+                    >
+                      <td className="px-3 py-2">
+                        <span className="font-semibold text-slate-900">
+                          {cItem.description || `Ítem Adicional #${cIdx + 1}`}
+                        </span>
+                        {cItem.applyITBIS ? (
+                          <span className="ml-2 text-[9.5px] px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded font-normal">
+                            ITBIS 18%
+                          </span>
+                        ) : (
+                          <span className="ml-2 text-[9.5px] px-1.5 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 rounded font-normal">
+                            Exento ITBIS
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-center font-bold">{cItem.quantity || 1}</td>
+                      <td className="px-3 py-2 text-center text-slate-500 font-normal">{cItem.unit || 'UD'}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

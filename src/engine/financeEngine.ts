@@ -239,26 +239,38 @@ export function calculateFinancialSummary(
     ? specs.pricePerWattUSD
     : (financials.pricePerWattUSD !== undefined && financials.pricePerWattUSD > 0 ? financials.pricePerWattUSD : 1.13);
 
-  // Total Gross Investment:
+  // Custom Quotation Items calculation (Additional Equipment, Materials, and Services)
+  const customItems = financials.customItems || [];
+  const customItemsTotalUSD = Math.round(customItems.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPriceUSD || 0)), 0) * 100) / 100;
+  const customItemsITBISUSD = Math.round(customItems.reduce((sum, item) => {
+    if (item.applyITBIS) {
+      return sum + ((item.quantity || 0) * (item.unitPriceUSD || 0) * 0.18);
+    }
+    return sum;
+  }, 0) * 100) / 100;
+
+  // Base Gross Investment:
   // 1. If explicit custom override is set, use it.
   // 2. If direct_watt mode: Total turnkey sale price is directly (dcCapacityKWp * 1000 * effectivePricePerWatt) - all inclusive.
   // 3. If cost_matrix mode: Turnkey total sale price from the Cost Matrix (costMatrix.porcentajeVentaUSD).
-  const grossInvestmentUSD = financials.customCostUSD && financials.customCostUSD > 0
+  const baseGrossInvestmentUSD = financials.customCostUSD && financials.customCostUSD > 0
     ? financials.customCostUSD
     : (isDirectWatt
         ? Math.round(dcCapacityKWp * 1000 * effectivePricePerWatt * 100) / 100
         : Math.round(costMatrix.porcentajeVentaUSD * 100) / 100);
+
+  const grossInvestmentUSD = Math.round((baseGrossInvestmentUSD + customItemsTotalUSD) * 100) / 100;
 
   // Synchronize Cost Matrix with Direct Price in direct_watt mode
   if (isDirectWatt) {
     if (specs.directPriceSurplusTarget === 'labor') {
       // Equipment portion stays with base margin multiplier
       const baseEquipmentVenta = Math.round((costMatrix.equipmentVentaUSD || 0) * 100) / 100;
-      const surplusLaborVenta = Math.max(0, Math.round((grossInvestmentUSD - baseEquipmentVenta) * 100) / 100);
+      const surplusLaborVenta = Math.max(0, Math.round((baseGrossInvestmentUSD - baseEquipmentVenta) * 100) / 100);
 
       costMatrix.porcentajeVentaUSD = grossInvestmentUSD;
       costMatrix.porcentajeVentaDOP = Math.round(grossInvestmentUSD * costMatrix.dopExchangeRate * 100) / 100;
-      costMatrix.gananciaUSD = Math.round((grossInvestmentUSD - costMatrix.totalNetoUSD) * 100) / 100;
+      costMatrix.gananciaUSD = Math.round((baseGrossInvestmentUSD - costMatrix.totalNetoUSD) * 100) / 100;
       costMatrix.gananciaDOP = Math.round(costMatrix.gananciaUSD * costMatrix.dopExchangeRate * 100) / 100;
       costMatrix.marginOnSalePct = grossInvestmentUSD > 0 ? Math.round((costMatrix.gananciaUSD / grossInvestmentUSD) * 10000) / 100 : 0;
       costMatrix.markupOnCostPct = costMatrix.totalNetoUSD > 0 ? Math.round((costMatrix.gananciaUSD / costMatrix.totalNetoUSD) * 10000) / 100 : 0;
@@ -266,14 +278,14 @@ export function calculateFinancialSummary(
       costMatrix.precioKilosVentasDOP = Math.round(costMatrix.precioKilosVentasUSD * costMatrix.dopExchangeRate * 100) / 100;
       costMatrix.salePricePerWattUSD = effectivePricePerWatt;
       costMatrix.laborVentaUSD = surplusLaborVenta;
-      costMatrix.equipmentVentaUSD = Math.min(grossInvestmentUSD, baseEquipmentVenta);
+      costMatrix.equipmentVentaUSD = Math.min(baseGrossInvestmentUSD, baseEquipmentVenta);
     } else {
       // Default: 'margin' -> Implied margin multiplier across the board
-      const impliedMargin = costMatrix.totalNetoUSD > 0 ? Math.round((grossInvestmentUSD / costMatrix.totalNetoUSD) * 10000) / 10000 : costMatrix.saleMarginMultiplier;
+      const impliedMargin = costMatrix.totalNetoUSD > 0 ? Math.round((baseGrossInvestmentUSD / costMatrix.totalNetoUSD) * 10000) / 10000 : costMatrix.saleMarginMultiplier;
       costMatrix.saleMarginMultiplier = impliedMargin;
       costMatrix.porcentajeVentaUSD = grossInvestmentUSD;
       costMatrix.porcentajeVentaDOP = Math.round(grossInvestmentUSD * costMatrix.dopExchangeRate * 100) / 100;
-      costMatrix.gananciaUSD = Math.round((grossInvestmentUSD - costMatrix.totalNetoUSD) * 100) / 100;
+      costMatrix.gananciaUSD = Math.round((baseGrossInvestmentUSD - costMatrix.totalNetoUSD) * 100) / 100;
       costMatrix.gananciaDOP = Math.round(costMatrix.gananciaUSD * costMatrix.dopExchangeRate * 100) / 100;
       costMatrix.marginOnSalePct = grossInvestmentUSD > 0 ? Math.round((costMatrix.gananciaUSD / grossInvestmentUSD) * 10000) / 100 : 0;
       costMatrix.markupOnCostPct = costMatrix.totalNetoUSD > 0 ? Math.round((costMatrix.gananciaUSD / costMatrix.totalNetoUSD) * 10000) / 100 : 0;
@@ -286,10 +298,10 @@ export function calculateFinancialSummary(
   }
 
   // Labor Portion (Mano de obra y materiales con margen e ITBIS)
-  const laborPortionUSD = Math.round((costMatrix.laborVentaUSD || 0) * 100) / 100;
+  const laborPortionUSD = Math.round(((costMatrix.laborVentaUSD || 0) + customItemsTotalUSD) * 100) / 100;
 
-  // Equipment Portion (Paneles, Inversores y Baterías con margen) - Base estricta para Ley 57-07 (excluye mano de obra)
-  const equipmentPortionUSD = Math.round((costMatrix.equipmentVentaUSD || (grossInvestmentUSD - laborPortionUSD)) * 100) / 100;
+  // Equipment Portion (Paneles, Inversores y Baterías con margen) - Base estricta para Ley 57-07 (excluye mano de obra y custom items)
+  const equipmentPortionUSD = Math.round((costMatrix.equipmentVentaUSD || (baseGrossInvestmentUSD - (costMatrix.laborVentaUSD || 0))) * 100) / 100;
 
   // Solar and Battery investment components breakdown
   const batteryInvestmentUSD = specs.hasBattery
@@ -299,14 +311,16 @@ export function calculateFinancialSummary(
     : 0;
 
   const solarInvestmentUSD = isDirectWatt
-    ? grossInvestmentUSD
-    : Math.round((costMatrix.solarOnlyVentaUSD || grossInvestmentUSD) * 100) / 100;
+    ? baseGrossInvestmentUSD
+    : Math.round((costMatrix.solarOnlyVentaUSD || baseGrossInvestmentUSD) * 100) / 100;
 
-  // ITBIS exoneration calculation (allows explicit custom override e.g. 1866.11 or standard calculation)
+  // ITBIS exoneration calculation (allows explicit custom override e.g. 1866.11 or standard calculation plus custom items ITBIS)
+  const baseITBISSaved = financials.customITBISSavedUSD !== undefined
+    ? financials.customITBISSavedUSD
+    : Math.round(baseGrossInvestmentUSD * 0.18 * 0.38768 * 100) / 100;
+
   const itbisSavedUSD = financials.applyITBISExemption
-    ? (financials.customITBISSavedUSD !== undefined
-        ? financials.customITBISSavedUSD
-        : Math.round(grossInvestmentUSD * 0.18 * 0.38768 * 100) / 100)
+    ? Math.round((baseITBISSaved + customItemsITBISUSD) * 100) / 100
     : 0;
 
   // Ley 57-07 40% ISR tax credit: APPLIES STRICTLY TO RENEWABLE EQUIPMENT (Panels, Inverters, Batteries) - EXCLUDES LABOR
@@ -451,5 +465,8 @@ export function calculateFinancialSummary(
     costMatrix,
     batteryUsableKWh,
     batteryBackupAutonomyHours,
+    customItemsTotalUSD,
+    customItemsITBISUSD,
+    customItemsList: customItems,
   };
 }

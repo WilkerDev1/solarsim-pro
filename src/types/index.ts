@@ -72,6 +72,15 @@ export interface UtilityRates {
   annualEnergyInflationPct: number; // e.g. 3.5%
 }
 
+export interface CustomQuotationItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unit?: string;         // e.g. 'UD', 'GL', 'M', 'PZA' (Default: 'UD')
+  unitPriceUSD: number;
+  applyITBIS: boolean;   // true = 18% ITBIS | false = 0%
+}
+
 export interface FinancialParams {
   applyLey5707: boolean;         // 40% ISR credit over 3 years
   applyITBISExemption: boolean; // 100% ITBIS exoneration
@@ -82,6 +91,7 @@ export interface FinancialParams {
   discountRatePct: number;       // % e.g. 10.0
   projectLifespanYears: number;  // e.g. 25
   co2FactorKgPerKWh: number;     // kg CO2 per kWh e.g. 0.481
+  customItems?: CustomQuotationItem[]; // Custom additional items/services with individual ITBIS toggle
 }
 
 export interface CostMatrixItem {
@@ -176,6 +186,9 @@ export interface FinancialSummaryResult {
   costMatrix: CostMatrixSummary;
   batteryUsableKWh: number;
   batteryBackupAutonomyHours: number;
+  customItemsTotalUSD?: number;
+  customItemsITBISUSD?: number;
+  customItemsList?: CustomQuotationItem[];
 }
 
 export interface DocumentCustomization {

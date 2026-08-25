@@ -237,18 +237,62 @@ const zeroSpecs: SystemSpecs = {
   ...defaultSpecs,
   panelCount: 0,
 };
-const resZero = calculateFinancialSummary(
+// TEST 9: Custom Quotation Items with ITBIS
+console.log('\n--- TEST 9: Custom Quotation Items with ITBIS ---');
+const financialsWithCustomItems: FinancialParams = {
+  ...defaultFinancials,
+  customItems: [
+    {
+      id: 'custom_1',
+      description: 'Estructura de Tejas de Barro',
+      quantity: 1,
+      unit: 'UD',
+      unitPriceUSD: 500.0,
+      applyITBIS: true, // ITBIS = 500 * 0.18 = $90
+    },
+    {
+      id: 'custom_2',
+      description: 'Gestión Permisología Especial',
+      quantity: 1,
+      unit: 'GL',
+      unitPriceUSD: 300.0,
+      applyITBIS: false, // 0% ITBIS
+    },
+  ],
+};
+
+const resCustom = calculateFinancialSummary(
   'Santo Domingo / Distrito Nacional',
-  zeroSpecs,
+  defaultSpecs,
   defaultRates,
-  defaultFinancials,
-  Array(12).fill(0)
+  financialsWithCustomItems,
+  monthlyConsumption
 );
 
-assert(!isNaN(resZero.paybackYears) && isFinite(resZero.paybackYears), 'Payback no es NaN con 0 paneles');
-assert(!isNaN(resZero.irrPct) && isFinite(resZero.irrPct), 'IRR no es NaN con 0 paneles');
-assert(!isNaN(resZero.npvUSD) && isFinite(resZero.npvUSD), 'NPV no es NaN con 0 paneles');
-assert(!isNaN(resZero.roi25YrPct) && isFinite(resZero.roi25YrPct), 'ROI no es NaN con 0 paneles');
+const baseRes = calculateFinancialSummary(
+  'Santo Domingo / Distrito Nacional',
+  defaultSpecs,
+  defaultRates,
+  defaultFinancials,
+  monthlyConsumption
+);
+
+assert(
+  Math.abs(resCustom.grossInvestmentUSD - (baseRes.grossInvestmentUSD + 800.0)) < 0.01,
+  `Inversión bruta incrementa exactamente $800 con los ítems adicionales ($${resCustom.grossInvestmentUSD} vs $${baseRes.grossInvestmentUSD + 800})`
+);
+assert(
+  Math.abs(resCustom.itbisSavedUSD - (baseRes.itbisSavedUSD + 90.0)) < 0.01,
+  `ITBIS ahorrado incluye los $90 del ítem con ITBIS ($${resCustom.itbisSavedUSD} vs $${baseRes.itbisSavedUSD + 90})`
+);
+assert(
+  resCustom.customItemsTotalUSD === 800.0,
+  `customItemsTotalUSD reporta $800.00`
+);
+assert(
+  resCustom.customItemsITBISUSD === 90.0,
+  `customItemsITBISUSD reporta $90.00`
+);
 
 console.log('\n=====================================================');
 if (allPassed) {

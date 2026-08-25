@@ -455,6 +455,24 @@ export function renderProposalPage(stored: StoredProposal): string {
               <td class="px-4 py-2 text-center font-mono font-bold">1</td>
               <td class="px-4 py-2 text-center text-slate-500 font-normal">UD</td>
             </tr>
+            ${(Array.isArray(financials.customItems) ? financials.customItems : []).map((cItem: any, idx: number) => `
+            <tr class="${idx % 2 === 0 ? 'bg-white' : 'bg-sky-50/30'}">
+              <td class="px-4 py-2 font-medium">
+                <span class="font-bold text-slate-900">${cItem.description || `Ítem Adicional #${idx + 1}`}</span>
+                ${cItem.applyITBIS ? `
+                  <span class="ml-2 text-[10px] px-1.5 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded font-normal">
+                    ITBIS 18%
+                  </span>
+                ` : `
+                  <span class="ml-2 text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 rounded font-normal">
+                    Exento ITBIS
+                  </span>
+                `}
+              </td>
+              <td class="px-4 py-2 text-center font-mono font-bold">${cItem.quantity || 1}</td>
+              <td class="px-4 py-2 text-center text-slate-500 font-normal">${cItem.unit || 'UD'}</td>
+            </tr>
+            `).join('')}
           </tbody>
         </table>
       </div>
