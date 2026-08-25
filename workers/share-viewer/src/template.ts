@@ -378,7 +378,7 @@ export function renderProposalPage(stored: StoredProposal): string {
           </thead>
           <tbody class="divide-y divide-slate-200 text-[11px] font-semibold text-slate-700">
             ${monthlyData.map((row: any, idx: number) => {
-              const rowCoverage = row.consumptionKWh > 0 ? Math.min(100, (row.productionKWh / row.consumptionKWh) * 100) : 0;
+              const rowCoverage = row.consumptionKWh > 0 ? ((row.productionKWh / row.consumptionKWh) * 100) : 0;
               return `
               <tr class="${idx % 2 === 0 ? 'bg-sky-50/30' : 'bg-white'}">
                 <td class="px-4 py-1.5 font-bold text-slate-900">${row.month}</td>

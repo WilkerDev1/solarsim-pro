@@ -130,7 +130,7 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
               <tbody className="divide-y divide-gray-200 font-semibold text-gray-700 text-[11px]">
                 {summary.monthlyBreakdown.map((row, idx) => {
                   const monthCoverage = row.consumptionKWh > 0
-                    ? Math.min(100, (row.productionKWh / row.consumptionKWh) * 100)
+                    ? (row.productionKWh / row.consumptionKWh) * 100
                     : 0;
                   return (
                     <tr key={idx} className={idx % 2 === 0 ? 'bg-gray-50/60' : 'bg-white'}>

@@ -201,7 +201,7 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
                 <td className="py-2 px-4 text-right font-semibold">{row.productionKWh.toFixed(1)}</td>
                 <td className="py-2 px-4 text-right font-semibold">{row.solarSelfConsumedKWh.toFixed(1)}</td>
                 <td className="py-2 px-4 text-right text-emerald-700 font-bold">
-                  {row.consumptionKWh > 0 ? Math.min(100, (row.productionKWh / row.consumptionKWh) * 100).toFixed(1) : 0}%
+                  {row.consumptionKWh > 0 ? ((row.productionKWh / row.consumptionKWh) * 100).toFixed(1) : '0.0'}%
                 </td>
               </tr>
             ))}

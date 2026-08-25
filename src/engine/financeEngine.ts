@@ -362,7 +362,7 @@ export function calculateFinancialSummary(
   const annualProductionKWh = monthlyResults.reduce((sum, m) => sum + m.productionKWh, 0);
   const year1SavingsUSD = monthlyResults.reduce((sum, m) => sum + m.savingsUSD, 0);
   const energyCoveragePct = annualConsumptionKWh > 0
-    ? Math.min(100, Math.round((annualProductionKWh / annualConsumptionKWh) * 1000) / 10)
+    ? Math.round((annualProductionKWh / annualConsumptionKWh) * 1000) / 10
     : 0;
 
   // Battery Usable Capacity & Backup Autonomy calculation
