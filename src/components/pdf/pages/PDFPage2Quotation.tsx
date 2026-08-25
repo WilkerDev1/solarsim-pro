@@ -208,6 +208,45 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
           </div>
         </div>
 
+        {/* DESGLOSE FINANCIERO DE PRECIOS */}
+        <div className="flex justify-end my-0.5">
+          <div className="w-[360px] bg-slate-50 border border-slate-200 rounded-lg p-2 space-y-1 text-[10px]">
+            <div className="flex justify-between text-slate-700">
+              <span className="font-bold">SUB-TOTAL (USD) SIN ITBIS :</span>
+              <span className="font-bold font-mono">
+                ${(summary.costMatrix?.precioNetoUSD || (summary.grossInvestmentUSD - summary.itbisSavedUSD)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div className="flex justify-between text-slate-900 bg-slate-200/80 px-2 py-0.5 rounded font-bold">
+              <span>TOTAL GENERAL (USD) :</span>
+              <span className="font-mono">
+                ${(summary.grossInvestmentUSD + (project.financials.applyITBISExemption ? summary.itbisSavedUSD : 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div className="flex justify-between font-bold" style={{ color: activeTheme.secondary }}>
+              <span>ITBIS A DESCONTAR POR LEY 57-07 US$ :</span>
+              <span className="font-mono">
+                ${summary.itbisSavedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div
+              className="flex justify-between text-white px-2 py-0.5 rounded font-bold"
+              style={{ backgroundColor: activeTheme.primary }}
+            >
+              <span>TOTAL GENERAL (USD) SI CALIFICA LEY 57-07 :</span>
+              <span className="font-mono">
+                ${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div className="flex justify-between text-slate-800 pt-0.5 border-t border-slate-300">
+              <span className="font-bold">PRECIO POR WATT (USD/W):</span>
+              <span className="font-bold font-mono" style={{ color: activeTheme.primary }}>
+                ${(project.specs.pricePerWattUSD || project.financials.pricePerWattUSD || (summary.solarInvestmentUSD / (summary.systemCapacityKWp * 1000)) || 1.13).toFixed(2)}
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* CONDICIONES ECONÓMICAS Y BENEFICIOS LEY 57-07 */}
         <div>
           <h3
