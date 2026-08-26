@@ -1,7 +1,7 @@
 {
   "name": "solarsim-pro",
   "private": true,
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "Simulador Fotovoltaico Técnico-Económico Profesional",
   "author": "WilkerDev1",
   "type": "module",
