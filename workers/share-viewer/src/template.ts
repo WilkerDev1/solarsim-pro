@@ -168,13 +168,44 @@ export function renderProposalPage(stored: StoredProposal): string {
     ? custom.projectSummarySubtitle.trim()
     : `Criterios de dimensionamiento técnico y solar para ${clientName}`;
 
-  const customP1 = custom.customProjectSummaryParagraph1 && custom.customProjectSummaryParagraph1.trim()
-    ? custom.customProjectSummaryParagraph1.trim()
-    : '';
+  const defaultP1 = `El consumo promedio anual de **${clientName}** es de **${annualConsumptionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh** (aprox. ${monthlyAvgConsumption.toLocaleString()} kWh/mes), por lo que se le propone la instalación de **${panelCount} ${panelBrandModel} (${panelPowerW}W)**, alcanzando una potencia DC instalada de **${systemCapacityKWp} kWp**. La producción energética estimada para este sistema es de **${annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh anuales**, representando el **${coveragePct.toFixed(1)}%** de cobertura del consumo total.`;
 
-  const customP2 = custom.customProjectSummaryParagraph2 && custom.customProjectSummaryParagraph2.trim()
-    ? custom.customProjectSummaryParagraph2.trim()
-    : '';
+  const defaultP2 = `Adicionalmente, se contempla la instalación de **${inverterCount} ${inverterBrandModel} (${inverterPowerKW} kW)**${hasBattery && batteryCapacityKWh > 0 ? ` y **${batteryCount} ${batteryBrandModel} (${batteryCapacityKWh} kWh)**` : ''}, ${custom.projectEngineeringScopeText || specs.installationServicesDesc || 'junto con todos los componentes de ingeniería complementarios (estructuras de montaje en aluminio anodizado de alta resistencia, cableado fotovoltaico resistente a rayos UV, protecciones en CC/CA, interruptores de desconexión y supresores de sobretensión) para garantizar un funcionamiento seguro, eficiente y duradero del sistema.'}.`;
+
+  const resolvedP1 = (() => {
+    let text = custom.customProjectSummaryParagraph1 && custom.customProjectSummaryParagraph1.trim()
+      ? custom.customProjectSummaryParagraph1.trim()
+      : defaultP1;
+    text = text
+      .replace(/{clientName}/gi, clientName)
+      .replace(/{panelCount}/gi, String(panelCount))
+      .replace(/{panelModel}/gi, `${panelBrandModel} (${panelPowerW}W)`)
+      .replace(/{systemCapacityKWp}/gi, `${systemCapacityKWp} kWp`)
+      .replace(/{annualProductionKWh}/gi, `${annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh`)
+      .replace(/{annualConsumptionKWh}/gi, `${annualConsumptionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh`)
+      .replace(/{energyCoveragePct}/gi, `${coveragePct.toFixed(1)}%`);
+    text = text.replace(/(\*\*?\s*)\d+\s+Módulos[^*]*?(\s*\*?\*?)/i, `$1${panelCount} ${panelBrandModel} (${panelPowerW}W)$2`);
+    text = text.replace(/(potencia\s+DC\s+instalada\s+de\s+\*\*?)\d+(?:\.\d+)?\s*kWp(\*\*?)/i, `$1${systemCapacityKWp} kWp$2`);
+    text = text.replace(/(producción\s+energética\s+estimada\s+para\s+este\s+sistema\s+es\s+de\s+\*\*?)[\d,.]+\s*kWh\s+anuales(\*\*?)/i, `$1${annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh anuales$2`);
+    text = text.replace(/(representando\s+el\s+\*\*?)[\d,.]+%\s*(\*\*?\s*del\s+consumo|\*\*?\s*de\s+cobertura)/i, `$1${coveragePct.toFixed(1)}%$2`);
+    return text;
+  })();
+
+  const resolvedP2 = (() => {
+    let text = custom.customProjectSummaryParagraph2 && custom.customProjectSummaryParagraph2.trim()
+      ? custom.customProjectSummaryParagraph2.trim()
+      : defaultP2;
+    text = text
+      .replace(/{inverterCount}/gi, String(inverterCount))
+      .replace(/{inverterModel}/gi, `${inverterBrandModel} (${inverterPowerKW} kW)`)
+      .replace(/{batteryCount}/gi, String(batteryCount))
+      .replace(/{batteryModel}/gi, `${batteryBrandModel} (${batteryCapacityKWh} kWh)`);
+    text = text.replace(/(instalación\s+de\s+\*\*?)\d+\s+Inversor[^*]*?(\*\*?)/i, `$1${inverterCount} ${inverterBrandModel} (${inverterPowerKW} kW)$2`);
+    if (hasBattery && batteryCapacityKWh > 0 && /Batería/i.test(text)) {
+      text = text.replace(/(y\s+\*\*?)\d+\s+Batería[^*]*?(\*\*?)/i, `$1${batteryCount} ${batteryBrandModel} (${batteryCapacityKWh} kWh)$2`);
+    }
+    return text;
+  })();
 
   const engineeringScopeText = custom.projectEngineeringScopeText !== undefined && custom.projectEngineeringScopeText.trim() !== ''
     ? custom.projectEngineeringScopeText.trim()
@@ -292,20 +323,8 @@ export function renderProposalPage(stored: StoredProposal): string {
       </div>
 
       <div class="space-y-3.5 text-xs text-slate-700 leading-relaxed text-justify">
-        ${customP1 ? `
-        <p class="whitespace-pre-line">${formatMarkdown(customP1)}</p>
-        ` : `
-        <p>
-          El consumo promedio anual de <strong class="text-slate-950 font-bold">${clientName}</strong> es de <strong class="text-slate-950 font-mono font-bold">${annualConsumptionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh</strong> (aprox. ${monthlyAvgConsumption.toLocaleString()} kWh/mes), por lo que se le propone la instalación de <strong class="font-bold text-slate-950">${panelCount} ${panelBrandModel} (${panelPowerW}W)</strong>, alcanzando una potencia DC instalada de <strong class="font-black font-mono text-orange-600">${systemCapacityKWp} kWp</strong>. La producción energética estimada para este sistema es de <strong class="font-bold font-mono text-slate-950">${annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh anuales</strong>, representando el <strong class="font-black text-sky-700">${coveragePct.toFixed(1)}%</strong> de cobertura del consumo total.
-        </p>
-        `}
-        ${customP2 ? `
-        <p class="whitespace-pre-line">${formatMarkdown(customP2)}</p>
-        ` : `
-        <p>
-          Adicionalmente, se contempla la instalación de <strong class="text-slate-950 font-bold">${inverterCount} ${inverterBrandModel} (${inverterPowerKW} kW)</strong>${hasBattery && batteryCapacityKWh > 0 ? ` y <strong class="text-slate-950 font-bold">${batteryCount} ${batteryBrandModel} (${batteryCapacityKWh} kWh)</strong>` : ''}, ${formatMarkdown(engineeringScopeText)}.
-        </p>
-        `}
+        <p class="whitespace-pre-line">${formatMarkdown(resolvedP1)}</p>
+        <p class="whitespace-pre-line">${formatMarkdown(resolvedP2)}</p>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-2">

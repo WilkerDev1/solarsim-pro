@@ -6,7 +6,7 @@ import { PDFFooter } from '../PDFFooter';
 import { PDFWatermark } from '../PDFWatermark';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
 import { FileText, ShieldAlert, Sparkles, Zap, BatteryCharging } from 'lucide-react';
-import { renderFormattedMarkdown } from '../../../utils/textFormatter';
+import { renderFormattedMarkdown, resolveDynamicProjectSummaryParagraph1, resolveDynamicProjectSummaryParagraph2 } from '../../../utils/textFormatter';
 
 import { InlineEditableText } from '../common/InlineEditableText';
 
@@ -78,6 +78,26 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
 
   const defaultParagraph2 = `Adicionalmente, se contempla la instalación de **${project.specs.inverterCount || 1} ${inverterModel}**${project.specs.hasBattery && project.specs.batteryCapacityKWh > 0 ? ` y **${project.specs.batteryCount || 1} ${batteryModel}**` : ''} ${cust.projectEngineeringScopeText !== undefined && cust.projectEngineeringScopeText.trim() !== '' ? cust.projectEngineeringScopeText.trim() : DEFAULT_DOCUMENT_CUSTOMIZATION.projectEngineeringScopeText}`;
 
+  const resolvedParagraph1 = resolveDynamicProjectSummaryParagraph1(
+    cust.customProjectSummaryParagraph1,
+    defaultParagraph1,
+    project,
+    summary,
+    clientName,
+    panelModel
+  );
+
+  const resolvedParagraph2 = resolveDynamicProjectSummaryParagraph2(
+    cust.customProjectSummaryParagraph2,
+    defaultParagraph2,
+    project,
+    inverterModel,
+    batteryModel,
+    cust.projectEngineeringScopeText !== undefined && cust.projectEngineeringScopeText.trim() !== ''
+      ? cust.projectEngineeringScopeText.trim()
+      : DEFAULT_DOCUMENT_CUSTOMIZATION.projectEngineeringScopeText || ''
+  );
+
   const defaultRegulatoryText = paragraphs.join('\n\n');
 
   return (
@@ -134,7 +154,7 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
 
           <div className="p-4 rounded-2xl border border-slate-200 bg-white shadow-xs space-y-3 leading-relaxed text-justify">
             <InlineEditableText
-              value={cust.customProjectSummaryParagraph1}
+              value={resolvedParagraph1}
               defaultValue={defaultParagraph1}
               onSave={(val) => updateDocumentCustomization?.({ customProjectSummaryParagraph1: val })}
               isEditMode={isEditMode}
@@ -147,7 +167,7 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
             />
 
             <InlineEditableText
-              value={cust.customProjectSummaryParagraph2}
+              value={resolvedParagraph2}
               defaultValue={defaultParagraph2}
               onSave={(val) => updateDocumentCustomization?.({ customProjectSummaryParagraph2: val })}
               isEditMode={isEditMode}
