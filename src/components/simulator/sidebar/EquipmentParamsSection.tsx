@@ -155,7 +155,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
           {/* MODO SIMPLE: Catálogo Inteligente con Búsqueda en Tiempo Real y Escaneo con IA */}
           {!isDetailed ? (
             <div className="space-y-3">
-              {/* Selector Inteligente de Paneles */}
+              {/* 1. Selector Inteligente de Paneles */}
               <SearchableEquipmentSelect
                 type="panel"
                 items={equipmentCatalog}
@@ -168,38 +168,9 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                 isDark={isDark}
               />
 
-              {/* Potencia del Panel y Eficiencia */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                    Potencia Panel
-                  </label>
-                  <div
-                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-mono font-bold ${
-                      isDark ? 'bg-[#18181b] border-[#3f3f46] text-emerald-400' : 'bg-slate-100 border-slate-300 text-emerald-800'
-                    }`}
-                  >
-                    {project.specs.panelPowerW} Wp
-                  </div>
-                </div>
-
-                <div>
-                  <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                    Eficiencia / Coef.
-                  </label>
-                  <div
-                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-mono font-bold ${
-                      isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-200' : 'bg-slate-100 border-slate-300 text-slate-800'
-                    }`}
-                  >
-                    {project.specs.panelEfficiency || 22.0}% ({project.specs.tempCoeff || -0.29}%/°C)
-                  </div>
-                </div>
-              </div>
-
               {/* Toggle Auto-Calcular Paneles */}
               <div
-                className={`p-2.5 rounded-lg border space-y-1 ${
+                className={`p-2 rounded-lg border space-y-1 ${
                   isDark ? 'bg-emerald-950/40 border-emerald-800/60' : 'bg-emerald-50/60 border-emerald-200/80'
                 }`}
               >
@@ -241,7 +212,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                 />
               </div>
 
-              {/* Selector Inteligente de Inversores */}
+              {/* 2. Selector Inteligente de Inversores */}
               <SearchableEquipmentSelect
                 type="inverter"
                 items={equipmentCatalog}
@@ -253,6 +224,25 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                 placeholder="Buscar o seleccionar inversor..."
                 isDark={isDark}
               />
+
+              {/* Cantidad de Inversores */}
+              <div>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                  Cantidad de Inversores
+                </label>
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  value={project.specs.inverterCount || 1}
+                  onChange={(e) => updateSpecs({ inverterCount: parseInt(e.target.value) || 1 })}
+                  className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                    isDark
+                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
+                      : 'bg-slate-50 border-slate-300 text-slate-800'
+                  }`}
+                />
+              </div>
 
               {/* Botón Destacado: Escanear Ficha Técnica (IA) */}
               <div className="pt-1">
@@ -498,49 +488,21 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                       isDark={isDark}
                     />
 
-                    {/* Fila de Capacidad, DoD y Cantidad */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <div>
-                        <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                          Capacidad Unit.
-                        </label>
-                        <div
-                          className={`w-full border rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-center ${
-                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-cyan-400' : 'bg-white border-slate-300 text-cyan-800'
-                          }`}
-                        >
-                          {project.specs.batteryCapacityKWh || 16.08} kWh
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                          DoD Descarga
-                        </label>
-                        <div
-                          className={`w-full border rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-center ${
-                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-200' : 'bg-white border-slate-300 text-slate-800'
-                          }`}
-                        >
-                          {project.specs.batteryDOD || 90}%
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                          Cantidad
-                        </label>
-                        <input
-                          type="number"
-                          step="1"
-                          min="1"
-                          value={project.specs.batteryCount || 1}
-                          onChange={(e) => updateSpecs({ batteryCount: parseInt(e.target.value) || 1 })}
-                          className={`w-full border rounded-lg px-2.5 py-1.5 text-xs font-bold text-center ${
-                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                          }`}
-                        />
-                      </div>
+                    {/* Cantidad de Baterías */}
+                    <div>
+                      <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                        Cantidad de Baterías
+                      </label>
+                      <input
+                        type="number"
+                        step="1"
+                        min="1"
+                        value={project.specs.batteryCount || 1}
+                        onChange={(e) => updateSpecs({ batteryCount: parseInt(e.target.value) || 1 })}
+                        className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                        }`}
+                      />
                     </div>
                   </div>
                 ) : (
