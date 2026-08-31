@@ -74,7 +74,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
             <button
               type="button"
               onClick={() => {
-                const autoWp = Math.round((summary.costMatrix.salePricePerWattUSD || project.specs.pricePerWattUSD || 1.15) * 100) / 100;
+                const autoWp = Math.round(((summary?.costMatrix?.salePricePerWattUSD) || project.specs.pricePerWattUSD || 1.15) * 100) / 100;
                 updateSpecs({
                   pricingMode: 'direct_watt',
                   pricePerWattUSD: autoWp,
@@ -241,14 +241,14 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                   <div className="flex justify-between text-[11px]">
                     <span className={isDark ? 'text-zinc-400' : 'text-slate-500'}>Margen Multiplicador:</span>
                     <span className="font-bold text-amber-500">
-                      {(summary.costMatrix.saleMarginMultiplier || 1.25).toFixed(2)}x (+{(summary.costMatrix.markupOnCostPct || 0).toFixed(1)}% s/costo)
+                      {((summary?.costMatrix?.saleMarginMultiplier) || 1.25).toFixed(2)}x (+{((summary?.costMatrix?.markupOnCostPct) || 0).toFixed(1)}% s/costo)
                     </span>
                   </div>
 
                   <div className="flex justify-between text-[11px]">
                     <span className={isDark ? 'text-zinc-400' : 'text-slate-500'}>Ganancia Neta:</span>
                     <span className="font-extrabold text-emerald-500">
-                      +${(summary.costMatrix.gananciaUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD
+                      +${((summary?.costMatrix?.gananciaUSD) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD
                     </span>
                   </div>
                 </div>
@@ -261,7 +261,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    const autoWp = Math.round((summary.costMatrix.salePricePerWattUSD || 1.15) * 100) / 100;
+                    const autoWp = Math.round(((summary?.costMatrix?.salePricePerWattUSD) || 1.15) * 100) / 100;
                     updateSpecs({
                       pricePerWattUSD: autoWp,
                       pricePerKWpUSD: Math.round(autoWp * 1000 * 100) / 100,
@@ -471,8 +471,8 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
 
               {/* 3. GRUPO: Desglose Comercial en Vivo (Costo vs Ganancia vs Precio Venta) */}
               {(() => {
-                const autoSaleWp = Math.round((summary.costMatrix.salePricePerWattUSD || 1.08) * 100) / 100;
-                const costWp = Math.round((summary.costMatrix.costPerWattUSD || 0.86) * 100) / 100;
+                const autoSaleWp = Math.round(((summary?.costMatrix?.salePricePerWattUSD) || 1.08) * 100) / 100;
+                const costWp = Math.round(((summary?.costMatrix?.costPerWattUSD) || 0.86) * 100) / 100;
                 const profitWp = Math.max(0, Math.round((autoSaleWp - costWp) * 100) / 100);
                 const marginPct = Math.round(((project.specs.saleMarginMultiplier || 1.25) - 1) * 100 * 10) / 10;
 

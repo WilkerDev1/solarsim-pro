@@ -34,14 +34,14 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
   // Filtrar y ordenar alfabéticamente
   const filteredAndSortedItems = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    return items
+    return (items || [])
       .filter((item) => {
-        if (item.type !== type) return false;
+        if (!item || item.type !== type) return false;
         if (!q) return true;
         return (
-          item.displayName.toLowerCase().includes(q) ||
-          item.brand.toLowerCase().includes(q) ||
-          item.modelSeries.toLowerCase().includes(q) ||
+          (item.displayName && item.displayName.toLowerCase().includes(q)) ||
+          (item.brand && item.brand.toLowerCase().includes(q)) ||
+          (item.modelSeries && item.modelSeries.toLowerCase().includes(q)) ||
           (item.powerW && item.powerW.toString().includes(q)) ||
           (item.powerKW && item.powerKW.toString().includes(q)) ||
           (item.capacityKWh && item.capacityKWh.toString().includes(q)) ||
@@ -51,7 +51,7 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
           (item.category && item.category.toLowerCase().includes(q))
         );
       })
-      .sort((a, b) => a.displayName.localeCompare(b.displayName, 'es', { sensitivity: 'base' }));
+      .sort((a, b) => (a.displayName || '').localeCompare(b.displayName || '', 'es', { sensitivity: 'base' }));
   }, [items, type, searchQuery]);
 
   // Manejar clic afuera para cerrar dropdown

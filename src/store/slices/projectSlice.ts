@@ -369,18 +369,20 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
 
   getActiveProject: () => {
     const state = get();
-    return state.projects.find((p) => p.id === state.activeProjectId) || state.projects[0] || BENCHMARK_PROJECT;
+    const found = state.projects.find((p) => p.id === state.activeProjectId);
+    if (found && found.client && found.specs && found.rates) return found;
+    return state.projects[0] || BENCHMARK_PROJECT;
   },
 
   getFinancialSummary: () => {
     const p = get().getActiveProject();
     return calculateFinancialSummary(
-      p.client.province,
-      p.specs,
-      p.rates,
-      p.financials,
-      p.monthlyConsumption,
-      p.client.customMonthlyHSP
+      p.client?.province || 'Santo Domingo / Distrito Nacional',
+      p.specs || BENCHMARK_PROJECT.specs,
+      p.rates || BENCHMARK_PROJECT.rates,
+      p.financials || BENCHMARK_PROJECT.financials,
+      p.monthlyConsumption || BENCHMARK_PROJECT.monthlyConsumption,
+      p.client?.customMonthlyHSP
     );
   },
 });

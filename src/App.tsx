@@ -13,9 +13,10 @@ import { ImportConflictModal } from './components/common/ImportConflictModal';
 import { ShareProposalModal } from './components/common/ShareProposalModal';
 import { SettingsModal } from './components/common/SettingsModal';
 import { SplashScreen } from './components/common/SplashScreen';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 export const App: React.FC = () => {
-  const { activeView, sidebarTheme } = useSimulationStore();
+  const { activeView, setActiveView, sidebarTheme } = useSimulationStore();
   const isDark = sidebarTheme === 'dark';
 
   return (
@@ -29,9 +30,11 @@ export const App: React.FC = () => {
 
       <Header />
       <main className="flex-1 flex overflow-hidden min-h-0 w-full">
-        {activeView === 'dashboard' && <DashboardView />}
-        {activeView === 'simulator' && <SimulatorView />}
-        {activeView === 'pdf-preview' && <PDFProposalView />}
+        <ErrorBoundary onReset={() => setActiveView('dashboard')}>
+          {activeView === 'dashboard' && <DashboardView />}
+          {activeView === 'simulator' && <SimulatorView />}
+          {activeView === 'pdf-preview' && <PDFProposalView />}
+        </ErrorBoundary>
       </main>
 
       {/* Global Modals Mounted at Root Level */}

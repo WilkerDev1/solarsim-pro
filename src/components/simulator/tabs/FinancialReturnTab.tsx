@@ -20,7 +20,7 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
   project,
   summary,
 }) => {
-  const cf25 = summary.cashFlow25Years;
+  const cf25 = summary?.cashFlow25Years || [];
   const year1Savings = cf25[0]?.savingsUSD || 0;
   const year1Tax = cf25[0]?.taxCreditUSD || 0;
 
@@ -32,8 +32,8 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
 
   const cumulativeChartData = cf25.map((row) => ({
     yearLabel: `Año ${row.year}`,
-    cumulative: Math.round(row.cumulativeCashFlowUSD),
-    netCashFlow: Math.round(row.netCashFlowUSD),
+    cumulative: Math.round(row.cumulativeCashFlowUSD || 0),
+    netCashFlow: Math.round(row.netCashFlowUSD || 0),
   }));
 
   return (

@@ -31,11 +31,11 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
         </div>
         <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">POTENCIA FOTOVOLTAICA</span>
-          <span className="text-lg font-bold text-emerald-800">{summary.systemCapacityKWp.toFixed(2)} kWp</span>
+          <span className="text-lg font-bold text-emerald-800">{((summary?.systemCapacityKWp) || 0).toFixed(2)} kWp</span>
         </div>
         <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">INVERSIÓN NETA (LEY 57-07)</span>
-          <span className="text-lg font-bold text-emerald-700">${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</span>
+          <span className="text-lg font-bold text-emerald-700">${((summary?.netInvestmentUSD) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</span>
         </div>
         <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">VALIDEZ OFERTA</span>

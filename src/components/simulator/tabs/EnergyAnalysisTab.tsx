@@ -26,10 +26,10 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
   updateMonthlyConsumption,
   updateAllMonthlyConsumption,
 }) => {
-  const totalConsumptionKWh = summary.monthlyBreakdown.reduce((sum, m) => sum + m.consumptionKWh, 0);
-  const totalProductionKWh = summary.monthlyBreakdown.reduce((sum, m) => sum + m.productionKWh, 0);
-  const totalSavingsKWh = summary.monthlyBreakdown.reduce((sum, m) => sum + m.solarSelfConsumedKWh, 0);
-  const avgCoveragePct = summary.energyCoveragePct;
+  const totalConsumptionKWh = (summary?.monthlyBreakdown || []).reduce((sum, m) => sum + (m.consumptionKWh || 0), 0);
+  const totalProductionKWh = (summary?.monthlyBreakdown || []).reduce((sum, m) => sum + (m.productionKWh || 0), 0);
+  const totalSavingsKWh = (summary?.monthlyBreakdown || []).reduce((sum, m) => sum + (m.solarSelfConsumedKWh || 0), 0);
+  const avgCoveragePct = summary?.energyCoveragePct || 0;
 
   const handleApplyToAllMonths = () => {
     const val = project.monthlyConsumption[0] || 0;
