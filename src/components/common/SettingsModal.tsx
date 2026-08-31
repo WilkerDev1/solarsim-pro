@@ -27,7 +27,9 @@ import {
   Zap,
   Cpu,
   Check,
+  Layers,
 } from 'lucide-react';
+import { EquipmentManagerSettingsTab } from './EquipmentManagerSettingsTab';
 import { SyncService, PingResult } from '../../services/syncService';
 import {
   validateGeminiApiKey,
@@ -56,6 +58,7 @@ export const SettingsModal: React.FC = () => {
     geminiModel,
     setGeminiModel,
     sidebarTheme,
+    equipmentCatalog,
   } = useSimulationStore();
 
   const isDark = sidebarTheme === 'dark';
@@ -453,6 +456,31 @@ export const SettingsModal: React.FC = () => {
           >
             <Sparkles className="w-4 h-4 text-purple-400" />
             <span>IA Gemini</span>
+          </button>
+
+          <button
+            onClick={() => setSettingsActiveTab('equipment')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-t-xl text-xs font-bold transition-all cursor-pointer border-b-2 ${
+              settingsActiveTab === 'equipment'
+                ? isDark
+                  ? 'border-emerald-500 bg-[#18181b] text-emerald-400'
+                  : 'border-emerald-600 bg-white text-emerald-800 shadow-xs'
+                : isDark
+                ? 'border-transparent text-zinc-400 hover:text-zinc-200'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Layers className="w-4 h-4 text-emerald-400" />
+            <span>Catálogo de Equipos</span>
+            <span
+              className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                isDark
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+              }`}
+            >
+              {equipmentCatalog.length}
+            </span>
           </button>
         </div>
 
@@ -1212,6 +1240,11 @@ export const SettingsModal: React.FC = () => {
                 </button>
               </div>
             </div>
+          )}
+
+          {/* TAB 5: EQUIPMENT CATALOG MANAGER */}
+          {settingsActiveTab === 'equipment' && (
+            <EquipmentManagerSettingsTab isDark={isDark} />
           )}
         </div>
 

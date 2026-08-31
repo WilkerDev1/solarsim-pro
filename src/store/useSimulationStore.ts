@@ -32,7 +32,7 @@ interface SimulationState {
   isAISettingsModalOpen: boolean;
   isShareModalOpen: boolean;
   isSettingsModalOpen: boolean;
-  settingsActiveTab: 'sync' | 'account' | 'share' | 'ai';
+  settingsActiveTab: 'sync' | 'account' | 'share' | 'ai' | 'equipment';
   updateInfo: UpdateInfo;
   saveFeedbackMessage: string | null;
 
@@ -66,14 +66,16 @@ interface SimulationState {
   closeAISettingsModal: () => void;
   openShareModal: () => void;
   closeShareModal: () => void;
-  openSettingsModal: (tab?: 'sync' | 'account' | 'share' | 'ai') => void;
+  openSettingsModal: (tab?: 'sync' | 'account' | 'share' | 'ai' | 'equipment') => void;
   closeSettingsModal: () => void;
-  setSettingsActiveTab: (tab: 'sync' | 'account' | 'share' | 'ai') => void;
+  setSettingsActiveTab: (tab: 'sync' | 'account' | 'share' | 'ai' | 'equipment') => void;
   
   // Equipment Actions
   addEquipmentItem: (item: SolarEquipmentItem) => void;
   addEquipmentBatch: (items: SolarEquipmentItem[]) => void;
+  updateEquipmentItem: (id: string, updates: Partial<SolarEquipmentItem>) => void;
   removeEquipmentItem: (id: string) => void;
+  resetEquipmentCatalogToDefaults: () => void;
   syncEquipmentWithServer: () => Promise<{ success: boolean; message: string }>;
   setSyncSettings: (settings: Partial<SyncSettings>) => void;
   loginUser: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
@@ -444,10 +446,39 @@ export const useSimulationStore = create<SimulationState>()(
         }
       },
 
+      updateEquipmentItem: (id, updates) => {
+        set((state) => ({
+          equipmentCatalog: state.equipmentCatalog.map((e) =>
+            e.id === id ? { ...e, ...updates, updatedAt: new Date().toISOString() } : e
+          ),
+          saveFeedbackMessage: '¡Equipo actualizado con éxito! ✨',
+        }));
+        setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
+        if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
+          get().syncEquipmentWithServer();
+        }
+      },
+
       removeEquipmentItem: (id) => {
         set((state) => ({
           equipmentCatalog: state.equipmentCatalog.filter((e) => e.id !== id),
+          saveFeedbackMessage: 'Equipo eliminado del catálogo',
         }));
+        setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
+        if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
+          get().syncEquipmentWithServer();
+        }
+      },
+
+      resetEquipmentCatalogToDefaults: () => {
+        set({
+          equipmentCatalog: DEFAULT_EQUIPMENT_CATALOG,
+          saveFeedbackMessage: 'Catálogo restablecido a modelos verificados oficiales',
+        });
+        setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
+        if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
+          get().syncEquipmentWithServer();
+        }
       },
 
       syncEquipmentWithServer: async () => {
@@ -1492,6 +1523,20 @@ export const useSimulationStore = create<SimulationState>()(
         if (state) {
           if (!state.equipmentCatalog || !Array.isArray(state.equipmentCatalog) || state.equipmentCatalog.length === 0) {
             state.equipmentCatalog = DEFAULT_EQUIPMENT_CATALOG;
+          } else {
+            const legacyDefaultIdsToRemove = new Set([
+              'eq-mod-ja-550', 'eq-mod-ja-545', 'eq-mod-ja-570', 'eq-mod-jinko-575', 'eq-mod-trina-580', 'eq-mod-longi-585',
+              'eq-inv-solis-5k', 'eq-inv-solis-6k', 'eq-inv-solis-10k-3p', 'eq-inv-deye-8k-us', 'eq-inv-deye-12k-3p',
+              'eq-inv-growatt-6k', 'eq-inv-growatt-10k', 'eq-inv-sungrow-50k', 'eq-inv-huawei-10k',
+              'eq-bat-hinaess-14k', 'eq-bat-hinaess-5k', 'eq-bat-dyness-10k', 'eq-bat-felicity-10k', 'eq-bat-felicity-5k',
+              'eq-bat-pylontech-5k', 'eq-bat-pylontech-3.5k', 'eq-bat-deye-5k', 'eq-bat-deye-6k', 'eq-bat-byd-4k', 'eq-bat-huawei-5k'
+            ]);
+            state.equipmentCatalog = state.equipmentCatalog.filter((e) => !legacyDefaultIdsToRemove.has(e.id));
+            DEFAULT_EQUIPMENT_CATALOG.forEach((def) => {
+              if (!state.equipmentCatalog.some((e) => e.id === def.id || e.displayName === def.displayName)) {
+                state.equipmentCatalog.push(def);
+              }
+            });
           }
         }
       },

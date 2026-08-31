@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { SolarEquipmentItem, EquipmentType } from '../../../types/equipment';
-import { Search, ChevronDown, Check, Sparkles, Sun, Zap, BatteryCharging, X } from 'lucide-react';
+import { useSimulationStore } from '../../../store/useSimulationStore';
+import { Search, ChevronDown, Check, Sparkles, Sun, Zap, BatteryCharging, X, Layers } from 'lucide-react';
 
 interface SearchableEquipmentSelectProps {
   type: EquipmentType;
@@ -282,9 +283,9 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
             )}
           </div>
 
-          {/* Footer del Dropdown con botón de Escanear Datasheet con IA */}
+          {/* Footer del Dropdown con botón de Escanear Datasheet con IA y Administrar Catálogo */}
           <div
-            className={`p-2 border-t flex items-center justify-between ${
+            className={`p-2 border-t flex items-center gap-1.5 ${
               isDark ? 'bg-[#14141c] border-[#27272a]' : 'bg-slate-50 border-slate-200'
             }`}
           >
@@ -294,10 +295,27 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
                 setIsOpen(false);
                 onOpenScanner();
               }}
-              className="w-full py-1.5 px-2 rounded-lg bg-gradient-to-r from-purple-600/20 to-indigo-600/20 hover:from-purple-600/30 hover:to-indigo-600/30 text-purple-400 border border-purple-500/30 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              className="flex-1 py-1.5 px-2 rounded-lg bg-gradient-to-r from-purple-600/20 to-indigo-600/20 hover:from-purple-600/30 hover:to-indigo-600/30 text-purple-400 border border-purple-500/30 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-              <span>Escanear Ficha Técnica con IA</span>
+              <span>Escanear con IA</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                useSimulationStore.getState().openSettingsModal('equipment');
+              }}
+              title="Administrar catálogo en Ajustes"
+              className={`p-1.5 rounded-lg border text-xs transition-all cursor-pointer flex items-center gap-1 ${
+                isDark
+                  ? 'border-[#3f3f46] hover:bg-[#272732] text-zinc-300'
+                  : 'border-slate-300 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="text-[10px] font-semibold">Catálogo</span>
             </button>
           </div>
         </div>
