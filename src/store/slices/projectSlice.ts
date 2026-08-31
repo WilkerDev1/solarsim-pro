@@ -7,7 +7,7 @@ import { calculateRecommendedPanelCount } from '../../engine/solarEngine';
 
 export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => ({
   projects: INITIAL_PROJECTS,
-  activeProjectId: BENCHMARK_PROJECT.id,
+  activeProjectId: '',
   activeView: 'simulator',
   searchQuery: '',
   statusFilter: 'All',

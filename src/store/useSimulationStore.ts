@@ -47,6 +47,10 @@ export const useSimulationStore = create<SimulationStore>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (state && state.projects && Array.isArray(state.projects)) {
+          // Remove legacy hardcoded mock projects to prevent DB sync conflicts
+          const mockProjectIds = new Set(['benchmark-centro-medico', 'proj-logistics-hub', 'proj-residential-42']);
+          state.projects = state.projects.filter((p) => !mockProjectIds.has(p.id));
+
           // Clean legacy projects that had '(Copia)' embedded in client.name
           let hasChanges = false;
           const cleaned = state.projects.map((p) => {
@@ -70,6 +74,9 @@ export const useSimulationStore = create<SimulationStore>()(
           });
           if (hasChanges) {
             state.projects = cleaned;
+          }
+          if (state.projects.length > 0 && (!state.activeProjectId || !state.projects.some((p) => p.id === state.activeProjectId))) {
+            state.activeProjectId = state.projects[0].id;
           }
         }
         if (state) {
