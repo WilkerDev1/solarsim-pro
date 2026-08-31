@@ -99,6 +99,13 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
         }
       }
 
+      // 3. Sincronizar catálogo de equipos con la nube
+      try {
+        await get().syncEquipmentWithServer();
+      } catch (eqErr) {
+        console.warn('Sync equipment warning:', eqErr);
+      }
+
       const newTimestamp = pullRes.serverTimestamp || new Date().toISOString();
       set((state) => ({
         projects: currentProjects,

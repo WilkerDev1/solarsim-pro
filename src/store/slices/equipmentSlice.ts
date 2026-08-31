@@ -1,6 +1,7 @@
 import { SimulationSlice, EquipmentSlice } from '../types';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../../data/defaultEquipmentCatalog';
 import { SolarEquipmentItem } from '../../types/equipment';
+import { SyncService } from '../../services/syncService';
 
 export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (set, get) => ({
   equipmentCatalog: DEFAULT_EQUIPMENT_CATALOG,
@@ -87,24 +88,39 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (set, get) 
 
   syncEquipmentWithServer: async () => {
     const { serverUrl, authToken } = get().syncSettings;
-    if (!authToken) return { success: false, message: 'No autenticado' };
+    if (!authToken) {
+      return { success: false, message: 'No autenticado. Inicia sesión en "Cuenta & Permisos".' };
+    }
 
     try {
-      const res = await fetch(`${serverUrl.replace(/\/+$/, '')}/api/equipment/batch`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({ items: get().equipmentCatalog }),
-      });
-
-      if (res.ok) {
-        return { success: true, message: 'Catálogo de equipos sincronizado con la nube' };
+      // 1. Push lote local de equipos hacia el servidor
+      const pushRes = await SyncService.pushEquipmentBatch(serverUrl, authToken, get().equipmentCatalog);
+      if (!pushRes.success) {
+        return { success: false, message: pushRes.error || 'Error al subir catálogo al servidor' };
       }
-      return { success: false, message: 'Error al sincronizar equipos' };
+
+      // 2. Pull de equipos desde el servidor para incorporar nuevos modelos del equipo
+      const pullRes = await SyncService.pullEquipment(serverUrl, authToken);
+      if (pullRes.success && pullRes.items && pullRes.items.length > 0) {
+        const localMap = new Map(get().equipmentCatalog.map((item) => [item.id, item]));
+        let hasNew = false;
+        for (const serverItem of pullRes.items) {
+          if (!localMap.has(serverItem.id)) {
+            localMap.set(serverItem.id, serverItem);
+            hasNew = true;
+          }
+        }
+        if (hasNew) {
+          set({ equipmentCatalog: Array.from(localMap.values()) });
+        }
+      }
+
+      return {
+        success: true,
+        message: `¡${get().equipmentCatalog.length} equipos sincronizados exitosamente con la nube!`,
+      };
     } catch (e: any) {
-      return { success: false, message: e.message || 'Error de red' };
+      return { success: false, message: e.message || 'Error de conexión con el servidor' };
     }
   },
 });
