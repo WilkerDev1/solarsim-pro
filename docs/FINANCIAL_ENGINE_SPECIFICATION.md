@@ -61,7 +61,8 @@ $$S_{yr1} = \sum_{m=1}^{12} S_{m}$$
 ### 1.4 Facturación Eléctrica Neta
 $$\text{Factura Original}_{m} = C_{m} \times T_{kwh}$$
 $$\text{Factura Neta con Solar}_{m} = \max(0, \text{Factura Original}_{m} - S_{m})$$
-$$\text{Cobertura Solar Anual (\%)} = \min\left(100\%, \frac{E_{anual}}{\sum_{m=1}^{12} C_{m}} \times 100\right)$$
+$$\text{Cobertura Solar Anual (\%)} = \frac{E_{anual}}{\sum_{m=1}^{12} C_{m}} \times 100$$
+*(Reporta el porcentaje físico y real de generación vs consumo anual sin límites artificiales).*
 
 ---
 
@@ -96,14 +97,20 @@ El costeo comercial se fundamenta en una matriz detallada de cuatro renglones op
    $$\text{Costo Baterías (USD)} = \begin{cases} N_{bat} \times P_{u,bat} & \text{si } \text{hasBattery} = \text{true} \\ 0 & \text{si } \text{hasBattery} = \text{false} \end{cases} \quad (\text{ITBIS } 18\%)$$
 4. **Mano de Obra, Estructuras y Materiales Locales**:
    $$\text{Costo Instalación (USD)} = P_{dc} \times P_{u,inst} \quad (\text{ITBIS } 18\%)$$
+5. **Ítems y Servicios Adicionales Personalizados (`customQuotationItems`)**:
+   $$\text{Costo Ítems Extra (USD)} = \sum_{i=1}^{K} (\text{Cantidad}_i \times P_{u,i})$$
+   * Cada ítem adicional cuenta con la opción independiente **`Exonerar ITBIS (18%)`**:
+     * Si `exemptITBIS: true`: Su monto se suma a la base de equipos exonerados de ITBIS por la Ley 57-07.
+     * Si `exemptITBIS: false`: Se le aplica el 18% de ITBIS y se factura en el precio final al cliente.
 
 ---
 
 ### 3.2 Subtotales, ITBIS y Margen Comercial de Venta
 
-$$\text{Precio Neto Equipos (USD)} = \text{Costo Paneles} + \text{Costo Inversores} + \text{Costo Baterías} + \text{Costo Instalación}$$
-$$\text{ITBIS Total (USD)} = (\text{Costo Baterías} \times 0.18) + (\text{Costo Instalación} \times 0.18)$$
-$$\text{Total Neto con ITBIS (USD)} = \text{Precio Neto Equipos} + \text{ITBIS Total}$$
+$$\text{Precio Neto Base (USD)} = \text{Costo Paneles} + \text{Costo Inversores} + \text{Costo Baterías} + \text{Costo Instalación} + \text{Costo Ítems Extra}$$
+$$\text{ITBIS Exonerado Matriz (USD)} = (\text{Costo Baterías} \times 0.18) + (\text{Costo Instalación} \times 0.18) + \sum_{i \in \text{Exentos}} (\text{Costo Ítem}_i \times 0.18)$$
+$$\text{ITBIS Gravado Facturable (USD)} = \sum_{i \notin \text{Exentos}} (\text{Costo Ítem}_i \times 0.18)$$
+$$\text{Total Neto con ITBIS (USD)} = \text{Precio Neto Base} + \text{ITBIS Exonerado Matriz} + \text{ITBIS Gravado Facturable}$$
 
 Aplicando el multiplicador de margen de venta $M_{venta}$ (típicamente $1.25\text{x}$ para $25\%$ de ganancia bruta):
 
@@ -116,7 +123,7 @@ $$\text{Ganancia Bruta Comercial (USD)} = I_{bruta} - \text{Total Neto con ITBIS
 
 $$P_{watt} \text{ (USD/W)} = \frac{I_{bruta}}{P_{dc} \times 1,000}$$
 
-* **Reactividad Automática**: Al agregar baterías ($N_{bat} > 0$), la inversión bruta $I_{bruta}$ y el $P_{watt}$ aumentan de forma proporcional. Al removerlas, se recalcula de inmediato el precio solar puro.
+* **Reactividad Automática**: Al agregar baterías ($N_{bat} > 0$) o ítems personalizados, la inversión bruta $I_{bruta}$ y el $P_{watt}$ aumentan de forma proporcional. Al removerlos, se recalcula de inmediato el precio solar puro.
 * **Sincronización `Auto`**: Si el usuario define un $P_{watt}$ personalizado en la barra lateral, el botón `✨ Auto` restaura en 1 clic el valor exacto derivado de la matriz de costos y el margen.
 
 ---
@@ -240,7 +247,7 @@ $$\text{CO}_{2, evitado} \text{ (Toneladas/Año)} = \frac{E_{anual} \times F_{co
 
 ## 7. 🎛️ Diccionario y Guía Técnica de Parámetros del Simulador
 
-Esta sección explica el **significado físico, técnico y financiero de cada parámetro** presente en la barra lateral del simulador (`src/components/simulator/SimulatorView.tsx`), su unidad de medida, valor por defecto e impacto en los cálculos.
+Esta sección explica el **significado físico, técnico y financiero de cada parámetro** presente en la barra lateral modular del simulador (`src/components/simulator/sidebar/ParameterSidebar.tsx`), sus componentes desacoplados (`ClientParamsSection`, `RatesParamsSection`, `EquipmentParamsSection`, `PricingParamsSection`, `FinancialsParamsSection`), su unidad de medida, valor por defecto e impacto en los cálculos.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -250,13 +257,13 @@ Esta sección explica el **significado físico, técnico y financiero de cada pa
 │  2. Tarifas y Distribuidora   → Tarifas eléctricas y Medición Neta     │
 │  3. Equipamiento y Marcas     → Paneles, Inversores, Baterías y Modo   │
 │  4. Costos y Margen de Venta  → Tasa DOP/USD, Costos Unitarios y Wp    │
-│  5. Finanzas e Incentivos     → Ley 57-07, Exoneración ITBIS y Tasa    │
+│  5. Finanzas e Incentivos     → Ley 57-07, Exoneración ITBIS e Ítems   │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-### 7.1 Sección 1: Proyecto y Cliente
+### 7.1 Sección 1: Proyecto y Cliente (`ClientParamsSection.tsx`)
 
 | Parámetro | Tipo / Control | Unidad / Formato | Valor por Defecto | Explicación Técnica y Comportamiento |
 | :--- | :--- | :--- | :--- | :--- |
@@ -272,7 +279,7 @@ Esta sección explica el **significado físico, técnico y financiero de cada pa
 
 ---
 
-### 7.2 Sección 2: Tarifas y Distribuidora
+### 7.2 Sección 2: Tarifas y Distribuidora (`RatesParamsSection.tsx`)
 
 | Parámetro | Tipo / Control | Unidad / Formato | Valor por Defecto | Explicación Técnica y Comportamiento |
 | :--- | :--- | :--- | :--- | :--- |
@@ -284,7 +291,7 @@ Esta sección explica el **significado físico, técnico y financiero de cada pa
 
 ---
 
-### 7.3 Sección 3: Equipamiento y Marcas
+### 7.3 Sección 3: Equipamiento y Marcas (`EquipmentParamsSection.tsx`)
 
 | Parámetro | Tipo / Control | Unidad / Formato | Valor por Defecto | Explicación Técnica y Comportamiento |
 | :--- | :--- | :--- | :--- | :--- |
@@ -319,7 +326,7 @@ Esta sección explica el **significado físico, técnico y financiero de cada pa
 
 ---
 
-### 7.4 Sección 4: Costos, Tasa de Cambio y Margen de Venta
+### 7.4 Sección 4: Costos, Tasa de Cambio y Margen de Venta (`PricingParamsSection.tsx`)
 
 | Parámetro | Tipo / Control | Unidad / Formato | Valor por Defecto | Explicación Técnica y Comportamiento |
 | :--- | :--- | :--- | :--- | :--- |
@@ -333,12 +340,14 @@ Esta sección explica el **significado físico, técnico y financiero de cada pa
 
 ---
 
-### 7.5 Sección 5: Finanzas e Incentivos
+### 7.5 Sección 5: Finanzas, Incentivos e Ítems Personalizados (`FinancialsParamsSection.tsx`)
 
 | Parámetro | Tipo / Control | Unidad / Formato | Valor por Defecto | Explicación Técnica y Comportamiento |
 | :--- | :--- | :--- | :--- | :--- |
 | **Aplicar Ley 57-07 (Crédito ISR 40%)** | Checkbox / Toggle | Booleano | `true` | Aplica el crédito fiscal del 40% sobre los equipos deducible del Impuesto Sobre la Renta (DGII) en 3 años fiscales. |
 | **Exoneración ITBIS 100% (18%)** | Checkbox / Toggle | Booleano | `true` | Aplica la exención del 100% del ITBIS (18%) sobre los equipos solares aprobados por la CNE y la DGII. |
+| **Ítems Adicionales en Cotización** | Formulario Dinámico | Lista de ítems | `[]` | Permite agregar renglones personalizados (descripción, cantidad, unidad, precio unitario USD). |
+| **Toggle "Exonerar ITBIS (18%)"** | Checkbox por Ítem | Booleano | `true` | • `true`: Se suma al ahorro fiscal exonerado de Ley 57-07.<br>• `false`: Se factura el 18% de ITBIS directo al cliente en la cotización. |
 | **Tasa de Descuento (%)** | Numérico | $\%$ ($0 - 50\%$) | `10.0%` | Tasa de oportunidad o costo del capital ($r$) empleada para descontar los flujos futuros en el cálculo del VAN (NPV). |
 | **Botón "Guardar"** | Botón de Acción | Persistencia | — | Guarda el estado completo de la simulación en el almacenamiento local persistente (`localStorage`). |
 | **Botón "Actualizar Simulación"** | Botón de Acción | Recálculo | — | Fuerza el recálculo instantáneo de todos los motores energéticos y financieros en tiempo real. |
@@ -370,9 +379,9 @@ Esta sección explica el **significado físico, técnico y financiero de cada pa
 ### 8.2 Comandos de Validación Automatizada
 
 ```bash
-# Validar el motor contra el benchmark oficial
+# Validar el motor contra el benchmark oficial de Centro Médico
 npx tsx src/engine/testBenchmark.ts
 
-# Ejecutar la suite integral de 8 pruebas unitarias financieras
+# Ejecutar la suite integral de 9 pruebas unitarias financieras (incluyendo ítems extra e ITBIS)
 npx tsx src/engine/testFinancialEngineComprehensive.ts
 ```

@@ -201,7 +201,7 @@ Cuando un conjunto de funciones en `beta` esté completamente listo y probado pa
    git checkout main
    git merge beta
    ```
-3. Ejecutar el **Protocolo de Lanzamiento de Release (Sección 5)** para compilar y publicar la nueva versión mayor/menor (ej. `v1.4.0`).
+3. Ejecutar el **Protocolo de Lanzamiento de Release (Sección 5)** para compilar y publicar la nueva versión mayor/menor (ej. `v1.5.0`).
 4. Sincronizar de vuelta a `beta`:
    ```bash
    git checkout beta
@@ -216,12 +216,13 @@ Cuando un conjunto de funciones en `beta` esté completamente listo y probado pa
 Este es el procedimiento exacto que ejecuto cuando solicitas publicar una actualización (ya sea un hotfix o una nueva versión estable):
 
 ### Paso 1: Actualizar la versión en `package.json`
-Modificar `"version"` (ejemplo: `"1.4.0"` o `"1.3.10"`).
+Modificar `"version"` (ejemplo: `"1.5.0"` o `"1.5.1"`).
 
 ### Paso 2: Validación de Tipos y Motores
 ```bash
-npm run lint                  # tsc --noEmit (Cero errores)
-npx tsx src/engine/testBenchmark.ts   # Validación matemática de Ley 57-07, VAN, TIR, Payback
+npm run lint                                            # tsc --noEmit (Cero errores)
+npx tsx src/engine/testBenchmark.ts                     # Validación matemática de Ley 57-07, VAN, TIR, Payback
+npx tsx src/engine/testFinancialEngineComprehensive.ts  # Suite integral de 9 pruebas unitarias
 ```
 
 ### Paso 3: Compilación del Frontend y Runtime de Electron
@@ -240,7 +241,7 @@ npx electron-builder --win --linux
 python3 -c "
 import shutil, os, subprocess
 
-v = '1.4.0' # Versión a lanzar
+v = '1.5.0' # Versión a lanzar
 
 # Copias de compatibilidad para electron-updater
 shutil.copyfile(f'release/SolarSim Pro Setup {v}.exe', f'release/SolarSim-Pro-Setup-{v}.exe')
@@ -261,21 +262,21 @@ for target in [f'release/solarsim-pro-{v}.pacman', f'release/solarsim-pro-{v}.ta
 ```
 
 ### Paso 6: Crear Notas de la Versión
-Crear el archivo `release/release-notes-v1.4.0.md` detallando las novedades y mejoras.
+Crear el archivo `release/release-notes-v1.5.0.md` detallando las novedades y mejoras.
 
 ### Paso 7: Commit, Tag y Push a GitHub
 ```bash
 git add .
-git commit -m "chore(release): Bump version to 1.4.0 and generate binaries"
-git tag v1.4.0
+git commit -m "chore(release): Bump version to 1.5.0 and generate binaries"
+git tag v1.5.0
 git push origin main --tags
 ```
 
 ### Paso 8: Publicar la Release Oficial en GitHub vía CLI (`gh`)
 ```bash
-gh release create v1.4.0 release/SolarSim* release/solarsim* release/latest* \
-  --title "⚡ SolarSim Pro v1.4.0" \
-  --notes-file release/release-notes-v1.4.0.md
+gh release create v1.5.0 release/SolarSim* release/solarsim* release/latest* \
+  --title "⚡ SolarSim Pro v1.5.0" \
+  --notes-file release/release-notes-v1.5.0.md
 ```
 
 ---

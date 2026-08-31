@@ -16,12 +16,15 @@ graph TD
     E -->|electron-builder| F[Windows NSIS / Portable .exe]
     E -->|electron-builder| G[Linux .pacman / .deb / .AppImage / .tar.gz]
     E -->|electron-updater| H[GitHub Releases API / Auto-Updates]
+    I[Cloudflare Worker & KV] -->|Hono API| J[Visor Web Propuestas /p/:id]
+    B -->|REST API /api/share| I
 ```
 
 ### Componentes Clave:
 * **Frontend**: React 18, TypeScript, Tailwind CSS, Lucide React, Recharts (gráficos solares e inversión), Zustand (estado global y persistencia).
 * **Motor de Simulación**: Módulos puros en TypeScript (`src/engine/`) para cálculo de balance de energía horaria/mensual, degradación de paneles, autoconsumo, tarifas EDES (BTS1/BTS2), Ley 57-07, Payback, VAN, TIR y ROI a 25 años.
 * **Generador de Documentos PDF**: `jspdf` + `html2canvas`. Todos los activos visuales (renders 3D, diagramas de flujo y logos) están pre-convertidos a Base64 en `src/assets/pdfGraphicAssets.ts` para evitar bloqueos por CORS o canvas tainting durante la exportación.
+* **Servicio Serverless de Propuestas Web**: Cloudflare Workers + KV (`workers/share-viewer/`) con Hono, generación de códigos QR y renderizado interactivo en la nube con TTL de expiración automática.
 * **Desktop & Actualizador**: Electron 31 + `electron-updater` conectado al repositorio `WilkerDev1/solarsim-pro`.
 
 ---
@@ -51,9 +54,11 @@ Para evitar roturas graves en el simulador y en los empaquetadores de escritorio
    ```
 3. **Verificación Obligatoria de Tipos y Pruebas**:
    ```bash
-   npm run lint                  # tsc --noEmit
-   npx tsx src/engine/testBenchmark.ts   # Validación matemática del motor
-   npm run build:electron && npm run build # Compilación de bundles
+   npm run lint                                            # tsc --noEmit (Cero errores)
+   npx tsx src/engine/testBenchmark.ts                     # Validación contra benchmark oficial
+   npx tsx src/engine/testFinancialEngineComprehensive.ts  # Suite integral de 9 pruebas financieras
+   npm run build && npm run build:electron                 # Compilación completa de bundles
+   npm run context:pack                                    # Snapshot empaquetado Repomix
    ```
 4. **Si hay Advertencias de Scripts (`allowScripts`)**:
    Revisar el listado en `package.json` bajo la clave `"allowScripts"` antes de aprobar nuevos paquetes con scripts de post-instalación:
@@ -74,13 +79,14 @@ El servicio de auto-actualización permite que cualquier usuario en Windows o Li
 ### 🌐 Flujo de Funcionamiento:
 
 ```
+```
 [ SolarSim Pro Cliente (v1.X) ]
             │
             ▼ (1. Al pulsar 'Buscar Actualizaciones' o en segundo plano)
 [ GitHub Releases API: WilkerDev1/solarsim-pro ]
             │
-            ├─► Windows: Descarga 'latest.yml' ──► Compara versión (ej. 1.2.0 vs 1.1.0)
-            │      └─► Si hay nueva versión: Descarga 'SolarSim-Pro-Setup-1.2.0.exe'
+            ├─► Windows: Descarga 'latest.yml' ──► Compara versión (ej. 1.5.0 vs 1.4.1)
+            │      └─► Si hay nueva versión: Descarga 'SolarSim-Pro-Setup-1.5.0.exe'
             │             └─► Ejecuta instalador NSIS silencioso al reiniciar la app.
             │
             └─► Linux: Descarga 'latest-linux.yml' ──► Detecta distro (Arch, Debian, Universal)
@@ -92,8 +98,8 @@ El servicio de auto-actualización permite que cualquier usuario en Windows o Li
 
 * `electron-updater` en Windows lee el manifiesto `latest.yml`.
 * **Regla Mandatoria**: El nombre del archivo en la URL de GitHub **DEBE COINCIDIR EXACTAMENTE** con el valor de `path` y `url` dentro de `latest.yml`.
-  * ✅ Correcto: `SolarSim-Pro-Setup-1.2.0.exe` (con guiones).
-  * ❌ Incorrecto: `SolarSim.Pro.Setup.1.2.0.exe` (si tiene puntos o espacios en la release pero guiones en el yml, causará **Error 404**).
+  * ✅ Correcto: `SolarSim-Pro-Setup-1.5.0.exe` (con guiones).
+  * ❌ Incorrecto: `SolarSim.Pro.Setup.1.5.0.exe` (si tiene puntos o espacios en la release pero guiones en el yml, causará **Error 404**).
 * Para máxima compatibilidad, el script de publicación siempre sube versiones con guiones y copias de seguridad con espacios.
 
 ---
@@ -114,13 +120,13 @@ Para evitar rechazos de seguridad en gestores de paquetes como `pacman` (`error:
 gpg --armor --export C22D550C3A2C8FAF > release/solarsim-public-key.asc
 
 # Firmar paquete pacman
-gpg --detach-sign --yes release/solarsim-pro-1.2.0.pacman
+gpg --detach-sign --yes release/solarsim-pro-1.5.0.pacman
 
 # Firmar paquete tar.gz
-gpg --detach-sign --yes release/solarsim-pro-1.2.0.tar.gz
+gpg --detach-sign --yes release/solarsim-pro-1.5.0.tar.gz
 
 # Firmar AppImage
-gpg --detach-sign --yes release/SolarSim-Pro-1.2.0.AppImage
+gpg --detach-sign --yes release/SolarSim-Pro-1.5.0.AppImage
 ```
 
 ---
@@ -130,32 +136,39 @@ gpg --detach-sign --yes release/SolarSim-Pro-1.2.0.AppImage
 Sigue esta lista de verificación cada vez que vayas a lanzar una actualización para los clientes:
 
 ### Paso 1: Incrementar Versión en `package.json`
-Modificar la clave `"version"` (ejemplo: `"1.3.0"`):
+Modificar la clave `"version"` (ejemplo: `"1.5.0"`):
 ```json
 {
   "name": "solarsim-pro",
-  "version": "1.3.0"
+  "version": "1.5.0"
 }
 ```
 
-### Paso 2: Compilar el Frontend y el Runtime de Electron
+### Paso 2: Validación de Tipos y Motores
+```bash
+npm run lint                                            # tsc --noEmit (Cero errores)
+npx tsx src/engine/testBenchmark.ts                     # Validación contra benchmark oficial
+npx tsx src/engine/testFinancialEngineComprehensive.ts  # Suite integral de 9 pruebas unitarias
+```
+
+### Paso 3: Compilar el Frontend y el Runtime de Electron
 ```bash
 npm run build && npm run build:electron
 ```
 
-### Paso 3: Empaquetar Binarios para Windows y Linux
+### Paso 4: Empaquetar Binarios para Windows y Linux
 ```bash
 npx electron-builder --win --linux
 ```
 *(Esto genera los instaladores en la carpeta `release/` junto con los manifiestos `latest.yml` y `latest-linux.yml`).*
 
-### Paso 4: Preparar Nombres de Archivo y Firmas Criptográficas
+### Paso 5: Preparar Nombres de Archivo y Firmas Criptográficas
 Ejecutar el script de preparación:
 ```bash
 python3 -c "
 import shutil, os, subprocess
 
-v = '1.3.0' # Sustituir por la versión actual
+v = '1.5.0' # Sustituir por la versión actual
 
 # Copias con nombres exactos para electron-updater
 shutil.copyfile(f'release/SolarSim Pro Setup {v}.exe', f'release/SolarSim-Pro-Setup-{v}.exe')
@@ -176,31 +189,31 @@ for target in [f'release/solarsim-pro-{v}.pacman', f'release/solarsim-pro-{v}.ta
 "
 ```
 
-### Paso 5: Commit, Tag y Push a GitHub
+### Paso 6: Commit, Tag y Push a GitHub
 ```bash
-git add package.json
-git commit -m "chore(release): bump version to 1.3.0"
-git tag -a v1.3.0 -m "Release v1.3.0 - Resumen de novedades"
+git add .
+git commit -m "chore(release): Bump version to 1.5.0 and generate binaries"
+git tag v1.5.0
 git push origin main --tags
 ```
 
-### Paso 6: Publicar la Release en GitHub
+### Paso 7: Publicar la Release en GitHub vía CLI (`gh`)
 ```bash
-gh release create v1.3.0 \
-  --title "☀️ SolarSim Pro v1.3.0 - Título del Lanzamiento" \
-  --notes-file "release/release-notes-v1.3.0.md" \
+gh release create v1.5.0 \
+  --title "⚡ SolarSim Pro v1.5.0" \
+  --notes-file "release/release-notes-v1.5.0.md" \
   "release/latest.yml" \
   "release/latest-linux.yml" \
-  "release/SolarSim-Pro-Setup-1.3.0.exe" \
-  "release/SolarSim-Pro-Setup-1.3.0.exe.blockmap" \
-  "release/SolarSim-Pro-1.3.0.exe" \
-  "release/SolarSim-Pro-1.3.0.AppImage" \
-  "release/SolarSim-Pro-1.3.0.AppImage.sig" \
-  "release/solarsim-pro-1.3.0.pacman" \
-  "release/solarsim-pro-1.3.0.pacman.sig" \
-  "release/solarsim-pro_1.3.0_amd64.deb" \
-  "release/solarsim-pro-1.3.0.tar.gz" \
-  "release/solarsim-pro-1.3.0.tar.gz.sig" \
+  "release/SolarSim-Pro-Setup-1.5.0.exe" \
+  "release/SolarSim-Pro-Setup-1.5.0.exe.blockmap" \
+  "release/SolarSim-Pro-1.5.0.exe" \
+  "release/SolarSim-Pro-1.5.0.AppImage" \
+  "release/SolarSim-Pro-1.5.0.AppImage.sig" \
+  "release/solarsim-pro-1.5.0.pacman" \
+  "release/solarsim-pro-1.5.0.pacman.sig" \
+  "release/solarsim-pro_1.5.0_amd64.deb" \
+  "release/solarsim-pro-1.5.0.tar.gz" \
+  "release/solarsim-pro-1.5.0.tar.gz.sig" \
   "release/solarsim-public-key.asc"
 ```
 
