@@ -1,0 +1,24 @@
+services:
+  api:
+    build:
+      context: ../../../server
+      dockerfile: Dockerfile
+    container_name: solarsim-api
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      DB_HOST: solarsim-db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-solarsim_user}
+      DB_PASSWORD: ${DB_PASSWORD:-solarsim_secret_2026}
+      DB_NAME: ${DB_NAME:-solarsim_prod}
+      JWT_SECRET: ${JWT_SECRET:-solarsim_enterprise_jwt_secret_key_2026}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - solarsim_net
+
+networks:
+  solarsim_net:
+    external: true

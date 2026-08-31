@@ -1,6 +1,6 @@
 import React from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
-import { Sun, Moon, FileText, LayoutDashboard, Save, Plus, ArrowLeft, RefreshCw, CheckCircle2, Sparkles, Bot, Share2, Globe } from 'lucide-react';
+import { Sun, Moon, FileText, LayoutDashboard, Save, Plus, ArrowLeft, RefreshCw, CheckCircle2, Sparkles, Bot, Share2, Globe, Settings, Cloud } from 'lucide-react';
 import electsunEmblem from '../../assets/electsun-emblem-transparent.png';
 
 export const Header: React.FC = () => {
@@ -12,6 +12,9 @@ export const Header: React.FC = () => {
     openUpdateModal,
     openAIInvoiceModal,
     openShareModal,
+    openSettingsModal,
+    syncSettings,
+    isSyncing,
     saveActiveProject,
     exportProjectAsJSON,
     saveFeedbackMessage,
@@ -179,6 +182,26 @@ export const Header: React.FC = () => {
             >
               <RefreshCw className="w-3.5 h-3.5 text-emerald-500" />
               <span className="hidden sm:inline">Actualizaciones</span>
+            </button>
+
+            {/* Button Ajustes / Configuración ⚙️ */}
+            <button
+              onClick={() => openSettingsModal('sync')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all shadow-xs cursor-pointer relative group ${
+                isDark
+                  ? 'border-[#3f3f46] bg-[#27272a] hover:bg-[#323238] text-zinc-100 hover:border-emerald-500/70'
+                  : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-800 hover:border-emerald-500'
+              }`}
+              title="Centro de Ajustes: Sincronización en la nube, usuarios RBAC y configuración"
+            >
+              <Settings className={`w-3.5 h-3.5 text-emerald-500 group-hover:rotate-45 transition-transform duration-300 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Ajustes</span>
+              {/* Online/User status dot indicator */}
+              {syncSettings.currentUser ? (
+                <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-xs animate-pulse" title={`Sesión activa: ${syncSettings.currentUser.name} (${syncSettings.currentUser.role})`}></span>
+              ) : syncSettings.authToken ? (
+                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+              ) : null}
             </button>
 
             {/* Share Web Proposal Button (when inside a Project) */}

@@ -255,6 +255,26 @@ export interface ExtraTOCItem {
   pageCount?: number; // Number of pages this extra section occupies (default: 1)
 }
 
+export type UserRole = 'ADMIN' | 'EDITOR' | 'LECTOR';
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  organizationId: string;
+  organizationName?: string;
+  isActive?: boolean;
+}
+
+export interface SyncSettings {
+  serverUrl: string; // e.g. 'http://10.0.0.103' or 'https://api.solarsim.electsun.com'
+  autoSyncEnabled: boolean;
+  lastSyncTimestamp: string | null;
+  authToken: string | null;
+  currentUser: UserProfile | null;
+}
+
 export interface ProjectSimulation {
   id: string;
   createdAt: string;
@@ -266,6 +286,15 @@ export interface ProjectSimulation {
   financials: FinancialParams;
   monthlyConsumption: number[]; // 12 months in kWh
   customization?: DocumentCustomization;
+  // Enterprise Sync & Authorship Metadata
+  authorId?: string;
+  authorName?: string;
+  authorEmail?: string;
+  lastModifiedBy?: string;
+  lastModifiedAt?: string;
+  version?: number;
+  syncStatus?: 'synced' | 'pending' | 'local_only' | 'conflict';
+  isDeleted?: boolean;
 }
 
 export type UpdateState = 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'installing' | 'error';

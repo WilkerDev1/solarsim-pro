@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: solarsim-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-solarsim_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-solarsim_secret_2026}
+      POSTGRES_DB: ${DB_NAME:-solarsim_prod}
+    volumes:
+      - ./data:/var/lib/postgresql/data
+    networks:
+      - solarsim_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-solarsim_user} -d ${DB_NAME:-solarsim_prod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  solarsim_net:
+    external: true

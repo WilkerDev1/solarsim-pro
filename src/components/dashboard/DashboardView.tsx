@@ -15,6 +15,11 @@ import {
   FileJson,
   CheckCircle2,
   AlertCircle,
+  Cloud,
+  Laptop,
+  User,
+  Shield,
+  RefreshCw,
 } from 'lucide-react';
 import { calculateDCCapacityKWp } from '../../engine/solarEngine';
 
@@ -30,10 +35,12 @@ export const DashboardView: React.FC = () => {
     exportProjectAsJSON,
     exportAllProjectsAsJSON,
     importProjectsFromJSON,
+    syncSettings,
     sidebarTheme,
   } = useSimulationStore();
 
   const isDark = sidebarTheme === 'dark';
+  const isLector = syncSettings.currentUser?.role === 'LECTOR';
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importNotification, setImportNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -288,21 +295,23 @@ export const DashboardView: React.FC = () => {
                       >
                         <Copy className="w-4 h-4" />
                       </button>
-                      <button
-                        onClick={() => {
-                          if (confirm(`¿Estás seguro de eliminar el proyecto "${project.client.name}"?`)) {
-                            deleteProject(project.id);
-                          }
-                        }}
-                        className={`p-2 rounded-lg transition-colors cursor-pointer ${
-                          isDark
-                            ? 'text-zinc-400 hover:text-red-400 hover:bg-red-950/50'
-                            : 'text-slate-400 hover:text-red-600 hover:bg-red-50'
-                        }`}
-                        title="Eliminar proyecto"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {!isLector && (
+                        <button
+                          onClick={() => {
+                            if (confirm(`¿Estás seguro de eliminar el proyecto "${project.client.name}"?`)) {
+                              deleteProject(project.id);
+                            }
+                          }}
+                          className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                            isDark
+                              ? 'text-zinc-400 hover:text-red-400 hover:bg-red-950/50'
+                              : 'text-slate-400 hover:text-red-600 hover:bg-red-50'
+                          }`}
+                          title="Eliminar proyecto"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -331,9 +340,44 @@ export const DashboardView: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* Creator & Authorship Bar */}
+                  <div
+                    className={`flex items-center justify-between text-[11px] px-1 py-1.5 mb-2 rounded-lg ${
+                      isDark ? 'bg-[#141418] text-zinc-300' : 'bg-slate-50 text-slate-600'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 truncate max-w-[65%]" title={`Creado por: ${project.authorName || 'Ing. Solar'}`}>
+                      <div className="w-5 h-5 rounded-full bg-emerald-600/20 text-emerald-400 font-black text-[9px] flex items-center justify-center shrink-0 border border-emerald-500/30">
+                        {(project.authorName || 'IS').substring(0, 2).toUpperCase()}
+                      </div>
+                      <span className="truncate font-semibold text-[10.5px]">
+                        {project.authorName || 'Ing. Solar'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0 text-[10px]">
+                      {project.syncStatus === 'synced' ? (
+                        <span className="flex items-center gap-1 text-emerald-400 font-bold" title="Sincronizado con la nube">
+                          <Cloud className="w-3.5 h-3.5 text-emerald-500" />
+                          <span className="hidden sm:inline">Nube</span>
+                        </span>
+                      ) : project.syncStatus === 'pending' ? (
+                        <span className="flex items-center gap-1 text-amber-400 font-bold" title="Cambios locales pendientes de sincronizar">
+                          <RefreshCw className="w-3.5 h-3.5 text-amber-500 animate-spin" />
+                          <span className="hidden sm:inline">Pendiente</span>
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-zinc-400" title="Guardado local en este equipo">
+                          <Laptop className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Local</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Footer */}
-                  <div className="mt-auto pt-2">
-                    <div className={`flex items-center justify-between text-[11px] mb-4 font-medium ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>
+                  <div className="mt-auto pt-1">
+                    <div className={`flex items-center justify-between text-[11px] mb-3 font-medium ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3.5 h-3.5" />
                         {dateStr}
@@ -348,7 +392,7 @@ export const DashboardView: React.FC = () => {
                       className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs hover:shadow-md cursor-pointer active:scale-98"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
-                      Abrir Simulación
+                      {isLector ? 'Ver Simulación / Propuesta' : 'Abrir Simulación'}
                     </button>
                   </div>
                 </article>

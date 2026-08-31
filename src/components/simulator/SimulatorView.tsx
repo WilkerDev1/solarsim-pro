@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { fetchSolarRadiationByCoordinates } from '../../services/solarRadiationApi';
+import { Shield } from 'lucide-react';
 import { ParameterSidebar } from './sidebar/ParameterSidebar';
 import { EnergyAnalysisTab } from './tabs/EnergyAnalysisTab';
 import { QuotationEquipmentsTab } from './tabs/QuotationEquipmentsTab';
@@ -20,6 +21,7 @@ export const SimulatorView: React.FC = () => {
     updateAllMonthlyConsumption,
     saveActiveProject,
     openAIInvoiceModal,
+    syncSettings,
     sidebarWidth,
     setSidebarWidth,
     sidebarTheme,
@@ -122,6 +124,16 @@ export const SimulatorView: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-full min-h-0 overflow-hidden bg-slate-100">
+        {/* Lector Role Notice Banner */}
+        {syncSettings.currentUser?.role === 'LECTOR' && (
+          <div className="bg-blue-900 text-blue-100 px-6 py-2 text-xs font-semibold flex items-center justify-between border-b border-blue-800 shrink-0">
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-blue-300" />
+              <span>Modo Solo Lectura: Has iniciado sesión con rol de <strong>Lector</strong>. Puedes explorar datos y exportar a PDF.</span>
+            </div>
+          </div>
+        )}
+
         {/* Top Fixed View Selector Tabs */}
         <div className="bg-white border-b border-slate-200 px-6 pt-3 pb-0 shrink-0 z-20 shadow-xs flex justify-between items-center">
           <div className="flex gap-8">

@@ -1,0 +1,19 @@
+{
+    admin off
+    auto_https off
+}
+
+:80 {
+    # Compresión
+    encode zstd gzip
+
+    # Proxy API endpoints hacia solarsim-api
+    handle /api/* {
+        reverse_proxy solarsim-api:3000
+    }
+
+    # Proxy a sitio web electsun o fallback health
+    handle {
+        respond "SolarSim Pro & Electsun Edge Gateway" 200
+    }
+}

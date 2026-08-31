@@ -10,6 +10,7 @@ import { AIInvoiceScannerModal } from './components/common/AIInvoiceScannerModal
 import { AISettingsModal } from './components/common/AISettingsModal';
 import { ImportConflictModal } from './components/common/ImportConflictModal';
 import { ShareProposalModal } from './components/common/ShareProposalModal';
+import { SettingsModal } from './components/common/SettingsModal';
 import { SplashScreen } from './components/common/SplashScreen';
 
 export const App: React.FC = () => {
@@ -39,6 +40,7 @@ export const App: React.FC = () => {
       <AISettingsModal />
       <ImportConflictModal />
       <ShareProposalModal />
+      <SettingsModal />
     </div>
   );
 };

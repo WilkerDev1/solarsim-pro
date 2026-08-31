@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { ProjectSimulation, ClientInfo, SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, UpdateInfo, DocumentCustomization, ExtractedInvoiceData } from '../types';
+import { ProjectSimulation, ClientInfo, SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, UpdateInfo, DocumentCustomization, ExtractedInvoiceData, SyncSettings, UserProfile, UserRole } from '../types';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateFinancialSummary, calculateCostMatrixSummary } from '../engine/financeEngine';
+import { SyncService } from '../services/syncService';
 
 export interface NewProjectPayload {
   name: string;
@@ -26,8 +27,15 @@ interface SimulationState {
   isAIInvoiceModalOpen: boolean;
   isAISettingsModalOpen: boolean;
   isShareModalOpen: boolean;
+  isSettingsModalOpen: boolean;
+  settingsActiveTab: 'sync' | 'account' | 'share' | 'ai';
   updateInfo: UpdateInfo;
   saveFeedbackMessage: string | null;
+
+  // Enterprise Cloud Sync & Authentication
+  syncSettings: SyncSettings;
+  isSyncing: boolean;
+  syncFeedbackMessage: string | null;
 
   // AI Configuration
   geminiApiKey: string;
@@ -49,6 +57,14 @@ interface SimulationState {
   closeAISettingsModal: () => void;
   openShareModal: () => void;
   closeShareModal: () => void;
+  openSettingsModal: (tab?: 'sync' | 'account' | 'share' | 'ai') => void;
+  closeSettingsModal: () => void;
+  setSettingsActiveTab: (tab: 'sync' | 'account' | 'share' | 'ai') => void;
+  setSyncSettings: (settings: Partial<SyncSettings>) => void;
+  loginUser: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  registerUser: (name: string, email: string, password: string, organizationName?: string) => Promise<{ success: boolean; error?: string }>;
+  logoutUser: () => void;
+  syncProjectsWithServer: () => Promise<{ success: boolean; message: string }>;
   setGeminiApiKey: (key: string) => void;
   setGeminiModel: (model: string) => void;
   setUpdateInfo: (info: UpdateInfo) => void;
@@ -334,9 +350,22 @@ export const useSimulationStore = create<SimulationState>()(
       isAIInvoiceModalOpen: false,
       isAISettingsModalOpen: false,
       isShareModalOpen: false,
+      isSettingsModalOpen: false,
+      settingsActiveTab: 'sync',
       updateInfo: { state: 'idle' },
       saveFeedbackMessage: null,
       pendingImportConflict: null,
+
+      // Enterprise Cloud Sync & Authentication
+      syncSettings: {
+        serverUrl: 'http://10.0.0.103',
+        autoSyncEnabled: true,
+        lastSyncTimestamp: null,
+        authToken: null,
+        currentUser: null,
+      },
+      isSyncing: false,
+      syncFeedbackMessage: null,
 
       geminiApiKey: '',
       geminiModel: 'gemini-3.5-flash-lite',
@@ -356,6 +385,114 @@ export const useSimulationStore = create<SimulationState>()(
       closeAISettingsModal: () => set({ isAISettingsModalOpen: false }),
       openShareModal: () => set({ isShareModalOpen: true }),
       closeShareModal: () => set({ isShareModalOpen: false }),
+      openSettingsModal: (tab = 'sync') => set({ isSettingsModalOpen: true, settingsActiveTab: tab }),
+      closeSettingsModal: () => set({ isSettingsModalOpen: false }),
+      setSettingsActiveTab: (tab) => set({ settingsActiveTab: tab }),
+      setSyncSettings: (settingsPartial) => set((state) => ({ syncSettings: { ...state.syncSettings, ...settingsPartial } })),
+
+      loginUser: async (email, password) => {
+        const { serverUrl } = get().syncSettings;
+        const res = await SyncService.login(serverUrl, email, password);
+        if (res.success && res.token && res.user) {
+          set((state) => ({
+            syncSettings: {
+              ...state.syncSettings,
+              authToken: res.token!,
+              currentUser: res.user!,
+            },
+          }));
+          get().syncProjectsWithServer();
+          return { success: true };
+        }
+        return { success: false, error: res.error || 'Error al iniciar sesión' };
+      },
+
+      registerUser: async (name, email, password, organizationName) => {
+        const { serverUrl } = get().syncSettings;
+        const res = await SyncService.register(serverUrl, { name, email, password, organizationName });
+        if (res.success && res.token && res.user) {
+          set((state) => ({
+            syncSettings: {
+              ...state.syncSettings,
+              authToken: res.token!,
+              currentUser: res.user!,
+            },
+          }));
+          get().syncProjectsWithServer();
+          return { success: true };
+        }
+        return { success: false, error: res.error || 'Error al registrar usuario' };
+      },
+
+      logoutUser: () => {
+        set((state) => ({
+          syncSettings: {
+            ...state.syncSettings,
+            authToken: null,
+            currentUser: null,
+          },
+        }));
+      },
+
+      syncProjectsWithServer: async () => {
+        const { serverUrl, authToken, lastSyncTimestamp } = get().syncSettings;
+        if (!authToken) {
+          return { success: false, message: 'Inicia sesión para sincronizar proyectos con la nube' };
+        }
+
+        set({ isSyncing: true, syncFeedbackMessage: 'Sincronizando con el servidor...' });
+
+        try {
+          // 1. Pull server changes
+          const pullRes = await SyncService.pullProjects(serverUrl, authToken, lastSyncTimestamp);
+          let currentProjects = [...get().projects];
+
+          if (pullRes.success && pullRes.projects && pullRes.projects.length > 0) {
+            const serverProjectsMap = new Map(pullRes.projects.map((p) => [p.id, p]));
+            currentProjects = currentProjects.map((local) => {
+              if (serverProjectsMap.has(local.id)) {
+                const serverVersion = serverProjectsMap.get(local.id)!;
+                serverProjectsMap.delete(local.id);
+                return { ...serverVersion, syncStatus: 'synced' as const };
+              }
+              return local;
+            });
+            for (const newServerProj of serverProjectsMap.values()) {
+              currentProjects.unshift({ ...newServerProj, syncStatus: 'synced' as const });
+            }
+          }
+
+          // 2. Push local pending / modified projects
+          const pendingProjects = currentProjects.filter((p) => p.syncStatus !== 'synced');
+          if (pendingProjects.length > 0) {
+            const pushRes = await SyncService.pushProjects(serverUrl, authToken, pendingProjects);
+            if (pushRes.success) {
+              currentProjects = currentProjects.map((p) => ({
+                ...p,
+                syncStatus: 'synced' as const,
+              }));
+            }
+          }
+
+          const newTimestamp = pullRes.serverTimestamp || new Date().toISOString();
+          set((state) => ({
+            projects: currentProjects,
+            isSyncing: false,
+            syncFeedbackMessage: '¡Proyectos sincronizados con éxito!',
+            syncSettings: {
+              ...state.syncSettings,
+              lastSyncTimestamp: newTimestamp,
+            },
+          }));
+
+          setTimeout(() => set({ syncFeedbackMessage: null }), 4000);
+          return { success: true, message: 'Sincronización completada exitosamente' };
+        } catch (err: any) {
+          set({ isSyncing: false, syncFeedbackMessage: null });
+          return { success: false, message: err.message || 'Error durante la sincronización' };
+        }
+      },
+
       setGeminiApiKey: (key) => set({ geminiApiKey: key }),
       setGeminiModel: (model) => set({ geminiModel: model }),
       setUpdateInfo: (info) => set({ updateInfo: info }),
@@ -668,6 +805,7 @@ export const useSimulationStore = create<SimulationState>()(
         const tariffCode = typeof payload === 'object' && payload?.tariffCode ? payload.tariffCode : 'BTS2';
         const address = typeof payload === 'object' && payload?.address ? payload.address : `${province}, República Dominicana`;
         const seq = generateNextProjectSequence(get().projects);
+        const currentUser = get().syncSettings?.currentUser;
 
         const newProj: ProjectSimulation = {
           ...BENCHMARK_PROJECT,
@@ -675,6 +813,13 @@ export const useSimulationStore = create<SimulationState>()(
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           status: 'Draft',
+          authorId: currentUser?.id,
+          authorName: currentUser?.name || 'Ing. Solar',
+          authorEmail: currentUser?.email,
+          lastModifiedBy: currentUser?.name || 'Ing. Solar',
+          lastModifiedAt: new Date().toISOString(),
+          version: 1,
+          syncStatus: currentUser ? 'pending' : 'local_only',
           client: {
             ...BENCHMARK_PROJECT.client,
             name,
@@ -706,6 +851,11 @@ export const useSimulationStore = create<SimulationState>()(
         setTimeout(() => {
           set({ saveFeedbackMessage: null });
         }, 3500);
+
+        // Auto-sync if online and logged in
+        if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
+          get().syncProjectsWithServer();
+        }
       },
 
       duplicateProject: (id) => {
@@ -714,12 +864,20 @@ export const useSimulationStore = create<SimulationState>()(
 
         const newId = `proj-${Date.now()}`;
         const dupIdentifiers = generateDuplicateProjectIdentifiers(target, get().projects);
+        const currentUser = get().syncSettings?.currentUser;
         const cloned: ProjectSimulation = {
           ...target,
           id: newId,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           status: 'Draft',
+          authorId: currentUser?.id || target.authorId,
+          authorName: currentUser?.name || target.authorName || 'Ing. Solar',
+          authorEmail: currentUser?.email || target.authorEmail,
+          lastModifiedBy: currentUser?.name || 'Ing. Solar',
+          lastModifiedAt: new Date().toISOString(),
+          version: 1,
+          syncStatus: currentUser ? 'pending' : 'local_only',
           client: {
             ...target.client,
             name: dupIdentifiers.cleanName,
@@ -738,6 +896,10 @@ export const useSimulationStore = create<SimulationState>()(
         setTimeout(() => {
           set({ saveFeedbackMessage: null });
         }, 3500);
+
+        if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
+          get().syncProjectsWithServer();
+        }
       },
 
       deleteProject: (id) => {
@@ -763,10 +925,19 @@ export const useSimulationStore = create<SimulationState>()(
       saveActiveProject: () => {
         const now = new Date();
         const timeStr = now.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const currentUser = get().syncSettings?.currentUser;
 
         set((state) => ({
           projects: state.projects.map((p) =>
-            p.id === state.activeProjectId ? { ...p, updatedAt: now.toISOString() } : p
+            p.id === state.activeProjectId
+              ? {
+                  ...p,
+                  updatedAt: now.toISOString(),
+                  lastModifiedBy: currentUser?.name || p.lastModifiedBy || 'Ing. Solar',
+                  lastModifiedAt: now.toISOString(),
+                  syncStatus: currentUser ? 'pending' : p.syncStatus || 'local_only',
+                }
+              : p
           ),
           saveFeedbackMessage: `Guardado a las ${timeStr}`,
         }));
@@ -774,6 +945,11 @@ export const useSimulationStore = create<SimulationState>()(
         setTimeout(() => {
           set({ saveFeedbackMessage: null });
         }, 3000);
+
+        // Auto sync if enabled
+        if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
+          get().syncProjectsWithServer();
+        }
       },
 
       exportProjectAsJSON: (id?: string) => {
@@ -1133,6 +1309,7 @@ export const useSimulationStore = create<SimulationState>()(
         sidebarWidth: state.sidebarWidth,
         geminiApiKey: state.geminiApiKey,
         geminiModel: state.geminiModel,
+        syncSettings: state.syncSettings,
       }),
     }
   )
