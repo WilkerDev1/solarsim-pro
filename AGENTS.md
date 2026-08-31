@@ -101,12 +101,15 @@ solarsim/
 │               ├── PDFPage4CashFlow.tsx     # Hoja 10: 8. Flujo de Caja a 25 Años
 │               └── PDFPage5CostMatrix.tsx   # Hoja 11: 9. Matriz de Costos Interna (Confidencial)
 ├── release/                                 # Binarios generados (.exe, .AppImage, .pacman, .deb)
+├── infra/                                   # 🖥️ INFRAESTRUCTURA & SERVIDORES (Docker, Caddy, Postgres)
+│   └── INFRASTRUCTURE.md                    # Mapa maestro de red, host Proxmox, CT 100 y servicios
 ├── docs/                                    # Documentación técnica y especificaciones
 │   ├── CLOUDFLARE_WORKER_GUIDE.md           # Guía de despliegue de Cloudflare Workers & KV
 │   ├── FINANCIAL_ENGINE_SPECIFICATION.md    # Auditoría matemática de fórmulas
 │   └── MAINTENANCE_AND_UPDATES.md           # Guía de actualizaciones y dependencias
 └── .agents/rules/                           # 🛡️ REGLAS DEL WORKSPACE
-    └── html2canvas_pdf_export_rules.md      # Reglas críticas para exportación a PDF
+    ├── html2canvas_pdf_export_rules.md      # Reglas críticas para exportación a PDF
+    └── server_deployment_rules.md           # Protocolo de despliegue y reglas en app-server
 ```
 
 ---
