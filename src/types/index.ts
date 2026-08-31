@@ -64,7 +64,7 @@ export interface UtilityRates {
   energyCostPerKWh: number;     // USD per kWh e.g. 0.18
   distributor: 'EDEESTE' | 'EDESUR' | 'EDENORTE' | 'CEPM';
   targetCoveragePct: number;    // Target Coverage (%) e.g. 95%
-  tariffCode: 'BTS1' | 'BTS2' | 'MTD' | 'BTD' | string;
+  tariffCode: 'BTS1' | 'BTS2' | 'BTD' | 'BTH' | 'MTD1' | 'MTD2' | 'MTD' | 'MTH' | 'ATD' | string;
   currency: 'USD' | 'DOP';
   usdExchangeRate: number;      // RD$ per USD e.g. 60.0
   gridExportFeePct: number;     // SIE-007-2026-REG fee (e.g. 25%)

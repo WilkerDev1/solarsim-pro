@@ -117,7 +117,11 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
               <option value="BTS1">BTS1 (Residencial Monómica &lt;10kW)</option>
               <option value="BTS2">BTS2 (Comercial Simple Monómica &lt;10kW)</option>
               <option value="BTD">BTD (Baja Tensión con Demanda &gt;10kW)</option>
-              <option value="MTD">MTD (Media Tensión con Demanda)</option>
+              <option value="BTH">BTH (Baja Tensión Horaria)</option>
+              <option value="MTD1">MTD1 (Media Tensión con Demanda 1)</option>
+              <option value="MTD2">MTD2 (Media Tensión con Demanda 2 - Horaria)</option>
+              <option value="MTH">MTH (Media Tensión Horaria)</option>
+              <option value="ATD">ATD (Alta Tensión con Demanda)</option>
             </select>
           </div>
 
@@ -148,13 +152,13 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
               <label className={`block text-xs font-medium ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
                 Cargo Exportación Red (%) (SIE-007-2026-REG)
               </label>
-              {(!project.rates.tariffCode || project.rates.tariffCode === 'BTS1' || project.rates.tariffCode === 'BTS2') && !project.rates.isZeroExport ? (
-                <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${isDark ? 'bg-amber-950/70 text-amber-300 border border-amber-800/50' : 'bg-amber-100 text-amber-800 border border-amber-200'}`}>
-                  Monómica (~25%)
+              {project.rates.isZeroExport ? (
+                <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${isDark ? 'bg-emerald-950/70 text-emerald-300 border border-emerald-800/50' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'}`}>
+                  0% (Inyección Cero)
                 </span>
               ) : (
-                <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${isDark ? 'bg-emerald-950/70 text-emerald-300 border border-emerald-800/50' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'}`}>
-                  0% (Exento / 1:1)
+                <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${isDark ? 'bg-amber-950/70 text-amber-300 border border-amber-800/50' : 'bg-amber-100 text-amber-800 border border-amber-200'}`}>
+                  Medición Neta (~{project.rates.gridExportFeePct ?? 25}%)
                 </span>
               )}
             </div>
@@ -162,11 +166,11 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
             <input
               type="number"
               step="1"
-              disabled={project.rates.isZeroExport || (project.rates.tariffCode !== 'BTS1' && project.rates.tariffCode !== 'BTS2' && project.rates.tariffCode !== undefined)}
+              disabled={project.rates.isZeroExport}
               value={
-                project.rates.isZeroExport || (project.rates.tariffCode !== 'BTS1' && project.rates.tariffCode !== 'BTS2' && project.rates.tariffCode !== undefined)
+                project.rates.isZeroExport
                   ? 0
-                  : project.rates.gridExportFeePct
+                  : (project.rates.gridExportFeePct ?? 25)
               }
               onChange={(e) => updateRates({ gridExportFeePct: parseFloat(e.target.value) || 0 })}
               className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
@@ -182,21 +186,14 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
                 <p className={`text-[10.5px] leading-tight flex items-start gap-1 ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
                   <span>⚡</span>
                   <span>
-                    <strong>Inyección Cero activa:</strong> El sistema no vuelca excedentes a la red pública; por lo tanto, no aplica cargo de uso de red.
-                  </span>
-                </p>
-              ) : (project.rates.tariffCode === 'BTD' || project.rates.tariffCode === 'MTD') ? (
-                <p className={`text-[10.5px] leading-tight flex items-start gap-1 ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
-                  <span>⚡</span>
-                  <span>
-                    <strong>Tarifa Binómica ({project.rates.tariffCode}):</strong> Compensación 1:1 de energía neta. No aplica cargo por exportación ya que la red se cubre mediante el cargo fijo por potencia/demanda.
+                    <strong>Inyección Cero activa:</strong> El sistema no vuelca excedentes a la red pública; por lo tanto, no aplica retención ni cargo por uso de red.
                   </span>
                 </p>
               ) : (
                 <p className={`text-[10.5px] leading-tight flex items-start gap-1 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
                   <span>⚡</span>
                   <span>
-                    <strong>Tarifa Monómica ({project.rates.tariffCode || 'BTS2'}):</strong> Aplica retención por derecho de uso de red bajo Res. SIE-007-2026-REG sobre los kWh excedentes exportados a la red.
+                    <strong>Medición Neta ({project.rates.tariffCode || 'BTS2'}):</strong> Aplica retención del {project.rates.gridExportFeePct ?? 25}% por derecho de uso de red bajo Res. SIE-007-2026-REG sobre los kWh excedentes exportados a la red de {project.rates.distributor || 'la distribuidora'}.
                   </span>
                 </p>
               )}

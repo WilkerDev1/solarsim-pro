@@ -31,12 +31,10 @@ export function calculateMonthlySolarProduction(
   const systemLossesPct = specs.isDetailed ? specs.systemLosses : 14.0;
   const derateFactor = 1 - (systemLossesPct / 100);
 
-  // SIE-007-2026-REG Tariff-Specific Rules:
-  // - Monomic low-voltage tariffs (BTS1, BTS2) are subject to network export retention (~25%).
-  // - Binomial tariffs (BTD, MTD, etc.) pay demand charges and receive 1:1 net metering (0% export retention).
+  // SIE-007-2026-REG / Net Metering Regulations:
+  // - Grid export fee / retention (~25%) applies to all exported energy across all tariffs (BTS1, BTS2, BTD, MTD1, MTD2, etc.).
   // - Zero-Export systems (antivertido) do not inject to grid, resulting in 0 exported kWh and 0 export fees.
-  const isMonomicTariff = !tariffCode || tariffCode === 'BTS1' || tariffCode === 'BTS2';
-  const effectiveGridExportFeePct = (isMonomicTariff && !isZeroExport) ? (gridExportFeePct || 0) : 0;
+  const effectiveGridExportFeePct = !isZeroExport ? (gridExportFeePct ?? 25) : 0;
 
   const results: MonthlyEnergyResult[] = [];
 

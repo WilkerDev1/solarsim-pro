@@ -22,7 +22,7 @@ REGLAS DE EXTRACCIÓN DETALLADAS PARA FACTURAS DOMINICANAS (EDEESTE, EDESUR, EDE
    - Teléfono / Referencia de Pago: ej. "2250790189-15".
 
 3. DATOS TÉCNICOS Y TARIFARIOS:
-   - Tarifa: Código como "BTS1" (residencial simple), "BTS2" (comercial baja tensión), "BTD" (baja tensión con demanda), "MTD" (media tensión con demanda).
+   - Tarifa: Código como "BTS1" (residencial simple), "BTS2" (comercial baja tensión), "BTD" (baja tensión con demanda), "BTH" (baja tensión horaria), "MTD1" (media tensión con demanda 1), "MTD2" (media tensión con demanda 2 horaria), "MTH", "ATD" (alta tensión).
    - Voltaje y Fase: "VOLTAJE" (ej. "Baja 120/240 Doble Monofasica", "Baja 120/208 Trifásica", "Monofásica").
    - Periodo de facturación y Días facturados: ej. 31 días.
    - Factor de Potencia / Eficiencia: ej. 0.97 si aplica.
@@ -30,11 +30,11 @@ REGLAS DE EXTRACCIÓN DETALLADAS PARA FACTURAS DOMINICANAS (EDEESTE, EDESUR, EDE
 4. DESGLOSE ECONÓMICO Y ESTRUCTURA TARIFARIA:
    - Cargo fijo: Valor en RD$ (ej. 127.83 o 210.15).
    - Estructura de Energía (RD$/kWh):
-     * Para tarifa plana (ej. BTD): un solo precio por kWh (ej. RD$ 9.02/kWh).
+     * Para tarifa plana (ej. BTD, MTD1): un solo precio por kWh (ej. RD$ 9.02/kWh).
      * Para tarifa escalonada (ej. BTS1): bloques como 200 kWh x RD$ 6.17, 100 kWh x RD$ 8.71, 373 kWh x RD$ 13.04.
      * En 'energyCostPerKWhDOP', calcula el precio medio efectivo ponderado de la energía (Total RD$ Energía / Total kWh).
      * En 'marginalRateDOP', guarda la tarifa marginal del escalón más alto (ej. 13.04 RD$/kWh).
-   - Potencia Máxima (Demanda en kW) y su costo por kW: si aplica para BTD/MTD (ej. 6.266 kW).
+   - Potencia Máxima (Demanda en kW) y su costo por kW: si aplica para BTD/MTD1/MTD2 (ej. 6.266 kW).
    - Importe Total: "VALOR TOTAL A PAGAR EN RD$" o "IMPORTE TOTAL" (ej. 7,096.75 o 17,394.01).
    - Subsidio Estatal: "IMPORTE SUBSIDIADO EN RD$" o "APORTE TOTAL GOBIERNO RD$" (ej. 3,736.69 o 14,286.18).
    - Importe sin Subsidio: "IMPORTE SIN SUBSIDIO EN RD$" (ej. 10,833.44 o 31,680.19).
@@ -84,7 +84,7 @@ const INVOICE_JSON_SCHEMA = {
     },
     tariffCode: {
       type: 'STRING',
-      description: 'Código de tarifa (ej. BTS1, BTS2, BTD, MTD)',
+      description: 'Código de tarifa (ej. BTS1, BTS2, BTD, BTH, MTD1, MTD2, MTH, ATD)',
     },
     energyCostPerKWhDOP: {
       type: 'NUMBER',

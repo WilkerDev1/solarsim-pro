@@ -57,10 +57,8 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
     let p4 = '';
     if (isZeroExport) {
       p4 = `Al operar con limitador antivertido (inyección cero)${project.specs.hasBattery ? ' y almacenamiento en baterías de litio' : ''}, la totalidad de la energía solar se aprovecha internamente, por lo que el proyecto no genera cargos por derecho de uso de la red bajo la normativa vigente.`;
-    } else if (isMonomic) {
-      p4 = `Para los clientes con tarifas ${tariff}, el análisis económico considera el cargo por derecho de uso de la red, equivalente al ${exportFee} % del valor de la energía excedente exportada, conforme a la normativa vigente (Resolución SIE-007-2026-REG). Por esta razón, el sistema se diseña para maximizar el autoconsumo y minimizar la exportación de energía, obteniendo así el mayor beneficio económico posible.${project.specs.hasBattery ? '' : ' Cuando resulte conveniente, se recomendará la incorporación de baterías de litio para incrementar el aprovechamiento de la energía generada.'}`;
     } else {
-      p4 = `Para clientes con tarifa binómica (${tariff}), el análisis económico contempla el régimen de Medición Neta con compensación 1:1 de energía activa, dado que los costos de capacidad y disponibilidad de red se remuneran formalmente a través del cargo fijo por potencia contratada y demanda máxima, no aplicando retención por uso de red conforme a la regulación vigente.`;
+      p4 = `Para la tarifa ${tariff}, el análisis económico considera el cargo por derecho de uso de la red, equivalente al ${exportFee}% del valor de la energía excedente exportada, conforme al régimen de Medición Neta y la normativa vigente (Resolución SIE-007-2026-REG). Por esta razón, el sistema se diseña para maximizar el autoconsumo y optimizar la inyección de energía, obteniendo así el mayor retorno de inversión posible.${project.specs.hasBattery ? '' : ' Cuando resulte conveniente, se recomendará la incorporación de baterías de litio para incrementar el aprovechamiento directo de la energía generada.'}`;
     }
 
     return [p1, p2, p3, p4];

@@ -330,6 +330,23 @@ app.patch('/api/users/:id', async (c) => {
 // 4. Sincronización Delta-Sync (Offline-First)
 // ----------------------------------------------------
 
+interface ProjectRow {
+  id: string;
+  organization_id: string;
+  created_by_id: string;
+  created_by_name: string;
+  created_by_email: string;
+  last_modified_by_name: string;
+  client_name: string;
+  project_code: string;
+  system_capacity_kwp: number;
+  version: number;
+  data_json: any;
+  is_deleted: boolean;
+  created_at: Date | string;
+  updated_at: Date | string;
+}
+
 // Pull: Descargar proyectos nuevos o actualizados desde lastSync
 app.post('/api/sync/pull', async (c) => {
   const authUser = await authenticate(c);
@@ -340,7 +357,7 @@ app.post('/api/sync/pull', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const lastSyncTimestamp = body.lastSyncTimestamp || '1970-01-01T00:00:00.000Z';
 
-  const res = await pool.query(
+  const res = await pool.query<ProjectRow>(
     `SELECT id, organization_id, created_by_id, created_by_name, created_by_email,
             last_modified_by_name, client_name, project_code, system_capacity_kwp,
             version, data_json, is_deleted, created_at, updated_at
@@ -350,8 +367,9 @@ app.post('/api/sync/pull', async (c) => {
     [authUser.organizationId, lastSyncTimestamp]
   );
 
-  const projects = res.rows.map(row => {
+  const projects = res.rows.map((row: ProjectRow) => {
     const data = row.data_json;
+    const updatedAtIso = row.updated_at instanceof Date ? row.updated_at.toISOString() : new Date(row.updated_at).toISOString();
     return {
       ...data,
       id: row.id,
@@ -360,7 +378,7 @@ app.post('/api/sync/pull', async (c) => {
       authorName: row.created_by_name,
       authorEmail: row.created_by_email,
       lastModifiedBy: row.last_modified_by_name,
-      lastModifiedAt: row.updated_at.toISOString(),
+      lastModifiedAt: updatedAtIso,
       syncStatus: 'synced',
       isDeleted: row.is_deleted,
     };

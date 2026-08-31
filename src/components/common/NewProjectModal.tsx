@@ -316,9 +316,13 @@ export const NewProjectModal: React.FC = () => {
                     }`}
                   >
                     <option value="BTS1" className={isDark ? 'bg-[#18181f] text-white' : ''}>BTS1 (Residencial)</option>
-                    <option value="BTS2" className={isDark ? 'bg-[#18181f] text-white' : ''}>BTS2 (Comercial/Demanda)</option>
-                    <option value="MTD" className={isDark ? 'bg-[#18181f] text-white' : ''}>MTD (Media Tensión)</option>
-                    <option value="BTD" className={isDark ? 'bg-[#18181f] text-white' : ''}>BTD (Baja Tensión)</option>
+                    <option value="BTS2" className={isDark ? 'bg-[#18181f] text-white' : ''}>BTS2 (Comercial Simple)</option>
+                    <option value="BTD" className={isDark ? 'bg-[#18181f] text-white' : ''}>BTD (Baja Tensión Demanda)</option>
+                    <option value="BTH" className={isDark ? 'bg-[#18181f] text-white' : ''}>BTH (Baja Tensión Horaria)</option>
+                    <option value="MTD1" className={isDark ? 'bg-[#18181f] text-white' : ''}>MTD1 (Media Tensión Demanda 1)</option>
+                    <option value="MTD2" className={isDark ? 'bg-[#18181f] text-white' : ''}>MTD2 (Media Tensión Demanda 2)</option>
+                    <option value="MTH" className={isDark ? 'bg-[#18181f] text-white' : ''}>MTH (Media Tensión Horaria)</option>
+                    <option value="ATD" className={isDark ? 'bg-[#18181f] text-white' : ''}>ATD (Alta Tensión Demanda)</option>
                   </select>
                 </div>
               </div>
