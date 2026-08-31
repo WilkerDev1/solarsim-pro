@@ -11,6 +11,7 @@ export const Header: React.FC = () => {
     openNewProjectModal,
     openUpdateModal,
     openAIInvoiceModal,
+    openAIDatasheetModal,
     openShareModal,
     openSettingsModal,
     syncSettings,
@@ -157,7 +158,7 @@ export const Header: React.FC = () => {
           </button>
 
           <div className={`flex items-center gap-2 border-l pl-3 ${isDark ? 'border-[#27272a]' : 'border-slate-200'}`}>
-            {/* Button Escanear Factura con IA (Icono llamativo morado) */}
+            {/* Button Escanear Factura con IA */}
             <button
               onClick={openAIInvoiceModal}
               className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all shadow-md cursor-pointer active:scale-95 group relative shrink-0 ${
@@ -167,7 +168,20 @@ export const Header: React.FC = () => {
               }`}
               title="Escanear factura eléctrica con IA (Google Gemini)"
             >
-              <Sparkles className="w-4 h-4 text-purple-400 fill-purple-400/30 group-hover:rotate-12 transition-transform duration-300" />
+              <FileText className="w-4 h-4 text-purple-400 fill-purple-400/30 group-hover:scale-110 transition-transform duration-300" />
+            </button>
+
+            {/* Button Escanear Ficha Técnica con IA */}
+            <button
+              onClick={openAIDatasheetModal}
+              className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all shadow-md cursor-pointer active:scale-95 group relative shrink-0 ${
+                isDark
+                  ? 'border-cyan-500/60 bg-gradient-to-br from-cyan-950 via-indigo-950 to-purple-950 text-cyan-300 hover:border-cyan-400 hover:shadow-cyan-900/50 hover:scale-105'
+                  : 'border-cyan-300 bg-gradient-to-br from-cyan-50 via-sky-50 to-indigo-50 text-cyan-600 hover:border-cyan-400 hover:bg-cyan-100 hover:shadow-cyan-200/80 hover:scale-105'
+              }`}
+              title="Escanear ficha técnica de paneles o inversores con IA (Google Gemini)"
+            >
+              <Sparkles className="w-4 h-4 text-cyan-400 fill-cyan-400/30 group-hover:rotate-12 transition-transform duration-300" />
             </button>
 
             {/* Button Buscar Actualizaciones */}

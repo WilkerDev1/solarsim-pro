@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { ProjectSimulation, ClientInfo, SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, UpdateInfo, DocumentCustomization, ExtractedInvoiceData, SyncSettings, UserProfile, UserRole } from '../types';
+import { SolarEquipmentItem } from '../types/equipment';
+import { DEFAULT_EQUIPMENT_CATALOG } from '../data/defaultEquipmentCatalog';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateFinancialSummary, calculateCostMatrixSummary } from '../engine/financeEngine';
 import { calculateRecommendedPanelCount } from '../engine/solarEngine';
@@ -26,12 +28,16 @@ interface SimulationState {
   isNewProjectModalOpen: boolean;
   isUpdateModalOpen: boolean;
   isAIInvoiceModalOpen: boolean;
+  isAIDatasheetModalOpen: boolean;
   isAISettingsModalOpen: boolean;
   isShareModalOpen: boolean;
   isSettingsModalOpen: boolean;
   settingsActiveTab: 'sync' | 'account' | 'share' | 'ai';
   updateInfo: UpdateInfo;
   saveFeedbackMessage: string | null;
+
+  // Equipment Catalog (Panels, Inverters, Batteries)
+  equipmentCatalog: SolarEquipmentItem[];
 
   // Enterprise Cloud Sync & Authentication
   syncSettings: SyncSettings;
@@ -54,6 +60,8 @@ interface SimulationState {
   closeUpdateModal: () => void;
   openAIInvoiceModal: () => void;
   closeAIInvoiceModal: () => void;
+  openAIDatasheetModal: () => void;
+  closeAIDatasheetModal: () => void;
   openAISettingsModal: () => void;
   closeAISettingsModal: () => void;
   openShareModal: () => void;
@@ -61,6 +69,12 @@ interface SimulationState {
   openSettingsModal: (tab?: 'sync' | 'account' | 'share' | 'ai') => void;
   closeSettingsModal: () => void;
   setSettingsActiveTab: (tab: 'sync' | 'account' | 'share' | 'ai') => void;
+  
+  // Equipment Actions
+  addEquipmentItem: (item: SolarEquipmentItem) => void;
+  addEquipmentBatch: (items: SolarEquipmentItem[]) => void;
+  removeEquipmentItem: (id: string) => void;
+  syncEquipmentWithServer: () => Promise<{ success: boolean; message: string }>;
   setSyncSettings: (settings: Partial<SyncSettings>) => void;
   loginUser: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   registerUser: (name: string, email: string, password: string, organizationName?: string) => Promise<{ success: boolean; error?: string }>;
@@ -349,6 +363,7 @@ export const useSimulationStore = create<SimulationState>()(
       isNewProjectModalOpen: false,
       isUpdateModalOpen: false,
       isAIInvoiceModalOpen: false,
+      isAIDatasheetModalOpen: false,
       isAISettingsModalOpen: false,
       isShareModalOpen: false,
       isSettingsModalOpen: false,
@@ -356,6 +371,9 @@ export const useSimulationStore = create<SimulationState>()(
       updateInfo: { state: 'idle' },
       saveFeedbackMessage: null,
       pendingImportConflict: null,
+
+      // Equipment Catalog Initial State
+      equipmentCatalog: DEFAULT_EQUIPMENT_CATALOG,
 
       // Enterprise Cloud Sync & Authentication
       syncSettings: {
@@ -382,6 +400,8 @@ export const useSimulationStore = create<SimulationState>()(
       closeUpdateModal: () => set({ isUpdateModalOpen: false }),
       openAIInvoiceModal: () => set({ isAIInvoiceModalOpen: true }),
       closeAIInvoiceModal: () => set({ isAIInvoiceModalOpen: false }),
+      openAIDatasheetModal: () => set({ isAIDatasheetModalOpen: true }),
+      closeAIDatasheetModal: () => set({ isAIDatasheetModalOpen: false }),
       openAISettingsModal: () => set({ isAISettingsModalOpen: true }),
       closeAISettingsModal: () => set({ isAISettingsModalOpen: false }),
       openShareModal: () => set({ isShareModalOpen: true }),
@@ -389,6 +409,68 @@ export const useSimulationStore = create<SimulationState>()(
       openSettingsModal: (tab = 'sync') => set({ isSettingsModalOpen: true, settingsActiveTab: tab }),
       closeSettingsModal: () => set({ isSettingsModalOpen: false }),
       setSettingsActiveTab: (tab) => set({ settingsActiveTab: tab }),
+      
+      // Equipment Actions
+      addEquipmentItem: (item) => {
+        set((state) => {
+          const exists = state.equipmentCatalog.some((e) => e.id === item.id || e.displayName === item.displayName);
+          const updated = exists
+            ? state.equipmentCatalog.map((e) => (e.id === item.id || e.displayName === item.displayName ? { ...item, updatedAt: new Date().toISOString() } : e))
+            : [item, ...state.equipmentCatalog];
+          return {
+            equipmentCatalog: updated,
+            saveFeedbackMessage: `¡Equipo "${item.displayName}" guardado en el catálogo! ✨`,
+          };
+        });
+        setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
+        if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
+          get().syncEquipmentWithServer();
+        }
+      },
+
+      addEquipmentBatch: (items) => {
+        set((state) => {
+          const catalogMap = new Map<string, SolarEquipmentItem>();
+          state.equipmentCatalog.forEach((e) => catalogMap.set(e.displayName.toLowerCase(), e));
+          items.forEach((item) => catalogMap.set(item.displayName.toLowerCase(), item));
+          return {
+            equipmentCatalog: Array.from(catalogMap.values()),
+            saveFeedbackMessage: `¡${items.length} variantes agregadas exitosamente al catálogo! ⚡`,
+          };
+        });
+        setTimeout(() => set({ saveFeedbackMessage: null }), 3500);
+        if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
+          get().syncEquipmentWithServer();
+        }
+      },
+
+      removeEquipmentItem: (id) => {
+        set((state) => ({
+          equipmentCatalog: state.equipmentCatalog.filter((e) => e.id !== id),
+        }));
+      },
+
+      syncEquipmentWithServer: async () => {
+        const { serverUrl, authToken } = get().syncSettings;
+        if (!authToken) return { success: false, message: 'No autenticado' };
+        try {
+          const res = await fetch(`${serverUrl.replace(/\/+$/, '')}/api/equipment/batch`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({ items: get().equipmentCatalog }),
+          });
+          if (res.ok) {
+            return { success: true, message: 'Catálogo de equipos sincronizado con la nube' };
+          }
+          return { success: false, message: 'Error al sincronizar equipos' };
+        } catch (e: any) {
+          return { success: false, message: e.message || 'Error de red' };
+        }
+      },
+
       setSyncSettings: (settingsPartial) => set((state) => ({ syncSettings: { ...state.syncSettings, ...settingsPartial } })),
 
       loginUser: async (email, password) => {
@@ -1407,6 +1489,11 @@ export const useSimulationStore = create<SimulationState>()(
             state.projects = cleaned;
           }
         }
+        if (state) {
+          if (!state.equipmentCatalog || !Array.isArray(state.equipmentCatalog) || state.equipmentCatalog.length === 0) {
+            state.equipmentCatalog = DEFAULT_EQUIPMENT_CATALOG;
+          }
+        }
       },
       partialize: (state) => ({
         projects: state.projects,
@@ -1418,6 +1505,7 @@ export const useSimulationStore = create<SimulationState>()(
         geminiApiKey: state.geminiApiKey,
         geminiModel: state.geminiModel,
         syncSettings: state.syncSettings,
+        equipmentCatalog: state.equipmentCatalog,
       }),
     }
   )

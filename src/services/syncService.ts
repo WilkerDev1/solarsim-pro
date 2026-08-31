@@ -292,4 +292,60 @@ export class SyncService {
       return { success: false, error: err.message || 'Error de conexión al enviar proyectos' };
     }
   }
+
+  /**
+   * Pull: Descargar catálogo global de equipos desde el servidor
+   */
+  static async pullEquipment(serverUrl: string, token: string): Promise<{ success: boolean; items?: import('../types/equipment').SolarEquipmentItem[]; error?: string }> {
+    const base = this.cleanUrl(serverUrl);
+    try {
+      const res = await fetch(`${base}/api/equipment`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || 'Error al descargar catálogo de equipos' };
+      }
+
+      return {
+        success: true,
+        items: data.items || [],
+      };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Error de conexión al obtener equipos' };
+    }
+  }
+
+  /**
+   * Push: Subir lote de equipos locales hacia el servidor
+   */
+  static async pushEquipmentBatch(serverUrl: string, token: string, items: import('../types/equipment').SolarEquipmentItem[]): Promise<{ success: boolean; count?: number; error?: string }> {
+    const base = this.cleanUrl(serverUrl);
+    try {
+      const res = await fetch(`${base}/api/equipment/batch`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ items }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || 'Error al subir equipos' };
+      }
+
+      return {
+        success: true,
+        count: data.count,
+      };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Error de conexión al enviar equipos' };
+    }
+  }
 }

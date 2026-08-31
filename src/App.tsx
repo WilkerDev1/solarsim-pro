@@ -7,6 +7,7 @@ import { PDFProposalView } from './components/pdf/PDFProposalView';
 import { NewProjectModal } from './components/common/NewProjectModal';
 import { UpdateModal } from './components/common/UpdateModal';
 import { AIInvoiceScannerModal } from './components/common/AIInvoiceScannerModal';
+import { AIDatasheetScannerModal } from './components/common/AIDatasheetScannerModal';
 import { AISettingsModal } from './components/common/AISettingsModal';
 import { ImportConflictModal } from './components/common/ImportConflictModal';
 import { ShareProposalModal } from './components/common/ShareProposalModal';
@@ -37,6 +38,7 @@ export const App: React.FC = () => {
       <NewProjectModal />
       <UpdateModal />
       <AIInvoiceScannerModal />
+      <AIDatasheetScannerModal />
       <AISettingsModal />
       <ImportConflictModal />
       <ShareProposalModal />

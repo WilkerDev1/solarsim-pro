@@ -495,6 +495,123 @@ app.post('/api/sync/push', async (c) => {
   }
 });
 
+// ----------------------------------------------------
+// 6. Equipos Fotovoltaicos: Catálogo Sincronizado
+// ----------------------------------------------------
+app.get('/api/equipment', async (c) => {
+  const authUser = await authenticate(c);
+  if (!authUser) {
+    return c.json({ error: 'No autorizado' }, 401);
+  }
+
+  const client = await pool.connect();
+  try {
+    const res = await client.query(
+      `SELECT id, type, brand, model_series as "modelSeries", display_name as "displayName",
+              power_w as "powerW", power_kw as "powerKW", efficiency_pct as "efficiencyPct",
+              temp_coeff as "tempCoeff", category, voltage_mppt as "voltageMPPT",
+              details, created_at as "createdAt", updated_at as "updatedAt"
+       FROM equipment_catalog
+       WHERE organization_id = $1
+       ORDER BY display_name ASC`,
+      [authUser.organizationId]
+    );
+
+    return c.json({
+      success: true,
+      items: res.rows.map((row) => ({
+        ...row,
+        powerW: row.powerW ? parseFloat(row.powerW) : undefined,
+        powerKW: row.powerKW ? parseFloat(row.powerKW) : undefined,
+        efficiencyPct: row.efficiencyPct ? parseFloat(row.efficiencyPct) : undefined,
+        tempCoeff: row.tempCoeff ? parseFloat(row.tempCoeff) : undefined,
+        ...(row.details || {}),
+      })),
+    });
+  } catch (error: any) {
+    console.error('Error al obtener catálogo de equipos:', error);
+    return c.json({ error: error.message || 'Error al consultar equipos' }, 500);
+  } finally {
+    client.release();
+  }
+});
+
+app.post('/api/equipment/batch', async (c) => {
+  const authUser = await authenticate(c);
+  if (!authUser) {
+    return c.json({ error: 'No autorizado' }, 401);
+  }
+
+  const body = await c.req.json();
+  const items = Array.isArray(body?.items) ? body.items : [];
+  if (items.length === 0) {
+    return c.json({ success: true, count: 0 });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    for (const item of items) {
+      const id = item.id || `eq-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      const type = item.type || 'panel';
+      const brand = item.brand || 'Fabricante';
+      const modelSeries = item.modelSeries || 'Modelo';
+      const displayName = item.displayName || `${brand} ${modelSeries}`;
+      const powerW = item.powerW || null;
+      const powerKW = item.powerKW || null;
+      const efficiencyPct = item.efficiencyPct || null;
+      const tempCoeff = item.tempCoeff || null;
+      const category = item.category || null;
+      const voltageMPPT = item.voltageMPPT || null;
+      const details = JSON.stringify({
+        voc: item.voc,
+        isc: item.isc,
+        vmp: item.vmp,
+        imp: item.imp,
+        maxAcPowerKW: item.maxAcPowerKW,
+        mpptCount: item.mpptCount,
+        dimensions: item.dimensions,
+        weightKg: item.weightKg,
+        isCustom: item.isCustom,
+      });
+
+      await client.query(
+        `INSERT INTO equipment_catalog
+          (id, organization_id, type, brand, model_series, display_name, power_w, power_kw, efficiency_pct, temp_coeff, category, voltage_mppt, details, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
+         ON CONFLICT (id) DO UPDATE SET
+          brand = EXCLUDED.brand,
+          model_series = EXCLUDED.model_series,
+          display_name = EXCLUDED.display_name,
+          power_w = EXCLUDED.power_w,
+          power_kw = EXCLUDED.power_kw,
+          efficiency_pct = EXCLUDED.efficiency_pct,
+          temp_coeff = EXCLUDED.temp_coeff,
+          category = EXCLUDED.category,
+          voltage_mppt = EXCLUDED.voltage_mppt,
+          details = EXCLUDED.details,
+          updated_at = NOW()`,
+        [id, authUser.organizationId, type, brand, modelSeries, displayName, powerW, powerKW, efficiencyPct, tempCoeff, category, voltageMPPT, details]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    return c.json({
+      success: true,
+      message: `${items.length} equipos sincronizados en la nube`,
+      count: items.length,
+    });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Error al guardar equipos en la nube:', error);
+    return c.json({ error: error.message || 'Error al guardar catálogo de equipos' }, 500);
+  } finally {
+    client.release();
+  }
+});
+
 // Iniciar servidor HTTP
 initDatabase()
   .then(() => {

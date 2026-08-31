@@ -1,6 +1,9 @@
 import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs } from '../../../types';
-import { Sun, ChevronDown } from 'lucide-react';
+import { useSimulationStore } from '../../../store/useSimulationStore';
+import { SearchableEquipmentSelect } from './SearchableEquipmentSelect';
+import { SolarEquipmentItem } from '../../../types/equipment';
+import { Sun, ChevronDown, Sparkles, Sliders, ShieldAlert, Cpu } from 'lucide-react';
 
 interface EquipmentParamsSectionProps {
   project: ProjectSimulation;
@@ -19,6 +22,26 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
   isDark,
   updateSpecs,
 }) => {
+  const { equipmentCatalog, openAIDatasheetModal } = useSimulationStore();
+
+  const handleSelectPanel = (item: SolarEquipmentItem) => {
+    updateSpecs({
+      panelBrandModel: item.displayName,
+      panelPowerW: item.powerW || 550,
+      panelEfficiency: item.efficiencyPct || 21.5,
+      tempCoeff: item.tempCoeff || -0.35,
+    });
+  };
+
+  const handleSelectInverter = (item: SolarEquipmentItem) => {
+    updateSpecs({
+      inverterBrandModel: item.displayName,
+      inverterPowerKW: item.powerKW || 5.0,
+    });
+  };
+
+  const isDetailed = !!project.specs.isDetailed;
+
   return (
     <div
       className={`rounded-xl border overflow-hidden transition-all ${
@@ -45,21 +68,21 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
 
       {isOpen && (
         <div
-          className={`p-3.5 pt-2 space-y-3 border-t ${
+          className={`p-3.5 pt-2 space-y-3.5 border-t ${
             isDark ? 'border-[#27272a] bg-[#14141c]/50' : 'border-slate-100 bg-slate-50/50'
           }`}
         >
-          {/* Selector de modo Simple / Detallado */}
+          {/* Selector de modo Simple (Catálogo) / Detallado (Manual) */}
           <div
-            className={`flex rounded-lg p-1 mb-2 border ${
+            className={`flex rounded-lg p-1 border ${
               isDark ? 'bg-[#121214] border-[#27272a]' : 'bg-slate-200/80 border-slate-300/60'
             }`}
           >
             <button
               type="button"
               onClick={() => updateSpecs({ isDetailed: false })}
-              className={`flex-1 rounded-md py-1.5 text-[12px] transition-all text-center cursor-pointer ${
-                !project.specs.isDetailed
+              className={`flex-1 rounded-md py-1.5 text-[12px] transition-all text-center cursor-pointer flex items-center justify-center gap-1.5 ${
+                !isDetailed
                   ? isDark
                     ? 'bg-[#27272a] shadow-xs text-white font-bold'
                     : 'bg-white shadow-xs text-slate-900 font-bold'
@@ -68,13 +91,14 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                   : 'text-slate-600 hover:text-slate-900 font-semibold'
               }`}
             >
-              Simple
+              <Cpu className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Simple (Catálogo IA)</span>
             </button>
             <button
               type="button"
               onClick={() => updateSpecs({ isDetailed: true })}
-              className={`flex-1 rounded-md py-1.5 text-[12px] transition-all text-center cursor-pointer ${
-                project.specs.isDetailed
+              className={`flex-1 rounded-md py-1.5 text-[12px] transition-all text-center cursor-pointer flex items-center justify-center gap-1.5 ${
+                isDetailed
                   ? isDark
                     ? 'bg-[#27272a] shadow-xs text-white font-bold'
                     : 'bg-white shadow-xs text-slate-900 font-bold'
@@ -83,209 +107,342 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                   : 'text-slate-600 hover:text-slate-900 font-semibold'
               }`}
             >
-              Detallado
+              <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Detallado (Manual)</span>
             </button>
           </div>
 
-          <div>
-            <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-              Modelo / Marca Módulos
-            </label>
-            <input
-              type="text"
-              value={project.specs.panelBrandModel || 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)'}
-              onChange={(e) => updateSpecs({ panelBrandModel: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                isDark
-                  ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                  : 'bg-slate-50 border-slate-300 text-slate-800'
-              }`}
-            />
-          </div>
-
-          <div>
-            <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-              Potencia del Panel (W)
-            </label>
-            <input
-              type="number"
-              step="5"
-              value={project.specs.panelPowerW}
-              onChange={(e) => updateSpecs({ panelPowerW: parseFloat(e.target.value) || 0 })}
-              className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                isDark
-                  ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                  : 'bg-slate-50 border-slate-300 text-slate-800'
-              }`}
-            />
-          </div>
-
-          {/* Toggle Auto-Calcular Paneles */}
+          {/* PARÁMETRO DESTACADO VISIBLE: Pérdidas del Sistema (%) */}
           <div
-            className={`p-2.5 rounded-lg border space-y-1 ${
-              isDark ? 'bg-emerald-950/40 border-emerald-800/60' : 'bg-emerald-50/60 border-emerald-200/80'
+            className={`p-2.5 rounded-lg border flex items-center justify-between gap-3 ${
+              isDark ? 'bg-[#1c1c24] border-[#3f3f46]' : 'bg-emerald-50/70 border-emerald-200/80'
             }`}
           >
-            <div className="flex items-center justify-between">
-              <span className={`text-xs font-semibold ${isDark ? 'text-emerald-300' : 'text-emerald-950'}`}>
-                Auto-Calcular Paneles
+            <div>
+              <label className={`block text-xs font-bold ${isDark ? 'text-emerald-400' : 'text-emerald-950'}`}>
+                Pérdidas del Sistema (%)
+              </label>
+              <span className={`text-[10px] block ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                Rendimiento fotovoltaico global (default: 25.0%)
               </span>
+            </div>
+
+            <div className="w-24 shrink-0">
               <input
-                type="checkbox"
-                checked={!!project.specs.autoCalculatePanels}
-                onChange={(e) => updateSpecs({ autoCalculatePanels: e.target.checked })}
-                className="rounded text-emerald-700 focus:ring-emerald-600 cursor-pointer h-4 w-4"
+                type="number"
+                step="0.5"
+                min="0"
+                max="50"
+                value={project.specs.systemLosses !== undefined ? project.specs.systemLosses : 25}
+                onChange={(e) => updateSpecs({ systemLosses: parseFloat(e.target.value) || 0 })}
+                className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold text-center ${
+                  isDark ? 'bg-[#121214] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-900'
+                }`}
               />
             </div>
-            {project.specs.autoCalculatePanels && (
-              <p className={`text-[10px] leading-tight ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
-                Calculando automáticamente para cubrir el {project.rates.targetCoveragePct ?? 95}% del consumo (considerando {project.specs.systemLosses ?? 25}% de pérdidas).
-              </p>
-            )}
           </div>
 
-          <div>
-            <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-              Cantidad de Paneles
-            </label>
-            <input
-              type="number"
-              step="1"
-              disabled={project.specs.autoCalculatePanels}
-              value={project.specs.panelCount}
-              onChange={(e) => updateSpecs({ panelCount: parseInt(e.target.value) || 0 })}
-              className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all disabled:opacity-50 ${
-                isDark
-                  ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                  : 'bg-slate-50 border-slate-300 text-slate-800'
-              }`}
-            />
-          </div>
+          {/* MODO SIMPLE: Catálogo Inteligente con Búsqueda en Tiempo Real y Escaneo con IA */}
+          {!isDetailed ? (
+            <div className="space-y-3">
+              {/* Selector Inteligente de Paneles */}
+              <SearchableEquipmentSelect
+                type="panel"
+                items={equipmentCatalog}
+                selectedValue={project.specs.panelBrandModel || ''}
+                selectedPower={project.specs.panelPowerW}
+                onSelect={handleSelectPanel}
+                onOpenScanner={openAIDatasheetModal}
+                label="Módulo Solar Fotovoltaico"
+                placeholder="Buscar o seleccionar panel..."
+                isDark={isDark}
+              />
 
-          <div>
-            <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-              Modelo / Marca Inversor
-            </label>
-            <input
-              type="text"
-              value={project.specs.inverterBrandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)'}
-              onChange={(e) => updateSpecs({ inverterBrandModel: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                isDark
-                  ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                  : 'bg-slate-50 border-slate-300 text-slate-800'
-              }`}
-            />
-          </div>
+              {/* Potencia del Panel (Solo lectura informativa en modo simple) */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                    Potencia Panel
+                  </label>
+                  <div
+                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-mono font-bold ${
+                      isDark ? 'bg-[#18181b] border-[#3f3f46] text-emerald-400' : 'bg-slate-100 border-slate-300 text-emerald-800'
+                    }`}
+                  >
+                    {project.specs.panelPowerW} Wp
+                  </div>
+                </div>
 
-          {/* CAMPOS MODO DETALLADO */}
-          {project.specs.isDetailed && (
-            <div
-              className={`space-y-3 p-3 rounded-lg border mt-3 ${
-                isDark ? 'bg-[#202024] border-[#2e2e34]' : 'bg-emerald-50/50 border-emerald-200'
-              }`}
-            >
-              <h4
-                className={`text-[11px] font-bold uppercase tracking-wider border-b pb-1 flex items-center gap-1.5 ${
-                  isDark ? 'text-emerald-400 border-[#2e2e34]' : 'text-emerald-900 border-emerald-200'
+                <div>
+                  <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                    Eficiencia
+                  </label>
+                  <div
+                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-mono font-bold ${
+                      isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-200' : 'bg-slate-100 border-slate-300 text-slate-800'
+                    }`}
+                  >
+                    {project.specs.panelEfficiency || 21.5}%
+                  </div>
+                </div>
+              </div>
+
+              {/* Toggle Auto-Calcular Paneles */}
+              <div
+                className={`p-2.5 rounded-lg border space-y-1 ${
+                  isDark ? 'bg-emerald-950/40 border-emerald-800/60' : 'bg-emerald-50/60 border-emerald-200/80'
                 }`}
               >
-                <span className="material-symbols-outlined text-[14px]">tune</span> Parámetros Técnicos Avanzados
-              </h4>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                    Potencia Inversor (kW)
-                  </label>
+                <div className="flex items-center justify-between">
+                  <span className={`text-xs font-semibold ${isDark ? 'text-emerald-300' : 'text-emerald-950'}`}>
+                    Auto-Calcular Paneles
+                  </span>
                   <input
-                    type="number"
-                    step="1"
-                    value={project.specs.inverterPowerKW}
-                    onChange={(e) => updateSpecs({ inverterPowerKW: parseFloat(e.target.value) || 0 })}
-                    className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold ${
-                      isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                    }`}
+                    type="checkbox"
+                    checked={!!project.specs.autoCalculatePanels}
+                    onChange={(e) => updateSpecs({ autoCalculatePanels: e.target.checked })}
+                    className="rounded text-emerald-700 focus:ring-emerald-600 cursor-pointer h-4 w-4"
                   />
                 </div>
-
-                <div>
-                  <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                    Cantidad Inversores
-                  </label>
-                  <input
-                    type="number"
-                    step="1"
-                    value={project.specs.inverterCount || 1}
-                    onChange={(e) => updateSpecs({ inverterCount: parseInt(e.target.value) || 1 })}
-                    className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold ${
-                      isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                    }`}
-                  />
-                </div>
+                {project.specs.autoCalculatePanels && (
+                  <p className={`text-[10px] leading-tight ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                    Calculando automáticamente para cubrir el {project.rates.targetCoveragePct ?? 95}% del consumo (considerando {project.specs.systemLosses ?? 25}% de pérdidas).
+                  </p>
+                )}
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                    Eficiencia Panel (%)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={project.specs.panelEfficiency}
-                    onChange={(e) => updateSpecs({ panelEfficiency: parseFloat(e.target.value) || 0 })}
-                    className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                      isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                    Coef. Temp (%/°C)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={project.specs.tempCoeff}
-                    onChange={(e) => updateSpecs({ tempCoeff: parseFloat(e.target.value) || 0 })}
-                    className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                      isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                    }`}
-                  />
-                </div>
+              {/* Cantidad de Paneles */}
+              <div>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                  Cantidad de Paneles
+                </label>
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  disabled={project.specs.autoCalculatePanels}
+                  value={project.specs.panelCount}
+                  onChange={(e) => updateSpecs({ panelCount: parseInt(e.target.value) || 0 })}
+                  className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all disabled:opacity-50 ${
+                    isDark
+                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
+                      : 'bg-slate-50 border-slate-300 text-slate-800'
+                  }`}
+                />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                    Pérdidas Sistema (%)
-                  </label>
+              {/* Selector Inteligente de Inversores */}
+              <SearchableEquipmentSelect
+                type="inverter"
+                items={equipmentCatalog}
+                selectedValue={project.specs.inverterBrandModel || ''}
+                selectedPower={project.specs.inverterPowerKW}
+                onSelect={handleSelectInverter}
+                onOpenScanner={openAIDatasheetModal}
+                label="Inversor Solar"
+                placeholder="Buscar o seleccionar inversor..."
+                isDark={isDark}
+              />
+
+              {/* Botón Destacado: Escanear Ficha Técnica (IA) */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={openAIDatasheetModal}
+                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-emerald-600 hover:from-purple-500 hover:to-emerald-500 text-white text-xs font-bold shadow-md hover:shadow-purple-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
+                >
+                  <Sparkles className="w-4 h-4 text-white" />
+                  <span>Escanear Ficha Técnica con IA</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* MODO DETALLADO: Ingreso Manual Libre de Parámetros */
+            <div className="space-y-3">
+              <div>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                  Modelo / Marca Módulos (Manual)
+                </label>
+                <input
+                  type="text"
+                  value={project.specs.panelBrandModel || 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)'}
+                  onChange={(e) => updateSpecs({ panelBrandModel: e.target.value })}
+                  className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    isDark
+                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
+                      : 'bg-slate-50 border-slate-300 text-slate-800'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                  Potencia del Panel (W)
+                </label>
+                <input
+                  type="number"
+                  step="5"
+                  value={project.specs.panelPowerW}
+                  onChange={(e) => updateSpecs({ panelPowerW: parseFloat(e.target.value) || 0 })}
+                  className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                    isDark
+                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
+                      : 'bg-slate-50 border-slate-300 text-slate-800'
+                  }`}
+                />
+              </div>
+
+              {/* Toggle Auto-Calcular Paneles */}
+              <div
+                className={`p-2.5 rounded-lg border space-y-1 ${
+                  isDark ? 'bg-emerald-950/40 border-emerald-800/60' : 'bg-emerald-50/60 border-emerald-200/80'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className={`text-xs font-semibold ${isDark ? 'text-emerald-300' : 'text-emerald-950'}`}>
+                    Auto-Calcular Paneles
+                  </span>
                   <input
-                    type="number"
-                    step="0.5"
-                    value={project.specs.systemLosses !== undefined ? project.specs.systemLosses : 25}
-                    onChange={(e) => updateSpecs({ systemLosses: parseFloat(e.target.value) || 0 })}
-                    className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                      isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                    }`}
+                    type="checkbox"
+                    checked={!!project.specs.autoCalculatePanels}
+                    onChange={(e) => updateSpecs({ autoCalculatePanels: e.target.checked })}
+                    className="rounded text-emerald-700 focus:ring-emerald-600 cursor-pointer h-4 w-4"
                   />
                 </div>
+                {project.specs.autoCalculatePanels && (
+                  <p className={`text-[10px] leading-tight ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                    Calculando automáticamente para cubrir el {project.rates.targetCoveragePct ?? 95}% del consumo (considerando {project.specs.systemLosses ?? 25}% de pérdidas).
+                  </p>
+                )}
+              </div>
 
-                <div>
-                  <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                    Degradación Anual (%)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={project.specs.annualDegradation}
-                    onChange={(e) => updateSpecs({ annualDegradation: parseFloat(e.target.value) || 0 })}
-                    className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                      isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                    }`}
-                  />
+              <div>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                  Cantidad de Paneles
+                </label>
+                <input
+                  type="number"
+                  step="1"
+                  disabled={project.specs.autoCalculatePanels}
+                  value={project.specs.panelCount}
+                  onChange={(e) => updateSpecs({ panelCount: parseInt(e.target.value) || 0 })}
+                  className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all disabled:opacity-50 ${
+                    isDark
+                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
+                      : 'bg-slate-50 border-slate-300 text-slate-800'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                  Modelo / Marca Inversor (Manual)
+                </label>
+                <input
+                  type="text"
+                  value={project.specs.inverterBrandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)'}
+                  onChange={(e) => updateSpecs({ inverterBrandModel: e.target.value })}
+                  className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                    isDark
+                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
+                      : 'bg-slate-50 border-slate-300 text-slate-800'
+                  }`}
+                />
+              </div>
+
+              {/* Subsección de Parámetros Técnicos Avanzados */}
+              <div
+                className={`space-y-3 p-3 rounded-lg border mt-3 ${
+                  isDark ? 'bg-[#202024] border-[#2e2e34]' : 'bg-emerald-50/50 border-emerald-200'
+                }`}
+              >
+                <h4
+                  className={`text-[11px] font-bold uppercase tracking-wider border-b pb-1 flex items-center gap-1.5 ${
+                    isDark ? 'text-emerald-400 border-[#2e2e34]' : 'text-emerald-900 border-emerald-200'
+                  }`}
+                >
+                  <Sliders className="w-3.5 h-3.5" /> Parámetros Técnicos Avanzados
+                </h4>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                      Potencia Inversor (kW)
+                    </label>
+                    <input
+                      type="number"
+                      step="1"
+                      value={project.specs.inverterPowerKW}
+                      onChange={(e) => updateSpecs({ inverterPowerKW: parseFloat(e.target.value) || 0 })}
+                      className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold ${
+                        isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                      Cantidad Inversores
+                    </label>
+                    <input
+                      type="number"
+                      step="1"
+                      value={project.specs.inverterCount || 1}
+                      onChange={(e) => updateSpecs({ inverterCount: parseInt(e.target.value) || 1 })}
+                      className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold ${
+                        isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                      Eficiencia Panel (%)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={project.specs.panelEfficiency}
+                      onChange={(e) => updateSpecs({ panelEfficiency: parseFloat(e.target.value) || 0 })}
+                      className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
+                        isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                      }`}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                      Coef. Temp (%/°C)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={project.specs.tempCoeff}
+                      onChange={(e) => updateSpecs({ tempCoeff: parseFloat(e.target.value) || 0 })}
+                      className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
+                        isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                      Degradación Anual (%)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={project.specs.annualDegradation}
+                      onChange={(e) => updateSpecs({ annualDegradation: parseFloat(e.target.value) || 0 })}
+                      className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
+                        isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                      }`}
+                    />
+                  </div>
                 </div>
               </div>
             </div>

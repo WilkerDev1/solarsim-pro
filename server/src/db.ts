@@ -98,6 +98,29 @@ export async function initDatabase(): Promise<void> {
       );
     `);
 
+    // 5. Tabla de Catálogo Global de Equipos Fotovoltaicos
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS equipment_catalog (
+        id VARCHAR(64) PRIMARY KEY,
+        organization_id VARCHAR(64) REFERENCES organizations(id) ON DELETE CASCADE,
+        type VARCHAR(32) NOT NULL,
+        brand VARCHAR(128) NOT NULL,
+        model_series VARCHAR(128) NOT NULL,
+        display_name VARCHAR(255) NOT NULL,
+        power_w NUMERIC(10, 2),
+        power_kw NUMERIC(10, 2),
+        efficiency_pct NUMERIC(5, 2),
+        temp_coeff NUMERIC(5, 4),
+        category VARCHAR(64),
+        voltage_mppt VARCHAR(64),
+        details JSONB,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_equipment_org_type ON equipment_catalog(organization_id, type);
+      CREATE INDEX IF NOT EXISTS idx_equipment_display ON equipment_catalog(display_name);
+    `);
+
     await client.query('COMMIT');
     console.log('✅ Esquemas de base de datos PostgreSQL inicializados con éxito.');
   } catch (error) {

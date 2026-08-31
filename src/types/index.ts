@@ -318,6 +318,7 @@ export interface UpdateInfo {
 }
 
 export * from './aiInvoice';
+export * from './equipment';
 
 declare global {
   interface Window {
@@ -332,6 +333,7 @@ declare global {
       openExternalUrl: (url: string) => Promise<void>;
       installLinuxPackage: (packageType: 'pacman' | 'deb', version: string) => Promise<{ success: boolean; error?: string }>;
       parseInvoiceWithAI?: (payload: { fileBase64: string; mimeType: string; fileName: string; apiKey?: string; model?: string; panelPowerW?: number }) => Promise<{ success: boolean; data?: ExtractedInvoiceData; error?: string }>;
+      parseDatasheetWithAI?: (payload: { fileBase64: string; mimeType: string; fileName: string; apiKey?: string; model?: string }) => Promise<{ success: boolean; data?: import('./equipment').ExtractedDatasheetData; error?: string }>;
       validateGeminiApiKey?: (apiKey: string, model?: string) => Promise<{ success: boolean; error?: string; modelName?: string; models?: GeminiModelInfo[] }>;
       listGeminiModels?: (apiKey: string) => Promise<{ success: boolean; error?: string; models?: GeminiModelInfo[] }>;
     };
