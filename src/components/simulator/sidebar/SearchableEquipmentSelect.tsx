@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { SolarEquipmentItem, EquipmentType } from '../../../types/equipment';
-import { Search, ChevronDown, Check, Sparkles, Plus, Sun, Zap, X } from 'lucide-react';
+import { Search, ChevronDown, Check, Sparkles, Sun, Zap, BatteryCharging, X } from 'lucide-react';
 
 interface SearchableEquipmentSelectProps {
   type: EquipmentType;
   items: SolarEquipmentItem[];
   selectedValue: string;
-  selectedPower?: number;
+  selectedPower?: number; // Para panel (W), inversor (kW) o batería (kWh)
   onSelect: (item: SolarEquipmentItem) => void;
   onOpenScanner: () => void;
   placeholder?: string;
@@ -43,6 +43,10 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
           item.modelSeries.toLowerCase().includes(q) ||
           (item.powerW && item.powerW.toString().includes(q)) ||
           (item.powerKW && item.powerKW.toString().includes(q)) ||
+          (item.capacityKWh && item.capacityKWh.toString().includes(q)) ||
+          (item.capacityAh && item.capacityAh.toString().includes(q)) ||
+          (item.voltageV && item.voltageV.toString().includes(q)) ||
+          (item.chemistry && item.chemistry.toLowerCase().includes(q)) ||
           (item.category && item.category.toLowerCase().includes(q))
         );
       })
@@ -67,6 +71,33 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
   };
 
   const isPanel = type === 'panel';
+  const isBattery = type === 'battery';
+  const isInverter = type === 'inverter';
+
+  const renderIcon = () => {
+    if (isPanel) return <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />;
+    if (isBattery) return <BatteryCharging className="w-3.5 h-3.5 text-cyan-400 shrink-0" />;
+    return <Zap className="w-3.5 h-3.5 text-emerald-500 shrink-0" />;
+  };
+
+  const getPlaceholderText = () => {
+    if (placeholder) return placeholder;
+    if (isPanel) return 'Seleccionar módulo solar...';
+    if (isBattery) return 'Seleccionar batería de almacenamiento...';
+    return 'Seleccionar inversor...';
+  };
+
+  const getSearchPlaceholderText = () => {
+    if (isPanel) return 'Buscar por marca, modelo o vatios (W)...';
+    if (isBattery) return 'Buscar por marca, kWh, Ah, voltaje (V)...';
+    return 'Buscar por marca, modelo o kilovatios (kW)...';
+  };
+
+  const formatPowerBadge = (item: SolarEquipmentItem) => {
+    if (item.type === 'panel') return `${item.powerW}W`;
+    if (item.type === 'battery') return `${item.capacityKWh}kWh`;
+    return `${item.powerKW}kW`;
+  };
 
   return (
     <div className="relative space-y-1" ref={containerRef}>
@@ -98,13 +129,9 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
         }`}
       >
         <div className="flex items-center gap-2 truncate flex-1">
-          {isPanel ? (
-            <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-          ) : (
-            <Zap className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-          )}
+          {renderIcon()}
           <span className="truncate font-semibold">
-            {selectedValue || placeholder || `Seleccionar ${isPanel ? 'módulo solar' : 'inversor'}...`}
+            {selectedValue || getPlaceholderText()}
           </span>
         </div>
 
@@ -112,10 +139,16 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
           {selectedPower ? (
             <span
               className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-bold ${
-                isDark ? 'bg-emerald-950/70 text-emerald-300 border border-emerald-800/50' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                isBattery
+                  ? isDark
+                    ? 'bg-cyan-950/70 text-cyan-300 border border-cyan-800/50'
+                    : 'bg-cyan-50 text-cyan-700 border border-cyan-200'
+                  : isDark
+                  ? 'bg-emerald-950/70 text-emerald-300 border border-emerald-800/50'
+                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
               }`}
             >
-              {isPanel ? `${selectedPower}W` : `${selectedPower}kW`}
+              {isPanel ? `${selectedPower}W` : isBattery ? `${selectedPower}kWh` : `${selectedPower}kW`}
             </span>
           ) : null}
           <ChevronDown
@@ -145,7 +178,7 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={`Buscar por marca, modelo o ${isPanel ? 'vatios (W)' : 'kilovatios (kW)'}...`}
+              placeholder={getSearchPlaceholderText()}
               className={`w-full bg-transparent border-none outline-none text-xs ${
                 isDark ? 'text-zinc-100 placeholder-zinc-500' : 'text-slate-900 placeholder-slate-400'
               }`}
@@ -171,7 +204,7 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
             {filteredAndSortedItems.length === 0 ? (
               <div className="p-4 text-center">
                 <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-                  No se encontraron {isPanel ? 'paneles' : 'inversores'} coincidentes.
+                  No se encontraron {isPanel ? 'paneles' : isBattery ? 'baterías' : 'inversores'} coincidentes.
                 </p>
                 <button
                   type="button"
@@ -213,24 +246,33 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
                       </div>
                       <div className={`text-[10px] flex items-center gap-2 mt-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
                         <span>{item.brand}</span>
-                        {item.category && (
+                        {item.type === 'battery' && (
                           <>
-                            <span>•</span>
-                            <span>{item.category}</span>
+                            {item.voltageV && <span>• {item.voltageV}V</span>}
+                            {item.capacityAh && <span>• {item.capacityAh}Ah</span>}
+                            {item.dodPct && <span>• {item.dodPct}% DoD</span>}
+                            {item.chemistry && <span>• {item.chemistry}</span>}
                           </>
                         )}
-                        {item.efficiencyPct && (
+                        {item.type === 'panel' && (
                           <>
-                            <span>•</span>
-                            <span>{item.efficiencyPct}% η</span>
+                            {item.category && <span>• {item.category}</span>}
+                            {item.efficiencyPct && <span>• {item.efficiencyPct}% η</span>}
+                            {item.tempCoeff && <span>• {item.tempCoeff}%/°C</span>}
+                          </>
+                        )}
+                        {item.type === 'inverter' && (
+                          <>
+                            {item.category && <span>• {item.category}</span>}
+                            {item.voltageMPPT && <span>• MPPT: {item.voltageMPPT}</span>}
                           </>
                         )}
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="font-mono text-[11px] font-bold text-emerald-500">
-                        {isPanel ? `${item.powerW}W` : `${item.powerKW}kW`}
+                      <span className={`font-mono text-[11px] font-bold ${isBattery ? 'text-cyan-400' : 'text-emerald-500'}`}>
+                        {formatPowerBadge(item)}
                       </span>
                       {isSelected && <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />}
                     </div>

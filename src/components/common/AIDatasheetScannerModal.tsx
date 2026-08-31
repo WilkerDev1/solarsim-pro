@@ -1,23 +1,23 @@
 import React, { useState, useRef } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { ExtractedDatasheetData, ExtractedEquipmentVariant, SolarEquipmentItem, EquipmentType } from '../../types/equipment';
 import { parseDatasheetWithGemini } from '../../services/geminiDatasheetService';
-import { ExtractedDatasheetData, ExtractedEquipmentVariant, SolarEquipmentItem } from '../../types/equipment';
 import {
   X,
+  Sparkles,
   Upload,
   FileText,
-  Sparkles,
   CheckCircle2,
   AlertTriangle,
-  RefreshCw,
-  Settings,
+  Database,
+  Trash2,
   Sun,
   Zap,
+  BatteryCharging,
+  Sliders,
+  RefreshCw,
   Plus,
-  Trash2,
   Layers,
-  Database,
-  ArrowRight,
 } from 'lucide-react';
 
 export const AIDatasheetScannerModal: React.FC = () => {
@@ -30,114 +30,72 @@ export const AIDatasheetScannerModal: React.FC = () => {
     geminiApiKey,
     geminiModel,
     sidebarTheme,
-    openSettingsModal,
   } = useSimulationStore();
 
   const isDark = sidebarTheme === 'dark';
-  const activeProject = getActiveProject();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [extractedData, setExtractedData] = useState<ExtractedDatasheetData | null>(null);
   const [applyToActiveProject, setApplyToActiveProject] = useState(true);
   const [selectedVariantIdForActive, setSelectedVariantIdForActive] = useState<string | null>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   if (!isAIDatasheetModalOpen) return null;
 
-  const handleFileSelect = (file: File) => {
-    setErrorMessage(null);
-    setExtractedData(null);
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
+    // Acepta PDF y formatos de imagen
     const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
     if (!validTypes.includes(file.type)) {
-      setErrorMessage('Formato no soportado. Por favor sube un archivo PDF o una imagen (JPG, PNG, WebP).');
+      setErrorMessage('Formato no soportado. Por favor sube un documento PDF o imagen JPG/PNG/WebP de la ficha técnica.');
       return;
     }
 
-    if (file.size > 20 * 1024 * 1024) {
-      setErrorMessage('El archivo excede el límite máximo de 20MB.');
+    if (file.size > 25 * 1024 * 1024) {
+      setErrorMessage('El archivo excede los 25 MB permitidos.');
       return;
     }
 
     setSelectedFile(file);
+    setErrorMessage(null);
 
-    if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (e) => setFilePreview(e.target?.result as string);
-      reader.readAsDataURL(file);
-    } else {
-      setFilePreview(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setFilePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleScanDatasheet = async () => {
+    if (!selectedFile || !filePreview) {
+      setErrorMessage('Por favor selecciona una ficha técnica antes de escanear.');
+      return;
     }
-  };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileSelect(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleScanWithAI = async () => {
-    if (!selectedFile) return;
     setIsLoading(true);
     setErrorMessage(null);
 
     try {
-      // Convertir a base64
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve, reject) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(selectedFile);
-      });
+      const data = await parseDatasheetWithGemini(
+        filePreview,
+        selectedFile.type,
+        selectedFile.name,
+        geminiApiKey,
+        geminiModel
+      );
 
-      const base64Data = await base64Promise;
-
-      let result: ExtractedDatasheetData;
-      if (window.electronAPI?.parseDatasheetWithAI) {
-        const electronRes = await window.electronAPI.parseDatasheetWithAI({
-          fileBase64: base64Data,
-          mimeType: selectedFile.type,
-          fileName: selectedFile.name,
-          apiKey: geminiApiKey,
-          model: geminiModel,
-        });
-        if (!electronRes.success || !electronRes.data) {
-          throw new Error(electronRes.error || 'Error al procesar el datasheet en Electron');
-        }
-        result = electronRes.data;
-      } else {
-        result = await parseDatasheetWithGemini(
-          base64Data,
-          selectedFile.type,
-          selectedFile.name,
-          geminiApiKey,
-          geminiModel
-        );
-      }
-
-      setExtractedData(result);
-      if (result.variants.length > 0) {
-        setSelectedVariantIdForActive(result.variants[0].id);
+      setExtractedData(data);
+      if (data.variants.length > 0) {
+        setSelectedVariantIdForActive(data.variants[0].id);
       }
     } catch (err: any) {
-      console.error('Error scanning datasheet:', err);
-      setErrorMessage(err.message || 'Ocurrió un error inesperado al analizar la ficha técnica.');
+      console.error('Error al analizar ficha técnica:', err);
+      setErrorMessage(err.message || 'Error desconocido al procesar el datasheet.');
     } finally {
       setIsLoading(false);
     }
@@ -168,12 +126,19 @@ export const AIDatasheetScannerModal: React.FC = () => {
       variants: extractedData.variants.map((v) => {
         if (v.id === id) {
           const updated = { ...v, ...updates };
-          // Regenerar displayName si cambió modelCode o potencia
-          if (updates.modelCode !== undefined || updates.powerW !== undefined || updates.powerKW !== undefined) {
+          // Regenerar displayName si cambió modelCode o potencia o capacidad
+          if (
+            updates.modelCode !== undefined ||
+            updates.powerW !== undefined ||
+            updates.powerKW !== undefined ||
+            updates.capacityKWh !== undefined
+          ) {
             if (extractedData.equipmentType === 'panel') {
-              updated.displayName = `Módulos ${extractedData.brand.toUpperCase()} ${updated.modelCode} (${updated.powerW}W)`;
+              updated.displayName = `Módulos ${extractedData.brand} ${updated.modelCode} (${updated.powerW}W)`;
             } else if (extractedData.equipmentType === 'inverter') {
-              updated.displayName = `Inversor ${extractedData.brand.toUpperCase()} ${updated.modelCode} (${updated.powerKW}Kw)`;
+              updated.displayName = `Inversor ${extractedData.brand} ${updated.modelCode} (${updated.powerKW}Kw)`;
+            } else {
+              updated.displayName = `Batería ${extractedData.brand} ${updated.modelCode} (${updated.capacityKWh}kWh)`;
             }
           }
           return updated;
@@ -207,8 +172,17 @@ export const AIDatasheetScannerModal: React.FC = () => {
       displayName: v.displayName,
       powerW: v.powerW,
       powerKW: v.powerKW,
+      capacityKWh: v.capacityKWh,
+      capacityAh: v.capacityAh,
+      voltageV: v.voltageV,
+      dodPct: v.dodPct,
+      batteryEfficiencyPct: v.batteryEfficiencyPct,
+      cycles: v.cycles,
+      chemistry: v.chemistry,
+      maxChargeCurrentA: v.maxChargeCurrentA,
       efficiencyPct: v.efficiencyPct,
       tempCoeff: v.tempCoeff,
+      annualDegradation: v.annualDegradation,
       category: extractedData.category,
       voltageMPPT: v.voltageMPPT,
       voc: v.voc,
@@ -216,7 +190,11 @@ export const AIDatasheetScannerModal: React.FC = () => {
       vmp: v.vmp,
       imp: v.imp,
       maxAcPowerKW: v.maxAcPowerKW,
+      maxPvPowerKW: v.maxPvPowerKW,
+      maxEfficiencyPct: v.maxEfficiencyPct,
       mpptCount: v.mpptCount,
+      dimensions: v.dimensions,
+      weightKg: v.weightKg,
       isCustom: true,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -232,13 +210,21 @@ export const AIDatasheetScannerModal: React.FC = () => {
           updateSpecs({
             panelBrandModel: activeVariant.displayName,
             panelPowerW: activeVariant.powerW || 550,
-            panelEfficiency: activeVariant.efficiencyPct || 21.5,
-            tempCoeff: activeVariant.tempCoeff || -0.35,
+            panelEfficiency: activeVariant.efficiencyPct || 22.0,
+            tempCoeff: activeVariant.tempCoeff || -0.29,
           });
         } else if (extractedData.equipmentType === 'inverter') {
           updateSpecs({
             inverterBrandModel: activeVariant.displayName,
             inverterPowerKW: activeVariant.powerKW || 5.0,
+          });
+        } else if (extractedData.equipmentType === 'battery') {
+          updateSpecs({
+            hasBattery: true,
+            batteryBrandModel: activeVariant.displayName,
+            batteryCapacityKWh: activeVariant.capacityKWh || 16.08,
+            batteryDOD: activeVariant.dodPct || 90,
+            batteryEfficiencyPct: activeVariant.batteryEfficiencyPct || 95,
           });
         }
       }
@@ -250,202 +236,154 @@ export const AIDatasheetScannerModal: React.FC = () => {
   const selectedCount = extractedData?.variants.filter((v) => v.selected).length || 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
       <div
-        className={`w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden transition-colors ${
+        className={`w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden transition-all ${
           isDark ? 'bg-[#18181b] border-[#27272a] text-zinc-100' : 'bg-white border-slate-200 text-slate-900'
         }`}
       >
-        {/* Header del Modal */}
+        {/* Cabecera del Modal */}
         <div
-          className={`flex items-center justify-between px-6 py-4 border-b shrink-0 ${
-            isDark ? 'border-[#27272a] bg-[#14141c]' : 'border-slate-200 bg-slate-50'
+          className={`p-5 border-b flex items-center justify-between ${
+            isDark
+              ? 'bg-gradient-to-r from-purple-950/40 via-[#18181b] to-indigo-950/40 border-[#27272a]'
+              : 'bg-gradient-to-r from-purple-50 via-white to-indigo-50 border-slate-200'
           }`}
         >
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-gradient-to-br from-purple-500 to-indigo-600 shadow-md">
-              <Sparkles className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-purple-500/20">
+              <Sparkles className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold flex items-center gap-2">
-                Escáner de Fichas Técnicas con IA
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30 font-mono">
-                  Gemini Vision
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold">Escáner de Fichas Técnicas (IA)</h2>
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                  Multivariante & BESS
                 </span>
-              </h2>
+              </div>
               <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-                Extrae familias y variantes completas de paneles o inversores para agregarlos al catálogo inteligente.
+                Extrae familias de Paneles, Inversores y Baterías por variantes de potencia desde PDF o imágenes
               </p>
             </div>
           </div>
 
           <button
+            type="button"
             onClick={closeAIDatasheetModal}
-            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
-              isDark ? 'hover:bg-[#27272a] text-zinc-400' : 'hover:bg-slate-200 text-slate-500'
+            className={`p-2 rounded-lg transition-colors cursor-pointer ${
+              isDark ? 'hover:bg-[#27272a] text-zinc-400 hover:text-zinc-200' : 'hover:bg-slate-100 text-slate-500'
             }`}
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Contenido Principal con Scroll */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Banner de Aviso de API Key si falta */}
-          {!geminiApiKey && (
-            <div
-              className={`p-4 rounded-xl border flex items-center justify-between ${
-                isDark ? 'bg-amber-950/40 border-amber-800/60 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-800'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
-                <span className="text-xs">
-                  Configura tu API Key gratuita de Google AI Studio en Ajustes para habilitar el escáner multimodal.
-                </span>
-              </div>
-              <button
-                onClick={() => {
-                  closeAIDatasheetModal();
-                  openSettingsModal('ai');
-                }}
-                className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-black text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
-              >
-                <Settings className="w-3.5 h-3.5" />
-                <span>Configurar IA</span>
-              </button>
+        {/* Cuerpo del Modal */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {errorMessage && (
+            <div className="p-3.5 rounded-xl bg-red-950/50 border border-red-800 text-red-300 text-xs flex items-start gap-2.5">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
+              <div className="flex-1">{errorMessage}</div>
             </div>
           )}
 
-          {/* Zona de Carga de Archivo (Si aún no se ha extraído o para re-escanear) */}
-          {!extractedData && (
+          {/* Estado Inicial: Carga y Procesamiento de Documento */}
+          {!extractedData ? (
             <div className="space-y-4">
               <div
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
-                className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-3 ${
-                  isDragging
-                    ? 'border-purple-500 bg-purple-500/10 scale-[0.99]'
+                className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-3 group ${
+                  selectedFile
+                    ? isDark
+                      ? 'border-purple-500/80 bg-purple-950/20'
+                      : 'border-purple-500 bg-purple-50/50'
                     : isDark
-                    ? 'border-[#3f3f46] hover:border-purple-500/70 bg-[#202028]/40 hover:bg-[#202028]'
-                    : 'border-slate-300 hover:border-purple-500 bg-slate-50 hover:bg-purple-50/50'
+                    ? 'border-[#3f3f46] hover:border-purple-400 bg-[#121214]/50 hover:bg-[#1c1c24]'
+                    : 'border-slate-300 hover:border-purple-500 bg-slate-50/50 hover:bg-purple-50/30'
                 }`}
               >
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".pdf,image/jpeg,image/png,image/webp"
-                  onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                  accept="application/pdf,image/jpeg,image/png,image/webp"
+                  onChange={handleFileSelect}
                   className="hidden"
                 />
 
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-gradient-to-br from-purple-500/20 to-indigo-500/20 border border-purple-500/30 text-purple-400">
-                  <Upload className="w-7 h-7" />
+                <div
+                  className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 ${
+                    selectedFile
+                      ? 'bg-purple-600 text-white'
+                      : isDark
+                      ? 'bg-[#27272a] text-purple-400'
+                      : 'bg-purple-100 text-purple-600'
+                  }`}
+                >
+                  {selectedFile ? <FileText className="w-7 h-7" /> : <Upload className="w-7 h-7" />}
                 </div>
 
-                <div>
+                <div className="space-y-1">
                   <p className="text-sm font-bold">
                     {selectedFile ? selectedFile.name : 'Haz clic o arrastra la ficha técnica aquí'}
                   </p>
-                  <p className={`text-xs mt-1 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-                    Soporta documentos PDF de fabricantes o imágenes (JPG, PNG, WebP) de hasta 20MB
+                  <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                    {selectedFile
+                      ? `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB • Listo para escanear`
+                      : 'Admite documentos PDF o imágenes JPG, PNG, WebP de cualquier fabricante'}
                   </p>
                 </div>
-
-                {selectedFile && (
-                  <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-semibold">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>{(selectedFile.size / 1024 / 1024).toFixed(2)} MB listo para análisis</span>
-                  </div>
-                )}
               </div>
 
-              {filePreview && (
-                <div className="flex justify-center">
-                  <img
-                    src={filePreview}
-                    alt="Preview"
-                    className="max-h-48 rounded-xl border border-slate-700 object-contain shadow-md"
-                  />
-                </div>
-              )}
-
-              {/* Botón de Iniciar Escaneo */}
-              {selectedFile && (
-                <div className="flex justify-end">
-                  <button
-                    onClick={handleScanWithAI}
-                    disabled={isLoading}
-                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-emerald-600 text-white text-xs font-bold shadow-lg hover:shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer flex items-center gap-2 disabled:opacity-50"
-                  >
-                    {isLoading ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Analizando ficha técnica con Gemini...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4" />
-                        <span>Escanear y Extraer Variantes con IA</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
+              {/* Botón de Escanear con IA */}
+              <button
+                type="button"
+                onClick={handleScanDatasheet}
+                disabled={!selectedFile || isLoading}
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-emerald-600 hover:from-purple-500 hover:to-emerald-500 text-white text-xs font-bold shadow-lg hover:shadow-purple-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Analizando tabla técnica y variantes con Google Gemini...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    <span>Escanear y Extraer Variantes con IA</span>
+                  </>
+                )}
+              </button>
             </div>
-          )}
-
-          {/* Mensaje de Error */}
-          {errorMessage && (
-            <div className="p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-400 text-xs flex items-center gap-2.5">
-              <AlertTriangle className="w-4 h-4 shrink-0 text-red-500" />
-              <span>{errorMessage}</span>
-            </div>
-          )}
-
-          {/* Vista de Resultados Extraídos */}
-          {extractedData && (
-            <div className="space-y-5">
-              {/* Cabecera del Equipo Extraído */}
+          ) : (
+            /* Estado 2: Revisión, Selección y Edición de Variantes Extraídas */
+            <div className="space-y-4">
+              {/* Resumen del Documento Extraído */}
               <div
                 className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                  isDark ? 'bg-[#202028] border-[#3f3f46]' : 'bg-slate-100 border-slate-300'
+                  isDark ? 'bg-[#202028] border-[#2e2e38]' : 'bg-slate-100 border-slate-200'
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-md ${
-                      extractedData.equipmentType === 'panel'
-                        ? 'bg-amber-500'
-                        : extractedData.equipmentType === 'inverter'
-                        ? 'bg-emerald-600'
-                        : 'bg-indigo-600'
-                    }`}
-                  >
+                  <div className="w-9 h-9 rounded-lg bg-purple-500/20 text-purple-400 border border-purple-500/30 flex items-center justify-center">
                     {extractedData.equipmentType === 'panel' ? (
                       <Sun className="w-5 h-5" />
-                    ) : extractedData.equipmentType === 'inverter' ? (
-                      <Zap className="w-5 h-5" />
+                    ) : extractedData.equipmentType === 'battery' ? (
+                      <BatteryCharging className="w-5 h-5" />
                     ) : (
-                      <Layers className="w-5 h-5" />
+                      <Zap className="w-5 h-5" />
                     )}
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono uppercase tracking-wider text-purple-400 font-bold">
+                      <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">
                         {extractedData.brand}
                       </span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-zinc-300 font-medium">
+                      <span className="text-[10px] px-2 py-0.5 rounded font-bold bg-purple-500/20 text-purple-300">
                         {extractedData.equipmentType === 'panel'
-                          ? 'Módulo Solar'
-                          : extractedData.equipmentType === 'inverter'
-                          ? 'Inversor'
-                          : 'Batería'}
-                      </span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
-                        {extractedData.variants.length} variantes detectadas
+                          ? 'Módulos Fotovoltaicos'
+                          : extractedData.equipmentType === 'battery'
+                          ? 'Batería / Almacenamiento'
+                          : 'Inversores Solares'}
                       </span>
                     </div>
                     <h3 className="text-sm font-bold mt-0.5">
@@ -546,7 +484,7 @@ export const AIDatasheetScannerModal: React.FC = () => {
 
                         {/* Parámetros Técnicos Editables de la Variante */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
-                          {extractedData.equipmentType === 'panel' ? (
+                          {extractedData.equipmentType === 'panel' && (
                             <>
                               <div>
                                 <span className="text-zinc-400 text-[10px] block">Potencia (W):</span>
@@ -564,7 +502,7 @@ export const AIDatasheetScannerModal: React.FC = () => {
                                 <input
                                   type="number"
                                   step="0.1"
-                                  value={variant.efficiencyPct || 21.5}
+                                  value={variant.efficiencyPct || 22.0}
                                   onChange={(e) => handleUpdateVariant(variant.id, { efficiencyPct: parseFloat(e.target.value) || 0 })}
                                   className={`w-full border rounded px-2 py-0.5 text-xs font-bold ${
                                     isDark ? 'bg-[#121214] border-[#3f3f46]' : 'bg-white border-slate-300'
@@ -576,7 +514,7 @@ export const AIDatasheetScannerModal: React.FC = () => {
                                 <input
                                   type="number"
                                   step="0.01"
-                                  value={variant.tempCoeff || -0.35}
+                                  value={variant.tempCoeff || -0.29}
                                   onChange={(e) => handleUpdateVariant(variant.id, { tempCoeff: parseFloat(e.target.value) || 0 })}
                                   className={`w-full border rounded px-2 py-0.5 text-xs font-bold ${
                                     isDark ? 'bg-[#121214] border-[#3f3f46]' : 'bg-white border-slate-300'
@@ -590,7 +528,9 @@ export const AIDatasheetScannerModal: React.FC = () => {
                                 </span>
                               </div>
                             </>
-                          ) : (
+                          )}
+
+                          {extractedData.equipmentType === 'inverter' && (
                             <>
                               <div>
                                 <span className="text-zinc-400 text-[10px] block">Potencia AC (kW):</span>
@@ -607,7 +547,7 @@ export const AIDatasheetScannerModal: React.FC = () => {
                               <div>
                                 <span className="text-zinc-400 text-[10px] block">Rango MPPT:</span>
                                 <span className="text-xs font-mono font-bold block pt-1">
-                                  {variant.voltageMPPT || '120-550V'}
+                                  {variant.voltageMPPT || '120-500V'}
                                 </span>
                               </div>
                               <div>
@@ -620,6 +560,47 @@ export const AIDatasheetScannerModal: React.FC = () => {
                                 <span className="text-zinc-400 text-[10px] block">Potencia Máx AC:</span>
                                 <span className="text-xs font-mono font-bold block pt-1">
                                   {variant.maxAcPowerKW ? `${variant.maxAcPowerKW} kW` : '-'}
+                                </span>
+                              </div>
+                            </>
+                          )}
+
+                          {extractedData.equipmentType === 'battery' && (
+                            <>
+                              <div>
+                                <span className="text-zinc-400 text-[10px] block">Capacidad (kWh):</span>
+                                <input
+                                  type="number"
+                                  step="0.1"
+                                  value={variant.capacityKWh || 16.08}
+                                  onChange={(e) => handleUpdateVariant(variant.id, { capacityKWh: parseFloat(e.target.value) || 0 })}
+                                  className={`w-full border rounded px-2 py-0.5 text-xs font-bold ${
+                                    isDark ? 'bg-[#121214] border-[#3f3f46]' : 'bg-white border-slate-300'
+                                  }`}
+                                />
+                              </div>
+                              <div>
+                                <span className="text-zinc-400 text-[10px] block">DoD Descarga (%):</span>
+                                <input
+                                  type="number"
+                                  step="5"
+                                  value={variant.dodPct || 90}
+                                  onChange={(e) => handleUpdateVariant(variant.id, { dodPct: parseFloat(e.target.value) || 0 })}
+                                  className={`w-full border rounded px-2 py-0.5 text-xs font-bold ${
+                                    isDark ? 'bg-[#121214] border-[#3f3f46]' : 'bg-white border-slate-300'
+                                  }`}
+                                />
+                              </div>
+                              <div>
+                                <span className="text-zinc-400 text-[10px] block">Voltaje / Ah:</span>
+                                <span className="text-xs font-mono font-bold block pt-1">
+                                  {variant.voltageV || 51.2}V {variant.capacityAh ? `/ ${variant.capacityAh}Ah` : ''}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-zinc-400 text-[10px] block">Ciclos / Química:</span>
+                                <span className="text-xs font-mono font-bold block pt-1">
+                                  {variant.cycles || 8000}c • {variant.chemistry || 'LFP'}
                                 </span>
                               </div>
                             </>

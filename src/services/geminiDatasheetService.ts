@@ -2,45 +2,57 @@ import { ExtractedDatasheetData, ExtractedEquipmentVariant, EquipmentType } from
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
-const DATASHEET_EXTRACTION_SYSTEM_INSTRUCTION = `Eres un ingeniero eléctrico y fotovoltaico experto en análisis de fichas técnicas (datasheets) de fabricantes de equipos solares (paneles fotovoltaicos, inversores y baterías).
-Tu objetivo es analizar minuciosamente el documento PDF o imagen del datasheet provisto y extraer de forma estructurada todas las variantes de potencia y especificaciones técnicas de la familia o serie de productos.
+const DATASHEET_EXTRACTION_SYSTEM_INSTRUCTION = `Eres un ingeniero eléctrico y fotovoltaico de élite, experto en análisis de fichas técnicas (datasheets) de fabricantes de equipos solares y almacenamiento (paneles fotovoltaicos, inversores y baterías BESS).
+Tu objetivo es analizar minuciosamente el documento PDF o imagen provisto y extraer de forma estructurada todas las variantes de modelos y especificaciones técnicas de la familia o serie de productos.
 
 REGLAS DE EXTRACCIÓN CRÍTICAS:
-1. DETECCIÓN DE TIPO DE EQUIPO:
-   - "panel": Módulos / Paneles solares fotovoltaicos.
-   - "inverter": Inversores solares (On-Grid / Red, Híbridos, Off-Grid, Microinversores).
-   - "battery": Baterías / Sistemas de almacenamiento (Litio LiFePO4, Alto Voltaje, Bajo Voltaje).
+1. DETECCIÓN DE TIPO DE EQUIPO ("equipmentType"):
+   - "panel": Módulos / Paneles solares fotovoltaicos (Monocristalino, Bifacial TOPCon, PERC, Heterounión HJT).
+   - "inverter": Inversores solares (On-Grid / Conexión a red, Híbridos Split Phase, Off-Grid, Microinversores).
+   - "battery": Baterías / Sistemas de almacenamiento de energía BESS (LiFePO4 / LFP, Módulos 48V/51.2V, Gabinetes de Alto Voltaje HV).
 
 2. MULTI-VARIANTE (MUY IMPORTANTE):
-   - Una ficha técnica habitualmente describe 1 FAMILIA de modelos y presenta una TABLA ELÉCTRICA (STC / NOCT o Especificaciones DC/AC) con MÚLTIPLES VARIACIONES DE POTENCIA.
-   - Debes IDENTIFICAR Y DESGLOSAR CADA VARIANTE DE POTENCIA COMO UN ELEMENTO SEPARADO en el array "variants".
-   - Por ejemplo, si la ficha técnica es de "JA Solar JAM72S30 / MR" y la tabla tiene columnas para 535W, 540W, 545W, 550W, 555W:
-     Debes generar 5 variantes individuales, cada una con su código de modelo exacto (ej. JAM72S30-545/MR) y su potencia en Watts (ej. 545).
-   - Si la ficha técnica es de inversores "Solis S6-GR1P" con modelos de 2.5kW, 3kW, 3.6kW, 4.2kW, 5kW, 6kW:
-     Debes generar cada variante individualmente con su potencia en kW (ej. 5.0).
+   - Una ficha técnica habitualmente describe 1 FAMILIA de modelos y presenta una TABLA ELÉCTRICA (STC / NOCT o Especificaciones DC/AC o Batería) con MÚLTIPLES VARIACIONES DE POTENCIA O CAPACIDAD.
+   - Debes IDENTIFICAR Y DESGLOSAR CADA VARIANTE COMO UN ELEMENTO INDIVIDUAL en el array "variants".
+   - Ejemplos:
+     * Para paneles "Canadian Solar TOPBiHiKu6 CS6.1-72TB": generar variantes individuales para 590W, 595W, 600W, 605W, 610W y 615W.
+     * Para inversores "LuxpowerTek LXP-LB-US 8-10k": generar variantes para "LXP-LB-US 8k" (8.0 kW) y "LXP-LB-US 10k" (10.0 kW).
+     * Para baterías "HinaESS PowerGem": generar cada modelo con su capacidad en kWh (ej. PowerGem Max 16.08kWh, PowerGem Plus 14.34kWh).
 
 3. CONSTRUCCIÓN DEL NOMBRE DISPLAY (displayName) ESTANDARIZADO:
-   - Para PANELES: Formato estricto -> "Módulos [Marca/Modelo] ([Potencia]W)"
-     Ejemplo: "Módulos JAM72S30-550/MR (550W)" o "Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)"
+   - Para PANELES: Formato estricto -> "Módulos [Marca] [Modelo] ([Potencia]W)"
+     Ejemplo: "Módulos Canadian Solar CS6.1-72TB-600 (600W)" o "Módulos JA Solar JAM72S30-550/MR (550W)"
    - Para INVERSORES: Formato estricto -> "Inversor [Marca] [Modelo] ([Potencia]Kw)"
-     Ejemplo: "Inversor SOLIS S6-GR1P5K 5K (5.0Kw)" o "Inversor Lux Power LXP-LB-US 8K (8.0Kw)"
-   - Para BATERÍAS: Formato estricto -> "Batería [Marca] [Modelo] ([Capacidad]KWh)"
-     Ejemplo: "Batería Hinaess 16 KwH-48 vdc."
+     Ejemplo: "Inversor LuxpowerTek LXP-LB-US 8k (8.0Kw)" o "Inversor SOLIS S6-GR1P5K 5K (5.0Kw)"
+   - Para BATERÍAS: Formato estricto -> "Batería [Marca] [Modelo] ([Capacidad]kWh)"
+     Ejemplo: "Batería HinaESS PowerGem Max (16.08kWh)" o "Batería Dyness Powerbox Pro (10.24kWh)"
 
-4. PARÁMETROS TÉCNICOS ESPECÍFICOS:
+4. PARÁMETROS TÉCNICOS ESPECÍFICOS SEGÚN EL TIPO:
    - Paneles:
-     * powerW: Potencia máxima Pmax en STC (Watts, número).
-     * efficiencyPct: Eficiencia del módulo en % (número, ej: 21.3).
-     * tempCoeff: Coeficiente de temperatura de Pmax en %/°C (número negativo, ej: -0.35).
-     * voc: Voltaje de circuito abierto Voc (V).
-     * isc: Corriente de cortocircuito Isc (A).
-     * vmp: Voltaje en Pmax Vmp (V).
-     * imp: Corriente en Pmax Imp (A).
+     * powerW: Potencia máxima nominal Pmax en STC (Watts, número ej: 600).
+     * efficiencyPct: Eficiencia del módulo en % (número ej: 22.2).
+     * tempCoeff: Coeficiente de temperatura de Pmax en %/°C (número negativo ej: -0.29).
+     * annualDegradation: Degradación lineal anual garantizada en % (número ej: 0.4).
+     * voc: Voltaje de circuito abierto Voc (V ej: 51.8).
+     * isc: Corriente de cortocircuito Isc (A ej: 14.60).
+     * vmp: Voltaje en Pmax Vmp (V ej: 44.0).
+     * imp: Corriente en Pmax Imp (A ej: 13.64).
    - Inversores:
-     * powerKW: Potencia nominal de salida AC en kW (número, ej: 5.0).
-     * maxAcPowerKW: Potencia máxima aparente / activa AC (kW).
-     * voltageMPPT: Rango de tensión MPPT (string, ej: "90-520V").
-     * mpptCount: Cantidad de trackers MPPT (número entero).
+     * powerKW: Potencia nominal de salida AC en kW (número ej: 8.0).
+     * maxAcPowerKW: Potencia máxima aparente / activa AC (kW ej: 8.0).
+     * maxPvPowerKW: Potencia máxima de entrada DC fotovoltaica (kW ej: 12.0).
+     * maxEfficiencyPct: Eficiencia máxima en % (número ej: 97.5).
+     * voltageMPPT: Rango de tensión MPPT (string ej: "120-500V").
+     * mpptCount: Cantidad de seguidores MPPT (número entero ej: 2).
+   - Baterías (Almacenamiento):
+     * capacityKWh: Capacidad nominal o energía utilizable en kWh (número ej: 16.08).
+     * capacityAh: Capacidad en Amperios-hora (número ej: 314).
+     * voltageV: Voltaje nominal de la batería en V (número ej: 51.2 o 48).
+     * dodPct: Profundidad de descarga recomendada / DoD en % (número ej: 90 o 95).
+     * batteryEfficiencyPct: Eficiencia de carga/descarga en % (número ej: 95).
+     * cycles: Ciclos de vida garantizados (número ej: 8000 o 6000).
+     * chemistry: Química de celdas (string ej: "LFP (LiFePO4)").
+     * maxChargeCurrentA: Corriente máxima de carga continua (A ej: 165).
 
 RESPONDE EXCLUSIVAMENTE CON EL SIGUIENTE OBJETO JSON VÁLIDO (sin bloques de markdown ni texto adicional):
 {
@@ -58,13 +70,26 @@ RESPONDE EXCLUSIVAMENTE CON EL SIGUIENTE OBJETO JSON VÁLIDO (sin bloques de mar
       "powerKW": number,
       "efficiencyPct": number,
       "tempCoeff": number,
+      "annualDegradation": number,
       "voc": number,
       "isc": number,
       "vmp": number,
       "imp": number,
       "maxAcPowerKW": number,
+      "maxPvPowerKW": number,
+      "maxEfficiencyPct": number,
       "voltageMPPT": string,
-      "mpptCount": number
+      "mpptCount": number,
+      "capacityKWh": number,
+      "capacityAh": number,
+      "voltageV": number,
+      "dodPct": number,
+      "batteryEfficiencyPct": number,
+      "cycles": number,
+      "chemistry": string,
+      "maxChargeCurrentA": number,
+      "dimensions": string,
+      "weightKg": number
     }
   ]
 }`;
@@ -78,7 +103,7 @@ export async function parseDatasheetWithGemini(
 ): Promise<ExtractedDatasheetData> {
   const apiKey = customApiKey?.trim() || (import.meta.env.VITE_GEMINI_API_KEY as string)?.trim();
   if (!apiKey) {
-    throw new Error('No se ha configurado la API Key de Google Gemini. Ve a Ajustes ⚙️ > Inteligencia Artificial (IA) o al modal de IA para configurarla.');
+    throw new Error('No se ha configurado la API Key de Google Gemini. Ve a Ajustes ⚙️ > Inteligencia Artificial (IA) para configurarla.');
   }
 
   // Normalizar base64
@@ -90,7 +115,7 @@ export async function parseDatasheetWithGemini(
   const model = customModel?.trim() || 'gemini-2.0-flash';
   const url = `${GEMINI_API_BASE}/models/${model}:generateContent?key=${apiKey}`;
 
-  const promptText = `Por favor analiza esta ficha técnica / datasheet solar ("${fileName}") y extrae la información completa del fabricante, serie y todas las variantes de potencia siguiendo estrictamente las instrucciones del sistema y el formato JSON.`;
+  const promptText = `Por favor analiza esta ficha técnica / datasheet ("${fileName}") y extrae la información completa del fabricante, serie y todas las variantes de modelos y potencia/capacidad siguiendo estrictamente las instrucciones del sistema y el formato JSON.`;
 
   const requestBody = {
     contents: [
@@ -175,11 +200,12 @@ export async function parseDatasheetWithGemini(
 
   const variants: ExtractedEquipmentVariant[] = rawVariants.map((v: any, index: number) => {
     const id = `var-${Date.now()}-${index}-${Math.random().toString(36).substring(2, 6)}`;
-    const modelCode = v.modelCode || `${modelSeries}-${v.powerW || v.powerKW || index + 1}`;
+    const modelCode = v.modelCode || `${modelSeries}-${v.powerW || v.powerKW || v.capacityKWh || index + 1}`;
     
     // Potencia y nombre estandarizado
     let powerW = v.powerW ? Number(v.powerW) : undefined;
     let powerKW = v.powerKW ? Number(v.powerKW) : undefined;
+    let capacityKWh = v.capacityKWh ? Number(v.capacityKWh) : undefined;
 
     if (equipmentType === 'panel') {
       if (!powerW && powerKW) powerW = Math.round(powerKW * 1000);
@@ -187,16 +213,21 @@ export async function parseDatasheetWithGemini(
     } else if (equipmentType === 'inverter') {
       if (!powerKW && powerW) powerKW = Math.round((powerW / 1000) * 10) / 10;
       if (!powerKW) powerKW = 5.0;
+    } else if (equipmentType === 'battery') {
+      if (!capacityKWh && v.capacityAh && v.voltageV) {
+        capacityKWh = Math.round(((Number(v.capacityAh) * Number(v.voltageV)) / 1000) * 100) / 100;
+      }
+      if (!capacityKWh) capacityKWh = 10.0;
     }
 
     let defaultDisplayName = v.displayName;
     if (!defaultDisplayName) {
       if (equipmentType === 'panel') {
-        defaultDisplayName = `Módulos ${brand.toUpperCase()} ${modelCode} (${powerW}W)`;
+        defaultDisplayName = `Módulos ${brand} ${modelCode} (${powerW}W)`;
       } else if (equipmentType === 'inverter') {
-        defaultDisplayName = `Inversor ${brand.toUpperCase()} ${modelCode} (${powerKW}Kw)`;
+        defaultDisplayName = `Inversor ${brand} ${modelCode} (${powerKW}Kw)`;
       } else {
-        defaultDisplayName = `Batería ${brand.toUpperCase()} ${modelCode}`;
+        defaultDisplayName = `Batería ${brand} ${modelCode} (${capacityKWh}kWh)`;
       }
     }
 
@@ -206,25 +237,42 @@ export async function parseDatasheetWithGemini(
       displayName: defaultDisplayName,
       powerW,
       powerKW,
-      efficiencyPct: v.efficiencyPct !== undefined ? Number(v.efficiencyPct) : (equipmentType === 'panel' ? 21.5 : undefined),
-      tempCoeff: v.tempCoeff !== undefined ? Number(v.tempCoeff) : (equipmentType === 'panel' ? -0.35 : undefined),
+      capacityKWh,
+      capacityAh: v.capacityAh ? Number(v.capacityAh) : undefined,
+      voltageV: v.voltageV ? Number(v.voltageV) : (equipmentType === 'battery' ? 51.2 : undefined),
+      dodPct: v.dodPct !== undefined ? Number(v.dodPct) : (equipmentType === 'battery' ? 90 : undefined),
+      batteryEfficiencyPct: v.batteryEfficiencyPct !== undefined ? Number(v.batteryEfficiencyPct) : (equipmentType === 'battery' ? 95 : undefined),
+      cycles: v.cycles ? Number(v.cycles) : (equipmentType === 'battery' ? 8000 : undefined),
+      chemistry: v.chemistry || (equipmentType === 'battery' ? 'LFP (LiFePO4)' : undefined),
+      maxChargeCurrentA: v.maxChargeCurrentA ? Number(v.maxChargeCurrentA) : undefined,
+      efficiencyPct: v.efficiencyPct !== undefined ? Number(v.efficiencyPct) : (equipmentType === 'panel' ? 22.0 : undefined),
+      tempCoeff: v.tempCoeff !== undefined ? Number(v.tempCoeff) : (equipmentType === 'panel' ? -0.29 : undefined),
+      annualDegradation: v.annualDegradation !== undefined ? Number(v.annualDegradation) : (equipmentType === 'panel' ? 0.4 : undefined),
       voc: v.voc !== undefined ? Number(v.voc) : undefined,
       isc: v.isc !== undefined ? Number(v.isc) : undefined,
       vmp: v.vmp !== undefined ? Number(v.vmp) : undefined,
       imp: v.imp !== undefined ? Number(v.imp) : undefined,
       maxAcPowerKW: v.maxAcPowerKW !== undefined ? Number(v.maxAcPowerKW) : undefined,
+      maxPvPowerKW: v.maxPvPowerKW !== undefined ? Number(v.maxPvPowerKW) : undefined,
+      maxEfficiencyPct: v.maxEfficiencyPct !== undefined ? Number(v.maxEfficiencyPct) : undefined,
       voltageMPPT: v.voltageMPPT || undefined,
       mpptCount: v.mpptCount ? Number(v.mpptCount) : undefined,
-      selected: true, // Seleccionado por defecto
+      dimensions: v.dimensions || undefined,
+      weightKg: v.weightKg ? Number(v.weightKg) : undefined,
+      selected: true, // Seleccionado por defecto para guardado masivo
     };
   });
+
+  let defaultCategory = 'Módulos Fotovoltaicos';
+  if (equipmentType === 'inverter') defaultCategory = 'Inversor Híbrido / String';
+  if (equipmentType === 'battery') defaultCategory = 'Batería de Litio LiFePO4';
 
   return {
     equipmentType,
     brand,
     modelSeries,
     documentTitle: parsed.documentTitle || `${brand} ${modelSeries}`,
-    category: parsed.category || (equipmentType === 'panel' ? 'Monocristalino N-Type' : 'Inversor String / Híbrido'),
+    category: parsed.category || defaultCategory,
     specsSummary: parsed.specsSummary || undefined,
     variants,
   };

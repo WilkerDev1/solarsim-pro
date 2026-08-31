@@ -508,7 +508,8 @@ app.get('/api/equipment', async (c) => {
   try {
     const res = await client.query(
       `SELECT id, type, brand, model_series as "modelSeries", display_name as "displayName",
-              power_w as "powerW", power_kw as "powerKW", efficiency_pct as "efficiencyPct",
+              power_w as "powerW", power_kw as "powerKW", capacity_kwh as "capacityKWh",
+              voltage_v as "voltageV", dod_pct as "dodPct", efficiency_pct as "efficiencyPct",
               temp_coeff as "tempCoeff", category, voltage_mppt as "voltageMPPT",
               details, created_at as "createdAt", updated_at as "updatedAt"
        FROM equipment_catalog
@@ -523,6 +524,9 @@ app.get('/api/equipment', async (c) => {
         ...row,
         powerW: row.powerW ? parseFloat(row.powerW) : undefined,
         powerKW: row.powerKW ? parseFloat(row.powerKW) : undefined,
+        capacityKWh: row.capacityKWh ? parseFloat(row.capacityKWh) : undefined,
+        voltageV: row.voltageV ? parseFloat(row.voltageV) : undefined,
+        dodPct: row.dodPct ? parseFloat(row.dodPct) : undefined,
         efficiencyPct: row.efficiencyPct ? parseFloat(row.efficiencyPct) : undefined,
         tempCoeff: row.tempCoeff ? parseFloat(row.tempCoeff) : undefined,
         ...(row.details || {}),
@@ -560,6 +564,9 @@ app.post('/api/equipment/batch', async (c) => {
       const displayName = item.displayName || `${brand} ${modelSeries}`;
       const powerW = item.powerW || null;
       const powerKW = item.powerKW || null;
+      const capacityKWh = item.capacityKWh || null;
+      const voltageV = item.voltageV || null;
+      const dodPct = item.dodPct || null;
       const efficiencyPct = item.efficiencyPct || null;
       const tempCoeff = item.tempCoeff || null;
       const category = item.category || null;
@@ -569,8 +576,19 @@ app.post('/api/equipment/batch', async (c) => {
         isc: item.isc,
         vmp: item.vmp,
         imp: item.imp,
+        annualDegradation: item.annualDegradation,
+        cellType: item.cellType,
+        bifacialityPct: item.bifacialityPct,
         maxAcPowerKW: item.maxAcPowerKW,
+        maxPvPowerKW: item.maxPvPowerKW,
+        maxEfficiencyPct: item.maxEfficiencyPct,
         mpptCount: item.mpptCount,
+        capacityAh: item.capacityAh,
+        batteryEfficiencyPct: item.batteryEfficiencyPct,
+        cycles: item.cycles,
+        chemistry: item.chemistry,
+        maxChargeCurrentA: item.maxChargeCurrentA,
+        maxDischargeCurrentA: item.maxDischargeCurrentA,
         dimensions: item.dimensions,
         weightKg: item.weightKg,
         isCustom: item.isCustom,
@@ -578,21 +596,24 @@ app.post('/api/equipment/batch', async (c) => {
 
       await client.query(
         `INSERT INTO equipment_catalog
-          (id, organization_id, type, brand, model_series, display_name, power_w, power_kw, efficiency_pct, temp_coeff, category, voltage_mppt, details, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
+          (id, organization_id, type, brand, model_series, display_name, power_w, power_kw, capacity_kwh, voltage_v, dod_pct, efficiency_pct, temp_coeff, category, voltage_mppt, details, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
          ON CONFLICT (id) DO UPDATE SET
           brand = EXCLUDED.brand,
           model_series = EXCLUDED.model_series,
           display_name = EXCLUDED.display_name,
           power_w = EXCLUDED.power_w,
           power_kw = EXCLUDED.power_kw,
+          capacity_kwh = EXCLUDED.capacity_kwh,
+          voltage_v = EXCLUDED.voltage_v,
+          dod_pct = EXCLUDED.dod_pct,
           efficiency_pct = EXCLUDED.efficiency_pct,
           temp_coeff = EXCLUDED.temp_coeff,
           category = EXCLUDED.category,
           voltage_mppt = EXCLUDED.voltage_mppt,
           details = EXCLUDED.details,
           updated_at = NOW()`,
-        [id, authUser.organizationId, type, brand, modelSeries, displayName, powerW, powerKW, efficiencyPct, tempCoeff, category, voltageMPPT, details]
+        [id, authUser.organizationId, type, brand, modelSeries, displayName, powerW, powerKW, capacityKWh, voltageV, dodPct, efficiencyPct, tempCoeff, category, voltageMPPT, details]
       );
     }
 

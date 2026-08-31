@@ -3,7 +3,7 @@ import { ProjectSimulation, FinancialSummaryResult, SystemSpecs } from '../../..
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { SearchableEquipmentSelect } from './SearchableEquipmentSelect';
 import { SolarEquipmentItem } from '../../../types/equipment';
-import { Sun, ChevronDown, Sparkles, Sliders, ShieldAlert, Cpu } from 'lucide-react';
+import { Sun, ChevronDown, Sparkles, Sliders, BatteryCharging, Cpu, Zap } from 'lucide-react';
 
 interface EquipmentParamsSectionProps {
   project: ProjectSimulation;
@@ -28,15 +28,25 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
     updateSpecs({
       panelBrandModel: item.displayName,
       panelPowerW: item.powerW || 550,
-      panelEfficiency: item.efficiencyPct || 21.5,
-      tempCoeff: item.tempCoeff || -0.35,
+      panelEfficiency: item.efficiencyPct || 22.0,
+      tempCoeff: item.tempCoeff || -0.29,
+      annualDegradation: item.annualDegradation || 0.4,
     });
   };
 
   const handleSelectInverter = (item: SolarEquipmentItem) => {
     updateSpecs({
       inverterBrandModel: item.displayName,
-      inverterPowerKW: item.powerKW || 5.0,
+      inverterPowerKW: item.powerKW || 8.0,
+    });
+  };
+
+  const handleSelectBattery = (item: SolarEquipmentItem) => {
+    updateSpecs({
+      batteryBrandModel: item.displayName,
+      batteryCapacityKWh: item.capacityKWh || 16.08,
+      batteryDOD: item.dodPct || 90,
+      batteryEfficiencyPct: item.batteryEfficiencyPct || 95,
     });
   };
 
@@ -158,7 +168,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                 isDark={isDark}
               />
 
-              {/* Potencia del Panel (Solo lectura informativa en modo simple) */}
+              {/* Potencia del Panel y Eficiencia */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
@@ -175,14 +185,14 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
 
                 <div>
                   <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                    Eficiencia
+                    Eficiencia / Coef.
                   </label>
                   <div
                     className={`w-full border rounded-lg px-3 py-1.5 text-xs font-mono font-bold ${
                       isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-200' : 'bg-slate-100 border-slate-300 text-slate-800'
                     }`}
                   >
-                    {project.specs.panelEfficiency || 21.5}%
+                    {project.specs.panelEfficiency || 22.0}% ({project.specs.tempCoeff || -0.29}%/°C)
                   </div>
                 </div>
               </div>
@@ -265,7 +275,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                 </label>
                 <input
                   type="text"
-                  value={project.specs.panelBrandModel || 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)'}
+                  value={project.specs.panelBrandModel || 'Módulos Canadian Solar CS6.1-72TB-600 (600W)'}
                   onChange={(e) => updateSpecs({ panelBrandModel: e.target.value })}
                   className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
                     isDark
@@ -448,139 +458,209 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
             </div>
           )}
 
-          {/* Almacenamiento (Batería) Toggle & Campos */}
+          {/* ========================================== */}
+          {/* 🔋 ALMACENAMIENTO (BATERÍA) CON MODO SIMPLE Y DETALLADO */}
+          {/* ========================================== */}
           <div className={`pt-2 border-t space-y-3 ${isDark ? 'border-[#27272a]' : 'border-slate-200'}`}>
             <div className="flex items-center justify-between">
-              <label className={`text-xs font-semibold ${isDark ? 'text-zinc-200' : 'text-slate-700'}`}>
-                Almacenamiento (Batería)
-              </label>
+              <div className="flex items-center gap-1.5">
+                <BatteryCharging className="w-4 h-4 text-cyan-400" />
+                <label className={`text-xs font-semibold ${isDark ? 'text-zinc-200' : 'text-slate-700'}`}>
+                  Almacenamiento (Batería BESS)
+                </label>
+              </div>
               <input
                 type="checkbox"
                 checked={project.specs.hasBattery}
                 onChange={(e) => updateSpecs({ hasBattery: e.target.checked })}
-                className="rounded text-emerald-700 focus:ring-emerald-600 cursor-pointer"
+                className="rounded text-cyan-600 focus:ring-cyan-500 cursor-pointer h-4 w-4"
               />
             </div>
 
             {project.specs.hasBattery && (
               <div
                 className={`space-y-3 p-3 rounded-lg border ${
-                  isDark ? 'bg-[#202024] border-[#2e2e34]' : 'bg-slate-50 border-slate-200'
+                  isDark ? 'bg-[#202024] border-[#2e2e34]' : 'bg-cyan-50/40 border-cyan-200'
                 }`}
               >
-                <div>
-                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                    Modelo / Marca Batería
-                  </label>
-                  <input
-                    type="text"
-                    value={project.specs.batteryBrandModel || 'Batería Hinaess 16 KwH-48 vdc.'}
-                    onChange={(e) => updateSpecs({ batteryBrandModel: e.target.value })}
-                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                      isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                    Cantidad de Baterías
-                  </label>
-                  <input
-                    type="number"
-                    step="1"
-                    min="1"
-                    value={project.specs.batteryCount || 1}
-                    onChange={(e) => updateSpecs({ batteryCount: parseInt(e.target.value) || 1 })}
-                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                      isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                    }`}
-                  />
-                </div>
-
-                <div>
-                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                    Capacidad Total Batería (kWh)
-                  </label>
-                  <input
-                    type="number"
-                    step="1"
-                    value={project.specs.batteryCapacityKWh}
-                    onChange={(e) => updateSpecs({ batteryCapacityKWh: parseFloat(e.target.value) || 0 })}
-                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                      isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                    }`}
-                  />
-                </div>
-
-                {/* Parámetros Detallados de Batería */}
-                <div className={`pt-2 border-t space-y-2 ${isDark ? 'border-[#2e2e34]' : 'border-slate-200'}`}>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                        DoD Descarga (%)
-                      </label>
-                      <input
-                        type="number"
-                        step="5"
-                        value={project.specs.batteryDOD || 80}
-                        onChange={(e) => updateSpecs({ batteryDOD: parseFloat(e.target.value) || 80 })}
-                        className={`w-full border rounded-lg px-2 py-1 text-xs font-semibold ${
-                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                        }`}
-                      />
-                    </div>
-                    <div>
-                      <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                        Eficiencia Carga (%)
-                      </label>
-                      <input
-                        type="number"
-                        step="1"
-                        value={project.specs.batteryEfficiencyPct || 92}
-                        onChange={(e) => updateSpecs({ batteryEfficiencyPct: parseFloat(e.target.value) || 92 })}
-                        className={`w-full border rounded-lg px-2 py-1 text-xs font-semibold ${
-                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                        }`}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-                      Costo Reemplazo Año 10 (USD)
-                    </label>
-                    <input
-                      type="number"
-                      step="500"
-                      value={project.specs.batteryReplacementCostUSD || 0}
-                      onChange={(e) => updateSpecs({ batteryReplacementCostUSD: parseFloat(e.target.value) || 0 })}
-                      placeholder="Ej. $3,500 USD"
-                      className={`w-full border rounded-lg px-2 py-1 text-xs font-semibold ${
-                        isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                      }`}
+                {!isDetailed ? (
+                  /* MODO SIMPLE PARA BATERÍAS (Catálogo Inteligente con Búsqueda en Tiempo Real) */
+                  <div className="space-y-3">
+                    <SearchableEquipmentSelect
+                      type="battery"
+                      items={equipmentCatalog}
+                      selectedValue={project.specs.batteryBrandModel || ''}
+                      selectedPower={project.specs.batteryCapacityKWh}
+                      onSelect={handleSelectBattery}
+                      onOpenScanner={openAIDatasheetModal}
+                      label="Batería / Banco de Almacenamiento"
+                      placeholder="Buscar o seleccionar batería..."
+                      isDark={isDark}
                     />
-                  </div>
 
-                  <div
-                    className={`rounded-lg p-2 text-[10px] font-bold space-y-0.5 mt-1 border ${
-                      isDark
-                        ? 'bg-emerald-950/80 border-emerald-800/80 text-emerald-300'
-                        : 'bg-emerald-100/80 border-emerald-300 text-emerald-950'
-                    }`}
-                  >
-                    <div className="flex justify-between">
-                      <span>Energía Útil Batería:</span>
-                      <span className={`font-extrabold ${isDark ? 'text-emerald-200' : 'text-emerald-800'}`}>
-                        {summary.batteryUsableKWh} kWh
-                      </span>
+                    {/* Fila de Capacidad, DoD y Cantidad */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                          Capacidad Unit.
+                        </label>
+                        <div
+                          className={`w-full border rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-center ${
+                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-cyan-400' : 'bg-white border-slate-300 text-cyan-800'
+                          }`}
+                        >
+                          {project.specs.batteryCapacityKWh || 16.08} kWh
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                          DoD Descarga
+                        </label>
+                        <div
+                          className={`w-full border rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-center ${
+                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-200' : 'bg-white border-slate-300 text-slate-800'
+                          }`}
+                        >
+                          {project.specs.batteryDOD || 90}%
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                          Cantidad
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          min="1"
+                          value={project.specs.batteryCount || 1}
+                          onChange={(e) => updateSpecs({ batteryCount: parseInt(e.target.value) || 1 })}
+                          className={`w-full border rounded-lg px-2.5 py-1.5 text-xs font-bold text-center ${
+                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                          }`}
+                        />
+                      </div>
                     </div>
-                    <div className="flex justify-between">
-                      <span>Autonomía Anti-Apagones:</span>
-                      <span className={`font-extrabold ${isDark ? 'text-emerald-200' : 'text-emerald-800'}`}>
-                        ~{summary.batteryBackupAutonomyHours} Horas
-                      </span>
+                  </div>
+                ) : (
+                  /* MODO DETALLADO PARA BATERÍAS (Manual) */
+                  <div className="space-y-3">
+                    <div>
+                      <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                        Modelo / Marca Batería (Manual)
+                      </label>
+                      <input
+                        type="text"
+                        value={project.specs.batteryBrandModel || 'Batería Hinaess 16 KwH-48 vdc.'}
+                        onChange={(e) => updateSpecs({ batteryBrandModel: e.target.value })}
+                        className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                        }`}
+                      />
                     </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                          Cantidad Baterías
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          min="1"
+                          value={project.specs.batteryCount || 1}
+                          onChange={(e) => updateSpecs({ batteryCount: parseInt(e.target.value) || 1 })}
+                          className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                          }`}
+                        />
+                      </div>
+
+                      <div>
+                        <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                          Capacidad Unit. (kWh)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={project.specs.batteryCapacityKWh}
+                          onChange={(e) => updateSpecs({ batteryCapacityKWh: parseFloat(e.target.value) || 0 })}
+                          className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                          }`}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                          DoD Descarga (%)
+                        </label>
+                        <input
+                          type="number"
+                          step="5"
+                          value={project.specs.batteryDOD || 90}
+                          onChange={(e) => updateSpecs({ batteryDOD: parseFloat(e.target.value) || 90 })}
+                          className={`w-full border rounded-lg px-2 py-1 text-xs font-semibold ${
+                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                          }`}
+                        />
+                      </div>
+                      <div>
+                        <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                          Eficiencia Carga (%)
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          value={project.specs.batteryEfficiencyPct || 95}
+                          onChange={(e) => updateSpecs({ batteryEfficiencyPct: parseFloat(e.target.value) || 95 })}
+                          className={`w-full border rounded-lg px-2 py-1 text-xs font-semibold ${
+                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                          }`}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                        Costo Reemplazo Año 10 (USD)
+                      </label>
+                      <input
+                        type="number"
+                        step="500"
+                        value={project.specs.batteryReplacementCostUSD || 0}
+                        onChange={(e) => updateSpecs({ batteryReplacementCostUSD: parseFloat(e.target.value) || 0 })}
+                        placeholder="Ej. $3,500 USD"
+                        className={`w-full border rounded-lg px-2 py-1 text-xs font-semibold ${
+                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Resumen de Autonomía y Energía Útil */}
+                <div
+                  className={`rounded-lg p-2.5 text-[10px] font-bold space-y-1 mt-2 border ${
+                    isDark
+                      ? 'bg-cyan-950/70 border-cyan-800/80 text-cyan-200'
+                      : 'bg-cyan-100/90 border-cyan-300 text-cyan-950'
+                  }`}
+                >
+                  <div className="flex justify-between">
+                    <span>Energía Útil Batería:</span>
+                    <span className={`font-extrabold font-mono ${isDark ? 'text-cyan-100' : 'text-cyan-900'}`}>
+                      {summary.batteryUsableKWh} kWh ({project.specs.batteryCount || 1} x {project.specs.batteryCapacityKWh || 16.08} kWh)
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Autonomía Anti-Apagones:</span>
+                    <span className={`font-extrabold font-mono ${isDark ? 'text-cyan-100' : 'text-cyan-900'}`}>
+                      ~{summary.batteryBackupAutonomyHours} Horas
+                    </span>
                   </div>
                 </div>
               </div>

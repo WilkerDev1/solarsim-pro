@@ -98,7 +98,7 @@ export async function initDatabase(): Promise<void> {
       );
     `);
 
-    // 5. Tabla de Catálogo Global de Equipos Fotovoltaicos
+    // 5. Tabla de Catálogo Global de Equipos Fotovoltaicos (Paneles, Inversores, Baterías)
     await client.query(`
       CREATE TABLE IF NOT EXISTS equipment_catalog (
         id VARCHAR(64) PRIMARY KEY,
@@ -109,6 +109,9 @@ export async function initDatabase(): Promise<void> {
         display_name VARCHAR(255) NOT NULL,
         power_w NUMERIC(10, 2),
         power_kw NUMERIC(10, 2),
+        capacity_kwh NUMERIC(10, 2),
+        voltage_v NUMERIC(8, 2),
+        dod_pct NUMERIC(5, 2),
         efficiency_pct NUMERIC(5, 2),
         temp_coeff NUMERIC(5, 4),
         category VARCHAR(64),
