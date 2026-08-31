@@ -22,8 +22,19 @@ import {
   Sparkles,
   Bot,
   Laptop,
+  ExternalLink,
+  AlertTriangle,
+  Zap,
+  Cpu,
+  Check,
 } from 'lucide-react';
 import { SyncService, PingResult } from '../../services/syncService';
+import {
+  validateGeminiApiKey,
+  fetchAvailableGeminiModels,
+  DEFAULT_POPULAR_MODELS,
+} from '../../services/geminiInvoiceService';
+import { GeminiModelInfo } from '../../types/aiInvoice';
 import { UserRole, UserProfile } from '../../types';
 
 export const SettingsModal: React.FC = () => {
@@ -78,10 +89,48 @@ export const SettingsModal: React.FC = () => {
   const [newUserRole, setNewUserRole] = useState<UserRole>('EDITOR');
   const [userActionMsg, setUserActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Local state for AI Gemini Tab (matching AISettingsModal)
+  const [aiInputKey, setAiInputKey] = useState('');
+  const [aiSelectedModel, setAiSelectedModel] = useState<string>('gemini-3.5-flash-lite');
+  const [aiCustomModelInput, setAiCustomModelInput] = useState('');
+  const [aiIsCustomMode, setAiIsCustomMode] = useState(false);
+  const [aiModelsList, setAiModelsList] = useState<GeminiModelInfo[]>(DEFAULT_POPULAR_MODELS);
+  const [aiIsLoadingModels, setAiIsLoadingModels] = useState(false);
+  const [aiIsValidating, setAiIsValidating] = useState(false);
+  const [aiValidationResult, setAiValidationResult] = useState<{
+    tested: boolean;
+    success: boolean;
+    message?: string;
+    modelName?: string;
+  }>({ tested: false, success: false });
+
   // Sync serverUrlInput with store
   useEffect(() => {
     setServerUrlInput(syncSettings.serverUrl || 'http://10.0.0.103');
   }, [syncSettings.serverUrl]);
+
+  // Sync AI state on modal open
+  useEffect(() => {
+    if (isSettingsModalOpen) {
+      const activeKey = geminiApiKey || '';
+      const activeModel = geminiModel || 'gemini-3.5-flash-lite';
+      setAiInputKey(activeKey);
+      setAiSelectedModel(activeModel);
+      setAiValidationResult({ tested: false, success: false });
+
+      const isPreset = DEFAULT_POPULAR_MODELS.some((m) => m.id === activeModel);
+      if (!isPreset && activeModel) {
+        setAiIsCustomMode(true);
+        setAiCustomModelInput(activeModel);
+      } else {
+        setAiIsCustomMode(false);
+      }
+
+      if (activeKey.trim().length > 10) {
+        handleAutoDetectAIModels(activeKey, activeModel);
+      }
+    }
+  }, [isSettingsModalOpen, geminiApiKey, geminiModel]);
 
   // Fetch users when admin opens account tab
   useEffect(() => {
@@ -91,6 +140,116 @@ export const SettingsModal: React.FC = () => {
   }, [isSettingsModalOpen, settingsActiveTab, syncSettings.currentUser?.role, syncSettings.authToken]);
 
   if (!isSettingsModalOpen) return null;
+
+  const handleAutoDetectAIModels = async (keyToUse?: string, currentModel?: string) => {
+    const key = (keyToUse || aiInputKey).trim();
+    if (!key) return;
+
+    setAiIsLoadingModels(true);
+    try {
+      let result: { success: boolean; error?: string; models?: GeminiModelInfo[] };
+      if (window.electronAPI?.listGeminiModels) {
+        result = await window.electronAPI.listGeminiModels(key);
+      } else {
+        result = await fetchAvailableGeminiModels(key);
+      }
+
+      if (result.success && result.models && result.models.length > 0) {
+        const merged: GeminiModelInfo[] = result.models.map((m) => {
+          const matchedPreset = DEFAULT_POPULAR_MODELS.find(
+            (p) => p.id === m.id || m.id.includes(p.id)
+          );
+          return {
+            ...m,
+            description: matchedPreset?.description || m.description,
+            rateLimitNote: matchedPreset?.rateLimitNote || m.rateLimitNote,
+            isRecommended: matchedPreset?.isRecommended || m.isRecommended,
+          };
+        });
+
+        DEFAULT_POPULAR_MODELS.forEach((preset) => {
+          if (!merged.some((m) => m.id === preset.id)) {
+            merged.push(preset);
+          }
+        });
+
+        setAiModelsList(merged);
+
+        if (!currentModel && !aiSelectedModel) {
+          const rec = merged.find((m) => m.id.includes('3.5-flash-lite')) || merged[0];
+          if (rec) setAiSelectedModel(rec.id);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not auto-detect models:', err);
+    } finally {
+      setAiIsLoadingModels(false);
+    }
+  };
+
+  const handleTestAndSaveAI = async () => {
+    const trimmed = aiInputKey.trim();
+    if (!trimmed) {
+      setAiValidationResult({
+        tested: true,
+        success: false,
+        message: 'Por favor ingresa una API Key de Google Gemini.',
+      });
+      return;
+    }
+
+    const modelToUse = aiIsCustomMode ? (aiCustomModelInput.trim() || 'gemini-3.5-flash-lite') : aiSelectedModel;
+
+    setAiIsValidating(true);
+    setAiValidationResult({ tested: false, success: false });
+
+    try {
+      let res: { success: boolean; error?: string; modelName?: string; models?: any[] };
+      if (window.electronAPI?.validateGeminiApiKey) {
+        res = await window.electronAPI.validateGeminiApiKey(trimmed, modelToUse);
+      } else {
+        res = await validateGeminiApiKey(trimmed, modelToUse);
+      }
+
+      if (res.success) {
+        setGeminiApiKey(trimmed);
+        setGeminiModel(modelToUse);
+        setAiValidationResult({
+          tested: true,
+          success: true,
+          modelName: res.modelName || modelToUse,
+          message: `¡Conexión exitosa con Google AI Studio (${res.modelName || modelToUse})! Clave y modelo guardados.`,
+        });
+
+        if (res.models && res.models.length > 0) {
+          setAiModelsList(res.models);
+        }
+      } else {
+        setAiValidationResult({
+          tested: true,
+          success: false,
+          message: res.error || 'No se pudo autenticar con Google AI Studio.',
+        });
+      }
+    } catch (err: any) {
+      setAiValidationResult({
+        tested: true,
+        success: false,
+        message: err.message || 'Error de red al conectar con Google AI.',
+      });
+    } finally {
+      setAiIsValidating(false);
+    }
+  };
+
+  const handleOpenGoogleAIStudio = () => {
+    const url = 'https://aistudio.google.com/app/apikey';
+    if (window.electronAPI?.openExternalUrl) {
+      window.electronAPI.openExternalUrl(url);
+    } else {
+      window.open(url, '_blank');
+    }
+  };
 
   const loadUsers = async () => {
     if (!syncSettings.authToken) return;
@@ -826,51 +985,231 @@ export const SettingsModal: React.FC = () => {
 
           {/* TAB 4: AI GEMINI VISION */}
           {settingsActiveTab === 'ai' && (
-            <div className="space-y-4">
+            <div className="space-y-4 text-xs">
+              {/* Banner Free Tier */}
               <div
-                className={`p-5 rounded-2xl border ${
-                  isDark ? 'bg-[#1f1f23] border-[#2f2f35]' : 'bg-slate-50 border-slate-200'
+                className={`border rounded-2xl p-4 flex items-start gap-3.5 transition-colors ${
+                  isDark
+                    ? 'bg-emerald-950/40 border-emerald-700/60 text-emerald-200'
+                    : 'bg-emerald-50 border-emerald-200 text-emerald-950'
                 }`}
               >
-                <div className="flex items-center gap-2.5 mb-3">
-                  <Sparkles className="w-5 h-5 text-purple-400" />
-                  <div>
-                    <h4 className="text-sm font-bold">Configuración de Google Gemini Vision</h4>
-                    <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-                      Extracción automática de facturas eléctricas dominicanas con IA
-                    </p>
+                <Sparkles className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                <div className="space-y-1.5 flex-1">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-bold text-xs sm:text-sm">Capa Gratuita de Google AI Studio</h4>
+                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                      Hasta 500-1,500 RPD
+                    </span>
+                  </div>
+                  <p className="opacity-90 text-xs leading-relaxed">
+                    Obtén tu API Key gratuita en segundos para procesar facturas con <strong>Gemini 3.5 Flash Lite</strong>, <strong>Gemini 3.6 Flash</strong> y <strong>Gemini 2.0 Flash</strong>.
+                  </p>
+                  <button
+                    onClick={handleOpenGoogleAIStudio}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-400 hover:text-emerald-300 hover:underline pt-1 cursor-pointer"
+                  >
+                    <span>Obtener API Key en aistudio.google.com/app/apikey</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* API Key Input */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <label className={`block text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                    Google Gemini API Key
+                  </label>
+                  {aiInputKey.trim().length > 10 && (
+                    <button
+                      onClick={() => handleAutoDetectAIModels(aiInputKey)}
+                      disabled={aiIsLoadingModels}
+                      className="text-xs font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${aiIsLoadingModels ? 'animate-spin' : ''}`} />
+                      <span>{aiIsLoadingModels ? 'Detectando...' : 'Auto-detectar Modelos'}</span>
+                    </button>
+                  )}
+                </div>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                    <Key className={`w-4 h-4 ${isDark ? 'text-zinc-500' : 'text-slate-400'}`} />
+                  </div>
+                  <input
+                    type="password"
+                    value={aiInputKey}
+                    onChange={(e) => {
+                      setAiInputKey(e.target.value);
+                      if (e.target.value.trim().length > 15) {
+                        handleAutoDetectAIModels(e.target.value);
+                      }
+                    }}
+                    placeholder="AIzaSy..."
+                    className={`w-full pl-10 pr-4 py-2.5 rounded-xl border font-mono text-xs transition-colors outline-none focus:ring-2 focus:ring-emerald-500 ${
+                      isDark
+                        ? 'bg-[#121216] border-[#2e2e3e] text-white placeholder-zinc-600'
+                        : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400'
+                    }`}
+                  />
+                </div>
+                <p className={`text-[11px] flex items-center gap-1.5 pt-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                  <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                  Tu API Key se almacena localmente de forma privada en tu dispositivo y nunca se comparte.
+                </p>
+              </div>
+
+              {/* Model Selector Section */}
+              <div className="space-y-2 pt-1">
+                <div className="flex justify-between items-center">
+                  <label className={`block text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                    Modelo Seleccionado
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setAiIsCustomMode(!aiIsCustomMode)}
+                      className="text-xs font-bold text-zinc-400 hover:text-white cursor-pointer underline"
+                    >
+                      {aiIsCustomMode ? 'Elegir de la lista' : 'Escribir modelo personalizado'}
+                    </button>
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Google Gemini API Key</label>
+                {/* Custom text input if custom mode */}
+                {aiIsCustomMode ? (
+                  <div className="space-y-1">
                     <input
-                      type="password"
-                      value={geminiApiKey}
-                      onChange={(e) => setGeminiApiKey(e.target.value)}
-                      placeholder="AIzaSy..."
-                      className={`w-full px-4 py-2.5 rounded-xl border text-sm font-mono ${
-                        isDark ? 'bg-[#121214] border-[#3f3f46]' : 'bg-white border-slate-300'
+                      type="text"
+                      value={aiCustomModelInput}
+                      onChange={(e) => setAiCustomModelInput(e.target.value)}
+                      placeholder="ej. gemini-3.5-flash-lite o gemini-3.6-flash"
+                      className={`w-full px-4 py-2.5 rounded-xl border font-mono text-xs outline-none focus:ring-2 focus:ring-emerald-500 ${
+                        isDark ? 'bg-[#121216] border-[#2e2e3e] text-white' : 'bg-white border-slate-300 text-slate-900'
                       }`}
                     />
+                    <p className="text-[11px] text-zinc-500">
+                      Ingresa el identificador exacto de cualquier modelo publicado en Google AI Studio.
+                    </p>
                   </div>
+                ) : (
+                  /* Models Cards Grid */
+                  <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
+                    {aiModelsList.map((m) => {
+                      const isSelected = aiSelectedModel === m.id;
+                      const isLite = m.id.includes('flash-lite') || m.id.includes('3.5-flash-lite');
+                      const is36 = m.id.includes('3.6-flash') || m.id.includes('3.7-flash');
 
-                  <div>
-                    <label className="block text-xs font-bold mb-1">Modelo de Inferencia</label>
-                    <select
-                      value={geminiModel}
-                      onChange={(e) => setGeminiModel(e.target.value)}
-                      className={`w-full px-4 py-2.5 rounded-xl border text-sm ${
-                        isDark ? 'bg-[#121214] border-[#3f3f46]' : 'bg-white border-slate-300'
-                      }`}
-                    >
-                      <option value="gemini-2.0-flash">Gemini 2.0 Flash (Recomendado - Ultrarrápido)</option>
-                      <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                      <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                    </select>
+                      return (
+                        <div
+                          key={m.id}
+                          onClick={() => setAiSelectedModel(m.id)}
+                          className={`p-3.5 rounded-2xl border cursor-pointer transition-all duration-150 flex items-start justify-between gap-3 ${
+                            isSelected
+                              ? isDark
+                                ? 'bg-emerald-950/60 border-emerald-500 text-white shadow-xs'
+                                : 'bg-emerald-50 border-emerald-600 text-emerald-950 shadow-xs'
+                              : isDark
+                              ? 'bg-[#121218] border-[#262634] text-zinc-300 hover:border-zinc-600'
+                              : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="space-y-1 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-extrabold text-xs sm:text-sm flex items-center gap-1.5">
+                                {isLite ? (
+                                  <Zap className="w-4 h-4 text-amber-400 fill-amber-400" />
+                                ) : is36 ? (
+                                  <Sparkles className="w-4 h-4 text-cyan-400" />
+                                ) : (
+                                  <Cpu className="w-4 h-4 text-emerald-400" />
+                                )}
+                                {m.name}
+                              </span>
+
+                              {isLite && (
+                                <span className="text-[9px] px-2 py-0.2 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                                  500 RPD Gratis
+                                </span>
+                              )}
+
+                              {m.rateLimitNote && !isLite && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-zinc-700/40 text-zinc-400 font-mono">
+                                  {m.rateLimitNote}
+                                </span>
+                              )}
+
+                              {m.isRecommended && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 font-semibold font-mono">
+                                  Recomendado
+                                </span>
+                              )}
+                            </div>
+
+                            <p className="text-[11px] opacity-80 leading-relaxed">{m.description}</p>
+                            <span className="text-[10px] font-mono opacity-60 block">ID: {m.id}</span>
+                          </div>
+
+                          <div className="pt-0.5">
+                            <div
+                              className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                                isSelected
+                                  ? 'border-emerald-500 bg-emerald-500 text-white'
+                                  : isDark
+                                  ? 'border-zinc-600'
+                                  : 'border-slate-300'
+                              }`}
+                            >
+                              {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Validation Feedback Message */}
+              {aiValidationResult.tested && (
+                <div
+                  className={`border rounded-2xl p-3.5 flex items-start gap-2.5 animate-in fade-in duration-200 ${
+                    aiValidationResult.success
+                      ? isDark
+                        ? 'bg-emerald-950/50 border-emerald-700/80 text-emerald-200'
+                        : 'bg-emerald-50 border-emerald-300 text-emerald-950'
+                      : isDark
+                      ? 'bg-rose-950/50 border-rose-800/80 text-rose-200'
+                      : 'bg-rose-50 border-rose-200 text-rose-900'
+                  }`}
+                >
+                  {aiValidationResult.success ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  )}
+                  <div className="space-y-0.5">
+                    <p className="font-bold text-xs">
+                      {aiValidationResult.success ? 'Conexión Validada con Éxito' : 'Fallo en la Validación'}
+                    </p>
+                    <p className="text-[11px] opacity-90">{aiValidationResult.message}</p>
                   </div>
                 </div>
+              )}
+
+              {/* Botón Probar y Guardar Modelo */}
+              <div className="pt-2 flex justify-end">
+                <button
+                  onClick={handleTestAndSaveAI}
+                  disabled={aiIsValidating || !aiInputKey.trim()}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs transition-all flex items-center gap-2 cursor-pointer shadow-md disabled:opacity-50 active:scale-95"
+                >
+                  {aiIsValidating ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4" />
+                  )}
+                  <span>{aiIsValidating ? 'Verificando con Google AI...' : 'Probar y Guardar Modelo'}</span>
+                </button>
               </div>
             </div>
           )}
