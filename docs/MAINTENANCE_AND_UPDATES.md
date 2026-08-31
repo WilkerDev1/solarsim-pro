@@ -5,11 +5,11 @@
 
 ## 1. 🏗️ Arquitectura del Sistema & Stack Tecnológico
 
-El proyecto está diseñado bajo una arquitectura híbrida de alto rendimiento que combina aplicaciones web modernas con un runtime de escritorio nativo:
+El proyecto está diseñado bajo una arquitectura híbrida de alto rendimiento que combina aplicaciones web modernas con un runtime de escritorio nativo, servicios serverless y un backend auto-hospedado:
 
 ```mermaid
 graph TD
-    A[React 18 + TypeScript] -->|Vite Build| B[dist/ Web Bundle]
+    A[React 18 + TypeScript + Zustand Slices] -->|Vite Build| B[dist/ Web Bundle]
     C[Electron 31 Main & Preload] -->|esbuild| D[dist-electron/ Node Bundle]
     B --> E[Electron Desktop Runtime]
     D --> E
@@ -18,12 +18,16 @@ graph TD
     E -->|electron-updater| H[GitHub Releases API / Auto-Updates]
     I[Cloudflare Worker & KV] -->|Hono API| J[Visor Web Propuestas /p/:id]
     B -->|REST API /api/share| I
+    B -->|REST API Sync & Auth| K[solarsim-api Node.js / Docker]
+    K -->|PostgreSQL 16| L[(solarsim-db CT 100 10.0.0.103)]
 ```
 
 ### Componentes Clave:
-* **Frontend**: React 18, TypeScript, Tailwind CSS, Lucide React, Recharts (gráficos solares e inversión), Zustand (estado global y persistencia).
-* **Motor de Simulación**: Módulos puros en TypeScript (`src/engine/`) para cálculo de balance de energía horaria/mensual, degradación de paneles, autoconsumo, tarifas EDES (BTS1/BTS2), Ley 57-07, Payback, VAN, TIR y ROI a 25 años.
-* **Generador de Documentos PDF**: `jspdf` + `html2canvas`. Todos los activos visuales (renders 3D, diagramas de flujo y logos) están pre-convertidos a Base64 en `src/assets/pdfGraphicAssets.ts` para evitar bloqueos por CORS o canvas tainting durante la exportación.
+* **Frontend**: React 18, TypeScript, Tailwind CSS, Lucide React, Recharts (gráficos solares e inversión), Zustand con Arquitectura de Slices (`projectSlice`, `equipmentSlice`, `syncAuthSlice`, `importExportSlice`, `aiSlice`, `uiSlice`).
+* **Motor de Simulación**: Módulos puros en TypeScript (`src/engine/`) para cálculo de balance de energía horaria/mensual, degradación de paneles, autoconsumo, tarifas EDES (BTS1/BTS2/MTD1/MTD2/etc.), Ley 57-07, Payback, VAN, TIR y ROI a 25 años.
+* **Inteligencia Artificial Multimodal**: Google Gemini Vision (`gemini-3.5-flash-lite`) para escaneo de facturas eléctricas dominicanas y extracción de fichas técnicas (*datasheets*) de módulos fotovoltaicos, inversores y almacenamiento BESS.
+* **Backend de Sincronización & Auth**: Servidor Node.js + Hono (`server/`) en contenedor Docker conectado a PostgreSQL 16 Alpine en Proxmox LXC CT 100 (`10.0.0.103`), con autenticación JWT, RBAC y sincronización delta de proyectos y catálogo.
+* **Generador de Documentos PDF**: `jspdf` + `html2canvas`. Todos los activos visuales están pre-convertidos a Base64 en `src/assets/pdfGraphicAssets.ts` para garantizar renderizado instantáneo y evitar tainting de canvas.
 * **Servicio Serverless de Propuestas Web**: Cloudflare Workers + KV (`workers/share-viewer/`) con Hono, generación de códigos QR y renderizado interactivo en la nube con TTL de expiración automática.
 * **Desktop & Actualizador**: Electron 31 + `electron-updater` conectado al repositorio `WilkerDev1/solarsim-pro`.
 
@@ -49,7 +53,6 @@ Para evitar roturas graves en el simulador y en los empaquetadores de escritorio
    ```
 2. **Actualizaciones de Parches y Menores Seguras**:
    ```bash
-   # Solo actualizar parches compatibles sin forzar majors
    npm update
    ```
 3. **Verificación Obligatoria de Tipos y Pruebas**:
@@ -79,7 +82,6 @@ El servicio de auto-actualización permite que cualquier usuario en Windows o Li
 ### 🌐 Flujo de Funcionamiento:
 
 ```
-```
 [ SolarSim Pro Cliente (v1.X) ]
             │
             ▼ (1. Al pulsar 'Buscar Actualizaciones' o en segundo plano)
@@ -98,141 +100,4 @@ El servicio de auto-actualización permite que cualquier usuario en Windows o Li
 
 * `electron-updater` en Windows lee el manifiesto `latest.yml`.
 * **Regla Mandatoria**: El nombre del archivo en la URL de GitHub **DEBE COINCIDIR EXACTAMENTE** con el valor de `path` y `url` dentro de `latest.yml`.
-  * ✅ Correcto: `SolarSim-Pro-Setup-1.5.0.exe` (con guiones).
-  * ❌ Incorrecto: `SolarSim.Pro.Setup.1.5.0.exe` (si tiene puntos o espacios en la release pero guiones en el yml, causará **Error 404**).
-* Para máxima compatibilidad, el script de publicación siempre sube versiones con guiones y copias de seguridad con espacios.
-
----
-
-## 4. 🔐 Firmas Criptográficas GPG (Para Arch Linux / AUR y Distribuciones Linux)
-
-Para evitar rechazos de seguridad en gestores de paquetes como `pacman` (`error: missing signature / 404`), todos los binarios de Linux se firman con la clave oficial de desarrollo.
-
-### Información de la Clave GPG Oficial:
-* **Key ID**: `C22D550C3A2C8FAF`
-* **Huella Digital**: `B55E 8CBF E8DC DEC4 7343 A390 C22D 550C 3A2C 8FAF`
-* **UID**: `WilkerDev1 <capellancoronadowilker@gmail.com>`
-* **Tipo**: RSA 4096 bits
-
-### Comandos de Firma para Releases:
-```bash
-# Exportar clave pública (si se requiere actualizar)
-gpg --armor --export C22D550C3A2C8FAF > release/solarsim-public-key.asc
-
-# Firmar paquete pacman
-gpg --detach-sign --yes release/solarsim-pro-1.5.0.pacman
-
-# Firmar paquete tar.gz
-gpg --detach-sign --yes release/solarsim-pro-1.5.0.tar.gz
-
-# Firmar AppImage
-gpg --detach-sign --yes release/SolarSim-Pro-1.5.0.AppImage
-```
-
----
-
-## 5. 🚀 Protocolo Paso a Paso para Publicar una Nueva Versión (Release Runbook)
-
-Sigue esta lista de verificación cada vez que vayas a lanzar una actualización para los clientes:
-
-### Paso 1: Incrementar Versión en `package.json`
-Modificar la clave `"version"` (ejemplo: `"1.5.0"`):
-```json
-{
-  "name": "solarsim-pro",
-  "version": "1.5.0"
-}
-```
-
-### Paso 2: Validación de Tipos y Motores
-```bash
-npm run lint                                            # tsc --noEmit (Cero errores)
-npx tsx src/engine/testBenchmark.ts                     # Validación contra benchmark oficial
-npx tsx src/engine/testFinancialEngineComprehensive.ts  # Suite integral de 9 pruebas unitarias
-```
-
-### Paso 3: Compilar el Frontend y el Runtime de Electron
-```bash
-npm run build && npm run build:electron
-```
-
-### Paso 4: Empaquetar Binarios para Windows y Linux
-```bash
-npx electron-builder --win --linux
-```
-*(Esto genera los instaladores en la carpeta `release/` junto con los manifiestos `latest.yml` y `latest-linux.yml`).*
-
-### Paso 5: Preparar Nombres de Archivo y Firmas Criptográficas
-Ejecutar el script de preparación:
-```bash
-python3 -c "
-import shutil, os, subprocess
-
-v = '1.5.0' # Sustituir por la versión actual
-
-# Copias con nombres exactos para electron-updater
-shutil.copyfile(f'release/SolarSim Pro Setup {v}.exe', f'release/SolarSim-Pro-Setup-{v}.exe')
-shutil.copyfile(f'release/SolarSim Pro Setup {v}.exe.blockmap', f'release/SolarSim-Pro-Setup-{v}.exe.blockmap')
-shutil.copyfile(f'release/SolarSim Pro {v}.exe', f'release/SolarSim-Pro-{v}.exe')
-shutil.copyfile(f'release/SolarSim Pro-{v}.AppImage', f'release/SolarSim-Pro-{v}.AppImage')
-
-# Exportar clave pública GPG
-subprocess.run(['gpg', '--armor', '--export', 'C22D550C3A2C8FAF'], stdout=open('release/solarsim-public-key.asc', 'w'), check=True)
-
-# Firmar paquetes de Linux
-for target in [f'release/solarsim-pro-{v}.pacman', f'release/solarsim-pro-{v}.tar.gz', f'release/SolarSim-Pro-{v}.AppImage']:
-    sig = target + '.sig'
-    if os.path.exists(sig):
-        os.remove(sig)
-    subprocess.run(['gpg', '--detach-sign', '--yes', target], check=True)
-    print(f'Firmado: {target} -> {sig}')
-"
-```
-
-### Paso 6: Commit, Tag y Push a GitHub
-```bash
-git add .
-git commit -m "chore(release): Bump version to 1.5.0 and generate binaries"
-git tag v1.5.0
-git push origin main --tags
-```
-
-### Paso 7: Publicar la Release en GitHub vía CLI (`gh`)
-```bash
-gh release create v1.5.0 \
-  --title "⚡ SolarSim Pro v1.5.0" \
-  --notes-file "release/release-notes-v1.5.0.md" \
-  "release/latest.yml" \
-  "release/latest-linux.yml" \
-  "release/SolarSim-Pro-Setup-1.5.0.exe" \
-  "release/SolarSim-Pro-Setup-1.5.0.exe.blockmap" \
-  "release/SolarSim-Pro-1.5.0.exe" \
-  "release/SolarSim-Pro-1.5.0.AppImage" \
-  "release/SolarSim-Pro-1.5.0.AppImage.sig" \
-  "release/solarsim-pro-1.5.0.pacman" \
-  "release/solarsim-pro-1.5.0.pacman.sig" \
-  "release/solarsim-pro_1.5.0_amd64.deb" \
-  "release/solarsim-pro-1.5.0.tar.gz" \
-  "release/solarsim-pro-1.5.0.tar.gz.sig" \
-  "release/solarsim-public-key.asc"
-```
-
----
-
-## 6. 🛠️ Solución de Problemas Frecuentes (Troubleshooting)
-
-### A. Error 404 al descargar la actualización en Windows
-* **Causa**: El archivo `latest.yml` apunta a `SolarSim-Pro-Setup-X.Y.Z.exe` pero en la release de GitHub se subió con otro nombre (ej. con espacios o puntos).
-* **Solución**: Subir el archivo con el nombre exacto usando `gh release upload vX.Y.Z "release/SolarSim-Pro-Setup-X.Y.Z.exe" --clobber`.
-
-### B. Pacman rechaza la instalación remota en Arch Linux
-* **Causa**: Pacman busca el archivo criptográfico de firma `.sig` en la misma ruta URL.
-* **Solución**: Asegurarse de haber firmado el paquete con `gpg --detach-sign` y subir `solarsim-pro-X.Y.Z.pacman.sig` a la release de GitHub.
-
-### C. La aplicación abre pero no recibe teclas en Wayland (Linux)
-* **Causa**: Incompatibilidad del protocolo de entrada de Electron bajo Wayland nativo sin parámetros de IME.
-* **Solución**: El acceso directo `.desktop` incluye los flags `--ozone-platform-hint=auto --enable-features=WaylandWindowDecorations` y `--no-sandbox` para garantizar compatibilidad total con GNOME/KDE.
-
-### D. Exportación PDF sale cortada o faltan imágenes
-* **Causa**: Imágenes cargadas mediante URLs externas bloqueadas por CORS o no resueltas al invocar `html2canvas`.
-* **Solución**: Convertir siempre las imágenes a Base64 e importarlas desde `src/assets/pdfGraphicAssets.ts`.
+* En Linux, se deben publicar tanto los binarios con espacios (`SolarSim Pro-1.5.0.AppImage`) como las copias con guiones (`SolarSim-Pro-1.5.0.AppImage`) para compatibilidad retroactiva con versiones anteriores de `latest-linux.yml`.

@@ -45,12 +45,24 @@ graph TD
    - **Motor**: PostgreSQL 16 Alpine
    - **Puerto Interno**: `5432` (sin exposición directa al host)
    - **Volumen Persistente**: `/home/agente/servicios/database/data/`
-   - **Función**: Cuentas de usuario, organizaciones, roles (RBAC), control de versiones de proyectos fotovoltaicos y auditoría.
+   - **Tablas Principales**:
+     - `users` (id, email, password_hash, name, role, organization_id)
+     - `organizations` (id, name, created_at)
+     - `projects` (id, organization_id, client_data, specs, rates, financials, sync_status, updated_at)
+     - `equipment_catalog` (id, organization_id, type, brand, model_series, display_name, power_w, power_kw, capacity_kwh, voltage_v, dod_pct, efficiency_pct, temp_coeff, category, voltage_mppt, details)
+     - `audit_logs` (id, user_id, action, timestamp)
 
-3. **`solarsim-api` (Motor de Sincronización & Auth)**:
+3. **`solarsim-api` (Motor de Sincronización, Catálogo & Auth)**:
    - **Ruta**: `/home/agente/servicios/solarsim-api/`
    - **Puerto Interno**: `3000`
-   - **Función**: API REST / WebSocket para autenticación JWT, gestión de permisos (Lector/Editor/Admin), delta-sync de proyectos y metadatos de autoría.
+   - **Endpoints Principales**:
+     - `POST /api/auth/login` (Autenticación JWT)
+     - `POST /api/auth/register` (Registro de usuario y organización)
+     - `GET /api/projects` (Pull de proyectos con timestamp delta)
+     - `POST /api/projects/sync` (Push de proyectos modificados)
+     - `GET /api/equipment` (Pull del catálogo global de equipos)
+     - `POST /api/equipment/batch` (Push por lotes de nuevos equipos o fichas técnicas escaneadas)
+     - `GET /api/health` (Healthcheck)
 
 4. **`electsun-web` (Sitio Web Corporativo)**:
    - **Ruta**: `/home/agente/servicios/electsun-web/`

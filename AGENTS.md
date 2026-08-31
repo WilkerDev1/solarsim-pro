@@ -1,27 +1,37 @@
 # ☀️ SolarSim Pro — Manual Maestro de Contexto, Arquitectura y Mantenimiento
 
-Este documento sirve como **fuente única de verdad** para desarrolladores y asistentes IA (Antigravity / Gemini) en nuevas sesiones de trabajo. Contiene la explicación exhaustiva de qué es el proyecto, la ubicación de cada componente, las herramientas utilizadas para desarrollo y despliegue, y las reglas críticas aprendidas.
+Este documento sirve como **fuente única de verdad** para desarrolladores y asistentes IA (Antigravity / Gemini) en nuevas sesiones de trabajo. Contiene la explicación exhaustiva de qué es el proyecto, la ubicación de cada componente, las herramientas utilizadas para desarrollo y despliegue, la infraestructura de servidores y las reglas críticas aprendidas.
 
 ---
 
 ## 1. 📖 ¿Qué es SolarSim Pro?
 
-**SolarSim Pro** es una plataforma de software de escritorio (construida con Electron + React) diseñada para ingenieros, consultores e instaladores de energía solar fotovoltaica en **República Dominicana**.
+**SolarSim Pro** es una plataforma de software de escritorio (construida con Electron + React + TypeScript) y backend serverless/auto-hospedado, diseñada para ingenieros, consultores e instaladores de energía solar fotovoltaica en **República Dominicana**.
 
 ### Capacidades Principales:
-1. **Dimensionamiento Técnico**:
-   - Estimación de irradiación solar ($\text{HSP}$) específica para las 32 provincias de RD (datos satelitales NASA SSE / NREL).
+1. **Dimensionamiento Técnico & Solar**:
+   - Estimación de irradiación solar ($\text{HSP}$) específica para las 32 provincias de RD (datos satelitales NASA SSE / NREL y soporte para HSP personalizado).
    - Balance de energía horaria y mensual, autoconsumo e inyección bajo el régimen de Medición Neta con las distribuidoras (**EDEESTE, EDESUR, EDENORTE, CEPM**).
-2. **Inteligencia Artificial Multimodal (Escáner de Facturas)**:
-   - Extracción automática con **Google Gemini Vision** (`gemini-2.0-flash`) de facturas eléctricas en PDF, JPG, PNG y WebP.
-   - Detección de NIS/NIC, RNC, cliente, historial de 12 meses de consumo (kWh), tarifa (BTS1, BTS2, MTD1) y potencia en kW.
-3. **Ingeniería Financiera & Ley 57-07 (Auditada)**:
+   - Cobertura de todas las tarifas dominicanas (**BTS1, BTS2, BTD, MTD1, MTD2, MTH, VMT1, VMT2, VMT3**) y aplicación de retención oficial del 25% de la producción de exportación.
+   - Factor de pérdidas del sistema visible y configurable (predeterminado auditado: **25.0%**).
+2. **Catálogo Inteligente de Equipos & Almacenamiento (BESS)**:
+   - Base de datos local y sincronizada en la nube con modelos verificados de **Paneles Solares** (Canadian Solar TOPBiHiKu6 TOPCon 590W-620W), **Inversores Híbridos Split Phase** (LuxpowerTek LXP-LB-US 8k/10k) y **Baterías Litio LiFePO4** (HinaESS PowerGem Max 16.08kWh).
+   - Selector inteligente con búsqueda en tiempo real por potencia, capacidad, voltaje o química, autocompletado y cálculo automático de autonomía anti-apagones.
+   - Administrador de Catálogo en el Centro de Ajustes para alta, baja y edición completa de parámetros.
+3. **Inteligencia Artificial Multimodal (Gemini Vision)**:
+   - **Escáner de Facturas EDE**: Extracción automática de NIS/NIC, RNC, cliente, historial de 12 meses de consumo (kWh), tarifa y potencia contratada en kW (`gemini-3.5-flash-lite`).
+   - **Escáner de Fichas Técnicas (Datasheets)**: Extracción instantánea de parámetros de paneles (Wp, eficiencia, coef. temp, degradación), inversores (kW AC, máx DC, MPPTs) y baterías (kWh, Ah, V, DoD %, ciclos, corriente máx).
+4. **Ingeniería Financiera & Ley 57-07 (Auditada)**:
    - Exoneración del 100% de ITBIS (18%) y aranceles sobre equipos solares.
-   - Crédito fiscal del 40% del costo de inversión en equipos aplicable al Impuesto Sobre la Renta (ISR) amortizable en 3 años fiscales.
+   - Crédito fiscal del 40% del costo de inversión en equipos aplicable al Impuesto Sobre la Renta (ISR) amortizable en 3 años fiscales ($13.33\%$ anual).
    - Proyecciones de Flujo de Caja a 25 años, Payback Simple y Descontado, VAN (NPV), TIR (IRR), LCOE y ROI total.
-4. **Generador de Propuestas Técnicas y Económicas en PDF**:
+5. **Generador de Propuestas Técnicas y Económicas en PDF**:
    - Dossier ejecutivo modular de 10 a 11 páginas con maquetación de revista (*Executive Pitch Deck*).
    - Personalización multi-empresa (*Document Customization*): logos, lemas, firmas, teléfonos, marcas de agua y paletas de color corporativas.
+6. **Sincronización en la Nube & Multi-usuario (RBAC)**:
+   - Servidor backend Node.js (`server/`) desplegado en Docker (`solarsim-api` + PostgreSQL) en Proxmox CT 100 (`10.0.0.103`).
+   - Autenticación JWT, control de acceso por roles (ADMIN, EDITOR, VIEWER), sincronización delta de proyectos y catálogo global.
+   - Publicación de propuestas web interactivas con Cloudflare Workers + KV y códigos QR.
 
 ---
 
@@ -33,9 +43,25 @@ solarsim/
 ├── package.json                             # Configuración del proyecto, dependencias y scripts
 ├── vite.config.ts                           # Configuración de Vite para React y bundling web
 ├── tailwind.config.js                       # Configuración de Tailwind CSS y paletas de colores
-├── electron/                                # Runtime de Escritorio (Node / Chromium)
+├── repomix.config.json                      # Configuración de empaquetado de contexto para IA
+├── server/                                  # 🖥️ BACKEND NODE.JS + HONO + POSTGRESQL (Sync & Auth API)
+│   ├── src/
+│   │   ├── index.ts                         # Endpoints REST (/api/auth, /api/projects, /api/equipment, /api/health)
+│   │   └── db.ts                            # Pool PostgreSQL e inicialización de tablas (users, projects, equipment)
+│   ├── Dockerfile                           # Contenedor de producción para solarsim-api
+│   ├── package.json                         # Dependencias del backend (@hono/node-server, pg, bcryptjs, jsonwebtoken)
+│   └── tsconfig.json                        # Configuración TypeScript del servidor
+├── infra/                                   # 🌐 INFRAESTRUCTURA & SERVIDORES (Docker, Caddy, Postgres)
+│   ├── INFRASTRUCTURE.md                    # Mapa maestro de red, host Proxmox, CT 100 y servicios
+│   └── services/                            # Composiciones Docker por servicio
+│       ├── caddy/                           # Proxy inverso Caddy con SSL automático (puertos 80, 443)
+│       ├── database/                        # PostgreSQL 16 Alpine persistente
+│       ├── solarsim-api/                    # API de sincronización conectada a solarsim_net
+│       └── electsun-web/                    # Landing page corporativa de Electsun
+├── electron/                                # 🖥️ RUNTIME DE ESCRITORIO (Node.js / Chromium)
 │   ├── main.ts                              # Proceso principal de Electron, IPC handlers, auto-updater
-│   └── preload.ts                           # Puente seguro contextBridge entre Electron y React
+│   ├── preload.ts                           # Puente seguro contextBridge entre Electron y React
+│   └── aiInvoiceHandler.ts                  # Procesamiento de imágenes y PDFs en Electron
 ├── workers/                                 # ☁️ MICROSERVICIOS SERVERLESS (Cloudflare)
 │   └── share-viewer/                        # Cloudflare Worker & Visor Web de Propuestas Temporales
 │       ├── wrangler.toml                    # Configuración KV y despliegue del worker
@@ -43,44 +69,67 @@ solarsim/
 │       └── src/                             # API (/api/share) y Plantilla Web (/p/:id)
 ├── src/
 │   ├── main.tsx                             # Punto de entrada de React
-│   ├── App.tsx                              # Enrutador y vista principal (Simulador vs Propuesta PDF)
+│   ├── App.tsx                              # Enrutador y vista principal (Simulador vs Propuesta PDF vs Dashboard)
 │   ├── index.css                            # Estilos base, scrollbars y regla @page para A4
 │   ├── types/
 │   │   ├── index.ts                         # Tipos TypeScript de simulación, cliente, finanzas y PDF
+│   │   ├── equipment.ts                     # Tipos del catálogo de paneles, inversores y baterías BESS
+│   │   ├── aiInvoice.ts                     # Tipos de escaneo de facturas con Gemini Vision
 │   │   └── defaultDocumentCustomization.ts  # Valores por defecto de personalización empresarial
 │   ├── services/
+│   │   ├── syncService.ts                   # Cliente HTTP de sincronización con solarsim-api
+│   │   ├── geminiInvoiceService.ts          # Integración con Google Gemini para facturas
+│   │   ├── geminiDatasheetService.ts        # Extracción multimodal de fichas técnicas con Gemini
 │   │   └── shareProposalService.ts          # Servicio de publicación de propuestas web en Cloudflare
-│   ├── store/
-│   │   └── useSimulationStore.ts            # Estado global Zustand con persistencia en localStorage
+│   ├── store/                               # 🧠 ESTADO GLOBAL MODULAR ZUSTAND (Slice Pattern)
+│   │   ├── useSimulationStore.ts            # Orquestador raíz limpio (<120 líneas) con persistencia
+│   │   ├── types.ts                         # Definición de tipos de slices y store compuesto
+│   │   ├── initialData.ts                   # Proyectos iniciales y generadores de secuencias (SP-2026, C-0001)
+│   │   └── slices/
+│   │       ├── projectSlice.ts              # CRUD de proyectos, dimensionamiento y mutación de parámetros
+│   │       ├── equipmentSlice.ts            # Catálogo de equipos (paneles, inversores, baterías, CRUD y sync)
+│   │       ├── syncAuthSlice.ts             # Autenticación JWT y sincronización con solarsim-api
+│   │       ├── importExportSlice.ts         # Importación, exportación JSON y resolución de conflictos
+│   │       ├── aiSlice.ts                   # Configuración Gemini API y escáner de facturas
+│   │       └── uiSlice.ts                   # Modales, temas claro/oscuro y ancho de sidebar
 │   ├── data/
 │   │   ├── rdProvinces.ts                   # Datos de irradiación solar (HSP) por provincia de RD
-│   │   └── defaultPanelsInverters.ts        # Catálogo de paneles Tier-1, inversores y baterías
-│   ├── engine/                              # 🧠 MOTORES DE CÁLCULO PUROS (Sin UI)
+│   │   └── defaultEquipmentCatalog.ts       # Catálogo base oficial verificado (Canadian Solar, Luxpower, HinaESS)
+│   ├── engine/                              # 🔬 MOTORES DE CÁLCULO PUROS (Sin UI)
 │   │   ├── solarEngine.ts                   # Balance de energía, generación mensual y cobertura
 │   │   ├── financialEngine.ts               # Flujo de caja 25 años, VAN, TIR, Payback y ROI
 │   │   ├── ley5707.ts                       # Deducciones fiscales y exenciones Ley 57-07
-│   │   └── testBenchmark.ts                 # Script de validación de cálculos contra benchmarks
+│   │   ├── referenceCase.ts                 # Caso de referencia oficial auditado (BENCHMARK_PROJECT)
+│   │   ├── testBenchmark.ts                 # Script de validación de cálculos contra benchmarks
+│   │   └── testFinancialEngineComprehensive.ts # Suite de 9 pruebas unitarias financieras
 │   ├── assets/
 │   │   └── pdfGraphicAssets.ts              # Gráficos, renders 3D y diagramas en Base64 para PDF
 │   └── components/
 │       ├── common/                          # Modales, cabeceras y utilidades compartidas
-│       │   ├── Header.tsx                   # Barra superior de la app con navegación y botones
+│       │   ├── Header.tsx                   # Barra superior con navegación, estado de sync y botones
+│       │   ├── SettingsModal.tsx            # Centro de Ajustes unificado (Nube, Cuenta, Share, IA, Catálogo)
+│       │   ├── EquipmentManagerSettingsTab.tsx # Administrador de Catálogo con tabla, edición y filtros
 │       │   ├── AIInvoiceScannerModal.tsx    # Modal de escáner de facturas con Gemini Vision
-│       │   └── ShareProposalModal.tsx       # Modal de compartir propuesta web interactiva y QR
-│       ├── simulator/                       # 🎛️ VISTA DEL SIMULADOR INTERACTIVO (Modular)
+│       │   ├── AIDatasheetScannerModal.tsx  # Modal de escáner de fichas técnicas de equipos con IA
+│       │   ├── ShareProposalModal.tsx       # Modal de compartir propuesta web interactiva y QR
+│       │   ├── ImportConflictModal.tsx      # Modal de resolución de conflictos de importación
+│       │   ├── NewProjectModal.tsx          # Modal de creación rápida de proyectos
+│       │   └── UpdateModal.tsx              # Modal de actualización de versión de escritorio
+│       ├── simulator/                       # 🎛️ VISTA DEL SIMULADOR INTERACTIVO
 │       │   ├── SimulatorView.tsx            # Orquestador conciso y limpio (<150 líneas)
-│       │   ├── sidebar/                     # 📂 Barra Lateral de Parámetros
+│       │   ├── sidebar/                     # Barra Lateral de Parámetros
 │       │   │   ├── ParameterSidebar.tsx     # Contenedor con drawer redimensionable, acordeones y temas
 │       │   │   ├── ClientParamsSection.tsx  # Sección 1: Cliente, Provincia, GPS NASA SSE
 │       │   │   ├── RatesParamsSection.tsx   # Sección 2: Tarifas, Distribuidora, Inyección Cero, SIE-007
-│       │   │   ├── EquipmentParamsSection.tsx# Sección 3: Paneles, Inversores, Baterías y Avanzados
+│       │   │   ├── EquipmentParamsSection.tsx# Sección 3: Paneles, Inversores, Baterías y Pérdidas del Sistema
 │       │   │   ├── PricingParamsSection.tsx # Sección 4: Precio Directo, Destino Excedente y Margen
-│       │   │   └── FinancialsParamsSection.tsx# Sección 5: Financiamiento, ITBIS 100% y Ley 57-07 40%
-│       │   └── tabs/                        # 📂 Pestañas de Análisis y Resultados
+│       │   │   ├── FinancialsParamsSection.tsx# Sección 5: Financiamiento, ITBIS 100% y Ley 57-07 40%
+│       │   │   └── SearchableEquipmentSelect.tsx # Combobox inteligente con búsqueda en tiempo real
+│       │   └── tabs/                        # Pestañas de Análisis y Resultados
 │       │       ├── EnergyAnalysisTab.tsx    # Pestaña 1: Métricas de Energía, Gráfico y Factura IA
 │       │       ├── QuotationEquipmentsTab.tsx# Pestaña 2: Cotización, Equipos y Matriz con Selector USD/DOP
 │       │       └── FinancialReturnTab.tsx   # Pestaña 3: KPIs VAN, TIR, Payback y Flujo 25 Años
-│       └── pdf/                             # 📄 VISTA Y GENERADOR DE PROPUESTAS PDF
+│       └── pdf/                             # 📄 VISTA Y GENERADOR DE PROPUESTAS PDF (A4)
 │           ├── PDFProposalView.tsx          # Visor de propuesta con modo edición in-situ y exportación
 │           ├── PDFHeaderBanner.tsx          # Cabecera estándar de hojas interiores (76px)
 │           ├── PDFFooter.tsx                # Pie de página estándar (42px, centrado, sin truncate)
@@ -88,28 +137,12 @@ solarsim/
 │           ├── controls/
 │           │   ├── PDFSidebarControls.tsx   # Panel de control de páginas, temas y personalización
 │           │   └── PDFCustomizationModal.tsx# Modal "Modo Edición" (logos, marcas de agua, anexos)
-│           └── pages/                       # 📑 PLANTILLAS DE HOJAS INDIVIDUALES (A4 Con Edición In-Situ)
-│               ├── PDFCoverPage.tsx         # Hoja 1: Portada ejecutiva con diseño geométrico
-│               ├── PDFTableOfContents.tsx   # Hoja 2: Índice de contenido dinámico con badges
-│               ├── PDFAboutUsPage.tsx       # Hoja 3: 1. ¿Quiénes Somos? & Servicios Principales
-│               ├── PDFSolarBenefitsPage.tsx # Hoja 4: 2. Beneficios Solares & Ley 57-07
-│               ├── PDFTechnicalIntroPage.tsx# Hoja 5: 3. ¿Qué es un Sistema FV? & Diagrama de Flujo
-│               ├── PDFProjectDescriptionPage.tsx # Hoja 6: 4. Descripción del Proyecto & Normativa SIE
-│               ├── PDFPage1Energy.tsx       # Hoja 7: 5. Análisis de Energía y Balance
-│               ├── PDFPage2Quotation.tsx    # Hoja 8: 6. Cotización y Presupuesto
-│               ├── PDFPage3ROI.tsx          # Hoja 9: 7. Retorno de Inversión (ROI & TIR)
-│               ├── PDFPage4CashFlow.tsx     # Hoja 10: 8. Flujo de Caja a 25 Años
-│               └── PDFPage5CostMatrix.tsx   # Hoja 11: 9. Matriz de Costos Interna (Confidencial)
+│           └── pages/                       # Plantillas de hojas individuales A4 (1 a 11)
 ├── release/                                 # Binarios generados (.exe, .AppImage, .pacman, .deb)
-├── infra/                                   # 🖥️ INFRAESTRUCTURA & SERVIDORES (Docker, Caddy, Postgres)
-│   └── INFRASTRUCTURE.md                    # Mapa maestro de red, host Proxmox, CT 100 y servicios
-├── docs/                                    # Documentación técnica y especificaciones
-│   ├── CLOUDFLARE_WORKER_GUIDE.md           # Guía de despliegue de Cloudflare Workers & KV
-│   ├── FINANCIAL_ENGINE_SPECIFICATION.md    # Auditoría matemática de fórmulas
-│   └── MAINTENANCE_AND_UPDATES.md           # Guía de actualizaciones y dependencias
-└── .agents/rules/                           # 🛡️ REGLAS DEL WORKSPACE
-    ├── html2canvas_pdf_export_rules.md      # Reglas críticas para exportación a PDF
-    └── server_deployment_rules.md           # Protocolo de despliegue y reglas en app-server
+└── docs/                                    # Documentación técnica y especificaciones
+    ├── CLOUDFLARE_WORKER_GUIDE.md           # Guía de despliegue de Cloudflare Workers & KV
+    ├── FINANCIAL_ENGINE_SPECIFICATION.md    # Auditoría matemática de fórmulas
+    └── MAINTENANCE_AND_UPDATES.md           # Guía de actualizaciones y dependencias
 ```
 
 ---
@@ -130,11 +163,26 @@ npm run lint
 # Validar matemáticas del motor financiero contra benchmarks
 npx tsx src/engine/testBenchmark.ts
 
+# Suite integral de 9 pruebas unitarias financieras
+npx tsx src/engine/testFinancialEngineComprehensive.ts
+
 # Compilar frontend y electron para producción
 npm run build && npm run build:electron
 
 # Generar snapshot de contexto empaquetado del repositorio para asistentes IA (Repomix)
 npm run context:pack
+```
+
+### Comandos de Servidor & Backend (`solarsim-api`):
+```bash
+# Comprobar estado de servicios en app-server
+ssh app-server "docker ps"
+
+# Ver logs de la API de sincronización
+ssh app-server "cd /home/agente/servicios/solarsim-api && docker compose logs --tail=50 -f"
+
+# Desplegar / actualizar solarsim-api
+ssh app-server "cd /home/agente/servicios/solarsim-api && docker compose up -d --build"
 ```
 
 ### Herramientas de Control de Versiones y Repositorio:
@@ -143,13 +191,8 @@ npm run context:pack
   - `beta`: **Rama de Desarrollo Activo / Nuevas Funciones**. Aquí se implementan todas las nuevas características, mejoras visuales y refactorizaciones antes de ser publicadas en producción.
 * **Git**:
   - `git status` / `git diff`: Inspección de cambios.
-  - `git add . && git commit -m "tipo(alcance): Mensaje descriptivo"`: Confirmación de cambios estructurados (siguiendo Conventional Commits: `fix`, `feat`, `docs`, `refactor`).
+  - `git add . && git commit -m "tipo(alcance): Mensaje descriptivo"`: Conventional Commits (`fix`, `feat`, `docs`, `refactor`).
   - `git push origin beta` o `git push origin main`: Envío a la rama correspondiente.
-* **GitHub CLI (`gh`)**:
-  - Para crear y publicar releases con binarios adjuntos:
-    ```bash
-    gh release create v1.X.X release/* --title "SolarSim Pro v1.X.X - Título" --notes-file release/release-notes-v1.X.X.md
-    ```
 
 ---
 
@@ -164,164 +207,41 @@ npm run context:pack
 
 ---
 
-### A. Desarrollo de Nuevas Funciones (En rama `beta`):
-1. Todo nuevo desarrollo se realiza en `beta`:
-   ```bash
-   git checkout beta && git pull origin beta
-   ```
-2. Desarrollar la funcionalidad y validar el Ciclo de Verificación:
-   ```bash
-   npm run lint && npx tsx src/engine/testBenchmark.ts && npm run build
-   ```
-3. Confirmar cambios con commits semánticos y subir:
-   ```bash
-   git add . && git commit -m "feat(modulo): Descripción de la nueva función"
-   git push origin beta
-   ```
+## 5. ⚠️ Invariantes Críticas y Reglas Inquebrantables
 
-### B. Parches Críticos / Hotfixes en Producción (En rama `main`):
-1. Si surge un bug urgente en producción, cambiar a `main`:
-   ```bash
-   git checkout main && git pull origin main
-   ```
-2. Aplicar la corrección y validar con el Ciclo de Verificación.
-3. Crear el release de parche (ej. `v1.3.10`) siguiendo el protocolo de la Sección 5.
-4. **Sincronizar hacia `beta`** inmediatamente para que desarrollo no pierda el arreglo:
-   ```bash
-   git checkout beta
-   git merge main
-   git push origin beta
-   ```
+### 🧠 Arquitectura de Estado Modular (Zustand Slices):
+1. **Separación Estricta de Slices**:
+   - Cada slice (`projectSlice`, `equipmentSlice`, `syncAuthSlice`, `importExportSlice`, `aiSlice`, `uiSlice`) maneja su propio dominio de estado.
+   - El store raíz `useSimulationStore.ts` solo debe combinar los slices y configurar la persistencia/rehidratación en `localStorage`.
+2. **Cero Cambios Rompientes en la API del Store**:
+   - Todos los tipos y helpers exportados originalmente (`NewProjectPayload`, `generateNextProjectSequence`, `findDuplicateProjectInfo`) deben mantenerse exportados desde `useSimulationStore.ts`.
 
-### C. Fusión / Merge de Beta hacia Main (Cierre de Versión):
-Cuando un conjunto de funciones en `beta` esté completamente listo y probado para salir al público:
-1. Validar suite completa en `beta`:
-   ```bash
-   npm run lint && npx tsx src/engine/testBenchmark.ts && npm run build
-   ```
-2. Fusionar `beta` en `main`:
-   ```bash
-   git checkout main
-   git merge beta
-   ```
-3. Ejecutar el **Protocolo de Lanzamiento de Release (Sección 5)** para compilar y publicar la nueva versión mayor/menor (ej. `v1.5.0`).
-4. Sincronizar de vuelta a `beta`:
-   ```bash
-   git checkout beta
-   git merge main
-   git push origin beta
-   ```
-
----
-
-## 5. 🚀 Protocolo Maestro de Lanzamiento de Releases (Release Runbook)
-
-Este es el procedimiento exacto que ejecuto cuando solicitas publicar una actualización (ya sea un hotfix o una nueva versión estable):
-
-### Paso 1: Actualizar la versión en `package.json`
-Modificar `"version"` (ejemplo: `"1.5.0"` o `"1.5.1"`).
-
-### Paso 2: Validación de Tipos y Motores
-```bash
-npm run lint                                            # tsc --noEmit (Cero errores)
-npx tsx src/engine/testBenchmark.ts                     # Validación matemática de Ley 57-07, VAN, TIR, Payback
-npx tsx src/engine/testFinancialEngineComprehensive.ts  # Suite integral de 9 pruebas unitarias
-```
-
-### Paso 3: Compilación del Frontend y Runtime de Electron
-```bash
-npm run build && npm run build:electron
-```
-
-### Paso 4: Empaquetar Binarios para Windows y Linux
-```bash
-npx electron-builder --win --linux
-```
-*(Genera `.exe`, `.AppImage`, `.pacman`, `.deb`, `.tar.gz`, `latest.yml` y `latest-linux.yml` en la carpeta `release/`).*
-
-### Paso 5: Preparación de Nombres y Firmas Criptográficas GPG (Linux)
-```bash
-python3 -c "
-import shutil, os, subprocess
-
-v = '1.5.0' # Versión a lanzar
-
-# Copias de compatibilidad para electron-updater
-shutil.copyfile(f'release/SolarSim Pro Setup {v}.exe', f'release/SolarSim-Pro-Setup-{v}.exe')
-shutil.copyfile(f'release/SolarSim Pro Setup {v}.exe.blockmap', f'release/SolarSim-Pro-Setup-{v}.exe.blockmap')
-shutil.copyfile(f'release/SolarSim Pro {v}.exe', f'release/SolarSim-Pro-{v}.exe')
-shutil.copyfile(f'release/SolarSim Pro-{v}.AppImage', f'release/SolarSim-Pro-{v}.AppImage')
-
-# Exportar clave pública GPG
-subprocess.run(['gpg', '--armor', '--export', 'C22D550C3A2C8FAF'], stdout=open('release/solarsim-public-key.asc', 'w'), check=True)
-
-# Firmar paquetes de Linux
-for target in [f'release/solarsim-pro-{v}.pacman', f'release/solarsim-pro-{v}.tar.gz', f'release/SolarSim-Pro-{v}.AppImage']:
-    sig = target + '.sig'
-    if os.path.exists(sig):
-        os.remove(sig)
-    subprocess.run(['gpg', '--detach-sign', '--yes', target], check=True)
-"
-```
-
-### Paso 6: Crear Notas de la Versión
-Crear el archivo `release/release-notes-v1.5.0.md` detallando las novedades y mejoras.
-
-### Paso 7: Commit, Tag y Push a GitHub
-```bash
-git add .
-git commit -m "chore(release): Bump version to 1.5.0 and generate binaries"
-git tag v1.5.0
-git push origin main --tags
-```
-
-### Paso 8: Publicar la Release Oficial en GitHub vía CLI (`gh`)
-```bash
-gh release create v1.5.0 release/SolarSim* release/solarsim* release/latest* \
-  --title "⚡ SolarSim Pro v1.5.0" \
-  --notes-file release/release-notes-v1.5.0.md
-```
-
----
-
-## 6. ⚠️ Invariantes Críticas y Reglas Inquebrantables
+### 🔋 Catálogo de Equipos y Baterías BESS:
+1. **Modelos Verificados Oficiales**:
+   - El catálogo base (`src/data/defaultEquipmentCatalog.ts`) solo debe contener equipos con especificaciones técnicas verificadas mediante fichas técnicas oficiales (Canadian Solar TOPBiHiKu6, LuxpowerTek LXP-LB-US, HinaESS PowerGem Max).
+2. **Extracción Multimodal con IA**:
+   - Los datos extraídos de datasheets deben normalizar automáticamente unidades (ej. $\text{W}$ para paneles, $\text{kW}$ para inversores, $\text{kWh}$ y $\text{Ah}$ para baterías).
 
 ### 🖥️ Arquitectura y Seguridad en Electron (Aislamiento de Procesos):
 1. **Aislamiento Estricto del Renderizador (`src/`)**:
    - El código en `src/` corre en el contexto de Chromium y **NUNCA** debe importar módulos nativos de Node.js (`fs`, `path`, `child_process`, `os`, etc.).
 2. **Puente Seguro IPC**:
-   - Toda comunicación entre la interfaz (React) y las capacidades del sistema operativo (guardar archivos, auto-actualizaciones, diálogos nativos) debe realizarse **exclusivamente** a través de la API segura expuesta en `electron/preload.ts` (`window.electronAPI`) y manejada en `electron/main.ts` con `ipcMain.handle`.
+   - Toda comunicación entre la interfaz (React) y las capacidades del sistema operativo debe realizarse a través de la API en `electron/preload.ts` (`window.electronAPI`) y manejada en `electron/main.ts`.
 
 ### 🧠 Integridad del Motor Financiero y Solar:
 1. **Contrato de Fórmulas Oficiales**:
-   - Antes de modificar o refactorizar cálculos solares o financieros, es obligatorio consultar `docs/FINANCIAL_ENGINE_SPECIFICATION.md`.
+   - Antes de modificar cálculos solares o financieros, es obligatorio consultar `docs/FINANCIAL_ENGINE_SPECIFICATION.md`.
 2. **Inversión Neta y Deducción Ley 57-07**:
    $$\text{netInvestmentUSD} = \text{grossInvestmentUSD} - \text{itbisSavedUSD} - \text{ley5707CreditUSD}$$
    - **Base Estricta de Equipos**: El crédito fiscal del 40% para el ISR aplica **exclusivamente sobre equipos fotovoltaicos y de almacenamiento** (paneles, inversores y baterías), deduciendo la mano de obra del cálculo.
 3. **Amortización Fiscal Ley 57-07**:
    - El crédito fiscal del 40% se divide estrictamente en 3 cuotas anuales iguales (Años 1, 2 y 3: $13.33\%$ anual).
-4. **Parámetros Estándar Auditados**:
-   - Degradación de paneles: 0.5% anual.
-   - Aumento tarifario eléctrico: 4.0% anual.
-   - Costo O&M: 1.0% anual de la inversión inicial con inflación del 3.0%.
-   - Provisión de reemplazo de baterías: Año 10 (50% del costo inicial de baterías).
 
 ### 📄 Exportación a PDF con `html2canvas` & `jsPDF`:
-1. **Reglas del Workspace**: Consultar `.agents/rules/html2canvas_pdf_export_rules.md` antes de crear o editar hojas del PDF.
-2. **NUNCA usar `truncate` o `overflow: hidden` en etiquetas de texto**:
-   - `html2canvas` recorta los trazos inferiores (*descenders*) de letras como 'p', 'g', 'q', 'y' cuando hay `overflow: hidden` en un elemento de texto. Usar `whitespace-nowrap font-bold` sin truncate.
-3. **Dimensionamiento de Imágenes**:
-   - `html2canvas` ignora `object-fit: contain/cover` en `<img>` si se coloca `w-full h-full`. Usar siempre dimensionamiento intrínseco auto-proporcional: `className="max-h-[Xpx] max-w-[Y%] w-auto h-auto mx-auto block object-contain"`.
-4. **Presupuesto de Altura A4 ($850\text{px} \times 1202\text{px}$)**:
-   - Header: 76px. Footer: 42px (`items-center`).
-   - Cuerpo de la página: `<div className="px-10 pt-3 pb-3 flex-1 flex flex-col justify-between min-h-0">`.
-   - **Prohibido `pb-14`**: Cualquier padding inferior grande empuja el footer por debajo de los 1,202px causando que se corte.
-5. **Sandbox de Captura**:
-   - En `PDFProposalView.tsx`, el sandbox debe tener `position: fixed; zIndex: -9999; pointerEvents: none; background: #ffffff;` para evitar parpadeos visuales al exportar.
-
-### 📦 Sistema de Empaquetado de Contexto (Repomix):
-- La configuración reside en `repomix.config.json`.
-- El comando `npm run context:pack` empaqueta toda la arquitectura de código y documentación en un snapshot XML optimizado (`repomix-output.xml`) excluyendo binarios, imágenes y dependencias pesadas.
+1. **Reglas del Workspace**: Consultar `.agents/rules/html2canvas_pdf_export_rules.md`.
+2. **NUNCA usar `truncate` o `overflow: hidden` en etiquetas de texto**.
+3. **Dimensionamiento de Imágenes**: Usar `className="max-h-[Xpx] max-w-[Y%] w-auto h-auto mx-auto block object-contain"`.
+4. **Presupuesto de Altura A4 ($850\text{px} \times 1202\text{px}$)**: Header: 76px. Footer: 42px. Prohibido `pb-14`.
 
 ---
 *Este documento garantiza continuidad total de desarrollo, gobernanza y consistencia técnica en cualquier sesión futura.*
