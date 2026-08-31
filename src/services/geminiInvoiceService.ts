@@ -1,4 +1,5 @@
 import { ExtractedInvoiceData, GeminiModelInfo } from '../types/aiInvoice';
+import { calculateRecommendedPanelCount } from '../engine/solarEngine';
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -393,14 +394,22 @@ export async function parseInvoiceWithGemini(params: {
   const totalAnnual = monthlyConsumption.reduce((sum, v) => sum + v, 0);
   const avgMonthly = Math.round(totalAnnual / 12);
 
-  // Solar Dimensioning Suggestion (Dominican average ~4.8 HSP and 80% Performance Ratio -> ~1,400 kWh/year per kWp)
-  // Target coverage: 95%
-  const targetCoverage = 0.95;
-  const targetAnnualSolarKWh = totalAnnual * targetCoverage;
-  const specificYieldKWhPerKWp = 1450; // Dominican Republic average annual yield
-  const recommendedCapacityKWp = Math.round((targetAnnualSolarKWh / specificYieldKWhPerKWp) * 100) / 100;
+  // Solar Dimensioning Suggestion based on local radiation, target coverage (95%), and default system losses (25%)
+  const cleanProvince = parsed.province || 'Santo Domingo / Distrito Nacional';
+  const targetCoverage = 95;
+  const defaultLosses = 25.0;
   const panelWatts = panelPowerW > 0 ? panelPowerW : 620;
-  const recommendedPanelCount = Math.max(1, Math.ceil((recommendedCapacityKWp * 1000) / panelWatts));
+
+  const rec = calculateRecommendedPanelCount(
+    cleanProvince,
+    monthlyConsumption,
+    panelWatts,
+    targetCoverage,
+    defaultLosses
+  );
+
+  const recommendedCapacityKWp = rec.recommendedCapacityKWp;
+  const recommendedPanelCount = rec.recommendedPanelCount;
 
   const result: ExtractedInvoiceData = {
     clientName: cleanName,

@@ -12,6 +12,57 @@ export function calculateDCCapacityKWp(panelPowerW: number, panelCount: number):
 }
 
 /**
+ * Calculates the exact recommended panel count and DC capacity required
+ * to achieve the target coverage percentage based on annual consumption,
+ * location solar irradiation (HSP), panel wattage, and system losses.
+ */
+export function calculateRecommendedPanelCount(
+  provinceName: string,
+  monthlyConsumptionKWh: number[],
+  panelPowerW: number,
+  targetCoveragePct: number = 95,
+  systemLossesPct: number = 25.0,
+  customMonthlyHSP?: number[]
+): {
+  recommendedPanelCount: number;
+  recommendedCapacityKWp: number;
+  annualSpecificYieldKWhPerKWp: number;
+  targetAnnualKWh: number;
+} {
+  const province = getProvinceHSP(provinceName);
+  const derateFactor = 1 - (systemLossesPct / 100);
+
+  let annualSpecificYield = 0;
+  for (let i = 0; i < 12; i++) {
+    const hsp = (customMonthlyHSP && customMonthlyHSP.length === 12 && customMonthlyHSP[i] > 0)
+      ? customMonthlyHSP[i]
+      : province.monthlyHSP[i];
+    const days = DAYS_IN_MONTH[i];
+    annualSpecificYield += 1.0 * hsp * days * derateFactor;
+  }
+
+  if (annualSpecificYield <= 0) {
+    annualSpecificYield = 1368.75; // Fallback ~5.0 HSP * 365 * 0.75
+  }
+
+  const totalAnnualConsumption = monthlyConsumptionKWh.reduce((sum, v) => sum + (Number(v) || 0), 0);
+  const safeCoverage = Math.max(1, targetCoveragePct) / 100;
+  const targetAnnualKWh = totalAnnualConsumption * safeCoverage;
+
+  const requiredCapacityKWp = targetAnnualKWh / annualSpecificYield;
+  const safePanelWatts = panelPowerW > 0 ? panelPowerW : 620;
+  const recommendedPanelCount = Math.max(1, Math.ceil((requiredCapacityKWp * 1000) / safePanelWatts));
+  const recommendedCapacityKWp = Math.round(((recommendedPanelCount * safePanelWatts) / 1000) * 100) / 100;
+
+  return {
+    recommendedPanelCount,
+    recommendedCapacityKWp,
+    annualSpecificYieldKWhPerKWp: Math.round(annualSpecificYield * 10) / 10,
+    targetAnnualKWh: Math.round(targetAnnualKWh * 10) / 10,
+  };
+}
+
+/**
  * Calculates monthly solar production and energy balance dynamically using location-specific solar radiation.
  */
 export function calculateMonthlySolarProduction(
@@ -27,8 +78,8 @@ export function calculateMonthlySolarProduction(
   const dcCapacityKWp = calculateDCCapacityKWp(specs.panelPowerW, specs.panelCount);
   const province = getProvinceHSP(provinceName);
 
-  // Losses factor: total efficiency percentage (e.g. 14% losses -> 0.86 efficiency factor)
-  const systemLossesPct = specs.isDetailed ? specs.systemLosses : 14.0;
+  // Losses factor: total efficiency percentage (default: 25.0% losses -> 0.75 derate factor)
+  const systemLossesPct = specs.systemLosses !== undefined ? specs.systemLosses : (specs.isDetailed ? 14.0 : 25.0);
   const derateFactor = 1 - (systemLossesPct / 100);
 
   // SIE-007-2026-REG / Net Metering Regulations:

@@ -50,7 +50,7 @@ export interface SystemSpecs {
   // Detailed params
   panelEfficiency: number;      // % e.g. 21.8
   tempCoeff: number;            // %/°C e.g. -0.35
-  systemLosses: number;         // % e.g. 14
+  systemLosses: number;         // % e.g. 25.0
   annualDegradation: number;    // % e.g. 0.5
   batteryDOD: number;           // % e.g. 80
   batteryEfficiencyPct?: number;       // % e.g. 92

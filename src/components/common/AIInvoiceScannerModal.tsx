@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { parseInvoiceWithGemini } from '../../services/geminiInvoiceService';
+import { calculateRecommendedPanelCount } from '../../engine/solarEngine';
 import { ExtractedInvoiceData } from '../../types/aiInvoice';
 import {
   X,
@@ -175,19 +176,25 @@ export const AIInvoiceScannerModal: React.FC = () => {
     const newTotal = newArr.reduce((s, v) => s + v, 0);
     const newAvg = Math.round(newTotal / 12);
     
-    // Recalculate suggested panels
+    // Recalculate suggested panels using location, target coverage and 25% losses
     const panelWatts = activeProject?.specs?.panelPowerW || 620;
-    const targetKWh = newTotal * 0.95;
-    const capKWp = Math.round((targetKWh / 1450) * 100) / 100;
-    const panelCount = Math.max(1, Math.ceil((capKWp * 1000) / panelWatts));
+    const targetCov = activeProject?.rates?.targetCoveragePct ?? 95;
+    const sysLosses = activeProject?.specs?.systemLosses ?? 25.0;
+    const rec = calculateRecommendedPanelCount(
+      extractedData.province || activeProject?.client?.province || 'Santo Domingo / Distrito Nacional',
+      newArr,
+      panelWatts,
+      targetCov,
+      sysLosses
+    );
 
     setExtractedData({
       ...extractedData,
       monthlyConsumptionKWh: newArr,
       annualConsumptionKWh: newTotal,
       averageMonthlyKWh: newAvg,
-      recommendedCapacityKWp: capKWp,
-      recommendedPanelCount: panelCount,
+      recommendedCapacityKWp: rec.recommendedCapacityKWp,
+      recommendedPanelCount: rec.recommendedPanelCount,
     });
   };
 

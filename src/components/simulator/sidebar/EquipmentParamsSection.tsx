@@ -122,19 +122,26 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
 
           {/* Toggle Auto-Calcular Paneles */}
           <div
-            className={`flex items-center justify-between p-2.5 rounded-lg border ${
+            className={`p-2.5 rounded-lg border space-y-1 ${
               isDark ? 'bg-emerald-950/40 border-emerald-800/60' : 'bg-emerald-50/60 border-emerald-200/80'
             }`}
           >
-            <span className={`text-xs font-semibold ${isDark ? 'text-emerald-300' : 'text-emerald-950'}`}>
-              Auto-Calcular Paneles
-            </span>
-            <input
-              type="checkbox"
-              checked={!!project.specs.autoCalculatePanels}
-              onChange={(e) => updateSpecs({ autoCalculatePanels: e.target.checked })}
-              className="rounded text-emerald-700 focus:ring-emerald-600 cursor-pointer"
-            />
+            <div className="flex items-center justify-between">
+              <span className={`text-xs font-semibold ${isDark ? 'text-emerald-300' : 'text-emerald-950'}`}>
+                Auto-Calcular Paneles
+              </span>
+              <input
+                type="checkbox"
+                checked={!!project.specs.autoCalculatePanels}
+                onChange={(e) => updateSpecs({ autoCalculatePanels: e.target.checked })}
+                className="rounded text-emerald-700 focus:ring-emerald-600 cursor-pointer h-4 w-4"
+              />
+            </div>
+            {project.specs.autoCalculatePanels && (
+              <p className={`text-[10px] leading-tight ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                Calculando automáticamente para cubrir el {project.rates.targetCoveragePct ?? 95}% del consumo (considerando {project.specs.systemLosses ?? 25}% de pérdidas).
+              </p>
+            )}
           </div>
 
           <div>
@@ -258,7 +265,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                   <input
                     type="number"
                     step="0.5"
-                    value={project.specs.systemLosses}
+                    value={project.specs.systemLosses !== undefined ? project.specs.systemLosses : 25}
                     onChange={(e) => updateSpecs({ systemLosses: parseFloat(e.target.value) || 0 })}
                     className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
                       isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'

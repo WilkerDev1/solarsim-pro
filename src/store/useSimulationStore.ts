@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { ProjectSimulation, ClientInfo, SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, UpdateInfo, DocumentCustomization, ExtractedInvoiceData, SyncSettings, UserProfile, UserRole } from '../types';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateFinancialSummary, calculateCostMatrixSummary } from '../engine/financeEngine';
+import { calculateRecommendedPanelCount } from '../engine/solarEngine';
 import { SyncService } from '../services/syncService';
 
 export interface NewProjectPayload {
@@ -501,10 +502,27 @@ export const useSimulationStore = create<SimulationState>()(
         set((state) => {
           const projects = state.projects.map((p) => {
             if (p.id === state.activeProjectId) {
+              const updatedClient = { ...p.client, ...clientPartial };
+              let updatedSpecs = { ...p.specs };
+
+              // If province or customMonthlyHSP changed and autoCalculatePanels is active, auto-calculate panelCount
+              if (updatedSpecs.autoCalculatePanels && (clientPartial.province !== undefined || clientPartial.customMonthlyHSP !== undefined)) {
+                const rec = calculateRecommendedPanelCount(
+                  updatedClient.province,
+                  p.monthlyConsumption,
+                  updatedSpecs.panelPowerW,
+                  p.rates.targetCoveragePct ?? 95,
+                  updatedSpecs.systemLosses ?? 25.0,
+                  updatedClient.customMonthlyHSP
+                );
+                updatedSpecs.panelCount = rec.recommendedPanelCount;
+              }
+
               return {
                 ...p,
                 updatedAt: new Date().toISOString(),
-                client: { ...p.client, ...clientPartial },
+                client: updatedClient,
+                specs: updatedSpecs,
               };
             }
             return p;
@@ -517,7 +535,20 @@ export const useSimulationStore = create<SimulationState>()(
         set((state) => {
           const projects = state.projects.map((p) => {
             if (p.id === state.activeProjectId) {
-              const updatedSpecs = { ...p.specs, ...specsPartial };
+              let updatedSpecs = { ...p.specs, ...specsPartial };
+
+              // If autoCalculatePanels is enabled (or just toggled on) and panelCount was not manually typed in this update
+              if (updatedSpecs.autoCalculatePanels && specsPartial.panelCount === undefined) {
+                const rec = calculateRecommendedPanelCount(
+                  p.client.province,
+                  p.monthlyConsumption,
+                  updatedSpecs.panelPowerW,
+                  p.rates.targetCoveragePct ?? 95,
+                  updatedSpecs.systemLosses ?? 25.0,
+                  p.client.customMonthlyHSP
+                );
+                updatedSpecs.panelCount = rec.recommendedPanelCount;
+              }
 
               // Sync pricePerWattUSD and pricePerKWpUSD bidirectionally
               let updatedFinancials = { ...p.financials };
@@ -543,7 +574,8 @@ export const useSimulationStore = create<SimulationState>()(
                 specsPartial.batteryUnitPriceUSD !== undefined ||
                 specsPartial.installationUnitPriceUSD !== undefined ||
                 specsPartial.saleMarginMultiplier !== undefined ||
-                specsPartial.dopExchangeRate !== undefined
+                specsPartial.dopExchangeRate !== undefined ||
+                specsPartial.autoCalculatePanels !== undefined
               ) {
                 delete updatedFinancials.customCostUSD;
                 delete updatedFinancials.customLey5707CreditUSD;
@@ -579,10 +611,27 @@ export const useSimulationStore = create<SimulationState>()(
         set((state) => {
           const projects = state.projects.map((p) => {
             if (p.id === state.activeProjectId) {
+              const updatedRates = { ...p.rates, ...ratesPartial };
+              let updatedSpecs = { ...p.specs };
+
+              // If targetCoveragePct changed and autoCalculatePanels is on, recalculate panelCount
+              if (updatedSpecs.autoCalculatePanels) {
+                const rec = calculateRecommendedPanelCount(
+                  p.client.province,
+                  p.monthlyConsumption,
+                  updatedSpecs.panelPowerW,
+                  updatedRates.targetCoveragePct ?? 95,
+                  updatedSpecs.systemLosses ?? 25.0,
+                  p.client.customMonthlyHSP
+                );
+                updatedSpecs.panelCount = rec.recommendedPanelCount;
+              }
+
               return {
                 ...p,
                 updatedAt: new Date().toISOString(),
-                rates: { ...p.rates, ...ratesPartial },
+                rates: updatedRates,
+                specs: updatedSpecs,
               };
             }
             return p;
@@ -619,10 +668,25 @@ export const useSimulationStore = create<SimulationState>()(
             if (p.id === state.activeProjectId) {
               const newCons = [...p.monthlyConsumption];
               newCons[index] = Math.max(0, value);
+              let updatedSpecs = { ...p.specs };
+
+              if (updatedSpecs.autoCalculatePanels) {
+                const rec = calculateRecommendedPanelCount(
+                  p.client.province,
+                  newCons,
+                  updatedSpecs.panelPowerW,
+                  p.rates.targetCoveragePct ?? 95,
+                  updatedSpecs.systemLosses ?? 25.0,
+                  p.client.customMonthlyHSP
+                );
+                updatedSpecs.panelCount = rec.recommendedPanelCount;
+              }
+
               return {
                 ...p,
                 updatedAt: new Date().toISOString(),
                 monthlyConsumption: newCons,
+                specs: updatedSpecs,
               };
             }
             return p;
@@ -634,12 +698,28 @@ export const useSimulationStore = create<SimulationState>()(
       updateAllMonthlyConsumption: (value) => {
         set((state) => {
           const safeVal = Math.max(0, value);
+          const newCons = Array(12).fill(safeVal);
           const projects = state.projects.map((p) => {
             if (p.id === state.activeProjectId) {
+              let updatedSpecs = { ...p.specs };
+
+              if (updatedSpecs.autoCalculatePanels) {
+                const rec = calculateRecommendedPanelCount(
+                  p.client.province,
+                  newCons,
+                  updatedSpecs.panelPowerW,
+                  p.rates.targetCoveragePct ?? 95,
+                  updatedSpecs.systemLosses ?? 25.0,
+                  p.client.customMonthlyHSP
+                );
+                updatedSpecs.panelCount = rec.recommendedPanelCount;
+              }
+
               return {
                 ...p,
                 updatedAt: new Date().toISOString(),
-                monthlyConsumption: Array(12).fill(safeVal),
+                monthlyConsumption: newCons,
+                specs: updatedSpecs,
               };
             }
             return p;
@@ -697,7 +777,16 @@ export const useSimulationStore = create<SimulationState>()(
           if (createNewProject) {
             targetProjectId = `proj-${Date.now()}`;
             const panelW = BENCHMARK_PROJECT.specs.panelPowerW || 620;
-            const count = data.recommendedPanelCount || Math.max(1, Math.ceil(((data.recommendedCapacityKWp || 10) * 1000) / panelW));
+            const targetCov = 95;
+            const sysLosses = 25.0;
+            const rec = calculateRecommendedPanelCount(
+              resolvedProvince,
+              data.monthlyConsumptionKWh && data.monthlyConsumptionKWh.length === 12 ? data.monthlyConsumptionKWh : BENCHMARK_PROJECT.monthlyConsumption,
+              panelW,
+              targetCov,
+              sysLosses
+            );
+            const count = data.recommendedPanelCount || rec.recommendedPanelCount;
             const seq = generateNextProjectSequence(projects);
             
             const newProj: ProjectSimulation = {
@@ -724,9 +813,12 @@ export const useSimulationStore = create<SimulationState>()(
               specs: {
                 ...BENCHMARK_PROJECT.specs,
                 panelCount: count,
+                systemLosses: 25.0,
+                autoCalculatePanels: false,
               },
               rates: {
                 ...BENCHMARK_PROJECT.rates,
+                targetCoveragePct: 95,
                 distributor: data.distributor,
                 tariffCode: data.tariffCode,
                 ...(data.energyCostPerKWhDOP ? { energyCostPerKWh: Math.round((data.energyCostPerKWhDOP / 60) * 100) / 100 } : {}),
@@ -750,7 +842,17 @@ export const useSimulationStore = create<SimulationState>()(
           projects = projects.map((p) => {
             if (p.id === targetProjectId) {
               const panelW = p.specs.panelPowerW || 620;
-              const count = data.recommendedPanelCount || Math.max(1, Math.ceil(((data.recommendedCapacityKWp || 10) * 1000) / panelW));
+              const targetCov = p.rates.targetCoveragePct ?? 95;
+              const sysLosses = p.specs.systemLosses ?? 25.0;
+              const rec = calculateRecommendedPanelCount(
+                resolvedProvince,
+                data.monthlyConsumptionKWh && data.monthlyConsumptionKWh.length === 12 ? data.monthlyConsumptionKWh : p.monthlyConsumption,
+                panelW,
+                targetCov,
+                sysLosses,
+                p.client.customMonthlyHSP
+              );
+              const count = data.recommendedPanelCount || rec.recommendedPanelCount;
               return {
                 ...p,
                 updatedAt: new Date().toISOString(),
@@ -833,8 +935,14 @@ export const useSimulationStore = create<SimulationState>()(
             quoteNumber: seq.quoteNumber,
             quoteValidityDays: 7,
           },
+          specs: {
+            ...BENCHMARK_PROJECT.specs,
+            systemLosses: 25.0,
+            autoCalculatePanels: false,
+          },
           rates: {
             ...BENCHMARK_PROJECT.rates,
+            targetCoveragePct: 95,
             distributor,
             tariffCode,
           },
