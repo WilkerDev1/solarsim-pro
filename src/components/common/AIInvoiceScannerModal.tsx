@@ -41,11 +41,13 @@ export const AIInvoiceScannerModal: React.FC = () => {
     geminiModel,
     applyExtractedInvoice,
     getActiveProject,
+    activeView,
     sidebarTheme,
   } = useSimulationStore();
 
   const isDark = sidebarTheme === 'dark';
   const activeProject = getActiveProject();
+  const isInsideProject = activeView !== 'dashboard' && !!activeProject;
 
   // File state
   const [selectedFile, setSelectedFile] = useState<{
@@ -248,7 +250,9 @@ export const AIInvoiceScannerModal: React.FC = () => {
                 </span>
               </h3>
               <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-300'}`}>
-                Carga tu factura de EDEESTE, EDESUR, EDENORTE o CEPM en PDF o imagen
+                {isInsideProject
+                  ? `Extracción y autocompletado para ${activeProject?.client?.name || 'el proyecto activo'}`
+                  : 'Carga tu factura de EDEESTE, EDESUR, EDENORTE o CEPM en PDF o imagen'}
               </p>
             </div>
           </div>
@@ -925,12 +929,24 @@ export const AIInvoiceScannerModal: React.FC = () => {
                           isDark ? 'bg-[#181822] border-[#2a2a38] text-zinc-300' : 'bg-white border-slate-200 text-slate-700'
                         }`}
                       >
-                        <span className="font-bold block text-emerald-400">¿Qué sucederá al crear el proyecto?</span>
+                        <span className="font-bold block text-emerald-400">
+                          {isInsideProject ? '¿Qué sucederá al aplicar al proyecto?' : '¿Qué sucederá al crear el proyecto?'}
+                        </span>
                         <ul className="space-y-1 text-[11px] list-disc list-inside opacity-90">
-                          <li>Se creará un nuevo proyecto en tu catálogo con el cliente, distribuidora y tarifa detectados.</li>
-                          <li>Se inyectará el historial completo de 12 meses de consumo (kWh) en el simulador.</li>
-                          <li>Se pre-dimensionará la potencia recomendada y la cantidad exacta de paneles Tier-1.</li>
-                          <li>Se generarán automáticamente las 11 páginas de la propuesta técnica y financiera.</li>
+                          {isInsideProject ? (
+                            <>
+                              <li>Se inyectará el historial completo de 12 meses de consumo (kWh) en este proyecto.</li>
+                              <li>Se actualizarán los datos de cliente, distribuidora y tarifa detectados.</li>
+                              <li>Se recalculará automáticamente la producción solar y el ahorro en el simulador.</li>
+                            </>
+                          ) : (
+                            <>
+                              <li>Se creará un nuevo proyecto en tu catálogo con el cliente, distribuidora y tarifa detectados.</li>
+                              <li>Se inyectará el historial completo de 12 meses de consumo (kWh) en el simulador.</li>
+                              <li>Se pre-dimensionará la potencia recomendada y la cantidad exacta de paneles Tier-1.</li>
+                              <li>Se generarán automáticamente las 11 páginas de la propuesta técnica y financiera.</li>
+                            </>
+                          )}
                         </ul>
                       </div>
                     </div>
@@ -953,13 +969,23 @@ export const AIInvoiceScannerModal: React.FC = () => {
                   </button>
 
                   <div className="w-full sm:w-auto flex items-center gap-2">
-                    <button
-                      onClick={handleApplyAsNew}
-                      className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-                    >
-                      <Check className="w-4 h-4" />
-                      <span>Crear Nuevo Proyecto</span>
-                    </button>
+                    {isInsideProject ? (
+                      <button
+                        onClick={handleApplyToActive}
+                        className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                      >
+                        <Check className="w-4 h-4" />
+                        <span>Aplicar al Proyecto</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleApplyAsNew}
+                        className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                      >
+                        <Check className="w-4 h-4" />
+                        <span>Crear Nuevo Proyecto</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
