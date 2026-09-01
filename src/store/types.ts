@@ -25,16 +25,45 @@ export interface NewProjectPayload {
 }
 
 export interface DefaultSimulationSettings {
+  // 1. Proyecto y Cliente
+  defaultProvince: string;
+  defaultDistributor: 'EDEESTE' | 'EDESUR' | 'EDENORTE' | 'CEPM';
+  defaultTariffCode: string;
+  defaultQuoteValidityDays: number;
+
+  // 2. Tarifas y Distribuidora
+  defaultTargetCoveragePct: number;
+  defaultZeroExport: boolean;
+  defaultApplySieRetention: boolean;
+  defaultEstimatedEnergyRateDOP: number;
+  defaultEstimatedExportRateDOP: number;
+
+  // 3. Equipamiento y Sistema
+  defaultPanelPowerW: number;
+  defaultPanelModel: string;
+  defaultInverterPowerKW: number;
+  defaultSystemLosses: number;
+  defaultAnnualDegradation: number;
+  defaultAutoCalculatePanels: boolean;
+  defaultHasBattery: boolean;
+  defaultBatteryCapacityKWh: number;
+  defaultBatteryDOD: number;
+
+  // 4. Costos y Margen de Venta
+  defaultPricingMode: 'direct' | 'matrix';
+  defaultDirectPriceUSDPerWp: number;
+  defaultTargetMarginPct: number;
+  defaultExcessEnergyDestiny: 'net_metering' | 'direct_sale';
+
+  // 5. Finanzas e Incentivos (Ley 57-07)
   currency: 'USD' | 'DOP';
   taxRatePct: number;
   discountRatePct: number;
   applyITBISExemption: boolean;
   applyLey5707: boolean;
-  targetCoveragePct: number;
-  panelPowerW: number;
-  systemLosses: number;
-  annualDegradation: number;
+  ley5707AmortizationYears: number;
   lifespanYears: number;
+  annualEnergyTariffEscalationPct: number;
 }
 
 export interface ProjectSlice {

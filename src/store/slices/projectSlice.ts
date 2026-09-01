@@ -12,16 +12,45 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
   searchQuery: '',
   statusFilter: 'All',
   defaultSimulationSettings: {
+    // 1. Proyecto y Cliente
+    defaultProvince: 'Santo Domingo / Distrito Nacional',
+    defaultDistributor: 'EDEESTE',
+    defaultTariffCode: 'BTS2',
+    defaultQuoteValidityDays: 7,
+
+    // 2. Tarifas y Distribuidora
+    defaultTargetCoveragePct: 95,
+    defaultZeroExport: false,
+    defaultApplySieRetention: true,
+    defaultEstimatedEnergyRateDOP: 10.35,
+    defaultEstimatedExportRateDOP: 5.50,
+
+    // 3. Equipamiento y Sistema
+    defaultPanelPowerW: 620,
+    defaultPanelModel: 'Canadian Solar TOPBiHiKu6 CS6W-620TB-AG (620W)',
+    defaultInverterPowerKW: 8.0,
+    defaultSystemLosses: 25.0,
+    defaultAnnualDegradation: 0.40,
+    defaultAutoCalculatePanels: false,
+    defaultHasBattery: false,
+    defaultBatteryCapacityKWh: 16.08,
+    defaultBatteryDOD: 90,
+
+    // 4. Costos y Margen de Venta
+    defaultPricingMode: 'direct',
+    defaultDirectPriceUSDPerWp: 1.05,
+    defaultTargetMarginPct: 28,
+    defaultExcessEnergyDestiny: 'net_metering',
+
+    // 5. Finanzas e Incentivos (Ley 57-07)
     currency: 'USD',
     taxRatePct: 18,
     discountRatePct: 12,
     applyITBISExemption: true,
     applyLey5707: true,
-    targetCoveragePct: 95,
-    panelPowerW: 620,
-    systemLosses: 25.0,
-    annualDegradation: 0.40,
+    ley5707AmortizationYears: 3,
     lifespanYears: 25,
+    annualEnergyTariffEscalationPct: 3.5,
   },
 
   setActiveView: (view) => set({ activeView: view }),
@@ -37,27 +66,16 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     })),
 
   createNewProject: (payload) => {
+    const defs = get().defaultSimulationSettings;
     const id = `proj-${Date.now()}`;
     const name = typeof payload === 'string' ? payload : (payload?.name || 'Nuevo Proyecto Solar');
     const company = typeof payload === 'object' && payload?.company ? payload.company : 'Cliente Comercial';
-    const province = typeof payload === 'object' && payload?.province ? payload.province : 'Santo Domingo / Distrito Nacional';
-    const distributor = typeof payload === 'object' && payload?.distributor ? payload.distributor : 'EDEESTE';
-    const tariffCode = typeof payload === 'object' && payload?.tariffCode ? payload.tariffCode : 'BTS2';
+    const province = typeof payload === 'object' && payload?.province ? payload.province : (defs?.defaultProvince || 'Santo Domingo / Distrito Nacional');
+    const distributor = typeof payload === 'object' && payload?.distributor ? payload.distributor : (defs?.defaultDistributor || 'EDEESTE');
+    const tariffCode = typeof payload === 'object' && payload?.tariffCode ? payload.tariffCode : (defs?.defaultTariffCode || 'BTS2');
     const address = typeof payload === 'object' && payload?.address ? payload.address : `${province}, República Dominicana`;
     const seq = generateNextProjectSequence(get().projects);
     const currentUser = get().syncSettings?.currentUser;
-    const defs = get().defaultSimulationSettings || {
-      currency: 'USD',
-      taxRatePct: 18,
-      discountRatePct: 12,
-      applyITBISExemption: true,
-      applyLey5707: true,
-      targetCoveragePct: 95,
-      panelPowerW: 620,
-      systemLosses: 25.0,
-      annualDegradation: 0.40,
-      lifespanYears: 25,
-    };
 
     const newProj: ProjectSimulation = {
       ...BENCHMARK_PROJECT,
@@ -83,25 +101,37 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
         tariffCode,
         projectId: seq.projectId,
         quoteNumber: seq.quoteNumber,
-        quoteValidityDays: 7,
+        quoteValidityDays: defs?.defaultQuoteValidityDays || 7,
       },
       specs: {
         ...BENCHMARK_PROJECT.specs,
-        panelPowerW: defs.panelPowerW,
-        systemLosses: defs.systemLosses,
-        autoCalculatePanels: false,
+        panelPowerW: defs?.defaultPanelPowerW || 620,
+        panelBrandModel: defs?.defaultPanelModel || BENCHMARK_PROJECT.specs.panelBrandModel,
+        inverterPowerKW: defs?.defaultInverterPowerKW || 8.0,
+        systemLosses: defs?.defaultSystemLosses !== undefined ? defs.defaultSystemLosses : 25.0,
+        annualDegradation: defs?.defaultAnnualDegradation || 0.40,
+        autoCalculatePanels: defs?.defaultAutoCalculatePanels || false,
+        hasBattery: defs?.defaultHasBattery || false,
+        batteryCapacityKWh: defs?.defaultBatteryCapacityKWh || 16.08,
+        batteryDOD: defs?.defaultBatteryDOD || 90,
       },
       rates: {
         ...BENCHMARK_PROJECT.rates,
-        targetCoveragePct: defs.targetCoveragePct,
+        targetCoveragePct: defs?.defaultTargetCoveragePct || 95,
+        isZeroExport: defs?.defaultZeroExport || false,
+        gridExportFeePct: defs?.defaultApplySieRetention ? 25.0 : 0.0,
         distributor,
         tariffCode,
+        currency: defs?.currency || 'USD',
+        annualEnergyInflationPct: defs?.annualEnergyTariffEscalationPct || 3.5,
       },
       financials: {
         ...BENCHMARK_PROJECT.financials,
-        discountRatePct: defs.discountRatePct,
-        applyITBISExemption: defs.applyITBISExemption,
-        applyLey5707: defs.applyLey5707,
+        pricePerWattUSD: defs?.defaultDirectPriceUSDPerWp || 1.05,
+        discountRatePct: defs?.discountRatePct || 12,
+        applyITBISExemption: defs?.applyITBISExemption !== undefined ? defs.applyITBISExemption : true,
+        applyLey5707: defs?.applyLey5707 !== undefined ? defs.applyLey5707 : true,
+        projectLifespanYears: defs?.lifespanYears || 25,
       },
     };
 

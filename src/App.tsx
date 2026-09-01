@@ -55,10 +55,19 @@ export const App: React.FC = () => {
     };
   }, [syncSettings.authToken, syncSettings.autoSyncEnabled]);
 
+  // 🌓 Sincronización del Modo Oscuro con Tailwind (html.dark)
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDark]);
+
   return (
     <div
       className={`h-screen w-screen flex flex-col overflow-hidden transition-colors duration-200 ${
-        isDark ? 'bg-[#121214] text-zinc-100' : 'bg-slate-100 text-slate-900'
+        isDark ? 'dark bg-[#121214] text-zinc-100' : 'bg-slate-100 text-slate-900'
       }`}
     >
       {/* App Launch Splash Screen */}
