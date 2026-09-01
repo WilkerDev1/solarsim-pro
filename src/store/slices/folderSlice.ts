@@ -62,7 +62,14 @@ export const createFolderSlice: SimulationSlice<FolderSlice> = (set, get) => ({
       if (!targetProject) return state;
 
       const updatedProjects = state.projects.map((p) =>
-        p.id === projectId ? { ...p, folderId: targetFolderId || undefined, updatedAt: new Date().toISOString() } : p
+        p.id === projectId
+          ? {
+              ...p,
+              folderId: targetFolderId || undefined,
+              syncStatus: 'pending' as const,
+              updatedAt: new Date().toISOString(),
+            }
+          : p
       );
 
       const folderName = targetFolderId
@@ -74,6 +81,8 @@ export const createFolderSlice: SimulationSlice<FolderSlice> = (set, get) => ({
         saveFeedbackMessage: `Proyecto movido a "${folderName}"`,
       };
     });
+
+    get().triggerAutoSync(false);
 
     setTimeout(() => {
       set({ saveFeedbackMessage: null });

@@ -88,6 +88,9 @@ export const SolarCoreTreeSidebar: React.FC = () => {
     const projectId = e.dataTransfer.getData('text/plain');
     if (projectId) {
       moveProjectToFolder(projectId, folderId);
+      if (folderId) {
+        setOpenFolderIds((prev) => ({ ...prev, [folderId]: true }));
+      }
     }
   };
 
@@ -154,16 +157,21 @@ export const SolarCoreTreeSidebar: React.FC = () => {
             {/* Sub-lista de proyectos generales */}
             {isProjectsOpen && (
               <div className="pl-6 pr-1 flex flex-col gap-1 mt-1 border-l-2 border-slate-100 dark:border-[#272f3e] ml-4">
-                {projects.slice(0, 5).map((proj) => (
-                  <button
+                {projects.slice(0, 8).map((proj) => (
+                  <div
                     key={proj.id}
+                    draggable={true}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('text/plain', proj.id);
+                      e.dataTransfer.effectAllowed = 'move';
+                    }}
                     onClick={() => setActiveProject(proj.id)}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#202634] flex items-center gap-2 transition-all truncate cursor-pointer group"
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#202634] flex items-center gap-2 transition-all truncate cursor-grab active:cursor-grabbing group"
                     title={proj.client.name}
                   >
                     <FileText className="w-3.5 h-3.5 shrink-0 text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400" />
                     <span className="truncate">{proj.client.name}</span>
-                  </button>
+                  </div>
                 ))}
               </div>
             )}
@@ -262,97 +270,106 @@ export const SolarCoreTreeSidebar: React.FC = () => {
                 </div>
               ) : (
                 folders.map((folder) => {
-                const isSelected = activeFolderId === folder.id;
-                const isOpen = !!openFolderIds[folder.id];
-                const folderProjects = projects.filter((p) => p.folderId === folder.id);
-                const isDragOver = dragOverFolderId === folder.id;
+                  const isSelected = activeFolderId === folder.id;
+                  const isOpen = !!openFolderIds[folder.id];
+                  const folderProjects = projects.filter((p) => p.folderId === folder.id);
+                  const isDragOver = dragOverFolderId === folder.id;
 
-                return (
-                  <div
-                    key={folder.id}
-                    onDragOver={(e) => handleDragOver(e, folder.id)}
-                    onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDropOnFolder(e, folder.id)}
-                    className={`rounded-xl transition-all ${
-                      isDragOver ? 'ring-2 ring-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/40' : ''
-                    }`}
-                  >
-                    {/* Item de Carpeta */}
+                  return (
                     <div
-                      onClick={() => setActiveFolderId(isSelected ? null : folder.id)}
-                      className={`flex items-center justify-between px-3 py-2 rounded-xl cursor-pointer transition-all ${
-                        isSelected
-                          ? 'bg-emerald-50 text-emerald-900 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60 font-bold shadow-2xs'
-                          : 'text-slate-700 dark:text-zinc-300 hover:bg-slate-100/80 dark:hover:bg-[#202634]'
+                      key={folder.id}
+                      onDragOver={(e) => handleDragOver(e, folder.id)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDropOnFolder(e, folder.id)}
+                      className={`rounded-xl transition-all ${
+                        isDragOver ? 'ring-2 ring-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/40' : ''
                       }`}
                     >
-                      <div className="flex items-center gap-2 truncate">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleFolder(folder.id);
-                          }}
-                          className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-white"
-                        >
+                      {/* Item de Carpeta */}
+                      <div
+                        onClick={() => {
+                          toggleFolder(folder.id);
+                          setActiveFolderId(isSelected ? null : folder.id);
+                        }}
+                        className={`flex items-center justify-between px-3 py-2 rounded-xl cursor-pointer transition-all ${
+                          isSelected
+                            ? 'bg-emerald-50 text-emerald-900 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60 font-bold shadow-2xs'
+                            : 'text-slate-700 dark:text-zinc-300 hover:bg-slate-100/80 dark:hover:bg-[#202634]'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleFolder(folder.id);
+                            }}
+                            className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-white"
+                          >
+                            {isOpen ? (
+                              <ChevronDown className="w-3.5 h-3.5" />
+                            ) : (
+                              <ChevronRight className="w-3.5 h-3.5" />
+                            )}
+                          </button>
                           {isOpen ? (
-                            <ChevronDown className="w-3.5 h-3.5" />
+                            <FolderOpen
+                              className="w-4 h-4 shrink-0"
+                              style={{ color: folder.color || '#10b981' }}
+                            />
                           ) : (
-                            <ChevronRight className="w-3.5 h-3.5" />
+                            <Folder
+                              className="w-4 h-4 shrink-0"
+                              style={{ color: folder.color || '#10b981' }}
+                            />
                           )}
-                        </button>
-                        {isOpen ? (
-                          <FolderOpen
-                            className="w-4 h-4 shrink-0"
-                            style={{ color: folder.color || '#10b981' }}
-                          />
-                        ) : (
-                          <Folder
-                            className="w-4 h-4 shrink-0"
-                            style={{ color: folder.color || '#10b981' }}
-                          />
-                        )}
-                        <span className="font-semibold truncate text-xs">{folder.name}</span>
-                      </div>
+                          <span className="font-semibold truncate text-xs">{folder.name}</span>
+                        </div>
 
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span
-                          className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                            isSelected
-                              ? 'bg-emerald-200 text-emerald-900 dark:bg-emerald-800 dark:text-emerald-100'
-                              : 'bg-slate-100 dark:bg-[#242b3b] text-slate-600 dark:text-zinc-400'
-                          }`}
-                        >
-                          {folderProjects.length}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Proyectos dentro de esta Carpeta */}
-                    {isOpen && (
-                      <div className="pl-6 pr-1 flex flex-col gap-1 mt-1 border-l-2 border-slate-100 dark:border-[#272f3e] ml-4">
-                        {folderProjects.length === 0 ? (
-                          <span className="text-[10px] text-slate-400 italic py-1 pl-2">
-                            Arrastra proyectos aquí
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span
+                            className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                              isSelected
+                                ? 'bg-emerald-200 text-emerald-900 dark:bg-emerald-800 dark:text-emerald-100'
+                                : 'bg-slate-100 dark:bg-[#242b3b] text-slate-600 dark:text-zinc-400'
+                            }`}
+                          >
+                            {folderProjects.length}
                           </span>
-                        ) : (
-                          folderProjects.map((proj) => (
-                            <button
-                              key={proj.id}
-                              onClick={() => setActiveProject(proj.id)}
-                              className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#202634] flex items-center gap-2 transition-all truncate cursor-pointer group"
-                              title={proj.client.name}
-                            >
-                              <FileText className="w-3.5 h-3.5 shrink-0 text-slate-400 group-hover:text-emerald-500" />
-                              <span className="truncate">{proj.client.name}</span>
-                            </button>
-                          ))
-                        )}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                );
-              }))}
+
+                      {/* Proyectos dentro de esta Carpeta */}
+                      {isOpen && (
+                        <div className="pl-6 pr-1 flex flex-col gap-1 mt-1 border-l-2 border-slate-100 dark:border-[#272f3e] ml-4">
+                          {folderProjects.length === 0 ? (
+                            <span className="text-[10px] text-slate-400 italic py-1 pl-2">
+                              Arrastra proyectos aquí
+                            </span>
+                          ) : (
+                            folderProjects.map((proj) => (
+                              <div
+                                key={proj.id}
+                                draggable={true}
+                                onDragStart={(e) => {
+                                  e.dataTransfer.setData('text/plain', proj.id);
+                                  e.dataTransfer.effectAllowed = 'move';
+                                }}
+                                onClick={() => setActiveProject(proj.id)}
+                                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#202634] flex items-center gap-2 transition-all truncate cursor-grab active:cursor-grabbing group"
+                                title={proj.client.name}
+                              >
+                                <FileText className="w-3.5 h-3.5 shrink-0 text-slate-400 group-hover:text-emerald-500" />
+                                <span className="truncate">{proj.client.name}</span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>

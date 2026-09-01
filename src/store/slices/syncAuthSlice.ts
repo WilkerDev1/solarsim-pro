@@ -117,8 +117,12 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
             if (local.syncStatus === 'pending') {
               return local;
             }
-            // De lo contrario, adopta la versión autoritativa del servidor
-            return { ...serverVersion, syncStatus: 'synced' as const };
+            // De lo contrario, adopta la versión autoritativa del servidor preservando la carpeta local
+            return {
+              ...serverVersion,
+              folderId: local.folderId !== undefined ? local.folderId : serverVersion.folderId,
+              syncStatus: 'synced' as const,
+            };
           }
           return local;
         });
