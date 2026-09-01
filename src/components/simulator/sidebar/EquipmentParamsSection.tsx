@@ -243,18 +243,6 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                   }`}
                 />
               </div>
-
-              {/* Botón Destacado: Escanear Ficha Técnica (IA) */}
-              <div className="pt-1">
-                <button
-                  type="button"
-                  onClick={openAIDatasheetModal}
-                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-emerald-600 hover:from-purple-500 hover:to-emerald-500 text-white text-xs font-bold shadow-md hover:shadow-purple-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
-                >
-                  <Sparkles className="w-4 h-4 text-white" />
-                  <span>Escanear Ficha Técnica con IA</span>
-                </button>
-              </div>
             </div>
           ) : (
             /* MODO DETALLADO: Ingreso Manual Libre de Parámetros */
