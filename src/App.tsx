@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react';
 import { useSimulationStore } from './store/useSimulationStore';
 import { Header } from './components/common/Header';
+import { PrimaryIconDock } from './components/layout/PrimaryIconDock';
+import { SolarCoreTreeSidebar } from './components/dashboard/sidebar/SolarCoreTreeSidebar';
 import { DashboardView } from './components/dashboard/DashboardView';
 import { SimulatorView } from './components/simulator/SimulatorView';
 import { PDFProposalView } from './components/pdf/PDFProposalView';
@@ -22,11 +24,9 @@ export const App: React.FC = () => {
   // 🔄 Ciclo de Vida Global de Sincronización Automática en Segundo Plano (Heartbeat & Focus)
   useEffect(() => {
     if (syncSettings.authToken && syncSettings.autoSyncEnabled) {
-      // 1. Sincronización inicial silenciosa al abrir la app
       syncProjectsWithServer(true);
     }
 
-    // 2. Heartbeat periódico cada 15 segundos (Red Social / Servidor como Fuente de Verdad)
     const interval = setInterval(() => {
       const state = useSimulationStore.getState();
       if (state.syncSettings.authToken && state.syncSettings.autoSyncEnabled && !state.isSyncing) {
@@ -34,7 +34,6 @@ export const App: React.FC = () => {
       }
     }, 15000);
 
-    // 3. Sincronización al reenfocar la ventana o cambiar de pestaña
     const handleFocus = () => {
       const state = useSimulationStore.getState();
       if (state.syncSettings.authToken && state.syncSettings.autoSyncEnabled && !state.isSyncing) {
@@ -66,21 +65,35 @@ export const App: React.FC = () => {
 
   return (
     <div
-      className={`h-screen w-screen flex flex-col overflow-hidden transition-colors duration-200 ${
-        isDark ? 'dark bg-[#121214] text-zinc-100' : 'bg-slate-100 text-slate-900'
+      className={`h-screen w-screen flex flex-row overflow-hidden transition-colors duration-200 ${
+        isDark ? 'dark bg-[#10141d] text-zinc-100' : 'bg-[#f4f6fa] text-slate-900'
       }`}
     >
       {/* App Launch Splash Screen */}
       <SplashScreen />
 
-      <Header />
-      <main className="flex-1 flex overflow-hidden min-h-0 w-full">
-        <ErrorBoundary onReset={() => setActiveView('dashboard')}>
-          {activeView === 'dashboard' && <DashboardView />}
-          {activeView === 'simulator' && <SimulatorView />}
-          {activeView === 'pdf-preview' && <PDFProposalView />}
-        </ErrorBoundary>
-      </main>
+      {/* 🧭 1. Dock Vertical Oscuro Estrecho (~64px) */}
+      <PrimaryIconDock />
+
+      {/* 🖼️ 2. Contenedor Principal con Header Adaptativo y Vistas */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+        {activeView !== 'dashboard' && <Header />}
+
+        <main className="flex-1 flex overflow-hidden min-h-0 w-full">
+          <ErrorBoundary onReset={() => setActiveView('dashboard')}>
+            {activeView === 'dashboard' && (
+              <div className="flex-1 flex h-full overflow-hidden w-full">
+                {/* 🌳 Pestaña Clara / Intermedia (Solar Core Tree Explorer) */}
+                <SolarCoreTreeSidebar />
+                {/* 🎴 Lienzo Principal de Proyectos */}
+                <DashboardView />
+              </div>
+            )}
+            {activeView === 'simulator' && <SimulatorView />}
+            {activeView === 'pdf-preview' && <PDFProposalView />}
+          </ErrorBoundary>
+        </main>
+      </div>
 
       {/* Global Modals Mounted at Root Level */}
       <NewProjectModal />

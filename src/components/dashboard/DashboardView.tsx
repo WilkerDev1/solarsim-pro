@@ -1,406 +1,243 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import {
   Search,
   Plus,
-  Calendar,
-  Edit3,
-  Trash2,
-  Copy,
-  MapPin,
-  Zap,
-  Upload,
-  Download,
-  Share2,
-  FileJson,
-  CheckCircle2,
-  AlertCircle,
-  Cloud,
-  Laptop,
-  User,
-  Shield,
-  RefreshCw,
+  Filter,
+  Folder,
+  FolderPlus,
+  X,
+  Sparkles,
+  FileText,
 } from 'lucide-react';
-import { calculateDCCapacityKWp } from '../../engine/solarEngine';
+import { ProjectCard } from './ProjectCard';
+import { FoldersResumeGrid } from './FoldersResumeGrid';
+import { CreateFolderModal } from './sidebar/CreateFolderModal';
 
 export const DashboardView: React.FC = () => {
   const {
     projects,
-    setActiveProject,
     searchQuery,
     setSearchQuery,
     openNewProjectModal,
-    duplicateProject,
-    deleteProject,
-    exportProjectAsJSON,
-    exportAllProjectsAsJSON,
-    importProjectsFromJSON,
-    syncSettings,
+    activeFolderId,
+    setActiveFolderId,
+    activeTeamMemberFilter,
+    setActiveTeamMemberFilter,
+    folders,
     sidebarTheme,
   } = useSimulationStore();
 
   const isDark = sidebarTheme === 'dark';
-  const isLector = syncSettings.currentUser?.role === 'LECTOR';
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [importNotification, setImportNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [showFiltersDropdown, setShowFiltersDropdown] = useState(false);
+  const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('All');
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const text = event.target?.result as string;
-        const parsed = JSON.parse(text);
-        const result = importProjectsFromJSON(parsed);
-
-        if (result.success) {
-          setImportNotification({ type: 'success', message: result.message });
-        } else {
-          setImportNotification({ type: 'error', message: result.message });
-        }
-      } catch (err: any) {
-        setImportNotification({
-          type: 'error',
-          message: 'Error al leer el archivo JSON: formato corrupto o inválido.',
-        });
-      }
-
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-
-      setTimeout(() => setImportNotification(null), 5000);
-    };
-
-    reader.readAsText(file);
-  };
-
+  // Filter projects by search, active folder, team member and status
   const filteredProjects = projects.filter((project) => {
-    return (
-      project.client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (project.client.company && project.client.company.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      project.client.province.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.client.projectId.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    // 1. Search Query Filter
+    const query = searchQuery.toLowerCase().trim();
+    const matchesSearch =
+      !query ||
+      project.client.name.toLowerCase().includes(query) ||
+      (project.client.company && project.client.company.toLowerCase().includes(query)) ||
+      project.client.province.toLowerCase().includes(query) ||
+      project.client.projectId.toLowerCase().includes(query);
+
+    // 2. Folder Filter
+    const matchesFolder = activeFolderId ? project.folderId === activeFolderId : true;
+
+    // 3. Team Member Filter
+    const matchesTeam = activeTeamMemberFilter
+      ? (project.authorName || '').toLowerCase() === activeTeamMemberFilter.toLowerCase()
+      : true;
+
+    // 4. Status Filter
+    const matchesStatus = statusFilter === 'All' ? true : project.status === statusFilter;
+
+    return matchesSearch && matchesFolder && matchesTeam && matchesStatus;
   });
+
+  const activeFolderName = activeFolderId ? folders.find((f) => f.id === activeFolderId)?.name : null;
 
   return (
     <div
-      className={`flex-1 overflow-y-auto w-full h-full p-6 sm:p-8 font-sans transition-colors duration-200 ${
-        isDark ? 'bg-[#121214] text-zinc-100' : 'bg-slate-100 text-slate-900'
+      className={`flex-1 overflow-y-auto w-full h-full p-6 md:p-10 font-sans transition-colors duration-200 ${
+        isDark ? 'bg-[#10141d] text-zinc-100' : 'bg-[#f4f6fa] text-slate-900'
       }`}
     >
-      <div className="max-w-[1400px] mx-auto w-full space-y-6">
-        {/* Import Notification Banner */}
-        {importNotification && (
-          <div
-            className={`p-4 rounded-2xl border flex items-center gap-3 transition-all animate-in fade-in slide-in-from-top-2 shadow-md ${
-              importNotification.type === 'success'
-                ? isDark
-                  ? 'bg-emerald-950/80 border-emerald-700/80 text-emerald-200'
-                  : 'bg-emerald-50 border-emerald-300 text-emerald-900'
-                : isDark
-                ? 'bg-red-950/80 border-red-700/80 text-red-200'
-                : 'bg-red-50 border-red-300 text-red-900'
-            }`}
-          >
-            {importNotification.type === 'success' ? (
-              <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
-            ) : (
-              <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
-            )}
-            <span className="text-xs sm:text-sm font-bold flex-1">{importNotification.message}</span>
+      <div className="max-w-[1500px] mx-auto w-full flex flex-col gap-8 pb-16">
+        {/* ========================================================================= */}
+        {/* 🔝 HEADER SUPERIOR: PROJECTS, BUSCADOR Y ACCIONES */}
+        {/* ========================================================================= */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <h2 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white uppercase">
+            Projects
+          </h2>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Buscador Integrado */}
+            <div className="relative min-w-[240px] sm:min-w-[320px]">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <Search className="w-4 h-4" />
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search projects..."
+                className="w-full pl-10 pr-4 py-2.5 rounded-2xl text-xs border border-slate-200/90 dark:border-[#272f3e] bg-white dark:bg-[#181d27] text-slate-900 dark:text-zinc-100 shadow-2xs focus:outline-hidden focus:border-emerald-500"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Botón Filters */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowFiltersDropdown(!showFiltersDropdown)}
+                className={`px-4 py-2.5 rounded-2xl text-xs font-bold border flex items-center gap-2 transition-all cursor-pointer shadow-2xs ${
+                  statusFilter !== 'All'
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-700'
+                    : 'border-slate-200/90 dark:border-[#272f3e] bg-white dark:bg-[#181d27] text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-[#202734]'
+                }`}
+              >
+                <Filter className="w-3.5 h-3.5" />
+                <span>Filters</span>
+                {statusFilter !== 'All' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+              </button>
+
+              {showFiltersDropdown && (
+                <div className="absolute right-0 mt-2 w-44 rounded-2xl bg-white dark:bg-[#181d27] border border-slate-200 dark:border-[#272f3e] shadow-xl p-2 z-40 flex flex-col gap-1 text-xs animate-in fade-in zoom-in-95 duration-150">
+                  {['All', 'Draft', 'Final', 'Archived'].map((status) => (
+                    <button
+                      key={status}
+                      onClick={() => {
+                        setStatusFilter(status);
+                        setShowFiltersDropdown(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-xl font-medium transition-colors cursor-pointer ${
+                        statusFilter === status
+                          ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 font-bold'
+                          : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-[#202734]'
+                      }`}
+                    >
+                      {status === 'All' ? 'Todos los Estados' : status}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Botón Folder */}
             <button
-              onClick={() => setImportNotification(null)}
-              className="text-xs font-black uppercase opacity-70 hover:opacity-100 cursor-pointer"
+              type="button"
+              onClick={() => setIsFolderModalOpen(true)}
+              className="px-4 py-2.5 rounded-2xl text-xs font-bold border border-slate-200/90 dark:border-[#272f3e] bg-white dark:bg-[#181d27] text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-[#202734] transition-all flex items-center gap-2 cursor-pointer shadow-2xs"
             >
-              Cerrar
+              <FolderPlus className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Folder</span>
+            </button>
+
+            {/* Botón Principal: + New Simulation */}
+            <button
+              type="button"
+              onClick={openNewProjectModal}
+              className="px-5 py-2.5 rounded-2xl text-xs font-bold bg-orange-500 hover:bg-orange-400 text-white transition-all flex items-center gap-2 shadow-xs cursor-pointer active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ New Simulation</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 📌 Banner de Filtro Activo (si se seleccionó una carpeta o colaborador en el árbol) */}
+        {(activeFolderName || activeTeamMemberFilter || statusFilter !== 'All') && (
+          <div className="p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-200/80 dark:bg-emerald-950/30 dark:border-emerald-800/40 flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-emerald-900 dark:text-emerald-300">
+                Mostrando:
+              </span>
+              {activeFolderName && (
+                <span className="px-2.5 py-1 rounded-lg bg-white dark:bg-[#181d27] border border-emerald-300 dark:border-emerald-700 font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                  <Folder className="w-3 h-3" />
+                  <span>{activeFolderName}</span>
+                </span>
+              )}
+              {activeTeamMemberFilter && (
+                <span className="px-2.5 py-1 rounded-lg bg-white dark:bg-[#181d27] border border-blue-300 dark:border-blue-700 font-bold text-blue-800 dark:text-blue-300">
+                  Autor: {activeTeamMemberFilter}
+                </span>
+              )}
+              {statusFilter !== 'All' && (
+                <span className="px-2.5 py-1 rounded-lg bg-white dark:bg-[#181d27] border border-slate-300 dark:border-zinc-700 font-bold text-slate-700 dark:text-zinc-300">
+                  Estado: {statusFilter}
+                </span>
+              )}
+            </div>
+
+            <button
+              onClick={() => {
+                setActiveFolderId(null);
+                setActiveTeamMemberFilter(null);
+                setStatusFilter('All');
+              }}
+              className="font-bold text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer flex items-center gap-1"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>Ver Todos los Proyectos</span>
             </button>
           </div>
         )}
 
-        {/* Header Banner */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div>
-            <h2 className={`text-2xl sm:text-3xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              Catálogo de Proyectos y Simulaciones
-            </h2>
-            <p className={`text-xs sm:text-sm mt-1 font-medium ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-              Gestión y diseño de propuestas comerciales de energía solar fotovoltaica en República Dominicana
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-            {/* Input Oculto de Archivo JSON */}
-            <input
-              type="file"
-              ref={fileInputRef}
-              accept=".json,application/json"
-              onChange={handleFileChange}
-              className="hidden"
-            />
-
-            {/* Botón Importar JSON */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className={`px-3.5 py-2.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95 ${
-                isDark
-                  ? 'bg-[#1e1e28] border-[#343446] text-zinc-200 hover:bg-[#282836] hover:border-amber-500/70 hover:text-amber-300'
-                  : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-amber-400 hover:text-amber-800'
-              }`}
-              title="Importar proyecto o respaldo completo desde un archivo JSON"
-            >
-              <Upload className="w-4 h-4 text-amber-500" />
-              <span>Importar JSON</span>
-            </button>
-
-            {/* Botón Exportar Respaldo Completo */}
-            <button
-              onClick={exportAllProjectsAsJSON}
-              className={`px-3.5 py-2.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95 ${
-                isDark
-                  ? 'bg-[#1e1e28] border-[#343446] text-zinc-200 hover:bg-[#282836] hover:border-emerald-500/70 hover:text-emerald-300'
-                  : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-emerald-400 hover:text-emerald-800'
-              }`}
-              title="Exportar todos los proyectos en un archivo JSON de respaldo"
-            >
-              <Download className="w-4 h-4 text-emerald-500" />
-              <span>Exportar Todo</span>
-            </button>
-
-            {/* Botón Nueva Simulación */}
-            <button
-              onClick={openNewProjectModal}
-              className="bg-emerald-700 hover:bg-emerald-600 text-white transition-all px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm flex items-center gap-2 shadow-md hover:shadow-lg cursor-pointer active:scale-95"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Nueva Simulación</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Toolbar Area */}
-        <div
-          className={`flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 rounded-2xl border transition-colors ${
-            isDark ? 'bg-[#18181f] border-[#2d2d38] shadow-md' : 'bg-white border-slate-200 shadow-xs'
-          }`}
-        >
-          {/* Search Input */}
-          <div className="relative flex-1 w-full sm:max-w-md">
-            <Search className={`w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 ${isDark ? 'text-zinc-400' : 'text-slate-400'}`} />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar por cliente, empresa, provincia o ID..."
-              className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-xs font-semibold transition-all ${
-                isDark
-                  ? 'bg-[#24242e] border-[#383846] text-white placeholder:text-zinc-500 focus:bg-[#282834] focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500'
-                  : 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 placeholder:text-slate-400'
-              }`}
-            />
-          </div>
-
-          <div className={`text-xs font-bold ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-            Total de proyectos guardados:{' '}
-            <span className="font-mono text-emerald-500 font-black text-sm ml-1">{projects.length}</span>
-          </div>
-        </div>
-
-        {/* Projects Grid */}
+        {/* ========================================================================= */}
+        {/* 🎴 GRID DE TARJETAS DE PROYECTOS */}
+        {/* ========================================================================= */}
         {filteredProjects.length === 0 ? (
-          <div
-            className={`border rounded-2xl p-12 text-center my-8 transition-colors ${
-              isDark ? 'bg-[#18181f] border-[#2d2d38]' : 'bg-white border-slate-200 shadow-xs'
-            }`}
-          >
-            <p className={`text-sm mb-4 font-semibold ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-              No se encontraron proyectos con los criterios de búsqueda.
-            </p>
+          <div className="py-20 text-center flex flex-col items-center justify-center gap-4 bg-white dark:bg-[#181d27] border border-slate-200/80 dark:border-[#272f3e] rounded-3xl p-8">
+            <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 flex items-center justify-center">
+              <FileText className="w-8 h-8" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                No se encontraron proyectos
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1 max-w-sm">
+                No hay propuestas que coincidan con la búsqueda o carpeta seleccionada.
+              </p>
+            </div>
             <button
               onClick={openNewProjectModal}
-              className="bg-emerald-700 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-xs inline-flex items-center gap-2 transition-all shadow-md cursor-pointer"
+              className="px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-xs cursor-pointer"
             >
-              <Plus className="w-4 h-4" /> Crear nuevo proyecto
+              Crear Nueva Propuesta
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredProjects.map((project) => {
-              const kwp = calculateDCCapacityKWp(project.specs.panelPowerW, project.specs.panelCount);
-              const dateStr = new Date(project.updatedAt).toLocaleDateString('es-DO', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric',
-              });
-
-              return (
-                <article
-                  key={project.id}
-                  className={`border rounded-2xl p-5 flex flex-col transition-all group relative overflow-hidden ${
-                    isDark
-                      ? 'bg-[#1b1b22] border-[#2e2e3a] hover:border-emerald-500/80 hover:bg-[#20202a] text-zinc-100 shadow-lg'
-                      : 'bg-white border-slate-200 hover:border-emerald-300 hover:shadow-xl shadow-xs'
-                  }`}
-                >
-                  {/* Top Header */}
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="space-y-1.5 flex-1 min-w-0 pr-2">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
-                          isDark
-                            ? 'bg-emerald-950/90 text-emerald-300 border-emerald-700/60'
-                            : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                        }`}
-                      >
-                        {project.client.projectId || 'SP-2026-001'}
-                      </span>
-                      <h3
-                        className={`font-bold text-base leading-snug truncate transition-colors ${
-                          isDark ? 'text-white group-hover:text-emerald-400' : 'text-slate-900 group-hover:text-emerald-800'
-                        }`}
-                        title={project.client.name}
-                      >
-                        {project.client.name}
-                      </h3>
-                      <p className={`text-xs flex items-center gap-1 font-medium ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-                        <MapPin className={`w-3 h-3 shrink-0 ${isDark ? 'text-zinc-500' : 'text-slate-400'}`} />
-                        <span className="truncate">{project.client.province || project.client.location}</span>
-                      </p>
-                    </div>
-
-                    {/* Actions (Export JSON, Duplicate & Delete) */}
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        onClick={() => exportProjectAsJSON(project.id)}
-                        className={`p-2 rounded-lg transition-colors cursor-pointer ${
-                          isDark
-                            ? 'text-zinc-400 hover:text-amber-400 hover:bg-[#2a2a36]'
-                            : 'text-slate-400 hover:text-amber-700 hover:bg-amber-50'
-                        }`}
-                        title="Compartir / Exportar proyecto en JSON"
-                      >
-                        <Share2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => duplicateProject(project.id)}
-                        className={`p-2 rounded-lg transition-colors cursor-pointer ${
-                          isDark
-                            ? 'text-zinc-400 hover:text-emerald-400 hover:bg-[#2a2a36]'
-                            : 'text-slate-400 hover:text-emerald-700 hover:bg-emerald-50'
-                        }`}
-                        title="Duplicar proyecto"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </button>
-                      {!isLector && (
-                        <button
-                          onClick={() => {
-                            if (confirm(`¿Estás seguro de eliminar el proyecto "${project.client.name}"?`)) {
-                              deleteProject(project.id);
-                            }
-                          }}
-                          className={`p-2 rounded-lg transition-colors cursor-pointer ${
-                            isDark
-                              ? 'text-zinc-400 hover:text-red-400 hover:bg-red-950/50'
-                              : 'text-slate-400 hover:text-red-600 hover:bg-red-50'
-                          }`}
-                          title="Eliminar proyecto"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Specs Box */}
-                  <div
-                    className={`grid grid-cols-2 gap-3 my-3 py-3 border-y rounded-xl px-3.5 text-xs ${
-                      isDark
-                        ? 'border-[#2a2a36] bg-[#14141a]'
-                        : 'border-slate-100 bg-slate-50/70'
-                    }`}
-                  >
-                    <div>
-                      <span className={`text-[10px] font-bold uppercase tracking-wider block mb-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>
-                        Potencia DC
-                      </span>
-                      <span className="font-mono text-base font-black text-emerald-500">{kwp.toFixed(2)} kWp</span>
-                    </div>
-                    <div>
-                      <span className={`text-[10px] font-bold uppercase tracking-wider block mb-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>
-                        Distribuidora
-                      </span>
-                      <span className={`font-bold flex items-center gap-1 truncate ${isDark ? 'text-zinc-200' : 'text-slate-700'}`}>
-                        <Zap className="w-3 h-3 text-amber-500 shrink-0" />
-                        <span className="truncate">{project.client.distributor || 'EDEESTE'} ({project.client.tariffCode || 'BTS2'})</span>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Creator & Authorship Bar */}
-                  <div
-                    className={`flex items-center justify-between text-[11px] px-1 py-1.5 mb-2 rounded-lg ${
-                      isDark ? 'bg-[#141418] text-zinc-300' : 'bg-slate-50 text-slate-600'
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 truncate max-w-[65%]" title={`Creado por: ${project.authorName || 'Ing. Solar'}`}>
-                      <div className="w-5 h-5 rounded-full bg-emerald-600/20 text-emerald-400 font-black text-[9px] flex items-center justify-center shrink-0 border border-emerald-500/30">
-                        {(project.authorName || 'IS').substring(0, 2).toUpperCase()}
-                      </div>
-                      <span className="truncate font-semibold text-[10.5px]">
-                        {project.authorName || 'Ing. Solar'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0 text-[10px]">
-                      {project.syncStatus === 'synced' ? (
-                        <span className="flex items-center gap-1 text-emerald-400 font-bold" title="Sincronizado con la nube">
-                          <Cloud className="w-3.5 h-3.5 text-emerald-500" />
-                          <span className="hidden sm:inline">Nube</span>
-                        </span>
-                      ) : project.syncStatus === 'pending' ? (
-                        <span className="flex items-center gap-1 text-amber-400 font-bold" title="Cambios locales pendientes de sincronizar">
-                          <RefreshCw className="w-3.5 h-3.5 text-amber-500 animate-spin" />
-                          <span className="hidden sm:inline">Pendiente</span>
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-zinc-400" title="Guardado local en este equipo">
-                          <Laptop className="w-3.5 h-3.5" />
-                          <span className="hidden sm:inline">Local</span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Footer */}
-                  <div className="mt-auto pt-1">
-                    <div className={`flex items-center justify-between text-[11px] mb-3 font-medium ${isDark ? 'text-zinc-400' : 'text-slate-400'}`}>
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5" />
-                        {dateStr}
-                      </span>
-                      <span className={`font-semibold ${isDark ? 'text-zinc-300' : 'text-slate-500'}`}>
-                        {project.specs.panelCount} Paneles ({project.specs.panelPowerW}W)
-                      </span>
-                    </div>
-
-                    <button
-                      onClick={() => setActiveProject(project.id)}
-                      className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-xs hover:shadow-md cursor-pointer active:scale-98"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                      {isLector ? 'Ver Simulación / Propuesta' : 'Abrir Simulación'}
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {filteredProjects.map((project) => (
+              <ProjectCard key={project.id} project={project} />
+            ))}
           </div>
         )}
+
+        {/* ========================================================================= */}
+        {/* 📁 RESUMEN DE CARPETAS (FOLDERS RESUME) */}
+        {/* ========================================================================= */}
+        <FoldersResumeGrid />
       </div>
+
+      <CreateFolderModal
+        isOpen={isFolderModalOpen}
+        onClose={() => setIsFolderModalOpen(false)}
+      />
     </div>
   );
 };

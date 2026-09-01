@@ -12,6 +12,7 @@ import {
   SyncSettings,
   UserProfile,
   UserRole,
+  ProjectFolder,
 } from '../types';
 import { SolarEquipmentItem } from '../types/equipment';
 
@@ -182,12 +183,26 @@ export interface UISlice {
   setSidebarWidth: (width: number) => void;
 }
 
+export interface FolderSlice {
+  folders: ProjectFolder[];
+  activeFolderId: string | null;
+  activeTeamMemberFilter: string | null;
+
+  setActiveFolderId: (folderId: string | null) => void;
+  setActiveTeamMemberFilter: (member: string | null) => void;
+  createFolder: (name: string, color?: string, description?: string) => ProjectFolder | null;
+  updateFolder: (id: string, updates: Partial<ProjectFolder>) => void;
+  deleteFolder: (id: string) => void;
+  moveProjectToFolder: (projectId: string, targetFolderId: string | null) => void;
+}
+
 export type SimulationStore = ProjectSlice &
   EquipmentSlice &
   SyncAuthSlice &
   ImportExportSlice &
   AISlice &
-  UISlice;
+  UISlice &
+  FolderSlice;
 
 export type SimulationState = SimulationStore;
 export type SimulationSlice<T> = StateCreator<SimulationStore, [], [], T>;

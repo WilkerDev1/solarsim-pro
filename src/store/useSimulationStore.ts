@@ -8,6 +8,7 @@ import { createSyncAuthSlice } from './slices/syncAuthSlice';
 import { createImportExportSlice } from './slices/importExportSlice';
 import { createAISlice } from './slices/aiSlice';
 import { createUISlice } from './slices/uiSlice';
+import { createFolderSlice } from './slices/folderSlice';
 
 // Re-export helper types and generators for backward compatibility
 export type { SimulationStore, SimulationState, NewProjectPayload };
@@ -27,6 +28,7 @@ export const useSimulationStore = create<SimulationStore>()(
       ...createImportExportSlice(...a),
       ...createAISlice(...a),
       ...createUISlice(...a),
+      ...createFolderSlice(...a),
     }),
     {
       name: 'solarsim-pro-storage',

@@ -295,7 +295,10 @@ export interface ProjectSimulation {
   version?: number;
   syncStatus?: 'synced' | 'pending' | 'local_only' | 'conflict';
   isDeleted?: boolean;
+  folderId?: string; // Optional custom folder assignment
 }
+
+export * from './folder';
 
 export type UpdateState = 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'installing' | 'error';
 
