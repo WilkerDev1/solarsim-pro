@@ -398,14 +398,14 @@ export const DashboardView: React.FC = () => {
               <span>Folder</span>
             </button>
 
-            {/* Botón Principal: + New Simulation */}
+            {/* Botón Principal: New Simulation */}
             <button
               type="button"
               onClick={openNewProjectModal}
               className="px-5 py-2.5 rounded-2xl text-xs font-bold bg-orange-500 hover:bg-orange-400 text-white transition-all flex items-center gap-2 shadow-xs cursor-pointer active:scale-95"
             >
               <Plus className="w-4 h-4" />
-              <span>+ New Simulation</span>
+              <span>New Simulation</span>
             </button>
           </div>
         </div>

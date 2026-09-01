@@ -41,7 +41,7 @@ export const FoldersResumeGrid: React.FC = () => {
             className="px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-400 text-white transition-all flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
           >
             <FolderPlus className="w-3.5 h-3.5" />
-            <span>+ New Folder</span>
+            <span>New Folder</span>
           </button>
         )}
       </div>
