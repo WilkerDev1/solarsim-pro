@@ -99,6 +99,11 @@ export const useSimulationStore = create<SimulationStore>()(
               }
             });
           }
+          // Clean legacy mock test folders
+          if (state.folders && Array.isArray(state.folders)) {
+            const mockFolderIds = new Set(['folder-commercial', 'folder-electsun', 'folder-solarta']);
+            state.folders = state.folders.filter((f) => !mockFolderIds.has(f.id));
+          }
         }
       },
       partialize: (state) => ({
@@ -112,6 +117,7 @@ export const useSimulationStore = create<SimulationStore>()(
         geminiModel: state.geminiModel,
         syncSettings: state.syncSettings,
         equipmentCatalog: state.equipmentCatalog,
+        folders: state.folders,
       }),
     }
   )

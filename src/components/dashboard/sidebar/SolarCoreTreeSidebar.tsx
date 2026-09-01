@@ -40,11 +40,7 @@ export const SolarCoreTreeSidebar: React.FC = () => {
   // Tree collapsible section states
   const [isProjectsOpen, setIsProjectsOpen] = useState(true);
   const [isTeamOpen, setIsTeamOpen] = useState(true);
-  const [openFolderIds, setOpenFolderIds] = useState<Record<string, boolean>>({
-    'folder-commercial': true,
-    'folder-electsun': false,
-    'folder-solarta': false,
-  });
+  const [openFolderIds, setOpenFolderIds] = useState<Record<string, boolean>>({});
 
   // Modal for folder creation / editing
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
@@ -57,17 +53,19 @@ export const SolarCoreTreeSidebar: React.FC = () => {
     setOpenFolderIds((prev) => ({ ...prev, [folderId]: !prev[folderId] }));
   };
 
-  // Distinct team members based on authorName or currentUser
+  // Distinct team members based strictly on real registered account or project authors
   const teamMembers = React.useMemo(() => {
     const memberSet = new Set<string>();
-    if (currentUser?.name) memberSet.add(currentUser.name);
+    if (currentUser?.name) {
+      memberSet.add(currentUser.name);
+    }
     projects.forEach((p) => {
-      if (p.authorName) memberSet.add(p.authorName);
+      if (p.authorName && p.authorName.trim()) {
+        memberSet.add(p.authorName.trim());
+      }
     });
-    // Add realistic defaults if only 1 exists
-    if (memberSet.size <= 1) {
-      memberSet.add('Maria Santos');
-      memberSet.add('Juan Perez');
+    if (memberSet.size === 0) {
+      memberSet.add(currentUser?.email || 'Usuario Principal');
     }
     return Array.from(memberSet);
   }, [projects, currentUser]);
@@ -246,7 +244,24 @@ export const SolarCoreTreeSidebar: React.FC = () => {
 
             {/* Listado de Carpetas */}
             <div className="flex flex-col gap-1">
-              {folders.map((folder) => {
+              {folders.length === 0 ? (
+                <div className="px-3 py-3 text-center border border-dashed border-slate-200 dark:border-[#272f3e] rounded-xl my-1">
+                  <p className="text-[11px] text-slate-400 dark:text-zinc-500">Sin carpetas creadas</p>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFolderToEdit(null);
+                        setIsFolderModalOpen(true);
+                      }}
+                      className="mt-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                    >
+                      + Crear primera carpeta
+                    </button>
+                  )}
+                </div>
+              ) : (
+                folders.map((folder) => {
                 const isSelected = activeFolderId === folder.id;
                 const isOpen = !!openFolderIds[folder.id];
                 const folderProjects = projects.filter((p) => p.folderId === folder.id);
@@ -337,7 +352,7 @@ export const SolarCoreTreeSidebar: React.FC = () => {
                     )}
                   </div>
                 );
-              })}
+              }))}
             </div>
           </div>
         </div>

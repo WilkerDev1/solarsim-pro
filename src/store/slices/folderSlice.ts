@@ -1,32 +1,8 @@
 import { SimulationSlice, FolderSlice } from '../types';
 import { ProjectFolder } from '../../types';
 
-export const DEFAULT_FOLDERS: ProjectFolder[] = [
-  {
-    id: 'folder-commercial',
-    name: 'Commercial Proposals',
-    color: '#10b981', // emerald
-    createdAt: new Date().toISOString(),
-    description: 'Propuestas para comercios, naves y centros de salud.',
-  },
-  {
-    id: 'folder-electsun',
-    name: 'ELECTSUN PROPOSALS',
-    color: '#3b82f6', // blue
-    createdAt: new Date().toISOString(),
-    description: 'Propuestas directas de Electsun Dominicana.',
-  },
-  {
-    id: 'folder-solarta',
-    name: 'SOLARTA PROPOSALS',
-    color: '#f59e0b', // amber
-    createdAt: new Date().toISOString(),
-    description: 'Proyectos asociados Solarta y clientes residenciales.',
-  },
-];
-
 export const createFolderSlice: SimulationSlice<FolderSlice> = (set, get) => ({
-  folders: DEFAULT_FOLDERS,
+  folders: [],
   activeFolderId: null,
   activeTeamMemberFilter: null,
 

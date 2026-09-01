@@ -87,6 +87,7 @@ solarsim/
 │   │   ├── initialData.ts                   # Proyectos iniciales y generadores de secuencias (SP-2026, C-0001)
 │   │   └── slices/
 │   │       ├── projectSlice.ts              # CRUD de proyectos, dimensionamiento y mutación de parámetros
+│   │       ├── folderSlice.ts               # CRUD de carpetas personalizadas y asignación drag and drop
 │   │       ├── equipmentSlice.ts            # Catálogo de equipos (paneles, inversores, baterías, CRUD y sync)
 │   │       ├── syncAuthSlice.ts             # Autenticación JWT y sincronización con solarsim-api
 │   │       ├── importExportSlice.ts         # Importación, exportación JSON y resolución de conflictos
@@ -105,6 +106,15 @@ solarsim/
 │   ├── assets/
 │   │   └── pdfGraphicAssets.ts              # Gráficos, renders 3D y diagramas en Base64 para PDF
 │   └── components/
+│       ├── layout/                          # 🧭 NAVEGACIÓN Y ESTRUCTURA GLOBAL
+│       │   └── PrimaryIconDock.tsx          # Dock vertical oscuro estrecho (Tema Sol/Luna, Proyectos, IA, Nuevo, Ajustes)
+│       ├── dashboard/                       # 🗂️ HOME Y EXPLORADOR DE PROPUESTAS
+│       │   ├── DashboardView.tsx            # Lienzo principal de proyectos con buscador, filtros avanzados y folders resume
+│       │   ├── ProjectCard.tsx              # Tarjeta moderna de proyecto con resumen técnico y drag source
+│       │   ├── FoldersResumeGrid.tsx        # Grid inferior de resumen de carpetas con estadísticas
+│       │   └── sidebar/                     # Explorador lateral del Dashboard
+│       │       ├── SolarCoreTreeSidebar.tsx # Árbol de Projects, Team (cuentas activas) y Folders (drag target)
+│       │       └── CreateFolderModal.tsx    # Modal de creación y edición de carpetas (ADMIN)
 │       ├── common/                          # Modales, cabeceras y utilidades compartidas
 │       │   ├── Header.tsx                   # Barra superior con navegación, estado de sync y botones
 │       │   ├── SettingsModal.tsx            # Centro de Configuración en Pantalla Completa (Sidebar de accesos directos, Perfil, Simulación, IA, Catálogo, RBAC, Respaldo)

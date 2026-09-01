@@ -45,8 +45,32 @@ export const FoldersResumeGrid: React.FC = () => {
       </div>
 
       {/* Grid Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {folders.map((folder) => {
+      {folders.length === 0 ? (
+        <div className="bg-white dark:bg-[#181d27] border border-dashed border-slate-200/90 dark:border-[#293242] rounded-3xl p-8 text-center flex flex-col items-center justify-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+            <Folder className="w-6 h-6" />
+          </div>
+          <div>
+            <h4 className="text-base font-bold text-slate-900 dark:text-white">No hay carpetas personalizadas</h4>
+            <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1 max-w-md">
+              Crea carpetas para clasificar y organizar propuestas por cliente comercial, licitación o región.
+            </p>
+          </div>
+          {isAdmin && (
+            <button
+              onClick={() => {
+                setFolderToEdit(null);
+                setIsModalOpen(true);
+              }}
+              className="mt-1 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-xs cursor-pointer"
+            >
+              + Crear Primera Carpeta
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {folders.map((folder) => {
           const folderProjects = projects.filter((p) => p.folderId === folder.id);
           const isSelected = activeFolderId === folder.id;
 
@@ -115,7 +139,8 @@ export const FoldersResumeGrid: React.FC = () => {
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
 
       <CreateFolderModal
         isOpen={isModalOpen}
