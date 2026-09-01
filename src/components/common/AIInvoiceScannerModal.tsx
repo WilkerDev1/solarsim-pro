@@ -145,6 +145,7 @@ export const AIInvoiceScannerModal: React.FC = () => {
           apiKey: geminiApiKey,
           model: geminiModel,
           panelPowerW: activeProject?.specs?.panelPowerW || 620,
+          onProgress: (step) => setProcessingStep(step),
         });
       }
 

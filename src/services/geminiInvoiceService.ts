@@ -299,6 +299,7 @@ export async function parseInvoiceWithGemini(params: {
   apiKey: string;
   model?: string;
   panelPowerW?: number; // Default 620W for solar estimation
+  onProgress?: (status: string) => void;
 }): Promise<ExtractedInvoiceData> {
   const {
     fileBase64,
@@ -307,6 +308,7 @@ export async function parseInvoiceWithGemini(params: {
     apiKey,
     model = 'gemini-2.0-flash',
     panelPowerW = 620,
+    onProgress,
   } = params;
 
   if (!apiKey || apiKey.trim().length === 0) {
@@ -319,7 +321,10 @@ export async function parseInvoiceWithGemini(params: {
     cleanBase64 = cleanBase64.split('base64,')[1];
   }
 
-  const endpoint = `${GEMINI_API_BASE}/models/${model}:generateContent?key=${apiKey.trim()}`;
+  const primaryModel = model?.trim() || 'gemini-2.0-flash';
+  const candidateModels = Array.from(
+    new Set([primaryModel, 'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-lite', 'gemini-2.5-flash-lite'])
+  ).filter(Boolean);
 
   const requestBody = {
     system_instruction: {
@@ -348,23 +353,76 @@ export async function parseInvoiceWithGemini(params: {
     },
   };
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(requestBody),
-  });
+  let rawText: string | undefined;
+  let lastError: any = null;
 
-  if (!response.ok) {
-    const errorJson = await response.json().catch(() => ({}));
-    const errorMsg = errorJson?.error?.message || `Error HTTP ${response.status}`;
-    throw new Error(`Google AI API Error: ${errorMsg}`);
+  for (let mIdx = 0; mIdx < candidateModels.length; mIdx++) {
+    const currentModel = candidateModels[mIdx];
+    const endpoint = `${GEMINI_API_BASE}/models/${currentModel}:generateContent?key=${apiKey.trim()}`;
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        if (mIdx > 0 || attempt > 1) {
+          onProgress?.(
+            attempt > 1
+              ? `Reintentando lectura de factura con ${currentModel} (intento ${attempt}/2)...`
+              : `Google experimenta alta demanda. Conectando con modelo de respaldo ${currentModel}...`
+          );
+        } else {
+          onProgress?.(`Analizando factura con ${currentModel}...`);
+        }
+
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+        });
+
+        if (response.ok) {
+          const responseJson = await response.json();
+          rawText = responseJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (rawText) {
+            break;
+          }
+        }
+
+        const errorJson = await response.json().catch(() => ({}));
+        const errorMsg = errorJson?.error?.message || `Error HTTP ${response.status}`;
+
+        // Si es API Key no válida, fallar de inmediato
+        if (response.status === 400 && errorMsg.toLowerCase().includes('api_key_invalid')) {
+          throw new Error(`API Key de Google Gemini inválida: ${errorMsg}`);
+        }
+        if (response.status === 401 || response.status === 403) {
+          throw new Error(`Permisos denegados en Google Gemini (${response.status}): ${errorMsg}`);
+        }
+
+        lastError = new Error(`Google AI (${response.status} en ${currentModel}): ${errorMsg}`);
+
+        if (response.status === 503 || response.status === 429) {
+          await new Promise((r) => setTimeout(r, 1500 * attempt));
+          continue;
+        }
+
+        break;
+      } catch (err: any) {
+        lastError = err;
+        if (err.message?.includes('API Key')) {
+          throw err;
+        }
+        await new Promise((r) => setTimeout(r, 1000 * attempt));
+      }
+    }
+
+    if (rawText) {
+      break;
+    }
   }
 
-  const responseJson = await response.json();
-  const rawText = responseJson?.candidates?.[0]?.content?.parts?.[0]?.text;
-
   if (!rawText) {
-    throw new Error('La IA no devolvió ninguna respuesta estructurada.');
+    throw new Error(
+      `Los servidores de Google Gemini están experimentando alta demanda momentánea (503). Intentamos con ${candidateModels.join(', ')}. ${lastError?.message || 'Por favor espera unos segundos y vuelve a intentar.'}`
+    );
   }
 
   let parsed: any;

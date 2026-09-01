@@ -38,6 +38,7 @@ export const AIDatasheetScannerModal: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState<string>('Analizando tabla técnica y variantes con Google Gemini...');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [extractedData, setExtractedData] = useState<ExtractedDatasheetData | null>(null);
   const [applyToActiveProject, setApplyToActiveProject] = useState(true);
@@ -78,6 +79,7 @@ export const AIDatasheetScannerModal: React.FC = () => {
     }
 
     setIsLoading(true);
+    setLoadingMessage('Analizando tabla técnica y variantes con Google Gemini...');
     setErrorMessage(null);
 
     try {
@@ -86,7 +88,8 @@ export const AIDatasheetScannerModal: React.FC = () => {
         selectedFile.type,
         selectedFile.name,
         geminiApiKey,
-        geminiModel
+        geminiModel,
+        (msg) => setLoadingMessage(msg)
       );
 
       setExtractedData(data);
@@ -344,7 +347,7 @@ export const AIDatasheetScannerModal: React.FC = () => {
                 {isLoading ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Analizando tabla técnica y variantes con Google Gemini...</span>
+                    <span>{loadingMessage}</span>
                   </>
                 ) : (
                   <>
