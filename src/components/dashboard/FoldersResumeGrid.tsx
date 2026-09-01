@@ -17,6 +17,8 @@ export const FoldersResumeGrid: React.FC = () => {
   const [folderToEdit, setFolderToEdit] = useState<ProjectFolder | null>(null);
   const isAdmin = syncSettings.currentUser?.role === 'ADMIN' || !syncSettings.currentUser;
 
+  const activeProjects = React.useMemo(() => projects.filter((p) => !p.isDeleted), [projects]);
+
   return (
     <div className="flex flex-col gap-5 pt-8 border-t border-slate-200/80 dark:border-[#272f3e]">
       {/* Header */}
@@ -71,7 +73,7 @@ export const FoldersResumeGrid: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {folders.map((folder) => {
-          const folderProjects = projects.filter((p) => p.folderId === folder.id);
+          const folderProjects = activeProjects.filter((p) => p.folderId === folder.id);
           const isSelected = activeFolderId === folder.id;
 
           // Unique authors who contributed to this folder

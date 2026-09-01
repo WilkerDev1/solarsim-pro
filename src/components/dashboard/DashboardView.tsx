@@ -70,7 +70,7 @@ export const DashboardView: React.FC = () => {
       memberSet.add(syncSettings.currentUser.name);
     }
     projects.forEach((p) => {
-      if (p.authorName && p.authorName.trim()) {
+      if (!p.isDeleted && p.authorName && p.authorName.trim()) {
         memberSet.add(p.authorName.trim());
       }
     });
@@ -99,6 +99,8 @@ export const DashboardView: React.FC = () => {
   // Filter and Sort Projects
   const filteredAndSortedProjects = useMemo(() => {
     const list = projects.filter((project) => {
+      if (project.isDeleted) return false;
+
       // 1. Search Query Filter
       const query = searchQuery.toLowerCase().trim();
       const matchesSearch =

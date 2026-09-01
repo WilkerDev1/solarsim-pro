@@ -108,24 +108,32 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
         const serverProjectsMap = new Map(pullRes.projects.map((p) => [p.id, p]));
 
         // Actualizar o preservar propuestas locales
-        currentProjects = currentProjects.map((local) => {
-          if (serverProjectsMap.has(local.id)) {
-            const serverVersion = serverProjectsMap.get(local.id)!;
-            serverProjectsMap.delete(local.id);
+        currentProjects = currentProjects
+          .map((local) => {
+            if (serverProjectsMap.has(local.id)) {
+              const serverVersion = serverProjectsMap.get(local.id)!;
+              serverProjectsMap.delete(local.id);
 
-            // Si el proyecto local tiene cambios pendientes, se mantiene para hacer push en el paso 2
-            if (local.syncStatus === 'pending') {
-              return local;
+              // Si el proyecto local tiene cambios pendientes (ej. pendiente de borrar), se conserva
+              if (local.syncStatus === 'pending') {
+                return local;
+              }
+              // De lo contrario, adopta la versión autoritativa del servidor preservando la carpeta local
+              return {
+                ...serverVersion,
+                folderId: local.folderId !== undefined ? local.folderId : serverVersion.folderId,
+                syncStatus: 'synced' as const,
+              };
             }
-            // De lo contrario, adopta la versión autoritativa del servidor preservando la carpeta local
-            return {
-              ...serverVersion,
-              folderId: local.folderId !== undefined ? local.folderId : serverVersion.folderId,
-              syncStatus: 'synced' as const,
-            };
-          }
-          return local;
-        });
+
+            // Si el proyecto estaba 'synced' localmente pero el servidor ya NO lo tiene (borrado en nube), se marca eliminado
+            if (local.syncStatus === 'synced' && !local.isDeleted) {
+              return { ...local, isDeleted: true };
+            }
+
+            return local;
+          })
+          .filter((p) => !(p.isDeleted && p.syncStatus === 'synced'));
 
         // Incorporar propuestas nuevas creadas por otros compañeros de la empresa
         for (const newServerProj of serverProjectsMap.values()) {
@@ -143,18 +151,21 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
         if (pushRes.success) {
           const resultsMap = new Map((pushRes.results || []).map((r) => [r.originalId || r.id, r]));
 
-          currentProjects = currentProjects.map((p) => {
-            if (resultsMap.has(p.id)) {
-              const resInfo = resultsMap.get(p.id)!;
-              return {
-                ...p,
-                id: resInfo.id || p.id,
-                version: resInfo.version || p.version || 1,
-                syncStatus: 'synced' as const,
-              };
-            }
-            return p;
-          });
+          // Eliminar de memoria local los proyectos borrados cuya eliminación ya confirmó el servidor
+          currentProjects = currentProjects
+            .filter((p) => !(p.isDeleted && resultsMap.has(p.id)))
+            .map((p) => {
+              if (resultsMap.has(p.id)) {
+                const resInfo = resultsMap.get(p.id)!;
+                return {
+                  ...p,
+                  id: resInfo.id || p.id,
+                  version: resInfo.version || p.version || 1,
+                  syncStatus: 'synced' as const,
+                };
+              }
+              return p;
+            });
         }
       }
 

@@ -53,13 +53,16 @@ export const SolarCoreTreeSidebar: React.FC = () => {
     setOpenFolderIds((prev) => ({ ...prev, [folderId]: !prev[folderId] }));
   };
 
+  // Filter active (non-deleted) projects
+  const activeProjects = React.useMemo(() => projects.filter((p) => !p.isDeleted), [projects]);
+
   // Distinct team members based strictly on real registered account or project authors
   const teamMembers = React.useMemo(() => {
     const memberSet = new Set<string>();
     if (currentUser?.name) {
       memberSet.add(currentUser.name);
     }
-    projects.forEach((p) => {
+    activeProjects.forEach((p) => {
       if (p.authorName && p.authorName.trim()) {
         memberSet.add(p.authorName.trim());
       }
@@ -68,7 +71,7 @@ export const SolarCoreTreeSidebar: React.FC = () => {
       memberSet.add(currentUser?.email || 'Usuario Principal');
     }
     return Array.from(memberSet);
-  }, [projects, currentUser]);
+  }, [activeProjects, currentUser]);
 
   // Resize sidebar state with mouse drag
   const [sidebarWidth, setSidebarWidth] = useState(290);
@@ -212,14 +215,14 @@ export const SolarCoreTreeSidebar: React.FC = () => {
                 <span className="font-semibold text-sm">Projects</span>
               </div>
               <span className="text-[11px] px-2 py-0.5 rounded-full font-mono bg-slate-100 dark:bg-[#242b3b] text-slate-600 dark:text-zinc-400 font-semibold">
-                {projects.length}
+                {activeProjects.length}
               </span>
             </div>
 
             {/* Sub-lista de proyectos generales con scroll y hasta 15 elementos */}
             {isProjectsOpen && (
               <div className="pl-6 pr-1 flex flex-col gap-1 mt-1 border-l-2 border-slate-100 dark:border-[#272f3e] ml-4 max-h-72 overflow-y-auto custom-scrollbar">
-                {projects.slice(0, 15).map((proj) => (
+                {activeProjects.slice(0, 15).map((proj) => (
                   <div
                     key={proj.id}
                     draggable={true}
@@ -261,7 +264,7 @@ export const SolarCoreTreeSidebar: React.FC = () => {
               <div className="pl-6 pr-1 flex flex-col gap-1 mt-1 border-l-2 border-slate-100 dark:border-[#272f3e] ml-4">
                 {teamMembers.map((member) => {
                   const isSelected = activeTeamMemberFilter === member;
-                  const memberProjectsCount = projects.filter(
+                  const memberProjectsCount = activeProjects.filter(
                     (p) => (p.authorName || '').toLowerCase() === member.toLowerCase()
                   ).length;
 
@@ -334,7 +337,7 @@ export const SolarCoreTreeSidebar: React.FC = () => {
                 folders.map((folder) => {
                   const isSelected = activeFolderId === folder.id;
                   const isOpen = !!openFolderIds[folder.id];
-                  const folderProjects = projects.filter((p) => p.folderId === folder.id);
+                  const folderProjects = activeProjects.filter((p) => p.folderId === folder.id);
                   const isDragOver = dragOverFolderId === folder.id;
 
                   return (

@@ -575,6 +575,42 @@ app.post('/api/sync/push', async (c) => {
 });
 
 // ----------------------------------------------------
+// 5.1 Eliminar Proyecto Específico (Soft-Delete)
+// ----------------------------------------------------
+app.delete('/api/projects/:id', async (c) => {
+  const authUser = await authenticate(c);
+  if (!authUser) {
+    return c.json({ error: 'No autorizado' }, 401);
+  }
+
+  const id = c.req.param('id');
+  const client = await pool.connect();
+  try {
+    const res = await client.query(
+      `UPDATE projects
+       SET is_deleted = TRUE,
+           last_modified_by_id = $1,
+           last_modified_by_name = $2,
+           updated_at = NOW()
+       WHERE id = $3 AND organization_id = $4
+       RETURNING id`,
+      [authUser.id, authUser.name, id, authUser.organizationId]
+    );
+
+    if (res.rows.length === 0) {
+      return c.json({ error: 'Proyecto no encontrado' }, 404);
+    }
+
+    return c.json({ success: true, message: 'Proyecto marcado como eliminado' });
+  } catch (error: any) {
+    console.error('Error al eliminar proyecto:', error);
+    return c.json({ error: error.message || 'Error en el servidor' }, 500);
+  } finally {
+    client.release();
+  }
+});
+
+// ----------------------------------------------------
 // 6. Equipos Fotovoltaicos: Catálogo Sincronizado
 // ----------------------------------------------------
 app.get('/api/equipment', async (c) => {

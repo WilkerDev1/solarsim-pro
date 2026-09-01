@@ -294,6 +294,24 @@ export class SyncService {
   }
 
   /**
+   * Eliminar un proyecto en el servidor
+   */
+  static async deleteProject(serverUrl: string, token: string, projectId: string): Promise<boolean> {
+    const base = this.cleanUrl(serverUrl);
+    try {
+      const res = await fetch(`${base}/api/projects/${projectId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Pull: Descargar catálogo global de equipos desde el servidor
    */
   static async pullEquipment(serverUrl: string, token: string): Promise<{ success: boolean; items?: import('../types/equipment').SolarEquipmentItem[]; error?: string }> {

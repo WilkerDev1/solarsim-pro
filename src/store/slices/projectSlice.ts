@@ -4,6 +4,7 @@ import { BENCHMARK_PROJECT } from '../../engine/referenceCase';
 import { INITIAL_PROJECTS, generateNextProjectSequence, generateDuplicateProjectIdentifiers } from '../initialData';
 import { calculateFinancialSummary, calculateCostMatrixSummary } from '../../engine/financeEngine';
 import { calculateRecommendedPanelCount } from '../../engine/solarEngine';
+import { SyncService } from '../../services/syncService';
 
 export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => ({
   projects: INITIAL_PROJECTS,
@@ -140,10 +141,10 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
       activeProjectId: id,
       activeView: 'simulator',
       isNewProjectModalOpen: false,
-      saveFeedbackMessage: `¡Proyecto "${name}" (${seq.projectId}) creado con éxito!`,
+      saveFeedbackMessage: '¡Nueva propuesta creada con éxito! ✨',
     }));
 
-    setTimeout(() => set({ saveFeedbackMessage: null }), 3500);
+    setTimeout(() => set({ saveFeedbackMessage: null }), 2500);
 
     if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
       get().triggerAutoSync(true);
@@ -151,27 +152,27 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
   },
 
   duplicateProject: (id) => {
-    const target = get().projects.find((p) => p.id === id);
-    if (!target) return;
+    const original = get().projects.find((p) => p.id === id);
+    if (!original) return;
 
+    const dupIdentifiers = generateDuplicateProjectIdentifiers(original, get().projects);
     const newId = `proj-${Date.now()}`;
-    const dupIdentifiers = generateDuplicateProjectIdentifiers(target, get().projects);
     const currentUser = get().syncSettings?.currentUser;
     const cloned: ProjectSimulation = {
-      ...target,
+      ...original,
       id: newId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       status: 'Draft',
-      authorId: currentUser?.id || target.authorId,
-      authorName: currentUser?.name || target.authorName || 'Ing. Solar',
-      authorEmail: currentUser?.email || target.authorEmail,
+      authorId: currentUser?.id || original.authorId,
+      authorName: currentUser?.name || original.authorName || 'Ing. Solar',
+      authorEmail: currentUser?.email || original.authorEmail,
       lastModifiedBy: currentUser?.name || 'Ing. Solar',
       lastModifiedAt: new Date().toISOString(),
       version: 1,
       syncStatus: currentUser ? 'pending' : 'local_only',
       client: {
-        ...target.client,
+        ...original.client,
         name: `${dupIdentifiers.cleanName} (Copia)`,
         projectId: dupIdentifiers.projectId,
         quoteNumber: dupIdentifiers.quoteNumber,
@@ -192,18 +193,39 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
   },
 
   deleteProject: (id) => {
-    const remaining = get().projects.filter((p) => p.id !== id);
-    if (remaining.length === 0) return;
+    const target = get().projects.find((p) => p.id === id);
+    if (!target) return;
+
+    const serverUrl = get().syncSettings?.serverUrl;
+    const authToken = get().syncSettings?.authToken;
+    const hasSyncAuth = !!(authToken && get().syncSettings?.autoSyncEnabled);
+
+    let nextProjects: ProjectSimulation[];
+    if (hasSyncAuth) {
+      nextProjects = get().projects.map((p) =>
+        p.id === id
+          ? { ...p, isDeleted: true, syncStatus: 'pending' as const, updatedAt: new Date().toISOString() }
+          : p
+      );
+      if (serverUrl && authToken) {
+        SyncService.deleteProject(serverUrl, authToken, id).catch(() => {});
+      }
+    } else {
+      nextProjects = get().projects.filter((p) => p.id !== id);
+    }
+
+    const activeRemaining = nextProjects.filter((p) => !p.isDeleted);
+    const nextActiveId = activeRemaining.length > 0 ? activeRemaining[0].id : '';
 
     set((state) => ({
-      projects: remaining,
-      activeProjectId: state.activeProjectId === id ? remaining[0].id : state.activeProjectId,
+      projects: nextProjects,
+      activeProjectId: state.activeProjectId === id ? nextActiveId : state.activeProjectId,
       saveFeedbackMessage: 'Proyecto eliminado.',
     }));
 
     setTimeout(() => set({ saveFeedbackMessage: null }), 2500);
 
-    if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
+    if (hasSyncAuth) {
       get().triggerAutoSync(true);
     }
   },
@@ -461,9 +483,10 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
 
   getActiveProject: () => {
     const state = get();
-    const found = state.projects.find((p) => p.id === state.activeProjectId);
+    const activeProjects = state.projects.filter((p) => !p.isDeleted);
+    const found = activeProjects.find((p) => p.id === state.activeProjectId);
     if (found && found.client && found.specs && found.rates) return found;
-    return state.projects[0] || BENCHMARK_PROJECT;
+    return activeProjects[0] || state.projects[0] || BENCHMARK_PROJECT;
   },
 
   getFinancialSummary: () => {
