@@ -24,17 +24,32 @@ export interface NewProjectPayload {
   address?: string;
 }
 
+export interface DefaultSimulationSettings {
+  currency: 'USD' | 'DOP';
+  taxRatePct: number;
+  discountRatePct: number;
+  applyITBISExemption: boolean;
+  applyLey5707: boolean;
+  targetCoveragePct: number;
+  panelPowerW: number;
+  systemLosses: number;
+  annualDegradation: number;
+  lifespanYears: number;
+}
+
 export interface ProjectSlice {
   projects: ProjectSimulation[];
   activeProjectId: string;
   activeView: 'dashboard' | 'simulator' | 'pdf-preview';
   searchQuery: string;
   statusFilter: string;
+  defaultSimulationSettings: DefaultSimulationSettings;
 
   setActiveView: (view: 'dashboard' | 'simulator' | 'pdf-preview') => void;
   setActiveProject: (id: string) => void;
   setSearchQuery: (query: string) => void;
   setStatusFilter: (filter: string) => void;
+  updateDefaultSimulationSettings: (settings: Partial<DefaultSimulationSettings>) => void;
 
   createNewProject: (payload?: string | NewProjectPayload) => void;
   duplicateProject: (id: string) => void;

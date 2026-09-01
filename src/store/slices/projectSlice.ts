@@ -11,11 +11,30 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
   activeView: 'simulator',
   searchQuery: '',
   statusFilter: 'All',
+  defaultSimulationSettings: {
+    currency: 'USD',
+    taxRatePct: 18,
+    discountRatePct: 12,
+    applyITBISExemption: true,
+    applyLey5707: true,
+    targetCoveragePct: 95,
+    panelPowerW: 620,
+    systemLosses: 25.0,
+    annualDegradation: 0.40,
+    lifespanYears: 25,
+  },
 
   setActiveView: (view) => set({ activeView: view }),
   setActiveProject: (id) => set({ activeProjectId: id, activeView: 'simulator' }),
   setSearchQuery: (query) => set({ searchQuery: query }),
   setStatusFilter: (filter) => set({ statusFilter: filter }),
+  updateDefaultSimulationSettings: (settingsPartial) =>
+    set((state) => ({
+      defaultSimulationSettings: {
+        ...state.defaultSimulationSettings,
+        ...settingsPartial,
+      },
+    })),
 
   createNewProject: (payload) => {
     const id = `proj-${Date.now()}`;
@@ -27,6 +46,18 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     const address = typeof payload === 'object' && payload?.address ? payload.address : `${province}, República Dominicana`;
     const seq = generateNextProjectSequence(get().projects);
     const currentUser = get().syncSettings?.currentUser;
+    const defs = get().defaultSimulationSettings || {
+      currency: 'USD',
+      taxRatePct: 18,
+      discountRatePct: 12,
+      applyITBISExemption: true,
+      applyLey5707: true,
+      targetCoveragePct: 95,
+      panelPowerW: 620,
+      systemLosses: 25.0,
+      annualDegradation: 0.40,
+      lifespanYears: 25,
+    };
 
     const newProj: ProjectSimulation = {
       ...BENCHMARK_PROJECT,
@@ -56,14 +87,21 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
       },
       specs: {
         ...BENCHMARK_PROJECT.specs,
-        systemLosses: 25.0,
+        panelPowerW: defs.panelPowerW,
+        systemLosses: defs.systemLosses,
         autoCalculatePanels: false,
       },
       rates: {
         ...BENCHMARK_PROJECT.rates,
-        targetCoveragePct: 95,
+        targetCoveragePct: defs.targetCoveragePct,
         distributor,
         tariffCode,
+      },
+      financials: {
+        ...BENCHMARK_PROJECT.financials,
+        discountRatePct: defs.discountRatePct,
+        applyITBISExemption: defs.applyITBISExemption,
+        applyLey5707: defs.applyLey5707,
       },
     };
 

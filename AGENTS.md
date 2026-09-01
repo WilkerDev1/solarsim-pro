@@ -107,8 +107,8 @@ solarsim/
 │   └── components/
 │       ├── common/                          # Modales, cabeceras y utilidades compartidas
 │       │   ├── Header.tsx                   # Barra superior con navegación, estado de sync y botones
-│       │   ├── SettingsModal.tsx            # Centro de Ajustes unificado (Nube, Cuenta, Share, IA, Catálogo)
-│       │   ├── EquipmentManagerSettingsTab.tsx # Administrador de Catálogo con tabla, edición y filtros
+│       │   ├── SettingsModal.tsx            # Centro de Configuración en Pantalla Completa (Sidebar de accesos directos, Perfil, Simulación, IA, Catálogo, RBAC, Respaldo)
+│       │   ├── EquipmentManagerSettingsTab.tsx # Administrador de Catálogo con tabla, edición, filtros y sync en la nube
 │       │   ├── AIInvoiceScannerModal.tsx    # Modal de escáner de facturas con Gemini Vision
 │       │   ├── AIDatasheetScannerModal.tsx  # Modal de escáner de fichas técnicas de equipos con IA
 │       │   ├── ShareProposalModal.tsx       # Modal de compartir propuesta web interactiva y QR

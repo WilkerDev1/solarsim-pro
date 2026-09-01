@@ -56,13 +56,17 @@ graph TD
    - **Ruta**: `/home/agente/servicios/solarsim-api/`
    - **Puerto Interno**: `3000`
    - **Endpoints Principales**:
-     - `POST /api/auth/login` (Autenticación JWT)
-     - `POST /api/auth/register` (Registro de usuario y organización)
-     - `GET /api/projects` (Pull de proyectos con timestamp delta)
-     - `POST /api/projects/sync` (Push de proyectos modificados)
-     - `GET /api/equipment` (Pull del catálogo global de equipos)
-     - `POST /api/equipment/batch` (Push por lotes de nuevos equipos o fichas técnicas escaneadas)
-     - `GET /api/health` (Healthcheck)
+     - `POST /api/auth/login` (Autenticación JWT y retorno de perfil de usuario)
+     - `POST /api/auth/register` (Registro de organización y cuenta ADMIN)
+     - `GET /api/auth/me` (Validación de token y datos de sesión activa)
+     - `GET /api/users` (Listado de integrantes de la organización - Solo ADMIN)
+     - `POST /api/users` (Invitación y creación de nuevos miembros de equipo - Solo ADMIN)
+     - `PATCH /api/users/:id` (Activación, desactivación y cambio de rol RBAC - Solo ADMIN)
+     - `POST /api/sync/pull` (Pull de propuestas autoritativas de toda la organización / Servidor como Fuente de Verdad)
+     - `POST /api/sync/push` (Push delta con resolución automática de colisiones de IDs y bifurcación a versiones V2, V3, V4...)
+     - `GET /api/equipment` (Catálogo global estándar de equipos + equipos personalizados de la empresa)
+     - `POST /api/equipment/batch` (Upsert por lotes de equipos escaneados con IA o creados manualmente)
+     - `GET /api/health` (Healthcheck y medición de latencia)
 
 4. **`electsun-web` (Sitio Web Corporativo)**:
    - **Ruta**: `/home/agente/servicios/electsun-web/`
