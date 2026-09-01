@@ -13,11 +13,11 @@ import {
   Edit2,
   Trash2,
   Sparkles,
-  Layers,
   Check,
 } from 'lucide-react';
 import { CreateFolderModal } from './CreateFolderModal';
 import { ProjectFolder } from '../../../types';
+import electsunEmblem from '../../../assets/electsun-emblem-transparent.png';
 
 export const SolarCoreTreeSidebar: React.FC = () => {
   const {
@@ -96,17 +96,22 @@ export const SolarCoreTreeSidebar: React.FC = () => {
 
   return (
     <aside className="w-72 md:w-80 h-full border-r border-slate-200/90 dark:border-[#27272a] bg-white dark:bg-[#161a22] flex flex-col justify-between shrink-0 select-none z-30 overflow-hidden shadow-xs">
-      {/* ☀️ Header: Solar Core Brand */}
+      {/* ☀️ Header: SolarSim Pro Brand con Logo Electsun */}
       <div className="flex flex-col flex-1 overflow-y-auto">
-        <div className="p-5 pb-4 border-b border-slate-100 dark:border-[#222734] flex items-center justify-between">
+        <div className="p-4 pb-3.5 border-b border-slate-100 dark:border-[#222734] flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-emerald-100/70 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 flex items-center justify-center font-bold shadow-2xs">
-              <Layers className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
-            </div>
-            <div>
-              <h2 className="text-lg font-extrabold tracking-tight text-emerald-950 dark:text-white flex items-center gap-1.5">
-                <span>Solar Core</span>
+            <img
+              src={electsunEmblem}
+              alt="Electsun Emblem"
+              className="w-7 h-7 object-contain select-none shrink-0 drop-shadow-2xs"
+            />
+            <div className="flex items-center gap-1.5">
+              <h2 className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white">
+                SolarSim
               </h2>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-400">
+                PRO
+              </span>
             </div>
           </div>
         </div>
@@ -154,10 +159,10 @@ export const SolarCoreTreeSidebar: React.FC = () => {
               </span>
             </div>
 
-            {/* Sub-lista de proyectos generales */}
+            {/* Sub-lista de proyectos generales con scroll y hasta 15 elementos */}
             {isProjectsOpen && (
-              <div className="pl-6 pr-1 flex flex-col gap-1 mt-1 border-l-2 border-slate-100 dark:border-[#272f3e] ml-4">
-                {projects.slice(0, 8).map((proj) => (
+              <div className="pl-6 pr-1 flex flex-col gap-1 mt-1 border-l-2 border-slate-100 dark:border-[#272f3e] ml-4 max-h-72 overflow-y-auto custom-scrollbar">
+                {projects.slice(0, 15).map((proj) => (
                   <div
                     key={proj.id}
                     draggable={true}
@@ -166,7 +171,7 @@ export const SolarCoreTreeSidebar: React.FC = () => {
                       e.dataTransfer.effectAllowed = 'move';
                     }}
                     onClick={() => setActiveProject(proj.id)}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#202634] flex items-center gap-2 transition-all truncate cursor-grab active:cursor-grabbing group"
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#202634] flex items-center gap-2 transition-all truncate cursor-grab active:cursor-grabbing group shrink-0"
                     title={proj.client.name}
                   >
                     <FileText className="w-3.5 h-3.5 shrink-0 text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400" />
@@ -341,7 +346,7 @@ export const SolarCoreTreeSidebar: React.FC = () => {
 
                       {/* Proyectos dentro de esta Carpeta */}
                       {isOpen && (
-                        <div className="pl-6 pr-1 flex flex-col gap-1 mt-1 border-l-2 border-slate-100 dark:border-[#272f3e] ml-4">
+                        <div className="pl-6 pr-1 flex flex-col gap-1 mt-1 border-l-2 border-slate-100 dark:border-[#272f3e] ml-4 max-h-60 overflow-y-auto custom-scrollbar">
                           {folderProjects.length === 0 ? (
                             <span className="text-[10px] text-slate-400 italic py-1 pl-2">
                               Arrastra proyectos aquí
@@ -356,7 +361,7 @@ export const SolarCoreTreeSidebar: React.FC = () => {
                                   e.dataTransfer.effectAllowed = 'move';
                                 }}
                                 onClick={() => setActiveProject(proj.id)}
-                                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#202634] flex items-center gap-2 transition-all truncate cursor-grab active:cursor-grabbing group"
+                                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#202634] flex items-center gap-2 transition-all truncate cursor-grab active:cursor-grabbing group shrink-0"
                                 title={proj.client.name}
                               >
                                 <FileText className="w-3.5 h-3.5 shrink-0 text-slate-400 group-hover:text-emerald-500" />
