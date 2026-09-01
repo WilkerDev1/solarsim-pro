@@ -23,14 +23,9 @@ export const FoldersResumeGrid: React.FC = () => {
     <div className="flex flex-col gap-5 pt-8 border-t border-slate-200/80 dark:border-[#272f3e]">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-sm font-black tracking-wider uppercase text-slate-800 dark:text-zinc-200">
-            Folders Resume
-          </h3>
-          <p className="text-xs text-slate-400 dark:text-zinc-500">
-            Organización por categorías y carpetas de proyectos
-          </p>
-        </div>
+        <h3 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white uppercase">
+          Folders
+        </h3>
 
         {isAdmin && (
           <button
