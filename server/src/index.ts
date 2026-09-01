@@ -80,18 +80,17 @@ app.post('/api/auth/register', async (c) => {
         return c.json({ error: 'El correo electrónico ya está registrado en el sistema' }, 409);
       }
 
-      // Comprobar cantidad total de usuarios para asignar ADMIN al primero
-      const userCountRes = await client.query('SELECT COUNT(*) FROM users');
-      const isFirstUser = parseInt(userCountRes.rows[0].count) === 0;
-      const role = isFirstUser ? 'ADMIN' : 'EDITOR';
-
       let orgId = 'org-electsun-default';
+      let role = 'ADMIN';
       if (organizationName) {
         orgId = `org-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
         await client.query(
           'INSERT INTO organizations (id, name, rnc, plan) VALUES ($1, $2, $3, $4)',
           [orgId, organizationName, organizationRnc || null, 'enterprise']
         );
+      } else {
+        const orgUsers = await client.query('SELECT COUNT(*) FROM users WHERE organization_id = $1', [orgId]);
+        role = parseInt(orgUsers.rows[0].count) === 0 ? 'ADMIN' : 'EDITOR';
       }
 
       const userId = `usr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -347,7 +346,7 @@ interface ProjectRow {
   updated_at: Date | string;
 }
 
-// Pull: Descargar proyectos nuevos o actualizados desde lastSync
+// Pull: Descargar proyectos de la organización (modelo colaborativo / servidor como fuente de verdad)
 app.post('/api/sync/pull', async (c) => {
   const authUser = await authenticate(c);
   if (!authUser) {
@@ -355,21 +354,31 @@ app.post('/api/sync/pull', async (c) => {
   }
 
   const body = await c.req.json().catch(() => ({}));
-  const lastSyncTimestamp = body.lastSyncTimestamp || '1970-01-01T00:00:00.000Z';
+  const lastSyncTimestamp = body.lastSyncTimestamp;
 
-  const res = await pool.query<ProjectRow>(
-    `SELECT id, organization_id, created_by_id, created_by_name, created_by_email,
-            last_modified_by_name, client_name, project_code, system_capacity_kwp,
-            version, data_json, is_deleted, created_at, updated_at
-     FROM projects
-     WHERE organization_id = $1 AND updated_at > $2
-     ORDER BY updated_at ASC`,
-    [authUser.organizationId, lastSyncTimestamp]
-  );
+  // Si se pasa lastSyncTimestamp, filtra por cambios recientes; de lo contrario retorna el catálogo completo de la empresa
+  let query = `
+    SELECT id, organization_id, created_by_id, created_by_name, created_by_email,
+           last_modified_by_id, last_modified_by_name, client_name, project_code, system_capacity_kwp,
+           version, data_json, is_deleted, created_at, updated_at
+    FROM projects
+    WHERE organization_id = $1 AND is_deleted = FALSE
+  `;
+  const params: any[] = [authUser.organizationId];
+
+  if (lastSyncTimestamp && lastSyncTimestamp !== '1970-01-01T00:00:00.000Z') {
+    query += ` AND updated_at > $2`;
+    params.push(lastSyncTimestamp);
+  }
+
+  query += ` ORDER BY updated_at DESC`;
+
+  const res = await pool.query<ProjectRow>(query, params);
 
   const projects = res.rows.map((row: ProjectRow) => {
-    const data = row.data_json;
+    const data = typeof row.data_json === 'string' ? JSON.parse(row.data_json) : row.data_json;
     const updatedAtIso = row.updated_at instanceof Date ? row.updated_at.toISOString() : new Date(row.updated_at).toISOString();
+    const createdAtIso = row.created_at instanceof Date ? row.created_at.toISOString() : new Date(row.created_at).toISOString();
     return {
       ...data,
       id: row.id,
@@ -379,6 +388,8 @@ app.post('/api/sync/pull', async (c) => {
       authorEmail: row.created_by_email,
       lastModifiedBy: row.last_modified_by_name,
       lastModifiedAt: updatedAtIso,
+      createdAt: createdAtIso,
+      updatedAt: updatedAtIso,
       syncStatus: 'synced',
       isDeleted: row.is_deleted,
     };
@@ -392,7 +403,7 @@ app.post('/api/sync/pull', async (c) => {
   });
 });
 
-// Push: Subir cambios locales hacia el servidor
+// Push: Subir cambios locales hacia el servidor con resolución inteligente de colisiones (V2, V3, V4...)
 app.post('/api/sync/push', async (c) => {
   const authUser = await authenticate(c);
   if (!authUser) {
@@ -417,25 +428,36 @@ app.post('/api/sync/push', async (c) => {
     await client.query('BEGIN');
 
     for (const proj of projects) {
-      const projId = proj.id;
+      const originalProjId = proj.id;
+      let finalProjId = originalProjId;
       const clientName = proj.client?.name || 'Cliente';
       const projectCode = proj.client?.projectId || 'PRJ';
       const capacity = ((proj.specs?.panelPowerW || 0) * (proj.specs?.panelCount || 0)) / 1000;
-      const clientVersion = proj.version || 1;
       const isDeleted = proj.isDeleted || false;
 
-      // Buscar si el proyecto ya existe en PostgreSQL
+      // Buscar si el ID de proyecto ya existe globalmente en PostgreSQL
       const existingRes = await client.query(
-        'SELECT id, version, updated_at, created_by_id, created_by_name, created_by_email FROM projects WHERE id = $1 AND organization_id = $2',
-        [projId, authUser.organizationId]
+        'SELECT id, organization_id, version, updated_at, created_by_id, created_by_name, created_by_email, data_json FROM projects WHERE id = $1',
+        [finalProjId]
       );
 
       if (existingRes.rows.length === 0) {
-        // Nuevo proyecto creado
+        // ID libre: Nuevo proyecto creado en el servidor
         const newVersion = 1;
         const authorId = proj.authorId || authUser.id;
         const authorName = proj.authorName || authUser.name;
         const authorEmail = proj.authorEmail || authUser.email;
+        const dataJson = {
+          ...proj,
+          id: finalProjId,
+          version: newVersion,
+          authorId,
+          authorName,
+          authorEmail,
+          lastModifiedBy: authUser.name,
+          lastModifiedAt: new Date().toISOString(),
+          syncStatus: 'synced',
+        };
 
         await client.query(
           `INSERT INTO projects (
@@ -444,37 +466,94 @@ app.post('/api/sync/push', async (c) => {
             system_capacity_kwp, version, data_json, is_deleted, created_at, updated_at
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())`,
           [
-            projId, authUser.organizationId, authorId, authorName, authorEmail,
+            finalProjId, authUser.organizationId, authorId, authorName, authorEmail,
             authUser.id, authUser.name, clientName, projectCode, capacity,
-            newVersion, JSON.stringify(proj), isDeleted
+            newVersion, JSON.stringify(dataJson), isDeleted
           ]
         );
 
-        results.push({ id: projId, status: 'created', version: newVersion });
+        results.push({ id: finalProjId, originalId: originalProjId, status: 'created', version: newVersion });
       } else {
-        // Actualizar proyecto existente
         const existing = existingRes.rows[0];
-        const newVersion = existing.version + 1;
+        const isSameOrg = existing.organization_id === authUser.organizationId;
 
-        await client.query(
-          `UPDATE projects SET
-            last_modified_by_id = $1,
-            last_modified_by_name = $2,
-            client_name = $3,
-            project_code = $4,
-            system_capacity_kwp = $5,
-            version = $6,
-            data_json = $7,
-            is_deleted = $8,
-            updated_at = NOW()
-          WHERE id = $9 AND organization_id = $10`,
-          [
-            authUser.id, authUser.name, clientName, projectCode, capacity,
-            newVersion, JSON.stringify(proj), isDeleted, projId, authUser.organizationId
-          ]
-        );
+        // Si se solicita forzar nueva versión o si el ID pertenece a otra organización:
+        if (proj.forceNewVersion || !isSameOrg) {
+          let vNum = 2;
+          let candidateId = `${originalProjId}-v${vNum}`;
+          while (true) {
+            const checkRes = await client.query('SELECT id FROM projects WHERE id = $1', [candidateId]);
+            if (checkRes.rows.length === 0) break;
+            vNum++;
+            candidateId = `${originalProjId}-v${vNum}`;
+          }
 
-        results.push({ id: projId, status: 'updated', version: newVersion });
+          finalProjId = candidateId;
+          const forkedCode = `${projectCode}-V${vNum}`;
+          const forkedName = `${clientName} (V${vNum})`;
+          const forkedData = {
+            ...proj,
+            id: finalProjId,
+            version: 1,
+            authorId: authUser.id,
+            authorName: authUser.name,
+            authorEmail: authUser.email,
+            lastModifiedBy: authUser.name,
+            lastModifiedAt: new Date().toISOString(),
+            syncStatus: 'synced',
+            client: {
+              ...proj.client,
+              name: forkedName,
+              projectId: forkedCode,
+            },
+          };
+
+          await client.query(
+            `INSERT INTO projects (
+              id, organization_id, created_by_id, created_by_name, created_by_email,
+              last_modified_by_id, last_modified_by_name, client_name, project_code,
+              system_capacity_kwp, version, data_json, is_deleted, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())`,
+            [
+              finalProjId, authUser.organizationId, authUser.id, authUser.name, authUser.email,
+              authUser.id, authUser.name, forkedName, forkedCode, capacity,
+              1, JSON.stringify(forkedData), isDeleted
+            ]
+          );
+
+          results.push({ id: finalProjId, originalId: originalProjId, status: 'forked', version: 1 });
+        } else {
+          // Actualización normal del proyecto existente dentro de la misma organización
+          const newVersion = (existing.version || 1) + 1;
+          const updatedData = {
+            ...proj,
+            id: finalProjId,
+            version: newVersion,
+            lastModifiedBy: authUser.name,
+            lastModifiedAt: new Date().toISOString(),
+            syncStatus: 'synced',
+          };
+
+          await client.query(
+            `UPDATE projects SET
+              last_modified_by_id = $1,
+              last_modified_by_name = $2,
+              client_name = $3,
+              project_code = $4,
+              system_capacity_kwp = $5,
+              version = $6,
+              data_json = $7,
+              is_deleted = $8,
+              updated_at = NOW()
+            WHERE id = $9 AND organization_id = $10`,
+            [
+              authUser.id, authUser.name, clientName, projectCode, capacity,
+              newVersion, JSON.stringify(updatedData), isDeleted, finalProjId, authUser.organizationId
+            ]
+          );
+
+          results.push({ id: finalProjId, originalId: originalProjId, status: 'updated', version: newVersion });
+        }
       }
     }
 
@@ -482,7 +561,7 @@ app.post('/api/sync/push', async (c) => {
 
     return c.json({
       success: true,
-      message: `${results.length} proyecto(s) sincronizado(s) exitosamente`,
+      message: `${results.length} propuesta(s) sincronizada(s) exitosamente`,
       serverTimestamp: new Date().toISOString(),
       results
     });
@@ -513,7 +592,7 @@ app.get('/api/equipment', async (c) => {
               temp_coeff as "tempCoeff", category, voltage_mppt as "voltageMPPT",
               details, created_at as "createdAt", updated_at as "updatedAt"
        FROM equipment_catalog
-       WHERE organization_id = $1
+       WHERE organization_id = $1 OR organization_id = 'org-electsun-default'
        ORDER BY display_name ASC`,
       [authUser.organizationId]
     );
@@ -599,6 +678,7 @@ app.post('/api/equipment/batch', async (c) => {
           (id, organization_id, type, brand, model_series, display_name, power_w, power_kw, capacity_kwh, voltage_v, dod_pct, efficiency_pct, temp_coeff, category, voltage_mppt, details, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
          ON CONFLICT (id) DO UPDATE SET
+          organization_id = EXCLUDED.organization_id,
           brand = EXCLUDED.brand,
           model_series = EXCLUDED.model_series,
           display_name = EXCLUDED.display_name,

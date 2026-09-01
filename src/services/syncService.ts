@@ -28,7 +28,7 @@ export interface SyncPushResult {
   success: boolean;
   message?: string;
   serverTimestamp?: string;
-  results?: Array<{ id: string; status: string; version: number }>;
+  results?: Array<{ id: string; originalId?: string; status: string; version: number }>;
   error?: string;
 }
 
@@ -234,7 +234,7 @@ export class SyncService {
   /**
    * Pull: Descargar proyectos actualizados en el servidor
    */
-  static async pullProjects(serverUrl: string, token: string, lastSyncTimestamp: string | null): Promise<SyncPullResult> {
+  static async pullProjects(serverUrl: string, token: string, lastSyncTimestamp?: string | null): Promise<SyncPullResult> {
     const base = this.cleanUrl(serverUrl);
     try {
       const res = await fetch(`${base}/api/sync/pull`, {

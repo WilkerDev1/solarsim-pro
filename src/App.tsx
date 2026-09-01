@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useSimulationStore } from './store/useSimulationStore';
 import { Header } from './components/common/Header';
 import { DashboardView } from './components/dashboard/DashboardView';
@@ -16,8 +16,44 @@ import { SplashScreen } from './components/common/SplashScreen';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 export const App: React.FC = () => {
-  const { activeView, setActiveView, sidebarTheme } = useSimulationStore();
+  const { activeView, setActiveView, sidebarTheme, syncSettings, syncProjectsWithServer } = useSimulationStore();
   const isDark = sidebarTheme === 'dark';
+
+  // 🔄 Ciclo de Vida Global de Sincronización Automática en Segundo Plano (Heartbeat & Focus)
+  useEffect(() => {
+    if (syncSettings.authToken && syncSettings.autoSyncEnabled) {
+      // 1. Sincronización inicial silenciosa al abrir la app
+      syncProjectsWithServer(true);
+    }
+
+    // 2. Heartbeat periódico cada 15 segundos (Red Social / Servidor como Fuente de Verdad)
+    const interval = setInterval(() => {
+      const state = useSimulationStore.getState();
+      if (state.syncSettings.authToken && state.syncSettings.autoSyncEnabled && !state.isSyncing) {
+        state.syncProjectsWithServer(true);
+      }
+    }, 15000);
+
+    // 3. Sincronización al reenfocar la ventana o cambiar de pestaña
+    const handleFocus = () => {
+      const state = useSimulationStore.getState();
+      if (state.syncSettings.authToken && state.syncSettings.autoSyncEnabled && !state.isSyncing) {
+        state.syncProjectsWithServer(true);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') handleFocus();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [syncSettings.authToken, syncSettings.autoSyncEnabled]);
 
   return (
     <div

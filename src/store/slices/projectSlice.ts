@@ -78,7 +78,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     setTimeout(() => set({ saveFeedbackMessage: null }), 3500);
 
     if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
-      get().syncProjectsWithServer();
+      get().triggerAutoSync(true);
     }
   },
 
@@ -119,7 +119,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
 
     if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
-      get().syncProjectsWithServer();
+      get().triggerAutoSync(true);
     }
   },
 
@@ -136,24 +136,28 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     setTimeout(() => set({ saveFeedbackMessage: null }), 2500);
 
     if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
-      get().syncProjectsWithServer();
+      get().triggerAutoSync(true);
     }
   },
 
   setProjectStatus: (id, status) => {
     set((state) => ({
       projects: state.projects.map((p) =>
-        p.id === id ? { ...p, status, updatedAt: new Date().toISOString() } : p
+        p.id === id ? { ...p, status, syncStatus: 'pending' as const, updatedAt: new Date().toISOString() } : p
       ),
       saveFeedbackMessage: `Estado actualizado a "${status}"`,
     }));
     setTimeout(() => set({ saveFeedbackMessage: null }), 2000);
+
+    if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
+      get().triggerAutoSync(true);
+    }
   },
 
   saveActiveProject: () => {
     set((state) => ({
       projects: state.projects.map((p) =>
-        p.id === state.activeProjectId ? { ...p, updatedAt: new Date().toISOString() } : p
+        p.id === state.activeProjectId ? { ...p, syncStatus: 'pending' as const, updatedAt: new Date().toISOString() } : p
       ),
       saveFeedbackMessage: '¡Proyecto guardado con éxito! ✨',
     }));
@@ -161,7 +165,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     setTimeout(() => set({ saveFeedbackMessage: null }), 2500);
 
     if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
-      get().syncProjectsWithServer();
+      get().triggerAutoSync(true);
     }
   },
 
@@ -189,6 +193,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
 
           return {
             ...p,
+            syncStatus: 'pending' as const,
             updatedAt: new Date().toISOString(),
             client: updatedClient,
             specs: updatedSpecs,
@@ -197,6 +202,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
         return p;
       }),
     }));
+
+    get().triggerAutoSync(false);
   },
 
   updateSpecs: (specsPartial) => {
@@ -230,11 +237,13 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
       return {
         projects: state.projects.map((p) =>
           p.id === state.activeProjectId
-            ? { ...p, updatedAt: new Date().toISOString(), specs: mergedSpecs }
+            ? { ...p, syncStatus: 'pending' as const, updatedAt: new Date().toISOString(), specs: mergedSpecs }
             : p
         ),
       };
     });
+
+    get().triggerAutoSync(false);
   },
 
   updateRates: (ratesPartial) => {
@@ -260,6 +269,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
 
           return {
             ...p,
+            syncStatus: 'pending' as const,
             updatedAt: new Date().toISOString(),
             rates: updatedRates,
             specs: updatedSpecs,
@@ -268,6 +278,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
         return p;
       }),
     }));
+
+    get().triggerAutoSync(false);
   },
 
   updateFinancials: (finPartial) => {
@@ -276,12 +288,15 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
         p.id === state.activeProjectId
           ? {
               ...p,
+              syncStatus: 'pending' as const,
               updatedAt: new Date().toISOString(),
               financials: { ...p.financials, ...finPartial },
             }
           : p
       ),
     }));
+
+    get().triggerAutoSync(false);
   },
 
   updateMonthlyConsumption: (index, value) => {
@@ -309,6 +324,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
 
           return {
             ...p,
+            syncStatus: 'pending' as const,
             updatedAt: new Date().toISOString(),
             monthlyConsumption: newConsumption,
             specs: updatedSpecs,
@@ -317,6 +333,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
         return p;
       }),
     }));
+
+    get().triggerAutoSync(false);
   },
 
   updateAllMonthlyConsumption: (value) => {
@@ -343,6 +361,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
 
           return {
             ...p,
+            syncStatus: 'pending' as const,
             updatedAt: new Date().toISOString(),
             monthlyConsumption: newConsumption,
             specs: updatedSpecs,
@@ -351,6 +370,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
         return p;
       }),
     }));
+
+    get().triggerAutoSync(false);
   },
 
   updateDocumentCustomization: (customizationPartial) => {
@@ -359,12 +380,15 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
         p.id === state.activeProjectId
           ? {
               ...p,
+              syncStatus: 'pending' as const,
               updatedAt: new Date().toISOString(),
               customization: { ...(p.customization || {}), ...customizationPartial },
             }
           : p
       ),
     }));
+
+    get().triggerAutoSync(false);
   },
 
   getActiveProject: () => {

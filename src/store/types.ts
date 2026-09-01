@@ -74,7 +74,8 @@ export interface SyncAuthSlice {
   loginUser: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   registerUser: (name: string, email: string, password: string, organizationName?: string) => Promise<{ success: boolean; error?: string }>;
   logoutUser: () => void;
-  syncProjectsWithServer: () => Promise<{ success: boolean; message: string }>;
+  syncProjectsWithServer: (silent?: boolean) => Promise<{ success: boolean; message: string }>;
+  triggerAutoSync: (immediate?: boolean) => void;
 }
 
 export interface ImportExportSlice {
