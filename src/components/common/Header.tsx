@@ -1,6 +1,14 @@
 import React from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
-import { Sun, Moon, FileText, LayoutDashboard, Save, Plus, ArrowLeft, RefreshCw, CheckCircle2, Sparkles, Bot, Share2, Globe, Settings, Cloud } from 'lucide-react';
+import {
+  FileText,
+  Sun,
+  Save,
+  ArrowLeft,
+  CheckCircle2,
+  Share2,
+  Globe,
+} from 'lucide-react';
 import electsunEmblem from '../../assets/electsun-emblem-transparent.png';
 
 export const Header: React.FC = () => {
@@ -8,19 +16,11 @@ export const Header: React.FC = () => {
     activeView,
     setActiveView,
     getActiveProject,
-    openNewProjectModal,
-    openUpdateModal,
-    openAIInvoiceModal,
-    openAIDatasheetModal,
     openShareModal,
-    openSettingsModal,
-    syncSettings,
-    isSyncing,
     saveActiveProject,
     exportProjectAsJSON,
     saveFeedbackMessage,
     sidebarTheme,
-    toggleSidebarTheme,
   } = useSimulationStore();
 
   const isDark = sidebarTheme === 'dark';
@@ -35,6 +35,7 @@ export const Header: React.FC = () => {
             : 'bg-white border-b border-slate-200 text-slate-900 shadow-xs'
         }`}
       >
+        {/* Left: Branding & Active Project Context */}
         <div className="flex items-center gap-6">
           <div
             className="flex items-center gap-2.5 cursor-pointer group"
@@ -46,7 +47,11 @@ export const Header: React.FC = () => {
               alt="Electsun Logo"
               className="w-8 h-8 object-contain transition-transform duration-200 group-hover:scale-105 select-none shrink-0"
             />
-            <h1 className={`font-bold text-xl tracking-tight transition-colors ${isDark ? 'text-white' : 'text-emerald-950'}`}>
+            <h1
+              className={`font-bold text-xl tracking-tight transition-colors ${
+                isDark ? 'text-white' : 'text-emerald-950'
+              }`}
+            >
               SolarSim Pro
             </h1>
           </div>
@@ -80,9 +85,9 @@ export const Header: React.FC = () => {
           )}
         </div>
 
-        {/* Navigation & Action Buttons */}
+        {/* Right: Navigation & Action Buttons */}
         <div className="flex items-center gap-3">
-          {/* Project Navigation (Only shown when inside a project) */}
+          {/* Project Navigation */}
           {activeView !== 'dashboard' && (
             <div className="flex items-center gap-2">
               {/* Back to Projects Button */}
@@ -140,85 +145,9 @@ export const Header: React.FC = () => {
             </div>
           )}
 
-          {/* Theme Toggle Button (Selector de Modo Oscuro / Claro - Icon Only) */}
-          <button
-            onClick={toggleSidebarTheme}
-            className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all cursor-pointer shadow-xs shrink-0 ${
-              isDark
-                ? 'bg-[#27272a] border-[#3f3f46] text-indigo-400 hover:bg-[#323238] hover:text-indigo-300'
-                : 'bg-white border-slate-200 text-amber-500 hover:bg-slate-50 hover:text-amber-600'
-            }`}
-            title={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
-          >
-            {isDark ? (
-              <Moon className="w-4 h-4 fill-indigo-400/20" />
-            ) : (
-              <Sun className="w-4 h-4 fill-amber-500/20" />
-            )}
-          </button>
-
-          <div className={`flex items-center gap-2 border-l pl-3 ${isDark ? 'border-[#27272a]' : 'border-slate-200'}`}>
-            {/* Button Escanear Factura con IA */}
-            <button
-              onClick={openAIInvoiceModal}
-              className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all shadow-md cursor-pointer active:scale-95 group relative shrink-0 ${
-                isDark
-                  ? 'border-purple-500/60 bg-gradient-to-br from-purple-950 via-purple-900/70 to-indigo-950 text-purple-300 hover:border-purple-400 hover:shadow-purple-900/50 hover:scale-105'
-                  : 'border-purple-300 bg-gradient-to-br from-purple-50 via-fuchsia-50 to-indigo-50 text-purple-600 hover:border-purple-400 hover:bg-purple-100 hover:shadow-purple-200/80 hover:scale-105'
-              }`}
-              title="Escanear factura eléctrica con IA (Google Gemini)"
-            >
-              <FileText className="w-4 h-4 text-purple-400 fill-purple-400/30 group-hover:scale-110 transition-transform duration-300" />
-            </button>
-
-            {/* Button Escanear Ficha Técnica con IA */}
-            <button
-              onClick={openAIDatasheetModal}
-              className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all shadow-md cursor-pointer active:scale-95 group relative shrink-0 ${
-                isDark
-                  ? 'border-cyan-500/60 bg-gradient-to-br from-cyan-950 via-indigo-950 to-purple-950 text-cyan-300 hover:border-cyan-400 hover:shadow-cyan-900/50 hover:scale-105'
-                  : 'border-cyan-300 bg-gradient-to-br from-cyan-50 via-sky-50 to-indigo-50 text-cyan-600 hover:border-cyan-400 hover:bg-cyan-100 hover:shadow-cyan-200/80 hover:scale-105'
-              }`}
-              title="Escanear ficha técnica de paneles o inversores con IA (Google Gemini)"
-            >
-              <Sparkles className="w-4 h-4 text-cyan-400 fill-cyan-400/30 group-hover:rotate-12 transition-transform duration-300" />
-            </button>
-
-            {/* Button Buscar Actualizaciones */}
-            <button
-              onClick={openUpdateModal}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors shadow-xs cursor-pointer ${
-                isDark
-                  ? 'border-[#3f3f46] bg-[#27272a] hover:bg-[#323238] text-zinc-200'
-                  : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
-              }`}
-              title="Buscar actualizaciones en GitHub"
-            >
-              <RefreshCw className="w-3.5 h-3.5 text-emerald-500" />
-              <span className="hidden sm:inline">Actualizaciones</span>
-            </button>
-
-            {/* Button Ajustes / Configuración ⚙️ */}
-            <button
-              onClick={() => openSettingsModal('sync')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all shadow-xs cursor-pointer relative group ${
-                isDark
-                  ? 'border-[#3f3f46] bg-[#27272a] hover:bg-[#323238] text-zinc-100 hover:border-emerald-500/70'
-                  : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-800 hover:border-emerald-500'
-              }`}
-              title="Centro de Ajustes: Sincronización en la nube, usuarios RBAC y configuración"
-            >
-              <Settings className={`w-3.5 h-3.5 text-emerald-500 group-hover:rotate-45 transition-transform duration-300 ${isSyncing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Ajustes</span>
-              {/* Online/User status dot indicator */}
-              {syncSettings.currentUser ? (
-                <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-xs animate-pulse" title={`Sesión activa: ${syncSettings.currentUser.name} (${syncSettings.currentUser.role})`}></span>
-              ) : syncSettings.authToken ? (
-                <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              ) : null}
-            </button>
-
-            {/* Share Web Proposal Button (when inside a Project) */}
+          {/* Action Buttons (Compartir, Exportar, Guardar) */}
+          <div className="flex items-center gap-2">
+            {/* Share Web Proposal Button */}
             {activeView !== 'dashboard' && (
               <button
                 onClick={openShareModal}
@@ -234,7 +163,7 @@ export const Header: React.FC = () => {
               </button>
             )}
 
-            {/* Export JSON Button (when inside a Project) */}
+            {/* Export JSON Button */}
             {activeView !== 'dashboard' && (
               <button
                 onClick={() => exportProjectAsJSON()}
@@ -250,7 +179,7 @@ export const Header: React.FC = () => {
               </button>
             )}
 
-            {/* Save Button (in Simulator View) */}
+            {/* Save Button */}
             {activeView === 'simulator' && (
               <button
                 onClick={saveActiveProject}
