@@ -5,7 +5,9 @@ import {
   Moon,
   FileText,
   Sparkles,
+  Cpu,
   Plus,
+  RefreshCw,
   Settings,
 } from 'lucide-react';
 
@@ -17,10 +19,14 @@ export const PrimaryIconDock: React.FC = () => {
     toggleSidebarTheme,
     openNewProjectModal,
     openAIInvoiceModal,
+    openAIDatasheetModal,
+    openUpdateModal,
     openSettingsModal,
+    updateInfo,
   } = useSimulationStore();
 
   const isDark = sidebarTheme === 'dark';
+  const hasUpdate = updateInfo.state === 'downloaded' || updateInfo.state === 'downloading';
 
   return (
     <aside
@@ -28,7 +34,7 @@ export const PrimaryIconDock: React.FC = () => {
       aria-label="Barra de Navegación Principal"
     >
       {/* Zona Superior: Theme Toggle & Navegación */}
-      <div className="flex flex-col items-center gap-6 w-full">
+      <div className="flex flex-col items-center gap-5 w-full">
         {/* Toggle de Tema (Sol/Luna) */}
         <button
           onClick={toggleSidebarTheme}
@@ -46,7 +52,7 @@ export const PrimaryIconDock: React.FC = () => {
         <div className="w-8 h-[1px] bg-[#2a3444]" />
 
         {/* Iconos de Acción Principal */}
-        <nav className="flex flex-col items-center gap-4 w-full px-2">
+        <nav className="flex flex-col items-center gap-3 w-full px-2">
           {/* 1. Proyectos / Dashboard */}
           <button
             onClick={() => setActiveView('dashboard')}
@@ -63,28 +69,54 @@ export const PrimaryIconDock: React.FC = () => {
             )}
           </button>
 
-          {/* 2. Escáner de Facturas & Fichas con IA Gemini */}
+          {/* 2. Escáner de Facturas con IA Gemini */}
           <button
             onClick={openAIInvoiceModal}
-            className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-purple-300 hover:bg-[#283243] transition-all cursor-pointer group"
-            title="Escanear Factura con IA Gemini"
+            className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-purple-300 hover:bg-[#283243] transition-all cursor-pointer group relative"
+            title="Escanear Factura Eléctrica con IA (Gemini)"
           >
             <Sparkles className="w-5 h-5 group-hover:scale-110 transition-transform text-purple-400" />
           </button>
 
-          {/* 3. Acción Rápida: Crear Nueva Simulación */}
+          {/* 3. Escáner de Equipos / Fichas Técnicas con IA Gemini */}
+          <button
+            onClick={openAIDatasheetModal}
+            className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-cyan-300 hover:bg-[#283243] transition-all cursor-pointer group relative"
+            title="Escanear Ficha Técnica de Equipos con IA (Gemini)"
+          >
+            <Cpu className="w-5 h-5 group-hover:scale-110 transition-transform text-cyan-400" />
+          </button>
+
+          {/* 4. Acción Rápida: Crear Nueva Simulación */}
           <button
             onClick={openNewProjectModal}
             className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-emerald-300 hover:bg-[#283243] transition-all cursor-pointer group"
             title="Crear Nueva Simulación (+)"
           >
-            <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" />
+            <Plus className="w-5 h-5 group-hover:scale-110 transition-transform text-emerald-400" />
           </button>
         </nav>
       </div>
 
-      {/* Zona Inferior: Ajustes y Configuración */}
-      <div className="flex flex-col items-center gap-3 w-full">
+      {/* Zona Inferior: Actualizaciones & Ajustes */}
+      <div className="flex flex-col items-center gap-3 w-full px-2">
+        {/* Botón de Actualizaciones */}
+        <button
+          onClick={openUpdateModal}
+          className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-emerald-300 hover:bg-[#283243] transition-all cursor-pointer group relative"
+          title="Buscar Actualizaciones de Software"
+        >
+          <RefreshCw
+            className={`w-5 h-5 group-hover:rotate-180 transition-transform duration-500 ${
+              hasUpdate ? 'text-emerald-400' : 'text-slate-400'
+            }`}
+          />
+          {hasUpdate && (
+            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-[#1b222d] animate-pulse" />
+          )}
+        </button>
+
+        {/* Centro de Ajustes y Configuración */}
         <button
           onClick={() => openSettingsModal('sync')}
           className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-[#283243] transition-all cursor-pointer group"
