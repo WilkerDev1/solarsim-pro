@@ -70,6 +70,45 @@ export const SolarCoreTreeSidebar: React.FC = () => {
     return Array.from(memberSet);
   }, [projects, currentUser]);
 
+  // Resize sidebar state with mouse drag
+  const [sidebarWidth, setSidebarWidth] = useState(290);
+  const [isResizing, setIsResizing] = useState(false);
+
+  const startResizing = React.useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+  }, []);
+
+  const stopResizing = React.useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  const resize = React.useCallback(
+    (e: MouseEvent) => {
+      if (isResizing) {
+        // e.clientX minus the left 64px PrimaryIconDock width
+        const leftDockWidth = 64;
+        const newWidth = e.clientX - leftDockWidth;
+        if (newWidth >= 220 && newWidth <= 550) {
+          setSidebarWidth(newWidth);
+        }
+      }
+    },
+    [isResizing]
+  );
+
+  React.useEffect(() => {
+    if (isResizing) {
+      window.addEventListener('mousemove', resize);
+      window.addEventListener('mouseup', stopResizing);
+    }
+    return () => {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResizing);
+    };
+  }, [isResizing, resize, stopResizing]);
+
   const handleDragOver = (e: React.DragEvent, folderId: string | null) => {
     e.preventDefault();
     e.stopPropagation();
@@ -95,7 +134,25 @@ export const SolarCoreTreeSidebar: React.FC = () => {
   };
 
   return (
-    <aside className="w-72 md:w-80 h-full border-r border-slate-200/90 dark:border-[#27272a] bg-white dark:bg-[#161a22] flex flex-col justify-between shrink-0 select-none z-30 overflow-hidden shadow-xs">
+    <aside
+      style={{ width: `${sidebarWidth}px` }}
+      className="relative h-full border-r border-slate-200/90 dark:border-[#27272a] bg-white dark:bg-[#161a22] flex flex-col justify-between shrink-0 select-none z-30 overflow-hidden shadow-xs transition-[width] duration-75"
+    >
+      {/* ↔️ Borde lateral interactivo para redimensionar arrastrando con el mouse */}
+      <div
+        onMouseDown={startResizing}
+        className={`absolute top-0 right-0 w-2 h-full cursor-col-resize z-40 transition-colors group select-none ${
+          isResizing ? 'bg-emerald-500/40' : 'hover:bg-emerald-500/25'
+        }`}
+        title="Arrastra con el ratón para cambiar el ancho de la barra lateral"
+      >
+        <div
+          className={`w-[2px] h-full mx-auto transition-colors ${
+            isResizing ? 'bg-emerald-500' : 'group-hover:bg-emerald-500/60'
+          }`}
+        />
+      </div>
+
       {/* ☀️ Header: SolarSim Pro Brand con Logo Electsun */}
       <div className="flex flex-col flex-1 overflow-y-auto">
         <div className="p-4 pb-3.5 border-b border-slate-100 dark:border-[#222734] flex items-center justify-between">
