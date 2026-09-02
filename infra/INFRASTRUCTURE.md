@@ -23,38 +23,41 @@ Todos los servicios de aplicaciones se ejecutan en contenedores Docker y se comu
 
 ```mermaid
 graph TD
-    Client[Cliente Web / SolarSim Desktop] -->|HTTP / HTTPS| Caddy[Caddy Reverse Proxy :80/:443]
+    Client[Cliente Web / SolarSim Desktop] -->|HTTPS| Cloudflare[Cloudflare Zero Trust Edge]
+    Cloudflare -->|Tunnel| Cloudflared[cloudflared-tunnel]
+    Cloudflared -->|HTTP :80| Caddy[Caddy Reverse Proxy :80/:443]
     
     subgraph Docker Network: solarsim_net
-        Caddy -->|/api/*| SyncAPI[solarsim-api :3000]
-        Caddy -->|/| WebSite[electsun-web :80]
-        SyncAPI -->|TCP :5432| Postgres[(solarsim-db :5432)]
+        Caddy -->|Host: solarsim.electsun.net| SyncAPI[solarsim-api :3000]
+        Caddy -->|Host: electsun.net| WebSite[electsun-web :3000]
+        SyncAPI -->|User: solarsim_user| PostgresSolarsim[(DB: solarsim_prod)]
+        WebSite -->|User: electsun_user max:5| PostgresElectsun[(DB: electsun_prod)]
     end
 ```
 
-### 📦 Catálogo de Servicios:
+### 📦 Catálogo de Servicios y Segregación:
 
-1. **`caddy-proxy` (Proxy Inverso & SSL)**:
+1. **`caddy-proxy` (Proxy Inverso & Enrutador por Host)**:
    - **Ruta**: `/home/agente/servicios/caddy/`
    - **Puertos Host**: `80:80`, `443:443`
    - **Red**: `solarsim_net`
-   - **Función**: Manejo automático de certificados SSL/TLS, compresión Zstandard/Gzip, enrutamiento a microservicios.
+   - **Función**: Manejo de compresión Zstandard/Gzip y enrutamiento granular basado en el encabezado `Host`:
+     - `solarsim.electsun.net`, `api.electsun.net`, `api.solarsim.electsun.net` ➔ `solarsim-api:3000`
+     - `www.electsun.net` ➔ Redirección canónica 301 a `https://electsun.net`
+     - `electsun.net` (y sus rutas internas `/api/*`) ➔ `electsun-web:3000`
 
-2. **`solarsim-db` (Base de Datos Relacional)**:
+2. **`solarsim-db` (Instancia Central de PostgreSQL 16 Alpine)**:
    - **Ruta**: `/home/agente/servicios/database/`
-   - **Motor**: PostgreSQL 16 Alpine
-   - **Puerto Interno**: `5432` (sin exposición directa al host)
+   - **Puerto Interno**: `5432` (sin exposición al host Proxmox)
    - **Volumen Persistente**: `/home/agente/servicios/database/data/`
-   - **Tablas Principales**:
-     - `users` (id, email, password_hash, name, role, organization_id)
-     - `organizations` (id, name, created_at)
-     - `projects` (id, organization_id, client_data, specs, rates, financials, sync_status, updated_at)
-     - `equipment_catalog` (id, organization_id, type, brand, model_series, display_name, power_w, power_kw, capacity_kwh, voltage_v, dod_pct, efficiency_pct, temp_coeff, category, voltage_mppt, details)
-     - `audit_logs` (id, user_id, action, timestamp)
+   - **Segregación de Bases de Datos & RBAC**:
+     - `solarsim_prod`: Propietario `solarsim_user`. Contiene las tablas de autenticación, proyectos multi-usuario y catálogo de equipos fotovoltaicos.
+     - `electsun_prod`: Propietario `electsun_user` (principio de mínimo privilegio; no posee acceso a las tablas de SolarSim). Almacena configuración del CMS web, proyectos públicos y leads.
 
 3. **`solarsim-api` (Motor de Sincronización, Catálogo & Auth)**:
    - **Ruta**: `/home/agente/servicios/solarsim-api/`
    - **Puerto Interno**: `3000`
+   - **Tecnología**: Node.js + Hono + `pg.Pool`
    - **Endpoints Principales**:
      - `POST /api/auth/login` (Autenticación JWT y retorno de perfil de usuario)
      - `POST /api/auth/register` (Registro de organización y cuenta ADMIN)
@@ -68,16 +71,21 @@ graph TD
      - `POST /api/equipment/batch` (Upsert por lotes de equipos escaneados con IA o creados manualmente)
      - `GET /api/health` (Healthcheck y medición de latencia)
 
-4. **`electsun-web` (Sitio Web Corporativo)**:
+4. **`electsun-web` (Portal Corporativo de Electsun)**:
    - **Ruta**: `/home/agente/servicios/electsun-web/`
-   - **Puerto Interno**: `80`
-   - **Función**: Página web oficial y landing page de Electsun.
+   - **Puerto Interno**: `3000`
+   - **Tecnología**: Next.js 16 (Standalone Output) + React 19 + Prisma / pg adapter
+   - **Control de Recursos**: Límite de conexiones acotado (`max: 5`, `idleTimeoutMillis: 30000`) para evitar inanición de conexiones en PostgreSQL.
 
 5. **`cloudflared-tunnel` (Conector Cloudflare Zero Trust Edge)**:
    - **Ruta**: `/home/agente/servicios/cloudflared/`
    - **Red**: `solarsim_net`
    - **Túnel**: `eletcsun-tunnel`
    - **Función**: Enrutamiento seguro hacia internet de `solarsim.electsun.net`, `api.electsun.net` y `electsun.net` sin abrir puertos en el firewall.
+
+6. **Estrategia Unificada de Respaldo (`scripts/backup-databases.sh`)**:
+   - Respaldo atómico de todas las bases de datos (`solarsim_prod` y `electsun_prod`), roles y permisos vía `pg_dumpall | gzip`.
+   - Archivo generado con timestamp en `~/backups/electsun/postgres_full_YYYY-MM-DD_HH-MM-SS.sql.gz` con política de retención automática de 14 días.
 
 ---
 

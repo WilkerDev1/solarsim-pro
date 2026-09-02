@@ -146,17 +146,23 @@ La infraestructura en `/home/agente/servicios/` está dividida en composiciones 
 }
 
 :80 {
-    # Compresión de alta velocidad
     encode zstd gzip
 
-    # Enrutamiento de la API REST hacia solarsim-api
-    handle /api/* {
+    # 1. Redirección canónica de www hacia el dominio raíz
+    @wwwHost host www.electsun.net
+    handle @wwwHost {
+        redir https://electsun.net{uri} permanent
+    }
+
+    # 2. Subdominios dedicados para SolarSim API & Sync
+    @solarsimHost host solarsim.electsun.net api.solarsim.electsun.net api.electsun.net
+    handle @solarsimHost {
         reverse_proxy solarsim-api:3000
     }
 
-    # Fallback / Landing page
+    # 3. Web Corporativa Electsun (electsun.net y cualquier otra petición)
     handle {
-        respond "SolarSim Pro & Electsun Edge Gateway" 200
+        reverse_proxy electsun-web:3000
     }
 }
 ```
@@ -471,11 +477,13 @@ ssh app-server "curl -s http://localhost/api/health"
 1. **Gestión de Secretos**:
    - Ninguna clave o credencial en texto plano está incrustada en el código fuente.
    - Las variables residen en `/home/agente/servicios/solarsim-api/.env` con permisos restringidos (`chmod 600 .env`).
-2. **Estrategia de Copias de Seguridad (Backups)**:
-   - **Nivel 1 (Base de Datos)**: Dump diario automatizado con `pg_dump` hacia un directorio de respaldo.
+2. **Estrategia de Copias de Seguridad Unificada (Backups)**:
+   - **Nivel 1 (Respaldo Unificado PostgreSQL)**: Script `scripts/backup-databases.sh` que ejecuta `pg_dumpall | gzip` respaldando atómicamente tanto `solarsim_prod` como `electsun_prod`, roles, permisos y esquemas hacia `~/backups/electsun/postgres_full_YYYY-MM-DD_HH-MM-SS.sql.gz` con rotación automática de 14 días.
    - **Nivel 2 (Host Proxmox)**: Copias de seguridad programadas de todo el contenedor **CT 100** vía Proxmox Backup Server / VZDump hacia almacenamiento NFS/ZFS externo.
-3. **Persistencia Garantizada**:
-   - El volumen `./data` de PostgreSQL en `/home/agente/servicios/database/data/` se mantiene intacto incluso si el contenedor se destruye o se actualiza la imagen base de PostgreSQL.
+3. **Persistencia y Aislamiento Garantizados**:
+   - **Segregación DB**: `solarsim_user` administra `solarsim_prod`, mientras que `electsun_user` opera con principio de mínimo privilegio sobre `electsun_prod` sin permisos de acceso a las tablas de SolarSim.
+   - El volumen `./data` de PostgreSQL en `/home/agente/servicios/database/data/` se mantiene intacto independientemente del ciclo de vida de los contenedores Docker.
 
 ---
 *Documento técnico de infraestructura generado y auditado para SolarSim Pro & Electsun.*
+
