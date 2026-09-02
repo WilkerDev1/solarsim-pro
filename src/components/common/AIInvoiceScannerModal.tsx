@@ -100,8 +100,6 @@ export const AIInvoiceScannerModal: React.FC = () => {
   const [zoomLevel, setZoomLevel] = useState(100);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  if (!isAIInvoiceModalOpen) return null;
-
   const handleFileSelect = (file: File) => {
     setErrorMsg(null);
     const validTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
@@ -387,6 +385,8 @@ export const AIInvoiceScannerModal: React.FC = () => {
   const maxConsumptionVal = extractedData
     ? Math.max(...extractedData.monthlyConsumptionKWh, 100)
     : 1000;
+
+  if (!isAIInvoiceModalOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-6 bg-black/80 backdrop-blur-xs animate-in fade-in duration-200">
