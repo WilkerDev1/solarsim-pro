@@ -150,6 +150,7 @@ solarsim/
 │           └── pages/                       # Plantillas de hojas individuales A4 (1 a 11)
 ├── release/                                 # Binarios generados (.exe, .AppImage, .pacman, .deb)
 └── docs/                                    # Documentación técnica y especificaciones
+    ├── INFRASTRUCTURE_ARCHITECTURE.md       # Manual maestro de arquitectura de infraestructura, Proxmox, Postgres y API
     ├── CLOUDFLARE_WORKER_GUIDE.md           # Guía de despliegue de Cloudflare Workers & KV
     ├── FINANCIAL_ENGINE_SPECIFICATION.md    # Auditoría matemática de fórmulas
     └── MAINTENANCE_AND_UPDATES.md           # Guía de actualizaciones y dependencias
