@@ -268,7 +268,7 @@ export interface UserProfile {
 }
 
 export interface SyncSettings {
-  serverUrl: string; // e.g. 'http://10.0.0.103' or 'https://api.solarsim.electsun.com'
+  serverUrl: string; // e.g. 'https://solarsim.electsun.net'
   autoSyncEnabled: boolean;
   lastSyncTimestamp: string | null;
   authToken: string | null;
