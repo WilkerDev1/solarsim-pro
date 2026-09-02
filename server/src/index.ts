@@ -45,7 +45,7 @@ app.get('/api/health', async (c) => {
     return c.json({
       status: 'ok',
       service: 'SolarSim Pro Enterprise Sync Engine',
-      version: '1.5.0',
+      version: '1.6.0',
       database: dbRes.rows[0].healthy === 1 ? 'connected' : 'disconnected',
       timestamp: new Date().toISOString(),
     });
