@@ -105,6 +105,11 @@ export const useSimulationStore = create<SimulationStore>()(
             const mockFolderIds = new Set(['folder-commercial', 'folder-electsun', 'folder-solarta']);
             state.folders = state.folders.filter((f) => !mockFolderIds.has(f.id));
           }
+
+          // Auto-migrate legacy serverUrl to official Cloudflare domain
+          if (state.syncSettings && (state.syncSettings.serverUrl === 'http://10.0.0.103' || state.syncSettings.serverUrl === 'https://api.electsun.com' || !state.syncSettings.serverUrl)) {
+            state.syncSettings.serverUrl = 'https://solarsim.electsun.net';
+          }
         }
       },
       partialize: (state) => ({

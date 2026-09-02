@@ -37,7 +37,7 @@ export class SyncService {
    * Limpia y normaliza la URL base del servidor
    */
   private static cleanUrl(url: string): string {
-    return (url || 'http://10.0.0.103').trim().replace(/\/+$/, '');
+    return (url || 'https://solarsim.electsun.net').trim().replace(/\/+$/, '');
   }
 
   /**

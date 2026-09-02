@@ -353,7 +353,7 @@ export const IntegrationsSection: React.FC = () => {
                   type="text"
                   value={serverUrlInput}
                   onChange={(e) => setServerUrlInput(e.target.value)}
-                  placeholder="https://api.electsun.com"
+                  placeholder="https://solarsim.electsun.net"
                   className="flex-1 px-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-900 dark:text-zinc-100 font-mono"
                 />
                 <button

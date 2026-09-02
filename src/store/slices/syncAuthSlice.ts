@@ -5,7 +5,7 @@ let autoSyncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) => ({
   syncSettings: {
-    serverUrl: 'http://10.0.0.103',
+    serverUrl: 'https://solarsim.electsun.net',
     autoSyncEnabled: true,
     lastSyncTimestamp: null,
     authToken: null,
