@@ -27,17 +27,18 @@ La infraestructura está diseñada bajo un modelo **modular de microservicios au
 
 ```mermaid
 graph TB
-    subgraph LAN_VPN ["🌐 Red Externa / LAN / VPN"]
-        DesktopApp["💻 SolarSim Pro Desktop (Electron + React)"]
-        BrowserApp["🌐 Clientes Web / Navegadores"]
+    subgraph CLOUDFLARE_EDGE ["☁️ Cloudflare Global Edge Network"]
+        CFDNS["🌐 DNS: electsun.net"]
+        CFWorker["📄 solarsim-share-viewer (Worker + KV)\nhttps://propuesta.electsun.net"]
+        CFTunnel["🚇 Zero Trust Tunnel: eletcsun-tunnel\nhttps://solarsim.electsun.net & https://electsun.net"]
     end
 
     subgraph PROXMOX ["🖥️ Proxmox VE 9.x (Host: pve01 - 10.0.0.83)"]
         subgraph CT100 ["📦 LXC Container: CT 100 (app-server - 10.0.0.103)"]
             
-            subgraph INGRESS ["Ingress & Cloudflare Edge"]
-                CFTunnel["☁️ cloudflared-tunnel\n(Zero Trust Tunnel: eletcsun-tunnel)"]
-                Caddy["🛡️ Caddy 2 Reverse Proxy\n(:80 / :443)"]
+            subgraph INGRESS ["Ingress"]
+                CFTunnelConn["☁️ cloudflared-tunnel (Connector)"]
+                Caddy["🛡️ Caddy 2 Reverse Proxy (:80 / :443)"]
             end
 
             subgraph DOCKER_NET ["🌐 Docker Network Bridge: solarsim_net"]
@@ -53,9 +54,13 @@ graph TB
         end
     end
 
-    DesktopApp -->|HTTPS / REST| CFTunnel
+    DesktopApp -->|POST /api/share| CFWorker
+    BrowserApp -->|GET /p/:id (Propuestas Web)| CFWorker
+    DesktopApp -->|Sync & Auth REST| CFTunnel
     BrowserApp -->|HTTP / HTTPS| CFTunnel
-    CFTunnel -->|HTTP Interno| Caddy
+    
+    CFTunnel --> CFTunnelConn
+    CFTunnelConn -->|HTTP Interno| Caddy
     
     Caddy -->|Enruta solarsim.* / api.*| API
     Caddy -->|Enruta electsun.net| Web
@@ -256,6 +261,51 @@ networks:
   solarsim_net:
     external: true
 ```
+
+---
+
+### 4.4 Sitio Corporativo: `electsun-web`
+
+* **Imagen**: `nginx:alpine`
+* **Contenedor**: `electsun-web`
+* **Puerto Interno**: `80`
+* **Función**: Servir la landing page corporativa de Electsun cuando se accede a `https://electsun.net`.
+
+---
+
+### 4.5 Conector Edge: `cloudflared-tunnel`
+
+* **Imagen**: `cloudflare/cloudflared:latest`
+* **Contenedor**: `cloudflared-tunnel`
+* **Túnel**: `eletcsun-tunnel`
+* **Función**: Establece 4 túneles QUIC encriptados salientes hacia la red perimetral de Cloudflare. Recibe tráfico para `https://solarsim.electsun.net` y `https://electsun.net` y lo entrega a `caddy-proxy:80` dentro de `solarsim_net` sin requerir puertos abiertos en el firewall del servidor.
+
+#### `docker-compose.yml` de Cloudflare Tunnel:
+```yaml
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    networks:
+      - solarsim_net
+
+networks:
+  solarsim_net:
+    external: true
+```
+
+---
+
+### 4.6 Microservicio Serverless en el Borde: `solarsim-share-viewer`
+
+* **Tecnología**: Cloudflare Workers + Hono (TypeScript) + Cloudflare KV (`PROPOSALS_KV`).
+* **Dominio Oficial**: `https://propuesta.electsun.net`
+* **Función**: Almacenar y renderizar propuestas web interactivas con gráficos interactivos y códigos QR para clientes e inversionistas con expiración automática (TTL de 1 a 90 días).
+* **Independencia Operativa**: Opera al 100% en la red global de Cloudflare Edge, garantizando que los clientes puedan consultar sus propuestas incluso si el servidor local Proxmox se encuentra en mantenimiento.
 
 ---
 
