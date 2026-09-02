@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { ProjectSimulation } from '../../types';
 import { calculateDCCapacityKWp } from '../../engine/solarEngine';
@@ -12,6 +12,7 @@ import {
   Cloud,
   Laptop,
   Check,
+  MoreVertical,
 } from 'lucide-react';
 
 interface ProjectCardProps {
@@ -28,6 +29,19 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
 
   const [copied, setCopied] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isMenuOpen]);
 
   // DC System capacity
   const dcKWp = calculateDCCapacityKWp(project.specs.panelPowerW, project.specs.panelCount);
@@ -88,32 +102,80 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
           {project.client.projectId || 'SP-2026-001'}
         </span>
 
-        <div className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
+        {/* 3-Dots Dropdown Menu */}
+        <div
+          className="relative"
+          ref={menuRef}
+          onClick={(e) => e.stopPropagation()}
+          draggable={false}
+          onDragStart={(e) => e.stopPropagation()}
+        >
           <button
             type="button"
-            onClick={handleShare}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-[#222a38] transition-colors cursor-pointer"
-            title="Compartir Propuesta Web"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsMenuOpen((prev) => !prev);
+            }}
+            className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+              isMenuOpen
+                ? 'bg-slate-100 dark:bg-[#252d3c] text-slate-800 dark:text-white'
+                : 'text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-100 dark:hover:bg-[#222a38]'
+            }`}
+            title="Opciones de la propuesta"
           >
-            <Share2 className="w-4 h-4" />
+            <MoreVertical className="w-4 h-4" />
           </button>
-          <button
-            type="button"
-            onClick={handleDuplicate}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-[#222a38] transition-colors cursor-pointer"
-            title="Duplicar Propuesta"
-          >
-            {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-          </button>
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={isDeleting}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-[#222a38] transition-colors cursor-pointer"
-            title="Eliminar Propuesta"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+
+          {/* Dropdown Menu */}
+          {isMenuOpen && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="absolute right-0 top-9 w-44 rounded-2xl bg-white dark:bg-[#1f2633] border border-slate-200/90 dark:border-[#2f3a4d] shadow-xl p-1.5 z-30 flex flex-col gap-1 text-xs animate-in fade-in zoom-in-95 duration-150"
+            >
+              <button
+                type="button"
+                onClick={(e) => {
+                  setIsMenuOpen(false);
+                  handleShare(e);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-[#2a3446] font-medium transition-colors cursor-pointer text-left"
+              >
+                <Share2 className="w-4 h-4 text-blue-500 shrink-0" />
+                <span>Compartir Web</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  handleDuplicate(e);
+                  setTimeout(() => setIsMenuOpen(false), 600);
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-[#2a3446] font-medium transition-colors cursor-pointer text-left"
+              >
+                {copied ? (
+                  <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+                ) : (
+                  <Copy className="w-4 h-4 text-emerald-500 shrink-0" />
+                )}
+                <span>{copied ? '¡Duplicado!' : 'Duplicar'}</span>
+              </button>
+
+              <div className="h-px bg-slate-100 dark:bg-[#2a3446] my-0.5" />
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  setIsMenuOpen(false);
+                  handleDelete(e);
+                }}
+                disabled={isDeleting}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 font-medium transition-colors cursor-pointer text-left disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4 text-rose-500 shrink-0" />
+                <span>Eliminar</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
