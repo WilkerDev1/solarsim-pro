@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { SyncService, PingResult } from '../../../services/syncService';
+import { ShareProposalService } from '../../../services/shareProposalService';
 import {
   Sparkles,
   Key,
@@ -32,26 +33,22 @@ export const IntegrationsSection: React.FC = () => {
     isSyncing,
   } = useSimulationStore();
 
-  // Gemini Local State
+  // AI Local State
   const [aiKeyInput, setAiKeyInput] = useState(geminiApiKey || '');
   const [aiShowKey, setAiShowKey] = useState(false);
   const [aiTesting, setAiTesting] = useState(false);
-  const [aiValidationResult, setAiValidationResult] = useState<{ tested: boolean; success: boolean; message: string }>({
-    tested: false,
-    success: false,
-    message: '',
-  });
+  const [aiValidationResult, setAiValidationResult] = useState<{ tested: boolean; success: boolean; message: string } | null>(null);
   const [aiSelectedModel, setAiSelectedModel] = useState<string>(geminiModel || 'gemini-2.5-flash');
   const [aiIsCustomMode, setAiIsCustomMode] = useState<boolean>(false);
   const [aiCustomInput, setAiCustomInput] = useState<string>('');
 
   // Worker Local State
-  const [workerUrlInput, setWorkerUrlInput] = useState('https://solarsim-share-viewer.wilker-dev.workers.dev');
+  const [workerUrlInput, setWorkerUrlInput] = useState(ShareProposalService.getWorkerUrl());
   const [testingWorker, setTestingWorker] = useState(false);
   const [workerTestResult, setWorkerTestResult] = useState<{ tested: boolean; success: boolean; message: string } | null>(null);
 
   // Central Server Local State
-  const [serverUrlInput, setServerUrlInput] = useState(syncSettings.serverUrl || 'https://api.electsun.com');
+  const [serverUrlInput, setServerUrlInput] = useState(syncSettings.serverUrl || 'https://solarsim.electsun.net');
   const [pingState, setPingState] = useState<{ testing: boolean; result: PingResult | null }>({
     testing: false,
     result: null,
@@ -90,12 +87,14 @@ export const IntegrationsSection: React.FC = () => {
       const cleanUrl = workerUrlInput.trim().replace(/\/+$/, '');
       const res = await fetch(`${cleanUrl}/api/health`).catch(() => null);
       if (res && res.ok) {
-        setWorkerTestResult({ tested: true, success: true, message: '¡Conexión exitosa con Cloudflare Worker! ✨' });
+        ShareProposalService.setWorkerUrl(cleanUrl);
+        setWorkerTestResult({ tested: true, success: true, message: '¡Conexión exitosa con Cloudflare Worker! Guardado como predeterminado ✨' });
       } else {
+        ShareProposalService.setWorkerUrl(cleanUrl);
         setWorkerTestResult({
           tested: true,
           success: true,
-          message: 'Worker accesible (Endpoint activo para visualización web).',
+          message: 'Worker accesible y guardado para visualización web.',
         });
       }
     } catch {
@@ -246,7 +245,7 @@ export const IntegrationsSection: React.FC = () => {
               </div>
             </div>
 
-            {aiValidationResult.tested && (
+            {aiValidationResult && aiValidationResult.tested && (
               <div
                 className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
                   aiValidationResult.success

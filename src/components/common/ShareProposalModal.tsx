@@ -214,7 +214,7 @@ export const ShareProposalModal: React.FC<ShareProposalModalProps> = (props) => 
                 type="text"
                 value={workerUrl}
                 onChange={(e) => setWorkerUrl(e.target.value)}
-                placeholder="https://tu-worker.workers.dev"
+                placeholder="https://propuesta.electsun.net"
                 className={`flex-1 px-3 py-2 rounded-xl font-mono text-xs border focus:outline-hidden focus:ring-1 focus:ring-emerald-500 ${
                   isDark
                     ? 'bg-[#101015] border-[#2e2e3e] text-zinc-200'

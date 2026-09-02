@@ -72,13 +72,19 @@ Al finalizar, Cloudflare te dará la URL pública de tu Worker (por ejemplo: `ht
 
 ---
 
-## ⚙️ Conectar la URL en SolarSim Pro Desktop
+### 4. Configurar Dominio Personalizado (Custom Domain Oficial)
+Para que las propuestas compartidas utilicen el dominio corporativo de tu empresa:
+1. En el panel de Cloudflare, ve a **Workers & Pages** ➔ **`solarsim-share-viewer`**.
+2. Ve a la pestaña **Settings** ➔ **Domains & Routes** ➔ **Add** ➔ **Custom Domain**.
+3. Escribe **`propuesta.electsun.net`** y haz clic en **Add Custom Domain**.
 
-1. Abre **SolarSim Pro**.
-2. En la vista de **Propuesta PDF** o en la barra superior, haz clic en **"Compartir Propuesta Web"** (o en el botón de la cabecera).
-3. En la ventana emergente, haz clic en el ícono de **Configuración ⚙️** (esquina superior derecha del modal).
-4. Pega la URL de tu Worker (ej. `https://solarsim-share-viewer.<tu-subdominio>.workers.dev`) y presiona **Guardar**.
-5. ¡Listo! Al hacer clic en **"Generar Enlace Web y Código QR"**, la propuesta se publicará inmediatamente en la nube con su enlace temporal y código QR para WhatsApp.
+---
+
+## ⚙️ Conexión Predeterminada en SolarSim Pro
+
+SolarSim Pro viene preconfigurado con **`https://propuesta.electsun.net`** como endpoint oficial por defecto:
+1. Al hacer clic en **"Compartir Propuesta Web"** en cualquier simulación, el sistema publicará automáticamente la propuesta en `https://propuesta.electsun.net/p/:id`.
+2. El código QR incrustado en el PDF y el botón para compartir por WhatsApp utilizarán automáticamente tu dominio corporativo con SSL.
 
 ---
 

@@ -7,9 +7,9 @@
     # Compresión moderna
     encode zstd gzip
 
-    # Subdominios de SolarSim / API
-    @api host api.electsun.net solarsim.electsun.net api.eletcsun.net solarsim.eletcsun.net
-    handle @api {
+    # Subdominios dedicados para la API de SolarSim
+    @apiHost host api.solarsim.electsun.net solarsim.electsun.net api.electsun.net
+    handle @apiHost {
         reverse_proxy solarsim-api:3000
     }
 
@@ -18,7 +18,7 @@
         reverse_proxy solarsim-api:3000
     }
 
-    # Landing page corporativa / Fallback
+    # Dominio principal / Landing page
     handle {
         respond "SolarSim Pro & Electsun Edge Gateway - Cloudflare Tunnel Connected" 200
     }

@@ -11,7 +11,7 @@ export interface ShareResult {
 }
 
 const STORAGE_WORKER_URL_KEY = 'solarsim_share_worker_url';
-export const DEFAULT_WORKER_URL = 'https://solarsim-share-viewer.solarsim-share-viewer.workers.dev';
+export const DEFAULT_WORKER_URL = 'https://propuesta.electsun.net';
 
 export class ShareProposalService {
   public static getWorkerUrl(): string {
