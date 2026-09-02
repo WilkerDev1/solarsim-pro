@@ -45,7 +45,8 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
 
       if (createNewProject) {
         targetProjectId = `proj-${Date.now()}`;
-        const panelW = BENCHMARK_PROJECT.specs.panelPowerW || 620;
+        const panelW = data.selectedPanelWatts || BENCHMARK_PROJECT.specs.panelPowerW || 620;
+        const panelModel = data.selectedPanelModel || BENCHMARK_PROJECT.specs.panelBrandModel;
         const targetCov = 95;
         const sysLosses = 25.0;
         const rec = calculateRecommendedPanelCount(
@@ -84,6 +85,8 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
           specs: {
             ...BENCHMARK_PROJECT.specs,
             panelCount: count,
+            panelPowerW: panelW,
+            panelBrandModel: panelModel,
             systemLosses: 25.0,
             autoCalculatePanels: false,
           },
@@ -115,7 +118,8 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
       // Update active project
       projects = projects.map((p) => {
         if (p.id === targetProjectId) {
-          const panelW = p.specs.panelPowerW || 620;
+          const panelW = data.selectedPanelWatts || p.specs.panelPowerW || 620;
+          const panelModel = data.selectedPanelModel || p.specs.panelBrandModel;
           const targetCov = p.rates.targetCoveragePct ?? 95;
           const sysLosses = p.specs.systemLosses ?? 25.0;
           const rec = calculateRecommendedPanelCount(
@@ -147,6 +151,8 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
             specs: {
               ...p.specs,
               panelCount: count,
+              panelPowerW: panelW,
+              panelBrandModel: panelModel,
             },
             rates: {
               ...p.rates,

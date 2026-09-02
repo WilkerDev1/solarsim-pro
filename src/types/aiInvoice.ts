@@ -46,6 +46,9 @@ export interface ExtractedInvoiceData {
   recommendedCapacityKWp?: number;
   recommendedPanelCount?: number;
   targetCoveragePct?: number;
+  selectedPanelId?: string;
+  selectedPanelModel?: string;
+  selectedPanelWatts?: number;
 
   // AI Inference Metadata
   confidenceScore: number; // 0 - 100%

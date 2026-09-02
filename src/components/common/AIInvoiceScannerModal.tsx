@@ -24,6 +24,9 @@ import {
   SunMedium,
   Check,
   HelpCircle,
+  TrendingUp,
+  Layers,
+  ChevronDown,
 } from 'lucide-react';
 import { RD_PROVINCES } from '../../data/rdProvinces';
 
@@ -43,11 +46,19 @@ export const AIInvoiceScannerModal: React.FC = () => {
     getActiveProject,
     activeView,
     sidebarTheme,
+    equipmentCatalog,
   } = useSimulationStore();
 
   const isDark = sidebarTheme === 'dark';
   const activeProject = getActiveProject();
   const isInsideProject = activeView !== 'dashboard' && !!activeProject;
+
+  // Catálogo de Paneles Fotovoltaicos disponibles
+  const panelCatalog = React.useMemo(() => {
+    return (equipmentCatalog || []).filter(
+      (item) => item.type === 'panel' && item.powerW && item.powerW > 0
+    );
+  }, [equipmentCatalog]);
 
   // File state
   const [selectedFile, setSelectedFile] = useState<{
@@ -63,6 +74,26 @@ export const AIInvoiceScannerModal: React.FC = () => {
   const [processingStep, setProcessingStep] = useState('');
   const [extractedData, setExtractedData] = useState<ExtractedInvoiceData | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Estados de Dimensionamiento Avanzado: Mes Pico & Módulo Solar
+  const [originalMonthlyConsumption, setOriginalMonthlyConsumption] = useState<number[] | null>(null);
+  const [isPeakModeActive, setIsPeakModeActive] = useState<boolean>(false);
+  const [selectedPanelId, setSelectedPanelId] = useState<string>('');
+
+  // Módulo solar seleccionado actualmente
+  const selectedPanel = React.useMemo(() => {
+    if (selectedPanelId) {
+      const found = panelCatalog.find((p) => p.id === selectedPanelId);
+      if (found) return found;
+    }
+    const targetW = extractedData?.selectedPanelWatts || activeProject?.specs?.panelPowerW || 620;
+    return (
+      panelCatalog.find((p) => p.powerW === targetW) ||
+      panelCatalog.find((p) => p.powerW === 620) ||
+      panelCatalog[0] ||
+      null
+    );
+  }, [selectedPanelId, panelCatalog, extractedData?.selectedPanelWatts, activeProject?.specs?.panelPowerW]);
 
   // Split View Active Tab
   const [activeTab, setActiveTab] = useState<'client' | 'consumption' | 'solar'>('client');
@@ -149,7 +180,22 @@ export const AIInvoiceScannerModal: React.FC = () => {
         });
       }
 
+      // Pre-seleccionar módulo inicial correspondiente
+      const initialPanel =
+        panelCatalog.find((p) => p.powerW === (activeProject?.specs?.panelPowerW || 620)) ||
+        panelCatalog[0];
+      if (initialPanel) {
+        setSelectedPanelId(initialPanel.id);
+        result.selectedPanelId = initialPanel.id;
+        result.selectedPanelModel = initialPanel.displayName || initialPanel.modelSeries;
+        result.selectedPanelWatts = initialPanel.powerW;
+      }
+
       setExtractedData(result);
+      if (result.monthlyConsumptionKWh && result.monthlyConsumptionKWh.length === 12) {
+        setOriginalMonthlyConsumption([...result.monthlyConsumptionKWh]);
+      }
+      setIsPeakModeActive(false);
     } catch (err: any) {
       console.error('Error in AI extraction:', err);
       setErrorMsg(err.message || 'Error procesando la factura con IA.');
@@ -172,15 +218,107 @@ export const AIInvoiceScannerModal: React.FC = () => {
     }
   };
 
+  // Alternar entre historial real extraído y dimensionamiento por mes pico (más alto)
+  const handleTogglePeakMonthMode = () => {
+    if (!extractedData) return;
+
+    const panelWatts = selectedPanel?.powerW || activeProject?.specs?.panelPowerW || 620;
+    const targetCov = activeProject?.rates?.targetCoveragePct ?? 95;
+    const sysLosses = activeProject?.specs?.systemLosses ?? 25.0;
+
+    if (isPeakModeActive) {
+      // Revertir al consumo original
+      const restored = originalMonthlyConsumption || extractedData.monthlyConsumptionKWh;
+      const restoredTotal = restored.reduce((s, v) => s + v, 0);
+      const restoredAvg = Math.round(restoredTotal / 12);
+
+      const rec = calculateRecommendedPanelCount(
+        extractedData.province || activeProject?.client?.province || 'Santo Domingo / Distrito Nacional',
+        restored,
+        panelWatts,
+        targetCov,
+        sysLosses
+      );
+
+      setExtractedData({
+        ...extractedData,
+        monthlyConsumptionKWh: [...restored],
+        annualConsumptionKWh: restoredTotal,
+        averageMonthlyKWh: restoredAvg,
+        recommendedCapacityKWp: rec.recommendedCapacityKWp,
+        recommendedPanelCount: rec.recommendedPanelCount,
+      });
+      setIsPeakModeActive(false);
+    } else {
+      // Guardar historial real previo si no existe
+      if (!originalMonthlyConsumption) {
+        setOriginalMonthlyConsumption([...extractedData.monthlyConsumptionKWh]);
+      }
+      const peakVal = Math.max(...extractedData.monthlyConsumptionKWh);
+      if (peakVal <= 0) return;
+
+      const peakArr = new Array(12).fill(peakVal);
+      const peakTotal = peakVal * 12;
+      const peakAvg = peakVal;
+
+      const rec = calculateRecommendedPanelCount(
+        extractedData.province || activeProject?.client?.province || 'Santo Domingo / Distrito Nacional',
+        peakArr,
+        panelWatts,
+        targetCov,
+        sysLosses
+      );
+
+      setExtractedData({
+        ...extractedData,
+        monthlyConsumptionKWh: peakArr,
+        annualConsumptionKWh: peakTotal,
+        averageMonthlyKWh: peakAvg,
+        recommendedCapacityKWp: rec.recommendedCapacityKWp,
+        recommendedPanelCount: rec.recommendedPanelCount,
+      });
+      setIsPeakModeActive(true);
+    }
+  };
+
+  // Cambio de módulo fotovoltaico desde el catálogo de equipos
+  const handlePanelChange = (newPanelId: string) => {
+    setSelectedPanelId(newPanelId);
+    const newPanel = panelCatalog.find((p) => p.id === newPanelId);
+    if (!newPanel || !extractedData) return;
+
+    const panelWatts = newPanel.powerW || 620;
+    const targetCov = activeProject?.rates?.targetCoveragePct ?? 95;
+    const sysLosses = activeProject?.specs?.systemLosses ?? 25.0;
+
+    const rec = calculateRecommendedPanelCount(
+      extractedData.province || activeProject?.client?.province || 'Santo Domingo / Distrito Nacional',
+      extractedData.monthlyConsumptionKWh,
+      panelWatts,
+      targetCov,
+      sysLosses
+    );
+
+    setExtractedData({
+      ...extractedData,
+      selectedPanelId: newPanel.id,
+      selectedPanelModel: newPanel.displayName || newPanel.modelSeries,
+      selectedPanelWatts: panelWatts,
+      recommendedCapacityKWp: rec.recommendedCapacityKWp,
+      recommendedPanelCount: rec.recommendedPanelCount,
+    });
+  };
+
   const handleUpdateMonthlyConsumption = (index: number, val: number) => {
     if (!extractedData) return;
+    setIsPeakModeActive(false);
     const newArr = [...extractedData.monthlyConsumptionKWh];
     newArr[index] = Math.max(0, val);
     const newTotal = newArr.reduce((s, v) => s + v, 0);
     const newAvg = Math.round(newTotal / 12);
     
-    // Recalculate suggested panels using location, target coverage and 25% losses
-    const panelWatts = activeProject?.specs?.panelPowerW || 620;
+    // Recalcular con el panel actualmente seleccionado
+    const panelWatts = selectedPanel?.powerW || activeProject?.specs?.panelPowerW || 620;
     const targetCov = activeProject?.rates?.targetCoveragePct ?? 95;
     const sysLosses = activeProject?.specs?.systemLosses ?? 25.0;
     const rec = calculateRecommendedPanelCount(
@@ -203,22 +341,49 @@ export const AIInvoiceScannerModal: React.FC = () => {
 
   const handleApplyToActive = () => {
     if (!extractedData) return;
-    applyExtractedInvoice(extractedData, false);
+    const dataToApply: ExtractedInvoiceData = {
+      ...extractedData,
+      selectedPanelId: selectedPanel?.id,
+      selectedPanelModel: selectedPanel?.displayName || selectedPanel?.modelSeries,
+      selectedPanelWatts: selectedPanel?.powerW,
+    };
+    applyExtractedInvoice(dataToApply, false);
   };
 
   const handleApplyAsNew = () => {
     if (!extractedData) return;
-    applyExtractedInvoice(extractedData, true);
+    const dataToApply: ExtractedInvoiceData = {
+      ...extractedData,
+      selectedPanelId: selectedPanel?.id,
+      selectedPanelModel: selectedPanel?.displayName || selectedPanel?.modelSeries,
+      selectedPanelWatts: selectedPanel?.powerW,
+    };
+    applyExtractedInvoice(dataToApply, true);
   };
 
   const handleResetDocument = () => {
     setSelectedFile(null);
     setExtractedData(null);
+    setOriginalMonthlyConsumption(null);
+    setIsPeakModeActive(false);
     setErrorMsg(null);
     setZoomLevel(100);
   };
 
-  // Max consumption for chart scaling
+  // Mes de mayor consumo (pico) para cálculos y UI
+  const peakConsumptionVal = React.useMemo(() => {
+    if (!extractedData || !extractedData.monthlyConsumptionKWh) return 0;
+    return Math.max(...extractedData.monthlyConsumptionKWh, 0);
+  }, [extractedData]);
+
+  const peakMonthIndex = React.useMemo(() => {
+    if (!extractedData || !extractedData.monthlyConsumptionKWh) return -1;
+    return extractedData.monthlyConsumptionKWh.indexOf(peakConsumptionVal);
+  }, [extractedData, peakConsumptionVal]);
+
+  const peakMonthName = peakMonthIndex >= 0 ? MONTH_NAMES[peakMonthIndex] : '';
+
+  // Consumo máximo para escalar la gráfica visual de barras
   const maxConsumptionVal = extractedData
     ? Math.max(...extractedData.monthlyConsumptionKWh, 100)
     : 1000;
@@ -857,6 +1022,70 @@ export const AIInvoiceScannerModal: React.FC = () => {
                         </div>
                       </div>
 
+                      {/* ⚡ Botón y Estado: Dimensionar con Consumo Pico Anual */}
+                      <div
+                        className={`p-3.5 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all ${
+                          isPeakModeActive
+                            ? isDark
+                              ? 'bg-amber-950/30 border-amber-500/50 text-amber-200'
+                              : 'bg-amber-50/80 border-amber-300 text-amber-900'
+                            : isDark
+                            ? 'bg-[#15151f] border-[#2a2a3c] text-zinc-300'
+                            : 'bg-slate-50 border-slate-200 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                              isPeakModeActive
+                                ? 'bg-amber-500 text-white shadow-xs'
+                                : isDark
+                                ? 'bg-[#20202e] text-amber-400'
+                                : 'bg-amber-100 text-amber-700'
+                            }`}
+                          >
+                            <TrendingUp className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold">
+                                {isPeakModeActive ? 'Modo Consumo Pico Activo' : 'Dimensionamiento por Mes Más Alto'}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                                {peakConsumptionVal.toLocaleString()} kWh ({peakMonthName})
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
+                              {isPeakModeActive
+                                ? `Se está aplicando ${peakConsumptionVal.toLocaleString()} kWh a todos los meses como la media del año para máxima cobertura solar.`
+                                : `Toma el consumo más alto del año (${peakConsumptionVal.toLocaleString()} kWh en ${peakMonthName}) como la media mensual para recomendar paneles.`}
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={handleTogglePeakMonthMode}
+                          className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0 shadow-2xs ${
+                            isPeakModeActive
+                              ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                              : 'bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white'
+                          }`}
+                        >
+                          {isPeakModeActive ? (
+                            <>
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              <span>Restablecer Historial Real</span>
+                            </>
+                          ) : (
+                            <>
+                              <TrendingUp className="w-3.5 h-3.5" />
+                              <span>Aplicar Mes Pico a Todo el Año</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+
                       {/* 12 Editable Inputs */}
                       <div className="space-y-1.5">
                         <span className="text-[10px] uppercase font-bold text-zinc-400">
@@ -917,12 +1146,81 @@ export const AIInvoiceScannerModal: React.FC = () => {
                             </p>
                           </div>
                           <div className={`p-3 rounded-xl border ${isDark ? 'bg-black/30 border-emerald-700/40' : 'bg-white border-emerald-200'}`}>
-                            <span className="text-[10px] uppercase font-bold opacity-80">Módulos Tier-1</span>
+                            <span className="text-[10px] uppercase font-bold opacity-80">Módulos Recomendados</span>
                             <p className="text-xl font-black text-amber-400 font-mono">
-                              {extractedData.recommendedPanelCount} <span className="text-xs font-normal">Paneles ({activeProject?.specs?.panelPowerW || 620}W)</span>
+                              {extractedData.recommendedPanelCount} <span className="text-xs font-normal">Paneles ({selectedPanel?.powerW || 620}W)</span>
                             </p>
                           </div>
                         </div>
+                      </div>
+
+                      {/* ☀️ Selector de Módulos Solares (Catálogo de Equipos) */}
+                      <div
+                        className={`p-4 rounded-xl border space-y-3 ${
+                          isDark ? 'bg-[#181822] border-[#2a2a38]' : 'bg-white border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Layers className="w-4 h-4 text-emerald-500" />
+                            <span className="text-xs font-bold text-slate-800 dark:text-zinc-100">
+                              Módulo Fotovoltaico (Catálogo de Equipos)
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                            {panelCatalog.length} disponibles
+                          </span>
+                        </div>
+
+                        {/* Desplegable de Paneles */}
+                        <div className="relative">
+                          <select
+                            value={selectedPanel?.id || ''}
+                            onChange={(e) => handlePanelChange(e.target.value)}
+                            className={`w-full px-3.5 py-2.5 rounded-xl border text-xs font-semibold appearance-none outline-none focus:ring-2 focus:ring-emerald-500/40 cursor-pointer pr-10 ${
+                              isDark
+                                ? 'bg-[#101016] border-[#343448] text-zinc-100 hover:border-emerald-500/50'
+                                : 'bg-slate-50 border-slate-300 text-slate-800 hover:border-emerald-500/50'
+                            }`}
+                          >
+                            {panelCatalog.map((panel) => (
+                              <option key={panel.id} value={panel.id}>
+                                {panel.displayName} — {panel.powerW}W ({panel.cellType || 'Bifacial'} • {panel.efficiencyPct || 21.8}%)
+                              </option>
+                            ))}
+                          </select>
+                          <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-slate-400">
+                            <ChevronDown className="w-4 h-4" />
+                          </div>
+                        </div>
+
+                        {/* Detalle Técnico Comparativo del Módulo Seleccionado */}
+                        {selectedPanel && (
+                          <div
+                            className={`p-3 rounded-xl border text-[11px] grid grid-cols-2 sm:grid-cols-4 gap-2.5 ${
+                              isDark ? 'bg-[#101016] border-[#252538] text-zinc-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                            }`}
+                          >
+                            <div>
+                              <span className="text-zinc-500 dark:text-zinc-400 font-bold block text-[9px] uppercase">Potencia Unitaria</span>
+                              <span className="font-mono font-bold text-emerald-500 dark:text-emerald-400 text-xs">{selectedPanel.powerW} Wp</span>
+                            </div>
+                            <div>
+                              <span className="text-zinc-500 dark:text-zinc-400 font-bold block text-[9px] uppercase">Eficiencia STC</span>
+                              <span className="font-mono font-bold text-amber-500 dark:text-amber-400 text-xs">{selectedPanel.efficiencyPct || 21.8}%</span>
+                            </div>
+                            <div>
+                              <span className="text-zinc-500 dark:text-zinc-400 font-bold block text-[9px] uppercase">Tecnología</span>
+                              <span className="font-semibold text-cyan-500 dark:text-cyan-400 text-xs truncate block">{selectedPanel.cellType || 'Bifacial TOPCon'}</span>
+                            </div>
+                            <div>
+                              <span className="text-zinc-500 dark:text-zinc-400 font-bold block text-[9px] uppercase">Área Requerida</span>
+                              <span className="font-mono font-bold text-slate-800 dark:text-zinc-200 text-xs">
+                                ~{((extractedData.recommendedPanelCount || 0) * 2.7).toFixed(1)} m²
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       <div
