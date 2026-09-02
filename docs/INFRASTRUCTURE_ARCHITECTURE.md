@@ -35,7 +35,8 @@ graph TB
     subgraph PROXMOX ["🖥️ Proxmox VE 9.x (Host: pve01 - 10.0.0.83)"]
         subgraph CT100 ["📦 LXC Container: CT 100 (app-server - 10.0.0.103)"]
             
-            subgraph INGRESS ["Ingress & Proxy"]
+            subgraph INGRESS ["Ingress & Cloudflare Edge"]
+                CFTunnel["☁️ cloudflared-tunnel\n(Zero Trust Tunnel: eletcsun-tunnel)"]
                 Caddy["🛡️ Caddy 2 Reverse Proxy\n(:80 / :443)"]
             end
 
@@ -52,11 +53,12 @@ graph TB
         end
     end
 
-    DesktopApp -->|HTTPS / WSS / REST| Caddy
-    BrowserApp -->|HTTP / HTTPS| Caddy
+    DesktopApp -->|HTTPS / REST| CFTunnel
+    BrowserApp -->|HTTP / HTTPS| CFTunnel
+    CFTunnel -->|HTTP Interno| Caddy
     
-    Caddy -->|Enruta /api/*| API
-    Caddy -->|Enruta /*| Web
+    Caddy -->|Enruta solarsim.* / api.*| API
+    Caddy -->|Enruta electsun.net| Web
     
     API -->|TCP Pool Interno| DB
     

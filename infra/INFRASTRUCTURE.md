@@ -73,6 +73,12 @@ graph TD
    - **Puerto Interno**: `80`
    - **Función**: Página web oficial y landing page de Electsun.
 
+5. **`cloudflared-tunnel` (Conector Cloudflare Zero Trust Edge)**:
+   - **Ruta**: `/home/agente/servicios/cloudflared/`
+   - **Red**: `solarsim_net`
+   - **Túnel**: `eletcsun-tunnel`
+   - **Función**: Enrutamiento seguro hacia internet de `solarsim.electsun.net`, `api.electsun.net` y `electsun.net` sin abrir puertos en el firewall.
+
 ---
 
 ## 🛠️ 3. Protocolo de Despliegue y Comandos
