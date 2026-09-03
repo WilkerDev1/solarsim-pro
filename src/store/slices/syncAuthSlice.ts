@@ -177,15 +177,46 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
       }
 
       const newTimestamp = pullRes.serverTimestamp || new Date().toISOString();
-      set((state) => ({
-        projects: currentProjects,
-        isSyncing: false,
-        syncFeedbackMessage: silent ? null : '¡Proyectos sincronizados con éxito! ✨',
-        syncSettings: {
-          ...state.syncSettings,
-          lastSyncTimestamp: newTimestamp,
-        },
-      }));
+      let hasPendingRemaining = false;
+
+      set((state) => {
+        // Combinar de manera segura: si un proyecto en el estado fresco de Zustand tiene syncStatus === 'pending'
+        // DEBEMOS PRESERVAR la versión local más reciente para no revertir cambios locales concurrentes (ej. adjuntos PDF)!
+        const mergedProjects = currentProjects.map((syncedP) => {
+          const freshLocal = state.projects.find((p) => p.id === syncedP.id);
+          if (freshLocal && freshLocal.syncStatus === 'pending') {
+            hasPendingRemaining = true;
+            return freshLocal;
+          }
+          return syncedP;
+        });
+
+        // Preservar proyectos recién creados localmente durante el sync
+        const syncedIds = new Set(currentProjects.map((p) => p.id));
+        for (const localP of state.projects) {
+          if (!syncedIds.has(localP.id)) {
+            mergedProjects.push(localP);
+            if (localP.syncStatus === 'pending') {
+              hasPendingRemaining = true;
+            }
+          }
+        }
+
+        return {
+          projects: mergedProjects,
+          isSyncing: false,
+          syncFeedbackMessage: silent ? null : '¡Proyectos sincronizados con éxito! ✨',
+          syncSettings: {
+            ...state.syncSettings,
+            lastSyncTimestamp: newTimestamp,
+          },
+        };
+      });
+
+      // Si quedaron cambios pendientes generados durante el sync, programar push inmediato
+      if (hasPendingRemaining) {
+        get().triggerAutoSync(false);
+      }
 
       if (!silent) {
         setTimeout(() => set({ syncFeedbackMessage: null }), 3000);

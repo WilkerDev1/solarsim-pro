@@ -43,8 +43,15 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
     s.projects.find((p) => p.id === s.activeProjectId) || s.getActiveProject()
   );
   const currentProject = storeProject || project;
-  const storeUpdateDoc = useSimulationStore((s) => s.updateDocumentCustomization);
-  const doUpdateDoc = updateDocumentCustomization || storeUpdateDoc;
+
+  const doUpdateDoc = (partial: Partial<DocumentCustomization>) => {
+    useSimulationStore.getState().updateDocumentCustomization(partial);
+    if (updateDocumentCustomization) {
+      try {
+        updateDocumentCustomization(partial);
+      } catch (_) {}
+    }
+  };
 
   if (!currentProject) {
     return null;
@@ -239,9 +246,12 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,application/pdf"
+        accept=".pdf,application/pdf,application/x-pdf"
         multiple
         className="hidden"
+        onClick={(e) => {
+          (e.target as HTMLInputElement).value = '';
+        }}
         onChange={(e) => {
           if (e.target.files && e.target.files.length > 0) {
             handleProcessFiles(e.target.files);
@@ -250,7 +260,12 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
       />
 
       <div
-        onClick={() => fileInputRef.current?.click()}
+        onClick={() => {
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+          fileInputRef.current?.click();
+        }}
         onDragOver={(e) => {
           e.preventDefault();
           setIsDragOver(true);
