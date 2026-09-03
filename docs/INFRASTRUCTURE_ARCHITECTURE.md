@@ -381,6 +381,7 @@ erDiagram
         varchar(64) category
         varchar(64) voltage_mppt
         jsonb details
+        jsonb supplier_prices "Array de ofertas comerciales multi-proveedor (GIN index)"
         timestamp created_at
         timestamp updated_at
     }

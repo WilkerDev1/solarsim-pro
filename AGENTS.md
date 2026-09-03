@@ -126,6 +126,7 @@ solarsim/
 │       │   ├── AIDatasheetScannerModal.tsx  # Modal de escáner de fichas técnicas de equipos con IA
 │       │   ├── AIPriceCatalogScannerModal.tsx # Modal de escaneo de listas de precios con IA y fuzzy matching
 │       │   ├── SupplierPricesDetailModal.tsx # Modal de comparativa y selección de ofertas por proveedor
+│       │   ├── SupplierManagerSection.tsx   # Panel integral de gestión y edición de distribuidores y precios
 │       │   ├── ShareProposalModal.tsx       # Modal de compartir propuesta web interactiva y QR
 │       │   ├── ImportConflictModal.tsx      # Modal de resolución de conflictos de importación
 │       │   ├── NewProjectModal.tsx          # Modal de creación rápida de proyectos
@@ -156,6 +157,8 @@ solarsim/
 ├── release/                                 # Binarios generados (.exe, .AppImage, .pacman, .deb)
 └── docs/                                    # Documentación técnica y especificaciones
     ├── INFRASTRUCTURE_ARCHITECTURE.md       # Manual maestro de arquitectura de infraestructura, Proxmox, Postgres y API
+    ├── DATABASE_AND_API_SPECIFICATION.md    # Manual técnico de BD PostgreSQL, JSONB supplier_prices y APIs REST
+    ├── AI_SCANNERS_SPECIFICATION.md         # Manual técnico de motores y escáneres de IA multimodal Gemini Vision
     ├── CLOUDFLARE_WORKER_GUIDE.md           # Guía de despliegue de Cloudflare Workers & KV
     ├── FINANCIAL_ENGINE_SPECIFICATION.md    # Auditoría matemática de fórmulas
     └── MAINTENANCE_AND_UPDATES.md           # Guía de actualizaciones y dependencias
