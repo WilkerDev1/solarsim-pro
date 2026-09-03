@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { SolarEquipmentItem, EquipmentType } from '../../types/equipment';
+import { SupplierManagerSection } from './SupplierManagerSection';
 import {
   Sun,
   Cpu,
@@ -43,6 +44,7 @@ export const EquipmentManagerSettingsTab: React.FC<EquipmentManagerSettingsTabPr
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<'all' | EquipmentType>('all');
+  const [viewMode, setViewMode] = useState<'equipment' | 'suppliers'>('equipment');
   const [syncingCloud, setSyncingCloud] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -58,6 +60,16 @@ export const EquipmentManagerSettingsTab: React.FC<EquipmentManagerSettingsTabPr
   const panelCount = useMemo(() => equipmentCatalog.filter((e) => e.type === 'panel').length, [equipmentCatalog]);
   const inverterCount = useMemo(() => equipmentCatalog.filter((e) => e.type === 'inverter').length, [equipmentCatalog]);
   const batteryCount = useMemo(() => equipmentCatalog.filter((e) => e.type === 'battery').length, [equipmentCatalog]);
+
+  const supplierCount = useMemo(() => {
+    const setNames = new Set<string>();
+    equipmentCatalog.forEach((e) => {
+      (e.supplierPrices || []).forEach((sp) => {
+        if (sp.supplierName) setNames.add(sp.supplierName.trim().toLowerCase());
+      });
+    });
+    return setNames.size;
+  }, [equipmentCatalog]);
 
   // Filtered list
   const filteredItems = useMemo(() => {
@@ -246,6 +258,19 @@ export const EquipmentManagerSettingsTab: React.FC<EquipmentManagerSettingsTabPr
 
             <button
               type="button"
+              onClick={() => setViewMode(viewMode === 'suppliers' ? 'equipment' : 'suppliers')}
+              className={`px-3 py-2 rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-1.5 cursor-pointer active:scale-[0.98] ${
+                viewMode === 'suppliers'
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-emerald-600/20'
+                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-blue-600/20'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span>{viewMode === 'suppliers' ? 'Ver Equipos' : `Proveedores (${supplierCount})`}</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => handleOpenAdd('panel')}
               className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer active:scale-[0.98]"
             >
@@ -285,13 +310,30 @@ export const EquipmentManagerSettingsTab: React.FC<EquipmentManagerSettingsTabPr
         </div>
 
         {/* Badges de Conteo Rápido */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-dashed border-zinc-700/40">
-          <div className={`p-2.5 rounded-xl border ${isDark ? 'bg-[#181820] border-[#282832]' : 'bg-slate-50 border-slate-200'}`}>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4 pt-4 border-t border-dashed border-zinc-700/40">
+          <div
+            onClick={() => setViewMode('equipment')}
+            className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
+              viewMode === 'equipment'
+                ? isDark
+                  ? 'bg-[#181820] border-emerald-500/60 ring-1 ring-emerald-500/40'
+                  : 'bg-slate-50 border-emerald-500/60 ring-1 ring-emerald-500/40'
+                : isDark
+                ? 'bg-[#181820] border-[#282832]'
+                : 'bg-slate-50 border-slate-200'
+            }`}
+          >
             <span className={`text-[10px] font-medium block ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>Total Equipos</span>
             <span className={`text-lg font-black ${isDark ? 'text-zinc-100' : 'text-slate-900'}`}>{equipmentCatalog.length}</span>
           </div>
 
-          <div className={`p-2.5 rounded-xl border ${isDark ? 'bg-amber-950/20 border-amber-900/40' : 'bg-amber-50/80 border-amber-200'}`}>
+          <div
+            onClick={() => {
+              setViewMode('equipment');
+              setSelectedTypeFilter('panel');
+            }}
+            className={`p-2.5 rounded-xl border transition-all cursor-pointer ${isDark ? 'bg-amber-950/20 border-amber-900/40 hover:border-amber-700' : 'bg-amber-50/80 border-amber-200 hover:border-amber-400'}`}
+          >
             <div className="flex items-center justify-between">
               <span className={`text-[10px] font-semibold ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>Paneles Solares</span>
               <Sun className="w-3.5 h-3.5 text-amber-500" />
@@ -299,7 +341,13 @@ export const EquipmentManagerSettingsTab: React.FC<EquipmentManagerSettingsTabPr
             <span className={`text-lg font-black ${isDark ? 'text-amber-200' : 'text-amber-900'}`}>{panelCount}</span>
           </div>
 
-          <div className={`p-2.5 rounded-xl border ${isDark ? 'bg-emerald-950/20 border-emerald-900/40' : 'bg-emerald-50/80 border-emerald-200'}`}>
+          <div
+            onClick={() => {
+              setViewMode('equipment');
+              setSelectedTypeFilter('inverter');
+            }}
+            className={`p-2.5 rounded-xl border transition-all cursor-pointer ${isDark ? 'bg-emerald-950/20 border-emerald-900/40 hover:border-emerald-700' : 'bg-emerald-50/80 border-emerald-200 hover:border-emerald-400'}`}
+          >
             <div className="flex items-center justify-between">
               <span className={`text-[10px] font-semibold ${isDark ? 'text-emerald-300' : 'text-emerald-800'}`}>Inversores</span>
               <Cpu className="w-3.5 h-3.5 text-emerald-500" />
@@ -307,12 +355,43 @@ export const EquipmentManagerSettingsTab: React.FC<EquipmentManagerSettingsTabPr
             <span className={`text-lg font-black ${isDark ? 'text-emerald-200' : 'text-emerald-900'}`}>{inverterCount}</span>
           </div>
 
-          <div className={`p-2.5 rounded-xl border ${isDark ? 'bg-cyan-950/20 border-cyan-900/40' : 'bg-cyan-50/80 border-cyan-200'}`}>
+          <div
+            onClick={() => {
+              setViewMode('equipment');
+              setSelectedTypeFilter('battery');
+            }}
+            className={`p-2.5 rounded-xl border transition-all cursor-pointer ${isDark ? 'bg-cyan-950/20 border-cyan-900/40 hover:border-cyan-700' : 'bg-cyan-50/80 border-cyan-200 hover:border-cyan-400'}`}
+          >
             <div className="flex items-center justify-between">
               <span className={`text-[10px] font-semibold ${isDark ? 'text-cyan-300' : 'text-cyan-800'}`}>Baterías BESS</span>
               <BatteryCharging className="w-3.5 h-3.5 text-cyan-400" />
             </div>
             <span className={`text-lg font-black ${isDark ? 'text-cyan-200' : 'text-cyan-900'}`}>{batteryCount}</span>
+          </div>
+
+          <div
+            onClick={() => setViewMode(viewMode === 'suppliers' ? 'equipment' : 'suppliers')}
+            className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
+              viewMode === 'suppliers'
+                ? isDark
+                  ? 'bg-blue-950/40 border-blue-500 ring-1 ring-blue-500/50'
+                  : 'bg-blue-50 border-blue-400 ring-1 ring-blue-400/50'
+                : isDark
+                ? 'bg-blue-950/20 border-blue-900/40 hover:border-blue-700'
+                : 'bg-blue-50/80 border-blue-200 hover:border-blue-400'
+            }`}
+            title="Clic para gestionar proveedores y precios"
+          >
+            <div className="flex items-center justify-between">
+              <span className={`text-[10px] font-semibold ${isDark ? 'text-blue-300' : 'text-blue-800'}`}>Proveedores</span>
+              <Building2 className="w-3.5 h-3.5 text-blue-500" />
+            </div>
+            <div className="flex items-center justify-between mt-0.5">
+              <span className={`text-lg font-black ${isDark ? 'text-blue-200' : 'text-blue-900'}`}>{supplierCount}</span>
+              <span className="text-[10px] text-blue-400 font-bold underline">
+                {viewMode === 'suppliers' ? 'Ver Equipos' : 'Gestionar'}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -340,8 +419,12 @@ export const EquipmentManagerSettingsTab: React.FC<EquipmentManagerSettingsTabPr
         </div>
       )}
 
-      {/* Barra de Filtros & Búsqueda */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+      {viewMode === 'suppliers' ? (
+        <SupplierManagerSection isDark={isDark} onBackToEquipment={() => setViewMode('equipment')} />
+      ) : (
+        <>
+          {/* Barra de Filtros & Búsqueda */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         {/* Buscador */}
         <div className="relative flex-1">
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400 pointer-events-none" />
@@ -704,6 +787,8 @@ export const EquipmentManagerSettingsTab: React.FC<EquipmentManagerSettingsTabPr
             );
           })}
         </div>
+      )}
+        </>
       )}
 
       {/* ========================================== */}

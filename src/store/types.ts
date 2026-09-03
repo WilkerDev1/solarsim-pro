@@ -116,6 +116,8 @@ export interface EquipmentSlice {
   removeSupplierPrice: (equipmentId: string, supplierPriceId: string) => void;
   batchUpdateSupplierPrices: (updates: { equipmentId: string; supplierPrice: import('../types/equipment').EquipmentSupplierPrice }[]) => void;
   setPreferredSupplier: (equipmentId: string, supplierPriceId?: string) => void;
+  renameSupplier: (oldName: string, newName: string) => void;
+  deleteSupplier: (supplierName: string) => void;
 }
 
 export interface SyncAuthSlice {

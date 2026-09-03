@@ -275,4 +275,106 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (set, get) 
       get().syncEquipmentWithServer();
     }
   },
+
+  renameSupplier: (oldName, newName) => {
+    const trimmedOld = oldName.trim();
+    const trimmedNew = newName.trim();
+    if (!trimmedOld || !trimmedNew || trimmedOld.toLowerCase() === trimmedNew.toLowerCase()) return;
+
+    set((state) => {
+      const nowIso = new Date().toISOString();
+      let updatedCount = 0;
+
+      const updatedCatalog = state.equipmentCatalog.map((item) => {
+        if (!item.supplierPrices || item.supplierPrices.length === 0) return item;
+
+        let hasChanges = false;
+        const newPricesMap = new Map<string, import('../../types/equipment').EquipmentSupplierPrice>();
+
+        item.supplierPrices.forEach((sp) => {
+          if (sp.supplierName.toLowerCase().trim() === trimmedOld.toLowerCase()) {
+            hasChanges = true;
+            updatedCount++;
+            const updatedSp = {
+              ...sp,
+              supplierName: trimmedNew,
+              updatedAt: nowIso,
+            };
+            const existing = newPricesMap.get(trimmedNew.toLowerCase());
+            if (!existing || updatedSp.priceUSD < existing.priceUSD) {
+              newPricesMap.set(trimmedNew.toLowerCase(), updatedSp);
+            }
+          } else {
+            const key = sp.supplierName.toLowerCase().trim();
+            if (!newPricesMap.has(key)) {
+              newPricesMap.set(key, sp);
+            }
+          }
+        });
+
+        if (!hasChanges) return item;
+
+        return {
+          ...item,
+          supplierPrices: Array.from(newPricesMap.values()),
+          updatedAt: nowIso,
+        };
+      });
+
+      return {
+        equipmentCatalog: updatedCatalog,
+        saveFeedbackMessage: `Proveedor "${trimmedOld}" renombrado a "${trimmedNew}" en ${updatedCount} ofertas.`,
+      };
+    });
+
+    setTimeout(() => set({ saveFeedbackMessage: null }), 3500);
+
+    if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
+      get().syncEquipmentWithServer();
+    }
+  },
+
+  deleteSupplier: (supplierName) => {
+    const cleanName = supplierName.toLowerCase().trim();
+    if (!cleanName) return;
+
+    set((state) => {
+      const nowIso = new Date().toISOString();
+      let deletedCount = 0;
+
+      const updatedCatalog = state.equipmentCatalog.map((item) => {
+        if (!item.supplierPrices || item.supplierPrices.length === 0) return item;
+
+        const filtered = item.supplierPrices.filter((sp) => {
+          const matches = sp.supplierName.toLowerCase().trim() === cleanName;
+          if (matches) deletedCount++;
+          return !matches;
+        });
+
+        if (filtered.length === item.supplierPrices.length) return item;
+
+        return {
+          ...item,
+          supplierPrices: filtered,
+          preferredSupplierId:
+            item.preferredSupplierId &&
+            item.supplierPrices.find((sp) => sp.id === item.preferredSupplierId)?.supplierName.toLowerCase().trim() === cleanName
+              ? undefined
+              : item.preferredSupplierId,
+          updatedAt: nowIso,
+        };
+      });
+
+      return {
+        equipmentCatalog: updatedCatalog,
+        saveFeedbackMessage: `Proveedor "${supplierName}" y sus ${deletedCount} ofertas eliminadas del catálogo.`,
+      };
+    });
+
+    setTimeout(() => set({ saveFeedbackMessage: null }), 3500);
+
+    if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
+      get().syncEquipmentWithServer();
+    }
+  },
 });
