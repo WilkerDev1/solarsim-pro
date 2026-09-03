@@ -9,11 +9,11 @@ const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 // Modelos candidatos en cascada para tolerancia a fallos y alta demanda (503/429)
 const FALLBACK_MODELS_CASCADE = [
-  'gemini-2.0-flash',
+  'gemini-3.7-flash',
   'gemini-2.5-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-2.0-flash',
   'gemini-1.5-flash',
-  'gemini-2.0-flash-lite',
-  'gemini-2.5-flash-lite',
 ];
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -172,7 +172,7 @@ export class GeminiPriceCatalogService {
       cleanBase64 = fileBase64.split('base64,')[1];
     }
 
-    const primaryModel = customModel?.trim() || 'gemini-2.0-flash';
+    const primaryModel = customModel?.trim() || 'gemini-2.5-flash';
     const candidateModels = Array.from(new Set([primaryModel, ...FALLBACK_MODELS_CASCADE])).filter(Boolean);
 
     // Preparar catálogo de referencia condensado para el prompt
