@@ -89,6 +89,8 @@ export interface ExtractedPriceCatalogItem {
 
 export interface ExtractedPriceCatalogResult {
   detectedSupplierName: string;
+  matchedExistingSupplier?: string | null; // Nombre del proveedor existente en el sistema con el que coincide
+  supplierMatchConfidence?: number;        // 0 a 1.0 (ej: 0.95 = 95% coincidencia de proveedor)
   documentDate?: string;
   documentTitle?: string;
   currencyDetected?: 'USD' | 'DOP';

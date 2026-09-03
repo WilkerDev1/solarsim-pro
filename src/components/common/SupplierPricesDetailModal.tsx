@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { SolarEquipmentItem, EquipmentSupplierPrice } from '../../types/equipment';
 import {
@@ -42,6 +42,17 @@ export const SupplierPricesDetailModal: React.FC = () => {
   const [sku, setSku] = useState('');
   const [notes, setNotes] = useState('');
   const [stockStatus, setStockStatus] = useState<EquipmentSupplierPrice['stockStatus']>('in_stock');
+
+  const equipmentCatalog = useSimulationStore((s) => s.equipmentCatalog);
+  const existingSupplierNames: string[] = useMemo(() => {
+    const setNames = new Set<string>();
+    equipmentCatalog.forEach((eq) => {
+      (eq.supplierPrices || []).forEach((sp) => {
+        if (sp.supplierName) setNames.add(sp.supplierName);
+      });
+    });
+    return Array.from(setNames).sort();
+  }, [equipmentCatalog]);
 
   if (!item) return null;
 
@@ -220,6 +231,7 @@ export const SupplierPricesDetailModal: React.FC = () => {
                   <input
                     type="text"
                     required
+                    list="supplier-names-datalist"
                     placeholder="ej: Enersys RD, RAAS Solar, Fersan..."
                     value={supplierName}
                     onChange={(e) => setSupplierName(e.target.value)}
@@ -227,6 +239,11 @@ export const SupplierPricesDetailModal: React.FC = () => {
                       isDark ? 'bg-[#181822] border-[#383848] text-white' : 'bg-white border-slate-300 text-slate-900'
                     }`}
                   />
+                  <datalist id="supplier-names-datalist">
+                    {existingSupplierNames.map((name: string) => (
+                      <option key={name} value={name} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div>

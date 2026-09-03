@@ -150,9 +150,11 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (set, get) 
       const currentPrices = Array.isArray(target.supplierPrices) ? [...target.supplierPrices] : [];
       const priceId = supplierPrice.id || `sp-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
       const nowIso = new Date().toISOString();
+      const cleanName = supplierPrice.supplierName.toLowerCase().trim();
 
-      const existingIndex = currentPrices.findIndex(
-        (sp) => sp.id === priceId || sp.supplierName.toLowerCase().trim() === supplierPrice.supplierName.toLowerCase().trim()
+      // Consolidar: eliminar cualquier otra entrada con el mismo ID o el mismo nombre normalizado
+      const otherPrices = currentPrices.filter(
+        (sp) => sp.id !== priceId && sp.supplierName.toLowerCase().trim() !== cleanName
       );
 
       const updatedPriceEntry = {
@@ -161,17 +163,13 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (set, get) 
         updatedAt: nowIso,
       };
 
-      if (existingIndex >= 0) {
-        currentPrices[existingIndex] = updatedPriceEntry;
-      } else {
-        currentPrices.push(updatedPriceEntry);
-      }
+      otherPrices.push(updatedPriceEntry);
 
       const updatedCatalog = state.equipmentCatalog.map((e) =>
         e.id === equipmentId
           ? {
               ...e,
-              supplierPrices: currentPrices,
+              supplierPrices: otherPrices,
               updatedAt: nowIso,
             }
           : e
@@ -230,8 +228,11 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (set, get) 
         if (item) {
           const prices = Array.isArray(item.supplierPrices) ? [...item.supplierPrices] : [];
           const priceId = supplierPrice.id || `sp-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-          const existingIdx = prices.findIndex(
-            (sp) => sp.id === priceId || sp.supplierName.toLowerCase().trim() === supplierPrice.supplierName.toLowerCase().trim()
+          const cleanName = supplierPrice.supplierName.toLowerCase().trim();
+
+          // Consolidar: eliminar cualquier duplicado previo del mismo proveedor o ID
+          const otherPrices = prices.filter(
+            (sp) => sp.id !== priceId && sp.supplierName.toLowerCase().trim() !== cleanName
           );
 
           const fullEntry = {
@@ -240,24 +241,23 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (set, get) 
             updatedAt: supplierPrice.updatedAt || nowIso,
           };
 
-          if (existingIdx >= 0) {
-            prices[existingIdx] = fullEntry;
-          } else {
-            prices.push(fullEntry);
-          }
+          otherPrices.push(fullEntry);
 
-          item.supplierPrices = prices;
-          item.updatedAt = nowIso;
+          catalogMap.set(equipmentId, {
+            ...item,
+            supplierPrices: otherPrices,
+            updatedAt: nowIso,
+          });
         }
       });
 
       return {
         equipmentCatalog: Array.from(catalogMap.values()),
-        saveFeedbackMessage: `¡${updates.length} precios de proveedores actualizados en el catálogo! ⚡`,
+        saveFeedbackMessage: `¡${updates.length} precios de proveedores actualizados en el catálogo! 🏷️`,
       };
     });
 
-    setTimeout(() => set({ saveFeedbackMessage: null }), 3500);
+    setTimeout(() => set({ saveFeedbackMessage: null }), 4000);
 
     if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
       get().syncEquipmentWithServer();

@@ -57,6 +57,8 @@ REGLAS DE EXTRACCIÓN Y COMPARACIÓN (MATCHING):
 RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO CON LA SIGUIENTE ESTRUCTURA (sin bloques de markdown ni texto extra):
 {
   "detectedSupplierName": string,
+  "matchedExistingSupplier": string | null,
+  "supplierMatchConfidence": number,
   "documentDate": string,
   "documentTitle": string,
   "currencyDetected": "USD" | "DOP",
@@ -85,9 +87,64 @@ export interface ScanPriceCatalogOptions {
   apiKey: string;
   customModel?: string;
   manualSupplierName?: string;
+  existingSuppliers?: string[];
   currentCatalog: SolarEquipmentItem[];
   dopExchangeRate?: number;
   onProgress?: (status: string) => void;
+}
+
+export function findBestSupplierMatch(
+  detectedName: string,
+  existingSuppliers: string[]
+): { matchedName: string; confidence: number } | null {
+  if (!detectedName || !existingSuppliers || existingSuppliers.length === 0) return null;
+  const cleanDetected = detectedName.toLowerCase().trim();
+
+  // 1. Coincidencia exacta
+  for (const existing of existingSuppliers) {
+    if (cleanDetected === existing.toLowerCase().trim()) {
+      return { matchedName: existing, confidence: 1.0 };
+    }
+  }
+
+  // 2. Coincidencia eliminando ruido corporativo (ej: "Unitrade" vs "Unitrade Dominicana")
+  const stripNoise = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/\b(dominicana|s\.r\.l\.|srl|r\.d\.|rd|corp|corp\.|sa|s\.a\.|inc|llc|solar|distribuidora|group|grupo)\b/gi, ' ')
+      .replace(/[^a-z0-9]/g, '')
+      .trim();
+
+  const coreDetected = stripNoise(cleanDetected);
+  if (!coreDetected) return null;
+
+  let bestMatch: { matchedName: string; confidence: number } | null = null;
+
+  for (const existing of existingSuppliers) {
+    const cleanExisting = existing.toLowerCase().trim();
+    const coreExisting = stripNoise(cleanExisting);
+
+    if (coreExisting && coreDetected === coreExisting) {
+      return { matchedName: existing, confidence: 0.95 };
+    }
+
+    if (
+      (coreExisting && coreDetected.includes(coreExisting)) ||
+      (coreExisting && coreExisting.includes(coreDetected))
+    ) {
+      const conf = 0.88;
+      if (!bestMatch || conf > bestMatch.confidence) {
+        bestMatch = { matchedName: existing, confidence: conf };
+      }
+    } else if (cleanDetected.includes(cleanExisting) || cleanExisting.includes(cleanDetected)) {
+      const conf = 0.82;
+      if (!bestMatch || conf > bestMatch.confidence) {
+        bestMatch = { matchedName: existing, confidence: conf };
+      }
+    }
+  }
+
+  return bestMatch;
 }
 
 export class GeminiPriceCatalogService {
@@ -99,6 +156,7 @@ export class GeminiPriceCatalogService {
       apiKey,
       customModel,
       manualSupplierName,
+      existingSuppliers = [],
       currentCatalog,
       dopExchangeRate = 60.0,
       onProgress,
@@ -131,12 +189,19 @@ export class GeminiPriceCatalogService {
 
     const promptText = `Por favor analiza esta lista de precios / catálogo comercial de equipos fotovoltaicos ("${fileName}").
 ${manualSupplierName ? `PROVEEDOR DECLARADO POR EL USUARIO: "${manualSupplierName}". Si el documento no especifica otro suplidor claramente, asigna este proveedor.` : ''}
+${
+  existingSuppliers.length > 0
+    ? `PROVEEDORES YA REGISTRADOS EN LA BASE DE DATOS (Para identificar y cotejar coincidencias sin duplicar):
+${JSON.stringify(existingSuppliers, null, 2)}
+Si el documento corresponde a uno de estos distribuidores o a una variante/sucursal (ej: "Unitrade" vs "Unitrade Dominicana"), indica el nombre del documento en "detectedSupplierName", pero enlaza el proveedor exacto en "matchedExistingSupplier" con confianza (0.0 a 1.0).`
+    : ''
+}
 TASA DE CAMBIO DE REFERENCIA: 1 USD = ${dopExchangeRate} DOP. (Si los precios están en DOP, conviértelos a USD dividiendo entre ${dopExchangeRate}).
 
-CATÁLOGO DE REFERENCIA EXISTENTE EN EL SISTEMA (Para comparar y vincular coincidencias):
+CATÁLOGO DE REFERENCIA EXISTENTE EN EL SISTEMA (Para comparar y vincular coincidencias de equipos):
 ${JSON.stringify(referenceCatalogCondensed, null, 2)}
 
-Extrae todos los modelos de paneles, inversores y baterías con sus precios unitarios de compra, y vincula cada modelo extraído con el ID del catálogo existente según corresponda.`;
+Extrae todos los modelos de paneles, inversores y baterías con sus precios unitarios de compra, e identifica el proveedor cotejándolo con los ya registrados en la base de datos.`;
 
     const requestBody = {
       contents: [
@@ -272,8 +337,22 @@ Extrae todos los modelos de paneles, inversores y baterías con sus precios unit
               };
             });
 
+            let matchedSupplier = parsed.matchedExistingSupplier || null;
+            let supplierConfidence = typeof parsed.supplierMatchConfidence === 'number' ? parsed.supplierMatchConfidence : 0;
+
+            // Si la IA no vinculó o si hay un mejor match local con proveedores existentes
+            if ((!matchedSupplier || supplierConfidence < 0.7) && existingSuppliers.length > 0) {
+              const localMatch = findBestSupplierMatch(parsed.detectedSupplierName || supplierName, existingSuppliers);
+              if (localMatch && localMatch.confidence >= 0.7) {
+                matchedSupplier = localMatch.matchedName;
+                supplierConfidence = localMatch.confidence;
+              }
+            }
+
             return {
-              detectedSupplierName: supplierName,
+              detectedSupplierName: parsed.detectedSupplierName || supplierName,
+              matchedExistingSupplier: matchedSupplier,
+              supplierMatchConfidence: supplierConfidence,
               documentDate: parsed.documentDate || new Date().toISOString().split('T')[0],
               documentTitle: parsed.documentTitle || fileName,
               currencyDetected: parsed.currencyDetected || 'USD',

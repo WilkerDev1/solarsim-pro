@@ -48,6 +48,8 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
   const [fileBase64, setFileBase64] = useState<string | null>(null);
   const [fileMimeType, setFileMimeType] = useState<string>('');
   const [manualSupplierName, setManualSupplierName] = useState('');
+  const [assignedSupplierName, setAssignedSupplierName] = useState('');
+  const [isEditingSupplierName, setIsEditingSupplierName] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progressStatus, setProgressStatus] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -135,15 +137,25 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
         apiKey: geminiApiKey,
         customModel: geminiModel,
         manualSupplierName: manualSupplierName.trim() || undefined,
+        existingSuppliers: existingSupplierNames,
         currentCatalog: equipmentCatalog,
         dopExchangeRate: dopRate,
         onProgress: setProgressStatus,
       });
 
       setScanResult(result);
-      if (result.detectedSupplierName && !manualSupplierName) {
-        setManualSupplierName(result.detectedSupplierName);
-      }
+
+      // Si el usuario especificó un proveedor manual, usarlo.
+      // Si no, y hay coincidencia con uno existente (>= 0.70), vincular con el existente automáticamente
+      // para evitar duplicar proveedores al subir el mismo documento 2 veces.
+      const initialAssigned =
+        manualSupplierName.trim() ||
+        result.matchedExistingSupplier ||
+        result.detectedSupplierName ||
+        'Proveedor General';
+
+      setAssignedSupplierName(initialAssigned);
+      setIsEditingSupplierName(false);
 
       // Marcar todos los ítems como seleccionados inicialmente
       const initialIds = new Set(result.items.map((i) => i.id));
@@ -264,7 +276,11 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
   const handleApplyPricesToCatalog = () => {
     if (!scanResult) return;
 
-    const supplier = manualSupplierName.trim() || scanResult.detectedSupplierName || 'Proveedor General';
+    const supplier =
+      assignedSupplierName.trim() ||
+      manualSupplierName.trim() ||
+      scanResult.detectedSupplierName ||
+      'Proveedor General';
     const nowIso = new Date().toISOString();
 
     const updates: { equipmentId: string; supplierPrice: any }[] = [];
@@ -500,36 +516,162 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
           ) : (
             /* PASO 2: RESULTADOS Y CONFIRMACIÓN DE COINCIDENCIAS */
             <div className="space-y-4 animate-in fade-in duration-200">
-              {/* Barra de Resumen de Extracción */}
+              {/* Card de Identificación y Vinculación del Proveedor */}
               <div
-                className={`p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
-                  isDark ? 'bg-[#1a1a28] border-[#34344c]' : 'bg-purple-50/50 border-purple-200'
+                className={`p-4 rounded-xl border ${
+                  isDark ? 'bg-[#1a1a28] border-[#34344c]' : 'bg-white border-purple-200 shadow-xs'
                 }`}
               >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-sm">{scanResult.detectedSupplierName}</span>
-                    <span className="text-[10.5px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                      {scanResult.items.length} equipos detectados
-                    </span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-zinc-800/40 dark:border-[#272736]">
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        Proveedor de la Lista / Factura
+                      </span>
+                      {scanResult.matchedExistingSupplier ? (
+                        <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                          <Check className="w-3 h-3" />
+                          Coincide en BD: {Math.round((scanResult.supplierMatchConfidence || 0.95) * 100)}%
+                        </span>
+                      ) : (
+                        <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                          Nuevo Proveedor
+                        </span>
+                      )}
+                      <span className="text-[10.5px] px-2 py-0.5 rounded-full font-bold bg-zinc-700/30 text-zinc-300 border border-zinc-600/40">
+                        {scanResult.items.length} equipos extraídos
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap text-xs">
+                      <span className={isDark ? 'text-zinc-400' : 'text-slate-500'}>Detectado en documento:</span>
+                      <strong className="font-extrabold text-zinc-100 bg-zinc-800/60 px-2 py-0.5 rounded">
+                        "{scanResult.detectedSupplierName}"
+                      </strong>
+                    </div>
                   </div>
-                  <p className={`text-xs mt-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-                    Moneda detectada: <strong>{scanResult.currencyDetected}</strong> • Fecha:{' '}
-                    {scanResult.documentDate}
-                  </p>
+
+                  <div className="flex items-center gap-3">
+                    <div className="text-right text-[11px] text-zinc-400 hidden sm:block">
+                      <div>Moneda: <strong className="text-zinc-200">{scanResult.currencyDetected}</strong></div>
+                      {scanResult.documentDate && <div>Fecha: <strong className="text-zinc-200">{scanResult.documentDate}</strong></div>}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setScanResult(null);
+                        setSelectedFile(null);
+                      }}
+                      className="text-xs font-semibold text-zinc-400 hover:text-zinc-200 flex items-center gap-1 cursor-pointer"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Escanear otro</span>
+                    </button>
+                  </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setScanResult(null);
-                    setSelectedFile(null);
-                  }}
-                  className="text-xs font-semibold text-zinc-400 hover:text-zinc-200 flex items-center gap-1 cursor-pointer"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Escanear otro archivo</span>
-                </button>
+                {/* Asignación y Selección de Proveedor */}
+                <div className={`mt-3 p-3 rounded-lg border flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+                  isDark ? 'bg-[#12121c] border-[#272738]' : 'bg-slate-50 border-slate-200'
+                }`}>
+                  <div className="flex-1 min-w-0">
+                    <label className="text-[11px] font-bold text-zinc-300 block mb-1">
+                      Asignar ofertas comerciales a este proveedor en el catálogo:
+                    </label>
+
+                    {isEditingSupplierName ? (
+                      <div className="flex items-center gap-2 max-w-md">
+                        <input
+                          type="text"
+                          value={assignedSupplierName}
+                          onChange={(e) => setAssignedSupplierName(e.target.value)}
+                          placeholder="Nombre del proveedor..."
+                          className={`w-full px-2.5 py-1.5 text-xs font-bold rounded-lg border outline-none ${
+                            isDark
+                              ? 'bg-[#181824] border-purple-500/50 text-zinc-100'
+                              : 'bg-white border-purple-400 text-slate-800'
+                          }`}
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingSupplierName(false)}
+                          className="px-3 py-1.5 text-xs font-bold rounded-lg bg-purple-600 hover:bg-purple-500 text-white cursor-pointer shrink-0"
+                        >
+                          Listo
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <select
+                          value={
+                            assignedSupplierName === scanResult.matchedExistingSupplier
+                              ? '__matched__'
+                              : assignedSupplierName === scanResult.detectedSupplierName
+                              ? '__detected__'
+                              : existingSupplierNames.includes(assignedSupplierName)
+                              ? assignedSupplierName
+                              : '__custom__'
+                          }
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '__matched__' && scanResult.matchedExistingSupplier) {
+                              setAssignedSupplierName(scanResult.matchedExistingSupplier);
+                            } else if (val === '__detected__') {
+                              setAssignedSupplierName(scanResult.detectedSupplierName);
+                            } else if (val === '__custom__') {
+                              setIsEditingSupplierName(true);
+                            } else {
+                              setAssignedSupplierName(val);
+                            }
+                          }}
+                          className={`text-xs font-extrabold rounded-lg px-2.5 py-1.5 border outline-none cursor-pointer max-w-full ${
+                            isDark
+                              ? 'bg-[#1e1e2c] border-[#38384a] text-zinc-100'
+                              : 'bg-white border-slate-300 text-slate-800 shadow-2xs'
+                          }`}
+                        >
+                          {scanResult.matchedExistingSupplier && (
+                            <option value="__matched__">
+                              ✓ Vincular con coincidencia: "{scanResult.matchedExistingSupplier}"
+                            </option>
+                          )}
+                          <option value="__detected__">
+                            {scanResult.matchedExistingSupplier
+                              ? `Crear como nuevo proveedor: "${scanResult.detectedSupplierName}"`
+                              : `Crear como nuevo proveedor: "${scanResult.detectedSupplierName}"`}
+                          </option>
+                          {existingSupplierNames.length > 0 && (
+                            <optgroup label="Sincronizar con otro proveedor existente...">
+                              {existingSupplierNames.map((name) => (
+                                <option key={name} value={name}>
+                                  {name}
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                          <option value="__custom__">✎ Escribir otro nombre personalizado...</option>
+                        </select>
+
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingSupplierName(true)}
+                          className="text-[11px] font-semibold text-purple-400 hover:text-purple-300 underline cursor-pointer"
+                        >
+                          Editar nombre
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="text-[11px] text-zinc-400">
+                    Proveedor asignado activo:{' '}
+                    <strong className="text-emerald-400 font-mono font-bold block sm:inline">
+                      {assignedSupplierName}
+                    </strong>
+                  </div>
+                </div>
               </div>
 
               {/* Tabla de Comparación y Coincidencias */}
@@ -723,7 +865,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
               <div className="flex items-center justify-between pt-2">
                 <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
                   Se actualizarán las ofertas comerciales para el proveedor{' '}
-                  <strong className="text-emerald-400">{manualSupplierName || scanResult.detectedSupplierName}</strong>.
+                  <strong className="text-emerald-400">{assignedSupplierName || manualSupplierName || scanResult.detectedSupplierName}</strong>.
                 </p>
 
                 <div className="flex items-center gap-2">
