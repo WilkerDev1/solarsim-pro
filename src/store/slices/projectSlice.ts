@@ -563,18 +563,21 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
   },
 
   updateDocumentCustomization: (customizationPartial) => {
-    set((state) => ({
-      projects: state.projects.map((p) =>
-        p.id === state.activeProjectId
-          ? {
-              ...p,
-              syncStatus: 'pending' as const,
-              updatedAt: new Date().toISOString(),
-              customization: { ...(p.customization || {}), ...customizationPartial },
-            }
-          : p
-      ),
-    }));
+    set((state) => {
+      const targetId = state.activeProjectId || state.getActiveProject()?.id;
+      return {
+        projects: state.projects.map((p) =>
+          p.id === targetId
+            ? {
+                ...p,
+                syncStatus: 'pending' as const,
+                updatedAt: new Date().toISOString(),
+                customization: { ...(p.customization || {}), ...customizationPartial },
+              }
+            : p
+        ),
+      };
+    });
 
     get().triggerAutoSync(false);
   },

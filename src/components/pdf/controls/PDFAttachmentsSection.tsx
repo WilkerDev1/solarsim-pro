@@ -7,15 +7,12 @@ import {
   ExternalLink,
   CheckCircle2,
   AlertCircle,
-  FileCheck,
-  Layers,
   Sparkles,
-  Info,
-  Download,
 } from 'lucide-react';
 import { ProjectSimulation, DocumentCustomization, AttachedPDFDocument } from '../../../types';
 import { PDFMergeService } from '../../../services/pdfMergeService';
 import { PDFAttachmentStorage } from '../../../services/pdfAttachmentStorage';
+import { useSimulationStore } from '../../../store/useSimulationStore';
 
 interface PDFAttachmentsSectionProps {
   isDark: boolean;
@@ -37,19 +34,29 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
 
-  if (!project || !updateDocumentCustomization) {
+  // Obtener referencia reactiva directa del store para evitar cualquier desfase por props
+  const activeProjectId = useSimulationStore((s) => s.activeProjectId);
+  const storeProject = useSimulationStore((s) =>
+    s.projects.find((p) => p.id === s.activeProjectId) || s.getActiveProject()
+  );
+  const currentProject = storeProject || project;
+  const storeUpdateDoc = useSimulationStore((s) => s.updateDocumentCustomization);
+  const doUpdateDoc = updateDocumentCustomization || storeUpdateDoc;
+
+  if (!currentProject) {
     return null;
   }
 
-  const attachedPdfs: AttachedPDFDocument[] = project.customization?.attachedPdfs || [];
-
+  const attachedPdfs: AttachedPDFDocument[] = currentProject.customization?.attachedPdfs || [];
   const enabledAttachments = attachedPdfs.filter((att) => att.enabled);
   const totalAttachedPages = enabledAttachments.reduce((sum, att) => sum + (att.pageCount || 1), 0);
 
   const handleProcessFiles = async (files: FileList | File[]) => {
     setUploadError(null);
+    setFeedbackMsg(null);
     setIsUploading(true);
 
     const pdfFiles = Array.from(files).filter(
@@ -66,8 +73,16 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
       const newItems: AttachedPDFDocument[] = [];
 
       for (const file of pdfFiles) {
-        const buffer = await file.arrayBuffer();
-        const pageCount = await PDFMergeService.getPdfPageCount(buffer);
+        const fileBuffer = await file.arrayBuffer();
+        // Clonar buffer para que nunca se desvincule al procesarlo
+        const bufferCopy = fileBuffer.slice(0);
+
+        let pageCount = 1;
+        try {
+          pageCount = await PDFMergeService.getPdfPageCount(bufferCopy);
+        } catch (pageErr) {
+          console.warn('Advertencia leyendo páginas de PDF (usando 1 por defecto):', pageErr);
+        }
 
         const cleanName = file.name
           .replace(/\.pdf$/i, '')
@@ -76,8 +91,9 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
 
         const docId = `att-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
-        // Guardar binario en IndexedDB
-        await PDFAttachmentStorage.saveAttachment(docId, project.id, file.name, buffer);
+        // Guardar binario en IndexedDB y caché
+        const targetProjId = currentProject.id || activeProjectId || 'default-proj';
+        await PDFAttachmentStorage.saveAttachment(docId, targetProjId, file.name, fileBuffer);
 
         newItems.push({
           id: docId,
@@ -88,13 +104,21 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
           subtitle: `Ficha Técnica / Anexo Oficial (${pageCount} ${pageCount === 1 ? 'pág' : 'págs'})`,
           uploadedAt: new Date().toISOString(),
           enabled: true,
-          addToTableOfContents: true,
+          addToTableOfContents: false, // Por defecto no altera el índice visual del lienzo
         });
       }
 
-      updateDocumentCustomization({
-        attachedPdfs: [...attachedPdfs, ...newItems],
+      // Tomar la lista más fresca directamente del store para no sobrescribir nada
+      const latestProj = useSimulationStore.getState().projects.find((p) => p.id === currentProject.id) || currentProject;
+      const currentList = latestProj.customization?.attachedPdfs || [];
+      const updatedList = [...currentList, ...newItems];
+
+      doUpdateDoc({
+        attachedPdfs: updatedList,
       });
+
+      setFeedbackMsg(`✓ ¡${newItems.length} archivo(s) PDF adjuntado(s) exitosamente! Listo para fusionar al exportar.`);
+      setTimeout(() => setFeedbackMsg(null), 5000);
     } catch (err: any) {
       console.error('Error procesando archivos PDF adjuntos:', err);
       setUploadError(err.message || 'Ocurrió un error al leer y procesar los archivos PDF.');
@@ -106,41 +130,51 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
     }
   };
 
+  const getLatestAttachments = (): AttachedPDFDocument[] => {
+    const latestProj = useSimulationStore.getState().projects.find((p) => p.id === currentProject.id) || currentProject;
+    return latestProj.customization?.attachedPdfs || [];
+  };
+
   const handleToggleEnabled = (id: string, enabled: boolean) => {
-    updateDocumentCustomization({
-      attachedPdfs: attachedPdfs.map((att) => (att.id === id ? { ...att, enabled } : att)),
+    const list = getLatestAttachments();
+    doUpdateDoc({
+      attachedPdfs: list.map((att) => (att.id === id ? { ...att, enabled } : att)),
     });
   };
 
   const handleToggleAddToToc = (id: string, addToTableOfContents: boolean) => {
-    updateDocumentCustomization({
-      attachedPdfs: attachedPdfs.map((att) => (att.id === id ? { ...att, addToTableOfContents } : att)),
+    const list = getLatestAttachments();
+    doUpdateDoc({
+      attachedPdfs: list.map((att) => (att.id === id ? { ...att, addToTableOfContents } : att)),
     });
   };
 
   const handleUpdateTitle = (id: string, title: string) => {
-    updateDocumentCustomization({
-      attachedPdfs: attachedPdfs.map((att) => (att.id === id ? { ...att, title } : att)),
+    const list = getLatestAttachments();
+    doUpdateDoc({
+      attachedPdfs: list.map((att) => (att.id === id ? { ...att, title } : att)),
     });
   };
 
   const handleUpdateSubtitle = (id: string, subtitle: string) => {
-    updateDocumentCustomization({
-      attachedPdfs: attachedPdfs.map((att) => (att.id === id ? { ...att, subtitle } : att)),
+    const list = getLatestAttachments();
+    doUpdateDoc({
+      attachedPdfs: list.map((att) => (att.id === id ? { ...att, subtitle } : att)),
     });
   };
 
   const handleRemoveAttachment = async (id: string) => {
     await PDFAttachmentStorage.deleteAttachment(id);
-    updateDocumentCustomization({
-      attachedPdfs: attachedPdfs.filter((att) => att.id !== id),
+    const list = getLatestAttachments();
+    doUpdateDoc({
+      attachedPdfs: list.filter((att) => att.id !== id),
     });
   };
 
   const handlePreviewAttachment = async (id: string, fileName: string) => {
     const buffer = await PDFAttachmentStorage.getAttachment(id);
     if (!buffer) {
-      alert('No se pudo encontrar el archivo binario en el almacenamiento local.');
+      alert(`No se encontró el archivo binario de "${fileName}" en memoria local.`);
       return;
     }
     PDFMergeService.previewPdfBytes(buffer);
@@ -172,13 +206,32 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
       </div>
 
       <p className={`text-[11px] leading-relaxed ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-        Adjunta fichas técnicas de paneles/inversores, planos o facturas en PDF. Se fusionarán automáticamente en alta resolución vectorial al final de tu propuesta al exportar o imprimir.
+        Adjunta fichas técnicas de paneles/inversores, planos o certificados. Se conservarán en el dock y se fusionarán vectorialmente en alta resolución al final de tu propuesta al exportar el PDF.
       </p>
 
+      {/* Feedback de Éxito Instantáneo */}
+      {feedbackMsg && (
+        <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center justify-between gap-2 animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{feedbackMsg}</span>
+          </div>
+          <button onClick={() => setFeedbackMsg(null)} className="text-zinc-400 hover:text-white cursor-pointer">
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Mensaje de Error */}
       {uploadError && (
-        <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{uploadError}</span>
+        <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{uploadError}</span>
+          </div>
+          <button onClick={() => setUploadError(null)} className="text-zinc-400 hover:text-white cursor-pointer">
+            ✕
+          </button>
         </div>
       )}
 
@@ -247,7 +300,7 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
             </span>
           </div>
           <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 shrink-0">
-            Auto-Merge
+            Auto-Merge al Exportar
           </span>
         </div>
       )}
@@ -255,7 +308,7 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
       {/* Lista de Documentos PDF Adjuntos */}
       {attachedPdfs.length > 0 && (
         <div className="space-y-2.5 pt-1">
-          {attachedPdfs.map((doc, idx) => (
+          {attachedPdfs.map((doc) => (
             <div
               key={doc.id}
               className={`p-3 rounded-xl border transition-all space-y-2 ${
@@ -279,7 +332,7 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
                       type="text"
                       value={doc.title}
                       onChange={(e) => handleUpdateTitle(doc.id, e.target.value)}
-                      placeholder="Título en el índice..."
+                      placeholder="Título descriptivo del archivo..."
                       className={`text-xs font-bold w-full bg-transparent border-b border-transparent hover:border-zinc-500 focus:border-emerald-500 outline-none transition-colors ${
                         isDark ? 'text-zinc-100' : 'text-slate-900'
                       }`}
@@ -296,7 +349,7 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
                   </div>
                 </div>
 
-                {/* Badge de Páginas y Botón de Eliminar */}
+                {/* Badge de Páginas y Botones de Acción */}
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span
                     className={`text-[10px] font-black font-mono px-2 py-0.5 rounded-md border ${
@@ -312,7 +365,7 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
                     type="button"
                     onClick={() => handlePreviewAttachment(doc.id, doc.fileName)}
                     className="p-1 rounded-md text-zinc-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer"
-                    title="Ver o descargar PDF original"
+                    title="Ver o descargar PDF original en pestaña nueva"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
                   </button>
@@ -328,21 +381,6 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
                 </div>
               </div>
 
-              {/* Subtítulo Opcional para el Índice */}
-              <div>
-                <input
-                  type="text"
-                  value={doc.subtitle || ''}
-                  onChange={(e) => handleUpdateSubtitle(doc.id, e.target.value)}
-                  placeholder="Subtema descriptivo para el índice (opcional)..."
-                  className={`text-[10.5px] w-full px-2 py-1 rounded-md border outline-none font-medium transition-colors ${
-                    isDark
-                      ? 'bg-[#121218] border-[#2c2c3e] text-zinc-300 focus:border-emerald-500'
-                      : 'bg-slate-50 border-slate-200 text-slate-700 focus:border-emerald-600'
-                  }`}
-                />
-              </div>
-
               {/* Fila de Opciones: Checkboxes de Inclusión */}
               <div className="pt-1.5 border-t border-dashed border-zinc-700/40 flex items-center justify-between text-[10.5px] gap-2">
                 <label className="flex items-center gap-1.5 cursor-pointer select-none">
@@ -352,8 +390,8 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
                     onChange={(e) => handleToggleEnabled(doc.id, e.target.checked)}
                     className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-0 cursor-pointer"
                   />
-                  <span className={isDark ? 'text-zinc-300' : 'text-slate-700'}>
-                    Fusionar al PDF
+                  <span className={`font-medium ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                    ✓ Fusionar al exportar
                   </span>
                 </label>
 
@@ -364,7 +402,7 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
                     onChange={(e) => handleToggleAddToToc(doc.id, e.target.checked)}
                     className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-0 cursor-pointer"
                   />
-                  <span className={isDark ? 'text-zinc-300' : 'text-slate-700'}>
+                  <span className={isDark ? 'text-zinc-400' : 'text-slate-500'}>
                     Mostrar en el Índice
                   </span>
                 </label>

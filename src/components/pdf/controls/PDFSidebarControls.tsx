@@ -134,7 +134,11 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
           style={{ backgroundColor: activeTheme.primary }}
         >
           <Download className="w-4 h-4" />
-          {isExporting ? 'Generando Documento...' : 'Descargar Propuesta PDF'}
+          {isExporting
+            ? (project?.customization?.attachedPdfs && project.customization.attachedPdfs.filter((a) => a.enabled).length > 0
+                ? `Escaneando y fusionando ${project.customization.attachedPdfs.filter((a) => a.enabled).length} anexo(s)...`
+                : 'Generando Documento...')
+            : 'Descargar Propuesta PDF'}
         </button>
 
         {onOpenShareModal && (

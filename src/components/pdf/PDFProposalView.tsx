@@ -32,7 +32,11 @@ export const PDFProposalView: React.FC = () => {
   } = useSimulationStore();
 
   const isDark = sidebarTheme === 'dark';
-  const project = getActiveProject();
+  const activeProjectId = useSimulationStore((s) => s.activeProjectId);
+  const activeProjectFromStore = useSimulationStore((s) =>
+    s.projects.find((p) => p.id === s.activeProjectId)
+  );
+  const project = activeProjectFromStore || getActiveProject();
   const summary = getFinancialSummary();
   const pdfRef = useRef<HTMLDivElement>(null);
 
@@ -165,8 +169,9 @@ export const PDFProposalView: React.FC = () => {
       const sanitizedClientName = (project.client.name || 'Cliente').replace(/[^a-zA-Z0-9_-]/g, '_');
       const filename = `Propuesta_SolarSim_${sanitizedClientName}.pdf`;
 
-      // Comprobar si hay documentos externos adjuntos para fusionar
-      const enabledAttachments = project.customization?.attachedPdfs?.filter((att) => att.enabled) || [];
+      // Comprobar si hay documentos externos adjuntos para fusionar (leído fresco del store)
+      const currentProj = useSimulationStore.getState().projects.find((p) => p.id === project.id) || project;
+      const enabledAttachments = currentProj.customization?.attachedPdfs?.filter((att) => att.enabled) || [];
 
       if (enabledAttachments.length > 0) {
         const proposalBuffer = pdf.output('arraybuffer');
@@ -386,8 +391,8 @@ export const PDFProposalView: React.FC = () => {
     }
   });
 
-  // Append Attached External PDFs to Table of Contents
-  const attachedPdfs = project.customization?.attachedPdfs?.filter((att) => att.enabled !== false && att.addToTableOfContents !== false) || [];
+  // Append Attached External PDFs to Table of Contents (only if user explicitly enabled it)
+  const attachedPdfs = project.customization?.attachedPdfs?.filter((att) => att.enabled !== false && att.addToTableOfContents === true) || [];
   attachedPdfs.forEach((att) => {
     if (att.title && att.title.trim()) {
       tocItems.push({

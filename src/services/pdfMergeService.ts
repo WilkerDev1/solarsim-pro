@@ -11,9 +11,17 @@ export class PDFMergeService {
    * Obtiene la cantidad exacta de páginas de un archivo PDF
    */
   static async getPdfPageCount(source: File | ArrayBuffer): Promise<number> {
-    const buffer = source instanceof File ? await source.arrayBuffer() : source;
-    const doc = await PDFDocument.load(buffer, { ignoreEncryption: true });
-    return doc.getPageCount();
+    try {
+      const buffer = source instanceof File ? await source.arrayBuffer() : source;
+      const doc = await PDFDocument.load(buffer, {
+        ignoreEncryption: true,
+        throwOnInvalidObject: false,
+      });
+      return doc.getPageCount();
+    } catch (err) {
+      console.warn('Advertencia al leer páginas con pdf-lib (usando 1 por defecto):', err);
+      return 1;
+    }
   }
 
   /**
@@ -24,20 +32,31 @@ export class PDFMergeService {
     proposalBuffer: ArrayBuffer,
     attachments: { name: string; buffer: ArrayBuffer }[]
   ): Promise<Uint8Array> {
-    const mergedDoc = await PDFDocument.load(proposalBuffer);
+    try {
+      const mergedDoc = await PDFDocument.load(proposalBuffer, {
+        ignoreEncryption: true,
+        throwOnInvalidObject: false,
+      });
 
-    for (const att of attachments) {
-      try {
-        const attDoc = await PDFDocument.load(att.buffer, { ignoreEncryption: true });
-        const pageIndices = attDoc.getPageIndices();
-        const copiedPages = await mergedDoc.copyPages(attDoc, pageIndices);
-        copiedPages.forEach((page) => mergedDoc.addPage(page));
-      } catch (err) {
-        console.error(`Error fusionando el documento adjunto ${att.name}:`, err);
+      for (const att of attachments) {
+        try {
+          const attDoc = await PDFDocument.load(att.buffer, {
+            ignoreEncryption: true,
+            throwOnInvalidObject: false,
+          });
+          const pageIndices = attDoc.getPageIndices();
+          const copiedPages = await mergedDoc.copyPages(attDoc, pageIndices);
+          copiedPages.forEach((page) => mergedDoc.addPage(page));
+        } catch (err) {
+          console.error(`Error fusionando el documento adjunto ${att.name}:`, err);
+        }
       }
-    }
 
-    return await mergedDoc.save();
+      return await mergedDoc.save();
+    } catch (err) {
+      console.error('Error general en mergeProposalWithAttachments, exportando original sin anexos:', err);
+      return new Uint8Array(proposalBuffer);
+    }
   }
 
   /**
