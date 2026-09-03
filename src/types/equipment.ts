@@ -49,6 +49,50 @@ export interface SolarEquipmentItem {
   isCustom?: boolean;            // Creado por el usuario / escaneado con IA
   createdAt: string;
   updatedAt: string;
+
+  // 💰 Soporte Multi-Proveedor & Cotizaciones
+  supplierPrices?: EquipmentSupplierPrice[];
+  preferredSupplierId?: string; // ID del proveedor predeterminado
+}
+
+export interface EquipmentSupplierPrice {
+  id: string;                    // ej: "sp-enersys-1725368000"
+  supplierName: string;          // ej: "Enersys RD", "RAAS Solar", "Fersan Solar"
+  priceUSD: number;              // Precio unitario de compra en USD
+  currency?: 'USD' | 'DOP';      // Moneda del catálogo (internamente se estandariza en USD)
+  priceDOP?: number;             // Precio en DOP si fue cotizado en pesos
+  sku?: string;                  // Código o SKU del proveedor
+  stockStatus?: 'in_stock' | 'on_order' | 'out_of_stock' | 'consult';
+  notes?: string;                // ej: "Precio por pallet", "Incluye entrega en Sto Dgo"
+  updatedAt: string;             // Fecha ISO de última actualización
+  source?: 'manual' | 'ai_scan'; // Origen del registro
+}
+
+export interface ExtractedPriceCatalogItem {
+  id: string;
+  extractedModelName: string;
+  brand: string;
+  equipmentType: EquipmentType;
+  priceUSD: number;
+  originalCurrency?: 'USD' | 'DOP';
+  originalPrice?: number;
+  sku?: string;
+  notes?: string;
+  
+  // Coincidencia con el catálogo actual
+  matchedEquipmentId?: string;   // ID del equipo coincidente
+  matchedDisplayName?: string;   // Nombre formateado en catálogo
+  matchConfidence: number;       // 0 a 1.0 (ej: 0.95 = 95% coincidencia)
+  action: 'update_price' | 'create_new' | 'ignore';
+  selected?: boolean;            // Checkbox para aplicar en lote
+}
+
+export interface ExtractedPriceCatalogResult {
+  detectedSupplierName: string;
+  documentDate?: string;
+  documentTitle?: string;
+  currencyDetected?: 'USD' | 'DOP';
+  items: ExtractedPriceCatalogItem[];
 }
 
 export interface ExtractedDatasheetData {

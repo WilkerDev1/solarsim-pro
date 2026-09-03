@@ -95,6 +95,7 @@ export interface ProjectSlice {
   updateAllMonthlyConsumption: (value: number) => void;
   setMonthlyConsumption: (monthlyConsumption: number[], lockAutoPanels?: boolean) => void;
   updateDocumentCustomization: (customization: Partial<DocumentCustomization>) => void;
+  applySupplierPriceToProject: (equipmentType: 'panel' | 'inverter' | 'battery', supplierPrice: import('../types/equipment').EquipmentSupplierPrice) => void;
 
   getActiveProject: () => ProjectSimulation;
   getFinancialSummary: () => FinancialSummaryResult;
@@ -109,6 +110,12 @@ export interface EquipmentSlice {
   removeEquipmentItem: (id: string) => void;
   resetEquipmentCatalogToDefaults: () => void;
   syncEquipmentWithServer: () => Promise<{ success: boolean; message: string }>;
+
+  // 🏷️ Gestión de Precios por Proveedor
+  addOrUpdateSupplierPrice: (equipmentId: string, supplierPrice: Omit<import('../types/equipment').EquipmentSupplierPrice, 'id' | 'updatedAt'> & { id?: string }) => void;
+  removeSupplierPrice: (equipmentId: string, supplierPriceId: string) => void;
+  batchUpdateSupplierPrices: (updates: { equipmentId: string; supplierPrice: import('../types/equipment').EquipmentSupplierPrice }[]) => void;
+  setPreferredSupplier: (equipmentId: string, supplierPriceId?: string) => void;
 }
 
 export interface SyncAuthSlice {
@@ -152,12 +159,15 @@ export interface UISlice {
   isUpdateModalOpen: boolean;
   isAIInvoiceModalOpen: boolean;
   isAIDatasheetModalOpen: boolean;
+  isAIPriceCatalogModalOpen: boolean;
   isAISettingsModalOpen: boolean;
   isShareModalOpen: boolean;
   isSettingsModalOpen: boolean;
   settingsActiveTab: 'sync' | 'account' | 'share' | 'ai' | 'equipment';
   updateInfo: UpdateInfo;
   saveFeedbackMessage: string | null;
+
+  supplierPriceModalEquipment: SolarEquipmentItem | null;
 
   sidebarTheme: 'dark' | 'light';
   sidebarWidth: number;
@@ -170,6 +180,10 @@ export interface UISlice {
   closeAIInvoiceModal: () => void;
   openAIDatasheetModal: () => void;
   closeAIDatasheetModal: () => void;
+  openAIPriceCatalogModal: () => void;
+  closeAIPriceCatalogModal: () => void;
+  openSupplierPriceModal: (item: SolarEquipmentItem) => void;
+  closeSupplierPriceModal: () => void;
   openAISettingsModal: () => void;
   closeAISettingsModal: () => void;
   openShareModal: () => void;

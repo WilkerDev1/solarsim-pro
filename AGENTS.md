@@ -14,13 +14,15 @@ Este documento sirve como **fuente única de verdad** para desarrolladores y asi
    - Balance de energía horaria y mensual, autoconsumo e inyección bajo el régimen de Medición Neta con las distribuidoras (**EDEESTE, EDESUR, EDENORTE, CEPM**).
    - Cobertura de todas las tarifas dominicanas (**BTS1, BTS2, BTD, MTD1, MTD2, MTH, VMT1, VMT2, VMT3**) y aplicación de retención oficial del 25% de la producción de exportación.
    - Factor de pérdidas del sistema visible y configurable (predeterminado auditado: **25.0%**).
-2. **Catálogo Inteligente de Equipos & Almacenamiento (BESS)**:
+2. **Catálogo Inteligente de Equipos, Almacenamiento (BESS) & Precios por Proveedor**:
    - Base de datos local y sincronizada en la nube con modelos verificados de **Paneles Solares** (Canadian Solar TOPBiHiKu6 TOPCon 590W-620W), **Inversores Híbridos Split Phase** (LuxpowerTek LXP-LB-US 8k/10k) y **Baterías Litio LiFePO4** (HinaESS PowerGem Max 16.08kWh).
-   - Selector inteligente con búsqueda en tiempo real por potencia, capacidad, voltaje o química, autocompletado y cálculo automático de autonomía anti-apagones.
-   - Administrador de Catálogo en el Centro de Ajustes para alta, baja y edición completa de parámetros.
+   - **Gestión Multi-Proveedor de Precios de Compra**: Cada equipo soporta múltiples ofertas comerciales de distribuidores con precio unitario en USD, moneda original, SKU, fecha de actualización, estado de stock y notas.
+   - **Modo Auto-costo desde Proveedores**: Sincronización instantánea de los costos unitarios de compra del proyecto (`panelUnitPriceUSD`, `inverterUnitPriceUSD`, `batteryUnitPriceUSD`) con el mejor precio disponible en el mercado.
+   - Selector inteligente con búsqueda en tiempo real, conteo de proveedores cotizando cada equipo y ventana comparativa de ofertas comerciales.
 3. **Inteligencia Artificial Multimodal (Gemini Vision)**:
    - **Escáner de Facturas EDE**: Extracción automática de NIS/NIC, RNC, cliente, historial de 12 meses de consumo (kWh), tarifa y potencia contratada en kW (`gemini-3.5-flash-lite`).
    - **Escáner de Fichas Técnicas (Datasheets)**: Extracción instantánea de parámetros de paneles (Wp, eficiencia, coef. temp, degradación), inversores (kW AC, máx DC, MPPTs) y baterías (kWh, Ah, V, DoD %, ciclos, corriente máx).
+   - **Escáner de Listas de Precios de Proveedores**: Extracción multimodal de cotizaciones y catálogos comerciales de distribuidores en PDF e imagen, con **Smart Fuzzy Matching** para comparar y emparejar automáticamente los modelos del distribuidor con los equipos del catálogo de referencia.
 4. **Ingeniería Financiera & Ley 57-07 (Auditada)**:
    - Exoneración del 100% de ITBIS (18%) y aranceles sobre equipos solares.
    - Crédito fiscal del 40% del costo de inversión en equipos aplicable al Impuesto Sobre la Renta (ISR) amortizable en 3 años fiscales ($13.33\%$ anual).
@@ -80,6 +82,7 @@ solarsim/
 │   │   ├── syncService.ts                   # Cliente HTTP de sincronización con solarsim-api
 │   │   ├── geminiInvoiceService.ts          # Integración con Google Gemini para facturas
 │   │   ├── geminiDatasheetService.ts        # Extracción multimodal de fichas técnicas con Gemini
+│   │   ├── geminiPriceCatalogService.ts     # Extracción y matching con IA de listas de precios de proveedores
 │   │   └── shareProposalService.ts          # Servicio de publicación de propuestas web en Cloudflare
 │   ├── store/                               # 🧠 ESTADO GLOBAL MODULAR ZUSTAND (Slice Pattern)
 │   │   ├── useSimulationStore.ts            # Orquestador raíz limpio (<120 líneas) con persistencia
@@ -88,7 +91,7 @@ solarsim/
 │   │   └── slices/
 │   │       ├── projectSlice.ts              # CRUD de proyectos, dimensionamiento y mutación de parámetros
 │   │       ├── folderSlice.ts               # CRUD de carpetas personalizadas y asignación drag and drop
-│   │       ├── equipmentSlice.ts            # Catálogo de equipos (paneles, inversores, baterías, CRUD y sync)
+│   │       ├── equipmentSlice.ts            # Catálogo de equipos, proveedores, ofertas y sync
 │   │       ├── syncAuthSlice.ts             # Autenticación JWT y sincronización con solarsim-api
 │   │       ├── importExportSlice.ts         # Importación, exportación JSON y resolución de conflictos
 │   │       ├── aiSlice.ts                   # Configuración Gemini API y escáner de facturas
@@ -118,9 +121,11 @@ solarsim/
 │       ├── common/                          # Modales, cabeceras y utilidades compartidas
 │       │   ├── Header.tsx                   # Barra superior con navegación, estado de sync y botones
 │       │   ├── SettingsModal.tsx            # Centro de Configuración en Pantalla Completa (Sidebar de accesos directos, Perfil, Simulación, IA, Catálogo, RBAC, Respaldo)
-│       │   ├── EquipmentManagerSettingsTab.tsx # Administrador de Catálogo con tabla, edición, filtros y sync en la nube
+│       │   ├── EquipmentManagerSettingsTab.tsx # Administrador de Catálogo con tabla, edición, ofertas y sync en la nube
 │       │   ├── AIInvoiceScannerModal.tsx    # Modal de escáner de facturas con Gemini Vision
 │       │   ├── AIDatasheetScannerModal.tsx  # Modal de escáner de fichas técnicas de equipos con IA
+│       │   ├── AIPriceCatalogScannerModal.tsx # Modal de escaneo de listas de precios con IA y fuzzy matching
+│       │   ├── SupplierPricesDetailModal.tsx # Modal de comparativa y selección de ofertas por proveedor
 │       │   ├── ShareProposalModal.tsx       # Modal de compartir propuesta web interactiva y QR
 │       │   ├── ImportConflictModal.tsx      # Modal de resolución de conflictos de importación
 │       │   ├── NewProjectModal.tsx          # Modal de creación rápida de proyectos

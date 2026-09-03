@@ -520,6 +520,57 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     get().triggerAutoSync(false);
   },
 
+  applySupplierPriceToProject: (equipmentType, supplierPrice) => {
+    set((state) => ({
+      projects: state.projects.map((p) => {
+        if (p.id === state.activeProjectId) {
+          const updatedSpecs = { ...p.specs };
+          const selectedSupplierInfo = { ...(updatedSpecs.selectedSupplierInfo || {}) };
+
+          if (equipmentType === 'panel') {
+            updatedSpecs.panelUnitPriceUSD = supplierPrice.priceUSD;
+            selectedSupplierInfo.panel = {
+              supplierName: supplierPrice.supplierName,
+              priceUSD: supplierPrice.priceUSD,
+              updatedAt: supplierPrice.updatedAt,
+              supplierPriceId: supplierPrice.id,
+            };
+          } else if (equipmentType === 'inverter') {
+            updatedSpecs.inverterUnitPriceUSD = supplierPrice.priceUSD;
+            selectedSupplierInfo.inverter = {
+              supplierName: supplierPrice.supplierName,
+              priceUSD: supplierPrice.priceUSD,
+              updatedAt: supplierPrice.updatedAt,
+              supplierPriceId: supplierPrice.id,
+            };
+          } else if (equipmentType === 'battery') {
+            updatedSpecs.batteryUnitPriceUSD = supplierPrice.priceUSD;
+            selectedSupplierInfo.battery = {
+              supplierName: supplierPrice.supplierName,
+              priceUSD: supplierPrice.priceUSD,
+              updatedAt: supplierPrice.updatedAt,
+              supplierPriceId: supplierPrice.id,
+            };
+          }
+
+          updatedSpecs.selectedSupplierInfo = selectedSupplierInfo;
+
+          return {
+            ...p,
+            syncStatus: 'pending' as const,
+            updatedAt: new Date().toISOString(),
+            specs: updatedSpecs,
+          };
+        }
+        return p;
+      }),
+      saveFeedbackMessage: `¡Precio aplicado: ${supplierPrice.supplierName} ($${supplierPrice.priceUSD} USD)! 🏷️`,
+    }));
+
+    setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
+    get().triggerAutoSync(false);
+  },
+
   getActiveProject: () => {
     const state = get();
     const activeProjects = state.projects.filter((p) => !p.isDeleted);

@@ -626,6 +626,7 @@ app.get('/api/equipment', async (c) => {
               power_w as "powerW", power_kw as "powerKW", capacity_kwh as "capacityKWh",
               voltage_v as "voltageV", dod_pct as "dodPct", efficiency_pct as "efficiencyPct",
               temp_coeff as "tempCoeff", category, voltage_mppt as "voltageMPPT",
+              supplier_prices as "supplierPrices",
               details, created_at as "createdAt", updated_at as "updatedAt"
        FROM equipment_catalog
        WHERE organization_id = $1 OR organization_id = 'org-electsun-default'
@@ -644,6 +645,9 @@ app.get('/api/equipment', async (c) => {
         dodPct: row.dodPct ? parseFloat(row.dodPct) : undefined,
         efficiencyPct: row.efficiencyPct ? parseFloat(row.efficiencyPct) : undefined,
         tempCoeff: row.tempCoeff ? parseFloat(row.tempCoeff) : undefined,
+        supplierPrices: Array.isArray(row.supplierPrices)
+          ? row.supplierPrices
+          : (row.details?.supplierPrices && Array.isArray(row.details.supplierPrices) ? row.details.supplierPrices : []),
         ...(row.details || {}),
       })),
     });
@@ -686,6 +690,7 @@ app.post('/api/equipment/batch', async (c) => {
       const tempCoeff = item.tempCoeff || null;
       const category = item.category || null;
       const voltageMPPT = item.voltageMPPT || null;
+      const supplierPricesJson = JSON.stringify(Array.isArray(item.supplierPrices) ? item.supplierPrices : []);
       const details = JSON.stringify({
         voc: item.voc,
         isc: item.isc,
@@ -707,12 +712,14 @@ app.post('/api/equipment/batch', async (c) => {
         dimensions: item.dimensions,
         weightKg: item.weightKg,
         isCustom: item.isCustom,
+        preferredSupplierId: item.preferredSupplierId,
+        supplierPrices: item.supplierPrices,
       });
 
       await client.query(
         `INSERT INTO equipment_catalog
-          (id, organization_id, type, brand, model_series, display_name, power_w, power_kw, capacity_kwh, voltage_v, dod_pct, efficiency_pct, temp_coeff, category, voltage_mppt, details, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW())
+          (id, organization_id, type, brand, model_series, display_name, power_w, power_kw, capacity_kwh, voltage_v, dod_pct, efficiency_pct, temp_coeff, category, voltage_mppt, supplier_prices, details, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW())
          ON CONFLICT (id) DO UPDATE SET
           organization_id = EXCLUDED.organization_id,
           brand = EXCLUDED.brand,
@@ -727,9 +734,10 @@ app.post('/api/equipment/batch', async (c) => {
           temp_coeff = EXCLUDED.temp_coeff,
           category = EXCLUDED.category,
           voltage_mppt = EXCLUDED.voltage_mppt,
+          supplier_prices = EXCLUDED.supplier_prices,
           details = EXCLUDED.details,
           updated_at = NOW()`,
-        [id, authUser.organizationId, type, brand, modelSeries, displayName, powerW, powerKW, capacityKWh, voltageV, dodPct, efficiencyPct, tempCoeff, category, voltageMPPT, details]
+        [id, authUser.organizationId, type, brand, modelSeries, displayName, powerW, powerKW, capacityKWh, voltageV, dodPct, efficiencyPct, tempCoeff, category, voltageMPPT, supplierPricesJson, details]
       );
     }
 

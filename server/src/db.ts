@@ -122,6 +122,10 @@ export async function initDatabase(): Promise<void> {
       );
       CREATE INDEX IF NOT EXISTS idx_equipment_org_type ON equipment_catalog(organization_id, type);
       CREATE INDEX IF NOT EXISTS idx_equipment_display ON equipment_catalog(display_name);
+
+      -- Soporte de ofertas y precios multiproveedor
+      ALTER TABLE equipment_catalog ADD COLUMN IF NOT EXISTS supplier_prices JSONB DEFAULT '[]'::jsonb;
+      CREATE INDEX IF NOT EXISTS idx_equipment_supplier_prices ON equipment_catalog USING gin (supplier_prices);
     `);
 
     await client.query('COMMIT');

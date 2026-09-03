@@ -1,6 +1,7 @@
 import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs } from '../../../types';
-import { DollarSign, ChevronDown, Sliders, Tag, Sparkles } from 'lucide-react';
+import { useSimulationStore } from '../../../store/useSimulationStore';
+import { DollarSign, ChevronDown, Sliders, Tag, Sparkles, Building2, Check, RefreshCw } from 'lucide-react';
 
 interface PricingParamsSectionProps {
   project: ProjectSimulation;
@@ -19,6 +20,77 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
   isDark,
   updateSpecs,
 }) => {
+  const { equipmentCatalog, openSupplierPriceModal } = useSimulationStore();
+
+  const selectedPanel = equipmentCatalog.find(
+    (e) => e.type === 'panel' && e.displayName === project.specs.panelBrandModel
+  );
+  const selectedInverter = equipmentCatalog.find(
+    (e) => e.type === 'inverter' && e.displayName === project.specs.inverterBrandModel
+  );
+  const selectedBattery = equipmentCatalog.find(
+    (e) => e.type === 'battery' && e.displayName === project.specs.batteryBrandModel
+  );
+
+  const panelSuppliersCount = selectedPanel?.supplierPrices?.length || 0;
+  const bestPanelPrice = panelSuppliersCount > 0 ? Math.min(...selectedPanel!.supplierPrices!.map((s) => s.priceUSD)) : null;
+
+  const inverterSuppliersCount = selectedInverter?.supplierPrices?.length || 0;
+  const bestInverterPrice = inverterSuppliersCount > 0 ? Math.min(...selectedInverter!.supplierPrices!.map((s) => s.priceUSD)) : null;
+
+  const batterySuppliersCount = selectedBattery?.supplierPrices?.length || 0;
+  const bestBatteryPrice = batterySuppliersCount > 0 ? Math.min(...selectedBattery!.supplierPrices!.map((s) => s.priceUSD)) : null;
+
+  const hasAnySupplierPrices = panelSuppliersCount > 0 || inverterSuppliersCount > 0 || (project.specs.hasBattery && batterySuppliersCount > 0);
+
+  const handleSyncAllWithBestSupplierPrices = () => {
+    const newSpecs: Partial<SystemSpecs> = {
+      autoSupplierPricing: true,
+    };
+    const newSupplierInfo = { ...(project.specs.selectedSupplierInfo || {}) };
+
+    if (selectedPanel && panelSuppliersCount > 0 && bestPanelPrice !== null) {
+      const bestSp = selectedPanel.supplierPrices!.find((s) => s.priceUSD === bestPanelPrice);
+      if (bestSp) {
+        newSpecs.panelUnitPriceUSD = bestSp.priceUSD;
+        newSupplierInfo.panel = {
+          supplierName: bestSp.supplierName,
+          priceUSD: bestSp.priceUSD,
+          updatedAt: bestSp.updatedAt,
+          supplierPriceId: bestSp.id,
+        };
+      }
+    }
+
+    if (selectedInverter && inverterSuppliersCount > 0 && bestInverterPrice !== null) {
+      const bestSp = selectedInverter.supplierPrices!.find((s) => s.priceUSD === bestInverterPrice);
+      if (bestSp) {
+        newSpecs.inverterUnitPriceUSD = bestSp.priceUSD;
+        newSupplierInfo.inverter = {
+          supplierName: bestSp.supplierName,
+          priceUSD: bestSp.priceUSD,
+          updatedAt: bestSp.updatedAt,
+          supplierPriceId: bestSp.id,
+        };
+      }
+    }
+
+    if (project.specs.hasBattery && selectedBattery && batterySuppliersCount > 0 && bestBatteryPrice !== null) {
+      const bestSp = selectedBattery.supplierPrices!.find((s) => s.priceUSD === bestBatteryPrice);
+      if (bestSp) {
+        newSpecs.batteryUnitPriceUSD = bestSp.priceUSD;
+        newSupplierInfo.battery = {
+          supplierName: bestSp.supplierName,
+          priceUSD: bestSp.priceUSD,
+          updatedAt: bestSp.updatedAt,
+          supplierPriceId: bestSp.id,
+        };
+      }
+    }
+
+    newSpecs.selectedSupplierInfo = newSupplierInfo;
+    updateSpecs(newSpecs);
+  };
   return (
     <div
       className={`rounded-xl border overflow-hidden transition-all ${
@@ -390,63 +462,148 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                   isDark ? 'bg-[#181822] border-[#2e2e40]' : 'bg-white border-slate-200 shadow-xs'
                 }`}
               >
-                <span className={`block text-[11px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-                  Costos Unitarios de Compra (USD)
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className={`block text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                    Costos Unitarios de Compra (USD)
+                  </span>
+
+                  {hasAnySupplierPrices && (
+                    <button
+                      type="button"
+                      onClick={handleSyncAllWithBestSupplierPrices}
+                      className={`px-2 py-1 rounded-md text-[10.5px] font-bold border transition-all flex items-center gap-1 cursor-pointer shadow-2xs ${
+                        project.specs.autoSupplierPricing
+                          ? isDark
+                            ? 'bg-amber-500/20 text-amber-300 border-amber-500/50'
+                            : 'bg-amber-100 text-amber-900 border-amber-300'
+                          : isDark
+                          ? 'bg-[#252538] hover:bg-[#2e2e46] text-amber-400 border-[#3f3f5a]'
+                          : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200'
+                      }`}
+                      title="Sincronizar automáticamente los costos de compra con el mejor precio disponible en el catálogo de proveedores"
+                    >
+                      <Building2 className="w-3 h-3 text-amber-500" />
+                      <span>Auto-costo Proveedores</span>
+                    </button>
+                  )}
+                </div>
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className={`block text-[10px] font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                      Precio Panel ($/ud)
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className={`block text-[10px] font-medium ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                        Precio Panel ($/ud)
+                      </label>
+                      {selectedPanel && (
+                        <button
+                          type="button"
+                          onClick={() => openSupplierPriceModal(selectedPanel)}
+                          className="text-[9.5px] text-amber-500 hover:underline font-bold flex items-center gap-0.5 cursor-pointer"
+                        >
+                          {panelSuppliersCount > 0 ? `${panelSuppliersCount} prov.` : '+ prov.'}
+                        </button>
+                      )}
+                    </div>
                     <input
                       type="number"
                       step="1"
                       value={project.specs.panelUnitPriceUSD !== undefined ? project.specs.panelUnitPriceUSD : 103.32}
-                      onChange={(e) => updateSpecs({ panelUnitPriceUSD: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        updateSpecs({
+                          panelUnitPriceUSD: parseFloat(e.target.value) || 0,
+                          autoSupplierPricing: false,
+                        })
+                      }
                       className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
                         isDark
                           ? 'bg-[#121216] border-[#383848] text-zinc-100'
                           : 'bg-slate-50 border-slate-300 text-slate-900'
                       }`}
                     />
+                    {project.specs.selectedSupplierInfo?.panel && (
+                      <span className="text-[9.5px] text-emerald-400 font-semibold block mt-0.5 truncate">
+                        🏷️ {project.specs.selectedSupplierInfo.panel.supplierName}
+                      </span>
+                    )}
                   </div>
 
                   <div>
-                    <label className={`block text-[10px] font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                      Precio Inversor ($/ud)
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className={`block text-[10px] font-medium ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                        Precio Inversor ($/ud)
+                      </label>
+                      {selectedInverter && (
+                        <button
+                          type="button"
+                          onClick={() => openSupplierPriceModal(selectedInverter)}
+                          className="text-[9.5px] text-amber-500 hover:underline font-bold flex items-center gap-0.5 cursor-pointer"
+                        >
+                          {inverterSuppliersCount > 0 ? `${inverterSuppliersCount} prov.` : '+ prov.'}
+                        </button>
+                      )}
+                    </div>
                     <input
                       type="number"
                       step="10"
                       value={project.specs.inverterUnitPriceUSD !== undefined ? project.specs.inverterUnitPriceUSD : 2300.0}
-                      onChange={(e) => updateSpecs({ inverterUnitPriceUSD: parseFloat(e.target.value) || 0 })}
+                      onChange={(e) =>
+                        updateSpecs({
+                          inverterUnitPriceUSD: parseFloat(e.target.value) || 0,
+                          autoSupplierPricing: false,
+                        })
+                      }
                       className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
                         isDark
                           ? 'bg-[#121216] border-[#383848] text-zinc-100'
                           : 'bg-slate-50 border-slate-300 text-slate-900'
                       }`}
                     />
+                    {project.specs.selectedSupplierInfo?.inverter && (
+                      <span className="text-[9.5px] text-emerald-400 font-semibold block mt-0.5 truncate">
+                        🏷️ {project.specs.selectedSupplierInfo.inverter.supplierName}
+                      </span>
+                    )}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
                   {project.specs.hasBattery ? (
                     <div>
-                      <label className={`block text-[10px] font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                        Precio Batería ($/ud)
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className={`block text-[10px] font-medium ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                          Precio Batería ($/ud)
+                        </label>
+                        {selectedBattery && (
+                          <button
+                            type="button"
+                            onClick={() => openSupplierPriceModal(selectedBattery)}
+                            className="text-[9.5px] text-amber-500 hover:underline font-bold flex items-center gap-0.5 cursor-pointer"
+                          >
+                            {batterySuppliersCount > 0 ? `${batterySuppliersCount} prov.` : '+ prov.'}
+                          </button>
+                        )}
+                      </div>
                       <input
                         type="number"
                         step="10"
                         value={project.specs.batteryUnitPriceUSD !== undefined ? project.specs.batteryUnitPriceUSD : 1990.0}
-                        onChange={(e) => updateSpecs({ batteryUnitPriceUSD: parseFloat(e.target.value) || 0 })}
+                        onChange={(e) =>
+                          updateSpecs({
+                            batteryUnitPriceUSD: parseFloat(e.target.value) || 0,
+                            autoSupplierPricing: false,
+                          })
+                        }
                         className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
                           isDark
                             ? 'bg-[#121216] border-[#383848] text-zinc-100'
                             : 'bg-slate-50 border-slate-300 text-slate-900'
                         }`}
                       />
+                      {project.specs.selectedSupplierInfo?.battery && (
+                        <span className="text-[9.5px] text-emerald-400 font-semibold block mt-0.5 truncate">
+                          🏷️ {project.specs.selectedSupplierInfo.battery.supplierName}
+                        </span>
+                      )}
                     </div>
                   ) : null}
 

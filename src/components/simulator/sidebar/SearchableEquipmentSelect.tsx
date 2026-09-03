@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { SolarEquipmentItem, EquipmentType } from '../../../types/equipment';
 import { useSimulationStore } from '../../../store/useSimulationStore';
-import { Search, ChevronDown, Check, Sparkles, Sun, Zap, BatteryCharging, X, Layers } from 'lucide-react';
+import { Search, ChevronDown, Check, Sparkles, Sun, Zap, BatteryCharging, X, Layers, Building2, DollarSign } from 'lucide-react';
 
 interface SearchableEquipmentSelectProps {
   type: EquipmentType;
@@ -232,6 +232,9 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
             ) : (
               filteredAndSortedItems.map((item) => {
                 const isSelected = selectedValue === item.displayName;
+                const suppliersCount = item.supplierPrices?.length || 0;
+                const bestPrice = suppliersCount > 0 ? Math.min(...item.supplierPrices!.map((s) => s.priceUSD)) : null;
+
                 return (
                   <div
                     key={item.id}
@@ -287,6 +290,32 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
+                      {/* Botón / Pill de Proveedores */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          useSimulationStore.getState().openSupplierPriceModal(item);
+                        }}
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-all flex items-center gap-1 cursor-pointer shrink-0 ${
+                          suppliersCount > 0
+                            ? isDark
+                              ? 'bg-amber-500/10 text-amber-300 border-amber-500/30 hover:bg-amber-500/20'
+                              : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                            : isDark
+                            ? 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-zinc-200'
+                            : 'bg-slate-100 text-slate-500 border-slate-200 hover:text-slate-800'
+                        }`}
+                        title={
+                          suppliersCount > 0
+                            ? `${suppliersCount} proveedores cotizan este equipo. Mejor precio: $${bestPrice?.toFixed(2)} USD. Clic para ver detalles.`
+                            : 'Agregar precio de proveedor para este equipo'
+                        }
+                      >
+                        <Building2 className="w-3 h-3 text-amber-500 shrink-0" />
+                        <span>{suppliersCount > 0 ? `${suppliersCount} prov.` : '+ Prov.'}</span>
+                      </button>
+
                       <span className={`font-mono text-[11px] font-bold ${isBattery ? 'text-cyan-400' : 'text-emerald-500'}`}>
                         {formatPowerBadge(item)}
                       </span>
@@ -298,7 +327,7 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
             )}
           </div>
 
-          {/* Footer del Dropdown con botón de Escanear Datasheet con IA y Administrar Catálogo */}
+          {/* Footer del Dropdown con botón de Escanear Datasheet con IA, Precios IA y Administrar Catálogo */}
           <div
             className={`p-2 border-t flex items-center gap-1.5 ${
               isDark ? 'bg-[#14141c] border-[#27272a]' : 'bg-slate-50 border-slate-200'
@@ -313,7 +342,24 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
               className="flex-1 py-1.5 px-2 rounded-lg bg-gradient-to-r from-purple-600/20 to-indigo-600/20 hover:from-purple-600/30 hover:to-indigo-600/30 text-purple-400 border border-purple-500/30 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-              <span>Escanear con IA</span>
+              <span>Escanear Ficha</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                useSimulationStore.getState().openAIPriceCatalogModal();
+              }}
+              title="Escanear listas de precios comerciales de proveedores con IA"
+              className={`py-1.5 px-2.5 rounded-lg border text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                isDark
+                  ? 'border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300'
+                  : 'border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900'
+              }`}
+            >
+              <DollarSign className="w-3.5 h-3.5 text-amber-400" />
+              <span className="text-[11px]">Precios IA</span>
             </button>
 
             <button

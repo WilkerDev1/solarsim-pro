@@ -19,6 +19,8 @@ import {
   Cloud,
   Zap,
   Info,
+  Building2,
+  DollarSign,
 } from 'lucide-react';
 
 interface EquipmentManagerSettingsTabProps {
@@ -33,6 +35,8 @@ export const EquipmentManagerSettingsTab: React.FC<EquipmentManagerSettingsTabPr
     removeEquipmentItem,
     resetEquipmentCatalogToDefaults,
     openAIDatasheetModal,
+    openAIPriceCatalogModal,
+    openSupplierPriceModal,
     syncEquipmentWithServer,
     syncSettings,
   } = useSimulationStore();
@@ -229,6 +233,15 @@ export const EquipmentManagerSettingsTab: React.FC<EquipmentManagerSettingsTabPr
             >
               <Sparkles className="w-3.5 h-3.5" />
               <span>Escanear Datasheet (IA)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={openAIPriceCatalogModal}
+              className="px-3 py-2 rounded-xl bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-white text-xs font-bold shadow-md shadow-amber-600/20 transition-all flex items-center gap-1.5 cursor-pointer active:scale-[0.98]"
+            >
+              <DollarSign className="w-3.5 h-3.5" />
+              <span>Escanear Precios (IA)</span>
             </button>
 
             <button
@@ -636,8 +649,30 @@ export const EquipmentManagerSettingsTab: React.FC<EquipmentManagerSettingsTabPr
                     </div>
                   </div>
 
-                  {/* Acciones Editar / Eliminar */}
+                  {/* Acciones Editar / Proveedores / Eliminar */}
                   <div className="flex items-center gap-1.5 self-end md:self-center shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => openSupplierPriceModal(item)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5 cursor-pointer ${
+                        (item.supplierPrices?.length || 0) > 0
+                          ? isDark
+                            ? 'border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20'
+                            : 'border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100'
+                          : isDark
+                          ? 'border-zinc-700 bg-zinc-800/80 text-zinc-300 hover:bg-zinc-700 hover:text-white'
+                          : 'border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                      title="Administrar ofertas de proveedores y precios para este modelo"
+                    >
+                      <Building2 className="w-3 h-3 text-amber-500" />
+                      <span>
+                        {(item.supplierPrices?.length || 0) > 0
+                          ? `${item.supplierPrices!.length} prov. ($${Math.min(...item.supplierPrices!.map((s) => s.priceUSD)).toFixed(2)})`
+                          : '+ Precio'}
+                      </span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => handleOpenEdit(item)}
@@ -1086,6 +1121,61 @@ export const EquipmentManagerSettingsTab: React.FC<EquipmentManagerSettingsTabPr
                   </div>
                 </div>
               )}
+
+              {/* 🏷️ Sección de Precios y Proveedores en Formulario de Edición */}
+              <div
+                className={`p-4 rounded-xl border space-y-3 ${
+                  isDark ? 'bg-[#15151e] border-[#2c2c3e]' : 'bg-amber-50/40 border-amber-200'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-amber-500" />
+                    <h5 className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-amber-300' : 'text-amber-900'}`}>
+                      Precios y Proveedores Registrados
+                    </h5>
+                  </div>
+                  <span className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                    {(editingItem.supplierPrices || []).length} oferta(s)
+                  </span>
+                </div>
+
+                {(!editingItem.supplierPrices || editingItem.supplierPrices.length === 0) ? (
+                  <p className={`text-xs ${isDark ? 'text-zinc-500' : 'text-slate-500'}`}>
+                    No hay proveedores registrados aún. Puedes agregar precios ahora o usar el botón "Precios" en la tabla principal.
+                  </p>
+                ) : (
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                    {editingItem.supplierPrices.map((sp, sIdx) => (
+                      <div
+                        key={sp.id || sIdx}
+                        className={`p-2 rounded-lg border text-xs flex items-center justify-between ${
+                          isDark ? 'bg-[#1a1a26] border-[#36364a]' : 'bg-white border-slate-200'
+                        }`}
+                      >
+                        <div>
+                          <strong className={isDark ? 'text-zinc-200' : 'text-slate-800'}>{sp.supplierName}</strong>
+                          {sp.sku && <span className="text-[10px] text-zinc-500 ml-2">SKU: {sp.sku}</span>}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-bold text-emerald-400">${sp.priceUSD.toFixed(2)} USD</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = editingItem.supplierPrices?.filter((_, idx) => idx !== sIdx) || [];
+                              setEditingItem({ ...editingItem, supplierPrices: updated });
+                            }}
+                            className="text-red-400 hover:text-red-300 p-1 cursor-pointer"
+                            title="Quitar oferta"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {/* Botones de Footer Modal */}
               <div className="pt-3 flex items-center justify-end gap-2 border-t border-zinc-700/40">

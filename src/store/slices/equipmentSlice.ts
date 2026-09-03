@@ -123,4 +123,138 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (set, get) 
       return { success: false, message: e.message || 'Error de conexión con el servidor' };
     }
   },
+
+  addOrUpdateSupplierPrice: (equipmentId, supplierPrice) => {
+    set((state) => {
+      const target = state.equipmentCatalog.find((e) => e.id === equipmentId);
+      if (!target) return state;
+
+      const currentPrices = Array.isArray(target.supplierPrices) ? [...target.supplierPrices] : [];
+      const priceId = supplierPrice.id || `sp-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      const nowIso = new Date().toISOString();
+
+      const existingIndex = currentPrices.findIndex(
+        (sp) => sp.id === priceId || sp.supplierName.toLowerCase().trim() === supplierPrice.supplierName.toLowerCase().trim()
+      );
+
+      const updatedPriceEntry = {
+        ...supplierPrice,
+        id: priceId,
+        updatedAt: nowIso,
+      };
+
+      if (existingIndex >= 0) {
+        currentPrices[existingIndex] = updatedPriceEntry;
+      } else {
+        currentPrices.push(updatedPriceEntry);
+      }
+
+      const updatedCatalog = state.equipmentCatalog.map((e) =>
+        e.id === equipmentId
+          ? {
+              ...e,
+              supplierPrices: currentPrices,
+              updatedAt: nowIso,
+            }
+          : e
+      );
+
+      return {
+        equipmentCatalog: updatedCatalog,
+        saveFeedbackMessage: `¡Precio de ${supplierPrice.supplierName} ($${supplierPrice.priceUSD} USD) guardado! 💰`,
+      };
+    });
+
+    setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
+
+    if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
+      get().syncEquipmentWithServer();
+    }
+  },
+
+  removeSupplierPrice: (equipmentId, supplierPriceId) => {
+    set((state) => {
+      const target = state.equipmentCatalog.find((e) => e.id === equipmentId);
+      if (!target || !target.supplierPrices) return state;
+
+      const filtered = target.supplierPrices.filter((sp) => sp.id !== supplierPriceId);
+      const updatedCatalog = state.equipmentCatalog.map((e) =>
+        e.id === equipmentId
+          ? {
+              ...e,
+              supplierPrices: filtered,
+              preferredSupplierId: e.preferredSupplierId === supplierPriceId ? undefined : e.preferredSupplierId,
+              updatedAt: new Date().toISOString(),
+            }
+          : e
+      );
+
+      return {
+        equipmentCatalog: updatedCatalog,
+        saveFeedbackMessage: 'Oferta de proveedor eliminada',
+      };
+    });
+
+    setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
+
+    if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
+      get().syncEquipmentWithServer();
+    }
+  },
+
+  batchUpdateSupplierPrices: (updates) => {
+    set((state) => {
+      const catalogMap = new Map(state.equipmentCatalog.map((item) => [item.id, { ...item }]));
+      const nowIso = new Date().toISOString();
+
+      updates.forEach(({ equipmentId, supplierPrice }) => {
+        const item = catalogMap.get(equipmentId);
+        if (item) {
+          const prices = Array.isArray(item.supplierPrices) ? [...item.supplierPrices] : [];
+          const priceId = supplierPrice.id || `sp-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+          const existingIdx = prices.findIndex(
+            (sp) => sp.id === priceId || sp.supplierName.toLowerCase().trim() === supplierPrice.supplierName.toLowerCase().trim()
+          );
+
+          const fullEntry = {
+            ...supplierPrice,
+            id: priceId,
+            updatedAt: supplierPrice.updatedAt || nowIso,
+          };
+
+          if (existingIdx >= 0) {
+            prices[existingIdx] = fullEntry;
+          } else {
+            prices.push(fullEntry);
+          }
+
+          item.supplierPrices = prices;
+          item.updatedAt = nowIso;
+        }
+      });
+
+      return {
+        equipmentCatalog: Array.from(catalogMap.values()),
+        saveFeedbackMessage: `¡${updates.length} precios de proveedores actualizados en el catálogo! ⚡`,
+      };
+    });
+
+    setTimeout(() => set({ saveFeedbackMessage: null }), 3500);
+
+    if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
+      get().syncEquipmentWithServer();
+    }
+  },
+
+  setPreferredSupplier: (equipmentId, supplierPriceId) => {
+    set((state) => ({
+      equipmentCatalog: state.equipmentCatalog.map((e) =>
+        e.id === equipmentId ? { ...e, preferredSupplierId: supplierPriceId, updatedAt: new Date().toISOString() } : e
+      ),
+    }));
+
+    if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
+      get().syncEquipmentWithServer();
+    }
+  },
 });

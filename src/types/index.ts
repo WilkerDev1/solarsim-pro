@@ -47,6 +47,15 @@ export interface SystemSpecs {
   batteryWeightKilos?: number;       // e.g. 32
   installationUnitPriceUSD?: number; // e.g. 170.00 USD per kWp
   directPriceSurplusTarget?: 'margin' | 'labor'; // Where excess direct price goes: profit margin (default) or installation labor
+  
+  // 🏷️ Auto-costo Inteligente desde Proveedores del Catálogo
+  autoSupplierPricing?: boolean;     // Sincronizar automáticamente costos unitarios con el proveedor seleccionado
+  selectedSupplierInfo?: {
+    panel?: { supplierName: string; priceUSD: number; updatedAt?: string; supplierPriceId?: string };
+    inverter?: { supplierName: string; priceUSD: number; updatedAt?: string; supplierPriceId?: string };
+    battery?: { supplierName: string; priceUSD: number; updatedAt?: string; supplierPriceId?: string };
+  };
+
   // Detailed params
   panelEfficiency: number;      // % e.g. 21.8
   tempCoeff: number;            // %/°C e.g. -0.35

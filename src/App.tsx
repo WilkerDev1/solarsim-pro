@@ -14,6 +14,8 @@ import { AISettingsModal } from './components/common/AISettingsModal';
 import { ImportConflictModal } from './components/common/ImportConflictModal';
 import { ShareProposalModal } from './components/common/ShareProposalModal';
 import { SettingsModal } from './components/common/SettingsModal';
+import { AIPriceCatalogScannerModal } from './components/common/AIPriceCatalogScannerModal';
+import { SupplierPricesDetailModal } from './components/common/SupplierPricesDetailModal';
 import { SplashScreen } from './components/common/SplashScreen';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 
@@ -104,6 +106,8 @@ export const App: React.FC = () => {
       <ImportConflictModal />
       <ShareProposalModal />
       <SettingsModal />
+      <AIPriceCatalogScannerModal />
+      <SupplierPricesDetailModal />
     </div>
   );
 };
