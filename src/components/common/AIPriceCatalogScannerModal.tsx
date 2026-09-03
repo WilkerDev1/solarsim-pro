@@ -170,13 +170,22 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
       ...scanResult,
       items: scanResult.items.map((item) => {
         if (item.id === itemId) {
+          if (targetCatalogId === '__ignore__') {
+            return {
+              ...item,
+              matchedEquipmentId: undefined,
+              matchedDisplayName: undefined,
+              matchConfidence: 0,
+              action: 'ignore' as const,
+            };
+          }
           if (targetCatalogId === '__create_new__') {
             return {
               ...item,
               matchedEquipmentId: undefined,
               matchedDisplayName: undefined,
               matchConfidence: 0,
-              action: 'create_new',
+              action: 'create_new' as const,
             };
           }
           return {
@@ -184,13 +193,73 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
             matchedEquipmentId: targetCatalogId,
             matchedDisplayName: targetEq?.displayName || '',
             matchConfidence: 1.0,
-            action: 'update_price',
+            action: 'update_price' as const,
           };
         }
         return item;
       }),
     });
+
+    if (targetCatalogId === '__ignore__') {
+      setSelectedItemIds((prev) => {
+        const next = new Set(prev);
+        next.delete(itemId);
+        return next;
+      });
+    } else {
+      setSelectedItemIds((prev) => {
+        const next = new Set(prev);
+        next.add(itemId);
+        return next;
+      });
+    }
   };
+
+  const handleIgnoreAllNew = () => {
+    if (!scanResult) return;
+    const nextItemIds = new Set(selectedItemIds);
+    const updatedItems = scanResult.items.map((item) => {
+      if (!item.matchedEquipmentId || item.action === 'create_new') {
+        nextItemIds.delete(item.id);
+        return {
+          ...item,
+          action: 'ignore' as const,
+        };
+      }
+      return item;
+    });
+    setScanResult({ ...scanResult, items: updatedItems });
+    setSelectedItemIds(nextItemIds);
+  };
+
+  const handleCreateAllNew = () => {
+    if (!scanResult) return;
+    const nextItemIds = new Set(selectedItemIds);
+    const updatedItems = scanResult.items.map((item) => {
+      if (!item.matchedEquipmentId || item.action === 'ignore') {
+        nextItemIds.add(item.id);
+        return {
+          ...item,
+          action: 'create_new' as const,
+        };
+      }
+      return item;
+    });
+    setScanResult({ ...scanResult, items: updatedItems });
+    setSelectedItemIds(nextItemIds);
+  };
+
+  const applicableItemsCount = useMemo(() => {
+    if (!scanResult) return 0;
+    return scanResult.items.filter(
+      (item) => selectedItemIds.has(item.id) && item.action !== 'ignore'
+    ).length;
+  }, [scanResult, selectedItemIds]);
+
+  const newItemsCount = useMemo(() => {
+    if (!scanResult) return 0;
+    return scanResult.items.filter((item) => !item.matchedEquipmentId).length;
+  }, [scanResult]);
 
   const handleApplyPricesToCatalog = () => {
     if (!scanResult) return;
@@ -201,7 +270,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
     const updates: { equipmentId: string; supplierPrice: any }[] = [];
 
     scanResult.items.forEach((item) => {
-      if (!selectedItemIds.has(item.id)) return;
+      if (!selectedItemIds.has(item.id) || item.action === 'ignore') return;
 
       if (item.action === 'update_price' && item.matchedEquipmentId) {
         updates.push({
@@ -219,7 +288,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
           },
         });
       } else if (item.action === 'create_new') {
-        // Si no existía, crear nuevo equipo con su precio de proveedor inicial
+        // Si no existía y el usuario eligió crear nuevo equipo con su precio de proveedor inicial
         const newId = `eq-${item.equipmentType}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
         const newEq: SolarEquipmentItem = {
           id: newId,
@@ -470,39 +539,72 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
                 }`}
               >
                 <div
-                  className={`p-3 border-b flex items-center justify-between text-xs font-bold ${
+                  className={`p-3 border-b flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs font-bold ${
                     isDark ? 'border-[#272736] bg-[#101016]' : 'border-slate-200 bg-slate-100'
                   }`}
                 >
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleToggleSelectAll}
-                      className="cursor-pointer text-zinc-400 hover:text-zinc-200"
-                    >
-                      {selectedItemIds.size === scanResult.items.length ? (
-                        <CheckSquare className="w-4 h-4 text-emerald-500" />
-                      ) : (
-                        <Square className="w-4 h-4" />
-                      )}
-                    </button>
-                    <span>
-                      EQUIPO EXTRAÍDO ({selectedItemIds.size} de {scanResult.items.length} seleccionados)
-                    </span>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleToggleSelectAll}
+                        className="cursor-pointer text-zinc-400 hover:text-zinc-200"
+                        title="Seleccionar o deseleccionar todos"
+                      >
+                        {selectedItemIds.size === scanResult.items.length ? (
+                          <CheckSquare className="w-4 h-4 text-emerald-500" />
+                        ) : (
+                          <Square className="w-4 h-4" />
+                        )}
+                      </button>
+                      <span>
+                        EQUIPO EXTRAÍDO ({applicableItemsCount} de {scanResult.items.length} a aplicar)
+                      </span>
+                    </div>
+
+                    {newItemsCount > 0 && (
+                      <div className="flex items-center gap-1.5 text-[10.5px]">
+                        <button
+                          type="button"
+                          onClick={handleIgnoreAllNew}
+                          className={`px-2 py-0.5 rounded font-semibold border transition-all cursor-pointer ${
+                            isDark
+                              ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border-zinc-700'
+                              : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300 shadow-2xs'
+                          }`}
+                          title="No agregar ningún equipo nuevo al catálogo (solo actualizar los existentes)"
+                        >
+                          🚫 Omitir nuevos ({newItemsCount})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCreateAllNew}
+                          className="px-2 py-0.5 rounded font-semibold bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 cursor-pointer"
+                          title="Marcar todos los no coincidentes para agregarlos al catálogo"
+                        >
+                          + Crear nuevos
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <span>VINCULACIÓN CON CATÁLOGO / PRECIO</span>
+                  <span className="text-[11px] text-zinc-400 font-semibold">VINCULACIÓN CON CATÁLOGO / PRECIO</span>
                 </div>
 
                 <div className="divide-y divide-zinc-800/40 dark:divide-[#272736] max-h-[380px] overflow-y-auto">
                   {scanResult.items.map((item) => {
-                    const isChecked = selectedItemIds.has(item.id);
+                    const isChecked = selectedItemIds.has(item.id) && item.action !== 'ignore';
+                    const isIgnored = item.action === 'ignore';
                     const matchingCatalog = equipmentCatalog.filter((e) => e.type === item.equipmentType);
 
                     return (
                       <div
                         key={item.id}
                         className={`p-3.5 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 transition-colors ${
-                          isChecked
+                          isIgnored
+                            ? isDark
+                              ? 'opacity-40 bg-[#101015]'
+                              : 'opacity-45 bg-slate-100/70'
+                            : isChecked
                             ? isDark
                               ? 'bg-[#181824]'
                               : 'bg-white'
@@ -515,8 +617,15 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
                         <div className="flex items-start gap-3 flex-1 min-w-0">
                           <button
                             type="button"
-                            onClick={() => handleToggleItemSelect(item.id)}
+                            onClick={() => {
+                              if (isIgnored) {
+                                handleUpdateItemMatch(item.id, '__create_new__');
+                              } else {
+                                handleToggleItemSelect(item.id);
+                              }
+                            }}
                             className="mt-0.5 cursor-pointer text-zinc-400 hover:text-zinc-200"
+                            title={isIgnored ? 'Clic para reactivar este equipo' : 'Seleccionar'}
                           >
                             {isChecked ? (
                               <CheckSquare className="w-4 h-4 text-emerald-500" />
@@ -527,7 +636,9 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
 
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-extrabold text-xs">{item.extractedModelName}</span>
+                              <span className={`font-extrabold text-xs ${isIgnored ? 'line-through text-zinc-500' : ''}`}>
+                                {item.extractedModelName}
+                              </span>
                               <span
                                 className={`text-[9.5px] px-1.5 py-0.2 rounded uppercase font-mono font-bold ${
                                   item.equipmentType === 'panel'
@@ -550,28 +661,39 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
                         <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
                           <div className="flex flex-col items-end">
                             <div className="flex items-center gap-1.5">
-                              {item.matchConfidence >= 0.7 ? (
+                              {isIgnored ? (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-700/30 text-zinc-400 border border-zinc-600/40">
+                                  🚫 No agregar (Omitido)
+                                </span>
+                              ) : item.matchConfidence >= 0.7 && item.matchedEquipmentId ? (
                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                                   <Check className="w-3 h-3" />
                                   {Math.round(item.matchConfidence * 100)}% Coincidencia
                                 </span>
                               ) : (
                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30">
-                                  Nuevo en Catálogo
+                                  + Nuevo en Catálogo
                                 </span>
                               )}
                             </div>
 
                             {/* Dropdown para corregir o cambiar equipo coincidente */}
                             <select
-                              value={item.matchedEquipmentId || '__create_new__'}
+                              value={isIgnored ? '__ignore__' : (item.matchedEquipmentId || '__create_new__')}
                               onChange={(e) => handleUpdateItemMatch(item.id, e.target.value)}
-                              className={`mt-1 max-w-[260px] text-xs font-semibold rounded-lg px-2 py-1 border outline-none ${
-                                isDark ? 'bg-[#1e1e2c] border-[#38384a] text-zinc-200' : 'bg-slate-50 border-slate-300 text-slate-800'
+                              className={`mt-1 max-w-[260px] text-xs font-semibold rounded-lg px-2 py-1 border outline-none cursor-pointer ${
+                                isIgnored
+                                  ? isDark
+                                    ? 'bg-zinc-800/80 border-zinc-700 text-zinc-400'
+                                    : 'bg-slate-200 border-slate-300 text-slate-500'
+                                  : isDark
+                                  ? 'bg-[#1e1e2c] border-[#38384a] text-zinc-200'
+                                  : 'bg-slate-50 border-slate-300 text-slate-800'
                               }`}
                             >
+                              <option value="__ignore__">🚫 No agregar al catálogo (Omitir)</option>
                               <option value="__create_new__">+ Crear como nuevo equipo</option>
-                              <optgroup label="Equipos coincidentes en catálogo">
+                              <optgroup label="Vincular con equipo existente en catálogo">
                                 {matchingCatalog.map((catItem) => (
                                   <option key={catItem.id} value={catItem.id}>
                                     {catItem.displayName}
@@ -583,7 +705,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
 
                           {/* Precio en USD */}
                           <div className="text-right min-w-[90px]">
-                            <span className="text-sm font-extrabold text-emerald-500 font-mono block">
+                            <span className={`text-sm font-extrabold font-mono block ${isIgnored ? 'text-zinc-500' : 'text-emerald-500'}`}>
                               ${item.priceUSD.toFixed(2)}
                             </span>
                             <span className={`text-[10px] ${isDark ? 'text-zinc-500' : 'text-slate-400'}`}>
@@ -614,12 +736,12 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    disabled={selectedItemIds.size === 0}
+                    disabled={applicableItemsCount === 0}
                     onClick={handleApplyPricesToCatalog}
                     className="px-5 py-2.5 rounded-xl font-extrabold text-xs bg-emerald-600 hover:bg-emerald-500 text-white shadow-md disabled:opacity-50 transition-all flex items-center gap-2 cursor-pointer"
                   >
                     <Check className="w-4 h-4" />
-                    <span>Aplicar {selectedItemIds.size} Precios al Catálogo</span>
+                    <span>Aplicar {applicableItemsCount} Precios al Catálogo</span>
                   </button>
                 </div>
               </div>
