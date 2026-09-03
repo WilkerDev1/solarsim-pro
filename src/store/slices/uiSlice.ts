@@ -13,7 +13,7 @@ export const createUISlice: SimulationSlice<UISlice> = (set) => ({
   saveFeedbackMessage: null,
 
   sidebarTheme: 'dark',
-  sidebarWidth: 350,
+  sidebarWidth: 380,
 
   openNewProjectModal: () => set({ isNewProjectModalOpen: true }),
   closeNewProjectModal: () => set({ isNewProjectModalOpen: false }),

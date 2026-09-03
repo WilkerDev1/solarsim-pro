@@ -77,7 +77,7 @@ export const ParameterSidebar: React.FC<ParameterSidebarProps> = ({
     <>
       {/* Left Sidebar: Parameters */}
       <aside
-        style={{ width: `${sidebarWidth || 350}px` }}
+        style={{ width: `${Math.max(sidebarWidth || 380, 380)}px` }}
         className={`flex flex-col shrink-0 h-full overflow-y-auto z-10 transition-[background-color,border-color,color] duration-200 ${
           isDark
             ? 'bg-[#18181b] border-r border-[#27272a] text-zinc-100 shadow-xl'

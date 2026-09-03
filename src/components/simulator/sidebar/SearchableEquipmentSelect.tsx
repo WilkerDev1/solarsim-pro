@@ -65,6 +65,16 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Asegurar que el selector expandido sea visible en el dock lateral
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      const timer = setTimeout(() => {
+        containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 80);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
   const handleSelect = (item: SolarEquipmentItem) => {
     onSelect(item);
     setIsOpen(false);
@@ -160,11 +170,11 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
         </div>
       </div>
 
-      {/* Menú Desplegable con Buscador en Tiempo Real */}
+      {/* Menú Desplegable con Buscador en Tiempo Real - En flujo normal para expandir la categoría */}
       {isOpen && (
         <div
-          className={`absolute left-0 right-0 top-full mt-1.5 z-40 rounded-xl border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 ${
-            isDark ? 'bg-[#1c1c24] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-900'
+          className={`mt-2 w-full rounded-xl border shadow-lg overflow-hidden transition-all duration-200 animate-in fade-in ${
+            isDark ? 'bg-[#1c1c24] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-900 shadow-slate-200'
           }`}
         >
           {/* Input de Búsqueda y Filtrado en Tiempo Real */}
@@ -200,8 +210,8 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
             )}
           </div>
 
-          {/* Lista de Resultados */}
-          <div className="max-h-56 overflow-y-auto p-1.5 space-y-1">
+          {/* Lista de Resultados con altura expandida (5 a 10 equipos visibles a la vez) */}
+          <div className="max-h-[440px] overflow-y-auto p-1.5 space-y-1">
             {filteredAndSortedItems.length === 0 ? (
               <div className="p-4 text-center">
                 <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
@@ -226,7 +236,7 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
                   <div
                     key={item.id}
                     onClick={() => handleSelect(item)}
-                    className={`px-3 py-2 rounded-lg text-xs transition-colors cursor-pointer flex items-center justify-between gap-2 ${
+                    className={`px-3 py-2.5 rounded-lg text-xs transition-colors cursor-pointer flex items-center justify-between gap-2.5 ${
                       isSelected
                         ? isDark
                           ? 'bg-emerald-950/50 text-emerald-300 font-bold border border-emerald-800/60'
@@ -236,17 +246,22 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
                         : 'hover:bg-slate-100 text-slate-800'
                     }`}
                   >
-                    <div className="flex-1 truncate">
-                      <div className="flex items-center gap-1.5">
-                        <span className="font-bold truncate">{item.displayName}</span>
+                    <div className="flex-1 min-w-0 pr-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span
+                          className="font-bold text-xs leading-snug break-words"
+                          title={item.displayName}
+                        >
+                          {item.displayName}
+                        </span>
                         {item.isCustom && (
-                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                          <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30 shrink-0 font-medium">
                             IA
                           </span>
                         )}
                       </div>
-                      <div className={`text-[10px] flex items-center gap-2 mt-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-                        <span>{item.brand}</span>
+                      <div className={`text-[10.5px] flex items-center gap-1.5 flex-wrap mt-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                        <span className="font-semibold">{item.brand}</span>
                         {item.type === 'battery' && (
                           <>
                             {item.voltageV && <span>• {item.voltageV}V</span>}
