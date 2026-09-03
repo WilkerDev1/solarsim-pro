@@ -9,6 +9,16 @@ interface QuotationEquipmentsTabProps {
   setCostTableCurrency: (curr: 'ALL' | 'USD' | 'DOP') => void;
 }
 
+const cleanInstallationDesc = (desc?: string): string => {
+  const defaultDesc = 'Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).';
+  if (!desc || typeof desc !== 'string' || !desc.trim()) return defaultDesc;
+  if (desc.includes('Notas del Sistema:')) {
+    const base = desc.split('Notas del Sistema:')[0].trim().replace(/\.\s*$/, '');
+    return base ? `${base}.` : defaultDesc;
+  }
+  return desc;
+};
+
 export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
   project,
   summary,
@@ -141,7 +151,7 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
                     </tr>
                   )}
                   <tr className="bg-slate-50/60">
-                    <td className="px-3 py-2">{project.specs.installationServicesDesc || 'Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).'}</td>
+                    <td className="px-3 py-2">{cleanInstallationDesc(project.specs.installationServicesDesc)}</td>
                     <td className="px-3 py-2 text-center font-bold">1</td>
                     <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
                   </tr>

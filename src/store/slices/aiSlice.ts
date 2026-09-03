@@ -87,15 +87,29 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
             panelCount: count,
             panelPowerW: panelW,
             panelBrandModel: panelModel,
-            inverterBrandModel: 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)',
-            inverterPowerKW: 8.0,
-            inverterCount: Math.max(1, Math.ceil((count * panelW) / 8000)),
+            panelUnitPriceUSD: data.selectedPanelUnitPriceUSD ?? BENCHMARK_PROJECT.specs.panelUnitPriceUSD,
+            inverterBrandModel: data.selectedInverterModel || BENCHMARK_PROJECT.specs.inverterBrandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)',
+            inverterPowerKW: data.selectedInverterPowerKW || 8.0,
+            inverterCount: data.selectedInverterCount || Math.max(1, Math.ceil((count * panelW) / 8000)),
+            inverterUnitPriceUSD: data.selectedInverterUnitPriceUSD ?? BENCHMARK_PROJECT.specs.inverterUnitPriceUSD,
+            hasBattery: data.hasBattery ?? false,
+            batteryBrandModel: data.selectedBatteryModel ?? BENCHMARK_PROJECT.specs.batteryBrandModel,
+            batteryCapacityKWh: data.selectedBatteryCapacityKWh ?? BENCHMARK_PROJECT.specs.batteryCapacityKWh,
+            batteryCount: data.selectedBatteryCount ?? (data.hasBattery ? 1 : 0),
+            batteryUnitPriceUSD: data.selectedBatteryUnitPriceUSD ?? BENCHMARK_PROJECT.specs.batteryUnitPriceUSD,
+            saleMarginMultiplier: data.targetMarginPct
+              ? Math.round((1 + data.targetMarginPct / 100) * 1000) / 1000
+              : BENCHMARK_PROJECT.specs.saleMarginMultiplier,
+            pricingMode: data.targetMarginPct ? 'cost_matrix' : BENCHMARK_PROJECT.specs.pricingMode,
+            autoSupplierPricing: data.autoSupplierPricing ?? false,
+            selectedSupplierInfo: data.selectedSupplierInfo ?? BENCHMARK_PROJECT.specs.selectedSupplierInfo,
+            installationServicesDesc: BENCHMARK_PROJECT.specs.installationServicesDesc,
             systemLosses: 25.0,
             autoCalculatePanels: false,
           },
           rates: {
             ...BENCHMARK_PROJECT.rates,
-            targetCoveragePct: 95,
+            targetCoveragePct: data.targetCoveragePct ?? 95,
             distributor: data.distributor,
             tariffCode: data.tariffCode,
             ...(data.energyCostPerKWhDOP
@@ -114,7 +128,7 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
           activeProjectId: targetProjectId,
           activeView: 'simulator',
           isAIInvoiceModalOpen: false,
-          saveFeedbackMessage: '¡Proyecto creado y dimensionado con IA desde la factura EDE! ✨',
+          saveFeedbackMessage: '¡Propuesta inteligente creada al 95% con IA y catálogo de equipos! ✨',
         };
       }
 
@@ -123,7 +137,7 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
         if (p.id === targetProjectId) {
           const panelW = data.selectedPanelWatts || p.specs.panelPowerW || 620;
           const panelModel = data.selectedPanelModel || p.specs.panelBrandModel;
-          const targetCov = p.rates.targetCoveragePct ?? 95;
+          const targetCov = data.targetCoveragePct ?? p.rates.targetCoveragePct ?? 95;
           const sysLosses = p.specs.systemLosses ?? 25.0;
           const rec = calculateRecommendedPanelCount(
             resolvedProvince,
@@ -156,9 +170,29 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
               panelCount: count,
               panelPowerW: panelW,
               panelBrandModel: panelModel,
+              ...(data.selectedPanelUnitPriceUSD !== undefined ? { panelUnitPriceUSD: data.selectedPanelUnitPriceUSD } : {}),
+              ...(data.selectedInverterModel ? { inverterBrandModel: data.selectedInverterModel } : {}),
+              ...(data.selectedInverterPowerKW ? { inverterPowerKW: data.selectedInverterPowerKW } : {}),
+              ...(data.selectedInverterCount ? { inverterCount: data.selectedInverterCount } : {}),
+              ...(data.selectedInverterUnitPriceUSD !== undefined ? { inverterUnitPriceUSD: data.selectedInverterUnitPriceUSD } : {}),
+              ...(data.hasBattery !== undefined ? { hasBattery: data.hasBattery } : {}),
+              ...(data.selectedBatteryModel ? { batteryBrandModel: data.selectedBatteryModel } : {}),
+              ...(data.selectedBatteryCapacityKWh ? { batteryCapacityKWh: data.selectedBatteryCapacityKWh } : {}),
+              ...(data.selectedBatteryCount !== undefined ? { batteryCount: data.selectedBatteryCount } : {}),
+              ...(data.selectedBatteryUnitPriceUSD !== undefined ? { batteryUnitPriceUSD: data.selectedBatteryUnitPriceUSD } : {}),
+              ...(data.targetMarginPct ? {
+                saleMarginMultiplier: Math.round((1 + data.targetMarginPct / 100) * 1000) / 1000,
+                pricingMode: 'cost_matrix',
+              } : {}),
+              ...(data.autoSupplierPricing !== undefined ? { autoSupplierPricing: data.autoSupplierPricing } : {}),
+              ...(data.selectedSupplierInfo ? { selectedSupplierInfo: data.selectedSupplierInfo } : {}),
+              ...(p.specs.installationServicesDesc?.includes('Notas del Sistema:') ? {
+                installationServicesDesc: p.specs.installationServicesDesc.split('Notas del Sistema:')[0].trim().replace(/\.\s*$/, '') + '.',
+              } : {}),
             },
             rates: {
               ...p.rates,
+              targetCoveragePct: data.targetCoveragePct ?? p.rates.targetCoveragePct ?? 95,
               distributor: data.distributor || p.rates.distributor,
               tariffCode: data.tariffCode || p.rates.tariffCode,
               ...(data.energyCostPerKWhDOP
@@ -177,7 +211,7 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
       return {
         projects,
         isAIInvoiceModalOpen: false,
-        saveFeedbackMessage: '¡Datos de consumo y cliente aplicados con IA exitosamente! ✨',
+        saveFeedbackMessage: '¡Datos y equipos de la propuesta aplicados con IA exitosamente! ✨',
       };
     });
 

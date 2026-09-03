@@ -93,8 +93,10 @@ export function renderProposalPage(stored: StoredProposal): string {
   const hasBattery = specs.hasBattery || false;
   const batteryCapacityKWh = specs.batteryCapacityKWh || 0;
   const batteryCount = specs.batteryCount || 1;
-  const batteryBrandModel = specs.batteryBrandModel || 'Banco de Baterías Litio LiFePO4';
-  const installationServicesDesc = specs.installationServicesDesc || 'Instalación y Accesorios (Estructura de montaje en aluminio anodizado, cableado fotovoltaico resistente a rayos UV, protecciones en CC/CA, interruptores de desconexión y puesta en marcha).';
+  const rawInstallationDesc = specs.installationServicesDesc || 'Instalación y Accesorios (Estructura de montaje en aluminio anodizado, cableado fotovoltaico resistente a rayos UV, protecciones en CC/CA, interruptores de desconexión y puesta en marcha).';
+  const installationServicesDesc = rawInstallationDesc.includes('Notas del Sistema:')
+    ? (rawInstallationDesc.split('Notas del Sistema:')[0].trim().replace(/\.\s*$/, '') + '.')
+    : rawInstallationDesc;
 
   const annualProductionKWh = Number(summary?.annualProductionKWh || 0);
   const annualConsumptionKWh = Number(summary?.annualConsumptionKWh || 0);

@@ -15,7 +15,20 @@
 - **Custom Domain en Cloudflare Workers**: Las propuestas compartidas ahora se publican bajo el dominio oficial de marca `https://propuesta.electsun.net/p/:id`.
 - **Códigos QR de Alta Definición**: Generación automática de accesos móviles instantáneos con retención configurable de 7 a 90 días en Cloudflare KV.
 
-#### 3. 🤖 Escáner de Facturas EDE con IA — Dimensionamiento Avanzado
+#### 3. 🤖 Smart Proposal Studio — Automatización al 95% con Factura EDE y Requisitos Técnicos
+- **Entrada Multimodal Dual (Documento + Requisitos Técnicos)**:
+  - Permite cargar la factura física (PDF/imagen) o ingresar directamente notas y requerimientos específicos del cliente o instalador.
+  - Admite inferencia autónoma sin factura física si el mensaje define metas de generación (ej: *"diseñado para 40kwh diario"* $\rightarrow$ síntesis automática de curva de consumo).
+- **Grounding Estricto en Tiempo Real con el Catálogo Oficial de Equipos**:
+  - Auto-selección y emparejamiento de módulos fotovoltaicos Tier-1 (Canadian Solar TOPBiHiKu6 615W/620W).
+  - Resolución técnica de inversores split-phase (traduciendo ej: *"16 kW"* a 2 unidades de 8 kW en paralelo).
+  - Configuración de almacenamiento BESS (baterías de litio LiFePO4 HinaESS PowerGem Max 16.08 kWh o Weco).
+- **Estrategia Financiera y Modo Auto-Costo**:
+  - Detección de margen comercial (ej: *"Venta 40%"* $\rightarrow$ activación automática de Matriz de Costos con factor `1.40x`).
+  - Sincronización automática de precios de compra con la mejor oferta disponible entre los distribuidores (`autoSupplierPricing`).
+- **Botones de Carga Rápida de Casos Reales**:
+  - ⚡ *Giovanni Gottardo* (21 Paneles + Lux Power 16 kW + 2 Baterías HinaESS + Venta 40%).
+  - ⚡ *Osia Moscoso* (11 kWp Canadian + Weco 8 kW + 2 Baterías + 40 kWh/día).
 - **Dimensionamiento por Mes Pico (Consumo Máximo del Año)**:
   - Detección automática del mes con mayor demanda energética (kWh).
   - Botón interactivo *"Aplicar Mes Pico a Todo el Año"* para nivelar los 12 meses a la máxima exigencia y recalcular al instante la potencia y cantidad de paneles recomendada.
@@ -24,7 +37,8 @@
   - Desplegable inteligente conectado en vivo a la base de datos de ítems (`equipmentCatalog`), permitiendo comparar y seleccionar módulos como Canadian Solar TOPBiHiKu6 (590W, 615W, 620W) o modelos personalizados.
   - Comparativa técnica instantánea de Potencia Unitaria, Eficiencia STC, Tecnología de Célula y Área Estimada de Techo ($m^2$).
   - Inyección directa del módulo y vataje seleccionado al simulador y al dossier PDF.
-- **Estabilidad React**: Corrección del orden de ciclo de vida de los hooks para garantizar una apertura rápida y sin fallos.
+- **Generación de Propuesta al 95% en 1 Clic**:
+  - Creación inmediata del proyecto con 11 páginas de dossier técnico-económico listas para exportar o presentar al cliente.
 
 #### 4. 🎴 Menú de Acciones Compacto en el Dashboard
 - **Menú Flotante de 3 Puntos**: Las tarjetas de proyectos (`ProjectCard`) agrupan elegantemente las acciones de **Compartir propuesta web**, **Duplicar proyecto** y **Eliminar**, maximizando el espacio visual y la limpieza de la interfaz.

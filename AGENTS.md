@@ -19,8 +19,9 @@ Este documento sirve como **fuente única de verdad** para desarrolladores y asi
    - **Gestión Multi-Proveedor de Precios de Compra**: Cada equipo soporta múltiples ofertas comerciales de distribuidores con precio unitario en USD, moneda original, SKU, fecha de actualización, estado de stock y notas.
    - **Modo Auto-costo desde Proveedores**: Sincronización instantánea de los costos unitarios de compra del proyecto (`panelUnitPriceUSD`, `inverterUnitPriceUSD`, `batteryUnitPriceUSD`) con el mejor precio disponible en el mercado.
    - Selector inteligente con búsqueda en tiempo real, conteo de proveedores cotizando cada equipo y ventana comparativa de ofertas comerciales.
-3. **Inteligencia Artificial Multimodal (Gemini Vision)**:
-   - **Escáner de Facturas EDE**: Extracción automática de NIS/NIC, RNC, cliente, historial de 12 meses de consumo (kWh), tarifa y potencia contratada en kW (`gemini-3.5-flash-lite`).
+3. **Inteligencia Artificial Multimodal (Gemini Vision) & Smart Proposal Studio**:
+   - **Smart Proposal Studio (Automatización al 95%)**: Combina la factura eléctrica EDE (o consumo estimado) con requisitos y alcance del proyecto en texto libre. Realiza grounding estricto en tiempo real contra el catálogo de equipos para seleccionar módulos Tier-1 (Canadian Solar 615W/620W), dimensionar inversores híbridos en paralelo (traduciendo ej: 16 kW a 2x 8 kW split-phase), agregar bancos de almacenamiento BESS (HinaESS 16.08 kWh, Weco), fijar márgenes comerciales (ej: 40% en modo matriz de costos) y sincronizar los precios más competitivos de distribuidores.
+   - **Escáner de Facturas EDE**: Extracción automática de NIS/NIC, RNC, cliente, historial de 12 meses de consumo (kWh), tarifa y potencia contratada en kW (`gemini-2.5-flash` / `gemini-3.5-flash-lite`).
    - **Escáner de Fichas Técnicas (Datasheets)**: Extracción instantánea de parámetros de paneles (Wp, eficiencia, coef. temp, degradación), inversores (kW AC, máx DC, MPPTs) y baterías (kWh, Ah, V, DoD %, ciclos, corriente máx).
    - **Escáner de Listas de Precios de Proveedores**: Extracción multimodal de cotizaciones y catálogos comerciales de distribuidores en PDF e imagen, con **Smart Fuzzy Matching** para comparar y emparejar automáticamente los modelos del distribuidor con los equipos del catálogo de referencia.
 4. **Ingeniería Financiera & Ley 57-07 (Auditada)**:
@@ -105,7 +106,8 @@ solarsim/
 │   │   ├── ley5707.ts                       # Deducciones fiscales y exenciones Ley 57-07
 │   │   ├── referenceCase.ts                 # Caso de referencia oficial auditado (BENCHMARK_PROJECT)
 │   │   ├── testBenchmark.ts                 # Script de validación de cálculos contra benchmarks
-│   │   └── testFinancialEngineComprehensive.ts # Suite de 9 pruebas unitarias financieras
+│   │   ├── testFinancialEngineComprehensive.ts # Suite de 9 pruebas unitarias financieras
+│   │   └── testAISmartProposal.ts           # Suite de validación de Smart Proposal IA, cobertura 95% y sanitización
 │   ├── assets/
 │   │   └── pdfGraphicAssets.ts              # Gráficos, renders 3D y diagramas en Base64 para PDF
 │   └── components/
@@ -122,7 +124,12 @@ solarsim/
 │       │   ├── Header.tsx                   # Barra superior con navegación, estado de sync y botones
 │       │   ├── SettingsModal.tsx            # Centro de Configuración en Pantalla Completa (Sidebar de accesos directos, Perfil, Simulación, IA, Catálogo, RBAC, Respaldo)
 │       │   ├── EquipmentManagerSettingsTab.tsx # Administrador de Catálogo con tabla, edición, ofertas y sync en la nube
-│       │   ├── AIInvoiceScannerModal.tsx    # Modal de escáner de facturas con Gemini Vision
+│       │   ├── AIInvoiceScannerModal.tsx    # Re-export de Smart Proposal Studio
+│       │   ├── ai-invoice/                  # 📁 Módulo desacoplado de Smart Proposal Studio
+│       │   │   ├── types.ts                 # Interfaces y constantes de UI
+│       │   │   ├── AIInvoiceScannerModal.tsx# Orquestador raíz limpio (~220 líneas)
+│       │   │   ├── hooks/useAIInvoiceScanner.ts # Lógica matemática, Gemini, zoom y mes pico
+│       │   │   └── components/              # Subcomponentes (Config, Loading, DocViewer, Client, Consumption, Solar, Error)
 │       │   ├── AIDatasheetScannerModal.tsx  # Modal de escáner de fichas técnicas de equipos con IA
 │       │   ├── AIPriceCatalogScannerModal.tsx # Modal de escaneo de listas de precios con IA y fuzzy matching
 │       │   ├── SupplierPricesDetailModal.tsx # Modal de comparativa y selección de ofertas por proveedor
@@ -185,6 +192,9 @@ npx tsx src/engine/testBenchmark.ts
 # Suite integral de 9 pruebas unitarias financieras
 npx tsx src/engine/testFinancialEngineComprehensive.ts
 
+# Suite de validación de Smart Proposal IA y dimensionamiento al 95%
+npx tsx src/engine/testAISmartProposal.ts
+
 # Compilar frontend y electron para producción
 npm run build && npm run build:electron
 
@@ -220,7 +230,7 @@ ssh app-server "cd /home/agente/servicios/solarsim-api && docker compose up -d -
 ### 🔄 Ciclo Obligatorio de Verificación (Verification Loop):
 **NO dar ninguna tarea por completada sin ejecutar previamente:**
 1. **Verificación de Tipos**: `npm run lint` (`npx tsc --noEmit` — Cero errores de tipo).
-2. **Validación de Motores Matemáticos**: `npx tsx src/engine/testBenchmark.ts` y `npx tsx src/engine/testFinancialEngineComprehensive.ts`.
+2. **Validación de Motores Matemáticos e IA**: `npx tsx src/engine/testBenchmark.ts`, `npx tsx src/engine/testFinancialEngineComprehensive.ts` y `npx tsx src/engine/testAISmartProposal.ts`.
 3. **Build de Producción**: `npm run build` (confirmar bundling sin fallos).
 4. **Snapshot de Contexto**: Si se introducen nuevos módulos, refactorizaciones grandes o cambios estructurales, regenerar el contexto empaquetado con `npm run context:pack`.
 
@@ -255,6 +265,13 @@ ssh app-server "cd /home/agente/servicios/solarsim-api && docker compose up -d -
    - **Base Estricta de Equipos**: El crédito fiscal del 40% para el ISR aplica **exclusivamente sobre equipos fotovoltaicos y de almacenamiento** (paneles, inversores y baterías), deduciendo la mano de obra del cálculo.
 3. **Amortización Fiscal Ley 57-07**:
    - El crédito fiscal del 40% se divide estrictamente en 3 cuotas anuales iguales (Años 1, 2 y 3: $13.33\%$ anual).
+
+### 🤖 Smart Proposal Studio & Integridad de Cotización:
+1. **Cobertura Meta Predeterminada (95%)**:
+   - El dimensionamiento asistido por IA calcula la capacidad y cantidad de módulos fotovoltaicos para alcanzar una **cobertura meta base del 95%** (`targetCoveragePct = 95`). Los módulos siempre se redondean al entero superior, resultando en una cobertura real cercana al 98%-100%.
+2. **Invariante de Descripción de Mano de Obra e Instalación (`installationServicesDesc`)**:
+   - La celda de instalación y mano de obra en la tabla de cotización del simulador y en la propuesta PDF debe ser siempre concisa y profesional (`Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).`).
+   - **PROHIBIDO** concatenar notas del sistema (`specialTechnicalNotes`) dentro de `installationServicesDesc`. Dichas notas se reservan exclusivamente para la pestaña técnica y la síntesis de razonamiento de la IA.
 
 ### 📄 Exportación a PDF con `html2canvas` & `jsPDF`:
 1. **Reglas del Workspace**: Consultar `.agents/rules/html2canvas_pdf_export_rules.md`.

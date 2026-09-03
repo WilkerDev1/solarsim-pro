@@ -42,17 +42,46 @@ export interface ExtractedInvoiceData {
   averageMonthlyKWh: number;
   currentBilledKWh?: number;
 
-  // Automatic Solar Dimensioning Suggestion
+  // Automatic Solar Dimensioning & Smart Proposal Matching
   recommendedCapacityKWp?: number;
   recommendedPanelCount?: number;
   targetCoveragePct?: number;
   selectedPanelId?: string;
   selectedPanelModel?: string;
   selectedPanelWatts?: number;
+  selectedPanelUnitPriceUSD?: number;
 
-  // AI Inference Metadata
+  // Smart Inverter Matching
+  selectedInverterId?: string;
+  selectedInverterModel?: string;
+  selectedInverterPowerKW?: number; // Potencia unitaria nominal
+  selectedInverterCount?: number;
+  selectedInverterUnitPriceUSD?: number;
+
+  // Smart BESS Battery Storage Matching
+  hasBattery?: boolean;
+  selectedBatteryId?: string;
+  selectedBatteryModel?: string;
+  selectedBatteryCapacityKWh?: number;
+  selectedBatteryCount?: number;
+  selectedBatteryUnitPriceUSD?: number;
+
+  // Commercial & Financial Strategy
+  targetMarginPct?: number; // e.g. 40 for 40% margin
+  pricingMode?: 'cost_matrix' | 'direct_watt'; // e.g. 'cost_matrix'
+  autoSupplierPricing?: boolean;
+  selectedSupplierInfo?: {
+    panel?: { supplierName: string; priceUSD: number; updatedAt?: string; supplierPriceId?: string };
+    inverter?: { supplierName: string; priceUSD: number; updatedAt?: string; supplierPriceId?: string };
+    battery?: { supplierName: string; priceUSD: number; updatedAt?: string; supplierPriceId?: string };
+  };
+
+  // AI Inference Metadata & Reasoning
   confidenceScore: number; // 0 - 100%
   extractedFromFileName?: string;
+  projectRequirementsPrompt?: string;
+  aiReasoningSummary?: string;
+  specialTechnicalNotes?: string;
   aiNotes?: string;
 }
 

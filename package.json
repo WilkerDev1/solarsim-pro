@@ -16,6 +16,10 @@
     "electron:build": "npm run build && npm run build:electron && electron-builder",
     "build:win": "npm run build && npm run build:electron && electron-builder --win",
     "build:linux": "npm run build && npm run build:electron && electron-builder --linux",
+    "test:benchmark": "npx tsx src/engine/testBenchmark.ts",
+    "test:finance": "npx tsx src/engine/testFinancialEngineComprehensive.ts",
+    "test:ai": "npx tsx src/engine/testAISmartProposal.ts",
+    "test": "npx tsx src/engine/testBenchmark.ts && npx tsx src/engine/testFinancialEngineComprehensive.ts && npx tsx src/engine/testAISmartProposal.ts",
     "context:pack": "repomix"
   },
   "dependencies": {

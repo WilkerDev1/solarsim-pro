@@ -20,6 +20,16 @@ interface PDFPage2QuotationProps {
   updateDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
 }
 
+const cleanInstallationDesc = (desc?: string): string => {
+  const defaultDesc = 'Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).';
+  if (!desc || typeof desc !== 'string' || !desc.trim()) return defaultDesc;
+  if (desc.includes('Notas del Sistema:')) {
+    const base = desc.split('Notas del Sistema:')[0].trim().replace(/\.\s*$/, '');
+    return base ? `${base}.` : defaultDesc;
+  }
+  return desc;
+};
+
 export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
   project,
   summary,
@@ -201,7 +211,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                 )}
                 <tr className={project.specs.hasBattery ? 'bg-slate-50/60' : 'bg-white'}>
                   <td className="px-3 py-1 font-medium text-slate-900">
-                    {project.specs.installationServicesDesc || 'Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).'}
+                    {cleanInstallationDesc(project.specs.installationServicesDesc)}
                   </td>
                   <td className="px-3 py-1 text-center font-bold font-mono">1</td>
                   <td className="px-3 py-1 text-center text-slate-500 font-normal">UD</td>

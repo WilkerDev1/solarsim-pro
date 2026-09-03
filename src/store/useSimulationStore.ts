@@ -56,6 +56,7 @@ export const useSimulationStore = create<SimulationStore>()(
           // Clean legacy projects that had '(Copia)' embedded in client.name
           let hasChanges = false;
           const cleaned = state.projects.map((p) => {
+            let updated = p;
             if (p.client?.name && /\((?:Copia|Copia Importada|COPIA)\)/i.test(p.client.name)) {
               hasChanges = true;
               const clean = p.client.name.replace(/\s*\((?:Copia|Copia Importada|COPIA)\)\s*/gi, '').trim();
@@ -63,16 +64,27 @@ export const useSimulationStore = create<SimulationStore>()(
               const newProjId = p.client.projectId && (p.client.projectId.includes('-V') || p.client.projectId.includes('-C'))
                 ? p.client.projectId
                 : `${baseProjId}-V2`;
-              return {
-                ...p,
+              updated = {
+                ...updated,
                 client: {
-                  ...p.client,
+                  ...updated.client,
                   name: clean,
                   projectId: newProjId,
                 },
               };
             }
-            return p;
+            if (updated.specs?.installationServicesDesc && updated.specs.installationServicesDesc.includes('Notas del Sistema:')) {
+              hasChanges = true;
+              const cleanDesc = updated.specs.installationServicesDesc.split('Notas del Sistema:')[0].trim().replace(/\.\s*$/, '') + '.';
+              updated = {
+                ...updated,
+                specs: {
+                  ...updated.specs,
+                  installationServicesDesc: cleanDesc,
+                },
+              };
+            }
+            return updated;
           });
           if (hasChanges) {
             state.projects = cleaned;

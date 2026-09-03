@@ -60,7 +60,37 @@ REGLAS DE EXTRACCIÓN DETALLADAS PARA FACTURAS DOMINICANAS (EDEESTE, EDESUR, EDE
 
 6. CONFIABILIDAD Y NOTAS:
    - Asigna un puntaje de confianza (0 a 100).
-   - En 'notes', resume la extracción detallando distribuidora, NIC, tarifa y desglose.`;
+   - En 'notes', resume la extracción detallando distribuidora, NIC, tarifa y desglose.
+
+7. SÍNTESIS DE REQUISITOS Y ALCANCE TÉCNICO-COMERCIAL DEL PROYECTO (GROUNDING CON EL CATÁLOGO):
+   Si el usuario provee requerimientos en texto libre (ej: "Giovanni Gottardo. 21 panel canadian solar 615w, 1 inversor lux power de 16 kw, 2 bateria hinaes de 16kw, Venta 40%"):
+   a) CLIENTE: Si el texto contiene el nombre del cliente (ej. 'Giovanni Gottardo' o 'Osia Moscoso'), dale prioridad absoluta en 'clientName'.
+   b) PANELES FOTOVOLTAICOS:
+      - Identifica el modelo y vatios (ej. 'Canadian 615w' -> 'Módulos Canadian Solar CS6.1-72TB-615 (615W)').
+      - Identifica la cantidad: matchedPanelCount = 21 (o calcula según kWp: ej. 11000 / 615 = 18 paneles).
+      - En 'matchedPanelId' coloca el id exacto del equipo en el catálogo provisto.
+      - En 'matchedPanelModel' coloca el displayName del catálogo.
+      - En 'matchedPanelWatts' coloca los vatios (ej. 615).
+   c) INVERSORES:
+      - Identifica el modelo y potencia (ej. '1 inversor lux power de 16 kw' o '1 weco 8 kw').
+      - Si se solicitan 16 kW con Lux Power (equipos residenciales split-phase de 8 kW en RD), matchedInverterPowerKW = 8.0 y matchedInverterCount = 2.
+      - En 'matchedInverterId' coloca el id del inversor en el catálogo.
+      - En 'matchedInverterModel' coloca el displayName del inversor.
+   d) BATERÍAS BESS (ALMACENAMIENTO):
+      - Si se solicitan baterías (ej. '2 bateria hinaes de 16kw' o '2 bateria de 16k weco'):
+        * hasBattery = true
+        * matchedBatteryModel = modelo del catálogo (ej. 'Banco de Baterías de Litio HinaESS PowerGem Max 16.08kWh')
+        * matchedBatteryId = id del catálogo
+        * matchedBatteryCapacityKWh = 16.08 (o la capacidad nominal en kWh)
+        * matchedBatteryCount = 2
+      - Si no se mencionan baterías: hasBattery = false, matchedBatteryCount = 0.
+   e) MARGEN DE VENTA COMERCIAL:
+      - Si se especifica 'Porcentaje de venta 40%' o 'Venta 40%' -> targetMarginPct = 40.
+   f) NOTAS Y RAZONAMIENTO:
+      - 'specialTechnicalNotes': Requisitos especiales como 'Equipos según disponibilidad y diseñado para 40kwh diario'.
+      - 'aiReasoningSummary': Resumen claro en español de cómo se interpretó la solicitud y qué equipos se seleccionaron.
+   g) SÍNTESIS DE CONSUMO SIN FACTURA:
+      - Si no se suministra factura pero el texto dice 'diseñado para 40kwh diario', genera 'monthlyConsumptionKWh' con 12 valores de Math.round(40 * 30.4) = 1216 kWh.`;
 
 const INVOICE_JSON_SCHEMA = {
   type: 'OBJECT',
@@ -102,6 +132,22 @@ const INVOICE_JSON_SCHEMA = {
     annualConsumptionKWh: { type: 'NUMBER' },
     averageMonthlyKWh: { type: 'NUMBER' },
     currentBilledKWh: { type: 'NUMBER' },
+    matchedPanelId: { type: 'STRING' },
+    matchedPanelModel: { type: 'STRING' },
+    matchedPanelWatts: { type: 'NUMBER' },
+    matchedPanelCount: { type: 'NUMBER' },
+    matchedInverterId: { type: 'STRING' },
+    matchedInverterModel: { type: 'STRING' },
+    matchedInverterPowerKW: { type: 'NUMBER' },
+    matchedInverterCount: { type: 'NUMBER' },
+    hasBattery: { type: 'BOOLEAN' },
+    matchedBatteryId: { type: 'STRING' },
+    matchedBatteryModel: { type: 'STRING' },
+    matchedBatteryCapacityKWh: { type: 'NUMBER' },
+    matchedBatteryCount: { type: 'NUMBER' },
+    targetMarginPct: { type: 'NUMBER' },
+    specialTechnicalNotes: { type: 'STRING' },
+    aiReasoningSummary: { type: 'STRING' },
     confidenceScore: { type: 'NUMBER' },
     notes: { type: 'STRING' },
   },
@@ -247,12 +293,15 @@ export function registerAIInvoiceHandlers() {
   });
 
   ipcMain.handle('parse-invoice-with-ai', async (_event, payload: {
-    fileBase64: string;
-    mimeType: string;
-    fileName: string;
+    fileBase64?: string;
+    mimeType?: string;
+    fileName?: string;
     apiKey?: string;
     model?: string;
     panelPowerW?: number;
+    projectRequirementsText?: string;
+    equipmentCatalog?: any[];
+    dopExchangeRate?: number;
   }) => {
     try {
       const {
@@ -262,15 +311,74 @@ export function registerAIInvoiceHandlers() {
         apiKey,
         model = 'gemini-2.0-flash',
         panelPowerW = 620,
+        projectRequirementsText,
+        equipmentCatalog = [],
+        dopExchangeRate = 60.0,
       } = payload;
 
       if (!apiKey || !apiKey.trim()) {
         return { success: false, error: 'No se configuró ninguna API Key de Google Gemini.' };
       }
 
-      let cleanBase64 = fileBase64;
+      let cleanBase64 = fileBase64 || '';
       if (cleanBase64.includes('base64,')) {
         cleanBase64 = cleanBase64.split('base64,')[1];
+      }
+
+      // Preparar catálogo de referencia condensado con mejores precios para grounding
+      const referenceCatalogCondensed = equipmentCatalog.map((e) => {
+        const prices = e.supplierPrices || [];
+        const bestSp = prices.length > 0 ? [...prices].sort((a: any, b: any) => a.priceUSD - b.priceUSD)[0] : undefined;
+        return {
+          id: e.id,
+          type: e.type,
+          brand: e.brand,
+          displayName: e.displayName,
+          modelSeries: e.modelSeries,
+          powerW: e.powerW,
+          powerKW: e.powerKW,
+          capacityKWh: e.capacityKWh,
+          bestPriceUSD: bestSp?.priceUSD,
+          bestSupplierName: bestSp?.supplierName,
+          supplierPriceId: bestSp?.id,
+        };
+      });
+
+      let promptIntro = '';
+      if (cleanBase64 && fileName) {
+        promptIntro += `Analiza esta factura eléctrica dominicana (archivo: "${fileName}") y extrae todos los datos de cliente, distribuidora, tarifa, desgloses económicos y el vector cronológico de 12 meses de consumo en kWh (Enero a Diciembre).\n\n`;
+      } else {
+        promptIntro += `No se ha suministrado un archivo físico de factura, pero se proporcionan requerimientos directos para diseñar y dimensionar la propuesta solar.\n\n`;
+      }
+
+      if (projectRequirementsText && projectRequirementsText.trim()) {
+        promptIntro += `REQUISITOS Y ESPECIFICACIONES TÉCNICAS DEL PROYECTO:\n"""\n${projectRequirementsText.trim()}\n"""\n\n`;
+        promptIntro += `INSTRUCCIONES CLAVE DE SÍNTESIS CON REQUISITOS:\n`;
+        promptIntro += `1. Si el texto indica nombre del cliente (ej. 'Giovanni Gottardo' o 'Osia Moscoso'), dale prioridad absoluta en 'clientName'.\n`;
+        promptIntro += `2. Analiza los equipos solicitados (paneles, inversores, baterías) y emparéjalos con los IDs y modelos del CATÁLOGO DE REFERENCIA adjunto.\n`;
+        promptIntro += `3. Si se especifica cantidad de paneles o kWp (ej. '21 panel' o '11 kwp paneles'), calcula o asigna la cantidad en 'matchedPanelCount'.\n`;
+        promptIntro += `4. Si se especifica inversor (ej. '1 inversor lux power de 16 kw' o '1 weco 8 kw'), identifica el modelo, asigna en 'matchedInverterPowerKW' la potencia unitaria nominal (ej. 8.0 kW para Lux Power 8K) y en 'matchedInverterCount' la cantidad (ej. 2 unidades para 16 kW en paralelo).\n`;
+        promptIntro += `5. Si se mencionan baterías (ej. '2 bateria hinaes de 16kw' o '2 bateria de 16k weco'), marca 'hasBattery' = true, empareja 'matchedBatteryModel' y 'matchedBatteryId', asigna 'matchedBatteryCapacityKWh' (ej. 16.08) y 'matchedBatteryCount' (ej. 2).\n`;
+        promptIntro += `6. Si se menciona margen comercial (ej. 'Porcentaje de venta 40%' o 'Venta 40%'), asigna 'targetMarginPct' = 40.\n`;
+        promptIntro += `7. Si no hay factura pero se menciona 'diseñado para X kwh diario', genera un consumo mensual de Math.round(X * 30.4) para los 12 meses.\n`;
+        promptIntro += `8. En 'aiReasoningSummary', resume brevemente en español las decisiones tomadas para asistir al instalador.\n\n`;
+      }
+
+      if (referenceCatalogCondensed.length > 0) {
+        promptIntro += `CATÁLOGO DE EQUIPOS DISPONIBLES EN EL SISTEMA (Para emparejar exactamente los IDs y modelos solicitados):\n`;
+        promptIntro += `${JSON.stringify(referenceCatalogCondensed, null, 2)}\n\n`;
+      }
+
+      promptIntro += `TASA DE CAMBIO: 1 USD = ${dopExchangeRate} DOP. Responde estrictamente con el JSON estructurado solicitado.`;
+
+      const userParts: any[] = [{ text: promptIntro }];
+      if (cleanBase64 && mimeType) {
+        userParts.push({
+          inline_data: {
+            mime_type: mimeType,
+            data: cleanBase64,
+          },
+        });
       }
 
       const url = `${GEMINI_API_BASE}/models/${model}:generateContent?key=${apiKey.trim()}`;
@@ -281,17 +389,7 @@ export function registerAIInvoiceHandlers() {
         contents: [
           {
             role: 'user',
-            parts: [
-              {
-                text: `Analiza esta factura eléctrica dominicana (archivo: "${fileName}") y extrae todos los datos de cliente, distribuidora, tarifa, desgloses económicos y el vector cronológico de 12 meses de consumo en kWh (Enero a Diciembre). Responde estrictamente con el JSON estructurado solicitado.`,
-              },
-              {
-                inline_data: {
-                  mime_type: mimeType,
-                  data: cleanBase64,
-                },
-              },
-            ],
+            parts: userParts,
           },
         ],
         generationConfig: {
@@ -309,7 +407,7 @@ export function registerAIInvoiceHandlers() {
       }
 
       const parsed = JSON.parse(rawText);
-      const cleanName = (parsed.clientName || 'Cliente Factura EDE').replace(/\?/g, 'Ñ');
+      const cleanName = (parsed.clientName || 'Cliente Propuesta Solar').replace(/\?/g, 'Ñ');
 
       // Normalize 12 months array
       let monthlyConsumption: number[] = Array.isArray(parsed.monthlyConsumptionKWh)
@@ -317,7 +415,7 @@ export function registerAIInvoiceHandlers() {
         : [];
 
       if (monthlyConsumption.length < 12) {
-        const avg = parsed.averageMonthlyKWh || 500;
+        const avg = parsed.averageMonthlyKWh || 1200;
         while (monthlyConsumption.length < 12) {
           monthlyConsumption.push(avg);
         }
@@ -328,12 +426,131 @@ export function registerAIInvoiceHandlers() {
       const totalAnnual = monthlyConsumption.reduce((sum, v) => sum + v, 0);
       const avgMonthly = Math.round(totalAnnual / 12);
 
+      // Smart Panel Matching con el Catálogo
+      let selectedPanelId: string | undefined;
+      let selectedPanelModel: string | undefined;
+      let selectedPanelWatts: number = panelPowerW > 0 ? panelPowerW : 620;
+      let selectedPanelUnitPriceUSD: number | undefined;
+
+      if (parsed.matchedPanelId || parsed.matchedPanelModel) {
+        const panMatch = equipmentCatalog.find(
+          (e) => e.type === 'panel' && (e.id === parsed.matchedPanelId || e.displayName === parsed.matchedPanelModel || e.modelSeries === parsed.matchedPanelModel)
+        );
+        if (panMatch) {
+          selectedPanelId = panMatch.id;
+          selectedPanelModel = panMatch.displayName;
+          selectedPanelWatts = panMatch.powerW || selectedPanelWatts;
+        } else {
+          selectedPanelModel = parsed.matchedPanelModel;
+          selectedPanelWatts = parsed.matchedPanelWatts || selectedPanelWatts;
+        }
+      }
+
       const targetCoverage = 0.95;
       const targetAnnualSolarKWh = totalAnnual * targetCoverage;
       const specificYieldKWhPerKWp = 1450;
       const recommendedCapacityKWp = Math.round((targetAnnualSolarKWh / specificYieldKWhPerKWp) * 100) / 100;
-      const panelWatts = panelPowerW > 0 ? panelPowerW : 620;
-      const recommendedPanelCount = Math.max(1, Math.ceil((recommendedCapacityKWp * 1000) / panelWatts));
+      const recommendedPanelCount = Math.max(1, Math.ceil((recommendedCapacityKWp * 1000) / selectedPanelWatts));
+
+      const finalPanelCount = parsed.matchedPanelCount && parsed.matchedPanelCount > 0
+        ? parsed.matchedPanelCount
+        : recommendedPanelCount;
+      const finalCapacityKWp = Math.round(((finalPanelCount * selectedPanelWatts) / 1000) * 100) / 100;
+
+      // Smart Inverter Matching con el Catálogo
+      let selectedInverterId: string | undefined;
+      let selectedInverterModel: string | undefined;
+      let selectedInverterPowerKW: number | undefined;
+      let selectedInverterCount: number | undefined;
+      let selectedInverterUnitPriceUSD: number | undefined;
+
+      if (parsed.matchedInverterId || parsed.matchedInverterModel || parsed.matchedInverterPowerKW) {
+        const invMatch = equipmentCatalog.find(
+          (e) => e.type === 'inverter' && (e.id === parsed.matchedInverterId || e.displayName === parsed.matchedInverterModel || e.modelSeries === parsed.matchedInverterModel)
+        );
+        if (invMatch) {
+          selectedInverterId = invMatch.id;
+          selectedInverterModel = invMatch.displayName;
+          selectedInverterPowerKW = invMatch.powerKW || parsed.matchedInverterPowerKW || 8.0;
+        } else {
+          selectedInverterModel = parsed.matchedInverterModel || 'Inversor Solar Híbrido';
+          selectedInverterPowerKW = parsed.matchedInverterPowerKW || 8.0;
+        }
+        selectedInverterCount = parsed.matchedInverterCount || Math.max(1, Math.ceil(finalCapacityKWp / (selectedInverterPowerKW || 8.0)));
+      }
+
+      // Smart BESS Battery Storage Matching con el Catálogo
+      let hasBattery = parsed.hasBattery === true;
+      let selectedBatteryId: string | undefined;
+      let selectedBatteryModel: string | undefined;
+      let selectedBatteryCapacityKWh: number | undefined;
+      let selectedBatteryCount: number | undefined;
+      let selectedBatteryUnitPriceUSD: number | undefined;
+
+      if (hasBattery || parsed.matchedBatteryId || parsed.matchedBatteryModel || (parsed.matchedBatteryCount && parsed.matchedBatteryCount > 0)) {
+        hasBattery = true;
+        const batMatch = equipmentCatalog.find(
+          (e) => e.type === 'battery' && (e.id === parsed.matchedBatteryId || e.displayName === parsed.matchedBatteryModel || e.modelSeries === parsed.matchedBatteryModel)
+        );
+        if (batMatch) {
+          selectedBatteryId = batMatch.id;
+          selectedBatteryModel = batMatch.displayName;
+          selectedBatteryCapacityKWh = batMatch.capacityKWh || parsed.matchedBatteryCapacityKWh || 16.08;
+        } else {
+          selectedBatteryModel = parsed.matchedBatteryModel || 'Banco de Baterías de Litio LiFePO4';
+          selectedBatteryCapacityKWh = parsed.matchedBatteryCapacityKWh || 16.08;
+        }
+        selectedBatteryCount = parsed.matchedBatteryCount || 1;
+      }
+
+      // Precios de proveedores y auto-pricing
+      const selectedSupplierInfo: any = {};
+      let autoSupplierPricing = false;
+
+      if (selectedPanelId) {
+        const pItem = equipmentCatalog.find((e) => e.id === selectedPanelId);
+        if (pItem?.supplierPrices && pItem.supplierPrices.length > 0) {
+          const best = [...pItem.supplierPrices].sort((a: any, b: any) => a.priceUSD - b.priceUSD)[0];
+          selectedPanelUnitPriceUSD = best.priceUSD;
+          selectedSupplierInfo.panel = {
+            supplierName: best.supplierName,
+            priceUSD: best.priceUSD,
+            updatedAt: best.updatedAt,
+            supplierPriceId: best.id,
+          };
+          autoSupplierPricing = true;
+        }
+      }
+
+      if (selectedInverterId) {
+        const iItem = equipmentCatalog.find((e) => e.id === selectedInverterId);
+        if (iItem?.supplierPrices && iItem.supplierPrices.length > 0) {
+          const best = [...iItem.supplierPrices].sort((a: any, b: any) => a.priceUSD - b.priceUSD)[0];
+          selectedInverterUnitPriceUSD = best.priceUSD;
+          selectedSupplierInfo.inverter = {
+            supplierName: best.supplierName,
+            priceUSD: best.priceUSD,
+            updatedAt: best.updatedAt,
+            supplierPriceId: best.id,
+          };
+          autoSupplierPricing = true;
+        }
+      }
+
+      if (selectedBatteryId) {
+        const bItem = equipmentCatalog.find((e) => e.id === selectedBatteryId);
+        if (bItem?.supplierPrices && bItem.supplierPrices.length > 0) {
+          const best = [...bItem.supplierPrices].sort((a: any, b: any) => a.priceUSD - b.priceUSD)[0];
+          selectedBatteryUnitPriceUSD = best.priceUSD;
+          selectedSupplierInfo.battery = {
+            supplierName: best.supplierName,
+            priceUSD: best.priceUSD,
+            updatedAt: best.updatedAt,
+            supplierPriceId: best.id,
+          };
+          autoSupplierPricing = true;
+        }
+      }
 
       const result = {
         clientName: cleanName,
@@ -369,11 +586,43 @@ export function registerAIInvoiceHandlers() {
         annualConsumptionKWh: totalAnnual,
         averageMonthlyKWh: avgMonthly,
         currentBilledKWh: parsed.currentBilledKWh || monthlyConsumption[0],
-        recommendedCapacityKWp,
-        recommendedPanelCount,
+
+        // Paneles
+        recommendedCapacityKWp: finalCapacityKWp,
+        recommendedPanelCount: finalPanelCount,
+        selectedPanelId,
+        selectedPanelModel,
+        selectedPanelWatts,
+        selectedPanelUnitPriceUSD,
+
+        // Inversor
+        selectedInverterId,
+        selectedInverterModel,
+        selectedInverterPowerKW,
+        selectedInverterCount,
+        selectedInverterUnitPriceUSD,
+
+        // Baterías
+        hasBattery,
+        selectedBatteryId,
+        selectedBatteryModel,
+        selectedBatteryCapacityKWh,
+        selectedBatteryCount,
+        selectedBatteryUnitPriceUSD,
+
+        // Estrategia Comercial & Finanzas
+        targetMarginPct: parsed.targetMarginPct || undefined,
+        pricingMode: parsed.targetMarginPct ? 'cost_matrix' : undefined,
+        autoSupplierPricing,
+        selectedSupplierInfo: autoSupplierPricing ? selectedSupplierInfo : undefined,
+
+        // Requisitos & Razonamiento IA
         targetCoveragePct: 95,
         confidenceScore: parsed.confidenceScore || 98,
-        extractedFromFileName: fileName,
+        extractedFromFileName: fileName || 'Requisitos en texto libre',
+        projectRequirementsPrompt: projectRequirementsText || undefined,
+        aiReasoningSummary: parsed.aiReasoningSummary || undefined,
+        specialTechnicalNotes: parsed.specialTechnicalNotes || undefined,
         aiNotes: parsed.notes || undefined,
       };
 
