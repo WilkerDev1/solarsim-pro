@@ -43,6 +43,62 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
 
   const hasAnySupplierPrices = panelSuppliersCount > 0 || inverterSuppliersCount > 0 || (project.specs.hasBattery && batterySuppliersCount > 0);
 
+  // 🏷️ Verificar correspondencia estricta: el proveedor asignado debe existir para el equipo actualmente seleccionado
+  const panelSupplierMatches = !!selectedPanel?.supplierPrices?.some(
+    (sp) =>
+      (project.specs.selectedSupplierInfo?.panel?.supplierPriceId && sp.id === project.specs.selectedSupplierInfo.panel.supplierPriceId) ||
+      (project.specs.selectedSupplierInfo?.panel?.supplierName &&
+        sp.supplierName.toLowerCase().trim() === project.specs.selectedSupplierInfo.panel.supplierName.toLowerCase().trim())
+  );
+
+  const inverterSupplierMatches = !!selectedInverter?.supplierPrices?.some(
+    (sp) =>
+      (project.specs.selectedSupplierInfo?.inverter?.supplierPriceId && sp.id === project.specs.selectedSupplierInfo.inverter.supplierPriceId) ||
+      (project.specs.selectedSupplierInfo?.inverter?.supplierName &&
+        sp.supplierName.toLowerCase().trim() === project.specs.selectedSupplierInfo.inverter.supplierName.toLowerCase().trim())
+  );
+
+  const batterySupplierMatches = !!selectedBattery?.supplierPrices?.some(
+    (sp) =>
+      (project.specs.selectedSupplierInfo?.battery?.supplierPriceId && sp.id === project.specs.selectedSupplierInfo.battery.supplierPriceId) ||
+      (project.specs.selectedSupplierInfo?.battery?.supplierName &&
+        sp.supplierName.toLowerCase().trim() === project.specs.selectedSupplierInfo.battery.supplierName.toLowerCase().trim())
+  );
+
+  // Limpieza automática de proveedores huérfanos/obsoletos si el equipo cambió de modelo
+  React.useEffect(() => {
+    const info = project.specs.selectedSupplierInfo;
+    if (!info) return;
+
+    let needsCleanup = false;
+    const cleanedInfo = { ...info };
+
+    if (info.panel && !panelSupplierMatches) {
+      delete cleanedInfo.panel;
+      needsCleanup = true;
+    }
+    if (info.inverter && !inverterSupplierMatches) {
+      delete cleanedInfo.inverter;
+      needsCleanup = true;
+    }
+    if (info.battery && !batterySupplierMatches) {
+      delete cleanedInfo.battery;
+      needsCleanup = true;
+    }
+
+    if (needsCleanup) {
+      updateSpecs({ selectedSupplierInfo: cleanedInfo });
+    }
+  }, [
+    project.specs.selectedSupplierInfo,
+    project.specs.panelBrandModel,
+    project.specs.inverterBrandModel,
+    project.specs.batteryBrandModel,
+    panelSupplierMatches,
+    inverterSupplierMatches,
+    batterySupplierMatches,
+  ]);
+
   const handleSyncAllWithBestSupplierPrices = () => {
     const newSpecs: Partial<SystemSpecs> = {
       autoSupplierPricing: true,
@@ -508,19 +564,25 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                       type="number"
                       step="1"
                       value={project.specs.panelUnitPriceUSD !== undefined ? project.specs.panelUnitPriceUSD : 103.32}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || 0;
+                        const newSupplierInfo = { ...(project.specs.selectedSupplierInfo || {}) };
+                        if (newSupplierInfo.panel && Math.abs(newSupplierInfo.panel.priceUSD - val) > 0.01) {
+                          delete newSupplierInfo.panel;
+                        }
                         updateSpecs({
-                          panelUnitPriceUSD: parseFloat(e.target.value) || 0,
+                          panelUnitPriceUSD: val,
                           autoSupplierPricing: false,
-                        })
-                      }
+                          selectedSupplierInfo: newSupplierInfo,
+                        });
+                      }}
                       className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
                         isDark
                           ? 'bg-[#121216] border-[#383848] text-zinc-100'
                           : 'bg-slate-50 border-slate-300 text-slate-900'
                       }`}
                     />
-                    {project.specs.selectedSupplierInfo?.panel && (
+                    {panelSupplierMatches && project.specs.selectedSupplierInfo?.panel && (
                       <span className="text-[9.5px] text-emerald-400 font-semibold block mt-0.5 truncate">
                         🏷️ {project.specs.selectedSupplierInfo.panel.supplierName}
                       </span>
@@ -546,19 +608,25 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                       type="number"
                       step="10"
                       value={project.specs.inverterUnitPriceUSD !== undefined ? project.specs.inverterUnitPriceUSD : 2300.0}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || 0;
+                        const newSupplierInfo = { ...(project.specs.selectedSupplierInfo || {}) };
+                        if (newSupplierInfo.inverter && Math.abs(newSupplierInfo.inverter.priceUSD - val) > 0.01) {
+                          delete newSupplierInfo.inverter;
+                        }
                         updateSpecs({
-                          inverterUnitPriceUSD: parseFloat(e.target.value) || 0,
+                          inverterUnitPriceUSD: val,
                           autoSupplierPricing: false,
-                        })
-                      }
+                          selectedSupplierInfo: newSupplierInfo,
+                        });
+                      }}
                       className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
                         isDark
                           ? 'bg-[#121216] border-[#383848] text-zinc-100'
                           : 'bg-slate-50 border-slate-300 text-slate-900'
                       }`}
                     />
-                    {project.specs.selectedSupplierInfo?.inverter && (
+                    {inverterSupplierMatches && project.specs.selectedSupplierInfo?.inverter && (
                       <span className="text-[9.5px] text-emerald-400 font-semibold block mt-0.5 truncate">
                         🏷️ {project.specs.selectedSupplierInfo.inverter.supplierName}
                       </span>
@@ -587,19 +655,25 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                         type="number"
                         step="10"
                         value={project.specs.batteryUnitPriceUSD !== undefined ? project.specs.batteryUnitPriceUSD : 1990.0}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value) || 0;
+                          const newSupplierInfo = { ...(project.specs.selectedSupplierInfo || {}) };
+                          if (newSupplierInfo.battery && Math.abs(newSupplierInfo.battery.priceUSD - val) > 0.01) {
+                            delete newSupplierInfo.battery;
+                          }
                           updateSpecs({
-                            batteryUnitPriceUSD: parseFloat(e.target.value) || 0,
+                            batteryUnitPriceUSD: val,
                             autoSupplierPricing: false,
-                          })
-                        }
+                            selectedSupplierInfo: newSupplierInfo,
+                          });
+                        }}
                         className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
                           isDark
                             ? 'bg-[#121216] border-[#383848] text-zinc-100'
                             : 'bg-slate-50 border-slate-300 text-slate-900'
                         }`}
                       />
-                      {project.specs.selectedSupplierInfo?.battery && (
+                      {batterySupplierMatches && project.specs.selectedSupplierInfo?.battery && (
                         <span className="text-[9.5px] text-emerald-400 font-semibold block mt-0.5 truncate">
                           🏷️ {project.specs.selectedSupplierInfo.battery.supplierName}
                         </span>

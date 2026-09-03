@@ -25,29 +25,125 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
   const { equipmentCatalog, openAIDatasheetModal } = useSimulationStore();
 
   const handleSelectPanel = (item: SolarEquipmentItem) => {
-    updateSpecs({
+    const suppliers = item.supplierPrices || [];
+    const newSupplierInfo = { ...(project.specs.selectedSupplierInfo || {}) };
+    const specsUpdate: Partial<SystemSpecs> = {
       panelBrandModel: item.displayName,
       panelPowerW: item.powerW || 550,
       panelEfficiency: item.efficiencyPct || 22.0,
       tempCoeff: item.tempCoeff || -0.29,
       annualDegradation: item.annualDegradation || 0.4,
-    });
+    };
+
+    if (project.specs.autoSupplierPricing && suppliers.length > 0) {
+      const bestSp = [...suppliers].sort((a, b) => a.priceUSD - b.priceUSD)[0];
+      specsUpdate.panelUnitPriceUSD = bestSp.priceUSD;
+      newSupplierInfo.panel = {
+        supplierName: bestSp.supplierName,
+        priceUSD: bestSp.priceUSD,
+        updatedAt: bestSp.updatedAt,
+        supplierPriceId: bestSp.id,
+      };
+    } else {
+      const match = suppliers.find(
+        (sp) =>
+          sp.id === newSupplierInfo.panel?.supplierPriceId ||
+          sp.supplierName.toLowerCase().trim() === newSupplierInfo.panel?.supplierName?.toLowerCase().trim()
+      );
+      if (match) {
+        newSupplierInfo.panel = {
+          supplierName: match.supplierName,
+          priceUSD: match.priceUSD,
+          updatedAt: match.updatedAt,
+          supplierPriceId: match.id,
+        };
+      } else {
+        delete newSupplierInfo.panel;
+      }
+    }
+
+    specsUpdate.selectedSupplierInfo = newSupplierInfo;
+    updateSpecs(specsUpdate);
   };
 
   const handleSelectInverter = (item: SolarEquipmentItem) => {
-    updateSpecs({
+    const suppliers = item.supplierPrices || [];
+    const newSupplierInfo = { ...(project.specs.selectedSupplierInfo || {}) };
+    const specsUpdate: Partial<SystemSpecs> = {
       inverterBrandModel: item.displayName,
       inverterPowerKW: item.powerKW || 8.0,
-    });
+    };
+
+    if (project.specs.autoSupplierPricing && suppliers.length > 0) {
+      const bestSp = [...suppliers].sort((a, b) => a.priceUSD - b.priceUSD)[0];
+      specsUpdate.inverterUnitPriceUSD = bestSp.priceUSD;
+      newSupplierInfo.inverter = {
+        supplierName: bestSp.supplierName,
+        priceUSD: bestSp.priceUSD,
+        updatedAt: bestSp.updatedAt,
+        supplierPriceId: bestSp.id,
+      };
+    } else {
+      const match = suppliers.find(
+        (sp) =>
+          sp.id === newSupplierInfo.inverter?.supplierPriceId ||
+          sp.supplierName.toLowerCase().trim() === newSupplierInfo.inverter?.supplierName?.toLowerCase().trim()
+      );
+      if (match) {
+        newSupplierInfo.inverter = {
+          supplierName: match.supplierName,
+          priceUSD: match.priceUSD,
+          updatedAt: match.updatedAt,
+          supplierPriceId: match.id,
+        };
+      } else {
+        delete newSupplierInfo.inverter;
+      }
+    }
+
+    specsUpdate.selectedSupplierInfo = newSupplierInfo;
+    updateSpecs(specsUpdate);
   };
 
   const handleSelectBattery = (item: SolarEquipmentItem) => {
-    updateSpecs({
+    const suppliers = item.supplierPrices || [];
+    const newSupplierInfo = { ...(project.specs.selectedSupplierInfo || {}) };
+    const specsUpdate: Partial<SystemSpecs> = {
       batteryBrandModel: item.displayName,
       batteryCapacityKWh: item.capacityKWh || 16.08,
       batteryDOD: item.dodPct || 90,
       batteryEfficiencyPct: item.batteryEfficiencyPct || 95,
-    });
+    };
+
+    if (project.specs.autoSupplierPricing && suppliers.length > 0) {
+      const bestSp = [...suppliers].sort((a, b) => a.priceUSD - b.priceUSD)[0];
+      specsUpdate.batteryUnitPriceUSD = bestSp.priceUSD;
+      newSupplierInfo.battery = {
+        supplierName: bestSp.supplierName,
+        priceUSD: bestSp.priceUSD,
+        updatedAt: bestSp.updatedAt,
+        supplierPriceId: bestSp.id,
+      };
+    } else {
+      const match = suppliers.find(
+        (sp) =>
+          sp.id === newSupplierInfo.battery?.supplierPriceId ||
+          sp.supplierName.toLowerCase().trim() === newSupplierInfo.battery?.supplierName?.toLowerCase().trim()
+      );
+      if (match) {
+        newSupplierInfo.battery = {
+          supplierName: match.supplierName,
+          priceUSD: match.priceUSD,
+          updatedAt: match.updatedAt,
+          supplierPriceId: match.id,
+        };
+      } else {
+        delete newSupplierInfo.battery;
+      }
+    }
+
+    specsUpdate.selectedSupplierInfo = newSupplierInfo;
+    updateSpecs(specsUpdate);
   };
 
   const isDetailed = !!project.specs.isDetailed;

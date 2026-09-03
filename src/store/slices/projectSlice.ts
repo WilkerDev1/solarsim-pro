@@ -324,6 +324,65 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
         mergedSpecs.autoCalculatePanels = false;
       }
 
+      // 🏷️ Validar coherencia de selectedSupplierInfo si cambió el modelo de equipo
+      if (
+        (specsPartial.panelBrandModel && specsPartial.panelBrandModel !== activeProj.specs.panelBrandModel) ||
+        (specsPartial.inverterBrandModel && specsPartial.inverterBrandModel !== activeProj.specs.inverterBrandModel) ||
+        (specsPartial.batteryBrandModel && specsPartial.batteryBrandModel !== activeProj.specs.batteryBrandModel)
+      ) {
+        const currentSupplierInfo = { ...(mergedSpecs.selectedSupplierInfo || {}) };
+        let infoChanged = false;
+
+        if (specsPartial.inverterBrandModel && !specsPartial.selectedSupplierInfo) {
+          const inv = state.equipmentCatalog.find(
+            (e) => e.type === 'inverter' && e.displayName === specsPartial.inverterBrandModel
+          );
+          const hasMatchingSupplier = (inv?.supplierPrices || []).some(
+            (sp) =>
+              sp.id === currentSupplierInfo.inverter?.supplierPriceId ||
+              sp.supplierName.toLowerCase().trim() === currentSupplierInfo.inverter?.supplierName?.toLowerCase().trim()
+          );
+          if (!hasMatchingSupplier) {
+            delete currentSupplierInfo.inverter;
+            infoChanged = true;
+          }
+        }
+
+        if (specsPartial.panelBrandModel && !specsPartial.selectedSupplierInfo) {
+          const pnl = state.equipmentCatalog.find(
+            (e) => e.type === 'panel' && e.displayName === specsPartial.panelBrandModel
+          );
+          const hasMatchingSupplier = (pnl?.supplierPrices || []).some(
+            (sp) =>
+              sp.id === currentSupplierInfo.panel?.supplierPriceId ||
+              sp.supplierName.toLowerCase().trim() === currentSupplierInfo.panel?.supplierName?.toLowerCase().trim()
+          );
+          if (!hasMatchingSupplier) {
+            delete currentSupplierInfo.panel;
+            infoChanged = true;
+          }
+        }
+
+        if (specsPartial.batteryBrandModel && !specsPartial.selectedSupplierInfo) {
+          const bat = state.equipmentCatalog.find(
+            (e) => e.type === 'battery' && e.displayName === specsPartial.batteryBrandModel
+          );
+          const hasMatchingSupplier = (bat?.supplierPrices || []).some(
+            (sp) =>
+              sp.id === currentSupplierInfo.battery?.supplierPriceId ||
+              sp.supplierName.toLowerCase().trim() === currentSupplierInfo.battery?.supplierName?.toLowerCase().trim()
+          );
+          if (!hasMatchingSupplier) {
+            delete currentSupplierInfo.battery;
+            infoChanged = true;
+          }
+        }
+
+        if (infoChanged) {
+          mergedSpecs.selectedSupplierInfo = currentSupplierInfo;
+        }
+      }
+
       return {
         projects: state.projects.map((p) =>
           p.id === state.activeProjectId
