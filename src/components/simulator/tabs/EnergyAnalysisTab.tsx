@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import {
   BarChart,
@@ -9,7 +9,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { Sparkles, ArrowDownToLine } from 'lucide-react';
+import { Sparkles, ArrowDownToLine, Copy, Check } from 'lucide-react';
 
 interface EnergyAnalysisTabProps {
   project: ProjectSimulation;
@@ -17,6 +17,7 @@ interface EnergyAnalysisTabProps {
   openAIInvoiceModal: () => void;
   updateMonthlyConsumption: (index: number, value: number) => void;
   updateAllMonthlyConsumption?: (value: number) => void;
+  setMonthlyConsumption?: (monthlyConsumption: number[], lockAutoPanels?: boolean) => void;
 }
 
 export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
@@ -25,11 +26,14 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
   openAIInvoiceModal,
   updateMonthlyConsumption,
   updateAllMonthlyConsumption,
+  setMonthlyConsumption,
 }) => {
   const totalConsumptionKWh = (summary?.monthlyBreakdown || []).reduce((sum, m) => sum + (m.consumptionKWh || 0), 0);
   const totalProductionKWh = (summary?.monthlyBreakdown || []).reduce((sum, m) => sum + (m.productionKWh || 0), 0);
   const totalSavingsKWh = (summary?.monthlyBreakdown || []).reduce((sum, m) => sum + (m.solarSelfConsumedKWh || 0), 0);
   const avgCoveragePct = summary?.energyCoveragePct || 0;
+
+  const [isReplicated, setIsReplicated] = useState(false);
 
   const handleApplyToAllMonths = () => {
     const val = project.monthlyConsumption[0] || 0;
@@ -40,6 +44,26 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
         updateMonthlyConsumption(i, val);
       }
     }
+  };
+
+  const handleReplicateProductionToConsumption = () => {
+    if (!summary?.monthlyBreakdown || summary.monthlyBreakdown.length !== 12) return;
+
+    // Extraer la producción estimada de cada uno de los 12 meses redondeada a 1 decimal
+    const prodValues = summary.monthlyBreakdown.map((m) =>
+      Math.max(0, Math.round((m.productionKWh || 0) * 10) / 10)
+    );
+
+    if (setMonthlyConsumption) {
+      setMonthlyConsumption(prodValues, true);
+    } else {
+      for (let i = 0; i < 12; i++) {
+        updateMonthlyConsumption(i, prodValues[i]);
+      }
+    }
+
+    setIsReplicated(true);
+    setTimeout(() => setIsReplicated(false), 2200);
   };
 
   return (
@@ -198,7 +222,37 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
                     )}
                   </div>
                 </td>
-                <td className="py-2 px-4 text-right font-semibold">{row.productionKWh.toFixed(1)}</td>
+                <td className="py-2 px-4 text-right font-semibold">
+                  {idx === 0 ? (
+                    <div className="flex items-center justify-end gap-1.5">
+                      <button
+                        type="button"
+                        onClick={handleReplicateProductionToConsumption}
+                        className={`px-2 py-1 rounded-md text-[10.5px] font-bold flex items-center gap-1 transition-all shadow-2xs hover:shadow-xs active:scale-95 cursor-pointer shrink-0 border ${
+                          isReplicated
+                            ? 'bg-emerald-100 text-emerald-900 border-emerald-400'
+                            : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
+                        }`}
+                        title="Replicar la producción estimada mes a mes en la columna de consumo (para cotizaciones basadas en producción con 100% de cobertura)"
+                      >
+                        {isReplicated ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                            <span>¡Replicado!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                            <span>Replicar a consumo</span>
+                          </>
+                        )}
+                      </button>
+                      <span className="tabular-nums">{row.productionKWh.toFixed(1)}</span>
+                    </div>
+                  ) : (
+                    <span className="tabular-nums">{row.productionKWh.toFixed(1)}</span>
+                  )}
+                </td>
                 <td className="py-2 px-4 text-right font-semibold">{row.solarSelfConsumedKWh.toFixed(1)}</td>
                 <td className="py-2 px-4 text-right text-emerald-700 font-bold">
                   {row.consumptionKWh > 0 ? ((row.productionKWh / row.consumptionKWh) * 100).toFixed(1) : '0.0'}%

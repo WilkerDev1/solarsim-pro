@@ -93,6 +93,7 @@ export interface ProjectSlice {
   updateFinancials: (financials: Partial<FinancialParams>) => void;
   updateMonthlyConsumption: (index: number, value: number) => void;
   updateAllMonthlyConsumption: (value: number) => void;
+  setMonthlyConsumption: (monthlyConsumption: number[], lockAutoPanels?: boolean) => void;
   updateDocumentCustomization: (customization: Partial<DocumentCustomization>) => void;
 
   getActiveProject: () => ProjectSimulation;

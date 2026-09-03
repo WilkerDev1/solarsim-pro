@@ -464,6 +464,45 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     get().triggerAutoSync(false);
   },
 
+  setMonthlyConsumption: (monthlyConsumption, lockAutoPanels = false) => {
+    set((state) => ({
+      projects: state.projects.map((p) => {
+        if (p.id === state.activeProjectId) {
+          const newConsumption = monthlyConsumption.map((v) => Math.max(0, v));
+          const updatedSpecs = { ...p.specs };
+
+          if (lockAutoPanels) {
+            updatedSpecs.autoCalculatePanels = false;
+          } else if (updatedSpecs.autoCalculatePanels) {
+            const panelW = updatedSpecs.panelPowerW || 620;
+            const targetCoverage = p.rates.targetCoveragePct ?? 95;
+            const losses = updatedSpecs.systemLosses !== undefined ? updatedSpecs.systemLosses : 25.0;
+            const rec = calculateRecommendedPanelCount(
+              p.client.province,
+              newConsumption,
+              panelW,
+              targetCoverage,
+              losses,
+              p.client.customMonthlyHSP
+            );
+            updatedSpecs.panelCount = rec.recommendedPanelCount;
+          }
+
+          return {
+            ...p,
+            syncStatus: 'pending' as const,
+            updatedAt: new Date().toISOString(),
+            monthlyConsumption: newConsumption,
+            specs: updatedSpecs,
+          };
+        }
+        return p;
+      }),
+    }));
+
+    get().triggerAutoSync(false);
+  },
+
   updateDocumentCustomization: (customizationPartial) => {
     set((state) => ({
       projects: state.projects.map((p) =>
