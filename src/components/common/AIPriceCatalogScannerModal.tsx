@@ -67,6 +67,18 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
     return Array.from(setNames).sort();
   }, [equipmentCatalog]);
 
+  const applicableItemsCount = useMemo(() => {
+    if (!scanResult) return 0;
+    return scanResult.items.filter(
+      (item) => selectedItemIds.has(item.id) && item.action !== 'ignore'
+    ).length;
+  }, [scanResult, selectedItemIds]);
+
+  const newItemsCount = useMemo(() => {
+    if (!scanResult) return 0;
+    return scanResult.items.filter((item) => !item.matchedEquipmentId).length;
+  }, [scanResult]);
+
   if (!isAIPriceCatalogModalOpen) return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -248,18 +260,6 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
     setScanResult({ ...scanResult, items: updatedItems });
     setSelectedItemIds(nextItemIds);
   };
-
-  const applicableItemsCount = useMemo(() => {
-    if (!scanResult) return 0;
-    return scanResult.items.filter(
-      (item) => selectedItemIds.has(item.id) && item.action !== 'ignore'
-    ).length;
-  }, [scanResult, selectedItemIds]);
-
-  const newItemsCount = useMemo(() => {
-    if (!scanResult) return 0;
-    return scanResult.items.filter((item) => !item.matchedEquipmentId).length;
-  }, [scanResult]);
 
   const handleApplyPricesToCatalog = () => {
     if (!scanResult) return;

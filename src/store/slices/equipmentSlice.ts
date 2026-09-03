@@ -99,18 +99,36 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (set, get) 
         return { success: false, message: pushRes.error || 'Error al subir catálogo al servidor' };
       }
 
-      // 2. Pull de equipos desde el servidor para incorporar nuevos modelos del equipo
+      // 2. Pull de equipos desde el servidor para incorporar nuevos modelos y precios actualizados
       const pullRes = await SyncService.pullEquipment(serverUrl, authToken);
       if (pullRes.success && pullRes.items && pullRes.items.length > 0) {
         const localMap = new Map(get().equipmentCatalog.map((item) => [item.id, item]));
-        let hasNew = false;
+        let hasUpdated = false;
+
         for (const serverItem of pullRes.items) {
-          if (!localMap.has(serverItem.id)) {
+          const localItem = localMap.get(serverItem.id);
+          if (!localItem) {
             localMap.set(serverItem.id, serverItem);
-            hasNew = true;
+            hasUpdated = true;
+          } else {
+            const serverUpdated = new Date(serverItem.updatedAt || 0).getTime();
+            const localUpdated = new Date(localItem.updatedAt || 0).getTime();
+            const serverPrices = serverItem.supplierPrices || [];
+            const localPrices = localItem.supplierPrices || [];
+
+            // Si el servidor tiene fecha más reciente o tiene ofertas que localmente faltan
+            if (serverUpdated > localUpdated || (serverPrices.length > 0 && localPrices.length === 0)) {
+              localMap.set(serverItem.id, {
+                ...localItem,
+                ...serverItem,
+                supplierPrices: serverPrices.length >= localPrices.length ? serverPrices : localPrices,
+              });
+              hasUpdated = true;
+            }
           }
         }
-        if (hasNew) {
+
+        if (hasUpdated) {
           set({ equipmentCatalog: Array.from(localMap.values()) });
         }
       }
