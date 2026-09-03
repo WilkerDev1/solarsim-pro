@@ -28,7 +28,7 @@ export const BENCHMARK_PROJECT: ProjectSimulation = {
     panelCount: 38, // 23.56 kWp DC
     pricePerWattUSD: 1.134971,
     panelBrandModel: 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)',
-    inverterPowerKW: 16,
+    inverterPowerKW: 8,
     inverterCount: 2,
     inverterBrandModel: 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)',
     hasBattery: true,

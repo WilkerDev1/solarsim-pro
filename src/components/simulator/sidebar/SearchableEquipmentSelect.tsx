@@ -104,6 +104,20 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
     return 'Buscar por marca, modelo o kilovatios (kW)...';
   };
 
+  const matchingItem = useMemo(() => {
+    if (!selectedValue) return null;
+    return (items || []).find((item) => item.type === type && item.displayName === selectedValue);
+  }, [items, type, selectedValue]);
+
+  const effectivePower = useMemo(() => {
+    if (matchingItem) {
+      if (isPanel) return matchingItem.powerW;
+      if (isBattery) return matchingItem.capacityKWh;
+      return matchingItem.powerKW;
+    }
+    return selectedPower;
+  }, [matchingItem, isPanel, isBattery, selectedPower]);
+
   const formatPowerBadge = (item: SolarEquipmentItem) => {
     if (item.type === 'panel') return `${item.powerW}W`;
     if (item.type === 'battery') return `${item.capacityKWh}kWh`;
@@ -147,7 +161,7 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          {selectedPower ? (
+          {effectivePower ? (
             <span
               className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-bold ${
                 isBattery
@@ -159,7 +173,7 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
                   : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
               }`}
             >
-              {isPanel ? `${selectedPower}W` : isBattery ? `${selectedPower}kWh` : `${selectedPower}kW`}
+              {isPanel ? `${effectivePower}W` : isBattery ? `${effectivePower}kWh` : `${effectivePower}kW`}
             </span>
           ) : null}
           <ChevronDown

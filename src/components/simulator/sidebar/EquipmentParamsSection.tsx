@@ -24,6 +24,26 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
 }) => {
   const { equipmentCatalog, openAIDatasheetModal } = useSimulationStore();
 
+  // Auto-sanear inconsistencias de potencia unitaria si el modelo seleccionado está en el catálogo verificado
+  React.useEffect(() => {
+    if (project.specs.inverterBrandModel && project.specs.inverterPowerKW) {
+      const match = equipmentCatalog.find(
+        (it) => it.type === 'inverter' && it.displayName === project.specs.inverterBrandModel
+      );
+      if (match && match.powerKW && match.powerKW !== project.specs.inverterPowerKW) {
+        updateSpecs({ inverterPowerKW: match.powerKW });
+      }
+    }
+    if (project.specs.panelBrandModel && project.specs.panelPowerW) {
+      const match = equipmentCatalog.find(
+        (it) => it.type === 'panel' && it.displayName === project.specs.panelBrandModel
+      );
+      if (match && match.powerW && match.powerW !== project.specs.panelPowerW) {
+        updateSpecs({ panelPowerW: match.powerW });
+      }
+    }
+  }, [project.specs.inverterBrandModel, project.specs.panelBrandModel, equipmentCatalog]);
+
   const handleSelectPanel = (item: SolarEquipmentItem) => {
     const suppliers = item.supplierPrices || [];
     const newSupplierInfo = { ...(project.specs.selectedSupplierInfo || {}) };

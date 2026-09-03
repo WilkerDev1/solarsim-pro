@@ -43,6 +43,7 @@ export interface DefaultSimulationSettings {
   defaultPanelPowerW: number;
   defaultPanelModel: string;
   defaultInverterPowerKW: number;
+  defaultInverterModel?: string;
   defaultSystemLosses: number;
   defaultAnnualDegradation: number;
   defaultAutoCalculatePanels: boolean;
