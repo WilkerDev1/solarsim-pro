@@ -1,4 +1,5 @@
 import { SimulationSlice, SyncAuthSlice } from '../types';
+import { ProjectSimulation } from '../../types';
 import { SyncService } from '../../services/syncService';
 
 let autoSyncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -146,6 +147,8 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
 
       // 2. Push: Subir cambios locales pendientes hacia el servidor
       const pendingProjects = currentProjects.filter((p) => p.syncStatus !== 'synced');
+      const pushedSnapshots = new Map(pendingProjects.map((p) => [p.id, p.updatedAt]));
+
       if (pendingProjects.length > 0) {
         const pushRes = await SyncService.pushProjects(serverUrl, authToken, pendingProjects);
         if (pushRes.success) {
@@ -180,23 +183,46 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
       let hasPendingRemaining = false;
 
       set((state) => {
-        // Combinar de manera segura: si un proyecto en el estado fresco de Zustand tiene syncStatus === 'pending'
-        // DEBEMOS PRESERVAR la versión local más reciente para no revertir cambios locales concurrentes (ej. adjuntos PDF)!
-        const mergedProjects = currentProjects.map((syncedP) => {
-          const freshLocal = state.projects.find((p) => p.id === syncedP.id);
-          if (freshLocal && freshLocal.syncStatus === 'pending') {
-            hasPendingRemaining = true;
-            return freshLocal;
-          }
-          return syncedP;
-        });
+        // Combinar de manera segura con el estado fresco de Zustand:
+        // - Si un proyecto fue editado localmente mientras el push estaba en vuelo (freshLocal.updatedAt !== pushedUpdatedAt),
+        //   se preserva la versión fresca local con status 'pending' para que se suba en el próximo ciclo.
+        // - Si no hubo ediciones concurrentes, se aplica la versión confirmada con syncStatus: 'synced'.
+        const syncedMap = new Map(currentProjects.map((p) => [p.id, p]));
+        const mergedProjects: ProjectSimulation[] = [];
 
-        // Preservar proyectos recién creados localmente durante el sync
-        const syncedIds = new Set(currentProjects.map((p) => p.id));
+        for (const syncedP of currentProjects) {
+          const freshLocal = state.projects.find((p) => p.id === syncedP.id);
+          if (freshLocal) {
+            const pushedUpdatedAt = pushedSnapshots.get(syncedP.id);
+            const wasModifiedConcurrently =
+              pushedUpdatedAt !== undefined &&
+              freshLocal.updatedAt !== undefined &&
+              freshLocal.updatedAt !== pushedUpdatedAt;
+
+            if (wasModifiedConcurrently) {
+              // Edición local concurrente en vuelo (ej. adjuntos de PDF mientras sincronizaba):
+              // Conservar versión local fresca con 'pending'
+              hasPendingRemaining = true;
+              mergedProjects.push(freshLocal);
+            } else {
+              // El push confirmó esta versión con éxito: marcar 'synced'
+              mergedProjects.push({
+                ...freshLocal,
+                id: syncedP.id,
+                version: syncedP.version || freshLocal.version || 1,
+                syncStatus: syncedP.syncStatus,
+              });
+            }
+          } else {
+            mergedProjects.push(syncedP);
+          }
+        }
+
+        // Preservar proyectos recién creados localmente durante el sync (que no estaban en currentProjects)
         for (const localP of state.projects) {
-          if (!syncedIds.has(localP.id)) {
+          if (!syncedMap.has(localP.id)) {
             mergedProjects.push(localP);
-            if (localP.syncStatus === 'pending') {
+            if (localP.syncStatus !== 'synced') {
               hasPendingRemaining = true;
             }
           }
