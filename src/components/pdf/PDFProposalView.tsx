@@ -3,6 +3,8 @@ import { useSimulationStore } from '../../store/useSimulationStore';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { PDFColorTheme, PDF_COLOR_THEMES } from '../../constants/pdfThemes';
+import { PDFMergeService } from '../../services/pdfMergeService';
+import { PDFAttachmentStorage } from '../../services/pdfAttachmentStorage';
 
 // Modular Page Components
 import { PDFSidebarControls } from './controls/PDFSidebarControls';
@@ -161,7 +163,31 @@ export const PDFProposalView: React.FC = () => {
       }
 
       const sanitizedClientName = (project.client.name || 'Cliente').replace(/[^a-zA-Z0-9_-]/g, '_');
-      pdf.save(`Propuesta_SolarSim_${sanitizedClientName}.pdf`);
+      const filename = `Propuesta_SolarSim_${sanitizedClientName}.pdf`;
+
+      // Comprobar si hay documentos externos adjuntos para fusionar
+      const enabledAttachments = project.customization?.attachedPdfs?.filter((att) => att.enabled) || [];
+
+      if (enabledAttachments.length > 0) {
+        const proposalBuffer = pdf.output('arraybuffer');
+        const attachmentsToMerge: { name: string; buffer: ArrayBuffer }[] = [];
+
+        for (const att of enabledAttachments) {
+          const buf = await PDFAttachmentStorage.getAttachment(att.id);
+          if (buf) {
+            attachmentsToMerge.push({ name: att.fileName, buffer: buf });
+          }
+        }
+
+        if (attachmentsToMerge.length > 0) {
+          const mergedBytes = await PDFMergeService.mergeProposalWithAttachments(proposalBuffer, attachmentsToMerge);
+          PDFMergeService.downloadPdfBytes(mergedBytes, filename);
+        } else {
+          pdf.save(filename);
+        }
+      } else {
+        pdf.save(filename);
+      }
     } catch (err) {
       console.error('Error generating multi-page PDF:', err);
       window.print();
@@ -356,6 +382,22 @@ export const PDFProposalView: React.FC = () => {
       });
       sectionIndex++;
       const pCount = typeof extra.pageCount === 'number' && extra.pageCount > 0 ? extra.pageCount : 1;
+      nextExtraPageNum += pCount;
+    }
+  });
+
+  // Append Attached External PDFs to Table of Contents
+  const attachedPdfs = project.customization?.attachedPdfs?.filter((att) => att.enabled !== false && att.addToTableOfContents !== false) || [];
+  attachedPdfs.forEach((att) => {
+    if (att.title && att.title.trim()) {
+      tocItems.push({
+        number: `${sectionIndex}`,
+        title: att.title.trim(),
+        subtitle: att.subtitle ? att.subtitle.trim() : `Ficha Técnica / Anexo Oficial (${att.fileName})`,
+        targetPage: nextExtraPageNum,
+      });
+      sectionIndex++;
+      const pCount = typeof att.pageCount === 'number' && att.pageCount > 0 ? att.pageCount : 1;
       nextExtraPageNum += pCount;
     }
   });

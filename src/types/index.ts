@@ -255,6 +255,21 @@ export interface DocumentCustomization {
 
   // Custom Extra Table of Contents Items (Appended Annexes / Extra Pages)
   extraTocItems?: ExtraTOCItem[];
+
+  // 📎 Documentos y Fichas Técnicas PDF Adjuntas para Fusión Automática
+  attachedPdfs?: AttachedPDFDocument[];
+}
+
+export interface AttachedPDFDocument {
+  id: string;                    // ID único (ej. 'att-1725370000000-xyz')
+  fileName: string;              // Nombre original del archivo (ej. 'Canadian_Solar_600W.pdf')
+  fileSize: number;              // Tamaño en bytes
+  pageCount: number;             // Cantidad exacta de páginas del documento PDF
+  title: string;                 // Título descriptivo (ej. 'Ficha Técnica Canadian Solar TOPBiHiKu6')
+  subtitle?: string;             // Subtema o descripción opcional
+  uploadedAt: string;            // Fecha de subida ISO
+  enabled: boolean;              // Si se fusionará al exportar la propuesta final
+  addToTableOfContents: boolean; // Si se reflejará correlativamente en el Índice de la propuesta
 }
 
 export interface ExtraTOCItem {

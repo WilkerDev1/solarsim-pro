@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { PDFColorTheme, PDF_COLOR_THEMES } from '../../../constants/pdfThemes';
 import { ProjectSimulation, DocumentCustomization, ExtraTOCItem } from '../../../types';
+import { PDFAttachmentsSection } from './PDFAttachmentsSection';
 
 interface PDFSectionTogglesProps {
   isDark: boolean;
@@ -719,6 +720,15 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
           </div>
         </div>
       </div>
+
+      <div className={`h-px w-full ${isDark ? 'bg-[#2a2a36]' : 'bg-slate-200'}`}></div>
+
+      {/* 4. ADJUNTAR Y FUSIONAR PDFS EXTERNOS (FICHAS TÉCNICAS / ANEXOS) */}
+      <PDFAttachmentsSection
+        isDark={isDark}
+        project={project}
+        updateDocumentCustomization={updateDocumentCustomization}
+      />
 
       <div className={`h-px w-full ${isDark ? 'bg-[#2a2a36]' : 'bg-slate-200'}`}></div>
 
