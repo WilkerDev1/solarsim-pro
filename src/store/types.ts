@@ -96,7 +96,11 @@ export interface ProjectSlice {
   updateAllMonthlyConsumption: (value: number) => void;
   setMonthlyConsumption: (monthlyConsumption: number[], lockAutoPanels?: boolean) => void;
   updateDocumentCustomization: (customization: Partial<DocumentCustomization>) => void;
-  applySupplierPriceToProject: (equipmentType: 'panel' | 'inverter' | 'battery', supplierPrice: import('../types/equipment').EquipmentSupplierPrice) => void;
+  applySupplierPriceToProject: (
+    equipmentType: 'panel' | 'inverter' | 'battery',
+    supplierPrice: import('../types/equipment').EquipmentSupplierPrice,
+    equipmentItem?: import('../types/equipment').SolarEquipmentItem
+  ) => void;
 
   getActiveProject: () => ProjectSimulation;
   getFinancialSummary: () => FinancialSummaryResult;

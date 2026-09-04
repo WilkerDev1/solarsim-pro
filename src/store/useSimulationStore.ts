@@ -84,6 +84,23 @@ export const useSimulationStore = create<SimulationStore>()(
                 },
               };
             }
+            if (
+              updated.specs?.batteryBrandModel &&
+              (updated.specs.batteryBrandModel.toLowerCase().includes('hinaess') ||
+                updated.specs.batteryBrandModel.toLowerCase().includes('powergem') ||
+                updated.specs.batteryBrandModel.toLowerCase().includes('banco de baterías de litio')) &&
+              updated.specs.batteryBrandModel !== 'Batería Hinaess 16 KwH-48 vdc.'
+            ) {
+              hasChanges = true;
+              updated = {
+                ...updated,
+                specs: {
+                  ...updated.specs,
+                  batteryBrandModel: 'Batería Hinaess 16 KwH-48 vdc.',
+                  batteryCapacityKWh: updated.specs.batteryCapacityKWh || 16.08,
+                },
+              };
+            }
             return updated;
           });
           if (hasChanges) {

@@ -106,8 +106,39 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
 
   const matchingItem = useMemo(() => {
     if (!selectedValue) return null;
-    return (items || []).find((item) => item.type === type && item.displayName === selectedValue);
-  }, [items, type, selectedValue]);
+    const exact = (items || []).find((item) => item.type === type && item.displayName === selectedValue);
+    if (exact) return exact;
+
+    const norm = selectedValue.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const byNorm = (items || []).find((item) => {
+      if (item.type !== type) return false;
+      const normItem = item.displayName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return normItem === norm || normItem.includes(norm) || norm.includes(normItem);
+    });
+    if (byNorm) return byNorm;
+
+    if (type === 'battery' && (norm.includes('hina') || norm.includes('powergem'))) {
+      const hina = (items || []).find(
+        (item) => item.type === 'battery' && (item.brand.toLowerCase().includes('hina') || item.displayName.toLowerCase().includes('hina'))
+      );
+      if (hina) return hina;
+    }
+
+    if (selectedPower && selectedPower > 0) {
+      if (type === 'battery') {
+        const byCap = (items || []).find((item) => item.type === 'battery' && item.capacityKWh && Math.abs(item.capacityKWh - selectedPower) <= 0.5);
+        if (byCap) return byCap;
+      } else if (type === 'panel') {
+        const byW = (items || []).find((item) => item.type === 'panel' && item.powerW && Math.abs(item.powerW - selectedPower) <= 5);
+        if (byW) return byW;
+      } else if (type === 'inverter') {
+        const byKW = (items || []).find((item) => item.type === 'inverter' && item.powerKW && Math.abs(item.powerKW - selectedPower) <= 0.5);
+        if (byKW) return byKW;
+      }
+    }
+
+    return null;
+  }, [items, type, selectedValue, selectedPower]);
 
   const effectivePower = useMemo(() => {
     if (matchingItem) {

@@ -199,6 +199,61 @@ console.log(' ✅ PASS: Acción "create_new" permite coexistencia de ambos ítem
 // Limpiar el item independiente de prueba
 store.removeEquipmentItem(independentItem.id);
 
+// --- TEST 5: Apply Supplier Price to Project for Battery (Model & Feedback Sync) ---
+console.log('--- TEST 5: Apply Battery Supplier Price to Project (Sync Model & Selected Info) ---');
+const hinaessItem = useSimulationStore.getState().equipmentCatalog.find((e) => e.id === 'eq-bat-hinaess-16k')!;
+
+const testSupplierPrice = {
+  id: 'sp-test-yake-1990',
+  supplierName: 'YAKE POWER',
+  priceUSD: 1990.0,
+  updatedAt: new Date().toISOString(),
+  stockStatus: 'in_stock' as const,
+  source: 'manual' as const,
+};
+
+// Agregar precio de proveedor al equipo
+store.addOrUpdateSupplierPrice(hinaessItem.id, testSupplierPrice);
+
+// Crear un proyecto activo de prueba para verificar la aplicación
+store.createNewProject({ name: 'Proyecto de Prueba Catálogo Batería' });
+
+// Simular que el proyecto activo tenía un nombre legado de batería
+store.updateSpecs({
+  batteryBrandModel: 'Banco de Baterías de Litio HinaESS PowerGem Max 16.08kWh',
+  hasBattery: true,
+});
+
+// Aplicar el precio del proveedor al proyecto activo pasando el item
+store.applySupplierPriceToProject('battery', testSupplierPrice, hinaessItem);
+
+const activeProject = useSimulationStore.getState().getActiveProject();
+
+console.log(`Battery Model in Project: "${activeProject.specs.batteryBrandModel}"`);
+console.log(`Battery Unit Price in Project: $${activeProject.specs.batteryUnitPriceUSD}`);
+console.log('Battery Supplier Info in Project:', activeProject.specs.selectedSupplierInfo?.battery);
+
+if (activeProject.specs.batteryUnitPriceUSD !== 1990) {
+  throw new Error(`❌ Expected batteryUnitPriceUSD to be 1990, got ${activeProject.specs.batteryUnitPriceUSD}`);
+}
+
+if (activeProject.specs.batteryBrandModel !== hinaessItem.displayName) {
+  throw new Error(`❌ Expected batteryBrandModel to be synchronized to "${hinaessItem.displayName}", got "${activeProject.specs.batteryBrandModel}"`);
+}
+
+if (activeProject.specs.selectedSupplierInfo?.battery?.supplierName !== 'YAKE POWER') {
+  throw new Error(`❌ Expected selectedSupplierInfo.battery.supplierName to be "YAKE POWER", got "${activeProject.specs.selectedSupplierInfo?.battery?.supplierName}"`);
+}
+
+if (activeProject.specs.selectedSupplierInfo?.battery?.supplierPriceId !== 'sp-test-yake-1990') {
+  throw new Error(`❌ Expected supplierPriceId to match "sp-test-yake-1990"`);
+}
+
+// Limpiar el precio de prueba y el proyecto
+store.removeSupplierPrice(hinaessItem.id, testSupplierPrice.id);
+store.deleteProject(activeProject.id);
+console.log(' ✅ PASS: Precio de proveedor de batería aplicado y sincronizado correctamente con modelo y feedback visual\n');
+
 console.log('=====================================================');
 console.log('🎉 ALL EQUIPMENT CATALOG TESTS PASSED (100% SUCCESS)');
 console.log('=====================================================\n');

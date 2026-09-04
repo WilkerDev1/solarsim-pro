@@ -1,5 +1,6 @@
 import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs } from '../../../types';
+import { SolarEquipmentItem, EquipmentSupplierPrice } from '../../../types/equipment';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { DollarSign, ChevronDown, Sliders, Tag, Sparkles, Building2, Check, RefreshCw } from 'lucide-react';
 
@@ -22,50 +23,125 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
 }) => {
   const { equipmentCatalog, openSupplierPriceModal } = useSimulationStore();
 
-  const selectedPanel = equipmentCatalog.find(
-    (e) => e.type === 'panel' && e.displayName === project.specs.panelBrandModel
+  // Helper resiliente para resolver el equipo del catálogo asociado al proyecto
+  const resolveEquipment = (
+    type: 'panel' | 'inverter' | 'battery',
+    modelName?: string,
+    powerOrCap?: number,
+    supplierPriceId?: string
+  ): SolarEquipmentItem | undefined => {
+    if (!equipmentCatalog || equipmentCatalog.length === 0) return undefined;
+
+    // 1. Coincidencia exacta por displayName
+    if (modelName) {
+      const exact = equipmentCatalog.find((e) => e.type === type && e.displayName === modelName);
+      if (exact) return exact;
+    }
+
+    // 2. Coincidencia por supplierPriceId asignado al proyecto
+    if (supplierPriceId) {
+      const byPrice = equipmentCatalog.find(
+        (e) => e.type === type && e.supplierPrices?.some((sp) => sp.id === supplierPriceId)
+      );
+      if (byPrice) return byPrice;
+    }
+
+    // 3. Coincidencia normalizada sin caracteres especiales
+    if (modelName) {
+      const normModel = modelName.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const byNorm = equipmentCatalog.find((e) => {
+        if (e.type !== type) return false;
+        const normE = e.displayName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        return normE === normModel || normE.includes(normModel) || normModel.includes(normE);
+      });
+      if (byNorm) return byNorm;
+
+      // Especial para Baterías: "HinaESS" o "PowerGem"
+      if (type === 'battery' && (normModel.includes('hina') || normModel.includes('powergem'))) {
+        const hinaMatch = equipmentCatalog.find(
+          (e) => e.type === 'battery' && (e.brand.toLowerCase().includes('hina') || e.displayName.toLowerCase().includes('hina'))
+        );
+        if (hinaMatch) return hinaMatch;
+      }
+    }
+
+    // 4. Coincidencia por especificación técnica (W / kW / kWh)
+    if (powerOrCap && powerOrCap > 0) {
+      if (type === 'battery') {
+        const byCap = equipmentCatalog.find(
+          (e) => e.type === 'battery' && e.capacityKWh && Math.abs(e.capacityKWh - powerOrCap) <= 0.5
+        );
+        if (byCap) return byCap;
+      } else if (type === 'panel') {
+        const byPower = equipmentCatalog.find(
+          (e) => e.type === 'panel' && e.powerW && Math.abs(e.powerW - powerOrCap) <= 5
+        );
+        if (byPower) return byPower;
+      } else if (type === 'inverter') {
+        const byPower = equipmentCatalog.find(
+          (e) => e.type === 'inverter' && e.powerKW && Math.abs(e.powerKW - powerOrCap) <= 0.5
+        );
+        if (byPower) return byPower;
+      }
+    }
+
+    // 5. Fallback al primer equipo disponible del catálogo para este tipo
+    return equipmentCatalog.find((e) => e.type === type);
+  };
+
+  const selectedPanel = resolveEquipment(
+    'panel',
+    project.specs.panelBrandModel,
+    project.specs.panelPowerW,
+    project.specs.selectedSupplierInfo?.panel?.supplierPriceId
   );
-  const selectedInverter = equipmentCatalog.find(
-    (e) => e.type === 'inverter' && e.displayName === project.specs.inverterBrandModel
+  const selectedInverter = resolveEquipment(
+    'inverter',
+    project.specs.inverterBrandModel,
+    project.specs.inverterPowerKW,
+    project.specs.selectedSupplierInfo?.inverter?.supplierPriceId
   );
-  const selectedBattery = equipmentCatalog.find(
-    (e) => e.type === 'battery' && e.displayName === project.specs.batteryBrandModel
+  const selectedBattery = resolveEquipment(
+    'battery',
+    project.specs.batteryBrandModel,
+    project.specs.batteryCapacityKWh,
+    project.specs.selectedSupplierInfo?.battery?.supplierPriceId
   );
 
   const panelSuppliersCount = selectedPanel?.supplierPrices?.length || 0;
-  const bestPanelPrice = panelSuppliersCount > 0 ? Math.min(...selectedPanel!.supplierPrices!.map((s) => s.priceUSD)) : null;
+  const bestPanelPrice = panelSuppliersCount > 0 ? Math.min(...selectedPanel!.supplierPrices!.map((s: EquipmentSupplierPrice) => s.priceUSD)) : null;
 
   const inverterSuppliersCount = selectedInverter?.supplierPrices?.length || 0;
-  const bestInverterPrice = inverterSuppliersCount > 0 ? Math.min(...selectedInverter!.supplierPrices!.map((s) => s.priceUSD)) : null;
+  const bestInverterPrice = inverterSuppliersCount > 0 ? Math.min(...selectedInverter!.supplierPrices!.map((s: EquipmentSupplierPrice) => s.priceUSD)) : null;
 
   const batterySuppliersCount = selectedBattery?.supplierPrices?.length || 0;
-  const bestBatteryPrice = batterySuppliersCount > 0 ? Math.min(...selectedBattery!.supplierPrices!.map((s) => s.priceUSD)) : null;
+  const bestBatteryPrice = batterySuppliersCount > 0 ? Math.min(...selectedBattery!.supplierPrices!.map((s: EquipmentSupplierPrice) => s.priceUSD)) : null;
 
   const hasAnySupplierPrices = panelSuppliersCount > 0 || inverterSuppliersCount > 0 || (project.specs.hasBattery && batterySuppliersCount > 0);
 
-  // 🏷️ Verificar correspondencia estricta: el proveedor asignado debe existir para el equipo actualmente seleccionado
+  // 🏷️ Verificar correspondencia: el proveedor asignado debe existir en el catálogo
   const panelSupplierMatches = !!selectedPanel?.supplierPrices?.some(
-    (sp) =>
+    (sp: EquipmentSupplierPrice) =>
       (project.specs.selectedSupplierInfo?.panel?.supplierPriceId && sp.id === project.specs.selectedSupplierInfo.panel.supplierPriceId) ||
       (project.specs.selectedSupplierInfo?.panel?.supplierName &&
         sp.supplierName.toLowerCase().trim() === project.specs.selectedSupplierInfo.panel.supplierName.toLowerCase().trim())
   );
 
   const inverterSupplierMatches = !!selectedInverter?.supplierPrices?.some(
-    (sp) =>
+    (sp: EquipmentSupplierPrice) =>
       (project.specs.selectedSupplierInfo?.inverter?.supplierPriceId && sp.id === project.specs.selectedSupplierInfo.inverter.supplierPriceId) ||
       (project.specs.selectedSupplierInfo?.inverter?.supplierName &&
         sp.supplierName.toLowerCase().trim() === project.specs.selectedSupplierInfo.inverter.supplierName.toLowerCase().trim())
   );
 
   const batterySupplierMatches = !!selectedBattery?.supplierPrices?.some(
-    (sp) =>
+    (sp: EquipmentSupplierPrice) =>
       (project.specs.selectedSupplierInfo?.battery?.supplierPriceId && sp.id === project.specs.selectedSupplierInfo.battery.supplierPriceId) ||
       (project.specs.selectedSupplierInfo?.battery?.supplierName &&
         sp.supplierName.toLowerCase().trim() === project.specs.selectedSupplierInfo.battery.supplierName.toLowerCase().trim())
   );
 
-  // Limpieza automática de proveedores huérfanos/obsoletos si el equipo cambió de modelo
+  // Limpieza protectora de proveedores huérfanos solo si el proveedor no existe en ningún equipo del catálogo
   React.useEffect(() => {
     const info = project.specs.selectedSupplierInfo;
     if (!info) return;
@@ -74,16 +150,40 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
     const cleanedInfo = { ...info };
 
     if (info.panel && !panelSupplierMatches) {
-      delete cleanedInfo.panel;
-      needsCleanup = true;
+      const existsInCatalog = equipmentCatalog.some((e) =>
+        e.type === 'panel' && e.supplierPrices?.some((sp) =>
+          (info.panel?.supplierPriceId && sp.id === info.panel.supplierPriceId) ||
+          (info.panel?.supplierName && sp.supplierName.toLowerCase().trim() === info.panel.supplierName.toLowerCase().trim())
+        )
+      );
+      if (!existsInCatalog) {
+        delete cleanedInfo.panel;
+        needsCleanup = true;
+      }
     }
     if (info.inverter && !inverterSupplierMatches) {
-      delete cleanedInfo.inverter;
-      needsCleanup = true;
+      const existsInCatalog = equipmentCatalog.some((e) =>
+        e.type === 'inverter' && e.supplierPrices?.some((sp) =>
+          (info.inverter?.supplierPriceId && sp.id === info.inverter.supplierPriceId) ||
+          (info.inverter?.supplierName && sp.supplierName.toLowerCase().trim() === info.inverter.supplierName.toLowerCase().trim())
+        )
+      );
+      if (!existsInCatalog) {
+        delete cleanedInfo.inverter;
+        needsCleanup = true;
+      }
     }
     if (info.battery && !batterySupplierMatches) {
-      delete cleanedInfo.battery;
-      needsCleanup = true;
+      const existsInCatalog = equipmentCatalog.some((e) =>
+        e.type === 'battery' && e.supplierPrices?.some((sp) =>
+          (info.battery?.supplierPriceId && sp.id === info.battery.supplierPriceId) ||
+          (info.battery?.supplierName && sp.supplierName.toLowerCase().trim() === info.battery.supplierName.toLowerCase().trim())
+        )
+      );
+      if (!existsInCatalog) {
+        delete cleanedInfo.battery;
+        needsCleanup = true;
+      }
     }
 
     if (needsCleanup) {
@@ -97,6 +197,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
     panelSupplierMatches,
     inverterSupplierMatches,
     batterySupplierMatches,
+    equipmentCatalog,
   ]);
 
   const handleSyncAllWithBestSupplierPrices = () => {
@@ -582,8 +683,8 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                           : 'bg-slate-50 border-slate-300 text-slate-900'
                       }`}
                     />
-                    {panelSupplierMatches && project.specs.selectedSupplierInfo?.panel && (
-                      <span className="text-[9.5px] text-emerald-400 font-semibold block mt-0.5 truncate">
+                    {project.specs.selectedSupplierInfo?.panel && (
+                      <span className="text-[9.5px] text-emerald-400 font-semibold block mt-0.5 truncate" title={`Proveedor: ${project.specs.selectedSupplierInfo.panel.supplierName} ($${project.specs.selectedSupplierInfo.panel.priceUSD} USD)`}>
                         🏷️ {project.specs.selectedSupplierInfo.panel.supplierName}
                       </span>
                     )}
@@ -626,8 +727,8 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                           : 'bg-slate-50 border-slate-300 text-slate-900'
                       }`}
                     />
-                    {inverterSupplierMatches && project.specs.selectedSupplierInfo?.inverter && (
-                      <span className="text-[9.5px] text-emerald-400 font-semibold block mt-0.5 truncate">
+                    {project.specs.selectedSupplierInfo?.inverter && (
+                      <span className="text-[9.5px] text-emerald-400 font-semibold block mt-0.5 truncate" title={`Proveedor: ${project.specs.selectedSupplierInfo.inverter.supplierName} ($${project.specs.selectedSupplierInfo.inverter.priceUSD} USD)`}>
                         🏷️ {project.specs.selectedSupplierInfo.inverter.supplierName}
                       </span>
                     )}
@@ -673,8 +774,8 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                             : 'bg-slate-50 border-slate-300 text-slate-900'
                         }`}
                       />
-                      {batterySupplierMatches && project.specs.selectedSupplierInfo?.battery && (
-                        <span className="text-[9.5px] text-emerald-400 font-semibold block mt-0.5 truncate">
+                      {project.specs.selectedSupplierInfo?.battery && (
+                        <span className="text-[9.5px] text-emerald-400 font-semibold block mt-0.5 truncate" title={`Proveedor: ${project.specs.selectedSupplierInfo.battery.supplierName} ($${project.specs.selectedSupplierInfo.battery.priceUSD} USD)`}>
                           🏷️ {project.specs.selectedSupplierInfo.battery.supplierName}
                         </span>
                       )}

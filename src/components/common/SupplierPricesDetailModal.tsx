@@ -56,14 +56,21 @@ export const SupplierPricesDetailModal: React.FC = () => {
 
   if (!item) return null;
 
-  const project = getActiveProject();
+  const projects = useSimulationStore((s) => s.projects);
+  const activeProjectId = useSimulationStore((s) => s.activeProjectId);
+  const project = useMemo(() => {
+    return projects.find((p) => p.id === activeProjectId && !p.isDeleted) || projects[0];
+  }, [projects, activeProjectId]);
+
   const selectedSupplierInfo = project?.specs?.selectedSupplierInfo;
-  const currentAppliedSupplierId =
+  const currentAppliedSupplier =
     item.type === 'panel'
-      ? selectedSupplierInfo?.panel?.supplierPriceId
+      ? selectedSupplierInfo?.panel
       : item.type === 'inverter'
-      ? selectedSupplierInfo?.inverter?.supplierPriceId
-      : selectedSupplierInfo?.battery?.supplierPriceId;
+      ? selectedSupplierInfo?.inverter
+      : selectedSupplierInfo?.battery;
+
+  const currentAppliedSupplierId = currentAppliedSupplier?.supplierPriceId;
 
   const supplierPrices: EquipmentSupplierPrice[] = Array.isArray(item.supplierPrices) ? item.supplierPrices : [];
 
@@ -109,7 +116,7 @@ export const SupplierPricesDetailModal: React.FC = () => {
   };
 
   const handleApplyToProject = (sp: EquipmentSupplierPrice) => {
-    applySupplierPriceToProject(item.type, sp);
+    applySupplierPriceToProject(item.type, sp, item);
   };
 
   const renderIcon = () => {
@@ -360,7 +367,11 @@ export const SupplierPricesDetailModal: React.FC = () => {
             <div className="space-y-2.5">
               {supplierPrices.map((sp) => {
                 const isLowest = sp.priceUSD === lowestPrice;
-                const isApplied = currentAppliedSupplierId === sp.id;
+                const isApplied =
+                  (currentAppliedSupplierId && currentAppliedSupplierId === sp.id) ||
+                  (currentAppliedSupplier?.supplierName &&
+                    currentAppliedSupplier.supplierName.toLowerCase().trim() === sp.supplierName.toLowerCase().trim() &&
+                    Math.abs((currentAppliedSupplier.priceUSD || 0) - sp.priceUSD) < 0.01);
                 const formattedDate = new Date(sp.updatedAt).toLocaleDateString('es-DO', {
                   day: '2-digit',
                   month: 'short',

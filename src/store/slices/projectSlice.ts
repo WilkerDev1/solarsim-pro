@@ -584,15 +584,25 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     get().triggerAutoSync(false);
   },
 
-  applySupplierPriceToProject: (equipmentType, supplierPrice) => {
+  applySupplierPriceToProject: (equipmentType, supplierPrice, equipmentItem) => {
     set((state) => ({
       projects: state.projects.map((p) => {
         if (p.id === state.activeProjectId) {
           const updatedSpecs = { ...p.specs };
           const selectedSupplierInfo = { ...(updatedSpecs.selectedSupplierInfo || {}) };
 
+          // Si no se pasó equipmentItem explícito, buscarlo en equipmentCatalog por supplierPrice.id
+          const targetItem = equipmentItem || state.equipmentCatalog.find(
+            (e) => e.type === equipmentType && e.supplierPrices?.some((sp) => sp.id === supplierPrice.id)
+          );
+
           if (equipmentType === 'panel') {
             updatedSpecs.panelUnitPriceUSD = supplierPrice.priceUSD;
+            if (targetItem) {
+              updatedSpecs.panelBrandModel = targetItem.displayName;
+              if (targetItem.powerW) updatedSpecs.panelPowerW = targetItem.powerW;
+              if (targetItem.efficiencyPct) updatedSpecs.panelEfficiency = targetItem.efficiencyPct;
+            }
             selectedSupplierInfo.panel = {
               supplierName: supplierPrice.supplierName,
               priceUSD: supplierPrice.priceUSD,
@@ -601,6 +611,10 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
             };
           } else if (equipmentType === 'inverter') {
             updatedSpecs.inverterUnitPriceUSD = supplierPrice.priceUSD;
+            if (targetItem) {
+              updatedSpecs.inverterBrandModel = targetItem.displayName;
+              if (targetItem.powerKW) updatedSpecs.inverterPowerKW = targetItem.powerKW;
+            }
             selectedSupplierInfo.inverter = {
               supplierName: supplierPrice.supplierName,
               priceUSD: supplierPrice.priceUSD,
@@ -609,6 +623,13 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
             };
           } else if (equipmentType === 'battery') {
             updatedSpecs.batteryUnitPriceUSD = supplierPrice.priceUSD;
+            updatedSpecs.hasBattery = true;
+            if (targetItem) {
+              updatedSpecs.batteryBrandModel = targetItem.displayName;
+              if (targetItem.capacityKWh) updatedSpecs.batteryCapacityKWh = targetItem.capacityKWh;
+              if (targetItem.dodPct) updatedSpecs.batteryDOD = targetItem.dodPct;
+              if (targetItem.batteryEfficiencyPct) updatedSpecs.batteryEfficiencyPct = targetItem.batteryEfficiencyPct;
+            }
             selectedSupplierInfo.battery = {
               supplierName: supplierPrice.supplierName,
               priceUSD: supplierPrice.priceUSD,

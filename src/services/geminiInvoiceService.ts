@@ -82,7 +82,7 @@ REGLAS DE EXTRACCIÓN DETALLADAS PARA FACTURAS DOMINICANAS (EDEESTE, EDESUR, EDE
    d) BATERÍAS BESS (ALMACENAMIENTO):
       - Si se solicitan baterías (ej. '2 bateria hinaes de 16kw' o '2 bateria de 16k weco'):
         * hasBattery = true
-        * matchedBatteryModel = modelo del catálogo (ej. 'Banco de Baterías de Litio HinaESS PowerGem Max 16.08kWh')
+        * matchedBatteryModel = modelo del catálogo (ej. 'Batería Hinaess 16 KwH-48 vdc.')
         * matchedBatteryId = id del catálogo
         * matchedBatteryCapacityKWh = 16.08 (o la capacidad nominal en kWh)
         * matchedBatteryCount = 2
@@ -679,8 +679,23 @@ export async function parseInvoiceWithGemini(params: {
       selectedBatteryModel = batMatch.displayName;
       selectedBatteryCapacityKWh = batMatch.capacityKWh || parsed.matchedBatteryCapacityKWh || 16.08;
     } else {
-      selectedBatteryModel = parsed.matchedBatteryModel || 'Banco de Baterías de Litio LiFePO4';
-      selectedBatteryCapacityKWh = parsed.matchedBatteryCapacityKWh || 16.08;
+      const smartBat = equipmentCatalog.find((e) => {
+        if (e.type !== 'battery') return false;
+        const req = (parsed.matchedBatteryModel || '').toLowerCase();
+        if ((req.includes('hina') || req.includes('powergem')) && e.brand.toLowerCase().includes('hina')) return true;
+        if (req.includes('weco') && e.brand.toLowerCase().includes('weco')) return true;
+        if (parsed.matchedBatteryCapacityKWh && e.capacityKWh && Math.abs(e.capacityKWh - parsed.matchedBatteryCapacityKWh) <= 0.5) return true;
+        return false;
+      }) || equipmentCatalog.find((e) => e.type === 'battery');
+
+      if (smartBat) {
+        selectedBatteryId = smartBat.id;
+        selectedBatteryModel = smartBat.displayName;
+        selectedBatteryCapacityKWh = smartBat.capacityKWh || parsed.matchedBatteryCapacityKWh || 16.08;
+      } else {
+        selectedBatteryModel = parsed.matchedBatteryModel || 'Batería Hinaess 16 KwH-48 vdc.';
+        selectedBatteryCapacityKWh = parsed.matchedBatteryCapacityKWh || 16.08;
+      }
     }
     selectedBatteryCount = parsed.matchedBatteryCount || 1;
   }

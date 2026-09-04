@@ -93,7 +93,17 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
             inverterCount: data.selectedInverterCount || Math.max(1, Math.ceil((count * panelW) / 8000)),
             inverterUnitPriceUSD: data.selectedInverterUnitPriceUSD ?? BENCHMARK_PROJECT.specs.inverterUnitPriceUSD,
             hasBattery: data.hasBattery ?? false,
-            batteryBrandModel: data.selectedBatteryModel ?? BENCHMARK_PROJECT.specs.batteryBrandModel,
+            batteryBrandModel: (() => {
+              if (!data.selectedBatteryModel) return BENCHMARK_PROJECT.specs.batteryBrandModel;
+              const cat = get().equipmentCatalog || [];
+              const match = cat.find((e) => e.type === 'battery' && (
+                e.displayName === data.selectedBatteryModel ||
+                e.modelSeries === data.selectedBatteryModel ||
+                ((e.brand.toLowerCase().includes('hina') || e.displayName.toLowerCase().includes('hina')) &&
+                 (data.selectedBatteryModel!.toLowerCase().includes('hina') || data.selectedBatteryModel!.toLowerCase().includes('powergem')))
+              ));
+              return match ? match.displayName : data.selectedBatteryModel;
+            })(),
             batteryCapacityKWh: data.selectedBatteryCapacityKWh ?? BENCHMARK_PROJECT.specs.batteryCapacityKWh,
             batteryCount: data.selectedBatteryCount ?? (data.hasBattery ? 1 : 0),
             batteryUnitPriceUSD: data.selectedBatteryUnitPriceUSD ?? BENCHMARK_PROJECT.specs.batteryUnitPriceUSD,
@@ -176,7 +186,18 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
               ...(data.selectedInverterCount ? { inverterCount: data.selectedInverterCount } : {}),
               ...(data.selectedInverterUnitPriceUSD !== undefined ? { inverterUnitPriceUSD: data.selectedInverterUnitPriceUSD } : {}),
               ...(data.hasBattery !== undefined ? { hasBattery: data.hasBattery } : {}),
-              ...(data.selectedBatteryModel ? { batteryBrandModel: data.selectedBatteryModel } : {}),
+              ...(data.selectedBatteryModel ? {
+                batteryBrandModel: (() => {
+                  const cat = get().equipmentCatalog || [];
+                  const match = cat.find((e) => e.type === 'battery' && (
+                    e.displayName === data.selectedBatteryModel ||
+                    e.modelSeries === data.selectedBatteryModel ||
+                    ((e.brand.toLowerCase().includes('hina') || e.displayName.toLowerCase().includes('hina')) &&
+                     (data.selectedBatteryModel!.toLowerCase().includes('hina') || data.selectedBatteryModel!.toLowerCase().includes('powergem')))
+                  ));
+                  return match ? match.displayName : data.selectedBatteryModel;
+                })(),
+              } : {}),
               ...(data.selectedBatteryCapacityKWh ? { batteryCapacityKWh: data.selectedBatteryCapacityKWh } : {}),
               ...(data.selectedBatteryCount !== undefined ? { batteryCount: data.selectedBatteryCount } : {}),
               ...(data.selectedBatteryUnitPriceUSD !== undefined ? { batteryUnitPriceUSD: data.selectedBatteryUnitPriceUSD } : {}),
