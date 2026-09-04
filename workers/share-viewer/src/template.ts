@@ -293,6 +293,25 @@ export function renderProposalPage(stored: StoredProposal): string {
       --sky-blue-bg: #f0f7fc;
     }
 
+    /* Mobile touch scrolling & custom slim scrollbars for responsive tables */
+    .overflow-x-auto {
+      -webkit-overflow-scrolling: touch;
+    }
+    .overflow-x-auto::-webkit-scrollbar {
+      height: 5px;
+    }
+    .overflow-x-auto::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 4px;
+    }
+    .overflow-x-auto::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
     @media print {
       body { background-color: #ffffff !important; }
       .no-print { display: none !important; }
@@ -301,176 +320,186 @@ export function renderProposalPage(stored: StoredProposal): string {
     }
   </style>
 </head>
-<body class="min-h-full flex flex-col pb-28 bg-[#f0f7fc] text-slate-800">
+<body class="min-h-full flex flex-col pb-8 sm:pb-12 bg-[#f0f7fc] text-slate-800">
 
   <!-- Document Master Container (Executive Dossier Layout) -->
-  <div class="max-w-4xl mx-auto w-full px-4 sm:px-6 pt-6 space-y-6">
+  <div class="max-w-4xl mx-auto w-full px-3 sm:px-6 pt-4 sm:pt-6 space-y-4 sm:space-y-6">
 
     <!-- 1. OFFICIAL COMPANY HEADER & DOCUMENT BANNER -->
-    <header class="bg-white border border-sky-100 rounded-3xl p-6 sm:p-8 shadow-sm relative overflow-hidden">
+    <header class="bg-white border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm relative overflow-hidden">
       <!-- Decorative Brand Top Border Strip -->
       <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-sky-500 via-orange-500 to-amber-400"></div>
 
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-6 border-b border-slate-100">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6 pb-4 sm:pb-6 border-b border-slate-100">
         <!-- Company Identity & Official Logo -->
         <div class="flex items-center">
-          <img src="${logoBase64}" alt="${companyName}" class="h-16 sm:h-20 max-h-[85px] w-auto max-w-[320px] object-contain drop-shadow-sm" />
+          <img src="${logoBase64}" alt="${companyName}" class="h-12 sm:h-20 max-h-[58px] sm:max-h-[85px] w-auto max-w-[220px] sm:max-w-[320px] object-contain drop-shadow-sm" />
         </div>
 
         <!-- Validity & Quick Print Action -->
-        <div class="flex items-center gap-3 self-start sm:self-auto">
-          <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-sky-50 border border-sky-200 text-sky-800 text-xs font-bold">
+        <div class="flex items-center justify-between sm:justify-end gap-2.5 sm:gap-3 w-full sm:w-auto">
+          <div class="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-sky-50 border border-sky-200 text-sky-800 text-[11px] sm:text-xs font-bold">
             <span class="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
             <span>Válido por ${quoteValidityDays} Días</span>
           </div>
-          <button onclick="window.print()" class="no-print p-2 rounded-xl border border-sky-200 bg-sky-50/60 hover:bg-sky-100 text-sky-700 transition-all shadow-xs" title="Imprimir o Guardar PDF">
+          <button onclick="window.print()" class="no-print p-2 rounded-xl border border-sky-200 bg-sky-50/60 hover:bg-sky-100 text-sky-700 transition-all shadow-xs shrink-0 cursor-pointer" title="Imprimir o Guardar PDF">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
           </button>
         </div>
       </div>
 
       <!-- Project Metadata Grid (Dual Column Corporate Format) -->
-      <div class="pt-6 grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-slate-700">
-        <div class="space-y-1.5">
-          <div class="text-[11px] font-black uppercase text-sky-700 tracking-wider flex items-center gap-1.5">
+      <div class="pt-4 sm:pt-6 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-6 text-xs text-slate-700">
+        <div class="bg-sky-50/40 md:bg-transparent p-3 sm:p-0 rounded-xl md:rounded-none border md:border-0 border-sky-100 space-y-1.5">
+          <div class="text-[10.5px] sm:text-[11px] font-black uppercase text-sky-700 tracking-wider flex items-center gap-1.5">
             <span class="w-1.5 h-1.5 rounded-full bg-orange-500"></span> Datos del Cliente
           </div>
-          <div><span class="font-bold text-slate-500">Cliente:</span> <span class="font-black text-slate-950 text-sm">${clientName}</span></div>
-          <div><span class="font-bold text-slate-500">Contacto:</span> <span class="font-semibold text-slate-800">${contactName}</span></div>
-          <div><span class="font-bold text-slate-500">Teléfono:</span> <span class="font-semibold text-slate-800">${clientPhone}</span></div>
-          <div><span class="font-bold text-slate-500">Ubicación:</span> <span class="font-semibold text-slate-800">${clientAddress}${client.solarSourceMode === 'gps' && client.coordinates ? ` <span class="text-[10px] font-mono text-sky-700 font-bold bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">🛰️ GPS NASA: ${client.coordinates}</span>` : ''}</span></div>
+          <div class="flex flex-wrap items-baseline gap-1"><span class="font-bold text-slate-500">Cliente:</span> <span class="font-black text-slate-950 text-xs sm:text-sm">${clientName}</span></div>
+          <div class="flex flex-wrap items-baseline gap-1"><span class="font-bold text-slate-500">Contacto:</span> <span class="font-semibold text-slate-800">${contactName}</span></div>
+          <div class="flex flex-wrap items-baseline gap-1"><span class="font-bold text-slate-500">Teléfono:</span> <span class="font-semibold text-slate-800">${clientPhone}</span></div>
+          <div class="flex flex-wrap items-baseline gap-1"><span class="font-bold text-slate-500">Ubicación:</span> <span class="font-semibold text-slate-800">${clientAddress}${client.solarSourceMode === 'gps' && client.coordinates ? ` <span class="text-[10px] font-mono text-sky-700 font-bold bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">🛰️ GPS NASA: ${client.coordinates}</span>` : ''}</span></div>
         </div>
-        <div class="space-y-1.5 md:text-right">
-          <div class="text-[11px] font-black uppercase text-orange-600 tracking-wider flex items-center justify-start md:justify-end gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span> Detalles de la Cotización</div>
-          <div><span class="font-bold text-slate-500">N° Cotización:</span> <span class="font-mono font-bold text-slate-950">${quoteNumber}</span></div>
-          <div><span class="font-bold text-slate-500">ID Proyecto:</span> <span class="font-mono font-bold text-slate-950">${projectId}</span></div>
-          <div><span class="font-bold text-slate-500">Distribuidora / Tarifa:</span> <span class="font-bold text-sky-900">${distributor} • ${tariffCode}</span></div>
-          <div><span class="font-bold text-slate-500">Fecha de Emisión:</span> <span class="font-semibold text-slate-800">${new Date().toLocaleDateString('es-DO', { day: '2-digit', month: 'long', year: 'numeric' })}</span></div>
+        <div class="bg-orange-50/30 md:bg-transparent p-3 sm:p-0 rounded-xl md:rounded-none border md:border-0 border-orange-100 space-y-1.5 md:text-right">
+          <div class="text-[10.5px] sm:text-[11px] font-black uppercase text-orange-600 tracking-wider flex items-center justify-start md:justify-end gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span> Detalles de la Cotización</div>
+          <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">N° Cotización:</span> <span class="font-mono font-bold text-slate-950">${quoteNumber}</span></div>
+          <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">ID Proyecto:</span> <span class="font-mono font-bold text-slate-950">${projectId}</span></div>
+          <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">Distribuidora / Tarifa:</span> <span class="font-bold text-sky-900">${distributor} • ${tariffCode}</span></div>
+          <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">Fecha de Emisión:</span> <span class="font-semibold text-slate-800">${new Date().toLocaleDateString('es-DO', { day: '2-digit', month: 'long', year: 'numeric' })}</span></div>
         </div>
       </div>
     </header>
 
-    <section class="bg-white border border-sky-100 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
-      <div class="border-b border-slate-100 pb-3 flex items-center justify-between">
+    <!-- 2. RESUMEN EJECUTIVO DE LA SOLUCIÓN PROPUESTA -->
+    <section class="bg-white border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">
+      <div class="border-b border-slate-100 pb-3 flex items-center justify-between gap-2">
         <div>
-          <h2 class="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-            <span class="w-2.5 h-2.5 rounded-sm bg-orange-500"></span>
+          <h2 class="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5 sm:gap-2">
+            <span class="w-2.5 h-2.5 rounded-xs bg-orange-500 shrink-0"></span>
             1. Resumen Ejecutivo de la Solución Propuesta
           </h2>
-          <p class="text-xs text-slate-500 font-medium">${formatMarkdown(projectSummarySubtitle, 'font-bold text-slate-700')}</p>
+          <p class="text-[11px] sm:text-xs text-slate-500 font-medium">${formatMarkdown(projectSummarySubtitle, 'font-bold text-slate-700')}</p>
         </div>
-        <span class="hidden sm:inline-block px-3 py-1 rounded-full bg-sky-50 text-sky-800 text-[10px] font-bold uppercase tracking-wider border border-sky-200">Ingeniería Certificada</span>
+        <span class="hidden sm:inline-block px-3 py-1 rounded-full bg-sky-50 text-sky-800 text-[10px] font-bold uppercase tracking-wider border border-sky-200 shrink-0">Ingeniería Certificada</span>
       </div>
 
-      <div class="space-y-3.5 text-xs text-slate-700 leading-relaxed text-justify">
+      <div class="space-y-3 text-xs text-slate-700 leading-relaxed text-left sm:text-justify">
         <p class="whitespace-pre-line">${formatMarkdown(resolvedP1)}</p>
         <p class="whitespace-pre-line">${formatMarkdown(resolvedP2)}</p>
       </div>
 
-      <div class="grid grid-cols-1 ${hasBattery && batteryCapacityKWh > 0 ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-3.5 pt-2">
-        <div class="bg-orange-50/70 border border-orange-200/90 rounded-2xl p-4 flex items-center gap-3.5">
-          <div class="w-11 h-11 rounded-2xl bg-orange-500 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-orange-500/20 shrink-0">⚡</div>
-          <div>
-            <span class="text-[10px] uppercase font-bold text-orange-800 block">Potencia DC</span>
-            <span class="text-base font-black font-mono text-slate-900">${systemCapacityKWp} kWp</span>
+      <div class="grid grid-cols-2 ${hasBattery && batteryCapacityKWh > 0 ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-2.5 sm:gap-3.5 pt-1 sm:pt-2">
+        <div class="bg-orange-50/70 border border-orange-200/90 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3.5">
+          <div class="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-orange-500 text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-sm sm:shadow-md shadow-orange-500/20 shrink-0">⚡</div>
+          <div class="min-w-0">
+            <span class="text-[9px] sm:text-[10px] uppercase font-bold text-orange-800 block truncate">Potencia DC</span>
+            <span class="text-sm sm:text-base font-black font-mono text-slate-900 block truncate">${systemCapacityKWp} kWp</span>
           </div>
         </div>
-        <div class="bg-sky-50/80 border border-sky-200 rounded-2xl p-4 flex items-center gap-3.5">
-          <div class="w-11 h-11 rounded-2xl bg-sky-600 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-sky-600/20 shrink-0">📈</div>
-          <div>
-            <span class="text-[10px] uppercase font-bold text-sky-800 block">Cobertura Solar</span>
-            <span class="text-base font-black font-mono text-sky-700">${coveragePct.toFixed(1)}% Anual</span>
+        <div class="bg-sky-50/80 border border-sky-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3.5">
+          <div class="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-sky-600 text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-sm sm:shadow-md shadow-sky-600/20 shrink-0">📈</div>
+          <div class="min-w-0">
+            <span class="text-[9px] sm:text-[10px] uppercase font-bold text-sky-800 block truncate">Cobertura Solar</span>
+            <span class="text-sm sm:text-base font-black font-mono text-sky-700 block truncate">${coveragePct.toFixed(1)}%</span>
           </div>
         </div>
-        <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center gap-3.5">
-          <div class="w-11 h-11 rounded-2xl bg-slate-800 text-white flex items-center justify-center font-bold text-lg shadow-md shrink-0">☀️</div>
-          <div>
-            <span class="text-[10px] uppercase font-bold text-slate-500 block">Generación Anual</span>
-            <span class="text-base font-black font-mono text-slate-900">${Math.round(annualProductionKWh).toLocaleString()} kWh</span>
+        <div class="bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3.5 ${hasBattery && batteryCapacityKWh > 0 ? '' : 'col-span-2 sm:col-span-1'}">
+          <div class="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-slate-800 text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-sm sm:shadow-md shrink-0">☀️</div>
+          <div class="min-w-0">
+            <span class="text-[9px] sm:text-[10px] uppercase font-bold text-slate-500 block truncate">Generación Anual</span>
+            <span class="text-sm sm:text-base font-black font-mono text-slate-900 block truncate">${Math.round(annualProductionKWh).toLocaleString()} kWh</span>
           </div>
         </div>
         ${hasBattery && batteryCapacityKWh > 0 ? `
-        <div class="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3.5">
-          <div class="w-11 h-11 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold text-lg shadow-md shrink-0">🔋</div>
-          <div>
-            <span class="text-[10px] uppercase font-bold text-emerald-800 block">Almacenamiento BESS</span>
-            <span class="text-base font-black font-mono text-emerald-950">${(batteryCount * batteryCapacityKWh).toFixed(1)} kWh</span>
+        <div class="bg-emerald-50/80 border border-emerald-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3.5">
+          <div class="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-sm sm:shadow-md shrink-0">🔋</div>
+          <div class="min-w-0">
+            <span class="text-[9px] sm:text-[10px] uppercase font-bold text-emerald-800 block truncate">Almacenamiento</span>
+            <span class="text-sm sm:text-base font-black font-mono text-emerald-950 block truncate">${(batteryCount * batteryCapacityKWh).toFixed(1)} kWh</span>
           </div>
         </div>` : ''}
       </div>
 
-      <div class="rounded-2xl border-2 border-orange-200 bg-orange-50/90 p-4 space-y-2 text-xs text-orange-950">
-        <div class="font-black uppercase tracking-wider text-[11px] flex items-center gap-2 text-orange-900">
-          <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+      <div class="rounded-xl sm:rounded-2xl border-2 border-orange-200 bg-orange-50/90 p-3.5 sm:p-4 space-y-2 text-xs text-orange-950">
+        <div class="font-black uppercase tracking-wider text-[10.5px] sm:text-[11px] flex items-center gap-1.5 sm:gap-2 text-orange-900">
+          <svg class="w-4 h-4 text-orange-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
           Marco Regulatorio y Condiciones de Operación (SIE / EDES)
         </div>
-        <div class="space-y-1.5 text-[11px] leading-relaxed text-justify">
+        <div class="space-y-1.5 text-[11px] leading-relaxed text-left sm:text-justify">
           ${regParagraphs.map((p) => `<p>${formatMarkdown(p, 'font-bold text-orange-950')}</p>`).join('\n')}
         </div>
       </div>
     </section>
 
     <!-- 3. ANÁLISIS DE ENERGÍA Y BALANCE MENSUAL -->
-    <section class="bg-white border border-sky-100 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-3">
+    <section class="bg-white border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 border-b border-slate-100 pb-3">
         <div>
-          <h2 class="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-            <span class="w-2.5 h-2.5 rounded-sm bg-sky-600"></span>
+          <h2 class="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5 sm:gap-2">
+            <span class="w-2.5 h-2.5 rounded-xs bg-sky-600 shrink-0"></span>
             2. Análisis de Energía y Balance Mensual
           </h2>
-          <p class="text-xs text-slate-500 font-medium">Comparativa de consumo histórico vs generación solar estimada</p>
+          <p class="text-[11px] sm:text-xs text-slate-500 font-medium">Comparativa de consumo histórico vs generación solar estimada</p>
         </div>
-        <div class="flex items-center gap-4 text-xs font-bold">
-          <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-xs bg-sky-700"></span> <span>Consumo (kWh)</span></div>
-          <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-xs bg-orange-500"></span> <span>Generación Solar (kWh)</span></div>
+        <div class="flex items-center gap-3 sm:gap-4 text-[11px] sm:text-xs font-bold self-start sm:self-auto">
+          <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-xs bg-sky-700 shrink-0"></span> <span>Consumo</span></div>
+          <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-xs bg-orange-500 shrink-0"></span> <span>Generación</span></div>
         </div>
       </div>
 
       <!-- Chart.js Canvas -->
-      <div class="w-full h-72 bg-sky-50/40 border border-sky-100 rounded-2xl p-3">
+      <div class="w-full h-56 sm:h-72 bg-sky-50/40 border border-sky-100 rounded-xl sm:rounded-2xl p-2 sm:p-3">
         <canvas id="energyChart"></canvas>
       </div>
 
-      <!-- Full 12-Month Table (Identical to PDF Page 1) -->
-      <div class="border border-slate-200 rounded-2xl overflow-hidden text-xs">
-        <table class="w-full text-left">
-          <thead class="bg-slate-900 text-white uppercase font-bold text-[10px]">
-            <tr>
-              <th class="px-4 py-2">Mes</th>
-              <th class="px-4 py-2 text-right">Consumo (kWh)</th>
-              <th class="px-4 py-2 text-right">Producción Solar (kWh)</th>
-              <th class="px-4 py-2 text-right">Ahorro Autoconsumo (kWh)</th>
-              <th class="px-4 py-2 text-right">% Cobertura</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-200 text-[11px] font-semibold text-slate-700">
-            ${monthlyData.map((row: any, idx: number) => {
-              const rowCoverage = row.consumptionKWh > 0 ? ((row.productionKWh / row.consumptionKWh) * 100) : 0;
-              return `
-              <tr class="${idx % 2 === 0 ? 'bg-sky-50/30' : 'bg-white'}">
-                <td class="px-4 py-1.5 font-bold text-slate-900">${row.month}</td>
-                <td class="px-4 py-1.5 text-right font-medium font-mono">${Math.round(row.consumptionKWh).toLocaleString()}</td>
-                <td class="px-4 py-1.5 text-right font-medium font-mono">${Number(row.productionKWh).toFixed(1)}</td>
-                <td class="px-4 py-1.5 text-right font-medium font-mono">${Number(row.solarSelfConsumedKWh || row.productionKWh).toFixed(1)}</td>
-                <td class="px-4 py-1.5 text-right font-bold text-orange-600 font-mono">${rowCoverage.toFixed(1)}%</td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-          <tfoot class="font-bold bg-slate-100 text-slate-900 border-t-2 border-slate-300 text-xs">
-            <tr>
-              <td class="px-4 py-2 uppercase font-black">TOTAL ANUAL</td>
-              <td class="px-4 py-2 text-right font-mono font-bold">${Math.round(annualConsumptionKWh).toLocaleString()}</td>
-              <td class="px-4 py-2 text-right font-mono font-bold">${Math.round(annualProductionKWh).toLocaleString()}</td>
-              <td class="px-4 py-2 text-right font-mono font-bold">${Math.round(monthlyData.reduce((s: number, m: any) => s + (m.solarSelfConsumedKWh || m.productionKWh), 0)).toLocaleString()}</td>
-              <td class="px-4 py-2 text-right font-mono font-black text-orange-600">${coveragePct.toFixed(1)}%</td>
-            </tr>
-          </tfoot>
-        </table>
+      <!-- Full 12-Month Table with Mobile Horizontal Scroll -->
+      <div class="space-y-1.5">
+        <div class="sm:hidden flex items-center justify-between text-[10px] text-slate-400 font-medium px-1">
+          <span class="flex items-center gap-1 text-sky-700 font-semibold">
+            <svg class="w-3.5 h-3.5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+            Desliza para ver meses y balances
+          </span>
+          <span class="font-mono text-slate-400">12 Meses</span>
+        </div>
+        <div class="border border-slate-200 rounded-xl sm:rounded-2xl overflow-x-auto text-xs shadow-xs">
+          <table class="w-full text-left min-w-[500px] sm:min-w-full">
+            <thead class="bg-slate-900 text-white uppercase font-bold text-[9px] sm:text-[10px] whitespace-nowrap">
+              <tr>
+                <th class="px-3 sm:px-4 py-2 sticky left-0 bg-slate-900 z-10">Mes</th>
+                <th class="px-3 sm:px-4 py-2 text-right">Consumo (kWh)</th>
+                <th class="px-3 sm:px-4 py-2 text-right">Producción (kWh)</th>
+                <th class="px-3 sm:px-4 py-2 text-right">Autoconsumo (kWh)</th>
+                <th class="px-3 sm:px-4 py-2 text-right">Cobertura</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200 text-[10.5px] sm:text-[11px] font-semibold text-slate-700 whitespace-nowrap">
+              ${monthlyData.map((row: any, idx: number) => {
+                const rowCoverage = row.consumptionKWh > 0 ? ((row.productionKWh / row.consumptionKWh) * 100) : 0;
+                return `
+                <tr class="${idx % 2 === 0 ? 'bg-sky-50/30' : 'bg-white'}">
+                  <td class="px-3 sm:px-4 py-1.5 font-bold text-slate-900 sticky left-0 ${idx % 2 === 0 ? 'bg-[#f5faff]' : 'bg-white'} z-10 border-r sm:border-r-0 border-slate-100">${row.month}</td>
+                  <td class="px-3 sm:px-4 py-1.5 text-right font-medium font-mono">${Math.round(row.consumptionKWh).toLocaleString()}</td>
+                  <td class="px-3 sm:px-4 py-1.5 text-right font-medium font-mono">${Number(row.productionKWh).toFixed(1)}</td>
+                  <td class="px-3 sm:px-4 py-1.5 text-right font-medium font-mono">${Number(row.solarSelfConsumedKWh || row.productionKWh).toFixed(1)}</td>
+                  <td class="px-3 sm:px-4 py-1.5 text-right font-bold text-orange-600 font-mono">${rowCoverage.toFixed(1)}%</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+            <tfoot class="font-bold bg-slate-100 text-slate-900 border-t-2 border-slate-300 text-[11px] sm:text-xs whitespace-nowrap">
+              <tr>
+                <td class="px-3 sm:px-4 py-2 uppercase font-black sticky left-0 bg-slate-100 z-10 border-r sm:border-r-0 border-slate-200">TOTAL ANUAL</td>
+                <td class="px-3 sm:px-4 py-2 text-right font-mono font-bold">${Math.round(annualConsumptionKWh).toLocaleString()}</td>
+                <td class="px-3 sm:px-4 py-2 text-right font-mono font-bold">${Math.round(annualProductionKWh).toLocaleString()}</td>
+                <td class="px-3 sm:px-4 py-2 text-right font-mono font-bold">${Math.round(monthlyData.reduce((s: number, m: any) => s + (m.solarSelfConsumedKWh || m.productionKWh), 0)).toLocaleString()}</td>
+                <td class="px-3 sm:px-4 py-2 text-right font-mono font-black text-orange-600">${coveragePct.toFixed(1)}%</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       </div>
 
       <!-- Environmental Impact Callout (Sky Blue Accent) -->
-      <div class="border border-sky-200 bg-sky-50/70 rounded-2xl p-4 flex items-center gap-4 text-xs text-sky-950">
-        <div class="w-10 h-10 rounded-full bg-sky-600 text-white flex items-center justify-center font-bold text-lg shrink-0">🌱</div>
+      <div class="border border-sky-200 bg-sky-50/70 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 flex items-center gap-3 sm:gap-4 text-xs text-sky-950">
+        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-sky-600 text-white flex items-center justify-center font-bold text-base sm:text-lg shrink-0">🌱</div>
         <div>
           <h4 class="font-bold text-sky-900 text-xs mb-0.5">Impacto Ambiental y Reducción de Emisiones</h4>
           <p class="text-[11px] leading-relaxed">
@@ -481,56 +510,56 @@ export function renderProposalPage(stored: StoredProposal): string {
     </section>
 
     <!-- 4. COTIZACIÓN DE SISTEMA FOTOVOLTAICO & LEY 57-07 -->
-    <section class="bg-white border border-sky-100 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+    <section class="bg-white border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">
       <div class="border-b border-slate-100 pb-3">
-        <h2 class="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-          <span class="w-2.5 h-2.5 rounded-sm bg-orange-500"></span>
+        <h2 class="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5 sm:gap-2">
+          <span class="w-2.5 h-2.5 rounded-xs bg-orange-500 shrink-0"></span>
           3. Cotización Oficial de Equipos e Ingeniería
         </h2>
-        <p class="text-xs text-slate-500 font-medium">Presupuesto detallado con deducciones tributarias auditadas</p>
+        <p class="text-[11px] sm:text-xs text-slate-500 font-medium">Presupuesto detallado con deducciones tributarias auditadas</p>
       </div>
 
       <!-- Equipment Table -->
-      <div class="border border-slate-200 rounded-2xl overflow-hidden text-xs">
+      <div class="border border-slate-200 rounded-xl sm:rounded-2xl overflow-hidden text-xs">
         <table class="w-full text-left">
-          <thead class="bg-slate-900 text-white uppercase font-bold text-[10px]">
+          <thead class="bg-slate-900 text-white uppercase font-bold text-[9px] sm:text-[10px]">
             <tr>
-              <th class="px-4 py-2">Descripción del Equipo / Servicio</th>
-              <th class="px-4 py-2 text-center w-24">Cantidad</th>
-              <th class="px-4 py-2 text-center w-24">Unidad</th>
+              <th class="px-3 sm:px-4 py-2">Descripción del Equipo / Servicio</th>
+              <th class="px-2 sm:px-4 py-2 text-center w-14 sm:w-24">Cant.</th>
+              <th class="px-2 sm:px-4 py-2 text-center w-14 sm:w-24">Unidad</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-200 text-[11px] font-semibold text-slate-800">
+          <tbody class="divide-y divide-slate-200 text-[10.5px] sm:text-[11px] font-semibold text-slate-800">
             <tr class="bg-white">
-              <td class="px-4 py-2 font-bold">${panelBrandModel}</td>
-              <td class="px-4 py-2 text-center font-mono font-bold">${panelCount}</td>
-              <td class="px-4 py-2 text-center text-slate-500 font-normal">UD</td>
+              <td class="px-3 sm:px-4 py-2 font-bold">${panelBrandModel}</td>
+              <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${panelCount}</td>
+              <td class="px-2 sm:px-4 py-2 text-center text-slate-500 font-normal">UD</td>
             </tr>
             <tr class="bg-sky-50/30">
-              <td class="px-4 py-2 font-bold">${inverterBrandModel}</td>
-              <td class="px-4 py-2 text-center font-mono font-bold">${inverterCount}</td>
-              <td class="px-4 py-2 text-center text-slate-500 font-normal">UD</td>
+              <td class="px-3 sm:px-4 py-2 font-bold">${inverterBrandModel}</td>
+              <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${inverterCount}</td>
+              <td class="px-2 sm:px-4 py-2 text-center text-slate-500 font-normal">UD</td>
             </tr>
             ${hasBattery ? `
             <tr class="bg-white">
-              <td class="px-4 py-2 font-bold">${displayBatteryModel}</td>
-              <td class="px-4 py-2 text-center font-mono font-bold">${batteryCount}</td>
-              <td class="px-4 py-2 text-center text-slate-500 font-normal">UD</td>
+              <td class="px-3 sm:px-4 py-2 font-bold">${displayBatteryModel}</td>
+              <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${batteryCount}</td>
+              <td class="px-2 sm:px-4 py-2 text-center text-slate-500 font-normal">UD</td>
             </tr>` : ''}
             <tr class="bg-sky-50/30">
-              <td class="px-4 py-2">${installationServicesDesc}</td>
-              <td class="px-4 py-2 text-center font-mono font-bold">1</td>
-              <td class="px-4 py-2 text-center text-slate-500 font-normal">UD</td>
+              <td class="px-3 sm:px-4 py-2">${installationServicesDesc}</td>
+              <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">1</td>
+              <td class="px-2 sm:px-4 py-2 text-center text-slate-500 font-normal">UD</td>
             </tr>
             ${(Array.isArray(financials.customItems) ? financials.customItems : []).map((cItem: any, idx: number) => {
               const isEven = (idx + (hasBattery ? 1 : 0)) % 2 === 0;
               return `
             <tr class="${isEven ? 'bg-white' : 'bg-sky-50/30'}">
-              <td class="px-4 py-2 font-medium">
+              <td class="px-3 sm:px-4 py-2 font-medium">
                 <span class="font-bold text-slate-900">${cItem.description || `Ítem Adicional #${idx + 1}`}</span>
               </td>
-              <td class="px-4 py-2 text-center font-mono font-bold">${cItem.quantity || 1}</td>
-              <td class="px-4 py-2 text-center text-slate-500 font-normal">${cItem.unit || 'UD'}</td>
+              <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${cItem.quantity || 1}</td>
+              <td class="px-2 sm:px-4 py-2 text-center text-slate-500 font-normal">${cItem.unit || 'UD'}</td>
             </tr>
             `;
             }).join('')}
@@ -538,71 +567,71 @@ export function renderProposalPage(stored: StoredProposal): string {
         </table>
       </div>
 
-      <!-- Financial Breakdown Box (Right-aligned) -->
-      <div class="flex justify-end">
-        <div class="w-full sm:w-96 bg-sky-50/60 border border-sky-200 rounded-2xl p-4 space-y-2 text-xs">
-          <div class="flex justify-between text-slate-600 font-medium">
-            <span>SUB-TOTAL (USD) SIN ITBIS:</span>
-            <span class="font-mono font-bold text-slate-900">US$ ${subTotalSinITBIS.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+      <!-- Financial Breakdown Box (Right-aligned on Desktop, Full Width on Mobile) -->
+      <div class="flex justify-end w-full">
+        <div class="w-full sm:w-96 bg-sky-50/70 border border-sky-200 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 space-y-2 text-xs">
+          <div class="flex items-center justify-between gap-2 text-slate-600 font-medium">
+            <span class="text-[10.5px] sm:text-xs">SUB-TOTAL (USD) SIN ITBIS:</span>
+            <span class="font-mono font-bold text-slate-900 shrink-0">US$ ${subTotalSinITBIS.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
-          <div class="flex justify-between text-slate-900 bg-sky-200/50 px-2.5 py-1 rounded-lg font-bold">
-            <span>TOTAL GENERAL (USD):</span>
-            <span class="font-mono font-bold">US$ ${(grossInvestmentUSD + (applyITBISExemption ? itbisSavedUSD : 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <div class="flex items-center justify-between gap-2 text-slate-900 bg-sky-200/50 px-2.5 py-1 rounded-lg font-bold">
+            <span class="text-[10.5px] sm:text-xs">TOTAL GENERAL (USD):</span>
+            <span class="font-mono font-bold shrink-0">US$ ${(grossInvestmentUSD + (applyITBISExemption ? itbisSavedUSD : 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
-          <div class="flex justify-between text-sky-800 font-semibold text-[11px]">
+          <div class="flex items-center justify-between gap-2 text-sky-800 font-semibold text-[10.5px] sm:text-[11px]">
             <span>ITBIS A DESCONTAR LEY 57-07:</span>
-            <span class="font-mono font-bold text-sky-700">- US$ ${itbisSavedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <span class="font-mono font-bold text-sky-700 shrink-0">- US$ ${itbisSavedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
-          <div class="flex justify-between text-white bg-slate-900 px-3 py-1.5 rounded-xl font-bold">
-            <span>TOTAL GENERAL (CON LEY 57-07):</span>
-            <span class="font-mono font-black text-orange-400">US$ ${grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <div class="flex items-center justify-between gap-2 text-white bg-slate-900 px-3 py-1.5 rounded-xl font-bold">
+            <span class="text-[10.5px] sm:text-xs">TOTAL GENERAL (CON LEY 57-07):</span>
+            <span class="font-mono font-black text-orange-400 text-xs sm:text-sm shrink-0">US$ ${grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
-          <div class="flex justify-between text-slate-700 pt-1 border-t border-sky-200 text-[11px]">
+          <div class="flex items-center justify-between gap-2 text-slate-700 pt-1 border-t border-sky-200 text-[10.5px] sm:text-[11px]">
             <span class="font-bold">PRECIO POR WATT INSTALADO:</span>
-            <span class="font-mono font-black text-orange-600">US$ ${pricePerWattUSD} / W</span>
+            <span class="font-mono font-black text-orange-600 shrink-0">US$ ${pricePerWattUSD} / W</span>
           </div>
         </div>
       </div>
 
       <!-- Ley 57-07 Tax Deduction Schedule Table -->
-      <div class="space-y-2">
-        <div class="text-[11px] font-black uppercase text-orange-600 tracking-wider flex items-center gap-1.5">
+      <div class="space-y-1.5 sm:space-y-2">
+        <div class="text-[10.5px] sm:text-[11px] font-black uppercase text-orange-600 tracking-wider flex items-center gap-1.5">
           <span class="w-1.5 h-1.5 rounded-full bg-orange-500"></span> Incentivos Fiscales Ley 57-07 (Crédito 40% al ISR)
         </div>
-        <div class="border border-slate-200 rounded-2xl overflow-hidden text-xs">
-          <table class="w-full text-left">
-            <thead class="bg-slate-900 text-white uppercase font-bold text-[10px]">
+        <div class="border border-slate-200 rounded-xl sm:rounded-2xl overflow-x-auto text-xs shadow-xs">
+          <table class="w-full text-left min-w-[420px] sm:min-w-full">
+            <thead class="bg-slate-900 text-white uppercase font-bold text-[9px] sm:text-[10px] whitespace-nowrap">
               <tr>
-                <th class="px-4 py-2">Concepto Tributario</th>
-                <th class="px-4 py-2 text-right">Monto US$</th>
-                <th class="px-4 py-2 text-right w-24">% Crédito</th>
+                <th class="px-3 sm:px-4 py-2">Concepto Tributario</th>
+                <th class="px-3 sm:px-4 py-2 text-right">Monto US$</th>
+                <th class="px-3 sm:px-4 py-2 text-right w-20 sm:w-24">% Crédito</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-200 text-[11px] font-semibold text-slate-800">
+            <tbody class="divide-y divide-slate-200 text-[10.5px] sm:text-[11px] font-semibold text-slate-800">
               <tr class="bg-white font-bold">
-                <td class="px-4 py-1.5">Inversión Elegible en Equipos Renovables (Paneles-Inversores-Baterías)</td>
-                <td class="px-4 py-1.5 text-right font-mono font-bold">US$ ${equipmentPortionUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td class="px-4 py-1.5 text-right font-mono">100%</td>
+                <td class="px-3 sm:px-4 py-1.5">Inversión Elegible en Equipos Renovables</td>
+                <td class="px-3 sm:px-4 py-1.5 text-right font-mono font-bold whitespace-nowrap">US$ ${equipmentPortionUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="px-3 sm:px-4 py-1.5 text-right font-mono">100%</td>
               </tr>
               <tr class="bg-sky-50/30">
-                <td class="px-4 py-1.5">Crédito Fiscal ISR — Año 1 (DGII)</td>
-                <td class="px-4 py-1.5 text-right font-mono text-sky-700 font-bold">US$ ${(ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td class="px-4 py-1.5 text-right font-mono text-sky-700">13.33%</td>
+                <td class="px-3 sm:px-4 py-1.5">Crédito Fiscal ISR — Año 1 (DGII)</td>
+                <td class="px-3 sm:px-4 py-1.5 text-right font-mono text-sky-700 font-bold whitespace-nowrap">US$ ${(ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="px-3 sm:px-4 py-1.5 text-right font-mono text-sky-700">13.33%</td>
               </tr>
               <tr class="bg-white">
-                <td class="px-4 py-1.5">Crédito Fiscal ISR — Año 2 (DGII)</td>
-                <td class="px-4 py-1.5 text-right font-mono text-sky-700 font-bold">US$ ${(ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td class="px-4 py-1.5 text-right font-mono text-sky-700">13.33%</td>
+                <td class="px-3 sm:px-4 py-1.5">Crédito Fiscal ISR — Año 2 (DGII)</td>
+                <td class="px-3 sm:px-4 py-1.5 text-right font-mono text-sky-700 font-bold whitespace-nowrap">US$ ${(ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="px-3 sm:px-4 py-1.5 text-right font-mono text-sky-700">13.33%</td>
               </tr>
               <tr class="bg-sky-50/30">
-                <td class="px-4 py-1.5">Crédito Fiscal ISR — Año 3 (DGII)</td>
-                <td class="px-4 py-1.5 text-right font-mono text-sky-700 font-bold">US$ ${(ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td class="px-4 py-1.5 text-right font-mono text-sky-700">13.33%</td>
+                <td class="px-3 sm:px-4 py-1.5">Crédito Fiscal ISR — Año 3 (DGII)</td>
+                <td class="px-3 sm:px-4 py-1.5 text-right font-mono text-sky-700 font-bold whitespace-nowrap">US$ ${(ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="px-3 sm:px-4 py-1.5 text-right font-mono text-sky-700">13.33%</td>
               </tr>
               <tr class="bg-orange-50 text-orange-950 font-bold border-t-2 border-orange-300">
-                <td class="px-4 py-2 font-black">TOTAL CRÉDITO FISCAL LEY 57-07 (40%)</td>
-                <td class="px-4 py-2 text-right font-mono font-black text-orange-700">US$ ${ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td class="px-4 py-2 text-right font-mono font-black text-orange-700">40.00%</td>
+                <td class="px-3 sm:px-4 py-2 font-black">TOTAL CRÉDITO FISCAL LEY 57-07 (40%)</td>
+                <td class="px-3 sm:px-4 py-2 text-right font-mono font-black text-orange-700 whitespace-nowrap">US$ ${ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="px-3 sm:px-4 py-2 text-right font-mono font-black text-orange-700">40.00%</td>
               </tr>
             </tbody>
           </table>
@@ -610,8 +639,8 @@ export function renderProposalPage(stored: StoredProposal): string {
       </div>
 
       <!-- Warranties & Turnkey Management Grid -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-        <div class="bg-sky-50/50 border border-sky-200 rounded-2xl p-4 space-y-1.5 text-xs">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-1 sm:pt-2">
+        <div class="bg-sky-50/50 border border-sky-200 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 space-y-1.5 text-xs">
           <h4 class="font-black uppercase tracking-wider text-sky-950 border-b border-sky-200 pb-1 flex items-center gap-1.5">
             🛡️ Garantías Oficiales
           </h4>
@@ -621,7 +650,7 @@ export function renderProposalPage(stored: StoredProposal): string {
           <div>• <span class="font-bold text-slate-600">Instalación y Mano de Obra:</span> <span class="font-bold text-slate-900">${workmanshipWarranty}</span></div>
         </div>
 
-        <div class="bg-orange-50/60 border border-orange-200 rounded-2xl p-4 space-y-1.5 text-xs">
+        <div class="bg-orange-50/60 border border-orange-200 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 space-y-1.5 text-xs">
           <h4 class="font-black uppercase tracking-wider text-orange-950 border-b border-orange-200 pb-1 flex items-center gap-1.5">
             ✅ Gestión Llave en Mano Incluida
           </h4>
@@ -640,79 +669,79 @@ export function renderProposalPage(stored: StoredProposal): string {
     </section>
 
     <!-- 5. RETORNO DE INVERSIÓN (ROI, TIR & VAN) -->
-    <section class="bg-white border border-sky-100 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+    <section class="bg-white border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">
       <div class="border-b border-slate-100 pb-3">
-        <h2 class="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-          <span class="w-2.5 h-2.5 rounded-sm bg-sky-600"></span>
+        <h2 class="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5 sm:gap-2">
+          <span class="w-2.5 h-2.5 rounded-xs bg-sky-600 shrink-0"></span>
           4. Retorno de Inversión y Métricas Financieras
         </h2>
-        <p class="text-xs text-slate-500 font-medium">Indicadores de rentabilidad y amortización del capital</p>
+        <p class="text-[11px] sm:text-xs text-slate-500 font-medium">Indicadores de rentabilidad y amortización del capital</p>
       </div>
 
-      <!-- 5 High-Impact Metric Cards (Sky Blue + Solar Orange) -->
-      <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div class="bg-orange-50/70 border border-orange-200 rounded-2xl p-3 text-center">
-          <p class="text-[9.5px] uppercase font-bold text-orange-700 mb-0.5">Payback</p>
-          <p class="text-xl font-black font-mono text-orange-600">${paybackYears} <span class="text-xs font-sans text-slate-500">años</span></p>
+      <!-- 5 High-Impact Metric Cards (Harmonized for Mobile & Desktop) -->
+      <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 sm:gap-3">
+        <div class="bg-orange-50/70 border border-orange-200 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 text-center">
+          <p class="text-[9px] sm:text-[9.5px] uppercase font-bold text-orange-700 mb-0.5">Payback</p>
+          <p class="text-lg sm:text-xl font-black font-mono text-orange-600">${paybackYears} <span class="text-[10px] sm:text-xs font-sans text-slate-500">años</span></p>
         </div>
 
-        <div class="bg-sky-50/70 border border-sky-200 rounded-2xl p-3 text-center">
-          <p class="text-[9.5px] uppercase font-bold text-sky-700 mb-0.5">TIR</p>
-          <p class="text-xl font-black font-mono text-sky-700">${irrPct}%</p>
+        <div class="bg-sky-50/70 border border-sky-200 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 text-center">
+          <p class="text-[9px] sm:text-[9.5px] uppercase font-bold text-sky-700 mb-0.5">TIR</p>
+          <p class="text-lg sm:text-xl font-black font-mono text-sky-700">${irrPct}%</p>
         </div>
 
-        <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3 text-center">
-          <p class="text-[9.5px] uppercase font-bold text-slate-400 mb-0.5">VAN (10%)</p>
-          <p class="text-sm font-black font-mono text-slate-900">US$ ${Math.round(npvUSD).toLocaleString()}</p>
+        <div class="bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 text-center">
+          <p class="text-[9px] sm:text-[9.5px] uppercase font-bold text-slate-400 mb-0.5">VAN (10%)</p>
+          <p class="text-xs sm:text-sm font-black font-mono text-slate-900">US$ ${Math.round(npvUSD).toLocaleString()}</p>
         </div>
 
-        <div class="bg-orange-50/70 border border-orange-200 rounded-2xl p-3 text-center col-span-2 sm:col-span-1">
-          <p class="text-[9.5px] uppercase font-bold text-orange-700 mb-0.5">Ahorro 25 Años</p>
-          <p class="text-sm font-black font-mono text-orange-600">US$ ${Math.round(total25YearSavingsUSD).toLocaleString()}</p>
+        <div class="bg-orange-50/70 border border-orange-200 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 text-center">
+          <p class="text-[9px] sm:text-[9.5px] uppercase font-bold text-orange-700 mb-0.5">Ahorro 25 Años</p>
+          <p class="text-xs sm:text-sm font-black font-mono text-orange-600">US$ ${Math.round(total25YearSavingsUSD).toLocaleString()}</p>
         </div>
 
-        <div class="bg-sky-50/70 border border-sky-200 rounded-2xl p-3 text-center col-span-2 sm:col-span-1">
-          <p class="text-[9.5px] uppercase font-bold text-sky-700 mb-0.5">ROI Total</p>
-          <p class="text-xl font-black font-mono text-sky-700">${roi25YrPct}%</p>
+        <div class="bg-sky-50/70 border border-sky-200 rounded-xl sm:rounded-2xl p-2.5 sm:p-3 text-center col-span-2 sm:col-span-1">
+          <p class="text-[9px] sm:text-[9.5px] uppercase font-bold text-sky-700 mb-0.5">ROI Total (25 Años)</p>
+          <p class="text-lg sm:text-xl font-black font-mono text-sky-700">${roi25YrPct}%</p>
         </div>
       </div>
 
       <!-- Financial Milestones Table -->
-      <div class="space-y-2">
-        <div class="text-[11px] font-black uppercase text-sky-700 tracking-wider flex items-center gap-1.5">
+      <div class="space-y-1.5 sm:space-y-2">
+        <div class="text-[10.5px] sm:text-[11px] font-black uppercase text-sky-700 tracking-wider flex items-center gap-1.5">
           <span class="w-1.5 h-1.5 rounded-full bg-orange-500"></span> Hitos de Recuperación y Flujo Acumulado
         </div>
-        <div class="border border-slate-200 rounded-2xl overflow-hidden text-xs">
+        <div class="border border-slate-200 rounded-xl sm:rounded-2xl overflow-hidden text-xs">
           <table class="w-full text-left">
-            <thead class="bg-slate-900 text-white uppercase font-bold text-[10px]">
+            <thead class="bg-slate-900 text-white uppercase font-bold text-[9px] sm:text-[10px]">
               <tr>
-                <th class="px-4 py-2">Hito Financiero</th>
-                <th class="px-4 py-2 text-right">Ahorro Energético Anual</th>
-                <th class="px-4 py-2 text-right">Beneficio Acumulado (USD)</th>
+                <th class="px-2.5 sm:px-4 py-2">Hito Financiero</th>
+                <th class="px-2.5 sm:px-4 py-2 text-right">Ahorro Anual</th>
+                <th class="px-2.5 sm:px-4 py-2 text-right">Beneficio Acumulado</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-200 text-[11px] font-semibold text-slate-800">
+            <tbody class="divide-y divide-slate-200 text-[10px] sm:text-[11px] font-semibold text-slate-800">
               <tr class="bg-white">
-                <td class="px-4 py-2 font-bold">Año 1 (Inicio de Ahorros)</td>
-                <td class="px-4 py-2 text-right font-mono font-bold">US$ ${Number(year1Obj.savingsUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td class="px-4 py-2 text-right font-mono text-red-600 font-bold">US$ ${Number(year1Obj.cumulativeCashFlowUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="px-2.5 sm:px-4 py-2 font-bold">Año 1 (Inicio)</td>
+                <td class="px-2.5 sm:px-4 py-2 text-right font-mono font-bold whitespace-nowrap">US$ ${Number(year1Obj.savingsUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="px-2.5 sm:px-4 py-2 text-right font-mono text-red-600 font-bold whitespace-nowrap">US$ ${Number(year1Obj.cumulativeCashFlowUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               </tr>
               <tr class="bg-orange-50 text-orange-950 font-bold border-y border-orange-200">
-                <td class="px-4 py-2 font-black flex items-center gap-1.5">
-                  <span>⭐ Año ${paybackYearObj.year} (Punto de Retorno / Payback)</span>
+                <td class="px-2.5 sm:px-4 py-2 font-black flex items-center gap-1">
+                  <span>⭐ Año ${paybackYearObj.year} (Payback)</span>
                 </td>
-                <td class="px-4 py-2 text-right font-mono font-black">US$ ${Number(paybackYearObj.savingsUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td class="px-4 py-2 text-right font-mono font-black text-sky-700">US$ ${Number(paybackYearObj.cumulativeCashFlowUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="px-2.5 sm:px-4 py-2 text-right font-mono font-black whitespace-nowrap">US$ ${Number(paybackYearObj.savingsUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="px-2.5 sm:px-4 py-2 text-right font-mono font-black text-sky-700 whitespace-nowrap">US$ ${Number(paybackYearObj.cumulativeCashFlowUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               </tr>
               <tr class="bg-white">
-                <td class="px-4 py-2 font-bold">Año 10 (Consolidación)</td>
-                <td class="px-4 py-2 text-right font-mono font-bold">US$ ${Number(year10Obj.savingsUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td class="px-4 py-2 text-right font-mono text-sky-700 font-bold">US$ ${Number(year10Obj.cumulativeCashFlowUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="px-2.5 sm:px-4 py-2 font-bold">Año 10 (Consolidación)</td>
+                <td class="px-2.5 sm:px-4 py-2 text-right font-mono font-bold whitespace-nowrap">US$ ${Number(year10Obj.savingsUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="px-2.5 sm:px-4 py-2 text-right font-mono text-sky-700 font-bold whitespace-nowrap">US$ ${Number(year10Obj.cumulativeCashFlowUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               </tr>
               <tr class="bg-sky-50/40 font-bold text-slate-950">
-                <td class="px-4 py-2 font-black">Año 25 (Fin de Vida Útil Garantizada)</td>
-                <td class="px-4 py-2 text-right font-mono font-black">US$ ${Number(year25Obj.savingsUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td class="px-4 py-2 text-right font-mono font-black text-sky-700">US$ ${Number(year25Obj.cumulativeCashFlowUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="px-2.5 sm:px-4 py-2 font-black">Año 25 (Fin Vida Útil)</td>
+                <td class="px-2.5 sm:px-4 py-2 text-right font-mono font-black whitespace-nowrap">US$ ${Number(year25Obj.savingsUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="px-2.5 sm:px-4 py-2 text-right font-mono font-black text-sky-700 whitespace-nowrap">US$ ${Number(year25Obj.cumulativeCashFlowUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               </tr>
             </tbody>
           </table>
@@ -720,118 +749,106 @@ export function renderProposalPage(stored: StoredProposal): string {
       </div>
 
       <!-- Accumulated Benefit 25 Years Chart -->
-      <div class="space-y-2">
-        <div class="text-[11px] font-black uppercase text-orange-600 tracking-wider flex items-center gap-1.5">
+      <div class="space-y-1.5 sm:space-y-2">
+        <div class="text-[10.5px] sm:text-[11px] font-black uppercase text-orange-600 tracking-wider flex items-center gap-1.5">
           <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span> Evolución de Beneficio Acumulado a 25 Años
         </div>
-        <div class="w-full h-64 bg-sky-50/40 border border-sky-100 rounded-2xl p-3">
+        <div class="w-full h-56 sm:h-64 bg-sky-50/40 border border-sky-100 rounded-xl sm:rounded-2xl p-2 sm:p-3">
           <canvas id="cumulativeChart"></canvas>
         </div>
       </div>
     </section>
 
     <!-- 6. TABLA COMPLETA DE FLUJO DE CAJA (25 AÑOS) -->
-    <section class="bg-white border border-sky-100 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
+    <section class="bg-white border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">
       <div class="border-b border-slate-100 pb-3">
-        <h2 class="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-          <span class="w-2.5 h-2.5 rounded-sm bg-orange-500"></span>
+        <h2 class="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5 sm:gap-2">
+          <span class="w-2.5 h-2.5 rounded-xs bg-orange-500 shrink-0"></span>
           5. Flujo de Caja y Beneficios Acumulados a 25 Años
         </h2>
-        <p class="text-xs text-slate-500 font-medium">Proyección contable completa considerando degradación de paneles e inflación tarifaria</p>
+        <p class="text-[11px] sm:text-xs text-slate-500 font-medium">Proyección contable completa considerando degradación de paneles e inflación tarifaria</p>
       </div>
 
-      <!-- 25 Years Table (Identical to PDF Page 4) -->
-      <div class="border border-slate-200 rounded-2xl overflow-x-auto text-xs">
-        <table class="w-full text-left min-w-[700px]">
-          <thead class="bg-slate-900 text-white uppercase font-bold text-[9px]">
-            <tr>
-              <th class="px-3 py-2 text-center w-12">Año</th>
-              <th class="px-3 py-2 text-right">Energía (kWh)</th>
-              <th class="px-3 py-2 text-right">Ahorro Energía</th>
-              <th class="px-3 py-2 text-right">Incentivo Ley 57-07</th>
-              <th class="px-3 py-2 text-right">Ahorro Total</th>
-              <th class="px-3 py-2 text-right">Cash Flow Neto</th>
-              <th class="px-3 py-2 text-right font-black">Beneficio Acumulado</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-slate-100 text-[10.5px] font-semibold text-slate-700">
-            <!-- Year 0 Outflow -->
-            <tr class="bg-red-50 text-red-700 font-bold">
-              <td class="px-3 py-1.5 text-center">0</td>
-              <td class="px-3 py-1.5 text-right font-mono text-slate-400">-</td>
-              <td class="px-3 py-1.5 text-right font-mono text-slate-400">-</td>
-              <td class="px-3 py-1.5 text-right font-mono text-slate-400">-</td>
-              <td class="px-3 py-1.5 text-right font-mono text-slate-400">-</td>
-              <td class="px-3 py-1.5 text-right font-mono text-red-600">-US$ ${initialOutflowUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-              <td class="px-3 py-1.5 text-right font-mono font-black text-red-600">-US$ ${initialOutflowUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-            </tr>
+      <!-- 25 Years Table with Mobile Horizontal Scroll -->
+      <div class="space-y-1.5">
+        <div class="sm:hidden flex items-center justify-between text-[10px] text-slate-400 font-medium px-1">
+          <span class="flex items-center gap-1 text-sky-700 font-semibold">
+            <svg class="w-3.5 h-3.5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+            Desliza para ver los 25 años
+          </span>
+          <span class="font-mono text-slate-400">25 Años</span>
+        </div>
+        <div class="border border-slate-200 rounded-xl sm:rounded-2xl overflow-x-auto text-xs shadow-xs">
+          <table class="w-full text-left min-w-[650px]">
+            <thead class="bg-slate-900 text-white uppercase font-bold text-[8.5px] sm:text-[9px] whitespace-nowrap">
+              <tr>
+                <th class="px-2.5 sm:px-3 py-2 text-center w-12 sticky left-0 bg-slate-900 z-10">Año</th>
+                <th class="px-2.5 sm:px-3 py-2 text-right">Energía (kWh)</th>
+                <th class="px-2.5 sm:px-3 py-2 text-right">Ahorro Energía</th>
+                <th class="px-2.5 sm:px-3 py-2 text-right">Incentivo Ley 57-07</th>
+                <th class="px-2.5 sm:px-3 py-2 text-right">Ahorro Total</th>
+                <th class="px-2.5 sm:px-3 py-2 text-right">Cash Flow Neto</th>
+                <th class="px-2.5 sm:px-3 py-2 text-right font-black">Beneficio Acumulado</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-[10px] sm:text-[10.5px] font-semibold text-slate-700 whitespace-nowrap">
+              <!-- Year 0 Outflow -->
+              <tr class="bg-red-50 text-red-700 font-bold">
+                <td class="px-2.5 sm:px-3 py-1.5 text-center sticky left-0 bg-red-50 z-10 border-r border-red-100">0</td>
+                <td class="px-2.5 sm:px-3 py-1.5 text-right font-mono text-slate-400">-</td>
+                <td class="px-2.5 sm:px-3 py-1.5 text-right font-mono text-slate-400">-</td>
+                <td class="px-2.5 sm:px-3 py-1.5 text-right font-mono text-slate-400">-</td>
+                <td class="px-2.5 sm:px-3 py-1.5 text-right font-mono text-slate-400">-</td>
+                <td class="px-2.5 sm:px-3 py-1.5 text-right font-mono text-red-600">-US$ ${initialOutflowUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td class="px-2.5 sm:px-3 py-1.5 text-right font-mono font-black text-red-600">-US$ ${initialOutflowUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              </tr>
 
-            <!-- Years 1 to 25 -->
-            ${cf25.map((row: any) => {
-              const isPayback = row.year === paybackCeil;
-              const cumulative = Number(row.cumulativeCashFlowUSD || 0);
-              const isNegative = cumulative < 0;
-              const savings = Number(row.savingsUSD || 0);
-              const taxCredit = Number(row.taxCreditUSD || 0);
-              const netCashFlow = Number(row.netCashFlowUSD || (savings + taxCredit));
-              const totalAnnualSavings = savings + taxCredit;
-              const prod = Number(row.productionKWh || 0);
+              <!-- Years 1 to 25 -->
+              ${cf25.map((row: any) => {
+                const isPayback = row.year === paybackCeil;
+                const cumulative = Number(row.cumulativeCashFlowUSD || 0);
+                const isNegative = cumulative < 0;
+                const savings = Number(row.savingsUSD || 0);
+                const taxCredit = Number(row.taxCreditUSD || 0);
+                const netCashFlow = Number(row.netCashFlowUSD || (savings + taxCredit));
+                const totalAnnualSavings = savings + taxCredit;
+                const prod = Number(row.productionKWh || 0);
 
-              return `
-              <tr class="${isPayback ? 'bg-orange-100 text-orange-950 font-bold border-y-2 border-orange-300' : row.year % 2 === 0 ? 'bg-sky-50/30' : 'bg-white'}">
-                <td class="px-3 py-1 text-center font-bold font-mono">${row.year} ${isPayback ? '⭐' : ''}</td>
-                <td class="px-3 py-1 text-right font-mono font-medium">${Math.round(prod).toLocaleString()}</td>
-                <td class="px-3 py-1 text-right font-mono font-medium">US$ ${savings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td class="px-3 py-1 text-right font-mono ${taxCredit > 0 ? 'text-sky-700 font-bold' : 'text-slate-400'}">${taxCredit > 0 ? 'US$ ' + taxCredit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '$0.00'}</td>
-                <td class="px-3 py-1 text-right font-mono font-bold text-slate-900">US$ ${totalAnnualSavings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td class="px-3 py-1 text-right font-mono font-bold text-orange-600">US$ ${netCashFlow.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                <td class="px-3 py-1 text-right font-mono font-black ${isNegative ? 'text-red-600' : 'text-sky-700'}">
-                  ${isNegative ? '-' : ''}US$ ${Math.abs(cumulative).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
+                return `
+                <tr class="${isPayback ? 'bg-orange-100 text-orange-950 font-bold border-y-2 border-orange-300' : row.year % 2 === 0 ? 'bg-sky-50/30' : 'bg-white'}">
+                  <td class="px-2.5 sm:px-3 py-1 text-center font-bold font-mono sticky left-0 ${isPayback ? 'bg-orange-100' : row.year % 2 === 0 ? 'bg-[#f5faff]' : 'bg-white'} z-10 border-r sm:border-r-0 border-slate-100">${row.year} ${isPayback ? '⭐' : ''}</td>
+                  <td class="px-2.5 sm:px-3 py-1 text-right font-mono font-medium">${Math.round(prod).toLocaleString()}</td>
+                  <td class="px-2.5 sm:px-3 py-1 text-right font-mono font-medium">US$ ${savings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td class="px-2.5 sm:px-3 py-1 text-right font-mono ${taxCredit > 0 ? 'text-sky-700 font-bold' : 'text-slate-400'}">${taxCredit > 0 ? 'US$ ' + taxCredit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '$0.00'}</td>
+                  <td class="px-2.5 sm:px-3 py-1 text-right font-mono font-bold text-slate-900">US$ ${totalAnnualSavings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td class="px-2.5 sm:px-3 py-1 text-right font-mono font-bold text-orange-600">US$ ${netCashFlow.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                  <td class="px-2.5 sm:px-3 py-1 text-right font-mono font-black ${isNegative ? 'text-red-600' : 'text-sky-700'}">
+                    ${isNegative ? '-' : ''}US$ ${Math.abs(cumulative).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
 
     <!-- FOOTER OFFICIAL INFORMATION -->
-    <footer class="text-center text-xs text-slate-500 space-y-1.5 pt-4 pb-8 border-t border-sky-200">
+    <footer class="text-center text-xs text-slate-500 space-y-1.5 pt-4 pb-6 sm:pb-8 border-t border-sky-200">
       <p class="font-bold text-slate-700">${companyName} — ${companySlogan}</p>
       <p>${custom.companyFooterText || `${province}, República Dominicana | ${companyWebsite}`}</p>
       ${companyRnc ? `<p>RNC: ${companyRnc}</p>` : ''}
-      <p class="text-[11px] text-slate-400 pt-2 font-mono">
+      <p class="text-[11px] text-slate-400 pt-1.5 font-mono">
         Esta propuesta digital expira el: <span class="font-bold text-slate-600">${new Date(expiresAt).toLocaleDateString('es-DO', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
       </p>
     </footer>
   </div>
 
-  <!-- FIXED FLOATING CALL-TO-ACTION BAR (WhatsApp & Call) -->
-  <div class="fixed bottom-0 left-0 right-0 z-50 bg-white/95 border-t border-sky-200 backdrop-blur-md p-3.5 shadow-2xl no-print">
-    <div class="max-w-4xl mx-auto flex items-center justify-between gap-4">
-      <div class="hidden sm:block">
-        <span class="text-xs text-slate-500 font-medium block">¿Desea dar el siguiente paso hacia el ahorro solar?</span>
-        <span class="text-sm font-bold text-slate-900">${companyName} está a su disposición para coordinar la visita técnica</span>
-      </div>
-
-      <div class="flex items-center gap-3 w-full sm:w-auto">
-        ${cleanPhone ? `
-        <a href="tel:${cleanPhone}" class="px-4 py-3 rounded-2xl border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-900 text-xs font-bold transition-all flex items-center justify-center gap-2 shrink-0">
-          <svg class="w-4 h-4 text-sky-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-          <span>Llamar</span>
-        </a>` : ''}
-
-        <a href="https://wa.me/${cleanPhone}?text=${whatsappMessage}" target="_blank" class="flex-1 sm:flex-initial px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs sm:text-sm font-extrabold shadow-lg shadow-emerald-600/30 transition-all flex items-center justify-center gap-2 active:scale-98">
-          <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
-          <span>Contactar por WhatsApp</span>
-        </a>
-      </div>
-    </div>
-  </div>
-
   <!-- Initialize Charts (Energy Balance & Cumulative ROI with Brand Colors) -->
   <script>
     document.addEventListener('DOMContentLoaded', function () {
+      const isMobile = window.innerWidth < 640;
+
       // 1. Energy Balance Bar Chart (Sky Blue for Consumption, Solar Orange for Generation)
       const energyCtx = document.getElementById('energyChart');
       if (energyCtx) {
@@ -844,13 +861,13 @@ export function renderProposalPage(stored: StoredProposal): string {
                 label: 'Consumo (kWh)',
                 data: ${monthConsumption},
                 backgroundColor: '#0284c7', // Sky Blue
-                borderRadius: 4,
+                borderRadius: isMobile ? 3 : 4,
               },
               {
                 label: 'Producción Solar (kWh)',
                 data: ${monthProduction},
                 backgroundColor: '#ff7a00', // Solar Orange
-                borderRadius: 4,
+                borderRadius: isMobile ? 3 : 4,
               }
             ]
           },
@@ -862,20 +879,27 @@ export function renderProposalPage(stored: StoredProposal): string {
               legend: { display: false },
               tooltip: {
                 backgroundColor: '#0f172a',
-                padding: 10,
+                padding: isMobile ? 8 : 10,
                 boxPadding: 4,
-                titleFont: { family: 'Plus Jakarta Sans', weight: 'bold' },
-                bodyFont: { family: 'JetBrains Mono' },
+                titleFont: { family: 'Plus Jakarta Sans', weight: 'bold', size: isMobile ? 11 : 12 },
+                bodyFont: { family: 'JetBrains Mono', size: isMobile ? 10 : 12 },
               }
             },
             scales: {
               x: {
                 grid: { display: false },
-                ticks: { color: '#64748b', font: { family: 'Plus Jakarta Sans', size: 10, weight: 'bold' } }
+                ticks: {
+                  color: '#64748b',
+                  font: { family: 'Plus Jakarta Sans', size: isMobile ? 9 : 10, weight: 'bold' },
+                  maxRotation: isMobile ? 45 : 0
+                }
               },
               y: {
                 grid: { color: '#e0f2fe' },
-                ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 10 } }
+                ticks: {
+                  color: '#64748b',
+                  font: { family: 'JetBrains Mono', size: isMobile ? 9 : 10 }
+                }
               }
             }
           }
@@ -897,7 +921,7 @@ export function renderProposalPage(stored: StoredProposal): string {
                 label: 'Beneficio Acumulado (USD)',
                 data: cumValues,
                 backgroundColor: cumColors,
-                borderRadius: 3,
+                borderRadius: isMobile ? 2 : 3,
               }
             ]
           },
@@ -908,7 +932,7 @@ export function renderProposalPage(stored: StoredProposal): string {
               legend: { display: false },
               tooltip: {
                 backgroundColor: '#0f172a',
-                padding: 10,
+                padding: isMobile ? 8 : 10,
                 boxPadding: 4,
                 callbacks: {
                   label: function(context) {
@@ -920,13 +944,17 @@ export function renderProposalPage(stored: StoredProposal): string {
             scales: {
               x: {
                 grid: { display: false },
-                ticks: { color: '#64748b', font: { family: 'Plus Jakarta Sans', size: 9 }, maxTicksLimit: 14 }
+                ticks: {
+                  color: '#64748b',
+                  font: { family: 'Plus Jakarta Sans', size: isMobile ? 8 : 9 },
+                  maxTicksLimit: isMobile ? 7 : 14
+                }
               },
               y: {
                 grid: { color: '#e0f2fe' },
                 ticks: {
                   color: '#64748b',
-                  font: { family: 'JetBrains Mono', size: 10 },
+                  font: { family: 'JetBrains Mono', size: isMobile ? 9 : 10 },
                   callback: function(value) {
                     return '$' + (value / 1000).toFixed(0) + 'k';
                   }
