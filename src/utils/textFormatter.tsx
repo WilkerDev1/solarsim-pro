@@ -94,6 +94,10 @@ export function resolveDynamicProjectSummaryParagraph1(
     `$1**${summary.annualConsumptionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh**`
   );
 
+  text = text.replace(/M[oó]dulos?\s+M[oó]dulos?/gi, 'Módulos');
+  text = text.replace(/(\(\d+W\))\s+\1/gi, '$1');
+  text = text.replace(/(Canadian Solar[^(]+?\(\d+W\))\s+\1/gi, '$1');
+
   return text;
 }
 
@@ -148,6 +152,11 @@ export function resolveDynamicProjectSummaryParagraph2(
       );
     }
   }
+
+  text = text.replace(/Inversor(?:es)?\s+Inversor(?:es)?/gi, invLabel);
+  text = text.replace(/Bater[íi]as?\s+Bater[íi]as?/gi, batLabel);
+  text = text.replace(/(\(\d+(?:\.\d+)?\s*k?W\))\s+\1/gi, '$1');
+  text = text.replace(/(\(\d+(?:\.\d+)?\s*kWh\))\s+\1/gi, '$1');
 
   return text;
 }

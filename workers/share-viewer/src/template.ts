@@ -186,9 +186,24 @@ export function renderProposalPage(stored: StoredProposal): string {
     ? custom.projectSummarySubtitle.trim()
     : `Criterios de dimensionamiento técnico y solar para ${clientName}`;
 
-  const defaultP1 = `El consumo promedio anual de **${clientName}** es de **${annualConsumptionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh** (aprox. ${monthlyAvgConsumption.toLocaleString()} kWh/mes), por lo que se le propone la instalación de **${panelCount} ${panelBrandModel} (${panelPowerW}W)**, alcanzando una potencia DC instalada de **${systemCapacityKWp} kWp**. La producción energética estimada para este sistema es de **${annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh anuales**, representando el **${coveragePct.toFixed(1)}%** de cobertura del consumo total.`;
+  const rawPanelDesc = panelBrandModel.replace(/^m[oó]dulos?\s+/i, '').trim();
+  const cleanPanelModel = (rawPanelDesc.toLowerCase().includes('w') || panelPowerW <= 0)
+    ? rawPanelDesc
+    : `${rawPanelDesc} (${panelPowerW}W)`;
 
-  const defaultP2 = `Adicionalmente, se contempla la instalación de **${inverterCount} ${inverterBrandModel} (${inverterPowerKW} kW)**${hasBattery && batteryCapacityKWh > 0 ? ` y **${batteryCount} ${batteryBrandModel} (${batteryCapacityKWh} kWh)**` : ''}, ${custom.projectEngineeringScopeText || specs.installationServicesDesc || 'junto con todos los componentes de ingeniería complementarios (estructuras de montaje en aluminio anodizado de alta resistencia, cableado fotovoltaico resistente a rayos UV, protecciones en CC/CA, interruptores de desconexión y supresores de sobretensión) para garantizar un funcionamiento seguro, eficiente y duradero del sistema.'}.`;
+  const rawInverterDesc = inverterBrandModel.replace(/^inversores?\s+/i, '').trim();
+  const cleanInverterModel = (rawInverterDesc.toLowerCase().includes('kw') || Number(inverterPowerKW) <= 0)
+    ? rawInverterDesc
+    : `${rawInverterDesc} (${inverterPowerKW} kW)`;
+
+  const rawBatteryDesc = batteryBrandModel.replace(/^bater[íi]as?\s+/i, '').trim();
+  const cleanBatteryModel = (rawBatteryDesc.toLowerCase().includes('kwh') || batteryCapacityKWh <= 0)
+    ? rawBatteryDesc
+    : `${rawBatteryDesc} (${batteryCapacityKWh} kWh)`;
+
+  const defaultP1 = `El consumo promedio anual de **${clientName}** es de **${annualConsumptionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh** (aprox. ${monthlyAvgConsumption.toLocaleString()} kWh/mes), por lo que se le propone la instalación de **${panelCount} Módulos ${cleanPanelModel}**, alcanzando una potencia DC instalada de **${systemCapacityKWp} kWp**. La producción energética estimada para este sistema es de **${annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh anuales**, representando el **${coveragePct.toFixed(1)}%** de cobertura del consumo total.`;
+
+  const defaultP2 = `Adicionalmente, se contempla la instalación de **${inverterCount} Inversor${inverterCount > 1 ? 'es' : ''} ${cleanInverterModel}**${hasBattery && batteryCapacityKWh > 0 ? ` y **${batteryCount} Batería${batteryCount > 1 ? 's' : ''} ${cleanBatteryModel}**` : ''}, ${custom.projectEngineeringScopeText || specs.installationServicesDesc || 'junto con todos los componentes de ingeniería complementarios (estructuras de montaje en aluminio anodizado de alta resistencia, cableado fotovoltaico resistente a rayos UV, protecciones en CC/CA, interruptores de desconexión y supresores de sobretensión) para garantizar un funcionamiento seguro, eficiente y duradero del sistema.'}.`;
 
   const resolvedP1 = (() => {
     let text = custom.customProjectSummaryParagraph1 && custom.customProjectSummaryParagraph1.trim()
@@ -197,15 +212,18 @@ export function renderProposalPage(stored: StoredProposal): string {
     text = text
       .replace(/{clientName}/gi, clientName)
       .replace(/{panelCount}/gi, String(panelCount))
-      .replace(/{panelModel}/gi, `${panelBrandModel} (${panelPowerW}W)`)
+      .replace(/{panelModel}/gi, `Módulos ${cleanPanelModel}`)
       .replace(/{systemCapacityKWp}/gi, `${systemCapacityKWp} kWp`)
       .replace(/{annualProductionKWh}/gi, `${annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh`)
       .replace(/{annualConsumptionKWh}/gi, `${annualConsumptionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh`)
       .replace(/{energyCoveragePct}/gi, `${coveragePct.toFixed(1)}%`);
-    text = text.replace(/(\*\*?\s*)\d+\s+Módulos[^*]*?(\s*\*?\*?)/i, `$1${panelCount} ${panelBrandModel} (${panelPowerW}W)$2`);
+    text = text.replace(/(\*\*?\s*)\d+\s+Módulos[^*]*?(\s*\*?\*?)/i, `$1${panelCount} Módulos ${cleanPanelModel}$2`);
     text = text.replace(/(potencia\s+DC\s+instalada\s+de\s+\*\*?)\d+(?:\.\d+)?\s*kWp(\*\*?)/i, `$1${systemCapacityKWp} kWp$2`);
     text = text.replace(/(producción\s+energética\s+estimada\s+para\s+este\s+sistema\s+es\s+de\s+\*\*?)[\d,.]+\s*kWh\s+anuales(\*\*?)/i, `$1${annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh anuales$2`);
     text = text.replace(/(representando\s+el\s+\*\*?)[\d,.]+%\s*(\*\*?\s*del\s+consumo|\*\*?\s*de\s+cobertura)/i, `$1${coveragePct.toFixed(1)}%$2`);
+    text = text.replace(/M[oó]dulos?\s+M[oó]dulos?/gi, 'Módulos');
+    text = text.replace(/(\(\d+W\))\s+\1/gi, '$1');
+    text = text.replace(/(Canadian Solar[^(]+?\(\d+W\))\s+\1/gi, '$1');
     return text;
   })();
 
@@ -215,13 +233,17 @@ export function renderProposalPage(stored: StoredProposal): string {
       : defaultP2;
     text = text
       .replace(/{inverterCount}/gi, String(inverterCount))
-      .replace(/{inverterModel}/gi, `${inverterBrandModel} (${inverterPowerKW} kW)`)
+      .replace(/{inverterModel}/gi, `Inversor${inverterCount > 1 ? 'es' : ''} ${cleanInverterModel}`)
       .replace(/{batteryCount}/gi, String(batteryCount))
-      .replace(/{batteryModel}/gi, `${batteryBrandModel} (${batteryCapacityKWh} kWh)`);
-    text = text.replace(/(instalación\s+de\s+\*\*?)\d+\s+Inversor[^*]*?(\*\*?)/i, `$1${inverterCount} ${inverterBrandModel} (${inverterPowerKW} kW)$2`);
+      .replace(/{batteryModel}/gi, `Batería${batteryCount > 1 ? 's' : ''} ${cleanBatteryModel}`);
+    text = text.replace(/(instalación\s+de\s+\*\*?)\d+\s+Inversor[^*]*?(\*\*?)/i, `$1${inverterCount} Inversor${inverterCount > 1 ? 'es' : ''} ${cleanInverterModel}$2`);
     if (hasBattery && batteryCapacityKWh > 0 && /Batería/i.test(text)) {
-      text = text.replace(/(y\s+\*\*?)\d+\s+Batería[^*]*?(\*\*?)/i, `$1${batteryCount} ${batteryBrandModel} (${batteryCapacityKWh} kWh)$2`);
+      text = text.replace(/(y\s+\*\*?)\d+\s+Batería[^*]*?(\*\*?)/i, `$1${batteryCount} Batería${batteryCount > 1 ? 's' : ''} ${cleanBatteryModel}$2`);
     }
+    text = text.replace(/Inversor(?:es)?\s+Inversor(?:es)?/gi, inverterCount > 1 ? 'Inversores' : 'Inversor');
+    text = text.replace(/Bater[íi]as?\s+Bater[íi]as?/gi, batteryCount > 1 ? 'Baterías' : 'Batería');
+    text = text.replace(/(\(\d+(?:\.\d+)?\s*k?W\))\s+\1/gi, '$1');
+    text = text.replace(/(\(\d+(?:\.\d+)?\s*kWh\))\s+\1/gi, '$1');
     return text;
   })();
 
