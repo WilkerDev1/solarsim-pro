@@ -8,6 +8,10 @@ import {
   Zap,
   BatteryCharging,
   Percent,
+  RefreshCw,
+  AlertTriangle,
+  ArrowRight,
+  Info,
 } from 'lucide-react';
 import { ExtractedInvoiceData } from '../../../../types/aiInvoice';
 import { SolarEquipmentItem } from '../../../../types/equipment';
@@ -31,6 +35,10 @@ export const AIInvoiceSolarTab: React.FC<AIInvoiceSolarTabProps> = ({
   handleCoverageChange,
   handlePanelChange,
 }) => {
+  const isPanelSubstituted = extractedData.equipmentSubstitutions?.some((s) => s.type === 'panel');
+  const isInverterSubstituted = extractedData.equipmentSubstitutions?.some((s) => s.type === 'inverter');
+  const isBatterySubstituted = extractedData.equipmentSubstitutions?.some((s) => s.type === 'battery');
+
   return (
     <div className="space-y-4">
       {/* Resumen del Asistente Solar IA */}
@@ -49,6 +57,46 @@ export const AIInvoiceSolarTab: React.FC<AIInvoiceSolarTabProps> = ({
           <p className="text-[11.5px] leading-relaxed opacity-90 font-sans">
             {extractedData.aiReasoningSummary}
           </p>
+        </div>
+      )}
+
+      {/* 🔄 Equipos Seleccionados por Sustitución Inteligente (si lo solicitado no figuraba en catálogo) */}
+      {extractedData.equipmentSubstitutions && extractedData.equipmentSubstitutions.length > 0 && (
+        <div
+          className={`p-3.5 rounded-xl border space-y-2.5 ${
+            isDark
+              ? 'bg-amber-950/30 border-amber-600/40 text-amber-200'
+              : 'bg-amber-50 border-amber-300 text-amber-950'
+          }`}
+        >
+          <div className="flex items-center gap-2 font-bold text-xs text-amber-400">
+            <RefreshCw className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>Selección Inteligente por Sustitución (Equipos fuera de base de datos):</span>
+          </div>
+          <p className="text-[11px] leading-relaxed opacity-90">
+            El sistema detectó que los siguientes equipos solicitados no figuran en la base de datos local y seleccionó automáticamente la alternativa equivalente más cercana del catálogo:
+          </p>
+
+          <div className="grid grid-cols-1 gap-2 pt-0.5">
+            {extractedData.equipmentSubstitutions.map((sub, idx) => (
+              <div
+                key={idx}
+                className={`p-2.5 rounded-lg border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
+                  isDark ? 'bg-black/40 border-amber-700/30' : 'bg-white/80 border-amber-200 shadow-xs'
+                }`}
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[9px] uppercase font-mono font-bold px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                    {sub.type === 'panel' ? 'Módulo' : sub.type === 'inverter' ? 'Inversor' : 'Batería'}
+                  </span>
+                  <span className="line-through opacity-70 text-[11px]">{sub.requestedModel}</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span className="font-bold text-emerald-400 text-[11.5px]">{sub.selectedModel}</span>
+                </div>
+                <span className="text-[10px] text-zinc-400 italic sm:text-right">{sub.reason}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -161,16 +209,25 @@ export const AIInvoiceSolarTab: React.FC<AIInvoiceSolarTabProps> = ({
           isDark ? 'bg-[#181822] border-[#2a2a38]' : 'bg-white border-slate-200'
         }`}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <Layers className="w-4 h-4 text-emerald-500" />
             <span className="text-xs font-bold text-slate-800 dark:text-zinc-100">
               Módulo Fotovoltaico (Catálogo Oficial)
             </span>
+            {isPanelSubstituted && (
+              <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 flex items-center gap-1">
+                <RefreshCw className="w-3 h-3" /> Sustituto IA
+              </span>
+            )}
           </div>
-          {extractedData.selectedPanelUnitPriceUSD && (
+          {extractedData.selectedPanelUnitPriceUSD ? (
             <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
               Compra: ${extractedData.selectedPanelUnitPriceUSD} USD/ud
+            </span>
+          ) : (
+            <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/30 flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3" /> Sin precio asignado (Por cotizar)
             </span>
           )}
         </div>
@@ -232,16 +289,25 @@ export const AIInvoiceSolarTab: React.FC<AIInvoiceSolarTabProps> = ({
           isDark ? 'bg-[#181822] border-[#2a2a38]' : 'bg-white border-slate-200'
         }`}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <Zap className="w-4 h-4 text-cyan-400" />
             <span className="text-xs font-bold text-slate-800 dark:text-zinc-100">
               Inversor Solar Emparejado
             </span>
+            {isInverterSubstituted && (
+              <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 flex items-center gap-1">
+                <RefreshCw className="w-3 h-3" /> Sustituto IA
+              </span>
+            )}
           </div>
-          {extractedData.selectedInverterUnitPriceUSD && (
+          {extractedData.selectedInverterUnitPriceUSD ? (
             <span className="text-[10px] font-mono font-bold text-cyan-400 bg-cyan-500/10 px-2.5 py-0.5 rounded-full border border-cyan-500/20">
               Compra: ${extractedData.selectedInverterUnitPriceUSD} USD/ud
+            </span>
+          ) : (
+            <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/30 flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3" /> Sin precio asignado (Por cotizar)
             </span>
           )}
         </div>
@@ -262,6 +328,13 @@ export const AIInvoiceSolarTab: React.FC<AIInvoiceSolarTabProps> = ({
             <span className="text-[9px] uppercase font-bold text-zinc-500">Capacidad Total</span>
           </div>
         </div>
+
+        {!extractedData.selectedInverterUnitPriceUSD && (
+          <div className="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[10.5px] text-amber-300 flex items-center gap-2">
+            <Info className="w-3.5 h-3.5 shrink-0" />
+            <span>Equipo seleccionado del catálogo sin cotización de distribuidor asignada. Podrás fijar su costo en el simulador.</span>
+          </div>
+        )}
       </div>
 
       {/* 🔋 Baterías BESS (Si aplica o fue especificado en los requisitos) */}
@@ -271,16 +344,25 @@ export const AIInvoiceSolarTab: React.FC<AIInvoiceSolarTabProps> = ({
             isDark ? 'bg-[#181822] border-[#2a2a38]' : 'bg-white border-slate-200'
           }`}
         >
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <BatteryCharging className="w-4 h-4 text-emerald-400" />
               <span className="text-xs font-bold text-slate-800 dark:text-zinc-100">
                 Banco de Baterías Litio LiFePO4 (BESS)
               </span>
+              {isBatterySubstituted && (
+                <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 flex items-center gap-1">
+                  <RefreshCw className="w-3 h-3" /> Sustituto IA
+                </span>
+              )}
             </div>
-            {extractedData.selectedBatteryUnitPriceUSD && (
+            {extractedData.selectedBatteryUnitPriceUSD ? (
               <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
                 Compra: ${extractedData.selectedBatteryUnitPriceUSD} USD/ud
+              </span>
+            ) : (
+              <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/30 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" /> Sin precio asignado (Por cotizar)
               </span>
             )}
           </div>
@@ -301,6 +383,13 @@ export const AIInvoiceSolarTab: React.FC<AIInvoiceSolarTabProps> = ({
               <span className="text-[9px] uppercase font-bold text-zinc-500">Almacenamiento</span>
             </div>
           </div>
+
+          {!extractedData.selectedBatteryUnitPriceUSD && (
+            <div className="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[10.5px] text-amber-300 flex items-center gap-2">
+              <Info className="w-3.5 h-3.5 shrink-0" />
+              <span>Batería seleccionada del catálogo sin cotización de distribuidor asignada. Podrás fijar su costo en el simulador.</span>
+            </div>
+          )}
         </div>
       )}
 

@@ -79,20 +79,27 @@ REGLAS DE EXTRACCIÓN DETALLADAS PARA FACTURAS DOMINICANAS (EDEESTE, EDESUR, EDE
    d) BATERÍAS BESS (ALMACENAMIENTO):
       - Si se solicitan baterías (ej. '2 bateria hinaes de 16kw' o '2 bateria de 16k weco'):
         * hasBattery = true
-        * matchedBatteryModel = modelo del catálogo (ej. 'Banco de Baterías de Litio HinaESS PowerGem Max 16.08kWh')
+        * matchedBatteryModel = modelo del catálogo (ej. 'Batería WeCo 16K0-LV (16.06kWh)' o 'Batería HinaESS PowerGem Max (16.08kWh)')
         * matchedBatteryId = id del catálogo
-        * matchedBatteryCapacityKWh = 16.08 (o la capacidad nominal en kWh)
+        * matchedBatteryCapacityKWh = 16.06 (o la capacidad nominal en kWh)
         * matchedBatteryCount = 2
       - Si no se mencionan baterías: hasBattery = false, matchedBatteryCount = 0.
-   e) MARGEN DE VENTA COMERCIAL:
+   e) REGLA CRÍTICA DE EQUIPOS SIN PRECIO ASIGNADO ('DISPONIBLE_SIN_PRECIO'):
+      - Si el equipo solicitado existe en el catálogo pero no tiene precios de distribuidores (priceStatus: 'DISPONIBLE_SIN_PRECIO'), DEBES SELECCIONARLO DE TODOS MODOS con su ID y nombre correspondiente. La falta de precio de proveedor no impide su selección en la propuesta.
+   f) REGLA DE SUSTITUCIÓN INTELIGENTE (EQUIPOS QUE NO EXISTEN EN LA BASE DE DATOS):
+      - Si el usuario solicita un equipo o marca que NO figura en el catálogo de referencia (ej. una marca no existente o potencia no disponible):
+        1. DEBES SELECCIONAR OBLIGATORIAMENTE UN SUSTITUTO del catálogo con función y potencia/capacidad equivalente (ej. si piden inversor 8 kW y no hay la marca solicitada, selecciona Luxpower 8K; si piden batería 16 kWh y no hay la marca, selecciona HinaESS 16.08 kWh).
+        2. Registra la sustitución en 'equipmentSubstitutions' indicando 'type', 'requestedModel', 'selectedModel' y 'reason'.
+        3. Explica claramente la sustitución en 'aiReasoningSummary'.
+   g) MARGEN DE VENTA COMERCIAL:
       - Si se especifica 'Porcentaje de venta 40%' o 'Venta 40%' -> targetMarginPct = 40.
-   f) NOTAS Y RAZONAMIENTO:
-      - 'specialTechnicalNotes': Requisitos especiales como 'Equipos según disponibilidad y diseñado para 40kwh diario'.
-      - 'aiReasoningSummary': Resumen claro en español de cómo se interpretó la solicitud y qué equipos se seleccionaron.
-   g) SÍNTESIS DE CONSUMO SIN FACTURA:
+   h) SÍNTESIS DE CONSUMO SIN FACTURA:
       - Si no se suministra factura pero el texto dice 'diseñado para 40kwh diario', genera 'monthlyConsumptionKWh' con 12 valores de Math.round(40 * 30.4) = 1216 kWh.
-   h) DIRECTIVA DE CALIDAD TÉCNICA Y SÍNTESIS PROFESIONAL:
-      - En los campos descriptivos ('specialTechnicalNotes', 'aiReasoningSummary', 'notes'), proporciona explicaciones técnicas claras, profesionales y sustanciosas sobre la justificación del dimensionamiento, acople DC/AC y configuración de equipos, sin incurrir en relleno redundante, especificaciones irrelevantes no solicitadas ni repeticiones de texto.`;
+   i) DIRECTIVA ESTRICTA DE CONCISIÓN TÉCNICA (MÁXIMO 350 CARACTERES POR CAMPO):
+      - 'specialTechnicalNotes': Máximo 2 oraciones (ej. 'Sistema diseñado para 40 kWh/día con acople de baterías y equipos según disponibilidad').
+      - 'aiReasoningSummary': Resumen profesional de 2 a 3 oraciones de los equipos seleccionados o sustituidos.
+      - 'notes': Resumen breve de la factura o dimensionamiento.
+      - PROHIBICIÓN ABSOLUTA: NUNCA copies, listes, repitas ni vuelques el catálogo de equipos dentro de estos campos de texto.`;
 
 const INVOICE_JSON_SCHEMA = {
   type: 'OBJECT',
@@ -152,6 +159,19 @@ const INVOICE_JSON_SCHEMA = {
     aiReasoningSummary: { type: 'STRING' },
     confidenceScore: { type: 'NUMBER' },
     notes: { type: 'STRING' },
+    equipmentSubstitutions: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          type: { type: 'STRING', enum: ['panel', 'inverter', 'battery'] },
+          requestedModel: { type: 'STRING' },
+          selectedModel: { type: 'STRING' },
+          reason: { type: 'STRING' },
+        },
+        required: ['type', 'requestedModel', 'selectedModel', 'reason'],
+      },
+    },
   },
   required: [
     'clientName',
@@ -340,14 +360,9 @@ export function registerAIInvoiceHandlers() {
           id: e.id,
           type: e.type,
           brand: e.brand,
-          displayName: e.displayName,
-          modelSeries: e.modelSeries,
-          powerW: e.powerW,
-          powerKW: e.powerKW,
-          capacityKWh: e.capacityKWh,
-          bestPriceUSD: bestSp?.priceUSD,
-          bestSupplierName: bestSp?.supplierName,
-          supplierPriceId: bestSp?.id,
+          model: e.displayName,
+          powerOrCap: e.type === 'panel' ? `${e.powerW}W` : e.type === 'inverter' ? `${e.powerKW}kW` : `${e.capacityKWh}kWh`,
+          priceStatus: bestSp ? `$${bestSp.priceUSD} USD (${bestSp.supplierName})` : 'DISPONIBLE_SIN_PRECIO',
         };
       });
 
@@ -361,19 +376,21 @@ export function registerAIInvoiceHandlers() {
       if (projectRequirementsText && projectRequirementsText.trim()) {
         promptIntro += `REQUISITOS Y ESPECIFICACIONES TÉCNICAS DEL PROYECTO:\n"""\n${projectRequirementsText.trim()}\n"""\n\n`;
         promptIntro += `INSTRUCCIONES CLAVE DE SÍNTESIS CON REQUISITOS:\n`;
-        promptIntro += `1. Si el texto indica nombre del cliente (ej. 'Giovanni Gottardo' o 'Osia Moscoso'), dale prioridad absoluta en 'clientName'.\n`;
+        promptIntro += `1. Si el texto indica nombre del cliente (ej. 'Josia Moscoso' o 'Giovanni Gottardo'), dale prioridad absoluta en 'clientName'.\n`;
         promptIntro += `2. Analiza los equipos solicitados (paneles, inversores, baterías) y emparéjalos con los IDs y modelos del CATÁLOGO DE REFERENCIA adjunto.\n`;
-        promptIntro += `3. Si se especifica cantidad de paneles o kWp (ej. '21 panel' o '11 kwp paneles'), calcula o asigna la cantidad en 'matchedPanelCount'.\n`;
-        promptIntro += `4. Si se especifica inversor (ej. '1 inversor lux power de 16 kw' o '1 weco 8 kw'), identifica el modelo, asigna en 'matchedInverterPowerKW' la potencia unitaria nominal (ej. 8.0 kW para Lux Power 8K) y en 'matchedInverterCount' la cantidad (ej. 2 unidades para 16 kW en paralelo).\n`;
-        promptIntro += `5. Si se mencionan baterías (ej. '2 bateria hinaes de 16kw' o '2 bateria de 16k weco'), marca 'hasBattery' = true, empareja 'matchedBatteryModel' y 'matchedBatteryId', asigna 'matchedBatteryCapacityKWh' (ej. 16.08) y 'matchedBatteryCount' (ej. 2).\n`;
-        promptIntro += `6. Si se menciona margen comercial (ej. 'Porcentaje de venta 40%' o 'Venta 40%'), asigna 'targetMarginPct' = 40.\n`;
-        promptIntro += `7. Si no hay factura pero se menciona 'diseñado para X kwh diario', genera un consumo mensual de Math.round(X * 30.4) para los 12 meses.\n`;
-        promptIntro += `8. En 'aiReasoningSummary', resume brevemente en español las decisiones tomadas para asistir al instalador.\n\n`;
+        promptIntro += `3. Si un equipo del catálogo tiene priceStatus 'DISPONIBLE_SIN_PRECIO', es 100% VÁLIDO y debes seleccionarlo si coincide con lo solicitado.\n`;
+        promptIntro += `4. Si el equipo solicitado no existe en el catálogo, selecciona un sustituto del catálogo de similar potencia/capacidad, agrégalo a 'equipmentSubstitutions' y explícalo en 'aiReasoningSummary'.\n`;
+        promptIntro += `5. Si se especifica cantidad de paneles o kWp (ej. '21 panel' o '11 kwp paneles'), calcula o asigna la cantidad en 'matchedPanelCount' (ej. 11000 / 615 = 18 paneles).\n`;
+        promptIntro += `6. Si se especifica inversor (ej. '1 inversor lux power de 16 kw' o '1 weco 8 kw'), identifica el modelo, asigna en 'matchedInverterPowerKW' la potencia unitaria nominal y en 'matchedInverterCount' la cantidad.\n`;
+        promptIntro += `7. Si se mencionan baterías (ej. '2 bateria hinaes de 16kw' o '2 bateria de 16k weco'), marca 'hasBattery' = true, empareja 'matchedBatteryModel' y 'matchedBatteryId', asigna 'matchedBatteryCapacityKWh' y 'matchedBatteryCount'.\n`;
+        promptIntro += `8. Si se menciona margen comercial (ej. 'Porcentaje de venta 40%' o 'Venta 40%'), asigna 'targetMarginPct' = 40.\n`;
+        promptIntro += `9. Si no hay factura pero se menciona 'diseñado para X kwh diario' (ej. 40kwh diario), genera un consumo mensual de Math.round(X * 30.4) para los 12 meses (ej. 1216 kWh).\n`;
+        promptIntro += `10. CONCISIÓN OBLIGATORIA: 'specialTechnicalNotes', 'aiReasoningSummary' y 'notes' deben ser muy breves (< 350 caracteres). NUNCA listes ni repitas el catálogo dentro de ellos.\n\n`;
       }
 
       if (referenceCatalogCondensed.length > 0) {
         promptIntro += `CATÁLOGO DE EQUIPOS DISPONIBLES EN EL SISTEMA (Para emparejar exactamente los IDs y modelos solicitados):\n`;
-        promptIntro += `${JSON.stringify(referenceCatalogCondensed, null, 2)}\n\n`;
+        promptIntro += referenceCatalogCondensed.map(item => JSON.stringify(item)).join('\n') + '\n\n';
       }
 
       promptIntro += `TASA DE CAMBIO: 1 USD = ${dopExchangeRate} DOP. Responde estrictamente con el JSON estructurado solicitado.`;
@@ -443,7 +460,7 @@ export function registerAIInvoiceHandlers() {
         };
       }
 
-      function safeParseJson(raw: string): any {
+      function robustParseJson(raw: string): any {
         let clean = raw.trim();
         if (clean.startsWith('```json')) {
           clean = clean.replace(/^```json\s*/, '').replace(/\s*```$/, '');
@@ -452,20 +469,70 @@ export function registerAIInvoiceHandlers() {
         }
         try {
           return JSON.parse(clean);
-        } catch (err: any) {
-          const lastBrace = clean.lastIndexOf('}');
-          if (lastBrace > 0) {
-            try {
-              return JSON.parse(clean.slice(0, lastBrace + 1));
-            } catch {
-              // ignore
+        } catch (firstErr: any) {
+          try {
+            let repaired = clean;
+            let inString = false;
+            let escaped = false;
+            const openBrackets: string[] = [];
+
+            for (let i = 0; i < repaired.length; i++) {
+              const char = repaired[i];
+              if (char === '\\' && inString) {
+                escaped = !escaped;
+                continue;
+              }
+              if (char === '"' && !escaped) {
+                inString = !inString;
+              }
+              if (!inString) {
+                if (char === '{' || char === '[') {
+                  openBrackets.push(char);
+                } else if (char === '}') {
+                  if (openBrackets[openBrackets.length - 1] === '{') openBrackets.pop();
+                } else if (char === ']') {
+                  if (openBrackets[openBrackets.length - 1] === '[') openBrackets.pop();
+                }
+              }
+              escaped = false;
             }
+
+            if (inString) {
+              repaired += '"';
+            }
+
+            repaired = repaired.replace(/,\s*$/, '');
+
+            while (openBrackets.length > 0) {
+              const last = openBrackets.pop();
+              if (last === '{') repaired += '}';
+              else if (last === '[') repaired += ']';
+            }
+
+            return JSON.parse(repaired);
+          } catch {
+            const lastComma = clean.lastIndexOf(',');
+            if (lastComma > 0) {
+              try {
+                return robustParseJson(clean.slice(0, lastComma));
+              } catch {
+                // ignore
+              }
+            }
+            const lastBrace = clean.lastIndexOf('}');
+            if (lastBrace > 0) {
+              try {
+                return JSON.parse(clean.slice(0, lastBrace + 1));
+              } catch {
+                // ignore
+              }
+            }
+            throw new Error(`Error interpretando JSON de la IA: ${firstErr?.message || 'Formato truncado'}`);
           }
-          throw new Error(`Error interpretando JSON de la IA: ${err?.message || 'Formato truncado'}`);
         }
       }
 
-      const parsed = safeParseJson(rawText);
+      const parsed = robustParseJson(rawText);
       const cleanName = (parsed.clientName || 'Cliente Propuesta Solar').replace(/\?/g, 'Ñ');
 
       // Normalize 12 months array
@@ -526,8 +593,19 @@ export function registerAIInvoiceHandlers() {
           selectedPanelModel = panMatch.displayName;
           selectedPanelWatts = panMatch.powerW || selectedPanelWatts;
         } else {
-          selectedPanelModel = parsed.matchedPanelModel;
-          selectedPanelWatts = parsed.matchedPanelWatts || selectedPanelWatts;
+          // Fallback al panel más cercano en potencia del catálogo si la marca pedida no existe
+          const targetW = parsed.matchedPanelWatts || selectedPanelWatts;
+          const sortedPanels = equipmentCatalog
+            .filter((e) => e.type === 'panel' && e.powerW)
+            .sort((a, b) => Math.abs((a.powerW || 0) - targetW) - Math.abs((b.powerW || 0) - targetW));
+          if (sortedPanels.length > 0) {
+            selectedPanelId = sortedPanels[0].id;
+            selectedPanelModel = sortedPanels[0].displayName;
+            selectedPanelWatts = sortedPanels[0].powerW || selectedPanelWatts;
+          } else {
+            selectedPanelModel = parsed.matchedPanelModel;
+            selectedPanelWatts = parsed.matchedPanelWatts || selectedPanelWatts;
+          }
         }
       }
 
@@ -565,6 +643,17 @@ export function registerAIInvoiceHandlers() {
             if (e.type !== 'inverter') return false;
             return matchBrandFuzzy(e.brand, reqInvStr) || reqInvStr.includes(e.brand.toLowerCase());
           });
+        }
+
+        // Fallback inteligente: si la marca pedida no existe en catálogo, elegir el inversor más cercano en kW
+        if (!invMatch) {
+          const targetKW = parsed.matchedInverterPowerKW || 8.0;
+          const sortedInverters = equipmentCatalog
+            .filter((e) => e.type === 'inverter' && e.powerKW)
+            .sort((a, b) => Math.abs((a.powerKW || 0) - targetKW) - Math.abs((b.powerKW || 0) - targetKW));
+          if (sortedInverters.length > 0) {
+            invMatch = sortedInverters[0];
+          }
         }
 
         if (invMatch) {
@@ -605,6 +694,17 @@ export function registerAIInvoiceHandlers() {
           });
         }
 
+        // Fallback inteligente: si la marca de batería no existe en catálogo, elegir la batería más cercana en kWh
+        if (!batMatch) {
+          const targetCap = parsed.matchedBatteryCapacityKWh || 16.08;
+          const sortedBatteries = equipmentCatalog
+            .filter((e) => e.type === 'battery' && e.capacityKWh)
+            .sort((a, b) => Math.abs((a.capacityKWh || 0) - targetCap) - Math.abs((b.capacityKWh || 0) - targetCap));
+          if (sortedBatteries.length > 0) {
+            batMatch = sortedBatteries[0];
+          }
+        }
+
         if (batMatch) {
           selectedBatteryId = batMatch.id;
           selectedBatteryModel = batMatch.displayName;
@@ -614,6 +714,51 @@ export function registerAIInvoiceHandlers() {
           selectedBatteryCapacityKWh = parsed.matchedBatteryCapacityKWh || 16.08;
         }
         selectedBatteryCount = parsed.matchedBatteryCount || 1;
+      }
+
+      // Detección y consolidación de sustituciones de equipos
+      const equipmentSubstitutions: Array<{
+        type: 'panel' | 'inverter' | 'battery';
+        requestedModel: string;
+        selectedModel: string;
+        reason: string;
+      }> = Array.isArray(parsed.equipmentSubstitutions) ? [...parsed.equipmentSubstitutions] : [];
+
+      if (projectRequirementsText) {
+        const reqLower = projectRequirementsText.toLowerCase();
+
+        // Inversor
+        if (selectedInverterModel) {
+          const knownInvBrands = ['weco', 'lux power', 'luxpower', 'solis', 'huawei', 'growatt', 'deye', 'sma', 'fronius', 'enphase', 'victron'];
+          const reqBrand = knownInvBrands.find(b => reqLower.includes(b));
+          if (reqBrand && !selectedInverterModel.toLowerCase().includes(reqBrand.replace('luxpower', 'lux'))) {
+            if (!equipmentSubstitutions.some(s => s.type === 'inverter')) {
+              equipmentSubstitutions.push({
+                type: 'inverter',
+                requestedModel: `Inversor ${reqBrand.toUpperCase()}`,
+                selectedModel: selectedInverterModel,
+                reason: `Marca ${reqBrand.toUpperCase()} no disponible en catálogo; se seleccionó ${selectedInverterModel} de potencia equivalente (${selectedInverterPowerKW || 8} kW).`,
+              });
+            }
+          }
+        }
+
+        // Batería
+        if (hasBattery && selectedBatteryModel) {
+          const knownBatBrands = ['weco', 'hinaess', 'hina', 'byd', 'tesla', 'pylontech', 'dyness'];
+          const reqBrand = knownBatBrands.find(b => reqLower.includes(b));
+          const normalizedReqBrand = reqBrand === 'hina' ? 'hinaess' : reqBrand;
+          if (normalizedReqBrand && !selectedBatteryModel.toLowerCase().includes(normalizedReqBrand)) {
+            if (!equipmentSubstitutions.some(s => s.type === 'battery')) {
+              equipmentSubstitutions.push({
+                type: 'battery',
+                requestedModel: `Batería ${normalizedReqBrand.toUpperCase()}`,
+                selectedModel: selectedBatteryModel,
+                reason: `Marca ${normalizedReqBrand.toUpperCase()} no disponible en catálogo; se seleccionó ${selectedBatteryModel} de capacidad equivalente (${selectedBatteryCapacityKWh || 16.08} kWh).`,
+              });
+            }
+          }
+        }
       }
 
       // Precios de proveedores y auto-pricing
@@ -737,6 +882,7 @@ export function registerAIInvoiceHandlers() {
         aiReasoningSummary: parsed.aiReasoningSummary || undefined,
         specialTechnicalNotes: parsed.specialTechnicalNotes || undefined,
         aiNotes: parsed.notes || undefined,
+        equipmentSubstitutions: equipmentSubstitutions.length > 0 ? equipmentSubstitutions : undefined,
       };
 
       return { success: true, data: result };

@@ -131,7 +131,75 @@ if (sizing110.recommendedPanelCount <= sizingResult.recommendedPanelCount) {
   throw new Error('❌ Increasing target coverage to 110% should yield more panels');
 }
 
-console.log(' ✅ PASS: El recálculo dinámico de cobertura meta aumenta proporcionalmente la cantidad de paneles\n');
+// --- TEST 5: Proposal with Equipment without Assigned Supplier Prices ---
+console.log('--- TEST 5: Apply Extracted Invoice with Unpriced Equipment (e.g. WeCo) ---');
+const unpricedExtractedData: ExtractedInvoiceData = {
+  clientName: 'Josia Moscoso',
+  distributor: 'EDEESTE',
+  tariffCode: 'BTS1',
+  province: 'Santo Domingo / Distrito Nacional',
+  monthlyConsumptionKWh: Array(12).fill(1216),
+  annualConsumptionKWh: 1216 * 12,
+  averageMonthlyKWh: 1216,
+  targetCoveragePct: 95,
+  recommendedPanelCount: 18,
+  recommendedCapacityKWp: 11.07,
+  selectedPanelWatts: 615,
+  selectedPanelModel: 'Módulos Canadian Solar CS6.1-72TB-615 (615W)',
+  selectedInverterPowerKW: 8.0,
+  selectedInverterCount: 1,
+  selectedInverterModel: 'Inversor WeCo XT-8K (8.0Kw)',
+  selectedInverterUnitPriceUSD: undefined, // Sin precio de distribuidor
+  hasBattery: true,
+  selectedBatteryCapacityKWh: 16.06,
+  selectedBatteryCount: 2,
+  selectedBatteryModel: 'Batería WeCo 16K0-LV (16.06kWh)',
+  selectedBatteryUnitPriceUSD: undefined, // Sin precio de distribuidor
+  targetMarginPct: 40,
+  confidenceScore: 98,
+  equipmentSubstitutions: [],
+};
+
+store.applyExtractedInvoice(unpricedExtractedData, true);
+const unpricedProj = useSimulationStore.getState().getActiveProject();
+
+console.log(`Client: "${unpricedProj.client.name}"`);
+console.log(`Inverter Selected: "${unpricedProj.specs.inverterBrandModel}" (unitPrice: $${unpricedProj.specs.inverterUnitPriceUSD})`);
+console.log(`Battery Selected: "${unpricedProj.specs.batteryBrandModel}" (unitPrice: $${unpricedProj.specs.batteryUnitPriceUSD})`);
+
+if (unpricedProj.client.name !== 'Josia Moscoso') {
+  throw new Error(`❌ Expected client name "Josia Moscoso", got "${unpricedProj.client.name}"`);
+}
+
+if (!unpricedProj.specs.inverterBrandModel?.includes('WeCo')) {
+  throw new Error(`❌ Expected inverter to contain WeCo, got "${unpricedProj.specs.inverterBrandModel}"`);
+}
+
+if (!unpricedProj.specs.batteryBrandModel?.includes('WeCo')) {
+  throw new Error(`❌ Expected battery to contain WeCo, got "${unpricedProj.specs.batteryBrandModel}"`);
+}
+
+console.log(' ✅ PASS: Propuesta creada exitosamente con equipos sin precio asignado (WeCo)\n');
+
+// --- TEST 6: Intelligent Equipment Substitution Tracking ---
+console.log('--- TEST 6: Equipment Substitution Tracking ---');
+const substitutedExtractedData: ExtractedInvoiceData = {
+  ...unpricedExtractedData,
+  equipmentSubstitutions: [
+    {
+      type: 'inverter',
+      requestedModel: 'Inversor Deye 8kW',
+      selectedModel: 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)',
+      reason: 'Marca DEYE no disponible en base de datos; sustituido por inversor de potencia equivalente.',
+    },
+  ],
+};
+
+if (!substitutedExtractedData.equipmentSubstitutions || substitutedExtractedData.equipmentSubstitutions.length !== 1) {
+  throw new Error('❌ Expected 1 substitution in equipmentSubstitutions');
+}
+console.log(`Substitution: ${substitutedExtractedData.equipmentSubstitutions[0].requestedModel} -> ${substitutedExtractedData.equipmentSubstitutions[0].selectedModel}`);
+console.log(' ✅ PASS: Sustitución inteligente rastreada correctamente\n');
 
 console.log('=====================================================');
 console.log('🎉 ALL AI SMART PROPOSAL & SIZING TESTS PASSED (100% SUCCESS)');

@@ -3,6 +3,13 @@ export interface InvoiceTierBlock {
   rateDOP: number;
 }
 
+export interface EquipmentSubstitutionInfo {
+  type: 'panel' | 'inverter' | 'battery';
+  requestedModel: string;
+  selectedModel: string;
+  reason: string;
+}
+
 export interface ExtractedInvoiceData {
   // Client & Company Identity
   clientName: string;
@@ -83,6 +90,7 @@ export interface ExtractedInvoiceData {
   aiReasoningSummary?: string;
   specialTechnicalNotes?: string;
   aiNotes?: string;
+  equipmentSubstitutions?: EquipmentSubstitutionInfo[];
 }
 
 export interface GeminiModelInfo {
