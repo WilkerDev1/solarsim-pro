@@ -94,9 +94,8 @@ REGLAS DE EXTRACCIÓN DETALLADAS PARA FACTURAS DOMINICANAS (EDEESTE, EDESUR, EDE
       - 'aiReasoningSummary': Resumen claro en español de cómo se interpretó la solicitud y qué equipos del catálogo se emparejaron.
    g) SÍNTESIS DE CONSUMO SIN FACTURA:
       - Si no se suministra factura pero el texto dice 'diseñado para 40kwh diario', genera 'monthlyConsumptionKWh' con 12 valores de Math.round(40 * 30.4) = 1216 kWh.
-   h) REGLA CRÍTICA DE BREVEDAD Y CONCISIÓN (OBLIGATORIA):
-      - Los campos de texto libre como 'specialTechnicalNotes', 'aiReasoningSummary' y 'notes' DEBEN SER MUY BREVES Y CONCISOS (máximo 1 o 2 oraciones, menos de 35 palabras cada uno).
-      - ESTRICTAMENTE PROHIBIDO redactar tratados largos de ingeniería eléctrica, memorias de cálculo extensas, especificaciones redundantes o bucles repetitivos de texto.`;
+   h) DIRECTIVA DE CALIDAD TÉCNICA Y SÍNTESIS PROFESIONAL:
+      - En los campos descriptivos ('specialTechnicalNotes', 'aiReasoningSummary', 'notes'), proporciona explicaciones técnicas claras, profesionales y sustanciosas sobre la justificación del dimensionamiento, acople DC/AC y configuración de equipos, sin incurrir en relleno redundante, especificaciones irrelevantes no solicitadas ni repeticiones de texto.`;
 
 const INVOICE_JSON_SCHEMA = {
   type: 'OBJECT',
@@ -497,13 +496,13 @@ export async function parseInvoiceWithGemini(params: {
     const isThinkingModel = currentModel.includes('3.7') || currentModel.includes('2.5');
 
     const generationConfig: any = {
-      temperature: 0.15,
-      maxOutputTokens: 4096,
+      temperature: 0.2,
+      maxOutputTokens: 8192,
       response_mime_type: 'application/json',
       response_schema: INVOICE_JSON_SCHEMA,
     };
     if (isThinkingModel) {
-      generationConfig.thinkingConfig = { thinkingBudget: 512 };
+      generationConfig.thinkingConfig = { thinkingBudget: 2048 };
     }
 
     const requestBody = {
