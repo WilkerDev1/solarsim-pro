@@ -198,6 +198,8 @@ export interface FinancialSummaryResult {
   batteryBackupAutonomyHours: number;
   customItemsTotalUSD?: number;
   customItemsITBISUSD?: number;
+  customItemsNonExoneratedITBISUSD?: number;
+  commercialPreTaxSubtotalUSD?: number;
   customItemsList?: CustomQuotationItem[];
 }
 

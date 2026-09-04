@@ -239,7 +239,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
             <div className="flex justify-between text-slate-700">
               <span className="font-bold">SUB-TOTAL (USD) SIN ITBIS :</span>
               <span className="font-bold font-mono">
-                ${(summary.costMatrix?.precioNetoUSD || (summary.grossInvestmentUSD - summary.itbisSavedUSD)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ${(summary.commercialPreTaxSubtotalUSD ?? (summary.grossInvestmentUSD - (summary.customItemsNonExoneratedITBISUSD || 0))).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="flex justify-between text-slate-900 bg-slate-200/80 px-2 py-0.5 rounded font-bold">

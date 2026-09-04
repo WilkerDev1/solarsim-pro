@@ -108,7 +108,7 @@ export function renderProposalPage(stored: StoredProposal): string {
   const equipmentPortionUSD = Number(summary?.equipmentPortionUSD || summary?.costMatrix?.equipmentVentaUSD || Math.max(0, grossInvestmentUSD - laborPortionUSD) || grossInvestmentUSD);
   const itbisSavedUSD = Number(summary?.itbisSavedUSD || 0);
   const ley5707CreditUSD = Number(summary?.ley5707CreditUSD || (equipmentPortionUSD * 0.40));
-  const subTotalSinITBIS = Number(summary?.costMatrix?.precioNetoUSD || (grossInvestmentUSD - itbisSavedUSD));
+  const subTotalSinITBIS = Number(summary?.commercialPreTaxSubtotalUSD || (grossInvestmentUSD - (summary?.customItemsNonExoneratedITBISUSD || 0)));
   const pricePerWattUSD = Number(specs.pricePerWattUSD || financials.pricePerWattUSD || (grossInvestmentUSD / (Number(systemCapacityKWp) * 1000)) || 1.13).toFixed(2);
 
   const paybackYears = Number(summary?.paybackYears || 0).toFixed(1);

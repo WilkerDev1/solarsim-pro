@@ -294,6 +294,92 @@ assert(
   resCustom.customItemsITBISUSD === 90.0,
   `customItemsITBISUSD reporta $90.00 de ITBIS exonerado`
 );
+assert(
+  resCustom.customItemsNonExoneratedITBISUSD === 54.0,
+  `customItemsNonExoneratedITBISUSD reporta $54.00 de ITBIS no exonerado`
+);
+
+// --- TEST 10: Commercial Pre-Tax Subtotal & Zero Wholesale Cost Leakage ---
+console.log('\n--- TEST 10: Commercial Pre-Tax Subtotal vs Wholesale Cost (Giovanni Gottardo Benchmark) ---');
+const giovanniSpecs: SystemSpecs = {
+  ...defaultSpecs,
+  panelCount: 21,
+  panelPowerW: 615,
+  panelUnitPriceUSD: 80,
+  inverterCount: 1,
+  inverterUnitPriceUSD: 2300,
+  hasBattery: true,
+  batteryCount: 2,
+  batteryCapacityKWh: 16.08,
+  batteryUnitPriceUSD: 1990,
+  installationUnitPriceUSD: 180,
+  pricingMode: 'cost_matrix',
+  saleMarginMultiplier: 1.40,
+};
+
+const giovanniFinancials: FinancialParams = {
+  ...defaultFinancials,
+  applyITBISExemption: true,
+  applyLey5707: true,
+  customItems: [
+    {
+      id: 'item-limiter',
+      description: 'Limitador de potencia',
+      quantity: 1,
+      unit: 'UD',
+      unitPriceUSD: 500,
+      exonerateITBIS: false, // $90 de ITBIS no exonerado
+    },
+  ],
+};
+
+const resGiovanni = calculateFinancialSummary(
+  'Santo Domingo / Distrito Nacional',
+  giovanniSpecs,
+  defaultRates,
+  giovanniFinancials,
+  monthlyConsumption
+);
+
+// 1. Costo mayorista interno (confidencial)
+const wholesaleCost = resGiovanni.costMatrix.precioNetoUSD;
+assert(
+  Math.abs(wholesaleCost - 10284.70) < 0.01,
+  `Costo mayorista interno es exactamente $10,284.70 ($${wholesaleCost})`
+);
+
+// 2. Subtotal comercial de venta antes de impuestos (lo que el cliente debe ver)
+const commercialSubtotal = resGiovanni.commercialPreTaxSubtotalUSD!;
+assert(
+  Math.abs(commercialSubtotal - 16487.36) < 0.01,
+  `Subtotal comercial antes de ITBIS es $16,487.36 ($${commercialSubtotal}), NO el costo mayorista ($10,284.70)`
+);
+
+// 3. Total General de Lista con ITBIS
+const totalGeneralConITBIS = resGiovanni.grossInvestmentUSD + resGiovanni.itbisSavedUSD;
+assert(
+  Math.abs(totalGeneralConITBIS - 17693.00) < 0.01,
+  `Total General con ITBIS es $17,693.00 ($${totalGeneralConITBIS})`
+);
+
+// 4. ITBIS a descontar por Ley 57-07
+assert(
+  Math.abs(resGiovanni.itbisSavedUSD - 1115.64) < 0.01,
+  `ITBIS a descontar por Ley 57-07 es $1,115.64 ($${resGiovanni.itbisSavedUSD})`
+);
+
+// 5. Total a pagar por el cliente con Ley 57-07
+assert(
+  Math.abs(resGiovanni.grossInvestmentUSD - 16577.36) < 0.01,
+  `Total a pagar final con Ley 57-07 es $16,577.36 ($${resGiovanni.grossInvestmentUSD})`
+);
+
+// 6. Validar que la brecha Total General - Subtotal sea estrictamente el ITBIS ($1,205.64), NUNCA 7.4K
+const itbisGap = Math.round((totalGeneralConITBIS - commercialSubtotal) * 100) / 100;
+assert(
+  Math.abs(itbisGap - 1205.64) < 0.01,
+  `Brecha entre Total General y Subtotal es exactamente el ITBIS ($1,205.64 vs $${itbisGap}), NUNCA 7.4K`
+);
 
 console.log('\n=====================================================');
 if (allPassed) {

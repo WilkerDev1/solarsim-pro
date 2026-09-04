@@ -273,6 +273,7 @@ export function calculateFinancialSummary(
 
   // If item is not exonerated, ITBIS is charged to the client in the final gross price
   const grossInvestmentUSD = Math.round((baseGrossInvestmentUSD + customItemsTotalUSD + nonExoneratedCustomITBISUSD) * 100) / 100;
+  const commercialPreTaxSubtotalUSD = Math.round((baseGrossInvestmentUSD + customItemsTotalUSD) * 100) / 100;
 
   // Synchronize Cost Matrix with Direct Price in direct_watt mode
   if (isDirectWatt) {
@@ -480,6 +481,8 @@ export function calculateFinancialSummary(
     batteryBackupAutonomyHours,
     customItemsTotalUSD,
     customItemsITBISUSD,
+    customItemsNonExoneratedITBISUSD: nonExoneratedCustomITBISUSD,
+    commercialPreTaxSubtotalUSD,
     customItemsList: customItems,
   };
 }
