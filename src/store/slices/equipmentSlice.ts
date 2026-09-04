@@ -5,6 +5,7 @@ import { SyncService } from '../../services/syncService';
 
 export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (set, get) => ({
   equipmentCatalog: DEFAULT_EQUIPMENT_CATALOG,
+  deletedEquipmentIds: [],
 
   addEquipmentItem: (item) => {
     set((state) => {
@@ -14,8 +15,10 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (set, get) 
             e.id === item.id || e.displayName === item.displayName ? { ...item, updatedAt: new Date().toISOString() } : e
           )
         : [item, ...state.equipmentCatalog];
+      const updatedDeleted = (state.deletedEquipmentIds || []).filter((delId) => delId !== item.id);
       return {
         equipmentCatalog: updated,
+        deletedEquipmentIds: updatedDeleted,
         saveFeedbackMessage: `¡Equipo "${item.displayName}" guardado en el catálogo! ✨`,
       };
     });
@@ -32,8 +35,11 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (set, get) 
       const catalogMap = new Map<string, SolarEquipmentItem>();
       state.equipmentCatalog.forEach((e) => catalogMap.set(e.displayName.toLowerCase(), e));
       items.forEach((item) => catalogMap.set(item.displayName.toLowerCase(), item));
+      const itemIds = new Set(items.map((i) => i.id));
+      const updatedDeleted = (state.deletedEquipmentIds || []).filter((delId) => !itemIds.has(delId));
       return {
         equipmentCatalog: Array.from(catalogMap.values()),
+        deletedEquipmentIds: updatedDeleted,
         saveFeedbackMessage: `¡${items.length} variantes agregadas exitosamente al catálogo! ⚡`,
       };
     });
@@ -61,14 +67,24 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (set, get) 
   },
 
   removeEquipmentItem: (id) => {
+    const currentDeleted = get().deletedEquipmentIds || [];
+    const updatedDeleted = currentDeleted.includes(id) ? currentDeleted : [...currentDeleted, id];
     set((state) => ({
       equipmentCatalog: state.equipmentCatalog.filter((e) => e.id !== id),
+      deletedEquipmentIds: updatedDeleted,
       saveFeedbackMessage: 'Equipo eliminado del catálogo',
     }));
 
     setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
 
-    if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
+    const { serverUrl, authToken, autoSyncEnabled } = get().syncSettings;
+    if (authToken) {
+      SyncService.deleteEquipment(serverUrl, authToken, id).catch((err) => {
+        console.warn('Error al sincronizar eliminación de equipo en servidor:', err);
+      });
+    }
+
+    if (autoSyncEnabled && authToken) {
       get().syncEquipmentWithServer();
     }
   },
@@ -76,6 +92,7 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (set, get) 
   resetEquipmentCatalogToDefaults: () => {
     set({
       equipmentCatalog: DEFAULT_EQUIPMENT_CATALOG,
+      deletedEquipmentIds: [],
       saveFeedbackMessage: 'Catálogo restablecido a modelos verificados oficiales',
     });
 
@@ -102,10 +119,12 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (set, get) 
       // 2. Pull de equipos desde el servidor para incorporar nuevos modelos y precios actualizados
       const pullRes = await SyncService.pullEquipment(serverUrl, authToken);
       if (pullRes.success && pullRes.items && pullRes.items.length > 0) {
+        const deletedIds = new Set(get().deletedEquipmentIds || []);
         const localMap = new Map(get().equipmentCatalog.map((item) => [item.id, item]));
         let hasUpdated = false;
 
         for (const serverItem of pullRes.items) {
+          if (deletedIds.has(serverItem.id)) continue;
           const localItem = localMap.get(serverItem.id);
           if (!localItem) {
             localMap.set(serverItem.id, serverItem);

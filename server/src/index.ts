@@ -757,6 +757,35 @@ app.post('/api/equipment/batch', async (c) => {
   }
 });
 
+app.delete('/api/equipment/:id', async (c) => {
+  const authUser = await authenticate(c);
+  if (!authUser) {
+    return c.json({ error: 'No autorizado' }, 401);
+  }
+
+  const id = c.req.param('id');
+  const client = await pool.connect();
+  try {
+    const res = await client.query(
+      `DELETE FROM equipment_catalog
+       WHERE id = $1 AND (organization_id = $2 OR organization_id = 'org-electsun-default')
+       RETURNING id`,
+      [id, authUser.organizationId]
+    );
+
+    if (res.rows.length === 0) {
+      return c.json({ error: 'Equipo no encontrado' }, 404);
+    }
+
+    return c.json({ success: true, message: 'Equipo eliminado del catálogo', id });
+  } catch (error: any) {
+    console.error('Error al eliminar equipo del catálogo:', error);
+    return c.json({ error: error.message || 'Error al eliminar equipo' }, 500);
+  } finally {
+    client.release();
+  }
+});
+
 // Iniciar servidor HTTP
 initDatabase()
   .then(() => {

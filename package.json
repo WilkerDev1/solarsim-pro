@@ -19,7 +19,8 @@
     "test:benchmark": "npx tsx src/engine/testBenchmark.ts",
     "test:finance": "npx tsx src/engine/testFinancialEngineComprehensive.ts",
     "test:ai": "npx tsx src/engine/testAISmartProposal.ts",
-    "test": "npx tsx src/engine/testBenchmark.ts && npx tsx src/engine/testFinancialEngineComprehensive.ts && npx tsx src/engine/testAISmartProposal.ts",
+    "test:catalog": "npx tsx src/engine/testEquipmentCatalog.ts",
+    "test": "npx tsx src/engine/testBenchmark.ts && npx tsx src/engine/testFinancialEngineComprehensive.ts && npx tsx src/engine/testAISmartProposal.ts && npx tsx src/engine/testEquipmentCatalog.ts",
     "context:pack": "repomix"
   },
   "dependencies": {

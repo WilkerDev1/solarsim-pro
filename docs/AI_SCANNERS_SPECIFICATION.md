@@ -210,6 +210,20 @@ El escáner analiza el encabezado y las curvas características del documento PD
 - **Profundidad de Descarga Recomendada ($DoD\text{ }\%$)**: Porcentaje de descarga segura (ej. $90\%$).
 - **Ciclos Garantizados de Vida**: Número de ciclos a $25\text{°C}$ (ej. $6,000$ u $8,000$ ciclos).
 
+### 🔍 Detección Inteligente de Coincidencias en Catálogo y Prevención de Duplicados:
+Al escanear un datasheet, es común que existan ligeras variaciones de nomenclatura respecto a un equipo ya registrado en el catálogo (por ejemplo: `"Batería Hinaess 16 KwH-48 vdc."` vs `"Batería HinaESS PowerGem Max (16.08kWh)"`).
+
+Para evitar la polución y duplicación involuntaria del catálogo, el escáner ejecuta la función [`findCatalogMatchForVariant()`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/components/common/AIDatasheetScannerModal.tsx) antes de presentar los resultados al usuario:
+1. **Cotejo de Familia y Marca Normalizada**: Filtra por tipo de equipo (`panel`, `inverter`, `battery`) y normaliza la marca eliminando caracteres especiales y espacios.
+2. **Cotejo Técnico Cuantitativo**:
+   - **Baterías**: Compara capacidad en kWh ($\pm 0.3\text{ kWh}$) o capacidad en Ah ($\pm 15\text{ Ah}$) y compatibilidad de modelo. Certeza asignada: $95\%$ si coinciden capacidad y modelo/Ah, $85\%$ si coincide capacidad.
+   - **Paneles**: Compara potencia en Vatios ($\pm 3\text{W}$) y serie de modelo. Certeza asignada: $95\%$ con modelo, $85\%$ por potencia nominal.
+   - **Inversores**: Compara potencia AC en kW ($\pm 0.25\text{ kW}$) y serie de modelo. Certeza asignada: $95\%$ con modelo, $85\%$ por potencia.
+3. **Decisión Soberana del Usuario (Dual Action Selector)**:
+   La interfaz resalta la coincidencia detectada con un banner ámbar y proporciona dos opciones explícitas por variante:
+   - **🔄 Actualizar Existente (`action: 'update'`)**: Actualiza las especificaciones técnicas del equipo existente preservando su identificador único (`id`) y el historial de ofertas de precios por proveedor ya vinculadas.
+   - **➕ Guardar como Nuevo (`action: 'create_new'`)**: Permite forzar la creación de un nuevo equipo independiente con un nuevo ID único, cubriendo los casos donde dos modelos tienen especificaciones muy similares pero corresponden a generaciones o revisiones distintas de hardware.
+
 ---
 
 ## 4. Escáner 3: Listas de Precios de Proveedores & Smart Fuzzy Matching

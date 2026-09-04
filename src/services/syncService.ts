@@ -366,4 +366,22 @@ export class SyncService {
       return { success: false, error: err.message || 'Error de conexión al enviar equipos' };
     }
   }
+
+  /**
+   * Delete: Eliminar un equipo del catálogo en el servidor
+   */
+  static async deleteEquipment(serverUrl: string, token: string, equipmentId: string): Promise<boolean> {
+    const base = this.cleanUrl(serverUrl);
+    try {
+      const res = await fetch(`${base}/api/equipment/${equipmentId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
 }

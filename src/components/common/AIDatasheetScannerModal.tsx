@@ -9,6 +9,7 @@ import {
   FileText,
   CheckCircle2,
   AlertTriangle,
+  AlertCircle,
   Database,
   Trash2,
   Sun,
@@ -20,10 +21,137 @@ import {
   Layers,
 } from 'lucide-react';
 
+interface CatalogMatchResult {
+  matchedItem: SolarEquipmentItem;
+  score: number;
+  reason: string;
+}
+
+export function findCatalogMatchForVariant(
+  variant: ExtractedEquipmentVariant,
+  type: EquipmentType,
+  brand: string,
+  catalog: SolarEquipmentItem[]
+): CatalogMatchResult | null {
+  const normBrand = (brand || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const normModel = (variant.modelCode || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const normDisplay = (variant.displayName || '').toLowerCase().trim();
+
+  let bestMatch: SolarEquipmentItem | null = null;
+  let bestScore = 0;
+  let bestReason = '';
+
+  for (const item of catalog) {
+    if (item.type !== type) continue;
+
+    const itemBrand = (item.brand || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const itemModel = (item.modelSeries || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const itemDisplay = (item.displayName || '').toLowerCase().trim();
+
+    // 1. Verificación de marca
+    const brandMatches =
+      normBrand &&
+      itemBrand &&
+      (normBrand === itemBrand || normBrand.includes(itemBrand) || itemBrand.includes(normBrand));
+
+    if (!brandMatches) continue;
+
+    // 2. Coincidencias técnicas según tipo de equipo
+    if (type === 'battery') {
+      const vCap = Number(variant.capacityKWh) || 0;
+      const iCap = Number(item.capacityKWh) || 0;
+      const vAh = Number(variant.capacityAh) || 0;
+      const iAh = Number(item.capacityAh) || 0;
+
+      const capMatch = vCap > 0 && iCap > 0 && Math.abs(vCap - iCap) <= 0.3;
+      const ahMatch = vAh > 0 && iAh > 0 && Math.abs(vAh - iAh) <= 15;
+      const modelMatch = Boolean(normModel && itemModel && (normModel.includes(itemModel) || itemModel.includes(normModel)));
+
+      if (capMatch && (modelMatch || ahMatch)) {
+        const score = 0.95;
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = item;
+          bestReason = `Misma marca (${item.brand}), capacidad (${iCap} kWh) y modelo compatible`;
+        }
+      } else if (capMatch) {
+        const score = 0.85;
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = item;
+          bestReason = `Misma marca (${item.brand}) y capacidad nominal (${iCap} kWh)`;
+        }
+      }
+    } else if (type === 'panel') {
+      const vPower = Number(variant.powerW) || 0;
+      const iPower = Number(item.powerW) || 0;
+      const powerMatch = vPower > 0 && iPower > 0 && Math.abs(vPower - iPower) <= 3;
+      const modelMatch = Boolean(normModel && itemModel && (normModel.includes(itemModel) || itemModel.includes(normModel)));
+
+      if (powerMatch && modelMatch) {
+        const score = 0.95;
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = item;
+          bestReason = `Misma marca (${item.brand}), potencia (${iPower}W) y serie de modelo`;
+        }
+      } else if (powerMatch) {
+        const score = 0.85;
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = item;
+          bestReason = `Misma marca (${item.brand}) y potencia nominal (${iPower}W)`;
+        }
+      }
+    } else if (type === 'inverter') {
+      const vKW = Number(variant.powerKW) || 0;
+      const iKW = Number(item.powerKW) || 0;
+      const kwMatch = vKW > 0 && iKW > 0 && Math.abs(vKW - iKW) <= 0.25;
+      const modelMatch = Boolean(normModel && itemModel && (normModel.includes(itemModel) || itemModel.includes(normModel)));
+
+      if (kwMatch && modelMatch) {
+        const score = 0.95;
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = item;
+          bestReason = `Misma marca (${item.brand}), potencia AC (${iKW} kW) y modelo`;
+        }
+      } else if (kwMatch) {
+        const score = 0.85;
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = item;
+          bestReason = `Misma marca (${item.brand}) y potencia AC (${iKW} kW)`;
+        }
+      }
+    }
+
+    if (itemDisplay === normDisplay) {
+      return {
+        matchedItem: item,
+        score: 1.0,
+        reason: 'Nombre de modelo idéntico ya existente en el catálogo',
+      };
+    }
+  }
+
+  if (bestMatch && bestScore >= 0.75) {
+    return {
+      matchedItem: bestMatch,
+      score: bestScore,
+      reason: bestReason,
+    };
+  }
+
+  return null;
+}
+
 export const AIDatasheetScannerModal: React.FC = () => {
   const {
     isAIDatasheetModalOpen,
     closeAIDatasheetModal,
+    equipmentCatalog,
+    updateEquipmentItem,
     addEquipmentBatch,
     updateSpecs,
     getActiveProject,
@@ -92,9 +220,31 @@ export const AIDatasheetScannerModal: React.FC = () => {
         (msg) => setLoadingMessage(msg)
       );
 
-      setExtractedData(data);
-      if (data.variants.length > 0) {
-        setSelectedVariantIdForActive(data.variants[0].id);
+      // Detección inteligente de coincidencias con el catálogo existente
+      const enrichedVariants: ExtractedEquipmentVariant[] = data.variants.map((v) => {
+        const match = findCatalogMatchForVariant(v, data.equipmentType, data.brand, equipmentCatalog);
+        if (match) {
+          return {
+            ...v,
+            matchedEquipmentId: match.matchedItem.id,
+            matchedDisplayName: match.matchedItem.displayName,
+            matchScore: match.score,
+            matchReason: match.reason,
+            action: 'update' as const, // Predeterminado: actualizar existente para evitar duplicar
+          };
+        }
+        return {
+          ...v,
+          action: 'create_new' as const,
+        };
+      });
+
+      setExtractedData({
+        ...data,
+        variants: enrichedVariants,
+      });
+      if (enrichedVariants.length > 0) {
+        setSelectedVariantIdForActive(enrichedVariants[0].id);
       }
     } catch (err: any) {
       console.error('Error al analizar ficha técnica:', err);
@@ -167,43 +317,83 @@ export const AIDatasheetScannerModal: React.FC = () => {
       return;
     }
 
-    const itemsToSave: SolarEquipmentItem[] = selectedVariants.map((v) => ({
-      id: `eq-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      type: extractedData.equipmentType,
-      brand: extractedData.brand,
-      modelSeries: extractedData.modelSeries,
-      displayName: v.displayName,
-      powerW: v.powerW,
-      powerKW: v.powerKW,
-      capacityKWh: v.capacityKWh,
-      capacityAh: v.capacityAh,
-      voltageV: v.voltageV,
-      dodPct: v.dodPct,
-      batteryEfficiencyPct: v.batteryEfficiencyPct,
-      cycles: v.cycles,
-      chemistry: v.chemistry,
-      maxChargeCurrentA: v.maxChargeCurrentA,
-      efficiencyPct: v.efficiencyPct,
-      tempCoeff: v.tempCoeff,
-      annualDegradation: v.annualDegradation,
-      category: extractedData.category,
-      voltageMPPT: v.voltageMPPT,
-      voc: v.voc,
-      isc: v.isc,
-      vmp: v.vmp,
-      imp: v.imp,
-      maxAcPowerKW: v.maxAcPowerKW,
-      maxPvPowerKW: v.maxPvPowerKW,
-      maxEfficiencyPct: v.maxEfficiencyPct,
-      mpptCount: v.mpptCount,
-      dimensions: v.dimensions,
-      weightKg: v.weightKg,
-      isCustom: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }));
+    const itemsToCreate: SolarEquipmentItem[] = [];
+    let updatedCount = 0;
 
-    addEquipmentBatch(itemsToSave);
+    for (const v of selectedVariants) {
+      if (v.action === 'update' && v.matchedEquipmentId) {
+        // Actualizar equipo existente preservando proveedores y precios registrados
+        updateEquipmentItem(v.matchedEquipmentId, {
+          powerW: v.powerW,
+          powerKW: v.powerKW,
+          capacityKWh: v.capacityKWh,
+          capacityAh: v.capacityAh,
+          voltageV: v.voltageV,
+          dodPct: v.dodPct,
+          batteryEfficiencyPct: v.batteryEfficiencyPct,
+          cycles: v.cycles,
+          chemistry: v.chemistry,
+          maxChargeCurrentA: v.maxChargeCurrentA,
+          efficiencyPct: v.efficiencyPct,
+          tempCoeff: v.tempCoeff,
+          annualDegradation: v.annualDegradation,
+          category: extractedData.category,
+          voltageMPPT: v.voltageMPPT,
+          voc: v.voc,
+          isc: v.isc,
+          vmp: v.vmp,
+          imp: v.imp,
+          maxAcPowerKW: v.maxAcPowerKW,
+          maxPvPowerKW: v.maxPvPowerKW,
+          maxEfficiencyPct: v.maxEfficiencyPct,
+          mpptCount: v.mpptCount,
+          dimensions: v.dimensions,
+          weightKg: v.weightKg,
+        });
+        updatedCount++;
+      } else {
+        // Crear como nuevo equipo independiente con nuevo ID
+        itemsToCreate.push({
+          id: `eq-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          type: extractedData.equipmentType,
+          brand: extractedData.brand,
+          modelSeries: extractedData.modelSeries,
+          displayName: v.displayName,
+          powerW: v.powerW,
+          powerKW: v.powerKW,
+          capacityKWh: v.capacityKWh,
+          capacityAh: v.capacityAh,
+          voltageV: v.voltageV,
+          dodPct: v.dodPct,
+          batteryEfficiencyPct: v.batteryEfficiencyPct,
+          cycles: v.cycles,
+          chemistry: v.chemistry,
+          maxChargeCurrentA: v.maxChargeCurrentA,
+          efficiencyPct: v.efficiencyPct,
+          tempCoeff: v.tempCoeff,
+          annualDegradation: v.annualDegradation,
+          category: extractedData.category,
+          voltageMPPT: v.voltageMPPT,
+          voc: v.voc,
+          isc: v.isc,
+          vmp: v.vmp,
+          imp: v.imp,
+          maxAcPowerKW: v.maxAcPowerKW,
+          maxPvPowerKW: v.maxPvPowerKW,
+          maxEfficiencyPct: v.maxEfficiencyPct,
+          mpptCount: v.mpptCount,
+          dimensions: v.dimensions,
+          weightKg: v.weightKg,
+          isCustom: true,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    if (itemsToCreate.length > 0) {
+      addEquipmentBatch(itemsToCreate);
+    }
 
     // Si se solicitó aplicar al proyecto activo
     if (applyToActiveProject && selectedVariantIdForActive) {
@@ -609,6 +799,66 @@ export const AIDatasheetScannerModal: React.FC = () => {
                             </>
                           )}
                         </div>
+
+                        {/* Alerta y Selector de Acción de Coincidencia en Catálogo */}
+                        {variant.matchedEquipmentId && (
+                          <div
+                            className={`mt-2 p-2.5 rounded-lg border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
+                              isDark
+                                ? 'bg-amber-950/30 border-amber-500/40 text-amber-200'
+                                : 'bg-amber-50 border-amber-300 text-amber-900'
+                            }`}
+                          >
+                            <div className="flex items-start gap-2 flex-1">
+                              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                              <div>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="font-bold">Coincidencia en Catálogo:</span>
+                                  <span className="font-semibold underline decoration-amber-500/40">
+                                    "{variant.matchedDisplayName}"
+                                  </span>
+                                  <span className="text-[10px] px-1.5 py-0.2 rounded font-mono font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                                    {Math.round((variant.matchScore || 0) * 100)}% certeza
+                                  </span>
+                                </div>
+                                <p className={`text-[11px] mt-0.5 ${isDark ? 'text-amber-300/80' : 'text-amber-800/80'}`}>
+                                  {variant.matchReason}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateVariant(variant.id, { action: 'update' })}
+                                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                                  variant.action === 'update'
+                                    ? 'bg-amber-500 text-black shadow-xs'
+                                    : isDark
+                                    ? 'bg-[#27272a] text-zinc-400 hover:text-zinc-200'
+                                    : 'bg-slate-200 text-slate-700 hover:text-slate-900'
+                                }`}
+                                title="Actualizar especificaciones del equipo existente sin duplicarlo"
+                              >
+                                🔄 Actualizar Existente
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateVariant(variant.id, { action: 'create_new' })}
+                                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                                  variant.action === 'create_new'
+                                    ? 'bg-purple-600 text-white shadow-xs'
+                                    : isDark
+                                    ? 'bg-[#27272a] text-zinc-400 hover:text-zinc-200'
+                                    : 'bg-slate-200 text-slate-700 hover:text-slate-900'
+                                }`}
+                                title="Crear un nuevo modelo independiente con ID propio"
+                              >
+                                ➕ Guardar como Nuevo
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 

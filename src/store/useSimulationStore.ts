@@ -99,15 +99,23 @@ export const useSimulationStore = create<SimulationStore>()(
             state.equipmentCatalog = DEFAULT_EQUIPMENT_CATALOG;
           } else {
             const legacyDefaultIdsToRemove = new Set([
+              'eq-bat-hinaess-powergem-max', // Duplicado de eq-bat-hinaess-16k
               'eq-mod-ja-550', 'eq-mod-ja-545', 'eq-mod-ja-570', 'eq-mod-jinko-575', 'eq-mod-trina-580', 'eq-mod-longi-585',
               'eq-inv-solis-5k', 'eq-inv-solis-6k', 'eq-inv-solis-10k-3p', 'eq-inv-deye-8k-us', 'eq-inv-deye-12k-3p',
               'eq-inv-growatt-6k', 'eq-inv-growatt-10k', 'eq-inv-sungrow-50k', 'eq-inv-huawei-10k',
               'eq-bat-hinaess-14k', 'eq-bat-hinaess-5k', 'eq-bat-dyness-10k', 'eq-bat-felicity-10k', 'eq-bat-felicity-5k',
               'eq-bat-pylontech-5k', 'eq-bat-pylontech-3.5k', 'eq-bat-deye-5k', 'eq-bat-deye-6k', 'eq-bat-byd-4k', 'eq-bat-huawei-5k',
             ]);
-            state.equipmentCatalog = state.equipmentCatalog.filter((e) => !legacyDefaultIdsToRemove.has(e.id));
+            const deletedIds = new Set(state.deletedEquipmentIds || []);
+            state.equipmentCatalog = state.equipmentCatalog.filter(
+              (e) => !legacyDefaultIdsToRemove.has(e.id) && !deletedIds.has(e.id)
+            );
             DEFAULT_EQUIPMENT_CATALOG.forEach((def) => {
-              if (!state.equipmentCatalog.some((e) => e.id === def.id || e.displayName === def.displayName)) {
+              if (
+                !legacyDefaultIdsToRemove.has(def.id) &&
+                !deletedIds.has(def.id) &&
+                !state.equipmentCatalog.some((e) => e.id === def.id || e.displayName === def.displayName)
+              ) {
                 state.equipmentCatalog.push(def);
               }
             });

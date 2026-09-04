@@ -145,4 +145,11 @@ export interface ExtractedEquipmentVariant {
   weightKg?: number;
 
   selected?: boolean;            // Checkbox en el modal de importación
+
+  // 🔍 Detección Inteligente de Coincidencias en Catálogo
+  matchedEquipmentId?: string;
+  matchedDisplayName?: string;
+  matchScore?: number;           // 0 a 1.0 (ej: 0.95 = 95% coincidencia)
+  matchReason?: string;          // Explicación técnica de la coincidencia
+  action?: 'update' | 'create_new'; // 'update': actualizar existente, 'create_new': nuevo ítem independiente
 }

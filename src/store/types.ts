@@ -104,6 +104,7 @@ export interface ProjectSlice {
 
 export interface EquipmentSlice {
   equipmentCatalog: SolarEquipmentItem[];
+  deletedEquipmentIds?: string[];
 
   addEquipmentItem: (item: SolarEquipmentItem) => void;
   addEquipmentBatch: (items: SolarEquipmentItem[]) => void;

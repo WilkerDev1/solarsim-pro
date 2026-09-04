@@ -195,6 +195,9 @@ npx tsx src/engine/testFinancialEngineComprehensive.ts
 # Suite de validación de Smart Proposal IA y dimensionamiento al 95%
 npx tsx src/engine/testAISmartProposal.ts
 
+# Suite de validación de catálogo de equipos, CRUD persistente y detección de coincidencias
+npx tsx src/engine/testEquipmentCatalog.ts
+
 # Compilar frontend y electron para producción
 npm run build && npm run build:electron
 
@@ -230,7 +233,7 @@ ssh app-server "cd /home/agente/servicios/solarsim-api && docker compose up -d -
 ### 🔄 Ciclo Obligatorio de Verificación (Verification Loop):
 **NO dar ninguna tarea por completada sin ejecutar previamente:**
 1. **Verificación de Tipos**: `npm run lint` (`npx tsc --noEmit` — Cero errores de tipo).
-2. **Validación de Motores Matemáticos e IA**: `npx tsx src/engine/testBenchmark.ts`, `npx tsx src/engine/testFinancialEngineComprehensive.ts` y `npx tsx src/engine/testAISmartProposal.ts`.
+2. **Validación de Motores Matemáticos, Catálogo e IA**: `npx tsx src/engine/testBenchmark.ts`, `npx tsx src/engine/testFinancialEngineComprehensive.ts`, `npx tsx src/engine/testAISmartProposal.ts` y `npx tsx src/engine/testEquipmentCatalog.ts` (o `npm test`).
 3. **Build de Producción**: `npm run build` (confirmar bundling sin fallos).
 4. **Snapshot de Contexto**: Si se introducen nuevos módulos, refactorizaciones grandes o cambios estructurales, regenerar el contexto empaquetado con `npm run context:pack`.
 
@@ -245,10 +248,18 @@ ssh app-server "cd /home/agente/servicios/solarsim-api && docker compose up -d -
 2. **Cero Cambios Rompientes en la API del Store**:
    - Todos los tipos y helpers exportados originalmente (`NewProjectPayload`, `generateNextProjectSequence`, `findDuplicateProjectInfo`) deben mantenerse exportados desde `useSimulationStore.ts`.
 
-### 🔋 Catálogo de Equipos y Baterías BESS:
+### 🔋 Catálogo de Equipos, Baterías BESS & Prevención de Resurrección (Tombstoning):
 1. **Modelos Verificados Oficiales**:
-   - El catálogo base (`src/data/defaultEquipmentCatalog.ts`) solo debe contener equipos con especificaciones técnicas verificadas mediante fichas técnicas oficiales (Canadian Solar TOPBiHiKu6, LuxpowerTek LXP-LB-US, HinaESS PowerGem Max).
-2. **Extracción Multimodal con IA**:
+   - El catálogo base (`src/data/defaultEquipmentCatalog.ts`) solo debe contener equipos con especificaciones técnicas verificadas mediante fichas técnicas oficiales (Canadian Solar TOPBiHiKu6, LuxpowerTek LXP-LB-US, HinaESS PowerGem Max / 16.08kWh).
+   - Prohibido reinyectar duplicados o alias del mismo equipo con IDs diferentes.
+2. **Eliminación Persistente y Prevención de Resurrección (`deletedEquipmentIds`)**:
+   - Cuando el usuario elimina un equipo en `removeEquipmentItem(id)`, el ID se registra en el arreglo persistente `deletedEquipmentIds` y se propaga al backend con `DELETE /api/equipment/:id`.
+   - `onRehydrateStorage` y `syncEquipmentWithServer` respetan estrictamente `deletedEquipmentIds`: ningún equipo borrado intencionalmente puede volver a insertarse ni por rehidratación de defaults ni por sincronización con la nube.
+3. **Detección Inteligente de Coincidencias en Escáner de Datasheets**:
+   - El escáner de fichas técnicas (`AIDatasheetScannerModal.tsx`) compara cada variante extraída contra el catálogo existente (`findCatalogMatchForVariant`). Si detecta coincidencia por marca y especificaciones técnicas (potencia/capacidad), alerta al usuario con el porcentaje de certeza y ofrece dos opciones:
+     - **🔄 Actualizar Existente**: Actualiza las especificaciones técnicas del equipo existente preservando su ID y cotizaciones de proveedores.
+     - **➕ Guardar como Nuevo**: Permite crear un equipo independiente con ID propio para versiones, revisiones o variantes diferentes.
+4. **Extracción Multimodal con IA**:
    - Los datos extraídos de datasheets deben normalizar automáticamente unidades (ej. $\text{W}$ para paneles, $\text{kW}$ para inversores, $\text{kWh}$ y $\text{Ah}$ para baterías).
 
 ### 🖥️ Arquitectura y Seguridad en Electron (Aislamiento de Procesos):
