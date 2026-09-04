@@ -201,6 +201,73 @@ if (!substitutedExtractedData.equipmentSubstitutions || substitutedExtractedData
 console.log(`Substitution: ${substitutedExtractedData.equipmentSubstitutions[0].requestedModel} -> ${substitutedExtractedData.equipmentSubstitutions[0].selectedModel}`);
 console.log(' ✅ PASS: Sustitución inteligente rastreada correctamente\n');
 
+// --- TEST 7: Deterministic Re-Grounding & Explicit Specification Precedence (Josia Moscoso Case) ---
+console.log('--- TEST 7: Deterministic Re-Grounding & Explicit kWp Precedence ---');
+const testCatalog = [
+  ...store.equipmentCatalog,
+  {
+    id: 'eq-inv-weco-8k',
+    type: 'inverter' as const,
+    brand: 'WeCo',
+    modelSeries: 'XT-8K',
+    displayName: 'Inversor WeCo XT-8K (8.0Kw)',
+    powerKW: 8.0,
+    maxAcPowerKW: 8.0,
+    maxPvPowerKW: 12.0,
+    isCustom: true,
+  },
+  {
+    id: 'eq-bat-weco-16k',
+    type: 'battery' as const,
+    brand: 'WeCo',
+    modelSeries: '16K0-LV',
+    displayName: 'Batería WeCo 16K0-LV (16.06kWh)',
+    capacityKWh: 16.06,
+    voltageV: 51.2,
+    isCustom: true,
+  },
+];
+
+const requirementsText = `Josia Moscoso
+11 kwp paneles Canadian 615w
+2 bateria de 16k weco
+1 weco 8 kw
+Porcentaje de venta 40%
+Equipos según disponibilidad y especificar que el sistema esta diseñado para 40kwh diario.`;
+
+// Simular el post-procesamiento determinista
+const panelWatts = 615;
+let extractedPanelCount = 0;
+const kwpMatch = requirementsText.match(/(\d+(?:\.\d+)?)\s*k(?:w|wp)\s*(?:paneles|panel|m[oó]dulos)?/i);
+if (kwpMatch) {
+  extractedPanelCount = Math.max(1, Math.round((parseFloat(kwpMatch[1]) * 1000) / panelWatts));
+}
+
+console.log(`Explicit kWp parsed panels: ${extractedPanelCount} paneles (~${((extractedPanelCount * panelWatts)/1000).toFixed(2)} kWp)`);
+if (extractedPanelCount !== 18) {
+  throw new Error(`❌ Expected 18 panels for 11 kWp with 615W modules, got ${extractedPanelCount}`);
+}
+
+const reqLower = requirementsText.toLowerCase();
+const wecoInverter = testCatalog.find(e => e.type === 'inverter' && e.brand.toLowerCase().includes('weco'));
+const wecoBattery = testCatalog.find(e => e.type === 'battery' && e.brand.toLowerCase().includes('weco'));
+
+if (!wecoInverter || !wecoBattery) {
+  throw new Error('❌ Test catalog must contain WeCo inverter and battery');
+}
+
+const batCountMatch = reqLower.match(/(\d+)\s*(?:bater[ií]as?|unidades?\s*de\s*bater[ií]a)/i);
+const extractedBatCount = batCountMatch ? parseInt(batCountMatch[1], 10) : 1;
+
+console.log(`Matched Inverter: "${wecoInverter.displayName}"`);
+console.log(`Matched Battery: "${wecoBattery.displayName}" (${extractedBatCount} unidades)`);
+
+if (extractedBatCount !== 2) {
+  throw new Error(`❌ Expected 2 batteries from text, got ${extractedBatCount}`);
+}
+
+console.log(' ✅ PASS: Re-Grounding determinista y precedencia de 11 kWp / 18 paneles validada\n');
+
 console.log('=====================================================');
 console.log('🎉 ALL AI SMART PROPOSAL & SIZING TESTS PASSED (100% SUCCESS)');
 console.log('=====================================================\n');

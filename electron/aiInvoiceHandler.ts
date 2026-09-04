@@ -84,13 +84,15 @@ REGLAS DE EXTRACCIÓN DETALLADAS PARA FACTURAS DOMINICANAS (EDEESTE, EDESUR, EDE
         * matchedBatteryCapacityKWh = 16.06 (o la capacidad nominal en kWh)
         * matchedBatteryCount = 2
       - Si no se mencionan baterías: hasBattery = false, matchedBatteryCount = 0.
-   e) REGLA CRÍTICA DE EQUIPOS SIN PRECIO ASIGNADO ('DISPONIBLE_SIN_PRECIO'):
-      - Si el equipo solicitado existe en el catálogo pero no tiene precios de distribuidores (priceStatus: 'DISPONIBLE_SIN_PRECIO'), DEBES SELECCIONARLO DE TODOS MODOS con su ID y nombre correspondiente. La falta de precio de proveedor no impide su selección en la propuesta.
-   f) REGLA DE SUSTITUCIÓN INTELIGENTE (EQUIPOS QUE NO EXISTEN EN LA BASE DE DATOS):
-      - Si el usuario solicita un equipo o marca que NO figura en el catálogo de referencia (ej. una marca no existente o potencia no disponible):
-        1. DEBES SELECCIONAR OBLIGATORIAMENTE UN SUSTITUTO del catálogo con función y potencia/capacidad equivalente (ej. si piden inversor 8 kW y no hay la marca solicitada, selecciona Luxpower 8K; si piden batería 16 kWh y no hay la marca, selecciona HinaESS 16.08 kWh).
+   e) REGLA CRÍTICA DE EQUIPOS SIN PRECIO ASIGNADO ('DISPONIBLE_SIN_PRECIO') Y 'EQUIPOS SEGÚN DISPONIBILIDAD':
+      - Si el equipo solicitado existe en el catálogo pero no tiene precios de distribuidores (priceStatus: 'DISPONIBLE_SIN_PRECIO'), DEBES SELECCIONARLO DE TODOS MODOS con su ID y nombre correspondiente. La falta de precio de distribuidor NO impide su selección en la propuesta.
+      - La frase 'Equipos según disponibilidad' significa dar prioridad absoluta a los equipos solicitados si existen en el catálogo (estén o no con precio asignado). NUNCA descartes un equipo solicitado para elegir otro solo porque el otro tenga precio.
+   f) REGLA DE SUSTITUCIÓN INTELIGENTE (ÚNICAMENTE SI EL EQUIPO NO EXISTE EN LA BASE DE DATOS):
+      - SOLO si la marca o potencia solicitada NO existe en absoluto en el catálogo provisto:
+        1. Selecciona un sustituto del catálogo con función y potencia/capacidad equivalente más cercana.
         2. Registra la sustitución en 'equipmentSubstitutions' indicando 'type', 'requestedModel', 'selectedModel' y 'reason'.
         3. Explica claramente la sustitución en 'aiReasoningSummary'.
+      - Si la marca o modelo solicitado (ej. WeCo, Luxpower, Canadian Solar, HinaESS) SÍ figura en el catálogo, NO generes sustitución; selecciona el equipo de esa marca.
    g) MARGEN DE VENTA COMERCIAL:
       - Si se especifica 'Porcentaje de venta 40%' o 'Venta 40%' -> targetMarginPct = 40.
    h) SÍNTESIS DE CONSUMO SIN FACTURA:
@@ -378,11 +380,11 @@ export function registerAIInvoiceHandlers() {
         promptIntro += `INSTRUCCIONES CLAVE DE SÍNTESIS CON REQUISITOS:\n`;
         promptIntro += `1. Si el texto indica nombre del cliente (ej. 'Josia Moscoso' o 'Giovanni Gottardo'), dale prioridad absoluta en 'clientName'.\n`;
         promptIntro += `2. Analiza los equipos solicitados (paneles, inversores, baterías) y emparéjalos con los IDs y modelos del CATÁLOGO DE REFERENCIA adjunto.\n`;
-        promptIntro += `3. Si un equipo del catálogo tiene priceStatus 'DISPONIBLE_SIN_PRECIO', es 100% VÁLIDO y debes seleccionarlo si coincide con lo solicitado.\n`;
-        promptIntro += `4. Si el equipo solicitado no existe en el catálogo, selecciona un sustituto del catálogo de similar potencia/capacidad, agrégalo a 'equipmentSubstitutions' y explícalo en 'aiReasoningSummary'.\n`;
-        promptIntro += `5. Si se especifica cantidad de paneles o kWp (ej. '21 panel' o '11 kwp paneles'), calcula o asigna la cantidad en 'matchedPanelCount' (ej. 11000 / 615 = 18 paneles).\n`;
-        promptIntro += `6. Si se especifica inversor (ej. '1 inversor lux power de 16 kw' o '1 weco 8 kw'), identifica el modelo, asigna en 'matchedInverterPowerKW' la potencia unitaria nominal y en 'matchedInverterCount' la cantidad.\n`;
-        promptIntro += `7. Si se mencionan baterías (ej. '2 bateria hinaes de 16kw' o '2 bateria de 16k weco'), marca 'hasBattery' = true, empareja 'matchedBatteryModel' y 'matchedBatteryId', asigna 'matchedBatteryCapacityKWh' y 'matchedBatteryCount'.\n`;
+        promptIntro += `3. Si un equipo del catálogo tiene priceStatus 'DISPONIBLE_SIN_PRECIO', es 100% VÁLIDO y debes seleccionarlo obligatoriamente si coincide con lo solicitado.\n`;
+        promptIntro += `4. La frase 'Equipos según disponibilidad' significa dar prioridad a los equipos solicitados si figuran en el catálogo (incluso sin cotización cargada). NUNCA sustituyas si la marca existe en el catálogo.\n`;
+        promptIntro += `5. Si se especifica cantidad de paneles o kWp (ej. '11 kwp paneles Canadian 615w' o '21 panel'), TIENE PRIORIDAD ABSOLUTA sobre cualquier cálculo de consumo. Asigna 'matchedPanelCount' = Math.round(11000 / 615) = 18 paneles.\n`;
+        promptIntro += `6. Si se especifica inversor (ej. '1 inversor lux power de 16 kw' o '1 weco 8 kw'), identifica el modelo del catálogo, asigna en 'matchedInverterPowerKW' la potencia unitaria nominal y en 'matchedInverterCount' la cantidad.\n`;
+        promptIntro += `7. Si se mencionan baterías (ej. '2 bateria hinaes de 16kw' o '2 bateria de 16k weco'), marca 'hasBattery' = true, empareja 'matchedBatteryModel' y 'matchedBatteryId', asigna 'matchedBatteryCapacityKWh' y 'matchedBatteryCount' (ej. 2 baterías).\n`;
         promptIntro += `8. Si se menciona margen comercial (ej. 'Porcentaje de venta 40%' o 'Venta 40%'), asigna 'targetMarginPct' = 40.\n`;
         promptIntro += `9. Si no hay factura pero se menciona 'diseñado para X kwh diario' (ej. 40kwh diario), genera un consumo mensual de Math.round(X * 30.4) para los 12 meses (ej. 1216 kWh).\n`;
         promptIntro += `10. CONCISIÓN OBLIGATORIA: 'specialTechnicalNotes', 'aiReasoningSummary' y 'notes' deben ser muy breves (< 350 caracteres). NUNCA listes ni repitas el catálogo dentro de ellos.\n\n`;
@@ -609,6 +611,25 @@ export function registerAIInvoiceHandlers() {
         }
       }
 
+      // Detección explícita de paneles / potencia solicitada en texto (Prioridad Absoluta)
+      if (projectRequirementsText) {
+        const kwpMatch = projectRequirementsText.match(/(\d+(?:\.\d+)?)\s*k(?:w|wp)\s*(?:paneles|panel|m[oó]dulos)?/i)
+          || projectRequirementsText.match(/(?:paneles|panel|m[oó]dulos)\s*(?:de\s*)?(\d+(?:\.\d+)?)\s*k(?:w|wp)/i);
+        const countMatch = projectRequirementsText.match(/(\d+)\s*(?:paneles|panel|m[oó]dulos)/i);
+
+        if (kwpMatch) {
+          const explicitKwp = parseFloat(kwpMatch[1]);
+          if (explicitKwp > 0) {
+            parsed.matchedPanelCount = Math.max(1, Math.round((explicitKwp * 1000) / selectedPanelWatts));
+          }
+        } else if (countMatch) {
+          const explicitCount = parseInt(countMatch[1], 10);
+          if (explicitCount > 0) {
+            parsed.matchedPanelCount = explicitCount;
+          }
+        }
+      }
+
       const targetCoverage = 0.95;
       const targetAnnualSolarKWh = totalAnnual * targetCoverage;
       const specificYieldKWhPerKWp = 1450;
@@ -620,26 +641,57 @@ export function registerAIInvoiceHandlers() {
         : recommendedPanelCount;
       const finalCapacityKWp = Math.round(((finalPanelCount * selectedPanelWatts) / 1000) * 100) / 100;
 
-      // Smart Inverter Matching con el Catálogo
+      // Smart Inverter Matching con el Catálogo y Re-Grounding Determinista
       let selectedInverterId: string | undefined;
       let selectedInverterModel: string | undefined;
       let selectedInverterPowerKW: number | undefined;
       let selectedInverterCount: number | undefined;
       let selectedInverterUnitPriceUSD: number | undefined;
 
-      if (parsed.matchedInverterId || parsed.matchedInverterModel || parsed.matchedInverterPowerKW) {
-        let invMatch = equipmentCatalog.find(
-          (e) => e.type === 'inverter' && (e.id === parsed.matchedInverterId || e.displayName === parsed.matchedInverterModel || e.modelSeries === parsed.matchedInverterModel)
+      let invMatch: any | undefined;
+
+      if (projectRequirementsText) {
+        const reqLower = projectRequirementsText.toLowerCase();
+        const knownInvBrands = ['weco', 'lux power', 'luxpower', 'solis', 'huawei', 'growatt', 'deye', 'sma', 'fronius', 'enphase', 'victron'];
+        const reqBrand = knownInvBrands.find((b) => reqLower.includes(b));
+        if (reqBrand) {
+          const cleanBrandKey = reqBrand.replace('luxpower', 'lux');
+          const brandInverters = equipmentCatalog.filter(
+            (e: any) => e.type === 'inverter' && (
+              e.brand?.toLowerCase().includes(cleanBrandKey) ||
+              e.displayName?.toLowerCase().includes(cleanBrandKey) ||
+              e.modelSeries?.toLowerCase().includes(cleanBrandKey)
+            )
+          );
+          if (brandInverters.length > 0) {
+            // Extraer potencia solicitada en texto si existe (ej. "8 kw", "16 kw")
+            const kwMatch = reqLower.match(/(\d+(?:\.\d+)?)\s*(?:kw|k)\b/);
+            const targetKW = kwMatch ? parseFloat(kwMatch[1]) : (parsed.matchedInverterPowerKW || 8.0);
+            brandInverters.sort((a: any, b: any) => Math.abs((a.powerKW || 0) - targetKW) - Math.abs((b.powerKW || 0) - targetKW));
+            invMatch = brandInverters[0];
+          }
+        }
+
+        // Extraer cantidad explícita de inversores si existe (ej. "1 weco 8 kw", "2 inversores")
+        const invCountMatch = reqLower.match(/(\d+)\s*(?:inversores?|unidades?\s*de\s*inversor|weco|lux power)/i);
+        if (invCountMatch) {
+          selectedInverterCount = parseInt(invCountMatch[1], 10);
+        }
+      }
+
+      if (!invMatch && (parsed.matchedInverterId || parsed.matchedInverterModel || parsed.matchedInverterPowerKW)) {
+        invMatch = equipmentCatalog.find(
+          (e: any) => e.type === 'inverter' && (e.id === parsed.matchedInverterId || e.displayName === parsed.matchedInverterModel || e.modelSeries === parsed.matchedInverterModel)
         );
         if (!invMatch) {
           const reqInvStr = `${parsed.matchedInverterModel || ''} ${parsed.aiReasoningSummary || ''}`.toLowerCase();
           const targetKW = parsed.matchedInverterPowerKW || 8.0;
-          invMatch = equipmentCatalog.find((e) => {
+          invMatch = equipmentCatalog.find((e: any) => {
             if (e.type !== 'inverter') return false;
             const matchBrand = matchBrandFuzzy(e.brand, reqInvStr) || reqInvStr.includes(e.brand.toLowerCase());
             const matchPower = Math.abs((e.powerKW || 0) - targetKW) <= 1.0;
             return matchBrand && matchPower;
-          }) || equipmentCatalog.find((e) => {
+          }) || equipmentCatalog.find((e: any) => {
             if (e.type !== 'inverter') return false;
             return matchBrandFuzzy(e.brand, reqInvStr) || reqInvStr.includes(e.brand.toLowerCase());
           });
@@ -649,25 +701,25 @@ export function registerAIInvoiceHandlers() {
         if (!invMatch) {
           const targetKW = parsed.matchedInverterPowerKW || 8.0;
           const sortedInverters = equipmentCatalog
-            .filter((e) => e.type === 'inverter' && e.powerKW)
-            .sort((a, b) => Math.abs((a.powerKW || 0) - targetKW) - Math.abs((b.powerKW || 0) - targetKW));
+            .filter((e: any) => e.type === 'inverter' && e.powerKW)
+            .sort((a: any, b: any) => Math.abs((a.powerKW || 0) - targetKW) - Math.abs((b.powerKW || 0) - targetKW));
           if (sortedInverters.length > 0) {
             invMatch = sortedInverters[0];
           }
         }
-
-        if (invMatch) {
-          selectedInverterId = invMatch.id;
-          selectedInverterModel = invMatch.displayName;
-          selectedInverterPowerKW = invMatch.powerKW || parsed.matchedInverterPowerKW || 8.0;
-        } else {
-          selectedInverterModel = parsed.matchedInverterModel || 'Inversor Solar Híbrido';
-          selectedInverterPowerKW = parsed.matchedInverterPowerKW || 8.0;
-        }
-        selectedInverterCount = parsed.matchedInverterCount || Math.max(1, Math.ceil(finalCapacityKWp / (selectedInverterPowerKW || 8.0)));
       }
 
-      // Smart BESS Battery Storage Matching con el Catálogo
+      if (invMatch) {
+        selectedInverterId = invMatch.id;
+        selectedInverterModel = invMatch.displayName;
+        selectedInverterPowerKW = invMatch.powerKW || parsed.matchedInverterPowerKW || 8.0;
+      } else {
+        selectedInverterModel = parsed.matchedInverterModel || 'Inversor Solar Híbrido';
+        selectedInverterPowerKW = parsed.matchedInverterPowerKW || 8.0;
+      }
+      selectedInverterCount = selectedInverterCount || parsed.matchedInverterCount || Math.max(1, Math.ceil(finalCapacityKWp / (selectedInverterPowerKW || 8.0)));
+
+      // Smart BESS Battery Storage Matching con el Catálogo y Re-Grounding Determinista
       let hasBattery = parsed.hasBattery === true;
       let selectedBatteryId: string | undefined;
       let selectedBatteryModel: string | undefined;
@@ -675,20 +727,53 @@ export function registerAIInvoiceHandlers() {
       let selectedBatteryCount: number | undefined;
       let selectedBatteryUnitPriceUSD: number | undefined;
 
-      if (hasBattery || parsed.matchedBatteryId || parsed.matchedBatteryModel || (parsed.matchedBatteryCount && parsed.matchedBatteryCount > 0)) {
+      let batMatch: any | undefined;
+
+      if (projectRequirementsText) {
+        const reqLower = projectRequirementsText.toLowerCase();
+        const knownBatBrands = ['weco', 'hinaess', 'hina', 'powergem', 'byd', 'tesla', 'pylontech', 'dyness', 'deye', 'felicity'];
+        const reqBrand = knownBatBrands.find((b) => reqLower.includes(b));
+        if (reqBrand || reqLower.includes('bateria') || reqLower.includes('batería')) {
+          hasBattery = true;
+          if (reqBrand) {
+            const cleanBrandKey = reqBrand === 'powergem' || reqBrand === 'hina' ? 'hina' : reqBrand;
+            const brandBatteries = equipmentCatalog.filter(
+              (e: any) => e.type === 'battery' && (
+                e.brand?.toLowerCase().includes(cleanBrandKey) ||
+                e.displayName?.toLowerCase().includes(cleanBrandKey) ||
+                e.modelSeries?.toLowerCase().includes(cleanBrandKey)
+              )
+            );
+            if (brandBatteries.length > 0) {
+              const capMatch = reqLower.match(/(\d+(?:\.\d+)?)\s*(?:kwh|k|k\b)/);
+              const targetCap = capMatch ? parseFloat(capMatch[1]) : (parsed.matchedBatteryCapacityKWh || 16.0);
+              brandBatteries.sort((a: any, b: any) => Math.abs((a.capacityKWh || 0) - targetCap) - Math.abs((b.capacityKWh || 0) - targetCap));
+              batMatch = brandBatteries[0];
+            }
+          }
+
+          // Extraer cantidad de baterías explícita (ej. "2 bateria de 16k weco", "2 baterías")
+          const batCountMatch = reqLower.match(/(\d+)\s*(?:bater[ií]as?|unidades?\s*de\s*bater[ií]a)/i);
+          if (batCountMatch) {
+            selectedBatteryCount = parseInt(batCountMatch[1], 10);
+          }
+        }
+      }
+
+      if (!batMatch && (hasBattery || parsed.matchedBatteryId || parsed.matchedBatteryModel || (parsed.matchedBatteryCount && parsed.matchedBatteryCount > 0))) {
         hasBattery = true;
-        let batMatch = equipmentCatalog.find(
-          (e) => e.type === 'battery' && (e.id === parsed.matchedBatteryId || e.displayName === parsed.matchedBatteryModel || e.modelSeries === parsed.matchedBatteryModel)
+        batMatch = equipmentCatalog.find(
+          (e: any) => e.type === 'battery' && (e.id === parsed.matchedBatteryId || e.displayName === parsed.matchedBatteryModel || e.modelSeries === parsed.matchedBatteryModel)
         );
         if (!batMatch) {
           const reqBatStr = `${parsed.matchedBatteryModel || ''} ${parsed.aiReasoningSummary || ''}`.toLowerCase();
           const targetCap = parsed.matchedBatteryCapacityKWh || 16.08;
-          batMatch = equipmentCatalog.find((e) => {
+          batMatch = equipmentCatalog.find((e: any) => {
             if (e.type !== 'battery') return false;
             const matchBrand = matchBrandFuzzy(e.brand, reqBatStr) || reqBatStr.includes(e.brand.toLowerCase());
             const matchCap = Math.abs((e.capacityKWh || 0) - targetCap) <= 1.0;
             return matchBrand && matchCap;
-          }) || equipmentCatalog.find((e) => {
+          }) || equipmentCatalog.find((e: any) => {
             if (e.type !== 'battery') return false;
             return matchBrandFuzzy(e.brand, reqBatStr) || reqBatStr.includes(e.brand.toLowerCase());
           });
@@ -698,26 +783,26 @@ export function registerAIInvoiceHandlers() {
         if (!batMatch) {
           const targetCap = parsed.matchedBatteryCapacityKWh || 16.08;
           const sortedBatteries = equipmentCatalog
-            .filter((e) => e.type === 'battery' && e.capacityKWh)
-            .sort((a, b) => Math.abs((a.capacityKWh || 0) - targetCap) - Math.abs((b.capacityKWh || 0) - targetCap));
+            .filter((e: any) => e.type === 'battery' && e.capacityKWh)
+            .sort((a: any, b: any) => Math.abs((a.capacityKWh || 0) - targetCap) - Math.abs((b.capacityKWh || 0) - targetCap));
           if (sortedBatteries.length > 0) {
             batMatch = sortedBatteries[0];
           }
         }
-
-        if (batMatch) {
-          selectedBatteryId = batMatch.id;
-          selectedBatteryModel = batMatch.displayName;
-          selectedBatteryCapacityKWh = batMatch.capacityKWh || parsed.matchedBatteryCapacityKWh || 16.08;
-        } else {
-          selectedBatteryModel = parsed.matchedBatteryModel || 'Banco de Baterías de Litio LiFePO4';
-          selectedBatteryCapacityKWh = parsed.matchedBatteryCapacityKWh || 16.08;
-        }
-        selectedBatteryCount = parsed.matchedBatteryCount || 1;
       }
 
+      if (batMatch) {
+        selectedBatteryId = batMatch.id;
+        selectedBatteryModel = batMatch.displayName;
+        selectedBatteryCapacityKWh = batMatch.capacityKWh || parsed.matchedBatteryCapacityKWh || 16.08;
+      } else if (hasBattery) {
+        selectedBatteryModel = parsed.matchedBatteryModel || 'Banco de Baterías de Litio LiFePO4';
+        selectedBatteryCapacityKWh = parsed.matchedBatteryCapacityKWh || 16.08;
+      }
+      selectedBatteryCount = selectedBatteryCount || parsed.matchedBatteryCount || 1;
+
       // Detección y consolidación de sustituciones de equipos
-      const equipmentSubstitutions: Array<{
+      let equipmentSubstitutions: Array<{
         type: 'panel' | 'inverter' | 'battery';
         requestedModel: string;
         selectedModel: string;
@@ -730,9 +815,9 @@ export function registerAIInvoiceHandlers() {
         // Inversor
         if (selectedInverterModel) {
           const knownInvBrands = ['weco', 'lux power', 'luxpower', 'solis', 'huawei', 'growatt', 'deye', 'sma', 'fronius', 'enphase', 'victron'];
-          const reqBrand = knownInvBrands.find(b => reqLower.includes(b));
+          const reqBrand = knownInvBrands.find((b) => reqLower.includes(b));
           if (reqBrand && !selectedInverterModel.toLowerCase().includes(reqBrand.replace('luxpower', 'lux'))) {
-            if (!equipmentSubstitutions.some(s => s.type === 'inverter')) {
+            if (!equipmentSubstitutions.some((s) => s.type === 'inverter')) {
               equipmentSubstitutions.push({
                 type: 'inverter',
                 requestedModel: `Inversor ${reqBrand.toUpperCase()}`,
@@ -746,10 +831,10 @@ export function registerAIInvoiceHandlers() {
         // Batería
         if (hasBattery && selectedBatteryModel) {
           const knownBatBrands = ['weco', 'hinaess', 'hina', 'byd', 'tesla', 'pylontech', 'dyness'];
-          const reqBrand = knownBatBrands.find(b => reqLower.includes(b));
+          const reqBrand = knownBatBrands.find((b) => reqLower.includes(b));
           const normalizedReqBrand = reqBrand === 'hina' ? 'hinaess' : reqBrand;
           if (normalizedReqBrand && !selectedBatteryModel.toLowerCase().includes(normalizedReqBrand)) {
-            if (!equipmentSubstitutions.some(s => s.type === 'battery')) {
+            if (!equipmentSubstitutions.some((s) => s.type === 'battery')) {
               equipmentSubstitutions.push({
                 type: 'battery',
                 requestedModel: `Batería ${normalizedReqBrand.toUpperCase()}`,
@@ -759,6 +844,29 @@ export function registerAIInvoiceHandlers() {
             }
           }
         }
+      }
+
+      // Sanitización de sustituciones: si el modelo finalmente seleccionado coincide con la marca solicitada, remover la sustitución
+      if (projectRequirementsText) {
+        const reqLower = projectRequirementsText.toLowerCase();
+        equipmentSubstitutions = equipmentSubstitutions.filter((sub) => {
+          if (sub.type === 'inverter' && selectedInverterModel) {
+            const invReqBrand = ['weco', 'lux power', 'luxpower', 'solis', 'huawei', 'growatt', 'deye', 'sma', 'fronius', 'victron']
+              .find((b) => sub.requestedModel.toLowerCase().includes(b) || reqLower.includes(b));
+            if (invReqBrand && selectedInverterModel.toLowerCase().includes(invReqBrand.replace('luxpower', 'lux'))) {
+              return false;
+            }
+          }
+          if (sub.type === 'battery' && selectedBatteryModel) {
+            const batReqBrand = ['weco', 'hinaess', 'hina', 'powergem', 'byd', 'tesla', 'pylontech', 'dyness', 'deye', 'felicity']
+              .find((b) => sub.requestedModel.toLowerCase().includes(b) || reqLower.includes(b));
+            const normBrand = batReqBrand === 'powergem' || batReqBrand === 'hina' ? 'hina' : batReqBrand;
+            if (normBrand && selectedBatteryModel.toLowerCase().includes(normBrand)) {
+              return false;
+            }
+          }
+          return true;
+        });
       }
 
       // Precios de proveedores y auto-pricing
