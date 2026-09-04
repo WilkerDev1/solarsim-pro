@@ -93,6 +93,10 @@ export function renderProposalPage(stored: StoredProposal): string {
   const hasBattery = specs.hasBattery || false;
   const batteryCapacityKWh = specs.batteryCapacityKWh || 0;
   const batteryCount = specs.batteryCount || 1;
+  const batteryBrandModel = specs.batteryBrandModel || 'Banco de Baterías de Litio LiFePO4';
+  const displayBatteryModel = batteryCapacityKWh > 0 && !batteryBrandModel.toLowerCase().includes('kwh')
+    ? `${batteryBrandModel} (${batteryCapacityKWh} kWh)`
+    : batteryBrandModel;
   const rawInstallationDesc = specs.installationServicesDesc || 'Instalación y Accesorios (Estructura de montaje en aluminio anodizado, cableado fotovoltaico resistente a rayos UV, protecciones en CC/CA, interruptores de desconexión y puesta en marcha).';
   const installationServicesDesc = rawInstallationDesc.includes('Notas del Sistema:')
     ? (rawInstallationDesc.split('Notas del Sistema:')[0].trim().replace(/\.\s*$/, '') + '.')
@@ -108,7 +112,19 @@ export function renderProposalPage(stored: StoredProposal): string {
   const equipmentPortionUSD = Number(summary?.equipmentPortionUSD || summary?.costMatrix?.equipmentVentaUSD || Math.max(0, grossInvestmentUSD - laborPortionUSD) || grossInvestmentUSD);
   const itbisSavedUSD = Number(summary?.itbisSavedUSD || 0);
   const ley5707CreditUSD = Number(summary?.ley5707CreditUSD || (equipmentPortionUSD * 0.40));
-  const subTotalSinITBIS = Number(summary?.commercialPreTaxSubtotalUSD || (grossInvestmentUSD - (summary?.customItemsNonExoneratedITBISUSD || 0)));
+  
+  const applyITBISExemption = financials.applyITBISExemption ?? true;
+  const customItemsNonExoneratedITBISUSD = Number(summary?.customItemsNonExoneratedITBISUSD ?? (
+    (financials?.customItems || [])
+      .filter((i: any) => (i.applyITBIS ?? true) && !(i.exonerateITBIS ?? true))
+      .reduce((sum: number, i: any) => sum + ((Number(i.quantity) || 1) * (Number(i.unitPriceUSD) || 0) * 0.18), 0)
+  ));
+  const subTotalSinITBIS = Number(
+    summary?.commercialPreTaxSubtotalUSD ?? 
+    (applyITBISExemption
+      ? (grossInvestmentUSD - customItemsNonExoneratedITBISUSD)
+      : (grossInvestmentUSD - itbisSavedUSD - customItemsNonExoneratedITBISUSD))
+  );
   const pricePerWattUSD = Number(specs.pricePerWattUSD || financials.pricePerWattUSD || (grossInvestmentUSD / (Number(systemCapacityKWp) * 1000)) || 1.13).toFixed(2);
 
   const paybackYears = Number(summary?.paybackYears || 0).toFixed(1);
@@ -300,7 +316,7 @@ export function renderProposalPage(stored: StoredProposal): string {
           <div><span class="font-bold text-slate-500">Cliente:</span> <span class="font-black text-slate-950 text-sm">${clientName}</span></div>
           <div><span class="font-bold text-slate-500">Contacto:</span> <span class="font-semibold text-slate-800">${contactName}</span></div>
           <div><span class="font-bold text-slate-500">Teléfono:</span> <span class="font-semibold text-slate-800">${clientPhone}</span></div>
-          <div><span class="font-bold text-slate-500">Ubicación:</span> <span class="font-semibold text-slate-800">${clientAddress}</span></div>
+          <div><span class="font-bold text-slate-500">Ubicación:</span> <span class="font-semibold text-slate-800">${clientAddress}${client.solarSourceMode === 'gps' && client.coordinates ? ` <span class="text-[10px] font-mono text-sky-700 font-bold bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">🛰️ GPS NASA: ${client.coordinates}</span>` : ''}</span></div>
         </div>
         <div class="space-y-1.5 md:text-right">
           <div class="text-[11px] font-black uppercase text-orange-600 tracking-wider flex items-center justify-start md:justify-end gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span> Detalles de la Cotización</div>
@@ -329,7 +345,7 @@ export function renderProposalPage(stored: StoredProposal): string {
         <p class="whitespace-pre-line">${formatMarkdown(resolvedP2)}</p>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-2">
+      <div class="grid grid-cols-1 ${hasBattery && batteryCapacityKWh > 0 ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-3.5 pt-2">
         <div class="bg-orange-50/70 border border-orange-200/90 rounded-2xl p-4 flex items-center gap-3.5">
           <div class="w-11 h-11 rounded-2xl bg-orange-500 text-white flex items-center justify-center font-bold text-lg shadow-md shadow-orange-500/20 shrink-0">⚡</div>
           <div>
@@ -351,6 +367,14 @@ export function renderProposalPage(stored: StoredProposal): string {
             <span class="text-base font-black font-mono text-slate-900">${Math.round(annualProductionKWh).toLocaleString()} kWh</span>
           </div>
         </div>
+        ${hasBattery && batteryCapacityKWh > 0 ? `
+        <div class="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3.5">
+          <div class="w-11 h-11 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold text-lg shadow-md shrink-0">🔋</div>
+          <div>
+            <span class="text-[10px] uppercase font-bold text-emerald-800 block">Almacenamiento BESS</span>
+            <span class="text-base font-black font-mono text-emerald-950">${(batteryCount * batteryCapacityKWh).toFixed(1)} kWh</span>
+          </div>
+        </div>` : ''}
       </div>
 
       <div class="rounded-2xl border-2 border-orange-200 bg-orange-50/90 p-4 space-y-2 text-xs text-orange-950">
@@ -467,7 +491,7 @@ export function renderProposalPage(stored: StoredProposal): string {
             </tr>
             ${hasBattery ? `
             <tr class="bg-white">
-              <td class="px-4 py-2 font-bold">${batteryBrandModel} (${batteryCapacityKWh} kWh)</td>
+              <td class="px-4 py-2 font-bold">${displayBatteryModel}</td>
               <td class="px-4 py-2 text-center font-mono font-bold">${batteryCount}</td>
               <td class="px-4 py-2 text-center text-slate-500 font-normal">UD</td>
             </tr>` : ''}
@@ -501,7 +525,7 @@ export function renderProposalPage(stored: StoredProposal): string {
           </div>
           <div class="flex justify-between text-slate-900 bg-sky-200/50 px-2.5 py-1 rounded-lg font-bold">
             <span>TOTAL GENERAL (USD):</span>
-            <span class="font-mono font-bold">US$ ${(grossInvestmentUSD + (financials.applyITBISExemption ? itbisSavedUSD : 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <span class="font-mono font-bold">US$ ${(grossInvestmentUSD + (applyITBISExemption ? itbisSavedUSD : 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
           <div class="flex justify-between text-sky-800 font-semibold text-[11px]">
             <span>ITBIS A DESCONTAR LEY 57-07:</span>

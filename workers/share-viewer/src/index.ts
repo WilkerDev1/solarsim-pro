@@ -92,7 +92,14 @@ app.get('/p/:id', async (c) => {
     }
 
     const storedProposal: StoredProposal = JSON.parse(raw);
-    return c.html(renderProposalPage(storedProposal));
+    try {
+      return c.html(renderProposalPage(storedProposal));
+    } catch (renderErr) {
+      console.error('Error rendering proposal page:', renderErr);
+      const compName = storedProposal?.project?.customization?.companyName || 'electsun';
+      const compPhone = storedProposal?.project?.customization?.companyPhone || '+1 (809) 378-6590';
+      return c.html(renderExpiredPage(compName, compPhone), 500);
+    }
   } catch (err) {
     console.error('Error fetching proposal from KV:', err);
     return c.html(renderExpiredPage(), 500);
