@@ -22,6 +22,7 @@ import {
   Layers,
   Calendar,
   ExternalLink,
+  Tag,
 } from 'lucide-react';
 
 interface SupplierManagerSectionProps {
@@ -58,6 +59,7 @@ export const SupplierManagerSection: React.FC<SupplierManagerSectionProps> = ({
   } = useSimulationStore();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedBrandFilter, setSelectedBrandFilter] = useState<string>('all');
   const [expandedSupplier, setExpandedSupplier] = useState<string | null>(null);
 
   // Estados para renombrar proveedor
@@ -140,22 +142,49 @@ export const SupplierManagerSection: React.FC<SupplierManagerSectionProps> = ({
     return Array.from(map.values()).sort((a, b) => a.supplierName.localeCompare(b.supplierName));
   }, [equipmentCatalog]);
 
-  // 2. Filtrado por búsqueda
+  // Lista de marcas presentes en las ofertas comerciales de los distribuidores
+  const quotedBrands = useMemo(() => {
+    const brandCounts = new Map<string, number>();
+    supplierGroups.forEach((group) => {
+      const groupBrands = new Set<string>();
+      group.items.forEach((it) => {
+        const b = it.equipment.brand?.trim() || 'Sin Marca';
+        groupBrands.add(b);
+      });
+      groupBrands.forEach((b) => {
+        brandCounts.set(b, (brandCounts.get(b) || 0) + 1);
+      });
+    });
+
+    return Array.from(brandCounts.entries())
+      .map(([brand, count]) => ({ brand, count }))
+      .sort((a, b) => a.brand.localeCompare(b.brand, 'es', { sensitivity: 'base' }));
+  }, [supplierGroups]);
+
+  // 2. Filtrado por marca y búsqueda
   const filteredSuppliers = useMemo(() => {
-    if (!searchQuery.trim()) return supplierGroups;
+    let list = supplierGroups;
+
+    if (selectedBrandFilter !== 'all') {
+      list = list.filter((group) =>
+        group.items.some((it) => (it.equipment.brand || 'Sin Marca') === selectedBrandFilter)
+      );
+    }
+
+    if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase().trim();
 
-    return supplierGroups.filter((group) => {
+    return list.filter((group) => {
       const matchesSupplier = group.supplierName.toLowerCase().includes(q);
       const matchesEquipment = group.items.some(
         (it) =>
           it.equipment.displayName.toLowerCase().includes(q) ||
-          it.equipment.brand.toLowerCase().includes(q) ||
+          (it.equipment.brand && it.equipment.brand.toLowerCase().includes(q)) ||
           (it.priceInfo.sku && it.priceInfo.sku.toLowerCase().includes(q))
       );
       return matchesSupplier || matchesEquipment;
     });
-  }, [supplierGroups, searchQuery]);
+  }, [supplierGroups, selectedBrandFilter, searchQuery]);
 
   // 3. Manejadores de acciones
   const handleStartRename = (supplierName: string) => {
@@ -396,6 +425,76 @@ export const SupplierManagerSection: React.FC<SupplierManagerSectionProps> = ({
           )}
         </div>
       </div>
+
+      {/* Píldoras de Filtro por Marca Cotizada */}
+      {quotedBrands.length > 0 && (
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-zinc-700/40">
+          <div className={`flex items-center gap-1 text-[11px] font-bold shrink-0 mr-1 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+            <Tag className="w-3.5 h-3.5 text-blue-400" />
+            <span>Marca Cotizada:</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setSelectedBrandFilter('all')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer ${
+              selectedBrandFilter === 'all'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : isDark
+                ? 'bg-[#181820] text-zinc-400 hover:text-zinc-200 border border-[#2e2e38]'
+                : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200'
+            }`}
+          >
+            Todas ({supplierGroups.length})
+          </button>
+
+          {quotedBrands.map(({ brand, count }) => {
+            const isSelected = selectedBrandFilter === brand;
+            return (
+              <button
+                key={brand}
+                type="button"
+                onClick={() => setSelectedBrandFilter(isSelected ? 'all' : brand)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                  isSelected
+                    ? 'bg-blue-600 text-white shadow-xs ring-1 ring-blue-400'
+                    : isDark
+                    ? 'bg-[#181820] text-zinc-300 hover:text-blue-300 hover:border-blue-500/50 border border-[#2e2e38]'
+                    : 'bg-white text-slate-700 hover:text-blue-700 hover:border-blue-300 border border-slate-200 shadow-2xs'
+                }`}
+              >
+                <span>{brand}</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                    isSelected
+                      ? 'bg-blue-800 text-blue-100'
+                      : isDark
+                      ? 'bg-zinc-800 text-zinc-400'
+                      : 'bg-slate-100 text-slate-500'
+                  }`}
+                >
+                  {count} {count === 1 ? 'prov.' : 'provs.'}
+                </span>
+              </button>
+            );
+          })}
+
+          {selectedBrandFilter !== 'all' && (
+            <button
+              type="button"
+              onClick={() => setSelectedBrandFilter('all')}
+              className={`text-[11px] font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 transition-all shrink-0 cursor-pointer ${
+                isDark
+                  ? 'text-blue-400 hover:text-blue-300 hover:bg-blue-950/40'
+                  : 'text-blue-700 hover:text-blue-900 hover:bg-blue-50'
+              }`}
+            >
+              <X className="w-3 h-3" />
+              <span>Limpiar</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Modal / Formulario de Nuevo Proveedor */}
       {isCreatingSupplier && (

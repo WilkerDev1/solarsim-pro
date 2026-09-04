@@ -110,6 +110,8 @@ solarsim/
 │   │   └── testAISmartProposal.ts           # Suite de validación de Smart Proposal IA, cobertura 95% y sanitización
 │   ├── assets/
 │   │   └── pdfGraphicAssets.ts              # Gráficos, renders 3D y diagramas en Base64 para PDF
+│   ├── utils/
+│   │   └── equipmentBrandUtils.ts           # Normalización de marcas, inferencia heurística y matching tolerante a alias
 │   └── components/
 │       ├── layout/                          # 🧭 NAVEGACIÓN Y ESTRUCTURA GLOBAL
 │       │   └── PrimaryIconDock.tsx          # Dock vertical oscuro estrecho (Tema Sol/Luna, Proyectos, IA, Nuevo, Ajustes)
@@ -261,6 +263,10 @@ ssh app-server "cd /home/agente/servicios/solarsim-api && docker compose up -d -
      - **➕ Guardar como Nuevo**: Permite crear un equipo independiente con ID propio para versiones, revisiones o variantes diferentes.
 4. **Extracción Multimodal con IA**:
    - Los datos extraídos de datasheets deben normalizar automáticamente unidades (ej. $\text{W}$ para paneles, $\text{kW}$ para inversores, $\text{kWh}$ y $\text{Ah}$ para baterías).
+5. **Normalización y Filtrado por Marca (`brand`)**:
+   - Todo equipo fotovoltaico posee obligatoriamente el campo `brand` normalizado mediante [`src/utils/equipmentBrandUtils.ts`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/utils/equipmentBrandUtils.ts).
+   - El escáner de fichas técnicas (`AIDatasheetScannerModal.tsx`) compara marcas resolviendo alias comunes (`Luxpower` <=> `LuxpowerTek`, `Canadian` <=> `Canadian Solar`, etc.) e infiere marcas desde el nombre comercial para actualizar equipos preexistentes que carecían de marca asignada.
+   - El Administrador de Catálogo, el Gestor de Proveedores y el Selector del Simulador incorporan filtros reactivos mediante píldoras dinámicas por marca.
 
 ### 🖥️ Arquitectura y Seguridad en Electron (Aislamiento de Procesos):
 1. **Aislamiento Estricto del Renderizador (`src/`)**:

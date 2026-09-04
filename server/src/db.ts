@@ -126,6 +126,29 @@ export async function initDatabase(): Promise<void> {
       -- Soporte de ofertas y precios multiproveedor
       ALTER TABLE equipment_catalog ADD COLUMN IF NOT EXISTS supplier_prices JSONB DEFAULT '[]'::jsonb;
       CREATE INDEX IF NOT EXISTS idx_equipment_supplier_prices ON equipment_catalog USING gin (supplier_prices);
+      CREATE INDEX IF NOT EXISTS idx_equipment_brand ON equipment_catalog(brand);
+
+      -- Sanitización defensiva de marcas para asegurar que ningún registro histórico carezca de marca
+      UPDATE equipment_catalog
+      SET brand = CASE
+        WHEN display_name ILIKE '%weco%' THEN 'WeCo'
+        WHEN display_name ILIKE '%luxpower%' OR display_name ILIKE '%lux power%' THEN 'LuxpowerTek'
+        WHEN display_name ILIKE '%canadian%' THEN 'Canadian Solar'
+        WHEN display_name ILIKE '%hinaess%' OR display_name ILIKE '%powergem%' THEN 'HinaESS'
+        WHEN display_name ILIKE '%solis%' THEN 'Solis'
+        WHEN display_name ILIKE '%huawei%' THEN 'Huawei'
+        WHEN display_name ILIKE '%ja solar%' OR display_name ILIKE '%jam72%' THEN 'JA Solar'
+        WHEN display_name ILIKE '%trina%' THEN 'Trina Solar'
+        WHEN display_name ILIKE '%jinko%' THEN 'Jinko Solar'
+        WHEN display_name ILIKE '%longi%' THEN 'LONGi Solar'
+        WHEN display_name ILIKE '%deye%' THEN 'Deye'
+        WHEN display_name ILIKE '%growatt%' THEN 'Growatt'
+        WHEN display_name ILIKE '%sungrow%' THEN 'Sungrow'
+        WHEN display_name ILIKE '%victron%' THEN 'Victron Energy'
+        WHEN display_name ILIKE '%ion energy%' OR display_name ILIKE '%ion-lv%' THEN 'Ion Energy'
+        ELSE 'General'
+      END
+      WHERE brand IS NULL OR brand = '' OR brand ILIKE 'fabricante%';
     `);
 
     await client.query('COMMIT');

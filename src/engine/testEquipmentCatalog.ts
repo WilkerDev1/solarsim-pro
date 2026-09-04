@@ -254,6 +254,87 @@ store.removeSupplierPrice(hinaessItem.id, testSupplierPrice.id);
 store.deleteProject(activeProject.id);
 console.log(' ✅ PASS: Precio de proveedor de batería aplicado y sincronizado correctamente con modelo y feedback visual\n');
 
+// --- TEST 6: Brand Field Support, Matching & Alias Resolution ---
+console.log('--- TEST 6: Brand Field Support, Inferred Brands & Alias Matching ---');
+
+// 6a. Comparación de marcas con alias (Luxpower vs LuxpowerTek)
+const scannedLuxVariant: ExtractedEquipmentVariant = {
+  id: 'var-lux-test',
+  displayName: 'Inversor Luxpower LXP-LB-US 8K (8.0Kw)',
+  modelCode: 'LXP-LB-US 8k',
+  powerKW: 8.0,
+  maxAcPowerKW: 8.0,
+};
+
+const matchLux = findCatalogMatchForVariant(
+  scannedLuxVariant,
+  'inverter',
+  'Luxpower', // Alias sin el sufijo Tek
+  DEFAULT_EQUIPMENT_CATALOG
+);
+
+if (!matchLux || matchLux.matchedItem.id !== 'eq-inv-luxpower-8k') {
+  throw new Error('❌ Failed to match Luxpower alias to LuxpowerTek catalog item');
+}
+console.log(' ✅ PASS: Coincidencia de marca con alias (Luxpower <=> LuxpowerTek) exitosa');
+
+// 6b. Coincidencia e inferencia de marca cuando el item del catálogo tenía marca genérica o vacía
+const legacyItemWithoutBrand: SolarEquipmentItem = {
+  id: 'eq-inv-weco-legacy',
+  type: 'inverter',
+  brand: 'Fabricante', // Marca genérica legacy
+  modelSeries: 'XT-8K',
+  displayName: 'Inversor WeCo XT-8K (8.0Kw)',
+  powerKW: 8.0,
+  maxAcPowerKW: 8.8,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+
+const scannedWecoVariant: ExtractedEquipmentVariant = {
+  id: 'var-weco-8k',
+  displayName: 'Inversor WeCo XT-8K (8.0Kw)',
+  modelCode: 'XT-8K',
+  powerKW: 8.0,
+  maxAcPowerKW: 8.8,
+};
+
+const matchWeco = findCatalogMatchForVariant(
+  scannedWecoVariant,
+  'inverter',
+  'WeCo',
+  [...DEFAULT_EQUIPMENT_CATALOG, legacyItemWithoutBrand]
+);
+
+if (!matchWeco || matchWeco.matchedItem.id !== 'eq-inv-weco-legacy') {
+  throw new Error('❌ Failed to infer brand from displayName when catalog item had generic brand "Fabricante"');
+}
+console.log(' ✅ PASS: Inferencia de marca desde displayName detectó coincidencia para item con marca "Fabricante"');
+
+// 6c. Registro de nueva marca e indexación en catálogo
+const newBrandItem: SolarEquipmentItem = {
+  id: 'eq-inv-solis-new-brand',
+  type: 'inverter',
+  brand: 'Solis',
+  modelSeries: 'S6-GR1P5K',
+  displayName: 'Inversor Solis S6-GR1P5K 5K (5.0Kw)',
+  powerKW: 5.0,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+
+store.addEquipmentItem(newBrandItem);
+const catalogAfterNewBrand = useSimulationStore.getState().equipmentCatalog;
+const retrievedNewBrand = catalogAfterNewBrand.find((e) => e.brand === 'Solis');
+
+if (!retrievedNewBrand) {
+  throw new Error('❌ New brand "Solis" was not properly indexed in equipmentCatalog');
+}
+console.log(' ✅ PASS: Nueva marca "Solis" agregada e indexada correctamente en catálogo\n');
+
+// Limpiar item de prueba
+store.removeEquipmentItem(newBrandItem.id);
+
 console.log('=====================================================');
 console.log('🎉 ALL EQUIPMENT CATALOG TESTS PASSED (100% SUCCESS)');
 console.log('=====================================================\n');

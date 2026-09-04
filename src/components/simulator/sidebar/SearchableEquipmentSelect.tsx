@@ -28,8 +28,22 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedBrandFilter, setSelectedBrandFilter] = useState<string>('all');
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Marcas únicas disponibles para este tipo de equipo
+  const availableBrands = useMemo(() => {
+    const brandCounts = new Map<string, number>();
+    (items || []).forEach((it) => {
+      if (it.type !== type) return;
+      const b = it.brand?.trim() || 'Sin Marca';
+      brandCounts.set(b, (brandCounts.get(b) || 0) + 1);
+    });
+    return Array.from(brandCounts.entries())
+      .map(([brand, count]) => ({ brand, count }))
+      .sort((a, b) => a.brand.localeCompare(b.brand, 'es', { sensitivity: 'base' }));
+  }, [items, type]);
 
   // Filtrar y ordenar alfabéticamente
   const filteredAndSortedItems = useMemo(() => {
@@ -37,6 +51,12 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
     return (items || [])
       .filter((item) => {
         if (!item || item.type !== type) return false;
+
+        if (selectedBrandFilter !== 'all') {
+          const itemBrand = item.brand?.trim() || 'Sin Marca';
+          if (itemBrand !== selectedBrandFilter) return false;
+        }
+
         if (!q) return true;
         return (
           (item.displayName && item.displayName.toLowerCase().includes(q)) ||
@@ -52,7 +72,7 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
         );
       })
       .sort((a, b) => (a.displayName || '').localeCompare(b.displayName || '', 'es', { sensitivity: 'base' }));
-  }, [items, type, searchQuery]);
+  }, [items, type, selectedBrandFilter, searchQuery]);
 
   // Manejar clic afuera para cerrar dropdown
   useEffect(() => {
@@ -254,6 +274,50 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
               </button>
             )}
           </div>
+
+          {/* Píldoras de Filtro Rápido por Marca */}
+          {availableBrands.length > 1 && (
+            <div
+              className={`p-1.5 border-b flex items-center gap-1 overflow-x-auto scrollbar-none ${
+                isDark ? 'bg-[#181820] border-[#27272a]' : 'bg-slate-100/80 border-slate-200'
+              }`}
+            >
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedBrandFilter('all');
+                }}
+                className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-all shrink-0 cursor-pointer ${
+                  selectedBrandFilter === 'all'
+                    ? isDark ? 'bg-zinc-700 text-white shadow-2xs' : 'bg-white text-slate-900 shadow-2xs'
+                    : isDark ? 'text-zinc-400 hover:text-zinc-200' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Todas ({(items || []).filter((i) => i.type === type).length})
+              </button>
+              {availableBrands.map(({ brand, count }) => (
+                <button
+                  key={brand}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedBrandFilter(selectedBrandFilter === brand ? 'all' : brand);
+                  }}
+                  className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
+                    selectedBrandFilter === brand
+                      ? 'bg-purple-600 text-white shadow-2xs'
+                      : isDark
+                      ? 'text-zinc-300 hover:text-purple-300 hover:bg-zinc-800'
+                      : 'text-slate-700 hover:text-purple-700 hover:bg-white'
+                  }`}
+                >
+                  <span>{brand}</span>
+                  <span className="opacity-70 font-mono text-[9px]">({count})</span>
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Lista de Resultados con altura expandida (5 a 10 equipos visibles a la vez) */}
           <div className="max-h-[440px] overflow-y-auto p-1.5 space-y-1">

@@ -20,6 +20,7 @@ import {
   Plus,
   Layers,
 } from 'lucide-react';
+import { areBrandsMatching, normalizeBrandName, inferBrandFromText } from '../../utils/equipmentBrandUtils';
 
 interface CatalogMatchResult {
   matchedItem: SolarEquipmentItem;
@@ -33,7 +34,6 @@ export function findCatalogMatchForVariant(
   brand: string,
   catalog: SolarEquipmentItem[]
 ): CatalogMatchResult | null {
-  const normBrand = (brand || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const normModel = (variant.modelCode || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const normDisplay = (variant.displayName || '').toLowerCase().trim();
 
@@ -44,17 +44,34 @@ export function findCatalogMatchForVariant(
   for (const item of catalog) {
     if (item.type !== type) continue;
 
-    const itemBrand = (item.brand || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     const itemModel = (item.modelSeries || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     const itemDisplay = (item.displayName || '').toLowerCase().trim();
 
-    // 1. Verificación de marca
-    const brandMatches =
-      normBrand &&
-      itemBrand &&
-      (normBrand === itemBrand || normBrand.includes(itemBrand) || itemBrand.includes(normBrand));
+    // Comprobación de coincidencia exacta por nombre display
+    if (itemDisplay === normDisplay) {
+      return {
+        matchedItem: item,
+        score: 1.0,
+        reason: 'Nombre de modelo idéntico ya existente en el catálogo',
+      };
+    }
 
-    if (!brandMatches) continue;
+    // 1. Verificación de marca e inferencia si el catálogo legacy no la tenía
+    const effectiveItemBrand = item.brand && item.brand.toLowerCase() !== 'fabricante' && item.brand.trim() !== ''
+      ? item.brand
+      : inferBrandFromText(item.displayName, item.modelSeries);
+
+    const brandMatches = areBrandsMatching(brand, effectiveItemBrand);
+
+    // Si la marca no coincide directamente pero el modelo/nombre coincide fuertemente
+    const modelMatchesDirectly = Boolean(normModel && itemModel && (normModel.includes(itemModel) || itemModel.includes(normModel)));
+    const displayMatchesDirectly = Boolean(normModel && itemDisplay.replace(/[^a-z0-9]/g, '').includes(normModel));
+
+    if (!brandMatches && !modelMatchesDirectly && !displayMatchesDirectly) {
+      continue;
+    }
+
+    const brandLabel = effectiveItemBrand || brand;
 
     // 2. Coincidencias técnicas según tipo de equipo
     if (type === 'battery') {
@@ -72,14 +89,14 @@ export function findCatalogMatchForVariant(
         if (score > bestScore) {
           bestScore = score;
           bestMatch = item;
-          bestReason = `Misma marca (${item.brand}), capacidad (${iCap} kWh) y modelo compatible`;
+          bestReason = `Misma marca (${brandLabel}), capacidad (${iCap} kWh) y modelo compatible`;
         }
       } else if (capMatch) {
         const score = 0.85;
         if (score > bestScore) {
           bestScore = score;
           bestMatch = item;
-          bestReason = `Misma marca (${item.brand}) y capacidad nominal (${iCap} kWh)`;
+          bestReason = `Misma marca (${brandLabel}) y capacidad nominal (${iCap} kWh)`;
         }
       }
     } else if (type === 'panel') {
@@ -93,14 +110,14 @@ export function findCatalogMatchForVariant(
         if (score > bestScore) {
           bestScore = score;
           bestMatch = item;
-          bestReason = `Misma marca (${item.brand}), potencia (${iPower}W) y serie de modelo`;
+          bestReason = `Misma marca (${brandLabel}), potencia (${iPower}W) y serie de modelo`;
         }
       } else if (powerMatch) {
         const score = 0.85;
         if (score > bestScore) {
           bestScore = score;
           bestMatch = item;
-          bestReason = `Misma marca (${item.brand}) y potencia nominal (${iPower}W)`;
+          bestReason = `Misma marca (${brandLabel}) y potencia nominal (${iPower}W)`;
         }
       }
     } else if (type === 'inverter') {
@@ -114,24 +131,16 @@ export function findCatalogMatchForVariant(
         if (score > bestScore) {
           bestScore = score;
           bestMatch = item;
-          bestReason = `Misma marca (${item.brand}), potencia AC (${iKW} kW) y modelo`;
+          bestReason = `Misma marca (${brandLabel}), potencia AC (${iKW} kW) y modelo`;
         }
       } else if (kwMatch) {
         const score = 0.85;
         if (score > bestScore) {
           bestScore = score;
           bestMatch = item;
-          bestReason = `Misma marca (${item.brand}) y potencia AC (${iKW} kW)`;
+          bestReason = `Misma marca (${brandLabel}) y potencia AC (${iKW} kW)`;
         }
       }
-    }
-
-    if (itemDisplay === normDisplay) {
-      return {
-        matchedItem: item,
-        score: 1.0,
-        reason: 'Nombre de modelo idéntico ya existente en el catálogo',
-      };
     }
   }
 
@@ -321,9 +330,12 @@ export const AIDatasheetScannerModal: React.FC = () => {
     let updatedCount = 0;
 
     for (const v of selectedVariants) {
+      const canonicalBrand = normalizeBrandName(extractedData.brand) || extractedData.brand || 'General';
       if (v.action === 'update' && v.matchedEquipmentId) {
         // Actualizar equipo existente preservando proveedores y precios registrados
         updateEquipmentItem(v.matchedEquipmentId, {
+          brand: canonicalBrand,
+          modelSeries: extractedData.modelSeries || v.modelCode || '',
           powerW: v.powerW,
           powerKW: v.powerKW,
           capacityKWh: v.capacityKWh,
@@ -356,7 +368,7 @@ export const AIDatasheetScannerModal: React.FC = () => {
         itemsToCreate.push({
           id: `eq-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
           type: extractedData.equipmentType,
-          brand: extractedData.brand,
+          brand: canonicalBrand,
           modelSeries: extractedData.modelSeries,
           displayName: v.displayName,
           powerW: v.powerW,

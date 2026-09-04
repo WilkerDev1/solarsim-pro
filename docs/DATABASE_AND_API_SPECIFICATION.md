@@ -120,6 +120,7 @@ CREATE TABLE IF NOT EXISTS equipment_catalog (
 
 CREATE INDEX IF NOT EXISTS idx_equipment_org_type ON equipment_catalog(organization_id, type);
 CREATE INDEX IF NOT EXISTS idx_equipment_display ON equipment_catalog(display_name);
+CREATE INDEX IF NOT EXISTS idx_equipment_brand ON equipment_catalog(brand);
 CREATE INDEX IF NOT EXISTS idx_equipment_supplier_prices ON equipment_catalog USING gin (supplier_prices);
 
 -- 5. Tabla de Auditoría de Sincronización
@@ -322,7 +323,10 @@ Marca un proyecto como eliminado (`is_deleted = TRUE`) para propagar la eliminac
 ### 4.4 Catálogo de Equipos & Precios de Proveedor
 
 #### `GET /api/equipment`
-Obtiene el catálogo completo de equipos fotovoltaicos, inversores y baterías disponibles para la organización del usuario, incluyendo todas las ofertas comerciales registradas en `supplier_prices`.
+Obtiene el catálogo de equipos fotovoltaicos, inversores y baterías disponibles para la organización del usuario, incluyendo todas las ofertas comerciales registradas en `supplier_prices`.
+* **Parámetros Opcionales de Consulta**:
+  - `?type=panel|inverter|battery`: Filtra por tipo de equipo.
+  - `?brand=NombreMarca`: Filtra por coincidencia parcial insensible a mayúsculas de la marca (ej: `?brand=WeCo`, `?brand=LuxpowerTek`, `?brand=Canadian`).
 
 * **Respuesta Exitosa (200 OK)**:
   ```json

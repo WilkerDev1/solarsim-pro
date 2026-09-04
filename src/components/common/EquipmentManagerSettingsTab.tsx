@@ -22,7 +22,9 @@ import {
   Info,
   Building2,
   DollarSign,
+  Tag,
 } from 'lucide-react';
+import { normalizeBrandName } from '../../utils/equipmentBrandUtils';
 
 interface EquipmentManagerSettingsTabProps {
   isDark: boolean;
@@ -44,6 +46,7 @@ export const EquipmentManagerSettingsTab: React.FC<EquipmentManagerSettingsTabPr
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<'all' | EquipmentType>('all');
+  const [selectedBrandFilter, setSelectedBrandFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'equipment' | 'suppliers'>('equipment');
   const [syncingCloud, setSyncingCloud] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -71,11 +74,45 @@ export const EquipmentManagerSettingsTab: React.FC<EquipmentManagerSettingsTabPr
     return setNames.size;
   }, [equipmentCatalog]);
 
-  // Filtered list
+  // Lista global de todas las marcas únicas para el autocompletado en el editor
+  const allUniqueBrands = useMemo(() => {
+    const setBrands = new Set<string>();
+    equipmentCatalog.forEach((item) => {
+      const b = item.brand?.trim();
+      if (b && b.toLowerCase() !== 'fabricante' && b.toLowerCase() !== 'desconocido') {
+        setBrands.add(b);
+      }
+    });
+    return Array.from(setBrands).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+  }, [equipmentCatalog]);
+
+  // Marcas disponibles según el filtro de tipo de equipo activo con sus respectivos conteos
+  const brandList = useMemo(() => {
+    const brandCounts = new Map<string, number>();
+    equipmentCatalog.forEach((item) => {
+      if (selectedTypeFilter !== 'all' && item.type !== selectedTypeFilter) return;
+      const b = item.brand?.trim() || 'Sin Marca';
+      brandCounts.set(b, (brandCounts.get(b) || 0) + 1);
+    });
+
+    const list = Array.from(brandCounts.entries()).map(([brand, count]) => ({
+      brand,
+      count,
+    }));
+
+    return list.sort((a, b) => a.brand.localeCompare(b.brand, 'es', { sensitivity: 'base' }));
+  }, [equipmentCatalog, selectedTypeFilter]);
+
+  // Filtered list con discriminación simultánea por Tipo, Marca y Búsqueda
   const filteredItems = useMemo(() => {
     return equipmentCatalog.filter((item) => {
       const matchesType = selectedTypeFilter === 'all' || item.type === selectedTypeFilter;
       if (!matchesType) return false;
+
+      const matchesBrand =
+        selectedBrandFilter === 'all' ||
+        (selectedBrandFilter === 'Sin Marca' ? !item.brand || item.brand.trim() === '' : item.brand === selectedBrandFilter);
+      if (!matchesBrand) return false;
 
       if (!searchQuery.trim()) return true;
       const q = searchQuery.toLowerCase().trim();
@@ -89,7 +126,7 @@ export const EquipmentManagerSettingsTab: React.FC<EquipmentManagerSettingsTabPr
         (item.capacityKWh && `${item.capacityKWh}kwh`.includes(q))
       );
     });
-  }, [equipmentCatalog, selectedTypeFilter, searchQuery]);
+  }, [equipmentCatalog, selectedTypeFilter, selectedBrandFilter, searchQuery]);
 
   const handleOpenAdd = (type: EquipmentType = 'panel') => {
     setIsNewItem(true);
@@ -134,7 +171,7 @@ export const EquipmentManagerSettingsTab: React.FC<EquipmentManagerSettingsTabPr
     const itemToSave: SolarEquipmentItem = {
       id: editingItem.id || `eq-${editingItem.type}-${Date.now()}`,
       type: editingItem.type || 'panel',
-      brand: editingItem.brand.trim(),
+      brand: normalizeBrandName(editingItem.brand) || editingItem.brand.trim(),
       modelSeries: editingItem.modelSeries?.trim() || '',
       displayName: editingItem.displayName.trim(),
       category: editingItem.category?.trim() || '',
@@ -518,6 +555,76 @@ export const EquipmentManagerSettingsTab: React.FC<EquipmentManagerSettingsTabPr
         </div>
       </div>
 
+      {/* Barra de Filtro Rápido por Marcas (Brands) */}
+      {brandList.length > 0 && (
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-zinc-700/40">
+          <div className={`flex items-center gap-1 text-[11px] font-bold shrink-0 mr-1 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+            <Tag className="w-3.5 h-3.5 text-purple-400" />
+            <span>Marca:</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setSelectedBrandFilter('all')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer ${
+              selectedBrandFilter === 'all'
+                ? 'bg-purple-600 text-white shadow-xs'
+                : isDark
+                ? 'bg-[#181820] text-zinc-400 hover:text-zinc-200 border border-[#2e2e38]'
+                : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200'
+            }`}
+          >
+            Todas ({brandList.reduce((acc, b) => acc + b.count, 0)})
+          </button>
+
+          {brandList.map(({ brand, count }) => {
+            const isSelected = selectedBrandFilter === brand;
+            return (
+              <button
+                key={brand}
+                type="button"
+                onClick={() => setSelectedBrandFilter(isSelected ? 'all' : brand)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                  isSelected
+                    ? 'bg-purple-600 text-white shadow-xs ring-1 ring-purple-400'
+                    : isDark
+                    ? 'bg-[#181820] text-zinc-300 hover:text-purple-300 hover:border-purple-500/50 border border-[#2e2e38]'
+                    : 'bg-white text-slate-700 hover:text-purple-700 hover:border-purple-300 border border-slate-200 shadow-2xs'
+                }`}
+              >
+                <span>{brand}</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                    isSelected
+                      ? 'bg-purple-800 text-purple-100'
+                      : isDark
+                      ? 'bg-zinc-800 text-zinc-400'
+                      : 'bg-slate-100 text-slate-500'
+                  }`}
+                >
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+
+          {selectedBrandFilter !== 'all' && (
+            <button
+              type="button"
+              onClick={() => setSelectedBrandFilter('all')}
+              className={`text-[11px] font-bold px-2 py-0.5 rounded-lg flex items-center gap-1 transition-all shrink-0 cursor-pointer ${
+                isDark
+                  ? 'text-purple-400 hover:text-purple-300 hover:bg-purple-950/40'
+                  : 'text-purple-700 hover:text-purple-900 hover:bg-purple-50'
+              }`}
+            >
+              <X className="w-3 h-3" />
+              <span>Limpiar filtro de marca</span>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Lista de Equipos */}
       {filteredItems.length === 0 ? (
         <div
@@ -616,6 +723,25 @@ export const EquipmentManagerSettingsTab: React.FC<EquipmentManagerSettingsTabPr
                         >
                           {isPanel ? 'MÓDULO SOLAR' : isInverter ? 'INVERSOR' : 'BATERÍA BESS'}
                         </span>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedBrandFilter(item.brand || 'all');
+                          }}
+                          title={`Filtrar por marca "${item.brand || 'Sin Marca'}"`}
+                          className={`text-[10px] font-black px-2 py-0.5 rounded-full border flex items-center gap-1 transition-all cursor-pointer ${
+                            selectedBrandFilter === item.brand
+                              ? 'bg-purple-600 text-white border-purple-500 shadow-xs'
+                              : isDark
+                              ? 'bg-purple-950/60 border-purple-800 text-purple-300 hover:bg-purple-900/60'
+                              : 'bg-purple-50 border-purple-200 text-purple-800 hover:bg-purple-100'
+                          }`}
+                        >
+                          <Tag className="w-2.5 h-2.5" />
+                          <span>{item.brand || 'Sin Marca'}</span>
+                        </button>
 
                         {item.category && (
                           <span
@@ -907,13 +1033,19 @@ export const EquipmentManagerSettingsTab: React.FC<EquipmentManagerSettingsTabPr
                   <input
                     type="text"
                     required
-                    placeholder="Ej. Canadian Solar, LuxpowerTek, HinaESS"
+                    list="equipment-brand-suggestions"
+                    placeholder="Ej. Canadian Solar, LuxpowerTek, WeCo, HinaESS..."
                     value={editingItem.brand || ''}
                     onChange={(e) => setEditingItem({ ...editingItem, brand: e.target.value })}
                     className={`w-full px-3 py-2 rounded-xl text-xs font-semibold border ${
                       isDark ? 'bg-[#121216] border-[#3f3f46] text-zinc-100' : 'bg-slate-50 border-slate-300 text-slate-900'
                     }`}
                   />
+                  <datalist id="equipment-brand-suggestions">
+                    {allUniqueBrands.map((b) => (
+                      <option key={b} value={b} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div>

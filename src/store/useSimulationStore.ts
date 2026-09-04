@@ -9,6 +9,7 @@ import { createImportExportSlice } from './slices/importExportSlice';
 import { createAISlice } from './slices/aiSlice';
 import { createUISlice } from './slices/uiSlice';
 import { createFolderSlice } from './slices/folderSlice';
+import { normalizeBrandName, inferBrandFromText } from '../utils/equipmentBrandUtils';
 
 // Re-export helper types and generators for backward compatibility
 export type { SimulationStore, SimulationState, NewProjectPayload };
@@ -135,6 +136,17 @@ export const useSimulationStore = create<SimulationStore>()(
               ) {
                 state.equipmentCatalog.push(def);
               }
+            });
+
+            // Sanitización y normalización proactiva de Marcas (Brand) para todos los items
+            state.equipmentCatalog = state.equipmentCatalog.map((item) => {
+              const currentBrand = (item.brand || '').trim();
+              if (!currentBrand || currentBrand.toLowerCase() === 'fabricante' || currentBrand.toLowerCase() === 'desconocido') {
+                const inferred = inferBrandFromText(item.displayName, item.modelSeries);
+                return { ...item, brand: inferred };
+              }
+              const normalized = normalizeBrandName(currentBrand);
+              return normalized !== currentBrand ? { ...item, brand: normalized } : item;
             });
           }
           // Clean legacy mock test folders

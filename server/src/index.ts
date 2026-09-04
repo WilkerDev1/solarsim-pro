@@ -621,18 +621,31 @@ app.get('/api/equipment', async (c) => {
 
   const client = await pool.connect();
   try {
-    const res = await client.query(
-      `SELECT id, type, brand, model_series as "modelSeries", display_name as "displayName",
+    const typeParam = c.req.query('type');
+    const brandParam = c.req.query('brand');
+
+    let query = `SELECT id, type, brand, model_series as "modelSeries", display_name as "displayName",
               power_w as "powerW", power_kw as "powerKW", capacity_kwh as "capacityKWh",
               voltage_v as "voltageV", dod_pct as "dodPct", efficiency_pct as "efficiencyPct",
               temp_coeff as "tempCoeff", category, voltage_mppt as "voltageMPPT",
               supplier_prices as "supplierPrices",
               details, created_at as "createdAt", updated_at as "updatedAt"
        FROM equipment_catalog
-       WHERE organization_id = $1 OR organization_id = 'org-electsun-default'
-       ORDER BY display_name ASC`,
-      [authUser.organizationId]
-    );
+       WHERE (organization_id = $1 OR organization_id = 'org-electsun-default')`;
+    const params: any[] = [authUser.organizationId];
+
+    if (typeParam && typeParam !== 'all') {
+      params.push(typeParam);
+      query += ` AND type = $${params.length}`;
+    }
+
+    if (brandParam && brandParam !== 'all') {
+      params.push(`%${brandParam.trim()}%`);
+      query += ` AND brand ILIKE $${params.length}`;
+    }
+
+    query += ` ORDER BY display_name ASC`;
+    const res = await client.query(query, params);
 
     return c.json({
       success: true,
@@ -678,7 +691,7 @@ app.post('/api/equipment/batch', async (c) => {
     for (const item of items) {
       const id = item.id || `eq-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
       const type = item.type || 'panel';
-      const brand = item.brand || 'Fabricante';
+      const brand = item.brand && item.brand.trim() ? item.brand.trim() : 'General';
       const modelSeries = item.modelSeries || 'Modelo';
       const displayName = item.displayName || `${brand} ${modelSeries}`;
       const powerW = item.powerW || null;
