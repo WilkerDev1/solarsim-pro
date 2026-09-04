@@ -654,6 +654,29 @@ export function registerAIInvoiceHandlers() {
         const reqLower = projectRequirementsText.toLowerCase();
         const knownInvBrands = ['weco', 'lux power', 'luxpower', 'solis', 'huawei', 'growatt', 'deye', 'sma', 'fronius', 'enphase', 'victron'];
         const reqBrand = knownInvBrands.find((b) => reqLower.includes(b));
+
+        // 1. Extraer potencia solicitada de inversor en texto (estrictamente contextualizada)
+        let explicitInvKW: number | undefined;
+
+        // Patrón A: "inversor ... [X] kw" o "[X] kw ... inversor" (ej. "1 inversor weco de 8kw", "inversor 8 kw")
+        const invKwMatch = reqLower.match(/(?:inversor(?:es)?|inv)\b[^\n,;.]*?(\d+(?:\.\d+)?)\s*(?:kw|k)\b/i)
+          || reqLower.match(/(\d+(?:\.\d+)?)\s*(?:kw|k)\b[^\n,;.]*?(?:inversor(?:es)?|inv)\b/i);
+        if (invKwMatch) {
+          explicitInvKW = parseFloat(invKwMatch[1]);
+        } else if (reqBrand) {
+          // Patrón B: cerca de la marca del inversor asegurando que no pertenezca a una línea de batería
+          const cleanBrandKey = reqBrand.replace('luxpower', 'lux');
+          const brandKwMatch = reqLower.match(new RegExp(`(?:${cleanBrandKey})\\b[^\\n,;.]*?(\\d+(?:\\.\\d+)?)\\s*(?:kw|k)\\b`, 'i'))
+            || reqLower.match(new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(?:kw|k)\\b[^\\n,;.]*?(?:${cleanBrandKey})`, 'i'));
+          if (brandKwMatch) {
+            const matchIdx = brandKwMatch.index ?? 0;
+            const surrounding = reqLower.slice(Math.max(0, matchIdx - 25), Math.min(reqLower.length, matchIdx + brandKwMatch[0].length + 25));
+            if (!surrounding.includes('bater')) {
+              explicitInvKW = parseFloat(brandKwMatch[1]);
+            }
+          }
+        }
+
         if (reqBrand) {
           const cleanBrandKey = reqBrand.replace('luxpower', 'lux');
           const brandInverters = equipmentCatalog.filter(
@@ -664,18 +687,37 @@ export function registerAIInvoiceHandlers() {
             )
           );
           if (brandInverters.length > 0) {
-            // Extraer potencia solicitada en texto si existe (ej. "8 kw", "16 kw")
-            const kwMatch = reqLower.match(/(\d+(?:\.\d+)?)\s*(?:kw|k)\b/);
-            const targetKW = kwMatch ? parseFloat(kwMatch[1]) : (parsed.matchedInverterPowerKW || 8.0);
-            brandInverters.sort((a: any, b: any) => Math.abs((a.powerKW || 0) - targetKW) - Math.abs((b.powerKW || 0) - targetKW));
+            const targetKW = explicitInvKW || parsed.matchedInverterPowerKW || 8.0;
+            // Ordenar con máxima prioridad a la diferencia de potencia y coincidencia de variante
+            brandInverters.sort((a: any, b: any) => {
+              const diffA = Math.abs((a.powerKW || 0) - targetKW);
+              const diffB = Math.abs((b.powerKW || 0) - targetKW);
+              if (Math.abs(diffA - diffB) > 0.05) return diffA - diffB;
+              const strTarget = `${Math.round(targetKW)}k`;
+              const matchNameA = (a.displayName || '').toLowerCase().includes(strTarget) || (a.modelSeries || '').toLowerCase().includes(strTarget);
+              const matchNameB = (b.displayName || '').toLowerCase().includes(strTarget) || (b.modelSeries || '').toLowerCase().includes(strTarget);
+              if (matchNameA && !matchNameB) return -1;
+              if (!matchNameA && matchNameB) return 1;
+              return 0;
+            });
             invMatch = brandInverters[0];
           }
         }
 
-        // Extraer cantidad explícita de inversores si existe (ej. "1 weco 8 kw", "2 inversores")
-        const invCountMatch = reqLower.match(/(\d+)\s*(?:inversores?|unidades?\s*de\s*inversor|weco|lux power)/i);
+        // 2. Extraer cantidad explícita de inversores (ej. "1 inversor", "2 inversores")
+        const invCountMatch = reqLower.match(/(\d+)\s*(?:x\s*)?(?:inversor(?:es)?|unidades?\s*(?:de\s*)?inversor)/i);
         if (invCountMatch) {
           selectedInverterCount = parseInt(invCountMatch[1], 10);
+        } else if (reqBrand) {
+          const cleanBrandKey = reqBrand.replace('luxpower', 'lux');
+          const countBrandMatch = reqLower.match(new RegExp(`(\\d+)\\s*(?:x\\s*)?(?:${cleanBrandKey})\\b(?!\\s*bater[ií]a)`, 'i'));
+          if (countBrandMatch) {
+            const fullMatchIdx = countBrandMatch.index ?? 0;
+            const lineText = reqLower.slice(Math.max(0, fullMatchIdx - 15), Math.min(reqLower.length, fullMatchIdx + 30));
+            if (!lineText.includes('bater')) {
+              selectedInverterCount = parseInt(countBrandMatch[1], 10);
+            }
+          }
         }
       }
 
@@ -717,7 +759,14 @@ export function registerAIInvoiceHandlers() {
         selectedInverterModel = parsed.matchedInverterModel || 'Inversor Solar Híbrido';
         selectedInverterPowerKW = parsed.matchedInverterPowerKW || 8.0;
       }
-      selectedInverterCount = selectedInverterCount || parsed.matchedInverterCount || Math.max(1, Math.ceil(finalCapacityKWp / (selectedInverterPowerKW || 8.0)));
+      
+      if (selectedInverterCount && selectedInverterCount > 0) {
+        // Respetar cantidad explícita detectada
+      } else if (parsed.matchedInverterCount && parsed.matchedInverterCount > 0) {
+        selectedInverterCount = parsed.matchedInverterCount;
+      } else {
+        selectedInverterCount = Math.max(1, Math.ceil(finalCapacityKWp / (selectedInverterPowerKW || 8.0)));
+      }
 
       // Smart BESS Battery Storage Matching con el Catálogo y Re-Grounding Determinista
       let hasBattery = parsed.hasBattery === true;
@@ -745,7 +794,9 @@ export function registerAIInvoiceHandlers() {
               )
             );
             if (brandBatteries.length > 0) {
-              const capMatch = reqLower.match(/(\d+(?:\.\d+)?)\s*(?:kwh|k|k\b)/);
+              const capMatch = reqLower.match(/(?:bater[ií]a(?:s)?|bess)\b[^\n,;.]*?(\d+(?:\.\d+)?)\s*(?:kwh|k\b)/i)
+                || reqLower.match(/(\d+(?:\.\d+)?)\s*(?:kwh|k\b)[^\n,;.]*?(?:bater[ií]a(?:s)?|bess)\b/i)
+                || reqLower.match(/(\d+(?:\.\d+)?)\s*(?:kwh|k|k\b)/);
               const targetCap = capMatch ? parseFloat(capMatch[1]) : (parsed.matchedBatteryCapacityKWh || 16.0);
               brandBatteries.sort((a: any, b: any) => Math.abs((a.capacityKWh || 0) - targetCap) - Math.abs((b.capacityKWh || 0) - targetCap));
               batMatch = brandBatteries[0];

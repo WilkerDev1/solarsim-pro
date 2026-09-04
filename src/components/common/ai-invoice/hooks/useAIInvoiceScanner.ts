@@ -303,6 +303,79 @@ export function useAIInvoiceScanner() {
     });
   };
 
+  // Cambio interactivo de inversor solar desde el catálogo
+  const handleInverterChange = (newInverterId: string) => {
+    if (!extractedData) return;
+    const inv = inverterCatalog.find((i: SolarEquipmentItem) => i.id === newInverterId);
+    if (!inv) return;
+
+    const bestPrice = inv.supplierPrices && inv.supplierPrices.length > 0
+      ? [...inv.supplierPrices].sort((a, b) => a.priceUSD - b.priceUSD)[0]?.priceUSD
+      : undefined;
+
+    setExtractedData({
+      ...extractedData,
+      selectedInverterId: inv.id,
+      selectedInverterModel: inv.displayName || inv.modelSeries,
+      selectedInverterPowerKW: inv.powerKW || 8.0,
+      selectedInverterUnitPriceUSD: bestPrice,
+    });
+  };
+
+  // Cambio de cantidad de unidades de inversor en paralelo
+  const handleInverterCountChange = (count: number) => {
+    if (!extractedData) return;
+    const safeCount = Math.max(1, Math.min(20, Math.round(count)));
+    setExtractedData({
+      ...extractedData,
+      selectedInverterCount: safeCount,
+    });
+  };
+
+  // Cambio interactivo de batería BESS desde el catálogo
+  const handleBatteryChange = (newBatteryId: string) => {
+    if (!extractedData) return;
+    if (newBatteryId === 'none') {
+      setExtractedData({
+        ...extractedData,
+        hasBattery: false,
+        selectedBatteryId: undefined,
+        selectedBatteryModel: undefined,
+        selectedBatteryCapacityKWh: undefined,
+        selectedBatteryCount: 0,
+        selectedBatteryUnitPriceUSD: undefined,
+      });
+      return;
+    }
+    const bat = batteryCatalog.find((b: SolarEquipmentItem) => b.id === newBatteryId);
+    if (!bat) return;
+
+    const bestPrice = bat.supplierPrices && bat.supplierPrices.length > 0
+      ? [...bat.supplierPrices].sort((a, b) => a.priceUSD - b.priceUSD)[0]?.priceUSD
+      : undefined;
+
+    setExtractedData({
+      ...extractedData,
+      hasBattery: true,
+      selectedBatteryId: bat.id,
+      selectedBatteryModel: bat.displayName || bat.modelSeries,
+      selectedBatteryCapacityKWh: bat.capacityKWh || 16.08,
+      selectedBatteryCount: Math.max(1, extractedData.selectedBatteryCount || 1),
+      selectedBatteryUnitPriceUSD: bestPrice,
+    });
+  };
+
+  // Cambio de cantidad de baterías
+  const handleBatteryCountChange = (count: number) => {
+    if (!extractedData) return;
+    const safeCount = Math.max(0, Math.min(20, Math.round(count)));
+    setExtractedData({
+      ...extractedData,
+      hasBattery: safeCount > 0,
+      selectedBatteryCount: safeCount,
+    });
+  };
+
   // Ajuste manual de consumo mensual
   const handleUpdateMonthlyConsumption = (index: number, val: number) => {
     if (!extractedData) return;
@@ -455,6 +528,10 @@ export function useAIInvoiceScanner() {
     handleTogglePeakMonthMode,
     handlePanelChange,
     handleCoverageChange,
+    handleInverterChange,
+    handleInverterCountChange,
+    handleBatteryChange,
+    handleBatteryCountChange,
     handleUpdateMonthlyConsumption,
     handleApplyToActive,
     handleApplyAsNew,

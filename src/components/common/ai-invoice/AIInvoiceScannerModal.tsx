@@ -26,6 +26,8 @@ export const AIInvoiceScannerModal: React.FC = () => {
     openAISettingsModal,
     geminiApiKey,
     panelCatalog,
+    inverterCatalog,
+    batteryCatalog,
     activeProject,
     isInsideProject,
     isDark,
@@ -61,6 +63,10 @@ export const AIInvoiceScannerModal: React.FC = () => {
     handleTogglePeakMonthMode,
     handlePanelChange,
     handleCoverageChange,
+    handleInverterChange,
+    handleInverterCountChange,
+    handleBatteryChange,
+    handleBatteryCountChange,
     handleUpdateMonthlyConsumption,
     handleApplyToActive,
     handleApplyAsNew,
@@ -286,9 +292,15 @@ export const AIInvoiceScannerModal: React.FC = () => {
                       extractedData={extractedData}
                       selectedPanel={selectedPanel}
                       panelCatalog={panelCatalog}
+                      inverterCatalog={inverterCatalog}
+                      batteryCatalog={batteryCatalog}
                       estimatedRealCoveragePct={estimatedRealCoveragePct}
                       handleCoverageChange={handleCoverageChange}
                       handlePanelChange={handlePanelChange}
+                      handleInverterChange={handleInverterChange}
+                      handleInverterCountChange={handleInverterCountChange}
+                      handleBatteryChange={handleBatteryChange}
+                      handleBatteryCountChange={handleBatteryCountChange}
                     />
                   )}
                 </div>

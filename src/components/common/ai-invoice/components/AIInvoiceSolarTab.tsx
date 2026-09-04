@@ -21,9 +21,15 @@ interface AIInvoiceSolarTabProps {
   extractedData: ExtractedInvoiceData;
   selectedPanel: SolarEquipmentItem | null;
   panelCatalog: SolarEquipmentItem[];
+  inverterCatalog?: SolarEquipmentItem[];
+  batteryCatalog?: SolarEquipmentItem[];
   estimatedRealCoveragePct: number | null;
   handleCoverageChange: (newCoverage: number) => void;
   handlePanelChange: (newPanelId: string) => void;
+  handleInverterChange?: (newInverterId: string) => void;
+  handleInverterCountChange?: (newCount: number) => void;
+  handleBatteryChange?: (newBatteryId: string) => void;
+  handleBatteryCountChange?: (newCount: number) => void;
 }
 
 export const AIInvoiceSolarTab: React.FC<AIInvoiceSolarTabProps> = ({
@@ -31,9 +37,15 @@ export const AIInvoiceSolarTab: React.FC<AIInvoiceSolarTabProps> = ({
   extractedData,
   selectedPanel,
   panelCatalog,
+  inverterCatalog = [],
+  batteryCatalog = [],
   estimatedRealCoveragePct,
   handleCoverageChange,
   handlePanelChange,
+  handleInverterChange,
+  handleInverterCountChange,
+  handleBatteryChange,
+  handleBatteryCountChange,
 }) => {
   const isPanelSubstituted = extractedData.equipmentSubstitutions?.some((s) => s.type === 'panel');
   const isInverterSubstituted = extractedData.equipmentSubstitutions?.some((s) => s.type === 'inverter');
@@ -293,7 +305,7 @@ export const AIInvoiceSolarTab: React.FC<AIInvoiceSolarTabProps> = ({
           <div className="flex items-center gap-2">
             <Zap className="w-4 h-4 text-cyan-500 dark:text-cyan-400" />
             <span className="text-xs font-bold text-slate-800 dark:text-zinc-100">
-              Inversor Solar Emparejado
+              Inversor Solar (Catálogo Oficial)
             </span>
             {isInverterSubstituted && (
               <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 flex items-center gap-1">
@@ -312,14 +324,69 @@ export const AIInvoiceSolarTab: React.FC<AIInvoiceSolarTabProps> = ({
           )}
         </div>
 
+        {/* Selector Desplegable de Inversor */}
+        <div className="relative">
+          <select
+            value={extractedData.selectedInverterId || ''}
+            onChange={(e) => handleInverterChange?.(e.target.value)}
+            className={`w-full px-3.5 py-2.5 rounded-xl border text-xs font-semibold appearance-none outline-none focus:ring-2 focus:ring-cyan-500/40 cursor-pointer pr-10 ${
+              isDark
+                ? 'bg-[#101016] border-[#343448] text-zinc-100 hover:border-cyan-500/50'
+                : 'bg-slate-50 border-slate-300 text-slate-800 hover:border-cyan-500/50'
+            }`}
+          >
+            {inverterCatalog && inverterCatalog.length > 0 ? (
+              inverterCatalog.map((inv) => (
+                <option key={inv.id} value={inv.id}>
+                  {inv.displayName} — {inv.powerKW}kW AC ({inv.category || 'Híbrido Split Phase'})
+                </option>
+              ))
+            ) : (
+              <option value="">{extractedData.selectedInverterModel || 'Inversor Solar'}</option>
+            )}
+          </select>
+          <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-slate-400">
+            <ChevronDown className="w-4 h-4" />
+          </div>
+        </div>
+
+        {/* Controles de Capacidad y Unidades en Paralelo */}
         <div className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${isDark ? 'bg-[#121218] border-[#262638]' : 'bg-slate-50 border-slate-200'}`}>
-          <div className="min-w-0">
-            <p className="text-xs font-bold text-slate-900 dark:text-zinc-100 truncate">
-              {extractedData.selectedInverterModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)'}
-            </p>
-            <p className="text-[11px] text-slate-600 dark:text-zinc-400 font-mono mt-0.5">
-              {extractedData.selectedInverterPowerKW || 8.0} kW unitario • {extractedData.selectedInverterCount || 1} {((extractedData.selectedInverterCount || 1) > 1) ? 'unidades en paralelo' : 'unidad'}
-            </p>
+          <div className="flex items-center gap-3">
+            <div>
+              <span className="text-[9px] uppercase font-bold text-slate-500 dark:text-zinc-500 block">Unidades en Paralelo</span>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <button
+                  type="button"
+                  onClick={() => handleInverterCountChange?.(Math.max(1, (extractedData.selectedInverterCount || 1) - 1))}
+                  className={`w-6 h-6 rounded-lg border flex items-center justify-center font-bold text-xs transition-colors cursor-pointer ${
+                    isDark ? 'border-[#36364a] text-zinc-300 hover:bg-[#20202c]' : 'border-slate-300 text-slate-700 hover:bg-slate-200'
+                  }`}
+                  title="Disminuir unidades"
+                >
+                  -
+                </button>
+                <span className="w-7 text-center font-mono font-bold text-xs text-slate-900 dark:text-zinc-100">
+                  {extractedData.selectedInverterCount || 1}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleInverterCountChange?.(Math.min(10, (extractedData.selectedInverterCount || 1) + 1))}
+                  className={`w-6 h-6 rounded-lg border flex items-center justify-center font-bold text-xs transition-colors cursor-pointer ${
+                    isDark ? 'border-[#36364a] text-zinc-300 hover:bg-[#20202c]' : 'border-slate-300 text-slate-700 hover:bg-slate-200'
+                  }`}
+                  title="Aumentar unidades"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+            <div className="border-l pl-3 border-slate-300 dark:border-zinc-800">
+              <span className="text-[9px] uppercase font-bold text-slate-500 dark:text-zinc-500 block">Potencia Unitaria</span>
+              <span className="text-xs font-mono font-bold text-cyan-600 dark:text-cyan-400">
+                {extractedData.selectedInverterPowerKW || 8.0} kW AC
+              </span>
+            </div>
           </div>
           <div className="text-right shrink-0">
             <span className="text-xs font-mono font-black text-cyan-600 dark:text-cyan-400 block">
@@ -338,25 +405,25 @@ export const AIInvoiceSolarTab: React.FC<AIInvoiceSolarTabProps> = ({
       </div>
 
       {/* 🔋 Baterías BESS (Si aplica o fue especificado en los requisitos) */}
-      {extractedData.hasBattery && (
-        <div
-          className={`p-4 rounded-xl border space-y-2.5 ${
-            isDark ? 'bg-[#181822] border-[#2a2a38]' : 'bg-white border-slate-200'
-          }`}
-        >
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <BatteryCharging className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
-              <span className="text-xs font-bold text-slate-800 dark:text-zinc-100">
-                Banco de Baterías Litio LiFePO4 (BESS)
+      <div
+        className={`p-4 rounded-xl border space-y-2.5 ${
+          isDark ? 'bg-[#181822] border-[#2a2a38]' : 'bg-white border-slate-200'
+        }`}
+      >
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <BatteryCharging className="w-4 h-4 text-emerald-500 dark:text-emerald-400" />
+            <span className="text-xs font-bold text-slate-800 dark:text-zinc-100">
+              Banco de Baterías Litio LiFePO4 (BESS)
+            </span>
+            {isBatterySubstituted && (
+              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 flex items-center gap-1">
+                <RefreshCw className="w-3 h-3" /> Sustituto IA
               </span>
-              {isBatterySubstituted && (
-                <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 flex items-center gap-1">
-                  <RefreshCw className="w-3 h-3" /> Sustituto IA
-                </span>
-              )}
-            </div>
-            {extractedData.selectedBatteryUnitPriceUSD ? (
+            )}
+          </div>
+          {extractedData.hasBattery ? (
+            extractedData.selectedBatteryUnitPriceUSD ? (
               <span className="text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
                 Compra: ${extractedData.selectedBatteryUnitPriceUSD} USD/ud
               </span>
@@ -364,34 +431,94 @@ export const AIInvoiceSolarTab: React.FC<AIInvoiceSolarTabProps> = ({
               <span className="text-[10px] font-mono font-bold text-amber-800 dark:text-amber-300 bg-amber-500/15 px-2.5 py-0.5 rounded-full border border-amber-500/30 flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3" /> Sin precio asignado (Por cotizar)
               </span>
-            )}
-          </div>
-
-          <div className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${isDark ? 'bg-[#121218] border-[#262638]' : 'bg-slate-50 border-slate-200'}`}>
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-slate-900 dark:text-zinc-100 truncate">
-                {extractedData.selectedBatteryModel || 'HinaESS PowerGem Max 16.08kWh'}
-              </p>
-              <p className="text-[11px] text-slate-600 dark:text-zinc-400 font-mono mt-0.5">
-                {extractedData.selectedBatteryCapacityKWh || 16.08} kWh unitarios • {extractedData.selectedBatteryCount || 1} {((extractedData.selectedBatteryCount || 1) > 1) ? 'baterías' : 'batería'}
-              </p>
-            </div>
-            <div className="text-right shrink-0">
-              <span className="text-xs font-mono font-black text-emerald-600 dark:text-emerald-400 block">
-                {((extractedData.selectedBatteryCapacityKWh || 16.08) * (extractedData.selectedBatteryCount || 1)).toFixed(1)} kWh
-              </span>
-              <span className="text-[9px] uppercase font-bold text-slate-500 dark:text-zinc-500">Almacenamiento</span>
-            </div>
-          </div>
-
-          {!extractedData.selectedBatteryUnitPriceUSD && (
-            <div className="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[10.5px] text-amber-800 dark:text-amber-300 flex items-center gap-2">
-              <Info className="w-3.5 h-3.5 shrink-0" />
-              <span>Batería seleccionada del catálogo sin cotización de distribuidor asignada. Podrás fijar su costo en el simulador.</span>
-            </div>
+            )
+          ) : (
+            <span className="text-[10px] font-medium text-slate-500 dark:text-zinc-500 bg-slate-500/10 px-2 py-0.5 rounded-md border border-slate-500/20">
+              Sin almacenamiento
+            </span>
           )}
         </div>
-      )}
+
+        {/* Selector Desplegable de Batería */}
+        <div className="relative">
+          <select
+            value={extractedData.hasBattery ? (extractedData.selectedBatteryId || '') : 'none'}
+            onChange={(e) => handleBatteryChange?.(e.target.value)}
+            className={`w-full px-3.5 py-2.5 rounded-xl border text-xs font-semibold appearance-none outline-none focus:ring-2 focus:ring-emerald-500/40 cursor-pointer pr-10 ${
+              isDark
+                ? 'bg-[#101016] border-[#343448] text-zinc-100 hover:border-emerald-500/50'
+                : 'bg-slate-50 border-slate-300 text-slate-800 hover:border-emerald-500/50'
+            }`}
+          >
+            <option value="none">Sin almacenamiento (Solo Sistema Fotovoltaico)</option>
+            {batteryCatalog && batteryCatalog.map((bat) => (
+              <option key={bat.id} value={bat.id}>
+                {bat.displayName} — {bat.capacityKWh}kWh ({bat.chemistry || 'LiFePO4'} • {bat.voltageV || 51.2}V)
+              </option>
+            ))}
+          </select>
+          <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-slate-400">
+            <ChevronDown className="w-4 h-4" />
+          </div>
+        </div>
+
+        {/* Controles de Capacidad y Cantidad de Baterías */}
+        {extractedData.hasBattery && (
+          <>
+            <div className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${isDark ? 'bg-[#121218] border-[#262638]' : 'bg-slate-50 border-slate-200'}`}>
+              <div className="flex items-center gap-3">
+                <div>
+                  <span className="text-[9px] uppercase font-bold text-slate-500 dark:text-zinc-500 block">Cantidad Baterías</span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => handleBatteryCountChange?.(Math.max(1, (extractedData.selectedBatteryCount || 1) - 1))}
+                      className={`w-6 h-6 rounded-lg border flex items-center justify-center font-bold text-xs transition-colors cursor-pointer ${
+                        isDark ? 'border-[#36364a] text-zinc-300 hover:bg-[#20202c]' : 'border-slate-300 text-slate-700 hover:bg-slate-200'
+                      }`}
+                      title="Disminuir baterías"
+                    >
+                      -
+                    </button>
+                    <span className="w-7 text-center font-mono font-bold text-xs text-slate-900 dark:text-zinc-100">
+                      {extractedData.selectedBatteryCount || 1}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleBatteryCountChange?.(Math.min(16, (extractedData.selectedBatteryCount || 1) + 1))}
+                      className={`w-6 h-6 rounded-lg border flex items-center justify-center font-bold text-xs transition-colors cursor-pointer ${
+                        isDark ? 'border-[#36364a] text-zinc-300 hover:bg-[#20202c]' : 'border-slate-300 text-slate-700 hover:bg-slate-200'
+                      }`}
+                      title="Aumentar baterías"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+                <div className="border-l pl-3 border-slate-300 dark:border-zinc-800">
+                  <span className="text-[9px] uppercase font-bold text-slate-500 dark:text-zinc-500 block">Capacidad Unitaria</span>
+                  <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                    {extractedData.selectedBatteryCapacityKWh || 16.08} kWh
+                  </span>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <span className="text-xs font-mono font-black text-emerald-600 dark:text-emerald-400 block">
+                  {((extractedData.selectedBatteryCapacityKWh || 16.08) * (extractedData.selectedBatteryCount || 1)).toFixed(1)} kWh
+                </span>
+                <span className="text-[9px] uppercase font-bold text-slate-500 dark:text-zinc-500">Almacenamiento Total</span>
+              </div>
+            </div>
+
+            {!extractedData.selectedBatteryUnitPriceUSD && (
+              <div className="px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[10.5px] text-amber-800 dark:text-amber-300 flex items-center gap-2">
+                <Info className="w-3.5 h-3.5 shrink-0" />
+                <span>Batería seleccionada del catálogo sin cotización de distribuidor asignada. Podrás fijar su costo en el simulador.</span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {/* 🏷️ Estrategia Financiera & Margen de Venta Comercial */}
       {extractedData.targetMarginPct && (
