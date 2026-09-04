@@ -57,11 +57,12 @@ graph TD
 
 ### Modelos de Inferencia Soportados:
 - **`gemini-2.5-flash`** (Recomendado): Máxima precisión en razonamiento multimodal, extracción de tablas densas y comprensión de requerimientos informales de chat.
+- **`gemini-3.7-flash`**: Modelo de razonamiento híbrido; opera con `thinkingConfig: { thinkingBudget: 512 }`, `maxOutputTokens: 4096` y `temperature: 0.15` con directiva estricta de brevedad para notas técnicas.
 - **`gemini-3.5-flash-lite`**: Inferencia ultrarrápida y económica para entornos de alta concurrencia.
 - **`gemini-2.0-flash`**: Soporte estándar de alta disponibilidad.
 
-### Aislamiento de Entorno (Desktop vs Web):
-- **Modo Escritorio (Electron)**: El proceso principal (`electron/aiInvoiceHandler.ts`) renderiza documentos PDF multi-página a lienzos de alta resolución (*Canvas*) en memoria para garantizar máxima legibilidad óptica de caracteres diminutos antes de transmitirlos a Gemini.
+### Aislamiento de Entorno (Desktop vs Web) y Grounding en Tiempo Real:
+- **Modo Escritorio (Electron)**: El proceso principal (`electron/aiInvoiceHandler.ts`) recibe el catálogo activo (`equipmentCatalog`) transmitido desde `useAIInvoiceScanner.ts`, ejecuta renderizado de alta resolución e implementa reintentos en cascada de modelos con timeout de 45 segundos y parseo JSON seguro con recuperación de truncado.
 - **Modo Web**: Utiliza el API nativo `FileReader` y renderizado vía WebAssembly / Canvas sin depender de binarios nativos del sistema operativo.
 
 ---

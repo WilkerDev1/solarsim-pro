@@ -93,7 +93,10 @@ REGLAS DE EXTRACCIÓN DETALLADAS PARA FACTURAS DOMINICANAS (EDEESTE, EDESUR, EDE
       - 'specialTechnicalNotes': Requisitos especiales como 'Equipos según disponibilidad y diseñado para 40kwh diario'.
       - 'aiReasoningSummary': Resumen claro en español de cómo se interpretó la solicitud y qué equipos del catálogo se emparejaron.
    g) SÍNTESIS DE CONSUMO SIN FACTURA:
-      - Si no se suministra factura pero el texto dice 'diseñado para 40kwh diario', genera 'monthlyConsumptionKWh' con 12 valores de Math.round(40 * 30.4) = 1216 kWh.`;
+      - Si no se suministra factura pero el texto dice 'diseñado para 40kwh diario', genera 'monthlyConsumptionKWh' con 12 valores de Math.round(40 * 30.4) = 1216 kWh.
+   h) REGLA CRÍTICA DE BREVEDAD Y CONCISIÓN (OBLIGATORIA):
+      - Los campos de texto libre como 'specialTechnicalNotes', 'aiReasoningSummary' y 'notes' DEBEN SER MUY BREVES Y CONCISOS (máximo 1 o 2 oraciones, menos de 35 palabras cada uno).
+      - ESTRICTAMENTE PROHIBIDO redactar tratados largos de ingeniería eléctrica, memorias de cálculo extensas, especificaciones redundantes o bucles repetitivos de texto.`;
 
 const INVOICE_JSON_SCHEMA = {
   type: 'OBJECT',
@@ -485,29 +488,36 @@ export async function parseInvoiceWithGemini(params: {
     });
   }
 
-  const requestBody = {
-    system_instruction: {
-      parts: [{ text: INVOICE_EXTRACTION_SYSTEM_INSTRUCTION }],
-    },
-    contents: [
-      {
-        role: 'user',
-        parts: userParts,
-      },
-    ],
-    generationConfig: {
-      temperature: 0.05,
-      response_mime_type: 'application/json',
-      response_schema: INVOICE_JSON_SCHEMA,
-    },
-  };
-
   let rawText: string | undefined;
   let lastError: any = null;
 
   for (let mIdx = 0; mIdx < candidateModels.length; mIdx++) {
     const currentModel = candidateModels[mIdx];
     const endpoint = `${GEMINI_API_BASE}/models/${currentModel}:generateContent?key=${apiKey.trim()}`;
+    const isThinkingModel = currentModel.includes('3.7') || currentModel.includes('2.5');
+
+    const generationConfig: any = {
+      temperature: 0.15,
+      maxOutputTokens: 4096,
+      response_mime_type: 'application/json',
+      response_schema: INVOICE_JSON_SCHEMA,
+    };
+    if (isThinkingModel) {
+      generationConfig.thinkingConfig = { thinkingBudget: 512 };
+    }
+
+    const requestBody = {
+      system_instruction: {
+        parts: [{ text: INVOICE_EXTRACTION_SYSTEM_INSTRUCTION }],
+      },
+      contents: [
+        {
+          role: 'user',
+          parts: userParts,
+        },
+      ],
+      generationConfig,
+    };
 
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
@@ -574,12 +584,29 @@ export async function parseInvoiceWithGemini(params: {
     );
   }
 
-  let parsed: any;
-  try {
-    parsed = JSON.parse(rawText);
-  } catch (err: any) {
-    throw new Error(`Error al parsear el JSON de la IA: ${err.message}`);
+  function safeParseJson(raw: string): any {
+    let clean = raw.trim();
+    if (clean.startsWith('```json')) {
+      clean = clean.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+    } else if (clean.startsWith('```')) {
+      clean = clean.replace(/^```\s*/, '').replace(/\s*```$/, '');
+    }
+    try {
+      return JSON.parse(clean);
+    } catch (err: any) {
+      const lastBrace = clean.lastIndexOf('}');
+      if (lastBrace > 0) {
+        try {
+          return JSON.parse(clean.slice(0, lastBrace + 1));
+        } catch {
+          // ignore
+        }
+      }
+      throw new Error(`Error interpretando JSON de la IA: ${err?.message || 'Formato truncado'}`);
+    }
   }
+
+  const parsed = safeParseJson(rawText);
 
   // Clean corrupted character encodings (e.g. NU?EZ -> NUÑEZ)
   let cleanName = (parsed.clientName || 'Cliente Propuesta Solar').replace(/\?/g, 'Ñ');
@@ -607,10 +634,21 @@ export async function parseInvoiceWithGemini(params: {
   let selectedPanelWatts: number = panelPowerW > 0 ? panelPowerW : 620;
   let selectedPanelUnitPriceUSD: number | undefined;
 
-  if (parsed.matchedPanelId || parsed.matchedPanelModel) {
-    const panMatch = equipmentCatalog.find(
+  if (parsed.matchedPanelId || parsed.matchedPanelModel || parsed.matchedPanelWatts) {
+    let panMatch = equipmentCatalog.find(
       (e) => e.type === 'panel' && (e.id === parsed.matchedPanelId || e.displayName === parsed.matchedPanelModel || e.modelSeries === parsed.matchedPanelModel)
     );
+    if (!panMatch) {
+      const reqBrand = (parsed.matchedPanelModel || '').toLowerCase();
+      const targetW = parsed.matchedPanelWatts || selectedPanelWatts;
+      panMatch = equipmentCatalog.find((e) => {
+        if (e.type !== 'panel') return false;
+        const matchPower = targetW > 0 ? Math.abs((e.powerW || 0) - targetW) <= 10 : true;
+        const matchBrand = reqBrand ? e.brand.toLowerCase().includes(reqBrand) || reqBrand.includes(e.brand.toLowerCase()) : true;
+        return matchPower && matchBrand;
+      }) || equipmentCatalog.find((e) => e.type === 'panel' && targetW > 0 && Math.abs((e.powerW || 0) - targetW) <= 15);
+    }
+
     if (panMatch) {
       selectedPanelId = panMatch.id;
       selectedPanelModel = panMatch.displayName;
@@ -647,9 +685,22 @@ export async function parseInvoiceWithGemini(params: {
   let selectedInverterUnitPriceUSD: number | undefined;
 
   if (parsed.matchedInverterId || parsed.matchedInverterModel || parsed.matchedInverterPowerKW) {
-    const invMatch = equipmentCatalog.find(
+    let invMatch = equipmentCatalog.find(
       (e) => e.type === 'inverter' && (e.id === parsed.matchedInverterId || e.displayName === parsed.matchedInverterModel || e.modelSeries === parsed.matchedInverterModel)
     );
+    if (!invMatch) {
+      const reqInvStr = `${parsed.matchedInverterModel || ''} ${parsed.aiReasoningSummary || ''}`.toLowerCase();
+      const targetKW = parsed.matchedInverterPowerKW || 8.0;
+      invMatch = equipmentCatalog.find((e) => {
+        if (e.type !== 'inverter') return false;
+        const matchBrand = reqInvStr.includes(e.brand.toLowerCase()) || (e.brand.toLowerCase().includes('weco') && reqInvStr.includes('weco')) || (e.brand.toLowerCase().includes('lux') && reqInvStr.includes('lux'));
+        const matchPower = Math.abs((e.powerKW || 0) - targetKW) <= 1.0;
+        return matchBrand && matchPower;
+      }) || equipmentCatalog.find((e) => {
+        if (e.type !== 'inverter') return false;
+        return reqInvStr.includes(e.brand.toLowerCase()) || (e.brand.toLowerCase().includes('weco') && reqInvStr.includes('weco')) || (e.brand.toLowerCase().includes('lux') && reqInvStr.includes('lux'));
+      });
+    }
     if (invMatch) {
       selectedInverterId = invMatch.id;
       selectedInverterModel = invMatch.displayName;

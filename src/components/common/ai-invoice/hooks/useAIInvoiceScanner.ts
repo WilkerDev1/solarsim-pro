@@ -195,6 +195,9 @@ export function useAIInvoiceScanner() {
           apiKey: geminiApiKey,
           model: geminiModel,
           projectRequirementsText: cleanPrompt,
+          equipmentCatalog,
+          dopExchangeRate: activeProject?.rates?.usdExchangeRate || 60.0,
+          panelPowerW: activeProject?.specs?.panelPowerW || 620,
         });
 
         if (!res.success || !res.data) {
@@ -225,6 +228,8 @@ export function useAIInvoiceScanner() {
           model: geminiModel,
           projectRequirementsText: cleanPrompt,
           equipmentCatalog,
+          dopExchangeRate: activeProject?.rates?.usdExchangeRate || 60.0,
+          panelPowerW: activeProject?.specs?.panelPowerW || 620,
         });
       }
 

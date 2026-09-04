@@ -90,7 +90,10 @@ REGLAS DE EXTRACCIÓN DETALLADAS PARA FACTURAS DOMINICANAS (EDEESTE, EDESUR, EDE
       - 'specialTechnicalNotes': Requisitos especiales como 'Equipos según disponibilidad y diseñado para 40kwh diario'.
       - 'aiReasoningSummary': Resumen claro en español de cómo se interpretó la solicitud y qué equipos se seleccionaron.
    g) SÍNTESIS DE CONSUMO SIN FACTURA:
-      - Si no se suministra factura pero el texto dice 'diseñado para 40kwh diario', genera 'monthlyConsumptionKWh' con 12 valores de Math.round(40 * 30.4) = 1216 kWh.`;
+      - Si no se suministra factura pero el texto dice 'diseñado para 40kwh diario', genera 'monthlyConsumptionKWh' con 12 valores de Math.round(40 * 30.4) = 1216 kWh.
+   h) REGLA CRÍTICA DE BREVEDAD Y CONCISIÓN (OBLIGATORIA):
+      - Los campos de texto libre como 'specialTechnicalNotes', 'aiReasoningSummary' y 'notes' DEBEN SER MUY BREVES Y CONCISOS (máximo 1 o 2 oraciones, menos de 35 palabras cada uno).
+      - ESTRICTAMENTE PROHIBIDO redactar tratados largos de ingeniería eléctrica, memorias de cálculo extensas, especificaciones redundantes o bucles repetitivos de texto.`;
 
 const INVOICE_JSON_SCHEMA = {
   type: 'OBJECT',
@@ -162,7 +165,7 @@ const INVOICE_JSON_SCHEMA = {
   ],
 };
 
-function httpsPostJson(url: string, data: any): Promise<any> {
+function httpsPostJson(url: string, data: any, timeoutMs = 50000): Promise<any> {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
     const postData = JSON.stringify(data);
@@ -177,6 +180,7 @@ function httpsPostJson(url: string, data: any): Promise<any> {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(postData),
         },
+        timeout: timeoutMs,
       },
       (res) => {
         let body = '';
@@ -186,7 +190,7 @@ function httpsPostJson(url: string, data: any): Promise<any> {
             try {
               resolve(JSON.parse(body));
             } catch (err) {
-              reject(err);
+              reject(new Error(`Respuesta de Google Gemini no es un JSON válido o fue truncada. Longitud: ${body.length}`));
             }
           } else {
             try {
@@ -199,6 +203,10 @@ function httpsPostJson(url: string, data: any): Promise<any> {
         });
       }
     );
+
+    req.on('timeout', () => {
+      req.destroy(new Error('Tiempo de espera agotado (timeout 50s) al conectar con la API de Google Gemini.'));
+    });
 
     req.on('error', reject);
     req.write(postData);
@@ -381,32 +389,84 @@ export function registerAIInvoiceHandlers() {
         });
       }
 
-      const url = `${GEMINI_API_BASE}/models/${model}:generateContent?key=${apiKey.trim()}`;
-      const reqBody = {
-        system_instruction: {
-          parts: [{ text: INVOICE_EXTRACTION_SYSTEM_INSTRUCTION }],
-        },
-        contents: [
-          {
-            role: 'user',
-            parts: userParts,
-          },
-        ],
-        generationConfig: {
-          temperature: 0.05,
+      const primaryModel = model?.trim() || 'gemini-2.0-flash';
+      const candidateModels = Array.from(
+        new Set([primaryModel, 'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-3.7-flash', 'gemini-3.5-flash-lite'])
+      ).filter(Boolean);
+
+      let rawText: string | undefined;
+      let lastError: any = null;
+
+      for (let mIdx = 0; mIdx < candidateModels.length; mIdx++) {
+        const currentModel = candidateModels[mIdx];
+        const url = `${GEMINI_API_BASE}/models/${currentModel}:generateContent?key=${apiKey.trim()}`;
+        const isThinkingModel = currentModel.includes('3.7') || currentModel.includes('2.5');
+
+        const generationConfig: any = {
+          temperature: 0.15,
+          maxOutputTokens: 4096,
           response_mime_type: 'application/json',
           response_schema: INVOICE_JSON_SCHEMA,
-        },
-      };
+        };
+        if (isThinkingModel) {
+          generationConfig.thinkingConfig = { thinkingBudget: 512 };
+        }
 
-      const responseJson = await httpsPostJson(url, reqBody);
-      const rawText = responseJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+        const reqBody = {
+          system_instruction: {
+            parts: [{ text: INVOICE_EXTRACTION_SYSTEM_INSTRUCTION }],
+          },
+          contents: [
+            {
+              role: 'user',
+              parts: userParts,
+            },
+          ],
+          generationConfig,
+        };
 
-      if (!rawText) {
-        return { success: false, error: 'La IA no devolvió contenido estructurado.' };
+        try {
+          const responseJson = await httpsPostJson(url, reqBody, 45000);
+          rawText = responseJson?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (rawText) {
+            break;
+          }
+        } catch (err: any) {
+          lastError = err;
+          console.warn(`[AIInvoiceHandler] Intento fallido con ${currentModel}:`, err?.message);
+        }
       }
 
-      const parsed = JSON.parse(rawText);
+      if (!rawText) {
+        return {
+          success: false,
+          error: lastError?.message || 'La IA no devolvió contenido estructurado o se agotó el tiempo de espera.',
+        };
+      }
+
+      function safeParseJson(raw: string): any {
+        let clean = raw.trim();
+        if (clean.startsWith('```json')) {
+          clean = clean.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+        } else if (clean.startsWith('```')) {
+          clean = clean.replace(/^```\s*/, '').replace(/\s*```$/, '');
+        }
+        try {
+          return JSON.parse(clean);
+        } catch (err: any) {
+          const lastBrace = clean.lastIndexOf('}');
+          if (lastBrace > 0) {
+            try {
+              return JSON.parse(clean.slice(0, lastBrace + 1));
+            } catch {
+              // ignore
+            }
+          }
+          throw new Error(`Error interpretando JSON de la IA: ${err?.message || 'Formato truncado'}`);
+        }
+      }
+
+      const parsed = safeParseJson(rawText);
       const cleanName = (parsed.clientName || 'Cliente Propuesta Solar').replace(/\?/g, 'Ñ');
 
       // Normalize 12 months array
@@ -426,16 +486,42 @@ export function registerAIInvoiceHandlers() {
       const totalAnnual = monthlyConsumption.reduce((sum, v) => sum + v, 0);
       const avgMonthly = Math.round(totalAnnual / 12);
 
+      const matchBrandFuzzy = (brandA?: string, brandB?: string) => {
+        if (!brandA || !brandB) return false;
+        const a = brandA.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const b = brandB.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (a === b) return true;
+        if (a.includes(b) || b.includes(a)) return true;
+        if (
+          (a.includes('lux') && b.includes('lux')) ||
+          (a.includes('weco') && b.includes('weco')) ||
+          (a.includes('hina') && b.includes('hina')) ||
+          (a.includes('canadian') && b.includes('canadian'))
+        ) return true;
+        return false;
+      };
+
       // Smart Panel Matching con el Catálogo
       let selectedPanelId: string | undefined;
       let selectedPanelModel: string | undefined;
       let selectedPanelWatts: number = panelPowerW > 0 ? panelPowerW : 620;
       let selectedPanelUnitPriceUSD: number | undefined;
 
-      if (parsed.matchedPanelId || parsed.matchedPanelModel) {
-        const panMatch = equipmentCatalog.find(
+      if (parsed.matchedPanelId || parsed.matchedPanelModel || parsed.matchedPanelWatts) {
+        let panMatch = equipmentCatalog.find(
           (e) => e.type === 'panel' && (e.id === parsed.matchedPanelId || e.displayName === parsed.matchedPanelModel || e.modelSeries === parsed.matchedPanelModel)
         );
+        if (!panMatch) {
+          const reqBrand = (parsed.matchedPanelModel || '').toLowerCase();
+          const targetW = parsed.matchedPanelWatts || selectedPanelWatts;
+          panMatch = equipmentCatalog.find((e) => {
+            if (e.type !== 'panel') return false;
+            const matchPower = targetW > 0 ? Math.abs((e.powerW || 0) - targetW) <= 10 : true;
+            const matchBrand = reqBrand ? matchBrandFuzzy(e.brand, reqBrand) || reqBrand.includes(e.brand.toLowerCase()) : true;
+            return matchPower && matchBrand;
+          }) || equipmentCatalog.find((e) => e.type === 'panel' && targetW > 0 && Math.abs((e.powerW || 0) - targetW) <= 15);
+        }
+
         if (panMatch) {
           selectedPanelId = panMatch.id;
           selectedPanelModel = panMatch.displayName;
@@ -465,9 +551,23 @@ export function registerAIInvoiceHandlers() {
       let selectedInverterUnitPriceUSD: number | undefined;
 
       if (parsed.matchedInverterId || parsed.matchedInverterModel || parsed.matchedInverterPowerKW) {
-        const invMatch = equipmentCatalog.find(
+        let invMatch = equipmentCatalog.find(
           (e) => e.type === 'inverter' && (e.id === parsed.matchedInverterId || e.displayName === parsed.matchedInverterModel || e.modelSeries === parsed.matchedInverterModel)
         );
+        if (!invMatch) {
+          const reqInvStr = `${parsed.matchedInverterModel || ''} ${parsed.aiReasoningSummary || ''}`.toLowerCase();
+          const targetKW = parsed.matchedInverterPowerKW || 8.0;
+          invMatch = equipmentCatalog.find((e) => {
+            if (e.type !== 'inverter') return false;
+            const matchBrand = matchBrandFuzzy(e.brand, reqInvStr) || reqInvStr.includes(e.brand.toLowerCase());
+            const matchPower = Math.abs((e.powerKW || 0) - targetKW) <= 1.0;
+            return matchBrand && matchPower;
+          }) || equipmentCatalog.find((e) => {
+            if (e.type !== 'inverter') return false;
+            return matchBrandFuzzy(e.brand, reqInvStr) || reqInvStr.includes(e.brand.toLowerCase());
+          });
+        }
+
         if (invMatch) {
           selectedInverterId = invMatch.id;
           selectedInverterModel = invMatch.displayName;
@@ -489,9 +589,23 @@ export function registerAIInvoiceHandlers() {
 
       if (hasBattery || parsed.matchedBatteryId || parsed.matchedBatteryModel || (parsed.matchedBatteryCount && parsed.matchedBatteryCount > 0)) {
         hasBattery = true;
-        const batMatch = equipmentCatalog.find(
+        let batMatch = equipmentCatalog.find(
           (e) => e.type === 'battery' && (e.id === parsed.matchedBatteryId || e.displayName === parsed.matchedBatteryModel || e.modelSeries === parsed.matchedBatteryModel)
         );
+        if (!batMatch) {
+          const reqBatStr = `${parsed.matchedBatteryModel || ''} ${parsed.aiReasoningSummary || ''}`.toLowerCase();
+          const targetCap = parsed.matchedBatteryCapacityKWh || 16.08;
+          batMatch = equipmentCatalog.find((e) => {
+            if (e.type !== 'battery') return false;
+            const matchBrand = matchBrandFuzzy(e.brand, reqBatStr) || reqBatStr.includes(e.brand.toLowerCase());
+            const matchCap = Math.abs((e.capacityKWh || 0) - targetCap) <= 1.0;
+            return matchBrand && matchCap;
+          }) || equipmentCatalog.find((e) => {
+            if (e.type !== 'battery') return false;
+            return matchBrandFuzzy(e.brand, reqBatStr) || reqBatStr.includes(e.brand.toLowerCase());
+          });
+        }
+
         if (batMatch) {
           selectedBatteryId = batMatch.id;
           selectedBatteryModel = batMatch.displayName;
