@@ -28,7 +28,9 @@ export const SupplierPricesDetailModal: React.FC = () => {
     applySupplierPriceToProject,
     openAIPriceCatalogModal,
     sidebarTheme,
-    getActiveProject,
+    projects,
+    activeProjectId,
+    equipmentCatalog,
   } = useSimulationStore();
 
   const isDark = sidebarTheme === 'dark';
@@ -43,7 +45,6 @@ export const SupplierPricesDetailModal: React.FC = () => {
   const [notes, setNotes] = useState('');
   const [stockStatus, setStockStatus] = useState<EquipmentSupplierPrice['stockStatus']>('in_stock');
 
-  const equipmentCatalog = useSimulationStore((s) => s.equipmentCatalog);
   const existingSupplierNames: string[] = useMemo(() => {
     const setNames = new Set<string>();
     equipmentCatalog.forEach((eq) => {
@@ -54,13 +55,11 @@ export const SupplierPricesDetailModal: React.FC = () => {
     return Array.from(setNames).sort();
   }, [equipmentCatalog]);
 
-  if (!item) return null;
-
-  const projects = useSimulationStore((s) => s.projects);
-  const activeProjectId = useSimulationStore((s) => s.activeProjectId);
   const project = useMemo(() => {
     return projects.find((p) => p.id === activeProjectId && !p.isDeleted) || projects[0];
   }, [projects, activeProjectId]);
+
+  if (!item) return null;
 
   const selectedSupplierInfo = project?.specs?.selectedSupplierInfo;
   const currentAppliedSupplier =
