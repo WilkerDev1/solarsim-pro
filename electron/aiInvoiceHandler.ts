@@ -611,7 +611,20 @@ export function registerAIInvoiceHandlers() {
         }
       }
 
+      // Detección de cobertura explícita solicitada en texto (ej. "cobertura al 105%", "meta 100%")
+      let requestedCoveragePct: number | undefined;
+      if (projectRequirementsText) {
+        const covMatch = projectRequirementsText.match(/(?:cobertura|meta)(?:\s*deseada)?(?:\s*al|\s*de)?\s*(\d+)\s*%/i);
+        if (covMatch) {
+          const parsedPct = parseInt(covMatch[1], 10);
+          if (parsedPct >= 10 && parsedPct <= 300) {
+            requestedCoveragePct = parsedPct;
+          }
+        }
+      }
+
       // Detección explícita de paneles / potencia solicitada en texto (Prioridad Absoluta)
+      let explicitPanelsDetected = false;
       if (projectRequirementsText) {
         const kwpMatch = projectRequirementsText.match(/(\d+(?:\.\d+)?)\s*k(?:w|wp)\s*(?:paneles|panel|m[oó]dulos)?/i)
           || projectRequirementsText.match(/(?:paneles|panel|m[oó]dulos)\s*(?:de\s*)?(\d+(?:\.\d+)?)\s*k(?:w|wp)/i);
@@ -621,18 +634,20 @@ export function registerAIInvoiceHandlers() {
           const explicitKwp = parseFloat(kwpMatch[1]);
           if (explicitKwp > 0) {
             parsed.matchedPanelCount = Math.max(1, Math.round((explicitKwp * 1000) / selectedPanelWatts));
+            explicitPanelsDetected = true;
           }
         } else if (countMatch) {
           const explicitCount = parseInt(countMatch[1], 10);
           if (explicitCount > 0) {
             parsed.matchedPanelCount = explicitCount;
+            explicitPanelsDetected = true;
           }
         }
       }
 
-      const targetCoverage = 0.95;
-      const targetAnnualSolarKWh = totalAnnual * targetCoverage;
       const specificYieldKWhPerKWp = 1450;
+      const baseCoveragePct = requestedCoveragePct || 95;
+      const targetAnnualSolarKWh = totalAnnual * (baseCoveragePct / 100);
       const recommendedCapacityKWp = Math.round((targetAnnualSolarKWh / specificYieldKWhPerKWp) * 100) / 100;
       const recommendedPanelCount = Math.max(1, Math.ceil((recommendedCapacityKWp * 1000) / selectedPanelWatts));
 
@@ -640,6 +655,27 @@ export function registerAIInvoiceHandlers() {
         ? parsed.matchedPanelCount
         : recommendedPanelCount;
       const finalCapacityKWp = Math.round(((finalPanelCount * selectedPanelWatts) / 1000) * 100) / 100;
+
+      // Deducción inteligente de la Cobertura Meta (%) para alinear la UI con los módulos calculados
+      let effectiveTargetCoverage = baseCoveragePct;
+      if (totalAnnual > 0) {
+        if (explicitPanelsDetected || (parsed.matchedPanelCount && parsed.matchedPanelCount !== recommendedPanelCount)) {
+          const STANDARD_PRESETS = [80, 90, 95, 100, 105, 110, 120];
+          const matchingPreset = STANDARD_PRESETS.find((pct) => {
+            const pCap = (totalAnnual * (pct / 100)) / specificYieldKWhPerKWp;
+            const pPanels = Math.max(1, Math.ceil((pCap * 1000) / selectedPanelWatts));
+            return pPanels === finalPanelCount;
+          });
+
+          if (matchingPreset !== undefined) {
+            effectiveTargetCoverage = matchingPreset;
+          } else {
+            const estimatedSolarAnnualKWh = finalCapacityKWp * specificYieldKWhPerKWp;
+            const rawPct = Math.round((estimatedSolarAnnualKWh / totalAnnual) * 100);
+            effectiveTargetCoverage = Math.max(10, Math.min(300, rawPct));
+          }
+        }
+      }
 
       // Smart Inverter Matching con el Catálogo y Re-Grounding Determinista
       let selectedInverterId: string | undefined;
@@ -1034,7 +1070,7 @@ export function registerAIInvoiceHandlers() {
         selectedSupplierInfo: autoSupplierPricing ? selectedSupplierInfo : undefined,
 
         // Requisitos & Razonamiento IA
-        targetCoveragePct: 95,
+        targetCoveragePct: effectiveTargetCoverage,
         confidenceScore: parsed.confidenceScore || 98,
         extractedFromFileName: fileName || 'Requisitos en texto libre',
         projectRequirementsPrompt: projectRequirementsText || undefined,

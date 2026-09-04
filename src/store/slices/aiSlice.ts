@@ -47,7 +47,7 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
         targetProjectId = `proj-${Date.now()}`;
         const panelW = data.selectedPanelWatts || BENCHMARK_PROJECT.specs.panelPowerW || 620;
         const panelModel = data.selectedPanelModel || BENCHMARK_PROJECT.specs.panelBrandModel;
-        const targetCov = 95;
+        const targetCov = data.targetCoveragePct ?? 95;
         const sysLosses = 25.0;
         const rec = calculateRecommendedPanelCount(
           resolvedProvince,

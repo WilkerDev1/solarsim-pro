@@ -472,7 +472,8 @@ export function useAIInvoiceScanner() {
       activeProject?.client?.customMonthlyHSP
     );
 
-    const annualProd = rec.recommendedCapacityKWp * rec.annualSpecificYieldKWhPerKWp;
+    const activeCapacityKWp = extractedData.recommendedCapacityKWp || rec.recommendedCapacityKWp;
+    const annualProd = activeCapacityKWp * rec.annualSpecificYieldKWhPerKWp;
     return Math.round((annualProd / totalAnnual) * 1000) / 10;
   }, [extractedData, selectedPanel, activeProject]);
 

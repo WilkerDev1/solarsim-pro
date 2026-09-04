@@ -738,20 +738,33 @@ export async function parseInvoiceWithGemini(params: {
     }
   }
 
+  // Detección de cobertura explícita solicitada en texto (ej. "cobertura al 105%", "meta 100%")
+  let requestedCoveragePct: number | undefined;
+  if (projectRequirementsText) {
+    const covMatch = projectRequirementsText.match(/(?:cobertura|meta)(?:\s*deseada)?(?:\s*al|\s*de)?\s*(\d+)\s*%/i);
+    if (covMatch) {
+      const parsedPct = parseInt(covMatch[1], 10);
+      if (parsedPct >= 10 && parsedPct <= 300) {
+        requestedCoveragePct = parsedPct;
+      }
+    }
+  }
+
   // Solar Dimensioning Suggestion based on local radiation, target coverage (95%), and default system losses (25%)
   const cleanProvince = parsed.province || 'Santo Domingo / Distrito Nacional';
-  const targetCoverage = 95;
+  const baseTargetCoverage = requestedCoveragePct || 95;
   const defaultLosses = 25.0;
 
   const rec = calculateRecommendedPanelCount(
     cleanProvince,
     monthlyConsumption,
     selectedPanelWatts,
-    targetCoverage,
+    baseTargetCoverage,
     defaultLosses
   );
 
   // Detección explícita de paneles / potencia solicitada en texto (Prioridad Absoluta)
+  let explicitPanelsDetected = false;
   if (projectRequirementsText) {
     const kwpMatch = projectRequirementsText.match(/(\d+(?:\.\d+)?)\s*k(?:w|wp)\s*(?:paneles|panel|m[oó]dulos)?/i)
       || projectRequirementsText.match(/(?:paneles|panel|m[oó]dulos)\s*(?:de\s*)?(\d+(?:\.\d+)?)\s*k(?:w|wp)/i);
@@ -761,11 +774,13 @@ export async function parseInvoiceWithGemini(params: {
       const explicitKwp = parseFloat(kwpMatch[1]);
       if (explicitKwp > 0) {
         parsed.matchedPanelCount = Math.max(1, Math.round((explicitKwp * 1000) / selectedPanelWatts));
+        explicitPanelsDetected = true;
       }
     } else if (countMatch) {
       const explicitCount = parseInt(countMatch[1], 10);
       if (explicitCount > 0) {
         parsed.matchedPanelCount = explicitCount;
+        explicitPanelsDetected = true;
       }
     }
   }
@@ -774,6 +789,35 @@ export async function parseInvoiceWithGemini(params: {
     ? parsed.matchedPanelCount
     : rec.recommendedPanelCount;
   const finalCapacityKWp = Math.round(((finalPanelCount * selectedPanelWatts) / 1000) * 100) / 100;
+
+  // Deducción inteligente de la Cobertura Meta (%) para alinear la UI con los módulos calculados
+  let effectiveTargetCoverage = baseTargetCoverage;
+  if (totalAnnual > 0) {
+    if (explicitPanelsDetected || (parsed.matchedPanelCount && parsed.matchedPanelCount !== rec.recommendedPanelCount)) {
+      // 1. Verificar si coincide exactamente con uno de los botones presets de la UI
+      const STANDARD_PRESETS = [80, 90, 95, 100, 105, 110, 120];
+      const matchingPreset = STANDARD_PRESETS.find((pct) => {
+        const check = calculateRecommendedPanelCount(
+          cleanProvince,
+          monthlyConsumption,
+          selectedPanelWatts,
+          pct,
+          defaultLosses
+        );
+        return check.recommendedPanelCount === finalPanelCount;
+      });
+
+      if (matchingPreset !== undefined) {
+        effectiveTargetCoverage = matchingPreset;
+      } else {
+        // 2. Cobertura proporcional a la producción calculada
+        const annualYield = rec.annualSpecificYieldKWhPerKWp || 1450;
+        const estimatedSolarAnnualKWh = finalCapacityKWp * annualYield;
+        const rawPct = Math.round((estimatedSolarAnnualKWh / totalAnnual) * 100);
+        effectiveTargetCoverage = Math.max(10, Math.min(300, rawPct));
+      }
+    }
+  }
 
   // Smart Inverter Matching con el Catálogo y Re-Grounding Determinista
   let selectedInverterId: string | undefined;
@@ -1165,7 +1209,7 @@ export async function parseInvoiceWithGemini(params: {
     selectedSupplierInfo: autoSupplierPricing ? selectedSupplierInfo : undefined,
 
     // Requisitos & Razonamiento IA
-    targetCoveragePct: 95,
+    targetCoveragePct: effectiveTargetCoverage,
     confidenceScore: parsed.confidenceScore || 98,
     extractedFromFileName: fileName || 'Requisitos en texto libre',
     projectRequirementsPrompt: projectRequirementsText || undefined,

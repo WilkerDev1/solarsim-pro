@@ -327,7 +327,37 @@ if (extractedBatCount !== 2) {
   throw new Error(`❌ Expected 2 batteries from text, got ${extractedBatCount}`);
 }
 
-console.log(' ✅ PASS: Detección exacta de variante WeCo 8 kW (1 ud), WeCo Batería (2 uds) y 18 paneles (11 kWp) validada\n');
+// Validación de alineación de Cobertura Meta (%) y Cobertura Real (~109.7%)
+const dailyKWh = 40;
+const monthlyArr = Array(12).fill(Math.round(dailyKWh * 30.4)); // 1216 kWh * 12 = 14,592 kWh
+const totalAnnualKWh = monthlyArr.reduce((a, b) => a + b, 0);
+const cleanProv = 'Santo Domingo / Distrito Nacional';
+const losses = 25.0;
+
+const STANDARD_PRESETS = [80, 90, 95, 100, 105, 110, 120];
+const matchingPreset = STANDARD_PRESETS.find((pct) => {
+  const check = calculateRecommendedPanelCount(cleanProv, monthlyArr, panelWatts, pct, losses);
+  return check.recommendedPanelCount === extractedPanelCount;
+});
+
+const effectiveTargetCoverage = matchingPreset || 95;
+console.log(`Deduced Target Coverage Preset: ${effectiveTargetCoverage}% (Meta)`);
+if (effectiveTargetCoverage !== 105) {
+  throw new Error(`❌ Expected target coverage preset of 105% for 18 panels, got ${effectiveTargetCoverage}%`);
+}
+
+// Cobertura real
+const recForYield = calculateRecommendedPanelCount(cleanProv, monthlyArr, panelWatts, effectiveTargetCoverage, losses);
+const actualCapacityKWp = Math.round(((extractedPanelCount * panelWatts) / 1000) * 100) / 100;
+const realAnnualProd = actualCapacityKWp * recForYield.annualSpecificYieldKWhPerKWp;
+const realCoveragePct = Math.round((realAnnualProd / totalAnnualKWh) * 1000) / 10;
+
+console.log(`Estimated Real Coverage: ~${realCoveragePct}%`);
+if (realCoveragePct < 109.0 || realCoveragePct > 110.5) {
+  throw new Error(`❌ Expected real coverage around 109.7%, got ${realCoveragePct}%`);
+}
+
+console.log(' ✅ PASS: Detección exacta de variante WeCo 8 kW (1 ud), WeCo Batería (2 uds), 18 paneles (11 kWp), Meta 105% y Cobertura Real ~109.7% validada\n');
 
 console.log('=====================================================');
 console.log('🎉 ALL AI SMART PROPOSAL & SIZING TESTS PASSED (100% SUCCESS)');
