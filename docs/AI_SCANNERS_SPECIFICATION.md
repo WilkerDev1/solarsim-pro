@@ -130,14 +130,21 @@ Entrenado y auditado para los formatos oficiales de facturación dominicana:
 | **Notas Técnicas** | `specialTechnicalNotes` | Advertencias de disponibilidad de stock, metas de autonomía diaria o condiciones de instalación. |
 | **Razonamiento IA** | `aiReasoningSummary` | Justificación técnica en lenguaje natural de cómo se interpretó la solicitud. |
 
-### 🧠 Regla 7 del System Prompt: Grounding Estricto y Resolución Eléctrica:
-En los servicios [`geminiInvoiceService.ts`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/services/geminiInvoiceService.ts) y [`electron/aiInvoiceHandler.ts`](file:///home/ishiro/Proyectos/1_Principales/solarsim/electron/aiInvoiceHandler.ts), se instruye a Gemini bajo las siguientes heurísticas de ingeniería:
-1. **Resolución de Inversores Split-Phase en RD**:
-   - En República Dominicana, las cotizaciones residenciales y comerciales pequeñas que solicitan *"1 inversor de 16 kW"* split-phase se configuran técnicamente con **dos unidades de 8 kW en paralelo**. La IA traduce esta solicitud configurando `selectedInverterPowerKW: 8.0` y `selectedInverterCount: 2`.
-2. **Priorización de Modelos Oficiales Verificados**:
-   - Si el texto menciona *"Canadian 615w"*, la IA lo vincula con el modelo verificado `Canadian Solar TOPBiHiKu6 CS6W-615T (615W)`.
-   - Si el texto menciona *"hinaes de 16kw"* o *"bateria de 16k"*, la IA lo empareja con la batería LiFePO4 de alta densidad `HinaESS PowerGem Max 16.08kWh`.
-3. **Cálculo del Margen Financiero**:
+### 🧠 Reglas Críticas de Grounding Estricto, Precedencia y Resolución Eléctrica:
+En los servicios [`geminiInvoiceService.ts`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/services/geminiInvoiceService.ts) y [`electron/aiInvoiceHandler.ts`](file:///home/ishiro/Proyectos/1_Principales/solarsim/electron/aiInvoiceHandler.ts), se aplican heurísticas de ingeniería y re-grounding determinista:
+1. **Precedencia Absoluta de Potencia Fotovoltaica Explícita (kWp o Módulos)**:
+   - Si el usuario indica en los requerimientos una potencia en kWp (ej. *"11 kwp paneles Canadian 615w"*) o una cantidad de módulos (ej. *"21 panel"*), el sistema calcula $\lceil (11,000 / 615) \rceil = 18\text{ paneles}$ y le otorga **prioridad absoluta**.
+   - El cálculo genérico por consumo histórico o autonomía diaria (ej. 40 kWh/día) nunca sobrescribe la cantidad explícita solicitada por el usuario.
+2. **Detección Contextualizada y Selección Exacta de Variantes de Inversor**:
+   - La extracción de potencia del inversor opera estrictamente dentro del contexto de la palabra *"inversor"* o de la marca detectada (`weco`, `luxpower`, `solis`, `huawei`, `growatt`, etc.), evitando colisiones con valores de baterías (kWh) o paneles (kWp).
+   - **Matching de Variantes de la Misma Marca**: Cuando existen múltiples potencias del mismo fabricante en el catálogo (ej: `WeCo XT-6K`, `WeCo XT-8K` y `WeCo XT-10K`), el algoritmo evalúa la diferencia mínima absoluta con la potencia requerida ($|P_{\text{cat}} - P_{\text{req}}|$) y desempata buscando el código de variante en el nombre comercial (`8K`, `8.0Kw`).
+   - **Cantidad Explícita de Inversores**: Si el texto indica *"1 inversor weco de 8kw"*, el sistema asigna de forma fija `selectedInverterCount = 1`, impidiendo que el redondeo automático por capacidad fotovoltaica configure 2 unidades en paralelo innecesariamente.
+3. **Equipos Pendientes de Cotizar (`DISPONIBLE_SIN_PRECIO`) y Cero Falsas Sustituciones**:
+   - Si un equipo solicitado existe en el catálogo pero aún no tiene ofertas comerciales cargadas de distribuidores (`priceStatus: 'DISPONIBLE_SIN_PRECIO'`), el sistema lo selecciona obligatoriamente con su ID y especificaciones técnicas oficiales.
+   - La frase *"Equipos según disponibilidad"* se interpreta como máxima prioridad a los modelos solicitados si figuran en la base de datos, eliminando falsas sustituciones y preservando los modelos pedidos (ej. WeCo, Luxpower, Canadian Solar).
+4. **Resolución de Inversores Split-Phase en RD**:
+   - En República Dominicana, las cotizaciones residenciales y comerciales que solicitan *"1 inversor de 16 kW"* split-phase se configuran técnicamente con **dos unidades de 8 kW en paralelo**. La IA traduce esta solicitud configurando `selectedInverterPowerKW: 8.0` y `selectedInverterCount: 2`.
+5. **Cálculo del Margen Financiero**:
    - Frases como *"Venta 40%"*, *"Porcentaje de venta 40%"* o *"Margen 35%"* se parsean como números flotantes ($40\%$, $35\%$) y se inyectan en el motor financiero para calcular el precio bruto de venta sobre el costo de adquisición de los equipos.
 
 ### ⚡ Botones de Carga Rápida para Pruebas Inmediatas:
@@ -150,17 +157,17 @@ La interfaz incorpora dos botones de un solo clic basados en casos de producció
   2 bateria hinaes de 16kw
   Venta 40%
   ```
-- **Osia Moscoso**:
+- **Josia Moscoso**:
   ```text
-  Osia Moscoso
+  Josia Moscoso
   11 kwp paneles Canadian 615w
   2 bateria de 16k weco
-  1 weco 8 kw
+  1 inversor weco de 8kw
   Porcentaje de venta 40%
   Equipos según disponibilidad y especificar que el sistema esta diseñado para 40kwh diario.
   ```
 
-### 🖥️ Experiencia en Pantalla Dividida (Split-View):
+### 🖥️ Experiencia en Pantalla Dividida (Split-View) y Selectores Interactivos:
 1. **Lado Izquierdo**:
    - Si hay archivo: Visor PDF/imagen con controles de zoom ($50\%$ a $250\%$) y reajuste.
    - Si no se suministra factura física: Tarjeta ejecutiva *"AI Requirements Blueprint"* con las especificaciones analizadas y la síntesis técnica del asistente.
@@ -168,12 +175,11 @@ La interfaz incorpora dos botones de un solo clic basados en casos de producció
    - **Pestaña 1 (Cliente & Suministro)**: Validación humana de NIS/NIC, RNC, nombre y distribuidora.
    - **Pestaña 2 (Consumo 12 Meses)**: Gráfica de barras de consumo mensual, modo Mes Pico y edición individual.
    - **Pestaña 3 (Propuesta Solar & Equipos)**:
-     - Banner de razonamiento del asistente con badge de Grounding activo.
-     - Selector interactivo de Cobertura Meta (95% base + presets 80-120%).
-     - Tarjeta de paneles solares con potencia total kWp y costo unitario de distribuidor.
-     - Tarjeta de inversor solar con unidades en paralelo y capacidad total AC en kW.
-     - Tarjeta de almacenamiento BESS con capacidad total en kWh.
-     - Badge destacado de margen comercial configurado (ej: $40\% \rightarrow 1.40\text{x}$).
+     - **Módulo Fotovoltaico**: Menú desplegable interactivo (`<select>`) con todos los paneles del catálogo oficial, badge de precio y cuadro comparativo de potencia unitaria, eficiencia STC, tecnología de celda y área en $m^2$.
+     - **Inversor Solar Emparejado**: Menú desplegable interactivo (`<select>`) con todos los inversores del catálogo (`inverterCatalog`), controles de cantidad de unidades en paralelo (stepper `-` y `+`), y cálculo instantáneo de la Capacidad Total en kW AC.
+     - **Banco de Baterías BESS**: Menú desplegable interactivo (`<select>`) con todas las baterías del catálogo (`batteryCatalog`) más la opción *"Sin almacenamiento (Solo FV)"*, controles de cantidad de baterías (stepper `-` y `+`), y cálculo instantáneo de los kWh totales almacenados.
+     - **Accesibilidad y Modo Claro/Oscuro**: Contraste optimizado con tipografía de alta legibilidad (`text-slate-900` / `dark:text-zinc-100`) para visualización cristalina en cualquier tema.
+     - **Margen Comercial**: Badge destacado de margen comercial configurado (ej: $40\% \rightarrow 1.40\text{x}$).
      - Botón principal de un solo clic: **`"Crear Propuesta (95% Lista) 🚀"`** o **`"Aplicar al Proyecto Activo ✨"`**.
 
 ---

@@ -289,6 +289,16 @@ ssh app-server "cd /home/agente/servicios/solarsim-api && docker compose up -d -
 2. **Invariante de Descripción de Mano de Obra e Instalación (`installationServicesDesc`)**:
    - La celda de instalación y mano de obra en la tabla de cotización del simulador y en la propuesta PDF debe ser siempre concisa y profesional (`Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).`).
    - **PROHIBIDO** concatenar notas del sistema (`specialTechnicalNotes`) dentro de `installationServicesDesc`. Dichas notas se reservan exclusivamente para la pestaña técnica y la síntesis de razonamiento de la IA.
+3. **Precedencia Absoluta de Potencia Fotovoltaica Explícita (kWp o Módulos)**:
+   - Si el usuario especifica una potencia en kWp (ej. `11 kwp paneles Canadian 615w`), se calcula de inmediato $\lceil 11,000 / 615 \rceil = 18\text{ paneles}$ y se le otorga **prioridad absoluta**. Los cálculos genéricos por consumo histórico o autonomía no deben sobrescribir este valor.
+4. **Detección Contextualizada y Selección Exacta de Variantes de Inversores**:
+   - La extracción de potencia del inversor opera estrictamente dentro del contexto de la palabra *"inversor"* o de la marca detectada (`weco`, `luxpower`, `solis`, etc.), evitando colisiones con valores de baterías (kWh) o paneles (kWp).
+   - Cuando existen múltiples variantes de la misma marca (ej: `WeCo XT-6K`, `XT-8K` y `XT-10K`), se selecciona la variante con la menor diferencia de potencia y se prioriza el código del modelo (`8K`, `8.0Kw`).
+   - Si se solicita una cantidad explícita (`1 inversor weco`), se respeta como 1 unidad, impidiendo que el dimensionamiento fotovoltaico configure 2 unidades en paralelo innecesariamente.
+5. **Equipos Pendientes de Cotizar (`DISPONIBLE_SIN_PRECIO`) y Cero Falsas Sustituciones**:
+   - Si un equipo solicitado existe en el catálogo pero aún no tiene ofertas de proveedores asignadas (`priceStatus: 'DISPONIBLE_SIN_PRECIO'`), se selecciona obligatoriamente con su ID oficial. La frase *"Equipos según disponibilidad"* da prioridad máxima a los modelos existentes en la base de datos y jamás dispara falsas sustituciones.
+6. **Controles Interactivos en la Pestaña 3 (Propuesta Solar)**:
+   - Los bloques de **Módulo Fotovoltaico**, **Inversor Solar** y **Banco de Baterías (BESS)** cuentan con menús desplegables (`<select>`) para cambiar de equipo en cualquier momento, controles de cantidad (unidades en paralelo y número de baterías) y cálculo instantáneo de capacidad total AC (kW) y almacenamiento (kWh) en tiempo real con contraste óptimo en Modo Claro y Oscuro.
 
 ### 📄 Exportación a PDF con `html2canvas` & `jsPDF`:
 1. **Reglas del Workspace**: Consultar `.agents/rules/html2canvas_pdf_export_rules.md`.
