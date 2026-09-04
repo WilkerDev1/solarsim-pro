@@ -115,25 +115,41 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 text-slate-700 font-semibold">
-            <tr className="hover:bg-slate-50">
-              <td className="py-2.5 px-4 font-bold text-slate-800">Inversión Bruta Sistema (USD)</td>
-              <td className="py-2.5 px-4 font-bold text-slate-900">${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</td>
-            </tr>
             {summary.itbisSavedUSD > 0 && (
-              <tr className="hover:bg-slate-50">
-                <td className="py-2.5 px-4 font-bold text-slate-800">Exoneración 18% ITBIS (Ley 57-07) (USD)</td>
-                <td className="py-2.5 px-4 font-bold text-emerald-700">-${summary.itbisSavedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</td>
-              </tr>
+              <>
+                <tr className="hover:bg-slate-50">
+                  <td className="py-2 px-4 text-slate-600">Precio de Lista con ITBIS (USD)</td>
+                  <td className="py-2 px-4 text-right font-mono text-slate-600">
+                    ${(summary.grossInvestmentUSD + summary.itbisSavedUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                  </td>
+                </tr>
+                <tr className="hover:bg-slate-50">
+                  <td className="py-2 px-4 text-emerald-800 font-semibold">Exoneración 18% ITBIS (Ley 57-07) (USD)</td>
+                  <td className="py-2 px-4 text-right font-mono font-bold text-emerald-700">
+                    -${summary.itbisSavedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                  </td>
+                </tr>
+              </>
             )}
+            <tr className="hover:bg-slate-50 bg-slate-100/60 font-bold">
+              <td className="py-2.5 px-4 text-slate-900">Total a Pagar en Contrato (Año 0) (USD)</td>
+              <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
+                ${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+              </td>
+            </tr>
             {summary.ley5707CreditUSD > 0 && (
               <tr className="hover:bg-slate-50">
-                <td className="py-2.5 px-4 font-bold text-slate-800">Crédito Fiscal 40% DGII (Ley 57-07) (USD)</td>
-                <td className="py-2.5 px-4 font-bold text-emerald-700">-${summary.ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</td>
+                <td className="py-2 px-4 text-emerald-800 font-semibold">Crédito Fiscal 40% DGII (Ley 57-07 a 3 años) (USD)</td>
+                <td className="py-2 px-4 text-right font-mono font-bold text-emerald-700">
+                  -${summary.ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                </td>
               </tr>
             )}
-            <tr className="hover:bg-slate-50 bg-emerald-50/50 font-bold">
-              <td className="py-2.5 px-4 text-slate-900">Inversión Neta Final (USD)</td>
-              <td className="py-2.5 px-4 text-emerald-800 text-sm">${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</td>
+            <tr className="hover:bg-slate-50 bg-emerald-50/70 font-bold border-t-2 border-emerald-200">
+              <td className="py-2.5 px-4 text-emerald-950">Inversión Neta Final tras Crédito Fiscal (USD)</td>
+              <td className="py-2.5 px-4 text-right font-mono font-black text-emerald-800 text-sm">
+                ${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+              </td>
             </tr>
           </tbody>
         </table>
@@ -160,7 +176,9 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
               <td className="py-2.5 px-4 text-right">${year1Savings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               <td className="py-2.5 px-4 text-right text-emerald-700">${year1Tax.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               <td className="py-2.5 px-4 text-right font-semibold">${(year1Savings + year1Tax).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-              <td className="py-2.5 px-4 text-right font-bold text-red-600">-${((summary.grossInvestmentUSD - summary.itbisSavedUSD) - year1Savings - year1Tax).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              <td className="py-2.5 px-4 text-right font-bold text-red-600">
+                {(cf25[0]?.cumulativeCashFlowUSD || 0) < 0 ? '-' : ''}${Math.abs(cf25[0]?.cumulativeCashFlowUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </td>
             </tr>
 
             <tr className="hover:bg-slate-50 bg-emerald-50/60 font-bold">

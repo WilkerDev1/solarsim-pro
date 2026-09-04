@@ -63,6 +63,7 @@ export const BENCHMARK_PROJECT: ProjectSimulation = {
   financials: {
     applyLey5707: true,
     applyITBISExemption: true,
+    customITBISSavedUSD: 1770.46,
     pricePerWattUSD: 1.135,
     discountRatePct: 10.0,
     projectLifespanYears: 25,

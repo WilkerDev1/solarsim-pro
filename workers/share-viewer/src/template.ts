@@ -143,7 +143,7 @@ export function renderProposalPage(stored: StoredProposal): string {
 
   // Cashflow 25 Years
   const cf25 = summary?.cashFlow25Years || [];
-  const initialOutflowUSD = grossInvestmentUSD - itbisSavedUSD;
+  const initialOutflowUSD = grossInvestmentUSD;
   const cumulativeChartData = [
     { year: 0, cumulative: -initialOutflowUSD },
     ...cf25.map((c: any) => ({

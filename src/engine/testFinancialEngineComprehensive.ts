@@ -73,8 +73,8 @@ assert(resSolarOnly.batteryInvestmentUSD === 0, 'Inversión Baterías es 0');
 assert(resSolarOnly.itbisSavedUSD > 0, 'ITBIS Exonerado > 0 cuando applyITBISExemption es true');
 assert(resSolarOnly.ley5707CreditUSD > 0, 'Crédito Ley 57-07 > 0 cuando applyLey5707 es true');
 assert(
-  resSolarOnly.netInvestmentUSD === Math.round((resSolarOnly.grossInvestmentUSD - resSolarOnly.itbisSavedUSD - resSolarOnly.ley5707CreditUSD) * 100) / 100,
-  'netInvestmentUSD = Gross - ITBIS - Ley5707'
+  resSolarOnly.netInvestmentUSD === Math.round((resSolarOnly.grossInvestmentUSD - resSolarOnly.ley5707CreditUSD) * 100) / 100,
+  'netInvestmentUSD = Gross - Ley5707'
 );
 
 // TEST 2: Dynamic Storage Addition (3 Batteries)
@@ -167,8 +167,8 @@ const resNoLey = calculateFinancialSummary(
 
 assert(resNoLey.ley5707CreditUSD === 0, 'ley5707CreditUSD es 0 cuando applyLey5707 es false');
 assert(
-  resNoLey.netInvestmentUSD === Math.round((resWithBattery.grossInvestmentUSD - resWithBattery.itbisSavedUSD) * 100) / 100,
-  'Inversión neta sin Ley 57-07 es igual a la inversión bruta menos ITBIS'
+  resNoLey.netInvestmentUSD === resWithBattery.grossInvestmentUSD,
+  'Inversión neta sin Ley 57-07 es igual a la inversión facturada de contrato'
 );
 
 // TEST 5: Cash Flow Year 0 and Multi-Year Integrity
@@ -358,14 +358,14 @@ assert(
 // 3. Total General de Lista con ITBIS
 const totalGeneralConITBIS = resGiovanni.grossInvestmentUSD + resGiovanni.itbisSavedUSD;
 assert(
-  Math.abs(totalGeneralConITBIS - 17693.00) < 0.01,
-  `Total General con ITBIS es $17,693.00 ($${totalGeneralConITBIS})`
+  Math.abs(totalGeneralConITBIS - 18166.14) < 0.01,
+  `Total General con ITBIS es $18,166.14 ($${totalGeneralConITBIS})`
 );
 
-// 4. ITBIS a descontar por Ley 57-07
+// 4. ITBIS a descontar por Ley 57-07 (dinámico de matriz con margen 1.40x)
 assert(
-  Math.abs(resGiovanni.itbisSavedUSD - 1115.64) < 0.01,
-  `ITBIS a descontar por Ley 57-07 es $1,115.64 ($${resGiovanni.itbisSavedUSD})`
+  Math.abs(resGiovanni.itbisSavedUSD - 1588.78) < 0.01,
+  `ITBIS a descontar por Ley 57-07 es $1,588.78 ($${resGiovanni.itbisSavedUSD})`
 );
 
 // 5. Total a pagar por el cliente con Ley 57-07
@@ -374,11 +374,11 @@ assert(
   `Total a pagar final con Ley 57-07 es $16,577.36 ($${resGiovanni.grossInvestmentUSD})`
 );
 
-// 6. Validar que la brecha Total General - Subtotal sea estrictamente el ITBIS ($1,205.64), NUNCA 7.4K
+// 6. Validar que la brecha Total General - Subtotal sea estrictamente el ITBIS total ($1,678.78), NUNCA 7.4K
 const itbisGap = Math.round((totalGeneralConITBIS - commercialSubtotal) * 100) / 100;
 assert(
-  Math.abs(itbisGap - 1205.64) < 0.01,
-  `Brecha entre Total General y Subtotal es exactamente el ITBIS ($1,205.64 vs $${itbisGap}), NUNCA 7.4K`
+  Math.abs(itbisGap - 1678.78) < 0.01,
+  `Brecha entre Total General y Subtotal es exactamente el ITBIS ($1,678.78 vs $${itbisGap}), NUNCA 7.4K`
 );
 
 console.log('\n=====================================================');

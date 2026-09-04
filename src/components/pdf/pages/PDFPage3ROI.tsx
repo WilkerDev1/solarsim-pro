@@ -129,21 +129,37 @@ export const PDFPage3ROI: React.FC<PDFPage3ROIProps> = ({
                   <td className="px-4 py-1.5 text-gray-800">Potencia Instalada (kWp)</td>
                   <td className="px-4 py-1.5 text-right font-bold">{summary.systemCapacityKWp.toFixed(2)} kWp</td>
                 </tr>
-                <tr className="bg-gray-50/60">
-                  <td className="px-4 py-1.5 text-gray-800">Inversión Inicial</td>
-                  <td className="px-4 py-1.5 text-right font-bold text-gray-900">
+                {summary.itbisSavedUSD > 0 && (
+                  <>
+                    <tr className="bg-gray-50/60">
+                      <td className="px-4 py-1.5 text-gray-800">Precio de Lista con ITBIS</td>
+                      <td className="px-4 py-1.5 text-right font-bold text-gray-500 font-mono">
+                        ${(summary.grossInvestmentUSD + summary.itbisSavedUSD).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="px-4 py-1.5 text-gray-800">Exoneración 18% ITBIS (Ley 57-07)</td>
+                      <td className="px-4 py-1.5 text-right font-bold text-green-700 font-mono">
+                        -${summary.itbisSavedUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  </>
+                )}
+                <tr className="bg-gray-50/60 font-bold">
+                  <td className="px-4 py-1.5 text-gray-900">Total a Pagar en Contrato (Año 0)</td>
+                  <td className="px-4 py-1.5 text-right font-bold text-gray-900 font-mono">
                     ${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </td>
                 </tr>
                 <tr>
-                  <td className="px-4 py-1.5 text-gray-800">Incentivo Fiscal Estimado (Ley 57-07)</td>
-                  <td className="px-4 py-1.5 text-right font-bold text-green-700">
+                  <td className="px-4 py-1.5 text-gray-800">Crédito Fiscal 40% DGII (Ley 57-07)</td>
+                  <td className="px-4 py-1.5 text-right font-bold text-green-700 font-mono">
                     -${summary.ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </td>
                 </tr>
-                <tr className="bg-gray-50/60">
-                  <td className="px-4 py-1.5 text-gray-800">Inversión Neta</td>
-                  <td className="px-4 py-1.5 text-right font-bold text-gray-900">
+                <tr className="bg-emerald-50/80 font-bold text-emerald-950 border-t border-emerald-200">
+                  <td className="px-4 py-1.5 text-emerald-950">Inversión Neta Final tras Crédito Fiscal</td>
+                  <td className="px-4 py-1.5 text-right font-black text-emerald-800 font-mono">
                     ${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </td>
                 </tr>

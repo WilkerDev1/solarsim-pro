@@ -328,10 +328,13 @@ export function calculateFinancialSummary(
     ? baseGrossInvestmentUSD
     : Math.round((costMatrix.solarOnlyVentaUSD || baseGrossInvestmentUSD) * 100) / 100;
 
-  // ITBIS exoneration calculation (allows explicit custom override e.g. 1866.11 or standard calculation plus custom items ITBIS)
+  // ITBIS exoneration calculation (allows explicit custom override e.g. 1866.11 or dynamic calculation from cost matrix)
+  const matrixITBISUSD = costMatrix.itbisUSD || 0;
+  const commercialITBISUSD = Math.round(matrixITBISUSD * (costMatrix.saleMarginMultiplier || specs.saleMarginMultiplier || 1.25) * 100) / 100;
+
   const baseITBISSaved = financials.customITBISSavedUSD !== undefined
     ? financials.customITBISSavedUSD
-    : Math.round(baseGrossInvestmentUSD * 0.18 * 0.38768 * 100) / 100;
+    : commercialITBISUSD;
 
   const itbisSavedUSD = financials.applyITBISExemption
     ? Math.round((baseITBISSaved + customItemsITBISUSD) * 100) / 100
@@ -344,8 +347,15 @@ export function calculateFinancialSummary(
         : Math.round(equipmentPortionUSD * 0.40 * 100) / 100)
     : 0;
 
-  // Total Net Investment after all fiscal incentives of Ley 57-07 (ITBIS exoneration + 40% DGII tax credit)
-  const netInvestmentUSD = Math.round((grossInvestmentUSD - itbisSavedUSD - ley5707CreditUSD) * 100) / 100;
+  // Total Contract Price Payable by Client at Year 0:
+  // If ITBIS is exempt under Ley 57-07, client pays grossInvestmentUSD.
+  // If ITBIS exemption is toggled off, client pays the non-exempt ITBIS (baseITBISSaved).
+  const contractPriceUSD = financials.applyITBISExemption
+    ? grossInvestmentUSD
+    : Math.round((grossInvestmentUSD + baseITBISSaved) * 100) / 100;
+
+  // Total Net Investment after 3 years of DGII ISR tax credit deduction:
+  const netInvestmentUSD = Math.round((contractPriceUSD - ley5707CreditUSD) * 100) / 100;
 
   // Monthly energy balance calculation dynamically based on location-specific solar radiation (HSP)
   const monthlyResults = calculateMonthlySolarProduction(
@@ -385,8 +395,8 @@ export function calculateFinancialSummary(
   const annualTaxCredit = financials.applyLey5707 ? ley5707CreditUSD / 3 : 0;
 
   // Initial cash outflow for the client at Year 0:
-  // If ITBIS is exempt, the client pays gross minus ITBIS.
-  const initialOutflowUSD = Math.max(0, grossInvestmentUSD - itbisSavedUSD);
+  // contractPriceUSD is the actual turnkey amount agreed and payable by the client under the proposal.
+  const initialOutflowUSD = contractPriceUSD;
 
   const cashFlow25Years: CashFlowYear[] = [];
   const annualNetCashFlows: number[] = [];
