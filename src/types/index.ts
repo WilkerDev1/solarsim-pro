@@ -321,6 +321,8 @@ export interface ProjectSimulation {
   version?: number;
   syncStatus?: 'synced' | 'pending' | 'local_only' | 'conflict';
   isDeleted?: boolean;
+  deletedAt?: string | null; // ISO 8601 timestamp cuando se envió a papelera
+  deletedBy?: string | null; // Nombre o identificador del usuario que lo eliminó
   folderId?: string; // Optional custom folder assignment
 }
 

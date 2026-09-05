@@ -29,6 +29,11 @@
 * 🏢 **Panel Multi-Empresa ("Datos del Documento")**:
   * Personalización instantánea de nombre, eslogan, redes, teléfonos, garantías y notas regulatorias.
   * Subida independiente de **Logotipo de Portada**, **Logotipo de Cabecera** y **Marca de Agua Central** con control de opacidad.
+* 🗑️ **Papelera de Reciclaje & Modo Solo Lectura**:
+  * Borrado suave con retención de 30 días y auto-purga sincronizada con el servidor.
+  * Exploración segura de propuestas eliminadas en Modo Solo Lectura (Simulador y PDF con alertas visuales).
+  * Restauración en 1-clic o eliminación física definitiva individual y masiva ("Vaciar Papelera").
+  * Soporte para Drag and Drop directamente desde el árbol lateral hacia la papelera.
 * 🔄 **Actualizador Automático Integrado**:
   * Detección y descarga en 1-clic de nuevas versiones en Windows y Linux.
 
@@ -68,7 +73,7 @@ npm run electron:dev
 npm run lint
 
 # Ejecutar validación de cálculos matemáticos del motor
-npx tsx src/engine/testBenchmark.ts
+npx tsx src/tests/testBenchmark.ts
 
 # Compilar bundles para producción
 npm run build && npm run build:electron

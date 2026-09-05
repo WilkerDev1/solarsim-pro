@@ -35,6 +35,12 @@ Este documento sirve como **fuente única de verdad** para desarrolladores y asi
    - Servidor backend Node.js (`server/`) desplegado en Docker (`solarsim-api` + PostgreSQL) en Proxmox CT 100 (`10.0.0.103`).
    - Autenticación JWT, control de acceso por roles (ADMIN, EDITOR, VIEWER), sincronización delta de proyectos y catálogo global.
    - Publicación de propuestas web interactivas con Cloudflare Workers + KV y códigos QR.
+7. **Papelera de Reciclaje (Recycle Bin / Trash) & Modo Solo Lectura**:
+   - Borrado suave (*soft-delete*) con retención automática auditada de **30 días** (`deletedAt`, `deletedBy`).
+   - Visualización y exploración de proyectos eliminados en **Modo Solo Lectura** (Simulador y PDF con banner de advertencia ámbar y protección contra mutaciones).
+   - Acciones de recuperación: **Restaurar** al catálogo activo, **Eliminación Definitiva Física** individual, o **Vaciar Papelera** completa.
+   - Sincronización transparente con PostgreSQL mediante purga automática en el servidor para registros mayores a 30 días (`POST /api/sync/pull`) y endpoints de restauración (`POST /api/projects/:id/restore`) y vaciado (`DELETE /api/trash`).
+   - Acceso dual desde el **Dock vertical** (icono `Trash2` con badge reactivo) y la carpeta integrada del **Árbol Lateral** con soporte para **Drag and Drop**.
 
 ---
 
@@ -104,23 +110,31 @@ solarsim/
 │   │   ├── solarEngine.ts                   # Balance de energía, generación mensual y cobertura
 │   │   ├── financialEngine.ts               # Flujo de caja 25 años, VAN, TIR, Payback y ROI
 │   │   ├── ley5707.ts                       # Deducciones fiscales y exenciones Ley 57-07
-│   │   ├── referenceCase.ts                 # Caso de referencia oficial auditado (BENCHMARK_PROJECT)
+│   │   └── referenceCase.ts                 # Caso de referencia oficial auditado (BENCHMARK_PROJECT)
+│   ├── tests/                               # 🧪 SUITES DE PRUEBAS UNITARIAS Y DE REGRESIÓN
 │   │   ├── testBenchmark.ts                 # Script de validación de cálculos contra benchmarks
 │   │   ├── testFinancialEngineComprehensive.ts # Suite de 9 pruebas unitarias financieras
-│   │   └── testAISmartProposal.ts           # Suite de validación de Smart Proposal IA, cobertura 95% y sanitización
+│   │   ├── testAISmartProposal.ts           # Suite de validación de Smart Proposal IA, cobertura 95% y sanitización
+│   │   ├── testEquipmentCatalog.ts          # Suite de validación de catálogo de equipos, CRUD y tombstoning
+│   │   ├── testFolderHidingAndSync.ts       # Suite de validación de ocultamiento en carpetas y sincronización
+│   │   ├── testTrashAndReadOnly.ts          # Suite de validación de papelera de reciclaje, retención 30 días y solo lectura
+│   │   ├── testMultiUserSync.ts             # Prueba de sincronización multi-usuario y resolución de colisiones
+│   │   └── testNewProjectModal.ts           # Prueba unitaria de creación de proyectos
 │   ├── assets/
 │   │   └── pdfGraphicAssets.ts              # Gráficos, renders 3D y diagramas en Base64 para PDF
 │   ├── utils/
 │   │   └── equipmentBrandUtils.ts           # Normalización de marcas, inferencia heurística y matching tolerante a alias
 │   └── components/
 │       ├── layout/                          # 🧭 NAVEGACIÓN Y ESTRUCTURA GLOBAL
-│       │   └── PrimaryIconDock.tsx          # Dock vertical oscuro estrecho (Tema Sol/Luna, Proyectos, IA, Nuevo, Ajustes)
+│       │   └── PrimaryIconDock.tsx          # Dock vertical oscuro estrecho (Tema Sol/Luna, Proyectos, IA, Papelera, Ajustes)
 │       ├── dashboard/                       # 🗂️ HOME Y EXPLORADOR DE PROPUESTAS
 │       │   ├── DashboardView.tsx            # Lienzo principal de proyectos con buscador, filtros avanzados y folders resume
 │       │   ├── ProjectCard.tsx              # Tarjeta moderna de proyecto con resumen técnico y drag source
+│       │   ├── TrashView.tsx                # Lienzo de papelera con barra de búsqueda, vaciado masivo y retención 30 días
+│       │   ├── TrashProjectCard.tsx         # Tarjeta de propuesta en papelera con countdown 30d, restaurar y hard delete
 │       │   ├── FoldersResumeGrid.tsx        # Grid inferior de resumen de carpetas con estadísticas
 │       │   └── sidebar/                     # Explorador lateral del Dashboard
-│       │       ├── SolarCoreTreeSidebar.tsx # Árbol de Projects, Team (cuentas activas) y Folders (drag target)
+│       │       ├── SolarCoreTreeSidebar.tsx # Árbol de Projects, Team, Folders y Papelera (drag target)
 │       │       └── CreateFolderModal.tsx    # Modal de creación y edición de carpetas (ADMIN)
 │       ├── common/                          # Modales, cabeceras y utilidades compartidas
 │       │   ├── Header.tsx                   # Barra superior con navegación, estado de sync y botones
@@ -189,16 +203,25 @@ npm run electron:dev
 npm run lint
 
 # Validar matemáticas del motor financiero contra benchmarks
-npx tsx src/engine/testBenchmark.ts
+npx tsx src/tests/testBenchmark.ts
 
 # Suite integral de 9 pruebas unitarias financieras
-npx tsx src/engine/testFinancialEngineComprehensive.ts
+npx tsx src/tests/testFinancialEngineComprehensive.ts
 
 # Suite de validación de Smart Proposal IA y dimensionamiento al 95%
-npx tsx src/engine/testAISmartProposal.ts
+npx tsx src/tests/testAISmartProposal.ts
 
 # Suite de validación de catálogo de equipos, CRUD persistente y detección de coincidencias
-npx tsx src/engine/testEquipmentCatalog.ts
+npx tsx src/tests/testEquipmentCatalog.ts
+
+# Suite de validación de ocultamiento en carpetas y sincronización
+npx tsx src/tests/testFolderHidingAndSync.ts
+
+# Suite de validación de papelera de reciclaje, retención de 30 días y solo lectura
+npx tsx src/tests/testTrashAndReadOnly.ts
+
+# Ejecutar todas las pruebas en conjunto (6 suites integradas)
+npm test
 
 # Compilar frontend y electron para producción
 npm run build && npm run build:electron
@@ -235,7 +258,7 @@ ssh app-server "cd /home/agente/servicios/solarsim-api && docker compose up -d -
 ### 🔄 Ciclo Obligatorio de Verificación (Verification Loop):
 **NO dar ninguna tarea por completada sin ejecutar previamente:**
 1. **Verificación de Tipos**: `npm run lint` (`npx tsc --noEmit` — Cero errores de tipo).
-2. **Validación de Motores Matemáticos, Catálogo e IA**: `npx tsx src/engine/testBenchmark.ts`, `npx tsx src/engine/testFinancialEngineComprehensive.ts`, `npx tsx src/engine/testAISmartProposal.ts` y `npx tsx src/engine/testEquipmentCatalog.ts` (o `npm test`).
+2. **Validación de Motores Matemáticos, Catálogo, Carpetas, IA y Papelera**: `npm test` (ejecuta `testBenchmark.ts`, `testFinancialEngineComprehensive.ts`, `testAISmartProposal.ts`, `testEquipmentCatalog.ts`, `testFolderHidingAndSync.ts` y `testTrashAndReadOnly.ts`).
 3. **Build de Producción**: `npm run build` (confirmar bundling sin fallos).
 4. **Snapshot de Contexto**: Si se introducen nuevos módulos, refactorizaciones grandes o cambios estructurales, regenerar el contexto empaquetado con `npm run context:pack`.
 
@@ -299,6 +322,35 @@ ssh app-server "cd /home/agente/servicios/solarsim-api && docker compose up -d -
    - Si un equipo solicitado existe en el catálogo pero aún no tiene ofertas de proveedores asignadas (`priceStatus: 'DISPONIBLE_SIN_PRECIO'`), se selecciona obligatoriamente con su ID oficial. La frase *"Equipos según disponibilidad"* da prioridad máxima a los modelos existentes en la base de datos y jamás dispara falsas sustituciones.
 6. **Controles Interactivos en la Pestaña 3 (Propuesta Solar)**:
    - Los bloques de **Módulo Fotovoltaico**, **Inversor Solar** y **Banco de Baterías (BESS)** cuentan con menús desplegables (`<select>`) para cambiar de equipo en cualquier momento, controles de cantidad (unidades en paralelo y número de baterías) y cálculo instantáneo de capacidad total AC (kW) y almacenamiento (kWh) en tiempo real con contraste óptimo en Modo Claro y Oscuro.
+
+### 📁 Organización de Carpetas y Ocultamiento de la Vista General (`hideFromGeneral`):
+1. **Filtrado Exclusivo en Modo Oculto**:
+   - Las carpetas soportan la propiedad booleana `hideFromGeneral?: boolean`.
+   - Cuando `hideFromGeneral: true`, los proyectos contenidos se **ocultan completamente del menú principal (Dashboard general cuando `activeFolderId === null`) y de la sección 1 "Projects" del árbol lateral**.
+   - Dichas propuestas **solo aparecen al ingresar o seleccionar la carpeta asignada** (`activeFolderId === folder.id`).
+   - Tanto el modal de creación como el de edición (`CreateFolderModal.tsx`) incluyen un control interactivo (switch/toggle) con icono `EyeOff` para activar o desactivar esta función.
+   - Se muestran distintivos `EyeOff` en `SolarCoreTreeSidebar` y `FoldersResumeGrid` para identificar de inmediato las carpetas en modo privado/oculto.
+
+### 🔄 Sincronización en la Nube y Prevención de Resurrección de Proyectos:
+1. **Prevención de Resurrección tras Borrado (`confirmedDeletedIds`)**:
+   - Durante la sincronización en `syncAuthSlice.ts`, cuando el push confirma la eliminación de un proyecto (`p.isDeleted && resultsMap.has(p.id)`), su ID se registra en `confirmedDeletedIds` y se elimina de la memoria local sin posibilidad de re-inyección en el ciclo de merge.
+2. **Metadatos y Auto-Sync en Creación/Importación con IA**:
+   - Toda propuesta generada mediante el Smart Proposal Studio (`applyExtractedInvoice`) o importada desde JSON (`importProjectJSON` / `resolveImportConflict`) asigna obligatoriamente `authorId`, `authorName`, `authorEmail`, `version: 1` y `syncStatus: currentUser ? 'pending' : 'local_only'`, disparando de inmediato `triggerAutoSync(true)` si la sincronización en la nube está activa.
+
+### 🗑️ Papelera de Reciclaje (Trash), Retención de 30 Días y Modo Solo Lectura:
+1. **Borrado Suave (*Soft-Delete*)**:
+   - Eliminar una propuesta (`moveToTrash(id)`) no borra el registro de la base de datos de inmediato; establece `isDeleted = true`, `deletedAt = NOW()` y `deletedBy = currentUser.name`.
+2. **Ventana de Retención Automática de 30 Días**:
+   - Tanto el servidor en `POST /api/sync/pull` como el cliente local en `onRehydrateStorage` ejecutan una purga permanente automática de proyectos cuyo `deletedAt` sea anterior a 30 días (`deleted_at < NOW() - INTERVAL '30 days'`).
+3. **Modo Solo Lectura (Read-Only)**:
+   - Al abrir un proyecto que está en la papelera (en el Simulador o en la vista de Propuesta PDF), se despliega un banner ámbar/rojo de alerta fija (*"Propuesta en Papelera (Modo Solo Lectura)"*).
+   - Se bloquean y resguardan todas las mutaciones sobre los parámetros del proyecto mientras esté en papelera.
+4. **Acciones de Recuperación y Purga**:
+   - **Restaurar**: Restaura la propuesta (`restoreProject`), restablece `isDeleted = false`, limpia `deletedAt` y reactiva la edición completa.
+   - **Eliminar Definitivamente**: Elimina físicamente el proyecto (`hardDeleteProject` con `DELETE /api/projects/:id?permanent=true`).
+   - **Vaciar Papelera**: Purga masiva de todas las propuestas eliminadas de la organización (`emptyTrash` con `DELETE /api/trash`).
+5. **Navegación Limpia y Aislamiento de Hooks**:
+   - La alternancia entre la vista del catálogo (`DashboardView`) y la papelera (`TrashView`) se gestiona condicionalmente en `App.tsx` (`isTrashActive ? <TrashView /> : <DashboardView />`), garantizando el respeto absoluto a las reglas de hooks de React y evitando retornos tempranos dentro de los componentes.
 
 ### 📄 Exportación a PDF con `html2canvas` & `jsPDF`:
 1. **Reglas del Workspace**: Consultar `.agents/rules/html2canvas_pdf_export_rules.md`.

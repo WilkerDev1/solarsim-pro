@@ -127,14 +127,16 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
               };
             }
 
-            // Si el proyecto estaba 'synced' localmente pero el servidor ya NO lo tiene (borrado en nube), se marca eliminado
+            // Si el proyecto estaba 'synced' localmente pero el servidor ya NO lo tiene
+            // (por ejemplo por pertenecer a otra organización, sesión o sincronización parcial),
+            // NUNCA eliminarlo automáticamente del dispositivo local: se preserva intacto
+            // cambiándolo a 'local_only' para blindar el trabajo del usuario contra pérdidas.
             if (local.syncStatus === 'synced' && !local.isDeleted) {
-              return { ...local, isDeleted: true };
+              return { ...local, syncStatus: 'local_only' as const };
             }
 
             return local;
-          })
-          .filter((p) => !(p.isDeleted && p.syncStatus === 'synced'));
+          });
 
         // Incorporar propuestas nuevas creadas por otros compañeros de la empresa
         for (const newServerProj of serverProjectsMap.values()) {
@@ -154,23 +156,29 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
         if (pushRes.success) {
           const resultsMap = new Map((pushRes.results || []).map((r) => [r.originalId || r.id, r]));
 
-          // Eliminar de memoria local los proyectos borrados cuya eliminación ya confirmó el servidor
-          currentProjects = currentProjects
-            .filter((p) => !(p.isDeleted && resultsMap.has(p.id)))
-            .map((p) => {
-              if (resultsMap.has(p.id)) {
-                const resInfo = resultsMap.get(p.id)!;
-                return {
-                  ...p,
-                  id: resInfo.id || p.id,
-                  version: resInfo.version || p.version || 1,
-                  syncStatus: 'synced' as const,
-                };
-              }
-              return p;
-            });
+          currentProjects = currentProjects.map((p) => {
+            if (resultsMap.has(p.id)) {
+              const resInfo = resultsMap.get(p.id)!;
+              return {
+                ...p,
+                id: resInfo.id || p.id,
+                version: resInfo.version || p.version || 1,
+                syncStatus: 'synced' as const,
+              };
+            }
+            return p;
+          });
         }
       }
+
+      // Filtrar proyectos en papelera con más de 30 días de antigüedad (retención cumplida)
+      const CUTOFF_30_DAYS = 30 * 24 * 60 * 60 * 1000;
+      const isExpiredTrash = (p: ProjectSimulation) => {
+        if (!p.isDeleted) return false;
+        const t = p.deletedAt ? new Date(p.deletedAt).getTime() : (p.updatedAt ? new Date(p.updatedAt).getTime() : 0);
+        return Date.now() - t > CUTOFF_30_DAYS;
+      };
+      currentProjects = currentProjects.filter((p) => !isExpiredTrash(p));
 
       // 3. Sincronizar catálogo de equipos bidireccionalmente con la nube
       try {
@@ -220,6 +228,9 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
 
         // Preservar proyectos recién creados localmente durante el sync (que no estaban en currentProjects)
         for (const localP of state.projects) {
+          if (isExpiredTrash(localP)) {
+            continue;
+          }
           if (!syncedMap.has(localP.id)) {
             mergedProjects.push(localP);
             if (localP.syncStatus !== 'synced') {

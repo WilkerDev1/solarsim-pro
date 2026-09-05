@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
-import { FolderPlus, X, Palette } from 'lucide-react';
+import { FolderPlus, X, Palette, EyeOff } from 'lucide-react';
 import { ProjectFolder } from '../../../types';
 
 interface CreateFolderModalProps {
@@ -27,7 +27,18 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({
   const [name, setName] = useState(folderToEdit?.name || '');
   const [color, setColor] = useState(folderToEdit?.color || '#10b981');
   const [description, setDescription] = useState(folderToEdit?.description || '');
+  const [hideFromGeneral, setHideFromGeneral] = useState(folderToEdit?.hideFromGeneral || false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setName(folderToEdit?.name || '');
+      setColor(folderToEdit?.color || '#10b981');
+      setDescription(folderToEdit?.description || '');
+      setHideFromGeneral(folderToEdit?.hideFromGeneral || false);
+      setError(null);
+    }
+  }, [isOpen, folderToEdit]);
 
   if (!isOpen) return null;
 
@@ -43,13 +54,15 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({
         name: name.trim(),
         color,
         description: description.trim(),
+        hideFromGeneral,
       });
     } else {
-      createFolder(name.trim(), color, description.trim());
+      createFolder(name.trim(), color, description.trim(), hideFromGeneral);
     }
 
     setName('');
     setDescription('');
+    setHideFromGeneral(false);
     setError(null);
     onClose();
   };
@@ -125,6 +138,48 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({
               onChange={(e) => setDescription(e.target.value)}
               className="w-full px-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-900 dark:text-white"
             />
+          </div>
+
+          {/* Opción para ocultar propuestas del menú principal y proyectos generales */}
+          <div className="p-3.5 rounded-xl border border-slate-200 dark:border-[#27272a] bg-slate-50/70 dark:bg-[#121214]/60 flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <div
+                className={`p-1.5 rounded-lg mt-0.5 transition-colors ${
+                  hideFromGeneral
+                    ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                    : 'bg-slate-200/60 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400'
+                }`}
+              >
+                <EyeOff className="w-4 h-4" />
+              </div>
+              <div className="flex flex-col">
+                <label
+                  htmlFor="hide-from-general-toggle"
+                  className="text-xs font-semibold text-slate-800 dark:text-zinc-200 cursor-pointer select-none"
+                >
+                  Ocultar del menú principal
+                </label>
+                <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5 leading-snug">
+                  Los proyectos de esta carpeta se ocultarán del menú principal y del folder de proyectos generales; solo se mostrarán al abrir esta carpeta.
+                </p>
+              </div>
+            </div>
+            <button
+              id="hide-from-general-toggle"
+              type="button"
+              role="switch"
+              aria-checked={hideFromGeneral}
+              onClick={() => setHideFromGeneral(!hideFromGeneral)}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                hideFromGeneral ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-zinc-700'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
+                  hideFromGeneral ? 'translate-x-4' : 'translate-x-0'
+                }`}
+              />
+            </button>
           </div>
 
           {error && <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">{error}</p>}

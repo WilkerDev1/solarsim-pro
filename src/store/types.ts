@@ -76,6 +76,9 @@ export interface ProjectSlice {
   statusFilter: string;
   defaultSimulationSettings: DefaultSimulationSettings;
 
+  isTrashActive: boolean;
+  setIsTrashActive: (active: boolean) => void;
+
   setActiveView: (view: 'dashboard' | 'simulator' | 'pdf-preview') => void;
   setActiveProject: (id: string) => void;
   setSearchQuery: (query: string) => void;
@@ -84,7 +87,11 @@ export interface ProjectSlice {
 
   createNewProject: (payload?: string | NewProjectPayload) => void;
   duplicateProject: (id: string) => void;
-  deleteProject: (id: string) => void;
+  moveToTrash: (id: string) => void;
+  deleteProject: (id: string) => void; // Compatibilidad: delega en moveToTrash
+  restoreProject: (id: string) => void;
+  hardDeleteProject: (id: string) => void;
+  emptyTrash: () => void;
   setProjectStatus: (id: string, status: 'Draft' | 'Final' | 'Archived') => void;
   saveActiveProject: () => void;
 
@@ -213,7 +220,7 @@ export interface FolderSlice {
 
   setActiveFolderId: (folderId: string | null) => void;
   setActiveTeamMemberFilter: (member: string | null) => void;
-  createFolder: (name: string, color?: string, description?: string) => ProjectFolder | null;
+  createFolder: (name: string, color?: string, description?: string, hideFromGeneral?: boolean) => ProjectFolder | null;
   updateFolder: (id: string, updates: Partial<ProjectFolder>) => void;
   deleteFolder: (id: string) => void;
   moveProjectToFolder: (projectId: string, targetFolderId: string | null) => void;

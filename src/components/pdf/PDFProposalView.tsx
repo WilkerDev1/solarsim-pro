@@ -20,6 +20,8 @@ import { PDFPage3ROI } from './pages/PDFPage3ROI';
 import { PDFPage4CashFlow } from './pages/PDFPage4CashFlow';
 import { PDFPage5CostMatrix } from './pages/PDFPage5CostMatrix';
 
+import { Trash2, RotateCcw } from 'lucide-react';
+
 export const PDFProposalView: React.FC = () => {
   const {
     getActiveProject,
@@ -29,6 +31,7 @@ export const PDFProposalView: React.FC = () => {
     updateDocumentCustomization,
     sidebarTheme,
     openShareModal,
+    restoreProject,
   } = useSimulationStore();
 
   const isDark = sidebarTheme === 'dark';
@@ -468,8 +471,37 @@ export const PDFProposalView: React.FC = () => {
           isDark ? 'bg-[#0a0a0d]' : 'bg-slate-300/80'
         }`}
       >
+        {/* Banner de Propuesta en Papelera (Modo Solo Lectura) */}
+        {project.isDeleted && (
+          <div className="w-[850px] bg-rose-900/95 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center justify-between gap-4 border border-rose-500/50 animate-in fade-in slide-in-from-top-2 sticky top-0 z-40">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-rose-800 text-rose-200 flex items-center justify-center shrink-0">
+                <Trash2 className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="text-xs font-black tracking-wide">
+                  PROPUESTA EN PAPELERA (MODO SOLO LECTURA)
+                </h4>
+                <p className="text-[11px] text-rose-200">
+                  Esta propuesta fue eliminada{project.deletedAt ? ` el ${new Date(project.deletedAt).toLocaleDateString('es-DO')}` : ''}. Puedes visualizarla y exportarla a PDF, pero no modificarla.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => restoreProject(project.id)}
+                className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Restaurar</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Live Edit Mode Floating Banner */}
-        {isEditMode && (
+        {isEditMode && !project.isDeleted && (
           <div className="w-[850px] bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center justify-between gap-4 border border-blue-400/40 animate-in fade-in slide-in-from-top-2 sticky top-0 z-40">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-white shrink-0 shadow-xs">

@@ -9,14 +9,15 @@ export const createFolderSlice: SimulationSlice<FolderSlice> = (set, get) => ({
   setActiveFolderId: (folderId) => set({ activeFolderId: folderId, activeTeamMemberFilter: null }),
   setActiveTeamMemberFilter: (member) => set({ activeTeamMemberFilter: member, activeFolderId: null }),
 
-  createFolder: (name, color = '#10b981', description = '') => {
+  createFolder: (name, color = '#10b981', description = '', hideFromGeneral = false) => {
     const trimmed = name.trim();
     if (!trimmed) return null;
     const newFolder: ProjectFolder = {
-      id: `folder-${Date.now()}`,
+      id: `folder-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       name: trimmed,
       color,
       description,
+      hideFromGeneral,
       createdAt: new Date().toISOString(),
       createdBy: get().syncSettings.currentUser?.name || 'Admin',
     };

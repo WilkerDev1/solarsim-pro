@@ -61,12 +61,20 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
         const count = data.recommendedPanelCount || rec.recommendedPanelCount;
         const seq = generateNextProjectSequence(projects);
 
+        const currentUser = get().syncSettings?.currentUser;
         const newProj: ProjectSimulation = {
           ...BENCHMARK_PROJECT,
           id: targetProjectId,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           status: 'Draft',
+          authorId: currentUser?.id || 'local-user',
+          authorName: currentUser?.name || 'Ing. Solar',
+          authorEmail: currentUser?.email || 'usuario@electsun.com',
+          lastModifiedBy: currentUser?.name || 'Ing. Solar',
+          lastModifiedAt: new Date().toISOString(),
+          version: 1,
+          syncStatus: currentUser ? 'pending' : 'local_only',
           client: {
             ...BENCHMARK_PROJECT.client,
             name: data.clientName || 'Cliente Factura EDE',
@@ -162,7 +170,10 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
           const count = data.recommendedPanelCount || rec.recommendedPanelCount;
           return {
             ...p,
+            syncStatus: 'pending' as const,
             updatedAt: new Date().toISOString(),
+            lastModifiedBy: get().syncSettings?.currentUser?.name || p.lastModifiedBy || 'Ing. Solar',
+            lastModifiedAt: new Date().toISOString(),
             client: {
               ...p.client,
               name: data.clientName || p.client.name,
@@ -235,6 +246,10 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
         saveFeedbackMessage: '¡Datos y equipos de la propuesta aplicados con IA exitosamente! ✨',
       };
     });
+
+    if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
+      get().triggerAutoSync(true);
+    }
 
     setTimeout(() => {
       set({ saveFeedbackMessage: null });

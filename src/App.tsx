@@ -4,6 +4,7 @@ import { Header } from './components/common/Header';
 import { PrimaryIconDock } from './components/layout/PrimaryIconDock';
 import { SolarCoreTreeSidebar } from './components/dashboard/sidebar/SolarCoreTreeSidebar';
 import { DashboardView } from './components/dashboard/DashboardView';
+import { TrashView } from './components/dashboard/TrashView';
 import { SimulatorView } from './components/simulator/SimulatorView';
 import { PDFProposalView } from './components/pdf/PDFProposalView';
 import { NewProjectModal } from './components/common/NewProjectModal';
@@ -20,7 +21,7 @@ import { SplashScreen } from './components/common/SplashScreen';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 export const App: React.FC = () => {
-  const { activeView, setActiveView, sidebarTheme, syncSettings, syncProjectsWithServer } = useSimulationStore();
+  const { activeView, setActiveView, sidebarTheme, syncSettings, syncProjectsWithServer, isTrashActive } = useSimulationStore();
   const isDark = sidebarTheme === 'dark';
 
   // 🔄 Ciclo de Vida Global de Sincronización Automática en Segundo Plano (Heartbeat & Focus)
@@ -87,8 +88,8 @@ export const App: React.FC = () => {
               <div className="flex-1 flex h-full overflow-hidden w-full">
                 {/* 🌳 Pestaña Clara / Intermedia (Solar Core Tree Explorer) */}
                 <SolarCoreTreeSidebar />
-                {/* 🎴 Lienzo Principal de Proyectos */}
-                <DashboardView />
+                {/* 🎴 Lienzo Principal de Proyectos o Papelera */}
+                {isTrashActive ? <TrashView /> : <DashboardView />}
               </div>
             )}
             {activeView === 'simulator' && <SimulatorView />}

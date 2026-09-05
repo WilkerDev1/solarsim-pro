@@ -88,11 +88,14 @@ CREATE TABLE IF NOT EXISTS projects (
     version INTEGER NOT NULL DEFAULT 1,
     data_json JSONB NOT NULL,
     is_deleted BOOLEAN DEFAULT FALSE,
+    deleted_at TIMESTAMP WITH TIME ZONE NULL,
+    deleted_by VARCHAR(255) NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_projects_org_updated ON projects(organization_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_projects_org_deleted ON projects(organization_id, is_deleted, deleted_at);
 CREATE INDEX IF NOT EXISTS idx_projects_client_name ON projects(client_name);
 
 -- 4. Tabla de Catálogo Global de Equipos Fotovoltaicos & BESS
@@ -264,8 +267,10 @@ Valida la vigencia del token y devuelve la sesión actual del usuario autenticad
 
 ### 4.3 Proyectos & Sincronización Delta
 
-#### `POST /api/projects/pull`
+#### `POST /api/projects/pull` (o `/api/sync/pull`)
 Solicita todos los proyectos creados o actualizados en la organización a partir de una fecha específica.
+* **Auto-purga de Papelera**: Antes de consultar, el servidor ejecuta automáticamente la eliminación definitiva de cualquier proyecto marcado como borrado (`is_deleted = TRUE`) cuya fecha de eliminación supere los 30 días (`deleted_at < NOW() - INTERVAL '30 days'`).
+* **Regla de Filtrado**: Devuelve proyectos activos (`is_deleted = FALSE`) y proyectos en papelera vigentes (`deleted_at > NOW() - INTERVAL '30 days'`) para mantener sincronizada la papelera entre múltiples computadoras.
 
 * **Payload**:
   ```json
@@ -286,6 +291,8 @@ Solicita todos los proyectos creados o actualizados en la organización a partir
         "systemCapacityKWp": 45.60,
         "version": 4,
         "isDeleted": false,
+        "deletedAt": null,
+        "deletedBy": null,
         "dataJson": { ... },
         "lastModifiedByName": "Ing. Carlos Mendoza",
         "updatedAt": "2026-09-02T18:30:00.000Z"
@@ -294,9 +301,9 @@ Solicita todos los proyectos creados o actualizados en la organización a partir
   }
   ```
 
-#### `POST /api/projects/push`
+#### `POST /api/projects/push` (o `/api/sync/push`)
 Sube un lote de proyectos locales para persistir en la base de datos central.
-
+* **Manejo de Papelera**: Recibe y persiste los campos `isDeleted`, `deletedAt` y `deletedBy` en las operaciones `INSERT` y `UPDATE`.
 * **Payload**:
   ```json
   {
@@ -305,6 +312,9 @@ Sube un lote de proyectos locales para persistir en la base de datos central.
         "id": "SP-2026-0042",
         "clientName": "Hotel Boutique Las Galeras",
         "version": 4,
+        "isDeleted": true,
+        "deletedAt": "2026-09-04T22:00:00.000Z",
+        "deletedBy": "Ing. Carlos Mendoza",
         "dataJson": { ... }
       }
     ]
@@ -316,7 +326,18 @@ Sube un lote de proyectos locales para persistir en la base de datos central.
   - Si `localVersion < serverVersion`: se detecta colisión concurrente y se responde con información del conflicto para bifurcación controlada.
 
 #### `DELETE /api/projects/:id`
-Marca un proyecto como eliminado (`is_deleted = TRUE`) para propagar la eliminación delta al resto de los clientes.
+Elimina un proyecto del servidor.
+* **Parámetros de Consulta**:
+  - `?permanent=true`: Ejecuta un borrado físico definitivo (`DELETE FROM projects WHERE id = $1 AND organization_id = $2`).
+  - Sin parámetro o `permanent=false`: Ejecuta borrado suave hacia la papelera (`UPDATE projects SET is_deleted = TRUE, deleted_at = NOW(), deleted_by = $user WHERE id = $1`).
+
+#### `POST /api/projects/:id/restore`
+Restaura una propuesta desde la papelera al catálogo activo de la organización:
+`UPDATE projects SET is_deleted = FALSE, deleted_at = NULL, deleted_by = NULL WHERE id = $1 AND organization_id = $2`.
+
+#### `DELETE /api/trash`
+Vacía completamente la papelera de la organización eliminando físicamente todos los registros borrados suavemente:
+`DELETE FROM projects WHERE organization_id = $1 AND is_deleted = TRUE`.
 
 ---
 

@@ -294,12 +294,49 @@ export class SyncService {
   }
 
   /**
-   * Eliminar un proyecto en el servidor
+   * Eliminar un proyecto en el servidor (Soft-Delete a papelera o eliminación definitiva física)
    */
-  static async deleteProject(serverUrl: string, token: string, projectId: string): Promise<boolean> {
+  static async deleteProject(serverUrl: string, token: string, projectId: string, permanent: boolean = false): Promise<boolean> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/projects/${projectId}`, {
+      const url = permanent ? `${base}/api/projects/${projectId}?permanent=true` : `${base}/api/projects/${projectId}`;
+      const res = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Restaurar un proyecto desde la papelera de reciclaje en el servidor
+   */
+  static async restoreProject(serverUrl: string, token: string, projectId: string): Promise<boolean> {
+    const base = this.cleanUrl(serverUrl);
+    try {
+      const res = await fetch(`${base}/api/projects/${projectId}/restore`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Vaciar toda la papelera de reciclaje en el servidor
+   */
+  static async emptyTrash(serverUrl: string, token: string): Promise<boolean> {
+    const base = this.cleanUrl(serverUrl);
+    try {
+      const res = await fetch(`${base}/api/trash`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,

@@ -83,6 +83,11 @@ export async function initDatabase(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_projects_client_name ON projects(client_name);
       CREATE INDEX IF NOT EXISTS idx_users_org ON users(organization_id);
       CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+      -- Soporte de papelera (soft-delete) y retención histórica
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZONE;
+      ALTER TABLE projects ADD COLUMN IF NOT EXISTS deleted_by VARCHAR(255);
+      CREATE INDEX IF NOT EXISTS idx_projects_org_deleted ON projects(organization_id, is_deleted, deleted_at);
     `);
 
     // 4. Tabla de Auditoría de Sincronización

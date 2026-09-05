@@ -1,5 +1,5 @@
 import { useSimulationStore } from '../store/useSimulationStore';
-import { calculateRecommendedPanelCount } from './solarEngine';
+import { calculateRecommendedPanelCount } from '../engine/solarEngine';
 import { ExtractedInvoiceData } from '../types/aiInvoice';
 
 console.log('=====================================================');

@@ -342,6 +342,8 @@ interface ProjectRow {
   version: number;
   data_json: any;
   is_deleted: boolean;
+  deleted_at?: Date | string | null;
+  deleted_by?: string | null;
   created_at: Date | string;
   updated_at: Date | string;
 }
@@ -353,16 +355,31 @@ app.post('/api/sync/pull', async (c) => {
     return c.json({ error: 'No autorizado' }, 401);
   }
 
+  // 1. Auto-purga de proyectos con más de 30 días en papelera de reciclaje
+  try {
+    await pool.query(
+      `DELETE FROM projects
+       WHERE organization_id = $1
+         AND is_deleted = TRUE
+         AND deleted_at < NOW() - INTERVAL '30 days'`,
+      [authUser.organizationId]
+    );
+  } catch (purgeErr) {
+    console.warn('Aviso en purga automática de papelera:', purgeErr);
+  }
+
   const body = await c.req.json().catch(() => ({}));
   const lastSyncTimestamp = body.lastSyncTimestamp;
 
   // Si se pasa lastSyncTimestamp, filtra por cambios recientes; de lo contrario retorna el catálogo completo de la empresa
+  // Incluye proyectos activos y proyectos en papelera dentro del tiempo de retención de 30 días
   let query = `
     SELECT id, organization_id, created_by_id, created_by_name, created_by_email,
            last_modified_by_id, last_modified_by_name, client_name, project_code, system_capacity_kwp,
-           version, data_json, is_deleted, created_at, updated_at
+           version, data_json, is_deleted, deleted_at, deleted_by, created_at, updated_at
     FROM projects
-    WHERE organization_id = $1 AND is_deleted = FALSE
+    WHERE organization_id = $1
+      AND (is_deleted = FALSE OR (is_deleted = TRUE AND (deleted_at IS NULL OR deleted_at > NOW() - INTERVAL '30 days')))
   `;
   const params: any[] = [authUser.organizationId];
 
@@ -379,6 +396,10 @@ app.post('/api/sync/pull', async (c) => {
     const data = typeof row.data_json === 'string' ? JSON.parse(row.data_json) : row.data_json;
     const updatedAtIso = row.updated_at instanceof Date ? row.updated_at.toISOString() : new Date(row.updated_at).toISOString();
     const createdAtIso = row.created_at instanceof Date ? row.created_at.toISOString() : new Date(row.created_at).toISOString();
+    const deletedAtIso = row.deleted_at
+      ? (row.deleted_at instanceof Date ? row.deleted_at.toISOString() : new Date(row.deleted_at).toISOString())
+      : (row.is_deleted ? updatedAtIso : null);
+
     return {
       ...data,
       id: row.id,
@@ -392,6 +413,8 @@ app.post('/api/sync/pull', async (c) => {
       updatedAt: updatedAtIso,
       syncStatus: 'synced',
       isDeleted: row.is_deleted,
+      deletedAt: deletedAtIso,
+      deletedBy: row.deleted_by || (row.is_deleted ? row.last_modified_by_name : null),
     };
   });
 
@@ -434,6 +457,8 @@ app.post('/api/sync/push', async (c) => {
       const projectCode = proj.client?.projectId || 'PRJ';
       const capacity = ((proj.specs?.panelPowerW || 0) * (proj.specs?.panelCount || 0)) / 1000;
       const isDeleted = proj.isDeleted || false;
+      const deletedAt = isDeleted ? (proj.deletedAt ? new Date(proj.deletedAt) : new Date()) : null;
+      const deletedBy = isDeleted ? (proj.deletedBy || authUser.name) : null;
 
       // Buscar si el ID de proyecto ya existe globalmente en PostgreSQL
       const existingRes = await client.query(
@@ -463,12 +488,12 @@ app.post('/api/sync/push', async (c) => {
           `INSERT INTO projects (
             id, organization_id, created_by_id, created_by_name, created_by_email,
             last_modified_by_id, last_modified_by_name, client_name, project_code,
-            system_capacity_kwp, version, data_json, is_deleted, created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())`,
+            system_capacity_kwp, version, data_json, is_deleted, deleted_at, deleted_by, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW())`,
           [
             finalProjId, authUser.organizationId, authorId, authorName, authorEmail,
             authUser.id, authUser.name, clientName, projectCode, capacity,
-            newVersion, JSON.stringify(dataJson), isDeleted
+            newVersion, JSON.stringify(dataJson), isDeleted, deletedAt, deletedBy
           ]
         );
 
@@ -512,12 +537,12 @@ app.post('/api/sync/push', async (c) => {
             `INSERT INTO projects (
               id, organization_id, created_by_id, created_by_name, created_by_email,
               last_modified_by_id, last_modified_by_name, client_name, project_code,
-              system_capacity_kwp, version, data_json, is_deleted, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())`,
+              system_capacity_kwp, version, data_json, is_deleted, deleted_at, deleted_by, created_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW())`,
             [
               finalProjId, authUser.organizationId, authUser.id, authUser.name, authUser.email,
               authUser.id, authUser.name, forkedName, forkedCode, capacity,
-              1, JSON.stringify(forkedData), isDeleted
+              1, JSON.stringify(forkedData), isDeleted, deletedAt, deletedBy
             ]
           );
 
@@ -544,11 +569,13 @@ app.post('/api/sync/push', async (c) => {
               version = $6,
               data_json = $7,
               is_deleted = $8,
+              deleted_at = $9,
+              deleted_by = $10,
               updated_at = NOW()
-            WHERE id = $9 AND organization_id = $10`,
+            WHERE id = $11 AND organization_id = $12`,
             [
               authUser.id, authUser.name, clientName, projectCode, capacity,
-              newVersion, JSON.stringify(updatedData), isDeleted, finalProjId, authUser.organizationId
+              newVersion, JSON.stringify(updatedData), isDeleted, deletedAt, deletedBy, finalProjId, authUser.organizationId
             ]
           );
 
@@ -575,9 +602,61 @@ app.post('/api/sync/push', async (c) => {
 });
 
 // ----------------------------------------------------
-// 5.1 Eliminar Proyecto Específico (Soft-Delete)
+// 5.1 Eliminar Proyecto Específico (Soft-Delete o Permanente)
 // ----------------------------------------------------
 app.delete('/api/projects/:id', async (c) => {
+  const authUser = await authenticate(c);
+  if (!authUser) {
+    return c.json({ error: 'No autorizado' }, 401);
+  }
+
+  const id = c.req.param('id');
+  const isPermanent = c.req.query('permanent') === 'true';
+  const client = await pool.connect();
+  try {
+    if (isPermanent) {
+      // Eliminación física definitiva de la base de datos
+      const res = await client.query(
+        `DELETE FROM projects WHERE id = $1 AND organization_id = $2 RETURNING id`,
+        [id, authUser.organizationId]
+      );
+      if (res.rows.length === 0) {
+        return c.json({ error: 'Proyecto no encontrado' }, 404);
+      }
+      return c.json({ success: true, message: 'Proyecto eliminado permanentemente' });
+    } else {
+      // Soft-Delete (Mover a la papelera)
+      const res = await client.query(
+        `UPDATE projects
+         SET is_deleted = TRUE,
+             deleted_at = NOW(),
+             deleted_by = $1,
+             last_modified_by_id = $2,
+             last_modified_by_name = $1,
+             updated_at = NOW()
+         WHERE id = $3 AND organization_id = $4
+         RETURNING id`,
+        [authUser.name, authUser.id, id, authUser.organizationId]
+      );
+
+      if (res.rows.length === 0) {
+        return c.json({ error: 'Proyecto no encontrado' }, 404);
+      }
+
+      return c.json({ success: true, message: 'Proyecto movido a la papelera de reciclaje' });
+    }
+  } catch (error: any) {
+    console.error('Error al eliminar proyecto:', error);
+    return c.json({ error: error.message || 'Error en el servidor' }, 500);
+  } finally {
+    client.release();
+  }
+});
+
+// ----------------------------------------------------
+// 5.2 Restaurar Proyecto de la Papelera
+// ----------------------------------------------------
+app.post('/api/projects/:id/restore', async (c) => {
   const authUser = await authenticate(c);
   if (!authUser) {
     return c.json({ error: 'No autorizado' }, 401);
@@ -588,7 +667,9 @@ app.delete('/api/projects/:id', async (c) => {
   try {
     const res = await client.query(
       `UPDATE projects
-       SET is_deleted = TRUE,
+       SET is_deleted = FALSE,
+           deleted_at = NULL,
+           deleted_by = NULL,
            last_modified_by_id = $1,
            last_modified_by_name = $2,
            updated_at = NOW()
@@ -598,12 +679,41 @@ app.delete('/api/projects/:id', async (c) => {
     );
 
     if (res.rows.length === 0) {
-      return c.json({ error: 'Proyecto no encontrado' }, 404);
+      return c.json({ error: 'Proyecto no encontrado en papelera' }, 404);
     }
 
-    return c.json({ success: true, message: 'Proyecto marcado como eliminado' });
+    return c.json({ success: true, message: 'Proyecto restaurado exitosamente' });
   } catch (error: any) {
-    console.error('Error al eliminar proyecto:', error);
+    console.error('Error al restaurar proyecto:', error);
+    return c.json({ error: error.message || 'Error en el servidor' }, 500);
+  } finally {
+    client.release();
+  }
+});
+
+// ----------------------------------------------------
+// 5.3 Vaciar Papelera Completa de la Organización
+// ----------------------------------------------------
+app.delete('/api/trash', async (c) => {
+  const authUser = await authenticate(c);
+  if (!authUser) {
+    return c.json({ error: 'No autorizado' }, 401);
+  }
+
+  const client = await pool.connect();
+  try {
+    const res = await client.query(
+      `DELETE FROM projects WHERE organization_id = $1 AND is_deleted = TRUE RETURNING id`,
+      [authUser.organizationId]
+    );
+
+    return c.json({
+      success: true,
+      message: `Se vació la papelera: ${res.rowCount} propuesta(s) eliminada(s) permanentemente`,
+      deletedCount: res.rowCount,
+    });
+  } catch (error: any) {
+    console.error('Error al vaciar papelera:', error);
     return c.json({ error: error.message || 'Error en el servidor' }, 500);
   } finally {
     client.release();

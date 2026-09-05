@@ -1,4 +1,4 @@
-import { validateReferenceCase } from './referenceCase';
+import { validateReferenceCase } from '../engine/referenceCase';
 
 const result = validateReferenceCase();
 

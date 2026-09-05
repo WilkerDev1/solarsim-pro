@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
-import { FolderPlus, Folder, ArrowRight, MoreVertical, Edit3, Trash2 } from 'lucide-react';
+import { FolderPlus, Folder, ArrowRight, MoreVertical, Edit3, Trash2, EyeOff } from 'lucide-react';
 import { CreateFolderModal } from './sidebar/CreateFolderModal';
 import { ProjectFolder } from '../../types';
 
@@ -100,10 +100,21 @@ export const FoldersResumeGrid: React.FC = () => {
                 <div>
                   {/* Top: Accent Color Pill & 3-Dots Action Button */}
                   <div className="flex items-center justify-between mb-3">
-                    <div
-                      className="w-16 h-3 rounded-full"
-                      style={{ backgroundColor: folder.color || '#10b981' }}
-                    />
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-16 h-3 rounded-full"
+                        style={{ backgroundColor: folder.color || '#10b981' }}
+                      />
+                      {folder.hideFromGeneral && (
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                          title="Los proyectos de esta carpeta están ocultos del menú principal y proyectos generales"
+                        >
+                          <EyeOff className="w-3 h-3" />
+                          <span>Oculta en principal</span>
+                        </span>
+                      )}
+                    </div>
 
                     {isAdmin && (
                       <div className="relative">

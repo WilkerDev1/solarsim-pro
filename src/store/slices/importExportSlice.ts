@@ -186,10 +186,12 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
         }
         existingIds.add(finalId);
 
+        const currentUser = get().syncSettings?.currentUser;
         processedProjects.push({
           ...proj,
           id: finalId,
           updatedAt: new Date().toISOString(),
+          syncStatus: currentUser ? 'pending' : 'local_only',
         });
       }
 
@@ -204,6 +206,10 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
           processedProjects.length === 1 ? 'proyecto importado' : 'proyectos importados'
         } con éxito!`,
       });
+
+      if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
+        get().triggerAutoSync(true);
+      }
 
       setTimeout(() => set({ saveFeedbackMessage: null }), 4000);
 
@@ -228,6 +234,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
 
     const { incomingProject, conflictingProject } = conflict;
     const currentProjects = get().projects;
+    const currentUser = get().syncSettings?.currentUser;
     let updatedProjects: ProjectSimulation[] = [];
     let targetActiveId = '';
     let toastMsg = '';
@@ -239,6 +246,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
         ...incomingProject,
         id: newId,
         updatedAt: new Date().toISOString(),
+        syncStatus: currentUser ? 'pending' : 'local_only',
         client: {
           ...incomingProject.client,
           projectId: nextSeq.projectId,
@@ -253,6 +261,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
         ...incomingProject,
         id: conflictingProject.id,
         updatedAt: new Date().toISOString(),
+        syncStatus: currentUser ? 'pending' : 'local_only',
       };
       updatedProjects = currentProjects.map((p) => (p.id === conflictingProject.id ? updatedProj : p));
       targetActiveId = conflictingProject.id;
@@ -264,6 +273,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
         ...incomingProject,
         id: newId,
         updatedAt: new Date().toISOString(),
+        syncStatus: currentUser ? 'pending' : 'local_only',
         client: {
           ...incomingProject.client,
           name: dupIdentifiers.cleanName,
@@ -283,6 +293,10 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
       pendingImportConflict: null,
       saveFeedbackMessage: toastMsg,
     });
+
+    if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
+      get().triggerAutoSync(true);
+    }
 
     setTimeout(() => set({ saveFeedbackMessage: null }), 4000);
   },

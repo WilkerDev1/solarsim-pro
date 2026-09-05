@@ -58,8 +58,9 @@ Para evitar roturas graves en el simulador y en los empaquetadores de escritorio
 3. **Verificación Obligatoria de Tipos y Pruebas**:
    ```bash
    npm run lint                                            # tsc --noEmit (Cero errores)
-   npx tsx src/engine/testBenchmark.ts                     # Validación contra benchmark oficial
-   npx tsx src/engine/testFinancialEngineComprehensive.ts  # Suite integral de 9 pruebas financieras
+   npx tsx src/tests/testBenchmark.ts                     # Validación contra benchmark oficial
+   npx tsx src/tests/testFinancialEngineComprehensive.ts  # Suite integral de 9 pruebas financieras
+   npm test                                               # Ejecutar todas las pruebas unitarias
    npm run build && npm run build:electron                 # Compilación completa de bundles
    npm run context:pack                                    # Snapshot empaquetado Repomix
    ```

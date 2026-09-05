@@ -50,9 +50,15 @@ export const useSimulationStore = create<SimulationStore>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (state && state.projects && Array.isArray(state.projects)) {
-          // Remove legacy hardcoded mock projects and already synced deleted projects
+          // Remove legacy hardcoded mock projects and purge expired trash projects (>30 days)
           const mockProjectIds = new Set(['benchmark-centro-medico', 'proj-logistics-hub', 'proj-residential-42']);
-          state.projects = state.projects.filter((p) => !mockProjectIds.has(p.id) && !(p.isDeleted && p.syncStatus === 'synced'));
+          const CUTOFF_30_DAYS = 30 * 24 * 60 * 60 * 1000;
+          const isExpiredTrash = (p: any) => {
+            if (!p.isDeleted) return false;
+            const t = p.deletedAt ? new Date(p.deletedAt).getTime() : (p.updatedAt ? new Date(p.updatedAt).getTime() : 0);
+            return Date.now() - t > CUTOFF_30_DAYS;
+          };
+          state.projects = state.projects.filter((p) => !mockProjectIds.has(p.id) && !isExpiredTrash(p));
 
           // Clean legacy projects that had '(Copia)' embedded in client.name
           let hasChanges = false;
@@ -165,13 +171,13 @@ export const useSimulationStore = create<SimulationStore>()(
         projects: state.projects,
         activeProjectId: state.activeProjectId,
         activeView: state.activeView,
-        searchQuery: state.searchQuery,
         sidebarTheme: state.sidebarTheme,
         sidebarWidth: state.sidebarWidth,
         geminiApiKey: state.geminiApiKey,
         geminiModel: state.geminiModel,
         syncSettings: state.syncSettings,
         equipmentCatalog: state.equipmentCatalog,
+        deletedEquipmentIds: state.deletedEquipmentIds,
         folders: state.folders,
       }),
     }

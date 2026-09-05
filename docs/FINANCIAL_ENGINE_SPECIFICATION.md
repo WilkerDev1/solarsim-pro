@@ -380,8 +380,8 @@ Esta sección explica el **significado físico, técnico y financiero de cada pa
 
 ```bash
 # Validar el motor contra el benchmark oficial de Centro Médico
-npx tsx src/engine/testBenchmark.ts
+npx tsx src/tests/testBenchmark.ts
 
 # Ejecutar la suite integral de 9 pruebas unitarias financieras (incluyendo ítems extra e ITBIS)
-npx tsx src/engine/testFinancialEngineComprehensive.ts
+npx tsx src/tests/testFinancialEngineComprehensive.ts
 ```

@@ -54,6 +54,9 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     annualEnergyTariffEscalationPct: 3.5,
   },
 
+  isTrashActive: false,
+  setIsTrashActive: (active) => set({ isTrashActive: active }),
+
   setActiveView: (view) => set({ activeView: view }),
   setActiveProject: (id) => set({ activeProjectId: id, activeView: 'simulator' }),
   setSearchQuery: (query) => set({ searchQuery: query }),
@@ -194,27 +197,28 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     }
   },
 
-  deleteProject: (id) => {
+  moveToTrash: (id) => {
     const target = get().projects.find((p) => p.id === id);
     if (!target) return;
 
+    const currentUser = get().syncSettings?.currentUser;
+    const nowIso = new Date().toISOString();
     const serverUrl = get().syncSettings?.serverUrl;
     const authToken = get().syncSettings?.authToken;
     const hasSyncAuth = !!(authToken && get().syncSettings?.autoSyncEnabled);
 
-    let nextProjects: ProjectSimulation[];
-    if (hasSyncAuth) {
-      nextProjects = get().projects.map((p) =>
-        p.id === id
-          ? { ...p, isDeleted: true, syncStatus: 'pending' as const, updatedAt: new Date().toISOString() }
-          : p
-      );
-      if (serverUrl && authToken) {
-        SyncService.deleteProject(serverUrl, authToken, id).catch(() => {});
-      }
-    } else {
-      nextProjects = get().projects.filter((p) => p.id !== id);
-    }
+    const nextProjects = get().projects.map((p) =>
+      p.id === id
+        ? {
+            ...p,
+            isDeleted: true,
+            deletedAt: nowIso,
+            deletedBy: currentUser?.name || 'Ing. Solar',
+            syncStatus: currentUser ? ('pending' as const) : ('local_only' as const),
+            updatedAt: nowIso,
+          }
+        : p
+    );
 
     const activeRemaining = nextProjects.filter((p) => !p.isDeleted);
     const nextActiveId = activeRemaining.length > 0 ? activeRemaining[0].id : '';
@@ -222,12 +226,111 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     set((state) => ({
       projects: nextProjects,
       activeProjectId: state.activeProjectId === id ? nextActiveId : state.activeProjectId,
-      saveFeedbackMessage: 'Proyecto eliminado.',
+      saveFeedbackMessage: 'Proyecto movido a la papelera. 🗑️',
     }));
 
     setTimeout(() => set({ saveFeedbackMessage: null }), 2500);
 
     if (hasSyncAuth) {
+      if (serverUrl && authToken) {
+        SyncService.deleteProject(serverUrl, authToken, id, false).catch(() => {});
+      }
+      get().triggerAutoSync(true);
+    }
+  },
+
+  deleteProject: (id) => {
+    get().moveToTrash(id);
+  },
+
+  restoreProject: (id) => {
+    const target = get().projects.find((p) => p.id === id);
+    if (!target) return;
+
+    const currentUser = get().syncSettings?.currentUser;
+    const nowIso = new Date().toISOString();
+    const serverUrl = get().syncSettings?.serverUrl;
+    const authToken = get().syncSettings?.authToken;
+    const hasSyncAuth = !!(authToken && get().syncSettings?.autoSyncEnabled);
+
+    const nextProjects = get().projects.map((p) =>
+      p.id === id
+        ? {
+            ...p,
+            isDeleted: false,
+            deletedAt: null,
+            deletedBy: null,
+            syncStatus: currentUser ? ('pending' as const) : ('local_only' as const),
+            updatedAt: nowIso,
+          }
+        : p
+    );
+
+    set({
+      projects: nextProjects,
+      activeProjectId: id,
+      saveFeedbackMessage: `Proyecto "${target.client?.name || 'Solar'}" restaurado exitosamente. ✨`,
+    });
+
+    setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
+
+    if (hasSyncAuth) {
+      if (serverUrl && authToken) {
+        SyncService.restoreProject(serverUrl, authToken, id).catch(() => {});
+      }
+      get().triggerAutoSync(true);
+    }
+  },
+
+  hardDeleteProject: (id) => {
+    const target = get().projects.find((p) => p.id === id);
+    if (!target) return;
+
+    const serverUrl = get().syncSettings?.serverUrl;
+    const authToken = get().syncSettings?.authToken;
+    const hasSyncAuth = !!(authToken && get().syncSettings?.autoSyncEnabled);
+
+    const nextProjects = get().projects.filter((p) => p.id !== id);
+    const activeRemaining = nextProjects.filter((p) => !p.isDeleted);
+    const nextActiveId = activeRemaining.length > 0 ? activeRemaining[0].id : '';
+
+    set((state) => ({
+      projects: nextProjects,
+      activeProjectId: state.activeProjectId === id ? nextActiveId : state.activeProjectId,
+      saveFeedbackMessage: 'Proyecto eliminado definitivamente.',
+    }));
+
+    setTimeout(() => set({ saveFeedbackMessage: null }), 2500);
+
+    if (hasSyncAuth && serverUrl && authToken) {
+      SyncService.deleteProject(serverUrl, authToken, id, true).catch(() => {});
+      get().triggerAutoSync(true);
+    }
+  },
+
+  emptyTrash: () => {
+    const serverUrl = get().syncSettings?.serverUrl;
+    const authToken = get().syncSettings?.authToken;
+    const hasSyncAuth = !!(authToken && get().syncSettings?.autoSyncEnabled);
+
+    const trashedCount = get().projects.filter((p) => p.isDeleted).length;
+    if (trashedCount === 0) return;
+
+    const nextProjects = get().projects.filter((p) => !p.isDeleted);
+    const nextActiveId = nextProjects.length > 0 ? nextProjects[0].id : '';
+
+    set((state) => ({
+      projects: nextProjects,
+      activeProjectId: state.projects.find((p) => p.id === state.activeProjectId)?.isDeleted
+        ? nextActiveId
+        : state.activeProjectId,
+      saveFeedbackMessage: `Se vació la papelera (${trashedCount} propuesta(s) eliminada(s)).`,
+    }));
+
+    setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
+
+    if (hasSyncAuth && serverUrl && authToken) {
+      SyncService.emptyTrash(serverUrl, authToken).catch(() => {});
       get().triggerAutoSync(true);
     }
   },

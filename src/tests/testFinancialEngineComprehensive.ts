@@ -1,4 +1,4 @@
-import { calculateFinancialSummary } from './financeEngine';
+import { calculateFinancialSummary } from '../engine/financeEngine';
 import { SystemSpecs, UtilityRates, FinancialParams } from '../types';
 
 console.log('=====================================================');

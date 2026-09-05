@@ -9,6 +9,7 @@ import {
   Plus,
   RefreshCw,
   Settings,
+  Trash2,
 } from 'lucide-react';
 
 export const PrimaryIconDock: React.FC = () => {
@@ -23,10 +24,16 @@ export const PrimaryIconDock: React.FC = () => {
     openUpdateModal,
     openSettingsModal,
     updateInfo,
+    setActiveFolderId,
+    setActiveTeamMemberFilter,
+    isTrashActive,
+    setIsTrashActive,
+    projects,
   } = useSimulationStore();
 
   const isDark = sidebarTheme === 'dark';
   const hasUpdate = updateInfo.state === 'downloaded' || updateInfo.state === 'downloading';
+  const trashedCount = React.useMemo(() => projects.filter((p) => p.isDeleted).length, [projects]);
 
   return (
     <aside
@@ -55,16 +62,21 @@ export const PrimaryIconDock: React.FC = () => {
         <nav className="flex flex-col items-center gap-3 w-full px-2">
           {/* 1. Proyectos / Dashboard */}
           <button
-            onClick={() => setActiveView('dashboard')}
+            onClick={() => {
+              setActiveView('dashboard');
+              setIsTrashActive(false);
+              setActiveFolderId(null);
+              setActiveTeamMemberFilter(null);
+            }}
             className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
-              activeView === 'dashboard'
+              activeView === 'dashboard' && !isTrashActive
                 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-xs font-bold'
                 : 'text-slate-400 hover:text-white hover:bg-[#283243]'
             }`}
             title="Catálogo de Proyectos (Home)"
           >
             <FileText className="w-5 h-5" />
-            {activeView === 'dashboard' && (
+            {activeView === 'dashboard' && !isTrashActive && (
               <span className="absolute -left-2 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-emerald-400 rounded-r-full" />
             )}
           </button>
@@ -100,6 +112,32 @@ export const PrimaryIconDock: React.FC = () => {
 
       {/* Zona Inferior: Actualizaciones & Ajustes */}
       <div className="flex flex-col items-center gap-3 w-full px-2">
+        {/* Papelera de Reciclaje */}
+        <button
+          onClick={() => {
+            setActiveView('dashboard');
+            setIsTrashActive(true);
+            setActiveFolderId(null);
+            setActiveTeamMemberFilter(null);
+          }}
+          className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer relative group ${
+            activeView === 'dashboard' && isTrashActive
+              ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 shadow-xs font-bold'
+              : 'text-slate-400 hover:text-rose-400 hover:bg-[#283243]'
+          }`}
+          title={`Papelera de Reciclaje (${trashedCount} propuesta${trashedCount === 1 ? '' : 's'})`}
+        >
+          <Trash2 className="w-5 h-5 group-hover:scale-105 transition-transform" />
+          {trashedCount > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center shadow-xs">
+              {trashedCount > 99 ? '99+' : trashedCount}
+            </span>
+          )}
+          {activeView === 'dashboard' && isTrashActive && (
+            <span className="absolute -left-2 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-rose-400 rounded-r-full" />
+          )}
+        </button>
+
         {/* Botón de Actualizaciones */}
         <button
           onClick={openUpdateModal}

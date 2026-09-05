@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { fetchSolarRadiationByCoordinates } from '../../services/solarRadiationApi';
-import { Shield } from 'lucide-react';
+import { Shield, Trash2, RotateCcw, ArrowLeft } from 'lucide-react';
 import { ParameterSidebar } from './sidebar/ParameterSidebar';
 import { EnergyAnalysisTab } from './tabs/EnergyAnalysisTab';
 import { QuotationEquipmentsTab } from './tabs/QuotationEquipmentsTab';
@@ -26,6 +26,10 @@ export const SimulatorView: React.FC = () => {
     sidebarWidth,
     setSidebarWidth,
     sidebarTheme,
+    restoreProject,
+    hardDeleteProject,
+    setActiveView,
+    setIsTrashActive,
   } = useSimulationStore();
 
   const project = getActiveProject();
@@ -116,17 +120,67 @@ export const SimulatorView: React.FC = () => {
         isFetchingSolar={isFetchingSolar}
         solarApiStatus={solarApiStatus}
         onFetchSolarApi={handleFetchSolarApi}
-        updateClient={updateClient}
-        updateSpecs={updateSpecs}
-        updateRates={updateRates}
-        updateFinancials={updateFinancials}
-        saveActiveProject={saveActiveProject}
+        updateClient={project.isDeleted ? () => {} : updateClient}
+        updateSpecs={project.isDeleted ? () => {} : updateSpecs}
+        updateRates={project.isDeleted ? () => {} : updateRates}
+        updateFinancials={project.isDeleted ? () => {} : updateFinancials}
+        saveActiveProject={project.isDeleted ? () => {} : saveActiveProject}
       />
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-full min-h-0 overflow-hidden bg-slate-100">
+        {/* Banner de Advertencia: Proyecto en Papelera (Modo Solo Lectura) */}
+        {project.isDeleted && (
+          <div className="bg-rose-900/95 border-b border-rose-700 text-white px-6 py-2.5 text-xs font-semibold flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0 shadow-sm z-30">
+            <div className="flex items-center gap-2.5">
+              <span className="p-1 rounded-md bg-rose-800 text-rose-200">
+                <Trash2 className="w-4 h-4" />
+              </span>
+              <span>
+                <strong>Propuesta en Papelera (Modo Solo Lectura)</strong> — Esta propuesta fue eliminada
+                {project.deletedAt ? ` el ${new Date(project.deletedAt).toLocaleDateString('es-DO')}` : ''}
+                {project.deletedBy ? ` por ${project.deletedBy}` : ''}. No se pueden aplicar modificaciones.
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => restoreProject(project.id)}
+                className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Restaurar</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (confirm(`¿Eliminar DEFINITIVAMENTE la propuesta "${project.client?.name}"?\n\nEsta acción NO se puede deshacer.`)) {
+                    hardDeleteProject(project.id);
+                    setActiveView('dashboard');
+                  }
+                }}
+                className="px-3 py-1.5 rounded-lg bg-rose-800 hover:bg-rose-700 text-white font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Eliminar Definitivo</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveView('dashboard');
+                  setIsTrashActive(true);
+                }}
+                className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                title="Volver a la Papelera"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Lector Role Notice Banner */}
-        {syncSettings.currentUser?.role === 'LECTOR' && (
+        {syncSettings.currentUser?.role === 'LECTOR' && !project.isDeleted && (
           <div className="bg-blue-900 text-blue-100 px-6 py-2 text-xs font-semibold flex items-center justify-between border-b border-blue-800 shrink-0">
             <div className="flex items-center gap-2">
               <Shield className="w-4 h-4 text-blue-300" />
