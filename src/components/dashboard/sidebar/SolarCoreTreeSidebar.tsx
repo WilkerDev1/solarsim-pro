@@ -45,6 +45,7 @@ export const SolarCoreTreeSidebar: React.FC = () => {
   const [isProjectsOpen, setIsProjectsOpen] = useState(true);
   const [isTeamOpen, setIsTeamOpen] = useState(true);
   const [openFolderIds, setOpenFolderIds] = useState<Record<string, boolean>>({});
+  const [isTrashOpen, setIsTrashOpen] = useState(false);
 
   // Modal for folder creation / editing
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
@@ -148,6 +149,7 @@ export const SolarCoreTreeSidebar: React.FC = () => {
     if (projectId) {
       if (folderId === 'trash') {
         moveToTrash(projectId);
+        setIsTrashOpen(true);
       } else {
         moveProjectToFolder(projectId, folderId);
         if (folderId) {
@@ -480,56 +482,103 @@ export const SolarCoreTreeSidebar: React.FC = () => {
                   );
                 })
               )}
-            </div>
-          </div>
 
-          {/* ========================================================================= */}
-          {/* SECCIÓN 4: 🗑️ PAPELERA DE RECICLAJE (Drag Target & Quick Filter) */}
-          {/* ========================================================================= */}
-          <div
-            onDragOver={(e) => handleDragOver(e, 'trash')}
-            onDragLeave={handleDragLeave}
-            onDrop={(e) => handleDropOnFolder(e, 'trash')}
-            className={`flex flex-col gap-1 rounded-xl transition-all ${
-              dragOverFolderId === 'trash'
-                ? 'bg-rose-50/90 dark:bg-rose-950/50 ring-2 ring-rose-400 dark:ring-rose-600 shadow-sm'
-                : ''
-            }`}
-          >
-            <div
-              onClick={() => {
-                setIsTrashActive(true);
-                setActiveFolderId(null);
-                setActiveTeamMemberFilter(null);
-              }}
-              className={`flex items-center justify-between px-3 py-2 rounded-xl cursor-pointer transition-all ${
-                isTrashActive
-                  ? 'bg-rose-50/90 text-rose-900 border border-rose-200/80 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800/50 font-bold shadow-2xs'
-                  : 'text-slate-700 dark:text-zinc-300 hover:bg-slate-100/80 dark:hover:bg-[#202634] group'
-              }`}
-              title="Papelera de Reciclaje — Arrastra propuestas aquí para moverlas a la papelera"
-            >
-              <div className="flex items-center gap-2.5">
-                <Trash2
-                  className={`w-4 h-4 transition-colors ${
-                    isTrashActive
-                      ? 'text-rose-600 dark:text-rose-400'
-                      : 'text-slate-400 group-hover:text-rose-500 dark:group-hover:text-rose-400'
-                  }`}
-                />
-                <span className="font-semibold text-sm">Papelera</span>
-              </div>
-              <span
-                className={`text-[11px] px-2 py-0.5 rounded-full font-mono font-semibold transition-colors ${
-                  trashedProjects.length > 0
-                    ? isTrashActive
-                      ? 'bg-rose-200 text-rose-900 dark:bg-rose-900 dark:text-rose-200'
-                      : 'bg-rose-100 dark:bg-rose-950/70 text-rose-600 dark:text-rose-400'
-                    : 'bg-slate-100 dark:bg-[#242b3b] text-slate-500 dark:text-zinc-400'
+              {/* 🗑️ Papelera (Carpeta Integrada de Sistema con Drop & Despliegue) */}
+              <div
+                onDragOver={(e) => handleDragOver(e, 'trash')}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => handleDropOnFolder(e, 'trash')}
+                className={`rounded-xl transition-all ${
+                  dragOverFolderId === 'trash'
+                    ? 'ring-2 ring-rose-500 bg-rose-50/50 dark:bg-rose-950/40 shadow-sm'
+                    : ''
                 }`}
               >
-                {trashedProjects.length}
-              </span>
+                {/* Item de Carpeta Papelera */}
+                <div
+                  onClick={() => {
+                    setIsTrashActive(true);
+                    setActiveFolderId(null);
+                    setActiveTeamMemberFilter(null);
+                  }}
+                  className={`flex items-center justify-between px-3 py-2 rounded-xl cursor-pointer transition-all ${
+                    isTrashActive
+                      ? 'bg-rose-50 text-rose-900 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/60 font-bold shadow-2xs'
+                      : 'text-slate-700 dark:text-zinc-300 hover:bg-slate-100/80 dark:hover:bg-[#202634] group'
+                  }`}
+                  title="Papelera de Reciclaje — Arrastra propuestas aquí para moverlas a la papelera"
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsTrashOpen((prev) => !prev);
+                      }}
+                      className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+                      title={isTrashOpen ? 'Colapsar papelera' : 'Desplegar proyectos en papelera'}
+                    >
+                      {isTrashOpen ? (
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      ) : (
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                    <Trash2
+                      className={`w-4 h-4 shrink-0 transition-colors ${
+                        isTrashActive
+                          ? 'text-rose-600 dark:text-rose-400'
+                          : 'text-slate-400 group-hover:text-rose-500 dark:group-hover:text-rose-400'
+                      }`}
+                    />
+                    <span className="font-semibold truncate text-xs">Papelera</span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span
+                      className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                        trashedProjects.length > 0
+                          ? isTrashActive
+                            ? 'bg-rose-200 text-rose-900 dark:bg-rose-800 dark:text-rose-100'
+                            : 'bg-rose-100 dark:bg-rose-950/80 text-rose-600 dark:text-rose-400'
+                          : isTrashActive
+                          ? 'bg-rose-200 text-rose-900 dark:bg-rose-800 dark:text-rose-100'
+                          : 'bg-slate-100 dark:bg-[#242b3b] text-slate-600 dark:text-zinc-400'
+                      }`}
+                    >
+                      {trashedProjects.length}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Proyectos dentro de la Papelera */}
+                {isTrashOpen && (
+                  <div className="pl-6 pr-1 flex flex-col gap-1 mt-1 border-l-2 border-rose-100 dark:border-rose-950/70 ml-4 max-h-60 overflow-y-auto custom-scrollbar">
+                    {trashedProjects.length === 0 ? (
+                      <span className="text-[10px] text-slate-400 italic py-1 pl-2">
+                        La papelera está vacía
+                      </span>
+                    ) : (
+                      trashedProjects.map((proj) => (
+                        <div
+                          key={proj.id}
+                          onClick={() => setActiveProject(proj.id)}
+                          className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white hover:bg-rose-50/60 dark:hover:bg-rose-950/30 flex items-center justify-between gap-2 transition-all truncate cursor-pointer group shrink-0"
+                          title={`${proj.client.name} (Modo Solo Lectura)`}
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            <FileText className="w-3.5 h-3.5 shrink-0 text-rose-400 group-hover:text-rose-500" />
+                            <span className="truncate">{proj.client.name}</span>
+                          </div>
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 font-mono shrink-0 font-medium">
+                            Solo Lectura
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
