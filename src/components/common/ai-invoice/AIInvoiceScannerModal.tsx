@@ -327,7 +327,7 @@ export const AIInvoiceScannerModal: React.FC = () => {
                         className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95"
                       >
                         <Check className="w-4 h-4" />
-                        <span>Aplicar al Proyecto Activo ✨</span>
+                        <span>Aplicar a Proyecto</span>
                       </button>
                     ) : (
                       <button

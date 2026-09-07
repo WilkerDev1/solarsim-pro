@@ -126,7 +126,7 @@ solarsim/
 │   │   └── equipmentBrandUtils.ts           # Normalización de marcas, inferencia heurística y matching tolerante a alias
 │   └── components/
 │       ├── layout/                          # 🧭 NAVEGACIÓN Y ESTRUCTURA GLOBAL
-│       │   └── PrimaryIconDock.tsx          # Dock vertical oscuro estrecho (Tema Sol/Luna, Proyectos, IA, Papelera, Ajustes)
+│       │   └── PrimaryIconDock.tsx          # Dock vertical oscuro estrecho (Tema Sol/Luna, Proyectos, Hub Unificado de IA, Papelera, Ajustes)
 │       ├── dashboard/                       # 🗂️ HOME Y EXPLORADOR DE PROPUESTAS
 │       │   ├── DashboardView.tsx            # Lienzo principal de proyectos con buscador, filtros avanzados y folders resume
 │       │   ├── ProjectCard.tsx              # Tarjeta moderna de proyecto con resumen técnico y drag source
@@ -322,6 +322,9 @@ ssh app-server "cd /home/agente/servicios/solarsim-api && docker compose up -d -
    - Si un equipo solicitado existe en el catálogo pero aún no tiene ofertas de proveedores asignadas (`priceStatus: 'DISPONIBLE_SIN_PRECIO'`), se selecciona obligatoriamente con su ID oficial. La frase *"Equipos según disponibilidad"* da prioridad máxima a los modelos existentes en la base de datos y jamás dispara falsas sustituciones.
 6. **Controles Interactivos en la Pestaña 3 (Propuesta Solar)**:
    - Los bloques de **Módulo Fotovoltaico**, **Inversor Solar** y **Banco de Baterías (BESS)** cuentan con menús desplegables (`<select>`) para cambiar de equipo en cualquier momento, controles de cantidad (unidades en paralelo y número de baterías) y cálculo instantáneo de capacidad total AC (kW) y almacenamiento (kWh) en tiempo real con contraste óptimo en Modo Claro y Oscuro.
+7. **Hub Unificado de IA & Detección Dinámica de Modelos en Configuración**:
+    - En el Dock principal (`PrimaryIconDock.tsx`), todos los accesos de IA (Facturas EDE, Datasheets de Equipos y Listas de Precios de Distribuidores) están unificados en el botón de la estrella morada (`Sparkles`) con un menú selector emergente interactivo.
+    - En el panel de Ajustes (`IntegrationsSection.tsx`), se incorpora la función para auto-detectar en tiempo real todos los modelos de la API de Google Gemini asociados a la API Key y seleccionarlos mediante un menú desplegable `<select>` completo con detalles técnicos y atajos recomendados.
 
 ### 📁 Organización de Carpetas y Ocultamiento de la Vista General (`hideFromGeneral`):
 1. **Filtrado Exclusivo en Modo Oculto**:

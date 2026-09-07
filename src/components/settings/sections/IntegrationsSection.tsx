@@ -1,7 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { SyncService, PingResult } from '../../../services/syncService';
 import { ShareProposalService } from '../../../services/shareProposalService';
+import {
+  fetchAvailableGeminiModels,
+  DEFAULT_POPULAR_MODELS,
+} from '../../../services/geminiInvoiceService';
+import { GeminiModelInfo } from '../../../types/aiInvoice';
 import {
   Sparkles,
   Key,
@@ -13,13 +18,9 @@ import {
   Globe,
   Server,
   Cloud,
+  Bot,
+  ChevronDown,
 } from 'lucide-react';
-
-const GEMINI_MODELS_LIST = [
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-  { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite' },
-  { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
-];
 
 export const IntegrationsSection: React.FC = () => {
   const {
@@ -38,9 +39,11 @@ export const IntegrationsSection: React.FC = () => {
   const [aiShowKey, setAiShowKey] = useState(false);
   const [aiTesting, setAiTesting] = useState(false);
   const [aiValidationResult, setAiValidationResult] = useState<{ tested: boolean; success: boolean; message: string } | null>(null);
-  const [aiSelectedModel, setAiSelectedModel] = useState<string>(geminiModel || 'gemini-2.5-flash');
+  const [aiSelectedModel, setAiSelectedModel] = useState<string>(geminiModel || 'gemini-3.5-flash-lite');
   const [aiIsCustomMode, setAiIsCustomMode] = useState<boolean>(false);
-  const [aiCustomInput, setAiCustomInput] = useState<string>('');
+  const [customModelInput, setCustomModelInput] = useState<string>('');
+  const [availableModelsList, setAvailableModelsList] = useState<GeminiModelInfo[]>(DEFAULT_POPULAR_MODELS);
+  const [isDetectingModels, setIsDetectingModels] = useState(false);
 
   // Worker Local State
   const [workerUrlInput, setWorkerUrlInput] = useState(ShareProposalService.getWorkerUrl());
@@ -55,6 +58,121 @@ export const IntegrationsSection: React.FC = () => {
   });
   const [syncFeedbackMessage, setSyncFeedbackMessage] = useState<string | null>(null);
 
+  // Auto-detect available models from Gemini API
+  const handleAutoDetectModels = async (keyToUse?: string) => {
+    const key = (keyToUse || aiKeyInput).trim();
+    if (!key || key.length < 10) {
+      setAiValidationResult({ tested: true, success: false, message: 'Por favor ingresa una API Key de Gemini primero.' });
+      return;
+    }
+
+    setIsDetectingModels(true);
+    try {
+      let result: { success: boolean; error?: string; models?: GeminiModelInfo[] };
+      if (window.electronAPI?.listGeminiModels) {
+        result = await window.electronAPI.listGeminiModels(key);
+      } else {
+        result = await fetchAvailableGeminiModels(key);
+      }
+
+      if (result.success && result.models && result.models.length > 0) {
+        // Combinar con metadatos descriptivos
+        const merged: GeminiModelInfo[] = result.models.map((m) => {
+          const matchedPreset = DEFAULT_POPULAR_MODELS.find(
+            (p) => p.id === m.id || m.id.includes(p.id)
+          );
+          return {
+            ...m,
+            description: matchedPreset?.description || m.description,
+            rateLimitNote: matchedPreset?.rateLimitNote || m.rateLimitNote,
+            isRecommended: matchedPreset?.isRecommended || m.isRecommended,
+          };
+        });
+
+        // Asegurar que modelos estándar figuren en la lista
+        DEFAULT_POPULAR_MODELS.forEach((preset) => {
+          if (!merged.some((m) => m.id === preset.id)) {
+            merged.push(preset);
+          }
+        });
+
+        setAvailableModelsList(merged);
+        setAiValidationResult({
+          tested: true,
+          success: true,
+          message: `¡Se detectaron ${result.models.length} modelos disponibles en tu cuenta de Google AI Studio!`,
+        });
+      } else {
+        setAiValidationResult({
+          tested: true,
+          success: false,
+          message: result.error || 'No se pudieron consultar los modelos con esta clave.',
+        });
+      }
+    } catch (err: any) {
+      setAiValidationResult({
+        tested: true,
+        success: false,
+        message: err?.message || 'Error al conectar con Google AI Studio.',
+      });
+    } finally {
+      setIsDetectingModels(false);
+    }
+  };
+
+  // Sync with store on mount
+  useEffect(() => {
+    if (geminiApiKey && geminiApiKey.trim().length > 10) {
+      setAiKeyInput(geminiApiKey);
+      handleAutoDetectModels(geminiApiKey);
+    }
+  }, [geminiApiKey]);
+
+  useEffect(() => {
+    if (geminiModel) {
+      setAiSelectedModel(geminiModel);
+      const isKnown = availableModelsList.some((m) => m.id === geminiModel);
+      if (!isKnown && geminiModel) {
+        setCustomModelInput(geminiModel);
+      }
+    }
+  }, [geminiModel, availableModelsList]);
+
+  // Model categories
+  const recommendedModels = useMemo(() => {
+    return availableModelsList.filter((m) => m.isRecommended || m.id.includes('flash'));
+  }, [availableModelsList]);
+
+  const otherModels = useMemo(() => {
+    const recIds = new Set(recommendedModels.map((m) => m.id));
+    return availableModelsList.filter((m) => !recIds.has(m.id));
+  }, [availableModelsList, recommendedModels]);
+
+  const selectedModelDetails = useMemo(() => {
+    return availableModelsList.find((m) => m.id === aiSelectedModel) || {
+      id: aiSelectedModel,
+      name: aiSelectedModel,
+      description: 'Modelo personalizado o seleccionado.',
+    };
+  }, [availableModelsList, aiSelectedModel]);
+
+  const popularShortcuts = useMemo(() => {
+    const presets = ['gemini-2.5-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-pro'];
+    const list: GeminiModelInfo[] = [];
+    presets.forEach((pId) => {
+      const found = availableModelsList.find((m) => m.id === pId || m.id.includes(pId));
+      if (found) {
+        list.push(found);
+      } else {
+        list.push({
+          id: pId,
+          name: pId === 'gemini-2.5-flash' ? 'Gemini 2.5 Flash' : pId === 'gemini-3.5-flash-lite' ? 'Gemini 3.5 Flash Lite' : 'Gemini 2.5 Pro',
+        });
+      }
+    });
+    return list;
+  }, [availableModelsList]);
+
   // Handlers
   const handleValidateAiKey = async () => {
     if (!aiKeyInput.trim()) {
@@ -63,14 +181,15 @@ export const IntegrationsSection: React.FC = () => {
     }
     setAiTesting(true);
     setGeminiApiKey(aiKeyInput.trim());
-    const modelToUse = aiIsCustomMode ? aiCustomInput.trim() : aiSelectedModel;
+    const modelToUse = aiIsCustomMode ? customModelInput.trim() : aiSelectedModel;
     if (modelToUse) setGeminiModel(modelToUse);
 
     try {
+      await handleAutoDetectModels(aiKeyInput.trim());
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${aiKeyInput.trim()}`);
       setAiTesting(false);
       if (res.ok) {
-        setAiValidationResult({ tested: true, success: true, message: '¡API Key válida y lista para escanear facturas!' });
+        setAiValidationResult({ tested: true, success: true, message: '¡API Key válida y modelos sincronizados con éxito!' });
       } else {
         setAiValidationResult({ tested: true, success: false, message: 'API Key inválida o sin cuota disponible.' });
       }
@@ -149,7 +268,7 @@ export const IntegrationsSection: React.FC = () => {
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-                  Extracción multimodal inteligente de facturas eléctricas dominicanas (EDEESTE, EDESUR, EDENORTE, CEPM).
+                  Extracción multimodal inteligente de facturas eléctricas dominicanas, datasheets y listas de precios.
                 </p>
               </div>
             </div>
@@ -167,9 +286,21 @@ export const IntegrationsSection: React.FC = () => {
 
           <div className="flex flex-col gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1.5">
-                API Key de Google Gemini
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                  API Key de Google Gemini
+                </label>
+                <button
+                  type="button"
+                  onClick={() => handleAutoDetectModels()}
+                  disabled={isDetectingModels || !aiKeyInput.trim()}
+                  className="text-xs font-bold text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40"
+                  title="Consultar y detectar todos los modelos disponibles en tu cuenta de Google Gemini"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isDetectingModels ? 'animate-spin' : ''}`} />
+                  <span>Auto-detectar Modelos</span>
+                </button>
+              </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                   <Key className="w-4 h-4" />
@@ -192,10 +323,10 @@ export const IntegrationsSection: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleValidateAiKey}
-                    disabled={aiTesting}
+                    disabled={aiTesting || isDetectingModels}
                     className="px-3 py-1 rounded-lg text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1 shadow-2xs"
                   >
-                    {aiTesting && <RefreshCw className="w-3 h-3 animate-spin" />}
+                    {(aiTesting || isDetectingModels) && <RefreshCw className="w-3 h-3 animate-spin" />}
                     <span>Probar</span>
                   </button>
                 </div>
@@ -214,34 +345,150 @@ export const IntegrationsSection: React.FC = () => {
               </span>
             </div>
 
-            {/* Model Pills */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-2">
-                Modelo Recomendado para Facturas
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                {GEMINI_MODELS_LIST.map((mod) => {
-                  const isSelected = !aiIsCustomMode && aiSelectedModel === mod.id;
-                  return (
-                    <button
-                      key={mod.id}
-                      type="button"
-                      onClick={() => {
-                        setAiIsCustomMode(false);
-                        setAiSelectedModel(mod.id);
-                        setGeminiModel(mod.id);
-                      }}
-                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                        isSelected
-                          ? 'bg-purple-50 border-purple-300 text-purple-900 dark:bg-purple-950/40 dark:border-purple-700 dark:text-purple-200 font-bold shadow-2xs'
-                          : 'border-slate-200 dark:border-[#27272a] text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-[#222226]'
-                      }`}
-                    >
-                      <div className="text-xs font-semibold truncate">{mod.name || mod.id}</div>
-                      <div className="text-[10px] text-slate-400 dark:text-zinc-500 truncate">{mod.id}</div>
-                    </button>
-                  );
-                })}
+            {/* Selector de Modelos de IA con Menú Desplegable */}
+            <div className="flex flex-col gap-3 pt-1">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-zinc-300">
+                    Modelo Activo de Google Gemini
+                  </label>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">
+                    {availableModelsList.length} modelos detectados
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAiIsCustomMode(!aiIsCustomMode)}
+                  className="text-[11px] text-purple-600 dark:text-purple-400 hover:underline font-semibold cursor-pointer"
+                >
+                  {aiIsCustomMode ? 'Elegir del menú desplegable' : 'Escribir modelo personalizado'}
+                </button>
+              </div>
+
+              {/* Menú Desplegable con todos los modelos disponibles */}
+              {!aiIsCustomMode ? (
+                <div className="relative">
+                  <select
+                    value={aiSelectedModel}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '__custom__') {
+                        setAiIsCustomMode(true);
+                      } else {
+                        setAiSelectedModel(val);
+                        setGeminiModel(val);
+                      }
+                    }}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-900 dark:text-zinc-100 text-xs font-medium focus:outline-hidden focus:ring-2 focus:ring-purple-500 cursor-pointer shadow-xs appearance-none pr-9"
+                  >
+                    {recommendedModels.length > 0 && (
+                      <optgroup label="⭐ Modelos Recomendados (Mayor Velocidad y Cuota)">
+                        {recommendedModels.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name || m.id} ({m.id}) {m.rateLimitNote ? `— ${m.rateLimitNote}` : ''}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {otherModels.length > 0 && (
+                      <optgroup label="📋 Todos los Modelos Disponibles en la API">
+                        {otherModels.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name || m.id} ({m.id}) {m.rateLimitNote ? `— ${m.rateLimitNote}` : ''}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <option value="__custom__">✏️ Escribir modelo personalizado...</option>
+                  </select>
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400">
+                    <ChevronDown className="w-4 h-4" />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={customModelInput}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCustomModelInput(val);
+                      setGeminiModel(val);
+                      setAiSelectedModel(val);
+                    }}
+                    placeholder="ej. gemini-2.5-flash o gemini-2.5-pro"
+                    className="flex-1 px-3.5 py-2.5 rounded-xl text-xs border border-purple-300 dark:border-purple-700 bg-white dark:bg-[#121214] text-slate-900 dark:text-zinc-100 font-mono focus:outline-hidden focus:ring-2 focus:ring-purple-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setAiIsCustomMode(false)}
+                    className="px-3 py-2.5 text-xs font-semibold rounded-xl bg-slate-100 dark:bg-[#202024] text-slate-600 dark:text-zinc-300 hover:bg-slate-200 cursor-pointer"
+                  >
+                    Volver a la lista
+                  </button>
+                </div>
+              )}
+
+              {/* Ficha Informativa del Modelo Actualmente Seleccionado */}
+              {selectedModelDetails && (
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#121214] border border-slate-200/80 dark:border-[#27272a] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 shadow-2xs">
+                      <Bot className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                          {selectedModelDetails.name || selectedModelDetails.id}
+                        </span>
+                        {selectedModelDetails.isRecommended && (
+                          <span className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-400 px-2 py-0.5 rounded-md font-semibold">
+                            Recomendado
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-500 dark:text-zinc-400 line-clamp-1 mt-0.5">
+                        {selectedModelDetails.description || `Modelo ${selectedModelDetails.id} configurado para procesamiento.`}
+                      </p>
+                    </div>
+                  </div>
+                  {selectedModelDetails.rateLimitNote && (
+                    <span className="text-[10px] px-2 py-1 rounded-md bg-slate-200/70 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-mono font-medium shrink-0 self-start sm:self-center">
+                      {selectedModelDetails.rateLimitNote}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Píldoras de Acceso Rápido */}
+              <div>
+                <span className="text-[11px] font-semibold text-slate-500 dark:text-zinc-400 mb-1.5 block">
+                  Accesos Rápidos Populares:
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {popularShortcuts.map((mod) => {
+                    const isSelected = !aiIsCustomMode && aiSelectedModel === mod.id;
+                    return (
+                      <button
+                        key={mod.id}
+                        type="button"
+                        onClick={() => {
+                          setAiIsCustomMode(false);
+                          setAiSelectedModel(mod.id);
+                          setGeminiModel(mod.id);
+                        }}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-purple-50 border-purple-300 text-purple-900 dark:bg-purple-950/40 dark:border-purple-700 dark:text-purple-200 font-bold shadow-2xs'
+                            : 'border-slate-200 dark:border-[#27272a] text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-[#222226]'
+                        }`}
+                      >
+                        <div className="text-xs font-semibold truncate">{mod.name || mod.id}</div>
+                        <div className="text-[10px] text-slate-400 dark:text-zinc-500 truncate">{mod.id}</div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
