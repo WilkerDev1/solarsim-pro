@@ -1,13 +1,13 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import {
   FileText,
   Sun,
   Save,
-  ArrowLeft,
   CheckCircle2,
   Share2,
   Globe,
+  MoreVertical,
 } from 'lucide-react';
 import electsunEmblem from '../../assets/electsun-emblem-transparent.png';
 
@@ -25,6 +25,29 @@ export const Header: React.FC = () => {
 
   const isDark = sidebarTheme === 'dark';
   const activeProject = getActiveProject();
+
+  const [isActionsOpen, setIsActionsOpen] = useState(false);
+  const actionsMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close actions dropdown when clicking outside or pressing Escape
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (actionsMenuRef.current && !actionsMenuRef.current.contains(e.target as Node)) {
+        setIsActionsOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsActionsOpen(false);
+    };
+    if (isActionsOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isActionsOpen]);
 
   return (
     <>
@@ -85,25 +108,10 @@ export const Header: React.FC = () => {
           )}
         </div>
 
-        {/* Right: Navigation & Action Buttons */}
+        {/* Right: Navigation Switcher & 3-Dots Action Menu */}
         <div className="flex items-center gap-3">
-          {/* Project Navigation */}
           {activeView !== 'dashboard' && (
-            <div className="flex items-center gap-2">
-              {/* Back to Projects Button */}
-              <button
-                onClick={() => setActiveView('dashboard')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-xs ${
-                  isDark
-                    ? 'bg-[#27272a] border-[#3f3f46] text-zinc-200 hover:bg-[#323238] hover:text-white'
-                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900'
-                }`}
-                title="Volver al catálogo de proyectos"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Proyectos</span>
-              </button>
-
+            <div className="flex items-center gap-2.5">
               {/* View Mode Toggle (Simulador vs Propuesta PDF) */}
               <div
                 className={`flex items-center gap-1 p-1 rounded-xl border transition-colors ${
@@ -142,59 +150,86 @@ export const Header: React.FC = () => {
                   <span>Propuesta PDF</span>
                 </button>
               </div>
+
+              {/* Botón de 3 Puntos Desplegable (Guardar, Compartir, Exportar) */}
+              <div className="relative" ref={actionsMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsActionsOpen(!isActionsOpen)}
+                  className={`p-2 rounded-xl border transition-all cursor-pointer shadow-xs flex items-center justify-center ${
+                    isActionsOpen
+                      ? isDark
+                        ? 'bg-[#27272a] border-emerald-500/50 text-emerald-400'
+                        : 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                      : isDark
+                      ? 'bg-[#27272a] border-[#3f3f46] text-zinc-300 hover:text-white hover:bg-[#323238]'
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:text-slate-900'
+                  }`}
+                  title="Opciones del proyecto (Guardar, Compartir, Exportar)"
+                >
+                  <MoreVertical className="w-4 h-4" />
+                </button>
+
+                {isActionsOpen && (
+                  <div
+                    className={`absolute right-0 top-full mt-2 w-52 rounded-2xl border shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150 backdrop-blur-xl ${
+                      isDark
+                        ? 'bg-[#18181b]/95 border-[#27272a] text-zinc-200'
+                        : 'bg-white/95 border-slate-200 text-slate-800'
+                    }`}
+                  >
+                    {/* Guardar Cambios */}
+                    <button
+                      onClick={() => {
+                        setIsActionsOpen(false);
+                        saveActiveProject();
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                        isDark
+                          ? 'hover:bg-emerald-950/60 text-zinc-200 hover:text-emerald-300'
+                          : 'hover:bg-emerald-50 text-slate-700 hover:text-emerald-900'
+                      }`}
+                    >
+                      <Save className="w-4 h-4 text-emerald-500" />
+                      <span>Guardar Cambios</span>
+                    </button>
+
+                    {/* Compartir Web */}
+                    <button
+                      onClick={() => {
+                        setIsActionsOpen(false);
+                        openShareModal();
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                        isDark
+                          ? 'hover:bg-emerald-950/60 text-zinc-200 hover:text-emerald-300'
+                          : 'hover:bg-emerald-50 text-slate-700 hover:text-emerald-900'
+                      }`}
+                    >
+                      <Globe className="w-4 h-4 text-emerald-500" />
+                      <span>Compartir Web</span>
+                    </button>
+
+                    {/* Exportar JSON */}
+                    <button
+                      onClick={() => {
+                        setIsActionsOpen(false);
+                        exportProjectAsJSON();
+                      }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                        isDark
+                          ? 'hover:bg-[#27272a] text-zinc-200 hover:text-amber-300'
+                          : 'hover:bg-slate-100 text-slate-700 hover:text-amber-800'
+                      }`}
+                    >
+                      <Share2 className="w-4 h-4 text-amber-500" />
+                      <span>Exportar JSON</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
-
-          {/* Action Buttons (Compartir, Exportar, Guardar) */}
-          <div className="flex items-center gap-2">
-            {/* Share Web Proposal Button */}
-            {activeView !== 'dashboard' && (
-              <button
-                onClick={openShareModal}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all shadow-xs cursor-pointer ${
-                  isDark
-                    ? 'border-emerald-700/60 bg-emerald-950/50 hover:bg-emerald-900/70 text-emerald-300'
-                    : 'border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900'
-                }`}
-                title="Compartir propuesta web interactiva y temporal (Cloudflare)"
-              >
-                <Globe className="w-3.5 h-3.5 text-emerald-500" />
-                <span className="hidden sm:inline">Compartir Web</span>
-              </button>
-            )}
-
-            {/* Export JSON Button */}
-            {activeView !== 'dashboard' && (
-              <button
-                onClick={() => exportProjectAsJSON()}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all shadow-xs cursor-pointer ${
-                  isDark
-                    ? 'border-[#3f3f46] bg-[#27272a] hover:bg-[#323238] text-amber-300'
-                    : 'border-slate-200 bg-white hover:bg-slate-50 text-amber-800'
-                }`}
-                title="Compartir / Exportar este proyecto como archivo JSON"
-              >
-                <Share2 className="w-3.5 h-3.5 text-amber-500" />
-                <span className="hidden sm:inline">Exportar JSON</span>
-              </button>
-            )}
-
-            {/* Save Button */}
-            {activeView === 'simulator' && (
-              <button
-                onClick={saveActiveProject}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg border text-xs font-bold transition-all shadow-xs cursor-pointer ${
-                  isDark
-                    ? 'border-emerald-700/80 bg-emerald-950/70 hover:bg-emerald-900/90 text-emerald-300'
-                    : 'border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-900'
-                }`}
-                title="Guardar cambios de la simulación"
-              >
-                <Save className="w-3.5 h-3.5 text-emerald-500" />
-                <span>Guardar Cambios</span>
-              </button>
-            )}
-          </div>
         </div>
       </header>
 
