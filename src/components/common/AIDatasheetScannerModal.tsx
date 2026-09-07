@@ -19,6 +19,7 @@ import {
   RefreshCw,
   Plus,
   Layers,
+  Settings,
 } from 'lucide-react';
 import { areBrandsMatching, normalizeBrandName, inferBrandFromText } from '../../utils/equipmentBrandUtils';
 
@@ -159,6 +160,7 @@ export const AIDatasheetScannerModal: React.FC = () => {
   const {
     isAIDatasheetModalOpen,
     closeAIDatasheetModal,
+    openSettingsModal,
     equipmentCatalog,
     updateEquipmentItem,
     addEquipmentBatch,
@@ -472,15 +474,31 @@ export const AIDatasheetScannerModal: React.FC = () => {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={closeAIDatasheetModal}
-            className={`p-2 rounded-lg transition-colors cursor-pointer ${
-              isDark ? 'hover:bg-[#27272a] text-zinc-400 hover:text-zinc-200' : 'hover:bg-slate-100 text-slate-500'
-            }`}
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => openSettingsModal('ai')}
+              className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                isDark
+                  ? 'border-zinc-700 hover:bg-zinc-800 text-zinc-400 hover:text-white'
+                  : 'border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-slate-800'
+              }`}
+              title="Configurar Modelo y Clave de Inteligencia Artificial"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={closeAIDatasheetModal}
+              className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                isDark
+                  ? 'border-zinc-700 hover:bg-zinc-800 text-zinc-400 hover:text-white'
+                  : 'border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Cuerpo del Modal */}

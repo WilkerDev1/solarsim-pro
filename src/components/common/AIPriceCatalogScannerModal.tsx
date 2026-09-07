@@ -28,18 +28,19 @@ import {
   Layers,
   ChevronDown,
   Cpu,
+  Settings,
 } from 'lucide-react';
 
 export const AIPriceCatalogScannerModal: React.FC = () => {
   const {
     isAIPriceCatalogModalOpen,
     closeAIPriceCatalogModal,
+    openSettingsModal,
     equipmentCatalog,
     batchUpdateSupplierPrices,
     addEquipmentItem,
     geminiApiKey,
     geminiModel,
-    setGeminiModel,
     sidebarTheme,
     getActiveProject,
   } = useSimulationStore();
@@ -374,15 +375,29 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={closeAIPriceCatalogModal}
-            className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-              isDark ? 'border-zinc-700 hover:bg-zinc-800 text-zinc-400' : 'border-slate-200 hover:bg-slate-100 text-slate-500'
-            }`}
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => openSettingsModal('ai')}
+              className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                isDark
+                  ? 'border-zinc-700 hover:bg-zinc-800 text-zinc-400 hover:text-white'
+                  : 'border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-slate-800'
+              }`}
+              title="Configurar Modelo y Clave de Inteligencia Artificial"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={closeAIPriceCatalogModal}
+              className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                isDark ? 'border-zinc-700 hover:bg-zinc-800 text-zinc-400' : 'border-slate-200 hover:bg-slate-100 text-slate-500'
+              }`}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Content Body */}
@@ -444,48 +459,6 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
                 <p className={`text-[11px] ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
                   * Si lo dejas vacío, la IA intentará detectarlo automáticamente en el membrete del documento.
                 </p>
-              </div>
-
-              {/* Selector de Modelo Global de IA */}
-              <div
-                className={`p-3.5 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 ${
-                  isDark ? 'bg-[#181824] border-[#2c2c3e]' : 'bg-purple-50/50 border-purple-200/80'
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Cpu className="w-4 h-4 text-purple-400 shrink-0" />
-                  <div>
-                    <span className="text-xs font-bold block">
-                      Modelo Global Activo: <strong className="text-purple-400">{geminiModel || 'gemini-3.7-flash'}</strong>
-                    </span>
-                    <span className={`text-[10.5px] ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-                      Se utilizará para extraer y comparar los precios de compra.
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5 flex-wrap self-end sm:self-center">
-                  {[
-                    { id: 'gemini-3.7-flash', label: '3.7 Flash' },
-                    { id: 'gemini-2.5-flash', label: '2.5 Flash' },
-                    { id: 'gemini-3.5-flash-lite', label: '3.5 Lite' },
-                  ].map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setGeminiModel(m.id)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                        geminiModel === m.id
-                          ? 'bg-purple-600 border-purple-500 text-white shadow-xs'
-                          : isDark
-                          ? 'bg-[#14141c] border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500'
-                          : 'bg-white border-slate-300 text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
               </div>
 
               {/* Dropzone de Archivo */}
