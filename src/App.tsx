@@ -9,12 +9,11 @@ import { SimulatorView } from './components/simulator/SimulatorView';
 import { PDFProposalView } from './components/pdf/PDFProposalView';
 import { NewProjectModal } from './components/common/NewProjectModal';
 import { UpdateModal } from './components/common/UpdateModal';
-import { AIInvoiceScannerModal } from './components/common/AIInvoiceScannerModal';
+import { AIInvoiceScannerModal } from './components/common/ai-invoice/AIInvoiceScannerModal';
 import { AIDatasheetScannerModal } from './components/common/AIDatasheetScannerModal';
-import { AISettingsModal } from './components/common/AISettingsModal';
 import { ImportConflictModal } from './components/common/ImportConflictModal';
 import { ShareProposalModal } from './components/common/ShareProposalModal';
-import { SettingsModal } from './components/common/SettingsModal';
+import { SettingsModal } from './components/settings/SettingsModal';
 import { AIPriceCatalogScannerModal } from './components/common/AIPriceCatalogScannerModal';
 import { SupplierPricesDetailModal } from './components/common/SupplierPricesDetailModal';
 import { SplashScreen } from './components/common/SplashScreen';
@@ -103,7 +102,6 @@ export const App: React.FC = () => {
       <UpdateModal />
       <AIInvoiceScannerModal />
       <AIDatasheetScannerModal />
-      <AISettingsModal />
       <ImportConflictModal />
       <ShareProposalModal />
       <SettingsModal />

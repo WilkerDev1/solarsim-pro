@@ -108,8 +108,7 @@ solarsim/
 │   │   └── defaultEquipmentCatalog.ts       # Catálogo base oficial verificado (Canadian Solar, Luxpower, HinaESS)
 │   ├── engine/                              # 🔬 MOTORES DE CÁLCULO PUROS (Sin UI)
 │   │   ├── solarEngine.ts                   # Balance de energía, generación mensual y cobertura
-│   │   ├── financialEngine.ts               # Flujo de caja 25 años, VAN, TIR, Payback y ROI
-│   │   ├── ley5707.ts                       # Deducciones fiscales y exenciones Ley 57-07
+│   │   ├── financeEngine.ts                 # Flujo de caja 25 años, VAN, TIR, Payback, ROI y Ley 57-07
 │   │   └── referenceCase.ts                 # Caso de referencia oficial auditado (BENCHMARK_PROJECT)
 │   ├── tests/                               # 🧪 SUITES DE PRUEBAS UNITARIAS Y DE REGRESIÓN
 │   │   ├── testBenchmark.ts                 # Script de validación de cálculos contra benchmarks
@@ -136,11 +135,13 @@ solarsim/
 │       │   └── sidebar/                     # Explorador lateral del Dashboard
 │       │       ├── SolarCoreTreeSidebar.tsx # Árbol de Projects, Team, Folders y Papelera (drag target)
 │       │       └── CreateFolderModal.tsx    # Modal de creación y edición de carpetas (ADMIN)
+│       ├── settings/                        # ⚙️ CENTRO DE CONFIGURACIÓN EN PANTALLA COMPLETA
+│       │   ├── SettingsModal.tsx            # Orquestador con navegación por tabs, scroll spy y temas
+│       │   ├── SettingsSidebar.tsx          # Sidebar de accesos directos (Cuenta, Simulación, IA, Catálogo, RBAC, Respaldo)
+│       │   └── sections/                    # Módulos de configuración (Profile, SimulationPreferences, Integrations, Equipment, Organization, Backup)
 │       ├── common/                          # Modales, cabeceras y utilidades compartidas
 │       │   ├── Header.tsx                   # Barra superior con navegación, estado de sync y botones
-│       │   ├── SettingsModal.tsx            # Centro de Configuración en Pantalla Completa (Sidebar de accesos directos, Perfil, Simulación, IA, Catálogo, RBAC, Respaldo)
 │       │   ├── EquipmentManagerSettingsTab.tsx # Administrador de Catálogo con tabla, edición, ofertas y sync en la nube
-│       │   ├── AIInvoiceScannerModal.tsx    # Re-export de Smart Proposal Studio
 │       │   ├── ai-invoice/                  # 📁 Módulo desacoplado de Smart Proposal Studio
 │       │   │   ├── types.ts                 # Interfaces y constantes de UI
 │       │   │   ├── AIInvoiceScannerModal.tsx# Orquestador raíz limpio (~220 líneas)

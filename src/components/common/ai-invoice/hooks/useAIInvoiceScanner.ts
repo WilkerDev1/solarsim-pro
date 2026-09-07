@@ -11,7 +11,7 @@ export function useAIInvoiceScanner() {
   const {
     isAIInvoiceModalOpen,
     closeAIInvoiceModal,
-    openAISettingsModal,
+    openSettingsModal,
     geminiApiKey,
     geminiModel,
     equipmentCatalog,
@@ -161,7 +161,7 @@ export function useAIInvoiceScanner() {
 
     if (!geminiApiKey) {
       setErrorMsg('No tienes una Google Gemini API Key configurada.');
-      openAISettingsModal();
+      openSettingsModal('ai');
       return;
     }
 
@@ -486,7 +486,8 @@ export function useAIInvoiceScanner() {
     // Store
     isAIInvoiceModalOpen,
     closeAIInvoiceModal,
-    openAISettingsModal,
+    openAISettingsModal: () => openSettingsModal('ai'),
+    openSettingsModal,
     geminiApiKey,
     geminiModel,
     panelCatalog,

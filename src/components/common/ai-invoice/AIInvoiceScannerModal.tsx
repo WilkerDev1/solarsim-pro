@@ -23,7 +23,7 @@ export const AIInvoiceScannerModal: React.FC = () => {
     // Store & Project
     isAIInvoiceModalOpen,
     closeAIInvoiceModal,
-    openAISettingsModal,
+    openSettingsModal,
     geminiApiKey,
     panelCatalog,
     inverterCatalog,
@@ -112,7 +112,7 @@ export const AIInvoiceScannerModal: React.FC = () => {
 
           <div className="flex items-center gap-2">
             <button
-              onClick={openAISettingsModal}
+              onClick={() => openSettingsModal('ai')}
               className={`p-2 rounded-xl border transition-colors cursor-pointer ${
                 isDark
                   ? 'border-[#2d2d3e] text-zinc-400 hover:text-white hover:bg-[#20202c]'
@@ -158,7 +158,7 @@ export const AIInvoiceScannerModal: React.FC = () => {
               isInsideProject={isInsideProject}
               activeProject={activeProject}
               geminiApiKey={geminiApiKey}
-              openAISettingsModal={openAISettingsModal}
+              openAISettingsModal={() => openSettingsModal('ai')}
               selectedFile={selectedFile}
               setSelectedFile={setSelectedFile}
               fileInputRef={fileInputRef}
@@ -350,7 +350,7 @@ export const AIInvoiceScannerModal: React.FC = () => {
               isDark={isDark}
               errorMsg={errorMsg}
               handleResetDocument={handleResetDocument}
-              openAISettingsModal={openAISettingsModal}
+              openAISettingsModal={() => openSettingsModal('ai')}
             />
           )}
         </div>

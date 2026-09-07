@@ -9,7 +9,7 @@ import { OrganizationSection } from './sections/OrganizationSection';
 import { BackupSection } from './sections/BackupSection';
 
 export const SettingsModal: React.FC = () => {
-  const { isSettingsModalOpen, closeSettingsModal, sidebarTheme, setSidebarTheme } = useSimulationStore();
+  const { isSettingsModalOpen, closeSettingsModal, sidebarTheme, setSidebarTheme, settingsActiveTab } = useSimulationStore();
   const isDark = sidebarTheme === 'dark';
   const [activeSection, setActiveSection] = useState<string>('cuenta');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -24,6 +24,27 @@ export const SettingsModal: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isSettingsModalOpen, closeSettingsModal]);
+
+  // Navegar a la pestaña solicitada al abrir (ej. 'ai' -> 'integraciones')
+  useEffect(() => {
+    if (isSettingsModalOpen && settingsActiveTab) {
+      const tabToSectionMap: Record<string, string> = {
+        ai: 'integraciones',
+        sync: 'integraciones',
+        share: 'integraciones',
+        equipment: 'catalogo',
+        account: 'cuenta',
+      };
+      const targetSection = tabToSectionMap[settingsActiveTab] || 'cuenta';
+      setActiveSection(targetSection);
+      setTimeout(() => {
+        const target = document.getElementById(`sec-${targetSection}`);
+        if (target && scrollContainerRef.current) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 60);
+    }
+  }, [isSettingsModalOpen, settingsActiveTab]);
 
   // Scroll Spy para detectar la sección activa automáticamente
   useEffect(() => {
@@ -65,7 +86,7 @@ export const SettingsModal: React.FC = () => {
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex ${
+      className={`fixed inset-0 z-[60] flex ${
         isDark ? 'dark bg-[#0f0f11] text-zinc-100' : 'bg-[#f8fafc] text-slate-900'
       } overflow-hidden select-none animate-in fade-in duration-150`}
     >

@@ -175,7 +175,6 @@ export interface UISlice {
   isAIInvoiceModalOpen: boolean;
   isAIDatasheetModalOpen: boolean;
   isAIPriceCatalogModalOpen: boolean;
-  isAISettingsModalOpen: boolean;
   isShareModalOpen: boolean;
   isSettingsModalOpen: boolean;
   settingsActiveTab: 'sync' | 'account' | 'share' | 'ai' | 'equipment';
