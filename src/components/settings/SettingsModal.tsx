@@ -86,9 +86,9 @@ export const SettingsModal: React.FC = () => {
 
   return (
     <div
-      className={`fixed inset-0 z-[60] flex ${
+      className={`fixed inset-y-0 right-0 left-16 z-40 flex ${
         isDark ? 'dark bg-[#0f0f11] text-zinc-100' : 'bg-[#f8fafc] text-slate-900'
-      } overflow-hidden select-none animate-in fade-in duration-150`}
+      } overflow-hidden select-none animate-in fade-in duration-150 border-l border-slate-200/80 dark:border-[#2a3444]`}
     >
       {/* 🧭 Sidebar de Accesos Directos y Tema */}
       <SettingsSidebar

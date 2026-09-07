@@ -26,6 +26,8 @@ export const PrimaryIconDock: React.FC = () => {
     openAIPriceCatalogModal,
     openUpdateModal,
     openSettingsModal,
+    isSettingsModalOpen,
+    closeSettingsModal,
     updateInfo,
     setActiveFolderId,
     setActiveTeamMemberFilter,
@@ -92,6 +94,7 @@ export const PrimaryIconDock: React.FC = () => {
           {/* 1. Proyectos / Dashboard */}
           <button
             onClick={() => {
+              if (isSettingsModalOpen) closeSettingsModal();
               setActiveView('dashboard');
               setIsTrashActive(false);
               setActiveFolderId(null);
@@ -99,14 +102,14 @@ export const PrimaryIconDock: React.FC = () => {
               setIsAIMenuOpen(false);
             }}
             className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
-              activeView === 'dashboard' && !isTrashActive
+              !isSettingsModalOpen && activeView === 'dashboard' && !isTrashActive
                 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-xs font-bold'
                 : 'text-slate-400 hover:text-white hover:bg-[#283243]'
             }`}
             title="Catálogo de Proyectos (Home)"
           >
             <FileText className="w-5 h-5" />
-            {activeView === 'dashboard' && !isTrashActive && (
+            {!isSettingsModalOpen && activeView === 'dashboard' && !isTrashActive && (
               <span className="absolute -left-2 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-emerald-400 rounded-r-full" />
             )}
           </button>
@@ -157,6 +160,7 @@ export const PrimaryIconDock: React.FC = () => {
                 {/* Opción 1: Smart Proposal Studio / Facturas EDE */}
                 <button
                   onClick={() => {
+                    if (isSettingsModalOpen) closeSettingsModal();
                     setIsAIMenuOpen(false);
                     openAIInvoiceModal();
                   }}
@@ -179,6 +183,7 @@ export const PrimaryIconDock: React.FC = () => {
                 {/* Opción 2: Fichas Técnicas (Datasheets) */}
                 <button
                   onClick={() => {
+                    if (isSettingsModalOpen) closeSettingsModal();
                     setIsAIMenuOpen(false);
                     openAIDatasheetModal();
                   }}
@@ -201,6 +206,7 @@ export const PrimaryIconDock: React.FC = () => {
                 {/* Opción 3: Listas de Precios de Proveedores */}
                 <button
                   onClick={() => {
+                    if (isSettingsModalOpen) closeSettingsModal();
                     setIsAIMenuOpen(false);
                     openAIPriceCatalogModal();
                   }}
@@ -243,6 +249,7 @@ export const PrimaryIconDock: React.FC = () => {
           {/* 3. Acción Rápida: Crear Nueva Simulación */}
           <button
             onClick={() => {
+              if (isSettingsModalOpen) closeSettingsModal();
               setIsAIMenuOpen(false);
               openNewProjectModal();
             }}
@@ -259,13 +266,14 @@ export const PrimaryIconDock: React.FC = () => {
         {/* Papelera de Reciclaje */}
         <button
           onClick={() => {
+            if (isSettingsModalOpen) closeSettingsModal();
             setActiveView('dashboard');
             setIsTrashActive(true);
             setActiveFolderId(null);
             setActiveTeamMemberFilter(null);
           }}
           className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer relative group ${
-            activeView === 'dashboard' && isTrashActive
+            !isSettingsModalOpen && activeView === 'dashboard' && isTrashActive
               ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 shadow-xs font-bold'
               : 'text-slate-400 hover:text-rose-400 hover:bg-[#283243]'
           }`}
@@ -277,14 +285,17 @@ export const PrimaryIconDock: React.FC = () => {
               {trashedCount > 99 ? '99+' : trashedCount}
             </span>
           )}
-          {activeView === 'dashboard' && isTrashActive && (
+          {!isSettingsModalOpen && activeView === 'dashboard' && isTrashActive && (
             <span className="absolute -left-2 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-rose-400 rounded-r-full" />
           )}
         </button>
 
         {/* Botón de Actualizaciones */}
         <button
-          onClick={openUpdateModal}
+          onClick={() => {
+            if (isSettingsModalOpen) closeSettingsModal();
+            openUpdateModal();
+          }}
           className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-emerald-300 hover:bg-[#283243] transition-all cursor-pointer group relative"
           title="Buscar Actualizaciones de Software"
         >
@@ -300,11 +311,28 @@ export const PrimaryIconDock: React.FC = () => {
 
         {/* Centro de Ajustes y Configuración */}
         <button
-          onClick={() => openSettingsModal('sync')}
-          className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-[#283243] transition-all cursor-pointer group"
-          title="Centro de Configuración"
+          onClick={() => {
+            if (isSettingsModalOpen) {
+              closeSettingsModal();
+            } else {
+              openSettingsModal('account');
+            }
+          }}
+          className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer group relative ${
+            isSettingsModalOpen
+              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-xs font-bold'
+              : 'text-slate-400 hover:text-white hover:bg-[#283243]'
+          }`}
+          title={isSettingsModalOpen ? 'Cerrar Configuración (Esc)' : 'Centro de Configuración'}
         >
-          <Settings className="w-5 h-5 group-hover:rotate-45 transition-transform" />
+          <Settings
+            className={`w-5 h-5 transition-transform duration-300 ${
+              isSettingsModalOpen ? 'rotate-45 text-emerald-400' : 'group-hover:rotate-45'
+            }`}
+          />
+          {isSettingsModalOpen && (
+            <span className="absolute -left-2 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-emerald-400 rounded-r-full" />
+          )}
         </button>
       </div>
     </aside>
