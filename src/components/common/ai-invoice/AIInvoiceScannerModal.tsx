@@ -48,6 +48,8 @@ export const AIInvoiceScannerModal: React.FC = () => {
     fileInputRef,
     projectRequirementsPrompt,
     setProjectRequirementsPrompt,
+    includeBattery,
+    setIncludeBattery,
 
     // Computados
     peakConsumptionVal,
@@ -63,6 +65,7 @@ export const AIInvoiceScannerModal: React.FC = () => {
     handleTogglePeakMonthMode,
     handlePanelChange,
     handleCoverageChange,
+    handleProvinceChange,
     handleInverterChange,
     handleInverterCountChange,
     handleBatteryChange,
@@ -166,6 +169,8 @@ export const AIInvoiceScannerModal: React.FC = () => {
               handleDrop={handleDrop}
               projectRequirementsPrompt={projectRequirementsPrompt}
               setProjectRequirementsPrompt={setProjectRequirementsPrompt}
+              includeBattery={includeBattery}
+              setIncludeBattery={setIncludeBattery}
               processSmartProposal={processSmartProposal}
               errorMsg={errorMsg}
             />
@@ -268,6 +273,7 @@ export const AIInvoiceScannerModal: React.FC = () => {
                       isDark={isDark}
                       extractedData={extractedData}
                       setExtractedData={setExtractedData}
+                      onProvinceChange={handleProvinceChange}
                     />
                   )}
 

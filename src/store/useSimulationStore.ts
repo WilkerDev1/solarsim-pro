@@ -55,7 +55,10 @@ export const useSimulationStore = create<SimulationStore>()(
           const CUTOFF_30_DAYS = 30 * 24 * 60 * 60 * 1000;
           const isExpiredTrash = (p: any) => {
             if (!p.isDeleted) return false;
-            const t = p.deletedAt ? new Date(p.deletedAt).getTime() : (p.updatedAt ? new Date(p.updatedAt).getTime() : 0);
+            if (!p.deletedAt && !p.updatedAt) return false;
+            const raw = p.deletedAt || p.updatedAt;
+            const t = new Date(raw).getTime();
+            if (isNaN(t) || t <= 0) return false;
             return Date.now() - t > CUTOFF_30_DAYS;
           };
           state.projects = state.projects.filter((p) => !mockProjectIds.has(p.id) && !isExpiredTrash(p));

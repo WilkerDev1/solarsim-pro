@@ -9,6 +9,7 @@ import {
   Trash2,
   Check,
   AlertTriangle,
+  BatteryCharging,
 } from 'lucide-react';
 import { FilePreview } from '../types';
 
@@ -25,6 +26,8 @@ interface AIInvoiceInitialConfigViewProps {
   handleDrop: (e: React.DragEvent) => void;
   projectRequirementsPrompt: string;
   setProjectRequirementsPrompt: (val: string) => void;
+  includeBattery: boolean;
+  setIncludeBattery: (val: boolean) => void;
   processSmartProposal: () => void;
   errorMsg: string | null;
 }
@@ -41,6 +44,8 @@ export const AIInvoiceInitialConfigView: React.FC<AIInvoiceInitialConfigViewProp
   handleDrop,
   projectRequirementsPrompt,
   setProjectRequirementsPrompt,
+  includeBattery,
+  setIncludeBattery,
   processSmartProposal,
   errorMsg,
 }) => {
@@ -263,6 +268,64 @@ export const AIInvoiceInitialConfigView: React.FC<AIInvoiceInitialConfigViewProp
             <span>Grounding:</span>
             <span className="font-mono text-zinc-400">Catálogo de equipos y precios</span>
           </div>
+        </div>
+      </div>
+
+      {/* Opción para Sistema Híbrido con Baterías BESS */}
+      <div
+        onClick={() => setIncludeBattery(!includeBattery)}
+        className={`w-full max-w-4xl p-3.5 rounded-2xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${
+          includeBattery
+            ? isDark
+              ? 'bg-cyan-950/40 border-cyan-500/50 text-cyan-200 shadow-md shadow-cyan-950/40'
+              : 'bg-cyan-50 border-cyan-300 text-cyan-950 shadow-sm'
+            : isDark
+            ? 'bg-[#181822] border-[#2b2b3c] text-zinc-400 hover:border-zinc-600'
+            : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 shadow-sm'
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className={`p-2.5 rounded-xl transition-colors ${
+              includeBattery
+                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                : isDark
+                ? 'bg-[#101016] text-zinc-500 border border-zinc-800'
+                : 'bg-slate-100 text-slate-500 border border-slate-200'
+            }`}
+          >
+            <BatteryCharging className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-bold ${includeBattery ? (isDark ? 'text-cyan-200' : 'text-cyan-900') : (isDark ? 'text-zinc-200' : 'text-slate-800')}`}>
+                Sistema Híbrido con Baterías BESS
+              </span>
+              <span
+                className={`text-[9.5px] font-mono px-2 py-0.5 rounded-full font-bold uppercase ${
+                  includeBattery
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                    : isDark
+                    ? 'bg-zinc-800 text-zinc-400'
+                    : 'bg-slate-200 text-slate-600'
+                }`}
+              >
+                {includeBattery ? 'Almacenamiento Activo' : 'Grid-Tie (Sin Baterías)'}
+              </span>
+            </div>
+            <p className={`text-[11px] mt-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+              Grounding automático de almacenamiento LiFePO4 del catálogo (ej. HinaESS 16.08 kWh) para respaldo y autoconsumo.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center pr-2">
+          <input
+            type="checkbox"
+            checked={includeBattery}
+            onChange={(e) => setIncludeBattery(e.target.checked)}
+            className="w-4 h-4 rounded text-cyan-600 focus:ring-cyan-500 cursor-pointer accent-cyan-500"
+          />
         </div>
       </div>
 

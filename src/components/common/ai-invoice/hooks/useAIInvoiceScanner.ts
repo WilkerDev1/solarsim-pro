@@ -2,6 +2,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import { useSimulationStore } from '../../../../store/useSimulationStore';
 import { parseInvoiceWithGemini } from '../../../../services/geminiInvoiceService';
 import { calculateRecommendedPanelCount } from '../../../../engine/solarEngine';
+import { getProvinceHSP } from '../../../../data/rdProvinces';
 import { ExtractedInvoiceData } from '../../../../types/aiInvoice';
 import { ProjectSimulation } from '../../../../types';
 import { SolarEquipmentItem } from '../../../../types/equipment';
@@ -45,6 +46,11 @@ export function useAIInvoiceScanner() {
 
   // Requisitos o especificaciones técnicas del proyecto
   const [projectRequirementsPrompt, setProjectRequirementsPrompt] = useState<string>('');
+
+  // Opción para forzar sistema híbrido con baterías BESS
+  const [includeBattery, setIncludeBattery] = useState<boolean>(
+    Boolean(activeProject?.specs?.hasBattery)
+  );
 
   // Módulo solar seleccionado actualmente
   const selectedPanel: SolarEquipmentItem | null = useMemo(() => {
@@ -198,6 +204,7 @@ export function useAIInvoiceScanner() {
           equipmentCatalog,
           dopExchangeRate: activeProject?.rates?.usdExchangeRate || 60.0,
           panelPowerW: activeProject?.specs?.panelPowerW || 620,
+          includeBattery,
         });
 
         if (!res.success || !res.data) {
@@ -230,7 +237,13 @@ export function useAIInvoiceScanner() {
           equipmentCatalog,
           dopExchangeRate: activeProject?.rates?.usdExchangeRate || 60.0,
           panelPowerW: activeProject?.specs?.panelPowerW || 620,
+          includeBattery,
         });
+      }
+
+      if (result) {
+        const canonicalProvince = getProvinceHSP(result.province || result.municipality || result.address || '').name;
+        result.province = canonicalProvince;
       }
 
       setExtractedData(result);
@@ -298,6 +311,31 @@ export function useAIInvoiceScanner() {
     setExtractedData({
       ...extractedData,
       targetCoveragePct: safeCoverage,
+      recommendedCapacityKWp: rec.recommendedCapacityKWp,
+      recommendedPanelCount: rec.recommendedPanelCount,
+    });
+  };
+
+  // Cambio interactivo de provincia con recálculo solar instantáneo
+  const handleProvinceChange = (newProvinceName: string) => {
+    if (!extractedData) return;
+    const canonicalProvince = getProvinceHSP(newProvinceName).name;
+    const panelWatts = selectedPanel?.powerW || activeProject?.specs?.panelPowerW || 620;
+    const targetCov = extractedData.targetCoveragePct ?? activeProject?.rates?.targetCoveragePct ?? 95;
+    const sysLosses = activeProject?.specs?.systemLosses ?? 25.0;
+
+    const rec = calculateRecommendedPanelCount(
+      canonicalProvince,
+      extractedData.monthlyConsumptionKWh,
+      panelWatts,
+      targetCov,
+      sysLosses,
+      activeProject?.client?.customMonthlyHSP
+    );
+
+    setExtractedData({
+      ...extractedData,
+      province: canonicalProvince,
       recommendedCapacityKWp: rec.recommendedCapacityKWp,
       recommendedPanelCount: rec.recommendedPanelCount,
     });
@@ -409,22 +447,54 @@ export function useAIInvoiceScanner() {
 
   const handleApplyToActive = () => {
     if (!extractedData) return;
+    const resolvedInverter = inverterCatalog.find((i: SolarEquipmentItem) => i.id === extractedData.selectedInverterId)
+      || inverterCatalog.find((i: SolarEquipmentItem) => i.displayName === extractedData.selectedInverterModel)
+      || inverterCatalog[0];
+    const resolvedBattery = extractedData.hasBattery
+      ? (batteryCatalog.find((b: SolarEquipmentItem) => b.id === extractedData.selectedBatteryId)
+         || batteryCatalog.find((b: SolarEquipmentItem) => b.displayName === extractedData.selectedBatteryModel)
+         || batteryCatalog[0])
+      : null;
+
     const dataToApply: ExtractedInvoiceData = {
       ...extractedData,
       selectedPanelId: selectedPanel?.id,
       selectedPanelModel: selectedPanel?.displayName || selectedPanel?.modelSeries,
       selectedPanelWatts: selectedPanel?.powerW,
+      selectedInverterId: resolvedInverter?.id,
+      selectedInverterModel: resolvedInverter?.displayName,
+      selectedInverterPowerKW: resolvedInverter?.powerKW || extractedData.selectedInverterPowerKW,
+      hasBattery: extractedData.hasBattery,
+      selectedBatteryId: resolvedBattery?.id,
+      selectedBatteryModel: resolvedBattery?.displayName,
+      selectedBatteryCapacityKWh: resolvedBattery?.capacityKWh || extractedData.selectedBatteryCapacityKWh,
     };
     applyExtractedInvoice(dataToApply, false);
   };
 
   const handleApplyAsNew = () => {
     if (!extractedData) return;
+    const resolvedInverter = inverterCatalog.find((i: SolarEquipmentItem) => i.id === extractedData.selectedInverterId)
+      || inverterCatalog.find((i: SolarEquipmentItem) => i.displayName === extractedData.selectedInverterModel)
+      || inverterCatalog[0];
+    const resolvedBattery = extractedData.hasBattery
+      ? (batteryCatalog.find((b: SolarEquipmentItem) => b.id === extractedData.selectedBatteryId)
+         || batteryCatalog.find((b: SolarEquipmentItem) => b.displayName === extractedData.selectedBatteryModel)
+         || batteryCatalog[0])
+      : null;
+
     const dataToApply: ExtractedInvoiceData = {
       ...extractedData,
       selectedPanelId: selectedPanel?.id,
       selectedPanelModel: selectedPanel?.displayName || selectedPanel?.modelSeries,
       selectedPanelWatts: selectedPanel?.powerW,
+      selectedInverterId: resolvedInverter?.id,
+      selectedInverterModel: resolvedInverter?.displayName,
+      selectedInverterPowerKW: resolvedInverter?.powerKW || extractedData.selectedInverterPowerKW,
+      hasBattery: extractedData.hasBattery,
+      selectedBatteryId: resolvedBattery?.id,
+      selectedBatteryModel: resolvedBattery?.displayName,
+      selectedBatteryCapacityKWh: resolvedBattery?.capacityKWh || extractedData.selectedBatteryCapacityKWh,
     };
     applyExtractedInvoice(dataToApply, true);
   };
@@ -514,6 +584,8 @@ export function useAIInvoiceScanner() {
     fileInputRef,
     projectRequirementsPrompt,
     setProjectRequirementsPrompt,
+    includeBattery,
+    setIncludeBattery,
 
     // Computados
     peakConsumptionVal,
@@ -530,6 +602,7 @@ export function useAIInvoiceScanner() {
     handleTogglePeakMonthMode,
     handlePanelChange,
     handleCoverageChange,
+    handleProvinceChange,
     handleInverterChange,
     handleInverterCountChange,
     handleBatteryChange,

@@ -95,22 +95,41 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
             panelCount: count,
             panelPowerW: panelW,
             panelBrandModel: panelModel,
-            panelUnitPriceUSD: data.selectedPanelUnitPriceUSD ?? BENCHMARK_PROJECT.specs.panelUnitPriceUSD,
-            inverterBrandModel: data.selectedInverterModel || BENCHMARK_PROJECT.specs.inverterBrandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)',
+            inverterBrandModel: (() => {
+              const cat = get().equipmentCatalog || [];
+              const inverters = cat.filter((e) => e.type === 'inverter');
+              const match = inverters.find((e) =>
+                e.id === data.selectedInverterId ||
+                e.displayName === data.selectedInverterModel ||
+                e.modelSeries === data.selectedInverterModel ||
+                (data.selectedInverterModel && e.displayName.toLowerCase().includes(data.selectedInverterModel.toLowerCase()))
+              );
+              if (match) return match.displayName;
+              if (data.selectedInverterModel && !data.selectedInverterModel.toLowerCase().includes('inversor solar híbrido') && !data.selectedInverterModel.toLowerCase().includes('inversor híbrido')) {
+                return data.selectedInverterModel;
+              }
+              const lux = inverters.find((e) => e.brand.toLowerCase().includes('lux') || e.displayName.toLowerCase().includes('lux'));
+              return lux ? lux.displayName : (inverters[0]?.displayName || BENCHMARK_PROJECT.specs.inverterBrandModel);
+            })(),
             inverterPowerKW: data.selectedInverterPowerKW || 8.0,
             inverterCount: data.selectedInverterCount || Math.max(1, Math.ceil((count * panelW) / 8000)),
             inverterUnitPriceUSD: data.selectedInverterUnitPriceUSD ?? BENCHMARK_PROJECT.specs.inverterUnitPriceUSD,
             hasBattery: data.hasBattery ?? false,
             batteryBrandModel: (() => {
-              if (!data.selectedBatteryModel) return BENCHMARK_PROJECT.specs.batteryBrandModel;
+              if (!data.hasBattery && !data.selectedBatteryModel) return BENCHMARK_PROJECT.specs.batteryBrandModel;
               const cat = get().equipmentCatalog || [];
-              const match = cat.find((e) => e.type === 'battery' && (
+              const batteries = cat.filter((e) => e.type === 'battery');
+              const match = batteries.find((e) =>
+                e.id === data.selectedBatteryId ||
                 e.displayName === data.selectedBatteryModel ||
                 e.modelSeries === data.selectedBatteryModel ||
                 ((e.brand.toLowerCase().includes('hina') || e.displayName.toLowerCase().includes('hina')) &&
-                 (data.selectedBatteryModel!.toLowerCase().includes('hina') || data.selectedBatteryModel!.toLowerCase().includes('powergem')))
-              ));
-              return match ? match.displayName : data.selectedBatteryModel;
+                 (data.selectedBatteryModel?.toLowerCase().includes('hina') || data.selectedBatteryModel?.toLowerCase().includes('powergem')))
+              );
+              if (match) return match.displayName;
+              if (data.selectedBatteryModel) return data.selectedBatteryModel;
+              const defBat = batteries.find((e) => e.brand.toLowerCase().includes('hina') || e.displayName.toLowerCase().includes('hina'));
+              return defBat ? defBat.displayName : (batteries[0]?.displayName || BENCHMARK_PROJECT.specs.batteryBrandModel);
             })(),
             batteryCapacityKWh: data.selectedBatteryCapacityKWh ?? BENCHMARK_PROJECT.specs.batteryCapacityKWh,
             batteryCount: data.selectedBatteryCount ?? (data.hasBattery ? 1 : 0),
@@ -192,21 +211,43 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
               panelPowerW: panelW,
               panelBrandModel: panelModel,
               ...(data.selectedPanelUnitPriceUSD !== undefined ? { panelUnitPriceUSD: data.selectedPanelUnitPriceUSD } : {}),
-              ...(data.selectedInverterModel ? { inverterBrandModel: data.selectedInverterModel } : {}),
+              ...(data.selectedInverterModel ? {
+                inverterBrandModel: (() => {
+                  const cat = get().equipmentCatalog || [];
+                  const inverters = cat.filter((e) => e.type === 'inverter');
+                  const match = inverters.find((e) =>
+                    e.id === data.selectedInverterId ||
+                    e.displayName === data.selectedInverterModel ||
+                    e.modelSeries === data.selectedInverterModel ||
+                    (data.selectedInverterModel && e.displayName.toLowerCase().includes(data.selectedInverterModel.toLowerCase()))
+                  );
+                  if (match) return match.displayName;
+                  if (!data.selectedInverterModel?.toLowerCase().includes('inversor solar híbrido') && !data.selectedInverterModel?.toLowerCase().includes('inversor híbrido')) {
+                    return data.selectedInverterModel;
+                  }
+                  const lux = inverters.find((e) => e.brand.toLowerCase().includes('lux') || e.displayName.toLowerCase().includes('lux'));
+                  return lux ? lux.displayName : (inverters[0]?.displayName || p.specs.inverterBrandModel);
+                })(),
+              } : {}),
               ...(data.selectedInverterPowerKW ? { inverterPowerKW: data.selectedInverterPowerKW } : {}),
               ...(data.selectedInverterCount ? { inverterCount: data.selectedInverterCount } : {}),
               ...(data.selectedInverterUnitPriceUSD !== undefined ? { inverterUnitPriceUSD: data.selectedInverterUnitPriceUSD } : {}),
               ...(data.hasBattery !== undefined ? { hasBattery: data.hasBattery } : {}),
-              ...(data.selectedBatteryModel ? {
+              ...((data.hasBattery || data.selectedBatteryModel) ? {
                 batteryBrandModel: (() => {
                   const cat = get().equipmentCatalog || [];
-                  const match = cat.find((e) => e.type === 'battery' && (
+                  const batteries = cat.filter((e) => e.type === 'battery');
+                  const match = batteries.find((e) =>
+                    e.id === data.selectedBatteryId ||
                     e.displayName === data.selectedBatteryModel ||
                     e.modelSeries === data.selectedBatteryModel ||
                     ((e.brand.toLowerCase().includes('hina') || e.displayName.toLowerCase().includes('hina')) &&
-                     (data.selectedBatteryModel!.toLowerCase().includes('hina') || data.selectedBatteryModel!.toLowerCase().includes('powergem')))
-                  ));
-                  return match ? match.displayName : data.selectedBatteryModel;
+                     (data.selectedBatteryModel?.toLowerCase().includes('hina') || data.selectedBatteryModel?.toLowerCase().includes('powergem')))
+                  );
+                  if (match) return match.displayName;
+                  if (data.selectedBatteryModel) return data.selectedBatteryModel;
+                  const defBat = batteries.find((e) => e.brand.toLowerCase().includes('hina') || e.displayName.toLowerCase().includes('hina'));
+                  return defBat ? defBat.displayName : (batteries[0]?.displayName || p.specs.batteryBrandModel);
                 })(),
               } : {}),
               ...(data.selectedBatteryCapacityKWh ? { batteryCapacityKWh: data.selectedBatteryCapacityKWh } : {}),

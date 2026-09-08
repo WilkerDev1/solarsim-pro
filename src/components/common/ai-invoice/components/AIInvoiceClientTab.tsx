@@ -1,18 +1,20 @@
 import React from 'react';
 import { Bot } from 'lucide-react';
 import { ExtractedInvoiceData } from '../../../../types/aiInvoice';
-import { RD_PROVINCES } from '../../../../data/rdProvinces';
+import { RD_PROVINCES, getProvinceHSP } from '../../../../data/rdProvinces';
 
 interface AIInvoiceClientTabProps {
   isDark: boolean;
   extractedData: ExtractedInvoiceData;
   setExtractedData: React.Dispatch<React.SetStateAction<ExtractedInvoiceData | null>>;
+  onProvinceChange?: (province: string) => void;
 }
 
 export const AIInvoiceClientTab: React.FC<AIInvoiceClientTabProps> = ({
   isDark,
   extractedData,
   setExtractedData,
+  onProvinceChange,
 }) => {
   return (
     <div className="space-y-4">
@@ -174,8 +176,15 @@ export const AIInvoiceClientTab: React.FC<AIInvoiceClientTabProps> = ({
             Provincia (Irradiación Solar)
           </label>
           <select
-            value={extractedData.province || 'Distrito Nacional'}
-            onChange={(e) => setExtractedData({ ...extractedData, province: e.target.value })}
+            value={getProvinceHSP(extractedData.province || extractedData.municipality || extractedData.address || '').name}
+            onChange={(e) => {
+              const newProv = e.target.value;
+              if (onProvinceChange) {
+                onProvinceChange(newProv);
+              } else {
+                setExtractedData({ ...extractedData, province: newProv });
+              }
+            }}
             className={`w-full px-3 py-2 rounded-xl border text-xs font-semibold outline-none focus:ring-2 focus:ring-emerald-500 ${
               isDark ? 'bg-[#181822] border-[#2e2e40] text-white' : 'bg-white border-slate-300 text-slate-900'
             }`}

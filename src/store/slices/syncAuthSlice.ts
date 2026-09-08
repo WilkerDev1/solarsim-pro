@@ -131,7 +131,7 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
             // (por ejemplo por pertenecer a otra organización, sesión o sincronización parcial),
             // NUNCA eliminarlo automáticamente del dispositivo local: se preserva intacto
             // cambiándolo a 'local_only' para blindar el trabajo del usuario contra pérdidas.
-            if (local.syncStatus === 'synced' && !local.isDeleted) {
+            if (local.syncStatus === 'synced') {
               return { ...local, syncStatus: 'local_only' as const };
             }
 
@@ -175,7 +175,10 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
       const CUTOFF_30_DAYS = 30 * 24 * 60 * 60 * 1000;
       const isExpiredTrash = (p: ProjectSimulation) => {
         if (!p.isDeleted) return false;
-        const t = p.deletedAt ? new Date(p.deletedAt).getTime() : (p.updatedAt ? new Date(p.updatedAt).getTime() : 0);
+        if (!p.deletedAt && !p.updatedAt) return false;
+        const raw = p.deletedAt || p.updatedAt;
+        const t = new Date(raw).getTime();
+        if (isNaN(t) || t <= 0) return false;
         return Date.now() - t > CUTOFF_30_DAYS;
       };
       currentProjects = currentProjects.filter((p) => !isExpiredTrash(p));

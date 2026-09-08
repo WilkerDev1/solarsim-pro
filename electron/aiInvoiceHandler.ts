@@ -331,6 +331,7 @@ export function registerAIInvoiceHandlers() {
     projectRequirementsText?: string;
     equipmentCatalog?: any[];
     dopExchangeRate?: number;
+    includeBattery?: boolean;
   }) => {
     try {
       const {
@@ -343,6 +344,7 @@ export function registerAIInvoiceHandlers() {
         projectRequirementsText,
         equipmentCatalog = [],
         dopExchangeRate = 60.0,
+        includeBattery = false,
       } = payload;
 
       if (!apiKey || !apiKey.trim()) {
@@ -388,6 +390,16 @@ export function registerAIInvoiceHandlers() {
         promptIntro += `8. Si se menciona margen comercial (ej. 'Porcentaje de venta 40%' o 'Venta 40%'), asigna 'targetMarginPct' = 40.\n`;
         promptIntro += `9. Si no hay factura pero se menciona 'diseñado para X kwh diario' (ej. 40kwh diario), genera un consumo mensual de Math.round(X * 30.4) para los 12 meses (ej. 1216 kWh).\n`;
         promptIntro += `10. CONCISIÓN OBLIGATORIA: 'specialTechnicalNotes', 'aiReasoningSummary' y 'notes' deben ser muy breves (< 350 caracteres). NUNCA listes ni repitas el catálogo dentro de ellos.\n\n`;
+      } else {
+        promptIntro += `GROUNDING DETERMINISTA OBLIGATORIO CON EL CATÁLOGO OFICIAL:\n`;
+        promptIntro += `1. Para los módulos solares, selecciona un panel del CATÁLOGO DE REFERENCIA (ej. Canadian Solar 615W/620W) y asígnalo en 'matchedPanelId', 'matchedPanelModel' y 'matchedPanelWatts'.\n`;
+        promptIntro += `2. Para el inversor, DEBES seleccionar un inversor real del CATÁLOGO DE REFERENCIA (ej. Luxpower LXP-LB-US 8k) con su ID exacto en 'matchedInverterId', su displayName en 'matchedInverterModel' y su potencia nominal en 'matchedInverterPowerKW'. PROHIBIDO responder con nombres genéricos como 'Inversor Solar Híbrido'.\n`;
+        if (includeBattery) {
+          promptIntro += `3. SISTEMA HÍBRIDO BESS: El usuario requiere almacenamiento por baterías. Marca 'hasBattery' = true, selecciona una batería de litio LiFePO4 del CATÁLOGO DE REFERENCIA (ej. HinaESS PowerGem Max 16.08kWh) y asígnala en 'matchedBatteryId', 'matchedBatteryModel', 'matchedBatteryCapacityKWh' y 'matchedBatteryCount' = 1.\n`;
+        } else {
+          promptIntro += `3. Si no se solicitan baterías explícitamente, fija 'hasBattery' = false y 'matchedBatteryCount' = 0.\n`;
+        }
+        promptIntro += `\n`;
       }
 
       if (referenceCatalogCondensed.length > 0) {
@@ -787,12 +799,22 @@ export function registerAIInvoiceHandlers() {
         }
       }
 
+      // Garantía absoluta de grounding de inversor contra catálogo (nunca dejar genérico)
+      if (!invMatch) {
+        const defaultInverters = equipmentCatalog.filter((e: any) => e.type === 'inverter');
+        invMatch = defaultInverters.find((i: any) => (i.powerKW || 0) === 8.0) || defaultInverters[0];
+      }
+
       if (invMatch) {
         selectedInverterId = invMatch.id;
         selectedInverterModel = invMatch.displayName;
         selectedInverterPowerKW = invMatch.powerKW || parsed.matchedInverterPowerKW || 8.0;
+        const prices = invMatch.supplierPrices || [];
+        if (prices.length > 0) {
+          selectedInverterUnitPriceUSD = [...prices].sort((a: any, b: any) => a.priceUSD - b.priceUSD)[0]?.priceUSD;
+        }
       } else {
-        selectedInverterModel = parsed.matchedInverterModel || 'Inversor Solar Híbrido';
+        selectedInverterModel = parsed.matchedInverterModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)';
         selectedInverterPowerKW = parsed.matchedInverterPowerKW || 8.0;
       }
       
@@ -878,15 +900,31 @@ export function registerAIInvoiceHandlers() {
         }
       }
 
-      if (batMatch) {
+      if (includeBattery) {
+        hasBattery = true;
+      }
+
+      if (hasBattery && !batMatch) {
+        const defaultBatteries = equipmentCatalog.filter((e: any) => e.type === 'battery');
+        batMatch = defaultBatteries.find((b: any) => (b.capacityKWh || 0) >= 15) || defaultBatteries[0];
+      }
+
+      if (batMatch && hasBattery) {
         selectedBatteryId = batMatch.id;
         selectedBatteryModel = batMatch.displayName;
         selectedBatteryCapacityKWh = batMatch.capacityKWh || parsed.matchedBatteryCapacityKWh || 16.08;
-      } else if (hasBattery) {
-        selectedBatteryModel = parsed.matchedBatteryModel || 'Banco de Baterías de Litio LiFePO4';
-        selectedBatteryCapacityKWh = parsed.matchedBatteryCapacityKWh || 16.08;
+        const prices = batMatch.supplierPrices || [];
+        if (prices.length > 0) {
+          selectedBatteryUnitPriceUSD = [...prices].sort((a: any, b: any) => a.priceUSD - b.priceUSD)[0]?.priceUSD;
+        }
+      } else if (!hasBattery) {
+        selectedBatteryId = undefined;
+        selectedBatteryModel = undefined;
+        selectedBatteryCapacityKWh = undefined;
+        selectedBatteryCount = 0;
+        selectedBatteryUnitPriceUSD = undefined;
       }
-      selectedBatteryCount = selectedBatteryCount || parsed.matchedBatteryCount || 1;
+      selectedBatteryCount = hasBattery ? (selectedBatteryCount || parsed.matchedBatteryCount || 1) : 0;
 
       // Detección y consolidación de sustituciones de equipos
       let equipmentSubstitutions: Array<{

@@ -1,6 +1,7 @@
 import { ExtractedInvoiceData, GeminiModelInfo } from '../types/aiInvoice';
 import { SolarEquipmentItem } from '../types/equipment';
 import { calculateRecommendedPanelCount } from '../engine/solarEngine';
+import { DEFAULT_EQUIPMENT_CATALOG } from '../data/defaultEquipmentCatalog';
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -89,22 +90,24 @@ REGLAS DE EXTRACCIÓN DETALLADAS PARA FACTURAS DOMINICANAS (EDEESTE, EDESUR, EDE
       - Si no se mencionan baterías: hasBattery = false, matchedBatteryCount = 0.
    e) REGLA CRÍTICA DE EQUIPOS SIN PRECIO ASIGNADO ('DISPONIBLE_SIN_PRECIO') Y 'EQUIPOS SEGÚN DISPONIBILIDAD':
        - Si el equipo solicitado existe en el catálogo pero no tiene precios de distribuidores (priceStatus: 'DISPONIBLE_SIN_PRECIO'), DEBES SELECCIONARLO DE TODOS MODOS con su ID y nombre correspondiente. La falta de precio de distribuidor NO impide su selección en la propuesta.
-       - La frase 'Equipos según disponibilidad' significa dar prioridad absoluta a los equipos solicitados si existen en el catálogo (estén o no con precio asignado). NUNCA descartes un equipo solicitado para elegir otro solo porque el otro tenga precio.
-    f) REGLA DE SUSTITUCIÓN INTELIGENTE (ÚNICAMENTE SI EL EQUIPO NO EXISTE EN LA BASE DE DATOS):
+       - Si el equipo solicitado existe en el catálogo, DEBES SELECCIONARLO DE TODOS MODOS con su ID y nombre correspondiente.
+   f) REGLA DE SUSTITUCIÓN INTELIGENTE (ÚNICAMENTE SI EL EQUIPO NO EXISTE EN LA BASE DE DATOS):
        - SOLO si la marca o potencia solicitada NO existe en absoluto en el catálogo provisto:
          1. Selecciona un sustituto del catálogo con función y potencia/capacidad equivalente más cercana.
          2. Registra la sustitución en 'equipmentSubstitutions' indicando 'type', 'requestedModel', 'selectedModel' y 'reason'.
          3. Explica claramente la sustitución en 'aiReasoningSummary'.
-       - Si la marca o modelo solicitado (ej. WeCo, Luxpower, Canadian Solar, HinaESS) SÍ figura en el catálogo, NO generes sustitución; selecciona el equipo de esa marca.
    g) MARGEN DE VENTA COMERCIAL:
       - Si se especifica 'Porcentaje de venta 40%' o 'Venta 40%' -> targetMarginPct = 40.
    h) SÍNTESIS DE CONSUMO SIN FACTURA:
       - Si no se suministra factura pero el texto dice 'diseñado para 40kwh diario', genera 'monthlyConsumptionKWh' con 12 valores de Math.round(40 * 30.4) = 1216 kWh.
    i) DIRECTIVA ESTRICTA DE CONCISIÓN TÉCNICA (MÁXIMO 350 CARACTERES POR CAMPO):
-      - 'specialTechnicalNotes': Máximo 2 oraciones (ej. 'Sistema diseñado para 40 kWh/día con acople de baterías y equipos según disponibilidad').
-      - 'aiReasoningSummary': Resumen profesional de 2 a 3 oraciones de los equipos seleccionados o sustituidos.
+      - 'specialTechnicalNotes': Máximo 2 oraciones.
+      - 'aiReasoningSummary': Resumen profesional de 2 a 3 oraciones.
       - 'notes': Resumen breve de la factura o dimensionamiento.
-      - PROHIBICIÓN ABSOLUTA: NUNCA copies, listes, repitas ni vuelques el catálogo de equipos dentro de estos campos de texto.`;
+      - PROHIBICIÓN ABSOLUTA: NUNCA copies, listes, repitas ni vuelques el catálogo de equipos dentro de estos campos de texto.
+   j) REGLA DE NO INVENTAR EQUIPOS:
+      - Queda TERMINANTEMENTE PROHIBIDO inventar nombres genéricos de equipos.
+      - 'matchedInverterModel', 'matchedInverterId', 'matchedBatteryModel' y 'matchedBatteryId' DEBEN coincidir exactamente con modelos reales del CATÁLOGO DE EQUIPOS provisto (DEFAULT_EQUIPMENT_CATALOG).`;
 
 const INVOICE_JSON_SCHEMA = {
   type: 'OBJECT',
@@ -424,6 +427,7 @@ export async function parseInvoiceWithGemini(params: {
   projectRequirementsText?: string;
   equipmentCatalog?: SolarEquipmentItem[];
   dopExchangeRate?: number;
+  includeBattery?: boolean; // Opción explícita para forzar sistema híbrido con BESS
   onProgress?: (status: string) => void;
 }): Promise<ExtractedInvoiceData> {
   const {
@@ -436,6 +440,7 @@ export async function parseInvoiceWithGemini(params: {
     projectRequirementsText,
     equipmentCatalog = [],
     dopExchangeRate = 60.0,
+    includeBattery = false,
     onProgress,
   } = params;
 
@@ -484,10 +489,21 @@ export async function parseInvoiceWithGemini(params: {
     promptIntro += `4. La frase 'Equipos según disponibilidad' significa dar prioridad a los equipos solicitados si figuran en el catálogo (incluso sin cotización cargada). NUNCA sustituyas si la marca existe en el catálogo.\n`;
     promptIntro += `5. Si se especifica cantidad de paneles o kWp (ej. '11 kwp paneles Canadian 615w' o '21 panel'), TIENE PRIORIDAD ABSOLUTA sobre cualquier cálculo de consumo. Asigna 'matchedPanelCount' = Math.round(11000 / 615) = 18 paneles.\n`;
     promptIntro += `6. Si se especifica inversor (ej. '1 inversor lux power de 16 kw' o '1 weco 8 kw'), identifica el modelo del catálogo, asigna en 'matchedInverterPowerKW' la potencia unitaria nominal y en 'matchedInverterCount' la cantidad.\n`;
-    promptIntro += `7. Si se mencionan baterías (ej. '2 bateria hinaes de 16kw' o '2 bateria de 16k weco'), marca 'hasBattery' = true, empareja 'matchedBatteryModel' y 'matchedBatteryId', asigna 'matchedBatteryCapacityKWh' y 'matchedBatteryCount' (ej. 2 baterías).\n`;
+    promptIntro += `7. Si se mencionan baterías (ej. '2 bateria hinaes de 16kw' o '2 bateria de 16k weco') o includeBattery = true, marca 'hasBattery' = true, empareja 'matchedBatteryModel' y 'matchedBatteryId', asigna 'matchedBatteryCapacityKWh' y 'matchedBatteryCount'.\n`;
     promptIntro += `8. Si se menciona margen comercial (ej. 'Porcentaje de venta 40%' o 'Venta 40%'), asigna 'targetMarginPct' = 40.\n`;
     promptIntro += `9. Si no hay factura pero se menciona 'diseñado para X kwh diario' (ej. 40kwh diario), genera un consumo mensual de Math.round(X * 30.4) para los 12 meses (ej. 1216 kWh).\n`;
     promptIntro += `10. CONCISIÓN OBLIGATORIA: 'specialTechnicalNotes', 'aiReasoningSummary' y 'notes' deben ser muy breves (< 350 caracteres). NUNCA listes ni repitas el catálogo dentro de ellos.\n\n`;
+  } else {
+    // Caso de SOLO FACTURA
+    promptIntro += `INSTRUCCIONES PARA PROYECTO BASADO EN FACTURA (SIN TEXTO ADICIONAL DE REQUISITOS):\n`;
+    promptIntro += `1. PANELES SOLARES: Dimensiona los módulos Canadian Solar de 615W/620W del catálogo para cubrir aproximadamente el 95% del consumo anual.\n`;
+    promptIntro += `2. INVERSOR SOLAR: Selecciona OBLIGATORIAMENTE un inversor real existente en el CATÁLOGO DE REFERENCIA adjunto (NUNCA inventes nombres genéricos como "Inversor Solar Híbrido"). Prioriza la marca líder en RD Lux Power / Luxpower (ej. "Inversor Lux Power LXP-LB-US 8K (8.0Kw)" o 10K/12K según la potencia fotovoltaica calculada). matchedInverterId y matchedInverterModel deben coincidir exactamente con el catálogo.\n`;
+    if (includeBattery) {
+      promptIntro += `3. ALMACENAMIENTO (MODO HÍBRIDO ACTIVADO): El usuario ha seleccionado que el sistema tenga BATERÍAS BESS. Asigna hasBattery = true, selecciona una batería de litio real del catálogo (ej. "Batería Hinaess 16 KwH-48 vdc." o equivalente de 16 kWh) con su matchedBatteryId y matchedBatteryModel, y matchedBatteryCount = 1.\n`;
+    } else {
+      promptIntro += `3. ALMACENAMIENTO: No se solicitó almacenamiento. Asigna hasBattery = false y matchedBatteryCount = 0.\n`;
+    }
+    promptIntro += `\n`;
   }
 
   if (referenceCatalogCondensed.length > 0) {
@@ -929,13 +945,30 @@ export async function parseInvoiceWithGemini(params: {
     }
   }
 
+  // GROUNDING DETERMINISTA OBLIGATORIO DE INVERSOR: NUNCA DEJAR VACÍO NI ASIGNAR NOMBRES INVENTADOS
+  if (!invMatch) {
+    const activeInverters = (equipmentCatalog.length > 0 ? equipmentCatalog : DEFAULT_EQUIPMENT_CATALOG)
+      .filter((e) => e.type === 'inverter' && (e.powerKW || 0) > 0);
+    const targetKW = parsed.matchedInverterPowerKW || (finalCapacityKWp > 10.0 ? 10.0 : 8.0);
+    
+    // Priorizar inversores híbridos split-phase LuxpowerTek o WeCo verificados en RD
+    const luxMatch = activeInverters.find(
+      (e) => (e.brand.toLowerCase().includes('lux') || e.displayName.toLowerCase().includes('lux')) &&
+             Math.abs((e.powerKW || 8.0) - targetKW) <= 2.0
+    ) || activeInverters.find(
+      (e) => e.brand.toLowerCase().includes('lux') || e.displayName.toLowerCase().includes('lux')
+    );
+    invMatch = luxMatch || activeInverters[0];
+  }
+
   if (invMatch) {
     selectedInverterId = invMatch.id;
     selectedInverterModel = invMatch.displayName;
     selectedInverterPowerKW = invMatch.powerKW || parsed.matchedInverterPowerKW || 8.0;
-  } else {
-    selectedInverterModel = parsed.matchedInverterModel || 'Inversor Solar Híbrido';
-    selectedInverterPowerKW = parsed.matchedInverterPowerKW || 8.0;
+    const invPrices = invMatch.supplierPrices || [];
+    if (invPrices.length > 0) {
+      selectedInverterUnitPriceUSD = [...invPrices].sort((a, b) => a.priceUSD - b.priceUSD)[0].priceUSD;
+    }
   }
   
   if (selectedInverterCount && selectedInverterCount > 0) {
@@ -947,7 +980,7 @@ export async function parseInvoiceWithGemini(params: {
   }
 
   // Smart BESS Battery Storage Matching con el Catálogo y Re-Grounding Determinista
-  let hasBattery = parsed.hasBattery === true;
+  let hasBattery = Boolean(includeBattery || parsed.hasBattery === true);
   let selectedBatteryId: string | undefined;
   let selectedBatteryModel: string | undefined;
   let selectedBatteryCapacityKWh: number | undefined;
@@ -1017,15 +1050,32 @@ export async function parseInvoiceWithGemini(params: {
     }
   }
 
-  if (batMatch) {
+  // GROUNDING DETERMINISTA OBLIGATORIO DE BATERÍA SI EL SISTEMA ES HÍBRIDO
+  if (hasBattery && !batMatch) {
+    const activeBatteries = (equipmentCatalog.length > 0 ? equipmentCatalog : DEFAULT_EQUIPMENT_CATALOG)
+      .filter((e) => e.type === 'battery');
+    const hinaMatch = activeBatteries.find(
+      (e) => e.brand.toLowerCase().includes('hina') || e.displayName.toLowerCase().includes('hina')
+    );
+    batMatch = hinaMatch || activeBatteries[0];
+  }
+
+  if (batMatch && hasBattery) {
     selectedBatteryId = batMatch.id;
     selectedBatteryModel = batMatch.displayName;
     selectedBatteryCapacityKWh = batMatch.capacityKWh || parsed.matchedBatteryCapacityKWh || 16.08;
-  } else if (hasBattery) {
-    selectedBatteryModel = parsed.matchedBatteryModel || 'Batería Hinaess 16 KwH-48 vdc.';
-    selectedBatteryCapacityKWh = parsed.matchedBatteryCapacityKWh || 16.08;
+    selectedBatteryCount = selectedBatteryCount || parsed.matchedBatteryCount || 1;
+    const batPrices = batMatch.supplierPrices || [];
+    if (batPrices.length > 0) {
+      selectedBatteryUnitPriceUSD = [...batPrices].sort((a, b) => a.priceUSD - b.priceUSD)[0].priceUSD;
+    }
+  } else if (!hasBattery) {
+    selectedBatteryId = undefined;
+    selectedBatteryModel = undefined;
+    selectedBatteryCapacityKWh = undefined;
+    selectedBatteryCount = 0;
+    selectedBatteryUnitPriceUSD = undefined;
   }
-  selectedBatteryCount = selectedBatteryCount || parsed.matchedBatteryCount || 1;
 
   // Detección y consolidación de sustituciones de equipos
   let equipmentSubstitutions: Array<{
