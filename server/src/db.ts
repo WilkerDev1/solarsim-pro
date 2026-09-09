@@ -153,10 +153,22 @@ export async function initDatabase(): Promise<void> {
         WHEN display_name ILIKE '%ion energy%' OR display_name ILIKE '%ion-lv%' THEN 'Ion Energy'
         ELSE 'General'
       END
-      WHERE brand IS NULL OR brand = '' OR brand ILIKE 'fabricante%';
-    `);
+      -- 6. Tabla de Pliegos Tarifarios Eléctricos (SIE & CEPM)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS utility_tariffs (
+          id VARCHAR(64) PRIMARY KEY,
+          organization_id VARCHAR(64) NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+          resolution_code VARCHAR(128) NOT NULL,
+          effective_date DATE,
+          tariffs_json JSONB NOT NULL,
+          updated_by VARCHAR(255),
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_tariffs_org ON utility_tariffs(organization_id);
+      `);
 
-    await client.query('COMMIT');
+      await client.query('COMMIT');
     console.log('✅ Esquemas de base de datos PostgreSQL inicializados con éxito.');
   } catch (error) {
     await client.query('ROLLBACK');

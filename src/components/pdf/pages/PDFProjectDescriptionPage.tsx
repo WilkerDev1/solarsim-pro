@@ -9,6 +9,7 @@ import { FileText, ShieldAlert, Sparkles, Zap, BatteryCharging, Sun } from 'luci
 import { renderFormattedMarkdown, resolveDynamicProjectSummaryParagraph1, resolveDynamicProjectSummaryParagraph2 } from '../../../utils/textFormatter';
 
 import { InlineEditableText } from '../common/InlineEditableText';
+import { getTariffDisplayName } from '../../../types/tariffs';
 
 interface PDFProjectDescriptionPageProps {
   project: ProjectSimulation;
@@ -42,13 +43,15 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
     }
 
     const isZeroExport = !!project.rates.isZeroExport;
-    const tariff = project.rates.tariffCode || 'BTS2';
-    const isMonomic = tariff === 'BTS1' || tariff === 'BTS2';
+    const distributor = project.client.distributor || project.rates.distributor || 'EDES';
+    const isCEPM = distributor === 'CEPM';
+    const tariff = project.rates.tariffCode || (isCEPM ? 'RBT-1' : 'BTS2');
+    const tariffDisplayName = getTariffDisplayName(distributor, tariff);
     const exportFee = project.rates.gridExportFeePct ?? 25;
 
     const p1 = isZeroExport
       ? 'El sistema fotovoltaico operará bajo la modalidad de Inyección Cero (Zero-Export con limitador antivertido), suministrando energía prioritariamente a los consumos internos del inmueble y evitando cualquier inyección de excedentes hacia la red eléctrica de distribución.'
-      : 'La energía generada mensualmente se descontará del consumo tomado de la red pública (EDES) o de la planta eléctrica. Cuando la producción supere el consumo, el excedente se acreditará como descuento en su factura eléctrica bajo el régimen de Medición Neta.';
+      : `La energía generada mensualmente se descontará del consumo tomado de la red de ${isCEPM ? 'CEPM' : 'la distribuidora eléctrica (EDES)'}. Cuando la producción supere el consumo, el excedente se acreditará como descuento en su factura eléctrica bajo el régimen de Medición Neta.`;
 
     const p2 = 'La presente propuesta ha sido elaborada conforme a la Resolución SIE-007-2026-REG y se basa en criterios técnicos y el historial de consumo del cliente.';
 
@@ -58,7 +61,7 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
     if (isZeroExport) {
       p4 = `Al operar con limitador antivertido (inyección cero)${project.specs.hasBattery ? ' y almacenamiento en baterías de litio' : ''}, la totalidad de la energía solar se aprovecha internamente, por lo que el proyecto no genera cargos por derecho de uso de la red bajo la normativa vigente.`;
     } else {
-      p4 = `Para la tarifa ${tariff}, el análisis económico considera el cargo por derecho de uso de la red, equivalente al ${exportFee}% del valor de la energía excedente exportada, conforme al régimen de Medición Neta y la normativa vigente (Resolución SIE-007-2026-REG). Por esta razón, el sistema se diseña para maximizar el autoconsumo y optimizar la inyección de energía, obteniendo así el mayor retorno de inversión posible.${project.specs.hasBattery ? '' : ' Cuando resulte conveniente, se recomendará la incorporación de baterías de litio para incrementar el aprovechamiento directo de la energía generada.'}`;
+      p4 = `Para la tarifa ${tariffDisplayName}, el análisis económico considera el cargo por derecho de uso de la red, equivalente al ${exportFee}% del valor de la energía excedente exportada, conforme al régimen de Medición Neta y la normativa vigente (Resolución SIE-007-2026-REG). Por esta razón, el sistema se diseña para maximizar el autoconsumo y optimizar la inyección de energía, obteniendo así el mayor retorno de inversión posible.${project.specs.hasBattery ? '' : ' Cuando resulte conveniente, se recomendará la incorporación de baterías de litio para incrementar el aprovechamiento directo de la energía generada.'}`;
     }
 
     return [p1, p2, p3, p4];

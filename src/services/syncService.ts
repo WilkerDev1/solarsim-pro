@@ -421,4 +421,61 @@ export class SyncService {
       return false;
     }
   }
+
+  /**
+   * Pull: Descargar matriz tarifaria eléctrica (SIE / CEPM) desde el servidor
+   */
+  static async fetchTariffMatrix(serverUrl: string, token: string): Promise<{ success: boolean; matrix?: import('../types/tariffs').GlobalTariffMatrix | null; error?: string }> {
+    const base = this.cleanUrl(serverUrl);
+    try {
+      const res = await fetch(`${base}/api/tariffs`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || 'Error al descargar tarifas del servidor' };
+      }
+
+      return {
+        success: true,
+        matrix: data.matrix || null,
+      };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Error de conexión al obtener tarifas' };
+    }
+  }
+
+  /**
+   * Push: Sincronizar matriz tarifaria eléctrica con el servidor
+   */
+  static async syncTariffMatrix(serverUrl: string, token: string, matrix: import('../types/tariffs').GlobalTariffMatrix): Promise<{ success: boolean; message?: string; error?: string }> {
+    const base = this.cleanUrl(serverUrl);
+    try {
+      const res = await fetch(`${base}/api/tariffs/sync`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ matrix }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || 'Error al guardar tarifas en el servidor' };
+      }
+
+      return {
+        success: true,
+        message: data.message || 'Tarifas sincronizadas correctamente',
+      };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Error de conexión al subir tarifas' };
+    }
+  }
 }
+

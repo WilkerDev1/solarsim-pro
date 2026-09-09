@@ -1,6 +1,14 @@
 import React from 'react';
 import { ProjectSimulation, UtilityRates } from '../../../types';
-import { Receipt, ChevronDown } from 'lucide-react';
+import { Receipt, ChevronDown, Sparkles, Check } from 'lucide-react';
+import { useSimulationStore } from '../../../store/useSimulationStore';
+import { getReferenceEnergyRateUSD, DEFAULT_RD_TARIFF_MATRIX } from '../../../data/rdTariffs';
+import {
+  UtilityDistributor,
+  getDistributorTariffOptions,
+  getTariffDisplayName,
+  mapTariffCodeOnDistributorChange,
+} from '../../../types/tariffs';
 
 interface RatesParamsSectionProps {
   project: ProjectSimulation;
@@ -17,6 +25,62 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
   isDark,
   updateRates,
 }) => {
+  const { tariffMatrix } = useSimulationStore();
+
+  const avgMonthlyConsumption =
+    project.monthlyConsumption && project.monthlyConsumption.length > 0
+      ? project.monthlyConsumption.reduce((a, b) => a + b, 0) / project.monthlyConsumption.length
+      : 900;
+
+  const activeMatrix = tariffMatrix || DEFAULT_RD_TARIFF_MATRIX;
+  const currentDistributor = (project.rates.distributor as UtilityDistributor) || 'EDESUR';
+  const currentTariffCode = project.rates.tariffCode || (currentDistributor === 'CEPM' ? 'RBT-1' : 'BTS2');
+
+  const referenceRateUSD = getReferenceEnergyRateUSD(
+    activeMatrix,
+    currentDistributor,
+    currentTariffCode,
+    avgMonthlyConsumption,
+    project.specs?.dopExchangeRate || 60.0
+  );
+
+  const isMatchingReference = Math.abs((project.rates.energyCostPerKWh || 0) - referenceRateUSD) < 0.001;
+
+  const handleDistributorChange = (newDist: UtilityDistributor) => {
+    const mappedCode = mapTariffCodeOnDistributorChange(
+      currentDistributor,
+      newDist,
+      currentTariffCode
+    );
+    const newRef = getReferenceEnergyRateUSD(
+      activeMatrix,
+      newDist,
+      mappedCode,
+      avgMonthlyConsumption,
+      project.specs?.dopExchangeRate || 60.0
+    );
+    updateRates({
+      distributor: newDist,
+      tariffCode: mappedCode,
+      energyCostPerKWh: newRef,
+    });
+  };
+
+  const handleTariffChange = (newCode: string) => {
+    const newRef = getReferenceEnergyRateUSD(
+      activeMatrix,
+      currentDistributor,
+      newCode,
+      avgMonthlyConsumption,
+      project.specs?.dopExchangeRate || 60.0
+    );
+    updateRates({
+      tariffCode: newCode,
+      energyCostPerKWh: newRef,
+    });
+  };
+
+
   return (
     <div
       className={`rounded-xl border overflow-hidden transition-all ${
@@ -48,9 +112,24 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
           }`}
         >
           <div>
-            <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-              Precio por kWh ($ USD)
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className={`block text-xs font-medium ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                Precio por kWh ($ USD)
+              </label>
+              <button
+                type="button"
+                onClick={() => updateRates({ energyCostPerKWh: referenceRateUSD })}
+                className={`text-[10px] px-2 py-0.5 rounded-md font-mono font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                  isMatchingReference
+                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300/50'
+                    : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300/50 hover:bg-amber-200'
+                }`}
+                title="Haz clic para aplicar la tarifa de referencia calculada según la resolución oficial"
+              >
+                {isMatchingReference ? <Check className="w-3 h-3" /> : <Sparkles className="w-3 h-3 text-amber-500" />}
+                <span>Oficial: ${referenceRateUSD.toFixed(3)}</span>
+              </button>
+            </div>
             <input
               type="number"
               step="0.001"
@@ -70,7 +149,7 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
             </label>
             <select
               value={project.rates.distributor || 'EDESUR'}
-              onChange={(e) => updateRates({ distributor: e.target.value as any })}
+              onChange={(e) => handleDistributorChange(e.target.value as UtilityDistributor)}
               className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer transition-all ${
                 isDark
                   ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
@@ -83,6 +162,7 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
               <option value="CEPM">CEPM</option>
             </select>
           </div>
+
 
           <div>
             <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
@@ -103,27 +183,30 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
 
           <div>
             <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
-              Tipo de Tarifa
+              Tipo de Tarifa ({currentDistributor})
             </label>
             <select
-              value={project.rates.tariffCode || 'BTS2'}
-              onChange={(e) => updateRates({ tariffCode: e.target.value as any })}
+              value={project.rates.tariffCode || (currentDistributor === 'CEPM' ? 'RBT-1' : 'BTS2')}
+              onChange={(e) => handleTariffChange(e.target.value)}
               className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer transition-all ${
                 isDark
                   ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
                   : 'bg-slate-50 border-slate-300 text-slate-800'
               }`}
             >
-              <option value="BTS1">BTS1 (Residencial Monómica &lt;10kW)</option>
-              <option value="BTS2">BTS2 (Comercial Simple Monómica &lt;10kW)</option>
-              <option value="BTD">BTD (Baja Tensión con Demanda &gt;10kW)</option>
-              <option value="BTH">BTH (Baja Tensión Horaria)</option>
-              <option value="MTD1">MTD1 (Media Tensión con Demanda 1)</option>
-              <option value="MTD2">MTD2 (Media Tensión con Demanda 2 - Horaria)</option>
-              <option value="MTH">MTH (Media Tensión Horaria)</option>
-              <option value="ATD">ATD (Alta Tensión con Demanda)</option>
+              {getDistributorTariffOptions(currentDistributor).map((opt) => (
+                <option key={opt.value} value={opt.value} title={opt.description}>
+                  {opt.label}
+                </option>
+              ))}
+              {!getDistributorTariffOptions(currentDistributor).some((opt) => opt.value === project.rates.tariffCode) && project.rates.tariffCode && (
+                <option value={project.rates.tariffCode}>
+                  {project.rates.tariffCode}
+                </option>
+              )}
             </select>
           </div>
+
 
           {/* Casilla Inyección Cero / Antivertido (Zero-Export) */}
           <div
@@ -193,7 +276,7 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
                 <p className={`text-[10.5px] leading-tight flex items-start gap-1 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
                   <span>⚡</span>
                   <span>
-                    <strong>Medición Neta ({project.rates.tariffCode || 'BTS2'}):</strong> Aplica retención del {project.rates.gridExportFeePct ?? 25}% por derecho de uso de red bajo Res. SIE-007-2026-REG sobre los kWh excedentes exportados a la red de {project.rates.distributor || 'la distribuidora'}.
+                    <strong>Medición Neta ({getTariffDisplayName(currentDistributor, project.rates.tariffCode || '')}):</strong> Aplica retención del {project.rates.gridExportFeePct ?? 25}% por derecho de uso de red bajo Res. SIE-007-2026-REG sobre los kWh excedentes exportados a la red de {currentDistributor}.
                   </span>
                 </p>
               )}

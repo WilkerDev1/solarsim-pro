@@ -7,6 +7,7 @@ import { PDFFooter } from '../PDFFooter';
 import { PDFWatermark } from '../PDFWatermark';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
 import { InlineEditableText } from '../common/InlineEditableText';
+import { getTariffDisplayName } from '../../../types/tariffs';
 
 interface PDFPage2QuotationProps {
   project: ProjectSimulation;
@@ -156,9 +157,9 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                 <span className="font-bold text-slate-900">{Math.round(summary.annualConsumptionKWh / 12).toLocaleString()} kWh</span>
               </div>
               <div>
-                <span className="font-bold text-slate-700">Distribuidor Eléctrico:</span>{' '}
+                <span className="font-bold text-slate-700">Distribuidor / Tarifa:</span>{' '}
                 <span className="font-bold" style={{ color: activeTheme.primary }}>
-                  {project.client.distributor || project.rates.distributor || 'EDES'}
+                  {project.client.distributor || project.rates.distributor || 'EDES'} • {getTariffDisplayName(project.client.distributor || project.rates.distributor, project.rates.tariffCode)}
                 </span>
               </div>
             </div>

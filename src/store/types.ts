@@ -225,13 +225,17 @@ export interface FolderSlice {
   moveProjectToFolder: (projectId: string, targetFolderId: string | null) => void;
 }
 
+import { TariffSlice } from './slices/tariffSlice';
+
 export type SimulationStore = ProjectSlice &
   EquipmentSlice &
   SyncAuthSlice &
   ImportExportSlice &
   AISlice &
   UISlice &
-  FolderSlice;
+  FolderSlice &
+  TariffSlice;
 
 export type SimulationState = SimulationStore;
 export type SimulationSlice<T> = StateCreator<SimulationStore, [], [], T>;
+

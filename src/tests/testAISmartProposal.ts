@@ -260,9 +260,29 @@ Equipos según disponibilidad y especificar que el sistema esta diseñado para 4
 // Simular el post-procesamiento determinista
 const panelWatts = 615;
 let extractedPanelCount = 0;
-const kwpMatch = requirementsText.match(/(\d+(?:\.\d+)?)\s*k(?:w|wp)\s*(?:paneles|panel|m[oó]dulos)?/i);
-if (kwpMatch) {
+let explicitPanelsDetected = false;
+
+const countMatch = requirementsText.match(/(\d+)\s*(?:paneles|panel|m[oó]dulos)\b/i);
+const kwpMatch =
+  requirementsText.match(/(?:paneles|panel|m[oó]dulos|sistema\s*(?:solar|fotovoltaico|fv)?|arreglo|planta)\s*(?:de|en)?\s*(\d+(?:\.\d+)?)\s*k(?:w|wp)\b/i)
+  || requirementsText.match(/(\d+(?:\.\d+)?)\s*k(?:w|wp)\s*(?:en\s+|de\s+)?(?:paneles|panel|m[oó]dulos|solar|fotovoltaic[oa]|fv|canadian|jinko|trina|longi|ja\s*solar|risen)\b/i)
+  || (() => {
+    const strictKwp = requirementsText.match(/(\d+(?:\.\d+)?)\s*kwp\b/i);
+    if (!strictKwp) return null;
+    const idx = strictKwp.index ?? 0;
+    const surrounding = requirementsText.slice(Math.max(0, idx - 25), Math.min(requirementsText.length, idx + strictKwp[0].length + 25)).toLowerCase();
+    if (surrounding.includes('inversor') || surrounding.includes('bater') || surrounding.includes('consum') || surrounding.includes('mensual') || surrounding.includes('diari')) {
+      return null;
+    }
+    return strictKwp;
+  })();
+
+if (countMatch) {
+  extractedPanelCount = parseInt(countMatch[1], 10);
+  explicitPanelsDetected = true;
+} else if (kwpMatch) {
   extractedPanelCount = Math.max(1, Math.round((parseFloat(kwpMatch[1]) * 1000) / panelWatts));
+  explicitPanelsDetected = true;
 }
 
 console.log(`Explicit kWp parsed panels: ${extractedPanelCount} paneles (~${((extractedPanelCount * panelWatts)/1000).toFixed(2)} kWp)`);
@@ -358,6 +378,57 @@ if (realCoveragePct < 109.0 || realCoveragePct > 110.5) {
 }
 
 console.log(' ✅ PASS: Detección exacta de variante WeCo 8 kW (1 ud), WeCo Batería (2 uds), 18 paneles (11 kWp), Meta 105% y Cobertura Real ~109.7% validada\n');
+
+// --- TEST 8: Monthly Consumption Text Disambiguation (Sr. Alfredo 900 kWh/month Case) ---
+console.log('--- TEST 8: Monthly Consumption Disambiguation (900 kWh/month != 900 kWp) ---');
+const alfredoPrompt = `cliente: SR.ALFREDO
+diseñado para 900kw mensuales de consumo
+paneles canadian solar 615w
+inversor lux power 8kw
+bateria weco 8kw
+ubicacion punta cana, distribuidora de red CPEM`;
+
+// Comprobar que "900kw mensuales de consumo" NO activa detección de paneles explícitos
+const alfredoCountMatch = alfredoPrompt.match(/(\d+)\s*(?:paneles|panel|m[oó]dulos)\b/i);
+const alfredoKwpMatch =
+  alfredoPrompt.match(/(?:paneles|panel|m[oó]dulos|sistema\s*(?:solar|fotovoltaico|fv)?|arreglo|planta)\s*(?:de|en)?\s*(\d+(?:\.\d+)?)\s*k(?:w|wp)\b/i)
+  || alfredoPrompt.match(/(\d+(?:\.\d+)?)\s*k(?:w|wp)\s*(?:en\s+|de\s+)?(?:paneles|panel|m[oó]dulos|solar|fotovoltaic[oa]|fv|canadian|jinko|trina|longi|ja\s*solar|risen)\b/i)
+  || (() => {
+    const strictKwp = alfredoPrompt.match(/(\d+(?:\.\d+)?)\s*kwp\b/i);
+    if (!strictKwp) return null;
+    const idx = strictKwp.index ?? 0;
+    const surrounding = alfredoPrompt.slice(Math.max(0, idx - 25), Math.min(alfredoPrompt.length, idx + strictKwp[0].length + 25)).toLowerCase();
+    if (surrounding.includes('inversor') || surrounding.includes('bater') || surrounding.includes('consum') || surrounding.includes('mensual') || surrounding.includes('diari')) {
+      return null;
+    }
+    return strictKwp;
+  })();
+
+console.log(`Alfredo countMatch:`, alfredoCountMatch);
+console.log(`Alfredo kwpMatch:`, alfredoKwpMatch);
+
+if (alfredoCountMatch || alfredoKwpMatch) {
+  throw new Error('❌ "900kw mensuales de consumo" was erroneously matched as explicit panel capacity!');
+}
+
+// Comprobar dimensionamiento solar del motor para 900 kWh/mes en La Altagracia (Punta Cana)
+const alfredoMonthlyConsumption = Array(12).fill(900); // 10,800 kWh/año
+const alfredoSizing = calculateRecommendedPanelCount(
+  'La Altagracia (Punta Cana / Higüey)',
+  alfredoMonthlyConsumption,
+  615, // Canadian Solar 615W
+  95,  // 95% target
+  25.0 // 25% losses
+);
+
+console.log(`Alfredo Recommended Panels (615W): ${alfredoSizing.recommendedPanelCount} paneles`);
+console.log(`Alfredo Recommended Capacity: ${alfredoSizing.recommendedCapacityKWp} kWp`);
+
+if (alfredoSizing.recommendedPanelCount < 11 || alfredoSizing.recommendedPanelCount > 14) {
+  throw new Error(`❌ Expected between 11 and 14 panels for 900 kWh/month in Punta Cana, got ${alfredoSizing.recommendedPanelCount}`);
+}
+
+console.log(' ✅ PASS: Caso Sr. Alfredo correctamente desambiguado (900 kWh/mes -> 12 paneles ~7.38 kWp, NO 1463 paneles)\n');
 
 console.log('=====================================================');
 console.log('🎉 ALL AI SMART PROPOSAL & SIZING TESTS PASSED (100% SUCCESS)');

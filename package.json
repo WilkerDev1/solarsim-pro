@@ -22,9 +22,11 @@
     "test:catalog": "npx tsx src/tests/testEquipmentCatalog.ts",
     "test:folders": "npx tsx src/tests/testFolderHidingAndSync.ts",
     "test:trash": "npx tsx src/tests/testTrashAndReadOnly.ts",
-    "test": "npx tsx src/tests/testBenchmark.ts && npx tsx src/tests/testFinancialEngineComprehensive.ts && npx tsx src/tests/testAISmartProposal.ts && npx tsx src/tests/testEquipmentCatalog.ts && npx tsx src/tests/testFolderHidingAndSync.ts && npx tsx src/tests/testTrashAndReadOnly.ts",
+    "test:tariffs": "npx tsx src/tests/testTariffEngine.ts",
+    "test": "npx tsx src/tests/testBenchmark.ts && npx tsx src/tests/testFinancialEngineComprehensive.ts && npx tsx src/tests/testAISmartProposal.ts && npx tsx src/tests/testEquipmentCatalog.ts && npx tsx src/tests/testFolderHidingAndSync.ts && npx tsx src/tests/testTrashAndReadOnly.ts && npx tsx src/tests/testTariffEngine.ts",
     "context:pack": "repomix"
   },
+
   "dependencies": {
     "clsx": "^2.1.1",
     "electron-updater": "^6.8.9",

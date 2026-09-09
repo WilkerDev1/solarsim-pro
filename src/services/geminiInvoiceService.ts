@@ -69,9 +69,9 @@ REGLAS DE EXTRACCIÓN DETALLADAS PARA FACTURAS DOMINICANAS (EDEESTE, EDESUR, EDE
    a) CLIENTE: Si el texto contiene el nombre del cliente (ej. 'Giovanni Gottardo' o 'Osia Moscoso'), dale prioridad a ese nombre sobre el de la factura o úsalo como cliente si no hay factura.
    b) PANELES FOTOVOLTAICOS:
       - Identifica el modelo y vatios solicitados (ej. 'Canadian 615w' -> 'Módulos Canadian Solar CS6.1-72TB-615 (615W)').
-      - Identifica la cantidad:
-        * Si dice '21 panel' -> matchedPanelCount = 21.
-        * Si dice '11 kwp paneles Canadian 615w' -> calcula Math.round(11000 / 615) = 18 paneles.
+      - Identifica la cantidad de módulos:
+        * Si el usuario fija una cantidad explícita (ej. '21 panel' o '11 kwp paneles') -> matchedPanelCount = 21 (o Math.round(11000 / 615) = 18).
+        * Si el usuario NO fijó una cantidad de módulos sino una demanda a cubrir (ej. 'para cubrir 900kw mensuales' o 'consumo 40kwh diario'), asigna matchedPanelCount = 0 o null. NUNCA dividas el consumo mensual entre los vatios del panel (eso daría 1463 paneles). Deja matchedPanelCount en null para que el motor solar dimensione automáticamente los paneles necesarios (ej. 12 paneles de 615W para 900 kWh/mes).
       - En 'matchedPanelId' coloca el id exacto del equipo en el catálogo provisto.
       - En 'matchedPanelModel' coloca el displayName exacto del catálogo.
       - En 'matchedPanelWatts' coloca los vatios (ej. 615).
@@ -99,7 +99,10 @@ REGLAS DE EXTRACCIÓN DETALLADAS PARA FACTURAS DOMINICANAS (EDEESTE, EDESUR, EDE
    g) MARGEN DE VENTA COMERCIAL:
       - Si se especifica 'Porcentaje de venta 40%' o 'Venta 40%' -> targetMarginPct = 40.
    h) SÍNTESIS DE CONSUMO SIN FACTURA:
-      - Si no se suministra factura pero el texto dice 'diseñado para 40kwh diario', genera 'monthlyConsumptionKWh' con 12 valores de Math.round(40 * 30.4) = 1216 kWh.
+      - Si no se suministra factura pero el texto indica consumo energético (ej. 'diseñado para 40kwh diario' o 'diseñado para 900kw mensuales de consumo' / '900 kwh/mes'):
+        * Para consumo diario (ej. 40 kWh/día): genera 'monthlyConsumptionKWh' con 12 valores de Math.round(40 * 30.416) = 1216 kWh.
+        * Para consumo mensual (ej. 900 kW/mes o 900 kWh/mes): genera 'monthlyConsumptionKWh' con 12 valores de 900 kWh.
+        * NOTA CRÍTICA: Valores como '900kw mensuales de consumo' representan CONSUMO ENERGÉTICO (kWh/mes), NUNCA potencia de paneles fotovoltaicos en kWp. NO los asignes a matchedPanelCount ni a potencia fotovoltaica.
    i) DIRECTIVA ESTRICTA DE CONCISIÓN TÉCNICA (MÁXIMO 350 CARACTERES POR CAMPO):
       - 'specialTechnicalNotes': Máximo 2 oraciones.
       - 'aiReasoningSummary': Resumen profesional de 2 a 3 oraciones.
@@ -192,7 +195,7 @@ const INVOICE_JSON_SCHEMA = {
     },
     matchedPanelCount: {
       type: 'NUMBER',
-      description: 'Cantidad exacta de paneles fotovoltaicos solicitados o recomendados',
+      description: 'Cantidad exacta de módulos fotovoltaicos SOLAMENTE si el usuario especificó una cantidad fija (ej. 21 si dice "21 paneles" o "11 kwp paneles"). Dejar en 0 o null si el usuario no fijó un número de paneles sino una demanda de consumo a cubrir (ej. "cubrir 900kw mensuales"), para que el sistema calcule los paneles con la fórmula solar.',
     },
     matchedInverterId: {
       type: 'STRING',
@@ -491,7 +494,7 @@ export async function parseInvoiceWithGemini(params: {
     promptIntro += `6. Si se especifica inversor (ej. '1 inversor lux power de 16 kw' o '1 weco 8 kw'), identifica el modelo del catálogo, asigna en 'matchedInverterPowerKW' la potencia unitaria nominal y en 'matchedInverterCount' la cantidad.\n`;
     promptIntro += `7. Si se mencionan baterías (ej. '2 bateria hinaes de 16kw' o '2 bateria de 16k weco') o includeBattery = true, marca 'hasBattery' = true, empareja 'matchedBatteryModel' y 'matchedBatteryId', asigna 'matchedBatteryCapacityKWh' y 'matchedBatteryCount'.\n`;
     promptIntro += `8. Si se menciona margen comercial (ej. 'Porcentaje de venta 40%' o 'Venta 40%'), asigna 'targetMarginPct' = 40.\n`;
-    promptIntro += `9. Si no hay factura pero se menciona 'diseñado para X kwh diario' (ej. 40kwh diario), genera un consumo mensual de Math.round(X * 30.4) para los 12 meses (ej. 1216 kWh).\n`;
+    promptIntro += `9. Si no hay factura pero se menciona consumo energético (ej. '40kwh diario' o '900kw mensuales de consumo' / '1000 kwh/mes'), genera 'monthlyConsumptionKWh' con 12 valores de ese consumo mensual. NUNCA confundas '900kw mensuales de consumo' con potencia fotovoltaica en kWp.\n`;
     promptIntro += `10. CONCISIÓN OBLIGATORIA: 'specialTechnicalNotes', 'aiReasoningSummary' y 'notes' deben ser muy breves (< 350 caracteres). NUNCA listes ni repitas el catálogo dentro de ellos.\n\n`;
   } else {
     // Caso de SOLO FACTURA
@@ -782,26 +785,41 @@ export async function parseInvoiceWithGemini(params: {
   // Detección explícita de paneles / potencia solicitada en texto (Prioridad Absoluta)
   let explicitPanelsDetected = false;
   if (projectRequirementsText) {
-    const kwpMatch = projectRequirementsText.match(/(\d+(?:\.\d+)?)\s*k(?:w|wp)\s*(?:paneles|panel|m[oó]dulos)?/i)
-      || projectRequirementsText.match(/(?:paneles|panel|m[oó]dulos)\s*(?:de\s*)?(\d+(?:\.\d+)?)\s*k(?:w|wp)/i);
-    const countMatch = projectRequirementsText.match(/(\d+)\s*(?:paneles|panel|m[oó]dulos)/i);
+    // 1. Cantidad explícita de módulos (ej. "21 panel", "21 paneles", "12 modulos", "14 paneles")
+    const countMatch = projectRequirementsText.match(/(\d+)\s*(?:paneles|panel|m[oó]dulos)\b/i);
 
-    if (kwpMatch) {
-      const explicitKwp = parseFloat(kwpMatch[1]);
-      if (explicitKwp > 0) {
-        parsed.matchedPanelCount = Math.max(1, Math.round((explicitKwp * 1000) / selectedPanelWatts));
-        explicitPanelsDetected = true;
-      }
-    } else if (countMatch) {
+    // 2. Potencia explícita del arreglo solar / paneles (ej. "11 kwp paneles", "11 kwp en paneles", "11 kwp Canadian", "paneles de 11 kwp", "sistema solar de 11 kwp")
+    // IMPORTANTE: Excluir estrictamente consumos (ej. "900kw mensuales", "40kwh diario"), inversores y baterías
+    const kwpMatch =
+      projectRequirementsText.match(/(?:paneles|panel|m[oó]dulos|sistema\s*(?:solar|fotovoltaico|fv)?|arreglo|planta)\s*(?:de|en)?\s*(\d+(?:\.\d+)?)\s*k(?:w|wp)\b/i)
+      || projectRequirementsText.match(/(\d+(?:\.\d+)?)\s*k(?:w|wp)\s*(?:en\s+|de\s+)?(?:paneles|panel|m[oó]dulos|solar|fotovoltaic[oa]|fv|canadian|jinko|trina|longi|ja\s*solar|risen)\b/i)
+      || (() => {
+        const strictKwp = projectRequirementsText.match(/(\d+(?:\.\d+)?)\s*kwp\b/i);
+        if (!strictKwp) return null;
+        const idx = strictKwp.index ?? 0;
+        const surrounding = projectRequirementsText.slice(Math.max(0, idx - 25), Math.min(projectRequirementsText.length, idx + strictKwp[0].length + 25)).toLowerCase();
+        if (surrounding.includes('inversor') || surrounding.includes('bater') || surrounding.includes('consum') || surrounding.includes('mensual') || surrounding.includes('diari')) {
+          return null;
+        }
+        return strictKwp;
+      })();
+
+    if (countMatch) {
       const explicitCount = parseInt(countMatch[1], 10);
       if (explicitCount > 0) {
         parsed.matchedPanelCount = explicitCount;
         explicitPanelsDetected = true;
       }
+    } else if (kwpMatch) {
+      const explicitKwp = parseFloat(kwpMatch[1]);
+      if (explicitKwp > 0) {
+        parsed.matchedPanelCount = Math.max(1, Math.round((explicitKwp * 1000) / selectedPanelWatts));
+        explicitPanelsDetected = true;
+      }
     }
   }
 
-  const finalPanelCount = parsed.matchedPanelCount && parsed.matchedPanelCount > 0
+  const finalPanelCount = (explicitPanelsDetected && parsed.matchedPanelCount && parsed.matchedPanelCount > 0)
     ? parsed.matchedPanelCount
     : rec.recommendedPanelCount;
   const finalCapacityKWp = Math.round(((finalPanelCount * selectedPanelWatts) / 1000) * 100) / 100;
@@ -809,7 +827,7 @@ export async function parseInvoiceWithGemini(params: {
   // Deducción inteligente de la Cobertura Meta (%) para alinear la UI con los módulos calculados
   let effectiveTargetCoverage = baseTargetCoverage;
   if (totalAnnual > 0) {
-    if (explicitPanelsDetected || (parsed.matchedPanelCount && parsed.matchedPanelCount !== rec.recommendedPanelCount)) {
+    if (explicitPanelsDetected) {
       // 1. Verificar si coincide exactamente con uno de los botones presets de la UI
       const STANDARD_PRESETS = [80, 90, 95, 100, 105, 110, 120];
       const matchingPreset = STANDARD_PRESETS.find((pct) => {

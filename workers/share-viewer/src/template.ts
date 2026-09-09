@@ -6,6 +6,27 @@ function formatMarkdown(text?: string | null, boldClass = 'font-bold text-slate-
   return text.replace(/\*\*([^*]+)\*\*/g, `<strong class="${boldClass}">$1</strong>`);
 }
 
+function getWorkerTariffDisplayName(dist: string, code: string): string {
+  const c = (code || '').toUpperCase().trim();
+  if (dist === 'CEPM') {
+    if (c === 'RBT-1' || c === 'BTS1' || c === 'BTS2') return 'RBT-1 (Baja Tensión Regular)';
+    if (c === 'RBT-2' || c === 'BTD') return 'RBT-2 (Baja Tensión con Demanda)';
+    if (c === 'ESTRBT-2') return 'ESTRBT-2 (Demanda Bayahíbe)';
+    if (c === 'RMT-1' || c === 'MTD1' || c === 'MTD2') return 'RMT-1 (Media Tensión con Demanda)';
+    return c;
+  }
+  if (c === 'BTS1') return 'BTS1 (Residencial Monómica)';
+  if (c === 'BTS2') return 'BTS2 (Comercial Simple)';
+  if (c === 'BTD') return 'BTD (Baja Tensión con Demanda)';
+  if (c === 'BTH') return 'BTH (Baja Tensión Horaria)';
+  if (c === 'MTD1') return 'MTD1 (Media Tensión con Demanda)';
+  if (c === 'MTD2') return 'MTD2 (Media Tensión Demanda Horaria)';
+  if (c === 'MTH') return 'MTH (Media Tensión Horaria)';
+  if (c === 'RBT-1') return 'BTS1 (Residencial Monómica)';
+  if (c === 'RBT-2') return 'BTD (Baja Tensión con Demanda)';
+  return c || 'BTS2';
+}
+
 export function renderExpiredPage(companyName = 'electsun', companyPhone = '+1 (809) 378-6590'): string {
   return `<!DOCTYPE html>
 <html lang="es" class="h-full bg-slate-100 text-slate-900">
@@ -77,9 +98,10 @@ export function renderProposalPage(stored: StoredProposal): string {
   const quoteNumber = client.quoteNumber || 'C-0001';
   const quoteValidityDays = client.quoteValidityDays || stored.validityDays || 7;
   const province = client.province || client.location || 'Santo Domingo';
-  const clientAddress = client.address || `${province}, República Dominicana`;
   const distributor = rates.distributor || client.distributor || 'EDEESTE';
-  const tariffCode = rates.tariffCode || client.tariffCode || 'BTS2';
+  const rawTariffCode = rates.tariffCode || client.tariffCode || (distributor === 'CEPM' ? 'RBT-1' : 'BTS2');
+  const tariffDisplayName = getWorkerTariffDisplayName(distributor, rawTariffCode);
+  const isCEPM = distributor === 'CEPM';
   const isZeroExport = !!rates.isZeroExport;
   const exportFee = rates.gridExportFeePct ?? 25;
 
@@ -169,17 +191,14 @@ export function renderProposalPage(stored: StoredProposal): string {
   const validityNote = custom.validityNote || `* Equipos según disponibilidad de inventario | * Propuesta válida por ${quoteValidityDays} días | * Precios en USD *`;
 
   // Dynamic Regulatory text
-  const isMonomic = tariffCode === 'BTS1' || tariffCode === 'BTS2';
   const regP1 = isZeroExport
     ? 'El sistema fotovoltaico operará bajo la modalidad de Inyección Cero (Zero-Export con limitador antivertido), suministrando energía prioritariamente a los consumos internos del inmueble y evitando cualquier inyección de excedentes hacia la red eléctrica de distribución.'
-    : 'La energía generada mensualmente se descontará del consumo tomado de la red pública (EDES) o de la planta eléctrica. Cuando la producción supere el consumo, el excedente se acreditará como descuento en su factura eléctrica bajo el régimen de Medición Neta.';
+    : `La energía generada mensualmente se descontará del consumo tomado de la red de ${isCEPM ? 'CEPM' : 'la distribuidora eléctrica (EDES)'}. Cuando la producción supere el consumo, el excedente se acreditará como descuento en su factura eléctrica bajo el régimen de Medición Neta.`;
   const regP2 = 'La presente propuesta ha sido elaborada conforme a la Resolución SIE-007-2026-REG y se basa en criterios técnicos y el historial de consumo del cliente.';
   const regP3 = 'Los ahorros indicados son estimados y pueden variar según los hábitos de consumo, el perfil de carga y las condiciones reales de operación del sistema.';
   const regP4 = isZeroExport
     ? `Al operar con limitador antivertido (inyección cero)${hasBattery ? ' y almacenamiento en baterías de litio' : ''}, la totalidad de la energía solar se aprovecha internamente, por lo que el proyecto no genera cargos por derecho de uso de la red bajo la normativa vigente.`
-    : isMonomic
-    ? `Para los clientes con tarifas ${tariffCode}, el análisis económico considera el cargo por derecho de uso de la red, equivalente al ${exportFee}% del valor de la energía excedente exportada, conforme a la normativa vigente (Resolución SIE-007-2026-REG). Por esta razón, el sistema se diseña para maximizar el autoconsumo y minimizar la exportación de energía.${hasBattery ? '' : ' Cuando resulte conveniente, se recomendará la incorporación de baterías de litio para incrementar el aprovechamiento de la energía generada.'}`
-    : `Para clientes con tarifa binómica (${tariffCode}), el análisis económico contempla el régimen de Medición Neta con compensación 1:1 de energía activa, no aplicando retención por uso de red conforme a la regulación vigente.`;
+    : `Para la tarifa ${tariffDisplayName}, el análisis económico considera el cargo por derecho de uso de la red, equivalente al ${exportFee}% del valor de la energía excedente exportada, conforme al régimen de Medición Neta y la normativa vigente (Resolución SIE-007-2026-REG). Por esta razón, el sistema se diseña para maximizar el autoconsumo y optimizar la inyección de energía, obteniendo así el mayor retorno de inversión posible.${hasBattery ? '' : ' Cuando resulte conveniente, se recomendará la incorporación de baterías de litio para incrementar el aprovechamiento directo de la energía generada.'}`;
 
   // Custom Executive Summary & Page 6 fields
   const projectSummarySubtitle = custom.projectSummarySubtitle && custom.projectSummarySubtitle.trim()
@@ -363,7 +382,7 @@ export function renderProposalPage(stored: StoredProposal): string {
           <div class="text-[10.5px] sm:text-[11px] font-black uppercase text-orange-600 tracking-wider flex items-center justify-start md:justify-end gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span> Detalles de la Cotización</div>
           <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">N° Cotización:</span> <span class="font-mono font-bold text-slate-950">${quoteNumber}</span></div>
           <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">ID Proyecto:</span> <span class="font-mono font-bold text-slate-950">${projectId}</span></div>
-          <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">Distribuidora / Tarifa:</span> <span class="font-bold text-sky-900">${distributor} • ${tariffCode}</span></div>
+          <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">Distribuidora / Tarifa:</span> <span class="font-bold text-sky-900">${distributor} • ${tariffDisplayName}</span></div>
           <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">Fecha de Emisión:</span> <span class="font-semibold text-slate-800">${new Date().toLocaleDateString('es-DO', { day: '2-digit', month: 'long', year: 'numeric' })}</span></div>
         </div>
       </div>

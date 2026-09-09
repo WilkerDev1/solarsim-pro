@@ -9,6 +9,8 @@ import { createImportExportSlice } from './slices/importExportSlice';
 import { createAISlice } from './slices/aiSlice';
 import { createUISlice } from './slices/uiSlice';
 import { createFolderSlice } from './slices/folderSlice';
+import { createTariffSlice } from './slices/tariffSlice';
+import { DEFAULT_RD_TARIFF_MATRIX } from '../data/rdTariffs';
 import { normalizeBrandName, inferBrandFromText } from '../utils/equipmentBrandUtils';
 
 // Re-export helper types and generators for backward compatibility
@@ -30,7 +32,9 @@ export const useSimulationStore = create<SimulationStore>()(
       ...createAISlice(...a),
       ...createUISlice(...a),
       ...createFolderSlice(...a),
+      ...createTariffSlice(...a),
     }),
+
     {
       name: 'solarsim-pro-storage',
       storage: createJSONStorage(() => {
@@ -168,8 +172,27 @@ export const useSimulationStore = create<SimulationStore>()(
           if (state.syncSettings && (state.syncSettings.serverUrl === 'http://10.0.0.103' || state.syncSettings.serverUrl === 'https://api.electsun.com' || !state.syncSettings.serverUrl)) {
             state.syncSettings.serverUrl = 'https://solarsim.electsun.net';
           }
+
+          // Ensure tariffMatrix is present and auto-migrate legacy CEPM schedules
+          if (!state.tariffMatrix || !state.tariffMatrix.schedules) {
+            state.tariffMatrix = DEFAULT_RD_TARIFF_MATRIX;
+          } else {
+            const cepmSchedule = state.tariffMatrix.schedules.CEPM;
+            if (!cepmSchedule || !cepmSchedule.tariffs || !cepmSchedule.tariffs['RBT-1']) {
+              state.tariffMatrix = {
+                ...state.tariffMatrix,
+                resolutionCode: 'SIE-176-2025-TF',
+                schedules: {
+                  ...state.tariffMatrix.schedules,
+                  CEPM: DEFAULT_RD_TARIFF_MATRIX.schedules.CEPM,
+                  EDEESTE: DEFAULT_RD_TARIFF_MATRIX.schedules.EDEESTE,
+                },
+              };
+            }
+          }
         }
       },
+
       partialize: (state) => ({
         projects: state.projects,
         activeProjectId: state.activeProjectId,
@@ -182,7 +205,9 @@ export const useSimulationStore = create<SimulationStore>()(
         equipmentCatalog: state.equipmentCatalog,
         deletedEquipmentIds: state.deletedEquipmentIds,
         folders: state.folders,
+        tariffMatrix: state.tariffMatrix,
       }),
     }
   )
 );
+

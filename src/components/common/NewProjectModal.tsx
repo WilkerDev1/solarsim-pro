@@ -3,6 +3,11 @@ import { useSimulationStore } from '../../store/useSimulationStore';
 import { RD_PROVINCES } from '../../data/rdProvinces';
 import { X, Building2, MapPin, Zap, ArrowRight, ChevronDown, ChevronUp, SlidersHorizontal, Sparkles } from 'lucide-react';
 import electsunEmblem from '../../assets/electsun-emblem-transparent.png';
+import {
+  UtilityDistributor,
+  getDistributorTariffOptions,
+  mapTariffCodeOnDistributorChange,
+} from '../../types/tariffs';
 
 export const NewProjectModal: React.FC = () => {
   const { isNewProjectModalOpen, closeNewProjectModal, createNewProject, openAIInvoiceModal, sidebarTheme } = useSimulationStore();
@@ -12,7 +17,7 @@ export const NewProjectModal: React.FC = () => {
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
   const [province, setProvince] = useState(RD_PROVINCES[0].name);
-  const [distributor, setDistributor] = useState<'EDEESTE' | 'EDESUR' | 'EDENORTE' | 'CEPM'>('EDEESTE');
+  const [distributor, setDistributor] = useState<UtilityDistributor>('EDEESTE');
   const [tariffCode, setTariffCode] = useState('BTS2');
   const [address, setAddress] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -45,7 +50,7 @@ export const NewProjectModal: React.FC = () => {
     setProvince(provName);
     if (provName.includes('Punta Cana') || provName.includes('Altagracia')) {
       setDistributor('CEPM');
-      setTariffCode('BTS1');
+      setTariffCode('RBT-1');
     } else if (
       provName.includes('Santiago') ||
       provName.includes('Puerto Plata') ||
@@ -54,7 +59,7 @@ export const NewProjectModal: React.FC = () => {
       provName.includes('Monte Cristi')
     ) {
       setDistributor('EDENORTE');
-      setTariffCode('MTD');
+      setTariffCode('BTS2');
     } else if (provName.includes('Cristóbal') || provName.includes('Barahona') || provName.includes('Sur')) {
       setDistributor('EDESUR');
       setTariffCode('BTS2');
@@ -62,6 +67,12 @@ export const NewProjectModal: React.FC = () => {
       setDistributor('EDEESTE');
       setTariffCode('BTS2');
     }
+  };
+
+  const handleDistributorChange = (newDist: UtilityDistributor) => {
+    const newTariff = mapTariffCodeOnDistributorChange(distributor, newDist, tariffCode);
+    setDistributor(newDist);
+    setTariffCode(newTariff);
   };
 
   if (!isNewProjectModalOpen) return null;
@@ -288,7 +299,7 @@ export const NewProjectModal: React.FC = () => {
                   </label>
                   <select
                     value={distributor}
-                    onChange={(e) => setDistributor(e.target.value as any)}
+                    onChange={(e) => handleDistributorChange(e.target.value as UtilityDistributor)}
                     className={`w-full border rounded-xl px-3 py-2 text-xs font-semibold transition-all cursor-pointer ${
                       isDark
                         ? 'bg-[#22222a] border-[#383846] text-white focus:bg-[#282834]'
@@ -298,13 +309,13 @@ export const NewProjectModal: React.FC = () => {
                     <option value="EDEESTE" className={isDark ? 'bg-[#18181f] text-white' : ''}>EDEESTE</option>
                     <option value="EDESUR" className={isDark ? 'bg-[#18181f] text-white' : ''}>EDESUR</option>
                     <option value="EDENORTE" className={isDark ? 'bg-[#18181f] text-white' : ''}>EDENORTE</option>
-                    <option value="CEPM" className={isDark ? 'bg-[#18181f] text-white' : ''}>CEPM (Punta Cana)</option>
+                    <option value="CEPM" className={isDark ? 'bg-[#18181f] text-white' : ''}>CEPM (Punta Cana / Bayahíbe)</option>
                   </select>
                 </div>
 
                 <div>
                   <label className={`block font-bold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                    Tarifa Eléctrica
+                    Tarifa Eléctrica ({distributor})
                   </label>
                   <select
                     value={tariffCode}
@@ -315,14 +326,16 @@ export const NewProjectModal: React.FC = () => {
                         : 'bg-white border-slate-300 text-slate-900'
                     }`}
                   >
-                    <option value="BTS1" className={isDark ? 'bg-[#18181f] text-white' : ''}>BTS1 (Residencial)</option>
-                    <option value="BTS2" className={isDark ? 'bg-[#18181f] text-white' : ''}>BTS2 (Comercial Simple)</option>
-                    <option value="BTD" className={isDark ? 'bg-[#18181f] text-white' : ''}>BTD (Baja Tensión Demanda)</option>
-                    <option value="BTH" className={isDark ? 'bg-[#18181f] text-white' : ''}>BTH (Baja Tensión Horaria)</option>
-                    <option value="MTD1" className={isDark ? 'bg-[#18181f] text-white' : ''}>MTD1 (Media Tensión Demanda 1)</option>
-                    <option value="MTD2" className={isDark ? 'bg-[#18181f] text-white' : ''}>MTD2 (Media Tensión Demanda 2)</option>
-                    <option value="MTH" className={isDark ? 'bg-[#18181f] text-white' : ''}>MTH (Media Tensión Horaria)</option>
-                    <option value="ATD" className={isDark ? 'bg-[#18181f] text-white' : ''}>ATD (Alta Tensión Demanda)</option>
+                    {getDistributorTariffOptions(distributor).map((opt) => (
+                      <option key={opt.value} value={opt.value} className={isDark ? 'bg-[#18181f] text-white' : ''}>
+                        {opt.label}
+                      </option>
+                    ))}
+                    {!getDistributorTariffOptions(distributor).some((opt) => opt.value === tariffCode) && tariffCode && (
+                      <option value={tariffCode} className={isDark ? 'bg-[#18181f] text-white' : ''}>
+                        {tariffCode}
+                      </option>
+                    )}
                   </select>
                 </div>
               </div>
