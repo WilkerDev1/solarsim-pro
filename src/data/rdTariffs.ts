@@ -406,7 +406,10 @@ export function getReferenceEnergyRateUSD(
 
     for (const block of tariff.blocks) {
       if (remaining <= 0) break;
-      const blockSize = block.maxKWh - block.minKWh;
+      const lower = block.minKWh > 0 && (block.minKWh === 201 || block.minKWh === 301 || block.minKWh === 701)
+        ? block.minKWh - 1
+        : block.minKWh;
+      const blockSize = block.maxKWh === Infinity ? Infinity : Math.max(0, block.maxKWh - lower);
       const consumedInBlock = Math.min(remaining, blockSize);
       totalDOP += consumedInBlock * block.rateDOP;
       remaining -= consumedInBlock;

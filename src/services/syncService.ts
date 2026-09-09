@@ -423,6 +423,35 @@ export class SyncService {
   }
 
   /**
+   * Helper defensivo para procesar respuestas JSON evitando SyntaxError por respuestas HTML/texto plano
+   */
+  private static async safeJsonParse<T = any>(res: Response, fallbackError: string): Promise<{ ok: boolean; data: T; error?: string }> {
+    const text = await res.text();
+    let data: any = {};
+    try {
+      data = JSON.parse(text);
+    } catch {
+      return {
+        ok: false,
+        data: {} as T,
+        error: !res.ok
+          ? `El servidor retornó error HTTP ${res.status} (${res.statusText || 'No disponible'})`
+          : 'Respuesta inválida del servidor (formato no JSON)',
+      };
+    }
+
+    if (!res.ok || data.success === false) {
+      return {
+        ok: false,
+        data,
+        error: data?.error || fallbackError,
+      };
+    }
+
+    return { ok: true, data };
+  }
+
+  /**
    * Pull: Descargar matriz tarifaria eléctrica (SIE / CEPM) desde el servidor
    */
   static async fetchTariffMatrix(serverUrl: string, token: string): Promise<{ success: boolean; matrix?: import('../types/tariffs').GlobalTariffMatrix | null; error?: string }> {
@@ -435,14 +464,14 @@ export class SyncService {
         },
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.error || 'Error al descargar tarifas del servidor' };
+      const parsed = await this.safeJsonParse(res, 'Error al descargar tarifas del servidor');
+      if (!parsed.ok) {
+        return { success: false, error: parsed.error };
       }
 
       return {
         success: true,
-        matrix: data.matrix || null,
+        matrix: parsed.data.matrix || null,
       };
     } catch (err: any) {
       return { success: false, error: err.message || 'Error de conexión al obtener tarifas' };
@@ -464,14 +493,14 @@ export class SyncService {
         body: JSON.stringify({ matrix }),
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.error || 'Error al guardar tarifas en el servidor' };
+      const parsed = await this.safeJsonParse(res, 'Error al guardar tarifas en el servidor');
+      if (!parsed.ok) {
+        return { success: false, error: parsed.error };
       }
 
       return {
         success: true,
-        message: data.message || 'Tarifas sincronizadas correctamente',
+        message: parsed.data.message || 'Tarifas sincronizadas correctamente',
       };
     } catch (err: any) {
       return { success: false, error: err.message || 'Error de conexión al subir tarifas' };

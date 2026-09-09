@@ -153,9 +153,12 @@ export async function initDatabase(): Promise<void> {
         WHEN display_name ILIKE '%ion energy%' OR display_name ILIKE '%ion-lv%' THEN 'Ion Energy'
         ELSE 'General'
       END
-      -- 6. Tabla de Pliegos Tarifarios Eléctricos (SIE & CEPM)
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS utility_tariffs (
+      WHERE brand IS NULL OR brand = '';
+    `);
+
+    // 6. Tabla de Pliegos Tarifarios Eléctricos (SIE & CEPM)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS utility_tariffs (
           id VARCHAR(64) PRIMARY KEY,
           organization_id VARCHAR(64) NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
           resolution_code VARCHAR(128) NOT NULL,
