@@ -98,6 +98,7 @@ export function renderProposalPage(stored: StoredProposal): string {
   const quoteNumber = client.quoteNumber || 'C-0001';
   const quoteValidityDays = client.quoteValidityDays || stored.validityDays || 7;
   const province = client.province || client.location || 'Santo Domingo';
+  const clientAddress = client.address || `${province}, República Dominicana`;
   const distributor = rates.distributor || client.distributor || 'EDEESTE';
   const rawTariffCode = rates.tariffCode || client.tariffCode || (distributor === 'CEPM' ? 'RBT-1' : 'BTS2');
   const tariffDisplayName = getWorkerTariffDisplayName(distributor, rawTariffCode);

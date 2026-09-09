@@ -36,6 +36,7 @@ export const SimulationPreferencesSection: React.FC = () => {
   const [isAITariffModalOpen, setIsAITariffModalOpen] = useState(false);
   const [prefDistributorTab, setPrefDistributorTab] = useState<UtilityDistributor>('EDEESTE');
   const [isSyncingTariffs, setIsSyncingTariffs] = useState(false);
+  const [tariffCurrencyMode, setTariffCurrencyMode] = useState<'USD' | 'DOP'>('USD');
 
   const handleSyncTariffsCloud = async () => {
     setIsSyncingTariffs(true);
@@ -513,21 +514,55 @@ export const SimulationPreferencesSection: React.FC = () => {
                 </div>
               </div>
 
-              {/* Tabs por Distribuidora */}
-              <div className="flex items-center gap-2 border-b border-slate-200 dark:border-[#27272a] pb-1 overflow-x-auto">
-                {(['EDEESTE', 'EDESUR', 'EDENORTE', 'CEPM'] as UtilityDistributor[]).map((dist) => (
-                  <button
-                    key={dist}
-                    onClick={() => setPrefDistributorTab(dist)}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      prefDistributorTab === dist
-                        ? 'bg-emerald-600 text-white shadow-2xs'
-                        : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-[#27272a]'
-                    }`}
-                  >
-                    {dist}
-                  </button>
-                ))}
+              {/* Tabs por Distribuidora & Selector de Moneda de Trabajo */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-[#27272a] pb-2">
+                <div className="flex items-center gap-2 overflow-x-auto">
+                  {(['EDEESTE', 'EDESUR', 'EDENORTE', 'CEPM'] as UtilityDistributor[]).map((dist) => (
+                    <button
+                      key={dist}
+                      onClick={() => setPrefDistributorTab(dist)}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        prefDistributorTab === dist
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-[#27272a]'
+                      }`}
+                    >
+                      {dist}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-semibold text-slate-500 dark:text-zinc-400">
+                    Modo Moneda:
+                  </span>
+                  <div className="inline-flex p-0.5 rounded-xl bg-slate-100 dark:bg-[#1f1f23] border border-slate-200 dark:border-[#2b2b30]">
+                    <button
+                      type="button"
+                      onClick={() => setTariffCurrencyMode('USD')}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        tariffCurrencyMode === 'USD'
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                      title="Editar tarifas directamente en Dólares ($ USD)"
+                    >
+                      $ USD (Dólares)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTariffCurrencyMode('DOP')}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        tariffCurrencyMode === 'DOP'
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                      title="Editar tarifas en Pesos Dominicanos (RD$)"
+                    >
+                      RD$ DOP (Pesos)
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Tabla Editable de Tarifas de la Distribuidora */}
@@ -537,9 +572,15 @@ export const SimulationPreferencesSection: React.FC = () => {
                     <thead className="bg-slate-50 dark:bg-[#1a1a1e] border-b border-slate-200 dark:border-[#27272a] text-slate-500 dark:text-zinc-400 font-semibold">
                       <tr>
                         <th className="p-3">Tarifa ({prefDistributorTab})</th>
-                        <th className="p-3">Energía (RD$/kWh)</th>
-                        <th className="p-3">Cargo Fijo (RD$)</th>
-                        <th className="p-3">Demanda (RD$/kW-mes)</th>
+                        <th className="p-3">
+                          {tariffCurrencyMode === 'USD' ? 'Energía ($ USD/kWh)' : 'Energía (RD$/kWh)'}
+                        </th>
+                        <th className="p-3">
+                          {tariffCurrencyMode === 'USD' ? 'Cargo Fijo ($ USD)' : 'Cargo Fijo (RD$)'}
+                        </th>
+                        <th className="p-3">
+                          {tariffCurrencyMode === 'USD' ? 'Demanda ($ USD/kW-mes)' : 'Demanda (RD$/kW-mes)'}
+                        </th>
                         <th className="p-3">Retención %</th>
                       </tr>
                     </thead>
@@ -551,95 +592,178 @@ export const SimulationPreferencesSection: React.FC = () => {
                           }
                           return !['RBT-1', 'RBT-2', 'ESTRBT-2', 'RMT-1'].includes(t.code);
                         })
-                        .map((tariff) => (
-                        <tr key={tariff.code} className="hover:bg-slate-50/60 dark:hover:bg-[#1a1a1e]/60">
-                          <td className="p-3 font-semibold">
-                            <span className="font-mono text-emerald-600 dark:text-emerald-400">{tariff.code}</span>
-                            <span className="block text-[10px] text-slate-400 font-normal truncate max-w-[200px]">{tariff.name}</span>
-                          </td>
-                          <td className="p-3">
-                            <div className="flex flex-col gap-1">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-[11px] text-slate-400 font-mono">RD$</span>
+                        .map((tariff) => {
+                          const currentUSD = tariff.baseEnergyRateUSD !== undefined && tariff.baseEnergyRateUSD > 0
+                            ? tariff.baseEnergyRateUSD
+                            : Math.round(((tariff.baseEnergyRateDOP || 0) / 60.0) * 1000) / 1000;
+                          const currentFixedUSD = tariff.fixedChargeUSD !== undefined && tariff.fixedChargeUSD > 0
+                            ? tariff.fixedChargeUSD
+                            : Math.round(((tariff.fixedChargeDOP || 0) / 60.0) * 100) / 100;
+                          const currentDemandUSD = tariff.demandChargePerKWUSD !== undefined && tariff.demandChargePerKWUSD > 0
+                            ? tariff.demandChargePerKWUSD
+                            : Math.round(((tariff.demandChargePerKWDOP || 0) / 60.0) * 100) / 100;
+
+                          return (
+                            <tr key={tariff.code} className="hover:bg-slate-50/60 dark:hover:bg-[#1a1a1e]/60">
+                              <td className="p-3 font-semibold">
+                                <span className="font-mono text-emerald-600 dark:text-emerald-400">{tariff.code}</span>
+                                <span className="block text-[10px] text-slate-400 font-normal truncate max-w-[200px]">{tariff.name}</span>
+                              </td>
+                              <td className="p-3">
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[11px] text-slate-400 font-mono font-bold">
+                                      {tariffCurrencyMode === 'USD' ? '$' : 'RD$'}
+                                    </span>
+                                    {tariffCurrencyMode === 'USD' ? (
+                                      <input
+                                        type="number"
+                                        step={0.001}
+                                        value={currentUSD}
+                                        onChange={(e) => {
+                                          const usdVal = parseFloat(e.target.value) || 0;
+                                          const dopVal = Math.round(usdVal * 60.0 * 100) / 100;
+                                          updateDistributorTariff(prefDistributorTab, tariff.code, {
+                                            baseEnergyRateUSD: usdVal,
+                                            baseEnergyRateDOP: dopVal,
+                                          });
+                                        }}
+                                        className="w-24 px-2 py-1 rounded-lg text-xs font-mono font-semibold border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#18181b]"
+                                      />
+                                    ) : (
+                                      <input
+                                        type="number"
+                                        step={0.01}
+                                        value={tariff.baseEnergyRateDOP || 0}
+                                        onChange={(e) => {
+                                          const dopVal = parseFloat(e.target.value) || 0;
+                                          const usdVal = Math.round((dopVal / 60.0) * 1000) / 1000;
+                                          updateDistributorTariff(prefDistributorTab, tariff.code, {
+                                            baseEnergyRateDOP: dopVal,
+                                            baseEnergyRateUSD: usdVal,
+                                          });
+                                        }}
+                                        className="w-24 px-2 py-1 rounded-lg text-xs font-mono font-semibold border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#18181b]"
+                                      />
+                                    )}
+                                    <span className="text-[10px] text-slate-400 font-mono">
+                                      {tariffCurrencyMode === 'USD'
+                                        ? `(≈ RD$ ${(tariff.baseEnergyRateDOP || currentUSD * 60.0).toFixed(2)})`
+                                        : `(≈ $${currentUSD.toFixed(3)} USD)`}
+                                    </span>
+                                  </div>
+                                  {tariff.blocks && tariff.blocks.length > 0 && (
+                                    <span className="text-[10px] text-amber-600 dark:text-amber-400">
+                                      Bloques SIE: 0-200: {tariff.blocks[0]?.rateDOP} | 201-300: {tariff.blocks[1]?.rateDOP} | 301-700: {tariff.blocks[2]?.rateDOP}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="p-3">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[11px] text-slate-400 font-mono font-bold">
+                                    {tariffCurrencyMode === 'USD' ? '$' : 'RD$'}
+                                  </span>
+                                  {tariffCurrencyMode === 'USD' ? (
+                                    <input
+                                      type="number"
+                                      step={0.1}
+                                      value={currentFixedUSD}
+                                      onChange={(e) => {
+                                        const usdVal = parseFloat(e.target.value) || 0;
+                                        const dopVal = Math.round(usdVal * 60.0 * 100) / 100;
+                                        updateDistributorTariff(prefDistributorTab, tariff.code, {
+                                          fixedChargeUSD: usdVal,
+                                          fixedChargeDOP: dopVal,
+                                        });
+                                      }}
+                                      className="w-20 px-2 py-1 rounded-lg text-xs font-mono font-semibold border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#18181b]"
+                                    />
+                                  ) : (
+                                    <input
+                                      type="number"
+                                      step={1}
+                                      value={tariff.fixedChargeDOP || 0}
+                                      onChange={(e) => {
+                                        const dopVal = parseFloat(e.target.value) || 0;
+                                        const usdVal = Math.round((dopVal / 60.0) * 100) / 100;
+                                        updateDistributorTariff(prefDistributorTab, tariff.code, {
+                                          fixedChargeDOP: dopVal,
+                                          fixedChargeUSD: usdVal,
+                                        });
+                                      }}
+                                      className="w-20 px-2 py-1 rounded-lg text-xs font-mono font-semibold border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#18181b]"
+                                    />
+                                  )}
+                                  <span className="text-[10px] text-slate-400 font-mono">
+                                    {tariffCurrencyMode === 'USD'
+                                      ? `(≈ RD$ ${(tariff.fixedChargeDOP || currentFixedUSD * 60.0).toFixed(0)})`
+                                      : `(≈ $${currentFixedUSD.toFixed(2)})`}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="p-3">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[11px] text-slate-400 font-mono font-bold">
+                                    {tariffCurrencyMode === 'USD' ? '$' : 'RD$'}
+                                  </span>
+                                  {tariffCurrencyMode === 'USD' ? (
+                                    <input
+                                      type="number"
+                                      step={0.5}
+                                      placeholder="0"
+                                      value={currentDemandUSD}
+                                      onChange={(e) => {
+                                        const usdVal = parseFloat(e.target.value) || 0;
+                                        const dopVal = Math.round(usdVal * 60.0 * 100) / 100;
+                                        updateDistributorTariff(prefDistributorTab, tariff.code, {
+                                          demandChargePerKWUSD: usdVal,
+                                          demandChargePerKWDOP: dopVal,
+                                        });
+                                      }}
+                                      className="w-22 px-2 py-1 rounded-lg text-xs font-mono font-semibold border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#18181b]"
+                                    />
+                                  ) : (
+                                    <input
+                                      type="number"
+                                      step={10}
+                                      placeholder="0"
+                                      value={tariff.demandChargePerKWDOP || 0}
+                                      onChange={(e) => {
+                                        const dopVal = parseFloat(e.target.value) || 0;
+                                        const usdVal = Math.round((dopVal / 60.0) * 100) / 100;
+                                        updateDistributorTariff(prefDistributorTab, tariff.code, {
+                                          demandChargePerKWDOP: dopVal,
+                                          demandChargePerKWUSD: usdVal,
+                                        });
+                                      }}
+                                      className="w-22 px-2 py-1 rounded-lg text-xs font-mono font-semibold border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#18181b]"
+                                    />
+                                  )}
+                                  <span className="text-[10px] text-slate-400 font-mono">
+                                    {tariffCurrencyMode === 'USD'
+                                      ? (currentDemandUSD > 0 ? `(≈ RD$ ${(tariff.demandChargePerKWDOP || currentDemandUSD * 60.0).toFixed(0)})` : '')
+                                      : ((tariff.demandChargePerKWDOP || 0) > 0 ? `(≈ $${currentDemandUSD.toFixed(2)})` : '')}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="p-3">
                                 <input
                                   type="number"
-                                  step={0.01}
-                                  value={tariff.baseEnergyRateDOP || 0}
-                                  onChange={(e) => {
-                                    const dopVal = parseFloat(e.target.value) || 0;
+                                  min={0}
+                                  max={100}
+                                  value={tariff.netMeteringRetentionPct ?? 25}
+                                  onChange={(e) =>
                                     updateDistributorTariff(prefDistributorTab, tariff.code, {
-                                      baseEnergyRateDOP: dopVal,
-                                      baseEnergyRateUSD: Math.round((dopVal / 60.0) * 1000) / 1000,
-                                    });
-                                  }}
-                                  className="w-24 px-2 py-1 rounded-lg text-xs font-mono border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#18181b]"
+                                      netMeteringRetentionPct: parseFloat(e.target.value) || 25,
+                                    })
+                                  }
+                                  className="w-16 px-2 py-1 rounded-lg text-xs font-mono border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#18181b]"
                                 />
-                                <span className="text-[10px] text-slate-400 font-mono">
-                                  (${((tariff.baseEnergyRateDOP || 0) / 60.0).toFixed(3)} USD)
-                                </span>
-                              </div>
-                              {tariff.blocks && tariff.blocks.length > 0 && (
-                                <span className="text-[10px] text-amber-600 dark:text-amber-400">
-                                  0-200: {tariff.blocks[0]?.rateDOP} | 201-300: {tariff.blocks[1]?.rateDOP} | 301-700: {tariff.blocks[2]?.rateDOP}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="p-3">
-                            <div className="flex items-center gap-1">
-                              <span className="text-[11px] text-slate-400 font-mono">RD$</span>
-                              <input
-                                type="number"
-                                step={1}
-                                value={tariff.fixedChargeDOP || 0}
-                                onChange={(e) =>
-                                  updateDistributorTariff(prefDistributorTab, tariff.code, {
-                                    fixedChargeDOP: parseFloat(e.target.value) || 0,
-                                  })
-                                }
-                                className="w-20 px-2 py-1 rounded-lg text-xs font-mono border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#18181b]"
-                              />
-                            </div>
-                          </td>
-                          <td className="p-3">
-                            <div className="flex items-center gap-1">
-                              <span className="text-[11px] text-slate-400 font-mono">RD$</span>
-                              <input
-                                type="number"
-                                step={10}
-                                placeholder="0"
-                                value={tariff.demandChargePerKWDOP || 0}
-                                onChange={(e) =>
-                                  updateDistributorTariff(prefDistributorTab, tariff.code, {
-                                    demandChargePerKWDOP: parseFloat(e.target.value) || 0,
-                                    demandChargePerKWUSD: Math.round(((parseFloat(e.target.value) || 0) / 60.0) * 100) / 100,
-                                  })
-                                }
-                                className="w-24 px-2 py-1 rounded-lg text-xs font-mono border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#18181b]"
-                              />
-                              {(tariff.demandChargePerKWDOP || 0) > 0 && (
-                                <span className="text-[10px] text-slate-400 font-mono">
-                                  (${((tariff.demandChargePerKWDOP || 0) / 60.0).toFixed(2)} USD)
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="p-3">
-                            <input
-                              type="number"
-                              min={0}
-                              max={100}
-                              value={tariff.netMeteringRetentionPct ?? 25}
-                              onChange={(e) =>
-                                updateDistributorTariff(prefDistributorTab, tariff.code, {
-                                  netMeteringRetentionPct: parseFloat(e.target.value) || 25,
-                                })
-                              }
-                              className="w-16 px-2 py-1 rounded-lg text-xs font-mono border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#18181b]"
-                            />
-                          </td>
-                        </tr>
-                      ))}
+                              </td>
+                            </tr>
+                          );
+                        })}
                     </tbody>
                   </table>
                 </div>
