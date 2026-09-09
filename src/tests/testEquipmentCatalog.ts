@@ -1,7 +1,8 @@
 import { useSimulationStore } from '../store/useSimulationStore';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../data/defaultEquipmentCatalog';
-import { findCatalogMatchForVariant } from '../components/common/AIDatasheetScannerModal';
+import { findCatalogMatchForVariant } from '../utils/equipmentMatchingUtils';
 import { ExtractedEquipmentVariant, SolarEquipmentItem } from '../types/equipment';
+
 
 console.log('=====================================================');
 console.log('🧪 RUNNING EQUIPMENT CATALOG CRUD & DUPLICATION TEST SUITE');
