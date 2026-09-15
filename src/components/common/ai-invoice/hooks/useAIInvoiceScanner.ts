@@ -195,11 +195,7 @@ export function useAIInvoiceScanner() {
           });
         }
 
-        // Sanear modelo si es gemini-3.8-flash-high (sin capacidad / 503 en servidores de Google)
-        const modelToRequest = (geminiModel && !geminiModel.includes('3.8')) ? geminiModel : 'gemini-2.0-flash';
-        if (geminiModel && geminiModel.includes('3.8')) {
-          setGeminiModel('gemini-2.0-flash');
-        }
+        const modelToRequest = geminiModel?.trim() || 'gemini-3.7-flash';
 
         try {
           const res = await window.electronAPI.parseInvoiceWithAI({
@@ -220,13 +216,13 @@ export function useAIInvoiceScanner() {
           }
           result = res.data;
         } catch (ipcErr: any) {
-          console.warn('[AIInvoiceScanner] Intento por Electron falló o modelo saturado (503). Conectando fallback web con modelos de alta disponibilidad...', ipcErr);
+          console.warn('[AIInvoiceScanner] Intento por Electron reportó error o falta de capacidad en el canal nativo. Conectando con fallback web...', ipcErr);
           result = await parseInvoiceWithGemini({
             fileBase64,
             mimeType: selectedFile?.type || 'application/pdf',
             fileName: selectedFile?.name || 'factura_desconocida',
             apiKey: geminiApiKey,
-            model: 'gemini-2.0-flash',
+            model: modelToRequest,
             panelPowerW: activeProject?.specs?.panelPowerW || 620,
             projectRequirementsText: cleanPrompt,
             equipmentCatalog,
@@ -250,10 +246,7 @@ export function useAIInvoiceScanner() {
           });
         }
 
-        const modelToRequest = (geminiModel && !geminiModel.includes('3.8')) ? geminiModel : 'gemini-2.0-flash';
-        if (geminiModel && geminiModel.includes('3.8')) {
-          setGeminiModel('gemini-2.0-flash');
-        }
+        const modelToRequest = geminiModel?.trim() || 'gemini-3.7-flash';
 
         result = await parseInvoiceWithGemini({
           fileBase64: base64,

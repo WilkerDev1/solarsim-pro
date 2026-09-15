@@ -283,6 +283,20 @@ const INVOICE_JSON_SCHEMA = {
 
 export const DEFAULT_POPULAR_MODELS: GeminiModelInfo[] = [
   {
+    id: 'gemini-3.7-flash',
+    name: 'Gemini 3.7 Flash',
+    description: 'Modelo insignia de la Familia 3 con máxima fidelidad en visión multimodal y tablas.',
+    rateLimitNote: '15 RPM / 500 RPD',
+    isRecommended: true,
+  },
+  {
+    id: 'gemini-3.6-flash',
+    name: 'Gemini 3.6 Flash',
+    description: 'Generación avanzada con razonamiento multimodal balanceado y rápida respuesta.',
+    rateLimitNote: '15 RPM / 500 RPD',
+    isRecommended: true,
+  },
+  {
     id: 'gemini-3.5-flash-lite',
     name: 'Gemini 3.5 Flash Lite',
     description: 'Mayor límite de solicitudes gratuitas en Google AI Studio (500 por día / 15 RPM). Extremadamente veloz.',
@@ -290,23 +304,22 @@ export const DEFAULT_POPULAR_MODELS: GeminiModelInfo[] = [
     isRecommended: true,
   },
   {
-    id: 'gemini-3.6-flash',
-    name: 'Gemini 3.6 Flash',
-    description: 'Nueva generación con razonamiento avanzado para tablas y tipografías complejas.',
-    rateLimitNote: '5 RPM / 20 RPD',
+    id: 'gemini-3.8-flash-high',
+    name: 'Gemini 3.8 Flash High',
+    description: 'Alta potencia experimental. Si Google reporta falta de capacidad (503), el sistema conmuta automáticamente a la Familia 3.',
+    rateLimitNote: 'Experimental / Capacidad variable',
   },
   {
-    id: 'gemini-3.7-flash',
-    name: 'Gemini 3.7 Flash',
-    description: 'Modelo de vanguardia con máxima fidelidad en visión multimodal.',
-    rateLimitNote: '5 RPM / 20 RPD',
+    id: 'gemini-2.5-flash',
+    name: 'Gemini 2.5 Flash',
+    description: 'Modelo de producción de alto rendimiento y estabilidad.',
+    rateLimitNote: '15 RPM / 1,500 RPD',
   },
   {
     id: 'gemini-2.0-flash',
     name: 'Gemini 2.0 Flash',
     description: 'Modelo estándar de alta velocidad y consistencia en extracción de JSON estructurado.',
     rateLimitNote: '15 RPM / 1,500 RPD',
-    isRecommended: true,
   },
   {
     id: 'gemini-1.5-flash',
@@ -356,7 +369,7 @@ export async function fetchAvailableGeminiModels(
           name: displayName,
           description: m.description || `Modelo ${displayName} disponible en tu cuenta.`,
           rateLimitNote: isFlashLite ? '15 RPM / 500 RPD' : isFlash ? '5-15 RPM' : undefined,
-          isRecommended: cleanId.includes('3.5-flash-lite') || cleanId === 'gemini-2.0-flash' || cleanId === 'gemini-3.6-flash',
+          isRecommended: cleanId === 'gemini-3.7-flash' || cleanId === 'gemini-3.6-flash' || cleanId === 'gemini-3.5-flash-lite',
         };
       });
 
@@ -382,7 +395,7 @@ export async function fetchAvailableGeminiModels(
 
 export async function validateGeminiApiKey(
   apiKey: string,
-  model: string = 'gemini-3.5-flash-lite'
+  model: string = 'gemini-3.7-flash'
 ): Promise<{ success: boolean; error?: string; modelName?: string; models?: GeminiModelInfo[] }> {
   if (!apiKey || apiKey.trim().length < 10) {
     return { success: false, error: 'API Key inválida o vacía.' };
@@ -440,7 +453,7 @@ export async function parseInvoiceWithGemini(params: {
     mimeType,
     fileName,
     apiKey,
-    model = 'gemini-2.0-flash',
+    model = 'gemini-3.7-flash',
     panelPowerW = 620,
     projectRequirementsText,
     equipmentCatalog = [],
@@ -459,11 +472,18 @@ export async function parseInvoiceWithGemini(params: {
     cleanBase64 = cleanBase64.split('base64,')[1];
   }
 
-  const cleanModel = model?.trim();
-  const primaryModel = (cleanModel && !cleanModel.includes('3.8') && !cleanModel.includes('high')) ? cleanModel : 'gemini-2.0-flash';
+  const cleanModel = model?.trim() || 'gemini-3.7-flash';
+  const requestedModel = cleanModel;
   const candidateModels = Array.from(
-    new Set([primaryModel, 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-lite', 'gemini-2.5-flash'])
-  ).filter((m) => m && !m.includes('3.8') && !m.includes('high'));
+    new Set([
+      requestedModel,
+      'gemini-3.7-flash',
+      'gemini-3.6-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+    ])
+  );
 
   // Preparar catálogo de referencia condensado con mejores precios para grounding
   const referenceCatalogCondensed = equipmentCatalog.map((e) => {
@@ -531,6 +551,8 @@ export async function parseInvoiceWithGemini(params: {
 
   let rawText: string | undefined;
   let lastError: any = null;
+  let successfulModel = requestedModel;
+  const rejectedAttempts: Array<{ model: string; error: string }> = [];
 
   for (let mIdx = 0; mIdx < candidateModels.length; mIdx++) {
     const currentModel = candidateModels[mIdx];
@@ -566,7 +588,7 @@ export async function parseInvoiceWithGemini(params: {
           onProgress?.(
             attempt > 1
               ? `Reintentando con ${currentModel} (intento ${attempt}/2)...`
-              : `Google experimenta alta demanda. Conectando con modelo de respaldo ${currentModel}...`
+              : `Google experimenta saturación momentánea. Conectando con modelo de respaldo ${currentModel}...`
           );
         } else {
           onProgress?.(`Analizando propuesta con ${currentModel}...`);
@@ -582,6 +604,7 @@ export async function parseInvoiceWithGemini(params: {
           const responseJson = await response.json();
           rawText = responseJson?.candidates?.[0]?.content?.parts?.[0]?.text;
           if (rawText) {
+            successfulModel = currentModel;
             break;
           }
         }
@@ -598,8 +621,20 @@ export async function parseInvoiceWithGemini(params: {
         }
 
         lastError = new Error(`Google AI (${response.status} en ${currentModel}): ${errorMsg}`);
+        rejectedAttempts.push({ model: currentModel, error: errorMsg });
 
-        if (response.status === 503 || response.status === 429) {
+        // Si el modelo reporta 503 UNAVAILABLE o falta de capacidad, saltar inmediatamente al siguiente candidato
+        if (
+          response.status === 503 ||
+          errorMsg.includes('503') ||
+          errorMsg.includes('No capacity') ||
+          errorMsg.includes('UNAVAILABLE')
+        ) {
+          console.warn(`[GeminiInvoiceService] Modelo ${currentModel} saturado o sin capacidad en Google (${errorMsg}). Pasando inmediatamente al siguiente modelo en cascada...`);
+          break;
+        }
+
+        if (response.status === 429) {
           await new Promise((r) => setTimeout(r, 1500 * attempt));
           continue;
         }
@@ -620,9 +655,18 @@ export async function parseInvoiceWithGemini(params: {
   }
 
   if (!rawText) {
+    const modelsTriedStr = candidateModels.join(', ');
     throw new Error(
-      `Los servidores de Google Gemini están experimentando alta demanda momentánea (503). Intentamos con ${candidateModels.join(', ')}. ${lastError?.message || 'Por favor espera unos segundos y vuelve a intentar.'}`
+      `Google AI rechazó las peticiones con los modelos probados (${modelsTriedStr}). Último error: ${lastError?.message || 'Sin capacidad en los servidores de Google'}. Por favor selecciona otro modelo en Ajustes > Integraciones IA.`
     );
+  }
+
+  let modelWarning: string | undefined;
+  if (successfulModel !== requestedModel) {
+    const initialRejection = rejectedAttempts.find((a) => a.model === requestedModel);
+    const reason = initialRejection ? initialRejection.error : 'Sobrecarga o falta de capacidad en servidores de Google (Error 503)';
+    modelWarning = `Google reportó saturación en el modelo solicitado "${requestedModel}" (${reason}). Tu propuesta se procesó exitosamente con el modelo de respaldo "${successfulModel}". Puedes cambiar tu modelo predeterminado en Ajustes si esto persiste.`;
+    console.info(`[GeminiInvoiceService] Fallback activado: ${modelWarning}`);
   }
 
   function robustParseJson(raw: string): any {
@@ -1320,6 +1364,11 @@ export async function parseInvoiceWithGemini(params: {
     specialTechnicalNotes: parsed.specialTechnicalNotes || undefined,
     aiNotes: parsed.notes || undefined,
     equipmentSubstitutions: equipmentSubstitutions.length > 0 ? equipmentSubstitutions : undefined,
+
+    // Información de modelo y advertencia de saturación
+    modelUsed: successfulModel,
+    requestedModel,
+    modelWarning,
   };
 
   return result;

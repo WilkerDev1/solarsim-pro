@@ -31,10 +31,10 @@ const normalizeProvinceName = (raw?: string): string => {
 
 export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
   geminiApiKey: '',
-  geminiModel: 'gemini-2.0-flash',
+  geminiModel: 'gemini-3.7-flash',
 
   setGeminiApiKey: (key) => set({ geminiApiKey: key }),
-  setGeminiModel: (model) => set({ geminiModel: (model && !model.includes('3.8') && !model.includes('high')) ? model : 'gemini-2.0-flash' }),
+  setGeminiModel: (model) => set({ geminiModel: model || 'gemini-3.7-flash' }),
 
   applyExtractedInvoice: (data, createNewProject = false) => {
     const resolvedProvince = normalizeProvinceName(data.province || data.municipality);

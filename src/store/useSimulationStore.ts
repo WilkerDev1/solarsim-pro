@@ -53,9 +53,6 @@ export const useSimulationStore = create<SimulationStore>()(
         };
       }),
       onRehydrateStorage: () => (state) => {
-        if (state && state.geminiModel && (state.geminiModel.includes('3.8') || state.geminiModel.includes('high'))) {
-          state.geminiModel = 'gemini-2.0-flash';
-        }
         if (state && state.projects && Array.isArray(state.projects)) {
           // Remove legacy hardcoded mock projects and purge expired trash projects (>30 days)
           const mockProjectIds = new Set(['benchmark-centro-medico', 'proj-logistics-hub', 'proj-residential-42']);

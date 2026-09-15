@@ -8,6 +8,7 @@ import {
   SunMedium,
   CheckCircle2,
   Check,
+  AlertTriangle,
 } from 'lucide-react';
 import { useAIInvoiceScanner } from './hooks/useAIInvoiceScanner';
 import { AIInvoiceInitialConfigView } from './components/AIInvoiceInitialConfigView';
@@ -204,6 +205,23 @@ export const AIInvoiceScannerModal: React.FC = () => {
                   isDark ? 'bg-[#141419]' : 'bg-slate-50'
                 }`}
               >
+                {/* Fallback Model Notice Banner if model was saturated (503) */}
+                {extractedData.modelWarning && (
+                  <div
+                    className={`px-5 py-2.5 border-b flex items-start gap-2.5 text-xs shrink-0 ${
+                      isDark
+                        ? 'bg-amber-950/40 border-amber-800/40 text-amber-200'
+                        : 'bg-amber-50 border-amber-200 text-amber-900'
+                    }`}
+                  >
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <div className="flex-1 leading-snug">
+                      <span className="font-bold text-amber-300">Aviso de Servidor Google AI: </span>
+                      <span>{extractedData.modelWarning}</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Tab Navigation Header */}
                 <div
                   className={`px-6 py-2.5 border-b flex items-center justify-between shrink-0 ${

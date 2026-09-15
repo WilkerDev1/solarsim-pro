@@ -67,10 +67,13 @@ solarsim/
 │       ├── database/                        # PostgreSQL 16 Alpine persistente
 │       ├── solarsim-api/                    # API de sincronización conectada a solarsim_net
 │       └── electsun-web/                    # Landing page corporativa de Electsun
-├── electron/                                # 🖥️ RUNTIME DE ESCRITORIO (Node.js / Chromium)
-│   ├── main.ts                              # Proceso principal de Electron, IPC handlers, auto-updater
+├── electron/                                # 🖥️ RUNTIME DE ESCRITORIO MODULAR (Node.js / Chromium)
+│   ├── main.ts                              # Orquestador de ciclo de vida (<40 líneas)
 │   ├── preload.ts                           # Puente seguro contextBridge entre Electron y React
-│   └── aiInvoiceHandler.ts                  # Procesamiento de imágenes y PDFs en Electron
+│   ├── window/                              # Ventana principal, flags Linux/Wayland y print-to-pdf (windowManager.ts)
+│   ├── menu/                                # Menú nativo del sistema operativo (appMenu.ts)
+│   ├── updater/                             # Auto-updater y gestor de paquetes Linux .pacman/.deb (autoUpdaterHandler.ts)
+│   └── ai/                                  # Motor IA modular (prompts, schema, httpClient, extractor, fallback 503 Familia 3)
 ├── workers/                                 # ☁️ MICROSERVICIOS SERVERLESS (Cloudflare)
 │   └── share-viewer/                        # Cloudflare Worker & Visor Web de Propuestas Temporales
 │       ├── wrangler.toml                    # Configuración KV y despliegue del worker
@@ -221,7 +224,13 @@ npx tsx src/tests/testFolderHidingAndSync.ts
 # Suite de validación de papelera de reciclaje, retención de 30 días y solo lectura
 npx tsx src/tests/testTrashAndReadOnly.ts
 
-# Ejecutar todas las pruebas en conjunto (6 suites integradas)
+# Suite de validación de tarifas SIE y CEPM
+npx tsx src/tests/testTariffEngine.ts
+
+# Suite de validación de modelos Familia 3 y cascada de respaldo 503
+npx tsx src/tests/testGeminiFamily3Cascade.ts
+
+# Ejecutar todas las pruebas en conjunto (8 suites integradas)
 npm test
 
 # Compilar frontend y electron para producción

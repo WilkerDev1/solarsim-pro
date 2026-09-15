@@ -93,6 +93,11 @@ export interface ExtractedInvoiceData {
   specialTechnicalNotes?: string;
   aiNotes?: string;
   equipmentSubstitutions?: EquipmentSubstitutionInfo[];
+
+  // Información de modelo y advertencia por fallback en saturación (Error 503)
+  modelUsed?: string;
+  requestedModel?: string;
+  modelWarning?: string;
 }
 
 export interface GeminiModelInfo {
