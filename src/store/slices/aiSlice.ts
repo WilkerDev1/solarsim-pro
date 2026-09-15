@@ -167,7 +167,7 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
           activeProjectId: targetProjectId,
           activeView: 'simulator',
           isAIInvoiceModalOpen: false,
-          saveFeedbackMessage: '¡Propuesta inteligente creada al 95% con IA y catálogo de equipos! ✨',
+          saveFeedbackMessage: `¡Nueva propuesta ${seq.projectId} creada al 95% con IA! ✨`,
         };
       }
 
@@ -285,10 +285,12 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
         return p;
       });
 
+      const updatedProj = projects.find((p) => p.id === targetProjectId);
+      const projCode = updatedProj?.client?.projectId || targetProjectId;
       return {
         projects,
         isAIInvoiceModalOpen: false,
-        saveFeedbackMessage: '¡Datos y equipos de la propuesta aplicados con IA exitosamente! ✨',
+        saveFeedbackMessage: `¡Proyecto ${projCode} actualizado con datos de la factura! 🔄`,
       };
     });
 

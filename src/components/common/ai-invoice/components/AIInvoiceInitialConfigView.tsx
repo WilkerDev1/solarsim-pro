@@ -73,10 +73,10 @@ export const AIInvoiceInitialConfigView: React.FC<AIInvoiceInitialConfigViewProp
       {/* Subtitle / Header banner */}
       <div className="text-center space-y-1 max-w-xl">
         <h3 className={`text-lg font-bold ${isDark ? 'text-zinc-100' : 'text-slate-800'}`}>
-          {isInsideProject ? 'Completar Proyecto con IA' : 'Configuración de Propuesta Inteligente'}
+          Configuración de Propuesta Inteligente
         </h3>
         <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-          Carga la factura eléctrica y/o define las especificaciones del cliente para dimensionar automáticamente.
+          Carga la factura eléctrica y/o define los requerimientos para dimensionar con IA. Podrás crear una nueva propuesta o actualizar el proyecto en memoria.
         </p>
       </div>
 

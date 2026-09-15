@@ -48,10 +48,8 @@ export function useAIInvoiceScanner() {
   // Requisitos o especificaciones técnicas del proyecto
   const [projectRequirementsPrompt, setProjectRequirementsPrompt] = useState<string>('');
 
-  // Opción para forzar sistema híbrido con baterías BESS
-  const [includeBattery, setIncludeBattery] = useState<boolean>(
-    Boolean(activeProject?.specs?.hasBattery)
-  );
+  // Opción para forzar sistema híbrido con baterías BESS (por defecto false a menos que el usuario lo elija)
+  const [includeBattery, setIncludeBattery] = useState<boolean>(false);
 
   // Módulo solar seleccionado actualmente
   const selectedPanel: SolarEquipmentItem | null = useMemo(() => {

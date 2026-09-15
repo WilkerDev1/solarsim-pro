@@ -430,6 +430,92 @@ if (alfredoSizing.recommendedPanelCount < 11 || alfredoSizing.recommendedPanelCo
 
 console.log(' ✅ PASS: Caso Sr. Alfredo correctamente desambiguado (900 kWh/mes -> 12 paneles ~7.38 kWp, NO 1463 paneles)\n');
 
+// --- TEST 9: Project Isolation: Create As New Project vs Update Active Project ---
+console.log('--- TEST 9: Project Isolation (Create As New vs Update Active) ---');
+const preState = useSimulationStore.getState();
+const existingActive = preState.getActiveProject();
+const existingProjectCount = preState.projects.length;
+const existingProjectId = existingActive.id;
+const existingProjectCode = existingActive.client.projectId;
+const existingClientName = existingActive.client.name;
+
+console.log(`Original Active Project: ${existingProjectCode} (${existingClientName}) [ID: ${existingProjectId}]`);
+
+// 1. Aplicar como proyecto nuevo (createNewProject = true)
+const newScannedInvoice: ExtractedInvoiceData = {
+  clientName: 'MATOS GALAN, RAMON ALFONSO',
+  distributor: 'EDESUR',
+  tariffCode: 'BTS1',
+  province: 'Santo Domingo / Distrito Nacional',
+  monthlyConsumptionKWh: Array(12).fill(2453),
+  annualConsumptionKWh: 2453 * 12,
+  averageMonthlyKWh: 2453,
+  targetCoveragePct: 95,
+  recommendedPanelCount: 18,
+  recommendedCapacityKWp: 11.07,
+  selectedPanelWatts: 615,
+  selectedPanelModel: 'Canadian Solar CS6.1-72TB-615 (615W)',
+  confidenceScore: 98,
+};
+
+preState.applyExtractedInvoice(newScannedInvoice, true);
+
+const postNewState = useSimulationStore.getState();
+const newActiveProj = postNewState.getActiveProject();
+
+console.log(`Post-Create Active Project: ${newActiveProj.client.projectId} (${newActiveProj.client.name}) [ID: ${newActiveProj.id}]`);
+console.log(`Total Projects: ${postNewState.projects.length} (was ${existingProjectCount})`);
+
+if (postNewState.projects.length !== existingProjectCount + 1) {
+  throw new Error(`❌ Expected project count to increase by 1 (${existingProjectCount + 1}), got ${postNewState.projects.length}`);
+}
+
+if (newActiveProj.id === existingProjectId) {
+  throw new Error(`❌ New project should have a distinct ID from the previous active project!`);
+}
+
+if (newActiveProj.client.name !== 'MATOS GALAN, RAMON ALFONSO') {
+  throw new Error(`❌ New project client name should be "MATOS GALAN, RAMON ALFONSO", got "${newActiveProj.client.name}"`);
+}
+
+// Verificar que el proyecto original NO fue modificado ni destruido
+const foundOriginal = postNewState.projects.find((p) => p.id === existingProjectId);
+if (!foundOriginal) {
+  throw new Error(`❌ Original project ${existingProjectCode} was lost from projects array!`);
+}
+
+if (foundOriginal.client.name !== existingClientName) {
+  throw new Error(`❌ CRITICAL BUG: Original project was overwritten! Expected "${existingClientName}", got "${foundOriginal.client.name}"`);
+}
+
+console.log(` ✅ PASS: "Crear como Proyecto Nuevo" preservó intacto el proyecto original ${existingProjectCode} (${existingClientName})`);
+
+// 2. Aplicar actualización intencional (createNewProject = false) sobre el proyecto nuevo
+const updateScannedData: ExtractedInvoiceData = {
+  ...newScannedInvoice,
+  clientName: 'MATOS GALAN, RAMON ALFONSO (MODIFICADO)',
+};
+
+postNewState.applyExtractedInvoice(updateScannedData, false);
+const postUpdateState = useSimulationStore.getState();
+const updatedActive = postUpdateState.getActiveProject();
+
+if (postUpdateState.projects.length !== existingProjectCount + 1) {
+  throw new Error(`❌ Updating active project should not change the total project count`);
+}
+
+if (updatedActive.client.name !== 'MATOS GALAN, RAMON ALFONSO (MODIFICADO)') {
+  throw new Error(`❌ Active project was not updated as expected`);
+}
+
+// Verificar que el proyecto original más viejo sigue intacto
+const stillIntactOriginal = postUpdateState.projects.find((p) => p.id === existingProjectId);
+if (stillIntactOriginal?.client?.name !== existingClientName) {
+  throw new Error(`❌ Updating current project affected the wrong project!`);
+}
+
+console.log(' ✅ PASS: "Actualizar Proyecto Abierto" actualizó el proyecto en memoria sin afectar otros proyectos\n');
+
 console.log('=====================================================');
 console.log('🎉 ALL AI SMART PROPOSAL & SIZING TESTS PASSED (100% SUCCESS)');
 console.log('=====================================================\n');

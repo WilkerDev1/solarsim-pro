@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   X,
   Sparkles,
@@ -9,6 +9,10 @@ import {
   CheckCircle2,
   Check,
   AlertTriangle,
+  PlusCircle,
+  FileEdit,
+  FolderKanban,
+  RefreshCw,
 } from 'lucide-react';
 import { useAIInvoiceScanner } from './hooks/useAIInvoiceScanner';
 import { AIInvoiceInitialConfigView } from './components/AIInvoiceInitialConfigView';
@@ -78,6 +82,8 @@ export const AIInvoiceScannerModal: React.FC = () => {
     handleResetDocument,
   } = useAIInvoiceScanner();
 
+  const [showOverwriteConfirm, setShowOverwriteConfirm] = useState(false);
+
   if (!isAIInvoiceModalOpen) return null;
 
   return (
@@ -101,16 +107,29 @@ export const AIInvoiceScannerModal: React.FC = () => {
               <Sparkles className="w-5 h-5 animate-pulse" />
             </div>
             <div>
-              <h3 className="font-extrabold text-base tracking-tight text-white flex items-center gap-2">
-                <span>Smart Proposal Studio</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-bold border border-emerald-500/30">
-                  IA Multimodal
-                </span>
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="font-extrabold text-base tracking-tight text-white flex items-center gap-2">
+                  <span>Smart Proposal Studio</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-bold border border-emerald-500/30">
+                    IA Multimodal
+                  </span>
+                </h3>
+                {activeProject && (
+                  <span
+                    className={`hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-mono font-medium border ${
+                      isDark
+                        ? 'bg-zinc-800/70 border-zinc-700 text-zinc-300'
+                        : 'bg-slate-800 border-slate-700 text-slate-300'
+                    }`}
+                    title={`Proyecto abierto en segundo plano: ${activeProject.client.name || activeProject.client.projectId}`}
+                  >
+                    <FolderKanban className="w-3 h-3 text-zinc-400" />
+                    <span>En memoria: <strong>{activeProject.client.projectId}</strong></span>
+                  </span>
+                )}
+              </div>
               <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-300'}`}>
-                {isInsideProject
-                  ? `Dimensionamiento y autocompletado para ${activeProject?.client?.name || 'el proyecto activo'}`
-                  : 'Generación automatizada de propuestas a partir de factura y especificaciones'}
+                Generación automatizada y dimensionamiento fotovoltaico a partir de facturas y requerimientos
               </p>
             </div>
           </div>
@@ -347,24 +366,32 @@ export const AIInvoiceScannerModal: React.FC = () => {
                     Ajustar Parámetros
                   </button>
 
-                  <div className="w-full sm:w-auto flex items-center gap-2">
-                    {isInsideProject ? (
+                  <div className="w-full sm:w-auto flex flex-col sm:flex-row items-center gap-2.5">
+                    {activeProject && (
                       <button
-                        onClick={handleApplyToActive}
-                        className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                        type="button"
+                        onClick={() => setShowOverwriteConfirm(true)}
+                        className={`w-full sm:w-auto px-4 py-2.5 rounded-xl border font-bold text-xs transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm ${
+                          isDark
+                            ? 'border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300'
+                            : 'border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900'
+                        }`}
+                        title={`Actualizar y reemplazar los parámetros del proyecto abierto (${activeProject.client.projectId})`}
                       >
-                        <Check className="w-4 h-4" />
-                        <span>Aplicar a Proyecto</span>
-                      </button>
-                    ) : (
-                      <button
-                        onClick={handleApplyAsNew}
-                        className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-                      >
-                        <Sparkles className="w-4 h-4 animate-pulse" />
-                        <span>Crear Propuesta (95% Lista) 🚀</span>
+                        <RefreshCw className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span className="truncate">Actualizar Proyecto Abierto ({activeProject.client.projectId})</span>
                       </button>
                     )}
+
+                    <button
+                      type="button"
+                      onClick={handleApplyAsNew}
+                      className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs transition-all shadow-md hover:shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                      title="Crear una nueva propuesta solar sin modificar ningún proyecto existente"
+                    >
+                      <PlusCircle className="w-4 h-4 text-emerald-100 shrink-0" />
+                      <span>Crear como Proyecto Nuevo ✨</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -382,6 +409,113 @@ export const AIInvoiceScannerModal: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* DIÁLOGO DE CONFIRMACIÓN DE SOBREESCRITURA */}
+      {showOverwriteConfirm && activeProject && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div
+            className={`w-full max-w-lg rounded-2xl border p-6 shadow-2xl flex flex-col gap-5 ${
+              isDark ? 'bg-[#181822] border-amber-500/40 text-zinc-100' : 'bg-white border-amber-300 text-slate-800'
+            }`}
+          >
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 shrink-0">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-base font-extrabold tracking-tight">
+                  ¿Sobrescribir Proyecto Existente?
+                </h4>
+                <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                  Estás a punto de reemplazar los parámetros técnicos, consumos y cliente del proyecto abierto en memoria con los datos de esta factura.
+                </p>
+              </div>
+            </div>
+
+            {/* Comparativa Visual */}
+            <div
+              className={`p-3.5 rounded-xl border text-xs space-y-2.5 ${
+                isDark ? 'bg-black/30 border-zinc-800' : 'bg-slate-50 border-slate-200'
+              }`}
+            >
+              <div className="flex items-center justify-between pb-2 border-b border-dashed border-zinc-700/50">
+                <span className="text-zinc-400">Proyecto a modificar:</span>
+                <span className="font-mono font-bold text-amber-400">
+                  {activeProject.client.projectId}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-[11px]">
+                <div className="p-2.5 rounded-lg bg-zinc-800/40 border border-zinc-700/50">
+                  <span className="text-[10px] uppercase font-bold text-zinc-400 block mb-1">
+                    Cliente Actual en Memoria
+                  </span>
+                  <div className="font-bold truncate text-zinc-200" title={activeProject.client.name}>
+                    {activeProject.client.name || 'Sin Nombre'}
+                  </div>
+                  <div className="text-zinc-400 text-[10px] truncate">
+                    {activeProject.specs.panelCount} Paneles • {((activeProject.specs.panelCount * activeProject.specs.panelPowerW) / 1000).toFixed(2)} kWp
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-emerald-950/20 border border-emerald-500/30">
+                  <span className="text-[10px] uppercase font-bold text-emerald-400 block mb-1">
+                    Nueva Factura Escaneada
+                  </span>
+                  <div className="font-bold truncate text-emerald-300" title={extractedData?.clientName}>
+                    {extractedData?.clientName || 'Cliente Factura'}
+                  </div>
+                  <div className="text-zinc-400 text-[10px] truncate">
+                    {extractedData?.recommendedPanelCount || selectedPanel?.powerW
+                      ? `${extractedData?.recommendedPanelCount || 0} Paneles • ${(extractedData?.recommendedCapacityKWp || 0).toFixed(2)} kWp`
+                      : extractedData?.distributor || 'EDE'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Botones de Decisión */}
+            <div className="flex flex-col sm:flex-row items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowOverwriteConfirm(false)}
+                className={`w-full sm:w-auto px-4 py-2.5 rounded-xl border text-xs font-bold transition-colors cursor-pointer ${
+                  isDark ? 'border-zinc-700 hover:bg-zinc-800 text-zinc-300' : 'border-slate-300 hover:bg-slate-100 text-slate-700'
+                }`}
+              >
+                Cancelar
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOverwriteConfirm(false);
+                  handleApplyAsNew();
+                }}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>No, Crear Proyecto Nuevo (Recomendado)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowOverwriteConfirm(false);
+                  handleApplyToActive();
+                }}
+                className={`w-full sm:w-auto px-4 py-2.5 rounded-xl border text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
+                  isDark
+                    ? 'border-amber-500/60 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200'
+                    : 'border-amber-400 bg-amber-100 hover:bg-amber-200 text-amber-900'
+                }`}
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>Sí, Sobrescribir</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
