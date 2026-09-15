@@ -29,7 +29,9 @@ export interface ExtractedInvoiceData {
   // Utility & Tariff Data (Dominican Republic EDES: Edesur, Edeeste, Edenorte, CEPM)
   distributor: 'EDEESTE' | 'EDESUR' | 'EDENORTE' | 'CEPM';
   tariffCode: 'BTS1' | 'BTS2' | 'MTD' | 'BTD' | string;
-  energyCostPerKWhDOP?: number; // e.g. 10.35 DOP/kWh (Effective average or top tier)
+  energyCostPerKWhDOP?: number; // e.g. 10.35 or 13.09 DOP/kWh (Tarifa facturada o promedio efectivo)
+  energyCostPerKWhUSD?: number; // e.g. 0.2164 USD/kWh (Tarifa convertida a USD)
+  dopExchangeRate?: number;     // e.g. 60.50 DOP/USD (Tasa de cambio aplicada)
   marginalRateDOP?: number;     // e.g. 13.04 DOP/kWh (Top tier for BTS1 escalonado)
   energyTiers?: InvoiceTierBlock[];
   fixedChargeDOP?: number;      // e.g. 127.83 DOP or 210.15 DOP

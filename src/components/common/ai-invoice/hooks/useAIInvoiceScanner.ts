@@ -15,6 +15,7 @@ export function useAIInvoiceScanner() {
     openSettingsModal,
     geminiApiKey,
     geminiModel,
+    setGeminiModel,
     equipmentCatalog,
     activeProjectId,
     projects,
@@ -194,23 +195,45 @@ export function useAIInvoiceScanner() {
           });
         }
 
-        const res = await window.electronAPI.parseInvoiceWithAI({
-          fileBase64,
-          mimeType: selectedFile?.type || 'application/pdf',
-          fileName: selectedFile?.name || 'factura_desconocida',
-          apiKey: geminiApiKey,
-          model: geminiModel,
-          projectRequirementsText: cleanPrompt,
-          equipmentCatalog,
-          dopExchangeRate: activeProject?.rates?.usdExchangeRate || 60.0,
-          panelPowerW: activeProject?.specs?.panelPowerW || 620,
-          includeBattery,
-        });
-
-        if (!res.success || !res.data) {
-          throw new Error(res.error || 'Error al procesar la factura con IA en Electron.');
+        // Sanear modelo si es gemini-3.8-flash-high (sin capacidad / 503 en servidores de Google)
+        const modelToRequest = (geminiModel && !geminiModel.includes('3.8')) ? geminiModel : 'gemini-2.0-flash';
+        if (geminiModel && geminiModel.includes('3.8')) {
+          setGeminiModel('gemini-2.0-flash');
         }
-        result = res.data;
+
+        try {
+          const res = await window.electronAPI.parseInvoiceWithAI({
+            fileBase64,
+            mimeType: selectedFile?.type || 'application/pdf',
+            fileName: selectedFile?.name || 'factura_desconocida',
+            apiKey: geminiApiKey,
+            model: modelToRequest,
+            projectRequirementsText: cleanPrompt,
+            equipmentCatalog,
+            dopExchangeRate: activeProject?.rates?.usdExchangeRate || 60.0,
+            panelPowerW: activeProject?.specs?.panelPowerW || 620,
+            includeBattery,
+          });
+
+          if (!res.success || !res.data) {
+            throw new Error(res.error || 'Error al procesar la factura con IA en Electron.');
+          }
+          result = res.data;
+        } catch (ipcErr: any) {
+          console.warn('[AIInvoiceScanner] Intento por Electron falló o modelo saturado (503). Conectando fallback web con modelos de alta disponibilidad...', ipcErr);
+          result = await parseInvoiceWithGemini({
+            fileBase64,
+            mimeType: selectedFile?.type || 'application/pdf',
+            fileName: selectedFile?.name || 'factura_desconocida',
+            apiKey: geminiApiKey,
+            model: 'gemini-2.0-flash',
+            panelPowerW: activeProject?.specs?.panelPowerW || 620,
+            projectRequirementsText: cleanPrompt,
+            equipmentCatalog,
+            dopExchangeRate: activeProject?.rates?.usdExchangeRate || 60.0,
+            includeBattery,
+          });
+        }
       } else {
         // Entorno Web (Fallback directo)
         let base64 = '';
@@ -227,12 +250,17 @@ export function useAIInvoiceScanner() {
           });
         }
 
+        const modelToRequest = (geminiModel && !geminiModel.includes('3.8')) ? geminiModel : 'gemini-2.0-flash';
+        if (geminiModel && geminiModel.includes('3.8')) {
+          setGeminiModel('gemini-2.0-flash');
+        }
+
         result = await parseInvoiceWithGemini({
           fileBase64: base64,
           mimeType: selectedFile?.type || 'application/pdf',
           fileName: selectedFile?.name || 'factura_desconocida',
           apiKey: geminiApiKey,
-          model: geminiModel,
+          model: modelToRequest,
           projectRequirementsText: cleanPrompt,
           equipmentCatalog,
           dopExchangeRate: activeProject?.rates?.usdExchangeRate || 60.0,
@@ -566,6 +594,7 @@ export function useAIInvoiceScanner() {
     activeProject,
     isInsideProject,
     isDark,
+    dopExchangeRate: activeProject?.rates?.usdExchangeRate || 60.50,
 
     // State
     selectedFile,

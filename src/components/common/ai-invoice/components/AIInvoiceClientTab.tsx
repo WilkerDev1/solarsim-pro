@@ -8,6 +8,7 @@ interface AIInvoiceClientTabProps {
   extractedData: ExtractedInvoiceData;
   setExtractedData: React.Dispatch<React.SetStateAction<ExtractedInvoiceData | null>>;
   onProvinceChange?: (province: string) => void;
+  dopExchangeRate?: number;
 }
 
 export const AIInvoiceClientTab: React.FC<AIInvoiceClientTabProps> = ({
@@ -15,7 +16,9 @@ export const AIInvoiceClientTab: React.FC<AIInvoiceClientTabProps> = ({
   extractedData,
   setExtractedData,
   onProvinceChange,
+  dopExchangeRate = 60.50,
 }) => {
+  const effectiveExchangeRate = dopExchangeRate > 0 ? dopExchangeRate : 60.50;
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -136,6 +139,86 @@ export const AIInvoiceClientTab: React.FC<AIInvoiceClientTabProps> = ({
             onChange={(e) => setExtractedData({ ...extractedData, tariffCode: e.target.value })}
             placeholder="Ej. BTD, BTS1, BTS2, MTD"
             className={`w-full px-3 py-2 rounded-xl border text-xs font-mono font-bold outline-none focus:ring-2 focus:ring-emerald-500 ${
+              isDark ? 'bg-[#181822] border-[#2e2e40] text-white' : 'bg-white border-slate-300 text-slate-900'
+            }`}
+          />
+        </div>
+
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] font-bold uppercase text-zinc-400">
+              Tarifa Facturada (RD$/kWh)
+            </label>
+            <span className="text-[9px] text-cyan-400 font-bold">Distribuidora</span>
+          </div>
+          <input
+            type="number"
+            step="0.01"
+            value={extractedData.energyCostPerKWhDOP !== undefined ? extractedData.energyCostPerKWhDOP : ''}
+            onChange={(e) => {
+              const val = e.target.value === '' ? undefined : parseFloat(e.target.value);
+              const convertedUSD = val !== undefined && !isNaN(val) && effectiveExchangeRate > 0
+                ? Number((val / effectiveExchangeRate).toFixed(4))
+                : undefined;
+              setExtractedData({
+                ...extractedData,
+                energyCostPerKWhDOP: val !== undefined && !isNaN(val) ? val : undefined,
+                energyCostPerKWhUSD: convertedUSD,
+              });
+            }}
+            placeholder="Ej. 13.09"
+            className={`w-full px-3 py-2 rounded-xl border text-xs font-mono font-bold outline-none focus:ring-2 focus:ring-emerald-500 ${
+              isDark ? 'bg-[#181822] border-[#2e2e40] text-cyan-300' : 'bg-white border-slate-300 text-cyan-700'
+            }`}
+          />
+        </div>
+
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] font-bold uppercase text-zinc-400">
+              Tarifa Convertida ($/kWh USD)
+            </label>
+            <span className="text-[9px] text-emerald-400 font-mono font-bold">1 USD = RD$ {effectiveExchangeRate.toFixed(2)}</span>
+          </div>
+          <input
+            type="number"
+            step="0.0001"
+            value={extractedData.energyCostPerKWhUSD !== undefined ? extractedData.energyCostPerKWhUSD : ''}
+            onChange={(e) => {
+              const val = e.target.value === '' ? undefined : parseFloat(e.target.value);
+              const convertedDOP = val !== undefined && !isNaN(val) && effectiveExchangeRate > 0
+                ? Number((val * effectiveExchangeRate).toFixed(2))
+                : undefined;
+              setExtractedData({
+                ...extractedData,
+                energyCostPerKWhUSD: val !== undefined && !isNaN(val) ? val : undefined,
+                energyCostPerKWhDOP: convertedDOP,
+              });
+            }}
+            placeholder="Ej. 0.2164"
+            className={`w-full px-3 py-2 rounded-xl border text-xs font-mono font-bold outline-none focus:ring-2 focus:ring-emerald-500 ${
+              isDark ? 'bg-[#181822] border-[#2e2e40] text-emerald-400' : 'bg-white border-slate-300 text-emerald-700'
+            }`}
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-[10px] font-bold uppercase text-zinc-400">
+            Cargo Fijo Facturado (RD$)
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            value={extractedData.fixedChargeDOP !== undefined ? extractedData.fixedChargeDOP : ''}
+            onChange={(e) => {
+              const val = e.target.value === '' ? undefined : parseFloat(e.target.value);
+              setExtractedData({
+                ...extractedData,
+                fixedChargeDOP: val !== undefined && !isNaN(val) ? val : undefined,
+              });
+            }}
+            placeholder="Ej. 128.59"
+            className={`w-full px-3 py-2 rounded-xl border text-xs font-mono font-semibold outline-none focus:ring-2 focus:ring-emerald-500 ${
               isDark ? 'bg-[#181822] border-[#2e2e40] text-white' : 'bg-white border-slate-300 text-slate-900'
             }`}
           />

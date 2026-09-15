@@ -31,10 +31,10 @@ const normalizeProvinceName = (raw?: string): string => {
 
 export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
   geminiApiKey: '',
-  geminiModel: 'gemini-3.5-flash-lite',
+  geminiModel: 'gemini-2.0-flash',
 
   setGeminiApiKey: (key) => set({ geminiApiKey: key }),
-  setGeminiModel: (model) => set({ geminiModel: model }),
+  setGeminiModel: (model) => set({ geminiModel: (model && !model.includes('3.8') && !model.includes('high')) ? model : 'gemini-2.0-flash' }),
 
   applyExtractedInvoice: (data, createNewProject = false) => {
     const resolvedProvince = normalizeProvinceName(data.province || data.municipality);
@@ -149,9 +149,11 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
             targetCoveragePct: data.targetCoveragePct ?? 95,
             distributor: data.distributor,
             tariffCode: data.tariffCode,
-            ...(data.energyCostPerKWhDOP
-              ? { energyCostPerKWh: Math.round((data.energyCostPerKWhDOP / 60) * 100) / 100 }
-              : {}),
+            ...(data.energyCostPerKWhUSD
+              ? { energyCostPerKWh: Number(data.energyCostPerKWhUSD.toFixed(4)) }
+              : data.energyCostPerKWhDOP
+                ? { energyCostPerKWh: Number((data.energyCostPerKWhDOP / (data.dopExchangeRate || BENCHMARK_PROJECT.rates.usdExchangeRate || 60.5)).toFixed(4)) }
+                : {}),
           },
           monthlyConsumption:
             data.monthlyConsumptionKWh && data.monthlyConsumptionKWh.length === 12
@@ -268,9 +270,11 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
               targetCoveragePct: data.targetCoveragePct ?? p.rates.targetCoveragePct ?? 95,
               distributor: data.distributor || p.rates.distributor,
               tariffCode: data.tariffCode || p.rates.tariffCode,
-              ...(data.energyCostPerKWhDOP
-                ? { energyCostPerKWh: Math.round((data.energyCostPerKWhDOP / p.rates.usdExchangeRate) * 100) / 100 }
-                : {}),
+              ...(data.energyCostPerKWhUSD
+                ? { energyCostPerKWh: Number(data.energyCostPerKWhUSD.toFixed(4)) }
+                : data.energyCostPerKWhDOP
+                  ? { energyCostPerKWh: Number((data.energyCostPerKWhDOP / (p.rates.usdExchangeRate || data.dopExchangeRate || 60.5)).toFixed(4)) }
+                  : {}),
             },
             monthlyConsumption:
               data.monthlyConsumptionKWh && data.monthlyConsumptionKWh.length === 12

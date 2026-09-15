@@ -31,6 +31,7 @@ export const AIInvoiceScannerModal: React.FC = () => {
     activeProject,
     isInsideProject,
     isDark,
+    dopExchangeRate,
 
     // State
     selectedFile,
@@ -274,6 +275,7 @@ export const AIInvoiceScannerModal: React.FC = () => {
                       extractedData={extractedData}
                       setExtractedData={setExtractedData}
                       onProvinceChange={handleProvinceChange}
+                      dopExchangeRate={dopExchangeRate}
                     />
                   )}
 
@@ -288,6 +290,7 @@ export const AIInvoiceScannerModal: React.FC = () => {
                       peakMonthName={peakMonthName}
                       handleTogglePeakMonthMode={handleTogglePeakMonthMode}
                       handleUpdateMonthlyConsumption={handleUpdateMonthlyConsumption}
+                      dopExchangeRate={dopExchangeRate}
                     />
                   )}
 

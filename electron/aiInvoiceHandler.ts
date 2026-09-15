@@ -28,17 +28,19 @@ REGLAS DE EXTRACCIÓN DETALLADAS PARA FACTURAS DOMINICANAS (EDEESTE, EDESUR, EDE
    - Periodo de facturación y Días facturados: ej. 31 días.
    - Factor de Potencia / Eficiencia: ej. 0.97 si aplica.
 
-4. DESGLOSE ECONÓMICO Y ESTRUCTURA TARIFARIA:
-   - Cargo fijo: Valor en RD$ (ej. 127.83 o 210.15).
-   - Estructura de Energía (RD$/kWh):
-     * Para tarifa plana (ej. BTD): un solo precio por kWh (ej. RD$ 9.02/kWh).
-     * Para tarifa escalonada (ej. BTS1): bloques como 200 kWh x RD$ 6.17, 100 kWh x RD$ 8.71, 373 kWh x RD$ 13.04.
-     * En 'energyCostPerKWhDOP', calcula el precio medio efectivo ponderado de la energía (Total RD$ Energía / Total kWh).
-     * En 'marginalRateDOP', guarda la tarifa marginal del escalón más alto (ej. 13.04 RD$/kWh).
-   - Potencia Máxima (Demanda en kW) y su costo por kW: si aplica para BTD/MTD (ej. 6.266 kW).
-   - Importe Total: "VALOR TOTAL A PAGAR EN RD$" o "IMPORTE TOTAL" (ej. 7,096.75 o 17,394.01).
-   - Subsidio Estatal: "IMPORTE SUBSIDIADO EN RD$" o "APORTE TOTAL GOBIERNO RD$" (ej. 3,736.69 o 14,286.18).
-   - Importe sin Subsidio: "IMPORTE SIN SUBSIDIO EN RD$" (ej. 10,833.44 o 31,680.19).
+4. DESGLOSE ECONÓMICO Y TARIFA DE ENERGÍA COBRADA AL CLIENTE ("CALCULO DE LA FACTURA"):
+   - Tarifa de Energía facturada en RD$/kWh ('energyCostPerKWhDOP'):
+     * Busca con máxima prioridad en el cuadro "CALCULO DE LA FACTURA", "DETALLE DE FACTURACIÓN" o "LIQUIDACIÓN".
+     * En facturas de EDESUR / EDEESTE / EDENORTE bajo el concepto "Energía" o "Consumo Activa", busca el renglón de cálculo: ej. "2394 kWh X RD$ 13.09" o "RD$ 13.09/kWh".
+     * Si la factura muestra la tarifa unitaria directa (ej. 13.09 en "2394 kWh X RD$ 13.09"), EXTRAE exactamente ese valor numérico en 'energyCostPerKWhDOP' (13.09).
+     * Si la factura desglosa bloques escalonados (ej. 0-200 a 6.17, 201-300 a 8.71, etc.), calcula el costo medio de la energía: (Total RD$ Energía / Total kWh Energía facturados).
+     * NUNCA dejes 'energyCostPerKWhDOP' en blanco si la factura contiene el cálculo de energía.
+   - Cargo fijo: Valor en RD$ (ej. 128.59, 127.83 o 210.15).
+   - Tarifa Marginal ('marginalRateDOP'): Tarifa del escalón más alto alcanzado (ej. 13.09 o 13.26 RD$/kWh).
+   - Potencia Máxima (Demanda en kW) y su costo por kW: si aplica para BTD/MTD (ej. 7.256 kW).
+   - Importe Total: "VALOR TOTAL A PAGAR EN RD$" o "IMPORTE TOTAL" (ej. 31,466.05 o 7,096.75).
+   - Subsidio Estatal: "APORTE TOTAL GOBIERNO RD$" o "IMPORTE SUBSIDIADO EN RD$" (ej. 5,202.91).
+   - Importe sin Subsidio: "IMPORTE TOTAL SIN SUBSIDIO RD$" (ej. 36,668.96).
 
 5. HISTÓRICO DE CONSUMOS (TABLA MM/AA O MM/AAAA Y GRÁFICA DE 12 MESES):
    - En la tabla "HISTÓRICO DE CONSUMOS", los meses pueden venir en formato MM/AAAA (ej. 04/2025... 04/2026 en Edeeste) o MM/AA (ej. 04/25... 04/26 en Edesur).
@@ -424,10 +426,17 @@ export function registerAIInvoiceHandlers() {
         });
       }
 
-      const primaryModel = model?.trim() || 'gemini-2.0-flash';
+      const cleanModel = model?.trim();
+      const primaryModel = (cleanModel && !cleanModel.includes('3.8') && !cleanModel.includes('high')) ? cleanModel : 'gemini-2.0-flash';
       const candidateModels = Array.from(
-        new Set([primaryModel, 'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-3.7-flash', 'gemini-3.5-flash-lite'])
-      ).filter(Boolean);
+        new Set([
+          primaryModel,
+          'gemini-2.0-flash',
+          'gemini-1.5-flash',
+          'gemini-2.0-flash-lite',
+          'gemini-2.5-flash',
+        ])
+      ).filter((m) => m && !m.includes('3.8') && !m.includes('high'));
 
       let rawText: string | undefined;
       let lastError: any = null;
@@ -435,7 +444,7 @@ export function registerAIInvoiceHandlers() {
       for (let mIdx = 0; mIdx < candidateModels.length; mIdx++) {
         const currentModel = candidateModels[mIdx];
         const url = `${GEMINI_API_BASE}/models/${currentModel}:generateContent?key=${apiKey.trim()}`;
-        const isThinkingModel = currentModel.includes('3.7') || currentModel.includes('2.5');
+        const isThinkingModel = currentModel.includes('thinking') || currentModel.includes('3.7');
 
         const generationConfig: any = {
           temperature: 0.2,
@@ -1063,6 +1072,36 @@ export function registerAIInvoiceHandlers() {
         }
       }
 
+      // Extracción inteligente y blindada de la tarifa eléctrica en RD$ y conversión a USD
+      let finalEnergyCostDOP: number | undefined = parsed.energyCostPerKWhDOP && Number(parsed.energyCostPerKWhDOP) > 0
+        ? Number(parsed.energyCostPerKWhDOP)
+        : undefined;
+
+      // Fallback 1: Si no vino en el campo numérico pero la IA lo mencionó en las notas
+      if (!finalEnergyCostDOP) {
+        const combinedNotes = `${parsed.aiNotes || ''} ${parsed.notes || ''} ${parsed.specialTechnicalNotes || ''}`;
+        const match = combinedNotes.match(/(?:tarifa|precio)(?:\s+de|\s*:)?\s*(?:RD\$?)?\s*([\d,.]+)\s*(?:\/|\s*por\s*)?kWh/i);
+        if (match && match[1]) {
+          const val = parseFloat(match[1].replace(/,/g, ''));
+          if (val > 0 && val < 60) {
+            finalEnergyCostDOP = val;
+          }
+        }
+      }
+
+      // Fallback 2: Deducción por importe facturado y consumo actual
+      if (!finalEnergyCostDOP && parsed.totalBilledAmountDOP && parsed.currentBilledKWh && Number(parsed.currentBilledKWh) > 0) {
+        const deduced = (Number(parsed.totalBilledAmountDOP) - (Number(parsed.fixedChargeDOP) || 0)) / Number(parsed.currentBilledKWh);
+        if (deduced > 3 && deduced < 50) {
+          finalEnergyCostDOP = Number(deduced.toFixed(2));
+        }
+      }
+
+      const effectiveExchangeRate = dopExchangeRate > 0 ? dopExchangeRate : 60.50;
+      const finalEnergyCostUSD = finalEnergyCostDOP
+        ? Number((finalEnergyCostDOP / effectiveExchangeRate).toFixed(4))
+        : undefined;
+
       const result = {
         clientName: cleanName,
         companyName: parsed.companyName || undefined,
@@ -1081,7 +1120,9 @@ export function registerAIInvoiceHandlers() {
           ? parsed.distributor
           : 'EDEESTE') as any,
         tariffCode: parsed.tariffCode || 'BTS1',
-        energyCostPerKWhDOP: parsed.energyCostPerKWhDOP || undefined,
+        energyCostPerKWhDOP: finalEnergyCostDOP,
+        energyCostPerKWhUSD: finalEnergyCostUSD,
+        dopExchangeRate: effectiveExchangeRate,
         marginalRateDOP: parsed.marginalRateDOP || undefined,
         fixedChargeDOP: parsed.fixedChargeDOP || undefined,
         peakDemandKW: parsed.peakDemandKW || undefined,

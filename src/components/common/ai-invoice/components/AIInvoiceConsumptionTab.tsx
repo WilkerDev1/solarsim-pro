@@ -12,6 +12,7 @@ interface AIInvoiceConsumptionTabProps {
   peakMonthName: string;
   handleTogglePeakMonthMode: () => void;
   handleUpdateMonthlyConsumption: (index: number, val: number) => void;
+  dopExchangeRate?: number;
 }
 
 export const AIInvoiceConsumptionTab: React.FC<AIInvoiceConsumptionTabProps> = ({
@@ -23,7 +24,12 @@ export const AIInvoiceConsumptionTab: React.FC<AIInvoiceConsumptionTabProps> = (
   peakMonthName,
   handleTogglePeakMonthMode,
   handleUpdateMonthlyConsumption,
+  dopExchangeRate = 60.50,
 }) => {
+  const effectiveExchangeRate = dopExchangeRate > 0 ? dopExchangeRate : 60.50;
+  const computedUSD = extractedData.energyCostPerKWhUSD
+    || (extractedData.energyCostPerKWhDOP ? Number((extractedData.energyCostPerKWhDOP / effectiveExchangeRate).toFixed(4)) : undefined);
+
   return (
     <div className="space-y-4">
       {/* Summary Cards */}
@@ -53,10 +59,15 @@ export const AIInvoiceConsumptionTab: React.FC<AIInvoiceConsumptionTabProps> = (
             isDark ? 'bg-[#1a1a26] border-[#2e2e44]' : 'bg-white border-slate-200'
           }`}
         >
-          <span className="text-[9px] uppercase font-bold text-zinc-400 block">Precio Energía</span>
-          <p className="text-base font-extrabold text-cyan-400 font-mono">
+          <span className="text-[9px] uppercase font-bold text-zinc-400 block">Tarifa Energía Facturada</span>
+          <p className="text-base font-extrabold text-cyan-400 font-mono leading-tight">
             {extractedData.energyCostPerKWhDOP ? `RD$ ${extractedData.energyCostPerKWhDOP.toFixed(2)}` : 'N/D'}
           </p>
+          {computedUSD !== undefined && (
+            <span className="text-[10px] font-mono text-emerald-400 font-bold block mt-0.5">
+              ≈ ${computedUSD.toFixed(4)} USD/kWh
+            </span>
+          )}
         </div>
         <div
           className={`p-3 rounded-xl border ${
