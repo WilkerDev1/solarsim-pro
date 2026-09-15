@@ -384,8 +384,8 @@ export const ShareProposalModal: React.FC<ShareProposalModalProps> = (props) => 
                 </button>
               </div>
 
-              {/* Regenerate Button */}
-              <div className="text-center pt-2">
+              {/* Regenerate Button & History Link */}
+              <div className="flex flex-col items-center gap-1.5 pt-2">
                 <button
                   type="button"
                   onClick={handleGenerateLink}
@@ -394,6 +394,18 @@ export const ShareProposalModal: React.FC<ShareProposalModalProps> = (props) => 
                 >
                   <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
                   <span>Regenerar con nueva vigencia ({validityDays} días)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    store.openSettingsModal('cloudflare');
+                  }}
+                  className="text-[11px] text-slate-400 hover:text-orange-400 dark:hover:text-orange-300 transition-colors inline-flex items-center gap-1.5 cursor-pointer pt-1"
+                >
+                  <Globe className="w-3 h-3" />
+                  <span>Ver historial completo de propuestas en Ajustes</span>
                 </button>
               </div>
             </div>

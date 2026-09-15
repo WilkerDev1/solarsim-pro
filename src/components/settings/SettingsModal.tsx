@@ -5,6 +5,7 @@ import { ProfileSection } from './sections/ProfileSection';
 import { SimulationPreferencesSection } from './sections/SimulationPreferencesSection';
 import { IntegrationsSection } from './sections/IntegrationsSection';
 import { EquipmentSection } from './sections/EquipmentSection';
+import { CloudflareProposalsSection } from './sections/CloudflareProposalsSection';
 import { OrganizationSection } from './sections/OrganizationSection';
 import { BackupSection } from './sections/BackupSection';
 
@@ -31,7 +32,8 @@ export const SettingsModal: React.FC = () => {
       const tabToSectionMap: Record<string, string> = {
         ai: 'integraciones',
         sync: 'integraciones',
-        share: 'integraciones',
+        share: 'cloudflare',
+        cloudflare: 'cloudflare',
         equipment: 'catalogo',
         account: 'cuenta',
       };
@@ -52,7 +54,7 @@ export const SettingsModal: React.FC = () => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    const sections = ['cuenta', 'preferencias', 'integraciones', 'catalogo', 'organizacion', 'respaldo'];
+    const sections = ['cuenta', 'preferencias', 'integraciones', 'catalogo', 'cloudflare', 'organizacion', 'respaldo'];
 
     const handleScroll = () => {
       const scrollPos = container.scrollTop + 140;
@@ -125,12 +127,17 @@ export const SettingsModal: React.FC = () => {
 
           <hr className="border-slate-200/60 dark:border-[#27272a]" />
 
-          {/* 5. Organización & Equipo RBAC */}
+          {/* 5. Propuestas Web (Cloudflare Workers) */}
+          <CloudflareProposalsSection />
+
+          <hr className="border-slate-200/60 dark:border-[#27272a]" />
+
+          {/* 6. Organización & Equipo RBAC */}
           <OrganizationSection />
 
           <hr className="border-slate-200/60 dark:border-[#27272a]" />
 
-          {/* 6. Respaldo & Exportación */}
+          {/* 7. Respaldo & Exportación */}
           <BackupSection />
         </div>
       </main>

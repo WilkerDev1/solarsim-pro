@@ -560,6 +560,25 @@ export const IntegrationsSection: React.FC = () => {
                 <span>{workerTestResult.message}</span>
               </div>
             )}
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-xs mt-1">
+              <div className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
+                <Globe className="w-4 h-4 shrink-0" />
+                <span>Consulta la tabla gráfica con todas las propuestas creadas y su tiempo restante.</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const target = document.getElementById('sec-cloudflare');
+                  if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                }}
+                className="px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs shrink-0 transition-colors cursor-pointer"
+              >
+                Ver Historial Web ➡️
+              </button>
+            </div>
           </div>
         </div>
 

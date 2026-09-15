@@ -177,7 +177,7 @@ export interface UISlice {
   isAIPriceCatalogModalOpen: boolean;
   isShareModalOpen: boolean;
   isSettingsModalOpen: boolean;
-  settingsActiveTab: 'sync' | 'account' | 'share' | 'ai' | 'equipment';
+  settingsActiveTab: 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare';
   updateInfo: UpdateInfo;
   saveFeedbackMessage: string | null;
 
@@ -202,9 +202,9 @@ export interface UISlice {
   closeAISettingsModal: () => void;
   openShareModal: () => void;
   closeShareModal: () => void;
-  openSettingsModal: (tab?: 'sync' | 'account' | 'share' | 'ai' | 'equipment') => void;
+  openSettingsModal: (tab?: 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare') => void;
   closeSettingsModal: () => void;
-  setSettingsActiveTab: (tab: 'sync' | 'account' | 'share' | 'ai' | 'equipment') => void;
+  setSettingsActiveTab: (tab: 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare') => void;
   setUpdateInfo: (info: UpdateInfo) => void;
 
   toggleSidebarTheme: () => void;

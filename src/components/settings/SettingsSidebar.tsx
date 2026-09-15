@@ -6,6 +6,7 @@ import {
   Layers,
   Building2,
   Database,
+  Globe,
   ArrowLeft,
   Sun,
   Moon,
@@ -33,6 +34,7 @@ export const SettingsSidebar: React.FC<SettingsSidebarProps> = ({
     { id: 'preferencias', label: 'Preferencias de Simulación', icon: SlidersHorizontal },
     { id: 'integraciones', label: 'IA & Integraciones', icon: Sparkles },
     { id: 'catalogo', label: 'Catálogo de Equipos', icon: Layers },
+    { id: 'cloudflare', label: 'Propuestas Web (Cloudflare)', icon: Globe },
     { id: 'organizacion', label: 'Organización & Equipo', icon: Building2 },
     { id: 'respaldo', label: 'Respaldo & Exportación', icon: Database },
   ];

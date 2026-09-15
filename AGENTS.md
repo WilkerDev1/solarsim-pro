@@ -230,7 +230,10 @@ npx tsx src/tests/testTariffEngine.ts
 # Suite de validación de modelos Familia 3 y cascada de respaldo 503
 npx tsx src/tests/testGeminiFamily3Cascade.ts
 
-# Ejecutar todas las pruebas en conjunto (8 suites integradas)
+# Suite de validación de historial y vigencia de propuestas Cloudflare
+npx tsx src/tests/testCloudflareShareHistory.ts
+
+# Ejecutar todas las pruebas en conjunto (9 suites integradas)
 npm test
 
 # Compilar frontend y electron para producción
