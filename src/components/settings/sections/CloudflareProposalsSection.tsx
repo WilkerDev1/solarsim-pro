@@ -65,6 +65,7 @@ export const CloudflareProposalsSection: React.FC = () => {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [showClearExpiredConfirm, setShowClearExpiredConfirm] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Cargar historial
   const loadHistory = () => {
@@ -74,6 +75,20 @@ export const CloudflareProposalsSection: React.FC = () => {
 
   useEffect(() => {
     loadHistory();
+
+    // Auto-hidratación retroactiva en segundo plano para recuperar datos reales desde Cloudflare KV
+    const autoEnrich = async () => {
+      try {
+        const res = await ShareProposalService.hydrateFromCloudflare();
+        if (res.updatedCount > 0) {
+          loadHistory();
+          showToast(`¡${res.updatedCount} propuesta${res.updatedCount > 1 ? 's' : ''} actualizada${res.updatedCount > 1 ? 's' : ''} con datos reales desde Cloudflare! ✨`);
+        }
+      } catch {
+        // silencioso en auto
+      }
+    };
+    autoEnrich();
 
     // Escuchar actualizaciones reactivas si otra parte de la app comparte una propuesta
     const handleStorageUpdate = () => loadHistory();
@@ -89,6 +104,30 @@ export const CloudflareProposalsSection: React.FC = () => {
       clearInterval(intervalId);
     };
   }, []);
+
+  // Sincronización manual forzada bajo demanda
+  const handleSyncRealData = async () => {
+    setIsSyncing(true);
+    try {
+      // 1. Reconciliar con proyectos locales
+      ShareProposalService.reconcileWithLocalProjects();
+      loadHistory();
+
+      // 2. Hidratar desde Cloudflare Workers
+      const res = await ShareProposalService.hydrateFromCloudflare();
+      loadHistory();
+
+      if (res.updatedCount > 0) {
+        showToast(`¡${res.updatedCount} propuesta${res.updatedCount > 1 ? 's' : ''} sincronizada${res.updatedCount > 1 ? 's' : ''} con datos reales! ✨`);
+      } else {
+        showToast('Todas las propuestas activas ya tienen sus datos reales sincronizados ✅');
+      }
+    } catch {
+      showToast('Error al conectar con Cloudflare Workers para sincronizar ⚠️');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   // Mostrar mensaje toast temporal
   const showToast = (msg: string) => {
@@ -505,6 +544,21 @@ export const CloudflareProposalsSection: React.FC = () => {
               <span>Expirados ({expiredCount})</span>
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={handleSyncRealData}
+            disabled={isSyncing}
+            className={`px-3 py-1.5 rounded-xl border border-slate-200 dark:border-zinc-800 text-slate-600 dark:text-zinc-400 hover:text-emerald-500 hover:border-emerald-300 dark:hover:border-emerald-900/50 hover:bg-emerald-500/5 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+              isSyncing ? 'opacity-60 cursor-not-allowed' : ''
+            }`}
+            title="Sincronizar nombres reales de clientes, IDs y cotizaciones desde la nube de Cloudflare"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-emerald-500' : ''}`} />
+            <span className="hidden sm:inline">
+              {isSyncing ? 'Sincronizando...' : 'Sincronizar Nube'}
+            </span>
+          </button>
 
           {expiredCount > 0 && (
             <button

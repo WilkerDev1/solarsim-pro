@@ -1,5 +1,6 @@
 import { ProjectSimulation, FinancialSummaryResult } from '../types';
 import { ELECTSUN_LOGO_COLOR_BASE64 } from '../assets/electsunLogo';
+import { useSimulationStore } from '../store/useSimulationStore';
 
 export interface ShareResult {
   success: boolean;
@@ -219,6 +220,11 @@ export class ShareProposalService {
    * Obtiene la lista completa de todas las propuestas web generadas en Cloudflare.
    * Auto-migra cualquier clave suelta de tipo solarsim_last_share_* presente en el navegador.
    */
+  /**
+   * Obtiene la lista completa de todas las propuestas web generadas en Cloudflare.
+   * Auto-migra cualquier clave suelta de tipo solarsim_last_share_* presente en el navegador
+   * y reconcilia retroactivamente los nombres y códigos de proyectos locales existentes.
+   */
   public static getSharedHistory(): SharedProposalRecord[] {
     try {
       const raw = localStorage.getItem(STORAGE_SHARED_HISTORY_KEY);
@@ -257,6 +263,13 @@ export class ShareProposalService {
         }
       }
 
+      // Reconciliación local automática con proyectos de la tienda Zustand
+      const { updatedRecords, hasChanges } = this.reconcileWithLocalProjects(history);
+      if (hasChanges) {
+        history = updatedRecords;
+        hasMigration = true;
+      }
+
       if (hasMigration) {
         localStorage.setItem(STORAGE_SHARED_HISTORY_KEY, JSON.stringify(history));
       }
@@ -267,6 +280,230 @@ export class ShareProposalService {
     } catch (err) {
       console.error('Error al leer el historial de propuestas compartidas:', err);
       return [];
+    }
+  }
+
+  /**
+   * Reconcilia registros del historial con los proyectos locales de la tienda Zustand.
+   * Si un registro contiene valores genéricos/marcador ('Propuesta Solar', 'proj-...', 'C-0001')
+   * y el proyecto correspondiente existe localmente, enriquece los metadatos reales al instante.
+   */
+  public static reconcileWithLocalProjects(records?: SharedProposalRecord[]): {
+    updatedRecords: SharedProposalRecord[];
+    hasChanges: boolean;
+  } {
+    try {
+      let localProjects: ProjectSimulation[] = [];
+      try {
+        const store = useSimulationStore.getState();
+        if (store && Array.isArray(store.projects)) {
+          localProjects = store.projects;
+        }
+      } catch {
+        // Entorno sin Zustand (tests unitarios aislados)
+      }
+
+      const list = records ? [...records] : (JSON.parse(localStorage.getItem(STORAGE_SHARED_HISTORY_KEY) || '[]') as SharedProposalRecord[]);
+      if (!localProjects.length || !list.length) {
+        return { updatedRecords: list, hasChanges: false };
+      }
+
+      let hasChanges = false;
+      const updated = list.map((record) => {
+        const matched = localProjects.find((p) => p.id === record.projectId);
+        if (!matched) return record;
+
+        let changed = false;
+        const newRec = { ...record };
+
+        const isGenericName =
+          !newRec.clientName ||
+          newRec.clientName === 'Propuesta Solar' ||
+          newRec.clientName === 'Cliente Solar' ||
+          newRec.clientName === 'Cliente';
+
+        if (isGenericName && matched.client?.name) {
+          newRec.clientName = matched.client.name;
+          changed = true;
+        }
+
+        const isGenericCode =
+          !newRec.projectCode ||
+          newRec.projectCode === newRec.projectId ||
+          newRec.projectCode.startsWith('proj-');
+
+        if (isGenericCode && matched.client?.projectId) {
+          newRec.projectCode = matched.client.projectId;
+          changed = true;
+        }
+
+        const isGenericQuote =
+          !newRec.quoteNumber ||
+          newRec.quoteNumber === 'C-0001';
+
+        if (isGenericQuote && matched.client?.quoteNumber && matched.client.quoteNumber !== 'C-0001') {
+          newRec.quoteNumber = matched.client.quoteNumber;
+          changed = true;
+        }
+
+        if (!newRec.systemKWp || newRec.systemKWp === 0) {
+          const kwp = Number(
+            (((matched.specs?.panelCount || 0) * (matched.specs?.panelPowerW || 0)) / 1000).toFixed(2)
+          );
+          if (kwp > 0) {
+            newRec.systemKWp = kwp;
+            changed = true;
+          }
+        }
+
+        if (!newRec.location && (matched.client?.province || matched.client?.location)) {
+          newRec.location = matched.client.province || matched.client.location;
+          changed = true;
+        }
+
+        if (!newRec.companyName && matched.client?.company) {
+          newRec.companyName = matched.client.company;
+          changed = true;
+        }
+
+        if (changed) {
+          hasChanges = true;
+          return newRec;
+        }
+        return record;
+      });
+
+      if (hasChanges && !records) {
+        localStorage.setItem(STORAGE_SHARED_HISTORY_KEY, JSON.stringify(updated));
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('solarsim_shared_links_updated'));
+        }
+      }
+
+      return { updatedRecords: updated, hasChanges };
+    } catch (err) {
+      console.error('Error reconciliando historial con proyectos locales:', err);
+      return { updatedRecords: records || [], hasChanges: false };
+    }
+  }
+
+  /**
+   * Consulta el Worker de Cloudflare para enriquecer metadatos reales de propuestas activas
+   * (nombres de cliente, IDs formales SP-2026-..., números de cotización C-010X y potencias kWp).
+   */
+  public static async hydrateFromCloudflare(
+    customWorkerUrl?: string
+  ): Promise<{ updatedCount: number; errors: number }> {
+    try {
+      const history = this.getSharedHistory();
+      if (!history.length) return { updatedCount: 0, errors: 0 };
+
+      // Identificar propuestas que aún tengan nombres o códigos de marcador de posición
+      const needsHydration = history.filter((r) => {
+        const isGenericName =
+          !r.clientName ||
+          r.clientName === 'Propuesta Solar' ||
+          r.clientName === 'Cliente Solar' ||
+          r.clientName === 'Cliente';
+        const isGenericCode =
+          !r.projectCode ||
+          r.projectCode === r.projectId ||
+          r.projectCode.startsWith('proj-');
+        const isGenericQuote = !r.quoteNumber || r.quoteNumber === 'C-0001';
+        return isGenericName || isGenericCode || isGenericQuote || !r.systemKWp;
+      });
+
+      if (!needsHydration.length) {
+        return { updatedCount: 0, errors: 0 };
+      }
+
+      const baseUrl = (customWorkerUrl || this.getWorkerUrl()).replace(/\/+$/, '');
+      const ids = needsHydration.map((r) => r.id);
+
+      let updatedCount = 0;
+      let errors = 0;
+
+      // 1. Intentar con el endpoint de lote POST /api/share/hydrate
+      try {
+        const res = await fetch(`${baseUrl}/api/share/hydrate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.success && Array.isArray(data.proposals)) {
+            let hasChanges = false;
+            for (const prop of data.proposals) {
+              const idx = history.findIndex((h) => h.id === prop.id);
+              if (idx >= 0) {
+                history[idx] = {
+                  ...history[idx],
+                  clientName: prop.clientName || history[idx].clientName,
+                  projectCode: prop.projectCode || history[idx].projectCode,
+                  quoteNumber: prop.quoteNumber || history[idx].quoteNumber,
+                  systemKWp: prop.systemKWp || history[idx].systemKWp,
+                  location: prop.location || history[idx].location,
+                  companyName: prop.companyName || history[idx].companyName,
+                };
+                updatedCount++;
+                hasChanges = true;
+              }
+            }
+            if (hasChanges) {
+              localStorage.setItem(STORAGE_SHARED_HISTORY_KEY, JSON.stringify(history));
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('solarsim_shared_links_updated'));
+              }
+              return { updatedCount, errors };
+            }
+          }
+        }
+      } catch (batchErr) {
+        console.warn('Batch hydration fallo, intentando fallback individual:', batchErr);
+      }
+
+      // 2. Fallback individual GET /api/share/:id para cualquier elemento pendiente
+      for (const rec of needsHydration) {
+        try {
+          const res = await fetch(`${baseUrl}/api/share/${rec.id}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.success) {
+              const idx = history.findIndex((h) => h.id === rec.id);
+              if (idx >= 0) {
+                history[idx] = {
+                  ...history[idx],
+                  clientName: data.clientName || history[idx].clientName,
+                  projectCode: data.projectCode || history[idx].projectCode,
+                  quoteNumber: data.quoteNumber || history[idx].quoteNumber,
+                  systemKWp: data.systemKWp || history[idx].systemKWp,
+                  location: data.location || history[idx].location,
+                  companyName: data.companyName || history[idx].companyName,
+                };
+                updatedCount++;
+              }
+            }
+          } else {
+            errors++;
+          }
+        } catch {
+          errors++;
+        }
+      }
+
+      if (updatedCount > 0) {
+        localStorage.setItem(STORAGE_SHARED_HISTORY_KEY, JSON.stringify(history));
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('solarsim_shared_links_updated'));
+        }
+      }
+
+      return { updatedCount, errors };
+    } catch (err) {
+      console.error('Error general durante la hidratación de Cloudflare:', err);
+      return { updatedCount: 0, errors: 1 };
     }
   }
 

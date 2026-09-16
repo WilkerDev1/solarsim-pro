@@ -234,6 +234,62 @@ if (finalHistory.some((r) => r.id === 'prop-abc1')) {
 
 console.log(' ✅ PASS: Eliminación individual y purga de expirados funcionando al 100%\n');
 
-console.log('=====================================================');
-console.log('🎉 ALL CLOUDFLARE SHARE HISTORY TESTS PASSED (100% SUCCESS)');
-console.log('=====================================================\n');
+// --- TEST 7: Retroactive Reconciliation & Hydration of Real Client Data ---
+console.log('--- TEST 7: Local Reconciliation & Cloudflare Remote Hydration ---');
+
+// Insertar un registro con datos genéricos / placeholder
+const placeholderRecord: SharedProposalRecord = {
+  id: '3t4BpRw',
+  projectId: 'proj-1789507552987',
+  projectCode: 'proj-1789507552987',
+  quoteNumber: 'C-0001',
+  clientName: 'Propuesta Solar',
+  systemKWp: 0,
+  shareUrl: 'https://propuesta.electsun.net/p/3t4BpRw',
+  createdAt: new Date().toISOString(),
+  expiresAt: new Date(Date.now() + 7 * 86400 * 1000).toISOString(),
+  validityDays: 7,
+  workerUrl: DEFAULT_WORKER_URL,
+};
+ShareProposalService.saveSharedRecord(placeholderRecord);
+
+// Ejecutar hidratación remota desde Cloudflare Worker
+async function runAsyncTests() {
+  const hydrationResult = await ShareProposalService.hydrateFromCloudflare();
+  console.log('Cloudflare Hydration Result:', hydrationResult);
+
+  const hydratedList = ShareProposalService.getSharedHistory();
+  const hydratedRecord = hydratedList.find((r) => r.id === '3t4BpRw');
+
+  if (!hydratedRecord) {
+    throw new Error('❌ Failed to find 3t4BpRw in history after hydration');
+  }
+
+  console.log(`Hydrated Client Name: "${hydratedRecord.clientName}"`);
+  console.log(`Hydrated Project Code: "${hydratedRecord.projectCode}"`);
+  console.log(`Hydrated Quote Number: "${hydratedRecord.quoteNumber}"`);
+  console.log(`Hydrated System kWp: "${hydratedRecord.systemKWp}"`);
+
+  if (hydratedRecord.clientName === 'Propuesta Solar') {
+    throw new Error('❌ Client name was not hydrated from Cloudflare Worker');
+  }
+
+  if (hydratedRecord.projectCode === 'proj-1789507552987') {
+    throw new Error('❌ Project code was not hydrated from Cloudflare Worker');
+  }
+
+  if (hydratedRecord.quoteNumber === 'C-0001') {
+    throw new Error('❌ Quote number was not hydrated from Cloudflare Worker');
+  }
+
+  console.log(' ✅ PASS: Hidratación retroactiva desde Cloudflare Worker completada con éxito\n');
+
+  console.log('=====================================================');
+  console.log('🎉 ALL CLOUDFLARE SHARE HISTORY TESTS PASSED (100% SUCCESS)');
+  console.log('=====================================================\n');
+}
+
+runAsyncTests().catch((err) => {
+  console.error('❌ Test failed with error:', err);
+  process.exit(1);
+});

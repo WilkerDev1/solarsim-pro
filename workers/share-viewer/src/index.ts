@@ -78,6 +78,107 @@ app.post('/api/share', async (c) => {
   }
 });
 
+// Get Proposal Metadata as JSON
+app.get('/api/share/:id', async (c) => {
+  const id = c.req.param('id');
+  if (!id) {
+    return c.json({ success: false, error: 'Proposal ID is required.' }, 400);
+  }
+
+  try {
+    const raw = await c.env.PROPOSALS_KV.get(`proposal:${id}`);
+    if (!raw) {
+      return c.json({ success: false, error: 'Proposal not found or expired.' }, 404);
+    }
+
+    const stored: StoredProposal = JSON.parse(raw);
+    const client = stored.project?.client;
+    const specs = stored.project?.specs;
+    const systemKWp =
+      stored.summary?.systemCapacityKWp ||
+      (specs && specs.panelCount && specs.panelPowerW
+        ? Number(((specs.panelCount * specs.panelPowerW) / 1000).toFixed(2))
+        : 0);
+
+    const url = new URL(c.req.url);
+    const shareUrl = `${url.protocol}//${url.host}/p/${id}`;
+
+    return c.json({
+      success: true,
+      id: stored.id,
+      projectId: stored.project?.id || '',
+      clientName: client?.name || 'Cliente Solar',
+      projectCode: client?.projectId || stored.project?.id || 'SP-XXXX',
+      quoteNumber: client?.quoteNumber || 'C-0001',
+      systemKWp,
+      location: client?.province || client?.location || 'República Dominicana',
+      companyName: stored.project?.customization?.companyName || 'electsun',
+      createdAt: stored.createdAt,
+      expiresAt: stored.expiresAt,
+      validityDays: stored.validityDays,
+      shareUrl,
+    });
+  } catch (err: any) {
+    console.error(`Error retrieving proposal metadata for ${id}:`, err);
+    return c.json({ success: false, error: err?.message || 'Error fetching proposal.' }, 500);
+  }
+});
+
+// Batch Hydrate Metadata for multiple Proposal IDs
+app.post('/api/share/hydrate', async (c) => {
+  try {
+    const body = await c.req.json<{ ids: string[] }>();
+    if (!body || !Array.isArray(body.ids)) {
+      return c.json({ success: false, error: 'Array of proposal IDs is required.' }, 400);
+    }
+
+    const safeIds = body.ids.slice(0, 50);
+    const url = new URL(c.req.url);
+
+    const proposals = await Promise.all(
+      safeIds.map(async (id) => {
+        try {
+          const raw = await c.env.PROPOSALS_KV.get(`proposal:${id}`);
+          if (!raw) return null;
+          const stored: StoredProposal = JSON.parse(raw);
+          const client = stored.project?.client;
+          const specs = stored.project?.specs;
+          const systemKWp =
+            stored.summary?.systemCapacityKWp ||
+            (specs && specs.panelCount && specs.panelPowerW
+              ? Number(((specs.panelCount * specs.panelPowerW) / 1000).toFixed(2))
+              : 0);
+
+          return {
+            id: stored.id,
+            projectId: stored.project?.id || '',
+            clientName: client?.name || 'Cliente Solar',
+            projectCode: client?.projectId || stored.project?.id || 'SP-XXXX',
+            quoteNumber: client?.quoteNumber || 'C-0001',
+            systemKWp,
+            location: client?.province || client?.location || 'República Dominicana',
+            companyName: stored.project?.customization?.companyName || 'electsun',
+            createdAt: stored.createdAt,
+            expiresAt: stored.expiresAt,
+            validityDays: stored.validityDays,
+            shareUrl: `${url.protocol}//${url.host}/p/${id}`,
+          };
+        } catch {
+          return null;
+        }
+      })
+    );
+
+    return c.json({
+      success: true,
+      proposals: proposals.filter(Boolean),
+    });
+  } catch (err: any) {
+    console.error('Error hydrating proposals:', err);
+    return c.json({ success: false, error: err?.message || 'Internal Server Error' }, 500);
+  }
+});
+
 // Render the Interactive Proposal View
 app.get('/p/:id', async (c) => {
   const id = c.req.param('id');
