@@ -155,11 +155,6 @@ export function renderProposalPage(stored: StoredProposal): string {
     financials.pricePerWattUSD ||
     1.13
   ).toFixed(2);
-  const pricePerKWpUSD = Number(
-    (summary as any)?.salePricePerKWpUSD ||
-    (Number(systemCapacityKWp) > 0 ? (grossInvestmentUSD / Number(systemCapacityKWp)) : 0) ||
-    (Number(pricePerWattUSD) * 1000)
-  ).toFixed(2);
 
   const paybackYears = Number(summary?.paybackYears || 0).toFixed(1);
   const irrPct = Number(summary?.irrPct || 0).toFixed(1);
@@ -618,8 +613,8 @@ export function renderProposalPage(stored: StoredProposal): string {
             <span class="font-mono font-black text-orange-400 text-xs sm:text-sm shrink-0">US$ ${grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
           <div class="flex items-center justify-between gap-2 text-slate-700 pt-1 border-t border-sky-200 text-[10.5px] sm:text-[11px]">
-            <span class="font-bold">PRECIO POR KILOVATIO / WATT:</span>
-            <span class="font-mono font-black text-orange-600 shrink-0">US$ ${pricePerWattUSD} / W <span class="text-slate-500 font-normal text-[10px]">(US$ ${Number(pricePerKWpUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/kWp)</span></span>
+            <span class="font-bold">PRECIO POR WATT INSTALADO:</span>
+            <span class="font-mono font-black text-orange-600 shrink-0">US$ ${pricePerWattUSD} / W</span>
           </div>
         </div>
       </div>
