@@ -109,6 +109,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
       },
       specs: {
         ...BENCHMARK_PROJECT.specs,
+        pricingMode: defs?.defaultPricingMode === 'direct' ? 'direct_watt' : 'cost_matrix',
         panelPowerW: defs?.defaultPanelPowerW || 620,
         panelBrandModel: defs?.defaultPanelModel || BENCHMARK_PROJECT.specs.panelBrandModel,
         inverterBrandModel: defs?.defaultInverterModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)',

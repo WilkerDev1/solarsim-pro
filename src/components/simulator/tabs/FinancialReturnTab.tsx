@@ -349,8 +349,13 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
               <td className="py-2.5 px-4 text-slate-500 text-[11px] font-normal">Factor emisión red RD: {project.financials.co2FactorKgPerKWh || 0.481} kg CO2/kWh</td>
             </tr>
             <tr>
-              <td className="py-2.5 px-4 font-bold text-slate-800">Precio por Watt instalado</td>
-              <td className="py-2.5 px-4 text-right font-bold text-emerald-700">${(project.specs.pricePerWattUSD || project.financials.pricePerWattUSD).toFixed(2)} USD/W</td>
+              <td className="py-2.5 px-4 font-bold text-slate-800">Precio por Watt / kW instalado</td>
+              <td className="py-2.5 px-4 text-right font-bold text-emerald-700 font-mono">
+                ${(summary.salePricePerWattUSD ?? (summary.systemCapacityKWp > 0 ? summary.grossInvestmentUSD / (summary.systemCapacityKWp * 1000) : 0)).toFixed(2)} USD/W
+                <span className="text-xs text-slate-500 font-normal ml-1.5 font-sans">
+                  (${(summary.salePricePerKWpUSD ?? (summary.systemCapacityKWp > 0 ? summary.grossInvestmentUSD / summary.systemCapacityKWp : 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/kWp)
+                </span>
+              </td>
               <td className="py-2.5 px-4 text-slate-500 text-[11px] font-normal">Competitividad vs mercado</td>
             </tr>
           </tbody>

@@ -844,40 +844,33 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                       <div className={`p-2 rounded-lg border ${isDark ? 'bg-emerald-950/40 border-emerald-700/50' : 'bg-emerald-100/70 border-emerald-300'}`}>
                         <span className="text-[10px] text-emerald-400 block font-extrabold">Precio Venta</span>
                         <span className="font-mono font-extrabold text-xs text-emerald-400">
-                          ${(project.specs.pricePerWattUSD || autoSaleWp).toFixed(2)}
+                          ${autoSaleWp.toFixed(2)}
                         </span>
                         <span className="text-[9px] text-emerald-400/80 block">/Wp</span>
                       </div>
                     </div>
 
-                    {/* Input de Precio por Vatio con Sincronización Automática */}
+                    {/* Resumen de Precio de Venta Calculado en Tiempo Real */}
                     <div className={`p-2.5 rounded-lg border flex items-center justify-between gap-2 ${
                       isDark ? 'bg-[#13131a] border-[#282838]' : 'bg-white border-slate-200 shadow-2xs'
                     }`}>
                       <div className="flex-1 min-w-0">
                         <span className={`text-[10px] font-bold block ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                          Precio Aplicado a la Simulación:
+                          Precio de Venta en Factura y Simulación:
                         </span>
-                        <span className="text-[10px] text-zinc-400 block font-mono">
-                          ${(project.specs.pricePerWattUSD || autoSaleWp).toFixed(2)} USD/Wp • Total: ${(summary.grossInvestmentUSD || 0).toLocaleString()} USD
+                        <span className="text-[10.5px] text-emerald-600 dark:text-emerald-400 font-extrabold block font-mono">
+                          ${autoSaleWp.toFixed(2)} USD/Wp (${(summary?.costMatrix?.precioKilosVentasUSD || (autoSaleWp * 1000)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/kWp) • Total: ${(summary?.grossInvestmentUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
                         </span>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          updateSpecs({ pricePerWattUSD: autoSaleWp });
-                        }}
-                        className={`px-2.5 py-1 text-[10px] rounded-lg font-bold flex items-center gap-1 border transition-all cursor-pointer ${
-                          isDark
-                            ? 'bg-emerald-900/40 hover:bg-emerald-900/60 border-emerald-700/50 text-emerald-300'
-                            : 'bg-emerald-100 hover:bg-emerald-200 border-emerald-300 text-emerald-900 shadow-xs'
-                        }`}
-                        title="Sincronizar automáticamente con el precio calculado por la matriz de costos y margen"
-                      >
-                        <Sparkles className="w-3 h-3 text-emerald-400" />
-                        <span>Sincronizar</span>
-                      </button>
+                      <div className={`px-2.5 py-1 text-[10px] rounded-lg font-bold flex items-center gap-1 border ${
+                        isDark
+                          ? 'bg-emerald-900/30 border-emerald-700/40 text-emerald-400'
+                          : 'bg-emerald-50 border-emerald-300 text-emerald-800 shadow-2xs'
+                      }`}>
+                        <Sparkles className="w-3 h-3 text-emerald-500" />
+                        <span>En vivo</span>
+                      </div>
                     </div>
                   </div>
                 );

@@ -193,9 +193,16 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
                 <span>TOTAL GENERAL (USD) SI CALIFICA LEY 57-07 :</span>
                 <span>${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
-              <div className="flex justify-between text-slate-800 pt-1 border-t border-slate-300">
-                <span className="font-bold">PRECIO POR WATT (USD/W):</span>
-                <span className="font-bold text-emerald-800">${(project.specs.pricePerWattUSD || project.financials.pricePerWattUSD || (summary.solarInvestmentUSD / (summary.systemCapacityKWp * 1000)) || 1.13).toFixed(2)}</span>
+              <div className="flex justify-between items-center text-slate-800 pt-1 border-t border-slate-300">
+                <span className="font-bold">PRECIO POR KILOVATIO (USD/kWp):</span>
+                <div className="text-right">
+                  <span className="font-bold text-emerald-800 font-mono text-xs">
+                    ${(summary.salePricePerKWpUSD ?? (summary.systemCapacityKWp > 0 ? summary.grossInvestmentUSD / summary.systemCapacityKWp : 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD/kWp
+                  </span>
+                  <span className="text-[10.5px] text-slate-500 font-mono ml-1.5 font-bold">
+                    (${(summary.salePricePerWattUSD ?? (summary.systemCapacityKWp > 0 ? summary.grossInvestmentUSD / (summary.systemCapacityKWp * 1000) : 0)).toFixed(2)} USD/W)
+                  </span>
+                </div>
               </div>
             </div>
           </div>

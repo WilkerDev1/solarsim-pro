@@ -464,12 +464,23 @@ export function calculateFinancialSummary(
   // CO2 avoided calculation (tons/year)
   const co2AvoidedTonsPerYear = Math.round((annualProductionKWh * (financials.co2FactorKgPerKWh || 0.481) / 1000) * 10) / 10;
 
+  // Effective sale price per Watt and per kWp (dynamic across both cost matrix and direct watt modes):
+  const salePricePerWattUSD = dcCapacityKWp > 0
+    ? Math.round((grossInvestmentUSD / (dcCapacityKWp * 1000)) * 10000) / 10000
+    : (costMatrix.salePricePerWattUSD || effectivePricePerWatt || 1.13);
+
+  const salePricePerKWpUSD = dcCapacityKWp > 0
+    ? Math.round((grossInvestmentUSD / dcCapacityKWp) * 100) / 100
+    : (costMatrix.precioKilosVentasUSD || Math.round(salePricePerWattUSD * 1000 * 100) / 100);
+
   return {
     systemCapacityKWp: Math.round(dcCapacityKWp * 100) / 100,
     annualConsumptionKWh,
     annualProductionKWh,
     energyCoveragePct,
     grossInvestmentUSD,
+    salePricePerWattUSD,
+    salePricePerKWpUSD,
     solarInvestmentUSD,
     batteryInvestmentUSD,
     equipmentPortionUSD,

@@ -381,6 +381,75 @@ assert(
   `Brecha entre Total General y Subtotal es exactamente el ITBIS ($1,678.78 vs $${itbisGap}), NUNCA 7.4K`
 );
 
+// TEST 11: Dynamic Sale Price Per Watt & Per KWp Reactivity (María Teresa Benchmark)
+console.log('\n--- TEST 11: Dynamic Sale Price Per Watt & Per KWp Reactivity ---');
+const specsMariaTeresa: SystemSpecs = {
+  ...defaultSpecs,
+  panelPowerW: 615,
+  panelCount: 11, // 6.765 kWp
+  pricingMode: 'cost_matrix',
+  pricePerWattUSD: 1.13, // Legacy static value that should NOT freeze dynamic prices
+  panelUnitPriceUSD: 104,
+  inverterUnitPriceUSD: 1700,
+  inverterCount: 1,
+  hasBattery: true,
+  batteryCount: 1,
+  batteryCapacityKWh: 14.3,
+  batteryUnitPriceUSD: 1880,
+  installationUnitPriceUSD: 160,
+  saleMarginMultiplier: 1.40, // 40% margin initially
+};
+
+// 1. Initial 40% margin calculation
+const resMT40 = calculateFinancialSummary(
+  'Santo Domingo / Distrito Nacional',
+  specsMariaTeresa,
+  defaultRates,
+  defaultFinancials,
+  monthlyConsumption
+);
+
+assert(resMT40.systemCapacityKWp === 6.77, `Capacidad DC correcta (6.77 kWp vs ${resMT40.systemCapacityKWp})`);
+assert(Math.abs(resMT40.grossInvestmentUSD - 8875.48) < 0.1, `Inversión bruta al 40% es $8,875.48 ($${resMT40.grossInvestmentUSD})`);
+assert(Math.abs(resMT40.salePricePerWattUSD - 1.31) < 0.02, `Precio de venta $/W al 40% es ~$1.31 ($${resMT40.salePricePerWattUSD})`);
+assert(Math.abs(resMT40.salePricePerKWpUSD - 1311.97) < 1.0, `Precio de venta $/kWp al 40% es ~$1,311.97 ($${resMT40.salePricePerKWpUSD})`);
+
+// 2. Updating margin to 32.5% (1.325x) - verify dynamic recalculation without manual sync
+const specsMT325: SystemSpecs = {
+  ...specsMariaTeresa,
+  saleMarginMultiplier: 1.325,
+};
+
+const resMT325 = calculateFinancialSummary(
+  'Santo Domingo / Distrito Nacional',
+  specsMT325,
+  defaultRates,
+  defaultFinancials,
+  monthlyConsumption
+);
+
+assert(Math.abs(resMT325.grossInvestmentUSD - 8400.01) < 0.1, `Inversión bruta al 32.5% se actualiza a $8,400.01 ($${resMT325.grossInvestmentUSD})`);
+assert(Math.abs(resMT325.salePricePerWattUSD - 1.24) < 0.02, `Precio de venta $/W al 32.5% se actualiza a ~$1.24 ($${resMT325.salePricePerWattUSD}), NUNCA congelado en 1.13`);
+assert(Math.abs(resMT325.salePricePerKWpUSD - 1241.69) < 1.0, `Precio de venta $/kWp al 32.5% se actualiza a ~$1,241.69 ($${resMT325.salePricePerKWpUSD})`);
+
+// 3. Direct Watt mode verification
+const specsDirectWatt: SystemSpecs = {
+  ...specsMariaTeresa,
+  pricingMode: 'direct_watt',
+  pricePerWattUSD: 1.18,
+};
+
+const resDirect = calculateFinancialSummary(
+  'Santo Domingo / Distrito Nacional',
+  specsDirectWatt,
+  defaultRates,
+  defaultFinancials,
+  monthlyConsumption
+);
+
+assert(resDirect.salePricePerWattUSD === 1.18, `Modo Directo $/W respeta valor manual exacto ($${resDirect.salePricePerWattUSD})`);
+assert(resDirect.salePricePerKWpUSD === 1180, `Modo Directo $/kWp respeta 1,180.00 ($${resDirect.salePricePerKWpUSD})`);
+
 console.log('\n=====================================================');
 if (allPassed) {
   console.log('🎉 ALL FINANCIAL ENGINE AUDIT TESTS PASSED (100% SUCCESS)');

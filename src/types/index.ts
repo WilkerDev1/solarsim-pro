@@ -177,6 +177,8 @@ export interface FinancialSummaryResult {
   annualProductionKWh: number;
   energyCoveragePct: number;
   grossInvestmentUSD: number;
+  salePricePerWattUSD: number;   // Real live effective turnkey sale price per Wp (e.g. 1.24)
+  salePricePerKWpUSD: number;    // Real live effective turnkey sale price per kWp (e.g. 1241.69)
   solarInvestmentUSD: number;
   batteryInvestmentUSD: number;
   equipmentPortionUSD: number;   // Base de Equipos para Ley 57-07 (sin mano de obra)

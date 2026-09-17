@@ -162,7 +162,7 @@ export const PDFPage4CashFlow: React.FC<PDFPage4CashFlowProps> = ({
             </div>
             <div>
               <p className="text-slate-400 text-[8.5px] uppercase tracking-wider font-bold mb-0.5">Precio por Watt</p>
-              <p className="font-bold text-slate-900">${(project.specs.pricePerWattUSD || project.financials.pricePerWattUSD).toFixed(3)} USD/W</p>
+              <p className="font-bold text-slate-900">${(summary.salePricePerWattUSD ?? (summary.systemCapacityKWp > 0 ? summary.grossInvestmentUSD / (summary.systemCapacityKWp * 1000) : 0)).toFixed(3)} USD/W</p>
             </div>
             <div>
               <p className="text-slate-400 text-[8.5px] uppercase tracking-wider font-bold mb-0.5">Capacidad DC</p>

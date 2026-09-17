@@ -264,11 +264,16 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                 ${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
-            <div className="flex justify-between text-slate-800 pt-0.5 border-t border-slate-300">
-              <span className="font-bold">PRECIO POR WATT (USD/W):</span>
-              <span className="font-bold font-mono" style={{ color: activeTheme.primary }}>
-                ${(project.specs.pricePerWattUSD || project.financials.pricePerWattUSD || (summary.solarInvestmentUSD / (summary.systemCapacityKWp * 1000)) || 1.13).toFixed(2)}
-              </span>
+            <div className="flex justify-between items-center text-slate-800 pt-0.5 border-t border-slate-300">
+              <span className="font-bold">PRECIO POR KILOVATIO / WATT:</span>
+              <div className="text-right">
+                <span className="font-bold font-mono text-[10.5px]" style={{ color: activeTheme.primary }}>
+                  ${(summary.salePricePerKWpUSD ?? (summary.systemCapacityKWp > 0 ? summary.grossInvestmentUSD / summary.systemCapacityKWp : 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/kWp
+                </span>
+                <span className="text-[9.5px] text-slate-500 font-mono ml-1 font-bold">
+                  (${(summary.salePricePerWattUSD ?? (summary.systemCapacityKWp > 0 ? summary.grossInvestmentUSD / (summary.systemCapacityKWp * 1000) : 0)).toFixed(2)}/W)
+                </span>
+              </div>
             </div>
           </div>
         </div>
