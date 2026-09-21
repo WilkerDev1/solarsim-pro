@@ -107,16 +107,30 @@ export function renderProposalPage(stored: StoredProposal): string {
   const exportFee = rates.gridExportFeePct ?? 25;
 
   const systemCapacityKWp = Number(summary?.systemCapacityKWp || ((specs.panelCount || 0) * (specs.panelPowerW || 0)) / 1000).toFixed(2);
-  const panelCount = specs.panelCount || 0;
-  const panelPowerW = specs.panelPowerW || 0;
-  const panelBrandModel = specs.panelBrandModel || 'Módulos Monocristalinos Tier-1 TOPCon';
-  const inverterBrandModel = specs.inverterBrandModel || 'Inversor Solar On-Grid / Híbrido';
-  const inverterCount = specs.inverterCount || 1;
-  const inverterPowerKW = specs.inverterPowerKW || (Number(systemCapacityKWp) * 0.9).toFixed(1);
+  const rawPanels: any[] = Array.isArray(specs.panels) && specs.panels.length > 0
+    ? specs.panels
+    : [{ brandModel: specs.panelBrandModel || 'Módulos Monocristalinos Tier-1 TOPCon', powerW: specs.panelPowerW || 0, count: specs.panelCount || 0 }];
+
+  const rawInverters: any[] = Array.isArray(specs.inverters) && specs.inverters.length > 0
+    ? specs.inverters
+    : [{ brandModel: specs.inverterBrandModel || 'Inversor Solar On-Grid / Híbrido', powerKW: specs.inverterPowerKW || (Number(systemCapacityKWp) * 0.9).toFixed(1), count: specs.inverterCount || 1 }];
+
   const hasBattery = specs.hasBattery || false;
-  const batteryCapacityKWh = specs.batteryCapacityKWh || 0;
-  const batteryCount = specs.batteryCount || 1;
-  const batteryBrandModel = specs.batteryBrandModel || 'Banco de Baterías de Litio LiFePO4';
+  const rawBatteries: any[] = hasBattery && Array.isArray(specs.batteries) && specs.batteries.length > 0
+    ? specs.batteries
+    : (hasBattery ? [{ brandModel: specs.batteryBrandModel || 'Banco de Baterías de Litio LiFePO4', capacityKWh: specs.batteryCapacityKWh || 0, count: specs.batteryCount || 1 }] : []);
+
+  const totalBESSKWh = rawBatteries.reduce((sum: number, b: any) => sum + (Number(b.capacityKWh) || 0) * (Number(b.count) || 0), 0);
+
+  const panelCount = rawPanels.reduce((sum: number, p: any) => sum + (Number(p.count) || 0), 0) || specs.panelCount || 0;
+  const panelPowerW = specs.panelPowerW || (rawPanels[0]?.powerW || 0);
+  const panelBrandModel = specs.panelBrandModel || rawPanels[0]?.brandModel || 'Módulos Monocristalinos Tier-1 TOPCon';
+  const inverterBrandModel = specs.inverterBrandModel || rawInverters[0]?.brandModel || 'Inversor Solar On-Grid / Híbrido';
+  const inverterCount = rawInverters.reduce((sum: number, inv: any) => sum + (Number(inv.count) || 0), 0) || specs.inverterCount || 1;
+  const inverterPowerKW = specs.inverterPowerKW || rawInverters[0]?.powerKW || (Number(systemCapacityKWp) * 0.9).toFixed(1);
+  const batteryCapacityKWh = specs.batteryCapacityKWh || rawBatteries[0]?.capacityKWh || 0;
+  const batteryCount = rawBatteries.reduce((sum: number, b: any) => sum + (Number(b.count) || 0), 0) || specs.batteryCount || 1;
+  const batteryBrandModel = specs.batteryBrandModel || rawBatteries[0]?.brandModel || 'Banco de Baterías de Litio LiFePO4';
   const displayBatteryModel = batteryCapacityKWh > 0 && !batteryBrandModel.toLowerCase().includes('kwh')
     ? `${batteryBrandModel} (${batteryCapacityKWh} kWh)`
     : batteryBrandModel;
@@ -217,7 +231,7 @@ export function renderProposalPage(stored: StoredProposal): string {
     ? rawPanelDesc
     : `${rawPanelDesc} (${panelPowerW}W)`;
 
-  const rawInverterDesc = inverterBrandModel.replace(/^inversores?\s+/i, '').trim();
+  const rawInverterDesc = inverterBrandModel.replace(/^inversor(?:es)?\s+/i, '').trim();
   const cleanInverterModel = (rawInverterDesc.toLowerCase().includes('kw') || Number(inverterPowerKW) <= 0)
     ? rawInverterDesc
     : `${rawInverterDesc} (${inverterPowerKW} kW)`;
@@ -227,9 +241,21 @@ export function renderProposalPage(stored: StoredProposal): string {
     ? rawBatteryDesc
     : `${rawBatteryDesc} (${batteryCapacityKWh} kWh)`;
 
-  const defaultP1 = `El consumo promedio anual de **${clientName}** es de **${annualConsumptionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh** (aprox. ${monthlyAvgConsumption.toLocaleString()} kWh/mes), por lo que se le propone la instalación de **${panelCount} Módulos ${cleanPanelModel}**, alcanzando una potencia DC instalada de **${systemCapacityKWp} kWp**. La producción energética estimada para este sistema es de **${annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh anuales**, representando el **${coveragePct.toFixed(1)}%** de cobertura del consumo total.`;
+  const multiPanelsDesc = rawPanels.length > 1
+    ? rawPanels.map((p: any) => `${p.count} Módulos ${(p.brandModel || `${p.powerW}W`).replace(/^m[oó]dulos?\s+/i, '').trim()}`).join(' y ')
+    : `${panelCount} Módulos ${cleanPanelModel}`;
 
-  const defaultP2 = `Adicionalmente, se contempla la instalación de **${inverterCount} Inversor${inverterCount > 1 ? 'es' : ''} ${cleanInverterModel}**${hasBattery && batteryCapacityKWh > 0 ? ` y **${batteryCount} Batería${batteryCount > 1 ? 's' : ''} ${cleanBatteryModel}**` : ''}, ${custom.projectEngineeringScopeText || specs.installationServicesDesc || 'junto con todos los componentes de ingeniería complementarios (estructuras de montaje en aluminio anodizado de alta resistencia, cableado fotovoltaico resistente a rayos UV, protecciones en CC/CA, interruptores de desconexión y supresores de sobretensión) para garantizar un funcionamiento seguro, eficiente y duradero del sistema.'}.`;
+  const multiInvertersDesc = rawInverters.length > 1
+    ? rawInverters.map((inv: any) => `${inv.count} ${inv.count === 1 ? 'Inversor' : 'Inversores'} ${(inv.brandModel || `${inv.powerKW} kW`).replace(/^inversor(?:es)?\s+/i, '').trim()}`).join(' y ')
+    : `${inverterCount} Inversor${inverterCount > 1 ? 'es' : ''} ${cleanInverterModel}`;
+
+  const multiBatteriesDesc = rawBatteries.length > 1
+    ? rawBatteries.map((b: any) => `${b.count} ${b.count === 1 ? 'Batería' : 'Baterías'} ${(b.brandModel || `${b.capacityKWh} kWh`).replace(/^bater[íi]as?\s+/i, '').trim()}`).join(' y ')
+    : `${batteryCount} Batería${batteryCount > 1 ? 's' : ''} ${cleanBatteryModel}`;
+
+  const defaultP1 = `El consumo promedio anual de **${clientName}** es de **${annualConsumptionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh** (aprox. ${monthlyAvgConsumption.toLocaleString()} kWh/mes), por lo que se le propone la instalación de **${multiPanelsDesc}**, alcanzando una potencia DC instalada de **${systemCapacityKWp} kWp**. La producción energética estimada para este sistema es de **${annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh anuales**, representando el **${coveragePct.toFixed(1)}%** de cobertura del consumo total.`;
+
+  const defaultP2 = `Adicionalmente, se contempla la instalación de **${multiInvertersDesc}**${hasBattery && totalBESSKWh > 0 ? ` y **${multiBatteriesDesc}**` : ''}, ${custom.projectEngineeringScopeText || specs.installationServicesDesc || 'junto con todos los componentes de ingeniería complementarios (estructuras de montaje en aluminio anodizado de alta resistencia, cableado fotovoltaico resistente a rayos UV, protecciones en CC/CA, interruptores de desconexión y supresores de sobretensión) para garantizar un funcionamiento seguro, eficiente y duradero del sistema.'}.`;
 
   const resolvedP1 = (() => {
     let text = custom.customProjectSummaryParagraph1 && custom.customProjectSummaryParagraph1.trim()
@@ -413,7 +439,7 @@ export function renderProposalPage(stored: StoredProposal): string {
         <p class="whitespace-pre-line">${formatMarkdown(resolvedP2)}</p>
       </div>
 
-      <div class="grid grid-cols-2 ${hasBattery && batteryCapacityKWh > 0 ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-2.5 sm:gap-3.5 pt-1 sm:pt-2">
+      <div class="grid grid-cols-2 ${hasBattery && totalBESSKWh > 0 ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-2.5 sm:gap-3.5 pt-1 sm:pt-2">
         <div class="bg-orange-50/70 border border-orange-200/90 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3.5">
           <div class="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-orange-500 text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-sm sm:shadow-md shadow-orange-500/20 shrink-0">⚡</div>
           <div class="min-w-0">
@@ -428,19 +454,19 @@ export function renderProposalPage(stored: StoredProposal): string {
             <span class="text-sm sm:text-base font-black font-mono text-sky-700 block truncate">${coveragePct.toFixed(1)}%</span>
           </div>
         </div>
-        <div class="bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3.5 ${hasBattery && batteryCapacityKWh > 0 ? '' : 'col-span-2 sm:col-span-1'}">
+        <div class="bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3.5 ${hasBattery && totalBESSKWh > 0 ? '' : 'col-span-2 sm:col-span-1'}">
           <div class="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-slate-800 text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-sm sm:shadow-md shrink-0">☀️</div>
           <div class="min-w-0">
             <span class="text-[9px] sm:text-[10px] uppercase font-bold text-slate-500 block truncate">Generación Anual</span>
             <span class="text-sm sm:text-base font-black font-mono text-slate-900 block truncate">${Math.round(annualProductionKWh).toLocaleString()} kWh</span>
           </div>
         </div>
-        ${hasBattery && batteryCapacityKWh > 0 ? `
+        ${hasBattery && totalBESSKWh > 0 ? `
         <div class="bg-emerald-50/80 border border-emerald-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3.5">
           <div class="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-sm sm:shadow-md shrink-0">🔋</div>
           <div class="min-w-0">
             <span class="text-[9px] sm:text-[10px] uppercase font-bold text-emerald-800 block truncate">Almacenamiento</span>
-            <span class="text-sm sm:text-base font-black font-mono text-emerald-950 block truncate">${(batteryCount * batteryCapacityKWh).toFixed(1)} kWh</span>
+            <span class="text-sm sm:text-base font-black font-mono text-emerald-950 block truncate">${totalBESSKWh.toFixed(1)} kWh</span>
           </div>
         </div>` : ''}
       </div>
@@ -556,22 +582,27 @@ export function renderProposalPage(stored: StoredProposal): string {
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-200 text-[10.5px] sm:text-[11px] font-semibold text-slate-800">
-            <tr class="bg-white">
-              <td class="px-3 sm:px-4 py-2 font-bold">${panelBrandModel}</td>
-              <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${panelCount}</td>
+            ${rawPanels.map((p: any, idx: number) => `
+            <tr class="${idx % 2 === 0 ? 'bg-white' : 'bg-sky-50/30'}">
+              <td class="px-3 sm:px-4 py-2 font-bold">${p.brandModel || 'Módulos Fotovoltaicos'}</td>
+              <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${p.count}</td>
               <td class="px-2 sm:px-4 py-2 text-center text-slate-500 font-normal">UD</td>
             </tr>
-            <tr class="bg-sky-50/30">
-              <td class="px-3 sm:px-4 py-2 font-bold">${inverterBrandModel}</td>
-              <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${inverterCount}</td>
+            `).join('')}
+            ${rawInverters.map((inv: any, idx: number) => `
+            <tr class="${idx % 2 === 0 ? 'bg-sky-50/30' : 'bg-white'}">
+              <td class="px-3 sm:px-4 py-2 font-bold">${inv.brandModel || 'Inversor Solar'}</td>
+              <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${inv.count}</td>
               <td class="px-2 sm:px-4 py-2 text-center text-slate-500 font-normal">UD</td>
             </tr>
-            ${hasBattery ? `
-            <tr class="bg-white">
-              <td class="px-3 sm:px-4 py-2 font-bold">${displayBatteryModel}</td>
-              <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${batteryCount}</td>
+            `).join('')}
+            ${hasBattery ? rawBatteries.map((bat: any, idx: number) => `
+            <tr class="${idx % 2 === 0 ? 'bg-white' : 'bg-sky-50/30'}">
+              <td class="px-3 sm:px-4 py-2 font-bold">${(bat.capacityKWh > 0 && !bat.brandModel?.toLowerCase().includes('kwh')) ? `${bat.brandModel} (${bat.capacityKWh} kWh)` : (bat.brandModel || 'Batería')}</td>
+              <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${bat.count}</td>
               <td class="px-2 sm:px-4 py-2 text-center text-slate-500 font-normal">UD</td>
-            </tr>` : ''}
+            </tr>
+            `).join('') : ''}
             <tr class="bg-sky-50/30">
               <td class="px-3 sm:px-4 py-2">${installationServicesDesc}</td>
               <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">1</td>

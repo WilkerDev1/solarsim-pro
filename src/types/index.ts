@@ -18,6 +18,44 @@ export interface ClientInfo {
   quoteValidityDays?: number; // e.g. 7
 }
 
+export interface PanelItemSpec {
+  id: string;
+  brandModel: string;
+  powerW: number;
+  count: number;
+  unitPriceUSD?: number;
+  weightKilos?: number;
+  efficiencyPct?: number;
+  tempCoeff?: number;
+  annualDegradation?: number;
+  selectedSupplierInfo?: { supplierName: string; priceUSD: number; updatedAt?: string; supplierPriceId?: string };
+}
+
+export interface InverterItemSpec {
+  id: string;
+  brandModel: string;
+  powerKW: number;
+  count: number;
+  unitPriceUSD?: number;
+  weightKilos?: number;
+  efficiencyPct?: number;
+  selectedSupplierInfo?: { supplierName: string; priceUSD: number; updatedAt?: string; supplierPriceId?: string };
+}
+
+export interface BatteryItemSpec {
+  id: string;
+  brandModel: string;
+  capacityKWh: number;
+  count: number;
+  unitPriceUSD?: number;
+  weightKilos?: number;
+  dodPct?: number;
+  efficiencyPct?: number;
+  lifespanYears?: number;
+  replacementCostUSD?: number;
+  selectedSupplierInfo?: { supplierName: string; priceUSD: number; updatedAt?: string; supplierPriceId?: string };
+}
+
 export interface SystemSpecs {
   isDetailed: boolean;
   pricingMode?: 'cost_matrix' | 'direct_watt'; // 'cost_matrix' (default) or 'direct_watt' (manual $/W or $/kW)
@@ -36,6 +74,12 @@ export interface SystemSpecs {
   batteryCostUSD?: number;       // Total battery cost in USD
   batteryBrandModel?: string;    // e.g. "Hinaess 16 KwH-48 vdc"
   installationServicesDesc?: string;
+
+  // 🔄 Múltiples Modelos de Equipos (Multi-Equipment Groups)
+  panels?: PanelItemSpec[];       // Lista de grupos de paneles con modelos distintos
+  inverters?: InverterItemSpec[]; // Lista de grupos de inversores con modelos distintos (ej: 2x 10kW + 2x 5kW)
+  batteries?: BatteryItemSpec[]; // Lista de grupos de baterías con modelos distintos
+
   // Cost & Profit Matrix params matching Excel sheet
   dopExchangeRate?: number;          // RD$ per USD e.g. 60.0
   saleMarginMultiplier?: number;     // Sales Factor e.g. 1.25 (25% margin)
@@ -43,6 +87,7 @@ export interface SystemSpecs {
   panelWeightKilos?: number;         // e.g. 30.75
   inverterUnitPriceUSD?: number;     // e.g. 2300.00 USD
   inverterWeightKilos?: number;      // e.g. 12
+  inverterEfficiencyPct?: number;    // % e.g. 97.5
   batteryUnitPriceUSD?: number;      // e.g. 1990.00 USD
   batteryWeightKilos?: number;       // e.g. 32
   installationUnitPriceUSD?: number; // e.g. 170.00 USD per kWp

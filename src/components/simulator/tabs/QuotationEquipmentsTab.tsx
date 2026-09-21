@@ -1,6 +1,7 @@
 import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import { ShieldCheck, CheckCircle2, Check } from 'lucide-react';
+import { getProjectPanels, getProjectInverters, getProjectBatteries } from '../../../utils/equipmentSpecsUtils';
 
 interface QuotationEquipmentsTabProps {
   project: ProjectSimulation;
@@ -133,23 +134,27 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 text-[11px] text-slate-800 font-semibold">
-                  <tr className="bg-white">
-                    <td className="px-3 py-2">{project.specs.panelBrandModel || 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)'}</td>
-                    <td className="px-3 py-2 text-center font-bold">{project.specs.panelCount}</td>
-                    <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
-                  </tr>
-                  <tr className="bg-slate-50/60">
-                    <td className="px-3 py-2">{project.specs.inverterBrandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)'}</td>
-                    <td className="px-3 py-2 text-center font-bold">{project.specs.inverterCount || 2}</td>
-                    <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
-                  </tr>
-                  {project.specs.hasBattery && (
-                    <tr className="bg-white">
-                      <td className="px-3 py-2">{project.specs.batteryBrandModel || 'Batería Hinaess 16 KwH-48 vdc.'}</td>
-                      <td className="px-3 py-2 text-center font-bold">{project.specs.batteryCount || 3}</td>
+                  {getProjectPanels(project.specs).map((panel, idx) => (
+                    <tr key={panel.id || `panel-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                      <td className="px-3 py-2">{panel.brandModel || 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)'}</td>
+                      <td className="px-3 py-2 text-center font-bold">{panel.count}</td>
                       <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
                     </tr>
-                  )}
+                  ))}
+                  {getProjectInverters(project.specs).map((inv, idx) => (
+                    <tr key={inv.id || `inv-${idx}`} className={idx % 2 === 0 ? 'bg-slate-50/60' : 'bg-white'}>
+                      <td className="px-3 py-2">{inv.brandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)'}</td>
+                      <td className="px-3 py-2 text-center font-bold">{inv.count || 1}</td>
+                      <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
+                    </tr>
+                  ))}
+                  {project.specs.hasBattery && getProjectBatteries(project.specs).map((bat, idx) => (
+                    <tr key={bat.id || `bat-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                      <td className="px-3 py-2">{bat.brandModel || 'Batería Hinaess 16 KwH-48 vdc.'}</td>
+                      <td className="px-3 py-2 text-center font-bold">{bat.count || 1}</td>
+                      <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
+                    </tr>
+                  ))}
                   <tr className="bg-slate-50/60">
                     <td className="px-3 py-2">{cleanInstallationDesc(project.specs.installationServicesDesc)}</td>
                     <td className="px-3 py-2 text-center font-bold">1</td>

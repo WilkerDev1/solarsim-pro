@@ -8,6 +8,7 @@ import { PDFWatermark } from '../PDFWatermark';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
 import { InlineEditableText } from '../common/InlineEditableText';
 import { getTariffDisplayName } from '../../../types/tariffs';
+import { getProjectPanels, getProjectInverters, getProjectBatteries } from '../../../utils/equipmentSpecsUtils';
 
 interface PDFPage2QuotationProps {
   project: ProjectSimulation;
@@ -187,29 +188,33 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 text-[10px] text-slate-800 font-semibold">
-                <tr className="bg-white">
-                  <td className="px-3 py-1 font-medium text-slate-900">
-                    {project.specs.panelBrandModel || `Módulos Monocristalinos Tier-1 (${project.specs.panelPowerW}W)`}
-                  </td>
-                  <td className="px-3 py-1 text-center font-bold font-mono">{project.specs.panelCount}</td>
-                  <td className="px-3 py-1 text-center text-slate-500 font-normal">UD</td>
-                </tr>
-                <tr className="bg-slate-50/60">
-                  <td className="px-3 py-1 font-medium text-slate-900">
-                    {project.specs.inverterBrandModel || 'Inversor Solar On-Grid / Híbrido'}
-                  </td>
-                  <td className="px-3 py-1 text-center font-bold font-mono">{project.specs.inverterCount || 1}</td>
-                  <td className="px-3 py-1 text-center text-slate-500 font-normal">UD</td>
-                </tr>
-                {project.specs.hasBattery && (
-                  <tr className="bg-white">
+                {getProjectPanels(project.specs).map((p, idx) => (
+                  <tr key={p.id || `panel-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
                     <td className="px-3 py-1 font-medium text-slate-900">
-                      {project.specs.batteryBrandModel || 'Banco de Baterías de Litio'}
+                      {p.brandModel || `Módulos Monocristalinos Tier-1 (${p.powerW}W)`}
                     </td>
-                    <td className="px-3 py-1 text-center font-bold font-mono">{project.specs.batteryCount || 1}</td>
+                    <td className="px-3 py-1 text-center font-bold font-mono">{p.count}</td>
                     <td className="px-3 py-1 text-center text-slate-500 font-normal">UD</td>
                   </tr>
-                )}
+                ))}
+                {getProjectInverters(project.specs).map((inv, idx) => (
+                  <tr key={inv.id || `inv-${idx}`} className={idx % 2 === 0 ? 'bg-slate-50/60' : 'bg-white'}>
+                    <td className="px-3 py-1 font-medium text-slate-900">
+                      {inv.brandModel || 'Inversor Solar On-Grid / Híbrido'}
+                    </td>
+                    <td className="px-3 py-1 text-center font-bold font-mono">{inv.count || 1}</td>
+                    <td className="px-3 py-1 text-center text-slate-500 font-normal">UD</td>
+                  </tr>
+                ))}
+                {project.specs.hasBattery && getProjectBatteries(project.specs).map((bat, idx) => (
+                  <tr key={bat.id || `bat-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                    <td className="px-3 py-1 font-medium text-slate-900">
+                      {bat.brandModel || 'Banco de Baterías de Litio'}
+                    </td>
+                    <td className="px-3 py-1 text-center font-bold font-mono">{bat.count || 1}</td>
+                    <td className="px-3 py-1 text-center text-slate-500 font-normal">UD</td>
+                  </tr>
+                ))}
                 <tr className={project.specs.hasBattery ? 'bg-slate-50/60' : 'bg-white'}>
                   <td className="px-3 py-1 font-medium text-slate-900">
                     {cleanInstallationDesc(project.specs.installationServicesDesc)}

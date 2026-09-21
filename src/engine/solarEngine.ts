@@ -1,5 +1,6 @@
 import { SystemSpecs, MonthlyEnergyResult } from '../types';
 import { getProvinceHSP } from '../data/rdProvinces';
+import { calculateTotalDCCapacityKWp } from '../utils/equipmentSpecsUtils';
 
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -75,7 +76,7 @@ export function calculateMonthlySolarProduction(
   tariffCode?: string,
   isZeroExport?: boolean
 ): MonthlyEnergyResult[] {
-  const dcCapacityKWp = calculateDCCapacityKWp(specs.panelPowerW, specs.panelCount);
+  const dcCapacityKWp = calculateTotalDCCapacityKWp(specs);
   const province = getProvinceHSP(provinceName);
 
   // Losses factor: total efficiency percentage (default: 25.0% losses -> 0.75 derate factor)

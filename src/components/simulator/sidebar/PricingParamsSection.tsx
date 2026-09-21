@@ -3,6 +3,7 @@ import { ProjectSimulation, FinancialSummaryResult, SystemSpecs } from '../../..
 import { SolarEquipmentItem, EquipmentSupplierPrice } from '../../../types/equipment';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { DollarSign, ChevronDown, Sliders, Tag, Sparkles, Building2, Check, RefreshCw } from 'lucide-react';
+import { getProjectPanels, getProjectInverters, getProjectBatteries } from '../../../utils/equipmentSpecsUtils';
 
 interface PricingParamsSectionProps {
   project: ProjectSimulation;
@@ -645,144 +646,165 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className={`block text-[10px] font-medium ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                        Precio Panel ($/ud)
-                      </label>
-                      {selectedPanel && (
-                        <button
-                          type="button"
-                          onClick={() => openSupplierPriceModal(selectedPanel)}
-                          className="text-[9.5px] text-amber-500 hover:underline font-bold flex items-center gap-0.5 cursor-pointer"
-                        >
-                          {panelSuppliersCount > 0 ? `${panelSuppliersCount} prov.` : '+ prov.'}
-                        </button>
-                      )}
-                    </div>
-                    <input
-                      type="number"
-                      step="1"
-                      value={project.specs.panelUnitPriceUSD !== undefined ? project.specs.panelUnitPriceUSD : 103.32}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value) || 0;
-                        const newSupplierInfo = { ...(project.specs.selectedSupplierInfo || {}) };
-                        if (newSupplierInfo.panel && Math.abs(newSupplierInfo.panel.priceUSD - val) > 0.01) {
-                          delete newSupplierInfo.panel;
-                        }
-                        updateSpecs({
-                          panelUnitPriceUSD: val,
-                          autoSupplierPricing: false,
-                          selectedSupplierInfo: newSupplierInfo,
-                        });
-                      }}
-                      className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
-                        isDark
-                          ? 'bg-[#121216] border-[#383848] text-zinc-100'
-                          : 'bg-slate-50 border-slate-300 text-slate-900'
-                      }`}
-                    />
-                    {project.specs.selectedSupplierInfo?.panel && (
-                      <span className="text-[9.5px] text-emerald-400 font-semibold block mt-0.5 truncate" title={`Proveedor: ${project.specs.selectedSupplierInfo.panel.supplierName} ($${project.specs.selectedSupplierInfo.panel.priceUSD} USD)`}>
-                        🏷️ {project.specs.selectedSupplierInfo.panel.supplierName}
-                      </span>
-                    )}
+                {/* Costos de Compra de Paneles e Inversores */}
+                <div className="space-y-2">
+                  {/* Paneles (1 o múltiples) */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {getProjectPanels(project.specs).map((p, idx, arr) => {
+                      const panelEq = resolveEquipment('panel', p.brandModel, p.powerW, p.selectedSupplierInfo?.supplierPriceId);
+                      const supCount = panelEq?.supplierPrices?.length || 0;
+                      return (
+                        <div key={p.id || idx}>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className={`block text-[10px] font-medium truncate max-w-[120px] ${isDark ? 'text-zinc-300' : 'text-slate-700'}`} title={p.brandModel}>
+                              {arr.length > 1 ? `Precio Panel #${idx + 1} ($/ud)` : 'Precio Panel ($/ud)'}
+                            </label>
+                            {panelEq && (
+                              <button
+                                type="button"
+                                onClick={() => openSupplierPriceModal(panelEq)}
+                                className="text-[9.5px] text-amber-500 hover:underline font-bold flex items-center gap-0.5 cursor-pointer"
+                              >
+                                {supCount > 0 ? `${supCount} prov.` : '+ prov.'}
+                              </button>
+                            )}
+                          </div>
+                          <input
+                            type="number"
+                            step="1"
+                            value={p.unitPriceUSD !== undefined ? p.unitPriceUSD : (project.specs.panelUnitPriceUSD !== undefined ? project.specs.panelUnitPriceUSD : 103.32)}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              const updatedPanels = [...getProjectPanels(project.specs)];
+                              updatedPanels[idx] = { ...updatedPanels[idx], unitPriceUSD: val };
+                              const update: Partial<SystemSpecs> = {
+                                panels: updatedPanels.length > 1 ? updatedPanels : undefined,
+                                autoSupplierPricing: false,
+                              };
+                              if (idx === 0) update.panelUnitPriceUSD = val;
+                              updateSpecs(update);
+                            }}
+                            className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
+                              isDark
+                                ? 'bg-[#121216] border-[#383848] text-zinc-100'
+                                : 'bg-slate-50 border-slate-300 text-slate-900'
+                            }`}
+                          />
+                          {p.selectedSupplierInfo && (
+                            <span className="text-[9.5px] text-emerald-400 font-semibold block mt-0.5 truncate" title={`Proveedor: ${p.selectedSupplierInfo.supplierName} ($${p.selectedSupplierInfo.priceUSD} USD)`}>
+                              🏷️ {p.selectedSupplierInfo.supplierName}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {/* Inversores (1 o múltiples) */}
+                    {getProjectInverters(project.specs).map((inv, idx, arr) => {
+                      const invEq = resolveEquipment('inverter', inv.brandModel, inv.powerKW, inv.selectedSupplierInfo?.supplierPriceId);
+                      const supCount = invEq?.supplierPrices?.length || 0;
+                      return (
+                        <div key={inv.id || idx}>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className={`block text-[10px] font-medium truncate max-w-[120px] ${isDark ? 'text-zinc-300' : 'text-slate-700'}`} title={inv.brandModel}>
+                              {arr.length > 1 ? `Precio Inversor #${idx + 1} ($/ud)` : 'Precio Inversor ($/ud)'}
+                            </label>
+                            {invEq && (
+                              <button
+                                type="button"
+                                onClick={() => openSupplierPriceModal(invEq)}
+                                className="text-[9.5px] text-amber-500 hover:underline font-bold flex items-center gap-0.5 cursor-pointer"
+                              >
+                                {supCount > 0 ? `${supCount} prov.` : '+ prov.'}
+                              </button>
+                            )}
+                          </div>
+                          <input
+                            type="number"
+                            step="10"
+                            value={inv.unitPriceUSD !== undefined ? inv.unitPriceUSD : (project.specs.inverterUnitPriceUSD !== undefined ? project.specs.inverterUnitPriceUSD : 2300.0)}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              const updatedInverters = [...getProjectInverters(project.specs)];
+                              updatedInverters[idx] = { ...updatedInverters[idx], unitPriceUSD: val };
+                              const update: Partial<SystemSpecs> = {
+                                inverters: updatedInverters.length > 1 ? updatedInverters : undefined,
+                                autoSupplierPricing: false,
+                              };
+                              if (idx === 0) update.inverterUnitPriceUSD = val;
+                              updateSpecs(update);
+                            }}
+                            className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
+                              isDark
+                                ? 'bg-[#121216] border-[#383848] text-zinc-100'
+                                : 'bg-slate-50 border-slate-300 text-slate-900'
+                            }`}
+                          />
+                          {inv.selectedSupplierInfo && (
+                            <span className="text-[9.5px] text-emerald-400 font-semibold block mt-0.5 truncate" title={`Proveedor: ${inv.selectedSupplierInfo.supplierName} ($${inv.selectedSupplierInfo.priceUSD} USD)`}>
+                              🏷️ {inv.selectedSupplierInfo.supplierName}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
 
+                  {/* Baterías si hasBattery es true */}
+                  {project.specs.hasBattery && (
+                    <div className="grid grid-cols-2 gap-2">
+                      {getProjectBatteries(project.specs).map((bat, idx, arr) => {
+                        const batEq = resolveEquipment('battery', bat.brandModel, bat.capacityKWh, bat.selectedSupplierInfo?.supplierPriceId);
+                        const supCount = batEq?.supplierPrices?.length || 0;
+                        return (
+                          <div key={bat.id || idx}>
+                            <div className="flex items-center justify-between mb-1">
+                              <label className={`block text-[10px] font-medium truncate max-w-[120px] ${isDark ? 'text-zinc-300' : 'text-slate-700'}`} title={bat.brandModel}>
+                                {arr.length > 1 ? `Precio Batería #${idx + 1} ($/ud)` : 'Precio Batería ($/ud)'}
+                              </label>
+                              {batEq && (
+                                <button
+                                  type="button"
+                                  onClick={() => openSupplierPriceModal(batEq)}
+                                  className="text-[9.5px] text-amber-500 hover:underline font-bold flex items-center gap-0.5 cursor-pointer"
+                                >
+                                  {supCount > 0 ? `${supCount} prov.` : '+ prov.'}
+                                </button>
+                              )}
+                            </div>
+                            <input
+                              type="number"
+                              step="10"
+                              value={bat.unitPriceUSD !== undefined ? bat.unitPriceUSD : (project.specs.batteryUnitPriceUSD !== undefined ? project.specs.batteryUnitPriceUSD : 1990.0)}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                const updatedBatteries = [...getProjectBatteries(project.specs)];
+                                updatedBatteries[idx] = { ...updatedBatteries[idx], unitPriceUSD: val };
+                                const update: Partial<SystemSpecs> = {
+                                  batteries: updatedBatteries.length > 1 ? updatedBatteries : undefined,
+                                  autoSupplierPricing: false,
+                                };
+                                if (idx === 0) update.batteryUnitPriceUSD = val;
+                                updateSpecs(update);
+                              }}
+                              className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
+                                isDark
+                                  ? 'bg-[#121216] border-[#383848] text-zinc-100'
+                                  : 'bg-slate-50 border-slate-300 text-slate-900'
+                              }`}
+                            />
+                            {bat.selectedSupplierInfo && (
+                              <span className="text-[9.5px] text-emerald-400 font-semibold block mt-0.5 truncate" title={`Proveedor: ${bat.selectedSupplierInfo.supplierName} ($${bat.selectedSupplierInfo.priceUSD} USD)`}>
+                                🏷️ {bat.selectedSupplierInfo.supplierName}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className={`block text-[10px] font-medium ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                        Precio Inversor ($/ud)
-                      </label>
-                      {selectedInverter && (
-                        <button
-                          type="button"
-                          onClick={() => openSupplierPriceModal(selectedInverter)}
-                          className="text-[9.5px] text-amber-500 hover:underline font-bold flex items-center gap-0.5 cursor-pointer"
-                        >
-                          {inverterSuppliersCount > 0 ? `${inverterSuppliersCount} prov.` : '+ prov.'}
-                        </button>
-                      )}
-                    </div>
-                    <input
-                      type="number"
-                      step="10"
-                      value={project.specs.inverterUnitPriceUSD !== undefined ? project.specs.inverterUnitPriceUSD : 2300.0}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value) || 0;
-                        const newSupplierInfo = { ...(project.specs.selectedSupplierInfo || {}) };
-                        if (newSupplierInfo.inverter && Math.abs(newSupplierInfo.inverter.priceUSD - val) > 0.01) {
-                          delete newSupplierInfo.inverter;
-                        }
-                        updateSpecs({
-                          inverterUnitPriceUSD: val,
-                          autoSupplierPricing: false,
-                          selectedSupplierInfo: newSupplierInfo,
-                        });
-                      }}
-                      className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
-                        isDark
-                          ? 'bg-[#121216] border-[#383848] text-zinc-100'
-                          : 'bg-slate-50 border-slate-300 text-slate-900'
-                      }`}
-                    />
-                    {project.specs.selectedSupplierInfo?.inverter && (
-                      <span className="text-[9.5px] text-emerald-400 font-semibold block mt-0.5 truncate" title={`Proveedor: ${project.specs.selectedSupplierInfo.inverter.supplierName} ($${project.specs.selectedSupplierInfo.inverter.priceUSD} USD)`}>
-                        🏷️ {project.specs.selectedSupplierInfo.inverter.supplierName}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  {project.specs.hasBattery ? (
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className={`block text-[10px] font-medium ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
-                          Precio Batería ($/ud)
-                        </label>
-                        {selectedBattery && (
-                          <button
-                            type="button"
-                            onClick={() => openSupplierPriceModal(selectedBattery)}
-                            className="text-[9.5px] text-amber-500 hover:underline font-bold flex items-center gap-0.5 cursor-pointer"
-                          >
-                            {batterySuppliersCount > 0 ? `${batterySuppliersCount} prov.` : '+ prov.'}
-                          </button>
-                        )}
-                      </div>
-                      <input
-                        type="number"
-                        step="10"
-                        value={project.specs.batteryUnitPriceUSD !== undefined ? project.specs.batteryUnitPriceUSD : 1990.0}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value) || 0;
-                          const newSupplierInfo = { ...(project.specs.selectedSupplierInfo || {}) };
-                          if (newSupplierInfo.battery && Math.abs(newSupplierInfo.battery.priceUSD - val) > 0.01) {
-                            delete newSupplierInfo.battery;
-                          }
-                          updateSpecs({
-                            batteryUnitPriceUSD: val,
-                            autoSupplierPricing: false,
-                            selectedSupplierInfo: newSupplierInfo,
-                          });
-                        }}
-                        className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
-                          isDark
-                            ? 'bg-[#121216] border-[#383848] text-zinc-100'
-                            : 'bg-slate-50 border-slate-300 text-slate-900'
-                        }`}
-                      />
-                      {project.specs.selectedSupplierInfo?.battery && (
-                        <span className="text-[9.5px] text-emerald-400 font-semibold block mt-0.5 truncate" title={`Proveedor: ${project.specs.selectedSupplierInfo.battery.supplierName} ($${project.specs.selectedSupplierInfo.battery.priceUSD} USD)`}>
-                          🏷️ {project.specs.selectedSupplierInfo.battery.supplierName}
-                        </span>
-                      )}
-                    </div>
-                  ) : null}
-
-                  <div className={project.specs.hasBattery ? '' : 'col-span-2'}>
                     <label className={`block text-[10px] font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
                       Mano de Obra & Mat. ($/kWp)
                     </label>

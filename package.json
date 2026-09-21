@@ -25,7 +25,8 @@
     "test:tariffs": "npx tsx src/tests/testTariffEngine.ts",
     "test:gemini": "npx tsx src/tests/testGeminiFamily3Cascade.ts",
     "test:cloudflare": "npx tsx src/tests/testCloudflareShareHistory.ts",
-    "test": "npx tsx src/tests/testBenchmark.ts && npx tsx src/tests/testFinancialEngineComprehensive.ts && npx tsx src/tests/testAISmartProposal.ts && npx tsx src/tests/testEquipmentCatalog.ts && npx tsx src/tests/testFolderHidingAndSync.ts && npx tsx src/tests/testTrashAndReadOnly.ts && npx tsx src/tests/testTariffEngine.ts && npx tsx src/tests/testGeminiFamily3Cascade.ts && npx tsx src/tests/testCloudflareShareHistory.ts",
+    "test:multiequipment": "npx tsx src/tests/testMultiEquipment.ts",
+    "test": "npx tsx src/tests/testBenchmark.ts && npx tsx src/tests/testFinancialEngineComprehensive.ts && npx tsx src/tests/testAISmartProposal.ts && npx tsx src/tests/testEquipmentCatalog.ts && npx tsx src/tests/testFolderHidingAndSync.ts && npx tsx src/tests/testTrashAndReadOnly.ts && npx tsx src/tests/testTariffEngine.ts && npx tsx src/tests/testGeminiFamily3Cascade.ts && npx tsx src/tests/testCloudflareShareHistory.ts && npx tsx src/tests/testMultiEquipment.ts",
     "context:pack": "repomix"
   },
 

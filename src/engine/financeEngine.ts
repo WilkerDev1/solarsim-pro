@@ -1,5 +1,12 @@
 import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem } from '../types';
 import { calculateDCCapacityKWp, calculateMonthlySolarProduction } from './solarEngine';
+import {
+  getProjectPanels,
+  getProjectInverters,
+  getProjectBatteries,
+  calculateTotalDCCapacityKWp,
+  calculateTotalBatteryCapacityKWh,
+} from '../utils/equipmentSpecsUtils';
 
 /**
  * Calculates internal cost matrix, sale price multiplier, and net profit matching Excel spreadsheet.
@@ -11,86 +18,123 @@ export function calculateCostMatrixSummary(
   const rate = specs.dopExchangeRate || 60.0;
   const margin = specs.saleMarginMultiplier || 1.25;
 
-  const realDCKWp = dcCapacityKWp > 0 ? dcCapacityKWp : ((specs.panelCount || 0) * (specs.panelPowerW || 620)) / 1000;
+  const panels = getProjectPanels(specs);
+  const inverters = getProjectInverters(specs);
+  const batteries = getProjectBatteries(specs);
 
-  const panelCount = specs.panelCount || 0;
-  const panelUnitUSD = specs.panelUnitPriceUSD !== undefined ? specs.panelUnitPriceUSD : 103.32;
-  const panelKilos = Math.round(realDCKWp * 1000) / 1000;
+  const realDCKWp = dcCapacityKWp > 0 ? dcCapacityKWp : calculateTotalDCCapacityKWp(specs);
 
-  const inverterCount = specs.inverterCount || (realDCKWp > 0 ? Math.max(1, Math.ceil(realDCKWp / (specs.inverterPowerKW || 8))) : 1);
-  const inverterUnitUSD = specs.inverterUnitPriceUSD !== undefined ? specs.inverterUnitPriceUSD : 2300.0;
-  const inverterKilos = specs.inverterWeightKilos || specs.inverterPowerKW || 12;
+  // Row 1..N: Panels
+  let panelTotalUSD = 0;
+  let panelTotalDOP = 0;
+  const panelItbisDOP = 0;
+  const panelItbisUSD = 0;
 
-  const batteryCount = specs.hasBattery ? (specs.batteryCount || 3) : 0;
-  const batteryUnitUSD = specs.batteryUnitPriceUSD !== undefined ? specs.batteryUnitPriceUSD : 1990.0;
-  const batteryKilos = specs.batteryWeightKilos || specs.batteryCapacityKWh || 32;
+  const panelItems: CostMatrixItem[] = panels.map((p) => {
+    const qty = p.count || 0;
+    const unitUSD = p.unitPriceUSD !== undefined
+      ? p.unitPriceUSD
+      : (specs.panelUnitPriceUSD !== undefined ? specs.panelUnitPriceUSD : 103.32);
+    const itemTotalUSD = qty * unitUSD;
+    const itemTotalDOP = itemTotalUSD * rate;
+    const itemKilos = p.weightKilos || Math.round((((p.powerW || 620) * qty) / 1000) * 1000) / 1000;
+    panelTotalUSD += itemTotalUSD;
+    panelTotalDOP += itemTotalDOP;
 
+    return {
+      name: p.brandModel || 'Panel JA Solar 620 watts.',
+      kilos: itemKilos,
+      quantity: qty,
+      unitPriceUSD: unitUSD,
+      unitPriceDOP: unitUSD * rate,
+      totalPriceDOP: itemTotalDOP,
+      totalPriceUSD: itemTotalUSD,
+      itbisDOP: 0,
+      itbisUSD: 0,
+    };
+  });
+
+  // Row N+1..M: Inverters
+  let inverterTotalUSD = 0;
+  let inverterTotalDOP = 0;
+  const inverterItbisDOP = 0;
+  const inverterItbisUSD = 0;
+
+  const inverterItems: CostMatrixItem[] = inverters.map((inv) => {
+    const qty = inv.count !== undefined ? inv.count : 1;
+    const unitUSD = inv.unitPriceUSD !== undefined
+      ? inv.unitPriceUSD
+      : (specs.inverterUnitPriceUSD !== undefined ? specs.inverterUnitPriceUSD : 2300.0);
+    const itemTotalUSD = qty * unitUSD;
+    const itemTotalDOP = itemTotalUSD * rate;
+    const itemKilos = inv.weightKilos || inv.powerKW || 12;
+    inverterTotalUSD += itemTotalUSD;
+    inverterTotalDOP += itemTotalDOP;
+
+    return {
+      name: inv.brandModel || 'Inversor Lux Power de 12 kwp',
+      kilos: itemKilos,
+      quantity: qty,
+      unitPriceUSD: unitUSD,
+      unitPriceDOP: unitUSD * rate,
+      totalPriceDOP: itemTotalDOP,
+      totalPriceUSD: itemTotalUSD,
+      itbisDOP: 0,
+      itbisUSD: 0,
+    };
+  });
+
+  // Row M+1..K: Batteries
+  let batteryTotalUSD = 0;
+  let batteryTotalDOP = 0;
+  let batteryItbisDOP = 0;
+  let batteryItbisUSD = 0;
+
+  const batteryItems: CostMatrixItem[] = specs.hasBattery
+    ? batteries.map((b) => {
+        const qty = b.count !== undefined ? b.count : 1;
+        const unitUSD = b.unitPriceUSD !== undefined
+          ? b.unitPriceUSD
+          : (specs.batteryUnitPriceUSD !== undefined ? specs.batteryUnitPriceUSD : 1990.0);
+        const itemTotalUSD = qty * unitUSD;
+        const itemTotalDOP = itemTotalUSD * rate;
+        const itemItbisDOP = itemTotalDOP * 0.18; // 18% ITBIS
+        const itemItbisUSD = itemItbisDOP / rate;
+        const itemKilos = b.weightKilos || b.capacityKWh || 32;
+
+        batteryTotalUSD += itemTotalUSD;
+        batteryTotalDOP += itemTotalDOP;
+        batteryItbisDOP += itemItbisDOP;
+        batteryItbisUSD += itemItbisUSD;
+
+        return {
+          name: b.brandModel || 'Bateria Hinaess 16.0 kwh',
+          kilos: itemKilos,
+          quantity: qty,
+          unitPriceUSD: unitUSD,
+          unitPriceDOP: unitUSD * rate,
+          totalPriceDOP: itemTotalDOP,
+          totalPriceUSD: itemTotalUSD,
+          itbisDOP: itemItbisDOP,
+          itbisUSD: itemItbisUSD,
+        };
+      })
+    : [];
+
+  // Row Final: Installation & Materials
   const installationKilos = 1;
   const installationQty = Math.round(realDCKWp * 1000) / 1000;
   const installationUnitUSD = specs.installationUnitPriceUSD !== undefined ? specs.installationUnitPriceUSD : 170.0;
 
-  // Row 1: Panel
-  const panelTotalUSD = panelCount * panelUnitUSD;
-  const panelTotalDOP = panelTotalUSD * rate;
-  const panelItbisDOP = 0;
-  const panelItbisUSD = 0;
-
-  // Row 2: Inverter
-  const inverterTotalUSD = inverterCount * inverterUnitUSD;
-  const inverterTotalDOP = inverterTotalUSD * rate;
-  const inverterItbisDOP = 0;
-  const inverterItbisUSD = 0;
-
-  // Row 3: Battery
-  const batteryTotalUSD = specs.hasBattery ? batteryCount * batteryUnitUSD : 0;
-  const batteryTotalDOP = batteryTotalUSD * rate;
-  const batteryItbisDOP = batteryTotalDOP * 0.18; // 18% ITBIS
-  const batteryItbisUSD = batteryItbisDOP / rate;
-
-  // Row 4: Installation & Materials
   const installTotalUSD = installationQty * installationUnitUSD;
   const installTotalDOP = installTotalUSD * rate;
   const installItbisDOP = installTotalDOP * 0.18; // 18% ITBIS
   const installItbisUSD = installItbisDOP / rate;
 
   const items: CostMatrixItem[] = [
-    {
-      name: `${specs.panelBrandModel || 'Panel JA Solar 620 watts.'}`,
-      kilos: panelKilos,
-      quantity: panelCount,
-      unitPriceUSD: panelUnitUSD,
-      unitPriceDOP: panelUnitUSD * rate,
-      totalPriceDOP: panelTotalDOP,
-      totalPriceUSD: panelTotalUSD,
-      itbisDOP: panelItbisDOP,
-      itbisUSD: panelItbisUSD,
-    },
-    {
-      name: `${specs.inverterBrandModel || 'Inversor Lux Power de 12 kwp'}`,
-      kilos: inverterKilos,
-      quantity: inverterCount,
-      unitPriceUSD: inverterUnitUSD,
-      unitPriceDOP: inverterUnitUSD * rate,
-      totalPriceDOP: inverterTotalDOP,
-      totalPriceUSD: inverterTotalUSD,
-      itbisDOP: inverterItbisDOP,
-      itbisUSD: inverterItbisUSD,
-    },
-    ...(specs.hasBattery
-      ? [
-          {
-            name: `${specs.batteryBrandModel || 'Bateria Hinaess 16.0 kwh'}`,
-            kilos: batteryKilos,
-            quantity: batteryCount,
-            unitPriceUSD: batteryUnitUSD,
-            unitPriceDOP: batteryUnitUSD * rate,
-            totalPriceDOP: batteryTotalDOP,
-            totalPriceUSD: batteryTotalUSD,
-            itbisDOP: batteryItbisDOP,
-            itbisUSD: batteryItbisUSD,
-          },
-        ]
-      : []),
+    ...panelItems,
+    ...inverterItems,
+    ...batteryItems,
     {
       name: 'Mano de obra y materiales',
       kilos: installationKilos,
@@ -228,7 +272,7 @@ export function calculateFinancialSummary(
   monthlyConsumptionKWh: number[],
   customMonthlyHSP?: number[]
 ): FinancialSummaryResult {
-  const dcCapacityKWp = calculateDCCapacityKWp(specs.panelPowerW, specs.panelCount);
+  const dcCapacityKWp = calculateTotalDCCapacityKWp(specs);
 
   // Calculate cost matrix summary
   const costMatrix = calculateCostMatrixSummary(specs, dcCapacityKWp);
@@ -379,8 +423,9 @@ export function calculateFinancialSummary(
   // Battery Usable Capacity & Backup Autonomy calculation
   const batteryDodPct = specs.batteryDOD || 80;
   const batteryEffPct = specs.batteryEfficiencyPct || 92;
+  const totalBatteryKWh = calculateTotalBatteryCapacityKWh(specs);
   const batteryUsableKWh = specs.hasBattery
-    ? Math.round((specs.batteryCapacityKWh * (batteryDodPct / 100) * (batteryEffPct / 100)) * 10) / 10
+    ? Math.round(((totalBatteryKWh || specs.batteryCapacityKWh) * (batteryDodPct / 100) * (batteryEffPct / 100)) * 10) / 10
     : 0;
 
   const avgDailyConsumptionKWh = annualConsumptionKWh > 0 ? annualConsumptionKWh / 365 : 100;

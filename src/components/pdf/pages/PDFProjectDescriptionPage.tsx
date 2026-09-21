@@ -10,6 +10,12 @@ import { renderFormattedMarkdown, resolveDynamicProjectSummaryParagraph1, resolv
 
 import { InlineEditableText } from '../common/InlineEditableText';
 import { getTariffDisplayName } from '../../../types/tariffs';
+import {
+  formatPanelsSummary,
+  formatInvertersSummary,
+  formatBatteriesSummary,
+  calculateTotalBatteryCapacityKWh,
+} from '../../../utils/equipmentSpecsUtils';
 
 interface PDFProjectDescriptionPageProps {
   project: ProjectSimulation;
@@ -86,9 +92,26 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
     ? rawBatteryModel
     : `${rawBatteryModel} (${project.specs.batteryCapacityKWh} kWh)`;
 
-  const defaultParagraph1 = `El consumo promedio anual de **${clientName}** es de **${summary.annualConsumptionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh**, por lo que se le propone la instalación de **${project.specs.panelCount} ${panelModel}**, alcanzando una potencia DC instalada de **${summary.systemCapacityKWp.toFixed(2)} kWp**. La producción energética estimada para este sistema es de **${summary.annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh anuales**, representando el **${summary.energyCoveragePct.toFixed(1)}%** del consumo total del cliente.`;
+  const hasMultiPanels = !!(project.specs.panels && project.specs.panels.length > 1);
+  const panelsSummaryText = hasMultiPanels
+    ? formatPanelsSummary(project.specs)
+    : `${project.specs.panelCount} ${panelModel}`;
 
-  const defaultParagraph2 = `Adicionalmente, se contempla la instalación de **${project.specs.inverterCount || 1} ${inverterModel}**${project.specs.hasBattery && project.specs.batteryCapacityKWh > 0 ? ` y **${project.specs.batteryCount || 1} ${batteryModel}**` : ''} ${cust.projectEngineeringScopeText !== undefined && cust.projectEngineeringScopeText.trim() !== '' ? cust.projectEngineeringScopeText.trim() : DEFAULT_DOCUMENT_CUSTOMIZATION.projectEngineeringScopeText}`;
+  const hasMultiInverters = !!(project.specs.inverters && project.specs.inverters.length > 1);
+  const invertersSummaryText = hasMultiInverters
+    ? formatInvertersSummary(project.specs)
+    : `${project.specs.inverterCount || 1} ${inverterModel}`;
+
+  const hasMultiBatteries = !!(project.specs.batteries && project.specs.batteries.length > 1);
+  const batteriesSummaryText = hasMultiBatteries
+    ? formatBatteriesSummary(project.specs)
+    : `${project.specs.batteryCount || 1} ${batteryModel}`;
+
+  const totalBESSKWh = calculateTotalBatteryCapacityKWh(project.specs);
+
+  const defaultParagraph1 = `El consumo promedio anual de **${clientName}** es de **${summary.annualConsumptionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh**, por lo que se le propone la instalación de **${panelsSummaryText}**, alcanzando una potencia DC instalada de **${summary.systemCapacityKWp.toFixed(2)} kWp**. La producción energética estimada para este sistema es de **${summary.annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh anuales**, representando el **${summary.energyCoveragePct.toFixed(1)}%** del consumo total del cliente.`;
+
+  const defaultParagraph2 = `Adicionalmente, se contempla la instalación de **${invertersSummaryText}**${project.specs.hasBattery && totalBESSKWh > 0 ? ` y **${batteriesSummaryText}**` : ''} ${cust.projectEngineeringScopeText !== undefined && cust.projectEngineeringScopeText.trim() !== '' ? cust.projectEngineeringScopeText.trim() : DEFAULT_DOCUMENT_CUSTOMIZATION.projectEngineeringScopeText}`;
 
   const resolvedParagraph1 = resolveDynamicProjectSummaryParagraph1(
     cust.customProjectSummaryParagraph1,
@@ -96,15 +119,15 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
     project,
     summary,
     clientName,
-    panelModel
+    hasMultiPanels ? panelsSummaryText : panelModel
   );
 
   const resolvedParagraph2 = resolveDynamicProjectSummaryParagraph2(
     cust.customProjectSummaryParagraph2,
     defaultParagraph2,
     project,
-    inverterModel,
-    batteryModel,
+    hasMultiInverters ? invertersSummaryText : inverterModel,
+    hasMultiBatteries ? batteriesSummaryText : batteryModel,
     cust.projectEngineeringScopeText !== undefined && cust.projectEngineeringScopeText.trim() !== ''
       ? cust.projectEngineeringScopeText.trim()
       : DEFAULT_DOCUMENT_CUSTOMIZATION.projectEngineeringScopeText || ''
@@ -193,7 +216,7 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
           </div>
 
           {/* Quick Metrics Cards (4 indicators when system has battery, 3 otherwise) */}
-          <div className={`grid ${project.specs.hasBattery && (project.specs.batteryCapacityKWh || 0) > 0 ? 'grid-cols-4 gap-2.5' : 'grid-cols-3 gap-3'}`}>
+          <div className={`grid ${project.specs.hasBattery && totalBESSKWh > 0 ? 'grid-cols-4 gap-2.5' : 'grid-cols-3 gap-3'}`}>
             <div className="p-3 rounded-2xl border border-slate-200 bg-slate-50/90 flex items-center gap-2.5 shadow-xs">
               <div
                 className="w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-2xs shrink-0"
@@ -233,7 +256,7 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
               </div>
             </div>
 
-            {project.specs.hasBattery && (project.specs.batteryCapacityKWh || 0) > 0 && (
+            {project.specs.hasBattery && totalBESSKWh > 0 && (
               <div className="p-3 rounded-2xl border border-emerald-200 bg-emerald-50/90 flex items-center gap-2.5 shadow-xs">
                 <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-emerald-600 text-white shadow-2xs shrink-0">
                   <BatteryCharging className="w-4 h-4" />
@@ -241,7 +264,7 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
                 <div>
                   <span className="text-[9.5px] uppercase font-black text-emerald-800 block">Almacenamiento BESS</span>
                   <span className="text-sm font-black font-mono text-emerald-950 block">
-                    {((project.specs.batteryCount || 1) * (project.specs.batteryCapacityKWh || 0)).toFixed(1)} kWh
+                    {totalBESSKWh.toFixed(1)} kWh
                   </span>
                 </div>
               </div>

@@ -121,7 +121,7 @@ export function resolveDynamicProjectSummaryParagraph2(
   const invCount = project.specs.inverterCount || 1;
   const batCount = project.specs.batteryCount || 1;
 
-  const rawInverter = inverterModel.replace(/^inversores?\s+/i, '').trim();
+  const rawInverter = inverterModel.replace(/^inversor(?:es)?\s+/i, '').trim();
   const invLabel = invCount > 1 ? 'Inversores' : 'Inversor';
   const formattedInverterDesc = `${invLabel} ${rawInverter}`;
 
@@ -139,7 +139,7 @@ export function resolveDynamicProjectSummaryParagraph2(
 
   // 2. Keep inverter count and model synchronized:
   text = text.replace(
-    /instalación\s+de\s+\*\*\s*\d+\s+(?:Inversores?\s+)?[^*]+\*\*/i,
+    /instalación\s+de\s+\*\*\s*\d+\s+(?:Inversor(?:es)?\s+)?[^*]+\*\*/i,
     `instalación de **${invCount} ${formattedInverterDesc}**`
   );
 
