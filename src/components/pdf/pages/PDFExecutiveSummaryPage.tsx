@@ -110,47 +110,13 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
       {/* Contenido Principal de la Página */}
       <div className="px-9 py-5 flex-1 flex flex-col justify-between relative z-10 min-h-0">
         {/* Cabecera del Cuadro Ejecutivo */}
-        <div className="border-b border-slate-200 pb-3 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span
-                className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-none font-mono border"
-                style={{
-                  backgroundColor: `${activeTheme.primary}12`,
-                  borderColor: `${activeTheme.primary}35`,
-                  color: activeTheme.primary,
-                }}
-              >
-                PROPUESTA TÉCNICO-ECONÓMICA
-              </span>
-              <span className="text-[10px] font-medium tracking-wide text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-none font-mono">
-                {isZeroExport ? 'Inyección Cero (Grid Zero)' : 'Suministro Bidireccional • Medición Neta'}
-              </span>
-            </div>
-            <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
-              Cuadro Resumen de Inversión y Retorno
-            </h1>
-            <p className="text-[11px] text-slate-500 font-medium">
-              Pipeline ejecutivo del dimensionamiento fotovoltaico, balance económico y marco de la Ley 57-07.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-none shadow-2xs">
-            <div
-              className="w-7 h-7 rounded-none flex items-center justify-center text-white font-black text-xs shadow-2xs"
-              style={{ backgroundColor: activeTheme.primary }}
-            >
-              ⚡
-            </div>
-            <div className="text-right">
-              <div className="text-[11px] font-extrabold uppercase tracking-wider text-slate-900 leading-none">
-                {project.customization?.companyName || 'Electsun'}
-              </div>
-              <div className="text-[9.5px] text-slate-500 font-semibold tracking-tight mt-0.5">
-                {project.customization?.companySlogan || 'El sol a tu favor'}
-              </div>
-            </div>
-          </div>
+        <div className="border-b border-slate-200 pb-3">
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+            Cuadro Resumen de Inversión y Retorno
+          </h1>
+          <p className="text-xs text-slate-500 font-medium mt-0.5">
+            Pipeline ejecutivo del dimensionamiento fotovoltaico, balance económico y marco de la Ley 57-07.
+          </p>
         </div>
 
         {/* 6 FILAS DE PIPELINE HORIZONTAL STREAMLINE */}
@@ -160,29 +126,21 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
             className="bg-white border border-slate-200 rounded-none p-3.5 shadow-2xs flex items-center justify-between gap-3 border-l-4"
             style={{ borderLeftColor: activeTheme.primary }}
           >
-            <div className="flex items-center gap-3 min-w-[210px]">
+            <div className="flex items-center gap-3.5 min-w-[210px]">
               <div
-                className="w-8 h-8 flex items-center justify-center font-mono font-bold text-xs shrink-0 border"
+                className="w-9 h-9 flex items-center justify-center font-mono font-black text-sm shrink-0 border"
                 style={{
                   backgroundColor: `${activeTheme.primary}15`,
-                  borderColor: `${activeTheme.primary}30`,
+                  borderColor: `${activeTheme.primary}35`,
                   color: activeTheme.primary,
                 }}
               >
                 01
               </div>
               <div>
-                <span
-                  className="text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.2 font-mono border"
-                  style={{
-                    backgroundColor: `${activeTheme.primary}10`,
-                    borderColor: `${activeTheme.primary}25`,
-                    color: activeTheme.primary,
-                  }}
-                >
-                  Generador FV
-                </span>
-                <h3 className="text-xs font-bold text-slate-900 leading-tight mt-0.5">Capacidad y Módulos</h3>
+                <h3 className="text-sm font-black text-slate-950 uppercase tracking-wide leading-tight">
+                  CAPACIDAD Y MÓDULOS
+                </h3>
               </div>
             </div>
 
@@ -238,29 +196,21 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
             className="bg-white border border-slate-200 rounded-none p-3.5 shadow-2xs flex items-center justify-between gap-3 border-l-4"
             style={{ borderLeftColor: activeTheme.secondary || activeTheme.primary }}
           >
-            <div className="flex items-center gap-3 min-w-[210px]">
+            <div className="flex items-center gap-3.5 min-w-[210px]">
               <div
-                className="w-8 h-8 flex items-center justify-center font-mono font-bold text-xs shrink-0 border"
+                className="w-9 h-9 flex items-center justify-center font-mono font-black text-sm shrink-0 border"
                 style={{
                   backgroundColor: `${activeTheme.secondary || activeTheme.primary}15`,
-                  borderColor: `${activeTheme.secondary || activeTheme.primary}30`,
+                  borderColor: `${activeTheme.secondary || activeTheme.primary}35`,
                   color: activeTheme.secondary || activeTheme.primary,
                 }}
               >
                 02
               </div>
               <div>
-                <span
-                  className="text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.2 font-mono border"
-                  style={{
-                    backgroundColor: `${activeTheme.secondary || activeTheme.primary}10`,
-                    borderColor: `${activeTheme.secondary || activeTheme.primary}25`,
-                    color: activeTheme.secondary || activeTheme.primary,
-                  }}
-                >
-                  Conversión AC
-                </span>
-                <h3 className="text-xs font-bold text-slate-900 leading-tight mt-0.5">Inversores & Conexión</h3>
+                <h3 className="text-sm font-black text-slate-950 uppercase tracking-wide leading-tight">
+                  INVERSORES & CONEXIÓN
+                </h3>
               </div>
             </div>
 
@@ -301,15 +251,14 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
 
           {/* FILA 03: INVERSIÓN BRUTA Y PARÁMETROS COMERCIALES (DARK CARD) */}
           <article className="bg-slate-900 border border-slate-800 border-l-4 border-l-amber-500 rounded-none p-3.5 shadow-2xs flex items-center justify-between gap-3 text-white">
-            <div className="flex items-center gap-3 min-w-[210px]">
-              <div className="w-8 h-8 bg-amber-500 text-slate-950 flex items-center justify-center font-mono font-black text-xs shrink-0">
+            <div className="flex items-center gap-3.5 min-w-[210px]">
+              <div className="w-9 h-9 bg-amber-500 text-slate-950 flex items-center justify-center font-mono font-black text-sm shrink-0">
                 03
               </div>
               <div>
-                <span className="text-[9.5px] font-bold uppercase tracking-wider text-amber-300 bg-slate-800 border border-slate-700 px-1.5 py-0.2 font-mono">
-                  Comercial & Divisas
-                </span>
-                <h3 className="text-xs font-bold text-white leading-tight mt-0.5">Inversión Bruta</h3>
+                <h3 className="text-sm font-black text-white uppercase tracking-wide leading-tight">
+                  INVERSIÓN BRUTA
+                </h3>
               </div>
             </div>
 
@@ -350,15 +299,14 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
 
           {/* FILA 04: INCENTIVOS FISCALES LEY 57-07 */}
           <article className="bg-emerald-50/30 border border-slate-200 border-l-4 border-l-emerald-600 rounded-none p-3.5 shadow-2xs flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-[210px]">
-              <div className="w-8 h-8 bg-emerald-100 border border-emerald-300 text-emerald-800 flex items-center justify-center font-mono font-bold text-xs shrink-0">
+            <div className="flex items-center gap-3.5 min-w-[210px]">
+              <div className="w-9 h-9 bg-emerald-100 border border-emerald-300 text-emerald-800 flex items-center justify-center font-mono font-black text-sm shrink-0">
                 04
               </div>
               <div>
-                <span className="text-[9.5px] font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100 px-1.5 py-0.2 border border-emerald-200 font-mono">
-                  Ley 57-07
-                </span>
-                <h3 className="text-xs font-bold text-slate-900 leading-tight mt-0.5">Incentivo Fiscal</h3>
+                <h3 className="text-sm font-black text-slate-950 uppercase tracking-wide leading-tight">
+                  INCENTIVO FISCAL
+                </h3>
               </div>
             </div>
 
@@ -405,10 +353,9 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
                 05
               </div>
               <div>
-                <div className="text-[9.5px] font-bold uppercase tracking-wider text-blue-100 font-mono">
-                  Resultado Neto • Desembolso Real
-                </div>
-                <h2 className="text-sm font-black text-white mt-0.5">Diferencia (Inversión Neta)</h2>
+                <h2 className="text-base font-black text-white uppercase tracking-wide leading-tight">
+                  DIFERENCIA (INVERSIÓN NETA)
+                </h2>
                 <p className="text-[10.5px] font-mono text-blue-100 mt-0.5">
                   ${grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bruto - $
                   {leyCreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Beneficio Ley 57-07
@@ -428,15 +375,14 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
 
           {/* FILA 06: RETORNO DE INVERSIÓN (PAYBACK) */}
           <article className="bg-white border border-slate-200 border-l-4 border-l-amber-500 rounded-none p-3.5 shadow-2xs flex items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-[210px]">
-              <div className="w-8 h-8 bg-amber-500 text-white flex items-center justify-center font-mono font-bold text-xs shrink-0">
+            <div className="flex items-center gap-3.5 min-w-[210px]">
+              <div className="w-9 h-9 bg-amber-500 text-white flex items-center justify-center font-mono font-black text-sm shrink-0">
                 06
               </div>
               <div>
-                <span className="text-[9.5px] font-bold uppercase tracking-wider text-amber-800 bg-amber-100 px-1.5 py-0.2 border border-amber-200 font-mono">
-                  Payback & Garantía
-                </span>
-                <h3 className="text-xs font-bold text-slate-900 leading-tight mt-0.5">Retorno Años</h3>
+                <h3 className="text-sm font-black text-slate-950 uppercase tracking-wide leading-tight">
+                  RETORNO DE INVERSIÓN
+                </h3>
               </div>
             </div>
 
