@@ -48,6 +48,9 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
   );
   const currentProject = storeProject || project;
 
+  // Registro de documentos para los cuales ya se intentó generar miniatura (evita bucles infinitos)
+  const attemptedThumbnailsRef = useRef<Set<string>>(new Set());
+
   const doUpdateDoc = (partial: Partial<DocumentCustomization>) => {
     useSimulationStore.getState().updateDocumentCustomization(partial);
     if (updateDocumentCustomization) {
@@ -76,7 +79,9 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
     if (!currentProject) return;
     let isMounted = true;
     const currentList = getLatestAttachments();
-    const missing = currentList.filter((att) => !att.thumbnailDataUrl);
+    const missing = currentList.filter(
+      (att) => !att.thumbnailDataUrl && !attemptedThumbnailsRef.current.has(att.id)
+    );
     if (missing.length === 0) return;
 
     const generateMissing = async () => {
@@ -84,12 +89,14 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
       const newList = [...getLatestAttachments()];
 
       for (let i = 0; i < newList.length; i++) {
-        if (!newList[i].thumbnailDataUrl) {
+        const item = newList[i];
+        if (!item.thumbnailDataUrl && !attemptedThumbnailsRef.current.has(item.id)) {
+          attemptedThumbnailsRef.current.add(item.id);
           try {
-            const buf = await PDFAttachmentStorage.getAttachment(newList[i].id);
+            const buf = await PDFAttachmentStorage.getAttachment(item.id);
             if (buf && isMounted) {
               const thumb = await PDFThumbnailService.generateThumbnail(buf);
-              if (thumb && isMounted) {
+              if (thumb && thumb.startsWith('data:image') && isMounted) {
                 newList[i] = { ...newList[i], thumbnailDataUrl: thumb };
                 updated = true;
               }
@@ -151,7 +158,10 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
 
         let thumbnailDataUrl: string | undefined = undefined;
         try {
-          thumbnailDataUrl = await PDFThumbnailService.generateThumbnail(bufferCopy);
+          const rawThumb = await PDFThumbnailService.generateThumbnail(bufferCopy);
+          if (rawThumb && typeof rawThumb === 'string' && rawThumb.startsWith('data:image')) {
+            thumbnailDataUrl = rawThumb;
+          }
         } catch (thumbErr) {
           console.warn('Advertencia generando miniatura al subir PDF:', thumbErr);
         }
