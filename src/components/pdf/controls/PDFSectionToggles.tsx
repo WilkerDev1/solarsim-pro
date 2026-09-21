@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Check,
   Zap,
@@ -16,10 +16,13 @@ import {
   Trash2,
   Sparkles,
   Layers,
+  GripVertical,
+  RotateCcw,
 } from 'lucide-react';
 import { PDFColorTheme, PDF_COLOR_THEMES } from '../../../constants/pdfThemes';
 import { ProjectSimulation, DocumentCustomization, ExtraTOCItem } from '../../../types';
 import { PDFAttachmentsSection } from './PDFAttachmentsSection';
+import { PDFSectionId, DEFAULT_PDF_SECTION_ORDER } from '../../../constants/pdfSections';
 
 interface PDFSectionTogglesProps {
   isDark: boolean;
@@ -91,7 +94,135 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
   const [newExtraPageCount, setNewExtraPageCount] = useState<number>(1);
   const [isAddingOpen, setIsAddingOpen] = useState(false);
 
+  const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+
   const extraTocItems: ExtraTOCItem[] = project?.customization?.extraTocItems || [];
+
+  const currentOrder: PDFSectionId[] = useMemo(() => {
+    const saved = project?.customization?.sectionOrder;
+    if (saved && Array.isArray(saved) && saved.length > 0) {
+      const validSaved = saved.filter((id): id is PDFSectionId =>
+        DEFAULT_PDF_SECTION_ORDER.includes(id as PDFSectionId)
+      );
+      const missing = DEFAULT_PDF_SECTION_ORDER.filter((id) => !validSaved.includes(id));
+      return [...validSaved, ...missing];
+    }
+    return DEFAULT_PDF_SECTION_ORDER;
+  }, [project?.customization?.sectionOrder]);
+
+  const isOrderModified = useMemo(() => {
+    if (currentOrder.length !== DEFAULT_PDF_SECTION_ORDER.length) return true;
+    return currentOrder.some((id, idx) => id !== DEFAULT_PDF_SECTION_ORDER[idx]);
+  }, [currentOrder]);
+
+  const handleReorderSections = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex || !updateDocumentCustomization) return;
+    const newOrder = [...currentOrder];
+    const [removed] = newOrder.splice(fromIndex, 1);
+    newOrder.splice(toIndex, 0, removed);
+    updateDocumentCustomization({
+      sectionOrder: newOrder,
+    });
+  };
+
+  const handleResetOrder = () => {
+    if (!updateDocumentCustomization) return;
+    updateDocumentCustomization({
+      sectionOrder: [...DEFAULT_PDF_SECTION_ORDER],
+    });
+  };
+
+  const sectionConfigs: Record<
+    PDFSectionId,
+    {
+      visible: boolean;
+      toggle: (val: boolean) => void;
+      icon: React.ComponentType<{ className?: string }>;
+      title: string;
+      subtitle: string;
+      isConfidential?: boolean;
+    }
+  > = {
+    cover: {
+      visible: showCover,
+      toggle: setShowCover,
+      icon: Layout,
+      title: 'Portada Ejecutiva',
+      subtitle: 'Imagen hero, cliente y datos',
+    },
+    tableOfContents: {
+      visible: showTableOfContents,
+      toggle: setShowTableOfContents,
+      icon: ListOrdered,
+      title: 'Índice del Dossier',
+      subtitle: 'Estructura y números dinámicos',
+    },
+    aboutUs: {
+      visible: showAboutUs,
+      toggle: setShowAboutUs,
+      icon: Building2,
+      title: '1. ¿Quiénes Somos? & Servicios',
+      subtitle: 'Visión y 4 tarjetas de servicio',
+    },
+    benefits: {
+      visible: showBenefits,
+      toggle: setShowBenefits,
+      icon: Sun,
+      title: '2. Beneficios Solares & Ley 57-07',
+      subtitle: 'Pilares y marco fiscal dominicano',
+    },
+    techIntro: {
+      visible: showTechIntro,
+      toggle: setShowTechIntro,
+      icon: Cpu,
+      title: '3. ¿Qué es FV? & Flujo Técnico',
+      subtitle: 'Render 3D y diagrama de flujo',
+    },
+    projectDescription: {
+      visible: showProjectDescription,
+      toggle: setShowProjectDescription,
+      icon: FileText,
+      title: '4. Resumen & Normativa SIE',
+      subtitle: 'Narrativa técnica y Res. SIE-007',
+    },
+    energy: {
+      visible: showPage1,
+      toggle: setShowPage1,
+      icon: Zap,
+      title: 'Análisis de Energía y Balance',
+      subtitle: 'Generación vs Demanda mensual',
+    },
+    quotation: {
+      visible: showPageQuotation,
+      toggle: setShowPageQuotation,
+      icon: FileText,
+      title: 'Cotización de Sistema',
+      subtitle: 'Equipos, inversión y garantías',
+    },
+    roi: {
+      visible: showPage2,
+      toggle: setShowPage2,
+      icon: TrendingUp,
+      title: 'Retorno de Inversión',
+      subtitle: 'Payback, VAN, TIR y Ley 57-07',
+    },
+    cashFlow: {
+      visible: showPage3,
+      toggle: setShowPage3,
+      icon: BarChart3,
+      title: 'Flujo de Caja 25 Años',
+      subtitle: 'Proyección financiera detallada',
+    },
+    costMatrix: {
+      visible: showPageCostMatrix,
+      toggle: setShowPageCostMatrix,
+      icon: Lock,
+      title: 'Costos Internos',
+      subtitle: 'Matriz de márgenes y desglose',
+      isConfidential: true,
+    },
+  };
 
   const handleAddExtraItem = () => {
     if (!newExtraTitle.trim() || !updateDocumentCustomization) return;
@@ -137,6 +268,7 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
       extraTocItems: extraTocItems.filter((it) => it.id !== id),
     });
   };
+
   return (
     <div className="space-y-4">
       {/* Selector de Color */}
@@ -176,350 +308,181 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
 
       <div className={`h-px w-full ${isDark ? 'bg-[#2a2a36]' : 'bg-slate-200'}`}></div>
 
-      {/* 1. SECCIÓN: PRESENTACIÓN Y MARCO INSTITUCIONAL */}
+      {/* 1. SECCIÓN: ESTRUCTURA Y ORDEN DE PÁGINAS */}
       <div className="space-y-2">
-        <h3 className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-          1. Presentación e Introducción
-        </h3>
-
-        {/* Portada */}
-        <label
-          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
-            showCover
-              ? isDark
-                ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
-                : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
-              : isDark
-              ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
-              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`p-1.5 rounded-lg shrink-0 ${showCover ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
-              <Layout className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs font-bold block leading-tight">Portada Ejecutiva</span>
-              <span className="text-[10px] opacity-75 block">Imagen hero, cliente y datos</span>
-            </div>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+              1. Estructura y Orden de Páginas
+            </h3>
+            <span className={`text-[10px] block ${isDark ? 'text-zinc-500' : 'text-slate-400'}`}>
+              Arrastra con ⋮⋮ para cambiar el orden en el PDF
+            </span>
           </div>
-          <input
-            type="checkbox"
-            checked={showCover}
-            onChange={(e) => setShowCover(e.target.checked)}
-            className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
-          />
-        </label>
+          {isOrderModified && (
+            <button
+              type="button"
+              onClick={handleResetOrder}
+              className={`text-[10px] font-semibold flex items-center gap-1 px-2 py-0.5 rounded-md border transition-colors cursor-pointer ${
+                isDark
+                  ? 'border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white'
+                  : 'border-slate-300 bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+              }`}
+              title="Restablecer orden predeterminado"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Restablecer</span>
+            </button>
+          )}
+        </div>
 
-        {/* Índice */}
-        <label
-          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
-            showTableOfContents
-              ? isDark
-                ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
-                : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
-              : isDark
-              ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
-              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`p-1.5 rounded-lg shrink-0 ${showTableOfContents ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
-              <ListOrdered className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs font-bold block leading-tight">Índice del Dossier</span>
-              <span className="text-[10px] opacity-75 block">Estructura y números dinámicos</span>
-            </div>
-          </div>
-          <input
-            type="checkbox"
-            checked={showTableOfContents}
-            onChange={(e) => setShowTableOfContents(e.target.checked)}
-            className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
-          />
-        </label>
+        <div className="space-y-1.5">
+          {currentOrder.map((sectionId, index) => {
+            const config = sectionConfigs[sectionId];
+            if (!config) return null;
+            const Icon = config.icon;
+            const isDragging = draggedIdx === index;
+            const isDragOver = dragOverIdx === index;
 
-        {/* Quiénes Somos */}
-        <label
-          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
-            showAboutUs
-              ? isDark
-                ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
-                : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
-              : isDark
-              ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
-              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`p-1.5 rounded-lg shrink-0 ${showAboutUs ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
-              <Building2 className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs font-bold block leading-tight">1. ¿Quiénes Somos? & Servicios</span>
-              <span className="text-[10px] opacity-75 block">Visión y 4 tarjetas de servicio</span>
-            </div>
-          </div>
-          <input
-            type="checkbox"
-            checked={showAboutUs}
-            onChange={(e) => setShowAboutUs(e.target.checked)}
-            className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
-          />
-        </label>
+            return (
+              <div
+                key={sectionId}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData('text/plain', String(index));
+                  e.dataTransfer.effectAllowed = 'move';
+                  setDraggedIdx(index);
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'move';
+                  if (dragOverIdx !== index) {
+                    setDragOverIdx(index);
+                  }
+                }}
+                onDragLeave={() => {
+                  if (dragOverIdx === index) {
+                    setDragOverIdx(null);
+                  }
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (draggedIdx !== null && draggedIdx !== index) {
+                    handleReorderSections(draggedIdx, index);
+                  }
+                  setDraggedIdx(null);
+                  setDragOverIdx(null);
+                }}
+                onDragEnd={() => {
+                  setDraggedIdx(null);
+                  setDragOverIdx(null);
+                }}
+                className={`flex items-center justify-between p-2 rounded-xl border transition-all select-none ${
+                  isDragging ? 'opacity-40 scale-[0.98] border-dashed border-emerald-500' : ''
+                } ${
+                  isDragOver ? 'border-emerald-500 ring-2 ring-emerald-500/30 bg-emerald-500/10' : ''
+                } ${
+                  !isDragOver && !isDragging
+                    ? config.visible
+                      ? config.isConfidential
+                        ? isDark
+                          ? 'bg-amber-950/40 border-amber-600/60 text-amber-200 shadow-2xs'
+                          : 'bg-amber-50/80 border-amber-300 text-amber-950 shadow-2xs'
+                        : isDark
+                        ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-2xs'
+                        : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-2xs'
+                      : isDark
+                      ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
+                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                    : ''
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  {/* Botón de arrastre de 3 rayas */}
+                  <div
+                    className={`cursor-grab active:cursor-grabbing p-1 -ml-0.5 rounded transition-colors shrink-0 ${
+                      isDark ? 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200'
+                    }`}
+                    title="Arrastrar arriba o abajo para cambiar el orden"
+                  >
+                    <GripVertical className="w-4 h-4" />
+                  </div>
 
-        {/* Beneficios Solares & Ley 57-07 */}
-        <label
-          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
-            showBenefits
-              ? isDark
-                ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
-                : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
-              : isDark
-              ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
-              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`p-1.5 rounded-lg shrink-0 ${showBenefits ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
-              <Sun className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs font-bold block leading-tight">2. Beneficios Solares & Ley 57-07</span>
-              <span className="text-[10px] opacity-75 block">Pilares y marco fiscal dominicano</span>
-            </div>
-          </div>
-          <input
-            type="checkbox"
-            checked={showBenefits}
-            onChange={(e) => setShowBenefits(e.target.checked)}
-            className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
-          />
-        </label>
+                  {/* Número de secuencia */}
+                  <span
+                    className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-mono font-bold shrink-0 ${
+                      config.visible
+                        ? config.isConfidential
+                          ? isDark
+                            ? 'bg-amber-500/20 text-amber-400'
+                            : 'bg-amber-200 text-amber-900'
+                          : isDark
+                          ? 'bg-emerald-500/20 text-emerald-400'
+                          : 'bg-emerald-200 text-emerald-900'
+                        : isDark
+                        ? 'bg-zinc-800 text-zinc-500'
+                        : 'bg-slate-200 text-slate-500'
+                    }`}
+                  >
+                    {index + 1}
+                  </span>
 
-        {/* Descripción Técnica */}
-        <label
-          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
-            showTechIntro
-              ? isDark
-                ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
-                : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
-              : isDark
-              ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
-              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`p-1.5 rounded-lg shrink-0 ${showTechIntro ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
-              <Cpu className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs font-bold block leading-tight">3. ¿Qué es FV? & Flujo Técnico</span>
-              <span className="text-[10px] opacity-75 block">Render 3D y diagrama de flujo</span>
-            </div>
-          </div>
-          <input
-            type="checkbox"
-            checked={showTechIntro}
-            onChange={(e) => setShowTechIntro(e.target.checked)}
-            className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
-          />
-        </label>
+                  {/* Icono de Sección */}
+                  <div
+                    className={`p-1.5 rounded-lg shrink-0 ${
+                      config.visible
+                        ? config.isConfidential
+                          ? isDark
+                            ? 'bg-amber-500/20 text-amber-400'
+                            : 'bg-amber-100 text-amber-800'
+                          : isDark
+                          ? 'bg-emerald-500/20 text-emerald-400'
+                          : 'bg-emerald-100 text-emerald-700'
+                        : isDark
+                        ? 'bg-zinc-800 text-zinc-500'
+                        : 'bg-slate-200 text-slate-500'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                  </div>
 
-        {/* Descripción del Proyecto & Normativa SIE */}
-        <label
-          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
-            showProjectDescription
-              ? isDark
-                ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
-                : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
-              : isDark
-              ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
-              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`p-1.5 rounded-lg shrink-0 ${showProjectDescription ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
-              <FileText className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs font-bold block leading-tight">4. Resumen & Normativa SIE</span>
-              <span className="text-[10px] opacity-75 block">Narrativa técnica y Res. SIE-007</span>
-            </div>
-          </div>
-          <input
-            type="checkbox"
-            checked={showProjectDescription}
-            onChange={(e) => setShowProjectDescription(e.target.checked)}
-            className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
-          />
-        </label>
-      </div>
+                  {/* Título y Subtítulo */}
+                  <div className="min-w-0 flex-1 pr-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs font-bold truncate leading-tight block">
+                        {config.title}
+                      </span>
+                      {config.isConfidential && (
+                        <span
+                          className={`text-[8.5px] font-extrabold px-1.5 py-0.2 rounded border ${
+                            isDark
+                              ? 'bg-amber-950/90 text-amber-300 border-amber-700/70'
+                              : 'bg-amber-100 text-amber-800 border-amber-300'
+                          }`}
+                        >
+                          CONFIDENCIAL
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] opacity-75 truncate block">
+                      {config.subtitle}
+                    </span>
+                  </div>
+                </div>
 
-      <div className={`h-px w-full ${isDark ? 'bg-[#2a2a36]' : 'bg-slate-200'}`}></div>
-
-      {/* 2. SECCIÓN: ANÁLISIS TÉCNICO Y ECONÓMICO */}
-      <div className="space-y-2">
-        <h3 className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
-          2. Análisis Técnico & Financiero
-        </h3>
-
-        {/* Page 1: Energía */}
-        <label
-          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
-            showPage1
-              ? isDark
-                ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
-                : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
-              : isDark
-              ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
-              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`p-1.5 rounded-lg shrink-0 ${showPage1 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
-              <Zap className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs font-bold block leading-tight">Análisis de Energía y Balance</span>
-              <span className="text-[10px] opacity-75 block">Generación vs Demanda mensual</span>
-            </div>
-          </div>
-          <input
-            type="checkbox"
-            checked={showPage1}
-            onChange={(e) => setShowPage1(e.target.checked)}
-            className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
-          />
-        </label>
-
-        {/* Page 2: Cotización */}
-        <label
-          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
-            showPageQuotation
-              ? isDark
-                ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
-                : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
-              : isDark
-              ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
-              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`p-1.5 rounded-lg shrink-0 ${showPageQuotation ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
-              <FileText className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs font-bold block leading-tight">Cotización de Sistema</span>
-              <span className="text-[10px] opacity-75 block">Equipos, inversión y garantías</span>
-            </div>
-          </div>
-          <input
-            type="checkbox"
-            checked={showPageQuotation}
-            onChange={(e) => setShowPageQuotation(e.target.checked)}
-            className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
-          />
-        </label>
-
-        {/* Page 3: ROI */}
-        <label
-          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
-            showPage2
-              ? isDark
-                ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
-                : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
-              : isDark
-              ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
-              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`p-1.5 rounded-lg shrink-0 ${showPage2 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
-              <TrendingUp className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs font-bold block leading-tight">Retorno de Inversión</span>
-              <span className="text-[10px] opacity-75 block">Payback, VAN, TIR y Ley 57-07</span>
-            </div>
-          </div>
-          <input
-            type="checkbox"
-            checked={showPage2}
-            onChange={(e) => setShowPage2(e.target.checked)}
-            className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
-          />
-        </label>
-
-        {/* Page 4: Flujo de Caja */}
-        <label
-          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
-            showPage3
-              ? isDark
-                ? 'bg-emerald-950/40 border-emerald-600/60 text-white shadow-xs'
-                : 'bg-emerald-50/70 border-emerald-300 text-emerald-950 shadow-xs'
-              : isDark
-              ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-zinc-500'
-              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`p-1.5 rounded-lg shrink-0 ${showPage3 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}`}>
-              <BarChart3 className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs font-bold block leading-tight">Flujo de Caja 25 Años</span>
-              <span className="text-[10px] opacity-75 block">Proyección financiera detallada</span>
-            </div>
-          </div>
-          <input
-            type="checkbox"
-            checked={showPage3}
-            onChange={(e) => setShowPage3(e.target.checked)}
-            className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
-          />
-        </label>
-
-        {/* Page 5: Costos Internos (Confidencial) */}
-        <label
-          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
-            showPageCostMatrix
-              ? isDark
-                ? 'bg-amber-950/50 border-amber-500/70 text-amber-200 shadow-xs'
-                : 'bg-amber-50 border-amber-400 text-amber-950 shadow-xs'
-              : isDark
-              ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400 hover:border-amber-700/50'
-              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`p-1.5 rounded-lg shrink-0 ${showPageCostMatrix ? 'bg-amber-500/20 text-amber-400' : 'bg-zinc-800 text-zinc-500'}`}>
-              <Lock className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold block leading-tight">Costos Internos</span>
-                <span
-                  className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded border ${
-                    isDark
-                      ? 'bg-amber-950/90 text-amber-300 border-amber-700/70'
-                      : 'bg-amber-100 text-amber-800 border-amber-300'
+                {/* Checkbox de visibilidad */}
+                <input
+                  type="checkbox"
+                  checked={config.visible}
+                  onChange={(e) => config.toggle(e.target.checked)}
+                  className={`w-4 h-4 rounded focus:ring-0 cursor-pointer shrink-0 ${
+                    config.isConfidential ? 'text-amber-600' : 'text-emerald-600'
                   }`}
-                >
-                  CONFIDENCIAL
-                </span>
+                />
               </div>
-              <span className="text-[10px] opacity-75 block">Matriz de márgenes y desglose</span>
-            </div>
-          </div>
-          <input
-            type="checkbox"
-            checked={showPageCostMatrix}
-            onChange={(e) => setShowPageCostMatrix(e.target.checked)}
-            className="w-4 h-4 rounded text-amber-600 focus:ring-0 cursor-pointer shrink-0"
-          />
-        </label>
+            );
+          })}
+        </div>
       </div>
 
       <div className={`h-px w-full ${isDark ? 'bg-[#2a2a36]' : 'bg-slate-200'}`}></div>

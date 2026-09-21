@@ -26,10 +26,10 @@
     "test:gemini": "npx tsx src/tests/testGeminiFamily3Cascade.ts",
     "test:cloudflare": "npx tsx src/tests/testCloudflareShareHistory.ts",
     "test:multiequipment": "npx tsx src/tests/testMultiEquipment.ts",
-    "test": "npx tsx src/tests/testBenchmark.ts && npx tsx src/tests/testFinancialEngineComprehensive.ts && npx tsx src/tests/testAISmartProposal.ts && npx tsx src/tests/testEquipmentCatalog.ts && npx tsx src/tests/testFolderHidingAndSync.ts && npx tsx src/tests/testTrashAndReadOnly.ts && npx tsx src/tests/testTariffEngine.ts && npx tsx src/tests/testGeminiFamily3Cascade.ts && npx tsx src/tests/testCloudflareShareHistory.ts && npx tsx src/tests/testMultiEquipment.ts",
+    "test:pdf-reorder": "npx tsx src/tests/testPDFSectionReordering.ts",
+    "test": "npx tsx src/tests/testBenchmark.ts && npx tsx src/tests/testFinancialEngineComprehensive.ts && npx tsx src/tests/testAISmartProposal.ts && npx tsx src/tests/testEquipmentCatalog.ts && npx tsx src/tests/testFolderHidingAndSync.ts && npx tsx src/tests/testTrashAndReadOnly.ts && npx tsx src/tests/testTariffEngine.ts && npx tsx src/tests/testGeminiFamily3Cascade.ts && npx tsx src/tests/testCloudflareShareHistory.ts && npx tsx src/tests/testMultiEquipment.ts && npx tsx src/tests/testPDFSectionReordering.ts",
     "context:pack": "repomix"
   },
-
   "dependencies": {
     "clsx": "^2.1.1",
     "electron-updater": "^6.8.9",
@@ -37,6 +37,7 @@
     "jspdf": "^2.5.2",
     "lucide-react": "^0.427.0",
     "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.3.289",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

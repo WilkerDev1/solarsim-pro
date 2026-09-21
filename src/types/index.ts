@@ -307,6 +307,9 @@ export interface DocumentCustomization {
 
   // 📎 Documentos y Fichas Técnicas PDF Adjuntas para Fusión Automática
   attachedPdfs?: AttachedPDFDocument[];
+
+  // 📑 Orden personalizado de secciones / páginas de la propuesta (IDs de sección)
+  sectionOrder?: string[];
 }
 
 export interface AttachedPDFDocument {
@@ -319,6 +322,7 @@ export interface AttachedPDFDocument {
   uploadedAt: string;            // Fecha de subida ISO
   enabled: boolean;              // Si se fusionará al exportar la propuesta final
   addToTableOfContents: boolean; // Si se reflejará correlativamente en el Índice de la propuesta
+  thumbnailDataUrl?: string;     // Preview visual real (Data URL JPEG) de la primera página
 }
 
 export interface ExtraTOCItem {

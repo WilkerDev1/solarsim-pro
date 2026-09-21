@@ -8,10 +8,12 @@ import {
   CheckCircle2,
   AlertCircle,
   Sparkles,
+  GripVertical,
 } from 'lucide-react';
 import { ProjectSimulation, DocumentCustomization, AttachedPDFDocument } from '../../../types';
 import { PDFMergeService } from '../../../services/pdfMergeService';
 import { PDFAttachmentStorage } from '../../../services/pdfAttachmentStorage';
+import { PDFThumbnailService } from '../../../services/pdfThumbnailService';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 
 interface PDFAttachmentsSectionProps {
@@ -36,6 +38,8 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [draggedAttIndex, setDraggedAttIndex] = useState<number | null>(null);
+  const [dragOverAttIndex, setDragOverAttIndex] = useState<number | null>(null);
 
   // Obtener referencia reactiva directa del store para evitar cualquier desfase por props
   const activeProjectId = useSimulationStore((s) => s.activeProjectId);
@@ -52,6 +56,60 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
       } catch (_) {}
     }
   };
+
+  const getLatestAttachments = (): AttachedPDFDocument[] => {
+    if (!currentProject) return [];
+    const latestProj = useSimulationStore.getState().projects.find((p) => p.id === currentProject.id) || currentProject;
+    return latestProj.customization?.attachedPdfs || [];
+  };
+
+  const handleReorderAttachments = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
+    const list = [...getLatestAttachments()];
+    const [moved] = list.splice(fromIndex, 1);
+    list.splice(toIndex, 0, moved);
+    doUpdateDoc({ attachedPdfs: list });
+  };
+
+  // Auto-generar miniaturas de la primera página para anexos existentes que aún no tengan miniatura
+  React.useEffect(() => {
+    if (!currentProject) return;
+    let isMounted = true;
+    const currentList = getLatestAttachments();
+    const missing = currentList.filter((att) => !att.thumbnailDataUrl);
+    if (missing.length === 0) return;
+
+    const generateMissing = async () => {
+      let updated = false;
+      const newList = [...getLatestAttachments()];
+
+      for (let i = 0; i < newList.length; i++) {
+        if (!newList[i].thumbnailDataUrl) {
+          try {
+            const buf = await PDFAttachmentStorage.getAttachment(newList[i].id);
+            if (buf && isMounted) {
+              const thumb = await PDFThumbnailService.generateThumbnail(buf);
+              if (thumb && isMounted) {
+                newList[i] = { ...newList[i], thumbnailDataUrl: thumb };
+                updated = true;
+              }
+            }
+          } catch (e) {
+            console.warn('Error generando miniatura para anexo existente:', e);
+          }
+        }
+      }
+
+      if (updated && isMounted) {
+        doUpdateDoc({ attachedPdfs: newList });
+      }
+    };
+
+    generateMissing();
+    return () => {
+      isMounted = false;
+    };
+  }, [currentProject?.customization?.attachedPdfs?.length]);
 
   if (!currentProject) {
     return null;
@@ -91,6 +149,13 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
           console.warn('Advertencia leyendo páginas de PDF (usando 1 por defecto):', pageErr);
         }
 
+        let thumbnailDataUrl: string | undefined = undefined;
+        try {
+          thumbnailDataUrl = await PDFThumbnailService.generateThumbnail(bufferCopy);
+        } catch (thumbErr) {
+          console.warn('Advertencia generando miniatura al subir PDF:', thumbErr);
+        }
+
         const cleanName = file.name
           .replace(/\.pdf$/i, '')
           .replace(/[_-]+/g, ' ')
@@ -112,6 +177,7 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
           uploadedAt: new Date().toISOString(),
           enabled: true,
           addToTableOfContents: false, // Por defecto no altera el índice visual del lienzo
+          thumbnailDataUrl,
         });
       }
 
@@ -137,10 +203,6 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
     }
   };
 
-  const getLatestAttachments = (): AttachedPDFDocument[] => {
-    const latestProj = useSimulationStore.getState().projects.find((p) => p.id === currentProject.id) || currentProject;
-    return latestProj.customization?.attachedPdfs || [];
-  };
 
   const handleToggleEnabled = (id: string, enabled: boolean) => {
     const list = getLatestAttachments();
@@ -323,25 +385,84 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
       {/* Lista de Documentos PDF Adjuntos */}
       {attachedPdfs.length > 0 && (
         <div className="space-y-2.5 pt-1">
-          {attachedPdfs.map((doc) => (
+          {attachedPdfs.map((doc, idx) => (
             <div
               key={doc.id}
-              className={`p-3 rounded-xl border transition-all space-y-2 ${
-                doc.enabled
+              draggable
+              onDragStart={(e) => {
+                setDraggedAttIndex(idx);
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', String(idx));
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                if (dragOverAttIndex !== idx) {
+                  setDragOverAttIndex(idx);
+                }
+              }}
+              onDragLeave={() => {
+                if (dragOverAttIndex === idx) {
+                  setDragOverAttIndex(null);
+                }
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (draggedAttIndex !== null && draggedAttIndex !== idx) {
+                  handleReorderAttachments(draggedAttIndex, idx);
+                }
+                setDraggedAttIndex(null);
+                setDragOverAttIndex(null);
+              }}
+              onDragEnd={() => {
+                setDraggedAttIndex(null);
+                setDragOverAttIndex(null);
+              }}
+              className={`p-3 rounded-xl border transition-all space-y-2 relative group ${
+                dragOverAttIndex === idx
                   ? isDark
-                    ? 'bg-[#1a1a24] border-[#2e2e3e]'
-                    : 'bg-white border-slate-200 shadow-2xs'
+                    ? 'border-emerald-400 bg-emerald-950/40 ring-2 ring-emerald-500/40 scale-[1.01]'
+                    : 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-400/50 scale-[1.01]'
+                  : doc.enabled
+                  ? isDark
+                    ? 'bg-[#1a1a24] border-[#2e2e3e] hover:border-zinc-500'
+                    : 'bg-white border-slate-200 shadow-2xs hover:border-slate-400'
                   : isDark
                   ? 'bg-[#14141c]/50 border-zinc-800 opacity-60'
                   : 'bg-slate-100 border-slate-200 opacity-60'
-              }`}
+              } ${draggedAttIndex === idx ? 'opacity-40 border-dashed border-emerald-500' : ''}`}
             >
-              {/* Fila Principal: Icono, Nombre, Badges y Acciones */}
+              {/* Fila Principal: Manecilla 3 Rayas, Thumbnail Real Pág 1, Nombre, Badges y Acciones */}
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-start gap-2 min-w-0 flex-1">
-                  <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0 mt-0.5">
-                    <FileText className="w-4 h-4" />
+                  {/* Manecilla de 3 rayas para arrastrar y reordenar */}
+                  <div
+                    className="p-1 cursor-grab active:cursor-grabbing text-zinc-500 hover:text-emerald-400 transition-colors shrink-0 self-center"
+                    title="Arrastra con el cursor para cambiar el orden de fusión"
+                  >
+                    <GripVertical className="w-4 h-4" />
                   </div>
+
+                  {/* Thumbnail Real de la Primera Página */}
+                  <div className="relative w-11 h-15 rounded-lg overflow-hidden border border-emerald-500/30 bg-black/40 shrink-0 shadow-xs group-hover:border-emerald-400 transition-all flex items-center justify-center">
+                    {doc.thumbnailDataUrl ? (
+                      <img
+                        src={doc.thumbnailDataUrl}
+                        alt={doc.title}
+                        className="w-full h-full object-cover object-top"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-emerald-950/20 text-emerald-400">
+                        <FileText className="w-5 h-5" />
+                        <span className="text-[7.5px] font-mono font-bold mt-0.5">PDF</span>
+                      </div>
+                    )}
+                    <div className="absolute bottom-0 inset-x-0 bg-black/75 backdrop-blur-[2px] text-[7.5px] font-mono text-center text-zinc-300 py-0.5 leading-none">
+                      Pág 1
+                    </div>
+                  </div>
+
                   <div className="min-w-0 flex-1">
                     <input
                       type="text"

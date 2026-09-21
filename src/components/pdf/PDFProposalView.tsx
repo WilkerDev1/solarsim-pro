@@ -1,10 +1,11 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { PDFColorTheme, PDF_COLOR_THEMES } from '../../constants/pdfThemes';
 import { PDFMergeService } from '../../services/pdfMergeService';
 import { PDFAttachmentStorage } from '../../services/pdfAttachmentStorage';
+import { PDFSectionId, DEFAULT_PDF_SECTION_ORDER } from '../../constants/pdfSections';
 
 // Modular Page Components
 import { PDFSidebarControls } from './controls/PDFSidebarControls';
@@ -210,171 +211,115 @@ export const PDFProposalView: React.FC = () => {
     year: 'numeric',
   });
 
-  // Calculate dynamic page numbers
-  const activePagesCount =
-    (showCover ? 1 : 0) +
-    (showTableOfContents ? 1 : 0) +
-    (showAboutUs ? 1 : 0) +
-    (showBenefits ? 1 : 0) +
-    (showTechIntro ? 1 : 0) +
-    (showProjectDescription ? 1 : 0) +
-    (showPage1 ? 1 : 0) +
-    (showPageQuotation ? 1 : 0) +
-    (showPage2 ? 1 : 0) +
-    (showPage3 ? 1 : 0) +
-    (showPageCostMatrix ? 1 : 0);
+  // Effective Section Order
+  const effectiveSectionOrder: PDFSectionId[] = useMemo(() => {
+    const saved = project?.customization?.sectionOrder;
+    if (saved && Array.isArray(saved) && saved.length > 0) {
+      const validSaved = saved.filter((id): id is PDFSectionId =>
+        DEFAULT_PDF_SECTION_ORDER.includes(id as PDFSectionId)
+      );
+      const missing = DEFAULT_PDF_SECTION_ORDER.filter((id) => !validSaved.includes(id));
+      return [...validSaved, ...missing];
+    }
+    return DEFAULT_PDF_SECTION_ORDER;
+  }, [project?.customization?.sectionOrder]);
+
+  const sectionVisibility: Record<PDFSectionId, boolean> = {
+    cover: showCover,
+    tableOfContents: showTableOfContents,
+    aboutUs: showAboutUs,
+    benefits: showBenefits,
+    techIntro: showTechIntro,
+    projectDescription: showProjectDescription,
+    energy: showPage1,
+    quotation: showPageQuotation,
+    roi: showPage2,
+    cashFlow: showPage3,
+    costMatrix: showPageCostMatrix,
+  };
+
+  // Calculate dynamic page numbers according to effectiveSectionOrder
+  const activePagesCount = effectiveSectionOrder.filter((id) => sectionVisibility[id]).length;
 
   let currentNum = 0;
-  let pageCoverNum = 0;
-  let pageTocNum = 0;
-  let pageAboutUsNum = 0;
-  let pageBenefitsNum = 0;
-  let pageTechIntroNum = 0;
-  let pageProjectDescNum = 0;
-  let page1Num = 0;
-  let pageQuotNum = 0;
-  let page2Num = 0;
-  let page3Num = 0;
-  let pageCostMatrixNum = 0;
+  const pageNumbers: Record<PDFSectionId, number> = {
+    cover: 0,
+    tableOfContents: 0,
+    aboutUs: 0,
+    benefits: 0,
+    techIntro: 0,
+    projectDescription: 0,
+    energy: 0,
+    quotation: 0,
+    roi: 0,
+    cashFlow: 0,
+    costMatrix: 0,
+  };
 
-  if (showCover) {
-    currentNum++;
-    pageCoverNum = currentNum;
-  }
-  if (showTableOfContents) {
-    currentNum++;
-    pageTocNum = currentNum;
-  }
-  if (showAboutUs) {
-    currentNum++;
-    pageAboutUsNum = currentNum;
-  }
-  if (showBenefits) {
-    currentNum++;
-    pageBenefitsNum = currentNum;
-  }
-  if (showTechIntro) {
-    currentNum++;
-    pageTechIntroNum = currentNum;
-  }
-  if (showProjectDescription) {
-    currentNum++;
-    pageProjectDescNum = currentNum;
-  }
-  if (showPage1) {
-    currentNum++;
-    page1Num = currentNum;
-  }
-  if (showPageQuotation) {
-    currentNum++;
-    pageQuotNum = currentNum;
-  }
-  if (showPage2) {
-    currentNum++;
-    page2Num = currentNum;
-  }
-  if (showPage3) {
-    currentNum++;
-    page3Num = currentNum;
-  }
-  if (showPageCostMatrix) {
-    currentNum++;
-    pageCostMatrixNum = currentNum;
-  }
+  effectiveSectionOrder.forEach((sectionId) => {
+    if (sectionVisibility[sectionId]) {
+      currentNum++;
+      pageNumbers[sectionId] = currentNum;
+    }
+  });
 
-  // Build dynamic TOC items
+  const TOC_METADATA: Partial<Record<PDFSectionId, { title: string; subtitle: string }>> = {
+    aboutUs: {
+      title: 'Quiénes Somos & Nuestros Servicios',
+      subtitle: 'Por Qué Elegirnos y Pilares de Servicio',
+    },
+    benefits: {
+      title: 'Beneficios de la Energía Solar',
+      subtitle: 'Objetivos e Incentivos Fiscales de la Ley 57-07',
+    },
+    techIntro: {
+      title: '¿Qué es un Sistema Fotovoltaico?',
+      subtitle: 'Funcionamiento y Diagrama de Flujo Técnico',
+    },
+    projectDescription: {
+      title: 'Descripción del Proyecto & Normativa SIE',
+      subtitle: 'Criterios de Dimensionamiento y Resolución SIE-007',
+    },
+    energy: {
+      title: 'Análisis de Energía y Balance',
+      subtitle: 'Generación Solar Estimada vs Demanda Mensual',
+    },
+    quotation: {
+      title: 'Presupuesto y Cotización de Sistema',
+      subtitle: 'Equipos Tier-1, Inversión y Términos de Garantías',
+    },
+    roi: {
+      title: 'Cálculo de Retorno de Inversión',
+      subtitle: 'Payback, VAN, TIR y Ahorro Estimado',
+    },
+    cashFlow: {
+      title: 'Flujo de Caja y Proyección a 25 Años',
+      subtitle: 'Análisis Financiero Acumulado y Rendimiento Anual',
+    },
+    costMatrix: {
+      title: 'Matriz de Costos Internos (Confidencial)',
+      subtitle: 'Desglose Detallado de Proveedores y Margen Comercial',
+    },
+  };
+
+  // Build dynamic TOC items in effectiveSectionOrder
   const tocItems: TOCItem[] = [];
   let sectionIndex = 1;
 
-  if (showAboutUs) {
-    tocItems.push({
-      number: `${sectionIndex}`,
-      title: 'Quiénes Somos & Nuestros Servicios',
-      subtitle: '1.1 Por Qué Elegirnos y Pilares de Servicio',
-      targetPage: pageAboutUsNum,
-    });
-    sectionIndex++;
-  }
-
-  if (showBenefits) {
-    tocItems.push({
-      number: `${sectionIndex}`,
-      title: 'Beneficios de la Energía Solar',
-      subtitle: '2.1 Objetivos e Incentivos Fiscales de la Ley 57-07',
-      targetPage: pageBenefitsNum,
-    });
-    sectionIndex++;
-  }
-
-  if (showTechIntro) {
-    tocItems.push({
-      number: `${sectionIndex}`,
-      title: '¿Qué es un Sistema Fotovoltaico?',
-      subtitle: '3.1 Funcionamiento y Diagrama de Flujo Técnico',
-      targetPage: pageTechIntroNum,
-    });
-    sectionIndex++;
-  }
-
-  if (showProjectDescription) {
-    tocItems.push({
-      number: `${sectionIndex}`,
-      title: 'Descripción del Proyecto & Normativa SIE',
-      subtitle: 'Criterios de Dimensionamiento y Resolución SIE-007',
-      targetPage: pageProjectDescNum,
-    });
-    sectionIndex++;
-  }
-
-  if (showPage1) {
-    tocItems.push({
-      number: `${sectionIndex}`,
-      title: 'Análisis de Energía y Balance',
-      subtitle: 'Generación Solar Estimada vs Demanda Mensual',
-      targetPage: page1Num,
-    });
-    sectionIndex++;
-  }
-
-  if (showPageQuotation) {
-    tocItems.push({
-      number: `${sectionIndex}`,
-      title: 'Presupuesto y Cotización de Sistema',
-      subtitle: 'Equipos Tier-1, Inversión y Términos de Garantías',
-      targetPage: pageQuotNum,
-    });
-    sectionIndex++;
-  }
-
-  if (showPage2) {
-    tocItems.push({
-      number: `${sectionIndex}`,
-      title: 'Cálculo de Retorno de Inversión',
-      subtitle: 'Payback, VAN, TIR y Ahorro Estimado',
-      targetPage: page2Num,
-    });
-    sectionIndex++;
-  }
-
-  if (showPage3) {
-    tocItems.push({
-      number: `${sectionIndex}`,
-      title: 'Flujo de Caja y Proyección a 25 Años',
-      subtitle: 'Análisis Financiero Acumulado y Rendimiento Anual',
-      targetPage: page3Num,
-    });
-    sectionIndex++;
-  }
-
-  if (showPageCostMatrix) {
-    tocItems.push({
-      number: `${sectionIndex}`,
-      title: 'Matriz de Costos Internos (Confidencial)',
-      subtitle: 'Desglose Detallado de Proveedores y Margen Comercial',
-      targetPage: pageCostMatrixNum,
-    });
-    sectionIndex++;
-  }
+  effectiveSectionOrder.forEach((sectionId) => {
+    if (sectionVisibility[sectionId]) {
+      const meta = TOC_METADATA[sectionId];
+      if (meta) {
+        tocItems.push({
+          number: `${sectionIndex}`,
+          title: meta.title,
+          subtitle: `${sectionIndex}.1 ${meta.subtitle}`,
+          targetPage: pageNumbers[sectionId],
+        });
+        sectionIndex++;
+      }
+    }
+  });
 
   // Append Custom Extra Table of Contents Items (Appended Annexes / Extra Pages)
   const extraTocItems = project.customization?.extraTocItems || [];
@@ -530,156 +475,165 @@ export const PDFProposalView: React.FC = () => {
         )}
 
         <div ref={pdfRef} className="flex flex-col gap-8 print:gap-0">
-          {/* PORTADA EJECUTIVA */}
-          {showCover && (
-            <PDFCoverPage
-              project={project}
-              summary={summary}
-              activeTheme={activeTheme}
-              currentDateStr={currentDateStr}
-            />
-          )}
+          {effectiveSectionOrder.map((sectionId) => {
+            if (!sectionVisibility[sectionId]) return null;
 
-          {/* ÍNDICE DE CONTENIDO */}
-          {showTableOfContents && (
-            <PDFTableOfContents
-              project={project}
-              summary={summary}
-              activeTheme={activeTheme}
-              showHeadersFooters={showHeadersFooters}
-              currentDateStr={currentDateStr}
-              pageNum={pageTocNum}
-              totalPages={totalCalculatedPages > 0 ? totalCalculatedPages : activePagesCount}
-              tocItems={tocItems}
-            />
-          )}
-
-          {/* 1. ¿QUIÉNES SOMOS? & SERVICIOS */}
-          {showAboutUs && (
-            <PDFAboutUsPage
-              project={project}
-              summary={summary}
-              activeTheme={activeTheme}
-              showHeadersFooters={showHeadersFooters}
-              currentDateStr={currentDateStr}
-              pageNum={pageAboutUsNum}
-              totalPages={activePagesCount}
-              isEditMode={isEditMode}
-              updateDocumentCustomization={updateDocumentCustomization}
-            />
-          )}
-
-          {/* 2. BENEFICIOS SOLARES & LEY 57-07 */}
-          {showBenefits && (
-            <PDFSolarBenefitsPage
-              project={project}
-              summary={summary}
-              activeTheme={activeTheme}
-              showHeadersFooters={showHeadersFooters}
-              currentDateStr={currentDateStr}
-              pageNum={pageBenefitsNum}
-              totalPages={activePagesCount}
-              isEditMode={isEditMode}
-              updateDocumentCustomization={updateDocumentCustomization}
-            />
-          )}
-
-          {/* 3. ¿QUÉ ES UN SISTEMA FV? & FLUJO TÉCNICO */}
-          {showTechIntro && (
-            <PDFTechnicalIntroPage
-              project={project}
-              summary={summary}
-              activeTheme={activeTheme}
-              showHeadersFooters={showHeadersFooters}
-              currentDateStr={currentDateStr}
-              pageNum={pageTechIntroNum}
-              totalPages={activePagesCount}
-              isEditMode={isEditMode}
-              updateDocumentCustomization={updateDocumentCustomization}
-            />
-          )}
-
-          {/* 4. DESCRIPCIÓN DEL PROYECTO & NORMATIVA SIE */}
-          {showProjectDescription && (
-            <PDFProjectDescriptionPage
-              project={project}
-              summary={summary}
-              activeTheme={activeTheme}
-              showHeadersFooters={showHeadersFooters}
-              currentDateStr={currentDateStr}
-              pageNum={pageProjectDescNum}
-              totalPages={activePagesCount}
-              isEditMode={isEditMode}
-              updateDocumentCustomization={updateDocumentCustomization}
-            />
-          )}
-
-          {/* 5. ANÁLISIS DE ENERGÍA Y BALANCE */}
-          {showPage1 && (
-            <PDFPage1Energy
-              project={project}
-              summary={summary}
-              activeTheme={activeTheme}
-              showHeadersFooters={showHeadersFooters}
-              currentDateStr={currentDateStr}
-              pageNum={page1Num}
-              totalPages={activePagesCount}
-            />
-          )}
-
-          {/* 6. COTIZACIÓN DE SISTEMA FOTOVOLTAICO */}
-          {showPageQuotation && (
-            <PDFPage2Quotation
-              project={project}
-              summary={summary}
-              activeTheme={activeTheme}
-              showHeadersFooters={showHeadersFooters}
-              currentDateStr={currentDateStr}
-              pageNum={pageQuotNum}
-              totalPages={activePagesCount}
-              isEditMode={isEditMode}
-              updateDocumentCustomization={updateDocumentCustomization}
-            />
-          )}
-
-          {/* 7. RETORNO DE INVERSIÓN Y MÉTRICAS */}
-          {showPage2 && (
-            <PDFPage3ROI
-              project={project}
-              summary={summary}
-              activeTheme={activeTheme}
-              showHeadersFooters={showHeadersFooters}
-              currentDateStr={currentDateStr}
-              pageNum={page2Num}
-              totalPages={activePagesCount}
-            />
-          )}
-
-          {/* 8. FLUJO DE CAJA 25 AÑOS */}
-          {showPage3 && (
-            <PDFPage4CashFlow
-              project={project}
-              summary={summary}
-              activeTheme={activeTheme}
-              showHeadersFooters={showHeadersFooters}
-              currentDateStr={currentDateStr}
-              pageNum={page3Num}
-              totalPages={activePagesCount}
-            />
-          )}
-
-          {/* 9. MATRIZ DE COSTOS INTERNOS (CONFIDENCIAL) */}
-          {showPageCostMatrix && (
-            <PDFPage5CostMatrix
-              project={project}
-              summary={summary}
-              activeTheme={activeTheme}
-              showHeadersFooters={showHeadersFooters}
-              currentDateStr={currentDateStr}
-              pageNum={pageCostMatrixNum}
-              totalPages={activePagesCount}
-            />
-          )}
+            switch (sectionId) {
+              case 'cover':
+                return (
+                  <PDFCoverPage
+                    key="cover"
+                    project={project}
+                    summary={summary}
+                    activeTheme={activeTheme}
+                    currentDateStr={currentDateStr}
+                  />
+                );
+              case 'tableOfContents':
+                return (
+                  <PDFTableOfContents
+                    key="tableOfContents"
+                    project={project}
+                    summary={summary}
+                    activeTheme={activeTheme}
+                    showHeadersFooters={showHeadersFooters}
+                    currentDateStr={currentDateStr}
+                    pageNum={pageNumbers.tableOfContents}
+                    totalPages={totalCalculatedPages > 0 ? totalCalculatedPages : activePagesCount}
+                    tocItems={tocItems}
+                  />
+                );
+              case 'aboutUs':
+                return (
+                  <PDFAboutUsPage
+                    key="aboutUs"
+                    project={project}
+                    summary={summary}
+                    activeTheme={activeTheme}
+                    showHeadersFooters={showHeadersFooters}
+                    currentDateStr={currentDateStr}
+                    pageNum={pageNumbers.aboutUs}
+                    totalPages={activePagesCount}
+                    isEditMode={isEditMode}
+                    updateDocumentCustomization={updateDocumentCustomization}
+                  />
+                );
+              case 'benefits':
+                return (
+                  <PDFSolarBenefitsPage
+                    key="benefits"
+                    project={project}
+                    summary={summary}
+                    activeTheme={activeTheme}
+                    showHeadersFooters={showHeadersFooters}
+                    currentDateStr={currentDateStr}
+                    pageNum={pageNumbers.benefits}
+                    totalPages={activePagesCount}
+                    isEditMode={isEditMode}
+                    updateDocumentCustomization={updateDocumentCustomization}
+                  />
+                );
+              case 'techIntro':
+                return (
+                  <PDFTechnicalIntroPage
+                    key="techIntro"
+                    project={project}
+                    summary={summary}
+                    activeTheme={activeTheme}
+                    showHeadersFooters={showHeadersFooters}
+                    currentDateStr={currentDateStr}
+                    pageNum={pageNumbers.techIntro}
+                    totalPages={activePagesCount}
+                    isEditMode={isEditMode}
+                    updateDocumentCustomization={updateDocumentCustomization}
+                  />
+                );
+              case 'projectDescription':
+                return (
+                  <PDFProjectDescriptionPage
+                    key="projectDescription"
+                    project={project}
+                    summary={summary}
+                    activeTheme={activeTheme}
+                    showHeadersFooters={showHeadersFooters}
+                    currentDateStr={currentDateStr}
+                    pageNum={pageNumbers.projectDescription}
+                    totalPages={activePagesCount}
+                    isEditMode={isEditMode}
+                    updateDocumentCustomization={updateDocumentCustomization}
+                  />
+                );
+              case 'energy':
+                return (
+                  <PDFPage1Energy
+                    key="energy"
+                    project={project}
+                    summary={summary}
+                    activeTheme={activeTheme}
+                    showHeadersFooters={showHeadersFooters}
+                    currentDateStr={currentDateStr}
+                    pageNum={pageNumbers.energy}
+                    totalPages={activePagesCount}
+                  />
+                );
+              case 'quotation':
+                return (
+                  <PDFPage2Quotation
+                    key="quotation"
+                    project={project}
+                    summary={summary}
+                    activeTheme={activeTheme}
+                    showHeadersFooters={showHeadersFooters}
+                    currentDateStr={currentDateStr}
+                    pageNum={pageNumbers.quotation}
+                    totalPages={activePagesCount}
+                    isEditMode={isEditMode}
+                    updateDocumentCustomization={updateDocumentCustomization}
+                  />
+                );
+              case 'roi':
+                return (
+                  <PDFPage3ROI
+                    key="roi"
+                    project={project}
+                    summary={summary}
+                    activeTheme={activeTheme}
+                    showHeadersFooters={showHeadersFooters}
+                    currentDateStr={currentDateStr}
+                    pageNum={pageNumbers.roi}
+                    totalPages={activePagesCount}
+                  />
+                );
+              case 'cashFlow':
+                return (
+                  <PDFPage4CashFlow
+                    key="cashFlow"
+                    project={project}
+                    summary={summary}
+                    activeTheme={activeTheme}
+                    showHeadersFooters={showHeadersFooters}
+                    currentDateStr={currentDateStr}
+                    pageNum={pageNumbers.cashFlow}
+                    totalPages={activePagesCount}
+                  />
+                );
+              case 'costMatrix':
+                return (
+                  <PDFPage5CostMatrix
+                    key="costMatrix"
+                    project={project}
+                    summary={summary}
+                    activeTheme={activeTheme}
+                    showHeadersFooters={showHeadersFooters}
+                    currentDateStr={currentDateStr}
+                    pageNum={pageNumbers.costMatrix}
+                    totalPages={activePagesCount}
+                  />
+                );
+              default:
+                return null;
+            }
+          })}
         </div>
       </main>
     </div>

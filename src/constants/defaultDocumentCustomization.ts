@@ -1,6 +1,8 @@
 import { DocumentCustomization } from '../types';
+import { DEFAULT_PDF_SECTION_ORDER } from './pdfSections';
 
 export const DEFAULT_DOCUMENT_CUSTOMIZATION: DocumentCustomization = {
+  sectionOrder: [...DEFAULT_PDF_SECTION_ORDER],
   companyName: 'electsun',
   companySlogan: 'El sol a tu favor',
   companyFooterText: 'Calle Ercilia Pepín #1, Plaza Toledo | Local 307 | Arroyo Manzano | Santo Domingo, RD | electsun.com.do',
