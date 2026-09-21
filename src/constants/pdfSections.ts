@@ -1,6 +1,7 @@
 export type PDFSectionId =
   | 'cover'
   | 'tableOfContents'
+  | 'executiveSummary'
   | 'aboutUs'
   | 'benefits'
   | 'techIntro'
@@ -23,6 +24,7 @@ export interface PDFSectionMeta {
 export const DEFAULT_PDF_SECTION_ORDER: PDFSectionId[] = [
   'cover',
   'tableOfContents',
+  'executiveSummary',
   'aboutUs',
   'benefits',
   'techIntro',
@@ -48,6 +50,14 @@ export const PDF_SECTIONS_META: Record<PDFSectionId, PDFSectionMeta> = {
     subtitle: 'Estructura ejecutiva y numeración dinámica',
     category: 'intro',
     toggleKey: 'showTableOfContents',
+  },
+  executiveSummary: {
+    id: 'executiveSummary',
+    title: 'Cuadro Resumen Ejecutivo',
+    subtitle: 'Inversión Bruta, Beneficios Fiscales y Retorno',
+    category: 'intro',
+    toggleKey: 'showExecutiveSummary',
+    defaultNumberLabel: '1',
   },
   aboutUs: {
     id: 'aboutUs',

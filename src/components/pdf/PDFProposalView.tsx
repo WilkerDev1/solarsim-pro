@@ -11,6 +11,7 @@ import { PDFSectionId, DEFAULT_PDF_SECTION_ORDER } from '../../constants/pdfSect
 import { PDFSidebarControls } from './controls/PDFSidebarControls';
 import { PDFCoverPage } from './pages/PDFCoverPage';
 import { PDFTableOfContents, TOCItem } from './pages/PDFTableOfContents';
+import { PDFExecutiveSummaryPage } from './pages/PDFExecutiveSummaryPage';
 import { PDFAboutUsPage } from './pages/PDFAboutUsPage';
 import { PDFSolarBenefitsPage } from './pages/PDFSolarBenefitsPage';
 import { PDFTechnicalIntroPage } from './pages/PDFTechnicalIntroPage';
@@ -47,6 +48,7 @@ export const PDFProposalView: React.FC = () => {
   // Document Toggles (Intro & Presentation)
   const [showCover, setShowCover] = useState(true); // Portada Ejecutiva
   const [showTableOfContents, setShowTableOfContents] = useState(true); // Índice de Contenido
+  const [showExecutiveSummary, setShowExecutiveSummary] = useState(true); // Cuadro Resumen Ejecutivo
   const [showAboutUs, setShowAboutUs] = useState(true); // 1. ¿Quiénes Somos? & Servicios
   const [showBenefits, setShowBenefits] = useState(true); // 2. Beneficios Solares & Ley 57-07
   const [showTechIntro, setShowTechIntro] = useState(true); // 3. ¿Qué es FV? & Flujo Técnico
@@ -227,6 +229,7 @@ export const PDFProposalView: React.FC = () => {
   const sectionVisibility: Record<PDFSectionId, boolean> = {
     cover: showCover,
     tableOfContents: showTableOfContents,
+    executiveSummary: showExecutiveSummary,
     aboutUs: showAboutUs,
     benefits: showBenefits,
     techIntro: showTechIntro,
@@ -245,6 +248,7 @@ export const PDFProposalView: React.FC = () => {
   const pageNumbers: Record<PDFSectionId, number> = {
     cover: 0,
     tableOfContents: 0,
+    executiveSummary: 0,
     aboutUs: 0,
     benefits: 0,
     techIntro: 0,
@@ -264,6 +268,10 @@ export const PDFProposalView: React.FC = () => {
   });
 
   const TOC_METADATA: Partial<Record<PDFSectionId, { title: string; subtitle: string }>> = {
+    executiveSummary: {
+      title: 'Cuadro Resumen de Inversión y Retorno',
+      subtitle: 'Pipeline Técnico, Beneficio Ley 57-07 y Payback',
+    },
     aboutUs: {
       title: 'Quiénes Somos & Nuestros Servicios',
       subtitle: 'Por Qué Elegirnos y Pilares de Servicio',
@@ -383,6 +391,8 @@ export const PDFProposalView: React.FC = () => {
         setShowCover={setShowCover}
         showTableOfContents={showTableOfContents}
         setShowTableOfContents={setShowTableOfContents}
+        showExecutiveSummary={showExecutiveSummary}
+        setShowExecutiveSummary={setShowExecutiveSummary}
         showAboutUs={showAboutUs}
         setShowAboutUs={setShowAboutUs}
         showBenefits={showBenefits}
@@ -501,6 +511,19 @@ export const PDFProposalView: React.FC = () => {
                     pageNum={pageNumbers.tableOfContents}
                     totalPages={totalCalculatedPages > 0 ? totalCalculatedPages : activePagesCount}
                     tocItems={tocItems}
+                  />
+                );
+              case 'executiveSummary':
+                return (
+                  <PDFExecutiveSummaryPage
+                    key="executiveSummary"
+                    project={project}
+                    summary={summary}
+                    activeTheme={activeTheme}
+                    showHeadersFooters={showHeadersFooters}
+                    currentDateStr={currentDateStr}
+                    pageNum={pageNumbers.executiveSummary}
+                    totalPages={totalCalculatedPages > 0 ? totalCalculatedPages : activePagesCount}
                   />
                 );
               case 'aboutUs':

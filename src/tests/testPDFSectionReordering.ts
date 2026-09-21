@@ -45,6 +45,7 @@ function computePageNumbers(order: PDFSectionId[], visibility: Record<PDFSection
 // Helper to compute TOC items
 function computeTOCItems(order: PDFSectionId[], visibility: Record<PDFSectionId, boolean>) {
   const TOC_METADATA: Partial<Record<PDFSectionId, { title: string; subtitle: string }>> = {
+    executiveSummary: { title: 'Cuadro Resumen de Inversión y Retorno', subtitle: 'Pipeline Técnico' },
     aboutUs: { title: 'Quiénes Somos & Nuestros Servicios', subtitle: 'Por Qué Elegirnos' },
     benefits: { title: 'Beneficios de la Energía Solar', subtitle: 'Ley 57-07' },
     techIntro: { title: '¿Qué es un Sistema Fotovoltaico?', subtitle: 'Flujo Técnico' },
@@ -77,28 +78,29 @@ function computeTOCItems(order: PDFSectionId[], visibility: Record<PDFSectionId,
 // TEST 1: DEFAULT_PDF_SECTION_ORDER integrity
 // -------------------------------------------------------------
 console.log('--- TEST 1: Default Section Order Integrity ---');
-assert(DEFAULT_PDF_SECTION_ORDER.length === 11, 'DEFAULT_PDF_SECTION_ORDER must have exactly 11 pages');
+assert(DEFAULT_PDF_SECTION_ORDER.length === 12, 'DEFAULT_PDF_SECTION_ORDER must have exactly 12 pages');
 assert(DEFAULT_PDF_SECTION_ORDER[0] === 'cover', 'First default section must be cover');
 assert(DEFAULT_PDF_SECTION_ORDER[1] === 'tableOfContents', 'Second default section must be tableOfContents');
+assert(DEFAULT_PDF_SECTION_ORDER[2] === 'executiveSummary', 'Third default section must be executiveSummary');
 assert(DEFAULT_PDF_SECTION_ORDER.includes('energy'), 'Must include energy');
 assert(DEFAULT_PDF_SECTION_ORDER.includes('quotation'), 'Must include quotation');
 assert(DEFAULT_PDF_SECTION_ORDER.includes('roi'), 'Must include roi');
 assert(DEFAULT_PDF_SECTION_ORDER.includes('cashFlow'), 'Must include cashFlow');
 assert(DEFAULT_PDF_SECTION_ORDER.includes('costMatrix'), 'Must include costMatrix');
-console.log(' ✅ PASS: Default section order contains all 11 sections in correct initial sequence.');
+console.log(' ✅ PASS: Default section order contains all 12 sections in correct initial sequence.');
 
 // -------------------------------------------------------------
 // TEST 2: Normalization handles undefined, partial, or invalid IDs
 // -------------------------------------------------------------
 console.log('\n--- TEST 2: Order Normalization Robustness ---');
 const order1 = normalizeSectionOrder(undefined);
-assert(order1.length === 11 && order1[0] === 'cover', 'Undefined order falls back to default');
+assert(order1.length === 12 && order1[0] === 'cover', 'Undefined order falls back to default');
 
 const order2 = normalizeSectionOrder(['quotation', 'cover', 'invalid_section' as any]);
 assert(order2[0] === 'quotation', 'User prioritized quotation to #1');
 assert(order2[1] === 'cover', 'User prioritized cover to #2');
 assert(!order2.includes('invalid_section' as any), 'Invalid section IDs must be filtered out');
-assert(order2.length === 11, 'All other sections must be appended in order');
+assert(order2.length === 12, 'All other sections must be appended in order');
 console.log(' ✅ PASS: Order normalization gracefully fills missing sections and strips invalid IDs.');
 
 // -------------------------------------------------------------
@@ -108,6 +110,7 @@ console.log('\n--- TEST 3: Dynamic Page Numbering with Reordered Sections ---');
 const defaultVisibility: Record<PDFSectionId, boolean> = {
   cover: true,
   tableOfContents: true,
+  executiveSummary: true,
   aboutUs: true,
   benefits: true,
   techIntro: true,
@@ -120,11 +123,12 @@ const defaultVisibility: Record<PDFSectionId, boolean> = {
 };
 
 const defaultRes = computePageNumbers(DEFAULT_PDF_SECTION_ORDER, defaultVisibility);
-assert(defaultRes.totalPages === 10, 'Default active pages count must be 10');
+assert(defaultRes.totalPages === 11, 'Default active pages count must be 11');
 assert(defaultRes.numbers.cover === 1, 'Cover is page 1 by default');
 assert(defaultRes.numbers.tableOfContents === 2, 'TOC is page 2 by default');
-assert(defaultRes.numbers.energy === 7, 'Energy is page 7 by default');
-assert(defaultRes.numbers.quotation === 8, 'Quotation is page 8 by default');
+assert(defaultRes.numbers.executiveSummary === 3, 'Executive Summary is page 3 by default');
+assert(defaultRes.numbers.energy === 8, 'Energy is page 8 by default');
+assert(defaultRes.numbers.quotation === 9, 'Quotation is page 9 by default');
 
 // Custom reorder: Move 'quotation' and 'roi' immediately after TOC
 const customOrder: PDFSectionId[] = [
@@ -132,6 +136,7 @@ const customOrder: PDFSectionId[] = [
   'tableOfContents',
   'quotation',
   'roi',
+  'executiveSummary',
   'energy',
   'aboutUs',
   'benefits',
@@ -142,13 +147,14 @@ const customOrder: PDFSectionId[] = [
 ];
 
 const customRes = computePageNumbers(customOrder, defaultVisibility);
-assert(customRes.totalPages === 10, 'Total pages remains 10');
+assert(customRes.totalPages === 11, 'Total pages remains 11');
 assert(customRes.numbers.cover === 1, 'Cover is page 1');
 assert(customRes.numbers.tableOfContents === 2, 'TOC is page 2');
 assert(customRes.numbers.quotation === 3, 'Quotation moved to page 3');
 assert(customRes.numbers.roi === 4, 'ROI moved to page 4');
-assert(customRes.numbers.energy === 5, 'Energy shifted to page 5');
-assert(customRes.numbers.aboutUs === 6, 'AboutUs shifted to page 6');
+assert(customRes.numbers.executiveSummary === 5, 'Executive Summary moved to page 5');
+assert(customRes.numbers.energy === 6, 'Energy shifted to page 6');
+assert(customRes.numbers.aboutUs === 7, 'AboutUs shifted to page 7');
 console.log(' ✅ PASS: Reordered pages receive strictly sequential page numbers matching new order.');
 
 // -------------------------------------------------------------
@@ -156,13 +162,15 @@ console.log(' ✅ PASS: Reordered pages receive strictly sequential page numbers
 // -------------------------------------------------------------
 console.log('\n--- TEST 4: Dynamic TOC Sequence and Target Pages ---');
 const tocItems = computeTOCItems(customOrder, defaultVisibility);
-assert(tocItems.length === 8, 'TOC lists all active body pages');
+assert(tocItems.length === 9, 'TOC lists all active body pages');
 assert(tocItems[0].title === 'Presupuesto y Cotización de Sistema', 'First TOC item is Quotation');
 assert(tocItems[0].targetPage === 3, 'First TOC item targets page 3');
 assert(tocItems[1].title === 'Cálculo de Retorno de Inversión', 'Second TOC item is ROI');
 assert(tocItems[1].targetPage === 4, 'Second TOC item targets page 4');
-assert(tocItems[2].title === 'Análisis de Energía y Balance', 'Third TOC item is Energy');
+assert(tocItems[2].title === 'Cuadro Resumen de Inversión y Retorno', 'Third TOC item is Executive Summary');
 assert(tocItems[2].targetPage === 5, 'Third TOC item targets page 5');
+assert(tocItems[3].title === 'Análisis de Energía y Balance', 'Fourth TOC item is Energy');
+assert(tocItems[3].targetPage === 6, 'Fourth TOC item targets page 6');
 console.log(' ✅ PASS: Table of Contents automatically reflects user-defined order and target pages.');
 
 // -------------------------------------------------------------
@@ -239,7 +247,7 @@ store.updateDocumentCustomization({
 
 const activeProj = store.getActiveProject();
 assert(activeProj.customization?.sectionOrder !== undefined, 'Project customization contains sectionOrder');
-assert(activeProj.customization?.sectionOrder?.length === 11, 'Saved sectionOrder has 11 entries');
+assert(activeProj.customization?.sectionOrder?.length === 12, 'Saved sectionOrder has 12 entries');
 assert(activeProj.customization?.sectionOrder?.[0] === 'cover', 'Saved section 0 is cover');
 assert(activeProj.customization?.sectionOrder?.[2] === 'quotation', 'Saved section 2 is quotation');
 assert(activeProj.customization?.attachedPdfs?.length === 3, 'Attached PDFs correctly saved in project');

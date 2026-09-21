@@ -32,6 +32,8 @@ interface PDFSidebarControlsProps {
   setShowCover: (val: boolean) => void;
   showTableOfContents: boolean;
   setShowTableOfContents: (val: boolean) => void;
+  showExecutiveSummary: boolean;
+  setShowExecutiveSummary: (val: boolean) => void;
   showAboutUs: boolean;
   setShowAboutUs: (val: boolean) => void;
   showBenefits: boolean;
@@ -80,6 +82,8 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
   setShowCover,
   showTableOfContents,
   setShowTableOfContents,
+  showExecutiveSummary,
+  setShowExecutiveSummary,
   showAboutUs,
   setShowAboutUs,
   showBenefits,
@@ -223,6 +227,8 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
             setShowCover={setShowCover}
             showTableOfContents={showTableOfContents}
             setShowTableOfContents={setShowTableOfContents}
+            showExecutiveSummary={showExecutiveSummary}
+            setShowExecutiveSummary={setShowExecutiveSummary}
             showAboutUs={showAboutUs}
             setShowAboutUs={setShowAboutUs}
             showBenefits={showBenefits}

@@ -18,6 +18,7 @@ import {
   Layers,
   GripVertical,
   RotateCcw,
+  LayoutDashboard,
 } from 'lucide-react';
 import { PDFColorTheme, PDF_COLOR_THEMES } from '../../../constants/pdfThemes';
 import { ProjectSimulation, DocumentCustomization, ExtraTOCItem } from '../../../types';
@@ -33,6 +34,8 @@ interface PDFSectionTogglesProps {
   setShowCover: (val: boolean) => void;
   showTableOfContents: boolean;
   setShowTableOfContents: (val: boolean) => void;
+  showExecutiveSummary: boolean;
+  setShowExecutiveSummary: (val: boolean) => void;
   showAboutUs: boolean;
   setShowAboutUs: (val: boolean) => void;
   showBenefits: boolean;
@@ -66,6 +69,8 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
   setShowCover,
   showTableOfContents,
   setShowTableOfContents,
+  showExecutiveSummary,
+  setShowExecutiveSummary,
   showAboutUs,
   setShowAboutUs,
   showBenefits,
@@ -157,6 +162,13 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
       icon: ListOrdered,
       title: 'Índice del Dossier',
       subtitle: 'Estructura y números dinámicos',
+    },
+    executiveSummary: {
+      visible: showExecutiveSummary,
+      toggle: setShowExecutiveSummary,
+      icon: LayoutDashboard,
+      title: 'Cuadro Resumen Ejecutivo',
+      subtitle: 'Inversión bruta, Ley 57-07 y retorno',
     },
     aboutUs: {
       visible: showAboutUs,
