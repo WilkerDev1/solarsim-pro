@@ -237,6 +237,7 @@ export const SimulatorView: React.FC = () => {
               updateMonthlyConsumption={updateMonthlyConsumption}
               updateAllMonthlyConsumption={updateAllMonthlyConsumption}
               setMonthlyConsumption={setMonthlyConsumption}
+              updateSpecs={updateSpecs}
             />
           )}
 

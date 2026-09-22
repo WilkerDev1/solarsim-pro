@@ -251,6 +251,7 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
             setShowHeadersFooters={setShowHeadersFooters}
             project={project}
             updateDocumentCustomization={updateDocumentCustomization}
+            updateSpecs={updateSpecs}
           />
         ) : (
           <PDFDocumentDataEditor

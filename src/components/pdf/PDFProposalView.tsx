@@ -597,6 +597,9 @@ export const PDFProposalView: React.FC = () => {
                     currentDateStr={currentDateStr}
                     pageNum={pageNumbers.energy}
                     totalPages={activePagesCount}
+                    isEditMode={isEditMode}
+                    updateDocumentCustomization={updateDocumentCustomization}
+                    updateSpecs={updateSpecs}
                   />
                 );
               case 'quotation':

@@ -114,6 +114,7 @@ export interface SystemSpecs {
   daytimeSelfConsumptionRatio?: number; // % e.g. 35 (alias retrocompatible para partición de carga diurna)
   daytimeLoadRatio?: number;            // % de carga diurna (8am-5pm) ej. 35 para residencial, 75 para comercial, 90 para industrial
   loadProfilePreset?: 'residential' | 'commercial' | 'industrial' | 'custom'; // Preset de perfil de consumo
+  showSelfConsumptionBreakdown?: boolean; // Default true: Permite alternar entre vista moderna y clásica/legacy sin autoconsumo en tablas y gráficas
 }
 
 export interface UtilityRates {
@@ -316,6 +317,9 @@ export interface DocumentCustomization {
 
   // 📑 Orden personalizado de secciones / páginas de la propuesta (IDs de sección)
   sectionOrder?: string[];
+
+  // ⚡ Visualización de autoconsumo en la propuesta PDF (true por defecto)
+  showSelfConsumptionInProposal?: boolean;
 }
 
 export interface AttachedPDFDocument {

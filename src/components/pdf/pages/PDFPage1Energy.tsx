@@ -11,7 +11,7 @@ import {
   ResponsiveContainer,
   LabelList,
 } from 'recharts';
-import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
+import { ProjectSimulation, FinancialSummaryResult, DocumentCustomization } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
 import { PDFHeaderBanner } from '../PDFHeaderBanner';
 import { PDFFooter } from '../PDFFooter';
@@ -23,8 +23,11 @@ interface PDFPage1EnergyProps {
   activeTheme: PDFColorTheme;
   showHeadersFooters: boolean;
   currentDateStr: string;
-  pageNum: number;
-  totalPages: number;
+  pageNum?: number;
+  totalPages?: number;
+  isEditMode?: boolean;
+  updateDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
+  updateSpecs?: (specs: Partial<ProjectSimulation['specs']>) => void;
 }
 
 export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
@@ -33,9 +36,15 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
   activeTheme,
   showHeadersFooters,
   currentDateStr,
-  pageNum,
-  totalPages,
+  pageNum = 1,
+  totalPages = 1,
+  isEditMode,
+  updateDocumentCustomization,
+  updateSpecs,
 }) => {
+  const showSelfConsumption = project.customization?.showSelfConsumptionInProposal !== undefined
+    ? project.customization.showSelfConsumptionInProposal
+    : (project.specs?.showSelfConsumptionBreakdown !== false);
   const treesPlanted = Math.round(summary.co2AvoidedTonsPerYear * 16);
   const totalConsumptionKWh = summary.monthlyBreakdown.reduce((sum, m) => sum + m.consumptionKWh, 0);
   const totalProductionKWh = summary.monthlyBreakdown.reduce((sum, m) => sum + m.productionKWh, 0);
@@ -73,9 +82,32 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
         {/* Chart Section */}
         <div className="space-y-2 mb-3">
           <div className="flex justify-between items-center border-b border-gray-100 pb-1.5">
-            <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wider">
-              Evolución Mensual de Energía
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wider">
+                Evolución Mensual de Energía
+              </h2>
+              {/* Interactive toggle on preview (hidden in print/export) */}
+              <button
+                type="button"
+                onClick={() => {
+                  const nextVal = !showSelfConsumption;
+                  if (updateDocumentCustomization) {
+                    updateDocumentCustomization({ showSelfConsumptionInProposal: nextVal });
+                  }
+                  if (updateSpecs) {
+                    updateSpecs({ showSelfConsumptionBreakdown: nextVal });
+                  }
+                }}
+                className={`print:hidden text-[9px] font-bold px-2 py-0.5 rounded border transition-all cursor-pointer flex items-center gap-1 ${
+                  showSelfConsumption
+                    ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
+                    : 'bg-slate-100 border-slate-300 text-slate-600 hover:bg-slate-200'
+                }`}
+                title="Alternar entre desglose con autoconsumo e inyección o formato clásico (solo consumo y producción)"
+              >
+                {showSelfConsumption ? '⚡ Autoconsumo: Visible' : '🏛️ Modo Clásico'}
+              </button>
+            </div>
             <div className="flex items-center gap-3.5 text-[11px] font-semibold">
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-xs" style={{ backgroundColor: activeTheme.primary }}></span>
@@ -85,11 +117,13 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
                 <span className="w-3 h-3 rounded-xs" style={{ backgroundColor: activeTheme.barColor }}></span>
                 <span className="text-slate-700">Producción Solar (kWh)</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-3 h-1 bg-[#2563eb] rounded-full inline-block"></span>
-                <span className="w-2 h-2 rounded-full bg-[#2563eb] inline-block -ml-2.5"></span>
-                <span className="text-blue-700 font-bold ml-1">Autoconsumo en Sitio</span>
-              </div>
+              {showSelfConsumption && (
+                <div className="flex items-center gap-1.5">
+                  <span className="w-3 h-1 bg-[#2563eb] rounded-full inline-block"></span>
+                  <span className="w-2 h-2 rounded-full bg-[#2563eb] inline-block -ml-2.5"></span>
+                  <span className="text-blue-700 font-bold ml-1">Autoconsumo en Sitio</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -117,14 +151,16 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
                     formatter={(val: number) => Math.round(val)}
                   />
                 </Bar>
-                <Line
-                  type="monotone"
-                  dataKey="solarSelfConsumedKWh"
-                  name="Autoconsumo en Sitio (kWh)"
-                  stroke="#2563eb"
-                  strokeWidth={2.5}
-                  dot={{ r: 3, fill: '#2563eb', strokeWidth: 1, stroke: '#ffffff' }}
-                />
+                {showSelfConsumption && (
+                  <Line
+                    type="monotone"
+                    dataKey="solarSelfConsumedKWh"
+                    name="Autoconsumo en Sitio (kWh)"
+                    stroke="#2563eb"
+                    strokeWidth={2.5}
+                    dot={{ r: 3, fill: '#2563eb', strokeWidth: 1, stroke: '#ffffff' }}
+                  />
+                )}
               </ComposedChart>
             </ResponsiveContainer>
           </div>
@@ -142,8 +178,12 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
                   <th className="px-3 py-1.5">Mes</th>
                   <th className="px-3 py-1.5 text-right">Consumo (kWh)</th>
                   <th className="px-3 py-1.5 text-right">Producción (kWh)</th>
-                  <th className="px-3 py-1.5 text-right">Autoconsumo (kWh)</th>
-                  <th className="px-3 py-1.5 text-right">Inyección (kWh)</th>
+                  {showSelfConsumption && (
+                    <>
+                      <th className="px-3 py-1.5 text-right">Autoconsumo (kWh)</th>
+                      <th className="px-3 py-1.5 text-right">Inyección (kWh)</th>
+                    </>
+                  )}
                   <th className="px-3 py-1.5 text-right">Ahorro Fact. (kWh)</th>
                   <th className="px-3 py-1.5 text-right">%</th>
                 </tr>
@@ -158,8 +198,12 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
                       <td className="px-3 py-1 font-bold text-gray-800">{row.month}</td>
                       <td className="px-3 py-1 text-right font-medium">{row.consumptionKWh.toLocaleString()}</td>
                       <td className="px-3 py-1 text-right font-medium">{row.productionKWh.toFixed(1)}</td>
-                      <td className="px-3 py-1 text-right font-medium text-blue-800">{row.solarSelfConsumedKWh.toFixed(1)}</td>
-                      <td className="px-3 py-1 text-right font-medium text-gray-600">{row.gridExportedKWh.toFixed(1)}</td>
+                      {showSelfConsumption && (
+                        <>
+                          <td className="px-3 py-1 text-right font-medium text-blue-800">{row.solarSelfConsumedKWh.toFixed(1)}</td>
+                          <td className="px-3 py-1 text-right font-medium text-gray-600">{row.gridExportedKWh.toFixed(1)}</td>
+                        </>
+                      )}
                       <td className="px-3 py-1 text-right font-bold text-emerald-800">
                         {(row.effectiveSavedKWh ?? (row.solarSelfConsumedKWh + (row.netExportCreditKWh || 0))).toFixed(1)}
                       </td>
@@ -175,8 +219,12 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
                   <td className="px-3 py-1.5 uppercase font-extrabold">TOTAL</td>
                   <td className="px-3 py-1.5 text-right">{totalConsumptionKWh.toLocaleString()}</td>
                   <td className="px-3 py-1.5 text-right">{totalProductionKWh.toFixed(1)}</td>
-                  <td className="px-3 py-1.5 text-right text-blue-900">{totalSelfConsumedKWh.toFixed(1)}</td>
-                  <td className="px-3 py-1.5 text-right text-gray-700">{totalExportedKWh.toFixed(1)}</td>
+                  {showSelfConsumption && (
+                    <>
+                      <td className="px-3 py-1.5 text-right text-blue-900">{totalSelfConsumedKWh.toFixed(1)}</td>
+                      <td className="px-3 py-1.5 text-right text-gray-700">{totalExportedKWh.toFixed(1)}</td>
+                    </>
+                  )}
                   <td className="px-3 py-1.5 text-right font-extrabold text-emerald-900">{totalEffectiveSavedKWh.toFixed(1)}</td>
                   <td className="px-3 py-1.5 text-right font-extrabold" style={{ color: activeTheme.primary }}>
                     {summary.energyCoveragePct.toFixed(1)}%
