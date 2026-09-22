@@ -74,7 +74,7 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
               <thead className="bg-slate-100 font-bold text-slate-700 border-b border-slate-200 uppercase text-[9px]">
                 <tr>
                   <th className="py-1 px-2">Productos</th>
-                  <th className="py-1 px-1.5 text-center text-red-600">kilos / Cap.</th>
+                  <th className="py-1 px-1.5 text-center text-red-600">KW</th>
                   <th className="py-1 px-1.5 text-center text-red-600">Cantidad</th>
                   <th className="py-1 px-2 text-right text-red-600">Precio Unit. USD</th>
                   <th className="py-1 px-2 text-right">Precio Unit. RD</th>

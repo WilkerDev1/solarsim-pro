@@ -499,7 +499,10 @@ const resJenny = calculateFinancialSummary(
   monthlyConsumption
 );
 
-// 1. Validar que el ítem adicional esté en la tabla de la matriz de costos
+// 1. Validar que el ítem adicional esté en la tabla de la matriz de costos y la potencia en kW de paneles
+const panelRow = resJenny.costMatrix.items[0];
+assert(panelRow?.kilos === 8.19, `Potencia de paneles en matriz es 8.19 kW (${panelRow?.kilos} kW)`);
+
 const customRow = resJenny.costMatrix.items.find((item) => item.name === 'Comision Gilda');
 assert(!!customRow, 'La fila "Comision Gilda" está presente en costMatrix.items');
 assert(customRow?.quantity === 1, 'Cantidad del ítem en matriz es 1');
@@ -507,7 +510,7 @@ assert(customRow?.unitPriceUSD === 1200.0, 'Precio unitario USD del ítem en mat
 assert(customRow?.totalPriceUSD === 1200.0, 'Precio total USD del ítem en matriz es $1,200.00');
 assert(customRow?.itbisUSD === 216.0, 'ITBIS USD no exonerado del ítem en matriz es $216.00');
 
-// 2. Validar totales de la matriz de costos (Imagen 2)
+// 2. Validar totales de la matriz de costos coincidiendo al 100% con Excel (Imagen 2)
 assert(
   Math.abs(resJenny.costMatrix.precioNetoUSD - 7645.20) < 0.01,
   `Precio Neto de la matriz incluye ítem extra: $7,645.20 ($${resJenny.costMatrix.precioNetoUSD})`
@@ -521,15 +524,27 @@ assert(
   `Total Neto (Costo Total) de la matriz es $8,436.16 ($${resJenny.costMatrix.totalNetoUSD})`
 );
 assert(
-  Math.abs(resJenny.costMatrix.porcentajeVentaUSD - 11028.22) < 0.01,
-  `Porcentaje venta (1.40x) de la matriz coincide con cotización: $11,028.22 ($${resJenny.costMatrix.porcentajeVentaUSD})`
+  Math.abs(resJenny.costMatrix.porcentajeVentaUSD - 11810.62) < 0.01,
+  `Porcentaje venta (1.40x) de la matriz coincide exactamente con Excel: $11,810.62 ($${resJenny.costMatrix.porcentajeVentaUSD})`
 );
 assert(
-  Math.abs(resJenny.costMatrix.gananciaUSD - 2808.06) < 0.01,
-  `Ganancia Proyectada del proyecto se preserva en $2,808.06 ($${resJenny.costMatrix.gananciaUSD})`
+  Math.abs(resJenny.costMatrix.gananciaUSD - 3374.46) < 0.01,
+  `Ganancia Proyectada del proyecto coincide exactamente con Excel: $3,374.46 ($${resJenny.costMatrix.gananciaUSD})`
+);
+assert(
+  Math.abs(resJenny.costMatrix.precioKilosVentasUSD - 1442.08) < 0.01,
+  `Precio kilos ventas USD coincide con Excel: $1,442.08/kW ($${resJenny.costMatrix.precioKilosVentasUSD})`
+);
+assert(
+  Math.abs(resJenny.costMatrix.porcentajeVentaDOP - 708637.10) < 0.1,
+  `Porcentaje venta DOP coincide con Excel: RD$ 708,637.10 ($${resJenny.costMatrix.porcentajeVentaDOP})`
+);
+assert(
+  Math.abs(resJenny.costMatrix.gananciaDOP - 202467.74) < 0.1,
+  `Ganancia Proyectada DOP coincide con Excel: RD$ 202,467.74 ($${resJenny.costMatrix.gananciaDOP})`
 );
 
-// 3. Validar coincidencia exacta con la Cotización (Imagen 1)
+// 3. Validar cotización comercial
 assert(
   Math.abs(resJenny.commercialPreTaxSubtotalUSD! - 11028.22) < 0.01,
   `Sub-total sin ITBIS en Cotización es $11,028.22 ($${resJenny.commercialPreTaxSubtotalUSD})`

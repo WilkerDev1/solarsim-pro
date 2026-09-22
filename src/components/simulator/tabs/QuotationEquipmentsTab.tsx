@@ -366,7 +366,7 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
               <thead className="bg-slate-100 font-bold text-slate-700 border-b border-slate-200 uppercase text-[10px]">
                 <tr>
                   <th className="py-2.5 px-3">Productos</th>
-                  <th className="py-2.5 px-3 text-center text-red-600">kilos / Cap.</th>
+                  <th className="py-2.5 px-3 text-center text-red-600">KW</th>
                   <th className="py-2.5 px-3 text-center text-red-600">Cantidad</th>
                   
                   {(costTableCurrency === 'USD' || costTableCurrency === 'ALL') && (

@@ -38,7 +38,7 @@ export function calculateCostMatrixSummary(
       : (specs.panelUnitPriceUSD !== undefined ? specs.panelUnitPriceUSD : 103.32);
     const itemTotalUSD = qty * unitUSD;
     const itemTotalDOP = itemTotalUSD * rate;
-    const itemKilos = p.weightKilos || Math.round((((p.powerW || 620) * qty) / 1000) * 1000) / 1000;
+    const itemKilos = Math.round((((p.powerW || 620) * qty) / 1000) * 1000) / 1000;
     panelTotalUSD += itemTotalUSD;
     panelTotalDOP += itemTotalDOP;
 
@@ -68,7 +68,7 @@ export function calculateCostMatrixSummary(
       : (specs.inverterUnitPriceUSD !== undefined ? specs.inverterUnitPriceUSD : 2300.0);
     const itemTotalUSD = qty * unitUSD;
     const itemTotalDOP = itemTotalUSD * rate;
-    const itemKilos = inv.weightKilos || inv.powerKW || 12;
+    const itemKilos = inv.powerKW || inv.weightKilos || 12;
     inverterTotalUSD += itemTotalUSD;
     inverterTotalDOP += itemTotalDOP;
 
@@ -101,7 +101,7 @@ export function calculateCostMatrixSummary(
         const itemTotalDOP = itemTotalUSD * rate;
         const itemItbisDOP = itemTotalDOP * 0.18; // 18% ITBIS
         const itemItbisUSD = itemItbisDOP / rate;
-        const itemKilos = b.weightKilos || b.capacityKWh || 32;
+        const itemKilos = b.capacityKWh ? Math.round(b.capacityKWh * qty * 100) / 100 : (b.weightKilos || 32);
 
         batteryTotalUSD += itemTotalUSD;
         batteryTotalDOP += itemTotalDOP;
@@ -211,8 +211,8 @@ export function calculateCostMatrixSummary(
   const totalNetoDOP = precioNetoDOP + itbisDOP;
   const totalNetoUSD = totalNetoDOP / rate;
 
-  const porcentajeVentaDOP = basePorcentajeVentaDOP + customItemsNetDOP;
-  const porcentajeVentaUSD = basePorcentajeVentaUSD + customItemsNetUSD;
+  const porcentajeVentaDOP = totalNetoDOP * margin;
+  const porcentajeVentaUSD = totalNetoUSD * margin;
 
   // Solar Only Subtotal (Paneles + Inversores + Instalación sin Baterías)
   const solarOnlyNetDOP = panelTotalDOP + inverterTotalDOP + installTotalDOP;
@@ -229,17 +229,16 @@ export function calculateCostMatrixSummary(
   const precioKilosVentasDOP = porcentajeVentaDOP / capacityKW;
   const precioKilosVentasUSD = porcentajeVentaUSD / capacityKW;
 
-  // Ganancia del proyecto: Los ítems adicionales / comisiones son costos pasantes que se transfieren al cliente
-  // por lo que la ganancia neta del proyecto se mantiene sobre el margen del sistema llave en mano.
-  const gananciaDOP = baseGananciaDOP;
-  const gananciaUSD = baseGananciaUSD;
+  // Ganancia neta del proyecto: Diferencia entre Porcentaje Venta y Costo Total Neto (fórmula de referencia Excel)
+  const gananciaDOP = porcentajeVentaDOP - totalNetoDOP;
+  const gananciaUSD = porcentajeVentaUSD - totalNetoUSD;
 
   const costPerWattUSD = totalNetoUSD / (capacityKW * 1000);
   const salePricePerWattUSD = porcentajeVentaUSD / (capacityKW * 1000);
   const solarSalePricePerWattUSD = capacityKW > 0 ? Math.round((solarOnlyVentaUSD / (capacityKW * 1000)) * 100) / 100 : 1.13;
 
-  const marginOnSalePct = basePorcentajeVentaUSD > 0 ? Math.round((baseGananciaUSD / basePorcentajeVentaUSD) * 10000) / 100 : 0;
-  const markupOnCostPct = baseTotalNetoUSD > 0 ? Math.round((baseGananciaUSD / baseTotalNetoUSD) * 10000) / 100 : 0;
+  const marginOnSalePct = porcentajeVentaUSD > 0 ? Math.round((gananciaUSD / porcentajeVentaUSD) * 10000) / 100 : 0;
+  const markupOnCostPct = totalNetoUSD > 0 ? Math.round((gananciaUSD / totalNetoUSD) * 10000) / 100 : 0;
 
   // Equipment vs Labor Breakdown for Ley 57-07
   const equipmentCostUSD = panelTotalUSD + inverterTotalUSD + batteryTotalUSD;
