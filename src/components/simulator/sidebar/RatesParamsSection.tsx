@@ -1,6 +1,6 @@
 import React from 'react';
-import { ProjectSimulation, UtilityRates } from '../../../types';
-import { Receipt, ChevronDown, Sparkles, Check } from 'lucide-react';
+import { ProjectSimulation, UtilityRates, SystemSpecs } from '../../../types';
+import { Receipt, ChevronDown, Sparkles, Check, Home, Building2, Factory, BatteryCharging } from 'lucide-react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { getReferenceEnergyRateUSD, DEFAULT_RD_TARIFF_MATRIX } from '../../../data/rdTariffs';
 import {
@@ -16,6 +16,7 @@ interface RatesParamsSectionProps {
   onToggle: () => void;
   isDark: boolean;
   updateRates: (rates: Partial<UtilityRates>) => void;
+  updateSpecs?: (specs: Partial<SystemSpecs>) => void;
 }
 
 export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
@@ -24,6 +25,7 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
   onToggle,
   isDark,
   updateRates,
+  updateSpecs,
 }) => {
   const { tariffMatrix } = useSimulationStore();
 
@@ -281,6 +283,102 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
                 </p>
               )}
             </div>
+          </div>
+
+          {/* Autoconsumo Diurno en Sitio (%) vs Inyección a Red */}
+          <div
+            className={`p-3 rounded-lg border space-y-2.5 transition-all ${
+              isDark ? 'bg-[#181824] border-[#2e2e42]' : 'bg-blue-50/60 border-blue-200'
+            }`}
+          >
+            <div className="flex justify-between items-center">
+              <div>
+                <label className={`block text-xs font-bold ${isDark ? 'text-blue-300' : 'text-blue-950'}`}>
+                  Autoconsumo Diurno en Sitio (%)
+                </label>
+                <span className={`text-[10px] block ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                  Consumo solar instantáneo en sitio (100% exento de peaje SIE-007)
+                </span>
+              </div>
+              <div className="shrink-0 text-right">
+                <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${
+                  isDark ? 'bg-blue-950/80 text-blue-300 border border-blue-800/60' : 'bg-blue-100 text-blue-800 border border-blue-200'
+                }`}>
+                  {project.specs.daytimeSelfConsumptionRatio ?? (project.specs.hasBattery ? 90 : 75)}%
+                </span>
+              </div>
+            </div>
+
+            {/* Slider */}
+            <input
+              type="range"
+              min="20"
+              max="98"
+              step="1"
+              value={project.specs.daytimeSelfConsumptionRatio ?? (project.specs.hasBattery ? 90 : 75)}
+              onChange={(e) => updateSpecs && updateSpecs({ daytimeSelfConsumptionRatio: parseFloat(e.target.value) || 75 })}
+              className="w-full h-1.5 bg-slate-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+            />
+
+            {/* Presets rápidos */}
+            <div className="grid grid-cols-4 gap-1 pt-0.5">
+              <button
+                type="button"
+                onClick={() => updateSpecs && updateSpecs({ daytimeSelfConsumptionRatio: 50 })}
+                className={`text-[9.5px] py-1 px-1 rounded-md font-semibold text-center transition-all cursor-pointer border flex flex-col items-center gap-0.5 ${
+                  (project.specs.daytimeSelfConsumptionRatio === 50)
+                    ? 'bg-blue-600 text-white border-blue-700 shadow-xs'
+                    : isDark ? 'bg-[#222230] hover:bg-[#2a2a3c] text-zinc-300 border-[#3a3a4e]' : 'bg-white hover:bg-blue-50 text-slate-700 border-slate-200 shadow-2xs'
+                }`}
+                title="Residencial Típico (50% consumo en sitio / 50% inyección a red)"
+              >
+                <Home className="w-3 h-3 text-blue-400" />
+                <span>Resid. 50%</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => updateSpecs && updateSpecs({ daytimeSelfConsumptionRatio: 75 })}
+                className={`text-[9.5px] py-1 px-1 rounded-md font-semibold text-center transition-all cursor-pointer border flex flex-col items-center gap-0.5 ${
+                  (!project.specs.daytimeSelfConsumptionRatio || project.specs.daytimeSelfConsumptionRatio === 75)
+                    ? 'bg-blue-600 text-white border-blue-700 shadow-xs'
+                    : isDark ? 'bg-[#222230] hover:bg-[#2a2a3c] text-zinc-300 border-[#3a3a4e]' : 'bg-white hover:bg-blue-50 text-slate-700 border-slate-200 shadow-2xs'
+                }`}
+                title="Comercial Diurno (75% consumo en sitio / 25% inyección a red)"
+              >
+                <Building2 className="w-3 h-3 text-emerald-400" />
+                <span>Com. 75%</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => updateSpecs && updateSpecs({ daytimeSelfConsumptionRatio: 90 })}
+                className={`text-[9.5px] py-1 px-1 rounded-md font-semibold text-center transition-all cursor-pointer border flex flex-col items-center gap-0.5 ${
+                  (project.specs.daytimeSelfConsumptionRatio === 90)
+                    ? 'bg-blue-600 text-white border-blue-700 shadow-xs'
+                    : isDark ? 'bg-[#222230] hover:bg-[#2a2a3c] text-zinc-300 border-[#3a3a4e]' : 'bg-white hover:bg-blue-50 text-slate-700 border-slate-200 shadow-2xs'
+                }`}
+                title="Industrial / Continuo (90% consumo en sitio / 10% inyección a red)"
+              >
+                <Factory className="w-3 h-3 text-amber-400" />
+                <span>Ind. 90%</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => updateSpecs && updateSpecs({ daytimeSelfConsumptionRatio: 95 })}
+                className={`text-[9.5px] py-1 px-1 rounded-md font-semibold text-center transition-all cursor-pointer border flex flex-col items-center gap-0.5 ${
+                  (project.specs.daytimeSelfConsumptionRatio === 95)
+                    ? 'bg-blue-600 text-white border-blue-700 shadow-xs'
+                    : isDark ? 'bg-[#222230] hover:bg-[#2a2a3c] text-zinc-300 border-[#3a3a4e]' : 'bg-white hover:bg-blue-50 text-slate-700 border-slate-200 shadow-2xs'
+                }`}
+                title="Baterías BESS (95% consumo en sitio / 5% inyección a red)"
+              >
+                <BatteryCharging className="w-3 h-3 text-cyan-400" />
+                <span>BESS 95%</span>
+              </button>
+            </div>
+
+            <p className={`text-[10px] leading-tight ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+              ⚡ <strong>{project.specs.daytimeSelfConsumptionRatio ?? (project.specs.hasBattery ? 90 : 75)}%</strong> se consume en sitio a <strong>${(project.rates.energyCostPerKWh || 0).toFixed(3)}/kWh</strong> (sin retención). El <strong>{100 - (project.specs.daytimeSelfConsumptionRatio ?? (project.specs.hasBattery ? 90 : 75))}%</strong> restante se inyecta a {currentDistributor} con {project.rates.gridExportFeePct ?? 25}% de peaje de red.
+            </p>
           </div>
         </div>
       )}

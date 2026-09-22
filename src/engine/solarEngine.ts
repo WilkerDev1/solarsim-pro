@@ -1,6 +1,6 @@
 import { SystemSpecs, MonthlyEnergyResult } from '../types';
 import { getProvinceHSP } from '../data/rdProvinces';
-import { calculateTotalDCCapacityKWp } from '../utils/equipmentSpecsUtils';
+import { calculateTotalDCCapacityKWp, calculateTotalBatteryCapacityKWh } from '../utils/equipmentSpecsUtils';
 
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -102,15 +102,38 @@ export function calculateMonthlySolarProduction(
     // Dynamic monthly solar production formula: kWp * HSP * days * derateFactor
     const production = Math.round(dcCapacityKWp * hsp * days * derateFactor * 10) / 10;
 
-    // Physics-based self-consumption & battery storage model
+    // Physics-based self-consumption & battery storage model (BESS)
+    const totalBatteryKWh = calculateTotalBatteryCapacityKWh(specs);
+    const hasBatteryStorage = !!(specs.hasBattery && totalBatteryKWh > 0);
+
     const baseDaytimeRatio = specs.daytimeSelfConsumptionRatio !== undefined
       ? specs.daytimeSelfConsumptionRatio / 100
-      : (specs.hasBattery ? 0.90 : 0.75);
+      : (hasBatteryStorage ? 0.70 : 0.75);
 
-    const daytimeSelfConsumptionRatio = Math.min(0.98, Math.max(0.40, baseDaytimeRatio));
-    
-    let solarSelfConsumed = Math.min(consumption, Math.round(production * daytimeSelfConsumptionRatio * 10) / 10);
-    
+    const daytimeSelfConsumptionRatio = Math.min(0.98, Math.max(0.20, baseDaytimeRatio));
+
+    // Direct daytime solar self-consumption (instantaneous in-situ without hitting the grid)
+    const directSolarConsumed = Math.min(consumption, Math.round(production * daytimeSelfConsumptionRatio * 10) / 10);
+
+    // Battery storage dynamics (BESS)
+    let batteryContributionKWh = 0;
+    if (hasBatteryStorage) {
+      const batteryDodPct = specs.batteryDOD !== undefined ? specs.batteryDOD : 90;
+      const batteryEffPct = specs.batteryEfficiencyPct !== undefined ? specs.batteryEfficiencyPct : 95;
+      const dailyUsableBatteryKWh = totalBatteryKWh * (batteryDodPct / 100) * (batteryEffPct / 100);
+      const monthlyMaxBatteryStorageKWh = days * dailyUsableBatteryKWh;
+
+      // Daytime surplus generation available to charge the battery
+      const daytimeSurplusKWh = Math.max(0, production - directSolarConsumed);
+      // Nighttime / off-peak consumption that can be displaced by the battery
+      const nighttimeConsumptionKWh = Math.max(0, consumption - directSolarConsumed);
+
+      // Battery displacement is limited by: surplus solar, battery throughput capacity, and nighttime demand
+      batteryContributionKWh = Math.round(Math.min(daytimeSurplusKWh, monthlyMaxBatteryStorageKWh, nighttimeConsumptionKWh) * 10) / 10;
+    }
+
+    const solarSelfConsumed = Math.min(consumption, Math.min(production, Math.round((directSolarConsumed + batteryContributionKWh) * 10) / 10));
+
     let gridExported = 0;
     if (isZeroExport) {
       // In Zero-Export mode (with anti-feed limiter), energy is only used on-site; no grid injection occurs
@@ -123,10 +146,11 @@ export function calculateMonthlySolarProduction(
     }
 
     // Grid export net metering with SIE-007-2026-REG fee on exported energy
-    const netExportCredit = gridExported * (1 - (effectiveGridExportFeePct / 100));
+    const netExportCreditKWh = Math.round(gridExported * (1 - (effectiveGridExportFeePct / 100)) * 10) / 10;
+    const retainedExportKWh = Math.round((gridExported - netExportCreditKWh) * 10) / 10;
 
-    // Energy savings = (Self consumed + net export credit) * energy cost
-    const effectiveSavedKWh = solarSelfConsumed + netExportCredit;
+    // Energy savings = (Self consumed in-situ + net export credit recognized) * energy cost
+    const effectiveSavedKWh = Math.round((solarSelfConsumed + netExportCreditKWh) * 10) / 10;
     const savingsUSD = Math.round(effectiveSavedKWh * energyCostPerKWh * 100) / 100;
 
     const originalBillUSD = Math.round(consumption * energyCostPerKWh * 100) / 100;
@@ -141,6 +165,10 @@ export function calculateMonthlySolarProduction(
       productionKWh: production,
       solarSelfConsumedKWh: solarSelfConsumed,
       gridExportedKWh: gridExported,
+      netExportCreditKWh,
+      retainedExportKWh,
+      effectiveSavedKWh,
+      batteryContributionKWh,
       savingsUSD,
       netBillUSD,
       originalBillUSD,

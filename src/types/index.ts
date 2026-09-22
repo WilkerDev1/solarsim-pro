@@ -202,6 +202,10 @@ export interface MonthlyEnergyResult {
   productionKWh: number;
   solarSelfConsumedKWh: number;
   gridExportedKWh: number;
+  netExportCreditKWh: number; // kWh excedentes reconocidos tras peaje de red SIE-007
+  retainedExportKWh: number;  // kWh retenidos por distribuidora (peaje SIE-007)
+  effectiveSavedKWh: number;  // Total kWh ahorrados/reconocidos (solarSelfConsumedKWh + netExportCreditKWh)
+  batteryContributionKWh?: number; // Aporte de baterías BESS al autoconsumo (kWh)
   savingsUSD: number;
   netBillUSD: number;
   originalBillUSD: number;

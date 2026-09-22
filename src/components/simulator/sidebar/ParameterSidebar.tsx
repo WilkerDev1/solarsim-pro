@@ -134,6 +134,7 @@ export const ParameterSidebar: React.FC<ParameterSidebarProps> = ({
             onToggle={() => toggleSection('rates')}
             isDark={isDark}
             updateRates={updateRates}
+            updateSpecs={updateSpecs}
           />
 
           {/* 3. SECCIÓN: Equipamiento y Sistema */}

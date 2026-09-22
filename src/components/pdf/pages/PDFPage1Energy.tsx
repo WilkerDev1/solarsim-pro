@@ -1,8 +1,9 @@
 import React from 'react';
 import { Leaf } from 'lucide-react';
 import {
-  BarChart,
+  ComposedChart,
   Bar,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -38,7 +39,12 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
   const treesPlanted = Math.round(summary.co2AvoidedTonsPerYear * 16);
   const totalConsumptionKWh = summary.monthlyBreakdown.reduce((sum, m) => sum + m.consumptionKWh, 0);
   const totalProductionKWh = summary.monthlyBreakdown.reduce((sum, m) => sum + m.productionKWh, 0);
-  const totalSavingsKWh = summary.monthlyBreakdown.reduce((sum, m) => sum + m.solarSelfConsumedKWh, 0);
+  const totalSelfConsumedKWh = summary.monthlyBreakdown.reduce((sum, m) => sum + m.solarSelfConsumedKWh, 0);
+  const totalExportedKWh = summary.monthlyBreakdown.reduce((sum, m) => sum + m.gridExportedKWh, 0);
+  const totalEffectiveSavedKWh = summary.monthlyBreakdown.reduce(
+    (sum, m) => sum + (m.effectiveSavedKWh || (m.solarSelfConsumedKWh + (m.netExportCreditKWh || 0))),
+    0
+  );
 
   return (
     <div className="pdf-page w-[850px] h-[1202px] min-h-[1202px] max-h-[1202px] bg-white shadow-xl flex flex-col shrink-0 relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
@@ -62,15 +68,15 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
         />
       )}
 
-      {/* Body */}
-      <div className="px-10 pt-3 pb-3 flex-1 flex flex-col gap-2.5 relative z-10 min-h-0">
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col px-7 py-3 overflow-hidden">
         {/* Chart Section */}
-        <div className="space-y-2">
+        <div className="space-y-2 mb-3">
           <div className="flex justify-between items-center border-b border-gray-100 pb-1.5">
             <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wider">
               Evolución Mensual de Energía
             </h2>
-            <div className="flex items-center gap-4 text-xs font-semibold">
+            <div className="flex items-center gap-3.5 text-[11px] font-semibold">
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-xs" style={{ backgroundColor: activeTheme.primary }}></span>
                 <span className="text-slate-700">Consumo (kWh)</span>
@@ -79,12 +85,17 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
                 <span className="w-3 h-3 rounded-xs" style={{ backgroundColor: activeTheme.barColor }}></span>
                 <span className="text-slate-700">Producción Solar (kWh)</span>
               </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-3 h-1 bg-[#2563eb] rounded-full inline-block"></span>
+                <span className="w-2 h-2 rounded-full bg-[#2563eb] inline-block -ml-2.5"></span>
+                <span className="text-blue-700 font-bold ml-1">Autoconsumo en Sitio</span>
+              </div>
             </div>
           </div>
 
           <div className="w-full bg-gray-50/70 border border-gray-200 rounded-xl p-3 h-[255px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={summary.monthlyBreakdown} margin={{ top: 20, right: 10, left: 0, bottom: 15 }}>
+              <ComposedChart data={summary.monthlyBreakdown} margin={{ top: 20, right: 10, left: 0, bottom: 15 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                 <XAxis dataKey="month" tick={{ fontSize: 9.5, fill: '#475569', fontWeight: 'bold' }} />
                 <YAxis tick={{ fontSize: 9.5, fill: '#475569', fontWeight: 'bold' }} />
@@ -94,7 +105,7 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
                   <LabelList
                     dataKey="consumptionKWh"
                     position="top"
-                    style={{ fontSize: '8px', fill: activeTheme.primary, fontWeight: 'bold' }}
+                    style={{ fontSize: '7.5px', fill: activeTheme.primary, fontWeight: 'bold' }}
                     formatter={(val: number) => Math.round(val)}
                   />
                 </Bar>
@@ -102,11 +113,19 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
                   <LabelList
                     dataKey="productionKWh"
                     position="top"
-                    style={{ fontSize: '8px', fill: activeTheme.secondary, fontWeight: 'bold' }}
+                    style={{ fontSize: '7.5px', fill: activeTheme.secondary, fontWeight: 'bold' }}
                     formatter={(val: number) => Math.round(val)}
                   />
                 </Bar>
-              </BarChart>
+                <Line
+                  type="monotone"
+                  dataKey="solarSelfConsumedKWh"
+                  name="Autoconsumo en Sitio (kWh)"
+                  stroke="#2563eb"
+                  strokeWidth={2.5}
+                  dot={{ r: 3, fill: '#2563eb', strokeWidth: 1, stroke: '#ffffff' }}
+                />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -114,32 +133,38 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
         {/* Table Section */}
         <div className="space-y-2">
           <h2 className="text-sm font-bold text-gray-800 border-b border-gray-100 pb-1.5 uppercase tracking-wider">
-            Resumen Mensual de Energía
+            Resumen Mensual de Energía & Balance de Ahorro
           </h2>
           <div className="border border-gray-200 rounded-lg overflow-hidden shadow-xs">
             <table className="w-full text-xs text-left">
-              <thead className="text-white uppercase font-bold text-[10.5px]" style={{ backgroundColor: activeTheme.primary }}>
+              <thead className="text-white uppercase font-bold text-[10px]" style={{ backgroundColor: activeTheme.primary }}>
                 <tr>
-                  <th className="px-4 py-1.5">Mes</th>
-                  <th className="px-4 py-1.5 text-right">Consumo (kWh)</th>
-                  <th className="px-4 py-1.5 text-right">Producción (kWh)</th>
-                  <th className="px-4 py-1.5 text-right">Ahorro Energ. (kWh)</th>
-                  <th className="px-4 py-1.5 text-right">%</th>
+                  <th className="px-3 py-1.5">Mes</th>
+                  <th className="px-3 py-1.5 text-right">Consumo (kWh)</th>
+                  <th className="px-3 py-1.5 text-right">Producción (kWh)</th>
+                  <th className="px-3 py-1.5 text-right">Autoconsumo (kWh)</th>
+                  <th className="px-3 py-1.5 text-right">Inyección (kWh)</th>
+                  <th className="px-3 py-1.5 text-right">Ahorro Fact. (kWh)</th>
+                  <th className="px-3 py-1.5 text-right">%</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 font-semibold text-gray-700 text-[11px]">
+              <tbody className="divide-y divide-gray-200 font-semibold text-gray-700 text-[10.5px]">
                 {summary.monthlyBreakdown.map((row, idx) => {
                   const monthCoverage = row.consumptionKWh > 0
                     ? (row.productionKWh / row.consumptionKWh) * 100
                     : 0;
                   return (
                     <tr key={idx} className={idx % 2 === 0 ? 'bg-gray-50/60' : 'bg-white'}>
-                      <td className="px-4 py-1 font-bold text-gray-800">{row.month}</td>
-                      <td className="px-4 py-1 text-right font-medium">{row.consumptionKWh.toLocaleString()}</td>
-                      <td className="px-4 py-1 text-right font-medium">{row.productionKWh.toFixed(1)}</td>
-                      <td className="px-4 py-1 text-right font-medium">{row.solarSelfConsumedKWh.toFixed(1)}</td>
-                      <td className="px-4 py-1 text-right font-bold" style={{ color: activeTheme.secondary }}>
-                        {monthCoverage.toFixed(2)}%
+                      <td className="px-3 py-1 font-bold text-gray-800">{row.month}</td>
+                      <td className="px-3 py-1 text-right font-medium">{row.consumptionKWh.toLocaleString()}</td>
+                      <td className="px-3 py-1 text-right font-medium">{row.productionKWh.toFixed(1)}</td>
+                      <td className="px-3 py-1 text-right font-medium text-blue-800">{row.solarSelfConsumedKWh.toFixed(1)}</td>
+                      <td className="px-3 py-1 text-right font-medium text-gray-600">{row.gridExportedKWh.toFixed(1)}</td>
+                      <td className="px-3 py-1 text-right font-bold text-emerald-800">
+                        {(row.effectiveSavedKWh ?? (row.solarSelfConsumedKWh + (row.netExportCreditKWh || 0))).toFixed(1)}
+                      </td>
+                      <td className="px-3 py-1 text-right font-bold" style={{ color: activeTheme.secondary }}>
+                        {monthCoverage.toFixed(1)}%
                       </td>
                     </tr>
                   );
@@ -147,12 +172,14 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
               </tbody>
               <tfoot className="font-bold bg-gray-100 text-gray-900 border-t-2 border-gray-300 text-xs">
                 <tr>
-                  <td className="px-4 py-1.5 uppercase font-extrabold">TOTAL</td>
-                  <td className="px-4 py-1.5 text-right">{totalConsumptionKWh.toLocaleString()}</td>
-                  <td className="px-4 py-1.5 text-right">{totalProductionKWh.toLocaleString()}</td>
-                  <td className="px-4 py-1.5 text-right">{totalSavingsKWh.toLocaleString()}</td>
-                  <td className="px-4 py-1.5 text-right font-extrabold" style={{ color: activeTheme.primary }}>
-                    {summary.energyCoveragePct.toFixed(2)}%
+                  <td className="px-3 py-1.5 uppercase font-extrabold">TOTAL</td>
+                  <td className="px-3 py-1.5 text-right">{totalConsumptionKWh.toLocaleString()}</td>
+                  <td className="px-3 py-1.5 text-right">{totalProductionKWh.toFixed(1)}</td>
+                  <td className="px-3 py-1.5 text-right text-blue-900">{totalSelfConsumedKWh.toFixed(1)}</td>
+                  <td className="px-3 py-1.5 text-right text-gray-700">{totalExportedKWh.toFixed(1)}</td>
+                  <td className="px-3 py-1.5 text-right font-extrabold text-emerald-900">{totalEffectiveSavedKWh.toFixed(1)}</td>
+                  <td className="px-3 py-1.5 text-right font-extrabold" style={{ color: activeTheme.primary }}>
+                    {summary.energyCoveragePct.toFixed(1)}%
                   </td>
                 </tr>
               </tfoot>
