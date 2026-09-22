@@ -9,7 +9,9 @@ Esta guía detalla los pasos para desplegar y conectar el microservicio de **Pro
 - **Tecnología**: [Cloudflare Workers](https://workers.cloudflare.com/) + [Hono](https://hono.dev/) (TypeScript).
 - **Almacenamiento**: Cloudflare Workers KV (`PROPOSALS_KV`) con TTL de expiración automática configurable (3, 7, 15, 30 días).
 - **Frontend Interactivo**: Plantilla web responsiva y optimizada para dispositivos móviles y escritorio con:
-  - Gráficas en vivo (Chart.js) de balance energético mensual y flujo de caja a 25 años.
+  - Gráfica combinada en vivo (Chart.js): Barras de Consumo y Producción Solar superpuestas con línea de Autoconsumo en Sitio.
+  - Tabla de balance mensual transparente de 7 columnas (Consumo, Producción FV, Autoconsumo en Sitio, Inyección a Red con retención neta del 25%, Ahorro Facturable y Cobertura %).
+  - Gráfica de Flujo de Caja acumulado y retorno de inversión a 25 años.
   - Cobertura solar real exacta sin topes artificiales.
   - Desglose detallado de ingeniería y Ley 57-07 (exoneración de ITBIS e incentivo fiscal del 40% ISR).
   - Cotización con soporte para ítems estándar y renglones personalizados con régimen de ITBIS.

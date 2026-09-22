@@ -66,12 +66,12 @@ $$\text{Cobertura Solar Anual (\%)} = \frac{E_{anual}}{\sum_{m=1}^{12} C_{m}} \t
 
 ---
 
-## 2. 🔋 Dimensionamiento de Almacenamiento (Baterías)
+## 2. 🔋 Dimensionamiento de Almacenamiento (Baterías & BESS)
 
-Cuando el sistema cuenta con banco de baterías (`hasBattery: true`), el motor calcula la capacidad útil y las horas de autonomía de respaldo ante fallas del suministro eléctrico:
+Cuando el sistema cuenta con banco de baterías (`hasBattery: true`), el motor calcula la capacidad útil, las horas de autonomía de respaldo ante fallas del suministro eléctrico y el **despacho físico de almacenamiento diurno a nocturno**:
 
 ### 2.1 Capacidad Útil de Almacenamiento ($E_{bat, util}$)
-$$E_{bat, util} \text{ (kWh)} = \text{Capacidad Nominal} \times \left(\frac{\text{DoD}}{100}\right) \times \left(\frac{\eta_{bat}}{100}\right)$$
+$$E_{bat, util} \text{ (kWh)} = \text{Capacidad Nominal Total} \times \left(\frac{\text{DoD}}{100}\right) \times \left(\frac{\eta_{bat}}{100}\right)$$
 
 *Donde:*
 * $\text{DoD}$: Profundidad de descarga permitida (*Depth of Discharge*, típicamente $80\% - 90\%$).
@@ -80,6 +80,24 @@ $$E_{bat, util} \text{ (kWh)} = \text{Capacidad Nominal} \times \left(\frac{\tex
 ### 2.2 Autonomía de Respaldo Anti-Apagones ($T_{autonomia}$)
 $$L_{horaria, prom} \text{ (kW)} = \frac{E_{consumo\_anual}}{365 \times 24}$$
 $$T_{autonomia} \text{ (Horas)} = \frac{E_{bat, util}}{L_{horaria, prom}}$$
+
+### 2.3 Despacho Físico de Energía y Absorción de Excedentes ($E_{bat, mes}$)
+En sistemas acoplados con baterías BESS, la batería no fuerza artificialmente un $100\%$ de autoconsumo ciego; simula el ciclado diario real de absorción del excedente solar diurno para suplir el consumo no cubierto (nocturno):
+
+1. **Excedente Solar Diurno Potencial**:
+   $$E_{surplus, m} = \max(0, E_{m} - E_{auto\_solar, m})$$
+2. **Capacidad Máxima de Ciclado Mensual de la Batería**:
+   $$E_{bat\_max, m} = E_{bat, util} \times D_{m}$$
+3. **Energía Solar Absorbida por la Batería**:
+   $$E_{bat\_stored, m} = \min(E_{surplus, m}, E_{bat\_max, m})$$
+4. **Aporte Efectivo de la Batería al Consumo del Inmueble**:
+   $$E_{bat\_dispatched, m} = \min(E_{bat\_stored, m}, C_{m} - E_{auto\_solar, m})$$
+5. **Autoconsumo Total en Sitio**:
+   $$E_{self\_consumed, m} = E_{auto\_solar, m} + E_{bat\_dispatched, m}$$
+6. **Excedente Remanente Inyectado a la Red**:
+   $$E_{exp, m} = \max(0, E_{m} - E_{self\_consumed, m})$$
+
+*Ventaja Regulatoria*: Cada kWh absorbido por la batería y autoconsumido en sitio ahorra el **$100\%$ del valor de la tarifa**, evitando el peaje regulatorio del **$25\%$ de retención de red** de la Resolución SIE-007-2026-REG.
 
 ---
 

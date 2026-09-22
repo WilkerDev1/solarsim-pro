@@ -12,7 +12,9 @@ Este documento sirve como **fuente única de verdad** para desarrolladores y asi
 1. **Dimensionamiento Técnico & Solar**:
    - Estimación de irradiación solar ($\text{HSP}$) específica para las 32 provincias de RD (datos satelitales NASA SSE / NREL y soporte para HSP personalizado).
    - Balance de energía horaria y mensual, autoconsumo e inyección bajo el régimen de Medición Neta con las distribuidoras (**EDEESTE, EDESUR, EDENORTE, CEPM**).
-   - Cobertura de todas las tarifas dominicanas (**BTS1, BTS2, BTD, MTD1, MTD2, MTH, VMT1, VMT2, VMT3**) y aplicación de retención oficial del 25% de la producción de exportación.
+   - Cobertura de todas las tarifas dominicanas (**BTS1, BTS2, BTD, MTD1, MTD2, MTH, VMT1, VMT2, VMT3**) y aplicación de retención oficial del 25% de la producción de exportación (Resolución SIE-007-2026-REG).
+   - **Despacho Físico de Baterías BESS & Autoconsumo Diurno Configurable**: Simulación de ciclado real de almacenamiento diario (absorción del excedente diurno para suplir demanda nocturna) y slider interactivo de ratio de autoconsumo (20%-98%) con perfiles predefinidos (Residencial 50%, Comercial 75%, Industrial 90%, BESS 95%).
+   - **Ingeniería Transparente & Gráficos Mixtos (ComposedChart)**: Separación explícita de Autoconsumo en Sitio (100% de tarifa), Inyección a Red (bruta y neta acreditada al 75%) y Ahorro Facturable total en Simulador, PDF y Propuesta Web Cloudflare.
    - Factor de pérdidas del sistema visible y configurable (predeterminado auditado: **25.0%**).
 2. **Catálogo Inteligente de Equipos, Almacenamiento (BESS) & Precios por Proveedor**:
    - Base de datos local y sincronizada en la nube con modelos verificados de **Paneles Solares** (Canadian Solar TOPBiHiKu6 TOPCon 590W-620W), **Inversores Híbridos Split Phase** (LuxpowerTek LXP-LB-US 8k/10k) y **Baterías Litio LiFePO4** (HinaESS PowerGem Max 16.08kWh).
@@ -29,12 +31,14 @@ Este documento sirve como **fuente única de verdad** para desarrolladores y asi
    - Crédito fiscal del 40% del costo de inversión en equipos aplicable al Impuesto Sobre la Renta (ISR) amortizable en 3 años fiscales ($13.33\%$ anual).
    - Proyecciones de Flujo de Caja a 25 años, Payback Simple y Descontado, VAN (NPV), TIR (IRR), LCOE y ROI total.
 5. **Generador de Propuestas Técnicas y Económicas en PDF**:
-   - Dossier ejecutivo modular de 10 a 11 páginas con maquetación de revista (*Executive Pitch Deck*).
+   - Dossier ejecutivo modular de 11 a 12 páginas con maquetación de revista (*Executive Pitch Deck*).
+   - **Página de Cuadro Resumen Ejecutivo** integrada justo tras el índice con KPIs clave, desglose técnico de módulos, inversores y BESS, divisas y desembolso neto con Ley 57-07.
+   - **Reorganización Dinámica Drag-and-Drop**: Posibilidad de reordenar hojas del PDF y anexos PDF externos mediante arrastrar y soltar, sincronizando automáticamente la numeración de páginas y el índice (*Table of Contents*).
    - Personalización multi-empresa (*Document Customization*): logos, lemas, firmas, teléfonos, marcas de agua y paletas de color corporativas.
 6. **Sincronización en la Nube & Multi-usuario (RBAC)**:
    - Servidor backend Node.js (`server/`) desplegado en Docker (`solarsim-api` + PostgreSQL) en Proxmox CT 100 (`10.0.0.103`).
    - Autenticación JWT, control de acceso por roles (ADMIN, EDITOR, VIEWER), sincronización delta de proyectos y catálogo global.
-   - Publicación de propuestas web interactivas con Cloudflare Workers + KV y códigos QR.
+   - Publicación de propuestas web interactivas con Cloudflare Workers + KV y códigos QR (con gráfica combinada y desglose transparente).
 7. **Papelera de Reciclaje (Recycle Bin / Trash) & Modo Solo Lectura**:
    - Borrado suave (*soft-delete*) con retención automática auditada de **30 días** (`deletedAt`, `deletedBy`).
    - Visualización y exploración de proyectos eliminados en **Modo Solo Lectura** (Simulador y PDF con banner de advertencia ámbar y protección contra mutaciones).
@@ -233,7 +237,16 @@ npx tsx src/tests/testGeminiFamily3Cascade.ts
 # Suite de validación de historial y vigencia de propuestas Cloudflare
 npx tsx src/tests/testCloudflareShareHistory.ts
 
-# Ejecutar todas las pruebas en conjunto (9 suites integradas)
+# Suite de validación de multi-equipamiento (inversores, paneles y BESS en paralelo)
+npx tsx src/tests/testMultiEquipment.ts
+
+# Suite de validación de reordenación drag-and-drop de secciones y anexos PDF
+npx tsx src/tests/testPDFSectionReordering.ts
+
+# Suite de validación de balance de energía, autoconsumo diurno y transparencia BESS
+npx tsx src/tests/testEnergyBalanceTransparency.ts
+
+# Ejecutar todas las pruebas en conjunto (12 suites integradas)
 npm test
 
 # Compilar frontend y electron para producción
@@ -271,7 +284,7 @@ ssh app-server "cd /home/agente/servicios/solarsim-api && docker compose up -d -
 ### 🔄 Ciclo Obligatorio de Verificación (Verification Loop):
 **NO dar ninguna tarea por completada sin ejecutar previamente:**
 1. **Verificación de Tipos**: `npm run lint` (`npx tsc --noEmit` — Cero errores de tipo).
-2. **Validación de Motores Matemáticos, Catálogo, Carpetas, IA y Papelera**: `npm test` (ejecuta `testBenchmark.ts`, `testFinancialEngineComprehensive.ts`, `testAISmartProposal.ts`, `testEquipmentCatalog.ts`, `testFolderHidingAndSync.ts` y `testTrashAndReadOnly.ts`).
+2. **Validación de Motores Matemáticos, Catálogo, Carpetas, IA, Papelera y Balance**: `npm test` (ejecuta las 12 suites: benchmarks, finanzas integrales, smart proposal IA, catálogo, carpetas ocultas, papelera de reciclaje, tarifas SIE/CEPM, cascada 503 Familia 3, historial Cloudflare, multi-equipos, reordenación PDF y transparencia de energía).
 3. **Build de Producción**: `npm run build` (confirmar bundling sin fallos).
 4. **Snapshot de Contexto**: Si se introducen nuevos módulos, refactorizaciones grandes o cambios estructurales, regenerar el contexto empaquetado con `npm run context:pack`.
 
@@ -367,6 +380,41 @@ ssh app-server "cd /home/agente/servicios/solarsim-api && docker compose up -d -
    - **Vaciar Papelera**: Purga masiva de todas las propuestas eliminadas de la organización (`emptyTrash` con `DELETE /api/trash`).
 5. **Navegación Limpia y Aislamiento de Hooks**:
    - La alternancia entre la vista del catálogo (`DashboardView`) y la papelera (`TrashView`) se gestiona condicionalmente en `App.tsx` (`isTrashActive ? <TrashView /> : <DashboardView />`), garantizando el respeto absoluto a las reglas de hooks de React y evitando retornos tempranos dentro de los componentes.
+
+### ⚡ Balance Energético, Despacho Físico BESS & Ingeniería Transparente:
+1. **Transparencia Total de Flujos de Energía**:
+   - El sistema separa explícitamente tres componentes fundamentales del balance energético:
+     - **Autoconsumo en Sitio ($E_{auto}$)**: Energía consumida instantáneamente en el inmueble (solar directa + despacho de baterías). Tiene un valor económico del **100% de la tarifa eléctrica**.
+     - **Inyección a Red Bruta ($E_{exp}$)**: Excedente que sale hacia la red de distribución.
+     - **Inyección Neta Acreditada ($E_{net\_credit}$)**: Excedente reconocido al cliente tras deducir la **retención oficial del 25%** por peaje de red bajo la Resolución SIE-007-2026-REG ($E_{net\_credit} = E_{exp} \times 0.75$).
+     - **Ahorro Facturable Total ($E_{saved}$)**: $E_{saved} = E_{auto} + E_{net\_credit}$.
+   - El ahorro monetario anual y mensual cumple estrictamente: $\text{savingsUSD} = E_{saved} \times T_{kwh}$.
+2. **Modelo Físico de Baterías BESS (Sin Abstracciones Cegas al 100%)**:
+   - En sistemas con baterías de litio LiFePO4, el motor simula el ciclado diario real:
+     - Capacidad útil diaria: $E_{bat, util} = \text{Capacidad Nominal} \times (\text{DoD}/100) \times (\eta/100)$.
+     - La batería almacena el excedente diurno hasta su tope mensual ($E_{bat, util} \times D_m$) y lo descarga para cubrir el consumo remanente no solar (nocturno).
+     - La inyección a red se reduce proporcionalmente y el ahorro monetario se maximiza al evitar el 25% de retención de red.
+3. **Gráficas Mixtas (ComposedChart)**:
+   - Tanto en el Simulador (`EnergyAnalysisTab.tsx`) como en la Propuesta PDF (`PDFPage1Energy.tsx`) y el Visor Web de Cloudflare (`template.ts`), la gráfica de energía es un gráfico compuesto:
+     - Barras para **Consumo** y **Producción FV**.
+     - Línea superpuesta azul (`#2563eb`) para **Autoconsumo en Sitio**.
+
+### 📑 Personalización de Propuesta PDF & Reordenación Modular:
+1. **Página de Cuadro Resumen Ejecutivo (`PDFPageExecutiveSummary.tsx`)**:
+   - Hoja ejecutiva maquetada al estilo *Executive Pitch Deck* ubicada inmediatamente tras el índice (hoja 2 por defecto).
+   - Sintetiza 5 cápsulas clave: (01) Capacidad y Módulos, (02) Conversión AC, (03) Parámetros Comerciales & Divisas, (04) Incentivos Ley 57-07, (05) Desembolso Real y Recuperación.
+2. **Reorganización Dinámica Drag-and-Drop de Secciones y Anexos**:
+   - El modal de personalización (`PDFCustomizationModal.tsx`) permite reordenar tanto las secciones internas de la propuesta como los documentos PDF externos anexados mediante arrastrar y soltar.
+   - El orden se persiste en `project.customization.sectionOrder` y `project.customization.attachedPdfs`.
+   - La numeración de páginas (`# de ##`) y la Tabla de Contenidos (`PDFPage0TableOfContents.tsx`) son 100% dinámicas y se recalculan automáticamente según el orden definido por el usuario.
+
+### ☁️ Propuestas Web Compartidas (Cloudflare Workers & KV):
+1. **Microservicio Serverless (`workers/share-viewer`)**:
+   - Construido con Hono y desplegado en Cloudflare Workers con KV (`propuesta.electsun.net`).
+   - Genera enlaces web compartibles con expiración automática (TTL) y códigos QR para el cliente.
+2. **Sincronización de Datos y Compatibilidad Retroactiva**:
+   - El visor web incorpora la gráfica Chart.js mixta (barras de consumo/producción + línea de autoconsumo) y la tabla transparente de 7 columnas.
+   - Posee *fallbacks* matemáticos automáticos para asegurar que los enlaces generados previamente continúen funcionando sin errores.
 
 ### 📄 Exportación a PDF con `html2canvas` & `jsPDF`:
 1. **Reglas del Workspace**: Consultar `.agents/rules/html2canvas_pdf_export_rules.md`.
