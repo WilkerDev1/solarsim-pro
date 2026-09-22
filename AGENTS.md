@@ -191,7 +191,8 @@ solarsim/
     ├── DATABASE_AND_API_SPECIFICATION.md    # Manual técnico de BD PostgreSQL, JSONB supplier_prices y APIs REST
     ├── AI_SCANNERS_SPECIFICATION.md         # Manual técnico de motores y escáneres de IA multimodal Gemini Vision
     ├── CLOUDFLARE_WORKER_GUIDE.md           # Guía de despliegue de Cloudflare Workers & KV
-    ├── FINANCIAL_ENGINE_SPECIFICATION.md    # Auditoría matemática de fórmulas
+    ├── FINANCIAL_ENGINE_SPECIFICATION.md    # Auditoría matemática de fórmulas financieras
+    ├── ENERGY_BALANCE_AND_SELF_CONSUMPTION_SPECIFICATION.md # Manual técnico de balance de energía, partición de carga y BESS
     └── MAINTENANCE_AND_UPDATES.md           # Guía de actualizaciones y dependencias
 ```
 
