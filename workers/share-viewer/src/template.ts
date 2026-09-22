@@ -105,9 +105,6 @@ export function renderProposalPage(stored: StoredProposal): string {
   const isCEPM = distributor === 'CEPM';
   const isZeroExport = !!rates.isZeroExport;
   const exportFee = rates.gridExportFeePct ?? 25;
-  const showSelfConsumption = custom.showSelfConsumptionInProposal !== undefined
-    ? !!custom.showSelfConsumptionInProposal
-    : (specs.showSelfConsumptionBreakdown !== false);
 
   const systemCapacityKWp = Number(summary?.systemCapacityKWp || ((specs.panelCount || 0) * (specs.panelPowerW || 0)) / 1000).toFixed(2);
   const rawPanels: any[] = Array.isArray(specs.panels) && specs.panels.length > 0
@@ -186,31 +183,9 @@ export function renderProposalPage(stored: StoredProposal): string {
   const monthLabels = JSON.stringify(monthlyData.map((m: any) => m.month || ''));
   const monthConsumption = JSON.stringify(monthlyData.map((m: any) => Math.round(m.consumptionKWh || 0)));
   const monthProduction = JSON.stringify(monthlyData.map((m: any) => Math.round(m.productionKWh || 0)));
-  const monthSelfConsumed = JSON.stringify(
-    monthlyData.map((m: any) => Math.round(m.solarSelfConsumedKWh ?? (m.productionKWh * 0.75)))
-  );
 
-  const totalSelfConsumedKWh = monthlyData.reduce(
-    (sum: number, m: any) => sum + (m.solarSelfConsumedKWh ?? (m.productionKWh * 0.75)),
-    0
-  );
-  const totalExportedKWh = monthlyData.reduce(
-    (sum: number, m: any) =>
-      sum + (m.gridExportedKWh ?? Math.max(0, m.productionKWh - (m.solarSelfConsumedKWh ?? (m.productionKWh * 0.75)))),
-    0
-  );
-  const totalNetExportCreditKWh = monthlyData.reduce(
-    (sum: number, m: any) =>
-      sum + (m.netExportCreditKWh ?? ((m.gridExportedKWh ?? Math.max(0, m.productionKWh - (m.solarSelfConsumedKWh ?? (m.productionKWh * 0.75)))) * 0.75)),
-    0
-  );
   const totalEffectiveSavedKWh = monthlyData.reduce(
-    (sum: number, m: any) => {
-      const self = m.solarSelfConsumedKWh ?? (m.productionKWh * 0.75);
-      const exp = m.gridExportedKWh ?? Math.max(0, m.productionKWh - self);
-      const net = m.netExportCreditKWh ?? (exp * 0.75);
-      return sum + (m.effectiveSavedKWh ?? (self + net));
-    },
+    (sum: number, m: any) => sum + (m.effectiveSavedKWh ?? m.productionKWh),
     0
   );
 
@@ -249,7 +224,7 @@ export function renderProposalPage(stored: StoredProposal): string {
   const regP3 = 'Los ahorros indicados son estimados y pueden variar según los hábitos de consumo, el perfil de carga y las condiciones reales de operación del sistema.';
   const regP4 = isZeroExport
     ? `Al operar con limitador antivertido (inyección cero)${hasBattery ? ' y almacenamiento en baterías de litio' : ''}, la totalidad de la energía solar se aprovecha internamente, por lo que el proyecto no genera cargos por derecho de uso de la red bajo la normativa vigente.`
-    : `Para la tarifa ${tariffDisplayName}, el análisis económico considera el cargo por derecho de uso de la red, equivalente al ${exportFee}% del valor de la energía excedente exportada, conforme al régimen de Medición Neta y la normativa vigente (Resolución SIE-007-2026-REG). Por esta razón, el sistema se diseña para maximizar el autoconsumo y optimizar la inyección de energía, obteniendo así el mayor retorno de inversión posible.${hasBattery ? '' : ' Cuando resulte conveniente, se recomendará la incorporación de baterías de litio para incrementar el aprovechamiento directo de la energía generada.'}`;
+    : `Para la tarifa ${tariffDisplayName}, el análisis económico considera el cargo por derecho de uso de la red, equivalente al ${exportFee}% del valor de la energía excedente exportada, conforme al régimen de Medición Neta y la normativa vigente (Resolución SIE-007-2026-REG). Por esta razón, el sistema se diseña para optimizar la inyección y el aprovechamiento de la energía solar, obteniendo así el mayor retorno de inversión posible.${hasBattery ? '' : ' Cuando resulte conveniente, se recomendará la incorporación de baterías de litio para incrementar el aprovechamiento directo de la energía generada.'}`;
 
   // Custom Executive Summary & Page 6 fields
   const projectSummarySubtitle = custom.projectSummarySubtitle && custom.projectSummarySubtitle.trim()
@@ -525,7 +500,6 @@ export function renderProposalPage(stored: StoredProposal): string {
         <div class="flex items-center gap-3 sm:gap-4 text-[11px] sm:text-xs font-bold self-start sm:self-auto flex-wrap">
           <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-xs bg-sky-600 shrink-0"></span> <span>Consumo</span></div>
           <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-xs bg-orange-500 shrink-0"></span> <span>Producción FV</span></div>
-          ${showSelfConsumption ? '<div class="flex items-center gap-1.5"><span class="w-4 h-1 bg-blue-600 rounded-full shrink-0"></span> <span class="text-blue-700">Autoconsumo en Sitio</span></div>' : ''}
         </div>
       </div>
 
@@ -549,27 +523,22 @@ export function renderProposalPage(stored: StoredProposal): string {
               <tr>
                 <th class="px-3 sm:px-4 py-2 sticky left-0 bg-slate-900 z-10">Mes</th>
                 <th class="px-3 sm:px-4 py-2 text-right">Consumo (kWh)</th>
-                <th class="px-3 sm:px-4 py-2 text-right">${showSelfConsumption ? 'Producción FV' : 'Producción (kWh)'}</th>
-                ${showSelfConsumption ? '<th class="px-3 sm:px-4 py-2 text-right text-blue-300">Autoconsumo Sitio</th>' : ''}
-                <th class="px-3 sm:px-4 py-2 text-right text-emerald-300">${showSelfConsumption ? 'Ahorro Facturable' : 'Ahorro Energ. (kWh)'}</th>
+                <th class="px-3 sm:px-4 py-2 text-right">Producción (kWh)</th>
+                <th class="px-3 sm:px-4 py-2 text-right text-emerald-300">Ahorro Energ. (kWh)</th>
                 <th class="px-3 sm:px-4 py-2 text-right">Cobertura</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-200 text-[10.5px] sm:text-[11px] font-semibold text-slate-700 whitespace-nowrap">
               ${monthlyData.map((row: any, idx: number) => {
                 const rowCoverage = row.consumptionKWh > 0 ? ((row.productionKWh / row.consumptionKWh) * 100) : 0;
-                const selfConsumed = row.solarSelfConsumedKWh ?? (row.productionKWh * 0.75);
-                const netCredit = row.netExportCreditKWh ?? 0;
-                const effectiveSaved = row.effectiveSavedKWh ?? (selfConsumed + netCredit);
+                const effectiveSaved = row.effectiveSavedKWh ?? row.productionKWh;
                 return `
                 <tr class="${idx % 2 === 0 ? 'bg-sky-50/30' : 'bg-white'}">
                   <td class="px-3 sm:px-4 py-1.5 font-bold text-slate-900 sticky left-0 ${idx % 2 === 0 ? 'bg-[#f5faff]' : 'bg-white'} z-10 border-r sm:border-r-0 border-slate-100">${row.month}</td>
                   <td class="px-3 sm:px-4 py-1.5 text-right font-medium font-mono">${Math.round(row.consumptionKWh).toLocaleString()}</td>
                   <td class="px-3 sm:px-4 py-1.5 text-right font-medium font-mono">${Number(row.productionKWh).toFixed(1)}</td>
-                  ${showSelfConsumption ? `<td class="px-3 sm:px-4 py-1.5 text-right font-semibold font-mono text-blue-700">${Number(selfConsumed).toFixed(1)}</td>` : ''}
                   <td class="px-3 sm:px-4 py-1.5 text-right font-bold font-mono text-emerald-800">
                     <span>${Number(effectiveSaved).toFixed(1)}</span>
-                    ${showSelfConsumption && row.savingsUSD ? `<span class="block text-[9.5px] text-emerald-600 font-normal">$${Number(row.savingsUSD).toFixed(1)}</span>` : ''}
                   </td>
                   <td class="px-3 sm:px-4 py-1.5 text-right font-bold text-orange-600 font-mono">${rowCoverage.toFixed(1)}%</td>
                 </tr>`;
@@ -580,10 +549,8 @@ export function renderProposalPage(stored: StoredProposal): string {
                 <td class="px-3 sm:px-4 py-2 uppercase font-black sticky left-0 bg-slate-100 z-10 border-r sm:border-r-0 border-slate-200">TOTAL ANUAL</td>
                 <td class="px-3 sm:px-4 py-2 text-right font-mono font-bold">${Math.round(annualConsumptionKWh).toLocaleString()}</td>
                 <td class="px-3 sm:px-4 py-2 text-right font-mono font-bold">${Math.round(annualProductionKWh).toLocaleString()}</td>
-                ${showSelfConsumption ? `<td class="px-3 sm:px-4 py-2 text-right font-mono font-bold text-blue-700">${Math.round(totalSelfConsumedKWh).toLocaleString()}</td>` : ''}
                 <td class="px-3 sm:px-4 py-2 text-right font-mono font-black text-emerald-900">
                   <span>${Math.round(totalEffectiveSavedKWh).toLocaleString()}</span>
-                  ${showSelfConsumption ? `<span class="block text-[9.5px] text-emerald-700 font-normal">$${Number(summary?.year1SavingsUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} USD</span>` : ''}
                 </td>
                 <td class="px-3 sm:px-4 py-2 text-right font-mono font-black text-orange-600">${coveragePct.toFixed(1)}%</td>
               </tr>
@@ -957,28 +924,13 @@ export function renderProposalPage(stored: StoredProposal): string {
           data: {
             labels: ${monthLabels},
             datasets: [
-              ${showSelfConsumption ? `{
-                type: 'line',
-                label: 'Autoconsumo en Sitio (kWh)',
-                data: ${monthSelfConsumed},
-                borderColor: '#2563eb', // Royal Blue
-                backgroundColor: '#2563eb',
-                borderWidth: isMobile ? 2 : 2.5,
-                pointRadius: isMobile ? 2.5 : 3.5,
-                pointHoverRadius: isMobile ? 4 : 5.5,
-                pointBackgroundColor: '#2563eb',
-                pointBorderColor: '#ffffff',
-                pointBorderWidth: 1.5,
-                tension: 0.25,
-                order: 1,
-              },` : ''}
               {
                 type: 'bar',
                 label: 'Consumo (kWh)',
                 data: ${monthConsumption},
                 backgroundColor: '#0284c7', // Sky Blue
                 borderRadius: isMobile ? 3 : 4,
-                order: 2,
+                order: 1,
               },
               {
                 type: 'bar',
@@ -986,7 +938,7 @@ export function renderProposalPage(stored: StoredProposal): string {
                 data: ${monthProduction},
                 backgroundColor: '#ff7a00', // Solar Orange
                 borderRadius: isMobile ? 3 : 4,
-                order: 3,
+                order: 2,
               }
             ]
           },
