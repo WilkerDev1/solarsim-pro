@@ -343,9 +343,14 @@ const resGiovanni = calculateFinancialSummary(
 
 // 1. Costo mayorista interno (confidencial)
 const wholesaleCost = resGiovanni.costMatrix.precioNetoUSD;
+const baseWholesaleCost = resGiovanni.costMatrix.basePrecioNetoUSD;
 assert(
-  Math.abs(wholesaleCost - 10284.70) < 0.01,
-  `Costo mayorista interno es exactamente $10,284.70 ($${wholesaleCost})`
+  Math.abs(baseWholesaleCost! - 10284.70) < 0.01,
+  `Costo mayorista base (sin ítems extra) es exactamente $10,284.70 ($${baseWholesaleCost})`
+);
+assert(
+  Math.abs(wholesaleCost - 10784.70) < 0.01,
+  `Costo mayorista total (con ítem limitador de $500) es exactamente $10,784.70 ($${wholesaleCost})`
 );
 
 // 2. Subtotal comercial de venta antes de impuestos (lo que el cliente debe ver)
@@ -449,6 +454,90 @@ const resDirect = calculateFinancialSummary(
 
 assert(resDirect.salePricePerWattUSD === 1.18, `Modo Directo $/W respeta valor manual exacto ($${resDirect.salePricePerWattUSD})`);
 assert(resDirect.salePricePerKWpUSD === 1180, `Modo Directo $/kWp respeta 1,180.00 ($${resDirect.salePricePerKWpUSD})`);
+
+// --- TEST 12: Custom Items in Cost Matrix (Jenny Rodríguez Cáceres - Comisión Gilda Audit Case) ---
+console.log('\n--- TEST 12: Custom Items in Cost Matrix (Jenny Rodríguez - Comisión Gilda) ---');
+const jennySpecs: SystemSpecs = {
+  ...defaultSpecs,
+  panelCount: 13,
+  panelPowerW: 630,
+  panelUnitPriceUSD: 107.0,
+  inverterCount: 1,
+  inverterPowerKW: 8.0,
+  inverterUnitPriceUSD: 1860.0,
+  hasBattery: true,
+  batteryCount: 2,
+  batteryCapacityKWh: 5.12,
+  batteryUnitPriceUSD: 860.0,
+  installationUnitPriceUSD: 180.0,
+  pricingMode: 'cost_matrix',
+  saleMarginMultiplier: 1.40,
+  dopExchangeRate: 60.0,
+};
+
+const jennyFinancials: FinancialParams = {
+  ...defaultFinancials,
+  applyITBISExemption: true,
+  applyLey5707: true,
+  customItems: [
+    {
+      id: 'custom-comision-gilda',
+      description: 'Comision Gilda',
+      quantity: 1,
+      unit: 'UD',
+      unitPriceUSD: 1200.0,
+      exonerateITBIS: false, // Se cobra ITBIS 18% = $216.00 al cliente
+    },
+  ],
+};
+
+const resJenny = calculateFinancialSummary(
+  'Santo Domingo / Distrito Nacional',
+  jennySpecs,
+  defaultRates,
+  jennyFinancials,
+  monthlyConsumption
+);
+
+// 1. Validar que el ítem adicional esté en la tabla de la matriz de costos
+const customRow = resJenny.costMatrix.items.find((item) => item.name === 'Comision Gilda');
+assert(!!customRow, 'La fila "Comision Gilda" está presente en costMatrix.items');
+assert(customRow?.quantity === 1, 'Cantidad del ítem en matriz es 1');
+assert(customRow?.unitPriceUSD === 1200.0, 'Precio unitario USD del ítem en matriz es $1,200.00');
+assert(customRow?.totalPriceUSD === 1200.0, 'Precio total USD del ítem en matriz es $1,200.00');
+assert(customRow?.itbisUSD === 216.0, 'ITBIS USD no exonerado del ítem en matriz es $216.00');
+
+// 2. Validar totales de la matriz de costos (Imagen 2)
+assert(
+  Math.abs(resJenny.costMatrix.precioNetoUSD - 7645.20) < 0.01,
+  `Precio Neto de la matriz incluye ítem extra: $7,645.20 ($${resJenny.costMatrix.precioNetoUSD})`
+);
+assert(
+  Math.abs(resJenny.costMatrix.itbisUSD - 790.96) < 0.01,
+  `ITBIS Total de la matriz incluye ITBIS del ítem: $790.96 ($${resJenny.costMatrix.itbisUSD})`
+);
+assert(
+  Math.abs(resJenny.costMatrix.totalNetoUSD - 8436.16) < 0.01,
+  `Total Neto (Costo Total) de la matriz es $8,436.16 ($${resJenny.costMatrix.totalNetoUSD})`
+);
+assert(
+  Math.abs(resJenny.costMatrix.porcentajeVentaUSD - 11028.22) < 0.01,
+  `Porcentaje venta (1.40x) de la matriz coincide con cotización: $11,028.22 ($${resJenny.costMatrix.porcentajeVentaUSD})`
+);
+assert(
+  Math.abs(resJenny.costMatrix.gananciaUSD - 2808.06) < 0.01,
+  `Ganancia Proyectada del proyecto se preserva en $2,808.06 ($${resJenny.costMatrix.gananciaUSD})`
+);
+
+// 3. Validar coincidencia exacta con la Cotización (Imagen 1)
+assert(
+  Math.abs(resJenny.commercialPreTaxSubtotalUSD! - 11028.22) < 0.01,
+  `Sub-total sin ITBIS en Cotización es $11,028.22 ($${resJenny.commercialPreTaxSubtotalUSD})`
+);
+assert(
+  Math.abs(resJenny.grossInvestmentUSD - 11244.22) < 0.01,
+  `Total General con Ley 57-07 es $11,244.22 ($${resJenny.grossInvestmentUSD})`
+);
 
 console.log('\n=====================================================');
 if (allPassed) {

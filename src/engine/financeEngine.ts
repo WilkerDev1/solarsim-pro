@@ -1,4 +1,4 @@
-import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem } from '../types';
+import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem, CustomQuotationItem } from '../types';
 import { calculateDCCapacityKWp, calculateMonthlySolarProduction } from './solarEngine';
 import {
   getProjectPanels,
@@ -13,7 +13,8 @@ import {
  */
 export function calculateCostMatrixSummary(
   specs: SystemSpecs,
-  dcCapacityKWp: number
+  dcCapacityKWp: number,
+  customItems?: CustomQuotationItem[]
 ): CostMatrixSummary {
   const rate = specs.dopExchangeRate || 60.0;
   const margin = specs.saleMarginMultiplier || 1.25;
@@ -131,35 +132,87 @@ export function calculateCostMatrixSummary(
   const installItbisDOP = installTotalDOP * 0.18; // 18% ITBIS
   const installItbisUSD = installItbisDOP / rate;
 
+  const installItem: CostMatrixItem = {
+    name: 'Mano de obra y materiales',
+    kilos: installationKilos,
+    quantity: installationQty,
+    unitPriceUSD: installationUnitUSD,
+    unitPriceDOP: installationUnitUSD * rate,
+    totalPriceDOP: installTotalDOP,
+    totalPriceUSD: installTotalUSD,
+    itbisDOP: installItbisDOP,
+    itbisUSD: installItbisUSD,
+  };
+
+  // Row Additional: Custom Items & Materials (Otros ítems y materiales)
+  let customItemsNetUSD = 0;
+  let customItemsNetDOP = 0;
+  let customItemsItbisUSD = 0;
+  let customItemsItbisDOP = 0;
+
+  const customMatrixItems: CostMatrixItem[] = (customItems || []).map((cItem, cIdx) => {
+    const qty = cItem.quantity || 1;
+    const unitUSD = cItem.unitPriceUSD || 0;
+    const itemTotalUSD = qty * unitUSD;
+    const itemTotalDOP = itemTotalUSD * rate;
+    const isExonerated = cItem.exonerateITBIS !== undefined ? cItem.exonerateITBIS : (cItem.applyITBIS ?? true);
+    const itemItbisDOP = isExonerated ? 0 : itemTotalDOP * 0.18;
+    const itemItbisUSD = isExonerated ? 0 : itemTotalUSD * 0.18;
+
+    customItemsNetUSD += itemTotalUSD;
+    customItemsNetDOP += itemTotalDOP;
+    customItemsItbisUSD += itemItbisUSD;
+    customItemsItbisDOP += itemItbisDOP;
+
+    return {
+      name: cItem.description || `Ítem Adicional #${cIdx + 1}`,
+      kilos: 1,
+      quantity: qty,
+      unitPriceUSD: unitUSD,
+      unitPriceDOP: unitUSD * rate,
+      totalPriceDOP: itemTotalDOP,
+      totalPriceUSD: itemTotalUSD,
+      itbisDOP: itemItbisDOP,
+      itbisUSD: itemItbisUSD,
+    };
+  });
+
   const items: CostMatrixItem[] = [
     ...panelItems,
     ...inverterItems,
     ...batteryItems,
-    {
-      name: 'Mano de obra y materiales',
-      kilos: installationKilos,
-      quantity: installationQty,
-      unitPriceUSD: installationUnitUSD,
-      unitPriceDOP: installationUnitUSD * rate,
-      totalPriceDOP: installTotalDOP,
-      totalPriceUSD: installTotalUSD,
-      itbisDOP: installItbisDOP,
-      itbisUSD: installItbisUSD,
-    },
+    installItem,
+    ...customMatrixItems,
   ];
 
-  // Totals
-  const precioNetoDOP = panelTotalDOP + inverterTotalDOP + batteryTotalDOP + installTotalDOP;
+  // Base Totals (Paneles, Inversores, Baterías, Instalación sin ítems adicionales)
+  const basePrecioNetoDOP = panelTotalDOP + inverterTotalDOP + batteryTotalDOP + installTotalDOP;
+  const basePrecioNetoUSD = basePrecioNetoDOP / rate;
+
+  const baseItbisDOP = panelItbisDOP + inverterItbisDOP + batteryItbisDOP + installItbisDOP;
+  const baseItbisUSD = baseItbisDOP / rate;
+
+  const baseTotalNetoDOP = basePrecioNetoDOP + baseItbisDOP;
+  const baseTotalNetoUSD = baseTotalNetoDOP / rate;
+
+  const basePorcentajeVentaDOP = baseTotalNetoDOP * margin;
+  const basePorcentajeVentaUSD = baseTotalNetoUSD * margin;
+
+  const baseGananciaDOP = basePorcentajeVentaDOP - baseTotalNetoDOP;
+  const baseGananciaUSD = basePorcentajeVentaUSD - baseTotalNetoUSD;
+
+  // Combined Totals (Including Custom Items)
+  const precioNetoDOP = basePrecioNetoDOP + customItemsNetDOP;
   const precioNetoUSD = precioNetoDOP / rate;
 
-  const itbisDOP = panelItbisDOP + inverterItbisDOP + batteryItbisDOP + installItbisDOP;
+  const itbisDOP = baseItbisDOP + customItemsItbisDOP;
   const itbisUSD = itbisDOP / rate;
 
   const totalNetoDOP = precioNetoDOP + itbisDOP;
   const totalNetoUSD = totalNetoDOP / rate;
 
-  const porcentajeVentaDOP = totalNetoDOP * margin;
-  const porcentajeVentaUSD = totalNetoUSD * margin;
+  const porcentajeVentaDOP = basePorcentajeVentaDOP + customItemsNetDOP;
+  const porcentajeVentaUSD = basePorcentajeVentaUSD + customItemsNetUSD;
 
   // Solar Only Subtotal (Paneles + Inversores + Instalación sin Baterías)
   const solarOnlyNetDOP = panelTotalDOP + inverterTotalDOP + installTotalDOP;
@@ -170,21 +223,23 @@ export function calculateCostMatrixSummary(
   const solarOnlyVentaUSD = solarOnlyTotalNetUSD * margin;
 
   const capacityKW = installationQty > 0 ? installationQty : (dcCapacityKWp > 0 ? dcCapacityKWp : 1);
-  const precioKilosCostoDOP = totalNetoDOP / (capacityKW * 800 || 1); // 67.50
-  const precioKilosCostoUSD = totalNetoUSD / capacityKW; // $900.01 / kWp
+  const precioKilosCostoDOP = totalNetoDOP / (capacityKW * 800 || 1);
+  const precioKilosCostoUSD = totalNetoUSD / capacityKW;
 
-  const precioKilosVentasDOP = porcentajeVentaDOP / capacityKW; // 67,501.10
-  const precioKilosVentasUSD = porcentajeVentaUSD / capacityKW; // $1,125.02 / kWp
+  const precioKilosVentasDOP = porcentajeVentaDOP / capacityKW;
+  const precioKilosVentasUSD = porcentajeVentaUSD / capacityKW;
 
-  const gananciaDOP = porcentajeVentaDOP - totalNetoDOP;
-  const gananciaUSD = porcentajeVentaUSD - totalNetoUSD;
+  // Ganancia del proyecto: Los ítems adicionales / comisiones son costos pasantes que se transfieren al cliente
+  // por lo que la ganancia neta del proyecto se mantiene sobre el margen del sistema llave en mano.
+  const gananciaDOP = baseGananciaDOP;
+  const gananciaUSD = baseGananciaUSD;
 
   const costPerWattUSD = totalNetoUSD / (capacityKW * 1000);
   const salePricePerWattUSD = porcentajeVentaUSD / (capacityKW * 1000);
   const solarSalePricePerWattUSD = capacityKW > 0 ? Math.round((solarOnlyVentaUSD / (capacityKW * 1000)) * 100) / 100 : 1.13;
 
-  const marginOnSalePct = porcentajeVentaUSD > 0 ? Math.round((gananciaUSD / porcentajeVentaUSD) * 10000) / 100 : 0;
-  const markupOnCostPct = totalNetoUSD > 0 ? Math.round((gananciaUSD / totalNetoUSD) * 10000) / 100 : 0;
+  const marginOnSalePct = basePorcentajeVentaUSD > 0 ? Math.round((baseGananciaUSD / basePorcentajeVentaUSD) * 10000) / 100 : 0;
+  const markupOnCostPct = baseTotalNetoUSD > 0 ? Math.round((baseGananciaUSD / baseTotalNetoUSD) * 10000) / 100 : 0;
 
   // Equipment vs Labor Breakdown for Ley 57-07
   const equipmentCostUSD = panelTotalUSD + inverterTotalUSD + batteryTotalUSD;
@@ -225,6 +280,20 @@ export function calculateCostMatrixSummary(
     laborCostUSD,
     laborTotalUSD,
     laborVentaUSD,
+    basePrecioNetoUSD,
+    basePrecioNetoDOP,
+    baseItbisUSD,
+    baseItbisDOP,
+    baseTotalNetoUSD,
+    baseTotalNetoDOP,
+    basePorcentajeVentaUSD,
+    basePorcentajeVentaDOP,
+    baseGananciaUSD,
+    baseGananciaDOP,
+    customItemsNetUSD,
+    customItemsNetDOP,
+    customItemsItbisUSD,
+    customItemsItbisDOP,
   };
 }
 
@@ -274,8 +343,11 @@ export function calculateFinancialSummary(
 ): FinancialSummaryResult {
   const dcCapacityKWp = calculateTotalDCCapacityKWp(specs);
 
-  // Calculate cost matrix summary
-  const costMatrix = calculateCostMatrixSummary(specs, dcCapacityKWp);
+  // Custom Quotation Items calculation (Additional Equipment, Materials, and Services)
+  const customItems = financials.customItems || [];
+
+  // Calculate cost matrix summary including custom quotation items
+  const costMatrix = calculateCostMatrixSummary(specs, dcCapacityKWp, customItems);
 
   // Pricing Mode: 'cost_matrix' (default) vs 'direct_watt' (manual $/W or $/kW base price)
   const isDirectWatt = specs.pricingMode === 'direct_watt' || (!specs.isDetailed && specs.pricingMode !== 'cost_matrix');
@@ -283,8 +355,6 @@ export function calculateFinancialSummary(
     ? specs.pricePerWattUSD
     : (financials.pricePerWattUSD !== undefined && financials.pricePerWattUSD > 0 ? financials.pricePerWattUSD : 1.13);
 
-  // Custom Quotation Items calculation (Additional Equipment, Materials, and Services)
-  const customItems = financials.customItems || [];
   const customItemsTotalUSD = Math.round(customItems.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPriceUSD || 0)), 0) * 100) / 100;
   
   // ITBIS differentiation: Exonerated by Ley 57-07 vs Charged to Client
@@ -308,12 +378,12 @@ export function calculateFinancialSummary(
   // Base Gross Investment:
   // 1. If explicit custom override is set, use it.
   // 2. If direct_watt mode: Total turnkey sale price is directly (dcCapacityKWp * 1000 * effectivePricePerWatt) - all inclusive.
-  // 3. If cost_matrix mode: Turnkey total sale price from the Cost Matrix (costMatrix.porcentajeVentaUSD).
+  // 3. If cost_matrix mode: Turnkey total sale price of base system (excluding pass-through custom items to avoid double counting).
   const baseGrossInvestmentUSD = financials.customCostUSD && financials.customCostUSD > 0
     ? financials.customCostUSD
     : (isDirectWatt
         ? Math.round(dcCapacityKWp * 1000 * effectivePricePerWatt * 100) / 100
-        : Math.round(costMatrix.porcentajeVentaUSD * 100) / 100);
+        : Math.round((costMatrix.basePorcentajeVentaUSD ?? (costMatrix.porcentajeVentaUSD - customItemsTotalUSD)) * 100) / 100);
 
   // If item is not exonerated, ITBIS is charged to the client in the final gross price
   const grossInvestmentUSD = Math.round((baseGrossInvestmentUSD + customItemsTotalUSD + nonExoneratedCustomITBISUSD) * 100) / 100;
@@ -326,28 +396,29 @@ export function calculateFinancialSummary(
       const baseEquipmentVenta = Math.round((costMatrix.equipmentVentaUSD || 0) * 100) / 100;
       const surplusLaborVenta = Math.max(0, Math.round((baseGrossInvestmentUSD - baseEquipmentVenta) * 100) / 100);
 
-      costMatrix.porcentajeVentaUSD = grossInvestmentUSD;
-      costMatrix.porcentajeVentaDOP = Math.round(grossInvestmentUSD * costMatrix.dopExchangeRate * 100) / 100;
-      costMatrix.gananciaUSD = Math.round((baseGrossInvestmentUSD - costMatrix.totalNetoUSD) * 100) / 100;
+      costMatrix.porcentajeVentaUSD = commercialPreTaxSubtotalUSD;
+      costMatrix.porcentajeVentaDOP = Math.round(commercialPreTaxSubtotalUSD * costMatrix.dopExchangeRate * 100) / 100;
+      costMatrix.gananciaUSD = Math.round((baseGrossInvestmentUSD - (costMatrix.baseTotalNetoUSD || costMatrix.totalNetoUSD)) * 100) / 100;
       costMatrix.gananciaDOP = Math.round(costMatrix.gananciaUSD * costMatrix.dopExchangeRate * 100) / 100;
-      costMatrix.marginOnSalePct = grossInvestmentUSD > 0 ? Math.round((costMatrix.gananciaUSD / grossInvestmentUSD) * 10000) / 100 : 0;
-      costMatrix.markupOnCostPct = costMatrix.totalNetoUSD > 0 ? Math.round((costMatrix.gananciaUSD / costMatrix.totalNetoUSD) * 10000) / 100 : 0;
-      costMatrix.precioKilosVentasUSD = dcCapacityKWp > 0 ? Math.round((grossInvestmentUSD / dcCapacityKWp) * 100) / 100 : 0;
+      costMatrix.marginOnSalePct = commercialPreTaxSubtotalUSD > 0 ? Math.round((costMatrix.gananciaUSD / commercialPreTaxSubtotalUSD) * 10000) / 100 : 0;
+      costMatrix.markupOnCostPct = (costMatrix.baseTotalNetoUSD || costMatrix.totalNetoUSD) > 0 ? Math.round((costMatrix.gananciaUSD / (costMatrix.baseTotalNetoUSD || costMatrix.totalNetoUSD)) * 10000) / 100 : 0;
+      costMatrix.precioKilosVentasUSD = dcCapacityKWp > 0 ? Math.round((commercialPreTaxSubtotalUSD / dcCapacityKWp) * 100) / 100 : 0;
       costMatrix.precioKilosVentasDOP = Math.round(costMatrix.precioKilosVentasUSD * costMatrix.dopExchangeRate * 100) / 100;
       costMatrix.salePricePerWattUSD = effectivePricePerWatt;
       costMatrix.laborVentaUSD = surplusLaborVenta;
       costMatrix.equipmentVentaUSD = Math.min(baseGrossInvestmentUSD, baseEquipmentVenta);
     } else {
       // Default: 'margin' -> Implied margin multiplier across the board
-      const impliedMargin = costMatrix.totalNetoUSD > 0 ? Math.round((baseGrossInvestmentUSD / costMatrix.totalNetoUSD) * 10000) / 10000 : costMatrix.saleMarginMultiplier;
+      const baseNetCost = costMatrix.baseTotalNetoUSD || costMatrix.totalNetoUSD;
+      const impliedMargin = baseNetCost > 0 ? Math.round((baseGrossInvestmentUSD / baseNetCost) * 10000) / 10000 : costMatrix.saleMarginMultiplier;
       costMatrix.saleMarginMultiplier = impliedMargin;
-      costMatrix.porcentajeVentaUSD = grossInvestmentUSD;
-      costMatrix.porcentajeVentaDOP = Math.round(grossInvestmentUSD * costMatrix.dopExchangeRate * 100) / 100;
-      costMatrix.gananciaUSD = Math.round((baseGrossInvestmentUSD - costMatrix.totalNetoUSD) * 100) / 100;
+      costMatrix.porcentajeVentaUSD = commercialPreTaxSubtotalUSD;
+      costMatrix.porcentajeVentaDOP = Math.round(commercialPreTaxSubtotalUSD * costMatrix.dopExchangeRate * 100) / 100;
+      costMatrix.gananciaUSD = Math.round((baseGrossInvestmentUSD - baseNetCost) * 100) / 100;
       costMatrix.gananciaDOP = Math.round(costMatrix.gananciaUSD * costMatrix.dopExchangeRate * 100) / 100;
-      costMatrix.marginOnSalePct = grossInvestmentUSD > 0 ? Math.round((costMatrix.gananciaUSD / grossInvestmentUSD) * 10000) / 100 : 0;
-      costMatrix.markupOnCostPct = costMatrix.totalNetoUSD > 0 ? Math.round((costMatrix.gananciaUSD / costMatrix.totalNetoUSD) * 10000) / 100 : 0;
-      costMatrix.precioKilosVentasUSD = dcCapacityKWp > 0 ? Math.round((grossInvestmentUSD / dcCapacityKWp) * 100) / 100 : 0;
+      costMatrix.marginOnSalePct = commercialPreTaxSubtotalUSD > 0 ? Math.round((costMatrix.gananciaUSD / commercialPreTaxSubtotalUSD) * 10000) / 100 : 0;
+      costMatrix.markupOnCostPct = baseNetCost > 0 ? Math.round((costMatrix.gananciaUSD / baseNetCost) * 10000) / 100 : 0;
+      costMatrix.precioKilosVentasUSD = dcCapacityKWp > 0 ? Math.round((commercialPreTaxSubtotalUSD / dcCapacityKWp) * 100) / 100 : 0;
       costMatrix.precioKilosVentasDOP = Math.round(costMatrix.precioKilosVentasUSD * costMatrix.dopExchangeRate * 100) / 100;
       costMatrix.salePricePerWattUSD = effectivePricePerWatt;
       costMatrix.equipmentVentaUSD = Math.round((costMatrix.equipmentTotalUSD || 0) * impliedMargin * 100) / 100;
@@ -373,7 +444,7 @@ export function calculateFinancialSummary(
     : Math.round((costMatrix.solarOnlyVentaUSD || baseGrossInvestmentUSD) * 100) / 100;
 
   // ITBIS exoneration calculation (allows explicit custom override e.g. 1866.11 or dynamic calculation from cost matrix)
-  const matrixITBISUSD = costMatrix.itbisUSD || 0;
+  const matrixITBISUSD = costMatrix.baseItbisUSD !== undefined ? costMatrix.baseItbisUSD : (costMatrix.itbisUSD || 0);
   const commercialITBISUSD = Math.round(matrixITBISUSD * (costMatrix.saleMarginMultiplier || specs.saleMarginMultiplier || 1.25) * 100) / 100;
 
   const baseITBISSaved = financials.customITBISSavedUSD !== undefined

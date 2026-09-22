@@ -194,6 +194,20 @@ export interface CostMatrixSummary {
   laborCostUSD?: number;         // Labor Cost USD
   laborTotalUSD?: number;        // Labor Total USD (with ITBIS)
   laborVentaUSD?: number;        // Labor Sale USD
+  basePrecioNetoUSD?: number;    // Base Equipment + Labor Net Cost without custom items
+  basePrecioNetoDOP?: number;
+  baseItbisUSD?: number;
+  baseItbisDOP?: number;
+  baseTotalNetoUSD?: number;     // Base Total Net Cost with ITBIS without custom items
+  baseTotalNetoDOP?: number;
+  basePorcentajeVentaUSD?: number; // Base Turnkey Sale Price without custom items
+  basePorcentajeVentaDOP?: number;
+  baseGananciaUSD?: number;      // Base Gross Profit without custom items
+  baseGananciaDOP?: number;
+  customItemsNetUSD?: number;    // Subtotal of custom items net price
+  customItemsNetDOP?: number;
+  customItemsItbisUSD?: number;  // Non-exonerated ITBIS of custom items
+  customItemsItbisDOP?: number;
 }
 
 export interface MonthlyEnergyResult {
