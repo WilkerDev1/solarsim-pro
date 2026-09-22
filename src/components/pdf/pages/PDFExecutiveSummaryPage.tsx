@@ -25,6 +25,31 @@ interface PDFExecutiveSummaryPageProps {
   totalPages: number;
 }
 
+/**
+ * Truncates and formats equipment labels cleanly to fit small PDF summary boxes.
+ * Removes redundant type names, trailing capacity repetitions, and safely limits
+ * string length to avoid Chromium's print-to-pdf ellipsis clipping bug.
+ */
+function formatShortEquipmentLabel(model: string, count?: number, maxChars = 20): string {
+  if (!model) return '';
+  // 1. Remove prefixes like "Módulos", "Inversor(es)", "Batería(s)"
+  let clean = model
+    .replace(/^(?:m[oó]dulos?|inversor(?:es)?|bater[ií]as?)\s+/i, '')
+    .trim();
+
+  // 2. Remove duplicate trailing specs in parentheses like "(630W)", "(8.0Kw)", "(16.08kWh)", "(16 KwH-48 Vdc)"
+  clean = clean.replace(/\s*\([^)]*(?:w|kw|kwh|vdc|v)[^)]*\)\s*$/i, '').trim();
+
+  // 3. Prepend count if provided
+  const prefix = count && count > 0 ? `${count} ` : '';
+  const full = `${prefix}${clean}`;
+
+  if (full.length <= maxChars) {
+    return full;
+  }
+  return `${full.slice(0, maxChars - 1).trim()}…`;
+}
+
 export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = ({
   project,
   summary,
@@ -147,30 +172,46 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
 
             <div className="grid grid-cols-4 gap-2.5 flex-1 border-l border-slate-200 pl-4 items-stretch">
               <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px] h-full">
-                <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-tight">Capacidad Panel</span>
+                <div className="min-h-[24px] flex items-start">
+                  <span className="text-[9.5px] text-slate-500 font-bold block uppercase tracking-tight leading-tight">
+                    Capacidad Panel
+                  </span>
+                </div>
                 <span className="text-sm font-black text-slate-900 font-mono block my-0.5">
                   {primaryPanel.powerW} Wp
                 </span>
-                <div className="text-[9.5px] text-slate-500 font-medium leading-normal pb-0.5 space-y-0.5">
-                  {panels.map((p, idx) => {
-                    const cleanModel = (p.brandModel || `${p.powerW} Wp`)
-                      .replace(/^m[oó]dulos?\s+/i, '')
-                      .trim();
-                    return (
-                      <span key={p.id || idx} className="block truncate" title={`${p.count} ${cleanModel}`}>
-                        {panels.length > 1 ? `${p.count} ` : ''}{cleanModel}
+                {panels.length > 1 ? (
+                  <div className="space-y-0.5">
+                    {panels.map((p, idx) => (
+                      <span
+                        key={p.id || idx}
+                        className="text-[9.5px] text-slate-500 font-medium block leading-normal pb-0.5 whitespace-nowrap"
+                        title={`${p.count} ${p.brandModel}`}
+                      >
+                        {formatShortEquipmentLabel(p.brandModel || `${p.powerW} Wp`, p.count, 19)}
                       </span>
-                    );
-                  })}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span
+                    className="text-[9.5px] text-slate-500 font-medium block leading-normal pb-0.5 whitespace-nowrap"
+                    title={primaryPanel.brandModel}
+                  >
+                    {formatShortEquipmentLabel(primaryPanel.brandModel, undefined, 19) || 'Tier-1 Monocristalino'}
+                  </span>
+                )}
               </div>
 
               <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px] h-full">
-                <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-tight">Cantidad Paneles</span>
+                <div className="min-h-[24px] flex items-start">
+                  <span className="text-[9.5px] text-slate-500 font-bold block uppercase tracking-tight leading-tight">
+                    Cantidad Paneles
+                  </span>
+                </div>
                 <span className="text-sm font-black text-slate-900 font-mono block my-0.5">
                   {totalPanels} Unidades
                 </span>
-                <span className="text-[9.5px] text-slate-500 font-medium block truncate leading-normal pb-0.5">
+                <span className="text-[9.5px] text-slate-500 font-medium block leading-normal pb-0.5 whitespace-nowrap">
                   Superficie optimizada
                 </span>
               </div>
@@ -182,23 +223,29 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
                   borderColor: `${activeTheme.primary}35`,
                 }}
               >
-                <span className="text-[10px] font-bold block uppercase tracking-tight" style={{ color: activeTheme.primary }}>
-                  Potencia a Instalar
-                </span>
+                <div className="min-h-[24px] flex items-start">
+                  <span className="text-[9.5px] font-bold block uppercase tracking-tight leading-tight" style={{ color: activeTheme.primary }}>
+                    Potencia a Instalar
+                  </span>
+                </div>
                 <span className="text-sm font-black font-mono block my-0.5" style={{ color: activeTheme.primary }}>
                   {systemCapacityKWp.toFixed(3)}
                 </span>
-                <span className="text-[9.5px] font-extrabold block truncate leading-normal pb-0.5" style={{ color: activeTheme.primary }}>
+                <span className="text-[9.5px] font-extrabold block leading-normal pb-0.5 whitespace-nowrap" style={{ color: activeTheme.primary }}>
                   kWp DC Total
                 </span>
               </div>
 
               <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px] h-full">
-                <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-tight">Eficiencia (PR)</span>
+                <div className="min-h-[24px] flex items-start">
+                  <span className="text-[9.5px] text-slate-500 font-bold block uppercase tracking-tight leading-tight">
+                    Eficiencia (PR)
+                  </span>
+                </div>
                 <span className="text-sm font-black text-slate-900 font-mono block my-0.5">
                   {performanceRatio}%
                 </span>
-                <span className="text-[9.5px] text-slate-500 font-medium block truncate leading-normal pb-0.5">
+                <span className="text-[9.5px] text-slate-500 font-medium block leading-normal pb-0.5 whitespace-nowrap">
                   Performance Ratio
                 </span>
               </div>
@@ -230,60 +277,84 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
 
             <div className={`grid ${hasBattery ? 'grid-cols-3' : 'grid-cols-2'} gap-2.5 flex-1 border-l border-slate-200 pl-4 items-stretch`}>
               <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px] h-full">
-                <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-tight">Inversores kW/AC</span>
+                <div className="min-h-[24px] flex items-start">
+                  <span className="text-[9.5px] text-slate-500 font-bold block uppercase tracking-tight leading-tight">
+                    Inversores kW/AC
+                  </span>
+                </div>
                 <span className="text-[12.5px] font-black text-slate-900 font-mono block my-0.5 leading-snug pb-0.5">
                   {totalInverterPowerKW > 0 ? `${totalInverterPowerKW} kW AC` : `${systemCapacityKWp.toFixed(1)} kW AC`}
                 </span>
-                <div className="text-[9.5px] text-slate-500 font-medium leading-normal pb-0.5 space-y-0.5">
-                  {inverters.length > 0 ? (
-                    inverters.map((inv, idx) => {
-                      const cleanModel = (inv.brandModel || `${inv.powerKW} kW`)
-                        .replace(/^inversor(?:es)?\s+/i, '')
-                        .trim();
-                      return (
-                        <span key={inv.id || idx} className="block truncate" title={`${inv.count} ${cleanModel}`}>
-                          {inv.count} {cleanModel}
-                        </span>
-                      );
-                    })
-                  ) : (
-                    <span className="block truncate">Potencia nominal AC sincronizada</span>
-                  )}
-                </div>
+                {inverters.length > 1 ? (
+                  <div className="space-y-0.5">
+                    {inverters.map((inv, idx) => (
+                      <span
+                        key={inv.id || idx}
+                        className="text-[9.5px] text-slate-500 font-medium block leading-normal pb-0.5 whitespace-nowrap"
+                        title={`${inv.count} ${inv.brandModel}`}
+                      >
+                        {formatShortEquipmentLabel(inv.brandModel || `${inv.powerKW} kW`, inv.count, 22)}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <span
+                    className="text-[9.5px] text-slate-500 font-medium block leading-normal pb-0.5 whitespace-nowrap"
+                    title={inverters[0]?.brandModel}
+                  >
+                    {inverters[0]
+                      ? formatShortEquipmentLabel(inverters[0].brandModel || `${inverters[0].powerKW} kW`, inverters[0].count, 22)
+                      : 'Potencia nominal AC'}
+                  </span>
+                )}
               </div>
 
               <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px] h-full">
-                <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-tight">Régimen de Inyección</span>
+                <div className="min-h-[24px] flex items-start">
+                  <span className="text-[9.5px] text-slate-500 font-bold block uppercase tracking-tight leading-tight">
+                    Régimen de Inyección
+                  </span>
+                </div>
                 <span className="text-[12.5px] font-black text-slate-900 block my-0.5 leading-snug pb-0.5 truncate">
                   {isZeroExport ? 'Inyección Cero' : 'Bidireccional'}
                 </span>
-                <span className="text-[9.5px] text-slate-500 font-medium block truncate leading-normal pb-0.5">
+                <span className="text-[9.5px] text-slate-500 font-medium block leading-normal pb-0.5 whitespace-nowrap">
                   {project.rates.distributor || 'Distribuidora'} • Norma SIE
                 </span>
               </div>
 
               {hasBattery && (
                 <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px] h-full">
-                  <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-tight">Almacenamiento BESS</span>
+                  <div className="min-h-[24px] flex items-start">
+                    <span className="text-[9.5px] text-slate-500 font-bold block uppercase tracking-tight leading-tight">
+                      Almacenamiento BESS
+                    </span>
+                  </div>
                   <span className="text-[12.5px] font-black text-emerald-700 font-mono block my-0.5 leading-snug pb-0.5 truncate">
                     {totalBatteryKWh} kWh LiFePO4
                   </span>
-                  <div className="text-[9.5px] text-slate-500 font-medium leading-normal pb-0.5 space-y-0.5">
-                    {batteries.length > 0 ? (
-                      batteries.map((b, idx) => {
-                        const cleanModel = (b.brandModel || `${b.capacityKWh} kWh`)
-                          .replace(/^bater[ií]as?\s+/i, '')
-                          .trim();
-                        return (
-                          <span key={b.id || idx} className="block truncate" title={`${b.count} ${cleanModel}`}>
-                            {b.count} {cleanModel}
-                          </span>
-                        );
-                      })
-                    ) : (
-                      <span className="block truncate">Baterías LiFePO4</span>
-                    )}
-                  </div>
+                  {batteries.length > 1 ? (
+                    <div className="space-y-0.5">
+                      {batteries.map((b, idx) => (
+                        <span
+                          key={b.id || idx}
+                          className="text-[9.5px] text-slate-500 font-medium block leading-normal pb-0.5 whitespace-nowrap"
+                          title={`${b.count} ${b.brandModel}`}
+                        >
+                          {formatShortEquipmentLabel(b.brandModel || `${b.capacityKWh} kWh`, b.count, 22)}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span
+                      className="text-[9.5px] text-slate-500 font-medium block leading-normal pb-0.5 whitespace-nowrap"
+                      title={batteries[0]?.brandModel}
+                    >
+                      {batteries[0]
+                        ? formatShortEquipmentLabel(batteries[0].brandModel || `${batteries[0].capacityKWh} kWh`, batteries[0].count, 22)
+                        : 'Baterías LiFePO4'}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
