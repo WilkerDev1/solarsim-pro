@@ -257,24 +257,24 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
               <tr>
                 <th className="py-2.5 px-3">MES</th>
                 <th className="py-2.5 px-3 text-center">CONSUMO (KWH)</th>
-                <th className="py-2.5 px-3 text-right">PRODUCCIÓN FV</th>
+                <th className="py-2.5 px-3 text-right">
+                  {showSelfConsumption ? 'PRODUCCIÓN FV' : 'PRODUCCION (KWH)'}
+                </th>
                 {showSelfConsumption && (
-                  <>
-                    <th className="py-2.5 px-3 text-right">
-                      <span className="text-blue-700">AUTOCONSUMO</span>
-                      <span className="block text-[9.5px] font-normal text-slate-500">En Sitio (100% tarifa)</span>
-                    </th>
-                    <th className="py-2.5 px-3 text-right">
-                      <span className="text-amber-800">INYECCIÓN RED</span>
-                      <span className="block text-[9.5px] font-normal text-slate-500">Excedente Bruto</span>
-                    </th>
-                  </>
+                  <th className="py-2.5 px-3 text-right">
+                    <span className="text-blue-700">AUTOCONSUMO</span>
+                    <span className="block text-[9.5px] font-normal text-slate-500">Datos aproximados</span>
+                  </th>
                 )}
                 <th className="py-2.5 px-3 text-right">
-                  <span className="text-emerald-800 font-extrabold">AHORRO FACTURABLE</span>
-                  <span className="block text-[9.5px] font-normal text-emerald-600">
-                    {showSelfConsumption ? 'Autoconsumo + Iny. Neta' : 'Ahorro Eléctrico Anual'}
+                  <span className="text-emerald-800 font-extrabold">
+                    {showSelfConsumption ? 'AHORRO FACTURABLE' : 'AHORRO ENERG. (KWH)'}
                   </span>
+                  {showSelfConsumption && (
+                    <span className="block text-[9.5px] font-normal text-emerald-600">
+                      Autoconsumo + Iny. Neta
+                    </span>
+                  )}
                 </th>
                 <th className="py-2.5 px-3 text-right">% COBERTURA</th>
               </tr>
@@ -338,19 +338,13 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
                     )}
                   </td>
                   {showSelfConsumption && (
-                    <>
-                      <td className="py-2 px-3 text-right font-semibold text-blue-800">{row.solarSelfConsumedKWh.toFixed(1)}</td>
-                      <td className="py-2 px-3 text-right font-medium text-slate-600">
-                        <span>{row.gridExportedKWh.toFixed(1)}</span>
-                        {row.netExportCreditKWh > 0 && (
-                          <span className="block text-[10px] text-amber-700">({row.netExportCreditKWh.toFixed(1)} netos)</span>
-                        )}
-                      </td>
-                    </>
+                    <td className="py-2 px-3 text-right font-semibold text-blue-800">{row.solarSelfConsumedKWh.toFixed(1)}</td>
                   )}
                   <td className="py-2 px-3 text-right font-bold text-emerald-800">
                     <span>{(row.effectiveSavedKWh ?? (row.solarSelfConsumedKWh + (row.netExportCreditKWh || 0))).toFixed(1)}</span>
-                    <span className="block text-[10px] text-emerald-600 font-semibold">${row.savingsUSD.toFixed(1)}</span>
+                    {showSelfConsumption && (
+                      <span className="block text-[10px] text-emerald-600 font-semibold">${row.savingsUSD.toFixed(1)}</span>
+                    )}
                   </td>
                   <td className="py-2 px-3 text-right text-emerald-700 font-bold">
                     {row.consumptionKWh > 0 ? ((row.productionKWh / row.consumptionKWh) * 100).toFixed(1) : '0.0'}%
@@ -364,19 +358,13 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
                 <td className="py-3 px-3 text-center font-bold">{totalConsumptionKWh.toLocaleString()} kWh</td>
                 <td className="py-3 px-3 text-right font-bold text-emerald-800">{totalProductionKWh.toFixed(1)} kWh</td>
                 {showSelfConsumption && (
-                  <>
-                    <td className="py-3 px-3 text-right font-bold text-blue-800">{totalSelfConsumedKWh.toFixed(1)} kWh</td>
-                    <td className="py-3 px-3 text-right font-bold text-slate-700">
-                      <span>{totalExportedKWh.toFixed(1)} kWh</span>
-                      {totalNetExportCreditKWh > 0 && (
-                        <span className="block text-[10px] text-amber-800 font-normal">({totalNetExportCreditKWh.toFixed(1)} netos)</span>
-                      )}
-                    </td>
-                  </>
+                  <td className="py-3 px-3 text-right font-bold text-blue-800">{totalSelfConsumedKWh.toFixed(1)} kWh</td>
                 )}
                 <td className="py-3 px-3 text-right font-extrabold text-emerald-900">
                   <span>{totalEffectiveSavedKWh.toFixed(1)} kWh</span>
-                  <span className="block text-[10.5px] text-emerald-700">${summary.year1SavingsUSD.toFixed(1)} USD</span>
+                  {showSelfConsumption && (
+                    <span className="block text-[10.5px] text-emerald-700">${summary.year1SavingsUSD.toFixed(1)} USD</span>
+                  )}
                 </td>
                 <td className="py-3 px-3 text-right font-extrabold text-emerald-800">{avgCoveragePct.toFixed(1)}%</td>
               </tr>

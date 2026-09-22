@@ -179,12 +179,11 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
                   <th className="px-3 py-1.5 text-right">Consumo (kWh)</th>
                   <th className="px-3 py-1.5 text-right">Producción (kWh)</th>
                   {showSelfConsumption && (
-                    <>
-                      <th className="px-3 py-1.5 text-right">Autoconsumo (kWh)</th>
-                      <th className="px-3 py-1.5 text-right">Inyección (kWh)</th>
-                    </>
+                    <th className="px-3 py-1.5 text-right">Autoconsumo (kWh)</th>
                   )}
-                  <th className="px-3 py-1.5 text-right">Ahorro Fact. (kWh)</th>
+                  <th className="px-3 py-1.5 text-right">
+                    {showSelfConsumption ? 'Ahorro Fact. (kWh)' : 'Ahorro Energ. (kWh)'}
+                  </th>
                   <th className="px-3 py-1.5 text-right">%</th>
                 </tr>
               </thead>
@@ -199,10 +198,7 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
                       <td className="px-3 py-1 text-right font-medium">{row.consumptionKWh.toLocaleString()}</td>
                       <td className="px-3 py-1 text-right font-medium">{row.productionKWh.toFixed(1)}</td>
                       {showSelfConsumption && (
-                        <>
-                          <td className="px-3 py-1 text-right font-medium text-blue-800">{row.solarSelfConsumedKWh.toFixed(1)}</td>
-                          <td className="px-3 py-1 text-right font-medium text-gray-600">{row.gridExportedKWh.toFixed(1)}</td>
-                        </>
+                        <td className="px-3 py-1 text-right font-medium text-blue-800">{row.solarSelfConsumedKWh.toFixed(1)}</td>
                       )}
                       <td className="px-3 py-1 text-right font-bold text-emerald-800">
                         {(row.effectiveSavedKWh ?? (row.solarSelfConsumedKWh + (row.netExportCreditKWh || 0))).toFixed(1)}
@@ -220,10 +216,7 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
                   <td className="px-3 py-1.5 text-right">{totalConsumptionKWh.toLocaleString()}</td>
                   <td className="px-3 py-1.5 text-right">{totalProductionKWh.toFixed(1)}</td>
                   {showSelfConsumption && (
-                    <>
-                      <td className="px-3 py-1.5 text-right text-blue-900">{totalSelfConsumedKWh.toFixed(1)}</td>
-                      <td className="px-3 py-1.5 text-right text-gray-700">{totalExportedKWh.toFixed(1)}</td>
-                    </>
+                    <td className="px-3 py-1.5 text-right text-blue-900">{totalSelfConsumedKWh.toFixed(1)}</td>
                   )}
                   <td className="px-3 py-1.5 text-right font-extrabold text-emerald-900">{totalEffectiveSavedKWh.toFixed(1)}</td>
                   <td className="px-3 py-1.5 text-right font-extrabold" style={{ color: activeTheme.primary }}>

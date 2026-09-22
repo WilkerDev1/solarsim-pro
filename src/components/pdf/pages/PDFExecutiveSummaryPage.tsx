@@ -145,48 +145,52 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
             </div>
 
             <div className="grid grid-cols-4 gap-2.5 flex-1 border-l border-slate-200 pl-4">
-              <div className="bg-slate-50 p-2.5 border border-slate-200">
-                <span className="text-[10.5px] text-slate-500 font-bold block">Capacidad Panel</span>
-                <span className="text-sm font-black text-slate-900 font-mono block mt-0.5">
+              <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px]">
+                <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-tight">Capacidad Panel</span>
+                <span className="text-sm font-black text-slate-900 font-mono block my-0.5">
                   {primaryPanel.powerW} Wp
                 </span>
-                <span className="text-[10px] text-slate-500 font-medium block truncate" title={primaryPanel.brandModel}>
-                  {primaryPanel.brandModel ? primaryPanel.brandModel.replace(/^m[oó]dulo\s+/i, '') : 'Tier-1 Monocristalino'}
+                <span className="text-[9.5px] text-slate-500 font-medium block truncate leading-normal pb-0.5" title={primaryPanel.brandModel}>
+                  {primaryPanel.brandModel ? primaryPanel.brandModel.replace(/^m[oó]dulos?\s+/i, '') : 'Tier-1 Monocristalino'}
                 </span>
               </div>
 
-              <div className="bg-slate-50 p-2.5 border border-slate-200">
-                <span className="text-[10.5px] text-slate-500 font-bold block">Cantidad Paneles</span>
-                <span className="text-sm font-black text-slate-900 font-mono block mt-0.5">
+              <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px]">
+                <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-tight">Cantidad Paneles</span>
+                <span className="text-sm font-black text-slate-900 font-mono block my-0.5">
                   {totalPanels} Unidades
                 </span>
-                <span className="text-[10px] text-slate-500 font-medium block">Superficie optimizada</span>
+                <span className="text-[9.5px] text-slate-500 font-medium block truncate leading-normal pb-0.5">
+                  Superficie optimizada
+                </span>
               </div>
 
               <div
-                className="p-2.5 border"
+                className="p-2 border flex flex-col justify-between min-h-[68px]"
                 style={{
                   backgroundColor: `${activeTheme.primary}10`,
                   borderColor: `${activeTheme.primary}35`,
                 }}
               >
-                <span className="text-[10.5px] font-bold block" style={{ color: activeTheme.primary }}>
+                <span className="text-[10px] font-bold block uppercase tracking-tight" style={{ color: activeTheme.primary }}>
                   Potencia a Instalar
                 </span>
-                <span className="text-base font-black font-mono block mt-0.5" style={{ color: activeTheme.primary }}>
+                <span className="text-sm font-black font-mono block my-0.5" style={{ color: activeTheme.primary }}>
                   {systemCapacityKWp.toFixed(3)}
                 </span>
-                <span className="text-[10px] font-extrabold block" style={{ color: activeTheme.primary }}>
+                <span className="text-[9.5px] font-extrabold block truncate leading-normal pb-0.5" style={{ color: activeTheme.primary }}>
                   kWp DC Total
                 </span>
               </div>
 
-              <div className="bg-slate-50 p-2.5 border border-slate-200">
-                <span className="text-[10.5px] text-slate-500 font-bold block">Eficiencia (PR)</span>
-                <span className="text-sm font-black text-slate-900 font-mono block mt-0.5">
+              <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px]">
+                <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-tight">Eficiencia (PR)</span>
+                <span className="text-sm font-black text-slate-900 font-mono block my-0.5">
                   {performanceRatio}%
                 </span>
-                <span className="text-[10px] text-slate-500 font-medium block">Performance Ratio</span>
+                <span className="text-[9.5px] text-slate-500 font-medium block truncate leading-normal pb-0.5">
+                  Performance Ratio
+                </span>
               </div>
             </div>
           </article>
@@ -215,33 +219,33 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
             </div>
 
             <div className={`grid ${hasBattery ? 'grid-cols-3' : 'grid-cols-2'} gap-2.5 flex-1 border-l border-slate-200 pl-4`}>
-              <div className="bg-slate-50 p-2.5 border border-slate-200">
-                <span className="text-[10.5px] text-slate-500 font-bold block">Inversores kW/AC</span>
-                <span className="text-sm font-black text-slate-900 font-mono block mt-0.5">
+              <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px]">
+                <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-tight">Inversores kW/AC</span>
+                <span className="text-sm font-black text-slate-900 font-mono block my-0.5">
                   {totalInverterPowerKW > 0 ? `${totalInverterPowerKW} kW AC` : `${systemCapacityKWp.toFixed(1)} kW AC`}
                 </span>
-                <span className="text-[10px] text-slate-500 font-medium block truncate" title={invertersSummary}>
+                <span className="text-[9.5px] text-slate-500 font-medium block truncate leading-normal pb-0.5" title={invertersSummary}>
                   {invertersSummary || 'Potencia nominal AC sincronizada'}
                 </span>
               </div>
 
-              <div className="bg-slate-50 p-2.5 border border-slate-200">
-                <span className="text-[10.5px] text-slate-500 font-bold block">Régimen de Inyección</span>
-                <span className="text-sm font-black text-slate-900 block mt-0.5">
+              <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px]">
+                <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-tight">Régimen de Inyección</span>
+                <span className="text-sm font-black text-slate-900 block my-0.5 truncate">
                   {isZeroExport ? 'Inyección Cero (Zero Export)' : 'Suministro Bidireccional'}
                 </span>
-                <span className="text-[10px] text-slate-500 font-medium block">
+                <span className="text-[9.5px] text-slate-500 font-medium block truncate leading-normal pb-0.5">
                   {project.rates.distributor || 'Distribuidora'} • Reglamentación SIE
                 </span>
               </div>
 
               {hasBattery && (
-                <div className="bg-slate-50 p-2.5 border border-slate-200">
-                  <span className="text-[10.5px] text-slate-500 font-bold block">Almacenamiento BESS</span>
-                  <span className="text-sm font-black text-emerald-700 font-mono block mt-0.5">
+                <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px]">
+                  <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-tight">Almacenamiento BESS</span>
+                  <span className="text-sm font-black text-emerald-700 font-mono block my-0.5">
                     {totalBatteryKWh} kWh LiFePO4
                   </span>
-                  <span className="text-[10px] text-slate-500 font-medium block truncate" title={batteriesSummary}>
+                  <span className="text-[9.5px] text-slate-500 font-medium block truncate leading-normal pb-0.5" title={batteriesSummary}>
                     {batteriesSummary}
                   </span>
                 </div>
@@ -357,7 +361,7 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
                   DIFERENCIA (INVERSIÓN NETA)
                 </h2>
                 <p className="text-xs font-mono text-blue-100 mt-1">
-                  ${grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bruto - $
+                  ${netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Neta tras -$
                   {leyCreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Beneficio Ley 57-07
                 </p>
               </div>
@@ -366,7 +370,7 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
             <div className="flex-1 border-l border-white/25 pl-6 flex items-center justify-end gap-3">
               <div className="flex items-baseline gap-2">
                 <span className="text-4xl lg:text-5xl font-black tracking-tight font-mono text-white">
-                  ${netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ${grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
                 <span className="text-lg font-bold font-mono text-white/90">USD</span>
               </div>
