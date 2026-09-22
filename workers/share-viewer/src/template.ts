@@ -105,6 +105,9 @@ export function renderProposalPage(stored: StoredProposal): string {
   const isCEPM = distributor === 'CEPM';
   const isZeroExport = !!rates.isZeroExport;
   const exportFee = rates.gridExportFeePct ?? 25;
+  const showSelfConsumption = custom.showSelfConsumptionInProposal !== undefined
+    ? !!custom.showSelfConsumptionInProposal
+    : (specs.showSelfConsumptionBreakdown !== false);
 
   const systemCapacityKWp = Number(summary?.systemCapacityKWp || ((specs.panelCount || 0) * (specs.panelPowerW || 0)) / 1000).toFixed(2);
   const rawPanels: any[] = Array.isArray(specs.panels) && specs.panels.length > 0
@@ -522,7 +525,7 @@ export function renderProposalPage(stored: StoredProposal): string {
         <div class="flex items-center gap-3 sm:gap-4 text-[11px] sm:text-xs font-bold self-start sm:self-auto flex-wrap">
           <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-xs bg-sky-600 shrink-0"></span> <span>Consumo</span></div>
           <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-xs bg-orange-500 shrink-0"></span> <span>Producción FV</span></div>
-          <div class="flex items-center gap-1.5"><span class="w-4 h-1 bg-blue-600 rounded-full shrink-0"></span> <span class="text-blue-700">Autoconsumo en Sitio</span></div>
+          ${showSelfConsumption ? '<div class="flex items-center gap-1.5"><span class="w-4 h-1 bg-blue-600 rounded-full shrink-0"></span> <span class="text-blue-700">Autoconsumo en Sitio</span></div>' : ''}
         </div>
       </div>
 
@@ -546,10 +549,9 @@ export function renderProposalPage(stored: StoredProposal): string {
               <tr>
                 <th class="px-3 sm:px-4 py-2 sticky left-0 bg-slate-900 z-10">Mes</th>
                 <th class="px-3 sm:px-4 py-2 text-right">Consumo (kWh)</th>
-                <th class="px-3 sm:px-4 py-2 text-right">Producción FV</th>
-                <th class="px-3 sm:px-4 py-2 text-right text-blue-300">Autoconsumo Sitio</th>
-                <th class="px-3 sm:px-4 py-2 text-right text-amber-300">Inyección Red</th>
-                <th class="px-3 sm:px-4 py-2 text-right text-emerald-300">Ahorro Facturable</th>
+                <th class="px-3 sm:px-4 py-2 text-right">${showSelfConsumption ? 'Producción FV' : 'Producción (kWh)'}</th>
+                ${showSelfConsumption ? '<th class="px-3 sm:px-4 py-2 text-right text-blue-300">Autoconsumo Sitio</th>' : ''}
+                <th class="px-3 sm:px-4 py-2 text-right text-emerald-300">${showSelfConsumption ? 'Ahorro Facturable' : 'Ahorro Energ. (kWh)'}</th>
                 <th class="px-3 sm:px-4 py-2 text-right">Cobertura</th>
               </tr>
             </thead>
@@ -557,22 +559,17 @@ export function renderProposalPage(stored: StoredProposal): string {
               ${monthlyData.map((row: any, idx: number) => {
                 const rowCoverage = row.consumptionKWh > 0 ? ((row.productionKWh / row.consumptionKWh) * 100) : 0;
                 const selfConsumed = row.solarSelfConsumedKWh ?? (row.productionKWh * 0.75);
-                const exported = row.gridExportedKWh ?? Math.max(0, row.productionKWh - selfConsumed);
-                const netCredit = row.netExportCreditKWh ?? (exported * 0.75);
+                const netCredit = row.netExportCreditKWh ?? 0;
                 const effectiveSaved = row.effectiveSavedKWh ?? (selfConsumed + netCredit);
                 return `
                 <tr class="${idx % 2 === 0 ? 'bg-sky-50/30' : 'bg-white'}">
                   <td class="px-3 sm:px-4 py-1.5 font-bold text-slate-900 sticky left-0 ${idx % 2 === 0 ? 'bg-[#f5faff]' : 'bg-white'} z-10 border-r sm:border-r-0 border-slate-100">${row.month}</td>
                   <td class="px-3 sm:px-4 py-1.5 text-right font-medium font-mono">${Math.round(row.consumptionKWh).toLocaleString()}</td>
                   <td class="px-3 sm:px-4 py-1.5 text-right font-medium font-mono">${Number(row.productionKWh).toFixed(1)}</td>
-                  <td class="px-3 sm:px-4 py-1.5 text-right font-semibold font-mono text-blue-700">${Number(selfConsumed).toFixed(1)}</td>
-                  <td class="px-3 sm:px-4 py-1.5 text-right font-medium font-mono text-slate-600">
-                    <span>${Number(exported).toFixed(1)}</span>
-                    ${netCredit > 0 ? `<span class="block text-[9.5px] text-amber-700 font-normal">(${Number(netCredit).toFixed(1)} netos)</span>` : ''}
-                  </td>
+                  ${showSelfConsumption ? `<td class="px-3 sm:px-4 py-1.5 text-right font-semibold font-mono text-blue-700">${Number(selfConsumed).toFixed(1)}</td>` : ''}
                   <td class="px-3 sm:px-4 py-1.5 text-right font-bold font-mono text-emerald-800">
                     <span>${Number(effectiveSaved).toFixed(1)}</span>
-                    ${row.savingsUSD ? `<span class="block text-[9.5px] text-emerald-600 font-normal">$${Number(row.savingsUSD).toFixed(1)}</span>` : ''}
+                    ${showSelfConsumption && row.savingsUSD ? `<span class="block text-[9.5px] text-emerald-600 font-normal">$${Number(row.savingsUSD).toFixed(1)}</span>` : ''}
                   </td>
                   <td class="px-3 sm:px-4 py-1.5 text-right font-bold text-orange-600 font-mono">${rowCoverage.toFixed(1)}%</td>
                 </tr>`;
@@ -583,14 +580,10 @@ export function renderProposalPage(stored: StoredProposal): string {
                 <td class="px-3 sm:px-4 py-2 uppercase font-black sticky left-0 bg-slate-100 z-10 border-r sm:border-r-0 border-slate-200">TOTAL ANUAL</td>
                 <td class="px-3 sm:px-4 py-2 text-right font-mono font-bold">${Math.round(annualConsumptionKWh).toLocaleString()}</td>
                 <td class="px-3 sm:px-4 py-2 text-right font-mono font-bold">${Math.round(annualProductionKWh).toLocaleString()}</td>
-                <td class="px-3 sm:px-4 py-2 text-right font-mono font-bold text-blue-700">${Math.round(totalSelfConsumedKWh).toLocaleString()}</td>
-                <td class="px-3 sm:px-4 py-2 text-right font-mono font-bold text-slate-700">
-                  <span>${Math.round(totalExportedKWh).toLocaleString()}</span>
-                  ${totalNetExportCreditKWh > 0 ? `<span class="block text-[9.5px] text-amber-700 font-normal">(${Math.round(totalNetExportCreditKWh).toLocaleString()} netos)</span>` : ''}
-                </td>
+                ${showSelfConsumption ? `<td class="px-3 sm:px-4 py-2 text-right font-mono font-bold text-blue-700">${Math.round(totalSelfConsumedKWh).toLocaleString()}</td>` : ''}
                 <td class="px-3 sm:px-4 py-2 text-right font-mono font-black text-emerald-900">
                   <span>${Math.round(totalEffectiveSavedKWh).toLocaleString()}</span>
-                  <span class="block text-[9.5px] text-emerald-700 font-normal">$${Number(summary?.year1SavingsUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} USD</span>
+                  ${showSelfConsumption ? `<span class="block text-[9.5px] text-emerald-700 font-normal">$${Number(summary?.year1SavingsUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} USD</span>` : ''}
                 </td>
                 <td class="px-3 sm:px-4 py-2 text-right font-mono font-black text-orange-600">${coveragePct.toFixed(1)}%</td>
               </tr>
@@ -964,7 +957,7 @@ export function renderProposalPage(stored: StoredProposal): string {
           data: {
             labels: ${monthLabels},
             datasets: [
-              {
+              ${showSelfConsumption ? `{
                 type: 'line',
                 label: 'Autoconsumo en Sitio (kWh)',
                 data: ${monthSelfConsumed},
@@ -978,7 +971,7 @@ export function renderProposalPage(stored: StoredProposal): string {
                 pointBorderWidth: 1.5,
                 tension: 0.25,
                 order: 1,
-              },
+              },` : ''}
               {
                 type: 'bar',
                 label: 'Consumo (kWh)',

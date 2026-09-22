@@ -108,6 +108,7 @@ export class ShareProposalService {
           aboutUsIntroText: project.customization?.aboutUsIntroText,
           aboutUsTransitionText: project.customization?.aboutUsTransitionText,
           whyChooseUsText: project.customization?.whyChooseUsText,
+          showSelfConsumptionInProposal: project.customization?.showSelfConsumptionInProposal,
         },
       };
 
