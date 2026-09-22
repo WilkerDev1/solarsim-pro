@@ -64,7 +64,56 @@ export function calculateRecommendedPanelCount(
 }
 
 /**
- * Calculates monthly solar production and energy balance dynamically using location-specific solar radiation.
+ * Deduce o sugiere el perfil de carga y el ratio diurno óptimo
+ * según la tarifa eléctrica (BTS1/BTS2 residencial vs BTD comercial vs MTD industrial)
+ * o según el consumo promedio mensual del cliente.
+ */
+export function getRecommendedLoadProfile(
+  tariffCode?: string,
+  monthlyAvgConsumption?: number
+): { preset: 'residential' | 'commercial' | 'industrial'; daytimeRatio: number } {
+  const code = (tariffCode || '').toUpperCase().trim();
+
+  // 1. Detección por código de tarifa dominicana (EDESUR, EDEESTE, EDENORTE, CEPM)
+  if (code.startsWith('BTS') || code.includes('RBT') || code.includes('RESID')) {
+    // Tarifas residenciales: BTS1, BTS2, RBT-1 (CEPM)
+    return { preset: 'residential', daytimeRatio: 35 };
+  }
+  if (code.startsWith('BTD') || code.includes('CBT') || code.includes('VMT1') || code.includes('COMER')) {
+    // Tarifas comerciales de baja tensión: BTD, CBT-1, CBT-2, VMT1
+    return { preset: 'commercial', daytimeRatio: 75 };
+  }
+  if (
+    code.startsWith('MTD') ||
+    code.startsWith('MTH') ||
+    code.startsWith('ATD') ||
+    code.includes('CMT') ||
+    code.includes('VMT2') ||
+    code.includes('VMT3') ||
+    code.includes('INDUS')
+  ) {
+    // Tarifas de media/alta tensión industrial: MTD1, MTD2, MTH, CMT-1, etc.
+    return { preset: 'industrial', daytimeRatio: 90 };
+  }
+
+  // 2. Detección heurística por volumen de consumo promedio mensual si no hay tarifa clara
+  if (monthlyAvgConsumption !== undefined && monthlyAvgConsumption > 0) {
+    if (monthlyAvgConsumption <= 1500) {
+      return { preset: 'residential', daytimeRatio: 35 };
+    }
+    if (monthlyAvgConsumption <= 15000) {
+      return { preset: 'commercial', daytimeRatio: 75 };
+    }
+    return { preset: 'industrial', daytimeRatio: 90 };
+  }
+
+  // Predeterminado de seguridad: Residencial (35% diurno / 65% nocturno)
+  return { preset: 'residential', daytimeRatio: 35 };
+}
+
+/**
+ * Calculates monthly solar production and energy balance dynamically using location-specific solar radiation,
+ * equivalent daily load partition (daytime vs nighttime), and physical BESS battery dispatch.
  */
 export function calculateMonthlySolarProduction(
   provinceName: string,
@@ -88,6 +137,35 @@ export function calculateMonthlySolarProduction(
   // - Zero-Export systems (antivertido) do not inject to grid, resulting in 0 exported kWh and 0 export fees.
   const effectiveGridExportFeePct = !isZeroExport ? (gridExportFeePct ?? 25) : 0;
 
+  // BESS battery specifications
+  const totalBatteryKWh = calculateTotalBatteryCapacityKWh(specs);
+  const hasBatteryStorage = !!(specs.hasBattery && totalBatteryKWh > 0);
+  const batteryDodPct = specs.batteryDOD !== undefined ? specs.batteryDOD : 90;
+  const batteryEffPct = specs.batteryEfficiencyPct !== undefined ? specs.batteryEfficiencyPct : 90;
+  const dailyUsableBatteryKWh = hasBatteryStorage
+    ? totalBatteryKWh * (batteryDodPct / 100) * (batteryEffPct / 100)
+    : 0;
+
+  // Calculate project-wide average monthly consumption to determine profile preset consistently
+  const totalProjectCons = (monthlyConsumptionKWh && monthlyConsumptionKWh.length > 0)
+    ? monthlyConsumptionKWh.reduce((sum, c) => sum + (c || 0), 0)
+    : 36000;
+  const avgMonthlyCons = monthlyConsumptionKWh && monthlyConsumptionKWh.length > 0
+    ? totalProjectCons / monthlyConsumptionKWh.length
+    : 3000;
+
+  // Determine daytime load ratio (hours 8:00 AM - 5:00 PM) for the project
+  let projectDaytimeRatio: number;
+  if (specs.daytimeLoadRatio !== undefined) {
+    projectDaytimeRatio = specs.daytimeLoadRatio / 100;
+  } else if (specs.daytimeSelfConsumptionRatio !== undefined) {
+    projectDaytimeRatio = specs.daytimeSelfConsumptionRatio / 100;
+  } else {
+    projectDaytimeRatio = getRecommendedLoadProfile(tariffCode, avgMonthlyCons).daytimeRatio / 100;
+  }
+  // Clamp between 15% and 95%
+  const daytimeRatio = Math.min(0.95, Math.max(0.15, projectDaytimeRatio));
+
   const results: MonthlyEnergyResult[] = [];
 
   for (let i = 0; i < 12; i++) {
@@ -102,44 +180,48 @@ export function calculateMonthlySolarProduction(
     // Dynamic monthly solar production formula: kWp * HSP * days * derateFactor
     const production = Math.round(dcCapacityKWp * hsp * days * derateFactor * 10) / 10;
 
-    // Physics-based self-consumption & battery storage model (BESS)
-    const totalBatteryKWh = calculateTotalBatteryCapacityKWh(specs);
-    const hasBatteryStorage = !!(specs.hasBattery && totalBatteryKWh > 0);
+    // Daily averages for the month
+    const dailyCons = consumption / days;
+    const dailyProd = production / days;
 
-    const baseDaytimeRatio = specs.daytimeSelfConsumptionRatio !== undefined
-      ? specs.daytimeSelfConsumptionRatio / 100
-      : (hasBatteryStorage ? 0.70 : 0.75);
+    // 2. Load partition: Day load vs Night load
+    const dayLoad = dailyCons * daytimeRatio;
+    const nightLoad = Math.max(0, dailyCons - dayLoad);
 
-    const daytimeSelfConsumptionRatio = Math.min(0.98, Math.max(0.20, baseDaytimeRatio));
+    // 3. Direct solar self-consumption (instantaneous in-situ during day)
+    const directSolarDaily = Math.min(dailyProd, dayLoad);
+    const dailySolarSurplus = Math.max(0, dailyProd - directSolarDaily);
 
-    // Direct daytime solar self-consumption (instantaneous in-situ without hitting the grid)
-    const directSolarConsumed = Math.min(consumption, Math.round(production * daytimeSelfConsumptionRatio * 10) / 10);
+    // 4. Physical BESS battery storage cycle:
+    // - Battery charges from diurnal solar surplus up to its usable throughput capacity
+    // - Battery discharges at night limited by its charge and actual nighttime demand
+    let bessChargeDaily = 0;
+    let bessDischargeDaily = 0;
 
-    // Battery storage dynamics (BESS)
-    let batteryContributionKWh = 0;
-    if (hasBatteryStorage) {
-      const batteryDodPct = specs.batteryDOD !== undefined ? specs.batteryDOD : 90;
-      const batteryEffPct = specs.batteryEfficiencyPct !== undefined ? specs.batteryEfficiencyPct : 95;
-      const dailyUsableBatteryKWh = totalBatteryKWh * (batteryDodPct / 100) * (batteryEffPct / 100);
-      const monthlyMaxBatteryStorageKWh = days * dailyUsableBatteryKWh;
-
-      // Daytime surplus generation available to charge the battery
-      const daytimeSurplusKWh = Math.max(0, production - directSolarConsumed);
-      // Nighttime / off-peak consumption that can be displaced by the battery
-      const nighttimeConsumptionKWh = Math.max(0, consumption - directSolarConsumed);
-
-      // Battery displacement is limited by: surplus solar, battery throughput capacity, and nighttime demand
-      batteryContributionKWh = Math.round(Math.min(daytimeSurplusKWh, monthlyMaxBatteryStorageKWh, nighttimeConsumptionKWh) * 10) / 10;
+    if (hasBatteryStorage && dailyUsableBatteryKWh > 0) {
+      bessChargeDaily = Math.min(dailySolarSurplus, dailyUsableBatteryKWh);
+      bessDischargeDaily = Math.min(bessChargeDaily, nightLoad);
     }
 
-    const solarSelfConsumed = Math.min(consumption, Math.min(production, Math.round((directSolarConsumed + batteryContributionKWh) * 10) / 10));
+    // 5. Total daily in-situ self-consumption: direct solar + battery night displacement
+    const dailyTotalSelfConsumption = directSolarDaily + bessDischargeDaily;
+    const solarSelfConsumed = Math.min(
+      consumption,
+      Math.min(production, Math.round(dailyTotalSelfConsumption * days * 10) / 10)
+    );
 
+    // Monthly battery contribution to self-consumption
+    const batteryContributionKWh = Math.round(bessDischargeDaily * days * 10) / 10;
+
+    // 6. Interaction with the grid
     let gridExported = 0;
     if (isZeroExport) {
-      // In Zero-Export mode (with anti-feed limiter), energy is only used on-site; no grid injection occurs
+      // In Zero-Export mode (with anti-feed limiter), excess generation is curtailed; no export
       gridExported = 0;
     } else {
-      gridExported = Math.max(0, Math.round((production - solarSelfConsumed) * 10) / 10);
+      const dailyGridExport = Math.max(0, dailySolarSurplus - bessChargeDaily);
+      gridExported = Math.round(dailyGridExport * days * 10) / 10;
+      // Guard: self-consumed + exported cannot physically exceed solar production
       if (solarSelfConsumed + gridExported > production) {
         gridExported = Math.max(0, Math.round((production - solarSelfConsumed) * 10) / 10);
       }

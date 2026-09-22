@@ -200,6 +200,75 @@ assert(summary.monthlyBreakdown[0].retainedExportKWh !== undefined, 'monthlyBrea
 assert(summary.monthlyBreakdown[0].effectiveSavedKWh !== undefined, 'monthlyBreakdown expone effectiveSavedKWh');
 assert(Math.abs(summary.year1SavingsUSD - totalSavingsUSD) < 1.0, 'year1SavingsUSD del resumen coincide con la suma mensual');
 
+// --- TEST 6: User's Audited Case (853 kWh/mo, 8.19 kWp, 1x 5.12 kWh BESS, Residential 35%) ---
+console.log('\n--- TEST 6: Audited 853 kWh/mo + 8.19 kWp + 5.12 kWh BESS Case ---');
+
+const auditedSpecs: SystemSpecs = {
+  isDetailed: false,
+  panelPowerW: 630,
+  panelCount: 13, // 8.19 kWp
+  panelEfficiency: 21.8,
+  tempCoeff: -0.35,
+  annualDegradation: 0.5,
+  inverterPowerKW: 8,
+  inverterCount: 1,
+  hasBattery: true,
+  batteryCapacityKWh: 5.12,
+  batteryCount: 1,
+  batteryDOD: 90,
+  batteryEfficiencyPct: 90,
+  systemLosses: 25.0,
+  pricingMode: 'direct_watt',
+  pricePerWattUSD: 1.15,
+};
+
+const auditedMonthlyCons = Array(12).fill(853);
+const auditedRates: UtilityRates = {
+  distributor: 'EDESUR',
+  tariffCode: 'BTS2',
+  energyCostPerKWh: 0.22,
+  gridExportFeePct: 25.0,
+  targetCoveragePct: 100,
+  currency: 'USD',
+  usdExchangeRate: 60.0,
+  annualEnergyInflationPct: 3.5,
+};
+
+const auditedResults = calculateMonthlySolarProduction(
+  'Santo Domingo / Distrito Nacional',
+  auditedSpecs,
+  auditedMonthlyCons,
+  auditedRates.energyCostPerKWh,
+  auditedRates.gridExportFeePct,
+  undefined,
+  auditedRates.tariffCode
+);
+
+const audProd = auditedResults.reduce((s, m) => s + m.productionKWh, 0);
+const audSelf = auditedResults.reduce((s, m) => s + m.solarSelfConsumedKWh, 0);
+const audBatt = auditedResults.reduce((s, m) => s + (m.batteryContributionKWh || 0), 0);
+const audExport = auditedResults.reduce((s, m) => s + m.gridExportedKWh, 0);
+const audNetCredit = auditedResults.reduce((s, m) => s + m.netExportCreditKWh, 0);
+const audConsTotal = 853 * 12; // 10,236 kWh
+
+const avgSelfMonthly = audSelf / 12;
+const avgBattMonthly = audBatt / 12;
+const avgExportMonthly = audExport / 12;
+const selfRatioPct = (audSelf / audConsTotal) * 100;
+
+console.log(`  Consumo Mensual: 853.0 kWh/mes (10,236 kWh/año)`);
+console.log(`  Producción Promedio: ${(audProd / 12).toFixed(1)} kWh/mes (${audProd.toFixed(1)} kWh/año)`);
+console.log(`  Autoconsumo Promedio: ${avgSelfMonthly.toFixed(1)} kWh/mes (${selfRatioPct.toFixed(1)}% del consumo)`);
+console.log(`  Aporte BESS Promedio: ${avgBattMonthly.toFixed(1)} kWh/mes (útil 4.15 kWh/día)`);
+console.log(`  Inyección a Red Promedio: ${avgExportMonthly.toFixed(1)} kWh/mes`);
+console.log(`  Inyección Neta Reconocida: ${(audNetCredit / 12).toFixed(1)} kWh/mes`);
+
+assert(avgSelfMonthly >= 415 && avgSelfMonthly <= 435, 'Autoconsumo promedio mensual está entre 415 y 435 kWh/mes (~423 kWh)');
+assert(selfRatioPct >= 48 && selfRatioPct <= 52, 'Ratio de autoconsumo respecto al consumo está entre 48% y 52% (~49.6%)');
+assert(avgBattMonthly >= 120 && avgBattMonthly <= 130, 'Aporte mensual de la batería BESS está entre 120 y 130 kWh/mes (~126 kWh)');
+assert(avgExportMonthly >= 520 && avgExportMonthly <= 580, 'Inyección a red mensual está entre 520 y 580 kWh/mes (~564 kWh)');
+assert(audSelf < audConsTotal, 'El autoconsumo físico NO satura al 100% (evita el error plano de 853 kWh)');
+
 console.log('=====================================================');
 console.log(`🎉 ALL ${passCount}/${totalTests} ENERGY BALANCE TRANSPARENCY TESTS PASSED!`);
 console.log('=====================================================');

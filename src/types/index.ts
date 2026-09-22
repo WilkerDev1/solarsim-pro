@@ -111,7 +111,9 @@ export interface SystemSpecs {
   batteryNightLoadSharePct?: number;   // % e.g. 50
   batteryLifespanYears?: number;       // e.g. 10
   batteryReplacementCostUSD?: number;  // e.g. 3500 (Optional replacement cost at Year 10)
-  daytimeSelfConsumptionRatio?: number; // % e.g. 75
+  daytimeSelfConsumptionRatio?: number; // % e.g. 35 (alias retrocompatible para partición de carga diurna)
+  daytimeLoadRatio?: number;            // % de carga diurna (8am-5pm) ej. 35 para residencial, 75 para comercial, 90 para industrial
+  loadProfilePreset?: 'residential' | 'commercial' | 'industrial' | 'custom'; // Preset de perfil de consumo
 }
 
 export interface UtilityRates {

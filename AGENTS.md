@@ -13,7 +13,7 @@ Este documento sirve como **fuente única de verdad** para desarrolladores y asi
    - Estimación de irradiación solar ($\text{HSP}$) específica para las 32 provincias de RD (datos satelitales NASA SSE / NREL y soporte para HSP personalizado).
    - Balance de energía horaria y mensual, autoconsumo e inyección bajo el régimen de Medición Neta con las distribuidoras (**EDEESTE, EDESUR, EDENORTE, CEPM**).
    - Cobertura de todas las tarifas dominicanas (**BTS1, BTS2, BTD, MTD1, MTD2, MTH, VMT1, VMT2, VMT3**) y aplicación de retención oficial del 25% de la producción de exportación (Resolución SIE-007-2026-REG).
-   - **Despacho Físico de Baterías BESS & Autoconsumo Diurno Configurable**: Simulación de ciclado real de almacenamiento diario (absorción del excedente diurno para suplir demanda nocturna) y slider interactivo de ratio de autoconsumo (20%-98%) con perfiles predefinidos (Residencial 50%, Comercial 75%, Industrial 90%, BESS 95%).
+   - **Despacho Físico de Baterías BESS & Partición de Carga Diurna Semi-Automática**: Simulación de ciclado real de almacenamiento diario (absorción del excedente diurno para suplir demanda nocturna) y partición física de carga diurna (8am-5pm) inferida automáticamente según tarifa dominicana o consumo: **Residencial 35%** (`BTS1`, `BTS2`), **Comercial 75%** (`BTD`), **Industrial 90%** (`MTD`), o slider manual interactivo (15%-95%). Con BESS activo, calcula matemáticamente la energía útil diaria ($E_{bat, util} = \text{Capacidad} \times \text{DoD} \times \eta$), cargando de excedentes y desplazando demanda nocturna real sin saturaciones artificiales al 100%.
    - **Ingeniería Transparente & Gráficos Mixtos (ComposedChart)**: Separación explícita de Autoconsumo en Sitio (100% de tarifa), Inyección a Red (bruta y neta acreditada al 75%) y Ahorro Facturable total en Simulador, PDF y Propuesta Web Cloudflare.
    - Factor de pérdidas del sistema visible y configurable (predeterminado auditado: **25.0%**).
 2. **Catálogo Inteligente de Equipos, Almacenamiento (BESS) & Precios por Proveedor**:
@@ -389,11 +389,12 @@ ssh app-server "cd /home/agente/servicios/solarsim-api && docker compose up -d -
      - **Inyección Neta Acreditada ($E_{net\_credit}$)**: Excedente reconocido al cliente tras deducir la **retención oficial del 25%** por peaje de red bajo la Resolución SIE-007-2026-REG ($E_{net\_credit} = E_{exp} \times 0.75$).
      - **Ahorro Facturable Total ($E_{saved}$)**: $E_{saved} = E_{auto} + E_{net\_credit}$.
    - El ahorro monetario anual y mensual cumple estrictamente: $\text{savingsUSD} = E_{saved} \times T_{kwh}$.
-2. **Modelo Físico de Baterías BESS (Sin Abstracciones Cegas al 100%)**:
-   - En sistemas con baterías de litio LiFePO4, el motor simula el ciclado diario real:
-     - Capacidad útil diaria: $E_{bat, util} = \text{Capacidad Nominal} \times (\text{DoD}/100) \times (\eta/100)$.
-     - La batería almacena el excedente diurno hasta su tope mensual ($E_{bat, util} \times D_m$) y lo descarga para cubrir el consumo remanente no solar (nocturno).
-     - La inyección a red se reduce proporcionalmente y el ahorro monetario se maximiza al evitar el 25% de retención de red.
+2. **Modelo Físico de Baterías BESS & Partición Diurna (Sin Abstracciones Cegas al 100%)**:
+   - La demanda del cliente se divide en diurna (8am-5pm) y nocturna según el perfil tarifario (`BTS1`/`BTS2` 35%, `BTD` 75%, `MTD` 90%, o manual).
+   - Autoconsumo solar directo instantáneo: $E_{solar\_directo, diario} = \min(P_{diario}, L_{dia})$.
+   - Capacidad útil diaria de la batería: $E_{bat, util} = \text{Capacidad Nominal} \times (\text{DoD}/100) \times (\eta/100)$.
+   - La batería absorbe el excedente diurno real ($E_{bat\_carga} = \min(P_{diario} - E_{solar\_directo}, E_{bat, util})$) y lo descarga cubriendo demanda nocturna ($E_{bat\_descarga} = \min(E_{bat\_carga}, L_{noche})$).
+   - Autoconsumo total en sitio: $E_{auto, diario} = E_{solar\_directo, diario} + E_{bat\_descarga, diario}$, evitando saturaciones planas irreales al 100% (ej. para 853 kWh con 5.12 kWh BESS, el autoconsumo físico real es ~423 kWh/mes / 49.6%).
 3. **Gráficas Mixtas (ComposedChart)**:
    - Tanto en el Simulador (`EnergyAnalysisTab.tsx`) como en la Propuesta PDF (`PDFPage1Energy.tsx`) y el Visor Web de Cloudflare (`template.ts`), la gráfica de energía es un gráfico compuesto:
      - Barras para **Consumo** y **Producción FV**.

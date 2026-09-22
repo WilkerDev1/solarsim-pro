@@ -35,24 +35,34 @@ $$E_{anual} = \sum_{m=1}^{12} E_{m}$$
 
 ---
 
-### 1.3 Autoconsumo, Inyección a Red y Ahorro en Factura
-El modelo distingue entre la energía consumida instantáneamente en el inmueble ($E_{auto}$) y la energía excedente inyectada a la red de distribución ($E_{exp}$):
+### 1.3 Autoconsumo Físico, Partición Diurna de Carga y Medición Neta
+El modelo calcula el balance energético mediante un **balance físico diario equivalente** para cada mes $m$ con $D_m$ días, evitando aproximaciones planas y considerando la partición horaria real de la demanda del cliente:
 
-$$E_{auto, m} = \min(C_{m}, E_{m} \times R_{sc})$$
-$$E_{exp, m} = \max(0, E_{m} - E_{auto, m})$$
+1. **Promedios Diarios**:
+   $$C_{diario} = \frac{C_{m}}{D_{m}}, \quad P_{diario} = \frac{E_{m}}{D_{m}}$$
 
-*Donde:*
-* $C_{m}$: Consumo eléctrico del cliente en el mes $m$ ($\text{kWh}$).
-* $R_{sc}$: Ratio de autoconsumo diurno ($75\%$ estándar sin baterías, $90\%$ con baterías, o personalizado entre $40\%$ y $98\%$).
-* **Crédito de Medición Neta (Resolución SIE-007-2026-REG)**: La energía inyectada a la red recibe un crédito descontando el cargo regulatorio por peaje de red ($F_{grid}$, típicamente $25\%$):
+2. **Partición de Demanda Diurna ($R_{diurno}$)**:
+   - **Residencial (`BTS1`, `BTS2`, `RBT-1`)**: $R_{diurno} = 35\%$ día (8:00 AM - 5:00 PM) / $65\%$ noche (aires acondicionados e iluminación).
+   - **Comercial (`BTD`, `CBT-1`, `CBT-2`, `VMT1`)**: $R_{diurno} = 75\%$ día / $25\%$ noche (oficinas, locales, plazas comerciales).
+   - **Industrial (`MTD1`, `MTD2`, `MTH`)**: $R_{diurno} = 90\%$ día / $10\%$ noche (fábricas y naves continuas).
+   - **Personalizado**: Configurable mediante slider interactivo (15% a 95%).
+   $$L_{dia} = C_{diario} \times R_{diurno}, \quad L_{noche} = C_{diario} \times (1 - R_{diurno})$$
 
-$$E_{net\_credit, m} = E_{exp, m} \times \left(1 - \frac{F_{grid}}{100}\right)$$
+3. **Autoconsumo Solar Directo Instantáneo**:
+   $$E_{solar\_directo, diario} = \min(P_{diario}, L_{dia})$$
+   $$E_{excedente\_solar, diario} = \max(0, P_{diario} - E_{solar\_directo, diario})$$
 
-La energía neta efectivamente compensada ($E_{saved, m}$) y el ahorro económico mensual ($S_{m}$) en dólares ($\text{USD}$) resultan en:
+4. **Inyección a Red y Retención SIE-007-2026-REG**:
+   - En régimen de **Medición Neta**:
+     $$E_{exp, diario} = E_{excedente\_solar, diario} - E_{bat\_carga, diario}$$
+     $$E_{exp, m} = E_{exp, diario} \times D_m$$
+     $$E_{net\_credit, m} = E_{exp, m} \times \left(1 - \frac{F_{grid}}{100}\right) = E_{exp, m} \times 0.75$$
+   - En modalidad **Inyección Cero (Zero-Export)**:
+     $$E_{exp, m} = 0, \quad E_{net\_credit, m} = 0$$
 
-$$E_{saved, m} = E_{auto, m} + E_{net\_credit, m}$$
-$$S_{m} = E_{saved, m} \times T_{kwh}$$
-$$S_{yr1} = \sum_{m=1}^{12} S_{m}$$
+5. **Ahorro Facturable Total y Monetario**:
+   $$E_{saved, m} = E_{auto, m} + E_{net\_credit, m}$$
+   $$S_{m} = E_{saved, m} \times T_{kwh}, \quad S_{yr1} = \sum_{m=1}^{12} S_{m}$$
 
 *Donde $T_{kwh}$ es la tarifa eléctrica de la distribuidora en $\text{USD/kWh}$.*
 
@@ -68,36 +78,36 @@ $$\text{Cobertura Solar Anual (\%)} = \frac{E_{anual}}{\sum_{m=1}^{12} C_{m}} \t
 
 ## 2. 🔋 Dimensionamiento de Almacenamiento (Baterías & BESS)
 
-Cuando el sistema cuenta con banco de baterías (`hasBattery: true`), el motor calcula la capacidad útil, las horas de autonomía de respaldo ante fallas del suministro eléctrico y el **despacho físico de almacenamiento diurno a nocturno**:
+Cuando el sistema cuenta con banco de almacenamiento en baterías (`hasBattery: true`), el motor calcula la capacidad útil, las horas de autonomía de respaldo ante fallas del suministro eléctrico y el **ciclado físico real diario**:
 
 ### 2.1 Capacidad Útil de Almacenamiento ($E_{bat, util}$)
 $$E_{bat, util} \text{ (kWh)} = \text{Capacidad Nominal Total} \times \left(\frac{\text{DoD}}{100}\right) \times \left(\frac{\eta_{bat}}{100}\right)$$
 
 *Donde:*
-* $\text{DoD}$: Profundidad de descarga permitida (*Depth of Discharge*, típicamente $80\% - 90\%$).
-* $\eta_{bat}$: Eficiencia de ciclo completo (*Round-Trip Efficiency*, típicamente $92\%$).
+* $\text{DoD}$: Profundidad de descarga permitida (*Depth of Discharge*, típicamente $90\%$).
+* $\eta_{bat}$: Eficiencia de ciclo completo (*Round-Trip Efficiency*, típicamente $90\% - 95\%$).
 
 ### 2.2 Autonomía de Respaldo Anti-Apagones ($T_{autonomia}$)
 $$L_{horaria, prom} \text{ (kW)} = \frac{E_{consumo\_anual}}{365 \times 24}$$
 $$T_{autonomia} \text{ (Horas)} = \frac{E_{bat, util}}{L_{horaria, prom}}$$
 
-### 2.3 Despacho Físico de Energía y Absorción de Excedentes ($E_{bat, mes}$)
-En sistemas acoplados con baterías BESS, la batería no fuerza artificialmente un $100\%$ de autoconsumo ciego; simula el ciclado diario real de absorción del excedente solar diurno para suplir el consumo no cubierto (nocturno):
+### 2.3 Ciclado Físico Diario de Energía y Despacho Nocturno ($E_{bat, mes}$)
+En sistemas BESS, la batería no fuerza artificialmente un $100\%$ de autoconsumo ciego; simula el ciclado diario real de absorción del excedente solar diurno para suplir la demanda nocturna real:
 
-1. **Excedente Solar Diurno Potencial**:
-   $$E_{surplus, m} = \max(0, E_{m} - E_{auto\_solar, m})$$
-2. **Capacidad Máxima de Ciclado Mensual de la Batería**:
-   $$E_{bat\_max, m} = E_{bat, util} \times D_{m}$$
-3. **Energía Solar Absorbida por la Batería**:
-   $$E_{bat\_stored, m} = \min(E_{surplus, m}, E_{bat\_max, m})$$
-4. **Aporte Efectivo de la Batería al Consumo del Inmueble**:
-   $$E_{bat\_dispatched, m} = \min(E_{bat\_stored, m}, C_{m} - E_{auto\_solar, m})$$
-5. **Autoconsumo Total en Sitio**:
-   $$E_{self\_consumed, m} = E_{auto\_solar, m} + E_{bat\_dispatched, m}$$
-6. **Excedente Remanente Inyectado a la Red**:
-   $$E_{exp, m} = \max(0, E_{m} - E_{self\_consumed, m})$$
+1. **Carga Diaria desde el Excedente Solar**:
+   $$E_{bat\_carga, diario} = \min(E_{excedente\_solar, diario}, E_{bat, util})$$
+2. **Descarga Nocturna Limitada por la Carga y la Demanda Nocturna**:
+   $$E_{bat\_descarga, diario} = \min(E_{bat\_carga, diario}, L_{noche})$$
+3. **Aporte Mensual de Almacenamiento BESS**:
+   $$E_{bat\_dispatched, m} = E_{bat\_descarga, diario} \times D_m$$
+4. **Autoconsumo Total en Sitio**:
+   $$E_{auto, diario} = E_{solar\_directo, diario} + E_{bat\_descarga, diario}$$
+   $$E_{auto, m} = \min(C_m, \min(E_m, E_{auto, diario} \times D_m))$$
+5. **Excedente Remanente Exportado a la Red**:
+   $$E_{exp, diario} = \max(0, E_{excedente\_solar, diario} - E_{bat\_carga, diario})$$
+   $$E_{exp, m} = E_{exp, diario} \times D_m$$
 
-*Ventaja Regulatoria*: Cada kWh absorbido por la batería y autoconsumido en sitio ahorra el **$100\%$ del valor de la tarifa**, evitando el peaje regulatorio del **$25\%$ de retención de red** de la Resolución SIE-007-2026-REG.
+*Ventaja Regulatoria*: Cada kWh absorbido por la batería y autoconsumido en sitio ahorra el **$100\%$ del valor de la tarifa**, evitando el peaje regulatorio del **$25\%$ de retención de red** de la Resolución SIE-007-2026-REG. Para un cliente residencial con $853\text{ kWh/mes}$, $8.19\text{ kWp}$ y batería de $5.12\text{ kWh}$, el autoconsumo se sitúa de forma físicamente exacta en $\mathbf{\approx 423\text{ kWh/mes}}$ ($\approx 49.6\%$ de su consumo), inyectando $\approx 564\text{ kWh/mes}$ a la red.
 
 ---
 
