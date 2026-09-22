@@ -193,14 +193,15 @@ export function calculateMonthlySolarProduction(
     const dailySolarSurplus = Math.max(0, dailyProd - directSolarDaily);
 
     // 4. Physical BESS battery storage cycle:
-    // - Battery charges from diurnal solar surplus up to its usable throughput capacity
-    // - Battery discharges at night limited by its charge and actual nighttime demand
+    // In steady daily cycling, the battery can only recharge what it actually discharges at night.
+    // If night demand is low, the battery only cycles that amount; excess surplus flows to the grid.
     let bessChargeDaily = 0;
     let bessDischargeDaily = 0;
 
     if (hasBatteryStorage && dailyUsableBatteryKWh > 0) {
-      bessChargeDaily = Math.min(dailySolarSurplus, dailyUsableBatteryKWh);
-      bessDischargeDaily = Math.min(bessChargeDaily, nightLoad);
+      const dailyBessCycle = Math.min(dailySolarSurplus, Math.min(dailyUsableBatteryKWh, nightLoad));
+      bessChargeDaily = dailyBessCycle;
+      bessDischargeDaily = dailyBessCycle;
     }
 
     // 5. Total daily in-situ self-consumption: direct solar + battery night displacement

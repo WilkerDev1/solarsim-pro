@@ -338,8 +338,11 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
             const solarDirectDaily = Math.min(avgDailyProd, estimatedDayLoad);
             const solarSurplusDaily = Math.max(0, avgDailyProd - solarDirectDaily);
 
-            const bessChargeDaily = hasBattery ? Math.min(solarSurplusDaily, dailyUsableBatteryKWh) : 0;
-            const bessDischargeDaily = hasBattery ? Math.min(bessChargeDaily, estimatedNightLoad) : 0;
+            const dailyBessCycle = hasBattery
+              ? Math.min(solarSurplusDaily, Math.min(dailyUsableBatteryKWh, estimatedNightLoad))
+              : 0;
+            const bessChargeDaily = dailyBessCycle;
+            const bessDischargeDaily = dailyBessCycle;
 
             const totalSelfDaily = solarDirectDaily + bessDischargeDaily;
             const gridImportDaily = Math.max(0, avgDailyCons - totalSelfDaily);
