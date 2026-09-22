@@ -48,6 +48,7 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
   const invertersSummary = formatInvertersSummary(project.specs);
   const isZeroExport = project.rates.isZeroExport || false;
   const hasBattery = project.specs.hasBattery && calculateTotalBatteryCapacityKWh(project.specs) > 0;
+  const batteries = getProjectBatteries(project.specs);
   const totalBatteryKWh = calculateTotalBatteryCapacityKWh(project.specs);
   const batteriesSummary = formatBatteriesSummary(project.specs);
 
@@ -144,18 +145,27 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-2.5 flex-1 border-l border-slate-200 pl-4">
-              <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px]">
+            <div className="grid grid-cols-4 gap-2.5 flex-1 border-l border-slate-200 pl-4 items-stretch">
+              <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px] h-full">
                 <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-tight">Capacidad Panel</span>
                 <span className="text-sm font-black text-slate-900 font-mono block my-0.5">
                   {primaryPanel.powerW} Wp
                 </span>
-                <span className="text-[9.5px] text-slate-500 font-medium block truncate leading-normal pb-0.5" title={primaryPanel.brandModel}>
-                  {primaryPanel.brandModel ? primaryPanel.brandModel.replace(/^m[oó]dulos?\s+/i, '') : 'Tier-1 Monocristalino'}
-                </span>
+                <div className="text-[9.5px] text-slate-500 font-medium leading-normal pb-0.5 space-y-0.5">
+                  {panels.map((p, idx) => {
+                    const cleanModel = (p.brandModel || `${p.powerW} Wp`)
+                      .replace(/^m[oó]dulos?\s+/i, '')
+                      .trim();
+                    return (
+                      <span key={p.id || idx} className="block truncate" title={`${p.count} ${cleanModel}`}>
+                        {panels.length > 1 ? `${p.count} ` : ''}{cleanModel}
+                      </span>
+                    );
+                  })}
+                </div>
               </div>
 
-              <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px]">
+              <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px] h-full">
                 <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-tight">Cantidad Paneles</span>
                 <span className="text-sm font-black text-slate-900 font-mono block my-0.5">
                   {totalPanels} Unidades
@@ -166,7 +176,7 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
               </div>
 
               <div
-                className="p-2 border flex flex-col justify-between min-h-[68px]"
+                className="p-2 border flex flex-col justify-between min-h-[68px] h-full"
                 style={{
                   backgroundColor: `${activeTheme.primary}10`,
                   borderColor: `${activeTheme.primary}35`,
@@ -183,7 +193,7 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
                 </span>
               </div>
 
-              <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px]">
+              <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px] h-full">
                 <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-tight">Eficiencia (PR)</span>
                 <span className="text-sm font-black text-slate-900 font-mono block my-0.5">
                   {performanceRatio}%
@@ -218,18 +228,31 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
               </div>
             </div>
 
-            <div className={`grid ${hasBattery ? 'grid-cols-3' : 'grid-cols-2'} gap-2.5 flex-1 border-l border-slate-200 pl-4`}>
-              <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px]">
+            <div className={`grid ${hasBattery ? 'grid-cols-3' : 'grid-cols-2'} gap-2.5 flex-1 border-l border-slate-200 pl-4 items-stretch`}>
+              <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px] h-full">
                 <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-tight">Inversores kW/AC</span>
                 <span className="text-[12.5px] font-black text-slate-900 font-mono block my-0.5 leading-snug pb-0.5">
                   {totalInverterPowerKW > 0 ? `${totalInverterPowerKW} kW AC` : `${systemCapacityKWp.toFixed(1)} kW AC`}
                 </span>
-                <span className="text-[9.5px] text-slate-500 font-medium block truncate leading-normal pb-0.5" title={invertersSummary}>
-                  {invertersSummary ? invertersSummary.replace(/^inversores?\s+/i, '') : 'Potencia nominal AC sincronizada'}
-                </span>
+                <div className="text-[9.5px] text-slate-500 font-medium leading-normal pb-0.5 space-y-0.5">
+                  {inverters.length > 0 ? (
+                    inverters.map((inv, idx) => {
+                      const cleanModel = (inv.brandModel || `${inv.powerKW} kW`)
+                        .replace(/^inversor(?:es)?\s+/i, '')
+                        .trim();
+                      return (
+                        <span key={inv.id || idx} className="block truncate" title={`${inv.count} ${cleanModel}`}>
+                          {inv.count} {cleanModel}
+                        </span>
+                      );
+                    })
+                  ) : (
+                    <span className="block truncate">Potencia nominal AC sincronizada</span>
+                  )}
+                </div>
               </div>
 
-              <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px]">
+              <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px] h-full">
                 <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-tight">Régimen de Inyección</span>
                 <span className="text-[12.5px] font-black text-slate-900 block my-0.5 leading-snug pb-0.5 truncate">
                   {isZeroExport ? 'Inyección Cero' : 'Bidireccional'}
@@ -240,14 +263,27 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
               </div>
 
               {hasBattery && (
-                <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px]">
+                <div className="bg-slate-50 p-2 border border-slate-200 flex flex-col justify-between min-h-[68px] h-full">
                   <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-tight">Almacenamiento BESS</span>
                   <span className="text-[12.5px] font-black text-emerald-700 font-mono block my-0.5 leading-snug pb-0.5 truncate">
                     {totalBatteryKWh} kWh LiFePO4
                   </span>
-                  <span className="text-[9.5px] text-slate-500 font-medium block truncate leading-normal pb-0.5" title={batteriesSummary}>
-                    {batteriesSummary ? batteriesSummary.replace(/^bater[ií]as?\s+/i, '') : ''}
-                  </span>
+                  <div className="text-[9.5px] text-slate-500 font-medium leading-normal pb-0.5 space-y-0.5">
+                    {batteries.length > 0 ? (
+                      batteries.map((b, idx) => {
+                        const cleanModel = (b.brandModel || `${b.capacityKWh} kWh`)
+                          .replace(/^bater[ií]as?\s+/i, '')
+                          .trim();
+                        return (
+                          <span key={b.id || idx} className="block truncate" title={`${b.count} ${cleanModel}`}>
+                            {b.count} {cleanModel}
+                          </span>
+                        );
+                      })
+                    ) : (
+                      <span className="block truncate">Baterías LiFePO4</span>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
