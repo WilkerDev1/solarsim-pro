@@ -1,4 +1,4 @@
-import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem, CustomQuotationItem } from '../types';
+import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem, CustomQuotationItem, CustomQuotationDiscount } from '../types';
 import { calculateDCCapacityKWp, calculateMonthlySolarProduction } from './solarEngine';
 import {
   getProjectPanels,
@@ -14,7 +14,8 @@ import {
 export function calculateCostMatrixSummary(
   specs: SystemSpecs,
   dcCapacityKWp: number,
-  customItems?: CustomQuotationItem[]
+  customItems?: CustomQuotationItem[],
+  customDiscounts?: CustomQuotationDiscount[]
 ): CostMatrixSummary {
   const rate = specs.dopExchangeRate || 60.0;
   const margin = specs.saleMarginMultiplier || 1.25;
@@ -226,7 +227,25 @@ export function calculateCostMatrixSummary(
   }
   const customItemsVentaDOP = customItemsVentaUSD * rate;
 
-  const porcentajeVentaUSD = Math.round((basePorcentajeVentaUSD + customItemsVentaUSD) * 100) / 100;
+  const listPorcentajeVentaUSD = Math.round((basePorcentajeVentaUSD + customItemsVentaUSD) * 100) / 100;
+  const listPorcentajeVentaDOP = Math.round(listPorcentajeVentaUSD * rate * 100) / 100;
+
+  // Process commercial discounts
+  let totalDiscountUSD = 0;
+  for (const disc of customDiscounts || []) {
+    let amt = 0;
+    if (disc.type === 'percentage') {
+      const pct = Math.max(0, Math.min(100, disc.value || 0));
+      amt = listPorcentajeVentaUSD * (pct / 100);
+    } else {
+      amt = Math.max(0, disc.value || 0);
+    }
+    totalDiscountUSD += amt;
+  }
+  totalDiscountUSD = Math.min(listPorcentajeVentaUSD, Math.round(totalDiscountUSD * 100) / 100);
+  const totalDiscountDOP = Math.round(totalDiscountUSD * rate * 100) / 100;
+
+  const porcentajeVentaUSD = Math.max(0, Math.round((listPorcentajeVentaUSD - totalDiscountUSD) * 100) / 100);
   const porcentajeVentaDOP = Math.round(porcentajeVentaUSD * rate * 100) / 100;
 
   // Solar Only Subtotal (Paneles + Inversores + Instalación sin Baterías)
@@ -244,7 +263,7 @@ export function calculateCostMatrixSummary(
   const precioKilosVentasDOP = porcentajeVentaDOP / capacityKW;
   const precioKilosVentasUSD = porcentajeVentaUSD / capacityKW;
 
-  // Ganancia neta del proyecto: Diferencia entre Porcentaje Venta y Costo Total Neto (fórmula de referencia Excel)
+  // Ganancia neta del proyecto: Diferencia entre Porcentaje Venta Real y Costo Total Neto (fórmula de referencia Excel)
   const gananciaDOP = porcentajeVentaDOP - totalNetoDOP;
   const gananciaUSD = porcentajeVentaUSD - totalNetoUSD;
 
@@ -274,6 +293,10 @@ export function calculateCostMatrixSummary(
     itbisUSD,
     totalNetoDOP,
     totalNetoUSD,
+    listPorcentajeVentaUSD,
+    listPorcentajeVentaDOP,
+    totalDiscountUSD,
+    totalDiscountDOP,
     porcentajeVentaDOP,
     porcentajeVentaUSD,
     solarOnlyVentaUSD,
@@ -359,9 +382,10 @@ export function calculateFinancialSummary(
 
   // Custom Quotation Items calculation (Additional Equipment, Materials, and Services)
   const customItems = financials.customItems || [];
+  const customDiscounts = financials.customDiscounts || [];
 
-  // Calculate cost matrix summary including custom quotation items
-  const costMatrix = calculateCostMatrixSummary(specs, dcCapacityKWp, customItems);
+  // Calculate cost matrix summary including custom quotation items and discounts
+  const costMatrix = calculateCostMatrixSummary(specs, dcCapacityKWp, customItems, customDiscounts);
 
   // Pricing Mode: 'cost_matrix' (default) vs 'direct_watt' (manual $/W or $/kW base price)
   const isDirectWatt = specs.pricingMode === 'direct_watt' || (!specs.isDetailed && specs.pricingMode !== 'cost_matrix');
@@ -404,19 +428,51 @@ export function calculateFinancialSummary(
     ? financials.customCostUSD
     : (isDirectWatt
         ? Math.round(dcCapacityKWp * 1000 * effectivePricePerWatt * 100) / 100
-        : Math.round((costMatrix.basePorcentajeVentaUSD || costMatrix.porcentajeVentaUSD || 0) * 100) / 100);
+        : Math.round((costMatrix.basePorcentajeVentaUSD || costMatrix.listPorcentajeVentaUSD || costMatrix.porcentajeVentaUSD || 0) * 100) / 100);
+
+  // List Gross Investment before commercial discounts
+  const listGrossInvestmentUSD = financials.customCostUSD && financials.customCostUSD > 0
+    ? financials.customCostUSD
+    : (isDirectWatt
+        ? Math.round((baseGrossInvestmentUSD + customItemsSaleTotalUSD + nonExoneratedCustomITBISUSD) * 100) / 100
+        : Math.round((costMatrix.listPorcentajeVentaUSD || costMatrix.porcentajeVentaUSD || 0) * 100) / 100);
+
+  // Process Commercial Discounts
+  let totalDiscountUSD = 0;
+  let equipmentDiscountUSD = 0;
+  for (const disc of customDiscounts) {
+    let amt = 0;
+    if (disc.type === 'percentage') {
+      const pct = Math.max(0, Math.min(100, disc.value || 0));
+      amt = listGrossInvestmentUSD * (pct / 100);
+    } else {
+      amt = Math.max(0, disc.value || 0);
+    }
+    amt = Math.round(amt * 100) / 100;
+    totalDiscountUSD += amt;
+    if (disc.target === 'equipment') {
+      equipmentDiscountUSD += amt;
+    }
+  }
+  totalDiscountUSD = Math.min(listGrossInvestmentUSD, Math.round(totalDiscountUSD * 100) / 100);
+  equipmentDiscountUSD = Math.min(totalDiscountUSD, Math.round(equipmentDiscountUSD * 100) / 100);
 
   // If item is not exonerated, ITBIS is charged to the client in the final gross price
   const grossInvestmentUSD = financials.customCostUSD && financials.customCostUSD > 0
     ? financials.customCostUSD
     : (isDirectWatt
-        ? Math.round((baseGrossInvestmentUSD + customItemsSaleTotalUSD + nonExoneratedCustomITBISUSD) * 100) / 100
+        ? Math.max(0, Math.round((listGrossInvestmentUSD - totalDiscountUSD) * 100) / 100)
         : Math.round(costMatrix.porcentajeVentaUSD * 100) / 100);
 
   const commercialPreTaxSubtotalUSD = Math.round((grossInvestmentUSD - nonExoneratedCustomITBISUSD) * 100) / 100;
 
   // Synchronize Cost Matrix with Direct Price in direct_watt mode
   if (isDirectWatt) {
+    costMatrix.listPorcentajeVentaUSD = listGrossInvestmentUSD;
+    costMatrix.listPorcentajeVentaDOP = Math.round(listGrossInvestmentUSD * costMatrix.dopExchangeRate * 100) / 100;
+    costMatrix.totalDiscountUSD = totalDiscountUSD;
+    costMatrix.totalDiscountDOP = Math.round(totalDiscountUSD * costMatrix.dopExchangeRate * 100) / 100;
+
     if (specs.directPriceSurplusTarget === 'labor') {
       // Equipment portion stays with base margin multiplier
       const baseEquipmentVenta = Math.round((costMatrix.equipmentVentaUSD || 0) * 100) / 100;
@@ -424,13 +480,13 @@ export function calculateFinancialSummary(
 
       costMatrix.porcentajeVentaUSD = commercialPreTaxSubtotalUSD;
       costMatrix.porcentajeVentaDOP = Math.round(commercialPreTaxSubtotalUSD * costMatrix.dopExchangeRate * 100) / 100;
-      costMatrix.gananciaUSD = Math.round((baseGrossInvestmentUSD - (costMatrix.baseTotalNetoUSD || costMatrix.totalNetoUSD)) * 100) / 100;
+      costMatrix.gananciaUSD = Math.round((commercialPreTaxSubtotalUSD - (costMatrix.baseTotalNetoUSD || costMatrix.totalNetoUSD)) * 100) / 100;
       costMatrix.gananciaDOP = Math.round(costMatrix.gananciaUSD * costMatrix.dopExchangeRate * 100) / 100;
       costMatrix.marginOnSalePct = commercialPreTaxSubtotalUSD > 0 ? Math.round((costMatrix.gananciaUSD / commercialPreTaxSubtotalUSD) * 10000) / 100 : 0;
       costMatrix.markupOnCostPct = (costMatrix.baseTotalNetoUSD || costMatrix.totalNetoUSD) > 0 ? Math.round((costMatrix.gananciaUSD / (costMatrix.baseTotalNetoUSD || costMatrix.totalNetoUSD)) * 10000) / 100 : 0;
       costMatrix.precioKilosVentasUSD = dcCapacityKWp > 0 ? Math.round((commercialPreTaxSubtotalUSD / dcCapacityKWp) * 100) / 100 : 0;
       costMatrix.precioKilosVentasDOP = Math.round(costMatrix.precioKilosVentasUSD * costMatrix.dopExchangeRate * 100) / 100;
-      costMatrix.salePricePerWattUSD = effectivePricePerWatt;
+      costMatrix.salePricePerWattUSD = dcCapacityKWp > 0 ? Math.round((grossInvestmentUSD / (dcCapacityKWp * 1000)) * 10000) / 10000 : effectivePricePerWatt;
       costMatrix.laborVentaUSD = surplusLaborVenta;
       costMatrix.equipmentVentaUSD = Math.min(baseGrossInvestmentUSD, baseEquipmentVenta);
     } else {
@@ -440,13 +496,13 @@ export function calculateFinancialSummary(
       costMatrix.saleMarginMultiplier = impliedMargin;
       costMatrix.porcentajeVentaUSD = commercialPreTaxSubtotalUSD;
       costMatrix.porcentajeVentaDOP = Math.round(commercialPreTaxSubtotalUSD * costMatrix.dopExchangeRate * 100) / 100;
-      costMatrix.gananciaUSD = Math.round((baseGrossInvestmentUSD - baseNetCost) * 100) / 100;
+      costMatrix.gananciaUSD = Math.round((commercialPreTaxSubtotalUSD - baseNetCost) * 100) / 100;
       costMatrix.gananciaDOP = Math.round(costMatrix.gananciaUSD * costMatrix.dopExchangeRate * 100) / 100;
       costMatrix.marginOnSalePct = commercialPreTaxSubtotalUSD > 0 ? Math.round((costMatrix.gananciaUSD / commercialPreTaxSubtotalUSD) * 10000) / 100 : 0;
       costMatrix.markupOnCostPct = baseNetCost > 0 ? Math.round((costMatrix.gananciaUSD / baseNetCost) * 10000) / 100 : 0;
       costMatrix.precioKilosVentasUSD = dcCapacityKWp > 0 ? Math.round((commercialPreTaxSubtotalUSD / dcCapacityKWp) * 100) / 100 : 0;
       costMatrix.precioKilosVentasDOP = Math.round(costMatrix.precioKilosVentasUSD * costMatrix.dopExchangeRate * 100) / 100;
-      costMatrix.salePricePerWattUSD = effectivePricePerWatt;
+      costMatrix.salePricePerWattUSD = dcCapacityKWp > 0 ? Math.round((grossInvestmentUSD / (dcCapacityKWp * 1000)) * 10000) / 10000 : effectivePricePerWatt;
       costMatrix.equipmentVentaUSD = Math.round((costMatrix.equipmentTotalUSD || 0) * impliedMargin * 100) / 100;
       costMatrix.laborVentaUSD = Math.round((costMatrix.laborTotalUSD || 0) * impliedMargin * 100) / 100;
     }
@@ -456,7 +512,9 @@ export function calculateFinancialSummary(
   const laborPortionUSD = Math.round(((costMatrix.laborVentaUSD || 0) + customItemsTotalUSD) * 100) / 100;
 
   // Equipment Portion (Paneles, Inversores y Baterías con margen) - Base estricta para Ley 57-07 (excluye mano de obra y custom items)
-  const equipmentPortionUSD = Math.round((costMatrix.equipmentVentaUSD || (baseGrossInvestmentUSD - (costMatrix.laborVentaUSD || 0))) * 100) / 100;
+  const rawEquipmentPortionUSD = Math.round((costMatrix.equipmentVentaUSD || (baseGrossInvestmentUSD - (costMatrix.laborVentaUSD || 0))) * 100) / 100;
+  // Si el descuento comercial fue imputado a equipos (target: 'equipment'), reduce la base elegible ante la DGII
+  const equipmentPortionUSD = Math.max(0, Math.round((rawEquipmentPortionUSD - equipmentDiscountUSD) * 100) / 100);
 
   // Solar and Battery investment components breakdown
   const batteryInvestmentUSD = specs.hasBattery
@@ -649,5 +707,9 @@ export function calculateFinancialSummary(
     customItemsNonExoneratedITBISUSD: nonExoneratedCustomITBISUSD,
     commercialPreTaxSubtotalUSD,
     customItemsList: customItems,
+    listGrossInvestmentUSD,
+    totalDiscountUSD,
+    equipmentDiscountUSD,
+    customDiscountsList: customDiscounts,
   };
 }

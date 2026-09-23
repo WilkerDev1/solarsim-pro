@@ -1,6 +1,8 @@
 import React from 'react';
-import { ProjectSimulation, FinancialParams, CustomQuotationItem } from '../../../types';
-import { Landmark, ChevronDown, Plus, Trash2, PackagePlus } from 'lucide-react';
+import { ProjectSimulation, FinancialParams, CustomQuotationItem, CustomQuotationDiscount } from '../../../types';
+import { Landmark, ChevronDown, Plus, Trash2, PackagePlus, Tag, Percent, DollarSign } from 'lucide-react';
+import { calculateCostMatrixSummary } from '../../../engine/financeEngine';
+import { calculateTotalDCCapacityKWp } from '../../../utils/equipmentSpecsUtils';
 
 interface FinancialsParamsSectionProps {
   project: ProjectSimulation;
@@ -18,6 +20,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
   updateFinancials,
 }) => {
   const customItems = project.financials.customItems || [];
+  const customDiscounts = project.financials.customDiscounts || [];
 
   const handleAddItem = () => {
     const newItem: CustomQuotationItem = {
@@ -47,6 +50,52 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
     const filtered = customItems.filter((item) => item.id !== id);
     updateFinancials({ customItems: filtered });
   };
+
+  const handleAddDiscount = () => {
+    const newDiscount: CustomQuotationDiscount = {
+      id: 'disc_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      description: '',
+      type: 'fixed',
+      value: 0,
+      target: 'general',
+    };
+    updateFinancials({ customDiscounts: [...customDiscounts, newDiscount] });
+  };
+
+  const handleUpdateDiscount = (id: string, partial: Partial<CustomQuotationDiscount>) => {
+    const updated = customDiscounts.map((disc) => {
+      if (disc.id === id) {
+        return { ...disc, ...partial };
+      }
+      return disc;
+    });
+    updateFinancials({ customDiscounts: updated });
+  };
+
+  const handleDeleteDiscount = (id: string) => {
+    const filtered = customDiscounts.filter((disc) => disc.id !== id);
+    updateFinancials({ customDiscounts: filtered });
+  };
+
+  const matrixSummary = React.useMemo(() => {
+    const dcCap = project.specs ? calculateTotalDCCapacityKWp(project.specs) : 1;
+    return calculateCostMatrixSummary(project.specs, dcCap, customItems);
+  }, [project.specs, customItems]);
+
+  const estimatedListPriceUSD = matrixSummary.listPorcentajeVentaUSD || matrixSummary.porcentajeVentaUSD || 0;
+
+  const getDiscountAmountUSD = (disc: CustomQuotationDiscount) => {
+    if (disc.type === 'percentage') {
+      const pct = Math.max(0, Math.min(100, disc.value || 0));
+      return Math.round((estimatedListPriceUSD * (pct / 100)) * 100) / 100;
+    }
+    return Math.max(0, disc.value || 0);
+  };
+
+  const totalDiscountUSD = customDiscounts.reduce((sum, disc) => sum + getDiscountAmountUSD(disc), 0);
+  const equipmentDiscountUSD = customDiscounts
+    .filter((disc) => disc.target === 'equipment')
+    .reduce((sum, disc) => sum + getDiscountAmountUSD(disc), 0);
 
   const customItemsSubtotalUSD = customItems.reduce(
     (sum, it) => sum + (it.quantity || 0) * (it.unitPriceUSD || 0),
@@ -82,6 +131,11 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
           {customItems.length > 0 && (
             <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-extrabold rounded-full">
               +{customItems.length}
+            </span>
+          )}
+          {customDiscounts.length > 0 && (
+            <span className="px-1.5 py-0.5 bg-rose-500/20 text-rose-600 dark:text-rose-400 text-[10px] font-extrabold rounded-full">
+              -{customDiscounts.length} desc
             </span>
           )}
         </div>
@@ -341,6 +395,219 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
                     {customItemsExoneratedITBISUSD > 0 && (
                       <span className="block text-[10px] font-normal text-emerald-600 dark:text-emerald-400">
                         (${customItemsExoneratedITBISUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ITBIS exonerado por Ley 57-07)
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Apartado de Descuentos Comerciales */}
+          <div className={`pt-3 border-t ${isDark ? 'border-zinc-800' : 'border-slate-200'}`}>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-rose-500" />
+                <span className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-200' : 'text-slate-700'}`}>
+                  Descuentos Comerciales
+                </span>
+                {customDiscounts.length > 0 && (
+                  <span className="px-1.5 py-0.2 bg-rose-500/20 text-rose-600 dark:text-rose-400 text-[10px] font-extrabold rounded-full">
+                    {customDiscounts.length}
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={handleAddDiscount}
+                className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-[10.5px] font-bold flex items-center gap-1 transition-all shadow-2xs hover:scale-105 active:scale-95 cursor-pointer"
+                title="Agregar un descuento comercial al total general"
+              >
+                <Plus className="w-3 h-3" />
+                <span>Agregar Descuento</span>
+              </button>
+            </div>
+
+            {customDiscounts.length === 0 ? (
+              <div
+                className={`p-2.5 rounded-lg border border-dashed text-center text-[11px] ${
+                  isDark ? 'border-zinc-800 bg-[#1e1e28]/40 text-zinc-400' : 'border-slate-200 bg-slate-50/60 text-slate-500'
+                }`}
+              >
+                Sin descuentos comerciales. Haz clic en <span className="font-bold text-rose-600 dark:text-rose-400">+ Agregar Descuento</span> para añadir una cortesía comercial, cierre especial o descuento de equipos.
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {customDiscounts.map((disc, index) => {
+                  const discountAmt = getDiscountAmountUSD(disc);
+                  const isEquipTarget = disc.target === 'equipment';
+
+                  return (
+                    <div
+                      key={disc.id || index}
+                      className={`p-2.5 rounded-lg border space-y-2 transition-all ${
+                        isDark ? 'border-rose-950/40 bg-[#1e161c] text-zinc-200' : 'border-rose-200/70 bg-rose-50/30 text-slate-800'
+                      }`}
+                    >
+                      {/* Fila 1: Descripción / Motivo y Botón Eliminar */}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-rose-400 dark:text-rose-500 w-4 shrink-0">
+                          #{index + 1}
+                        </span>
+                        <input
+                          type="text"
+                          placeholder="Motivo / Nota (ej. Cierre especial, Cortesía comercial...)"
+                          value={disc.description}
+                          onChange={(e) => handleUpdateDiscount(disc.id, { description: e.target.value })}
+                          className={`flex-1 px-2 py-1 text-xs font-semibold rounded border transition-all ${
+                            isDark
+                              ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:border-rose-500'
+                              : 'bg-white border-slate-300 text-slate-900 focus:border-rose-600'
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteDiscount(disc.id)}
+                          className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40 rounded transition-colors cursor-pointer shrink-0"
+                          title="Eliminar este descuento"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Fila 2: Selector Tipo ($ vs %), Input Valor y Descuento Calculado */}
+                      <div className="grid grid-cols-12 gap-1.5 items-center text-[11px]">
+                        {/* Selector Tipo */}
+                        <div className="col-span-5">
+                          <label className="text-[9.5px] font-semibold text-slate-500 dark:text-zinc-400 block mb-0.5">
+                            Tipo de Descuento
+                          </label>
+                          <div className="flex rounded-md border border-slate-300 dark:border-[#3f3f46] overflow-hidden p-0.5 bg-slate-100 dark:bg-[#27272a]">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateDiscount(disc.id, { type: 'fixed' })}
+                              className={`flex-1 py-0.5 text-[10px] font-bold rounded flex items-center justify-center gap-0.5 transition-all cursor-pointer ${
+                                disc.type === 'fixed'
+                                  ? 'bg-white dark:bg-zinc-800 text-rose-600 dark:text-rose-400 shadow-2xs'
+                                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
+                              }`}
+                            >
+                              <DollarSign className="w-3 h-3" />
+                              <span>Fijo ($)</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateDiscount(disc.id, { type: 'percentage' })}
+                              className={`flex-1 py-0.5 text-[10px] font-bold rounded flex items-center justify-center gap-0.5 transition-all cursor-pointer ${
+                                disc.type === 'percentage'
+                                  ? 'bg-white dark:bg-zinc-800 text-rose-600 dark:text-rose-400 shadow-2xs'
+                                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-200'
+                              }`}
+                            >
+                              <Percent className="w-3 h-3" />
+                              <span>Porc. (%)</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Input Valor */}
+                        <div className="col-span-4">
+                          <label className="text-[9.5px] font-semibold text-slate-500 dark:text-zinc-400 block mb-0.5">
+                            {disc.type === 'percentage' ? 'Porcentaje (%)' : 'Monto (USD)'}
+                          </label>
+                          <input
+                            type="number"
+                            step={disc.type === 'percentage' ? '0.5' : '50'}
+                            min="0"
+                            max={disc.type === 'percentage' ? '100' : undefined}
+                            value={disc.value}
+                            onChange={(e) => handleUpdateDiscount(disc.id, { value: Math.max(0, parseFloat(e.target.value) || 0) })}
+                            className={`w-full px-2 py-1 text-right font-bold rounded border ${
+                              isDark ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-900'
+                            }`}
+                          />
+                        </div>
+
+                        {/* Total Descontado USD */}
+                        <div className="col-span-3 text-right">
+                          <span className="text-[9.5px] font-semibold text-slate-500 dark:text-zinc-400 block mb-0.5">
+                            Deducción
+                          </span>
+                          <span className="font-bold text-rose-600 dark:text-rose-400 font-mono text-[11px] block pt-1">
+                            -${discountAmt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Fila 3: Imputación / Destino Ley 57-07 */}
+                      <div className="pt-1.5 border-t border-rose-100 dark:border-rose-950/60">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[10px] font-bold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
+                            <span>Destino de Deducción:</span>
+                          </label>
+                          <div className="flex items-center gap-2">
+                            <label className="flex items-center gap-1 cursor-pointer text-[10px]">
+                              <input
+                                type="radio"
+                                name={`target_${disc.id}`}
+                                checked={!isEquipTarget}
+                                onChange={() => handleUpdateDiscount(disc.id, { target: 'general' })}
+                                className="text-rose-600 focus:ring-rose-500 cursor-pointer"
+                              />
+                              <span className={!isEquipTarget ? 'font-bold text-slate-900 dark:text-white' : 'text-slate-500 dark:text-zinc-400'}>
+                                Global / Cortesía
+                              </span>
+                            </label>
+                            <label className="flex items-center gap-1 cursor-pointer text-[10px]">
+                              <input
+                                type="radio"
+                                name={`target_${disc.id}`}
+                                checked={isEquipTarget}
+                                onChange={() => handleUpdateDiscount(disc.id, { target: 'equipment' })}
+                                className="text-rose-600 focus:ring-rose-500 cursor-pointer"
+                              />
+                              <span className={isEquipTarget ? 'font-bold text-rose-600 dark:text-rose-400' : 'text-slate-500 dark:text-zinc-400'}>
+                                Descuento Equipos (DGII)
+                              </span>
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="mt-1 text-[9.5px]">
+                          {isEquipTarget ? (
+                            <span className="text-amber-700 dark:text-amber-400 font-medium">
+                              ⚠️ Reduce la base elegible del 40% ISR Ley 57-07 en -${discountAmt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD (DGII no admite crédito fiscal sobre montos que no se facturen).
+                            </span>
+                          ) : (
+                            <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+                              ✓ Descuento comercial general; la base de equipos renovables ante DGII se mantiene al 100%.
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Resumen Total de Descuentos Comerciales */}
+                <div
+                  className={`p-2.5 rounded-lg border flex justify-between items-center text-xs font-bold ${
+                    isDark ? 'border-rose-950/60 bg-[#20151c] text-zinc-200' : 'border-rose-200 bg-rose-50/80 text-rose-950'
+                  }`}
+                >
+                  <div>
+                    <span className="block">Total Descuentos Comerciales:</span>
+                    <span className="text-[10px] font-normal text-slate-500 dark:text-zinc-400">
+                      Lista: ${estimatedListPriceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} → Final: ${(Math.max(0, estimatedListPriceUSD - totalDiscountUSD)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-mono text-rose-600 dark:text-rose-400 text-sm font-black">
+                      -${totalDiscountUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                    </span>
+                    {equipmentDiscountUSD > 0 && (
+                      <span className="block text-[9.5px] font-semibold text-amber-700 dark:text-amber-400">
+                        (-${equipmentDiscountUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} imputado a equipos Ley 57-07)
                       </span>
                     )}
                   </div>

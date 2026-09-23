@@ -405,7 +405,11 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
                 <span className="text-base font-black text-slate-950 font-mono leading-tight mt-0.5">
                   ${totalBeforeLeyUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
-                <span className="text-[9.5px] text-amber-950 font-semibold block mt-0.5">Total antes de ley</span>
+                <span className="text-[9.5px] text-amber-950 font-semibold block mt-0.5 truncate">
+                  {(summary.totalDiscountUSD || 0) > 0
+                    ? `Desc: -$${summary.totalDiscountUSD?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
+                    : 'Total antes de ley'}
+                </span>
               </div>
             </div>
           </article>

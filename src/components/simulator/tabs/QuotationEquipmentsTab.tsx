@@ -188,12 +188,23 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
               </div>
               <div className="flex justify-between text-slate-900 bg-slate-200/80 px-2 py-1 rounded font-bold">
                 <span>TOTAL GENERAL (USD) :</span>
-                <span>${(summary.grossInvestmentUSD + (project.financials.applyITBISExemption ? summary.itbisSavedUSD : 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span>${((summary.listGrossInvestmentUSD ?? summary.grossInvestmentUSD) + (project.financials.applyITBISExemption ? summary.itbisSavedUSD : 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
               <div className="flex justify-between text-emerald-800 font-semibold">
                 <span>ITBIS A DESCONTAR POR LEY 57-07 US$ :</span>
                 <span className="font-bold">${summary.itbisSavedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
+              {(summary.totalDiscountUSD || 0) > 0 && (
+                <div className="flex justify-between text-rose-600 bg-rose-50/80 px-2 py-1 rounded font-bold border border-rose-200">
+                  <span className="flex items-center gap-1">
+                    DESCUENTO COMERCIAL :
+                    {summary.equipmentDiscountUSD ? (
+                      <span className="text-[9.5px] font-normal text-amber-700">(Equipos Ley 57-07)</span>
+                    ) : null}
+                  </span>
+                  <span>-${summary.totalDiscountUSD?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</span>
+                </div>
+              )}
               <div className="flex justify-between bg-[#14532d] text-white px-2 py-1 rounded font-bold">
                 <span>TOTAL GENERAL (USD) SI CALIFICA LEY 57-07 :</span>
                 <span>${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
@@ -477,19 +488,60 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
                 </span>
               </div>
 
-              {/* Porcentaje de Venta */}
-              <div className="flex justify-between text-red-600 font-extrabold bg-red-50 border border-red-200 px-2.5 py-1 rounded">
-                <span>Porcentaje venta ({(summary.costMatrix.saleMarginMultiplier || 1.25).toFixed(2)}) :</span>
-                <span>
-                  {costTableCurrency === 'USD' ? (
-                    <strong>${summary.costMatrix.porcentajeVentaUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</strong>
-                  ) : costTableCurrency === 'DOP' ? (
-                    <strong>RD$ {summary.costMatrix.porcentajeVentaDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
-                  ) : (
-                    <>RD$ {summary.costMatrix.porcentajeVentaDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong>${summary.costMatrix.porcentajeVentaUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></>
-                  )}
-                </span>
-              </div>
+              {/* Porcentaje de Venta (Lista vs Descuento vs Final) */}
+              {(summary.costMatrix.totalDiscountUSD || 0) > 0 ? (
+                <>
+                  <div className="flex justify-between text-slate-700">
+                    <span>Precio de Lista (antes de desc.) :</span>
+                    <span>
+                      {costTableCurrency === 'USD' ? (
+                        <strong className="text-slate-900">${(summary.costMatrix.listPorcentajeVentaUSD || summary.costMatrix.porcentajeVentaUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</strong>
+                      ) : costTableCurrency === 'DOP' ? (
+                        <strong className="text-slate-900">RD$ {(summary.costMatrix.listPorcentajeVentaDOP || summary.costMatrix.porcentajeVentaDOP).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                      ) : (
+                        <>RD$ {(summary.costMatrix.listPorcentajeVentaDOP || summary.costMatrix.porcentajeVentaDOP).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong className="text-slate-900">${(summary.costMatrix.listPorcentajeVentaUSD || summary.costMatrix.porcentajeVentaUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></>
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded font-bold">
+                    <span>Descuento Comercial :</span>
+                    <span>
+                      {costTableCurrency === 'USD' ? (
+                        <strong>-${(summary.costMatrix.totalDiscountUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</strong>
+                      ) : costTableCurrency === 'DOP' ? (
+                        <strong>-RD$ {summary.costMatrix.totalDiscountDOP?.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                      ) : (
+                        <>-RD$ {summary.costMatrix.totalDiscountDOP?.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong>-${(summary.costMatrix.totalDiscountUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></>
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-red-600 font-extrabold bg-red-50 border border-red-200 px-2.5 py-1 rounded">
+                    <span>Precio Venta Final (con desc.) :</span>
+                    <span>
+                      {costTableCurrency === 'USD' ? (
+                        <strong>${summary.costMatrix.porcentajeVentaUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</strong>
+                      ) : costTableCurrency === 'DOP' ? (
+                        <strong>RD$ {summary.costMatrix.porcentajeVentaDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                      ) : (
+                        <>RD$ {summary.costMatrix.porcentajeVentaDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong>${summary.costMatrix.porcentajeVentaUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></>
+                      )}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex justify-between text-red-600 font-extrabold bg-red-50 border border-red-200 px-2.5 py-1 rounded">
+                  <span>Porcentaje venta ({(summary.costMatrix.saleMarginMultiplier || 1.25).toFixed(2)}) :</span>
+                  <span>
+                    {costTableCurrency === 'USD' ? (
+                      <strong>${summary.costMatrix.porcentajeVentaUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</strong>
+                    ) : costTableCurrency === 'DOP' ? (
+                      <strong>RD$ {summary.costMatrix.porcentajeVentaDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+                    ) : (
+                      <>RD$ {summary.costMatrix.porcentajeVentaDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp; <strong>${summary.costMatrix.porcentajeVentaUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></>
+                    )}
+                  </span>
+                </div>
+              )}
 
               {/* Precio Kilos Costo */}
               <div className="flex justify-between text-slate-800">

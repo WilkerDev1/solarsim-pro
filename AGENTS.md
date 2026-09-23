@@ -29,6 +29,7 @@ Este documento sirve como **fuente única de verdad** para desarrolladores y asi
 4. **Ingeniería Financiera & Ley 57-07 (Auditada)**:
    - Exoneración del 100% de ITBIS (18%) y aranceles sobre equipos solares.
    - Crédito fiscal del 40% del costo de inversión en equipos aplicable al Impuesto Sobre la Renta (ISR) amortizable en 3 años fiscales ($13.33\%$ anual).
+   - **Descuentos Comerciales & Recálculo de Rentabilidad Real**: Deducciones individuales ($ / %) en Categoría 5 (Finanzas e Incentivos) aplicadas al Total General. Recálculo automático de ganancia real, markup sobre costo y margen sobre venta manteniendo inalterado el costo de adquisición mayorista. Selector de destino DGII: global/cortesía (base equipos Ley 57-07 intacta) vs equipos (reducción de base elegible del 40% ISR para evitar deducciones tributarias indebidas sobre montos no pagados). Flujo de caja Año 0 con desembolso neto real, TIR y Payback sincronizados.
    - Proyecciones de Flujo de Caja a 25 años, Payback Simple y Descontado, VAN (NPV), TIR (IRR), LCOE y ROI total.
 5. **Generador de Propuestas Técnicas y Económicas en PDF**:
    - Dossier ejecutivo modular de 11 a 12 páginas con maquetación de revista (*Executive Pitch Deck*).
@@ -214,7 +215,7 @@ npm run lint
 # Validar matemáticas del motor financiero contra benchmarks
 npx tsx src/tests/testBenchmark.ts
 
-# Suite integral de 9 pruebas unitarias financieras
+# Suite integral de 15 pruebas unitarias financieras (incluyendo ítems extra, ITBIS y descuentos comerciales)
 npx tsx src/tests/testFinancialEngineComprehensive.ts
 
 # Suite de validación de Smart Proposal IA y dimensionamiento al 95%

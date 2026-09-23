@@ -140,6 +140,14 @@ export interface CustomQuotationItem {
   applyITBIS?: boolean;    // Backwards compatibility alias
 }
 
+export interface CustomQuotationDiscount {
+  id: string;
+  description: string;                // Motivo / Nota (ej. "Cierre especial", "Descuento en equipos", "Cortesía comercial")
+  type: 'fixed' | 'percentage';       // 'fixed' ($) | 'percentage' (%)
+  value: number;                      // Monto en USD (ej. 3500) o Porcentaje (ej. 10 para 10%)
+  target?: 'general' | 'equipment';   // 'general' (descuento global comercial) vs 'equipment' (reduce base elegible DGII Ley 57-07)
+}
+
 export interface FinancialParams {
   applyLey5707: boolean;         // 40% ISR credit over 3 years
   applyITBISExemption: boolean; // 100% ITBIS exoneration
@@ -151,6 +159,7 @@ export interface FinancialParams {
   projectLifespanYears: number;  // e.g. 25
   co2FactorKgPerKWh: number;     // kg CO2 per kWh e.g. 0.481
   customItems?: CustomQuotationItem[]; // Custom additional items/services with individual ITBIS toggle
+  customDiscounts?: CustomQuotationDiscount[]; // Descuentos comerciales aplicados al total general
 }
 
 export interface CostMatrixItem {
@@ -209,6 +218,10 @@ export interface CostMatrixSummary {
   customItemsNetDOP?: number;
   customItemsItbisUSD?: number;  // Non-exonerated ITBIS of custom items
   customItemsItbisDOP?: number;
+  listPorcentajeVentaUSD?: number; // Precio de venta de lista antes de descuentos
+  listPorcentajeVentaDOP?: number;
+  totalDiscountUSD?: number;       // Suma de descuentos comerciales aplicados
+  totalDiscountDOP?: number;
 }
 
 export interface MonthlyEnergyResult {
@@ -243,7 +256,10 @@ export interface FinancialSummaryResult {
   annualConsumptionKWh: number;
   annualProductionKWh: number;
   energyCoveragePct: number;
-  grossInvestmentUSD: number;
+  listGrossInvestmentUSD?: number; // Inversión Bruta de Lista antes de descuentos
+  totalDiscountUSD?: number;       // Total descuentos comerciales aplicados (USD)
+  equipmentDiscountUSD?: number;   // Descuento imputado a equipos (afecta base Ley 57-07)
+  grossInvestmentUSD: number;      // Inversión Bruta Final tras descuentos comerciales
   contractPriceUSD: number;      // Monto acordado y pagable en contrato Año 0 (con ITBIS exonerado si aplica)
   initialOutflowUSD: number;     // Desembolso inicial real para flujo de caja Año 0 (= contractPriceUSD)
   salePricePerWattUSD: number;   // Real live effective turnkey sale price per Wp (e.g. 1.24)
@@ -272,6 +288,7 @@ export interface FinancialSummaryResult {
   customItemsNonExoneratedITBISUSD?: number;
   commercialPreTaxSubtotalUSD?: number;
   customItemsList?: CustomQuotationItem[];
+  customDiscountsList?: CustomQuotationDiscount[];
 }
 
 export interface DocumentCustomization {

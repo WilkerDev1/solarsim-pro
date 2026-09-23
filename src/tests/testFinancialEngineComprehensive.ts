@@ -693,9 +693,168 @@ assert(resCloned.systemCapacityKWp === 9.44, `Capacidad clonada es 9.44 kWp (${r
 assert(resCloned.batteryInvestmentUSD === 0, 'Inversión en baterías es 0 tras removerlas');
 assert(resCloned.itbisSavedUSD < resProjectA.itbisSavedUSD, `ITBIS exonerado se redujo proporcionalmente ($${resCloned.itbisSavedUSD} < $${resProjectA.itbisSavedUSD})`);
 assert(resCloned.itbisSavedUSD > 0, `ITBIS exonerado para 9.44 kWp es positivo ($${resCloned.itbisSavedUSD})`);
+// TEST 15: Commercial Discounts (Fixed vs Percentage, Profit Recalculation, Cash Flow Year 0 & DGII Ley 57-07)
+console.log('\n--- TEST 15: Commercial Discounts (Fixed vs Percentage, Real Profit & DGII Base) ---');
+const specsDiscountTest: SystemSpecs = {
+  ...defaultSpecs,
+  panelCount: 16,
+  panelPowerW: 620, // 9.92 kWp
+  pricingMode: 'cost_matrix',
+  panelUnitPriceUSD: 105,
+  inverterUnitPriceUSD: 1650,
+  inverterCount: 1,
+  hasBattery: true,
+  batteryCount: 1,
+  batteryCapacityKWh: 16.08,
+  batteryUnitPriceUSD: 2000,
+  installationUnitPriceUSD: 160,
+  saleMarginMultiplier: 1.40, // 40% margin
+};
+
+// 1. Base project without discounts
+const resBaseNoDiscount = calculateFinancialSummary(
+  'Santo Domingo / Distrito Nacional',
+  specsDiscountTest,
+  defaultRates,
+  defaultFinancials,
+  monthlyConsumption
+);
+
+const baseListPrice = resBaseNoDiscount.grossInvestmentUSD;
+const baseNetCost = resBaseNoDiscount.costMatrix.totalNetoUSD;
+const baseProfit = resBaseNoDiscount.costMatrix.gananciaUSD;
+const baseEquipPortion = resBaseNoDiscount.equipmentPortionUSD;
+const baseLeyCredit = resBaseNoDiscount.ley5707CreditUSD;
+
+assert(resBaseNoDiscount.totalDiscountUSD === 0, 'Sin descuentos, totalDiscountUSD es 0');
+assert(Math.abs(baseProfit - (baseListPrice - baseNetCost)) < 0.05, 'Ganancia base es listPrice - netCost');
+
+// 2. Commercial fixed discount of $2,500 USD targeted as "general" (Cortesía / Pronto pago)
+const financialsGeneralDiscount: FinancialParams = {
+  ...defaultFinancials,
+  customDiscounts: [
+    {
+      id: 'disc-gen-1',
+      description: 'Cortesía comercial por pronto pago',
+      type: 'fixed',
+      value: 2500,
+      target: 'general',
+    },
+  ],
+};
+
+const resGenDiscount = calculateFinancialSummary(
+  'Santo Domingo / Distrito Nacional',
+  specsDiscountTest,
+  defaultRates,
+  financialsGeneralDiscount,
+  monthlyConsumption
+);
+
+assert(resGenDiscount.totalDiscountUSD === 2500, 'Total descuento registrado es exactamente $2,500.00 USD');
+assert(resGenDiscount.equipmentDiscountUSD === 0, 'Descuento imputado a equipos es 0 en descuento general');
 assert(
-  resCloned.grossInvestmentUSD === resCloned.costMatrix.porcentajeVentaUSD,
-  `Cotización ($${resCloned.grossInvestmentUSD}) y Hoja de Costos ($${resCloned.costMatrix.porcentajeVentaUSD}) coinciden al 100% en proyecto clonado`
+  Math.abs(resGenDiscount.grossInvestmentUSD - (baseListPrice - 2500)) < 0.05,
+  `Inversión final descontada es exactamente $${baseListPrice - 2500} ($${resGenDiscount.grossInvestmentUSD})`
+);
+// Wholesale cost must remain identical
+assert(
+  Math.abs(resGenDiscount.costMatrix.totalNetoUSD - baseNetCost) < 0.01,
+  `Costo mayorista neto NO cambia con descuento ($${resGenDiscount.costMatrix.totalNetoUSD} == $${baseNetCost})`
+);
+// Real profit drops by exactly $2,500
+assert(
+  Math.abs(resGenDiscount.costMatrix.gananciaUSD - (baseProfit - 2500)) < 0.05,
+  `Ganancia real disminuye en exactamente $2,500 ($${resGenDiscount.costMatrix.gananciaUSD} vs $${baseProfit - 2500})`
+);
+// Real markup and margin recalculation
+const expectedRealMarkup = ((baseProfit - 2500) / baseNetCost) * 100;
+assert(
+  Math.abs((resGenDiscount.costMatrix.markupOnCostPct || 0) - expectedRealMarkup) < 0.2,
+  `Markup real se recalcula correctamente (${resGenDiscount.costMatrix.markupOnCostPct}% vs ${expectedRealMarkup.toFixed(2)}%)`
+);
+// DGII equipment base remains 100% intact under general discount
+assert(
+  Math.abs(resGenDiscount.equipmentPortionUSD - baseEquipPortion) < 0.01,
+  `Base de equipos Ley 57-07 se mantiene intacta ante descuento general ($${resGenDiscount.equipmentPortionUSD} == $${baseEquipPortion})`
+);
+assert(
+  Math.abs(resGenDiscount.ley5707CreditUSD - baseLeyCredit) < 0.01,
+  `Crédito fiscal Ley 57-07 se mantiene intacto ante descuento general ($${resGenDiscount.ley5707CreditUSD} == $${baseLeyCredit})`
+);
+// Cash flow Year 0 initial outflow reflects discounted price
+assert(
+  resGenDiscount.initialOutflowUSD === resGenDiscount.contractPriceUSD && resGenDiscount.contractPriceUSD === resGenDiscount.grossInvestmentUSD,
+  'Flujo de caja Año 0 initialOutflowUSD coincide con monto pagable real con descuento'
+);
+
+// 3. Commercial discount of $2,000 USD targeted at "equipment" (Descuento en Equipos)
+const financialsEquipDiscount: FinancialParams = {
+  ...defaultFinancials,
+  customDiscounts: [
+    {
+      id: 'disc-eq-1',
+      description: 'Descuento especial en equipos solares',
+      type: 'fixed',
+      value: 2000,
+      target: 'equipment',
+    },
+  ],
+};
+
+const resEquipDiscount = calculateFinancialSummary(
+  'Santo Domingo / Distrito Nacional',
+  specsDiscountTest,
+  defaultRates,
+  financialsEquipDiscount,
+  monthlyConsumption
+);
+
+assert(resEquipDiscount.equipmentDiscountUSD === 2000, 'equipmentDiscountUSD es $2,000.00 USD');
+assert(
+  Math.abs(resEquipDiscount.equipmentPortionUSD - (baseEquipPortion - 2000)) < 0.05,
+  `Base elegible de equipos Ley 57-07 se reduce en exactamente $2,000 ($${resEquipDiscount.equipmentPortionUSD} vs $${baseEquipPortion - 2000})`
+);
+const expectedReducedLeyCredit = Math.round((baseEquipPortion - 2000) * 0.40 * 100) / 100;
+assert(
+  Math.abs(resEquipDiscount.ley5707CreditUSD - expectedReducedLeyCredit) < 0.05,
+  `Crédito Ley 57-07 se reduce acorde a la nueva base elegible ($${resEquipDiscount.ley5707CreditUSD} vs $${expectedReducedLeyCredit})`
+);
+
+// 4. Percentage discount (10%)
+const financialsPctDiscount: FinancialParams = {
+  ...defaultFinancials,
+  customDiscounts: [
+    {
+      id: 'disc-pct-1',
+      description: 'Descuento de cierre 10%',
+      type: 'percentage',
+      value: 10,
+      target: 'general',
+    },
+  ],
+};
+
+const resPctDiscount = calculateFinancialSummary(
+  'Santo Domingo / Distrito Nacional',
+  specsDiscountTest,
+  defaultRates,
+  financialsPctDiscount,
+  monthlyConsumption
+);
+
+const expectedPctDiscountUSD = Math.round(baseListPrice * 0.10 * 100) / 100;
+assert(
+  Math.abs(resPctDiscount.totalDiscountUSD! - expectedPctDiscountUSD) < 0.05,
+  `Descuento del 10% calcula exactamente $${expectedPctDiscountUSD} ($${resPctDiscount.totalDiscountUSD})`
+);
+assert(
+  Math.abs(resPctDiscount.grossInvestmentUSD - (baseListPrice - expectedPctDiscountUSD)) < 0.05,
+  `Inversión final con 10% descuento es $${baseListPrice - expectedPctDiscountUSD} ($${resPctDiscount.grossInvestmentUSD})`
+);
+assert(
+  resPctDiscount.grossInvestmentUSD === resPctDiscount.costMatrix.porcentajeVentaUSD,
+  'Inversión bruta coincide 100% con costMatrix.porcentajeVentaUSD'
 );
 
 console.log('\n=====================================================');

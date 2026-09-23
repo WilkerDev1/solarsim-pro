@@ -251,7 +251,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
             <div className="flex justify-between text-slate-900 bg-slate-200/80 px-2 py-0.5 rounded font-bold">
               <span>TOTAL GENERAL (USD) :</span>
               <span className="font-mono">
-                ${(summary.grossInvestmentUSD + (project.financials.applyITBISExemption ? summary.itbisSavedUSD : 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ${((summary.listGrossInvestmentUSD ?? summary.grossInvestmentUSD) + (project.financials.applyITBISExemption ? summary.itbisSavedUSD : 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="flex justify-between font-bold" style={{ color: activeTheme.secondary }}>
@@ -260,6 +260,19 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                 ${summary.itbisSavedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
+            {(summary.totalDiscountUSD || 0) > 0 && (
+              <div className="flex justify-between text-rose-600 bg-rose-50/80 px-2 py-0.5 rounded font-bold border border-rose-200/70">
+                <span className="flex items-center gap-1">
+                  DESCUENTO COMERCIAL :
+                  {summary.equipmentDiscountUSD ? (
+                    <span className="text-[9px] font-normal text-amber-700">(Equipos Ley 57-07)</span>
+                  ) : null}
+                </span>
+                <span className="font-mono">
+                  -${summary.totalDiscountUSD?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                </span>
+              </div>
+            )}
             <div
               className="flex justify-between text-white px-2 py-0.5 rounded font-bold"
               style={{ backgroundColor: activeTheme.primary }}

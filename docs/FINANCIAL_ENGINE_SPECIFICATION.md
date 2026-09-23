@@ -152,7 +152,47 @@ $$\text{Ganancia Bruta Comercial (USD)} = I_{bruta} - \text{Total Neto con ITBIS
 $$P_{watt} \text{ (USD/W)} = \frac{I_{bruta}}{P_{dc} \times 1,000}$$
 
 * **Reactividad Automática**: Al agregar baterías ($N_{bat} > 0$) o ítems personalizados, la inversión bruta $I_{bruta}$ y el $P_{watt}$ aumentan de forma proporcional. Al removerlos, se recalcula de inmediato el precio solar puro.
-* **Sincronización `Auto`**: Si el usuario define un $P_{watt}$ personalizado en la barra lateral, el botón `✨ Auto` restaura en 1 clic el valor exacto derivado de la matriz de costos y el margen.
+### 3.4 Descuentos Comerciales y Recálculo de Rentabilidad Real
+
+Los **Descuentos Comerciales** se configuran como deducciones individuales en la **Categoría 5 (Finanzas e Incentivos)** de la barra lateral, aplicándose al final del modelo sobre el **Total General (Inversión Bruta)**:
+
+#### 1. Tipos de Descuento
+* **Monto Fijo (`fixed`)**: Deducción directa en dólares (ej. $-\$3,500.00\text{ USD}$).
+* **Porcentaje (`percentage`)**: Deducción porcentual calculada dinámicamente sobre el precio de lista antes de descuentos:
+  $$D_i \text{ (USD)} = I_{lista} \times \left(\frac{\%_i}{100}\right)$$
+
+#### 2. Lógica Matemática y Recálculo de Rentabilidad
+1. **Costo Base Mayorista Inalterado**:
+   El costo neto de adquisición ($C_{total} = \text{totalNetoUSD}$) permanece estrictamente inalterado, pues los costos de compra a distribuidores no varían por una concesión comercial al cliente.
+2. **Precio de Lista antes de Descuento**:
+   $$I_{lista} = \text{basePorcentajeVentaUSD} + \text{customItemsVentaUSD}$$
+3. **Inversión Final Descontada**:
+   $$D_{total} = \min\left(I_{lista}, \sum D_i\right)$$
+   $$I_{final} = \max(0, I_{lista} - D_{total})$$
+4. **Recálculo Obligatorio de Rentabilidad Real**:
+   * **Ganancia Real**:
+     $$\text{Ganancia Real (USD)} = I_{final} - C_{total}$$
+   * **Markup Real sobre Costo**:
+     $$\text{Markup Real (\%)} = \left(\frac{\text{Ganancia Real}}{C_{total}}\right) \times 100$$
+   * **Margen Real sobre Venta**:
+     $$\text{Margen sobre Venta (\%)} = \left(\frac{\text{Ganancia Real}}{I_{final}}\right) \times 100$$
+   * **Precio por Watt Real**:
+     $$P_{watt, real} \text{ (USD/W)} = \frac{I_{final}}{P_{dc} \times 1,000}$$
+
+#### 3. Destino de Imputación Tributaria (Ley 57-07 / DGII)
+Cada descuento posee un selector de imputación para cumplir rigurosamente con la normativa de la Dirección General de Impuestos Internos:
+* **Global / Cortesía Comercial (`target: 'general'`)**:
+  Aplica como cortesía de cierre, pronto pago o mano de obra. La base de equipos renovables computables para el crédito fiscal del 40% de Ley 57-07 permanece **100% intacta**.
+* **Descuento en Equipos (`target: 'equipment'`)**:
+  Se imputa directamente a paneles, inversores o baterías. La base elegible ante la DGII se reduce en el monto del descuento:
+  $$\text{Base Equipos Elegible} = \max(0, \text{Base Equipos Bruta} - D_{equipos})$$
+  $$\text{Crédito Ley 57-07} = \text{Base Equipos Elegible} \times 0.40$$
+  *Razón técnica*: Ante la DGII no se puede reclamar crédito fiscal sobre montos que el cliente no pagó en la factura final.
+
+#### 4. Impacto en Flujo de Caja (Cash Flow)
+El desembolso inicial de caja en el Año 0 ($CF_0$) se actualiza automáticamente al monto real pagable:
+$$CF_0 = -I_{final}$$
+Esto recalcula automáticamente la **TIR (IRR)**, el **Payback** y el **VAN (NPV)** con la realidad financiera del descuento comercial pactado.
 
 ---
 
@@ -374,11 +414,13 @@ Esta sección explica el **significado físico, técnico y financiero de cada pa
 | :--- | :--- | :--- | :--- | :--- |
 | **Aplicar Ley 57-07 (Crédito ISR 40%)** | Checkbox / Toggle | Booleano | `true` | Aplica el crédito fiscal del 40% sobre los equipos deducible del Impuesto Sobre la Renta (DGII) en 3 años fiscales. |
 | **Exoneración ITBIS 100% (18%)** | Checkbox / Toggle | Booleano | `true` | Aplica la exención del 100% del ITBIS (18%) sobre los equipos solares aprobados por la CNE y la DGII. |
+| **Tasa de Descuento (%)** | Numérico | $\%$ ($0 - 50\%$) | `10.0%` | Tasa de oportunidad o costo del capital ($r$) empleada para descontar los flujos futuros en el cálculo del VAN (NPV). |
 | **Ítems Adicionales en Cotización** | Formulario Dinámico | Lista de ítems | `[]` | Permite agregar renglones personalizados (descripción, cantidad, unidad, precio unitario USD). |
 | **Toggle "Exonerar ITBIS (18%)"** | Checkbox por Ítem | Booleano | `true` | • `true`: Se suma al ahorro fiscal exonerado de Ley 57-07.<br>• `false`: Se factura el 18% de ITBIS directo al cliente en la cotización. |
-| **Tasa de Descuento (%)** | Numérico | $\%$ ($0 - 50\%$) | `10.0%` | Tasa de oportunidad o costo del capital ($r$) empleada para descontar los flujos futuros en el cálculo del VAN (NPV). |
-| **Botón "Guardar"** | Botón de Acción | Persistencia | — | Guarda el estado completo de la simulación en el almacenamiento local persistente (`localStorage`). |
-| **Botón "Actualizar Simulación"** | Botón de Acción | Recálculo | — | Fuerza el recálculo instantáneo de todos los motores energéticos y financieros en tiempo real. |
+| **Toggle "Aplicar margen comercial"** | Checkbox por Ítem | Booleano | `true` | • `true`: Aplica multiplicador de margen del proyecto.<br>• `false`: Pasa costo directo al cliente (pass-through). |
+| **Descuentos Comerciales** | Formulario Dinámico | Lista de descuentos | `[]` | Permite agregar deducciones comerciales al total general (motivo/nota, tipo `$`/`%`, valor y destino DGII). |
+| **Selector Tipo Descuento** | Botones Segmentados | `Fijo ($)` o `Porc. (%)` | `Fijo ($)` | • `Fijo`: Descuento en USD directo.<br>• `Porc`: Porcentaje calculado sobre el precio de lista antes de descuentos. |
+| **Destino de Deducción DGII** | Radio Selector | `general` / `equipment` | `general` | • `Global / Cortesía`: Base elegible 40% Ley 57-07 intacta.<br>• `Descuento Equipos`: Reduce base elegible ante DGII para evitar reclamo fiscal indebido. |
 
 ---
 
@@ -410,6 +452,6 @@ Esta sección explica el **significado físico, técnico y financiero de cada pa
 # Validar el motor contra el benchmark oficial de Centro Médico
 npx tsx src/tests/testBenchmark.ts
 
-# Ejecutar la suite integral de 9 pruebas unitarias financieras (incluyendo ítems extra e ITBIS)
+# Ejecutar la suite integral de 15 pruebas unitarias financieras (incluyendo ítems extra, ITBIS y descuentos comerciales)
 npx tsx src/tests/testFinancialEngineComprehensive.ts
 ```
