@@ -79,6 +79,8 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
 
   // --- 3. Datos Comerciales & Divisas ---
   const grossInvestmentUSD = summary.grossInvestmentUSD || 0;
+  const totalBeforeLeyUSD =
+    grossInvestmentUSD + (project.financials.applyITBISExemption ? summary.itbisSavedUSD || 0 : 0);
   const costPerWattUSD =
     systemCapacityKWp > 0 ? grossInvestmentUSD / (systemCapacityKWp * 1000) : project.specs.pricePerWattUSD || 0;
   const exchangeRate = project.rates.usdExchangeRate || project.specs.dopExchangeRate || 60.0;
@@ -401,7 +403,7 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
               <div className="bg-amber-500 p-2.5 border border-amber-400 flex flex-col justify-center text-slate-950">
                 <span className="text-[10.5px] text-amber-950 font-bold block">Inversión Bruta USD</span>
                 <span className="text-base font-black text-slate-950 font-mono leading-tight mt-0.5">
-                  ${grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ${totalBeforeLeyUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
                 <span className="text-[9.5px] text-amber-950 font-semibold block mt-0.5">Total antes de ley</span>
               </div>
