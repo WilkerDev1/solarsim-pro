@@ -477,7 +477,7 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
             <div className="flex-1 border-l border-white/25 pl-6 flex items-center justify-end gap-3">
               <div className="flex items-baseline gap-2">
                 <span className="text-4xl lg:text-5xl font-black tracking-tight font-mono text-white">
-                  ${netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ${grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
                 <span className="text-lg font-bold font-mono text-white/90">USD</span>
               </div>
