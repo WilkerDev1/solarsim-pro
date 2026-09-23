@@ -594,6 +594,8 @@ export function calculateFinancialSummary(
     annualProductionKWh,
     energyCoveragePct,
     grossInvestmentUSD,
+    contractPriceUSD,
+    initialOutflowUSD,
     salePricePerWattUSD,
     salePricePerKWpUSD,
     solarInvestmentUSD,

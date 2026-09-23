@@ -243,6 +243,8 @@ export interface FinancialSummaryResult {
   annualProductionKWh: number;
   energyCoveragePct: number;
   grossInvestmentUSD: number;
+  contractPriceUSD: number;      // Monto acordado y pagable en contrato Año 0 (con ITBIS exonerado si aplica)
+  initialOutflowUSD: number;     // Desembolso inicial real para flujo de caja Año 0 (= contractPriceUSD)
   salePricePerWattUSD: number;   // Real live effective turnkey sale price per Wp (e.g. 1.24)
   salePricePerKWpUSD: number;    // Real live effective turnkey sale price per kWp (e.g. 1241.69)
   solarInvestmentUSD: number;

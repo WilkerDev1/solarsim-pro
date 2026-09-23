@@ -35,7 +35,7 @@ export const PDFPage3ROI: React.FC<PDFPage3ROIProps> = ({
   totalPages,
 }) => {
   const cf25 = summary.cashFlow25Years;
-  const initialOutflowUSD = summary.grossInvestmentUSD - summary.itbisSavedUSD;
+  const initialOutflowUSD = summary.contractPriceUSD ?? summary.initialOutflowUSD ?? summary.grossInvestmentUSD;
   const cumulativeChartData = [
     { yearLabel: '0', year: 0, cumulative: -initialOutflowUSD },
     ...cf25.map((c) => ({
@@ -191,7 +191,7 @@ export const PDFPage3ROI: React.FC<PDFPage3ROIProps> = ({
                   </td>
                 </tr>
                 <tr className={`font-bold ${activeTheme.accentLightBg}`}>
-                  <td className="px-4 py-1.5" style={{ color: activeTheme.primary }}>Año {paybackYearObj.year} (Payback)</td>
+                  <td className="px-4 py-1.5" style={{ color: activeTheme.primary }}>Año {paybackYearObj.year} (Retorno: {summary.paybackYears} años)</td>
                   <td className="px-4 py-1.5 text-right">${paybackYearObj.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                   <td className="px-4 py-1.5 text-right font-bold" style={{ color: activeTheme.primary }}>
                     ${paybackYearObj.cumulativeCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}

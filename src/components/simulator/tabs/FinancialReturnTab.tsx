@@ -182,7 +182,7 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
             </tr>
 
             <tr className="hover:bg-slate-50 bg-emerald-50/60 font-bold">
-              <td className="py-2.5 px-4 text-emerald-900">Año {Math.ceil(summary.paybackYears)} (Retorno Payback)</td>
+              <td className="py-2.5 px-4 text-emerald-900">Año {Math.ceil(summary.paybackYears)} (Retorno Payback: {summary.paybackYears} años)</td>
               <td className="py-2.5 px-4 text-right">${(cf25[Math.ceil(summary.paybackYears) - 1]?.savingsUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               <td className="py-2.5 px-4 text-right text-emerald-700">${(cf25[Math.ceil(summary.paybackYears) - 1]?.taxCreditUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               <td className="py-2.5 px-4 text-right">${((cf25[Math.ceil(summary.paybackYears) - 1]?.savingsUSD || 0) + (cf25[Math.ceil(summary.paybackYears) - 1]?.taxCreditUSD || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>

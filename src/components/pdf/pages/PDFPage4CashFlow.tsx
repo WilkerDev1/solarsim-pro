@@ -68,7 +68,7 @@ export const PDFPage4CashFlow: React.FC<PDFPage4CashFlowProps> = ({
             <tbody className="divide-y divide-slate-100 text-slate-700 font-semibold text-[9px]">
               {/* Year 0 Row */}
               {(() => {
-                const initialOutflow = summary.grossInvestmentUSD - summary.itbisSavedUSD;
+                const initialOutflow = summary.contractPriceUSD ?? summary.initialOutflowUSD ?? summary.grossInvestmentUSD;
                 return (
                   <tr className="bg-red-50/70 text-red-700 font-bold">
                     <td className="px-2 py-0.5 text-center">0</td>

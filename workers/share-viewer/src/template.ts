@@ -191,7 +191,7 @@ export function renderProposalPage(stored: StoredProposal): string {
 
   // Cashflow 25 Years
   const cf25 = summary?.cashFlow25Years || [];
-  const initialOutflowUSD = grossInvestmentUSD;
+  const initialOutflowUSD = summary?.contractPriceUSD ?? summary?.initialOutflowUSD ?? grossInvestmentUSD;
   const cumulativeChartData = [
     { year: 0, cumulative: -initialOutflowUSD },
     ...cf25.map((c: any) => ({
@@ -795,7 +795,7 @@ export function renderProposalPage(stored: StoredProposal): string {
               </tr>
               <tr class="bg-orange-50 text-orange-950 font-bold border-y border-orange-200">
                 <td class="px-2.5 sm:px-4 py-2 font-black flex items-center gap-1">
-                  <span>⭐ Año ${paybackYearObj.year} (Payback)</span>
+                  <span>⭐ Año ${paybackYearObj.year} (Retorno: ${paybackYears} años)</span>
                 </td>
                 <td class="px-2.5 sm:px-4 py-2 text-right font-mono font-black whitespace-nowrap">US$ ${Number(paybackYearObj.savingsUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td class="px-2.5 sm:px-4 py-2 text-right font-mono font-black text-sky-700 whitespace-nowrap">US$ ${Number(paybackYearObj.cumulativeCashFlowUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>

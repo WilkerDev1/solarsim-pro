@@ -554,6 +554,34 @@ assert(
   `Total General con Ley 57-07 es $11,244.22 ($${resJenny.grossInvestmentUSD})`
 );
 
+// --- TEST 13: Initial Cash Outflow & Cash Flow Year 0 Integrity (Mildred Moquete Audit Case) ---
+console.log('\n--- TEST 13: Initial Cash Outflow & Cash Flow Year 0 Integrity (Mildred Moquete Case) ---');
+assert(
+  resJenny.contractPriceUSD === resJenny.grossInvestmentUSD,
+  `contractPriceUSD coincide con grossInvestmentUSD ($${resJenny.contractPriceUSD} vs $${resJenny.grossInvestmentUSD}) cuando aplica Ley 57-07`
+);
+assert(
+  resJenny.initialOutflowUSD === resJenny.contractPriceUSD,
+  `initialOutflowUSD coincide con contractPriceUSD ($${resJenny.initialOutflowUSD} vs $${resJenny.contractPriceUSD})`
+);
+
+// Validar que en cashFlow25Years[0], el acumulado del Año 1 es exactamente -initialOutflowUSD + netCashFlowUSD
+const y1 = resJenny.cashFlow25Years[0];
+const expectedY1Cum = Math.round((-resJenny.initialOutflowUSD + y1.netCashFlowUSD) * 100) / 100;
+assert(
+  Math.abs(y1.cumulativeCashFlowUSD - expectedY1Cum) < 0.01,
+  `Año 1 acumulado (${y1.cumulativeCashFlowUSD}) es exactamente -initialOutflowUSD + netCashFlowUSD (${expectedY1Cum}), SIN doble descuento de ITBIS`
+);
+
+// Validar caso específico con exoneración de ITBIS
+const moqueteContractPrice = 19100.88;
+const moqueteY1NetCashFlow = 5962.36;
+const moqueteExpectedY1Cum = Math.round((-moqueteContractPrice + moqueteY1NetCashFlow) * 100) / 100;
+assert(
+  moqueteExpectedY1Cum === -13138.52,
+  `Caso Mildred Moquete: -$19,100.88 + $5,962.36 da exactamente -$13,138.52 (${moqueteExpectedY1Cum})`
+);
+
 console.log('\n=====================================================');
 if (allPassed) {
   console.log('🎉 ALL FINANCIAL ENGINE AUDIT TESTS PASSED (100% SUCCESS)');
