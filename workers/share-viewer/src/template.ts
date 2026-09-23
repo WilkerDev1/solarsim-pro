@@ -145,9 +145,41 @@ export function renderProposalPage(stored: StoredProposal): string {
   const monthlyAvgConsumption = Math.round(annualConsumptionKWh / 12);
 
   const grossInvestmentUSD = Number(summary?.grossInvestmentUSD || 0);
-  const listGrossInvestmentUSD = Number(summary?.listGrossInvestmentUSD || grossInvestmentUSD);
-  const totalDiscountUSD = Number(summary?.totalDiscountUSD || 0);
-  const equipmentDiscountUSD = Number(summary?.equipmentDiscountUSD || 0);
+  const hasSummaryDiscountFields = summary && typeof summary.totalDiscountUSD === 'number';
+  let totalDiscountUSD = Number(summary?.totalDiscountUSD || 0);
+  let equipmentDiscountUSD = Number(summary?.equipmentDiscountUSD || 0);
+  let listGrossInvestmentUSD = Number(summary?.listGrossInvestmentUSD || (hasSummaryDiscountFields ? grossInvestmentUSD : 0));
+
+  // Fallback para propuestas previas donde summary no incluía los campos calculados de descuento
+  if (!hasSummaryDiscountFields && Array.isArray(financials?.customDiscounts) && financials.customDiscounts.length > 0) {
+    let fallbackTotal = 0;
+    let fallbackEquip = 0;
+    const baseList = listGrossInvestmentUSD > 0 ? listGrossInvestmentUSD : grossInvestmentUSD;
+    for (const disc of financials.customDiscounts) {
+      let amt = 0;
+      if (disc.type === 'percentage') {
+        const pct = Math.max(0, Math.min(100, Number(disc.value) || 0));
+        amt = baseList * (pct / 100);
+      } else {
+        amt = Math.max(0, Number(disc.value) || 0);
+      }
+      amt = Math.round(amt * 100) / 100;
+      fallbackTotal += amt;
+      if (disc.target === 'equipment') {
+        fallbackEquip += amt;
+      }
+    }
+    totalDiscountUSD = fallbackTotal;
+    equipmentDiscountUSD = fallbackEquip;
+    if (listGrossInvestmentUSD === 0 && totalDiscountUSD > 0) {
+      listGrossInvestmentUSD = grossInvestmentUSD + totalDiscountUSD;
+    }
+  }
+
+  if (listGrossInvestmentUSD <= 0) {
+    listGrossInvestmentUSD = grossInvestmentUSD;
+  }
+
   const laborPortionUSD = Number(summary?.laborPortionUSD || summary?.costMatrix?.laborVentaUSD || 0);
   const equipmentPortionUSD = Number(summary?.equipmentPortionUSD || summary?.costMatrix?.equipmentVentaUSD || Math.max(0, grossInvestmentUSD - laborPortionUSD) || grossInvestmentUSD);
   const itbisSavedUSD = Number(summary?.itbisSavedUSD || 0);
