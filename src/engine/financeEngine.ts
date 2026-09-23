@@ -513,7 +513,7 @@ export function calculateFinancialSummary(
 
   // Equipment Portion (Paneles, Inversores y Baterías con margen) - Base estricta para Ley 57-07 (excluye mano de obra y custom items)
   const rawEquipmentPortionUSD = Math.round((costMatrix.equipmentVentaUSD || (baseGrossInvestmentUSD - (costMatrix.laborVentaUSD || 0))) * 100) / 100;
-  // Si el descuento comercial fue imputado a equipos (target: 'equipment'), reduce la base elegible ante la DGII
+  // Si el descuento fue imputado a equipos (target: 'equipment'), reduce la base elegible ante la DGII
   const equipmentPortionUSD = Math.max(0, Math.round((rawEquipmentPortionUSD - equipmentDiscountUSD) * 100) / 100);
 
   // Solar and Battery investment components breakdown

@@ -145,6 +145,9 @@ export function renderProposalPage(stored: StoredProposal): string {
   const monthlyAvgConsumption = Math.round(annualConsumptionKWh / 12);
 
   const grossInvestmentUSD = Number(summary?.grossInvestmentUSD || 0);
+  const listGrossInvestmentUSD = Number(summary?.listGrossInvestmentUSD || grossInvestmentUSD);
+  const totalDiscountUSD = Number(summary?.totalDiscountUSD || 0);
+  const equipmentDiscountUSD = Number(summary?.equipmentDiscountUSD || 0);
   const laborPortionUSD = Number(summary?.laborPortionUSD || summary?.costMatrix?.laborVentaUSD || 0);
   const equipmentPortionUSD = Number(summary?.equipmentPortionUSD || summary?.costMatrix?.equipmentVentaUSD || Math.max(0, grossInvestmentUSD - laborPortionUSD) || grossInvestmentUSD);
   const itbisSavedUSD = Number(summary?.itbisSavedUSD || 0);
@@ -162,6 +165,7 @@ export function renderProposalPage(stored: StoredProposal): string {
       ? (grossInvestmentUSD - customItemsNonExoneratedITBISUSD)
       : (grossInvestmentUSD - itbisSavedUSD - customItemsNonExoneratedITBISUSD))
   );
+  const listTotalConITBIS = listGrossInvestmentUSD + (applyITBISExemption ? itbisSavedUSD : 0);
   const pricePerWattUSD = Number(
     (summary as any)?.salePricePerWattUSD ||
     (Number(systemCapacityKWp) > 0 ? (grossInvestmentUSD / (Number(systemCapacityKWp) * 1000)) : 0) ||
@@ -643,12 +647,21 @@ export function renderProposalPage(stored: StoredProposal): string {
           </div>
           <div class="flex items-center justify-between gap-2 text-slate-900 bg-sky-200/50 px-2.5 py-1 rounded-lg font-bold">
             <span class="text-[10.5px] sm:text-xs">TOTAL GENERAL (USD):</span>
-            <span class="font-mono font-bold shrink-0">US$ ${(grossInvestmentUSD + (applyITBISExemption ? itbisSavedUSD : 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <span class="font-mono font-bold shrink-0">US$ ${listTotalConITBIS.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
           <div class="flex items-center justify-between gap-2 text-sky-800 font-semibold text-[10.5px] sm:text-[11px]">
             <span>ITBIS A DESCONTAR LEY 57-07:</span>
             <span class="font-mono font-bold text-sky-700 shrink-0">- US$ ${itbisSavedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
+          ${totalDiscountUSD > 0 ? `
+          <div class="flex items-center justify-between gap-2 text-rose-700 bg-rose-50 border border-rose-200/80 px-2.5 py-1 rounded-lg font-bold">
+            <span class="text-[10.5px] sm:text-xs flex items-center gap-1">
+              DESCUENTO:
+              ${equipmentDiscountUSD > 0 ? '<span class="text-[9px] font-normal text-amber-700">(Equipos Ley 57-07)</span>' : ''}
+            </span>
+            <span class="font-mono font-bold shrink-0 text-rose-600">- US$ ${totalDiscountUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          </div>
+          ` : ''}
           <div class="flex items-center justify-between gap-2 text-white bg-slate-900 px-3 py-1.5 rounded-xl font-bold">
             <span class="text-[10.5px] sm:text-xs">TOTAL GENERAL (CON LEY 57-07):</span>
             <span class="font-mono font-black text-orange-400 text-xs sm:text-sm shrink-0">US$ ${grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>

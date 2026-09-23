@@ -263,7 +263,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
             {(summary.totalDiscountUSD || 0) > 0 && (
               <div className="flex justify-between text-rose-600 bg-rose-50/80 px-2 py-0.5 rounded font-bold border border-rose-200/70">
                 <span className="flex items-center gap-1">
-                  DESCUENTO COMERCIAL :
+                  DESCUENTO :
                   {summary.equipmentDiscountUSD ? (
                     <span className="text-[9px] font-normal text-amber-700">(Equipos Ley 57-07)</span>
                   ) : null}

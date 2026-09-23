@@ -197,7 +197,7 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
               {(summary.totalDiscountUSD || 0) > 0 && (
                 <div className="flex justify-between text-rose-600 bg-rose-50/80 px-2 py-1 rounded font-bold border border-rose-200">
                   <span className="flex items-center gap-1">
-                    DESCUENTO COMERCIAL :
+                    DESCUENTO :
                     {summary.equipmentDiscountUSD ? (
                       <span className="text-[9.5px] font-normal text-amber-700">(Equipos Ley 57-07)</span>
                     ) : null}
@@ -504,7 +504,7 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
                     </span>
                   </div>
                   <div className="flex justify-between text-rose-600 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded font-bold">
-                    <span>Descuento Comercial :</span>
+                    <span>Descuento :</span>
                     <span>
                       {costTableCurrency === 'USD' ? (
                         <strong>-${(summary.costMatrix.totalDiscountUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</strong>

@@ -403,13 +403,13 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
             )}
           </div>
 
-          {/* Apartado de Descuentos Comerciales */}
+          {/* Apartado de Descuentos */}
           <div className={`pt-3 border-t ${isDark ? 'border-zinc-800' : 'border-slate-200'}`}>
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-1.5">
                 <Tag className="w-3.5 h-3.5 text-rose-500" />
                 <span className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-200' : 'text-slate-700'}`}>
-                  Descuentos Comerciales
+                  Descuentos
                 </span>
                 {customDiscounts.length > 0 && (
                   <span className="px-1.5 py-0.2 bg-rose-500/20 text-rose-600 dark:text-rose-400 text-[10px] font-extrabold rounded-full">
@@ -421,7 +421,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
                 type="button"
                 onClick={handleAddDiscount}
                 className="px-2 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-[10.5px] font-bold flex items-center gap-1 transition-all shadow-2xs hover:scale-105 active:scale-95 cursor-pointer"
-                title="Agregar un descuento comercial al total general"
+                title="Agregar un descuento al total general"
               >
                 <Plus className="w-3 h-3" />
                 <span>Agregar Descuento</span>
@@ -434,7 +434,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
                   isDark ? 'border-zinc-800 bg-[#1e1e28]/40 text-zinc-400' : 'border-slate-200 bg-slate-50/60 text-slate-500'
                 }`}
               >
-                Sin descuentos comerciales. Haz clic en <span className="font-bold text-rose-600 dark:text-rose-400">+ Agregar Descuento</span> para añadir una cortesía comercial, cierre especial o descuento de equipos.
+                Sin descuentos. Haz clic en <span className="font-bold text-rose-600 dark:text-rose-400">+ Agregar Descuento</span> para añadir una cortesía comercial, cierre especial o descuento de equipos.
               </div>
             ) : (
               <div className="space-y-2.5">
@@ -580,7 +580,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
                             </span>
                           ) : (
                             <span className="text-emerald-700 dark:text-emerald-400 font-medium">
-                              ✓ Descuento comercial general; la base de equipos renovables ante DGII se mantiene al 100%.
+                              ✓ Descuento general; la base de equipos renovables ante DGII se mantiene al 100%.
                             </span>
                           )}
                         </div>
@@ -589,14 +589,14 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
                   );
                 })}
 
-                {/* Resumen Total de Descuentos Comerciales */}
+                {/* Resumen Total de Descuentos */}
                 <div
                   className={`p-2.5 rounded-lg border flex justify-between items-center text-xs font-bold ${
                     isDark ? 'border-rose-950/60 bg-[#20151c] text-zinc-200' : 'border-rose-200 bg-rose-50/80 text-rose-950'
                   }`}
                 >
                   <div>
-                    <span className="block">Total Descuentos Comerciales:</span>
+                    <span className="block">Total Descuentos:</span>
                     <span className="text-[10px] font-normal text-slate-500 dark:text-zinc-400">
                       Lista: ${estimatedListPriceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} → Final: ${(Math.max(0, estimatedListPriceUSD - totalDiscountUSD)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
                     </span>

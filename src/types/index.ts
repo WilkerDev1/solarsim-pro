@@ -159,7 +159,7 @@ export interface FinancialParams {
   projectLifespanYears: number;  // e.g. 25
   co2FactorKgPerKWh: number;     // kg CO2 per kWh e.g. 0.481
   customItems?: CustomQuotationItem[]; // Custom additional items/services with individual ITBIS toggle
-  customDiscounts?: CustomQuotationDiscount[]; // Descuentos comerciales aplicados al total general
+  customDiscounts?: CustomQuotationDiscount[]; // Descuentos aplicados al total general
 }
 
 export interface CostMatrixItem {
@@ -220,7 +220,7 @@ export interface CostMatrixSummary {
   customItemsItbisDOP?: number;
   listPorcentajeVentaUSD?: number; // Precio de venta de lista antes de descuentos
   listPorcentajeVentaDOP?: number;
-  totalDiscountUSD?: number;       // Suma de descuentos comerciales aplicados
+  totalDiscountUSD?: number;       // Suma de descuentos aplicados
   totalDiscountDOP?: number;
 }
 
@@ -257,9 +257,9 @@ export interface FinancialSummaryResult {
   annualProductionKWh: number;
   energyCoveragePct: number;
   listGrossInvestmentUSD?: number; // Inversión Bruta de Lista antes de descuentos
-  totalDiscountUSD?: number;       // Total descuentos comerciales aplicados (USD)
+  totalDiscountUSD?: number;       // Total descuentos aplicados (USD)
   equipmentDiscountUSD?: number;   // Descuento imputado a equipos (afecta base Ley 57-07)
-  grossInvestmentUSD: number;      // Inversión Bruta Final tras descuentos comerciales
+  grossInvestmentUSD: number;      // Inversión Bruta Final tras descuentos
   contractPriceUSD: number;      // Monto acordado y pagable en contrato Año 0 (con ITBIS exonerado si aplica)
   initialOutflowUSD: number;     // Desembolso inicial real para flujo de caja Año 0 (= contractPriceUSD)
   salePricePerWattUSD: number;   // Real live effective turnkey sale price per Wp (e.g. 1.24)
