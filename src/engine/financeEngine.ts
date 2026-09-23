@@ -211,8 +211,23 @@ export function calculateCostMatrixSummary(
   const totalNetoDOP = precioNetoDOP + itbisDOP;
   const totalNetoUSD = totalNetoDOP / rate;
 
-  const porcentajeVentaDOP = totalNetoDOP * margin;
-  const porcentajeVentaUSD = totalNetoUSD * margin;
+  // Calculate custom items contribution to projected sale price based on applyMargin
+  let customItemsVentaUSD = 0;
+  for (const cItem of customItems || []) {
+    const qty = cItem.quantity || 1;
+    const unitUSD = cItem.unitPriceUSD || 0;
+    const itemTotalUSD = qty * unitUSD;
+    const isExonerated = cItem.exonerateITBIS !== undefined ? cItem.exonerateITBIS : (cItem.applyITBIS ?? true);
+    const itemItbisUSD = isExonerated ? 0 : itemTotalUSD * 0.18;
+    const itemCostWithTaxUSD = itemTotalUSD + itemItbisUSD;
+    // If applyMargin === false: pass-through direct cost (1.00x). If applyMargin !== false: project margin multiplier (e.g. 1.40x)
+    const itemMultiplier = cItem.applyMargin === false ? 1.0 : margin;
+    customItemsVentaUSD += itemCostWithTaxUSD * itemMultiplier;
+  }
+  const customItemsVentaDOP = customItemsVentaUSD * rate;
+
+  const porcentajeVentaUSD = Math.round((basePorcentajeVentaUSD + customItemsVentaUSD) * 100) / 100;
+  const porcentajeVentaDOP = Math.round(porcentajeVentaUSD * rate * 100) / 100;
 
   // Solar Only Subtotal (Paneles + Inversores + Instalación sin Baterías)
   const solarOnlyNetDOP = panelTotalDOP + inverterTotalDOP + installTotalDOP;
@@ -357,19 +372,26 @@ export function calculateFinancialSummary(
   const customItemsTotalUSD = Math.round(customItems.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPriceUSD || 0)), 0) * 100) / 100;
   
   // ITBIS differentiation: Exonerated by Ley 57-07 vs Charged to Client
+  let customItemsSaleTotalUSD = 0;
   let exoneratedCustomITBISUSD = 0;
   let nonExoneratedCustomITBISUSD = 0;
 
   for (const item of customItems) {
     const itemTotal = (item.quantity || 0) * (item.unitPriceUSD || 0);
     const isExonerated = item.exonerateITBIS !== undefined ? item.exonerateITBIS : (item.applyITBIS ?? true);
+    // If applyMargin === true: applies project margin multiplier. If applyMargin === false or undefined: pass-through direct cost
+    const itemMargin = item.applyMargin === true ? (costMatrix.saleMarginMultiplier || specs.saleMarginMultiplier || 1.25) : 1.0;
+    const itemSalePreTax = itemTotal * itemMargin;
+
+    customItemsSaleTotalUSD += itemSalePreTax;
     if (isExonerated) {
-      exoneratedCustomITBISUSD += itemTotal * 0.18;
+      exoneratedCustomITBISUSD += itemSalePreTax * 0.18;
     } else {
-      nonExoneratedCustomITBISUSD += itemTotal * 0.18;
+      nonExoneratedCustomITBISUSD += itemSalePreTax * 0.18;
     }
   }
 
+  customItemsSaleTotalUSD = Math.round(customItemsSaleTotalUSD * 100) / 100;
   exoneratedCustomITBISUSD = Math.round(exoneratedCustomITBISUSD * 100) / 100;
   nonExoneratedCustomITBISUSD = Math.round(nonExoneratedCustomITBISUSD * 100) / 100;
   const customItemsITBISUSD = exoneratedCustomITBISUSD;
@@ -377,16 +399,21 @@ export function calculateFinancialSummary(
   // Base Gross Investment:
   // 1. If explicit custom override is set, use it.
   // 2. If direct_watt mode: Total turnkey sale price is directly (dcCapacityKWp * 1000 * effectivePricePerWatt) - all inclusive.
-  // 3. If cost_matrix mode: Turnkey total sale price of base system (excluding pass-through custom items to avoid double counting).
+  // 3. If cost_matrix mode: Turnkey total sale price of base system.
   const baseGrossInvestmentUSD = financials.customCostUSD && financials.customCostUSD > 0
     ? financials.customCostUSD
     : (isDirectWatt
         ? Math.round(dcCapacityKWp * 1000 * effectivePricePerWatt * 100) / 100
-        : Math.round((costMatrix.basePorcentajeVentaUSD ?? (costMatrix.porcentajeVentaUSD - customItemsTotalUSD)) * 100) / 100);
+        : Math.round((costMatrix.basePorcentajeVentaUSD || costMatrix.porcentajeVentaUSD || 0) * 100) / 100);
 
   // If item is not exonerated, ITBIS is charged to the client in the final gross price
-  const grossInvestmentUSD = Math.round((baseGrossInvestmentUSD + customItemsTotalUSD + nonExoneratedCustomITBISUSD) * 100) / 100;
-  const commercialPreTaxSubtotalUSD = Math.round((baseGrossInvestmentUSD + customItemsTotalUSD) * 100) / 100;
+  const grossInvestmentUSD = financials.customCostUSD && financials.customCostUSD > 0
+    ? financials.customCostUSD
+    : (isDirectWatt
+        ? Math.round((baseGrossInvestmentUSD + customItemsSaleTotalUSD + nonExoneratedCustomITBISUSD) * 100) / 100
+        : Math.round(costMatrix.porcentajeVentaUSD * 100) / 100);
+
+  const commercialPreTaxSubtotalUSD = Math.round((grossInvestmentUSD - nonExoneratedCustomITBISUSD) * 100) / 100;
 
   // Synchronize Cost Matrix with Direct Price in direct_watt mode
   if (isDirectWatt) {
@@ -446,7 +473,7 @@ export function calculateFinancialSummary(
   const matrixITBISUSD = costMatrix.baseItbisUSD !== undefined ? costMatrix.baseItbisUSD : (costMatrix.itbisUSD || 0);
   const commercialITBISUSD = Math.round(matrixITBISUSD * (costMatrix.saleMarginMultiplier || specs.saleMarginMultiplier || 1.25) * 100) / 100;
 
-  const baseITBISSaved = financials.customITBISSavedUSD !== undefined
+  const baseITBISSaved = (financials.customITBISSavedUSD !== undefined && financials.customITBISSavedUSD > 0)
     ? financials.customITBISSavedUSD
     : commercialITBISUSD;
 

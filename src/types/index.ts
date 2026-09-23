@@ -136,6 +136,7 @@ export interface CustomQuotationItem {
   unit?: string;           // e.g. 'UD', 'GL', 'M', 'PZA' (Default: 'UD')
   unitPriceUSD: number;
   exonerateITBIS: boolean; // true = Exonerar ITBIS (18%) por Ley 57-07 | false = Cobrar ITBIS (18%) en la cotización final
+  applyMargin?: boolean;   // true = Aplica margen comercial del proyecto (ej. 1.40x) | false = Costo directo pass-through (sin margen)
   applyITBIS?: boolean;    // Backwards compatibility alias
 }
 

@@ -133,12 +133,13 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
         annualEnergyInflationPct: defs?.annualEnergyTariffEscalationPct || 3.5,
       },
       financials: {
-        ...BENCHMARK_PROJECT.financials,
+        applyLey5707: defs?.applyLey5707 !== undefined ? defs.applyLey5707 : true,
+        applyITBISExemption: defs?.applyITBISExemption !== undefined ? defs.applyITBISExemption : true,
         pricePerWattUSD: defs?.defaultDirectPriceUSDPerWp || 1.05,
         discountRatePct: defs?.discountRatePct || 12,
-        applyITBISExemption: defs?.applyITBISExemption !== undefined ? defs.applyITBISExemption : true,
-        applyLey5707: defs?.applyLey5707 !== undefined ? defs.applyLey5707 : true,
         projectLifespanYears: defs?.lifespanYears || 25,
+        co2FactorKgPerKWh: BENCHMARK_PROJECT.financials?.co2FactorKgPerKWh || 0.481,
+        customItems: [],
       },
     };
 
@@ -164,6 +165,11 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     const dupIdentifiers = generateDuplicateProjectIdentifiers(original, get().projects);
     const newId = `proj-${Date.now()}`;
     const currentUser = get().syncSettings?.currentUser;
+    const clonedFinancials = { ...original.financials };
+    delete clonedFinancials.customITBISSavedUSD;
+    delete clonedFinancials.customLey5707CreditUSD;
+    delete clonedFinancials.customCostUSD;
+
     const cloned: ProjectSimulation = {
       ...original,
       id: newId,
@@ -183,6 +189,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
         projectId: dupIdentifiers.projectId,
         quoteNumber: dupIdentifiers.quoteNumber,
       },
+      financials: clonedFinancials,
     };
 
     set((state) => ({
@@ -490,11 +497,24 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
       }
 
       return {
-        projects: state.projects.map((p) =>
-          p.id === state.activeProjectId
-            ? { ...p, syncStatus: 'pending' as const, updatedAt: new Date().toISOString(), specs: mergedSpecs }
-            : p
-        ),
+        projects: state.projects.map((p) => {
+          if (p.id === state.activeProjectId) {
+            const nextFinancials = { ...p.financials };
+            if (p.id !== 'benchmark-centro-medico') {
+              delete nextFinancials.customITBISSavedUSD;
+              delete nextFinancials.customLey5707CreditUSD;
+              delete nextFinancials.customCostUSD;
+            }
+            return {
+              ...p,
+              syncStatus: 'pending' as const,
+              updatedAt: new Date().toISOString(),
+              specs: mergedSpecs,
+              financials: nextFinancials,
+            };
+          }
+          return p;
+        }),
       };
     });
 
@@ -539,16 +559,23 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
 
   updateFinancials: (finPartial) => {
     set((state) => ({
-      projects: state.projects.map((p) =>
-        p.id === state.activeProjectId
-          ? {
-              ...p,
-              syncStatus: 'pending' as const,
-              updatedAt: new Date().toISOString(),
-              financials: { ...p.financials, ...finPartial },
-            }
-          : p
-      ),
+      projects: state.projects.map((p) => {
+        if (p.id === state.activeProjectId) {
+          const nextFinancials = { ...p.financials, ...finPartial };
+          if (p.id !== 'benchmark-centro-medico') {
+            delete nextFinancials.customITBISSavedUSD;
+            delete nextFinancials.customLey5707CreditUSD;
+            delete nextFinancials.customCostUSD;
+          }
+          return {
+            ...p,
+            syncStatus: 'pending' as const,
+            updatedAt: new Date().toISOString(),
+            financials: nextFinancials,
+          };
+        }
+        return p;
+      }),
     }));
 
     get().triggerAutoSync(false);

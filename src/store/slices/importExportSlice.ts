@@ -124,10 +124,23 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
           ...(raw.rates || {}),
           energyCostPerKWh: typeof raw.rates?.energyCostPerKWh === 'number' && raw.rates.energyCostPerKWh > 0 ? raw.rates.energyCostPerKWh : 0.20,
         },
-        financials: {
-          ...BENCHMARK_PROJECT.financials,
-          ...(raw.financials || {}),
-        },
+        financials: (() => {
+          const rawFin = raw.financials || {};
+          const fin = {
+            ...rawFin,
+            applyLey5707: rawFin.applyLey5707 !== undefined ? rawFin.applyLey5707 : true,
+            applyITBISExemption: rawFin.applyITBISExemption !== undefined ? rawFin.applyITBISExemption : true,
+            pricePerWattUSD: rawFin.pricePerWattUSD || 1.05,
+            discountRatePct: rawFin.discountRatePct || 12,
+            projectLifespanYears: rawFin.projectLifespanYears || 25,
+            co2FactorKgPerKWh: rawFin.co2FactorKgPerKWh || 0.481,
+            customItems: Array.isArray(rawFin.customItems) ? rawFin.customItems : [],
+          };
+          delete (fin as any).customITBISSavedUSD;
+          delete (fin as any).customLey5707CreditUSD;
+          delete (fin as any).customCostUSD;
+          return fin;
+        })(),
         monthlyConsumption: Array.isArray(raw.monthlyConsumption) && raw.monthlyConsumption.length === 12
           ? raw.monthlyConsumption.map((v: any) => typeof v === 'number' && !isNaN(v) && v >= 0 ? v : 1000)
           : [...BENCHMARK_PROJECT.monthlyConsumption],

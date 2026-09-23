@@ -115,6 +115,24 @@ export const useSimulationStore = create<SimulationStore>()(
                 },
               };
             }
+            // Sanitize legacy ghost overrides from all stored projects to guarantee 100% dynamic calculation
+            if (updated.financials && updated.id !== 'benchmark-centro-medico') {
+              if (
+                updated.financials.customITBISSavedUSD !== undefined ||
+                updated.financials.customLey5707CreditUSD !== undefined ||
+                updated.financials.customCostUSD !== undefined
+              ) {
+                hasChanges = true;
+                const nextFin = { ...updated.financials };
+                delete nextFin.customITBISSavedUSD;
+                delete nextFin.customLey5707CreditUSD;
+                delete nextFin.customCostUSD;
+                updated = {
+                  ...updated,
+                  financials: nextFin,
+                };
+              }
+            }
             return updated;
           });
           if (hasChanges) {

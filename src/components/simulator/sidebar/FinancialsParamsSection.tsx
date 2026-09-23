@@ -28,6 +28,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
       unitPriceUSD: 0,
       exonerateITBIS: true,
       applyITBIS: true,
+      applyMargin: true,
     };
     updateFinancials({ customItems: [...customItems, newItem] });
   };
@@ -297,6 +298,26 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
                           {isExonerated
                             ? `Exonerado: -$${(itemTotalUSD * 0.18).toFixed(2)} (Ley 57-07)`
                             : `Se cobra ITBIS: +$${(itemTotalUSD * 0.18).toFixed(2)}`}
+                        </span>
+                      </div>
+
+                      {/* Fila 4: Toggle Margen Comercial de Venta */}
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-zinc-800/80">
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={item.applyMargin !== false}
+                            onChange={(e) => handleUpdateItem(item.id, { applyMargin: e.target.checked })}
+                            className="rounded text-emerald-700 focus:ring-emerald-600 cursor-pointer"
+                          />
+                          <span className="text-[10.5px] font-medium text-slate-600 dark:text-zinc-300">
+                            Aplicar margen comercial ({project.specs?.saleMarginMultiplier || 1.25}x)
+                          </span>
+                        </label>
+                        <span className={`text-[10px] font-semibold ${item.applyMargin !== false ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-zinc-400'}`}>
+                          {item.applyMargin !== false
+                            ? `Con margen: $${(itemTotalUSD * (project.specs?.saleMarginMultiplier || 1.25)).toFixed(2)}`
+                            : `Costo directo: $${itemTotalUSD.toFixed(2)}`}
                         </span>
                       </div>
                     </div>

@@ -329,6 +329,7 @@ const giovanniFinancials: FinancialParams = {
       unit: 'UD',
       unitPriceUSD: 500,
       exonerateITBIS: false, // $90 de ITBIS no exonerado
+      applyMargin: false, // Pass-through direct cost (1.00x)
     },
   ],
 };
@@ -377,6 +378,10 @@ assert(
 assert(
   Math.abs(resGiovanni.grossInvestmentUSD - 16577.36) < 0.01,
   `Total a pagar final con Ley 57-07 es $16,577.36 ($${resGiovanni.grossInvestmentUSD})`
+);
+assert(
+  Math.abs(resGiovanni.costMatrix.porcentajeVentaUSD - 16577.36) < 0.01,
+  `Cost Matrix porcentajeVentaUSD coincide exactamente con grossInvestmentUSD ($${resGiovanni.costMatrix.porcentajeVentaUSD})`
 );
 
 // 6. Validar que la brecha Total General - Subtotal sea estrictamente el ITBIS total ($1,678.78), NUNCA 7.4K
@@ -544,30 +549,64 @@ assert(
   `Ganancia Proyectada DOP coincide con Excel: RD$ 202,467.74 ($${resJenny.costMatrix.gananciaDOP})`
 );
 
-// 3. Validar cotización comercial
+// 3. Validar cotización comercial con margen aplicado (Modo Con Margen)
 assert(
-  Math.abs(resJenny.commercialPreTaxSubtotalUSD! - 11028.22) < 0.01,
-  `Sub-total sin ITBIS en Cotización es $11,028.22 ($${resJenny.commercialPreTaxSubtotalUSD})`
+  Math.abs(resJenny.costMatrix.porcentajeVentaUSD - 11810.62) < 0.01,
+  `Porcentaje venta (1.40x) de la matriz coincide exactamente con Excel: $11,810.62 ($${resJenny.costMatrix.porcentajeVentaUSD})`
 );
 assert(
-  Math.abs(resJenny.grossInvestmentUSD - 11244.22) < 0.01,
-  `Total General con Ley 57-07 es $11,244.22 ($${resJenny.grossInvestmentUSD})`
+  Math.abs(resJenny.grossInvestmentUSD - 11810.62) < 0.01,
+  `Total General Cotización coincide 100% con Hoja de Costos: $11,810.62 ($${resJenny.grossInvestmentUSD})`
+);
+assert(
+  Math.abs(resJenny.commercialPreTaxSubtotalUSD! - 11594.62) < 0.01,
+  `Sub-total sin ITBIS en Cotización (con margen) es $11,594.62 ($${resJenny.commercialPreTaxSubtotalUSD})`
+);
+
+// 4. Validar modo Pass-Through directo (sin margen)
+const jennyFinancialsPassThrough: FinancialParams = {
+  ...jennyFinancials,
+  customItems: [
+    {
+      ...jennyFinancials.customItems![0],
+      applyMargin: false,
+    },
+  ],
+};
+const resJennyPass = calculateFinancialSummary(
+  'Santo Domingo / Distrito Nacional',
+  jennySpecs,
+  defaultRates,
+  jennyFinancialsPassThrough,
+  monthlyConsumption
+);
+assert(
+  Math.abs(resJennyPass.commercialPreTaxSubtotalUSD! - 11028.22) < 0.01,
+  `Sub-total sin ITBIS en Cotización (pass-through) es $11,028.22 ($${resJennyPass.commercialPreTaxSubtotalUSD})`
+);
+assert(
+  Math.abs(resJennyPass.grossInvestmentUSD - 11244.22) < 0.01,
+  `Total General Cotización (pass-through) es $11,244.22 ($${resJennyPass.grossInvestmentUSD})`
+);
+assert(
+  Math.abs(resJennyPass.costMatrix.porcentajeVentaUSD - 11244.22) < 0.01,
+  `Hoja de Costos (pass-through) coincide 100% con Cotización: $11,244.22 ($${resJennyPass.costMatrix.porcentajeVentaUSD})`
 );
 
 // --- TEST 13: Initial Cash Outflow & Cash Flow Year 0 Integrity (Mildred Moquete Audit Case) ---
 console.log('\n--- TEST 13: Initial Cash Outflow & Cash Flow Year 0 Integrity (Mildred Moquete Case) ---');
 assert(
-  resJenny.contractPriceUSD === resJenny.grossInvestmentUSD,
-  `contractPriceUSD coincide con grossInvestmentUSD ($${resJenny.contractPriceUSD} vs $${resJenny.grossInvestmentUSD}) cuando aplica Ley 57-07`
+  resJennyPass.contractPriceUSD === resJennyPass.grossInvestmentUSD,
+  `contractPriceUSD coincide con grossInvestmentUSD ($${resJennyPass.contractPriceUSD} vs $${resJennyPass.grossInvestmentUSD}) cuando aplica Ley 57-07`
 );
 assert(
-  resJenny.initialOutflowUSD === resJenny.contractPriceUSD,
-  `initialOutflowUSD coincide con contractPriceUSD ($${resJenny.initialOutflowUSD} vs $${resJenny.contractPriceUSD})`
+  resJennyPass.initialOutflowUSD === resJennyPass.contractPriceUSD,
+  `initialOutflowUSD coincide con contractPriceUSD ($${resJennyPass.initialOutflowUSD} vs $${resJennyPass.contractPriceUSD})`
 );
 
 // Validar que en cashFlow25Years[0], el acumulado del Año 1 es exactamente -initialOutflowUSD + netCashFlowUSD
-const y1 = resJenny.cashFlow25Years[0];
-const expectedY1Cum = Math.round((-resJenny.initialOutflowUSD + y1.netCashFlowUSD) * 100) / 100;
+const y1 = resJennyPass.cashFlow25Years[0];
+const expectedY1Cum = Math.round((-resJennyPass.initialOutflowUSD + y1.netCashFlowUSD) * 100) / 100;
 assert(
   Math.abs(y1.cumulativeCashFlowUSD - expectedY1Cum) < 0.01,
   `Año 1 acumulado (${y1.cumulativeCashFlowUSD}) es exactamente -initialOutflowUSD + netCashFlowUSD (${expectedY1Cum}), SIN doble descuento de ITBIS`
@@ -580,6 +619,83 @@ const moqueteExpectedY1Cum = Math.round((-moqueteContractPrice + moqueteY1NetCas
 assert(
   moqueteExpectedY1Cum === -13138.52,
   `Caso Mildred Moquete: -$19,100.88 + $5,962.36 da exactamente -$13,138.52 (${moqueteExpectedY1Cum})`
+);
+
+// --- TEST 14: Universal Project Duplication and Dynamic Equipment Recalculation ---
+console.log('\n--- TEST 14: Universal Project Duplication and Dynamic Equipment Recalculation ---');
+
+// Project A: Large system with 3 batteries
+const projectASpecs: SystemSpecs = {
+  ...defaultSpecs,
+  panelCount: 38,
+  panelPowerW: 620, // 23.56 kWp
+  panelUnitPriceUSD: 103.32,
+  inverterPowerKW: 8,
+  inverterCount: 2,
+  inverterUnitPriceUSD: 2300,
+  hasBattery: true,
+  batteryCount: 3,
+  batteryCapacityKWh: 16.08,
+  batteryUnitPriceUSD: 1990,
+  installationUnitPriceUSD: 170,
+  pricingMode: 'cost_matrix',
+  saleMarginMultiplier: 1.25,
+};
+
+const projectAFinancials: FinancialParams = {
+  ...defaultFinancials,
+  applyITBISExemption: true,
+  applyLey5707: true,
+};
+
+const resProjectA = calculateFinancialSummary(
+  'Santo Domingo / Distrito Nacional',
+  projectASpecs,
+  defaultRates,
+  projectAFinancials,
+  monthlyConsumption
+);
+
+// Verify Project A dynamic ITBIS is calculated from equipment (not hardcoded)
+assert(resProjectA.itbisSavedUSD > 2000, `Project A ITBIS exonerado es dinámico ($${resProjectA.itbisSavedUSD} > 2000)`);
+assert(resProjectA.grossInvestmentUSD === resProjectA.costMatrix.porcentajeVentaUSD, 'Project A Cotización y Hoja de Costos coinciden');
+
+// Simulate cloning project and modifying equipment: removing batteries, changing inverter to 10kW
+const clonedSpecs: SystemSpecs = {
+  ...projectASpecs,
+  panelCount: 16,
+  panelPowerW: 590, // 9.44 kWp
+  inverterCount: 1,
+  inverterPowerKW: 10,
+  inverterUnitPriceUSD: 1800,
+  hasBattery: false,
+  batteryCount: 0,
+};
+
+// Cloned financials: MUST NOT carry any ghost overrides
+const clonedFinancials: FinancialParams = {
+  ...projectAFinancials,
+};
+delete (clonedFinancials as any).customITBISSavedUSD;
+delete (clonedFinancials as any).customLey5707CreditUSD;
+delete (clonedFinancials as any).customCostUSD;
+
+const resCloned = calculateFinancialSummary(
+  'Santo Domingo / Distrito Nacional',
+  clonedSpecs,
+  defaultRates,
+  clonedFinancials,
+  monthlyConsumption
+);
+
+// Dynamic recalculation validations
+assert(resCloned.systemCapacityKWp === 9.44, `Capacidad clonada es 9.44 kWp (${resCloned.systemCapacityKWp})`);
+assert(resCloned.batteryInvestmentUSD === 0, 'Inversión en baterías es 0 tras removerlas');
+assert(resCloned.itbisSavedUSD < resProjectA.itbisSavedUSD, `ITBIS exonerado se redujo proporcionalmente ($${resCloned.itbisSavedUSD} < $${resProjectA.itbisSavedUSD})`);
+assert(resCloned.itbisSavedUSD > 0, `ITBIS exonerado para 9.44 kWp es positivo ($${resCloned.itbisSavedUSD})`);
+assert(
+  resCloned.grossInvestmentUSD === resCloned.costMatrix.porcentajeVentaUSD,
+  `Cotización ($${resCloned.grossInvestmentUSD}) y Hoja de Costos ($${resCloned.costMatrix.porcentajeVentaUSD}) coinciden al 100% en proyecto clonado`
 );
 
 console.log('\n=====================================================');
