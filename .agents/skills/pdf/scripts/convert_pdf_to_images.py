@@ -1,7 +1,15 @@
 import os
 import sys
 
-from pdf2image import convert_from_path
+try:
+    from pdf2image import convert_from_path
+except ImportError:
+    print("Error: El módulo 'pdf2image' no está instalado en el intérprete de Python.")
+    print("En Arch Linux / CachyOS / Manjaro, instálalo con:")
+    print("  yay -S python-pdf2image")
+    print("O en un entorno virtual:")
+    print("  python3 -m venv .venv && .venv/bin/pip install pdf2image")
+    sys.exit(1)
 
 
 

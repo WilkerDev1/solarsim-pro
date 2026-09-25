@@ -14,7 +14,16 @@ Usage: python extract_form_structure.py <input.pdf> <output.json>
 
 import json
 import sys
-import pdfplumber
+
+try:
+    import pdfplumber
+except ImportError:
+    print("Error: El módulo 'pdfplumber' no está instalado en el intérprete de Python.")
+    print("En Arch Linux / CachyOS / Manjaro, instálalo con:")
+    print("  yay -S python-pdfplumber")
+    print("O en un entorno virtual:")
+    print("  python3 -m venv .venv && .venv/bin/pip install pdfplumber")
+    sys.exit(1)
 
 
 def extract_form_structure(pdf_path):
