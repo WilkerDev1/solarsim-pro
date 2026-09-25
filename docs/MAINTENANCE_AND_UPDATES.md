@@ -97,11 +97,17 @@ El servicio de auto-actualización permite que cualquier usuario en Windows o Li
                    └─► AppImage / Deb: Descarga paquete verificado con firma criptográfica GPG.
 ```
 
-### ⚠️ Reglas Críticas de Nombrado de Archivos (Para evitar Errores 404):
+### ⚠️ Reglas Críticas de Nombrado de Archivos & Nomenclatura Canónica:
 
-* `electron-updater` en Windows lee el manifiesto `latest.yml`.
-* **Regla Mandatoria**: El nombre del archivo en la URL de GitHub **DEBE COINCIDIR EXACTAMENTE** con el valor de `path` y `url` dentro de `latest.yml`.
-* En Linux, se deben publicar tanto los binarios con espacios (`SolarSim Pro-2.0.0.AppImage`, `SolarSim Pro 2.0.0.exe`) como las copias con guiones (`SolarSim-Pro-2.0.0.AppImage`, `SolarSim-Pro-2.0.0.exe`) para compatibilidad retroactiva con versiones anteriores de `latest-linux.yml` y `UpdateModal.tsx`.
+* **Nomenclatura Unificada sin Espacios**: Todos los paquetes oficiales generados por `electron-builder` utilizan nombres estandarizados mediante `artifactName` en `package.json`:
+  - **Windows (Instalador NSIS)**: `SolarSim-Pro-Setup-${version}.exe` y `SolarSim-Pro-Setup-${version}.exe.blockmap`
+  - **Windows (Portable)**: `SolarSim-Pro-${version}.exe`
+  - **Linux (AppImage)**: `SolarSim-Pro-${version}.AppImage`
+  - **Linux (Arch / Pacman)**: `solarsim-pro-${version}.pacman`
+  - **Linux (Debian / DEB)**: `solarsim-pro_${version}_amd64.deb`
+  - **Linux (Tarball)**: `solarsim-pro-${version}.tar.gz`
+* **Eliminación de Aliases Legacy**: Las versiones antiguas (v1.1.0/v1.4.0) utilizaban enlaces simbólicos y duplicados con espacios (`SolarSim Pro...`). A partir de la versión **v2.0.0**, se eliminó esta sobrecarga de mantenimiento; todos los clientes y actualizadores leen exclusivamente la nomenclatura estándar con guiones.
+* **Consistencia con Manifiestos**: El valor de `url` y `path` en `latest.yml` y `latest-linux.yml` coincide directamente con estos archivos sin necesidad de scripts de copiado.
 
 ---
 
@@ -136,45 +142,29 @@ Si únicamente se crea y empuja un tag de Git (`git push origin v2.0.0`), la API
    npm run build && npm run build:electron
    npx electron-builder --win --linux
    ```
+   *(Los binarios se generan directamente con nombres limpios sin espacios gracias a `artifactName` en `package.json`).*
 
-3. **Generación de Aliases Retrocompatibles (Con y Sin Espacios)**:
-   ```bash
-   # Windows NSIS y Portable
-   cp -l "release/SolarSim Pro Setup X.Y.Z.exe" "release/SolarSim-Pro-Setup-X.Y.Z.exe" 2>/dev/null || true
-   cp -l "release/SolarSim Pro Setup X.Y.Z.exe.blockmap" "release/SolarSim-Pro-Setup-X.Y.Z.exe.blockmap" 2>/dev/null || true
-   cp -l "release/SolarSim Pro X.Y.Z.exe" "release/SolarSim-Pro-X.Y.Z.exe" 2>/dev/null || true
-
-   # Linux AppImage
-   cp -l "release/SolarSim Pro-X.Y.Z.AppImage" "release/SolarSim-Pro-X.Y.Z.AppImage" 2>/dev/null || true
-   ```
-
-4. **Firma Criptográfica GPG de Paquetes Linux**:
+3. **Firma Criptográfica GPG de Paquetes Linux**:
    ```bash
    gpg --batch --yes --detach-sign --armor --output release/SolarSim-Pro-X.Y.Z.AppImage.sig release/SolarSim-Pro-X.Y.Z.AppImage
-   cp release/SolarSim-Pro-X.Y.Z.AppImage.sig "release/SolarSim Pro-X.Y.Z.AppImage.sig"
    gpg --batch --yes --detach-sign --armor --output release/solarsim-pro-X.Y.Z.pacman.sig release/solarsim-pro-X.Y.Z.pacman
    gpg --batch --yes --detach-sign --armor --output release/solarsim-pro-X.Y.Z.tar.gz.sig release/solarsim-pro-X.Y.Z.tar.gz
    ```
 
-5. **Generar y Sincronizar Manifiestos JSON (`latest.json` & `update.json`)**:
+4. **Generar y Sincronizar Manifiestos JSON (`latest.json` & `update.json`)**:
    - Calcular hashes SHA-256 con `sha256sum release/*X.Y.Z*`.
    - Exportar metadatos en `release/latest.json` y copiar a `release/update.json`.
 
-6. **Crear y Publicar el Release Oficial en GitHub**:
+5. **Crear y Publicar el Release Oficial en GitHub**:
    ```bash
    gh release create vX.Y.Z \
      --title "⚡ SolarSim Pro vX.Y.Z — <Título de la Versión>" \
      --notes-file release/release-notes-vX.Y.Z.md \
      release/SolarSim-Pro-Setup-X.Y.Z.exe \
      release/SolarSim-Pro-Setup-X.Y.Z.exe.blockmap \
-     "release/SolarSim Pro Setup X.Y.Z.exe" \
-     "release/SolarSim Pro Setup X.Y.Z.exe.blockmap" \
      release/SolarSim-Pro-X.Y.Z.exe \
-     "release/SolarSim Pro X.Y.Z.exe" \
      release/SolarSim-Pro-X.Y.Z.AppImage \
-     "release/SolarSim Pro-X.Y.Z.AppImage" \
      release/SolarSim-Pro-X.Y.Z.AppImage.sig \
-     "release/SolarSim Pro-X.Y.Z.AppImage.sig" \
      release/solarsim-pro_X.Y.Z_amd64.deb \
      release/solarsim-pro-X.Y.Z.pacman \
      release/solarsim-pro-X.Y.Z.pacman.sig \
@@ -187,7 +177,7 @@ Si únicamente se crea y empuja un tag de Git (`git push origin v2.0.0`), la API
      release/update.json
    ```
 
-7. **Instalación Local para Validación Inmediata**:
+6. **Instalación Local para Validación Inmediata**:
    ```bash
    sudo pacman -U --noconfirm release/solarsim-pro-X.Y.Z.pacman
    ```

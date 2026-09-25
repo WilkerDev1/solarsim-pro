@@ -63,9 +63,9 @@
 
 | Plataforma | Formato de Paquete | Nombre del Archivo |
 | :--- | :--- | :--- |
-| **Windows** | Instalador Guiado NSIS (x64) | `SolarSim Pro Setup 2.0.0.exe` |
-| **Windows** | Portable / Sin Instalación (x64) | `SolarSim Pro 2.0.0.exe` |
-| **Linux (Universal)** | AppImage Autoejecutable (x64) | `SolarSim Pro-2.0.0.AppImage` |
+| **Windows** | Instalador Guiado NSIS (x64) | `SolarSim-Pro-Setup-2.0.0.exe` |
+| **Windows** | Portable / Sin Instalación (x64) | `SolarSim-Pro-2.0.0.exe` |
+| **Linux (Universal)** | AppImage Autoejecutable (x64) | `SolarSim-Pro-2.0.0.AppImage` |
 | **Linux (Arch / Manjaro / CachyOS)** | Paquete Nativo Pacman | `solarsim-pro-2.0.0.pacman` |
 | **Linux (Debian / Ubuntu / Mint)** | Paquete Nativo DEB | `solarsim-pro_2.0.0_amd64.deb` |
 | **Linux (Genérico)** | Tarball Comprimido | `solarsim-pro-2.0.0.tar.gz` |

@@ -75,6 +75,7 @@
       "dist/**/*",
       "dist-electron/**/*"
     ],
+    "artifactName": "SolarSim-Pro-${version}.${ext}",
     "win": {
       "target": [
         {
@@ -92,11 +93,18 @@
       ]
     },
     "nsis": {
+      "artifactName": "SolarSim-Pro-Setup-${version}.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "SolarSim Pro"
+    },
+    "portable": {
+      "artifactName": "SolarSim-Pro-${version}.${ext}"
+    },
+    "appImage": {
+      "artifactName": "SolarSim-Pro-${version}.${ext}"
     },
     "linux": {
       "target": [
