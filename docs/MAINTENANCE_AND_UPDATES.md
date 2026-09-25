@@ -21,7 +21,7 @@ graph TD
     B -->|REST API Sync & Auth| K[solarsim-api Node.js / Docker]
     K -->|PostgreSQL 16| L[(solarsim-db CT 100 10.0.0.103)]
 ```
-
+000d
 ### Componentes Clave:
 * **Frontend**: React 18, TypeScript, Tailwind CSS, Lucide React, Recharts (gráficos solares e inversión), Zustand con Arquitectura de Slices (`projectSlice`, `equipmentSlice`, `syncAuthSlice`, `importExportSlice`, `aiSlice`, `uiSlice`).
 * **Motor de Simulación**: Módulos puros en TypeScript (`src/engine/`) para cálculo de balance de energía horaria/mensual, degradación de paneles, autoconsumo, tarifas EDES (BTS1/BTS2/MTD1/MTD2/etc.), Ley 57-07, Payback, VAN, TIR y ROI a 25 años.
@@ -101,4 +101,94 @@ El servicio de auto-actualización permite que cualquier usuario en Windows o Li
 
 * `electron-updater` en Windows lee el manifiesto `latest.yml`.
 * **Regla Mandatoria**: El nombre del archivo en la URL de GitHub **DEBE COINCIDIR EXACTAMENTE** con el valor de `path` y `url` dentro de `latest.yml`.
-* En Linux, se deben publicar tanto los binarios con espacios (`SolarSim Pro-1.5.0.AppImage`) como las copias con guiones (`SolarSim-Pro-1.5.0.AppImage`) para compatibilidad retroactiva con versiones anteriores de `latest-linux.yml`.
+* En Linux, se deben publicar tanto los binarios con espacios (`SolarSim Pro-2.0.0.AppImage`, `SolarSim Pro 2.0.0.exe`) como las copias con guiones (`SolarSim-Pro-2.0.0.AppImage`, `SolarSim-Pro-2.0.0.exe`) para compatibilidad retroactiva con versiones anteriores de `latest-linux.yml` y `UpdateModal.tsx`.
+
+---
+
+## 4. 📋 Manifiestos de Actualización: YAML & JSON
+
+SolarSim Pro soporta tanto actualizadores basados en YAML de `electron-updater` como clientes HTTP y scripts de terceros que consumen JSON:
+
+| Archivo Manifiesto | Propósito & Consumidor | Ubicación en Release |
+| :--- | :--- | :--- |
+| `latest.yml` | Manifiesto nativo de `electron-updater` para Windows (NSIS). Contiene versión, SHA-512 y tamaño en bytes de `SolarSim-Pro-Setup-X.Y.Z.exe`. | `release/latest.yml` |
+| `latest-linux.yml` | Manifiesto nativo de `electron-updater` para Linux (`AppImage`, `.deb`). | `release/latest-linux.yml` |
+| `latest.json` | Manifiesto JSON estructurado con enlaces directos, hashes SHA-256 / SHA-512 y notas de versión para todos los instaladores (Windows, Pacman, Deb, AppImage, Tarball). | `release/latest.json` |
+| `update.json` | Alias JSON de `latest.json` para clientes heredados y scripts de auto-despliegue. | `release/update.json` |
+
+---
+
+## 5. 🚀 Flujo Oficial de Compilación, Firma y Publicación de Releases
+
+### ⚠️ Causa Raíz de Versiones Desfasadas al Actualizar:
+Si únicamente se crea y empuja un tag de Git (`git push origin v2.0.0`), la API de GitHub (`/repos/WilkerDev1/solarsim-pro/releases/latest`) **NO** reconoce el nuevo tag como un lanzamiento disponible hasta que se cree formalmente el **GitHub Release**. Si el usuario pulsa *"Buscar Actualizaciones"* en la app antes de que el release esté publicado en GitHub, la app consultará la API, obtendrá la versión anterior (ej. v1.6.0) y descargará el paquete antiguo, sobreescribiendo la instalación.
+
+### 🛠️ Protocolo Paso a Paso para Nuevas Versiones:
+
+1. **Sincronización de Versión en Archivos JSON**:
+   - `package.json`: `"version": "X.Y.Z"`
+   - `server/package.json`: `"version": "X.Y.Z"`
+   - `workers/share-viewer/package.json`: `"version": "X.Y.Z"`
+   - Sincronizar lockfiles (`npm install --package-lock-only`).
+
+2. **Compilación de Producción Multiplataforma**:
+   ```bash
+   npm run build && npm run build:electron
+   npx electron-builder --win --linux
+   ```
+
+3. **Generación de Aliases Retrocompatibles (Con y Sin Espacios)**:
+   ```bash
+   # Windows NSIS y Portable
+   cp -l "release/SolarSim Pro Setup X.Y.Z.exe" "release/SolarSim-Pro-Setup-X.Y.Z.exe" 2>/dev/null || true
+   cp -l "release/SolarSim Pro Setup X.Y.Z.exe.blockmap" "release/SolarSim-Pro-Setup-X.Y.Z.exe.blockmap" 2>/dev/null || true
+   cp -l "release/SolarSim Pro X.Y.Z.exe" "release/SolarSim-Pro-X.Y.Z.exe" 2>/dev/null || true
+
+   # Linux AppImage
+   cp -l "release/SolarSim Pro-X.Y.Z.AppImage" "release/SolarSim-Pro-X.Y.Z.AppImage" 2>/dev/null || true
+   ```
+
+4. **Firma Criptográfica GPG de Paquetes Linux**:
+   ```bash
+   gpg --batch --yes --detach-sign --armor --output release/SolarSim-Pro-X.Y.Z.AppImage.sig release/SolarSim-Pro-X.Y.Z.AppImage
+   cp release/SolarSim-Pro-X.Y.Z.AppImage.sig "release/SolarSim Pro-X.Y.Z.AppImage.sig"
+   gpg --batch --yes --detach-sign --armor --output release/solarsim-pro-X.Y.Z.pacman.sig release/solarsim-pro-X.Y.Z.pacman
+   gpg --batch --yes --detach-sign --armor --output release/solarsim-pro-X.Y.Z.tar.gz.sig release/solarsim-pro-X.Y.Z.tar.gz
+   ```
+
+5. **Generar y Sincronizar Manifiestos JSON (`latest.json` & `update.json`)**:
+   - Calcular hashes SHA-256 con `sha256sum release/*X.Y.Z*`.
+   - Exportar metadatos en `release/latest.json` y copiar a `release/update.json`.
+
+6. **Crear y Publicar el Release Oficial en GitHub**:
+   ```bash
+   gh release create vX.Y.Z \
+     --title "⚡ SolarSim Pro vX.Y.Z — <Título de la Versión>" \
+     --notes-file release/release-notes-vX.Y.Z.md \
+     release/SolarSim-Pro-Setup-X.Y.Z.exe \
+     release/SolarSim-Pro-Setup-X.Y.Z.exe.blockmap \
+     "release/SolarSim Pro Setup X.Y.Z.exe" \
+     "release/SolarSim Pro Setup X.Y.Z.exe.blockmap" \
+     release/SolarSim-Pro-X.Y.Z.exe \
+     "release/SolarSim Pro X.Y.Z.exe" \
+     release/SolarSim-Pro-X.Y.Z.AppImage \
+     "release/SolarSim Pro-X.Y.Z.AppImage" \
+     release/SolarSim-Pro-X.Y.Z.AppImage.sig \
+     "release/SolarSim Pro-X.Y.Z.AppImage.sig" \
+     release/solarsim-pro_X.Y.Z_amd64.deb \
+     release/solarsim-pro-X.Y.Z.pacman \
+     release/solarsim-pro-X.Y.Z.pacman.sig \
+     release/solarsim-pro-X.Y.Z.tar.gz \
+     release/solarsim-pro-X.Y.Z.tar.gz.sig \
+     release/solarsim-public-key.asc \
+     release/latest.yml \
+     release/latest-linux.yml \
+     release/latest.json \
+     release/update.json
+   ```
+
+7. **Instalación Local para Validación Inmediata**:
+   ```bash
+   sudo pacman -U --noconfirm release/solarsim-pro-X.Y.Z.pacman
+   ```
+

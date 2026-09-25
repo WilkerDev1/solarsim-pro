@@ -61,7 +61,7 @@ export const UpdateModal: React.FC = () => {
   const targetVer = updateInfo.version || '2.0.0';
   const pacmanUrl = `https://github.com/WilkerDev1/solarsim-pro/releases/download/v${targetVer}/solarsim-pro-${targetVer}.pacman`;
   const debUrl = `https://github.com/WilkerDev1/solarsim-pro/releases/download/v${targetVer}/solarsim-pro_${targetVer}_amd64.deb`;
-  const appImageUrl = `https://github.com/WilkerDev1/solarsim-pro/releases/download/v${targetVer}/SolarSim.Pro-${targetVer}.AppImage`;
+  const appImageUrl = `https://github.com/WilkerDev1/solarsim-pro/releases/download/v${targetVer}/SolarSim-Pro-${targetVer}.AppImage`;
   const pacmanTerminalCmd = `sudo pacman -U ${pacmanUrl}`;
 
   const handleCheckUpdates = async () => {
@@ -201,7 +201,7 @@ export const UpdateModal: React.FC = () => {
                 <div className="space-y-1">
                   <h4 className="font-extrabold text-sm">¡Nueva versión disponible: v{targetVer}!</h4>
                   <p className="opacity-85 text-[11px]">
-                    Incluye personalización multi-empresa, logos editables, marca de agua con opacidad y mejoras de rendimiento.
+                    Gran actualización con soporte de BESS, partición de carga diurna/nocturna, auditoría de Ley 57-07, descuentos comerciales y mejoras de rendimiento.
                   </p>
                 </div>
               </div>
