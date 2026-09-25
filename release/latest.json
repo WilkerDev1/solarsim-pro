@@ -1,8 +1,8 @@
 {
   "version": "2.0.0",
   "name": "SolarSim Pro v2.0.0",
-  "releaseDate": "2026-09-25T14:16:00.657Z",
-  "notes": "Gran actualización v2.0.0: Despacho Físico de Baterías BESS, Partición Diurna/Nocturna Dinámica, Transparencia de Autoconsumo vs Inyección vs Red Eléctrica, Descuentos Financieros y Ley 57-07, Visor Web en Cloudflare Workers y Generador PDF A4 de 11 páginas.",
+  "releaseDate": "2026-09-25T14:28:19.519Z",
+  "notes": "¡Nos enorgullece presentar **SolarSim Pro v2.0.0**! Esta es la actualización más ambiciosa en la historia de la plataforma, marcando el salto a una suite de ingeniería solar integral de grado empresarial para República Dominicana.",
   "downloads": {
     "windows": {
       "installer": {
@@ -16,7 +16,7 @@
         "fileName": "SolarSim-Pro-2.0.0.exe",
         "url": "https://github.com/WilkerDev1/solarsim-pro/releases/download/v2.0.0/SolarSim-Pro-2.0.0.exe",
         "sha256": "d9e5c3522bbb3e33fb29713d0ff27ac3e7bc9491061dc1be2f6b27558f4c5a82",
-        "size": 99120640
+        "size": 99181043
       }
     },
     "linux": {
@@ -38,13 +38,13 @@
         "fileName": "solarsim-pro-2.0.0.pacman",
         "url": "https://github.com/WilkerDev1/solarsim-pro/releases/download/v2.0.0/solarsim-pro-2.0.0.pacman",
         "sha256": "40076bbcf20c810ff8a08daf1d8bedae64875a968bb2114d3f6281d222531625",
-        "size": 87145300
+        "size": 87172840
       },
       "tar": {
         "fileName": "solarsim-pro-2.0.0.tar.gz",
         "url": "https://github.com/WilkerDev1/solarsim-pro/releases/download/v2.0.0/solarsim-pro-2.0.0.tar.gz",
         "sha256": "06e3c7e643f6954c226fccb047d40df8d0b61f660646f1ffb9f09594ad550f8c",
-        "size": 130638520
+        "size": 130683538
       }
     }
   }

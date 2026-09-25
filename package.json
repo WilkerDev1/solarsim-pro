@@ -29,6 +29,8 @@
     "test:pdf-reorder": "npx tsx src/tests/testPDFSectionReordering.ts",
     "test:energy": "npx tsx src/tests/testEnergyBalanceTransparency.ts",
     "test": "npx tsx src/tests/testBenchmark.ts && npx tsx src/tests/testFinancialEngineComprehensive.ts && npx tsx src/tests/testAISmartProposal.ts && npx tsx src/tests/testEquipmentCatalog.ts && npx tsx src/tests/testFolderHidingAndSync.ts && npx tsx src/tests/testTrashAndReadOnly.ts && npx tsx src/tests/testTariffEngine.ts && npx tsx src/tests/testGeminiFamily3Cascade.ts && npx tsx src/tests/testCloudflareShareHistory.ts && npx tsx src/tests/testMultiEquipment.ts && npx tsx src/tests/testPDFSectionReordering.ts && npx tsx src/tests/testEnergyBalanceTransparency.ts",
+    "release:manifests": "npx tsx scripts/release.ts --manifests",
+    "release:bump": "npx tsx scripts/release.ts --bump",
     "context:pack": "repomix"
   },
   "dependencies": {

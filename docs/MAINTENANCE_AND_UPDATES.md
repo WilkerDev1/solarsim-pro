@@ -131,31 +131,26 @@ Si únicamente se crea y empuja un tag de Git (`git push origin v2.0.0`), la API
 
 ### 🛠️ Protocolo Paso a Paso para Nuevas Versiones:
 
-1. **Sincronización de Versión en Archivos JSON**:
-   - `package.json`: `"version": "X.Y.Z"`
-   - `server/package.json`: `"version": "X.Y.Z"`
-   - `workers/share-viewer/package.json`: `"version": "X.Y.Z"`
-   - Sincronizar lockfiles (`npm install --package-lock-only`).
+1. **Sincronización de Versión en Archivos JSON (1 Comando)**:
+   ```bash
+   npm run release:bump 2.1.0
+   ```
+   *(Actualiza automáticamente `package.json`, `server/package.json`, `workers/share-viewer/package.json`, `/api/health`, UI y sincroniza todos los lockfiles).*
 
 2. **Compilación de Producción Multiplataforma**:
    ```bash
    npm run build && npm run build:electron
    npx electron-builder --win --linux
    ```
-   *(Los binarios se generan directamente con nombres limpios sin espacios gracias a `artifactName` en `package.json`).*
+   *(Los binarios se generan directamente con nombres canónicos sin espacios gracias a `artifactName` en `package.json`).*
 
-3. **Firma Criptográfica GPG de Paquetes Linux**:
+3. **Firma Criptográfica GPG y Manifiestos JSON Automáticos (1 Comando)**:
    ```bash
-   gpg --batch --yes --detach-sign --armor --output release/SolarSim-Pro-X.Y.Z.AppImage.sig release/SolarSim-Pro-X.Y.Z.AppImage
-   gpg --batch --yes --detach-sign --armor --output release/solarsim-pro-X.Y.Z.pacman.sig release/solarsim-pro-X.Y.Z.pacman
-   gpg --batch --yes --detach-sign --armor --output release/solarsim-pro-X.Y.Z.tar.gz.sig release/solarsim-pro-X.Y.Z.tar.gz
+   npm run release:manifests
    ```
+   *(Firma con GPG los paquetes Linux y calcula instantáneamente los hashes SHA-256 / SHA-512 y tamaños, generando `latest.json` y `update.json`).*
 
-4. **Generar y Sincronizar Manifiestos JSON (`latest.json` & `update.json`)**:
-   - Calcular hashes SHA-256 con `sha256sum release/*X.Y.Z*`.
-   - Exportar metadatos en `release/latest.json` y copiar a `release/update.json`.
-
-5. **Crear y Publicar el Release Oficial en GitHub**:
+4. **Crear y Publicar el Release Oficial en GitHub**:
    ```bash
    gh release create vX.Y.Z \
      --title "⚡ SolarSim Pro vX.Y.Z — <Título de la Versión>" \
@@ -177,7 +172,7 @@ Si únicamente se crea y empuja un tag de Git (`git push origin v2.0.0`), la API
      release/update.json
    ```
 
-6. **Instalación Local para Validación Inmediata**:
+5. **Instalación Local para Validación Inmediata**:
    ```bash
    sudo pacman -U --noconfirm release/solarsim-pro-X.Y.Z.pacman
    ```
