@@ -208,7 +208,7 @@ Verifica la disponibilidad del servidor y la conectividad con PostgreSQL.
   {
     "status": "ok",
     "service": "SolarSim Pro Enterprise Sync Engine",
-    "version": "1.6.0",
+    "version": "2.0.0",
     "database": "connected",
     "timestamp": "2026-09-03T10:45:00.000Z"
   }

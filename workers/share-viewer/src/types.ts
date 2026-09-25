@@ -14,5 +14,5 @@ export interface StoredProposal {
 }
 
 export interface Env {
-  PROPOSALS_KV: KVNamespace;
+  PROPOSALS_KV: any; // KVNamespace in Cloudflare environment
 }

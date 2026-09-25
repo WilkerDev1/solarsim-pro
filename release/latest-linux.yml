@@ -1,0 +1,12 @@
+version: 2.0.0
+files:
+  - url: SolarSim-Pro-2.0.0.AppImage
+    sha512: GxM1qgqG3507fWqA2EtP+iA/8+SJ1Y4kt8MDlKDWeHdQvGOFgVHxoJ0Gnk/WXdGDsxPfuXeWSyXqBJ4ztKoYaQ==
+    size: 138167817
+    blockMapSize: 144925
+  - url: solarsim-pro_2.0.0_amd64.deb
+    sha512: 2P+AEbVyDXZdm91l6s/5u2Zd954znBuU3ADdTDqZ1IAHZ2K+SyoAJHevO89XlLf30/8w3DrPrrZqhGLSU6ippw==
+    size: 87142488
+path: SolarSim-Pro-2.0.0.AppImage
+sha512: GxM1qgqG3507fWqA2EtP+iA/8+SJ1Y4kt8MDlKDWeHdQvGOFgVHxoJ0Gnk/WXdGDsxPfuXeWSyXqBJ4ztKoYaQ==
+releaseDate: '2026-09-25T13:49:27.522Z'

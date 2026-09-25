@@ -58,7 +58,7 @@ export const UpdateModal: React.FC = () => {
 
   if (!isUpdateModalOpen) return null;
 
-  const targetVer = updateInfo.version || '1.1.0';
+  const targetVer = updateInfo.version || '2.0.0';
   const pacmanUrl = `https://github.com/WilkerDev1/solarsim-pro/releases/download/v${targetVer}/solarsim-pro-${targetVer}.pacman`;
   const debUrl = `https://github.com/WilkerDev1/solarsim-pro/releases/download/v${targetVer}/solarsim-pro_${targetVer}_amd64.deb`;
   const appImageUrl = `https://github.com/WilkerDev1/solarsim-pro/releases/download/v${targetVer}/SolarSim.Pro-${targetVer}.AppImage`;

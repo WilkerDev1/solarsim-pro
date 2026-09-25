@@ -253,9 +253,35 @@ const placeholderRecord: SharedProposalRecord = {
 };
 ShareProposalService.saveSharedRecord(placeholderRecord);
 
+// Mock fetch para Test 7 para garantizar pruebas unitarias deterministas sin depender de la expiración de la nube
+const originalFetch = (global as any).fetch;
+(global as any).fetch = async (url: string) => {
+  if (url.includes('/api/share/hydrate') || url.includes('/api/share/3t4BpRw')) {
+    return {
+      ok: true,
+      json: async () => ({
+        success: true,
+        proposals: [
+          {
+            id: '3t4BpRw',
+            clientName: 'Cliente Hidratado Real',
+            projectCode: 'SP-2026-REAL',
+            quoteNumber: 'C-8888',
+            systemKWp: 15.5,
+            location: 'Santo Domingo',
+            companyName: 'Electsun',
+          },
+        ],
+      }),
+    };
+  }
+  return { ok: false, status: 404, json: async () => ({ error: 'Not found' }) };
+};
+
 // Ejecutar hidratación remota desde Cloudflare Worker
 async function runAsyncTests() {
   const hydrationResult = await ShareProposalService.hydrateFromCloudflare();
+  (global as any).fetch = originalFetch;
   console.log('Cloudflare Hydration Result:', hydrationResult);
 
   const hydratedList = ShareProposalService.getSharedHistory();

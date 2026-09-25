@@ -8,6 +8,9 @@ build
 .env.local
 release/*
 !release/*.md
+!release/*.json
+!release/*.yml
+release/builder-debug.yml
 .wrangler
 repomix-output.xml
 repomix-output.txt
