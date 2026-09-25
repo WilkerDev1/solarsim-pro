@@ -83,13 +83,13 @@ El servicio de auto-actualización permite que cualquier usuario en Windows o Li
 ### 🌐 Flujo de Funcionamiento:
 
 ```
-[ SolarSim Pro Cliente (v1.X) ]
+[ SolarSim Pro Cliente (v2.X) ]
             │
             ▼ (1. Al pulsar 'Buscar Actualizaciones' o en segundo plano)
 [ GitHub Releases API: WilkerDev1/solarsim-pro ]
             │
-            ├─► Windows: Descarga 'latest.yml' ──► Compara versión (ej. 1.5.0 vs 1.4.1)
-            │      └─► Si hay nueva versión: Descarga 'SolarSim-Pro-Setup-1.5.0.exe'
+            ├─► Windows: Descarga 'latest.yml' ──► Compara versión (ej. 2.0.0 vs 1.6.0)
+            │      └─► Si hay nueva versión: Descarga 'SolarSim-Pro-Setup-2.0.0.exe'
             │             └─► Ejecuta instalador NSIS silencioso al reiniciar la app.
             │
             └─► Linux: Descarga 'latest-linux.yml' ──► Detecta distro (Arch, Debian, Universal)
