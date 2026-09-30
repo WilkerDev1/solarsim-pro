@@ -3,6 +3,7 @@ import { ProjectSimulation } from '../../types';
 import { BENCHMARK_PROJECT } from '../../engine/referenceCase';
 import { generateNextProjectSequence } from '../initialData';
 import { calculateRecommendedPanelCount } from '../../engine/solarEngine';
+import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
 
 const normalizeProvinceName = (raw?: string): string => {
   if (!raw) return 'Santo Domingo / Distrito Nacional';
@@ -159,6 +160,12 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
             data.monthlyConsumptionKWh && data.monthlyConsumptionKWh.length === 12
               ? [...data.monthlyConsumptionKWh]
               : [...BENCHMARK_PROJECT.monthlyConsumption],
+          customization: {
+            ...(get().defaultDocumentCustomization || DEFAULT_DOCUMENT_CUSTOMIZATION),
+            contactName: data.clientName || undefined,
+            clientPhone: data.phone || undefined,
+            clientEmail: data.email || undefined,
+          },
         };
 
         projects = [newProj, ...projects];

@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Check, X, Bold, RotateCcw, Pencil } from 'lucide-react';
+import { Check, X, Bold, RotateCcw, Pencil, BookmarkCheck } from 'lucide-react';
 import { renderFormattedMarkdown } from '../../../utils/textFormatter';
 
 interface InlineEditableTextProps {
   value?: string | null;
   defaultValue?: string;
   onSave: (newValue: string) => void;
+  onSavePermanent?: (newValue: string) => void;
   isEditMode: boolean;
   multiline?: boolean;
   className?: string;
@@ -22,6 +23,7 @@ export const InlineEditableText: React.FC<InlineEditableTextProps> = ({
   value,
   defaultValue = '',
   onSave,
+  onSavePermanent,
   isEditMode,
   multiline = true,
   className = '',
@@ -36,6 +38,7 @@ export const InlineEditableText: React.FC<InlineEditableTextProps> = ({
   const effectiveValue = value !== undefined && value !== null && value !== '' ? value : defaultValue;
   const [isEditing, setIsEditing] = useState(false);
   const [tempValue, setTempValue] = useState(effectiveValue || '');
+  const [justSavedPermanent, setJustSavedPermanent] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement | HTMLInputElement>(null);
 
@@ -79,6 +82,20 @@ export const InlineEditableText: React.FC<InlineEditableTextProps> = ({
   const handleSave = () => {
     onSave(tempValue.trim());
     setIsEditing(false);
+  };
+
+  const handleSavePermanent = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!onSavePermanent) return;
+    const finalVal = tempValue.trim();
+    onSave(finalVal);
+    onSavePermanent(finalVal);
+    setJustSavedPermanent(true);
+    setTimeout(() => {
+      setJustSavedPermanent(false);
+      setIsEditing(false);
+    }, 600);
   };
 
   const handleCancel = () => {
@@ -224,12 +241,38 @@ export const InlineEditableText: React.FC<InlineEditableTextProps> = ({
           )}
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
+          {onSavePermanent && (
+            <button
+              type="button"
+              onClick={handleSavePermanent}
+              disabled={justSavedPermanent}
+              className={`px-2.5 py-0.5 rounded-lg text-white font-bold text-[10.5px] flex items-center gap-1 shadow-xs transition-all cursor-pointer border ${
+                justSavedPermanent
+                  ? 'bg-emerald-600 border-emerald-400 text-white animate-pulse'
+                  : 'bg-indigo-600 hover:bg-indigo-500 border-indigo-400/50 hover:shadow-indigo-500/20 active:scale-95'
+              }`}
+              title="Guardar en esta propuesta y aplicar como plantilla permanente para futuras propuestas"
+            >
+              {justSavedPermanent ? (
+                <>
+                  <Check className="w-3 h-3 text-emerald-200" />
+                  <span>¡Plantilla Guardada!</span>
+                </>
+              ) : (
+                <>
+                  <BookmarkCheck className="w-3 h-3 text-amber-300" />
+                  <span>Hacer Permanente</span>
+                </>
+              )}
+            </button>
+          )}
           <button
             type="button"
             onClick={handleSave}
-            className="px-2.5 py-0.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center gap-1 shadow-xs transition-colors cursor-pointer"
-            title="Guardar cambios (Ctrl+Enter)"
+            disabled={justSavedPermanent}
+            className="px-2.5 py-0.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center gap-1 shadow-xs transition-colors cursor-pointer active:scale-95"
+            title="Guardar cambios solo para esta propuesta (Ctrl+Enter)"
           >
             <Check className="w-3 h-3" />
             <span>Guardar</span>
@@ -270,7 +313,7 @@ export const InlineEditableText: React.FC<InlineEditableTextProps> = ({
         />
       )}
       <div className="flex items-center justify-between text-[9.5px] text-slate-400 px-1 pt-0.5">
-        <span>Tip: Usa <code>**texto**</code> o presiona <code>Ctrl+B</code> para negrita.</span>
+        <span>Tip: Usa <code>**texto**</code> o <code>Ctrl+B</code> para negrita{onSavePermanent ? ' • Usa "Hacer Permanente" para futuras propuestas' : ''}.</span>
         <span><code>Ctrl+Enter</code> para guardar • <code>Esc</code> para cancelar</span>
       </div>
     </div>

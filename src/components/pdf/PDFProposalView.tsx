@@ -31,6 +31,9 @@ export const PDFProposalView: React.FC = () => {
     updateClient,
     updateSpecs,
     updateDocumentCustomization,
+    updateDefaultDocumentCustomization,
+    saveCurrentProjectAsDefaultDocumentTemplate,
+    resetDefaultDocumentCustomization,
     sidebarTheme,
     openShareModal,
     restoreProject,
@@ -416,6 +419,9 @@ export const PDFProposalView: React.FC = () => {
         updateClient={updateClient}
         updateSpecs={updateSpecs}
         updateDocumentCustomization={updateDocumentCustomization}
+        updateDefaultDocumentCustomization={updateDefaultDocumentCustomization}
+        saveCurrentProjectAsDefaultDocumentTemplate={saveCurrentProjectAsDefaultDocumentTemplate}
+        resetDefaultDocumentCustomization={resetDefaultDocumentCustomization}
         isEditMode={isEditMode}
         setIsEditMode={setIsEditMode}
       />
@@ -470,7 +476,7 @@ export const PDFProposalView: React.FC = () => {
                   </span>
                 </h4>
                 <p className="text-[11px] text-blue-100 font-medium">
-                  Haz clic sobre cualquier párrafo o subtítulo para modificarlo. Usa <code className="bg-blue-900/60 px-1 py-0.5 rounded text-[10px] text-amber-200">**texto**</code> o <kbd className="bg-blue-900/60 px-1 py-0.5 rounded text-[10px] text-amber-200">Ctrl+B</kbd> para negritas.
+                  Haz clic sobre cualquier párrafo o subtítulo para modificarlo. Usa <code className="bg-blue-900/60 px-1 py-0.5 rounded text-[10px] text-amber-200">**texto**</code> o <kbd className="bg-blue-900/60 px-1 py-0.5 rounded text-[10px] text-amber-200">Ctrl+B</kbd> para negritas, o <strong>Hacer Permanente</strong> para fijar plantillas futuras.
                 </p>
               </div>
             </div>
@@ -539,6 +545,7 @@ export const PDFProposalView: React.FC = () => {
                     totalPages={activePagesCount}
                     isEditMode={isEditMode}
                     updateDocumentCustomization={updateDocumentCustomization}
+                    updateDefaultDocumentCustomization={updateDefaultDocumentCustomization}
                   />
                 );
               case 'benefits':
@@ -554,6 +561,7 @@ export const PDFProposalView: React.FC = () => {
                     totalPages={activePagesCount}
                     isEditMode={isEditMode}
                     updateDocumentCustomization={updateDocumentCustomization}
+                    updateDefaultDocumentCustomization={updateDefaultDocumentCustomization}
                   />
                 );
               case 'techIntro':
@@ -569,6 +577,7 @@ export const PDFProposalView: React.FC = () => {
                     totalPages={activePagesCount}
                     isEditMode={isEditMode}
                     updateDocumentCustomization={updateDocumentCustomization}
+                    updateDefaultDocumentCustomization={updateDefaultDocumentCustomization}
                   />
                 );
               case 'projectDescription':
@@ -584,6 +593,7 @@ export const PDFProposalView: React.FC = () => {
                     totalPages={activePagesCount}
                     isEditMode={isEditMode}
                     updateDocumentCustomization={updateDocumentCustomization}
+                    updateDefaultDocumentCustomization={updateDefaultDocumentCustomization}
                   />
                 );
               case 'energy':
@@ -615,6 +625,7 @@ export const PDFProposalView: React.FC = () => {
                     totalPages={activePagesCount}
                     isEditMode={isEditMode}
                     updateDocumentCustomization={updateDocumentCustomization}
+                    updateDefaultDocumentCustomization={updateDefaultDocumentCustomization}
                   />
                 );
               case 'roi':

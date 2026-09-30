@@ -11,7 +11,11 @@ import {
   ListPlus,
   PlusCircle,
   Pencil,
+  BookmarkCheck,
+  Save,
+  Check,
 } from 'lucide-react';
+import { useSimulationStore } from '../../../store/useSimulationStore';
 import { ProjectSimulation, DocumentCustomization, ExtraTOCItem } from '../../../types';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
 import {
@@ -26,6 +30,9 @@ interface PDFDocumentDataEditorProps {
   updateClient: (client: Partial<ProjectSimulation['client']>) => void;
   updateSpecs?: (specs: Partial<ProjectSimulation['specs']>) => void;
   updateDocumentCustomization: (customization: Partial<DocumentCustomization>) => void;
+  updateDefaultDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
+  saveCurrentProjectAsDefaultDocumentTemplate?: () => void;
+  resetDefaultDocumentCustomization?: () => void;
   isEditMode: boolean;
   setIsEditMode: (val: boolean) => void;
 }
@@ -35,10 +42,14 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
   project,
   updateClient,
   updateDocumentCustomization,
+  updateDefaultDocumentCustomization,
+  saveCurrentProjectAsDefaultDocumentTemplate,
+  resetDefaultDocumentCustomization,
   isEditMode,
   setIsEditMode,
 }) => {
   const cust = project.customization || {};
+  const [templateSavedFeedback, setTemplateSavedFeedback] = useState(false);
 
   // File input refs
   const coverLogoInputRef = useRef<HTMLInputElement>(null);
@@ -201,6 +212,84 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
             'Activa este modo para hacer clic sobre cualquier párrafo o título del PDF y editarlo en tiempo real.'
           )}
         </p>
+      </div>
+
+      {/* TARJETA DE PLANTILLA PERMANENTE PARA FUTURAS PROPUESTAS */}
+      <div className={`p-3.5 rounded-2xl border transition-all ${
+        isDark
+          ? 'bg-[#181822] border-[#2e2e42]'
+          : 'bg-gradient-to-br from-indigo-50/70 via-purple-50/30 to-slate-50 border-indigo-200/80 shadow-xs'
+      }`}>
+        <div className="flex items-start gap-2.5">
+          <div className="w-7 h-7 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+            <BookmarkCheck className="w-4 h-4 text-amber-300" />
+          </div>
+          <div className="flex-1">
+            <h4 className={`text-xs font-black uppercase tracking-tight flex items-center gap-1.5 ${isDark ? 'text-zinc-100' : 'text-slate-900'}`}>
+              <span>Plantilla Permanente</span>
+              <span className="text-[9px] bg-indigo-500/20 text-indigo-400 font-extrabold px-1.5 py-0.2 rounded-full border border-indigo-400/30">
+                Global
+              </span>
+            </h4>
+            <p className={`text-[10.5px] leading-relaxed mt-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+              Aplica los datos y textos de esta propuesta como la plantilla predeterminada permanente para cualquier propuesta futura.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-3 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              if (saveCurrentProjectAsDefaultDocumentTemplate) {
+                saveCurrentProjectAsDefaultDocumentTemplate();
+              } else {
+                useSimulationStore.getState().saveCurrentProjectAsDefaultDocumentTemplate();
+              }
+              setTemplateSavedFeedback(true);
+              setTimeout(() => setTemplateSavedFeedback(false), 2500);
+            }}
+            className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer active:scale-95 ${
+              templateSavedFeedback
+                ? 'bg-emerald-600 text-white shadow-emerald-950/40'
+                : 'bg-indigo-600 hover:bg-indigo-500 text-white hover:shadow-indigo-600/30'
+            }`}
+            title="Guardar todos los textos y datos de esta propuesta como plantilla para futuros proyectos"
+          >
+            {templateSavedFeedback ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-200" />
+                <span>¡Plantilla Guardada!</span>
+              </>
+            ) : (
+              <>
+                <Save className="w-3.5 h-3.5 text-amber-300" />
+                <span>Guardar como Plantilla Futura</span>
+              </>
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm('¿Deseas restablecer la plantilla predeterminada de propuestas a los valores de fábrica originales?')) {
+                if (resetDefaultDocumentCustomization) {
+                  resetDefaultDocumentCustomization();
+                } else {
+                  useSimulationStore.getState().resetDefaultDocumentCustomization();
+                }
+              }
+            }}
+            className={`py-2 px-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 border transition-all cursor-pointer ${
+              isDark
+                ? 'bg-[#222230] border-[#36364a] text-zinc-300 hover:bg-[#2c2c3e] hover:text-white'
+                : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-100 shadow-xs'
+            }`}
+            title="Restablecer plantilla a los valores de fábrica oficiales"
+          >
+            <RotateCcw className="w-3.5 h-3.5 text-zinc-400" />
+            <span className="text-[11px]">Fábrica</span>
+          </button>
+        </div>
       </div>
 
       {/* 1. SECCIÓN: IDENTIDAD DE LA EMPRESA EMISORA Y LOGOS */}

@@ -5,6 +5,7 @@ import { INITIAL_PROJECTS, generateNextProjectSequence, generateDuplicateProject
 import { calculateFinancialSummary, calculateCostMatrixSummary } from '../../engine/financeEngine';
 import { calculateRecommendedPanelCount } from '../../engine/solarEngine';
 import { SyncService } from '../../services/syncService';
+import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
 
 export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => ({
   projects: INITIAL_PROJECTS,
@@ -53,6 +54,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     lifespanYears: 25,
     annualEnergyTariffEscalationPct: 3.5,
   },
+  defaultDocumentCustomization: DEFAULT_DOCUMENT_CUSTOMIZATION,
 
   isTrashActive: false,
   setIsTrashActive: (active) => set({ isTrashActive: active }),
@@ -68,6 +70,39 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
         ...settingsPartial,
       },
     })),
+
+  updateDefaultDocumentCustomization: (customizationPartial) => {
+    set((state) => ({
+      defaultDocumentCustomization: {
+        ...(state.defaultDocumentCustomization || DEFAULT_DOCUMENT_CUSTOMIZATION),
+        ...customizationPartial,
+      },
+      saveFeedbackMessage: '¡Plantilla de propuesta actualizada para futuros proyectos! 📑',
+    }));
+    setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
+  },
+
+  saveCurrentProjectAsDefaultDocumentTemplate: () => {
+    const active = get().getActiveProject();
+    if (!active) return;
+    const currentCust = active.customization || {};
+    set((state) => ({
+      defaultDocumentCustomization: {
+        ...(state.defaultDocumentCustomization || DEFAULT_DOCUMENT_CUSTOMIZATION),
+        ...currentCust,
+      },
+      saveFeedbackMessage: '¡Configuración actual guardada como plantilla permanente para futuras propuestas! 🌟',
+    }));
+    setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
+  },
+
+  resetDefaultDocumentCustomization: () => {
+    set({
+      defaultDocumentCustomization: DEFAULT_DOCUMENT_CUSTOMIZATION,
+      saveFeedbackMessage: 'Plantilla de propuesta restablecida a los valores de fábrica originales 🔄',
+    });
+    setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
+  },
 
   createNewProject: (payload) => {
     const defs = get().defaultSimulationSettings;
@@ -140,6 +175,10 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
         projectLifespanYears: defs?.lifespanYears || 25,
         co2FactorKgPerKWh: BENCHMARK_PROJECT.financials?.co2FactorKgPerKWh || 0.481,
         customItems: [],
+      },
+      customization: {
+        ...(get().defaultDocumentCustomization || DEFAULT_DOCUMENT_CUSTOMIZATION),
+        contactName: company || name,
       },
     };
 

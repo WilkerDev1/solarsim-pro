@@ -75,6 +75,7 @@ export interface ProjectSlice {
   searchQuery: string;
   statusFilter: string;
   defaultSimulationSettings: DefaultSimulationSettings;
+  defaultDocumentCustomization: DocumentCustomization;
 
   isTrashActive: boolean;
   setIsTrashActive: (active: boolean) => void;
@@ -84,6 +85,9 @@ export interface ProjectSlice {
   setSearchQuery: (query: string) => void;
   setStatusFilter: (filter: string) => void;
   updateDefaultSimulationSettings: (settings: Partial<DefaultSimulationSettings>) => void;
+  updateDefaultDocumentCustomization: (customization: Partial<DocumentCustomization>) => void;
+  saveCurrentProjectAsDefaultDocumentTemplate: () => void;
+  resetDefaultDocumentCustomization: () => void;
 
   createNewProject: (payload?: string | NewProjectPayload) => void;
   duplicateProject: (id: string) => void;

@@ -20,6 +20,7 @@ interface PDFPage2QuotationProps {
   totalPages: number;
   isEditMode?: boolean;
   updateDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
+  updateDefaultDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
 }
 
 const cleanInstallationDesc = (desc?: string): string => {
@@ -42,6 +43,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
   totalPages,
   isEditMode = false,
   updateDocumentCustomization,
+  updateDefaultDocumentCustomization,
 }) => {
   const cust = project.customization || {};
 
@@ -369,6 +371,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                 value={cust.panelWarrantyText}
                 defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.panelWarrantyText || '25 Años de Producción Lineal'}
                 onSave={(val) => updateDocumentCustomization?.({ panelWarrantyText: val })}
+                onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ panelWarrantyText: val })}
                 isEditMode={isEditMode}
                 multiline={false}
                 label="Garantía Paneles"
@@ -384,6 +387,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                 value={cust.inverterWarrantyText}
                 defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.inverterWarrantyText || '5 a 10 Años de Fábrica'}
                 onSave={(val) => updateDocumentCustomization?.({ inverterWarrantyText: val })}
+                onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ inverterWarrantyText: val })}
                 isEditMode={isEditMode}
                 multiline={false}
                 label="Garantía Inversor"
@@ -400,6 +404,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                   value={cust.batteryWarrantyText}
                   defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.batteryWarrantyText || '5 a 10 Años (según fabricante)'}
                   onSave={(val) => updateDocumentCustomization?.({ batteryWarrantyText: val })}
+                  onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ batteryWarrantyText: val })}
                   isEditMode={isEditMode}
                   multiline={false}
                   label="Garantía Batería"
@@ -416,6 +421,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                 value={cust.workmanshipWarrantyText}
                 defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.workmanshipWarrantyText || '1 Año en Instalación y Soporte Técnico'}
                 onSave={(val) => updateDocumentCustomization?.({ workmanshipWarrantyText: val })}
+                onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ workmanshipWarrantyText: val })}
                 isEditMode={isEditMode}
                 multiline={false}
                 label="Garantía Mano de Obra"
@@ -449,6 +455,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                 value={cust.servicesIncludedText}
                 defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.servicesIncludedText}
                 onSave={(val) => updateDocumentCustomization?.({ servicesIncludedText: val })}
+                onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ servicesIncludedText: val })}
                 isEditMode={isEditMode}
                 multiline={true}
                 label="Servicios Gestionados"
@@ -467,6 +474,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
             value={cust.validityNote}
             defaultValue={defaultValidityNote}
             onSave={(val) => updateDocumentCustomization?.({ validityNote: val })}
+            onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ validityNote: val })}
             isEditMode={isEditMode}
             multiline={false}
             label="Nota Legal y Términos"

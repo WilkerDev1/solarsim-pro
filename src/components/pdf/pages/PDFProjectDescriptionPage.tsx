@@ -27,6 +27,7 @@ interface PDFProjectDescriptionPageProps {
   totalPages: number;
   isEditMode?: boolean;
   updateDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
+  updateDefaultDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
 }
 
 export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps> = ({
@@ -39,6 +40,7 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
   totalPages,
   isEditMode = false,
   updateDocumentCustomization,
+  updateDefaultDocumentCustomization,
 }) => {
   const cust = project.customization || {};
 
@@ -176,6 +178,7 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
                 value={cust.projectSummarySubtitle}
                 defaultValue={`Criterios de dimensionamiento técnico para ${clientName}`}
                 onSave={(val) => updateDocumentCustomization?.({ projectSummarySubtitle: val })}
+                onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ projectSummarySubtitle: val })}
                 isEditMode={isEditMode}
                 multiline={false}
                 label="Subtítulo del Resumen Técnico"
@@ -192,6 +195,7 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
               value={resolvedParagraph1}
               defaultValue={defaultParagraph1}
               onSave={(val) => updateDocumentCustomization?.({ customProjectSummaryParagraph1: val })}
+              onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ customProjectSummaryParagraph1: val })}
               isEditMode={isEditMode}
               multiline={true}
               label="Párrafo 1 (Consumo y Producción)"
@@ -205,6 +209,7 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
               value={resolvedParagraph2}
               defaultValue={defaultParagraph2}
               onSave={(val) => updateDocumentCustomization?.({ customProjectSummaryParagraph2: val })}
+              onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ customProjectSummaryParagraph2: val })}
               isEditMode={isEditMode}
               multiline={true}
               label="Párrafo 2 (Equipos y Alcance de Instalación)"
@@ -284,6 +289,7 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
               value={cust.regulatoryNote}
               defaultValue={defaultRegulatoryText}
               onSave={(val) => updateDocumentCustomization?.({ regulatoryNote: val })}
+              onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ regulatoryNote: val })}
               isEditMode={isEditMode}
               multiline={true}
               label="Marco Regulatorio SIE (Párrafos)"

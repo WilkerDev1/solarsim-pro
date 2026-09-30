@@ -12,6 +12,7 @@ import { createFolderSlice } from './slices/folderSlice';
 import { createTariffSlice } from './slices/tariffSlice';
 import { DEFAULT_RD_TARIFF_MATRIX } from '../data/rdTariffs';
 import { normalizeBrandName, inferBrandFromText } from '../utils/equipmentBrandUtils';
+import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../constants/defaultDocumentCustomization';
 
 // Re-export helper types and generators for backward compatibility
 export type { SimulationStore, SimulationState, NewProjectPayload };
@@ -208,6 +209,15 @@ export const useSimulationStore = create<SimulationStore>()(
               };
             }
           }
+
+          if (!state.defaultDocumentCustomization) {
+            state.defaultDocumentCustomization = DEFAULT_DOCUMENT_CUSTOMIZATION;
+          } else {
+            state.defaultDocumentCustomization = {
+              ...DEFAULT_DOCUMENT_CUSTOMIZATION,
+              ...state.defaultDocumentCustomization,
+            };
+          }
         }
       },
 
@@ -224,6 +234,8 @@ export const useSimulationStore = create<SimulationStore>()(
         deletedEquipmentIds: state.deletedEquipmentIds,
         folders: state.folders,
         tariffMatrix: state.tariffMatrix,
+        defaultSimulationSettings: state.defaultSimulationSettings,
+        defaultDocumentCustomization: state.defaultDocumentCustomization,
       }),
     }
   )

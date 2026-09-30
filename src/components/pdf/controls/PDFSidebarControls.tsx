@@ -60,6 +60,9 @@ interface PDFSidebarControlsProps {
   updateClient: (client: Partial<ProjectSimulation['client']>) => void;
   updateSpecs: (specs: Partial<ProjectSimulation['specs']>) => void;
   updateDocumentCustomization: (customization: Partial<DocumentCustomization>) => void;
+  updateDefaultDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
+  saveCurrentProjectAsDefaultDocumentTemplate?: () => void;
+  resetDefaultDocumentCustomization?: () => void;
   isEditMode: boolean;
   setIsEditMode: (val: boolean) => void;
 }
@@ -109,6 +112,9 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
   updateClient,
   updateSpecs,
   updateDocumentCustomization,
+  updateDefaultDocumentCustomization,
+  saveCurrentProjectAsDefaultDocumentTemplate,
+  resetDefaultDocumentCustomization,
   isEditMode,
   setIsEditMode,
 }) => {
@@ -260,6 +266,9 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
             updateClient={updateClient}
             updateSpecs={updateSpecs}
             updateDocumentCustomization={updateDocumentCustomization}
+            updateDefaultDocumentCustomization={updateDefaultDocumentCustomization}
+            saveCurrentProjectAsDefaultDocumentTemplate={saveCurrentProjectAsDefaultDocumentTemplate}
+            resetDefaultDocumentCustomization={resetDefaultDocumentCustomization}
             isEditMode={isEditMode}
             setIsEditMode={setIsEditMode}
           />
