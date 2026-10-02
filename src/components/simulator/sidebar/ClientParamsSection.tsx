@@ -99,14 +99,55 @@ export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
             </label>
             <input
               type="text"
-              value={project.client.address || 'Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.'}
+              value={project.client.address ?? ''}
               onChange={(e) => updateClient({ address: e.target.value })}
+              placeholder="Ej: Av. 27 de Febrero #45, Santo Domingo"
               className={`w-full border rounded-lg px-3 py-1.5 text-xs transition-all ${
                 isDark
                   ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:ring-1 focus:ring-emerald-500'
                   : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600'
               }`}
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                Teléfono del Cliente
+              </label>
+              <input
+                type="text"
+                value={
+                  project.client.contactPhone && !project.client.contactPhone.includes('555-0199')
+                    ? project.client.contactPhone
+                    : ''
+                }
+                onChange={(e) => updateClient({ contactPhone: e.target.value })}
+                placeholder="Ej: 809-000-0000"
+                className={`w-full border rounded-lg px-3 py-1.5 text-xs transition-all ${
+                  isDark
+                    ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:ring-1 focus:ring-emerald-500'
+                    : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600'
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                Atención / Contacto
+              </label>
+              <input
+                type="text"
+                value={project.client.contactPerson ?? project.customization?.contactName ?? project.client.company ?? ''}
+                onChange={(e) => updateClient({ contactPerson: e.target.value })}
+                placeholder="Persona o dpto."
+                className={`w-full border rounded-lg px-3 py-1.5 text-xs transition-all ${
+                  isDark
+                    ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:ring-1 focus:ring-emerald-500'
+                    : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600'
+                }`}
+              />
+            </div>
           </div>
 
           {/* Selector de Fuente de Radiación Solar: Provincia vs GPS Satelital */}

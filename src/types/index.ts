@@ -14,6 +14,7 @@ export interface ClientInfo {
   tariffCode?: string;
   contactEmail?: string;
   contactPhone?: string;
+  contactPerson?: string; // e.g. "Ing. Juan Pérez" / "Atención a"
   quoteNumber?: string; // e.g. "C-0030"
   quoteValidityDays?: number; // e.g. 7
 }

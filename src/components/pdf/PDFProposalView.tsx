@@ -626,6 +626,7 @@ export const PDFProposalView: React.FC = () => {
                     isEditMode={isEditMode}
                     updateDocumentCustomization={updateDocumentCustomization}
                     updateDefaultDocumentCustomization={updateDefaultDocumentCustomization}
+                    updateClient={updateClient}
                   />
                 );
               case 'roi':

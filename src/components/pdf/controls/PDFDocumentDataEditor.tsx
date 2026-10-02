@@ -630,8 +630,11 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
               </label>
               <input
                 type="text"
-                value={cust.contactName !== undefined ? cust.contactName : (project.client.name || '')}
-                onChange={(e) => updateDocumentCustomization({ contactName: e.target.value })}
+                value={cust.contactName !== undefined ? cust.contactName : (project.client.contactPerson || project.client.name || '')}
+                onChange={(e) => {
+                  updateDocumentCustomization({ contactName: e.target.value });
+                  updateClient({ contactPerson: e.target.value });
+                }}
                 placeholder={project.client.name || 'Nombre del cliente'}
                 className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
                   isDark
@@ -648,11 +651,16 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                 </label>
                 <input
                   type="text"
-                  value={cust.clientPhone !== undefined ? cust.clientPhone : (project.client.contactPhone || '809-378-6590')}
+                  value={
+                    cust.clientPhone !== undefined
+                      ? (cust.clientPhone.includes('555-0199') || cust.clientPhone === '+1 (809) 000-0000' ? '' : cust.clientPhone)
+                      : (project.client.contactPhone && !project.client.contactPhone.includes('555-0199') ? project.client.contactPhone : '')
+                  }
                   onChange={(e) => {
                     updateDocumentCustomization({ clientPhone: e.target.value });
                     updateClient({ contactPhone: e.target.value });
                   }}
+                  placeholder="Ej: 809-000-0000 (Opcional)"
                   className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
                     isDark
                       ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'

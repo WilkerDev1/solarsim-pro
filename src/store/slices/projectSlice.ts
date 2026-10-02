@@ -138,6 +138,9 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
         address,
         distributor,
         tariffCode,
+        contactEmail: '',
+        contactPhone: '',
+        contactPerson: company || '',
         projectId: seq.projectId,
         quoteNumber: seq.quoteNumber,
         quoteValidityDays: defs?.defaultQuoteValidityDays || 7,
@@ -179,6 +182,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
       customization: {
         ...(get().defaultDocumentCustomization || DEFAULT_DOCUMENT_CUSTOMIZATION),
         contactName: company || name,
+        clientPhone: '',
+        clientEmail: '',
       },
     };
 
@@ -417,6 +422,14 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
         if (p.id === state.activeProjectId) {
           const updatedClient = { ...p.client, ...clientPartial };
           const updatedSpecs = { ...p.specs };
+          const updatedCustomization = { ...(p.customization || {}) };
+
+          if (clientPartial.contactPhone !== undefined) {
+            updatedCustomization.clientPhone = clientPartial.contactPhone;
+          }
+          if (clientPartial.contactPerson !== undefined) {
+            updatedCustomization.contactName = clientPartial.contactPerson;
+          }
 
           if (updatedSpecs.autoCalculatePanels && clientPartial.province) {
             const panelW = updatedSpecs.panelPowerW || 620;
@@ -439,6 +452,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
             updatedAt: new Date().toISOString(),
             client: updatedClient,
             specs: updatedSpecs,
+            customization: updatedCustomization,
           };
         }
         return p;
@@ -738,16 +752,25 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     set((state) => {
       const targetId = state.activeProjectId || state.getActiveProject()?.id;
       return {
-        projects: state.projects.map((p) =>
-          p.id === targetId
-            ? {
-                ...p,
-                syncStatus: 'pending' as const,
-                updatedAt: new Date().toISOString(),
-                customization: { ...(p.customization || {}), ...customizationPartial },
-              }
-            : p
-        ),
+        projects: state.projects.map((p) => {
+          if (p.id === targetId) {
+            const updatedClient = { ...p.client };
+            if (customizationPartial.clientPhone !== undefined) {
+              updatedClient.contactPhone = customizationPartial.clientPhone;
+            }
+            if (customizationPartial.contactName !== undefined) {
+              updatedClient.contactPerson = customizationPartial.contactName;
+            }
+            return {
+              ...p,
+              syncStatus: 'pending' as const,
+              updatedAt: new Date().toISOString(),
+              client: updatedClient,
+              customization: { ...(p.customization || {}), ...customizationPartial },
+            };
+          }
+          return p;
+        }),
       };
     });
 

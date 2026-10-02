@@ -11,8 +11,8 @@ export const DEFAULT_DOCUMENT_CUSTOMIZATION: DocumentCustomization = {
   companyRnc: '1-31-12345-6',
 
   contactName: '',
-  clientPhone: '+1 (809) 000-0000',
-  clientEmail: 'contacto@cliente.com',
+  clientPhone: '',
+  clientEmail: '',
   validityNote: 'Precios sujetos a disponibilidad de inventario. Cotización válida por 7 días laborables.',
 
   panelWarrantyText: '25 Años de Producción Lineal',

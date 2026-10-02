@@ -209,7 +209,7 @@ export const InlineEditableText: React.FC<InlineEditableTextProps> = ({
   return (
     <div ref={containerRef} className="relative z-40 my-1">
       {/* Mini floating action toolbar */}
-      <div className="absolute -top-9 left-0 right-0 flex items-center justify-between bg-slate-900/95 backdrop-blur-md text-white px-2.5 py-1 rounded-xl shadow-xl border border-slate-700 text-xs gap-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
+      <div className="absolute -top-9 left-0 min-w-[320px] flex items-center justify-between bg-slate-900/95 backdrop-blur-md text-white px-2.5 py-1 rounded-xl shadow-xl border border-slate-700 text-xs gap-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
         <div className="flex items-center gap-1.5">
           <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider pl-1">
             {label}
