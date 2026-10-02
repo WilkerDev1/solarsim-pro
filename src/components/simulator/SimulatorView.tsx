@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { fetchSolarRadiationByCoordinates } from '../../services/solarRadiationApi';
-import { Shield, Trash2, RotateCcw, ArrowLeft, Undo2, Redo2, FolderKanban } from 'lucide-react';
+import { Shield, Trash2, RotateCcw, ArrowLeft, Undo2, Redo2 } from 'lucide-react';
 import { ParameterSidebar } from './sidebar/ParameterSidebar';
 import { EnergyAnalysisTab } from './tabs/EnergyAnalysisTab';
 import { QuotationEquipmentsTab } from './tabs/QuotationEquipmentsTab';
@@ -278,18 +278,6 @@ export const SimulatorView: React.FC = () => {
             >
               <Redo2 className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Rehacer</span>
-            </button>
-
-            <div className="h-4 w-px bg-slate-200 mx-1" />
-
-            <button
-              type="button"
-              onClick={() => setActiveView('project-hub')}
-              className="p-1.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100 transition-all cursor-pointer flex items-center gap-1 text-xs font-bold"
-              title="Volver al Hub de esta propuesta"
-            >
-              <FolderKanban className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Hub</span>
             </button>
           </div>
         </div>

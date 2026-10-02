@@ -144,7 +144,7 @@ export const ProjectHubSidebarDock: React.FC<ProjectHubSidebarDockProps> = ({
                 ? 'text-slate-400 hover:text-white hover:bg-slate-800'
                 : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
             }`}
-            title="Historial Git"
+            title="Historial y Restauración"
           >
             <GitBranch className="w-4 h-4" />
           </button>
@@ -245,9 +245,10 @@ export const ProjectHubSidebarDock: React.FC<ProjectHubSidebarDockProps> = ({
               ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
               : 'text-slate-600 hover:text-slate-900 hover:bg-white'
           }`}
+          title="Historial y Restauración de Versiones"
         >
           <GitBranch className="w-3.5 h-3.5 shrink-0" />
-          <span className="truncate">Historial</span>
+          <span className="truncate">Historial y Restauración</span>
         </button>
       </div>
 
@@ -836,7 +837,7 @@ export const ProjectHubSidebarDock: React.FC<ProjectHubSidebarDockProps> = ({
           <div className="space-y-3.5 animate-in fade-in duration-150">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wide flex items-center gap-1.5">
-                <GitBranch className="w-3.5 h-3.5 text-blue-500" /> Hitos de Versión
+                <GitBranch className="w-3.5 h-3.5 text-blue-500" /> Historial y Restauración
               </span>
               <button
                 onClick={onOpenSnapshotModal}

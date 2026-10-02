@@ -1,7 +1,6 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, forwardRef, useImperativeHandle, useEffect } from 'react';
 import { ProjectSimulation, FinancialSummaryResult } from '../../types';
 import { PDF_COLOR_THEMES, PDFColorTheme } from '../../constants/pdfThemes';
-import { useSimulationStore } from '../../store/useSimulationStore';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { PDFMergeService } from '../../services/pdfMergeService';
@@ -12,13 +11,8 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize2,
-  Printer,
-  Download,
-  FileEdit,
-  Sliders,
   ChevronDown,
   Loader2,
-  Sparkles,
 } from 'lucide-react';
 
 // Modular PDF Pages
@@ -34,19 +28,21 @@ import { PDFPage2Quotation } from '../pdf/pages/PDFPage2Quotation';
 import { PDFPage3ROI } from '../pdf/pages/PDFPage3ROI';
 import { PDFPage4CashFlow } from '../pdf/pages/PDFPage4CashFlow';
 
-interface ProjectHubPDFCanvasProps {
+export interface ProjectHubPDFCanvasHandle {
+  exportPDF: () => Promise<void>;
+  print: () => void;
+}
+
+export interface ProjectHubPDFCanvasProps {
   project: ProjectSimulation;
   summary: FinancialSummaryResult;
   isDark: boolean;
+  onExportStateChange?: (isExporting: boolean, progress: string) => void;
 }
 
-export const ProjectHubPDFCanvas: React.FC<ProjectHubPDFCanvasProps> = ({
-  project,
-  summary,
-  isDark,
-}) => {
-  const { setActiveView } = useSimulationStore();
-  const pdfContainerRef = useRef<HTMLDivElement>(null);
+export const ProjectHubPDFCanvas = forwardRef<ProjectHubPDFCanvasHandle, ProjectHubPDFCanvasProps>(
+  ({ project, summary, isDark, onExportStateChange }, ref) => {
+    const pdfContainerRef = useRef<HTMLDivElement>(null);
 
   const [zoomLevel, setZoomLevel] = useState<number>(0.85); // 85% default fits nicely
   const [isExporting, setIsExporting] = useState<boolean>(false);
@@ -427,6 +423,15 @@ export const ProjectHubPDFCanvas: React.FC<ProjectHubPDFCanvasProps> = ({
     }
   };
 
+  useImperativeHandle(ref, () => ({
+    exportPDF: handleExportPDF,
+    print: () => window.print(),
+  }));
+
+  useEffect(() => {
+    onExportStateChange?.(isExporting, exportProgress);
+  }, [isExporting, exportProgress, onExportStateChange]);
+
   const a4Width = 850;
   const a4Height = 1202;
 
@@ -467,7 +472,7 @@ export const ProjectHubPDFCanvas: React.FC<ProjectHubPDFCanvasProps> = ({
           </span>
         </div>
 
-        {/* Center: Zoom Controls */}
+        {/* Right: Zoom Controls */}
         <div className="flex items-center gap-1.5">
           <button
             onClick={handleZoomOut}
@@ -518,57 +523,6 @@ export const ProjectHubPDFCanvas: React.FC<ProjectHubPDFCanvasProps> = ({
             <span>100%</span>
           </button>
         </div>
-
-        {/* Right: Quick Action Buttons */}
-        <div className="flex items-center gap-2">
-          {/* Print */}
-          <button
-            onClick={() => window.print()}
-            className={`p-1.5 sm:px-3 sm:py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-              isDark
-                ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-200'
-                : 'bg-slate-100 border-slate-300 hover:bg-slate-200 text-slate-700'
-            }`}
-            title="Imprimir propuesta"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Imprimir</span>
-          </button>
-
-          {/* Export PDF */}
-          <button
-            onClick={handleExportPDF}
-            disabled={isExporting}
-            className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs disabled:opacity-50"
-            title="Descargar propuesta completa en PDF"
-          >
-            {isExporting ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>{exportProgress || 'Exportando...'}</span>
-              </>
-            ) : (
-              <>
-                <Download className="w-3.5 h-3.5" />
-                <span>Descargar PDF</span>
-              </>
-            )}
-          </button>
-
-          {/* Open Full PDF Editor */}
-          <button
-            onClick={() => setActiveView('pdf-preview')}
-            className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-              isDark
-                ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-amber-400'
-                : 'bg-amber-50 border-amber-300 hover:bg-amber-100 text-amber-800'
-            }`}
-            title="Abrir editor completo de propuesta PDF con personalización de textos e imágenes"
-          >
-            <FileEdit className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Personalizar PDF</span>
-          </button>
-        </div>
       </div>
 
       {/* 📄 Scrollable Paper Canvas */}
@@ -615,4 +569,6 @@ export const ProjectHubPDFCanvas: React.FC<ProjectHubPDFCanvasProps> = ({
       </main>
     </div>
   );
-};
+});
+
+ProjectHubPDFCanvas.displayName = 'ProjectHubPDFCanvas';

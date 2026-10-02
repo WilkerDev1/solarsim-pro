@@ -1,21 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import {
   ArrowLeft,
   Share2,
   Sliders,
-  Camera,
   MapPin,
   Calendar,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Building,
   RotateCcw,
   Trash2,
+  Download,
+  Printer,
+  FileEdit,
+  ChevronDown,
+  Loader2,
 } from 'lucide-react';
 import { calculateProjectFinancialSummary } from '../../engine/financeEngine';
 import { ProjectHubSidebarDock } from './ProjectHubSidebarDock';
-import { ProjectHubPDFCanvas } from './ProjectHubPDFCanvas';
+import { ProjectHubPDFCanvas, ProjectHubPDFCanvasHandle } from './ProjectHubPDFCanvas';
 import { CreateSnapshotModal } from './components/CreateSnapshotModal';
 
 export const ProjectHubView: React.FC = () => {
@@ -33,6 +34,32 @@ export const ProjectHubView: React.FC = () => {
 
   const [isDockOpen, setIsDockOpen] = useState<boolean>(true);
   const [isSnapshotModalOpen, setIsSnapshotModalOpen] = useState<boolean>(false);
+  const [isOptionsOpen, setIsOptionsOpen] = useState<boolean>(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [exportProgress, setExportProgress] = useState<string>('');
+
+  const canvasRef = useRef<ProjectHubPDFCanvasHandle>(null);
+  const optionsMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (optionsMenuRef.current && !optionsMenuRef.current.contains(e.target as Node)) {
+        setIsOptionsOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOptionsOpen(false);
+    };
+
+    if (isOptionsOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOptionsOpen]);
 
   if (!project) {
     return (
@@ -118,54 +145,154 @@ export const ProjectHubView: React.FC = () => {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
-          {/* Toggle Details Dock */}
-          <button
-            onClick={() => setIsDockOpen(!isDockOpen)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
-              isDockOpen
-                ? isDark
-                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-400'
-                  : 'bg-amber-50 border-amber-300 text-amber-800'
-                : isDark
-                ? 'bg-slate-800/80 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700'
-                : 'bg-slate-100 border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-200'
-            }`}
-            title={isDockOpen ? 'Ocultar panel de detalles' : 'Mostrar panel de detalles'}
-          >
-            {isDockOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeftOpen className="w-4 h-4" />}
-            <span className="hidden lg:inline">{isDockOpen ? 'Ocultar Dock' : 'Ver Detalles'}</span>
-          </button>
+          {/* Unified Dropdown Menu: Compartir, Descargar, Imprimir, Personalizar */}
+          <div className="relative" ref={optionsMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsOptionsOpen(!isOptionsOpen)}
+              disabled={isExporting}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
+                isOptionsOpen
+                  ? isDark
+                    ? 'bg-slate-800 border-slate-600 text-white shadow-md'
+                    : 'bg-slate-200 border-slate-300 text-slate-900 shadow-md'
+                  : isDark
+                  ? 'bg-slate-800/80 border-slate-700 text-slate-200 hover:text-white hover:bg-slate-700'
+                  : 'bg-slate-100 border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-200'
+              }`}
+              title="Opciones de exportación, compartir y personalización"
+            >
+              {isExporting ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-500" />
+                  <span className="font-bold text-emerald-500">Exportando...</span>
+                </>
+              ) : (
+                <>
+                  <Share2 className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Opciones</span>
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
+                      isOptionsOpen ? 'rotate-180' : ''
+                    }`}
+                  />
+                </>
+              )}
+            </button>
 
-          {/* Git Milestone Snapshot */}
-          <button
-            onClick={() => setIsSnapshotModalOpen(true)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
-              isDark
-                ? 'bg-slate-800/80 border-slate-700 text-slate-200 hover:text-white hover:bg-slate-700'
-                : 'bg-slate-100 border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-200'
-            }`}
-            title="Guardar un hito o versión intencional de este proyecto"
-          >
-            <Camera className="w-3.5 h-3.5 text-blue-500" />
-            <span className="hidden sm:inline">Hito Git</span>
-          </button>
+            {isOptionsOpen && (
+              <div
+                className={`absolute right-0 mt-2 w-72 rounded-2xl border shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150 ${
+                  isDark
+                    ? 'bg-[#141a27] border-slate-700 text-slate-200'
+                    : 'bg-white border-slate-200 text-slate-800'
+                }`}
+              >
+                {/* 1. Compartir Web */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOptionsOpen(false);
+                    openShareModal();
+                  }}
+                  className={`w-full p-2.5 rounded-xl flex items-start gap-3 text-left transition-colors cursor-pointer ${
+                    isDark ? 'hover:bg-slate-800/80' : 'hover:bg-slate-100'
+                  }`}
+                >
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-500 shrink-0 mt-0.5">
+                    <Share2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                      Compartir Web
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                      Enlace temporal interactivo y QR para el cliente
+                    </div>
+                  </div>
+                </button>
 
-          {/* Share Web Proposal */}
-          <button
-            onClick={() => openShareModal()}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${
-              isDark
-                ? 'bg-slate-800/80 border-slate-700 text-slate-200 hover:text-white hover:bg-slate-700'
-                : 'bg-slate-100 border-slate-200 text-slate-700 hover:text-slate-900 hover:bg-slate-200'
-            }`}
-            title="Compartir propuesta web interactiva con enlace temporal y QR"
-          >
-            <Share2 className="w-3.5 h-3.5 text-emerald-500" />
-            <span className="hidden sm:inline">Compartir Web</span>
-          </button>
+                {/* 2. Descargar PDF */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOptionsOpen(false);
+                    canvasRef.current?.exportPDF();
+                  }}
+                  disabled={isExporting}
+                  className={`w-full p-2.5 rounded-xl flex items-start gap-3 text-left transition-colors cursor-pointer ${
+                    isDark ? 'hover:bg-slate-800/80' : 'hover:bg-slate-100'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  <div className="w-8 h-8 rounded-lg bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-500 shrink-0 mt-0.5">
+                    <Download className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-blue-600 dark:text-blue-400">
+                      Descargar PDF
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                      Documento A4 en alta resolución con anexos
+                    </div>
+                  </div>
+                </button>
+
+                {/* 3. Imprimir */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOptionsOpen(false);
+                    window.print();
+                  }}
+                  className={`w-full p-2.5 rounded-xl flex items-start gap-3 text-left transition-colors cursor-pointer ${
+                    isDark ? 'hover:bg-slate-800/80' : 'hover:bg-slate-100'
+                  }`}
+                >
+                  <div className="w-8 h-8 rounded-lg bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-500 shrink-0 mt-0.5">
+                    <Printer className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-purple-600 dark:text-purple-400">
+                      Imprimir
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                      Enviar a impresora o guardar como PDF nativo
+                    </div>
+                  </div>
+                </button>
+
+                <div className={`my-1 border-t ${isDark ? 'border-slate-800' : 'border-slate-100'}`} />
+
+                {/* 4. Personalizar PDF */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOptionsOpen(false);
+                    setActiveView('pdf-preview');
+                  }}
+                  className={`w-full p-2.5 rounded-xl flex items-start gap-3 text-left transition-colors cursor-pointer ${
+                    isDark ? 'hover:bg-slate-800/80' : 'hover:bg-slate-100'
+                  }`}
+                >
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-500 shrink-0 mt-0.5">
+                    <FileEdit className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                      Personalizar PDF
+                    </div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                      Editor completo, temas, marcas de agua y páginas
+                    </div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Primary Action: Abrir en Simulador */}
           <button
+            type="button"
             onClick={() => setActiveView('simulator')}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
             title="Abrir en simulador para ajustar parámetros solares y cotización"
@@ -209,11 +336,29 @@ export const ProjectHubView: React.FC = () => {
 
         {/* Center Stage: Continuous Scrollable PDF Proposal Canvas */}
         <ProjectHubPDFCanvas
+          ref={canvasRef}
           project={project}
           summary={financialSummary}
           isDark={isDark}
+          onExportStateChange={(exporting, progress) => {
+            setIsExporting(exporting);
+            setExportProgress(progress);
+          }}
         />
       </div>
+
+      {/* 🚀 Floating Export Progress Notification */}
+      {isExporting && (
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl bg-slate-900/95 border border-emerald-500/50 text-white shadow-2xl backdrop-blur-md flex items-center gap-3 animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <Loader2 className="w-5 h-5 text-emerald-400 animate-spin shrink-0" />
+          <div>
+            <div className="text-xs font-bold text-emerald-400">Generando Propuesta PDF</div>
+            <div className="text-[11px] text-slate-300 font-mono">
+              {exportProgress || 'Procesando páginas...'}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 📸 Snapshot Creation Modal */}
       <CreateSnapshotModal
