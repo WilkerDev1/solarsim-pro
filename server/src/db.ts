@@ -159,19 +159,57 @@ export async function initDatabase(): Promise<void> {
     // 6. Tabla de Pliegos Tarifarios Eléctricos (SIE & CEPM)
     await client.query(`
       CREATE TABLE IF NOT EXISTS utility_tariffs (
-          id VARCHAR(64) PRIMARY KEY,
-          organization_id VARCHAR(64) NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-          resolution_code VARCHAR(128) NOT NULL,
-          effective_date DATE,
-          tariffs_json JSONB NOT NULL,
-          updated_by VARCHAR(255),
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
-        CREATE INDEX IF NOT EXISTS idx_tariffs_org ON utility_tariffs(organization_id);
-      `);
+        id VARCHAR(64) PRIMARY KEY,
+        organization_id VARCHAR(64) NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        resolution_code VARCHAR(128) NOT NULL,
+        effective_date DATE,
+        tariffs_json JSONB NOT NULL,
+        updated_by VARCHAR(255),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_tariffs_org ON utility_tariffs(organization_id);
+    `);
 
-      await client.query('COMMIT');
+    // 7. Tabla Inmutable de Historial de Versiones Git (project_version_history)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS project_version_history (
+        id VARCHAR(64) PRIMARY KEY,
+        project_id VARCHAR(128) NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        version_number INTEGER NOT NULL,
+        label VARCHAR(255) NOT NULL,
+        notes TEXT,
+        type VARCHAR(32) DEFAULT 'auto',
+        author_id VARCHAR(64) REFERENCES users(id) ON DELETE SET NULL,
+        author_name VARCHAR(255) NOT NULL,
+        author_email VARCHAR(255),
+        system_capacity_kwp NUMERIC(10, 2) DEFAULT 0,
+        net_investment_usd NUMERIC(12, 2) DEFAULT 0,
+        data_json JSONB NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_pvh_project_version ON project_version_history(project_id, version_number);
+    `);
+
+    // 8. Tabla de Muro de Actividad y Notificaciones de Organización (team_notifications)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS team_notifications (
+        id VARCHAR(64) PRIMARY KEY,
+        organization_id VARCHAR(64) NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+        user_id VARCHAR(64) REFERENCES users(id) ON DELETE CASCADE,
+        project_id VARCHAR(128) REFERENCES projects(id) ON DELETE CASCADE,
+        project_code VARCHAR(64),
+        client_name VARCHAR(255),
+        author_name VARCHAR(255) NOT NULL,
+        action VARCHAR(64) NOT NULL,
+        message TEXT NOT NULL,
+        read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_team_notif_org ON team_notifications(organization_id, created_at);
+    `);
+
+    await client.query('COMMIT');
     console.log('✅ Esquemas de base de datos PostgreSQL inicializados con éxito.');
   } catch (error) {
     await client.query('ROLLBACK');

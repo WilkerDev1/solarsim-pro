@@ -7,6 +7,9 @@ import { DashboardView } from './components/dashboard/DashboardView';
 import { TrashView } from './components/dashboard/TrashView';
 import { SimulatorView } from './components/simulator/SimulatorView';
 import { PDFProposalView } from './components/pdf/PDFProposalView';
+import { ProjectHubView } from './components/hub/ProjectHubView';
+import { CompanyProfileHubView } from './components/companies/CompanyProfileHubView';
+import { ConflictResolutionModal } from './components/common/ConflictResolutionModal';
 import { NewProjectModal } from './components/common/NewProjectModal';
 import { UpdateModal } from './components/common/UpdateModal';
 import { AIInvoiceScannerModal } from './components/common/ai-invoice/AIInvoiceScannerModal';
@@ -79,7 +82,7 @@ export const App: React.FC = () => {
 
       {/* 🖼️ 2. Contenedor Principal con Header Adaptativo y Vistas */}
       <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
-        {activeView !== 'dashboard' && <Header />}
+        {(activeView === 'simulator' || activeView === 'pdf-preview') && <Header />}
 
         <main className="flex-1 flex overflow-hidden min-h-0 w-full">
           <ErrorBoundary onReset={() => setActiveView('dashboard')}>
@@ -91,6 +94,8 @@ export const App: React.FC = () => {
                 {isTrashActive ? <TrashView /> : <DashboardView />}
               </div>
             )}
+            {activeView === 'project-hub' && <ProjectHubView />}
+            {activeView === 'companies-hub' && <CompanyProfileHubView />}
             {activeView === 'simulator' && <SimulatorView />}
             {activeView === 'pdf-preview' && <PDFProposalView />}
           </ErrorBoundary>
@@ -98,6 +103,7 @@ export const App: React.FC = () => {
       </div>
 
       {/* Global Modals Mounted at Root Level */}
+      <ConflictResolutionModal />
       <NewProjectModal />
       <UpdateModal />
       <AIInvoiceScannerModal />

@@ -13,6 +13,12 @@ import {
   UserProfile,
   UserRole,
   ProjectFolder,
+  CompanyProfile,
+  LocalUserProfile,
+  ProjectSnapshot,
+  DiffFieldChange,
+  ProjectConflictInfo,
+  TeamNotification,
 } from '../types';
 import { SolarEquipmentItem } from '../types/equipment';
 
@@ -71,7 +77,7 @@ export interface DefaultSimulationSettings {
 export interface ProjectSlice {
   projects: ProjectSimulation[];
   activeProjectId: string;
-  activeView: 'dashboard' | 'simulator' | 'pdf-preview';
+  activeView: 'dashboard' | 'simulator' | 'pdf-preview' | 'project-hub' | 'companies-hub';
   searchQuery: string;
   statusFilter: string;
   defaultSimulationSettings: DefaultSimulationSettings;
@@ -80,8 +86,8 @@ export interface ProjectSlice {
   isTrashActive: boolean;
   setIsTrashActive: (active: boolean) => void;
 
-  setActiveView: (view: 'dashboard' | 'simulator' | 'pdf-preview') => void;
-  setActiveProject: (id: string) => void;
+  setActiveView: (view: 'dashboard' | 'simulator' | 'pdf-preview' | 'project-hub' | 'companies-hub') => void;
+  setActiveProject: (id: string, targetView?: 'simulator' | 'project-hub') => void;
   setSearchQuery: (query: string) => void;
   setStatusFilter: (filter: string) => void;
   updateDefaultSimulationSettings: (settings: Partial<DefaultSimulationSettings>) => void;
@@ -229,6 +235,49 @@ export interface FolderSlice {
   moveProjectToFolder: (projectId: string, targetFolderId: string | null) => void;
 }
 
+export interface CompanyProfileSlice {
+  companies: CompanyProfile[];
+  activeCompanyId: string;
+  localUserProfile: LocalUserProfile;
+
+  addCompany: (companyData: Omit<CompanyProfile, 'id' | 'createdAt' | 'updatedAt'> & { id?: string; createdAt?: string; updatedAt?: string }) => string;
+  updateCompany: (id: string, partial: Partial<CompanyProfile>) => void;
+  deleteCompany: (id: string) => void;
+  setActiveCompany: (id: string) => void;
+  updateLocalUserProfile: (partial: Partial<LocalUserProfile>) => void;
+  getActiveCompany: () => CompanyProfile;
+}
+
+export interface VersionHistorySlice {
+  undoStack: ProjectSimulation[];
+  redoStack: ProjectSimulation[];
+  canUndo: boolean;
+  canRedo: boolean;
+  snapshotsByProject: Record<string, ProjectSnapshot[]>;
+  activeConflict: ProjectConflictInfo | null;
+
+  recordUndoState: (project: ProjectSimulation) => void;
+  undo: () => void;
+  redo: () => void;
+  createSnapshot: (projectId: string, label: string, notes?: string, type?: 'auto' | 'manual') => ProjectSnapshot;
+  restoreSnapshot: (projectId: string, snapshotId: string) => boolean;
+  getProjectSnapshots: (projectId: string) => ProjectSnapshot[];
+  deleteSnapshot: (projectId: string, snapshotId: string) => void;
+  compareSnapshots: (oldSnap: ProjectSnapshot, newSnap: ProjectSnapshot) => DiffFieldChange[];
+  setActiveConflict: (conflict: ProjectConflictInfo | null) => void;
+  resolveConflict: (resolution: 'keep_local' | 'accept_server' | 'fork') => void;
+}
+
+export interface NotificationSlice {
+  notifications: TeamNotification[];
+  unreadNotificationsCount: number;
+
+  addNotification: (notification: Omit<TeamNotification, 'id' | 'timestamp' | 'read'>) => void;
+  markAsRead: (id: string) => void;
+  markAllAsRead: () => void;
+  clearNotifications: () => void;
+}
+
 import { TariffSlice } from './slices/tariffSlice';
 
 export type SimulationStore = ProjectSlice &
@@ -238,8 +287,12 @@ export type SimulationStore = ProjectSlice &
   AISlice &
   UISlice &
   FolderSlice &
-  TariffSlice;
+  TariffSlice &
+  CompanyProfileSlice &
+  VersionHistorySlice &
+  NotificationSlice;
 
 export type SimulationState = SimulationStore;
 export type SimulationSlice<T> = StateCreator<SimulationStore, [], [], T>;
+
 

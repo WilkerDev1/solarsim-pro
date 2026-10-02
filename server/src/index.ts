@@ -497,6 +497,19 @@ app.post('/api/sync/push', async (c) => {
           ]
         );
 
+        // 🔔 Registrar notificación de creación en el equipo
+        const notifId = `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+        await client.query(
+          `INSERT INTO team_notifications (
+            id, organization_id, user_id, project_id, project_code, client_name,
+            author_name, action, message, read, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, FALSE, NOW())`,
+          [
+            notifId, authUser.organizationId, authUser.id, finalProjId, projectCode, clientName,
+            authUser.name, 'CREATE', `${authUser.name} creó la propuesta "${clientName}"`
+          ]
+        );
+
         results.push({ id: finalProjId, originalId: originalProjId, status: 'created', version: newVersion });
       } else {
         const existing = existingRes.rows[0];
@@ -548,12 +561,49 @@ app.post('/api/sync/push', async (c) => {
 
           results.push({ id: finalProjId, originalId: originalProjId, status: 'forked', version: 1 });
         } else {
+          // 🛡️ Detección de Concurrencia Optimista (Conflict Detection)
+          if (proj.baseVersion !== undefined && existing.version > proj.baseVersion && !proj.forceOverwrite) {
+            results.push({
+              id: finalProjId,
+              originalId: originalProjId,
+              status: 'conflict',
+              serverVersion: existing.version,
+              localVersion: proj.baseVersion,
+              serverProject: existing.data_json,
+              lastModifiedByName: existing.last_modified_by_name || 'Otro consultor',
+              lastModifiedAt: existing.updated_at,
+            });
+            continue; // No sobreescribir ciegamente en base de datos
+          }
+
+          // 📸 Guardar copia inmutable en project_version_history antes de sobreescribir
+          const snapshotId = `snap-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+          await client.query(
+            `INSERT INTO project_version_history (
+              id, project_id, version_number, label, notes, type, author_id, author_name, author_email,
+              system_capacity_kwp, net_investment_usd, data_json, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())`,
+            [
+              snapshotId, finalProjId, existing.version,
+              `Versión v${existing.version}`,
+              'Auto-checkpoint previo a sincronización',
+              'auto',
+              existing.created_by_id,
+              existing.last_modified_by_name || existing.created_by_name,
+              existing.created_by_email,
+              existing.system_capacity_kwp || 0,
+              0,
+              JSON.stringify(existing.data_json)
+            ]
+          );
+
           // Actualización normal del proyecto existente dentro de la misma organización
           const newVersion = (existing.version || 1) + 1;
           const updatedData = {
             ...proj,
             id: finalProjId,
             version: newVersion,
+            baseVersion: newVersion,
             lastModifiedBy: authUser.name,
             lastModifiedAt: new Date().toISOString(),
             syncStatus: 'synced',
@@ -576,6 +626,19 @@ app.post('/api/sync/push', async (c) => {
             [
               authUser.id, authUser.name, clientName, projectCode, capacity,
               newVersion, JSON.stringify(updatedData), isDeleted, deletedAt, deletedBy, finalProjId, authUser.organizationId
+            ]
+          );
+
+          // 🔔 Registrar notificación de actualización en el equipo
+          const notifId = `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+          await client.query(
+            `INSERT INTO team_notifications (
+              id, organization_id, user_id, project_id, project_code, client_name,
+              author_name, action, message, read, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, FALSE, NOW())`,
+            [
+              notifId, authUser.organizationId, authUser.id, finalProjId, projectCode, clientName,
+              authUser.name, 'UPDATE', `${authUser.name} actualizó la propuesta "${clientName}" a v${newVersion}`
             ]
           );
 
@@ -718,6 +781,146 @@ app.delete('/api/trash', async (c) => {
   } finally {
     client.release();
   }
+});
+
+// ----------------------------------------------------
+// 5.4 Historial de Versiones Git Inmutable (Snapshots)
+// ----------------------------------------------------
+app.get('/api/projects/:id/history', async (c) => {
+  const authUser = await authenticate(c);
+  if (!authUser) {
+    return c.json({ error: 'No autorizado' }, 401);
+  }
+
+  const projectId = c.req.param('id');
+  const res = await pool.query(
+    `SELECT pvh.id, pvh.project_id, pvh.version_number, pvh.label, pvh.notes, pvh.type,
+            pvh.author_name, pvh.author_email, pvh.system_capacity_kwp, pvh.net_investment_usd,
+            pvh.data_json, pvh.created_at
+     FROM project_version_history pvh
+     JOIN projects p ON p.id = pvh.project_id
+     WHERE pvh.project_id = $1 AND p.organization_id = $2
+     ORDER BY pvh.version_number DESC`,
+    [projectId, authUser.organizationId]
+  );
+
+  return c.json({ success: true, history: res.rows });
+});
+
+app.post('/api/projects/:id/history/:versionId/restore', async (c) => {
+  const authUser = await authenticate(c);
+  if (!authUser) {
+    return c.json({ error: 'No autorizado' }, 401);
+  }
+
+  if (authUser.role === 'LECTOR') {
+    return c.json({ error: 'Permisos insuficientes: rol Lector no puede restaurar versiones' }, 403);
+  }
+
+  const projectId = c.req.param('id');
+  const versionId = c.req.param('versionId');
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const snapRes = await client.query(
+      `SELECT pvh.* FROM project_version_history pvh
+       JOIN projects p ON p.id = pvh.project_id
+       WHERE pvh.id = $1 AND pvh.project_id = $2 AND p.organization_id = $3`,
+      [versionId, projectId, authUser.organizationId]
+    );
+
+    if (snapRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return c.json({ error: 'Versión histórica no encontrada' }, 404);
+    }
+    const snap = snapRes.rows[0];
+
+    const currentProjRes = await client.query('SELECT version FROM projects WHERE id = $1', [projectId]);
+    const nextVersion = ((currentProjRes.rows[0]?.version) || 1) + 1;
+
+    const restoredData = {
+      ...snap.data_json,
+      version: nextVersion,
+      baseVersion: nextVersion,
+      lastModifiedBy: authUser.name,
+      lastModifiedAt: new Date().toISOString(),
+      syncStatus: 'synced',
+    };
+
+    await client.query(
+      `UPDATE projects SET
+        version = $1,
+        data_json = $2,
+        last_modified_by_id = $3,
+        last_modified_by_name = $4,
+        updated_at = NOW()
+       WHERE id = $5 AND organization_id = $6`,
+      [nextVersion, JSON.stringify(restoredData), authUser.id, authUser.name, projectId, authUser.organizationId]
+    );
+
+    // 🔔 Notificación de restauración en el equipo
+    const notifId = `notif-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    await client.query(
+      `INSERT INTO team_notifications (
+        id, organization_id, user_id, project_id, project_code, client_name,
+        author_name, action, message, read, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, FALSE, NOW())`,
+      [
+        notifId, authUser.organizationId, authUser.id, projectId, snap.data_json?.client?.projectId, snap.data_json?.client?.name,
+        authUser.name, 'SNAPSHOT', `${authUser.name} restauró la propuesta a la versión v${snap.version_number}`
+      ]
+    );
+
+    await client.query('COMMIT');
+    return c.json({
+      success: true,
+      message: `Propuesta restaurada exitosamente a versión ${snap.version_number}`,
+      version: nextVersion,
+      project: restoredData
+    });
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    return c.json({ error: err.message || 'Error al restaurar versión' }, 500);
+  } finally {
+    client.release();
+  }
+});
+
+// ----------------------------------------------------
+// 5.5 Notificaciones y Muro de Actividad de Organización
+// ----------------------------------------------------
+app.get('/api/notifications', async (c) => {
+  const authUser = await authenticate(c);
+  if (!authUser) {
+    return c.json({ error: 'No autorizado' }, 401);
+  }
+
+  const res = await pool.query(
+    `SELECT id, organization_id, user_id, project_id, project_code, client_name,
+            author_name, action, message, read, created_at
+     FROM team_notifications
+     WHERE organization_id = $1
+     ORDER BY created_at DESC
+     LIMIT 50`,
+    [authUser.organizationId]
+  );
+
+  return c.json({ success: true, notifications: res.rows });
+});
+
+app.patch('/api/notifications/mark-read', async (c) => {
+  const authUser = await authenticate(c);
+  if (!authUser) {
+    return c.json({ error: 'No autorizado' }, 401);
+  }
+
+  await pool.query(
+    `UPDATE team_notifications SET read = TRUE WHERE organization_id = $1`,
+    [authUser.organizationId]
+  );
+
+  return c.json({ success: true, message: 'Notificaciones marcadas como leídas' });
 });
 
 // ----------------------------------------------------

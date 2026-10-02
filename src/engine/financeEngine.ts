@@ -1,4 +1,4 @@
-import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem, CustomQuotationItem, CustomQuotationDiscount } from '../types';
+import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem, CustomQuotationItem, CustomQuotationDiscount, ProjectSimulation } from '../types';
 import { calculateDCCapacityKWp, calculateMonthlySolarProduction } from './solarEngine';
 import {
   getProjectPanels,
@@ -713,3 +713,18 @@ export function calculateFinancialSummary(
     customDiscountsList: customDiscounts,
   };
 }
+
+/**
+ * Convenience helper to calculate complete financial summary directly from a ProjectSimulation object.
+ */
+export function calculateProjectFinancialSummary(p: ProjectSimulation): FinancialSummaryResult {
+  return calculateFinancialSummary(
+    p.client?.province || 'Santo Domingo / Distrito Nacional',
+    p.specs,
+    p.rates,
+    p.financials,
+    p.monthlyConsumption,
+    p.client?.customMonthlyHSP
+  );
+}
+

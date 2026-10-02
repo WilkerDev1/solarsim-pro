@@ -420,9 +420,14 @@ export interface ProjectSimulation {
   deletedAt?: string | null; // ISO 8601 timestamp cuando se envió a papelera
   deletedBy?: string | null; // Nombre o identificador del usuario que lo eliminó
   folderId?: string; // Optional custom folder assignment
+  baseVersion?: number; // Base version when editing started for optimistic concurrency
+  companyProfileId?: string; // Associated Company Profile ID
 }
 
 export * from './folder';
+export * from './companyProfile';
+export * from './versionHistory';
+export * from './notification';
 
 export type UpdateState = 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'installing' | 'error';
 

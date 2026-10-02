@@ -10,6 +10,9 @@ import { createAISlice } from './slices/aiSlice';
 import { createUISlice } from './slices/uiSlice';
 import { createFolderSlice } from './slices/folderSlice';
 import { createTariffSlice } from './slices/tariffSlice';
+import { createCompanyProfileSlice } from './slices/companyProfileSlice';
+import { createVersionHistorySlice } from './slices/versionHistorySlice';
+import { createNotificationSlice } from './slices/notificationSlice';
 import { DEFAULT_RD_TARIFF_MATRIX } from '../data/rdTariffs';
 import { normalizeBrandName, inferBrandFromText } from '../utils/equipmentBrandUtils';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../constants/defaultDocumentCustomization';
@@ -34,6 +37,9 @@ export const useSimulationStore = create<SimulationStore>()(
       ...createUISlice(...a),
       ...createFolderSlice(...a),
       ...createTariffSlice(...a),
+      ...createCompanyProfileSlice(...a),
+      ...createVersionHistorySlice(...a),
+      ...createNotificationSlice(...a),
     }),
 
     {

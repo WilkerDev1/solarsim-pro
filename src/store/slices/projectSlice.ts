@@ -60,7 +60,13 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
   setIsTrashActive: (active) => set({ isTrashActive: active }),
 
   setActiveView: (view) => set({ activeView: view }),
-  setActiveProject: (id) => set({ activeProjectId: id, activeView: 'simulator' }),
+  setActiveProject: (id, targetView = 'project-hub') => {
+    set({ activeProjectId: id, activeView: targetView });
+    const p = get().projects.find((proj) => proj.id === id);
+    if (p) {
+      get().recordUndoState(p);
+    }
+  },
   setSearchQuery: (query) => set({ searchQuery: query }),
   setStatusFilter: (filter) => set({ statusFilter: filter }),
   updateDefaultSimulationSettings: (settingsPartial) =>
@@ -460,6 +466,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     }));
 
     get().triggerAutoSync(false);
+    const active = get().getActiveProject();
+    if (active) get().recordUndoState(active);
   },
 
   updateSpecs: (specsPartial) => {
@@ -572,6 +580,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     });
 
     get().triggerAutoSync(false);
+    const active = get().getActiveProject();
+    if (active) get().recordUndoState(active);
   },
 
   updateRates: (ratesPartial) => {
@@ -608,6 +618,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     }));
 
     get().triggerAutoSync(false);
+    const active = get().getActiveProject();
+    if (active) get().recordUndoState(active);
   },
 
   updateFinancials: (finPartial) => {
@@ -632,6 +644,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     }));
 
     get().triggerAutoSync(false);
+    const active = get().getActiveProject();
+    if (active) get().recordUndoState(active);
   },
 
   updateMonthlyConsumption: (index, value) => {
@@ -670,6 +684,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     }));
 
     get().triggerAutoSync(false);
+    const active = get().getActiveProject();
+    if (active) get().recordUndoState(active);
   },
 
   updateAllMonthlyConsumption: (value) => {
@@ -707,6 +723,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     }));
 
     get().triggerAutoSync(false);
+    const active = get().getActiveProject();
+    if (active) get().recordUndoState(active);
   },
 
   setMonthlyConsumption: (monthlyConsumption, lockAutoPanels = false) => {
@@ -746,6 +764,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     }));
 
     get().triggerAutoSync(false);
+    const active = get().getActiveProject();
+    if (active) get().recordUndoState(active);
   },
 
   updateDocumentCustomization: (customizationPartial) => {

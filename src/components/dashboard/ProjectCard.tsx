@@ -93,7 +93,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
     <div
       draggable={true}
       onDragStart={handleDragStart}
-      onClick={() => setActiveProject(project.id)}
+      onClick={() => setActiveProject(project.id, 'project-hub')}
       className="bg-white dark:bg-[#181d27] border border-slate-200/90 dark:border-[#293242] rounded-3xl p-6 shadow-xs hover:shadow-xl transition-all duration-200 flex flex-col justify-between gap-4 cursor-pointer hover:border-emerald-300 dark:hover:border-emerald-700/60 group relative select-none"
     >
       {/* 🏷️ Top Row: ID Tag & Quick Actions */}
@@ -253,12 +253,12 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project }) => {
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          setActiveProject(project.id);
+          setActiveProject(project.id, 'project-hub');
         }}
         className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-[#202734] dark:hover:bg-[#2a3446] text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-[0.98]"
       >
         <Eye className="w-3.5 h-3.5" />
-        <span>Detalles</span>
+        <span>Abrir Hub de Propuesta</span>
       </button>
     </div>
   );
