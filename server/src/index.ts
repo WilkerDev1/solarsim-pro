@@ -17,11 +17,20 @@ app.use('*', cors({
   origin: '*',
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization'],
-  exposeHeaders: ['Content-Length'],
+  exposeHeaders: ['Content-Length', 'X-Renewed-Token'],
   maxAge: 600,
 }));
 
-// Helper: Extraer y validar token JWT
+// Helper: Normalizar roles (mapea VIEWER a LECTOR)
+function normalizeRole(role?: string): 'ADMIN' | 'EDITOR' | 'LECTOR' {
+  if (!role) return 'EDITOR';
+  const upper = String(role).toUpperCase().trim();
+  if (upper === 'ADMIN') return 'ADMIN';
+  if (upper === 'LECTOR' || upper === 'VIEWER') return 'LECTOR';
+  return 'EDITOR';
+}
+
+// Helper: Extraer y validar token JWT con Auto-Renovación Segura
 async function authenticate(c: any): Promise<{ id: string; name: string; email: string; role: string; organizationId: string } | null> {
   const authHeader = c.req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -31,7 +40,43 @@ async function authenticate(c: any): Promise<{ id: string; name: string; email: 
   try {
     const payload = jwt.verify(token, JWT_SECRET) as any;
     return payload;
-  } catch (err) {
+  } catch (err: any) {
+    // Si el token expiró pero la firma criptográfica es legítima de este servidor
+    if (err && err.name === 'TokenExpiredError') {
+      try {
+        const payload = jwt.verify(token, JWT_SECRET, { ignoreExpiration: true }) as any;
+        if (payload && payload.id) {
+          // Verificar en base de datos si el usuario existe y sigue activo
+          const res = await pool.query(
+            `SELECT u.id, u.organization_id, u.name, u.email, u.role, u.is_active, o.name as org_name
+             FROM users u
+             JOIN organizations o ON u.organization_id = o.id
+             WHERE u.id = $1`,
+            [payload.id]
+          );
+
+          if (res.rows.length > 0 && res.rows[0].is_active) {
+            const user = res.rows[0];
+            // Auto-renovar token por 365 días
+            const renewedToken = jwt.sign(
+              { id: user.id, name: user.name, email: user.email, role: user.role, organizationId: user.organization_id },
+              JWT_SECRET,
+              { expiresIn: '365d' }
+            );
+            c.header('X-Renewed-Token', renewedToken);
+            return {
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              role: user.role,
+              organizationId: user.organization_id
+            };
+          }
+        }
+      } catch (renewErr) {
+        return null;
+      }
+    }
     return null;
   }
 }
@@ -105,7 +150,7 @@ app.post('/api/auth/register', async (c) => {
       const token = jwt.sign(
         { id: userId, name: name.trim(), email: email.toLowerCase().trim(), role, organizationId: orgId },
         JWT_SECRET,
-        { expiresIn: '30d' }
+        { expiresIn: '365d' }
       );
 
       return c.json({
@@ -161,7 +206,7 @@ app.post('/api/auth/login', async (c) => {
     const token = jwt.sign(
       { id: user.id, name: user.name, email: user.email, role: user.role, organizationId: user.organization_id },
       JWT_SECRET,
-      { expiresIn: '30d' }
+      { expiresIn: '365d' }
     );
 
     return c.json({
@@ -201,7 +246,16 @@ app.get('/api/auth/me', async (c) => {
   }
 
   const user = res.rows[0];
+  const freshToken = jwt.sign(
+    { id: user.id, name: user.name, email: user.email, role: user.role, organizationId: user.organization_id },
+    JWT_SECRET,
+    { expiresIn: '365d' }
+  );
+  c.header('X-Renewed-Token', freshToken);
+
   return c.json({
+    success: true,
+    token: freshToken,
     user: {
       id: user.id,
       name: user.name,
@@ -213,6 +267,55 @@ app.get('/api/auth/me', async (c) => {
   });
 });
 
+app.post('/api/auth/refresh', async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json({ error: 'Token no proporcionado' }, 401);
+  }
+  const token = authHeader.substring(7);
+  try {
+    const payload = jwt.verify(token, JWT_SECRET, { ignoreExpiration: true }) as any;
+    if (!payload || !payload.id) {
+      return c.json({ error: 'Token inválido' }, 401);
+    }
+
+    const res = await pool.query(
+      `SELECT u.id, u.organization_id, u.name, u.email, u.role, u.is_active, o.name as org_name
+       FROM users u
+       JOIN organizations o ON u.organization_id = o.id
+       WHERE u.id = $1`,
+      [payload.id]
+    );
+
+    if (res.rows.length === 0 || !res.rows[0].is_active) {
+      return c.json({ error: 'Usuario no encontrado o inactivo' }, 404);
+    }
+
+    const user = res.rows[0];
+    const freshToken = jwt.sign(
+      { id: user.id, name: user.name, email: user.email, role: user.role, organizationId: user.organization_id },
+      JWT_SECRET,
+      { expiresIn: '365d' }
+    );
+    c.header('X-Renewed-Token', freshToken);
+
+    return c.json({
+      success: true,
+      token: freshToken,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        organizationId: user.organization_id,
+        organizationName: user.org_name
+      }
+    });
+  } catch (err: any) {
+    return c.json({ error: 'Token inválido o firma no autorizada' }, 401);
+  }
+});
+
 // ----------------------------------------------------
 // 3. Gestión de Usuarios (RBAC - Solo ADMIN)
 // ----------------------------------------------------
@@ -220,6 +323,9 @@ app.get('/api/users', async (c) => {
   const authUser = await authenticate(c);
   if (!authUser) {
     return c.json({ error: 'No autorizado' }, 401);
+  }
+  if (authUser.role !== 'ADMIN') {
+    return c.json({ error: 'Permisos insuficientes: solo un Administrador puede consultar los miembros de la empresa' }, 403);
   }
 
   const res = await pool.query(
@@ -230,7 +336,7 @@ app.get('/api/users', async (c) => {
     [authUser.organizationId]
   );
 
-  return c.json({ users: res.rows });
+  return c.json({ success: true, users: res.rows });
 });
 
 app.post('/api/users', async (c) => {
@@ -248,7 +354,7 @@ app.post('/api/users', async (c) => {
     return c.json({ error: 'Nombre, correo y contraseña son obligatorios' }, 400);
   }
 
-  const validRole = ['ADMIN', 'EDITOR', 'LECTOR'].includes(role) ? role : 'EDITOR';
+  const validRole = normalizeRole(role);
 
   const existing = await pool.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase().trim()]);
   if (existing.rows.length > 0) {
@@ -295,9 +401,9 @@ app.patch('/api/users/:id', async (c) => {
   const values: any[] = [];
   let idx = 1;
 
-  if (role && ['ADMIN', 'EDITOR', 'LECTOR'].includes(role)) {
+  if (role) {
     updates.push(`role = $${idx++}`);
-    values.push(role);
+    values.push(normalizeRole(role));
   }
   if (typeof isActive === 'boolean') {
     updates.push(`is_active = $${idx++}`);
@@ -433,8 +539,8 @@ app.post('/api/sync/push', async (c) => {
     return c.json({ error: 'No autorizado' }, 401);
   }
 
-  if (authUser.role === 'LECTOR') {
-    return c.json({ error: 'Permisos insuficientes: los usuarios con rol Lector no pueden sincronizar cambios' }, 403);
+  if (authUser.role === 'LECTOR' || authUser.role === 'VIEWER') {
+    return c.json({ error: 'Permisos insuficientes: los usuarios con rol Lector/Viewer no pueden sincronizar cambios' }, 403);
   }
 
   const body = await c.req.json();
@@ -672,6 +778,9 @@ app.delete('/api/projects/:id', async (c) => {
   if (!authUser) {
     return c.json({ error: 'No autorizado' }, 401);
   }
+  if (authUser.role === 'LECTOR' || authUser.role === 'VIEWER') {
+    return c.json({ error: 'Permisos insuficientes: el rol de Lector no puede eliminar proyectos' }, 403);
+  }
 
   const id = c.req.param('id');
   const isPermanent = c.req.query('permanent') === 'true';
@@ -724,6 +833,9 @@ app.post('/api/projects/:id/restore', async (c) => {
   if (!authUser) {
     return c.json({ error: 'No autorizado' }, 401);
   }
+  if (authUser.role === 'LECTOR' || authUser.role === 'VIEWER') {
+    return c.json({ error: 'Permisos insuficientes: el rol de Lector no puede restaurar proyectos' }, 403);
+  }
 
   const id = c.req.param('id');
   const client = await pool.connect();
@@ -761,6 +873,9 @@ app.delete('/api/trash', async (c) => {
   const authUser = await authenticate(c);
   if (!authUser) {
     return c.json({ error: 'No autorizado' }, 401);
+  }
+  if (authUser.role === 'LECTOR' || authUser.role === 'VIEWER') {
+    return c.json({ error: 'Permisos insuficientes: el rol de Lector no puede vaciar la papelera' }, 403);
   }
 
   const client = await pool.connect();
@@ -813,8 +928,8 @@ app.post('/api/projects/:id/history/:versionId/restore', async (c) => {
     return c.json({ error: 'No autorizado' }, 401);
   }
 
-  if (authUser.role === 'LECTOR') {
-    return c.json({ error: 'Permisos insuficientes: rol Lector no puede restaurar versiones' }, 403);
+  if (authUser.role === 'LECTOR' || authUser.role === 'VIEWER') {
+    return c.json({ error: 'Permisos insuficientes: rol Lector/Viewer no puede restaurar versiones' }, 403);
   }
 
   const projectId = c.req.param('id');
@@ -990,6 +1105,9 @@ app.post('/api/equipment/batch', async (c) => {
   if (!authUser) {
     return c.json({ error: 'No autorizado' }, 401);
   }
+  if (authUser.role === 'LECTOR' || authUser.role === 'VIEWER') {
+    return c.json({ error: 'Permisos insuficientes: el rol de Lector no puede modificar el catálogo de equipos' }, 403);
+  }
 
   const body = await c.req.json();
   const items = Array.isArray(body?.items) ? body.items : [];
@@ -1088,6 +1206,9 @@ app.delete('/api/equipment/:id', async (c) => {
   if (!authUser) {
     return c.json({ error: 'No autorizado' }, 401);
   }
+  if (authUser.role === 'LECTOR' || authUser.role === 'VIEWER') {
+    return c.json({ error: 'Permisos insuficientes: el rol de Lector no puede eliminar equipos del catálogo' }, 403);
+  }
 
   const id = c.req.param('id');
   const client = await pool.connect();
@@ -1167,8 +1288,8 @@ app.post('/api/tariffs/sync', async (c) => {
     return c.json({ error: 'No autorizado' }, 401);
   }
 
-  if (authUser.role === 'LECTOR') {
-    return c.json({ error: 'Permisos insuficientes: rol Lector no puede actualizar tarifas' }, 403);
+  if (authUser.role === 'LECTOR' || authUser.role === 'VIEWER') {
+    return c.json({ error: 'Permisos insuficientes: rol Lector/Viewer no puede actualizar tarifas' }, 403);
   }
 
   const body = await c.req.json();

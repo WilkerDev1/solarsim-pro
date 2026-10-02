@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
-import { User, Edit3, LogOut, RefreshCw, CheckCircle2, AlertCircle, Key } from 'lucide-react';
+import { User, Edit3, LogOut, RefreshCw, CheckCircle2, AlertCircle, Shield, Building2 } from 'lucide-react';
 
 export const ProfileSection: React.FC = () => {
-  const { syncSettings, loginUser, registerUser, logoutUser } = useSimulationStore();
+  const { syncSettings, loginUser, registerUser, logoutUser, validateSession } = useSimulationStore();
   const currentUser = syncSettings.currentUser;
 
   // Local state for Auth Form
@@ -17,6 +17,29 @@ export const ProfileSection: React.FC = () => {
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authSuccess, setAuthSuccess] = useState<string | null>(null);
+
+  // Session verification state
+  const [validatingSession, setValidatingSession] = useState(false);
+  const [sessionFeedback, setSessionFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const handleVerifySession = async () => {
+    setValidatingSession(true);
+    setSessionFeedback(null);
+    const res = await validateSession();
+    setValidatingSession(false);
+    if (res.valid) {
+      setSessionFeedback({
+        type: 'success',
+        message: '¡Sesión activa y verificada con el servidor! Token renovado correctamente.',
+      });
+      setTimeout(() => setSessionFeedback(null), 4000);
+    } else {
+      setSessionFeedback({
+        type: 'error',
+        message: res.error || 'La sesión no pudo ser verificada. Por favor vuelve a iniciar sesión.',
+      });
+    }
+  };
 
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,13 +75,15 @@ export const ProfileSection: React.FC = () => {
     }
   };
 
+  const displayRole = currentUser?.role === 'VIEWER' ? 'LECTOR' : currentUser?.role;
+
   return (
     <section id="sec-cuenta" className="flex flex-col gap-4 scroll-mt-6">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Perfil de Usuario</h3>
           <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-            Actualiza tu información personal, contraseña y credenciales de acceso.
+            Información de cuenta, credenciales de acceso y estado de sesión RBAC.
           </p>
         </div>
       </div>
@@ -68,21 +93,23 @@ export const ProfileSection: React.FC = () => {
         {currentUser ? (
           <div className="flex flex-col md:flex-row items-start md:items-center gap-7">
             {/* Avatar & Rol */}
-            <div className="flex flex-col items-center gap-2 shrink-0">
+            <div className="flex flex-col items-center gap-2.5 shrink-0">
               <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-sky-400/20 via-indigo-400/20 to-emerald-400/20 border-2 border-sky-300/60 dark:border-sky-500/40 flex items-center justify-center relative shadow-xs">
                 <User className="w-9 h-9 text-sky-700 dark:text-sky-300" />
                 <div className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-white dark:bg-[#27272a] border border-slate-200 dark:border-zinc-700 flex items-center justify-center text-slate-600 dark:text-zinc-300 shadow-2xs">
-                  <Edit3 className="w-3 h-3" />
+                  <Shield className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
                 </div>
               </div>
               <span
                 className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider border ${
                   currentUser.role === 'ADMIN'
                     ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800'
+                    : currentUser.role === 'LECTOR' || currentUser.role === 'VIEWER'
+                    ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
                     : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
                 }`}
               >
-                {currentUser.role}
+                {displayRole}
               </span>
             </div>
 
@@ -113,12 +140,51 @@ export const ProfileSection: React.FC = () => {
                 </div>
               </div>
 
+              {/* Empresa y Servidor */}
+              <div className="p-3 rounded-xl bg-slate-50/80 dark:bg-[#121214] border border-slate-200/60 dark:border-[#27272a] flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex items-center gap-2 text-slate-700 dark:text-zinc-300">
+                  <Building2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span>Empresa: <strong>{currentUser.organizationName || 'Electsun Dominicana'}</strong></span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-500 dark:text-zinc-400">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Servidor: <span className="font-mono text-[11px]">{syncSettings.serverUrl}</span></span>
+                </div>
+              </div>
+
+              {sessionFeedback && (
+                <div
+                  className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
+                    sessionFeedback.type === 'success'
+                      ? 'bg-emerald-50 border border-emerald-200 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800'
+                      : 'bg-rose-50 border border-rose-200 text-rose-700 dark:bg-rose-950/40 dark:border-rose-800'
+                  }`}
+                >
+                  {sessionFeedback.type === 'success' ? (
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                  )}
+                  <span className="font-medium">{sessionFeedback.message}</span>
+                </div>
+              )}
+
               <div className="pt-3 border-t border-slate-100 dark:border-[#27272a] flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <span className="text-xs font-semibold text-slate-800 dark:text-zinc-200">Contraseña y Acceso</span>
-                  <p className="text-[11px] text-slate-500 dark:text-zinc-400">Sesión activa con token JWT seguro en la nube.</p>
+                  <span className="text-xs font-semibold text-slate-800 dark:text-zinc-200">Seguridad & Sesión</span>
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                    Token seguro con auto-renovación continua y permisos {displayRole}.
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleVerifySession}
+                    disabled={validatingSession}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold border border-slate-200 dark:border-[#27272a] hover:bg-slate-50 dark:hover:bg-[#222226] text-slate-700 dark:text-zinc-300 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${validatingSession ? 'animate-spin' : ''}`} />
+                    <span>Verificar Conexión</span>
+                  </button>
                   <button
                     onClick={logoutUser}
                     className="px-3 py-1.5 rounded-xl text-xs font-bold border border-rose-200 dark:border-rose-900/40 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors flex items-center gap-1.5 cursor-pointer"

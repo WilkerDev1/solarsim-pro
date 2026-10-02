@@ -379,7 +379,7 @@ export interface ExtraTOCItem {
   pageCount?: number; // Number of pages this extra section occupies (default: 1)
 }
 
-export type UserRole = 'ADMIN' | 'EDITOR' | 'LECTOR';
+export type UserRole = 'ADMIN' | 'EDITOR' | 'LECTOR' | 'VIEWER';
 
 export interface UserProfile {
   id: string;

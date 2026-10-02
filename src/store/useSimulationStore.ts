@@ -224,6 +224,13 @@ export const useSimulationStore = create<SimulationStore>()(
               ...state.defaultDocumentCustomization,
             };
           }
+
+          // Validación y auto-renovación silenciosa de sesión en segundo plano al iniciar la app
+          if (state.syncSettings?.authToken && typeof window !== 'undefined') {
+            setTimeout(() => {
+              state.validateSession().catch(() => {});
+            }, 1200);
+          }
         }
       },
 

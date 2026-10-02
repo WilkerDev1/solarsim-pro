@@ -154,6 +154,7 @@ export interface SyncAuthSlice {
   logoutUser: () => void;
   syncProjectsWithServer: (silent?: boolean) => Promise<{ success: boolean; message: string }>;
   triggerAutoSync: (immediate?: boolean) => void;
+  validateSession: () => Promise<{ valid: boolean; user?: UserProfile | null; error?: string }>;
 }
 
 export interface ImportExportSlice {

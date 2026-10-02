@@ -32,12 +32,44 @@ export interface SyncPushResult {
   error?: string;
 }
 
+export type TokenRenewedCallback = (newToken: string) => void;
+let tokenRenewedListeners: TokenRenewedCallback[] = [];
+
+export function registerTokenRenewedListener(cb: TokenRenewedCallback): () => void {
+  tokenRenewedListeners.push(cb);
+  return () => {
+    tokenRenewedListeners = tokenRenewedListeners.filter((l) => l !== cb);
+  };
+}
+
+export function notifyTokenRenewed(newToken: string) {
+  tokenRenewedListeners.forEach((cb) => {
+    try {
+      cb(newToken);
+    } catch (err) {
+      console.error('Error en listener de renovación de token:', err);
+    }
+  });
+}
+
 export class SyncService {
   /**
    * Limpia y normaliza la URL base del servidor
    */
   private static cleanUrl(url: string): string {
     return (url || 'https://solarsim.electsun.net').trim().replace(/\/+$/, '');
+  }
+
+  /**
+   * Detecta y propaga tokens renovados automáticamente por el servidor
+   */
+  private static checkRenewedToken(res: Response) {
+    try {
+      const renewed = res.headers.get('x-renewed-token');
+      if (renewed) {
+        notifyTokenRenewed(renewed);
+      }
+    } catch {}
   }
 
   /**
@@ -139,7 +171,7 @@ export class SyncService {
   }
 
   /**
-   * Obtener perfil actual y verificar validez de token
+   * Obtener perfil actual y verificar validez de token (con auto-renovación)
    */
   static async getMe(serverUrl: string, token: string): Promise<UserProfile | null> {
     const base = this.cleanUrl(serverUrl);
@@ -147,6 +179,7 @@ export class SyncService {
       const res = await fetch(`${base}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      this.checkRenewedToken(res);
       if (!res.ok) return null;
       const data = await res.json();
       return data.user || null;
@@ -156,19 +189,59 @@ export class SyncService {
   }
 
   /**
+   * Renovar sesión y obtener token fresco
+   */
+  static async refreshToken(serverUrl: string, token: string): Promise<AuthResponse> {
+    const base = this.cleanUrl(serverUrl);
+    try {
+      const res = await fetch(`${base}/api/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      this.checkRenewedToken(res);
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || 'No se pudo renovar la sesión' };
+      }
+      return { success: true, token: data.token, user: data.user };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Fallo de red al renovar sesión' };
+    }
+  }
+
+  /**
    * Obtener listado de usuarios de la organización (Solo ADMIN)
    */
-  static async getCompanyUsers(serverUrl: string, token: string): Promise<UserProfile[]> {
+  static async getCompanyUsers(serverUrl: string, token: string): Promise<{ success: boolean; users: UserProfile[]; error?: string }> {
     const base = this.cleanUrl(serverUrl);
     try {
       const res = await fetch(`${base}/api/users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) return [];
-      const data = await res.json();
-      return data.users || [];
-    } catch {
-      return [];
+      this.checkRenewedToken(res);
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        return {
+          success: false,
+          users: [],
+          error: data?.error || `Error al obtener usuarios (HTTP ${res.status})`,
+        };
+      }
+      const users: UserProfile[] = (data.users || []).map((u: any) => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        organizationId: u.organization_id || u.organizationId,
+        isActive: u.isActive !== undefined ? u.isActive : u.is_active !== undefined ? u.is_active : true,
+        createdAt: u.created_at || u.createdAt,
+      }));
+      return { success: true, users };
+    } catch (err: any) {
+      return { success: false, users: [], error: err.message || 'Error de conexión al obtener usuarios' };
     }
   }
 
@@ -190,10 +263,11 @@ export class SyncService {
         },
         body: JSON.stringify(payload),
       });
+      this.checkRenewedToken(res);
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.error || 'Error al crear usuario' };
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        return { success: false, error: data?.error || `Error al crear usuario (HTTP ${res.status})` };
       }
       return { success: true, user: data.user };
     } catch (err: any) {
@@ -220,10 +294,11 @@ export class SyncService {
         },
         body: JSON.stringify(payload),
       });
+      this.checkRenewedToken(res);
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.error || 'Error al actualizar usuario' };
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        return { success: false, error: data?.error || `Error al actualizar usuario (HTTP ${res.status})` };
       }
       return { success: true };
     } catch (err: any) {
@@ -245,10 +320,11 @@ export class SyncService {
         },
         body: JSON.stringify({ lastSyncTimestamp: lastSyncTimestamp || '1970-01-01T00:00:00.000Z' }),
       });
+      this.checkRenewedToken(res);
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.error || 'Error al descargar proyectos' };
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        return { success: false, error: data?.error || `Error al descargar proyectos (HTTP ${res.status})` };
       }
 
       return {
@@ -276,10 +352,11 @@ export class SyncService {
         },
         body: JSON.stringify({ projects }),
       });
+      this.checkRenewedToken(res);
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.error || 'Error al subir proyectos' };
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        return { success: false, error: data?.error || `Error al subir proyectos (HTTP ${res.status})` };
       }
 
       return {
@@ -306,6 +383,7 @@ export class SyncService {
           Authorization: `Bearer ${token}`,
         },
       });
+      this.checkRenewedToken(res);
       return res.ok;
     } catch {
       return false;
@@ -324,6 +402,7 @@ export class SyncService {
           Authorization: `Bearer ${token}`,
         },
       });
+      this.checkRenewedToken(res);
       return res.ok;
     } catch {
       return false;
@@ -342,6 +421,7 @@ export class SyncService {
           Authorization: `Bearer ${token}`,
         },
       });
+      this.checkRenewedToken(res);
       return res.ok;
     } catch {
       return false;
@@ -360,10 +440,11 @@ export class SyncService {
           Authorization: `Bearer ${token}`,
         },
       });
+      this.checkRenewedToken(res);
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.error || 'Error al descargar catálogo de equipos' };
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        return { success: false, error: data?.error || `Error al descargar catálogo de equipos (HTTP ${res.status})` };
       }
 
       return {
@@ -389,10 +470,11 @@ export class SyncService {
         },
         body: JSON.stringify({ items }),
       });
+      this.checkRenewedToken(res);
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.error || 'Error al subir equipos' };
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        return { success: false, error: data?.error || `Error al subir equipos (HTTP ${res.status})` };
       }
 
       return {
@@ -416,6 +498,7 @@ export class SyncService {
           Authorization: `Bearer ${token}`,
         },
       });
+      this.checkRenewedToken(res);
       return res.ok;
     } catch {
       return false;
@@ -426,6 +509,7 @@ export class SyncService {
    * Helper defensivo para procesar respuestas JSON evitando SyntaxError por respuestas HTML/texto plano
    */
   private static async safeJsonParse<T = any>(res: Response, fallbackError: string): Promise<{ ok: boolean; data: T; error?: string }> {
+    this.checkRenewedToken(res);
     const text = await res.text();
     let data: any = {};
     try {

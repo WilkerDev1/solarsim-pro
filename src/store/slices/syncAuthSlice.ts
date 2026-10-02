@@ -1,10 +1,24 @@
 import { SimulationSlice, SyncAuthSlice } from '../types';
 import { ProjectSimulation } from '../../types';
-import { SyncService } from '../../services/syncService';
+import { SyncService, registerTokenRenewedListener } from '../../services/syncService';
 
 let autoSyncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let isTokenRenewedListenerRegistered = false;
 
-export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) => ({
+export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) => {
+  if (!isTokenRenewedListenerRegistered) {
+    isTokenRenewedListenerRegistered = true;
+    registerTokenRenewedListener((newToken) => {
+      set((state) => ({
+        syncSettings: {
+          ...state.syncSettings,
+          authToken: newToken,
+        },
+      }));
+    });
+  }
+
+  return {
   syncSettings: {
     serverUrl: 'https://solarsim.electsun.net',
     autoSyncEnabled: true,
@@ -147,8 +161,10 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
         }
       }
 
-      // 2. Push: Subir cambios locales pendientes hacia el servidor
-      const pendingProjects = currentProjects.filter((p) => p.syncStatus !== 'synced');
+      // 2. Push: Subir cambios locales pendientes hacia el servidor (solo roles con permisos de escritura)
+      const userRole = get().syncSettings.currentUser?.role;
+      const isLector = userRole === 'LECTOR' || userRole === 'VIEWER';
+      const pendingProjects = isLector ? [] : currentProjects.filter((p) => p.syncStatus !== 'synced');
       const pushedSnapshots = new Map(pendingProjects.map((p) => [p.id, p.updatedAt]));
 
       if (pendingProjects.length > 0) {
@@ -268,4 +284,39 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
       return { success: false, message: err.message || 'Error durante la sincronización' };
     }
   },
-});
+
+  validateSession: async () => {
+    const { serverUrl, authToken } = get().syncSettings;
+    if (!authToken) {
+      return { valid: false, error: 'No hay token de sesión configurado' };
+    }
+
+    // 1. Intentar validar con /api/auth/me (aprovecha auto-renovación silenciosa)
+    const freshUser = await SyncService.getMe(serverUrl, authToken);
+    if (freshUser) {
+      set((state) => ({
+        syncSettings: {
+          ...state.syncSettings,
+          currentUser: freshUser,
+        },
+      }));
+      return { valid: true, user: freshUser };
+    }
+
+    // 2. Si getMe falló (ej. expiración o formato), intentar refresh explícito
+    const refreshRes = await SyncService.refreshToken(serverUrl, authToken);
+    if (refreshRes.success && refreshRes.token && refreshRes.user) {
+      set((state) => ({
+        syncSettings: {
+          ...state.syncSettings,
+          authToken: refreshRes.token!,
+          currentUser: refreshRes.user!,
+        },
+      }));
+      return { valid: true, user: refreshRes.user };
+    }
+
+    return { valid: false, error: refreshRes.error || 'La sesión ha expirado en el servidor' };
+  },
+};
+};
