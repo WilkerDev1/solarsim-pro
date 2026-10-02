@@ -228,23 +228,40 @@ export function registerAutoUpdater() {
         throw new Error('Formato de versión semántica inválido.');
       }
 
-      const filename = packageType === 'pacman'
-        ? `solarsim-pro-${cleanVersion}.pacman`
-        : `solarsim-pro_${cleanVersion}_amd64.deb`;
-      const downloadUrl = `https://github.com/WilkerDev1/solarsim-pro/releases/download/v${cleanVersion}/${filename}`;
-      const tmpDest = path.join('/tmp', filename);
+      const candidateFilenames = packageType === 'pacman'
+        ? [`SolarSim-Pro-${cleanVersion}.pacman`, `solarsim-pro-${cleanVersion}.pacman`]
+        : [`SolarSim-Pro-${cleanVersion}.deb`, `solarsim-pro_${cleanVersion}_amd64.deb`, `solarsim-pro-${cleanVersion}.deb`];
 
       sendUpdateStatus({ state: 'downloading', progressPct: 0, transferredBytes: 0, totalBytes: 0 });
 
-      await downloadFile(downloadUrl, tmpDest, (transferred, total) => {
-        const pct = total > 0 ? Math.round((transferred / total) * 100) : 0;
-        sendUpdateStatus({
-          state: 'downloading',
-          progressPct: pct,
-          transferredBytes: transferred,
-          totalBytes: total,
-        });
-      });
+      let downloaded = false;
+      let usedFilename = candidateFilenames[0];
+      let tmpDest = path.join('/tmp', usedFilename);
+
+      for (const filename of candidateFilenames) {
+        const downloadUrl = `https://github.com/WilkerDev1/solarsim-pro/releases/download/v${cleanVersion}/${filename}`;
+        tmpDest = path.join('/tmp', filename);
+        try {
+          await downloadFile(downloadUrl, tmpDest, (transferred, total) => {
+            const pct = total > 0 ? Math.round((transferred / total) * 100) : 0;
+            sendUpdateStatus({
+              state: 'downloading',
+              progressPct: pct,
+              transferredBytes: transferred,
+              totalBytes: total,
+            });
+          });
+          downloaded = true;
+          usedFilename = filename;
+          break;
+        } catch (downloadErr) {
+          console.warn(`Intento fallido para ${filename}:`, downloadErr);
+        }
+      }
+
+      if (!downloaded) {
+        throw new Error(`No se pudo descargar el paquete Linux para v${cleanVersion} desde GitHub Releases.`);
+      }
 
       sendUpdateStatus({ state: 'installing' });
 

@@ -21,19 +21,69 @@ export function generateManifests() {
   const version = pkg.version;
   console.log(`\n📋 Generando manifiestos de actualización para SolarSim Pro v${version}...`);
 
+  // Asegurar nombres alternativos / enlaces duales para Linux (compatibilidad total)
+  const aliasPairs: [string, string][] = [
+    [path.join(releaseDir, `SolarSim-Pro-${version}.deb`), path.join(releaseDir, `solarsim-pro_${version}_amd64.deb`)],
+    [path.join(releaseDir, `SolarSim-Pro-${version}.deb`), path.join(releaseDir, `solarsim-pro-${version}.deb`)],
+    [path.join(releaseDir, `SolarSim-Pro-${version}.pacman`), path.join(releaseDir, `solarsim-pro-${version}.pacman`)],
+    [path.join(releaseDir, `SolarSim-Pro-${version}.tar.gz`), path.join(releaseDir, `solarsim-pro-${version}.tar.gz`)],
+    [path.join(releaseDir, `SolarSim-Pro-${version}.AppImage`), path.join(releaseDir, `solarsim-pro-${version}.AppImage`)],
+  ];
+
+  for (const [src, dest] of aliasPairs) {
+    if (fs.existsSync(src) && !fs.existsSync(dest)) {
+      try {
+        fs.linkSync(src, dest);
+        console.log(`   🔗 Enlace dual creado: ${path.basename(dest)} -> ${path.basename(src)}`);
+      } catch {
+        try {
+          fs.copyFileSync(src, dest);
+        } catch {}
+      }
+    }
+  }
+
+  function findFirstExisting(candidates: string[]): string {
+    for (const c of candidates) {
+      if (fs.existsSync(c)) return c;
+    }
+    return candidates[0];
+  }
+
   const files = {
-    winInstaller: path.join(releaseDir, `SolarSim-Pro-Setup-${version}.exe`),
-    winPortable: path.join(releaseDir, `SolarSim-Pro-${version}.exe`),
-    linuxAppImage: path.join(releaseDir, `SolarSim-Pro-${version}.AppImage`),
-    linuxDeb: path.join(releaseDir, `solarsim-pro_${version}_amd64.deb`),
-    linuxPacman: path.join(releaseDir, `solarsim-pro-${version}.pacman`),
-    linuxTar: path.join(releaseDir, `solarsim-pro-${version}.tar.gz`),
+    winInstaller: findFirstExisting([
+      path.join(releaseDir, `SolarSim-Pro-Setup-${version}.exe`),
+      path.join(releaseDir, `solarsim-pro-setup-${version}.exe`),
+    ]),
+    winPortable: findFirstExisting([
+      path.join(releaseDir, `SolarSim-Pro-${version}.exe`),
+      path.join(releaseDir, `solarsim-pro-${version}.exe`),
+    ]),
+    linuxAppImage: findFirstExisting([
+      path.join(releaseDir, `SolarSim-Pro-${version}.AppImage`),
+      path.join(releaseDir, `solarsim-pro-${version}.AppImage`),
+    ]),
+    linuxDeb: findFirstExisting([
+      path.join(releaseDir, `SolarSim-Pro-${version}.deb`),
+      path.join(releaseDir, `solarsim-pro_${version}_amd64.deb`),
+      path.join(releaseDir, `solarsim-pro-${version}.deb`),
+    ]),
+    linuxPacman: findFirstExisting([
+      path.join(releaseDir, `SolarSim-Pro-${version}.pacman`),
+      path.join(releaseDir, `solarsim-pro-${version}.pacman`),
+    ]),
+    linuxTar: findFirstExisting([
+      path.join(releaseDir, `SolarSim-Pro-${version}.tar.gz`),
+      path.join(releaseDir, `solarsim-pro-${version}.tar.gz`),
+    ]),
   };
 
   // Validar existencia de archivos
   for (const [key, filePath] of Object.entries(files)) {
     if (!fs.existsSync(filePath)) {
       console.warn(`⚠️ Advertencia: No se encontró el binario: ${path.basename(filePath)}`);
+    } else {
+      console.log(`   ✓ Detectado: ${path.basename(filePath)} (${(fs.statSync(filePath).size / (1024 * 1024)).toFixed(2)} MB)`);
     }
   }
 
@@ -111,21 +161,27 @@ export function signLinuxPackages() {
   const version = pkg.version;
   console.log(`\n🔏 Firmando paquetes Linux con GPG para v${version}...`);
 
-  const targets = [
+  const potentialTargets = [
     path.join(releaseDir, `SolarSim-Pro-${version}.AppImage`),
+    path.join(releaseDir, `solarsim-pro-${version}.AppImage`),
+    path.join(releaseDir, `SolarSim-Pro-${version}.pacman`),
     path.join(releaseDir, `solarsim-pro-${version}.pacman`),
+    path.join(releaseDir, `SolarSim-Pro-${version}.tar.gz`),
     path.join(releaseDir, `solarsim-pro-${version}.tar.gz`),
+    path.join(releaseDir, `SolarSim-Pro-${version}.deb`),
+    path.join(releaseDir, `solarsim-pro_${version}_amd64.deb`),
+    path.join(releaseDir, `solarsim-pro-${version}.deb`),
   ];
 
-  for (const target of targets) {
-    if (fs.existsSync(target)) {
-      const sigPath = `${target}.sig`;
-      try {
-        execSync(`gpg --batch --yes --detach-sign --armor --output "${sigPath}" "${target}"`, { stdio: 'inherit' });
-        console.log(`   ✓ Firmado: ${path.basename(sigPath)}`);
-      } catch (err: any) {
-        console.warn(`   ⚠️ No se pudo firmar ${path.basename(target)}: ${err.message}`);
-      }
+  const uniqueExistingTargets = Array.from(new Set(potentialTargets.filter((t) => fs.existsSync(t))));
+
+  for (const target of uniqueExistingTargets) {
+    const sigPath = `${target}.sig`;
+    try {
+      execSync(`gpg --batch --yes --detach-sign --armor --output "${sigPath}" "${target}"`, { stdio: 'inherit' });
+      console.log(`   ✓ Firmado: ${path.basename(sigPath)}`);
+    } catch (err: any) {
+      console.warn(`   ⚠️ No se pudo firmar ${path.basename(target)}: ${err.message}`);
     }
   }
 }
