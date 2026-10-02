@@ -17,6 +17,7 @@ export interface ClientInfo {
   contactPerson?: string; // e.g. "Ing. Juan Pérez" / "Atención a"
   quoteNumber?: string; // e.g. "C-0030"
   quoteValidityDays?: number; // e.g. 7
+  quoteDate?: string; // Fecha de emisión/cotización personalizada (ej. "2026-10-02" o "02/10/2026")
 }
 
 export interface PanelItemSpec {
@@ -305,6 +306,7 @@ export interface DocumentCustomization {
   contactName?: string;           // Default: project.client.name
   clientPhone?: string;           // Default: project.client.contactPhone
   clientEmail?: string;           // Default: project.client.contactEmail
+  quoteDate?: string;             // Fecha personalizada de emisión/cotización para todo el PDF
   validityNote?: string;          // Default: 'Precios sujetos a disponibilidad de inventario. Cotización válida por 7 días laborables.'
   
   // Warranties & Guarantees

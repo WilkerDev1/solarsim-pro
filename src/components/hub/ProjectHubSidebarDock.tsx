@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ProjectSimulation, FinancialSummaryResult, ProjectSnapshot } from '../../types';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { calculateDCCapacityKWp } from '../../engine/solarEngine';
+import { formatProposalDate, getProposalDateInputValue } from '../../utils/formatDateUtils';
 import {
   LayoutDashboard,
   Zap,
@@ -49,7 +50,7 @@ export const ProjectHubSidebarDock: React.FC<ProjectHubSidebarDockProps> = ({
   onToggleOpen,
   onOpenSnapshotModal,
 }) => {
-  const { setActiveView, getProjectSnapshots, restoreSnapshot } = useSimulationStore();
+  const { setActiveView, getProjectSnapshots, restoreSnapshot, updateClient } = useSimulationStore();
   const [activeTab, setActiveTab] = useState<DockTab>('overview');
 
   const dcKWp = calculateDCCapacityKWp(project.specs.panelPowerW, project.specs.panelCount);
@@ -494,6 +495,41 @@ export const ProjectHubSidebarDock: React.FC<ProjectHubSidebarDockProps> = ({
                 <div>
                   <span className="text-slate-400 block text-[10px]">Retención SIE-007:</span>
                   <span className="font-semibold text-emerald-500">25% (Net Metering)</span>
+                </div>
+                <div className="col-span-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-slate-400 block text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-amber-500" />
+                      Fecha Emisión Propuesta
+                    </span>
+                    {project.client.quoteDate && (
+                      <button
+                        type="button"
+                        onClick={() => updateClient({ quoteDate: undefined })}
+                        className="text-[10px] text-amber-500 hover:underline cursor-pointer"
+                        title="Restablecer a fecha actual"
+                      >
+                        Usar Hoy
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="date"
+                      value={getProposalDateInputValue(project.client.quoteDate)}
+                      onChange={(e) => updateClient({ quoteDate: e.target.value })}
+                      className={`flex-1 text-[11px] p-1.5 rounded-lg border font-semibold outline-none transition-colors ${
+                        isDark
+                          ? 'bg-[#181822] border-slate-700 text-white focus:border-amber-500'
+                          : 'bg-white border-slate-300 text-slate-900 focus:border-amber-600'
+                      }`}
+                    />
+                    <span className={`text-[11px] font-bold font-mono px-2 py-1.5 rounded-lg border shrink-0 ${
+                      isDark ? 'bg-[#0f141f] border-slate-700 text-amber-400' : 'bg-slate-100 border-slate-300 text-slate-800'
+                    }`}>
+                      {formatProposalDate(project.client.quoteDate, 'numeric')}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>

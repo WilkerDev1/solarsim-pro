@@ -6,6 +6,7 @@ import { PDFColorTheme, PDF_COLOR_THEMES } from '../../constants/pdfThemes';
 import { PDFMergeService } from '../../services/pdfMergeService';
 import { PDFAttachmentStorage } from '../../services/pdfAttachmentStorage';
 import { PDFSectionId, DEFAULT_PDF_SECTION_ORDER } from '../../constants/pdfSections';
+import { formatProposalDate } from '../../utils/formatDateUtils';
 
 // Modular Page Components
 import { PDFSidebarControls } from './controls/PDFSidebarControls';
@@ -210,11 +211,9 @@ export const PDFProposalView: React.FC = () => {
     }
   };
 
-  const currentDateStr = new Date().toLocaleDateString('es-DO', {
-    day: '2-digit',
-    month: 'numeric',
-    year: 'numeric',
-  });
+  const currentDateStr = useMemo(() => {
+    return formatProposalDate(project?.client?.quoteDate || project?.customization?.quoteDate);
+  }, [project?.client?.quoteDate, project?.customization?.quoteDate]);
 
   // Effective Section Order
   const effectiveSectionOrder: PDFSectionId[] = useMemo(() => {
@@ -503,6 +502,8 @@ export const PDFProposalView: React.FC = () => {
                     summary={summary}
                     activeTheme={activeTheme}
                     currentDateStr={currentDateStr}
+                    isEditMode={isEditMode}
+                    updateClient={updateClient}
                   />
                 );
               case 'tableOfContents':

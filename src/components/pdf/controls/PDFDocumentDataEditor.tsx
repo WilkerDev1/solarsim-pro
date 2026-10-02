@@ -14,10 +14,12 @@ import {
   BookmarkCheck,
   Save,
   Check,
+  Calendar,
 } from 'lucide-react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { ProjectSimulation, DocumentCustomization, ExtraTOCItem } from '../../../types';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
+import { getProposalDateInputValue, formatProposalDate } from '../../../utils/formatDateUtils';
 import {
   ELECTSUN_LOGO_WHITE_BASE64,
   ELECTSUN_LOGO_COLOR_BASE64,
@@ -684,6 +686,56 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                   }`}
                 />
               </div>
+            </div>
+
+            {/* Fecha de Emisión del Proyecto / Cotización */}
+            <div className={`p-2.5 rounded-xl border space-y-1.5 transition-all ${
+              isDark ? 'border-emerald-500/30 bg-emerald-950/20' : 'border-emerald-200 bg-emerald-50/60'
+            }`}>
+              <div className="flex items-center justify-between">
+                <label className={`text-[10.5px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                  isDark ? 'text-emerald-400' : 'text-emerald-900'
+                }`}>
+                  <Calendar className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>Fecha de Emisión de la Propuesta</span>
+                </label>
+                {(project.client.quoteDate || cust.quoteDate) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      updateClient({ quoteDate: undefined });
+                      updateDocumentCustomization({ quoteDate: undefined });
+                    }}
+                    className="text-[10.5px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                    title="Restablecer a fecha de hoy"
+                  >
+                    Usar Fecha de Hoy
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={getProposalDateInputValue(project.client.quoteDate || cust.quoteDate)}
+                  onChange={(e) => {
+                    updateClient({ quoteDate: e.target.value });
+                    updateDocumentCustomization({ quoteDate: e.target.value });
+                  }}
+                  className={`flex-1 text-xs p-2 rounded-lg border font-semibold outline-none transition-colors ${
+                    isDark
+                      ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
+                      : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
+                  }`}
+                />
+                <span className={`text-xs font-bold font-mono px-2.5 py-2 rounded-lg border shrink-0 ${
+                  isDark ? 'bg-[#181822] border-emerald-500/30 text-emerald-400' : 'bg-emerald-100/70 border-emerald-300 text-emerald-900'
+                }`}>
+                  {formatProposalDate(project.client.quoteDate || cust.quoteDate, 'numeric')}
+                </span>
+              </div>
+              <p className={`text-[10px] leading-tight ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                Actualiza la fecha en la portada, encabezados y cuadros de cotización de todo el PDF.
+              </p>
             </div>
 
             <div>

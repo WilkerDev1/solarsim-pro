@@ -2,6 +2,7 @@ import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import { ShieldCheck, CheckCircle2, Check } from 'lucide-react';
 import { getProjectPanels, getProjectInverters, getProjectBatteries } from '../../../utils/equipmentSpecsUtils';
+import { formatProposalDate } from '../../../utils/formatDateUtils';
 
 interface QuotationEquipmentsTabProps {
   project: ProjectSimulation;
@@ -26,11 +27,10 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
   costTableCurrency,
   setCostTableCurrency,
 }) => {
-  const currentDateStr = new Date().toLocaleDateString('es-DO', {
-    day: '2-digit',
-    month: 'numeric',
-    year: 'numeric',
-  });
+  const currentDateStr = React.useMemo(
+    () => formatProposalDate(project?.client?.quoteDate || project?.customization?.quoteDate),
+    [project?.client?.quoteDate, project?.customization?.quoteDate]
+  );
 
   return (
     <div className="space-y-6 shrink-0">

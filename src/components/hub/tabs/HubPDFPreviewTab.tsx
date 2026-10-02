@@ -27,6 +27,8 @@ import { PDFSolarBenefitsPage } from '../../pdf/pages/PDFSolarBenefitsPage';
 import { PDFTechnicalIntroPage } from '../../pdf/pages/PDFTechnicalIntroPage';
 import { PDFProjectDescriptionPage } from '../../pdf/pages/PDFProjectDescriptionPage';
 
+import { formatProposalDate } from '../../../utils/formatDateUtils';
+
 interface HubPDFPreviewTabProps {
   project: ProjectSimulation;
 }
@@ -36,13 +38,8 @@ export const HubPDFPreviewTab: React.FC<HubPDFPreviewTabProps> = ({ project }) =
   const summary = useMemo(() => calculateProjectFinancialSummary(project), [project]);
   const activeTheme = PDF_COLOR_THEMES[0];
   const currentDateStr = useMemo(
-    () =>
-      new Date().toLocaleDateString('es-DO', {
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric',
-      }),
-    []
+    () => formatProposalDate(project?.client?.quoteDate || project?.customization?.quoteDate),
+    [project?.client?.quoteDate, project?.customization?.quoteDate]
   );
 
   const [currentPage, setCurrentPage] = useState<number>(1);

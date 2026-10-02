@@ -6,6 +6,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { PDFMergeService } from '../../services/pdfMergeService';
 import { PDFAttachmentStorage } from '../../services/pdfAttachmentStorage';
+import { formatProposalDate } from '../../utils/formatDateUtils';
 
 import {
   ZoomIn,
@@ -54,12 +55,8 @@ export const ProjectHubPDFCanvas: React.FC<ProjectHubPDFCanvasProps> = ({
   const activeTheme: PDFColorTheme = PDF_COLOR_THEMES[0];
 
   const currentDateStr = useMemo(() => {
-    return new Date().toLocaleDateString('es-DO', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric',
-    });
-  }, []);
+    return formatProposalDate(project?.client?.quoteDate || project?.customization?.quoteDate);
+  }, [project?.client?.quoteDate, project?.customization?.quoteDate]);
 
   const totalPages = 11;
 

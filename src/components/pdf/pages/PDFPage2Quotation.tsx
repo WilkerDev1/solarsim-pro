@@ -199,8 +199,19 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                   boldClassName="font-bold font-mono text-slate-950"
                 />
               </div>
-              <div>
-                <span className="font-bold text-slate-600">Fecha:</span> {currentDateStr}
+              <div className="flex items-center justify-end gap-1.5 leading-snug">
+                <span className="font-bold text-slate-600 shrink-0">Fecha:</span>{' '}
+                <InlineEditableText
+                  value={project.client.quoteDate || currentDateStr}
+                  defaultValue={currentDateStr}
+                  onSave={(val) => updateClient?.({ quoteDate: val })}
+                  isEditMode={isEditMode}
+                  multiline={false}
+                  label="Fecha de Cotización"
+                  placeholder="DD/MM/AAAA o YYYY-MM-DD"
+                  className="font-semibold text-slate-800 inline-block"
+                  boldClassName="font-semibold text-slate-900"
+                />
               </div>
               <div className="flex items-center justify-end gap-1.5 leading-snug">
                 <span className="font-bold text-slate-600 shrink-0">Válido por:</span>{' '}
