@@ -287,8 +287,67 @@ async function runRBACTests() {
   }
   console.log('✅ Cuenta desactivada bloqueada correctamente al intentar iniciar sesión');
 
+  // 15. Admin actualiza el nombre completo de un miembro
+  console.log('\n--- 15. Admin actualiza nombre y rol de miembro (PATCH con name y role) ---');
+  const updateNameRes = await fetch(`${BASE_URL}/api/users/${lectorUser.id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
+    body: JSON.stringify({ name: 'Ing. Roberto Díaz Actualizado', role: 'EDITOR' }),
+  });
+  const updateNameData = await updateNameRes.json();
+  if (updateNameRes.status !== 200 || !updateNameData.success || updateNameData.user?.name !== 'Ing. Roberto Díaz Actualizado') {
+    throw new Error(`Fallo actualización de nombre de miembro: ${JSON.stringify(updateNameData)}`);
+  }
+  console.log('✅ Nombre de miembro actualizado exitosamente a:', updateNameData.user.name);
+
+  // 16. Verificación de Seguridad: Admin no puede auto-eliminarse
+  console.log('\n--- 16. Verificación de Seguridad: Admin no puede eliminarse a sí mismo ---');
+  const selfDeleteRes = await fetch(`${BASE_URL}/api/users/${adminUser.id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${adminToken}` },
+  });
+  if (selfDeleteRes.status !== 400) {
+    throw new Error(`Seguridad comprometida: Admin pudo auto-eliminarse! Status: ${selfDeleteRes.status}`);
+  }
+  console.log('✅ Bloqueada correctamente la auto-eliminación del Administrador (HTTP 400)');
+
+  // 17. Verificación de Seguridad: Lector/Editor no puede eliminar usuarios
+  console.log('\n--- 17. Verificación de Seguridad: Lector/Editor no puede eliminar usuarios ---');
+  const unauthorizedDeleteRes = await fetch(`${BASE_URL}/api/users/${viewerUser.id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${lectorToken}` },
+  });
+  if (unauthorizedDeleteRes.status !== 403) {
+    throw new Error(`Seguridad comprometida: No-admin pudo eliminar usuario! Status: ${unauthorizedDeleteRes.status}`);
+  }
+  console.log('✅ Eliminación bloqueada para cuentas no-administradoras (HTTP 403)');
+
+  // 18. Admin elimina la cuenta de miembro
+  console.log('\n--- 18. Admin elimina permanentemente una cuenta de miembro (DELETE /api/users/:id) ---');
+  const deleteMemberRes = await fetch(`${BASE_URL}/api/users/${viewerUser.id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${adminToken}` },
+  });
+  const deleteMemberData = await deleteMemberRes.json();
+  if (deleteMemberRes.status !== 200 || !deleteMemberData.success) {
+    throw new Error(`Fallo al eliminar miembro: ${JSON.stringify(deleteMemberData)}`);
+  }
+  console.log('✅ Cuenta de miembro eliminada correctamente:', deleteMemberData.message);
+
+  // 19. Verificar que el miembro eliminado ya NO puede iniciar sesión
+  console.log('\n--- 19. Verificación de inicio de sesión con cuenta eliminada ---');
+  const loginDeletedRes = await fetch(`${BASE_URL}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: viewerEmail, password: 'viewerPassword123!' }),
+  });
+  if (loginDeletedRes.status !== 401) {
+    throw new Error(`Seguridad comprometida: cuenta eliminada pudo iniciar sesión! Status: ${loginDeletedRes.status}`);
+  }
+  console.log('✅ Intento de login de cuenta eliminada rechazado correctamente (HTTP 401 Credenciales inválidas)');
+
   console.log('\n===============================================================');
-  console.log('🎉 AUDITORÍA COMPLETA: TODOS LOS ROLES Y PERMISOS FUNCIONAN AL 100%');
+  console.log('🎉 AUDITORÍA COMPLETA: TODOS LOS ROLES, EDICIONES Y ELIMINACIONES FUNCIONAN AL 100%');
   console.log('===============================================================');
 }
 

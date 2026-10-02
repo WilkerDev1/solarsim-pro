@@ -176,7 +176,9 @@ app.post('/api/auth/register', async (c) => {
 
 app.post('/api/auth/login', async (c) => {
   try {
-    const { email, password } = await c.req.json();
+    const body = await c.req.json();
+    const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const password = typeof body?.password === 'string' ? body.password.trim() : '';
     if (!email || !password) {
       return c.json({ error: 'Correo y contraseña requeridos' }, 400);
     }
@@ -186,7 +188,7 @@ app.post('/api/auth/login', async (c) => {
        FROM users u
        JOIN organizations o ON u.organization_id = o.id
        WHERE u.email = $1`,
-      [email.toLowerCase().trim()]
+      [email]
     );
 
     if (res.rows.length === 0) {
@@ -395,12 +397,16 @@ app.patch('/api/users/:id', async (c) => {
 
   const targetId = c.req.param('id');
   const body = await c.req.json();
-  const { role, isActive, password } = body;
+  const { name, role, isActive, password } = body;
 
   const updates: string[] = [];
   const values: any[] = [];
   let idx = 1;
 
+  if (typeof name === 'string' && name.trim().length > 0) {
+    updates.push(`name = $${idx++}`);
+    values.push(name.trim());
+  }
   if (role) {
     updates.push(`role = $${idx++}`);
     values.push(normalizeRole(role));
@@ -409,8 +415,8 @@ app.patch('/api/users/:id', async (c) => {
     updates.push(`is_active = $${idx++}`);
     values.push(isActive);
   }
-  if (password && password.length >= 6) {
-    const passwordHash = await bcrypt.hash(password, 10);
+  if (typeof password === 'string' && password.trim().length >= 6) {
+    const passwordHash = await bcrypt.hash(password.trim(), 10);
     updates.push(`password_hash = $${idx++}`);
     values.push(passwordHash);
   }
@@ -423,12 +429,61 @@ app.patch('/api/users/:id', async (c) => {
   values.push(targetId);
   values.push(authUser.organizationId);
 
-  await pool.query(
-    `UPDATE users SET ${updates.join(', ')} WHERE id = $${idx++} AND organization_id = $${idx}`,
+  const res = await pool.query(
+    `UPDATE users SET ${updates.join(', ')} WHERE id = $${idx++} AND organization_id = $${idx}
+     RETURNING id, name, email, role, is_active, organization_id, created_at`,
     values
   );
 
-  return c.json({ success: true, message: 'Usuario actualizado exitosamente' });
+  if (res.rows.length === 0) {
+    return c.json({ error: 'Usuario no encontrado en tu organización' }, 404);
+  }
+
+  const u = res.rows[0];
+  return c.json({
+    success: true,
+    message: 'Usuario actualizado exitosamente',
+    user: {
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      organizationId: u.organization_id,
+      isActive: u.is_active,
+      createdAt: u.created_at,
+    }
+  });
+});
+
+app.delete('/api/users/:id', async (c) => {
+  const authUser = await authenticate(c);
+  if (!authUser) {
+    return c.json({ error: 'No autorizado' }, 401);
+  }
+
+  if (authUser.role !== 'ADMIN') {
+    return c.json({ error: 'Permisos insuficientes: solo un Administrador puede eliminar usuarios' }, 403);
+  }
+
+  const targetId = c.req.param('id');
+  if (targetId === authUser.id) {
+    return c.json({ error: 'No puedes eliminar tu propia cuenta de Administrador' }, 400);
+  }
+
+  const res = await pool.query(
+    `DELETE FROM users WHERE id = $1 AND organization_id = $2 RETURNING id, name, email`,
+    [targetId, authUser.organizationId]
+  );
+
+  if (res.rows.length === 0) {
+    return c.json({ error: 'Usuario no encontrado en tu organización' }, 404);
+  }
+
+  return c.json({
+    success: true,
+    message: `Usuario ${res.rows[0].name} eliminado correctamente`,
+    deletedId: res.rows[0].id,
+  });
 });
 
 // ----------------------------------------------------

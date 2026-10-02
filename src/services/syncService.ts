@@ -282,8 +282,8 @@ export class SyncService {
     serverUrl: string,
     token: string,
     userId: string,
-    payload: { role?: UserRole; isActive?: boolean; password?: string }
-  ): Promise<{ success: boolean; error?: string }> {
+    payload: { name?: string; role?: UserRole; isActive?: boolean; password?: string }
+  ): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
     const base = this.cleanUrl(serverUrl);
     try {
       const res = await fetch(`${base}/api/users/${userId}`, {
@@ -300,9 +300,37 @@ export class SyncService {
       if (!res.ok || !data?.success) {
         return { success: false, error: data?.error || `Error al actualizar usuario (HTTP ${res.status})` };
       }
-      return { success: true };
+      return { success: true, user: data.user };
     } catch (err: any) {
       return { success: false, error: err.message || 'Fallo de red al actualizar usuario' };
+    }
+  }
+
+  /**
+   * Eliminar usuario de equipo de la organización (Solo ADMIN)
+   */
+  static async deleteCompanyUser(
+    serverUrl: string,
+    token: string,
+    userId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const base = this.cleanUrl(serverUrl);
+    try {
+      const res = await fetch(`${base}/api/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      this.checkRenewedToken(res);
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        return { success: false, error: data?.error || `Error al eliminar usuario (HTTP ${res.status})` };
+      }
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Fallo de red al eliminar usuario' };
     }
   }
 

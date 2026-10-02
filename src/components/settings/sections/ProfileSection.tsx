@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
-import { User, Edit3, LogOut, RefreshCw, CheckCircle2, AlertCircle, Shield, Building2 } from 'lucide-react';
+import { User, Edit3, LogOut, RefreshCw, CheckCircle2, AlertCircle, Shield, Building2, Eye, EyeOff } from 'lucide-react';
 
 export const ProfileSection: React.FC = () => {
   const { syncSettings, loginUser, registerUser, logoutUser, validateSession } = useSimulationStore();
@@ -10,6 +10,7 @@ export const ProfileSection: React.FC = () => {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showAuthPassword, setShowAuthPassword] = useState(false);
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
@@ -48,7 +49,7 @@ export const ProfileSection: React.FC = () => {
     setAuthSuccess(null);
 
     if (authMode === 'login') {
-      const res = await loginUser(loginEmail, loginPassword);
+      const res = await loginUser(loginEmail.trim(), loginPassword.trim());
       setAuthLoading(false);
       if (res.success) {
         setAuthSuccess('¡Sesión iniciada con éxito! Proyectos sincronizados con la empresa.');
@@ -272,14 +273,23 @@ export const ProfileSection: React.FC = () => {
                   <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">
                     Contraseña
                   </label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    value={authMode === 'login' ? loginPassword : regPassword}
-                    onChange={(e) => (authMode === 'login' ? setLoginPassword(e.target.value) : setRegPassword(e.target.value))}
-                    className="w-full px-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-900 dark:text-zinc-100"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showAuthPassword ? 'text' : 'password'}
+                      required
+                      placeholder="••••••••"
+                      value={authMode === 'login' ? loginPassword : regPassword}
+                      onChange={(e) => (authMode === 'login' ? setLoginPassword(e.target.value) : setRegPassword(e.target.value))}
+                      className="w-full pl-3.5 pr-10 py-2 rounded-xl text-sm border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-900 dark:text-zinc-100"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAuthPassword(!showAuthPassword)}
+                      className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer"
+                    >
+                      {showAuthPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
               </div>
 
