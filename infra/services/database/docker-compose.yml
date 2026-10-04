@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER:-solarsim_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-solarsim_secret_2026}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set a private database password}
       POSTGRES_DB: ${DB_NAME:-solarsim_prod}
     volumes:
       - ./data:/var/lib/postgresql/data
