@@ -219,7 +219,7 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
               <Tooltip
                 formatter={(val: number, name: string) => [
                   `${Math.round(val).toLocaleString()} kWh`,
-                  name === 'consumptionKWh' ? 'Consumo' : name === 'productionKWh' ? 'Producción FV' : 'Autoconsumo en Sitio'
+                  name
                 ]}
               />
               <Bar dataKey="consumptionKWh" name="Consumo" fill="#14532d" radius={[2, 2, 0, 0]} />
