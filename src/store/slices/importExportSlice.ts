@@ -1,3 +1,4 @@
+import { projectMutationMetadata } from '../sync/projectMutation';
 import { SimulationSlice, ImportExportSlice } from '../types';
 import { ProjectSimulation } from '../../types';
 import { BENCHMARK_PROJECT } from '../../engine/referenceCase';
@@ -204,6 +205,10 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
           ...proj,
           id: finalId,
           updatedAt: new Date().toISOString(),
+          organizationId: currentUser?.organizationId,
+          syncServerUrl: currentUser ? get().syncSettings.serverUrl.trim().replace(/\/+$/, '') : undefined,
+          version: 1,
+          baseVersion: 0,
           syncStatus: currentUser ? 'pending' : 'local_only',
         });
       }
@@ -259,7 +264,11 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
         ...incomingProject,
         id: newId,
         updatedAt: new Date().toISOString(),
-        syncStatus: currentUser ? 'pending' : 'local_only',
+        organizationId: currentUser?.organizationId,
+          syncServerUrl: currentUser ? get().syncSettings.serverUrl.trim().replace(/\/+$/, '') : undefined,
+          version: 1,
+          baseVersion: 0,
+          syncStatus: currentUser ? 'pending' : 'local_only',
         client: {
           ...incomingProject.client,
           projectId: nextSeq.projectId,
@@ -274,7 +283,10 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
         ...incomingProject,
         id: conflictingProject.id,
         updatedAt: new Date().toISOString(),
-        syncStatus: currentUser ? 'pending' : 'local_only',
+        organizationId: conflictingProject.organizationId,
+        syncServerUrl: conflictingProject.syncServerUrl,
+        version: conflictingProject.version,
+        ...projectMutationMetadata(conflictingProject, get().syncSettings),
       };
       updatedProjects = currentProjects.map((p) => (p.id === conflictingProject.id ? updatedProj : p));
       targetActiveId = conflictingProject.id;
@@ -286,7 +298,11 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
         ...incomingProject,
         id: newId,
         updatedAt: new Date().toISOString(),
-        syncStatus: currentUser ? 'pending' : 'local_only',
+        organizationId: currentUser?.organizationId,
+          syncServerUrl: currentUser ? get().syncSettings.serverUrl.trim().replace(/\/+$/, '') : undefined,
+          version: 1,
+          baseVersion: 0,
+          syncStatus: currentUser ? 'pending' : 'local_only',
         client: {
           ...incomingProject.client,
           name: dupIdentifiers.cleanName,

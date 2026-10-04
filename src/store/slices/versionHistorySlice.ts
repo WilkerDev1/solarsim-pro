@@ -1,3 +1,7 @@
+import { calculateProjectFinancialSummary } from '../../engine/financeEngine';
+import { effectiveFeatureSettings } from '../../features/application/featurePolicy';
+import { energyCalculationMode } from '../../../shared/applicationFeatures';
+import { restoreProjectContent } from '../sync/projectMutation';
 import { SimulationSlice, VersionHistorySlice } from '../types';
 import { ProjectSimulation, ProjectSnapshot, DiffFieldChange, ProjectConflictInfo } from '../../types';
 
@@ -76,8 +80,9 @@ export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (
       redoStack: newRedoStack,
       canUndo: newUndoStack.length > 1,
       canRedo: true,
-      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...previousState } : p)),
+      projects: state.projects.map((p) => (p.id === activeProjectId ? restoreProjectContent(p, previousState, get().syncSettings) : p)),
     }));
+    get().triggerAutoSync();
   },
 
   redo: () => {
@@ -93,8 +98,9 @@ export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (
       redoStack: newRedoStack,
       canUndo: true,
       canRedo: newRedoStack.length > 0,
-      projects: state.projects.map((p) => (p.id === activeProjectId ? { ...nextState } : p)),
+      projects: state.projects.map((p) => (p.id === activeProjectId ? restoreProjectContent(p, nextState, get().syncSettings) : p)),
     }));
+    get().triggerAutoSync();
   },
 
   createSnapshot: (projectId, label, notes = '', type = 'manual') => {
@@ -107,8 +113,9 @@ export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (
     const authorEmail = get().syncSettings.currentUser?.email || get().localUserProfile.email || '';
     const now = new Date().toISOString();
 
-    const dcKWp = ((project.specs.panelPowerW || 0) * (project.specs.panelCount || 0)) / 1000;
-    const netInvestment = project.financials?.customCostUSD || (dcKWp * 1000 * (project.financials?.pricePerWattUSD || 1.13));
+    const summary = calculateProjectFinancialSummary(project, energyCalculationMode(effectiveFeatureSettings(get())));
+    const dcKWp = summary.systemCapacityKWp;
+    const netInvestment = summary.netInvestmentUSD;
 
     const snapshot: ProjectSnapshot = {
       id: `snap-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -169,9 +176,10 @@ export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (
     restoredData.lastModifiedBy = get().syncSettings.currentUser?.name || get().localUserProfile.name || 'Consultor Local';
 
     set((state) => ({
-      projects: state.projects.map((p) => (p.id === projectId ? restoredData : p)),
+      projects: state.projects.map((p) => (p.id === projectId ? restoreProjectContent(p, restoredData, get().syncSettings) : p)),
     }));
 
+    get().triggerAutoSync();
     return true;
   },
 
@@ -270,13 +278,14 @@ export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (
     const { activeConflict, projects } = get();
     if (!activeConflict) return;
 
-    const { projectId, localProject, serverProject } = activeConflict;
+    const { projectId, serverProject } = activeConflict;
+    const localProject = projects.find((project) => project.id === projectId) || activeConflict.localProject;
 
     if (resolution === 'keep_local') {
       // Force next push to increment over server version
       const bumpedLocal = {
         ...localProject,
-        version: (serverProject.version || 1) + 1,
+        version: serverProject.version || 1,
         baseVersion: serverProject.version,
         syncStatus: 'pending' as const,
       };
@@ -287,7 +296,7 @@ export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (
     } else if (resolution === 'accept_server') {
       // Overwrite local with server
       set((state) => ({
-        projects: state.projects.map((p) => (p.id === projectId ? { ...serverProject, syncStatus: 'synced' as const } : p)),
+        projects: state.projects.map((p) => (p.id === projectId ? { ...serverProject, baseVersion: serverProject.version, syncStatus: 'synced' as const } : p)),
         activeConflict: null,
       }));
     } else if (resolution === 'fork') {
@@ -302,16 +311,17 @@ export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (
           projectId: `${localProject.client.projectId || 'SP'}-FORK`,
         },
         version: 1,
-        baseVersion: 1,
+        baseVersion: 0,
         syncStatus: 'pending',
       };
       set((state) => ({
         projects: [
-          ...state.projects.map((p) => (p.id === projectId ? { ...serverProject, syncStatus: 'synced' as const } : p)),
+          ...state.projects.map((p) => (p.id === projectId ? { ...serverProject, baseVersion: serverProject.version, syncStatus: 'synced' as const } : p)),
           forkedProject,
         ],
         activeConflict: null,
       }));
     }
+    get().triggerAutoSync();
   },
 });

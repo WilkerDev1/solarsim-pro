@@ -1,3 +1,4 @@
+import { useEnergyCalculationMode } from '../../../features/application/useApplicationFeatures';
 import React from 'react';
 import { ProjectSimulation } from '../../../types';
 import { calculateDCCapacityKWp } from '../../../engine/solarEngine';
@@ -20,7 +21,8 @@ interface HubOverviewTabProps {
 
 export const HubOverviewTab: React.FC<HubOverviewTabProps> = ({ project }) => {
   const dcKWp = calculateDCCapacityKWp(project.specs.panelPowerW, project.specs.panelCount);
-  const financialSummary = calculateProjectFinancialSummary(project);
+  const calculationMode = useEnergyCalculationMode();
+  const financialSummary = calculateProjectFinancialSummary(project, calculationMode);
   const monthlyGen = financialSummary.monthlyBreakdown;
   const annualGenKWh = financialSummary.annualProductionKWh;
   const annualConsKWh = financialSummary.annualConsumptionKWh;

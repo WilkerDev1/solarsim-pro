@@ -29,16 +29,20 @@
     "test:pdf-reorder": "npx tsx src/tests/testPDFSectionReordering.ts",
     "test:energy": "npx tsx src/tests/testEnergyBalanceTransparency.ts",
     "test:client-sync": "npx tsx src/tests/testClientContactDataSync.ts",
-    "test": "npx tsx src/tests/testBenchmark.ts && npx tsx src/tests/testFinancialEngineComprehensive.ts && npx tsx src/tests/testAISmartProposal.ts && npx tsx src/tests/testEquipmentCatalog.ts && npx tsx src/tests/testFolderHidingAndSync.ts && npx tsx src/tests/testTrashAndReadOnly.ts && npx tsx src/tests/testTariffEngine.ts && npx tsx src/tests/testGeminiFamily3Cascade.ts && npx tsx src/tests/testCloudflareShareHistory.ts && npx tsx src/tests/testMultiEquipment.ts && npx tsx src/tests/testPDFSectionReordering.ts && npx tsx src/tests/testEnergyBalanceTransparency.ts && npx tsx src/tests/testClientContactDataSync.ts",
+    "test": "tsx scripts/test.ts",
     "release:manifests": "npx tsx scripts/release.ts --manifests",
     "release:bump": "npx tsx scripts/release.ts --bump",
-    "context:pack": "repomix"
+    "context:pack": "repomix",
+    "test:features": "tsx src/tests/testApplicationFeatures.ts",
+    "test:sync": "tsx src/tests/testSyncReconciliation.ts",
+    "test:updater": "tsx electron/updater/tests/updaterIntegrity.test.ts",
+    "release:sign": "tsx scripts/release.ts --sign"
   },
   "dependencies": {
     "clsx": "^2.1.1",
     "electron-updater": "^6.8.9",
     "html2canvas": "^1.4.1",
-    "jspdf": "^2.5.2",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.427.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^4.4.168",
@@ -61,6 +65,7 @@
     "postcss": "^8.4.41",
     "repomix": "^1.18.0",
     "tailwindcss": "^3.4.10",
+    "tsx": "^4.23.15",
     "typescript": "^5.5.4",
     "vite": "^5.4.1"
   },

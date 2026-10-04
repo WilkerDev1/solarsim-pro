@@ -1,6 +1,9 @@
 import { ProjectSimulation, FinancialSummaryResult } from '../types';
 import { ELECTSUN_LOGO_COLOR_BASE64 } from '../assets/electsunLogo';
 import { useSimulationStore } from '../store/useSimulationStore';
+import { energyCalculationMode, featureScope } from '../../shared/applicationFeatures';
+import { effectiveFeatureSettings } from '../features/application/featurePolicy';
+import { calculateProjectFinancialSummary } from '../engine/financeEngine';
 
 export interface ShareResult {
   success: boolean;
@@ -69,6 +72,22 @@ export class ShareProposalService {
     const endpoint = `${baseUrl}/api/share`;
 
     try {
+      const initialSession = useSimulationStore.getState().syncSettings;
+      if (!initialSession.currentUser || !initialSession.authToken) return { success: false, error: 'Inicia sesión en tu organización para publicar una propuesta.' };
+      if (!['ADMIN', 'EDITOR'].includes(initialSession.currentUser.role)) return { success: false, error: 'Esta cuenta no tiene permiso para publicar propuestas.' };
+      const destination = new URL(baseUrl);
+      if (destination.protocol !== 'https:') return { success: false, error: 'La publicación autenticada requiere una URL HTTPS.' };
+      await useSimulationStore.getState().loadOrganizationFeaturePolicy();
+      const state = useSimulationStore.getState();
+      const session = state.syncSettings;
+      if (session.currentUser?.id !== initialSession.currentUser.id || session.currentUser.organizationId !== initialSession.currentUser.organizationId || session.serverUrl !== initialSession.serverUrl || !session.authToken) return { success: false, error: 'La sesión cambió. Vuelve a intentar la publicación.' };
+      const policy = state.organizationFeaturePolicies[featureScope(session.serverUrl, session.currentUser.organizationId)];
+      if (!policy || state.featurePolicyRequest?.status === 'error') return { success: false, error: 'No se pudo confirmar la configuración de simulación del servidor.' };
+      const mode = energyCalculationMode(effectiveFeatureSettings(state));
+      // One immutable publication captures both the confirmed policy and its financial result.
+      // The caller's preview may have been calculated before settings changed.
+      summary = calculateProjectFinancialSummary(project, mode);
+      const calculationSnapshot = { mode, organizationId: session.currentUser.organizationId, policyVersion: policy.version, capturedAt: new Date().toISOString() };
       // Remove large unnecessary base64 or temporary buffers from project payload if needed
       const projectPayload = {
         id: project.id,
@@ -116,9 +135,11 @@ export class ShareProposalService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.authToken}`,
         },
         body: JSON.stringify({
           project: projectPayload,
+          calculationSnapshot,
           summary,
           validityDays,
         }),
@@ -136,10 +157,10 @@ export class ShareProposalService {
       }
 
       const result = await response.json();
-      if (result && result.success && result.shareUrl) {
+      if (result && result.success && result.shareUrl && typeof result.id === 'string' && /^[a-zA-Z0-9_-]{7,64}$/.test(result.id)) {
         const resolvedExpiresAt =
           result.expiresAt || new Date(Date.now() + validityDays * 86400 * 1000).toISOString();
-        const resolvedId = result.id || Math.random().toString(36).substring(2, 9);
+        const resolvedId = result.id;
 
         // Cache locally for the current project
         try {

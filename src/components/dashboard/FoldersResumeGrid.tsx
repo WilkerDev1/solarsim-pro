@@ -1,231 +1,37 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { Folder, FolderPlus, Edit3, Trash2, EyeOff } from 'lucide-react';
 import { useSimulationStore } from '../../store/useSimulationStore';
-import { FolderPlus, Folder, ArrowRight, MoreVertical, Edit3, Trash2, EyeOff } from 'lucide-react';
-import { CreateFolderModal } from './sidebar/CreateFolderModal';
 import { ProjectFolder } from '../../types';
+import { CreateFolderModal } from './sidebar/CreateFolderModal';
 
 export const FoldersResumeGrid: React.FC = () => {
-  const {
-    folders,
-    projects,
-    activeFolderId,
-    setActiveFolderId,
-    syncSettings,
-    deleteFolder,
-  } = useSimulationStore();
-
+  const { folders, projects, activeFolderId, setActiveFolderId, syncSettings, deleteFolder, moveProjectToFolder } = useSimulationStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [folderToEdit, setFolderToEdit] = useState<ProjectFolder | null>(null);
-  const [openMenuFolderId, setOpenMenuFolderId] = useState<string | null>(null);
-  const isAdmin = syncSettings.currentUser?.role === 'ADMIN' || !syncSettings.currentUser;
-
-  const activeProjects = React.useMemo(() => projects.filter((p) => !p.isDeleted), [projects]);
-
-  // Cerrar menú al hacer clic fuera
-  useEffect(() => {
-    const handleGlobalClick = () => setOpenMenuFolderId(null);
-    if (openMenuFolderId) {
-      window.addEventListener('click', handleGlobalClick);
-      return () => window.removeEventListener('click', handleGlobalClick);
-    }
-  }, [openMenuFolderId]);
-
-  return (
-    <div className="flex flex-col gap-5 pt-8 border-t border-slate-200/80 dark:border-[#272f3e]">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white uppercase">
-          Folders
-        </h3>
-
-        {isAdmin && (
-          <button
-            onClick={() => {
-              setFolderToEdit(null);
-              setIsModalOpen(true);
-            }}
-            className="px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 hover:bg-orange-400 text-white transition-all flex items-center gap-1.5 shadow-xs cursor-pointer active:scale-95"
-          >
-            <FolderPlus className="w-3.5 h-3.5" />
-            <span>New Folder</span>
-          </button>
-        )}
-      </div>
-
-      {/* Grid Cards */}
-      {folders.length === 0 ? (
-        <div className="bg-white dark:bg-[#181d27] border border-dashed border-slate-200/90 dark:border-[#293242] rounded-3xl p-8 text-center flex flex-col items-center justify-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-            <Folder className="w-6 h-6" />
-          </div>
-          <div>
-            <h4 className="text-base font-bold text-slate-900 dark:text-white">No hay carpetas personalizadas</h4>
-            <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1 max-w-md">
-              Crea carpetas para clasificar y organizar propuestas por cliente comercial, licitación o región.
-            </p>
-          </div>
-          {isAdmin && (
-            <button
-              onClick={() => {
-                setFolderToEdit(null);
-                setIsModalOpen(true);
-              }}
-              className="mt-1 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-xs cursor-pointer"
-            >
-              + Crear Primera Carpeta
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {folders.map((folder) => {
-            const folderProjects = activeProjects.filter((p) => p.folderId === folder.id);
-            const isSelected = activeFolderId === folder.id;
-
-            // Unique authors who contributed to this folder
-            const authors = Array.from(
-              new Set(folderProjects.map((p) => p.authorName || 'Ing. Solar').filter(Boolean))
-            );
-
-            return (
-              <div
-                key={folder.id}
-                onClick={() => setActiveFolderId(isSelected ? null : folder.id)}
-                className={`bg-white dark:bg-[#181d27] border rounded-3xl p-6 flex flex-col justify-between gap-5 transition-all cursor-pointer shadow-xs hover:shadow-lg relative group ${
-                  isSelected
-                    ? 'border-emerald-500 ring-2 ring-emerald-500/20 dark:border-emerald-600'
-                    : 'border-slate-200/90 dark:border-[#293242] hover:border-slate-300 dark:hover:border-zinc-600'
-                }`}
-              >
-                <div>
-                  {/* Top: Accent Color Pill & 3-Dots Action Button */}
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-16 h-3 rounded-full"
-                        style={{ backgroundColor: folder.color || '#10b981' }}
-                      />
-                      {folder.hideFromGeneral && (
-                        <span
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-                          title="Los proyectos de esta carpeta están ocultos del menú principal y proyectos generales"
-                        >
-                          <EyeOff className="w-3 h-3" />
-                          <span>Oculta en principal</span>
-                        </span>
-                      )}
-                    </div>
-
-                    {isAdmin && (
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenMenuFolderId(openMenuFolderId === folder.id ? null : folder.id);
-                          }}
-                          className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#252d3c] transition-all cursor-pointer"
-                          title="Opciones de la carpeta"
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
-
-                        {/* Dropdown Menu */}
-                        {openMenuFolderId === folder.id && (
-                          <div
-                            onClick={(e) => e.stopPropagation()}
-                            className="absolute right-0 top-9 w-36 rounded-2xl bg-white dark:bg-[#1f2633] border border-slate-200/90 dark:border-[#2f3a4d] shadow-xl p-1.5 z-30 flex flex-col gap-1 text-xs animate-in fade-in zoom-in-95 duration-150"
-                          >
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setOpenMenuFolderId(null);
-                                setFolderToEdit(folder);
-                                setIsModalOpen(true);
-                              }}
-                              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-[#2a3446] font-semibold transition-all cursor-pointer text-left"
-                            >
-                              <Edit3 className="w-3.5 h-3.5 text-blue-500" />
-                              <span>Editar</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setOpenMenuFolderId(null);
-                                if (
-                                  window.confirm(
-                                    `¿Estás seguro de eliminar la carpeta "${folder.name}"? Los proyectos contenidos se conservarán.`
-                                  )
-                                ) {
-                                  deleteFolder(folder.id);
-                                }
-                              }}
-                              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 font-semibold transition-all cursor-pointer text-left"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Eliminar</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  <h4 className="text-lg font-bold text-slate-900 dark:text-white truncate">
-                    {folder.name}
-                  </h4>
-                  <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
-                    {folderProjects.length} Simulations • Activo
-                  </p>
-                </div>
-
-                {/* Footer: Collaborator Stack & Details Button */}
-                <div className="flex items-center justify-between pt-2">
-                  <div className="flex -space-x-2 overflow-hidden">
-                    {authors.length === 0 ? (
-                      <div className="w-7 h-7 rounded-full bg-slate-100 dark:bg-[#252d3c] border border-slate-200 dark:border-zinc-700 flex items-center justify-center text-[10px] text-slate-400">
-                        —
-                      </div>
-                    ) : (
-                      authors.slice(0, 3).map((author, idx) => (
-                        <div
-                          key={idx}
-                          className="w-7 h-7 rounded-full bg-gradient-to-tr from-sky-400 to-indigo-500 text-white font-bold text-[10px] flex items-center justify-center ring-2 ring-white dark:ring-[#181d27]"
-                          title={author}
-                        >
-                          {author.charAt(0).toUpperCase()}
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveFolderId(isSelected ? null : folder.id);
-                    }}
-                    className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-[#202734] dark:hover:bg-[#2a3446] text-white font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
-                  >
-                    <span>DETAILS</span>
-                    <ArrowRight className="w-3 h-3" />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      <CreateFolderModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setFolderToEdit(null);
-        }}
-        folderToEdit={folderToEdit}
-      />
+  const isAdmin = !syncSettings.currentUser || syncSettings.currentUser.role === 'ADMIN';
+  const edit = (folder: ProjectFolder | null) => { setFolderToEdit(folder); setIsModalOpen(true); };
+  return <section className="space-y-4 border-t border-slate-200 pt-6 dark:border-zinc-800" aria-label="Carpetas de propuestas">
+    <div className="flex items-center justify-between gap-3">
+      <h2 className="text-base font-semibold text-slate-900 dark:text-white">Carpetas</h2>
+      {isAdmin && <button type="button" onClick={() => edit(null)} className="flex min-h-9 items-center gap-2 rounded-lg px-3 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:text-zinc-300 dark:hover:bg-zinc-800"><FolderPlus className="h-4 w-4" />Nueva carpeta</button>}
     </div>
-  );
+    {folders.length === 0 ? <p className="text-sm text-slate-500 dark:text-zinc-400">Crea una carpeta para organizar propuestas por cliente, licitación o región.</p> :
+      <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
+        {folders.map((folder) => <li key={folder.id} onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; }} onDrop={(event) => {
+          event.preventDefault(); const id = event.dataTransfer.getData('text/plain');
+          if (id) moveProjectToFolder(id, folder.id);
+        }} className={`flex items-center gap-3 rounded-xl border bg-white px-4 py-3 dark:bg-zinc-900 ${activeFolderId === folder.id ? 'border-emerald-600 dark:border-emerald-500' : 'border-slate-200 dark:border-zinc-800'}`}>
+          <Folder className="h-5 w-5 shrink-0" style={{ color: folder.color || '#059669' }} />
+          <button type="button" aria-pressed={activeFolderId === folder.id} onClick={() => setActiveFolderId(activeFolderId === folder.id ? null : folder.id)} className="min-w-0 flex-1 text-left">
+            <span className="block break-words text-sm font-medium text-slate-900 dark:text-zinc-100">{folder.name}</span>
+            <span className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 dark:text-zinc-400">{projects.filter((project) => !project.isDeleted && project.folderId === folder.id).length} propuestas{folder.hideFromGeneral && <><EyeOff className="h-3 w-3" />Oculta en principal</>}</span>
+          </button>
+          {isAdmin && <div className="flex shrink-0 items-center gap-1">
+            <button type="button" aria-label={`Editar carpeta ${folder.name}`} onClick={() => edit(folder)} className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 dark:text-zinc-400 dark:hover:bg-zinc-800"><Edit3 className="h-3.5 w-3.5" /></button>
+            <button type="button" aria-label={`Eliminar carpeta ${folder.name}`} onClick={() => { if (confirm(`¿Eliminar la carpeta «${folder.name}»? Sus proyectos se conservarán.`)) deleteFolder(folder.id); }} className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-rose-50 hover:text-rose-700 dark:text-zinc-400 dark:hover:bg-rose-950 dark:hover:text-rose-300"><Trash2 className="h-3.5 w-3.5" /></button>
+          </div>}
+        </li>)}
+      </ul>}
+    <CreateFolderModal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setFolderToEdit(null); }} folderToEdit={folderToEdit} />
+  </section>;
 };
