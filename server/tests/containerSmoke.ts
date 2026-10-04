@@ -136,7 +136,8 @@ try {
 } finally {
   for (const name of [api, database]) {
     try {
-      docker("rm", "-f", name);
+      // These UUID-named containers belong to this smoke; remove their anonymous volumes too.
+      docker("rm", "-f", "-v", name);
     } catch {
       /* Nothing created. */
     }
