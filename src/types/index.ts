@@ -400,6 +400,8 @@ export interface SyncSettings {
 }
 
 export interface ProjectSimulation {
+  organizationId?: string;
+  syncServerUrl?: string;
   id: string;
   createdAt: string;
   updatedAt: string;
@@ -473,4 +475,3 @@ declare global {
     };
   }
 }
-

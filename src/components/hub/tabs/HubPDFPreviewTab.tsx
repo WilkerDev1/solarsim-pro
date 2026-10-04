@@ -1,3 +1,4 @@
+import { useEnergyCalculationMode } from '../../../features/application/useApplicationFeatures';
 import React, { useState, useMemo } from 'react';
 import { ProjectSimulation } from '../../../types';
 import { calculateProjectFinancialSummary } from '../../../engine/financeEngine';
@@ -35,7 +36,8 @@ interface HubPDFPreviewTabProps {
 
 export const HubPDFPreviewTab: React.FC<HubPDFPreviewTabProps> = ({ project }) => {
   const { setActiveView } = useSimulationStore();
-  const summary = useMemo(() => calculateProjectFinancialSummary(project), [project]);
+  const calculationMode = useEnergyCalculationMode();
+  const summary = useMemo(() => calculateProjectFinancialSummary(project, calculationMode), [project, calculationMode]);
   const activeTheme = PDF_COLOR_THEMES[0];
   const currentDateStr = useMemo(
     () => formatProposalDate(project?.client?.quoteDate || project?.customization?.quoteDate),

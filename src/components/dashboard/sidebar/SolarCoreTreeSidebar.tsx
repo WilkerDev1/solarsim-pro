@@ -244,7 +244,7 @@ export const SolarCoreTreeSidebar: React.FC = () => {
                   {isProjectsOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                 </button>
                 <Folder className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <span className="font-semibold text-sm">Projects</span>
+                <span className="font-semibold text-sm">Propuestas</span>
               </div>
               <span className="text-[11px] px-2 py-0.5 rounded-full font-mono bg-slate-100 dark:bg-[#242b3b] text-slate-600 dark:text-zinc-400 font-semibold">
                 {generalProjects.length}
@@ -287,7 +287,7 @@ export const SolarCoreTreeSidebar: React.FC = () => {
                   {isTeamOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                 </span>
                 <Users className="w-4 h-4 text-slate-500 dark:text-zinc-400" />
-                <span className="font-semibold text-sm">Team</span>
+                <span className="font-semibold text-sm">Equipo</span>
               </div>
               <span className="text-[11px] text-slate-400 font-mono">{teamMembers.length}</span>
             </div>
@@ -333,7 +333,7 @@ export const SolarCoreTreeSidebar: React.FC = () => {
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between px-3 pt-2">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
-                Folders
+                Carpetas
               </span>
               {isAdmin && (
                 <button
@@ -602,7 +602,7 @@ export const SolarCoreTreeSidebar: React.FC = () => {
               className="w-full py-2 px-3 rounded-xl text-xs font-semibold text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-[#202634] transition-colors flex items-center gap-2 cursor-pointer"
             >
               <UserPlus className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              <span>Invite teammates</span>
+              <span>Gestionar equipo</span>
             </button>
 
             {/* Píldora de Perfil del Usuario Activo */}

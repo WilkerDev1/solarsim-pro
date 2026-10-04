@@ -1,3 +1,4 @@
+import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
 import { SystemSpecs, MonthlyEnergyResult } from '../types';
 import { getProvinceHSP } from '../data/rdProvinces';
 import { calculateTotalDCCapacityKWp, calculateTotalBatteryCapacityKWh } from '../utils/equipmentSpecsUtils';
@@ -123,7 +124,8 @@ export function calculateMonthlySolarProduction(
   gridExportFeePct: number,
   customMonthlyHSP?: number[],
   tariffCode?: string,
-  isZeroExport?: boolean
+  isZeroExport?: boolean,
+  calculationMode: EnergyCalculationMode = 'legacy'
 ): MonthlyEnergyResult[] {
   const dcCapacityKWp = calculateTotalDCCapacityKWp(specs);
   const province = getProvinceHSP(provinceName);
@@ -175,7 +177,7 @@ export function calculateMonthlySolarProduction(
       : province.monthlyHSP[i];
 
     const days = DAYS_IN_MONTH[i];
-    const consumption = monthlyConsumptionKWh[i] || 3000;
+    const consumption = monthlyConsumptionKWh[i] ?? 3000;
 
     // Dynamic monthly solar production formula: kWp * HSP * days * derateFactor
     const production = Math.round(dcCapacityKWp * hsp * days * derateFactor * 10) / 10;
@@ -206,13 +208,17 @@ export function calculateMonthlySolarProduction(
 
     // 5. Total daily in-situ self-consumption: direct solar + battery night displacement
     const dailyTotalSelfConsumption = directSolarDaily + bessDischargeDaily;
-    const solarSelfConsumed = Math.min(
+    const physicalSelfConsumed = Math.min(
       consumption,
       Math.min(production, Math.round(dailyTotalSelfConsumption * days * 10) / 10)
     );
 
     // Monthly battery contribution to self-consumption
-    const batteryContributionKWh = Math.round(bessDischargeDaily * days * 10) / 10;
+    // Disabled experimental parameters never influence the historical model.
+    const solarSelfConsumed = calculationMode === 'legacy'
+      ? Math.min(consumption, Math.round(production * (specs.hasBattery ? 0.90 : 0.75) * 10) / 10)
+      : physicalSelfConsumed;
+    const batteryContributionKWh = calculationMode === 'legacy' ? 0 : Math.round(bessDischargeDaily * days * 10) / 10;
 
     // 6. Interaction with the grid
     let gridExported = 0;
@@ -227,6 +233,8 @@ export function calculateMonthlySolarProduction(
         gridExported = Math.max(0, Math.round((production - solarSelfConsumed) * 10) / 10);
       }
     }
+
+    if (calculationMode === 'legacy') gridExported = isZeroExport ? 0 : Math.max(0, Math.round((production - solarSelfConsumed) * 10) / 10);
 
     // Grid export net metering with SIE-007-2026-REG fee on exported energy
     const netExportCreditKWh = Math.round(gridExported * (1 - (effectiveGridExportFeePct / 100)) * 10) / 10;

@@ -1,0 +1,38 @@
+name: Verify modular contracts
+on:
+  pull_request:
+  push:
+    branches: [beta, 'codex/**']
+permissions:
+  contents: read
+concurrency:
+  group: verify-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+            workers/share-viewer/package-lock.json
+      - run: npm ci
+      - run: npm --prefix server ci
+      - run: npm --prefix workers/share-viewer ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - run: npm run build:electron
+      - run: npm --prefix server test
+      - run: npm --prefix server run format:check
+      - run: npm --prefix server run build
+      - run: docker build -f server/Dockerfile -t solarsim-api:qa-modular .
+      - run: npx tsx server/tests/containerSmoke.ts
+      - run: npm --prefix workers/share-viewer test
+      - run: npm --prefix workers/share-viewer run build

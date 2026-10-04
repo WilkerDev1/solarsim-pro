@@ -1,3 +1,4 @@
+import { useEnergyCalculationMode } from '../../features/application/useApplicationFeatures';
 import React, { useState, useRef, useEffect } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import {
@@ -82,7 +83,8 @@ export const ProjectHubView: React.FC = () => {
     );
   }
 
-  const financialSummary = calculateProjectFinancialSummary(project);
+  const calculationMode = useEnergyCalculationMode();
+  const financialSummary = calculateProjectFinancialSummary(project, calculationMode);
 
   return (
     <div

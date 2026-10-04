@@ -16,11 +16,14 @@ import {
   Check,
   RotateCcw,
   EyeOff,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 import { ProjectCard } from './ProjectCard';
+import { ProjectDocumentList } from './ProjectDocumentList';
 import { FoldersResumeGrid } from './FoldersResumeGrid';
 import { CreateFolderModal } from './sidebar/CreateFolderModal';
-import { calculateDCCapacityKWp } from '../../engine/solarEngine';
+import { calculateTotalDCCapacityKWp, calculateTotalPanelCount } from '../../utils/equipmentSpecsUtils';
 
 export const DashboardView: React.FC = () => {
   const {
@@ -35,6 +38,8 @@ export const DashboardView: React.FC = () => {
     folders,
     syncSettings,
     sidebarTheme,
+    dashboardViewMode,
+    setDashboardViewMode,
   } = useSimulationStore();
 
   const isDark = sidebarTheme === 'dark';
@@ -161,13 +166,13 @@ export const DashboardView: React.FC = () => {
         return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
       }
       if (sortBy === 'power_desc') {
-        const pA = calculateDCCapacityKWp(a.specs.panelPowerW, a.specs.panelCount);
-        const pB = calculateDCCapacityKWp(b.specs.panelPowerW, b.specs.panelCount);
+        const pA = calculateTotalDCCapacityKWp(a.specs);
+        const pB = calculateTotalDCCapacityKWp(b.specs);
         return pB - pA;
       }
       if (sortBy === 'power_asc') {
-        const pA = calculateDCCapacityKWp(a.specs.panelPowerW, a.specs.panelCount);
-        const pB = calculateDCCapacityKWp(b.specs.panelPowerW, b.specs.panelCount);
+        const pA = calculateTotalDCCapacityKWp(a.specs);
+        const pB = calculateTotalDCCapacityKWp(b.specs);
         return pA - pB;
       }
       // default: newest (prioriza la fecha más reciente entre updatedAt o createdAt)
@@ -193,6 +198,7 @@ export const DashboardView: React.FC = () => {
     distributorFilter,
     projectTypeFilter,
     sortBy,
+    hiddenFolderIds,
   ]);
 
   const activeFolder = activeFolderId ? folders.find((f) => f.id === activeFolderId) : null;
@@ -200,26 +206,17 @@ export const DashboardView: React.FC = () => {
 
   return (
     <div
-      className={`flex-1 overflow-y-auto w-full h-full p-6 md:p-10 font-sans transition-colors duration-200 ${
-        isDark ? 'bg-[#10141d] text-zinc-100' : 'bg-[#f4f6fa] text-slate-900'
+      className={`flex-1 overflow-y-auto w-full h-full p-6 lg:p-8 font-sans transition-colors duration-200 ${
+        isDark ? 'bg-zinc-950 text-zinc-100' : 'bg-slate-50 text-slate-900'
       }`}
     >
-      <div className="max-w-[1500px] mx-auto w-full flex flex-col gap-8 pb-16">
+      <div className="max-w-[1500px] mx-auto w-full flex flex-col gap-5 pb-12">
         {/* ========================================================================= */}
         {/* 🔝 HEADER SUPERIOR: PROJECTS, BUSCADOR Y ACCIONES */}
         {/* ========================================================================= */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-3">
-            <h2
-              onClick={() => {
-                setActiveFolderId(null);
-                setActiveTeamMemberFilter(null);
-              }}
-              className="text-3xl font-black tracking-tight text-slate-900 dark:text-white uppercase cursor-pointer hover:opacity-80 transition-opacity"
-              title="Ver todas las propuestas"
-            >
-              Projects
-            </h2>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Propuestas</h1>
             {activeFolderName && (
               <div className="flex items-center gap-2">
                 <span className="text-slate-400 dark:text-zinc-600 font-black text-2xl select-none">/</span>
@@ -246,7 +243,7 @@ export const DashboardView: React.FC = () => {
 
           <div className="flex flex-wrap items-center gap-3">
             {/* Buscador Integrado */}
-            <div className="relative min-w-[240px] sm:min-w-[320px]">
+            <div className="relative w-full sm:w-72">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
                 <Search className="w-4 h-4" />
               </div>
@@ -254,12 +251,14 @@ export const DashboardView: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search projects..."
-                className="w-full pl-10 pr-4 py-2.5 rounded-2xl text-xs border border-slate-200/90 dark:border-[#272f3e] bg-white dark:bg-[#181d27] text-slate-900 dark:text-zinc-100 shadow-2xs focus:outline-hidden focus:border-emerald-500"
+                placeholder="Buscar cliente, código o provincia…"
+                aria-label="Buscar propuestas"
+                className="placeholder:text-slate-500 dark:placeholder:text-zinc-400 w-full pl-10 pr-4 py-2.5 rounded-lg text-xs border border-slate-200/90 dark:border-[#272f3e] bg-white dark:bg-[#181d27] text-slate-900 dark:text-zinc-100 shadow-2xs focus:outline-hidden focus:border-emerald-500"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
+                  aria-label="Limpiar búsqueda"
                   className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -271,15 +270,17 @@ export const DashboardView: React.FC = () => {
             <div className="relative" ref={filtersRef}>
               <button
                 type="button"
+                aria-expanded={showFiltersModal}
+                aria-controls="project-filters"
                 onClick={() => setShowFiltersModal(!showFiltersModal)}
-                className={`px-4 py-2.5 rounded-2xl text-xs font-bold border flex items-center gap-2 transition-all cursor-pointer shadow-2xs ${
+                className={`px-4 py-2.5 rounded-lg text-xs font-bold border flex items-center gap-2 transition-all cursor-pointer shadow-2xs ${
                   activeFiltersCount > 0
                     ? 'bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-700'
                     : 'border-slate-200/90 dark:border-[#272f3e] bg-white dark:bg-[#181d27] text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-[#202734]'
                 }`}
               >
                 <Filter className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>Filters</span>
+                <span>Filtros</span>
                 {activeFiltersCount > 0 && (
                   <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center">
                     {activeFiltersCount}
@@ -289,7 +290,7 @@ export const DashboardView: React.FC = () => {
 
               {/* 🗂️ Popover Flotante de Filtros Avanzados */}
               {showFiltersModal && (
-                <div className="absolute right-0 mt-3 w-80 md:w-96 rounded-3xl bg-white dark:bg-[#181d27] border border-slate-200 dark:border-[#272f3e] shadow-2xl p-5 z-50 flex flex-col gap-5 text-xs animate-in fade-in zoom-in-95 duration-150">
+                <div id="project-filters" className="absolute right-0 mt-3 w-80 md:w-96 rounded-3xl bg-white dark:bg-[#181d27] border border-slate-200 dark:border-[#272f3e] shadow-2xl p-5 z-50 flex flex-col gap-5 text-xs animate-in fade-in zoom-in-95 duration-150">
                   <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#272f3e]">
                     <div className="flex items-center gap-2">
                       <Filter className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
@@ -448,21 +449,30 @@ export const DashboardView: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsFolderModalOpen(true)}
-              className="px-4 py-2.5 rounded-2xl text-xs font-bold border border-slate-200/90 dark:border-[#272f3e] bg-white dark:bg-[#181d27] text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-[#202734] transition-all flex items-center gap-2 cursor-pointer shadow-2xs"
+              className="px-4 py-2.5 rounded-lg text-xs font-bold border border-slate-200/90 dark:border-[#272f3e] bg-white dark:bg-[#181d27] text-slate-700 dark:text-zinc-300 hover:bg-slate-50 dark:hover:bg-[#202734] transition-all flex items-center gap-2 cursor-pointer shadow-2xs"
             >
               <FolderPlus className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span>Folder</span>
+              <span>Carpeta</span>
             </button>
 
             {/* Botón Principal: New Simulation */}
             <button
               type="button"
               onClick={openNewProjectModal}
-              className="px-5 py-2.5 rounded-2xl text-xs font-bold bg-orange-500 hover:bg-orange-400 text-white transition-all flex items-center gap-2 shadow-xs cursor-pointer active:scale-95"
+              className="px-5 py-2.5 rounded-lg text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white transition-all flex items-center gap-2 shadow-xs cursor-pointer active:scale-95"
             >
               <Plus className="w-4 h-4" />
-              <span>New Simulation</span>
+              <span>Nueva simulación</span>
             </button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4 dark:border-zinc-800">
+          <p className="text-xs text-slate-600 dark:text-zinc-400" aria-live="polite">{filteredAndSortedProjects.length} {filteredAndSortedProjects.length === 1 ? 'propuesta' : 'propuestas'}{activeTeamMemberFilter ? ` · ${activeTeamMemberFilter}` : ''}</p>
+          <div role="group" aria-label="Vista de propuestas" className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1 dark:border-zinc-700 dark:bg-zinc-900">
+            {([{ mode: 'cards', label: 'Tarjetas', Icon: LayoutGrid }, { mode: 'list', label: 'Lista', Icon: List }] as const).map(({ mode, label, Icon }) => (
+              <button key={mode} type="button" aria-pressed={dashboardViewMode === mode} onClick={() => setDashboardViewMode(mode)} className={`flex min-h-8 items-center gap-2 rounded-md px-3 text-xs font-medium transition-colors ${dashboardViewMode === mode ? 'bg-slate-100 text-slate-900 dark:bg-zinc-700 dark:text-white' : 'text-slate-600 hover:bg-slate-50 dark:text-zinc-400 dark:hover:bg-zinc-800'}`}><Icon className="h-3.5 w-3.5" />{label}</button>
+            ))}
           </div>
         </div>
 
@@ -545,7 +555,7 @@ export const DashboardView: React.FC = () => {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              {activeFiltersCount > 0 && (
+              {(activeFiltersCount > 0 || searchQuery || activeFolderId || activeTeamMemberFilter) && (
                 <button
                   onClick={resetAllFilters}
                   className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-[#202634] transition-all cursor-pointer"
@@ -561,8 +571,10 @@ export const DashboardView: React.FC = () => {
               </button>
             </div>
           </div>
+        ) : dashboardViewMode === 'list' ? (
+          <ProjectDocumentList projects={filteredAndSortedProjects} />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {filteredAndSortedProjects.map((project) => (
               <ProjectCard key={project.id} project={project} />
             ))}

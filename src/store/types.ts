@@ -124,6 +124,11 @@ export interface ProjectSlice {
 }
 
 export interface EquipmentSlice {
+  equipmentChanges: Record<string, { scope: string; baseVersion: number; revision: string }>;
+  equipmentDeletionQueue: Array<{ scope: string; id: string; baseVersion: number; item?: SolarEquipmentItem }>;
+  equipmentSyncFeedback: string | null;
+  equipmentConflicts: Record<string, { serverItem?: SolarEquipmentItem; serverVersion?: number; reason: string }>;
+  resolveEquipmentConflict: (id: string, resolution: 'accept_server' | 'keep_local' | 'fork') => void;
   equipmentCatalog: SolarEquipmentItem[];
   deletedEquipmentIds?: string[];
 
@@ -144,6 +149,16 @@ export interface EquipmentSlice {
 }
 
 export interface SyncAuthSlice {
+  sessionGeneration: number;
+  projectDeletionQueue: Array<{
+    scope: string;
+    id: string;
+    baseVersion: number;
+    /** Durable recovery copy; optional only for queues saved by older versions. */
+    project?: ProjectSimulation;
+    stage?: 'trash' | 'delete';
+  }>;
+  queueProjectDeletion: (project: ProjectSimulation) => void;
   syncSettings: SyncSettings;
   isSyncing: boolean;
   syncFeedbackMessage: string | null;
@@ -188,7 +203,7 @@ export interface UISlice {
   isAIPriceCatalogModalOpen: boolean;
   isShareModalOpen: boolean;
   isSettingsModalOpen: boolean;
-  settingsActiveTab: 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare';
+  settingsActiveTab: 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare' | 'features';
   updateInfo: UpdateInfo;
   saveFeedbackMessage: string | null;
 
@@ -196,6 +211,8 @@ export interface UISlice {
 
   sidebarTheme: 'dark' | 'light';
   sidebarWidth: number;
+  dashboardViewMode: 'cards' | 'list';
+  setDashboardViewMode: (mode: 'cards' | 'list') => void;
 
   openNewProjectModal: () => void;
   closeNewProjectModal: () => void;
@@ -213,9 +230,9 @@ export interface UISlice {
   closeAISettingsModal: () => void;
   openShareModal: () => void;
   closeShareModal: () => void;
-  openSettingsModal: (tab?: 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare') => void;
+  openSettingsModal: (tab?: 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare' | 'features') => void;
   closeSettingsModal: () => void;
-  setSettingsActiveTab: (tab: 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare') => void;
+  setSettingsActiveTab: (tab: 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare' | 'features') => void;
   setUpdateInfo: (info: UpdateInfo) => void;
 
   toggleSidebarTheme: () => void;
@@ -280,6 +297,7 @@ export interface NotificationSlice {
 }
 
 import { TariffSlice } from './slices/tariffSlice';
+import { FeatureSettingsSlice } from './slices/featureSettingsSlice';
 
 export type SimulationStore = ProjectSlice &
   EquipmentSlice &
@@ -291,9 +309,8 @@ export type SimulationStore = ProjectSlice &
   TariffSlice &
   CompanyProfileSlice &
   VersionHistorySlice &
-  NotificationSlice;
+  NotificationSlice &
+  FeatureSettingsSlice;
 
 export type SimulationState = SimulationStore;
 export type SimulationSlice<T> = StateCreator<SimulationStore, [], [], T>;
-
-
