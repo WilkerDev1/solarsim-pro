@@ -7,7 +7,7 @@ Esta versión incorpora el **Informe Maestro de Auditoría de Código y Arquitec
 ## 🚀 Principales Novedades y Mejoras
 
 ### 1. 🛡️ Auditoría Integral del Código y Remediaciones de Seguridad
-* **Informe Maestro**: Generado y documentado en `docs/CODEBASE_AUDIT_REPORT.md` cubriendo las 5 dimensiones arquitectónicas del sistema.
+* **Informe Maestro**: Generado y documentado en el informe histórico de auditoría (sustituido por `docs/ANALISIS_TECNICO_2026-10-03.md`) cubriendo las 5 dimensiones arquitectónicas del sistema.
 * **Sanitización en Electron IPC (`pkexec`)**: Validación estricta y saneamiento de versiones y tipos de paquetes en `install-linux-package` para prevenir vulnerabilidades de inyección en comandos con privilegios elevados.
 * **Tipado Estricto**: Eliminación de tipos `any` en `window.electronAPI` y reemplazo por interfaces fuertemente tipadas (`ExtractedInvoiceData`, `GeminiModelInfo`, `UpdateInfo`).
 
