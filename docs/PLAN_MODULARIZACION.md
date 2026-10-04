@@ -17,7 +17,7 @@ Rama de trabajo: `codex/modular-audit-feature-controls`, creada desde `beta` en 
 - [x] Pulir el dock, la navegación principal y Ajustes con Impeccable: jerarquía empresarial, categorías claras, controles consistentes, estados accesibles y temas claro/oscuro.
 - [x] Añadir vista compacta de documentos al menú principal junto a las tarjetas: misma búsqueda, filtros, ordenación, acciones y arrastre a carpetas; guardar la preferencia local.
 - [x] Verificación completa: tipos, tests, frontend, Electron, backend, Worker, comportamiento en navegador y snapshot Repomix.
-- [ ] Rama publicada en GitHub con commits revisables y PR de pruebas; sin merge ni despliegue a producción.
+- [x] Rama publicada en GitHub con commits revisables y PR de pruebas; sin merge ni despliegue a producción.
 
 El usuario autoriza ajustes del backend y del CT cuando sean necesarios. Antes de cualquier cambio en infraestructura se verificará el respaldo recuperable y se probará la migración en una base aislada. No se eliminarán volúmenes, datos ni copias de seguridad de producción. El despliegue no sustituye la revisión de la rama de pruebas.
 
@@ -43,3 +43,7 @@ La política de organización tendrá precedencia sobre la preferencia local mie
 ## Evidencia de partida
 
 La auditoría del 3 de octubre verificó compilaciones y 13 suites, además de siete fallos reproducidos con mocks. El código desplegado de API coincidía con la compilación local. La infraestructura se inspeccionó mediante `pve01` y tenía un respaldo de CT del mismo día. Esta información es una línea base, no una certificación de los cambios de esta rama.
+
+## Entrega
+
+[PR #1](https://github.com/WilkerDev1/solarsim-pro/pull/1), draft contra `beta`, publicado sin merge ni deploy. Resultados locales y límites en [QA_RESULTS](QA_RESULTS.md); el estado CI vigente se consulta en el PR.
