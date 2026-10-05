@@ -19,9 +19,11 @@ jobs:
           - os: ubuntu-latest
             platform: linux
             arch: x64
+            metadata: latest-linux.yml
           - os: windows-latest
             platform: win
             arch: x64
+            metadata: latest.yml
     runs-on: ${{ matrix.os }}
     timeout-minutes: 35
     steps:
@@ -76,8 +78,7 @@ jobs:
             release/SolarSim-Pro-*.deb
             release/SolarSim-Pro-*.pacman
             release/SolarSim-Pro-*.tar.gz
-            release/latest.yml
-            release/latest-linux.yml
+            release/${{ matrix.metadata }}
   draft:
     needs: desktop
     runs-on: ubuntu-latest

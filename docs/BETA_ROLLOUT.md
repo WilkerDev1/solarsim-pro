@@ -1,6 +1,6 @@
-# Beta 2.3.0-beta.1: preparación y despliegue
+# Release 2.2.1: preparación y despliegue
 
-Estado: candidata local y PR a beta, sin publicación, merge ni despliegue. El PDF con anexos fue aprobado por el usuario y no forma parte del trabajo pendiente. La lista de abajo conserva las tareas operativas abiertas.
+Estado al 5 de octubre: PR1 integrado en beta; release de escritorio 2.2.1 publicada y verificada. API/Worker y secretos de producción no desplegados ni rotados. El ensayo2.3.0-beta.1 de abajo es evidencia histórica; la versión oficial solicitada es2.2.1. El PDF con anexos fue aprobado por el usuario y no forma parte del trabajo pendiente. La lista de abajo conserva las tareas operativas abiertas.
 
 ## CT app-server: revisión solicitada
 
@@ -50,18 +50,28 @@ La integración con el runtime real de Workers detectó `redirect:'error'` no ad
 - [x] Procedimiento de rotación probado en contenedores desechables.
 - [ ] Rotación en producción durante la ventana coordinada. Inventariar todos los consumidores del rol DB, detener escritores API, cambiar contraseña del rol, actualizar env privados y reiniciar consumidores. Rotar JWT invalida sesiones: avisar y volver a iniciar sesión. No conservar secretos expuestos como vía de rollback.
 
-## Paquetes y criterios de publicación
+## Ensayo histórico de paquetes — 4 de octubre
 
 Electron44.5.1, electron-builder26.15.3, Vite7.3.6, pdfjs6.4.299; cliente/API/Worker2.3.0-beta.1. Paquetes Linux AppImage/deb/pacman/tar.gz y Windows NSIS/portable se generan con `--publish never`. El ensayo `node scripts/qa/runElectronRuntime.mjs` usa entrada/main/preload ASAR reales y perfil privado: verifica arranque, aislamiento de Node, IPC de versión/plataforma y eliminación de suscripciones. No reemplaza la instalación del usuario.
 
-`.github/workflows/beta-packages.yml` construye los formatos Linux/Windows y comprueba el ASAR instalado mediante Electron de node_modules de la misma versión (no arranca directamente el binario instalado): instalación deb en Ubuntu y NSIS2.1.5 seguido de actualización a la candidata en Windows. Estos ensayos usan runners efímeros, no el equipo del usuario. El [run37300154064](https://github.com/WilkerDev1/solarsim-pro/actions/runs/37300154064) pasó en ambos sistemas para el commit56af783; los artefactos CI expiran a los7días. La instalación interactiva, SmartScreen y pkexec siguen siendo comprobaciones manuales distintas.
+El workflow histórico `.github/workflows/beta-packages.yml`, retirado y desactivado el5 de octubre, construía los formatos Linux/Windows y comprueba el ASAR instalado mediante Electron de node_modules de la misma versión (no arranca directamente el binario instalado): instalación deb en Ubuntu y NSIS2.1.5 seguido de actualización a la candidata en Windows. Estos ensayos usan runners efímeros, no el equipo del usuario. El [run37300154064](https://github.com/WilkerDev1/solarsim-pro/actions/runs/37300154064) pasó en ambos sistemas para el commit56af783; los artefactos CI expiran a los7días. La instalación interactiva, SmartScreen y pkexec siguen siendo comprobaciones manuales distintas.
 
 - [x] Instalación deb en Ubuntu y NSIS2.1.5 →2.3.0-beta.1 en Windows, en runners efímeros.
 - [ ] Comprobar interacción del instalador, SmartScreen y actualización Linux mediante autorización del sistema en un equipo de usuario.
 - [x] Paquetes y manifiestos Linux locales firmados con GPG; `npx tsx scripts/qa/verifyCandidate.ts` verificó contra la clave pública fijada ambos manifiestos y los cuatro formatos Linux. También comprobó tamaño/SHA256 de los seis paquetes. Esto no acredita Authenticode en Windows; esa firma sigue pendiente si se requiere para publicar.
-- [ ] Publicar una GitHub prerelease beta. Estables no reciben beta automáticamente; beta admite beta/rc/final y excluye alpha. AppImage indica actualización manual.
+- [x] Sustituir la publicación beta por la release oficial2.2.1 solicitada; las betas ahora usan dev/gates sin instaladores. Estables no reciben beta automáticamente; beta admite beta/rc/final y excluye alpha. AppImage indica actualización manual.
 
-Audit actual raíz:6 avisos altos en dependencias de desarrollo Tailwind3/braces; producción0. Backend/Worker se auditan aparte. No se aplicó `audit fix --force`; pasar a Tailwind4 exige otro cambio de UI. No declarar el proyecto libre de vulnerabilidades. Los chunks grandes del PDF siguen como optimización futura, fuera del PDF aprobado.
+Audit del ensayo del4 de octubre:6 avisos altos en dependencias de desarrollo Tailwind3/braces; producción0. Backend/Worker se auditan aparte. No se aplicó `audit fix --force`; pasar a Tailwind4 exige otro cambio de UI. No declarar el proyecto libre de vulnerabilidades. Los chunks grandes del PDF siguen como optimización futura, fuera del PDF aprobado.
+
+## Release oficial 2.2.1 — 5 de octubre
+
+- [Release 2.2.1 publicada](https://github.com/WilkerDev1/solarsim-pro/releases/tag/v2.2.1), con 20 assets verificados por tamaño/SHA256 después de subir las firmas y los YAML correctos. PR1 integrado en beta; main conserva su revisión previa. Tag v2.2.1 en ba97d15: binarios compilados en GitHub, sin compilación de instaladores en la laptop y sin macOS.
+- [CI nativa completa](https://github.com/WilkerDev1/solarsim-pro/actions/runs/37315592565) pasó contratos, Windows/Linux y generación del borrador. [Gates beta](https://github.com/WilkerDev1/solarsim-pro/actions/runs/37315413118) pasaron.
+- Windows: NSIS2.1.5 →2.2.1, arranque del ejecutable instalado e IPC/ASAR; portable generado y comprobado por hash/tamaño. Linux: instalación deb en Ubuntu, arranque AppImage con extracción sinFUSE, instalación/arranque pacman en Arch aislado e IPC/ASAR; tar.gz generado y comprobado por hash/tamaño.
+- `verifyReleaseFiles.ts` comprueba seis paquetes, alias Debian, blockmap, versión/path/SHA512/tamaños de ambos YAML y unicidad de nombres sin distinguir mayúsculas. La regresión rechazó el YAML2.3.0-beta.1 mezclado durante la agregación. Cada runner ahora aporta únicamente el YAML de su plataforma.
+- `verifyCandidate.ts` pasó con los binarios reales descargados: firmas fijadas GPG de ambos JSON y los cuatro formatos Linux; seis SHA256/tamaños. Clave privada local, nunca enviada a GitHub. Authenticode/SmartScreen y autorización interactiva Linux no se acreditan.
+- Audit npm del5 de octubre: raíz7 altos en dependencias dev (Tailwind3/braces y cadena de Repomix), raíz producción0, backend0 y Worker0. No se forzó Tailwind4.
+- Acceso directo SSH a app-server: health API2.2.0 y BD conectada, solo lectura. El despliegue coordinado y la rotación siguen pendientes; no actualizar el volumen PostgreSQL ni ejecutar pruebas de escritura en producción.
 
 ## Ventana de despliegue y rollback
 
@@ -72,4 +82,4 @@ Audit actual raíz:6 avisos altos en dependencias de desarrollo Tailwind3/braces
 5. Para volver atrás, parar escritores nuevos; guardar dump posterior con las escrituras recientes; activar imagen API anterior y revisión Worker anterior con **los nuevos secretos** y la **misma BD**. Migraciones son aditivas: no borrar tablas/columnas para volver atrás. Las publicaciones nuevas deben conservarse en KV. Conservar exportaciones de documentos pendientes de clientes beta antes de volver al cliente anterior.
 6. Si el rollback de aplicación no resuelve un fallo de datos, restaurar a una base nueva, verificarla y reconciliar explícitamente las escrituras posteriores al checkpoint antes de cambiar el destino. Un snapshot CT anterior no es rollback seguro de datos que recibieron escrituras nuevas.
 
-Criterios de abortar: health/BD fallido, migración fallida, permisos incorrectos, pérdida de contenido o recuentos no explicada, clientes antiguos todavía escribiendo, firmas ausentes o fallo de instalación. La actualización de producción sigue pendiente; la PR y los paquetes permiten revisar concretamente ese paso.
+Criterios de abortar: health/BD fallido, migración fallida, permisos incorrectos, pérdida de contenido o recuentos no explicada, clientes antiguos todavía escribiendo, firmas ausentes o fallo de instalación. La actualización de producción sigue pendiente; la rama beta integrada y los paquetes permiten revisar concretamente ese paso.

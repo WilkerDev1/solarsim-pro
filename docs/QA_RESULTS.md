@@ -64,4 +64,16 @@ El commit56af783 pasó en GitHub [contratos](https://github.com/WilkerDev1/solar
 
 Revisiones independientes de sincronización, updater e interfaz cerraron conformes después de corregir los hallazgos y sus regresiones. El revisor operativo detectó una ruta insegura al preparar secretos; el guard corregido se verificó desde repo, subdirectorio, carpeta externa y enlace simbólico.
 
-La entrega sigue siendo PR a beta y paquetes locales, sin merge ni deploy. El plan operativo registra las tareas abiertas con protección del dato y rollback.
+Estado histórico al4 de octubre: PR a beta y paquetes locales, sin merge ni deploy. El estado vigente está en la actualización siguiente. El plan operativo registra las tareas abiertas con protección del dato y rollback.
+
+## Actualización vigente — release 2.2.1, 5 de octubre
+
+PR1 integrado en beta; macOS excluido por decisión del usuario. Windows/Linuxx64 compilados en [GitHub CI37315592565](https://github.com/WilkerDev1/solarsim-pro/actions/runs/37315592565), todos los jobs correctos. Betas sin empaquetado de SO: `verify.yml` comprueba dev/gates y el antiguo workflow de paquetes beta se retiró/desactivó. Los checks push cancelados de PR1 eran ejecuciones duplicadas por concurrencia; ahora las ramas codex reciben solo el check de PR.
+
+Linux: deb instalado en Ubuntu, AppImage arrancado sinFUSE mediante extracción, pacman instalado/arrancado en Arch aislado. Windows: NSIS2.1.5 actualizado a2.2.1 y ejecutable instalado arrancado. Ambos ASAR verifican aislamiento/IPC. Portable Windows y tar.gz Linux generados; hashes/tamaños correctos, sin afirmar pruebas interactivas de esos dos formatos.
+
+El primer draft falló por alias que solo diferían en mayúsculas; se conservan nombres canónicos y solo el alias Debian distinto. La agregación también mezclaba YAML tracked del otro SO: se sustituyó la metadata del borrador antes de publicar y se añadió validación de versión, paquete principal, entradas permitidas, SHA512 y tamaños. El checker rechazó el YAML antiguo en una regresión reproducida con archivos reales.
+
+Verificación local de los seis archivos descargados y firmas GPG con la clave fijada: PASS. Los manifiestos JSON firmados y ambos YAML corresponden a2.2.1. Revisión independiente del updater/pipeline sin bloqueantes. Se volvieron a descargar los manifiestos/YAML y firmas del borrador: ambos verificadores pasaron. Los 20 assets remotos coincidieron en tamaño/SHA256; después se publicó la [release 2.2.1](https://github.com/WilkerDev1/solarsim-pro/releases/tag/v2.2.1).
+
+Audit actual: raíz7 altos dev, producción0; backend0, Worker0. Producción conserva API2.2.0 y PostgreSQL conectado; no se desplegó ni se escribió en datos empresariales. [Runbook vigente y límites](BETA_ROLLOUT.md).
