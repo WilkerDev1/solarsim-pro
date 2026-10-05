@@ -126,7 +126,7 @@
       "maintainer": "WilkerDev1 <wilkerdev@github.com>",
       "synopsis": "Simulador Fotovoltaico Profesional",
       "description": "Simulador de proyectos solares fotovoltaicos con dimensionamiento, an\u00e1lisis financiero y exportaci\u00f3n de propuestas PDF.",
-      "desktopName": "solarsim-pro.desktop"
+      "syncDesktopName": true
     },
     "publish": {
       "provider": "github",
@@ -184,5 +184,6 @@
   },
   "engines": {
     "node": ">=24"
-  }
+  },
+  "desktopName": "solarsim-pro.desktop"
 }
