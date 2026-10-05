@@ -1,8 +1,8 @@
 services:
   api:
     build:
-      context: ../../../server
-      dockerfile: Dockerfile
+      context: ../../..
+      dockerfile: server/Dockerfile
     container_name: solarsim-api
     restart: unless-stopped
     environment:
@@ -10,12 +10,9 @@ services:
       DB_HOST: solarsim-db
       DB_PORT: 5432
       DB_USER: ${DB_USER:-solarsim_user}
-      DB_PASSWORD: ${DB_PASSWORD:-solarsim_secret_2026}
+      DB_PASSWORD: ${DB_PASSWORD:?Set a private database password}
       DB_NAME: ${DB_NAME:-solarsim_prod}
-      JWT_SECRET: ${JWT_SECRET:-solarsim_enterprise_jwt_secret_key_2026}
-    depends_on:
-      postgres:
-        condition: service_healthy
+      JWT_SECRET: ${JWT_SECRET:?Set a private random JWT secret (32+ characters)}
     networks:
       - solarsim_net
 

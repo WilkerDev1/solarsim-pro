@@ -1,4 +1,9 @@
 import { ProjectSimulation, UserProfile, UserRole } from '../types';
+import type { SolarEquipmentItem } from '../types/equipment';
+
+export type EquipmentPushOutcome =
+  | { id: string; status: 'created' | 'updated'; version: number; item: SolarEquipmentItem }
+  | { id: string; status: 'conflict'; reason: string; serverVersion?: number; serverItem?: SolarEquipmentItem };
 
 export interface PingResult {
   online: boolean;
@@ -17,6 +22,7 @@ export interface AuthResponse {
 }
 
 export interface SyncPullResult {
+  deletedIds?: string[];
   success: boolean;
   projects?: ProjectSimulation[];
   serverTimestamp?: string;
@@ -24,15 +30,19 @@ export interface SyncPullResult {
   error?: string;
 }
 
+export type SyncPushOutcome =
+  | { id: string; originalId?: string; status: 'created' | 'updated' | 'forked'; version: number; project?: ProjectSimulation; awaitingConfirmation?: boolean }
+  | { id: string; originalId?: string; status: 'conflict'; reason?: string; serverVersion: number; serverProject?: ProjectSimulation; localVersion?: number; lastModifiedByName?: string; lastModifiedAt?: string };
+
 export interface SyncPushResult {
   success: boolean;
   message?: string;
   serverTimestamp?: string;
-  results?: Array<{ id: string; originalId?: string; status: string; version: number }>;
+  results?: SyncPushOutcome[];
   error?: string;
 }
 
-export type TokenRenewedCallback = (newToken: string) => void;
+export type TokenRenewedCallback = (newToken: string, origin?: { serverUrl: string; token: string }) => void;
 let tokenRenewedListeners: TokenRenewedCallback[] = [];
 
 export function registerTokenRenewedListener(cb: TokenRenewedCallback): () => void {
@@ -42,14 +52,59 @@ export function registerTokenRenewedListener(cb: TokenRenewedCallback): () => vo
   };
 }
 
-export function notifyTokenRenewed(newToken: string) {
+export function notifyTokenRenewed(newToken: string, origin?: { serverUrl: string; token: string }) {
   tokenRenewedListeners.forEach((cb) => {
     try {
-      cb(newToken);
+      cb(newToken, origin);
     } catch (err) {
       console.error('Error en listener de renovación de token:', err);
     }
   });
+}
+
+const refreshRequests = new Map<string, Promise<string | null>>();
+
+/** One bounded refresh on 401. A revoked account or forbidden role is never retried. */
+export async function fetchWithSessionRetry(url: string, init: RequestInit = {}): Promise<Response> {
+  const send = (options: RequestInit) => fetch(url, { ...options, signal: options.signal ?? AbortSignal.timeout(12000) });
+  const response = await send(init);
+  const authorization = new Headers(init.headers).get('Authorization');
+  if (response.status !== 401 || !authorization?.startsWith('Bearer ') || /\/api\/auth\/(?:refresh|login|register)$/.test(url)) return response;
+  const token = authorization.slice(7);
+  const base = url.slice(0, url.indexOf('/api/'));
+  if (!base) return response;
+  const key = `${base}|${token}`;
+  let renewal = refreshRequests.get(key);
+  if (!renewal) {
+    renewal = (async () => {
+      const refreshed = await fetch(`${base}/api/auth/refresh`, { method: 'POST', headers: { Authorization: authorization }, signal: AbortSignal.timeout(8000) });
+      if (!refreshed.ok) return null;
+      const data = await refreshed.json();
+      if (!data.success || typeof data.token !== 'string') return null;
+      notifyTokenRenewed(data.token, { serverUrl: base, token });
+      return data.token as string;
+    })().catch(() => null);
+    refreshRequests.set(key, renewal);
+  }
+  const renewed = await renewal;
+  if (refreshRequests.get(key) === renewal) refreshRequests.delete(key);
+  if (!renewed) return response;
+  const headers = new Headers(init.headers);
+  headers.set('Authorization', `Bearer ${renewed}`);
+  return send({ ...init, headers });
+}
+
+function validatePushResults(results: unknown, ids: string[], content: 'project'): SyncPushOutcome[];
+function validatePushResults(results: unknown, ids: string[], content: 'item'): EquipmentPushOutcome[];
+function validatePushResults(results: unknown, ids: string[], content: 'project' | 'item'): any[] {
+  const expected = new Set(ids);
+  if (!Array.isArray(results) || results.length !== ids.length) throw new Error('El servidor no confirmó todos los documentos.');
+  for (const result of results) {
+    const source = result?.originalId || result?.id;
+    if (!expected.delete(source) || !['created', 'updated', ...(content === 'project' ? ['forked'] : []), 'conflict'].includes(result?.status)) throw new Error('Confirmación de sincronización inválida. Actualiza el servidor.');
+    if (result.status !== 'conflict' && (!Number.isSafeInteger(result.version) || result.version < 1 || (result[content]?.id !== result.id && !(content === 'project' && result.awaitingConfirmation === true)))) throw new Error('El servidor no devolvió el documento confirmado y su versión.');
+  }
+  return results;
 }
 
 export class SyncService {
@@ -63,11 +118,11 @@ export class SyncService {
   /**
    * Detecta y propaga tokens renovados automáticamente por el servidor
    */
-  private static checkRenewedToken(res: Response) {
+  private static checkRenewedToken(res: Response, serverUrl: string, token: string) {
     try {
       const renewed = res.headers.get('x-renewed-token');
       if (renewed) {
-        notifyTokenRenewed(renewed);
+        notifyTokenRenewed(renewed, { serverUrl: this.cleanUrl(serverUrl), token });
       }
     } catch {}
   }
@@ -82,7 +137,7 @@ export class SyncService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 4000);
 
-      const res = await fetch(`${base}/api/health`, {
+      const res = await fetchWithSessionRetry(`${base}/api/health`, {
         method: 'GET',
         signal: controller.signal,
       });
@@ -122,7 +177,7 @@ export class SyncService {
   static async login(serverUrl: string, email: string, password: string): Promise<AuthResponse> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/auth/login`, {
+      const res = await fetchWithSessionRetry(`${base}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -149,7 +204,7 @@ export class SyncService {
   static async register(serverUrl: string, payload: { name: string; email: string; password: string; organizationName?: string }): Promise<AuthResponse> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/auth/register`, {
+      const res = await fetchWithSessionRetry(`${base}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -176,10 +231,10 @@ export class SyncService {
   static async getMe(serverUrl: string, token: string): Promise<UserProfile | null> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/auth/me`, {
+      const res = await fetchWithSessionRetry(`${base}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      this.checkRenewedToken(res);
+      this.checkRenewedToken(res, serverUrl, token);
       if (!res.ok) return null;
       const data = await res.json();
       return data.user || null;
@@ -194,14 +249,14 @@ export class SyncService {
   static async refreshToken(serverUrl: string, token: string): Promise<AuthResponse> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/auth/refresh`, {
+      const res = await fetchWithSessionRetry(`${base}/api/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
       });
-      this.checkRenewedToken(res);
+      this.checkRenewedToken(res, serverUrl, token);
       const data = await res.json();
       if (!res.ok || !data.success) {
         return { success: false, error: data.error || 'No se pudo renovar la sesión' };
@@ -218,10 +273,10 @@ export class SyncService {
   static async getCompanyUsers(serverUrl: string, token: string): Promise<{ success: boolean; users: UserProfile[]; error?: string }> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/users`, {
+      const res = await fetchWithSessionRetry(`${base}/api/users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      this.checkRenewedToken(res);
+      this.checkRenewedToken(res, serverUrl, token);
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success) {
         return {
@@ -255,7 +310,7 @@ export class SyncService {
   ): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/users`, {
+      const res = await fetchWithSessionRetry(`${base}/api/users`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -263,7 +318,7 @@ export class SyncService {
         },
         body: JSON.stringify(payload),
       });
-      this.checkRenewedToken(res);
+      this.checkRenewedToken(res, serverUrl, token);
 
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success) {
@@ -286,7 +341,7 @@ export class SyncService {
   ): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/users/${userId}`, {
+      const res = await fetchWithSessionRetry(`${base}/api/users/${userId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -294,7 +349,7 @@ export class SyncService {
         },
         body: JSON.stringify(payload),
       });
-      this.checkRenewedToken(res);
+      this.checkRenewedToken(res, serverUrl, token);
 
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success) {
@@ -316,13 +371,13 @@ export class SyncService {
   ): Promise<{ success: boolean; error?: string }> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/users/${userId}`, {
+      const res = await fetchWithSessionRetry(`${base}/api/users/${userId}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      this.checkRenewedToken(res);
+      this.checkRenewedToken(res, serverUrl, token);
 
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success) {
@@ -340,7 +395,7 @@ export class SyncService {
   static async pullProjects(serverUrl: string, token: string, lastSyncTimestamp?: string | null): Promise<SyncPullResult> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/sync/pull`, {
+      const res = await fetchWithSessionRetry(`${base}/api/sync/pull`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -348,7 +403,7 @@ export class SyncService {
         },
         body: JSON.stringify({ lastSyncTimestamp: lastSyncTimestamp || '1970-01-01T00:00:00.000Z' }),
       });
-      this.checkRenewedToken(res);
+      this.checkRenewedToken(res, serverUrl, token);
 
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success) {
@@ -357,7 +412,8 @@ export class SyncService {
 
       return {
         success: true,
-        projects: data.projects || [],
+        projects: Array.isArray(data.projects) ? data.projects : (() => { throw new Error('Respuesta de proyectos inválida.'); })(),
+        deletedIds: data.deletedIds || [],
         serverTimestamp: data.serverTimestamp,
         count: data.count || 0,
       };
@@ -372,7 +428,7 @@ export class SyncService {
   static async pushProjects(serverUrl: string, token: string, projects: ProjectSimulation[]): Promise<SyncPushResult> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/sync/push`, {
+      const res = await fetchWithSessionRetry(`${base}/api/sync/push`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -380,18 +436,35 @@ export class SyncService {
         },
         body: JSON.stringify({ projects }),
       });
-      this.checkRenewedToken(res);
+      this.checkRenewedToken(res, serverUrl, token);
 
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success) {
         return { success: false, error: data?.error || `Error al subir proyectos (HTTP ${res.status})` };
       }
 
+      if (Array.isArray(data.results) && data.results.some((result: any) => result.awaitingConfirmation !== undefined)) throw new Error('Confirmación de sincronización inválida.');
+      // Legacy servers acknowledge versions without returning the canonical document.
+      // Read back once; never guess a confirmed document from the submitted payload.
+      if (Array.isArray(data.results) && data.results.some((result: SyncPushOutcome) => result.status !== 'conflict' && !result.project)) {
+        const expected = new Set(projects.map(project => project.id));
+        if (data.results.length !== projects.length || data.results.some((result: SyncPushOutcome) => typeof result.id !== 'string' || !result.id || !expected.delete(result.originalId || result.id) || !['created', 'updated', 'forked', 'conflict'].includes(result.status) || (result.status !== 'conflict' && (!Number.isSafeInteger(result.version) || result.version < 1)))) throw new Error('Confirmación de sincronización inválida.');
+        const readback = await this.pullProjects(serverUrl, token);
+        const receipts = data.results.map((result: SyncPushOutcome) => result.status !== 'conflict' && !result.project ? { ...result, awaitingConfirmation: true } : result);
+        if (!readback.success || !readback.projects) return { success: true, results: receipts, message: 'El servidor guardó cambios; su confirmación sigue pendiente.' };
+        data.results = data.results.map((result: SyncPushOutcome) => {
+          if (result.status === 'conflict' || result.project) return result;
+          const confirmed = readback.projects!.find(project => project.id === result.id);
+          if (!confirmed || !Number.isSafeInteger(confirmed.version) || confirmed.version! < result.version || !confirmed.client || !confirmed.specs || !confirmed.rates || !confirmed.financials) return { ...result, awaitingConfirmation: true };
+          if (confirmed.version !== result.version) return { id: result.id, originalId: result.originalId, status: 'conflict', serverVersion: confirmed.version, localVersion: result.version, serverProject: confirmed };
+          return { ...result, project: confirmed };
+        });
+      }
       return {
         success: true,
         message: data.message,
         serverTimestamp: data.serverTimestamp,
-        results: data.results,
+        results: validatePushResults(data.results, projects.map((item) => item.id), 'project'),
       };
     } catch (err: any) {
       return { success: false, error: err.message || 'Error de conexión al enviar proyectos' };
@@ -401,17 +474,18 @@ export class SyncService {
   /**
    * Eliminar un proyecto en el servidor (Soft-Delete a papelera o eliminación definitiva física)
    */
-  static async deleteProject(serverUrl: string, token: string, projectId: string, permanent: boolean = false): Promise<boolean> {
+  static async deleteProject(serverUrl: string, token: string, projectId: string, permanent: boolean = false, baseVersion?: number): Promise<boolean> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const url = permanent ? `${base}/api/projects/${projectId}?permanent=true` : `${base}/api/projects/${projectId}`;
-      const res = await fetch(url, {
+      const versionQuery = baseVersion !== undefined ? `&baseVersion=${baseVersion}` : '';
+      const url = `${base}/api/projects/${encodeURIComponent(projectId)}?permanent=${permanent}${versionQuery}`;
+      const res = await fetchWithSessionRetry(url, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      this.checkRenewedToken(res);
+      this.checkRenewedToken(res, serverUrl, token);
       return res.ok;
     } catch {
       return false;
@@ -421,16 +495,16 @@ export class SyncService {
   /**
    * Restaurar un proyecto desde la papelera de reciclaje en el servidor
    */
-  static async restoreProject(serverUrl: string, token: string, projectId: string): Promise<boolean> {
+  static async restoreProject(serverUrl: string, token: string, projectId: string, baseVersion?: number): Promise<boolean> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/projects/${projectId}/restore`, {
+      const res = await fetchWithSessionRetry(`${base}/api/projects/${encodeURIComponent(projectId)}/restore?baseVersion=${baseVersion ?? ''}`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      this.checkRenewedToken(res);
+      this.checkRenewedToken(res, serverUrl, token);
       return res.ok;
     } catch {
       return false;
@@ -443,13 +517,13 @@ export class SyncService {
   static async emptyTrash(serverUrl: string, token: string): Promise<boolean> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/trash`, {
+      const res = await fetchWithSessionRetry(`${base}/api/trash`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      this.checkRenewedToken(res);
+      this.checkRenewedToken(res, serverUrl, token);
       return res.ok;
     } catch {
       return false;
@@ -459,16 +533,16 @@ export class SyncService {
   /**
    * Pull: Descargar catálogo global de equipos desde el servidor
    */
-  static async pullEquipment(serverUrl: string, token: string): Promise<{ success: boolean; items?: import('../types/equipment').SolarEquipmentItem[]; error?: string }> {
+  static async pullEquipment(serverUrl: string, token: string): Promise<{ success: boolean; items?: SolarEquipmentItem[]; deletedIds?: string[]; error?: string }> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/equipment`, {
+      const res = await fetchWithSessionRetry(`${base}/api/equipment`, {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      this.checkRenewedToken(res);
+      this.checkRenewedToken(res, serverUrl, token);
 
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success) {
@@ -478,6 +552,7 @@ export class SyncService {
       return {
         success: true,
         items: data.items || [],
+        deletedIds: data.deletedIds || [],
       };
     } catch (err: any) {
       return { success: false, error: err.message || 'Error de conexión al obtener equipos' };
@@ -487,10 +562,10 @@ export class SyncService {
   /**
    * Push: Subir lote de equipos locales hacia el servidor
    */
-  static async pushEquipmentBatch(serverUrl: string, token: string, items: import('../types/equipment').SolarEquipmentItem[]): Promise<{ success: boolean; count?: number; error?: string }> {
+  static async pushEquipmentBatch(serverUrl: string, token: string, items: SolarEquipmentItem[]): Promise<{ success: boolean; count?: number; results?: EquipmentPushOutcome[]; error?: string }> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/equipment/batch`, {
+      const res = await fetchWithSessionRetry(`${base}/api/equipment/batch`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -498,7 +573,7 @@ export class SyncService {
         },
         body: JSON.stringify({ items }),
       });
-      this.checkRenewedToken(res);
+      this.checkRenewedToken(res, serverUrl, token);
 
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success) {
@@ -508,6 +583,7 @@ export class SyncService {
       return {
         success: true,
         count: data.count,
+        results: validatePushResults(data.results, items.map((item) => item.id), 'item'),
       };
     } catch (err: any) {
       return { success: false, error: err.message || 'Error de conexión al enviar equipos' };
@@ -517,16 +593,16 @@ export class SyncService {
   /**
    * Delete: Eliminar un equipo del catálogo en el servidor
    */
-  static async deleteEquipment(serverUrl: string, token: string, equipmentId: string): Promise<boolean> {
+  static async deleteEquipment(serverUrl: string, token: string, equipmentId: string, baseVersion?: number): Promise<boolean> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/equipment/${equipmentId}`, {
+      const res = await fetchWithSessionRetry(`${base}/api/equipment/${encodeURIComponent(equipmentId)}${baseVersion !== undefined ? `?baseVersion=${baseVersion}` : ''}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      this.checkRenewedToken(res);
+      this.checkRenewedToken(res, serverUrl, token);
       return res.ok;
     } catch {
       return false;
@@ -537,7 +613,6 @@ export class SyncService {
    * Helper defensivo para procesar respuestas JSON evitando SyntaxError por respuestas HTML/texto plano
    */
   private static async safeJsonParse<T = any>(res: Response, fallbackError: string): Promise<{ ok: boolean; data: T; error?: string }> {
-    this.checkRenewedToken(res);
     const text = await res.text();
     let data: any = {};
     try {
@@ -569,7 +644,7 @@ export class SyncService {
   static async fetchTariffMatrix(serverUrl: string, token: string): Promise<{ success: boolean; matrix?: import('../types/tariffs').GlobalTariffMatrix | null; error?: string }> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/tariffs`, {
+      const res = await fetchWithSessionRetry(`${base}/api/tariffs`, {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -596,7 +671,7 @@ export class SyncService {
   static async syncTariffMatrix(serverUrl: string, token: string, matrix: import('../types/tariffs').GlobalTariffMatrix): Promise<{ success: boolean; message?: string; error?: string }> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/tariffs/sync`, {
+      const res = await fetchWithSessionRetry(`${base}/api/tariffs/sync`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -619,4 +694,3 @@ export class SyncService {
     }
   }
 }
-

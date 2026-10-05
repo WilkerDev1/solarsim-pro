@@ -1,3 +1,4 @@
+import { useSelfConsumptionProjection } from '../../../features/application/useApplicationFeatures';
 import React, { useState } from 'react';
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs } from '../../../types';
 import {
@@ -31,7 +32,8 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
   setMonthlyConsumption,
   updateSpecs,
 }) => {
-  const showSelfConsumption = project.specs.showSelfConsumptionBreakdown !== false;
+  const projectionEnabled = useSelfConsumptionProjection();
+  const showSelfConsumption = projectionEnabled && project.specs.showSelfConsumptionBreakdown !== false;
   const totalConsumptionKWh = (summary?.monthlyBreakdown || []).reduce((sum, m) => sum + (m.consumptionKWh || 0), 0);
   const totalProductionKWh = (summary?.monthlyBreakdown || []).reduce((sum, m) => sum + (m.productionKWh || 0), 0);
   const totalSelfConsumedKWh = (summary?.monthlyBreakdown || []).reduce((sum, m) => sum + (m.solarSelfConsumedKWh || 0), 0);
@@ -175,7 +177,7 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
               Evolución Mensual de Energía
             </h3>
             {/* Botón de alternancia Modo Autoconsumo vs Clásico */}
-            <button
+            {projectionEnabled && <button
               type="button"
               onClick={() => updateSpecs && updateSpecs({ showSelfConsumptionBreakdown: !showSelfConsumption })}
               className={`text-[10px] px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer border flex items-center gap-1 shadow-2xs ${
@@ -187,7 +189,7 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
             >
               <span className={`w-1.5 h-1.5 rounded-full ${showSelfConsumption ? 'bg-blue-600' : 'bg-slate-400'}`}></span>
               <span>{showSelfConsumption ? 'Autoconsumo Activo' : 'Modo Clásico'}</span>
-            </button>
+            </button>}
           </div>
           <div className="flex items-center gap-4 text-xs font-semibold">
             <div className="flex items-center gap-1.5">
@@ -217,7 +219,7 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
               <Tooltip
                 formatter={(val: number, name: string) => [
                   `${Math.round(val).toLocaleString()} kWh`,
-                  name === 'consumptionKWh' ? 'Consumo' : name === 'productionKWh' ? 'Producción FV' : 'Autoconsumo en Sitio'
+                  name
                 ]}
               />
               <Bar dataKey="consumptionKWh" name="Consumo" fill="#14532d" radius={[2, 2, 0, 0]} />

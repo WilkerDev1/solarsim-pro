@@ -1,3 +1,5 @@
+> Alcance actual: este documento describe el modelo físico opcional. Legacy es el predeterminado. Consultar [APPLICATION_FEATURES.md](APPLICATION_FEATURES.md) para cálculo histórico, política y visibilidad.
+
 # ☀️ Especificación Técnica: Balance de Energía, Autoconsumo Físico y Despacho BESS
 
 Este documento detalla la **arquitectura matemática, los principios físicos de termodinámica y conservación de carga, el modelo regulatorio dominicano (SIE-007-2026-REG) y los algoritmos de simulación** implementados en el motor de **SolarSim Pro** (`src/engine/solarEngine.ts`), explicando en profundidad cómo se calcula el **autoconsumo en sitio**, la **inyección a red**, el **ciclado de baterías BESS** y el **ahorro facturable**.

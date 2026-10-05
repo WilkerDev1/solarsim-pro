@@ -100,7 +100,12 @@ export const UpdateModal: React.FC = () => {
   const handleDownload = async () => {
     if (window.electronAPI && typeof window.electronAPI.downloadUpdate === 'function') {
       setUpdateInfo({ ...updateInfo, state: 'downloading', progressPct: 0 });
-      await window.electronAPI.downloadUpdate();
+      try {
+        const result = await window.electronAPI.downloadUpdate();
+        if (result && !result.success) setUpdateInfo({ ...updateInfo, state: 'error', error: result.error || 'No se pudo descargar la actualización.' });
+      } catch (error) {
+        setUpdateInfo({ ...updateInfo, state: 'error', error: error instanceof Error ? error.message : 'No se pudo descargar la actualización.' });
+      }
     }
   };
 
@@ -221,7 +226,12 @@ export const UpdateModal: React.FC = () => {
               )}
 
               {/* Action for Windows / AppImage vs Native Arch / Debian */}
-              {platformInfo.platform === 'win32' || platformInfo.isAppImage ? (
+              {platformInfo.isAppImage ? (
+                <div className="space-y-3">
+                  <p className="text-xs leading-relaxed">Descarga el AppImage de la release oficial y comprueba su firma antes de reemplazar tu aplicación.</p>
+                  <button onClick={() => handleOpenUrl(`https://github.com/WilkerDev1/solarsim-pro/releases/tag/v${targetVer}`)} className="w-full rounded-lg bg-emerald-700 px-4 py-3 text-sm font-medium text-white hover:bg-emerald-800">Abrir descarga oficial</button>
+                </div>
+              ) : platformInfo.platform === 'win32' ? (
                 <button
                   onClick={handleDownload}
                   className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer text-xs active:scale-95"

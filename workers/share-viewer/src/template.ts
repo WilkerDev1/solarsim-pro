@@ -1,10 +1,6 @@
 import { StoredProposal } from './types';
 import { ELECTSUN_LOGO_COLOR_BASE64 } from './electsunLogo';
-
-function formatMarkdown(text?: string | null, boldClass = 'font-bold text-slate-950'): string {
-  if (!text) return '';
-  return text.replace(/\*\*([^*]+)\*\*/g, `<strong class="${boldClass}">$1</strong>`);
-}
+import { escapeHtml, formatMarkdown, safeLogoUrl, scriptJson } from './escaping';
 
 function getWorkerTariffDisplayName(dist: string, code: string): string {
   const c = (code || '').toUpperCase().trim();
@@ -33,7 +29,7 @@ export function renderExpiredPage(companyName = 'electsun', companyPhone = '+1 (
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Propuesta No Disponible | ${companyName}</title>
+  <title>Propuesta No Disponible | ${escapeHtml(companyName)}</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -45,7 +41,7 @@ export function renderExpiredPage(companyName = 'electsun', companyPhone = '+1 (
 <body class="h-full flex items-center justify-center p-4 bg-[#f0f7fc]">
   <div class="max-w-md w-full bg-white border border-sky-200 rounded-3xl p-8 text-center shadow-xl relative overflow-hidden">
     <div class="mb-6 flex justify-center">
-      <img src="${ELECTSUN_LOGO_COLOR_BASE64}" alt="${companyName}" class="h-16 max-h-[68px] w-auto object-contain drop-shadow-sm" />
+      <img src="${ELECTSUN_LOGO_COLOR_BASE64}" alt="${escapeHtml(companyName)}" class="h-16 max-h-[68px] w-auto object-contain drop-shadow-sm" />
     </div>
     <div class="w-12 h-12 bg-orange-50 border border-orange-200 rounded-2xl flex items-center justify-center mx-auto mb-4 text-orange-500">
       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -57,12 +53,12 @@ export function renderExpiredPage(companyName = 'electsun', companyPhone = '+1 (
       Este enlace temporal ha expirado o el documento ya no se encuentra accesible en la nube.
     </p>
     <div class="bg-sky-50/70 border border-sky-200 rounded-2xl p-4 mb-6 text-xs text-slate-700 text-left space-y-2">
-      <div class="flex justify-between"><span class="text-slate-500 font-semibold">Empresa:</span> <span class="font-bold text-sky-900">${companyName}</span></div>
-      ${companyPhone ? `<div class="flex justify-between"><span class="text-slate-500 font-semibold">Teléfono:</span> <span class="font-bold text-orange-600">${companyPhone}</span></div>` : ''}
+      <div class="flex justify-between"><span class="text-slate-500 font-semibold">Empresa:</span> <span class="font-bold text-sky-900">${escapeHtml(companyName)}</span></div>
+      ${companyPhone ? `<div class="flex justify-between"><span class="text-slate-500 font-semibold">Teléfono:</span> <span class="font-bold text-orange-600">${escapeHtml(companyPhone)}</span></div>` : ''}
       <div class="flex justify-between"><span class="text-slate-500 font-semibold">Seguridad:</span> <span class="text-slate-600">Expiración Automática</span></div>
     </div>
     ${companyPhone ? `
-    <a href="https://wa.me/${companyPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent('Hola, estaba intentando ver una propuesta solar que ha expirado y me gustaría solicitar una actualización.')}" target="_blank" class="inline-flex items-center justify-center gap-2 w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-sm shadow-lg shadow-orange-500/20 transition-all active:scale-98">
+    <a href="https://wa.me/${companyPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent('Hola, estaba intentando ver una propuesta solar que ha expirado y me gustaría solicitar una actualización.')}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-2 w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-sm shadow-lg shadow-orange-500/20 transition-all active:scale-98">
       <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
       Solicitar Propuesta Actualizada
     </a>` : ''}
@@ -90,7 +86,7 @@ export function renderProposalPage(stored: StoredProposal): string {
   const rawClientPhone = custom.clientPhone || client.contactPhone || '809-378-6590';
   const clientPhone = (rawClientPhone.includes('555-0199') || rawClientPhone.includes('5550199')) ? '809-378-6590' : rawClientPhone;
 
-  const logoBase64 = custom.headerLogoBase64 || custom.coverLogoBase64 || ELECTSUN_LOGO_COLOR_BASE64;
+  const logoBase64 = safeLogoUrl(custom.headerLogoBase64 || custom.coverLogoBase64, ELECTSUN_LOGO_COLOR_BASE64);
 
   const rawClientName = client.name || 'Cliente Estimado';
   const clientName = rawClientName.replace(/\s*\((?:Copia|Copia Importada|COPIA|V\d+|C\d+)\)\s*/gi, '').trim();
@@ -180,10 +176,12 @@ export function renderProposalPage(stored: StoredProposal): string {
     listGrossInvestmentUSD = grossInvestmentUSD;
   }
 
-  const laborPortionUSD = Number(summary?.laborPortionUSD || summary?.costMatrix?.laborVentaUSD || 0);
-  const equipmentPortionUSD = Number(summary?.equipmentPortionUSD || summary?.costMatrix?.equipmentVentaUSD || Math.max(0, grossInvestmentUSD - laborPortionUSD) || grossInvestmentUSD);
+  const laborPortionUSD = Number(summary?.laborPortionUSD ?? summary?.costMatrix?.laborVentaUSD ?? 0);
+  const equipmentPortionUSD = Number(summary?.equipmentPortionUSD ?? summary?.costMatrix?.equipmentVentaUSD ?? Math.max(0, grossInvestmentUSD - laborPortionUSD));
   const itbisSavedUSD = Number(summary?.itbisSavedUSD || 0);
-  const ley5707CreditUSD = Number(summary?.ley5707CreditUSD || (equipmentPortionUSD * 0.40));
+  // Stored amounts are authoritative, including zero after discounts or disabled incentives.
+  // Older publications without this metric use the project preference for the fallback.
+  const ley5707CreditUSD = Number(summary?.ley5707CreditUSD ?? (financials.applyLey5707 === false ? 0 : equipmentPortionUSD * 0.40));
   
   const applyITBISExemption = financials.applyITBISExemption ?? true;
   const customItemsNonExoneratedITBISUSD = Number(summary?.customItemsNonExoneratedITBISUSD ?? (
@@ -214,11 +212,18 @@ export function renderProposalPage(stored: StoredProposal): string {
   const co2AvoidedTonsPerYear = Number(summary?.co2AvoidedTonsPerYear || 0);
   const treesPlanted = Math.round(co2AvoidedTonsPerYear * 16);
 
+  const projectionEnabled = stored.calculationSnapshot?.mode === 'self_consumption';
+  const showSelfConsumption = projectionEnabled && custom.showSelfConsumptionInProposal !== false && (custom.showSelfConsumptionInProposal === true || specs.showSelfConsumptionBreakdown !== false);
+
   // Monthly Breakdown
   const monthlyData = summary?.monthlyBreakdown || [];
-  const monthLabels = JSON.stringify(monthlyData.map((m: any) => m.month || ''));
-  const monthConsumption = JSON.stringify(monthlyData.map((m: any) => Math.round(m.consumptionKWh || 0)));
-  const monthProduction = JSON.stringify(monthlyData.map((m: any) => Math.round(m.productionKWh || 0)));
+  const monthLabels = scriptJson(monthlyData.map((m: any) => m.month || ''));
+  const monthConsumption = scriptJson(monthlyData.map((m: any) => Math.round(m.consumptionKWh || 0)));
+  const monthSelfConsumption = scriptJson(monthlyData.map((m: any) => Math.round(m.solarSelfConsumedKWh || 0)));
+  const annualSelfConsumption = monthlyData.reduce((sum: number, m: any) => sum + Number(m.solarSelfConsumedKWh || 0), 0);
+  const annualNetExport = monthlyData.reduce((sum: number, m: any) => sum + Number(m.netExportCreditKWh || 0), 0);
+  const annualBatteryContribution = monthlyData.reduce((sum: number, m: any) => sum + Number(m.batteryContributionKWh || 0), 0);
+  const monthProduction = scriptJson(monthlyData.map((m: any) => Math.round(m.productionKWh || 0)));
 
   const totalEffectiveSavedKWh = monthlyData.reduce(
     (sum: number, m: any) => sum + (m.effectiveSavedKWh ?? m.productionKWh),
@@ -227,7 +232,7 @@ export function renderProposalPage(stored: StoredProposal): string {
 
   // Cashflow 25 Years
   const cf25 = summary?.cashFlow25Years || [];
-  const initialOutflowUSD = summary?.contractPriceUSD ?? summary?.initialOutflowUSD ?? grossInvestmentUSD;
+  const initialOutflowUSD = Number(summary?.contractPriceUSD ?? summary?.initialOutflowUSD ?? grossInvestmentUSD);
   const cumulativeChartData = [
     { year: 0, cumulative: -initialOutflowUSD },
     ...cf25.map((c: any) => ({
@@ -235,8 +240,8 @@ export function renderProposalPage(stored: StoredProposal): string {
       cumulative: c.cumulativeCashFlowUSD,
     })),
   ];
-  const cumulativeYears = JSON.stringify(cumulativeChartData.map((c) => `Año ${c.year}`));
-  const cumulativeValues = JSON.stringify(cumulativeChartData.map((c) => Math.round(c.cumulative)));
+  const cumulativeYears = scriptJson(cumulativeChartData.map((c) => `Año ${c.year}`));
+  const cumulativeValues = scriptJson(cumulativeChartData.map((c) => Math.round(c.cumulative)));
 
   const year1Obj = cf25[0] || { savingsUSD: 0, cumulativeCashFlowUSD: -initialOutflowUSD };
   const paybackCeil = Math.ceil(Number(paybackYears)) || 3;
@@ -360,8 +365,8 @@ export function renderProposalPage(stored: StoredProposal): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Propuesta Solar ${clientName} | ${companyName}</title>
-  <meta name="description" content="Propuesta técnica y económica oficial de energía solar fotovoltaica para ${clientName} por ${companyName}.">
+  <title>Propuesta Solar ${escapeHtml(clientName)} | ${escapeHtml(companyName)}</title>
+  <meta name="description" content="Propuesta técnica y económica oficial de energía solar fotovoltaica para ${escapeHtml(clientName)} por ${escapeHtml(companyName)}.">
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -426,14 +431,14 @@ export function renderProposalPage(stored: StoredProposal): string {
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6 pb-4 sm:pb-6 border-b border-slate-100">
         <!-- Company Identity & Official Logo -->
         <div class="flex items-center">
-          <img src="${logoBase64}" alt="${companyName}" class="h-12 sm:h-20 max-h-[58px] sm:max-h-[85px] w-auto max-w-[220px] sm:max-w-[320px] object-contain drop-shadow-sm" />
+          <img src="${escapeHtml(logoBase64)}" alt="${escapeHtml(companyName)}" class="h-12 sm:h-20 max-h-[58px] sm:max-h-[85px] w-auto max-w-[220px] sm:max-w-[320px] object-contain drop-shadow-sm" />
         </div>
 
         <!-- Validity & Quick Print Action -->
         <div class="flex items-center justify-between sm:justify-end gap-2.5 sm:gap-3 w-full sm:w-auto">
           <div class="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 sm:px-3.5 sm:py-1.5 rounded-full bg-sky-50 border border-sky-200 text-sky-800 text-[11px] sm:text-xs font-bold">
             <span class="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></span>
-            <span>Válido por ${quoteValidityDays} Días</span>
+            <span>Válido por ${escapeHtml(quoteValidityDays)} Días</span>
           </div>
           <button onclick="window.print()" class="no-print p-2 rounded-xl border border-sky-200 bg-sky-50/60 hover:bg-sky-100 text-sky-700 transition-all shadow-xs shrink-0 cursor-pointer" title="Imprimir o Guardar PDF">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
@@ -447,16 +452,16 @@ export function renderProposalPage(stored: StoredProposal): string {
           <div class="text-[10.5px] sm:text-[11px] font-black uppercase text-sky-700 tracking-wider flex items-center gap-1.5">
             <span class="w-1.5 h-1.5 rounded-full bg-orange-500"></span> Datos del Cliente
           </div>
-          <div class="flex flex-wrap items-baseline gap-1"><span class="font-bold text-slate-500">Cliente:</span> <span class="font-black text-slate-950 text-xs sm:text-sm">${clientName}</span></div>
-          <div class="flex flex-wrap items-baseline gap-1"><span class="font-bold text-slate-500">Contacto:</span> <span class="font-semibold text-slate-800">${contactName}</span></div>
-          <div class="flex flex-wrap items-baseline gap-1"><span class="font-bold text-slate-500">Teléfono:</span> <span class="font-semibold text-slate-800">${clientPhone}</span></div>
-          <div class="flex flex-wrap items-baseline gap-1"><span class="font-bold text-slate-500">Ubicación:</span> <span class="font-semibold text-slate-800">${clientAddress}${client.solarSourceMode === 'gps' && client.coordinates ? ` <span class="text-[10px] font-mono text-sky-700 font-bold bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">🛰️ GPS NASA: ${client.coordinates}</span>` : ''}</span></div>
+          <div class="flex flex-wrap items-baseline gap-1"><span class="font-bold text-slate-500">Cliente:</span> <span class="font-black text-slate-950 text-xs sm:text-sm">${escapeHtml(clientName)}</span></div>
+          <div class="flex flex-wrap items-baseline gap-1"><span class="font-bold text-slate-500">Contacto:</span> <span class="font-semibold text-slate-800">${escapeHtml(contactName)}</span></div>
+          <div class="flex flex-wrap items-baseline gap-1"><span class="font-bold text-slate-500">Teléfono:</span> <span class="font-semibold text-slate-800">${escapeHtml(clientPhone)}</span></div>
+          <div class="flex flex-wrap items-baseline gap-1"><span class="font-bold text-slate-500">Ubicación:</span> <span class="font-semibold text-slate-800">${escapeHtml(clientAddress)}${client.solarSourceMode === 'gps' && client.coordinates ? ` <span class="text-[10px] font-mono text-sky-700 font-bold bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200">🛰️ GPS NASA: ${escapeHtml(client.coordinates)}</span>` : ''}</span></div>
         </div>
         <div class="bg-orange-50/30 md:bg-transparent p-3 sm:p-0 rounded-xl md:rounded-none border md:border-0 border-orange-100 space-y-1.5 md:text-right">
           <div class="text-[10.5px] sm:text-[11px] font-black uppercase text-orange-600 tracking-wider flex items-center justify-start md:justify-end gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span> Detalles de la Cotización</div>
-          <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">N° Cotización:</span> <span class="font-mono font-bold text-slate-950">${quoteNumber}</span></div>
-          <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">ID Proyecto:</span> <span class="font-mono font-bold text-slate-950">${projectId}</span></div>
-          <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">Distribuidora / Tarifa:</span> <span class="font-bold text-sky-900">${distributor} • ${tariffDisplayName}</span></div>
+          <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">N° Cotización:</span> <span class="font-mono font-bold text-slate-950">${escapeHtml(quoteNumber)}</span></div>
+          <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">ID Proyecto:</span> <span class="font-mono font-bold text-slate-950">${escapeHtml(projectId)}</span></div>
+          <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">Distribuidora / Tarifa:</span> <span class="font-bold text-sky-900">${escapeHtml(distributor)} • ${escapeHtml(tariffDisplayName)}</span></div>
           <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">Fecha de Emisión:</span> <span class="font-semibold text-slate-800">${new Date().toLocaleDateString('es-DO', { day: '2-digit', month: 'long', year: 'numeric' })}</span></div>
         </div>
       </div>
@@ -536,6 +541,7 @@ export function renderProposalPage(stored: StoredProposal): string {
         <div class="flex items-center gap-3 sm:gap-4 text-[11px] sm:text-xs font-bold self-start sm:self-auto flex-wrap">
           <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-xs bg-sky-600 shrink-0"></span> <span>Consumo</span></div>
           <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-xs bg-orange-500 shrink-0"></span> <span>Producción FV</span></div>
+          ${showSelfConsumption ? '<div class="flex items-center gap-1.5"><span class="w-3 h-1 bg-blue-600 shrink-0"></span><span>Autoconsumo en sitio</span></div>' : ''}
         </div>
       </div>
 
@@ -544,6 +550,7 @@ export function renderProposalPage(stored: StoredProposal): string {
         <canvas id="energyChart"></canvas>
       </div>
 
+      ${showSelfConsumption ? `<p class="text-xs text-slate-600" data-energy-mode="self_consumption">Autoconsumo anual en sitio: <strong>${Math.round(annualSelfConsumption).toLocaleString()} kWh</strong>${hasBattery ? `; aporte nocturno de baterías: <strong>${Math.round(annualBatteryContribution).toLocaleString()} kWh</strong>` : ''}. La inyección se presenta como crédito neto después de retención.</p>` : ''}
       <!-- Full 12-Month Table with Mobile Horizontal Scroll -->
       <div class="space-y-1.5">
         <div class="sm:hidden flex items-center justify-between text-[10px] text-slate-400 font-medium px-1">
@@ -560,7 +567,8 @@ export function renderProposalPage(stored: StoredProposal): string {
                 <th class="px-3 sm:px-4 py-2 sticky left-0 bg-slate-900 z-10">Mes</th>
                 <th class="px-3 sm:px-4 py-2 text-right">Consumo (kWh)</th>
                 <th class="px-3 sm:px-4 py-2 text-right">Producción (kWh)</th>
-                <th class="px-3 sm:px-4 py-2 text-right text-emerald-300">Ahorro Energ. (kWh)</th>
+                ${showSelfConsumption ? '<th class="px-3 sm:px-4 py-2 text-right">Autoconsumo (kWh)</th><th class="px-3 sm:px-4 py-2 text-right">Inyección neta (kWh)</th>' : ''}
+                <th class="px-3 sm:px-4 py-2 text-right text-emerald-300">${showSelfConsumption ? 'Ahorro fact. (kWh)' : 'Ahorro Energ. (kWh)'}</th>
                 <th class="px-3 sm:px-4 py-2 text-right">Cobertura</th>
               </tr>
             </thead>
@@ -570,9 +578,10 @@ export function renderProposalPage(stored: StoredProposal): string {
                 const effectiveSaved = row.effectiveSavedKWh ?? row.productionKWh;
                 return `
                 <tr class="${idx % 2 === 0 ? 'bg-sky-50/30' : 'bg-white'}">
-                  <td class="px-3 sm:px-4 py-1.5 font-bold text-slate-900 sticky left-0 ${idx % 2 === 0 ? 'bg-[#f5faff]' : 'bg-white'} z-10 border-r sm:border-r-0 border-slate-100">${row.month}</td>
+                  <td class="px-3 sm:px-4 py-1.5 font-bold text-slate-900 sticky left-0 ${idx % 2 === 0 ? 'bg-[#f5faff]' : 'bg-white'} z-10 border-r sm:border-r-0 border-slate-100">${escapeHtml(row.month)}</td>
                   <td class="px-3 sm:px-4 py-1.5 text-right font-medium font-mono">${Math.round(row.consumptionKWh).toLocaleString()}</td>
                   <td class="px-3 sm:px-4 py-1.5 text-right font-medium font-mono">${Number(row.productionKWh).toFixed(1)}</td>
+                  ${showSelfConsumption ? `<td class="px-3 sm:px-4 py-1.5 text-right font-mono text-blue-800">${Number(row.solarSelfConsumedKWh || 0).toFixed(1)}</td><td class="px-3 sm:px-4 py-1.5 text-right font-mono">${Number(row.netExportCreditKWh || 0).toFixed(1)}</td>` : ''}
                   <td class="px-3 sm:px-4 py-1.5 text-right font-bold font-mono text-emerald-800">
                     <span>${Number(effectiveSaved).toFixed(1)}</span>
                   </td>
@@ -585,6 +594,7 @@ export function renderProposalPage(stored: StoredProposal): string {
                 <td class="px-3 sm:px-4 py-2 uppercase font-black sticky left-0 bg-slate-100 z-10 border-r sm:border-r-0 border-slate-200">TOTAL ANUAL</td>
                 <td class="px-3 sm:px-4 py-2 text-right font-mono font-bold">${Math.round(annualConsumptionKWh).toLocaleString()}</td>
                 <td class="px-3 sm:px-4 py-2 text-right font-mono font-bold">${Math.round(annualProductionKWh).toLocaleString()}</td>
+                ${showSelfConsumption ? `<td class="px-3 sm:px-4 py-2 text-right font-mono text-blue-800">${Math.round(annualSelfConsumption).toLocaleString()}</td><td class="px-3 sm:px-4 py-2 text-right font-mono">${Math.round(annualNetExport).toLocaleString()}</td>` : ''}
                 <td class="px-3 sm:px-4 py-2 text-right font-mono font-black text-emerald-900">
                   <span>${Math.round(totalEffectiveSavedKWh).toLocaleString()}</span>
                 </td>
@@ -630,27 +640,27 @@ export function renderProposalPage(stored: StoredProposal): string {
           <tbody class="divide-y divide-slate-200 text-[10.5px] sm:text-[11px] font-semibold text-slate-800">
             ${rawPanels.map((p: any, idx: number) => `
             <tr class="${idx % 2 === 0 ? 'bg-white' : 'bg-sky-50/30'}">
-              <td class="px-3 sm:px-4 py-2 font-bold">${p.brandModel || 'Módulos Fotovoltaicos'}</td>
-              <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${p.count}</td>
+              <td class="px-3 sm:px-4 py-2 font-bold">${escapeHtml(p.brandModel || 'Módulos Fotovoltaicos')}</td>
+              <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${escapeHtml(p.count)}</td>
               <td class="px-2 sm:px-4 py-2 text-center text-slate-500 font-normal">UD</td>
             </tr>
             `).join('')}
             ${rawInverters.map((inv: any, idx: number) => `
             <tr class="${idx % 2 === 0 ? 'bg-sky-50/30' : 'bg-white'}">
-              <td class="px-3 sm:px-4 py-2 font-bold">${inv.brandModel || 'Inversor Solar'}</td>
-              <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${inv.count}</td>
+              <td class="px-3 sm:px-4 py-2 font-bold">${escapeHtml(inv.brandModel || 'Inversor Solar')}</td>
+              <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${escapeHtml(inv.count)}</td>
               <td class="px-2 sm:px-4 py-2 text-center text-slate-500 font-normal">UD</td>
             </tr>
             `).join('')}
             ${hasBattery ? rawBatteries.map((bat: any, idx: number) => `
             <tr class="${idx % 2 === 0 ? 'bg-white' : 'bg-sky-50/30'}">
-              <td class="px-3 sm:px-4 py-2 font-bold">${(bat.capacityKWh > 0 && !bat.brandModel?.toLowerCase().includes('kwh')) ? `${bat.brandModel} (${bat.capacityKWh} kWh)` : (bat.brandModel || 'Batería')}</td>
-              <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${bat.count}</td>
+              <td class="px-3 sm:px-4 py-2 font-bold">${escapeHtml((bat.capacityKWh > 0 && !bat.brandModel?.toLowerCase().includes('kwh')) ? `${bat.brandModel} (${bat.capacityKWh} kWh)` : (bat.brandModel || 'Batería'))}</td>
+              <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${escapeHtml(bat.count)}</td>
               <td class="px-2 sm:px-4 py-2 text-center text-slate-500 font-normal">UD</td>
             </tr>
             `).join('') : ''}
             <tr class="bg-sky-50/30">
-              <td class="px-3 sm:px-4 py-2">${installationServicesDesc}</td>
+              <td class="px-3 sm:px-4 py-2">${escapeHtml(installationServicesDesc)}</td>
               <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">1</td>
               <td class="px-2 sm:px-4 py-2 text-center text-slate-500 font-normal">UD</td>
             </tr>
@@ -659,10 +669,10 @@ export function renderProposalPage(stored: StoredProposal): string {
               return `
             <tr class="${isEven ? 'bg-white' : 'bg-sky-50/30'}">
               <td class="px-3 sm:px-4 py-2 font-medium">
-                <span class="font-bold text-slate-900">${cItem.description || `Ítem Adicional #${idx + 1}`}</span>
+                <span class="font-bold text-slate-900">${escapeHtml(cItem.description || `Ítem Adicional #${idx + 1}`)}</span>
               </td>
-              <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${cItem.quantity || 1}</td>
-              <td class="px-2 sm:px-4 py-2 text-center text-slate-500 font-normal">${cItem.unit || 'UD'}</td>
+              <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${escapeHtml(cItem.quantity || 1)}</td>
+              <td class="px-2 sm:px-4 py-2 text-center text-slate-500 font-normal">${escapeHtml(cItem.unit || 'UD')}</td>
             </tr>
             `;
             }).join('')}
@@ -756,10 +766,10 @@ export function renderProposalPage(stored: StoredProposal): string {
           <h4 class="font-black uppercase tracking-wider text-sky-950 border-b border-sky-200 pb-1 flex items-center gap-1.5">
             🛡️ Garantías Oficiales
           </h4>
-          <div>• <span class="font-bold text-slate-600">Paneles Solares:</span> <span class="font-bold text-slate-900">${panelWarranty}</span></div>
-          <div>• <span class="font-bold text-slate-600">Inversor Solar:</span> <span class="font-bold text-slate-900">${inverterWarranty}</span></div>
-          <div>• <span class="font-bold text-slate-600">Batería de Respaldo:</span> <span class="font-bold text-slate-900">${batteryWarranty}</span></div>
-          <div>• <span class="font-bold text-slate-600">Instalación y Mano de Obra:</span> <span class="font-bold text-slate-900">${workmanshipWarranty}</span></div>
+          <div>• <span class="font-bold text-slate-600">Paneles Solares:</span> <span class="font-bold text-slate-900">${escapeHtml(panelWarranty)}</span></div>
+          <div>• <span class="font-bold text-slate-600">Inversor Solar:</span> <span class="font-bold text-slate-900">${escapeHtml(inverterWarranty)}</span></div>
+          <div>• <span class="font-bold text-slate-600">Batería de Respaldo:</span> <span class="font-bold text-slate-900">${escapeHtml(batteryWarranty)}</span></div>
+          <div>• <span class="font-bold text-slate-600">Instalación y Mano de Obra:</span> <span class="font-bold text-slate-900">${escapeHtml(workmanshipWarranty)}</span></div>
         </div>
 
         <div class="bg-orange-50/60 border border-orange-200 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 space-y-1.5 text-xs">
@@ -769,14 +779,14 @@ export function renderProposalPage(stored: StoredProposal): string {
           ${serviceItems.map((item: string) => `
             <div class="flex items-start gap-1.5 text-orange-950 font-medium">
               <span class="text-orange-600 font-bold shrink-0">✓</span>
-              <span>${item}</span>
+              <span>${escapeHtml(item)}</span>
             </div>
           `).join('')}
         </div>
       </div>
 
       <div class="text-center text-[10px] text-slate-500 font-semibold italic">
-        ${validityNote}
+        ${escapeHtml(validityNote)}
       </div>
     </section>
 
@@ -840,7 +850,7 @@ export function renderProposalPage(stored: StoredProposal): string {
               </tr>
               <tr class="bg-orange-50 text-orange-950 font-bold border-y border-orange-200">
                 <td class="px-2.5 sm:px-4 py-2 font-black flex items-center gap-1">
-                  <span>⭐ Año ${paybackYearObj.year} (Retorno: ${paybackYears} años)</span>
+                  <span>⭐ Año ${escapeHtml(paybackYearObj.year)} (Retorno: ${paybackYears} años)</span>
                 </td>
                 <td class="px-2.5 sm:px-4 py-2 text-right font-mono font-black whitespace-nowrap">US$ ${Number(paybackYearObj.savingsUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td class="px-2.5 sm:px-4 py-2 text-right font-mono font-black text-sky-700 whitespace-nowrap">US$ ${Number(paybackYearObj.cumulativeCashFlowUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
@@ -922,13 +932,13 @@ export function renderProposalPage(stored: StoredProposal): string {
                 const isNegative = cumulative < 0;
                 const savings = Number(row.savingsUSD || 0);
                 const taxCredit = Number(row.taxCreditUSD || 0);
-                const netCashFlow = Number(row.netCashFlowUSD || (savings + taxCredit));
+                const netCashFlow = Number(row.netCashFlowUSD ?? (savings + taxCredit));
                 const totalAnnualSavings = savings + taxCredit;
                 const prod = Number(row.productionKWh || 0);
 
                 return `
                 <tr class="${isPayback ? 'bg-orange-100 text-orange-950 font-bold border-y-2 border-orange-300' : row.year % 2 === 0 ? 'bg-sky-50/30' : 'bg-white'}">
-                  <td class="px-2.5 sm:px-3 py-1 text-center font-bold font-mono sticky left-0 ${isPayback ? 'bg-orange-100' : row.year % 2 === 0 ? 'bg-[#f5faff]' : 'bg-white'} z-10 border-r sm:border-r-0 border-slate-100">${row.year} ${isPayback ? '⭐' : ''}</td>
+                  <td class="px-2.5 sm:px-3 py-1 text-center font-bold font-mono sticky left-0 ${isPayback ? 'bg-orange-100' : row.year % 2 === 0 ? 'bg-[#f5faff]' : 'bg-white'} z-10 border-r sm:border-r-0 border-slate-100">${escapeHtml(row.year)} ${isPayback ? '⭐' : ''}</td>
                   <td class="px-2.5 sm:px-3 py-1 text-right font-mono font-medium">${Math.round(prod).toLocaleString()}</td>
                   <td class="px-2.5 sm:px-3 py-1 text-right font-mono font-medium">US$ ${savings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td class="px-2.5 sm:px-3 py-1 text-right font-mono ${taxCredit > 0 ? 'text-sky-700 font-bold' : 'text-slate-400'}">${taxCredit > 0 ? 'US$ ' + taxCredit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '$0.00'}</td>
@@ -947,9 +957,9 @@ export function renderProposalPage(stored: StoredProposal): string {
 
     <!-- FOOTER OFFICIAL INFORMATION -->
     <footer class="text-center text-xs text-slate-500 space-y-1.5 pt-4 pb-6 sm:pb-8 border-t border-sky-200">
-      <p class="font-bold text-slate-700">${companyName} — ${companySlogan}</p>
-      <p>${custom.companyFooterText || `${province}, República Dominicana | ${companyWebsite}`}</p>
-      ${companyRnc ? `<p>RNC: ${companyRnc}</p>` : ''}
+      <p class="font-bold text-slate-700">${escapeHtml(companyName)} — ${escapeHtml(companySlogan)}</p>
+      <p>${escapeHtml(custom.companyFooterText || `${province}, República Dominicana | ${companyWebsite}`)}</p>
+      ${companyRnc ? `<p>RNC: ${escapeHtml(companyRnc)}</p>` : ''}
       <p class="text-[11px] text-slate-400 pt-1.5 font-mono">
         Esta propuesta digital expira el: <span class="font-bold text-slate-600">${new Date(expiresAt).toLocaleDateString('es-DO', { day: '2-digit', month: 'long', year: 'numeric' })}</span>
       </p>
@@ -984,7 +994,7 @@ export function renderProposalPage(stored: StoredProposal): string {
                 backgroundColor: '#ff7a00', // Solar Orange
                 borderRadius: isMobile ? 3 : 4,
                 order: 2,
-              }
+              }${showSelfConsumption ? `, { type: 'line', label: 'Autoconsumo en sitio (kWh)', data: ${monthSelfConsumption}, borderColor: '#2563eb', backgroundColor: '#2563eb', tension: 0.2, pointRadius: 2, order: 0 }` : ''}
             ]
           },
           options: {

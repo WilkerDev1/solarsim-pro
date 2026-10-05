@@ -1,3 +1,4 @@
+import { useSelfConsumptionProjection } from '../../../features/application/useApplicationFeatures';
 import React, { useState, useMemo } from 'react';
 import {
   Check,
@@ -96,6 +97,7 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
   updateDocumentCustomization,
   updateSpecs,
 }) => {
+  const projectionEnabled = useSelfConsumptionProjection();
   const [newExtraTitle, setNewExtraTitle] = useState('');
   const [newExtraSubtitle, setNewExtraSubtitle] = useState('');
   const [newExtraPageCount, setNewExtraPageCount] = useState<number>(1);
@@ -497,7 +499,7 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
                 </div>
 
                 {/* Sub-toggle de Autoconsumo para la sección de Energía */}
-                {sectionId === 'energy' && config.visible && (
+                {projectionEnabled && sectionId === 'energy' && config.visible && (
                   <div
                     className={`mt-2 pt-1.5 border-t flex items-center justify-between w-full ${
                       isDark ? 'border-zinc-800/80 text-zinc-400' : 'border-slate-200 text-slate-500'

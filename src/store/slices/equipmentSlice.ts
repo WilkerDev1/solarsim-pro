@@ -1,9 +1,72 @@
+import { featureScope } from '../../../shared/applicationFeatures';
 import { SimulationSlice, EquipmentSlice } from '../types';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../../data/defaultEquipmentCatalog';
 import { SolarEquipmentItem } from '../../types/equipment';
 import { SyncService } from '../../services/syncService';
 
-export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (set, get) => ({
+export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (baseSet, get) => {
+  let inFlight: { generation: number; promise: Promise<{ success: boolean; message: string }> } | null = null;
+  const set: typeof baseSet = (update, replace) => baseSet((state) => {
+    const patch = typeof update === 'function' ? update(state) : update;
+    if (!patch.equipmentCatalog || patch.equipmentCatalog === state.equipmentCatalog) return patch;
+    const user = state.syncSettings.currentUser;
+    if (user && user.role !== 'ADMIN' && user.role !== 'EDITOR') return { equipmentSyncFeedback: 'Tu cuenta solo puede consultar el catálogo.' };
+    const scope = user ? featureScope(state.syncSettings.serverUrl, user.organizationId) : 'local';
+    const prior = new Map(state.equipmentCatalog.map((item) => [item.id, item]));
+    const changes = { ...state.equipmentChanges };
+    const deleted = [...state.equipmentDeletionQueue];
+    let next = patch.equipmentCatalog.map((item) => {
+      const old = prior.get(item.id);
+      if (old && JSON.stringify(old) === JSON.stringify(item)) return item;
+      if (user && old && ((old.organizationId && old.organizationId !== user.organizationId) || (old.syncServerUrl && old.syncServerUrl.trim().replace(/\/+$/, '') !== state.syncSettings.serverUrl.trim().replace(/\/+$/, '')))) return old;
+      const baseVersion = changes[item.id]?.baseVersion ?? old?.baseVersion ?? old?.version ?? 0;
+      changes[item.id] = { scope, baseVersion, revision: crypto.randomUUID() };
+      return { ...item, organizationId: user?.organizationId, syncServerUrl: user ? state.syncSettings.serverUrl : undefined, baseVersion };
+    });
+    // A tenant cannot remove another tenant's cached document or route its deletion to the active server.
+    const protectedItems = state.equipmentCatalog.filter((item) => !!user && (
+      (!!item.organizationId && item.organizationId !== user.organizationId && item.organizationId !== 'org-electsun-default') ||
+      (!!item.syncServerUrl && item.syncServerUrl.trim().replace(/\/+$/, '') !== state.syncSettings.serverUrl.trim().replace(/\/+$/, ''))));
+    for (const item of protectedItems) if (!next.some((entry) => entry.id === item.id)) next = [...next, item];
+    const remaining = new Set(next.map((item) => item.id));
+    for (const item of state.equipmentCatalog) if (!remaining.has(item.id)) {
+      if (user) {
+        deleted.push({ scope, id: item.id, baseVersion: item.baseVersion ?? item.version ?? 0, item: structuredClone(item) });
+      }
+      delete changes[item.id];
+    }
+    return { ...patch, deletedEquipmentIds: patch.deletedEquipmentIds?.filter((id) => !protectedItems.some((item) => item.id === id)) ?? state.deletedEquipmentIds, equipmentCatalog: next, equipmentChanges: changes, equipmentDeletionQueue: deleted };
+  }, replace);
+  return {
+  equipmentChanges: {}, equipmentDeletionQueue: [], equipmentSyncFeedback: null, equipmentConflicts: {},
+  resolveEquipmentConflict: (id, resolution) => {
+    const state = get();
+    const conflict = state.equipmentConflicts[id];
+    const local = state.equipmentCatalog.find((item) => item.id === id);
+    if (!conflict || !local) return;
+    const user = state.syncSettings.currentUser;
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'EDITOR')) return;
+    const scope = featureScope(state.syncSettings.serverUrl, user.organizationId);
+    const conflicts = { ...state.equipmentConflicts };
+    delete conflicts[id];
+    const changes = { ...state.equipmentChanges };
+    let catalog = state.equipmentCatalog;
+    if (resolution === 'accept_server' && conflict.serverItem) {
+      catalog = catalog.map((item) => item.id === id ? { ...conflict.serverItem!, baseVersion: conflict.serverVersion, syncServerUrl: state.syncSettings.serverUrl } : item);
+      delete changes[id];
+    } else if (resolution === 'keep_local' && conflict.serverItem?.organizationId === user.organizationId && conflict.serverVersion) {
+      changes[id] = { scope, baseVersion: conflict.serverVersion, revision: crypto.randomUUID() };
+      catalog = catalog.map((item) => item.id === id ? { ...item, baseVersion: conflict.serverVersion, version: conflict.serverVersion } : item);
+    } else if (resolution === 'fork') {
+      const forkId = `eq-${crypto.randomUUID()}`;
+      const fork = { ...local, id: forkId, organizationId: user.organizationId, baseVersion: 0, version: 1, displayName: `${local.displayName} (copia local)` };
+      changes[forkId] = { scope, baseVersion: 0, revision: crypto.randomUUID() };
+      delete changes[id];
+      catalog = [...catalog.filter((item) => item.id !== id), ...(conflict.serverItem ? [conflict.serverItem] : []), fork];
+    } else return;
+    baseSet({ equipmentCatalog: catalog, equipmentChanges: changes, equipmentConflicts: conflicts });
+    if (state.syncSettings.autoSyncEnabled) void get().syncEquipmentWithServer();
+  },
   equipmentCatalog: DEFAULT_EQUIPMENT_CATALOG,
   deletedEquipmentIds: [],
 
@@ -77,16 +140,7 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (set, get) 
 
     setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
 
-    const { serverUrl, authToken, autoSyncEnabled } = get().syncSettings;
-    if (authToken) {
-      SyncService.deleteEquipment(serverUrl, authToken, id).catch((err) => {
-        console.warn('Error al sincronizar eliminación de equipo en servidor:', err);
-      });
-    }
-
-    if (autoSyncEnabled && authToken) {
-      get().syncEquipmentWithServer();
-    }
+    if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) void get().syncEquipmentWithServer();
   },
 
   resetEquipmentCatalogToDefaults: () => {
@@ -104,61 +158,133 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (set, get) 
   },
 
   syncEquipmentWithServer: async () => {
-    const { serverUrl, authToken } = get().syncSettings;
-    if (!authToken) {
-      return { success: false, message: 'No autenticado. Inicia sesión en "Cuenta & Permisos".' };
-    }
-
-    try {
-      // 1. Push lote local de equipos hacia el servidor
-      const pushRes = await SyncService.pushEquipmentBatch(serverUrl, authToken, get().equipmentCatalog);
-      if (!pushRes.success) {
-        return { success: false, message: pushRes.error || 'Error al subir catálogo al servidor' };
-      }
-
-      // 2. Pull de equipos desde el servidor para incorporar nuevos modelos y precios actualizados
-      const pullRes = await SyncService.pullEquipment(serverUrl, authToken);
-      if (pullRes.success && pullRes.items && pullRes.items.length > 0) {
-        const deletedIds = new Set(get().deletedEquipmentIds || []);
-        const localMap = new Map(get().equipmentCatalog.map((item) => [item.id, item]));
-        let hasUpdated = false;
-
-        for (const serverItem of pullRes.items) {
-          if (deletedIds.has(serverItem.id)) continue;
-          const localItem = localMap.get(serverItem.id);
-          if (!localItem) {
-            localMap.set(serverItem.id, serverItem);
-            hasUpdated = true;
-          } else {
-            const serverUpdated = new Date(serverItem.updatedAt || 0).getTime();
-            const localUpdated = new Date(localItem.updatedAt || 0).getTime();
-            const serverPrices = serverItem.supplierPrices || [];
-            const localPrices = localItem.supplierPrices || [];
-
-            // Si el servidor tiene fecha más reciente o tiene ofertas que localmente faltan
-            if (serverUpdated > localUpdated || (serverPrices.length > 0 && localPrices.length === 0)) {
-              localMap.set(serverItem.id, {
-                ...localItem,
-                ...serverItem,
-                supplierPrices: serverPrices.length >= localPrices.length ? serverPrices : localPrices,
-              });
-              hasUpdated = true;
+    const generation = get().sessionGeneration;
+    if (inFlight?.generation === generation) return inFlight.promise;
+    const session = get().syncSettings;
+    const { serverUrl, authToken, currentUser } = session;
+    if (!authToken || !currentUser) return { success: false, message: 'Inicia sesión para sincronizar el catálogo.' };
+    const scope = featureScope(serverUrl, currentUser.organizationId);
+    const canWrite = currentUser.role === 'ADMIN' || currentUser.role === 'EDITOR';
+    const ensureSession = () => {
+      const fresh = get().syncSettings;
+      if (generation !== get().sessionGeneration || !fresh.authToken || fresh.currentUser?.id !== currentUser.id || fresh.currentUser.organizationId !== currentUser.organizationId || fresh.serverUrl !== serverUrl) throw new Error('La sesión cambió durante la sincronización del catálogo.');
+    };
+    const run = async () => {
+      let deletionErrors = 0;
+      let conflictCount = 0;
+      const releaseDeletion = (id: string) => baseSet((state) => ({ equipmentDeletionQueue: state.equipmentDeletionQueue.filter((item) => item.scope !== scope || item.id !== id) }));
+      const recoverDeletion = (deletion: EquipmentSlice['equipmentDeletionQueue'][number], serverItem?: SolarEquipmentItem) => {
+        conflictCount++;
+        baseSet((state) => ({
+          equipmentDeletionQueue: state.equipmentDeletionQueue.filter((item) => item.scope !== scope || item.id !== deletion.id),
+          deletedEquipmentIds: (state.deletedEquipmentIds || []).filter((id) => id !== deletion.id),
+          equipmentCatalog: deletion.item ? [...state.equipmentCatalog.filter((item) => item.id !== deletion.id), deletion.item] : state.equipmentCatalog,
+          equipmentChanges: deletion.item ? { ...state.equipmentChanges, [deletion.id]: { scope, baseVersion: deletion.baseVersion, revision: crypto.randomUUID() } } : state.equipmentChanges,
+          equipmentConflicts: { ...state.equipmentConflicts, [deletion.id]: { reason: 'deletion_version_conflict', serverItem, serverVersion: serverItem?.version } },
+        }));
+      };
+      try {
+        const pulled = await SyncService.pullEquipment(serverUrl, get().syncSettings.authToken!);
+        ensureSession();
+        if (!pulled.success || !pulled.items) throw new Error(pulled.error || 'No se pudo descargar el catálogo.');
+        baseSet((state) => {
+          const queued = new Set(state.equipmentDeletionQueue.filter((item) => item.scope === scope).map((item) => item.id));
+          const deleted = new Set([...(state.deletedEquipmentIds || []), ...(pulled.deletedIds || []), ...queued]);
+          const conflicts = { ...state.equipmentConflicts };
+          const local = new Map(state.equipmentCatalog.filter((item) => {
+            if (!deleted.has(item.id)) return true;
+            // A remote deletion wins, but unsent work remains recoverable as a new fork.
+            if (!queued.has(item.id) && state.equipmentChanges[item.id]?.scope === scope && item.organizationId === currentUser.organizationId) {
+              if (!conflicts[item.id]) conflictCount++;
+              conflicts[item.id] = { reason: 'deleted' };
+              return true;
+            }
+            return false;
+          }).map((item) => [item.id, item]));
+          for (const item of pulled.items!) if (!deleted.has(item.id) && !state.equipmentChanges[item.id]) local.set(item.id, { ...item, syncServerUrl: serverUrl, baseVersion: item.version ?? 1 });
+          const recoverable = new Set([...local.values()].filter((item) => conflicts[item.id]?.reason === 'deleted' && state.equipmentChanges[item.id]?.scope === scope).map((item) => item.id));
+          return { equipmentCatalog: Array.from(local.values()), equipmentConflicts: conflicts, deletedEquipmentIds: [...deleted].filter((id) => !recoverable.has(id)) };
+        });
+        if (canWrite) for (const captured of get().equipmentDeletionQueue.filter((item) => item.scope === scope)) {
+          let deletion = captured;
+          if (pulled.deletedIds?.includes(deletion.id)) { releaseDeletion(deletion.id); continue; }
+          const serverItem = pulled.items.find((item) => item.id === deletion.id);
+          if (!deletion.item && serverItem) {
+            deletion = { ...deletion, item: structuredClone(serverItem) };
+            baseSet((state) => ({ equipmentDeletionQueue: state.equipmentDeletionQueue.map((item) => item === captured ? deletion : item) }));
+          }
+          if (serverItem?.organizationId === currentUser.organizationId && serverItem.version !== deletion.baseVersion) { recoverDeletion(deletion, serverItem); continue; }
+          // DELETE creates a tenant-scoped tombstone even for an ID never uploaded.
+          const success = await SyncService.deleteEquipment(serverUrl, get().syncSettings.authToken!, deletion.id, deletion.baseVersion);
+          ensureSession();
+          if (success) { releaseDeletion(deletion.id); continue; }
+          const latest = await SyncService.pullEquipment(serverUrl, get().syncSettings.authToken!);
+          ensureSession();
+          if (latest.success && latest.deletedIds?.includes(deletion.id)) { releaseDeletion(deletion.id); continue; }
+          const changed = latest.items?.find((item) => item.id === deletion.id);
+          if (changed?.organizationId === currentUser.organizationId && changed.version !== deletion.baseVersion) recoverDeletion(deletion, changed);
+          else deletionErrors++;
+        }
+        const capturedChanges = get().equipmentChanges;
+        const sent = canWrite ? get().equipmentCatalog.filter((item) => capturedChanges[item.id]?.scope === scope && item.organizationId === currentUser.organizationId && !get().equipmentConflicts[item.id]) : [];
+        if (sent.length) {
+          const pushed = await SyncService.pushEquipmentBatch(serverUrl, get().syncSettings.authToken!, sent);
+          ensureSession();
+          if (!pushed.success || !pushed.results) throw new Error(pushed.error || 'El servidor no confirmó los cambios del catálogo.');
+          // A create/update response must acknowledge deletion intent even when its row disappeared.
+          const recoveredDeletionIds = new Set<string>();
+          for (const result of pushed.results) if (result.status === 'conflict') {
+            const deletion = get().equipmentDeletionQueue.find((item) => item.scope === scope && item.id === result.id);
+            if (deletion) {
+              if (result.reason === 'deleted') releaseDeletion(deletion.id);
+              else { recoverDeletion(deletion, result.serverItem); recoveredDeletionIds.add(result.id); }
             }
           }
+          baseSet((state) => {
+            const results = new Map(pushed.results!.map((result) => [result.id, result]));
+            const changes = { ...state.equipmentChanges };
+            const conflicts = { ...state.equipmentConflicts };
+            const equipmentCatalog = state.equipmentCatalog.map((item) => {
+              const result = results.get(item.id);
+              if (!result) return item;
+              if (recoveredDeletionIds.has(item.id)) return item;
+              if (result.status === 'conflict') { conflictCount++; conflicts[item.id] = { serverItem: result.serverItem, serverVersion: result.serverVersion, reason: result.reason }; return item; }
+              if (changes[item.id]?.revision !== capturedChanges[item.id]?.revision) {
+                if (changes[item.id]) changes[item.id] = { ...changes[item.id], baseVersion: result.version };
+                return { ...item, baseVersion: result.version, version: result.version };
+              }
+              delete changes[item.id];
+              delete conflicts[item.id];
+              return { ...result.item, syncServerUrl: serverUrl, baseVersion: result.version };
+            });
+            const equipmentDeletionQueue = state.equipmentDeletionQueue.map((deletion) => {
+              const result = results.get(deletion.id);
+              if (deletion.scope !== scope || !result || result.status === 'conflict') return deletion;
+              return { ...deletion, baseVersion: result.version, item: deletion.item ? { ...deletion.item, version: result.version, baseVersion: result.version } : undefined };
+            });
+            return { equipmentCatalog, equipmentChanges: changes, equipmentConflicts: conflicts, equipmentDeletionQueue };
+          });
+          if (pushed.results.length !== sent.length) throw new Error('Hay cambios del catálogo sin confirmar.');
         }
-
-        if (hasUpdated) {
-          set({ equipmentCatalog: Array.from(localMap.values()) });
-        }
+        const message = deletionErrors ? `${deletionErrors} eliminación(es) pendientes; otros equipos procesados.` : conflictCount ? `${conflictCount} equipo(s) tienen cambios remotos. Los cambios locales se conservaron; revisa las ofertas antes de reemplazarlas.` : 'Catálogo sincronizado.';
+        baseSet({ equipmentSyncFeedback: message });
+        return { success: !deletionErrors && !conflictCount, message };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'No se pudo sincronizar el catálogo.';
+        if (generation === get().sessionGeneration) baseSet({ equipmentSyncFeedback: message });
+        return { success: false, message };
       }
-
-      return {
-        success: true,
-        message: `¡${get().equipmentCatalog.length} equipos sincronizados exitosamente con la nube!`,
-      };
-    } catch (e: any) {
-      return { success: false, message: e.message || 'Error de conexión con el servidor' };
-    }
+    };
+    const promise = run();
+    inFlight = { generation, promise };
+    try {
+      const result = await promise;
+      if (result.success && generation === get().sessionGeneration && get().syncSettings.autoSyncEnabled && canWrite &&
+        (get().equipmentDeletionQueue.some((item) => item.scope === scope) || get().equipmentCatalog.some((item) => get().equipmentChanges[item.id]?.scope === scope && !get().equipmentConflicts[item.id]))) {
+        setTimeout(() => { if (generation === get().sessionGeneration && get().syncSettings.autoSyncEnabled) void get().syncEquipmentWithServer(); }, 0);
+      }
+      return result;
+    } finally { if (inFlight?.promise === promise) inFlight = null; }
   },
 
   addOrUpdateSupplierPrice: (equipmentId, supplierPrice) => {
@@ -396,4 +522,5 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (set, get) 
       get().syncEquipmentWithServer();
     }
   },
-});
+};
+};

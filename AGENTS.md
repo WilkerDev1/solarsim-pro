@@ -1,3 +1,11 @@
+# Contratos vigentes de esta rama
+
+Consultar primero [docs/README.md](docs/README.md), [arquitectura](docs/ARCHITECTURE.md) y [funciones](docs/APPLICATION_FEATURES.md). El manual histórico abajo aporta contexto de producto, pero no sustituye esos contratos actualizados. Legacy es default; proyección física es opcional. API requiere CAS/baseVersion y consulta permisos actuales en BD. Ninguna prueba debe escribir en producción. Registro público no une a Electsun automáticamente. La composición de API usa contexto raíz del repositorio, no solo server/.
+
+Gates obligatorios: `npm run lint`, `npm test`, `npm run build`, `npm run build:electron`, `npm --prefix server test`, `npm --prefix server run build`, `npm --prefix workers/share-viewer test`, `npm --prefix workers/share-viewer run build`; si cambia estructura, `npm run context:pack`. No afirmar ausencia de vulnerabilidades sin npm audit actual. Manual financiero y reglas de PDF siguen vigentes. Conservar API pública del store, slices y aislamiento IPC.
+
+---
+
 # ☀️ SolarSim Pro — Manual Maestro de Contexto, Arquitectura y Mantenimiento
 
 Este documento sirve como **fuente única de verdad** para desarrolladores y asistentes IA (Antigravity / Gemini) en nuevas sesiones de trabajo. Contiene la explicación exhaustiva de qué es el proyecto, la ubicación de cada componente, las herramientas utilizadas para desarrollo y despliegue, la infraestructura de servidores y las reglas críticas aprendidas.
@@ -125,7 +133,7 @@ solarsim/
 │   │   ├── testEquipmentCatalog.ts          # Suite de validación de catálogo de equipos, CRUD y tombstoning
 │   │   ├── testFolderHidingAndSync.ts       # Suite de validación de ocultamiento en carpetas y sincronización
 │   │   ├── testTrashAndReadOnly.ts          # Suite de validación de papelera de reciclaje, retención 30 días y solo lectura
-│   │   ├── testMultiUserSync.ts             # Prueba de sincronización multi-usuario y resolución de colisiones
+│   │   ├── testSyncReconciliation.ts             # Prueba de sincronización multi-usuario y resolución de colisiones
 │   │   └── testNewProjectModal.ts           # Prueba unitaria de creación de proyectos
 │   ├── assets/
 │   │   └── pdfGraphicAssets.ts              # Gráficos, renders 3D y diagramas en Base64 para PDF
@@ -248,7 +256,7 @@ npx tsx src/tests/testPDFSectionReordering.ts
 # Suite de validación de balance de energía, autoconsumo diurno y transparencia BESS
 npx tsx src/tests/testEnergyBalanceTransparency.ts
 
-# Ejecutar todas las pruebas en conjunto (12 suites integradas)
+# Ejecutar todas las pruebas en conjunto (descubrimiento automático de suites)
 npm test
 
 # Compilar frontend y electron para producción
@@ -286,7 +294,7 @@ ssh app-server "cd /home/agente/servicios/solarsim-api && docker compose up -d -
 ### 🔄 Ciclo Obligatorio de Verificación (Verification Loop):
 **NO dar ninguna tarea por completada sin ejecutar previamente:**
 1. **Verificación de Tipos**: `npm run lint` (`npx tsc --noEmit` — Cero errores de tipo).
-2. **Validación de Motores Matemáticos, Catálogo, Carpetas, IA, Papelera y Balance**: `npm test` (ejecuta las 12 suites: benchmarks, finanzas integrales, smart proposal IA, catálogo, carpetas ocultas, papelera de reciclaje, tarifas SIE/CEPM, cascada 503 Familia 3, historial Cloudflare, multi-equipos, reordenación PDF y transparencia de energía).
+2. **Validación de Motores Matemáticos, Catálogo, Carpetas, IA, Papelera y Balance**: `npm test` (descubre suites por dominio: motores, IA, catálogo, carpetas, papelera, tarifas, publicaciones, multi-equipos, PDF, funciones, persistencia, sincronización, colas de eliminación y updater).
 3. **Build de Producción**: `npm run build` (confirmar bundling sin fallos).
 4. **Snapshot de Contexto**: Si se introducen nuevos módulos, refactorizaciones grandes o cambios estructurales, regenerar el contexto empaquetado con `npm run context:pack`.
 

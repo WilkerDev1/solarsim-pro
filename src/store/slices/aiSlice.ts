@@ -1,3 +1,4 @@
+import { projectMutationMetadata } from '../sync/projectMutation';
 import { SimulationSlice, AISlice } from '../types';
 import { ProjectSimulation } from '../../types';
 import { BENCHMARK_PROJECT } from '../../engine/referenceCase';
@@ -75,6 +76,9 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
           lastModifiedBy: currentUser?.name || 'Ing. Solar',
           lastModifiedAt: new Date().toISOString(),
           version: 1,
+          baseVersion: 0,
+          organizationId: currentUser?.organizationId,
+          syncServerUrl: currentUser ? get().syncSettings.serverUrl.trim().replace(/\/+$/, '') : undefined,
           syncStatus: currentUser ? 'pending' : 'local_only',
           client: {
             ...BENCHMARK_PROJECT.client,
@@ -198,7 +202,7 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
           const count = data.recommendedPanelCount || rec.recommendedPanelCount;
           return {
             ...p,
-            syncStatus: 'pending' as const,
+            ...projectMutationMetadata(p, get().syncSettings),
             updatedAt: new Date().toISOString(),
             lastModifiedBy: get().syncSettings?.currentUser?.name || p.lastModifiedBy || 'Ing. Solar',
             lastModifiedAt: new Date().toISOString(),

@@ -1,6 +1,10 @@
 export type EquipmentType = 'panel' | 'inverter' | 'battery';
 
 export interface SolarEquipmentItem {
+  organizationId?: string;
+  syncServerUrl?: string;
+  version?: number;
+  baseVersion?: number;
   id: string;
   type: EquipmentType;
   brand: string;

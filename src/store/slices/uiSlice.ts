@@ -16,6 +16,8 @@ export const createUISlice: SimulationSlice<UISlice> = (set) => ({
 
   sidebarTheme: 'dark',
   sidebarWidth: 380,
+  dashboardViewMode: 'cards',
+  setDashboardViewMode: (mode) => set({ dashboardViewMode: mode }),
 
   openNewProjectModal: () => set({ isNewProjectModalOpen: true }),
   closeNewProjectModal: () => set({ isNewProjectModalOpen: false }),

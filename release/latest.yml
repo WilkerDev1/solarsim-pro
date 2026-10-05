@@ -1,8 +1,8 @@
-version: 2.1.5
+version: 2.3.0-beta.1
 files:
-  - url: SolarSim-Pro-Setup-2.1.5.exe
-    sha512: 4aDckQb9B/R+3iGUqxSLwsspkRMCrhOwZ5gLnhgOFGIWdYdlbRoiQQZ7CArow/VqkIZAvou9clRz27o/PKLhRQ==
-    size: 99417526
-path: SolarSim-Pro-Setup-2.1.5.exe
-sha512: 4aDckQb9B/R+3iGUqxSLwsspkRMCrhOwZ5gLnhgOFGIWdYdlbRoiQQZ7CArow/VqkIZAvou9clRz27o/PKLhRQ==
-releaseDate: '2026-10-02T14:56:15.440Z'
+  - url: SolarSim-Pro-Setup-2.3.0-beta.1.exe
+    sha512: fRIZUfEJPi2GsZz6oAN1mlQ+SyyxxqaGqcKNNR/Ni5bEBEmp8X+qc5qWReacJo71Ndyg3kjO5lQRRDJ5KGUsaw==
+    size: 143564848
+path: SolarSim-Pro-Setup-2.3.0-beta.1.exe
+sha512: fRIZUfEJPi2GsZz6oAN1mlQ+SyyxxqaGqcKNNR/Ni5bEBEmp8X+qc5qWReacJo71Ndyg3kjO5lQRRDJ5KGUsaw==
+releaseDate: '2026-10-05T10:51:02.274Z'

@@ -1,3 +1,4 @@
+import { useSelfConsumptionProjection } from '../../../features/application/useApplicationFeatures';
 import React from 'react';
 import { Leaf } from 'lucide-react';
 import {
@@ -42,9 +43,10 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
   updateDocumentCustomization,
   updateSpecs,
 }) => {
-  const showSelfConsumption = project.customization?.showSelfConsumptionInProposal !== undefined
+  const projectionEnabled = useSelfConsumptionProjection();
+  const showSelfConsumption = projectionEnabled && (project.customization?.showSelfConsumptionInProposal !== undefined
     ? project.customization.showSelfConsumptionInProposal
-    : (project.specs?.showSelfConsumptionBreakdown !== false);
+    : (project.specs?.showSelfConsumptionBreakdown !== false));
   const treesPlanted = Math.round(summary.co2AvoidedTonsPerYear * 16);
   const totalConsumptionKWh = summary.monthlyBreakdown.reduce((sum, m) => sum + m.consumptionKWh, 0);
   const totalProductionKWh = summary.monthlyBreakdown.reduce((sum, m) => sum + m.productionKWh, 0);
@@ -87,7 +89,7 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
                 Evolución Mensual de Energía
               </h2>
               {/* Interactive toggle on preview (hidden in print/export) */}
-              <button
+              {projectionEnabled && <button
                 type="button"
                 onClick={() => {
                   const nextVal = !showSelfConsumption;
@@ -106,7 +108,7 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
                 title="Alternar entre desglose con autoconsumo e inyección o formato clásico (solo consumo y producción)"
               >
                 {showSelfConsumption ? '⚡ Autoconsumo: Visible' : '🏛️ Modo Clásico'}
-              </button>
+              </button>}
             </div>
             <div className="flex items-center gap-3.5 text-[11px] font-semibold">
               <div className="flex items-center gap-1.5">

@@ -69,7 +69,7 @@ export const PrimaryIconDock: React.FC = () => {
 
   return (
     <aside
-      className="w-16 h-full bg-[#1b222d] border-r border-[#2a3444] flex flex-col items-center justify-between py-5 shrink-0 z-40 select-none shadow-lg relative"
+      className="w-16 h-full bg-slate-900 border-r border-slate-800 flex flex-col items-center justify-between py-4 shrink-0 z-40 select-none relative"
       aria-label="Barra de Navegación Principal"
     >
       {/* Zona Superior: Theme Toggle & Navegación */}
@@ -77,7 +77,7 @@ export const PrimaryIconDock: React.FC = () => {
         {/* Toggle de Tema (Sol/Luna) */}
         <button
           onClick={toggleSidebarTheme}
-          className="w-10 h-10 rounded-xl bg-[#2e3748] hover:bg-[#384358] text-amber-400 border border-[#3e4b62] flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95 group"
+          className="w-10 h-10 rounded-lg bg-[#2e3748] hover:bg-[#384358] text-amber-400 border border-[#3e4b62] flex items-center justify-center transition-all cursor-pointer group"
           title={`Cambiar a ${isDark ? 'Modo Claro' : 'Modo Oscuro'}`}
         >
           {isDark ? (
@@ -102,11 +102,12 @@ export const PrimaryIconDock: React.FC = () => {
               setActiveTeamMemberFilter(null);
               setIsAIMenuOpen(false);
             }}
-            className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
+            className={`w-11 h-11 rounded-lg flex items-center justify-center transition-all cursor-pointer relative ${
               !isSettingsModalOpen && activeView === 'dashboard' && !isTrashActive
-                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-xs font-bold'
+                ? 'bg-emerald-900/60 text-emerald-300'
                 : 'text-slate-400 hover:text-white hover:bg-[#283243]'
             }`}
+            aria-current={!isSettingsModalOpen && activeView === 'dashboard' && !isTrashActive ? 'page' : undefined}
             title="Catálogo de Proyectos (Home)"
           >
             <FileText className="w-5 h-5" />
@@ -123,9 +124,9 @@ export const PrimaryIconDock: React.FC = () => {
               setIsTrashActive(false);
               setIsAIMenuOpen(false);
             }}
-            className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer relative ${
+            className={`w-11 h-11 rounded-lg flex items-center justify-center transition-all cursor-pointer relative ${
               !isSettingsModalOpen && activeView === 'companies-hub'
-                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-xs font-bold'
+                ? 'bg-emerald-900/60 text-emerald-300'
                 : 'text-slate-400 hover:text-white hover:bg-[#283243]'
             }`}
             title="Centro de Empresas & Perfiles (Logos, Membretes y Firmas)"
@@ -139,15 +140,16 @@ export const PrimaryIconDock: React.FC = () => {
           {/* 3. Botón Unificado de IA Gemini con Menú Selector */}
           <div className="relative">
             <button
+              aria-expanded={isAIMenuOpen}
               onClick={() => setIsAIMenuOpen(!isAIMenuOpen)}
-              className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer group relative ${
+              className={`w-11 h-11 rounded-lg flex items-center justify-center transition-all cursor-pointer group relative ${
                 isAIMenuOpen
                   ? 'bg-purple-500/25 text-purple-300 border border-purple-500/50 shadow-md shadow-purple-950/50 font-bold'
                   : 'text-slate-400 hover:text-purple-300 hover:bg-[#283243]'
               }`}
               title="Herramientas de Inteligencia Artificial (Facturas, Datasheets y Precios)"
             >
-              <Sparkles className="w-5 h-5 group-hover:scale-110 transition-transform text-purple-400" />
+              <Sparkles className="w-5 h-5 transition-colors" />
               {isAIMenuOpen && (
                 <span className="absolute -left-2 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-purple-400 rounded-r-full" />
               )}
@@ -186,9 +188,9 @@ export const PrimaryIconDock: React.FC = () => {
                     setIsAIMenuOpen(false);
                     openAIInvoiceModal();
                   }}
-                  className="w-full p-2.5 rounded-xl hover:bg-[#202734] transition-all flex items-center gap-3 text-left group cursor-pointer border border-transparent hover:border-purple-500/30"
+                  className="w-full p-2.5 rounded-lg hover:bg-[#202734] transition-all flex items-center gap-3 text-left group cursor-pointer border border-transparent hover:border-purple-500/30"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-purple-500/15 group-hover:bg-purple-500/25 text-purple-400 flex items-center justify-center shrink-0 transition-colors">
+                  <div className="w-9 h-9 rounded-lg bg-purple-500/15 group-hover:bg-purple-500/25 text-purple-400 flex items-center justify-center shrink-0 transition-colors">
                     <FileText className="w-4.5 h-4.5 group-hover:scale-105 transition-transform" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -209,9 +211,9 @@ export const PrimaryIconDock: React.FC = () => {
                     setIsAIMenuOpen(false);
                     openAIDatasheetModal();
                   }}
-                  className="w-full p-2.5 rounded-xl hover:bg-[#202734] transition-all flex items-center gap-3 text-left group cursor-pointer border border-transparent hover:border-cyan-500/30"
+                  className="w-full p-2.5 rounded-lg hover:bg-[#202734] transition-all flex items-center gap-3 text-left group cursor-pointer border border-transparent hover:border-cyan-500/30"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-cyan-500/15 group-hover:bg-cyan-500/25 text-cyan-400 flex items-center justify-center shrink-0 transition-colors">
+                  <div className="w-9 h-9 rounded-lg bg-cyan-500/15 group-hover:bg-cyan-500/25 text-cyan-400 flex items-center justify-center shrink-0 transition-colors">
                     <Cpu className="w-4.5 h-4.5 group-hover:scale-105 transition-transform" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -232,9 +234,9 @@ export const PrimaryIconDock: React.FC = () => {
                     setIsAIMenuOpen(false);
                     openAIPriceCatalogModal();
                   }}
-                  className="w-full p-2.5 rounded-xl hover:bg-[#202734] transition-all flex items-center gap-3 text-left group cursor-pointer border border-transparent hover:border-emerald-500/30"
+                  className="w-full p-2.5 rounded-lg hover:bg-[#202734] transition-all flex items-center gap-3 text-left group cursor-pointer border border-transparent hover:border-emerald-500/30"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-emerald-500/15 group-hover:bg-emerald-500/25 text-emerald-400 flex items-center justify-center shrink-0 transition-colors">
+                  <div className="w-9 h-9 rounded-lg bg-emerald-500/15 group-hover:bg-emerald-500/25 text-emerald-400 flex items-center justify-center shrink-0 transition-colors">
                     <Tag className="w-4.5 h-4.5 group-hover:scale-105 transition-transform" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -275,10 +277,10 @@ export const PrimaryIconDock: React.FC = () => {
               setIsAIMenuOpen(false);
               openNewProjectModal();
             }}
-            className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-emerald-300 hover:bg-[#283243] transition-all cursor-pointer group"
+            className="w-11 h-11 rounded-lg flex items-center justify-center text-slate-400 hover:text-emerald-300 hover:bg-[#283243] transition-all cursor-pointer group"
             title="Crear Nueva Simulación (+)"
           >
-            <Plus className="w-5 h-5 group-hover:scale-110 transition-transform text-emerald-400" />
+            <Plus className="w-5 h-5 transition-colors" />
           </button>
         </nav>
       </div>
@@ -294,7 +296,7 @@ export const PrimaryIconDock: React.FC = () => {
             setActiveFolderId(null);
             setActiveTeamMemberFilter(null);
           }}
-          className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer relative group ${
+          className={`w-11 h-11 rounded-lg flex items-center justify-center transition-all cursor-pointer relative group ${
             !isSettingsModalOpen && activeView === 'dashboard' && isTrashActive
               ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 shadow-xs font-bold'
               : 'text-slate-400 hover:text-rose-400 hover:bg-[#283243]'
@@ -318,11 +320,11 @@ export const PrimaryIconDock: React.FC = () => {
             if (isSettingsModalOpen) closeSettingsModal();
             openUpdateModal();
           }}
-          className="w-11 h-11 rounded-xl flex items-center justify-center text-slate-400 hover:text-emerald-300 hover:bg-[#283243] transition-all cursor-pointer group relative"
+          className="w-11 h-11 rounded-lg flex items-center justify-center text-slate-400 hover:text-emerald-300 hover:bg-[#283243] transition-all cursor-pointer group relative"
           title="Buscar Actualizaciones de Software"
         >
           <RefreshCw
-            className={`w-5 h-5 group-hover:rotate-180 transition-transform duration-500 ${
+            className={`w-5 h-5 transition-colors ${
               hasUpdate ? 'text-emerald-400' : 'text-slate-400'
             }`}
           />
@@ -340,16 +342,17 @@ export const PrimaryIconDock: React.FC = () => {
               openSettingsModal('account');
             }
           }}
-          className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all cursor-pointer group relative ${
+          className={`w-11 h-11 rounded-lg flex items-center justify-center transition-all cursor-pointer group relative ${
             isSettingsModalOpen
-              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-xs font-bold'
+              ? 'bg-emerald-900/60 text-emerald-300'
               : 'text-slate-400 hover:text-white hover:bg-[#283243]'
           }`}
+          aria-current={isSettingsModalOpen ? 'page' : undefined}
           title={isSettingsModalOpen ? 'Cerrar Configuración (Esc)' : 'Centro de Configuración'}
         >
           <Settings
             className={`w-5 h-5 transition-transform duration-300 ${
-              isSettingsModalOpen ? 'rotate-45 text-emerald-400' : 'group-hover:rotate-45'
+              isSettingsModalOpen ? 'text-emerald-300' : ''
             }`}
           />
           {isSettingsModalOpen && (

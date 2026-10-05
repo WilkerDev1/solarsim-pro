@@ -1,29 +1,29 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, lazy, Suspense } from 'react';
 import { useSimulationStore } from './store/useSimulationStore';
 import { Header } from './components/common/Header';
 import { PrimaryIconDock } from './components/layout/PrimaryIconDock';
 import { SolarCoreTreeSidebar } from './components/dashboard/sidebar/SolarCoreTreeSidebar';
 import { DashboardView } from './components/dashboard/DashboardView';
 import { TrashView } from './components/dashboard/TrashView';
-import { SimulatorView } from './components/simulator/SimulatorView';
-import { PDFProposalView } from './components/pdf/PDFProposalView';
-import { ProjectHubView } from './components/hub/ProjectHubView';
-import { CompanyProfileHubView } from './components/companies/CompanyProfileHubView';
+const SimulatorView = lazy(() => import('./components/simulator/SimulatorView').then((module) => ({ default: module.SimulatorView })));
+const PDFProposalView = lazy(() => import('./components/pdf/PDFProposalView').then((module) => ({ default: module.PDFProposalView })));
+const ProjectHubView = lazy(() => import('./components/hub/ProjectHubView').then((module) => ({ default: module.ProjectHubView })));
+const CompanyProfileHubView = lazy(() => import('./components/companies/CompanyProfileHubView').then((module) => ({ default: module.CompanyProfileHubView })));
 import { ConflictResolutionModal } from './components/common/ConflictResolutionModal';
 import { NewProjectModal } from './components/common/NewProjectModal';
 import { UpdateModal } from './components/common/UpdateModal';
-import { AIInvoiceScannerModal } from './components/common/ai-invoice/AIInvoiceScannerModal';
-import { AIDatasheetScannerModal } from './components/common/AIDatasheetScannerModal';
+const AIInvoiceScannerModal = lazy(() => import('./components/common/ai-invoice/AIInvoiceScannerModal').then((module) => ({ default: module.AIInvoiceScannerModal })));
+const AIDatasheetScannerModal = lazy(() => import('./components/common/AIDatasheetScannerModal').then((module) => ({ default: module.AIDatasheetScannerModal })));
 import { ImportConflictModal } from './components/common/ImportConflictModal';
 import { ShareProposalModal } from './components/common/ShareProposalModal';
 import { SettingsModal } from './components/settings/SettingsModal';
-import { AIPriceCatalogScannerModal } from './components/common/AIPriceCatalogScannerModal';
+const AIPriceCatalogScannerModal = lazy(() => import('./components/common/AIPriceCatalogScannerModal').then((module) => ({ default: module.AIPriceCatalogScannerModal })));
 import { SupplierPricesDetailModal } from './components/common/SupplierPricesDetailModal';
 import { SplashScreen } from './components/common/SplashScreen';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 export const App: React.FC = () => {
-  const { activeView, setActiveView, sidebarTheme, syncSettings, syncProjectsWithServer, isTrashActive } = useSimulationStore();
+  const { activeView, setActiveView, sidebarTheme, syncSettings, syncProjectsWithServer, isTrashActive, isSettingsModalOpen, activeConflict, loadOrganizationFeaturePolicy } = useSimulationStore();
   const isDark = sidebarTheme === 'dark';
 
   // 🔄 Ciclo de Vida Global de Sincronización Automática en Segundo Plano (Heartbeat & Focus)
@@ -59,6 +59,10 @@ export const App: React.FC = () => {
     };
   }, [syncSettings.authToken, syncSettings.autoSyncEnabled]);
 
+  useEffect(() => {
+    if (syncSettings.currentUser && syncSettings.authToken) void loadOrganizationFeaturePolicy();
+  }, [syncSettings.currentUser?.id, syncSettings.currentUser?.organizationId, syncSettings.serverUrl]);
+
   // 🌓 Sincronización del Modo Oscuro con Tailwind (html.dark)
   useEffect(() => {
     if (isDark) {
@@ -69,7 +73,8 @@ export const App: React.FC = () => {
   }, [isDark]);
 
   return (
-    <div
+    <Suspense fallback={<div role="status" className="flex h-screen items-center justify-center text-sm text-slate-600">Cargando SolarSim…</div>}>
+    <div aria-hidden={!!activeConflict || undefined} {...(activeConflict ? { inert: '' } : {})}
       className={`h-screen w-screen flex flex-row overflow-hidden transition-colors duration-200 ${
         isDark ? 'dark bg-[#10141d] text-zinc-100' : 'bg-[#f4f6fa] text-slate-900'
       }`}
@@ -81,7 +86,7 @@ export const App: React.FC = () => {
       <PrimaryIconDock />
 
       {/* 🖼️ 2. Contenedor Principal con Header Adaptativo y Vistas */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0">
+      <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0" aria-hidden={isSettingsModalOpen || undefined} {...(isSettingsModalOpen ? { inert: '' } : {})}>
         {(activeView === 'simulator' || activeView === 'pdf-preview') && <Header />}
 
         <main className="flex-1 flex overflow-hidden min-h-0 w-full">
@@ -114,6 +119,7 @@ export const App: React.FC = () => {
       <AIPriceCatalogScannerModal />
       <SupplierPricesDetailModal />
     </div>
+    </Suspense>
   );
 };
 

@@ -34,7 +34,9 @@ export function createMainWindow(): BrowserWindow {
     minWidth: 1024,
     minHeight: 700,
     title: 'SolarSim Pro - Simulador Fotovoltaico',
-    icon: path.join(__dirname, '../src/assets/electsun-emblem-transparent.png'),
+    icon: app.isPackaged
+      ? path.join(process.resourcesPath, 'electsun-emblem-transparent.png')
+      : path.join(__dirname, '../src/assets/electsun-emblem-transparent.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -71,7 +73,7 @@ export function registerWindowIpcHandlers() {
       const pdfData = await mainWindow.webContents.printToPDF({
         printBackground: true,
         pageSize: 'A4',
-        margins: { marginType: 'none' },
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
       });
 
       const { filePath } = await dialog.showSaveDialog(mainWindow, {

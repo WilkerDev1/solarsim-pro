@@ -41,6 +41,17 @@
     "tsconfig*.json",
     "vite.config.ts",
     "tailwind.config.js",
-    "index.html"
+    "index.html",
+    "shared/**/*.ts",
+    "server/src/**/*.ts",
+    "server/tests/**/*.ts",
+    "server/package.json",
+    "scripts/**/*.{ts,tsx,mjs,cjs,html,ps1}",
+    "PRODUCT.md",
+    "shared/package.json",
+    "src/index.css",
+    ".github/workflows/*.yml",
+    "infra/services/**/*.yml",
+    "server/Dockerfile"
   ]
 }

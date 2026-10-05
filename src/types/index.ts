@@ -400,6 +400,8 @@ export interface SyncSettings {
 }
 
 export interface ProjectSimulation {
+  organizationId?: string;
+  syncServerUrl?: string;
   id: string;
   createdAt: string;
   updatedAt: string;
@@ -422,6 +424,7 @@ export interface ProjectSimulation {
   deletedAt?: string | null; // ISO 8601 timestamp cuando se envió a papelera
   deletedBy?: string | null; // Nombre o identificador del usuario que lo eliminó
   folderId?: string; // Optional custom folder assignment
+  pendingCanonicalAck?: { version: number }; // Durable sparse ACK; never re-send before authoritative readback
   baseVersion?: number; // Base version when editing started for optimistic concurrency
   companyProfileId?: string; // Associated Company Profile ID
 }
@@ -473,4 +476,3 @@ declare global {
     };
   }
 }
-
