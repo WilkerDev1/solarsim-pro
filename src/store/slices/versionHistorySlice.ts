@@ -25,6 +25,7 @@ export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (
   recordUndoState: (project) => {
     if (!project || !project.id) return;
 
+    const generation = get().sessionGeneration;
     // Deep clone state to freeze snapshot
     const cloned = JSON.parse(JSON.stringify(project));
 
@@ -46,6 +47,7 @@ export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (
     }
 
     undoDebounceTimer = setTimeout(() => {
+      if (get().sessionGeneration !== generation) return;
       set((state) => {
         let currentStack = state.undoStack;
         if (lastRecordedProjectId !== project.id) {

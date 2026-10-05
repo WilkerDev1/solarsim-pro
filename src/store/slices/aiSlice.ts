@@ -1,3 +1,4 @@
+import { companyDocumentSnapshot } from '../../utils/companyDocumentSnapshot';
 import { projectMutationMetadata } from '../sync/projectMutation';
 import { SimulationSlice, AISlice } from '../types';
 import { ProjectSimulation } from '../../types';
@@ -164,8 +165,10 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
             data.monthlyConsumptionKWh && data.monthlyConsumptionKWh.length === 12
               ? [...data.monthlyConsumptionKWh]
               : [...BENCHMARK_PROJECT.monthlyConsumption],
-          customization: {
+          companyProfileId: get().activeCompanyId,
+      customization: {
             ...(get().defaultDocumentCustomization || DEFAULT_DOCUMENT_CUSTOMIZATION),
+        ...companyDocumentSnapshot(get().getActiveCompany(), get().defaultDocumentCustomization),
             contactName: data.clientName || undefined,
             clientPhone: data.phone || undefined,
             clientEmail: data.email || undefined,

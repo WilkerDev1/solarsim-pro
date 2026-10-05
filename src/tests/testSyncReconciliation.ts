@@ -38,6 +38,7 @@ const pushProjects = SyncService.pushProjects;
 const pullEquipment = SyncService.pullEquipment;
 const pushEquipment = SyncService.pushEquipmentBatch;
 try {
+  initial.setSyncSettings(session);
   useSimulationStore.setState({ syncSettings: session, projects: [local], equipmentCatalog: [], equipmentChanges: {}, projectDeletionQueue: [], equipmentDeletionQueue: [], isSyncing: false });
   SyncService.pullProjects = async () => ({ success: false, error: 'Network unavailable' });
   const failure = await initial.syncProjectsWithServer(true);

@@ -1,3 +1,5 @@
+import { changeWorkspace } from '../sync/organizationWorkspace';
+import { CompanyService } from '../../services/companyService';
 import { projectDifferences } from '../sync/projectDifferences';
 import { SimulationSlice, SyncAuthSlice } from '../types';
 import { featureScope } from '../../../shared/applicationFeatures';
@@ -26,6 +28,21 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
 
   return {
   sessionGeneration: 0,
+  workspaceScope: '',
+  organizationWorkspaces: {},
+  switchOrganization: async (organizationId) => {
+    const session = captureSession();
+    if (!session.authToken) return { success: false, error: 'Inicia sesión primero.' };
+    const result = await CompanyService.switch(session.serverUrl, session.authToken, organizationId);
+    if (!session.isCurrent()) return { success: false, error: 'La sesión cambió.' };
+    if (!result.success || !result.token || !result.user) return { success: false, error: result.error || 'Respuesta de sesión inválida.' };
+    sessionEpoch++;
+    if (autoSyncDebounceTimer) { clearTimeout(autoSyncDebounceTimer); autoSyncDebounceTimer = null; }
+    set(state => { const syncSettings = { ...state.syncSettings, authToken: result.token!, currentUser: result.user!, lastSyncTimestamp: null }; return { ...changeWorkspace(state, syncSettings), syncSettings, sessionGeneration: sessionEpoch, isSyncing: false }; });
+    void get().loadOrganizationFeaturePolicy();
+    void get().syncProjectsWithServer(false);
+    return { success: true };
+  },
   syncSettings: {
     serverUrl: 'https://solarsim.electsun.net',
     autoSyncEnabled: true,
@@ -45,7 +62,11 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
 
   setSyncSettings: (settingsPartial) => {
     if (settingsPartial.serverUrl || settingsPartial.currentUser !== undefined || settingsPartial.authToken === null) sessionEpoch++;
-    set((state) => ({ syncSettings: { ...state.syncSettings, ...settingsPartial }, sessionGeneration: sessionEpoch, isSyncing: false, activeConflict: null }));
+    set((state) => {
+      const syncSettings = { ...state.syncSettings, ...settingsPartial };
+      if (settingsPartial.serverUrl && settingsPartial.serverUrl !== state.syncSettings.serverUrl && settingsPartial.authToken === undefined && settingsPartial.currentUser === undefined) { syncSettings.authToken = null; syncSettings.currentUser = null; }
+      return { ...changeWorkspace(state, syncSettings), syncSettings, sessionGeneration: sessionEpoch, isSyncing: false, activeConflict: null };
+    });
     if (settingsPartial.autoSyncEnabled && get().syncSettings.authToken) {
       get().triggerAutoSync(true);
     }
@@ -59,6 +80,7 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
     if (epoch !== sessionEpoch || serverUrl !== get().syncSettings.serverUrl) return { success: false, error: 'La sesión cambió mientras se iniciaba el acceso.' };
     if (res.success && res.token && res.user) {
       set((state) => ({
+        ...changeWorkspace(state, { ...state.syncSettings, authToken: res.token!, currentUser: res.user! }),
         syncSettings: {
           ...state.syncSettings,
           authToken: res.token!,
@@ -81,6 +103,7 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
     if (epoch !== sessionEpoch || serverUrl !== get().syncSettings.serverUrl) return { success: false, error: 'La sesión cambió mientras se iniciaba el acceso.' };
     if (res.success && res.token && res.user) {
       set((state) => ({
+        ...changeWorkspace(state, { ...state.syncSettings, authToken: res.token!, currentUser: res.user! }),
         syncSettings: {
           ...state.syncSettings,
           authToken: res.token!,
@@ -103,8 +126,10 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
       autoSyncDebounceTimer = null;
     }
     set((state) => ({
+      ...changeWorkspace(state, { ...state.syncSettings, authToken: null, currentUser: null }),
       syncSettings: {
         ...state.syncSettings,
+        lastSyncTimestamp: null,
         authToken: null,
         currentUser: null,
       },
@@ -277,6 +302,7 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
     if (!session.isCurrent()) return { valid: false, error: 'La sesión cambió durante la verificación.' };
     if (freshUser) {
       set((state) => ({
+        ...changeWorkspace(state, { ...state.syncSettings, currentUser: freshUser }),
         syncSettings: {
           ...state.syncSettings,
           currentUser: freshUser,
@@ -290,6 +316,7 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
     if (!session.isCurrent()) return { valid: false, error: 'La sesión cambió durante la renovación.' };
     if (refreshRes.success && refreshRes.token && refreshRes.user) {
       set((state) => ({
+        ...changeWorkspace(state, { ...state.syncSettings, authToken: refreshRes.token!, currentUser: refreshRes.user! }),
         syncSettings: {
           ...state.syncSettings,
           authToken: refreshRes.token!,

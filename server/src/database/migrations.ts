@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import { baselineSchema } from "./001_baseline.js";
 import { featurePolicyAndTombstones } from "./002_feature_policy_and_tombstones.js";
+import { companyManagement } from "./003_company_management.js";
 /** Additive, recorded migrations, guarded by a cross-process transaction lock. */
 export async function migrateDatabase(pool: Pool): Promise<void> {
   const client = await pool.connect();
@@ -26,6 +27,7 @@ export async function migrateDatabase(pool: Pool): Promise<void> {
         name: "feature_policy_and_tombstones",
         run: featurePolicyAndTombstones,
       },
+      { version: 3, name: "company_management", run: companyManagement },
     ]) {
       if (applied.has(migration.version)) continue;
       await migration.run(client);

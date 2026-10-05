@@ -30,7 +30,7 @@
     ]
   },
   "include": [
-    "src/**/*.{ts,tsx}",
+    "src/**/*.{ts,tsx,css}",
     "electron/**/*.ts",
     "workers/share-viewer/src/**/*.ts",
     "workers/share-viewer/wrangler.toml",
@@ -52,6 +52,7 @@
     "src/index.css",
     ".github/workflows/*.yml",
     "infra/services/**/*.yml",
-    "server/Dockerfile"
+    "server/Dockerfile",
+    "DESIGN.md"
   ]
 }

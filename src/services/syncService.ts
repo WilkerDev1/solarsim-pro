@@ -291,6 +291,7 @@ export class SyncService {
         email: u.email,
         role: u.role,
         organizationId: u.organization_id || u.organizationId,
+        canEditIdentity: u.canEditIdentity,
         isActive: u.isActive !== undefined ? u.isActive : u.is_active !== undefined ? u.is_active : true,
         createdAt: u.created_at || u.createdAt,
       }));

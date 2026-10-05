@@ -1,0 +1,472 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-05T17:00:22.581304+00:00",
+  "title": "Design System: SolarSim Pro — Centro empresarial",
+  "extensions": {
+    "colorMeta": {
+      "cc-bg": {
+        "role": "neutral",
+        "displayName": "cc-bg",
+        "canonical": "#f6f8fa",
+        "tonalRamp": [
+          "oklch(15% 0.00342 247.86)",
+          "oklch(26% 0.00342 247.86)",
+          "oklch(38% 0.00342 247.86)",
+          "oklch(49% 0.00342 247.86)",
+          "oklch(61% 0.00342 247.86)",
+          "oklch(72% 0.00342 247.86)",
+          "oklch(84% 0.00342 247.86)",
+          "oklch(95% 0.00342 247.86)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "cc-panel": {
+        "role": "neutral",
+        "displayName": "cc-panel",
+        "canonical": "#fff",
+        "tonalRamp": [
+          "oklch(15% 0.00000 89.88)",
+          "oklch(26% 0.00000 89.88)",
+          "oklch(38% 0.00000 89.88)",
+          "oklch(49% 0.00000 89.88)",
+          "oklch(61% 0.00000 89.88)",
+          "oklch(72% 0.00000 89.88)",
+          "oklch(84% 0.00000 89.88)",
+          "oklch(95% 0.00000 89.88)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "cc-border": {
+        "role": "neutral",
+        "displayName": "cc-border",
+        "canonical": "#dce2e8",
+        "tonalRamp": [
+          "oklch(15% 0.01044 247.94)",
+          "oklch(26% 0.01044 247.94)",
+          "oklch(38% 0.01044 247.94)",
+          "oklch(49% 0.01044 247.94)",
+          "oklch(61% 0.01044 247.94)",
+          "oklch(72% 0.01044 247.94)",
+          "oklch(84% 0.01044 247.94)",
+          "oklch(95% 0.01044 247.94)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "cc-text": {
+        "role": "neutral",
+        "displayName": "cc-text",
+        "canonical": "#182230",
+        "tonalRamp": [
+          "oklch(15% 0.03038 256.86)",
+          "oklch(26% 0.03038 256.86)",
+          "oklch(38% 0.03038 256.86)",
+          "oklch(49% 0.03038 256.86)",
+          "oklch(61% 0.03038 256.86)",
+          "oklch(72% 0.03038 256.86)",
+          "oklch(84% 0.03038 256.86)",
+          "oklch(95% 0.03038 256.86)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "cc-muted": {
+        "role": "neutral",
+        "displayName": "cc-muted",
+        "canonical": "#536174",
+        "tonalRamp": [
+          "oklch(15% 0.03518 256.10)",
+          "oklch(26% 0.03518 256.10)",
+          "oklch(38% 0.03518 256.10)",
+          "oklch(49% 0.03518 256.10)",
+          "oklch(61% 0.03518 256.10)",
+          "oklch(72% 0.03518 256.10)",
+          "oklch(84% 0.03518 256.10)",
+          "oklch(95% 0.03518 256.10)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "cc-selected": {
+        "role": "primary",
+        "displayName": "cc-selected",
+        "canonical": "#e8f7f0",
+        "tonalRamp": [
+          "oklch(15% 0.01830 166.38)",
+          "oklch(26% 0.01830 166.38)",
+          "oklch(38% 0.01830 166.38)",
+          "oklch(49% 0.01830 166.38)",
+          "oklch(61% 0.01830 166.38)",
+          "oklch(72% 0.01830 166.38)",
+          "oklch(84% 0.01830 166.38)",
+          "oklch(95% 0.01830 166.38)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "cc-green": {
+        "role": "primary",
+        "displayName": "cc-green",
+        "canonical": "#067451",
+        "tonalRamp": [
+          "oklch(15% 0.10464 163.50)",
+          "oklch(26% 0.10464 163.50)",
+          "oklch(38% 0.10464 163.50)",
+          "oklch(49% 0.10464 163.50)",
+          "oklch(61% 0.10464 163.50)",
+          "oklch(72% 0.10464 163.50)",
+          "oklch(84% 0.10464 163.50)",
+          "oklch(95% 0.10464 163.50)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "cc-bg-dark": {
+        "role": "neutral",
+        "displayName": "cc-bg-dark",
+        "canonical": "#141619",
+        "tonalRamp": [
+          "oklch(15% 0.00678 258.37)",
+          "oklch(26% 0.00678 258.37)",
+          "oklch(38% 0.00678 258.37)",
+          "oklch(49% 0.00678 258.37)",
+          "oklch(61% 0.00678 258.37)",
+          "oklch(72% 0.00678 258.37)",
+          "oklch(84% 0.00678 258.37)",
+          "oklch(95% 0.00678 258.37)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "cc-panel-dark": {
+        "role": "neutral",
+        "displayName": "cc-panel-dark",
+        "canonical": "#1c1f23",
+        "tonalRamp": [
+          "oklch(15% 0.00889 255.60)",
+          "oklch(26% 0.00889 255.60)",
+          "oklch(38% 0.00889 255.60)",
+          "oklch(49% 0.00889 255.60)",
+          "oklch(61% 0.00889 255.60)",
+          "oklch(72% 0.00889 255.60)",
+          "oklch(84% 0.00889 255.60)",
+          "oklch(95% 0.00889 255.60)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "cc-border-dark": {
+        "role": "neutral",
+        "displayName": "cc-border-dark",
+        "canonical": "#363b43",
+        "tonalRamp": [
+          "oklch(15% 0.01550 259.81)",
+          "oklch(26% 0.01550 259.81)",
+          "oklch(38% 0.01550 259.81)",
+          "oklch(49% 0.01550 259.81)",
+          "oklch(61% 0.01550 259.81)",
+          "oklch(72% 0.01550 259.81)",
+          "oklch(84% 0.01550 259.81)",
+          "oklch(95% 0.01550 259.81)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "cc-text-dark": {
+        "role": "neutral",
+        "displayName": "cc-text-dark",
+        "canonical": "#f1f3f5",
+        "tonalRamp": [
+          "oklch(15% 0.00343 247.86)",
+          "oklch(26% 0.00343 247.86)",
+          "oklch(38% 0.00343 247.86)",
+          "oklch(49% 0.00343 247.86)",
+          "oklch(61% 0.00343 247.86)",
+          "oklch(72% 0.00343 247.86)",
+          "oklch(84% 0.00343 247.86)",
+          "oklch(95% 0.00343 247.86)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "cc-muted-dark": {
+        "role": "neutral",
+        "displayName": "cc-muted-dark",
+        "canonical": "#abb4c0",
+        "tonalRamp": [
+          "oklch(15% 0.01989 255.56)",
+          "oklch(26% 0.01989 255.56)",
+          "oklch(38% 0.01989 255.56)",
+          "oklch(49% 0.01989 255.56)",
+          "oklch(61% 0.01989 255.56)",
+          "oklch(72% 0.01989 255.56)",
+          "oklch(84% 0.01989 255.56)",
+          "oklch(95% 0.01989 255.56)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "cc-selected-dark": {
+        "role": "primary",
+        "displayName": "cc-selected-dark",
+        "canonical": "#123d30",
+        "tonalRamp": [
+          "oklch(15% 0.05289 169.75)",
+          "oklch(26% 0.05289 169.75)",
+          "oklch(38% 0.05289 169.75)",
+          "oklch(49% 0.05289 169.75)",
+          "oklch(61% 0.05289 169.75)",
+          "oklch(72% 0.05289 169.75)",
+          "oklch(84% 0.05289 169.75)",
+          "oklch(95% 0.05289 169.75)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "cc-green-dark": {
+        "role": "primary",
+        "displayName": "cc-green-dark",
+        "canonical": "#6be0b5",
+        "tonalRamp": [
+          "oklch(15% 0.12396 166.77)",
+          "oklch(26% 0.12396 166.77)",
+          "oklch(38% 0.12396 166.77)",
+          "oklch(49% 0.12396 166.77)",
+          "oklch(61% 0.12396 166.77)",
+          "oklch(72% 0.12396 166.77)",
+          "oklch(84% 0.12396 166.77)",
+          "oklch(95% 0.12396 166.77)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "action-green": {
+        "role": "primary",
+        "displayName": "action-green",
+        "canonical": "#087b58",
+        "tonalRamp": [
+          "oklch(15% 0.10726 164.63)",
+          "oklch(26% 0.10726 164.63)",
+          "oklch(38% 0.10726 164.63)",
+          "oklch(49% 0.10726 164.63)",
+          "oklch(61% 0.10726 164.63)",
+          "oklch(72% 0.10726 164.63)",
+          "oklch(84% 0.10726 164.63)",
+          "oklch(95% 0.10726 164.63)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "action-green-hover": {
+        "role": "primary",
+        "displayName": "action-green-hover",
+        "canonical": "#066344",
+        "tonalRamp": [
+          "oklch(15% 0.09369 162.95)",
+          "oklch(26% 0.09369 162.95)",
+          "oklch(38% 0.09369 162.95)",
+          "oklch(49% 0.09369 162.95)",
+          "oklch(61% 0.09369 162.95)",
+          "oklch(72% 0.09369 162.95)",
+          "oklch(84% 0.09369 162.95)",
+          "oklch(95% 0.09369 162.95)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "danger": {
+        "role": "neutral",
+        "displayName": "danger",
+        "canonical": "#c93545",
+        "tonalRamp": [
+          "oklch(15% 0.18372 19.82)",
+          "oklch(26% 0.18372 19.82)",
+          "oklch(38% 0.18372 19.82)",
+          "oklch(49% 0.18372 19.82)",
+          "oklch(61% 0.18372 19.82)",
+          "oklch(72% 0.18372 19.82)",
+          "oklch(84% 0.18372 19.82)",
+          "oklch(95% 0.18372 19.82)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "danger-dark": {
+        "role": "neutral",
+        "displayName": "danger-dark",
+        "canonical": "#ff9aaa",
+        "tonalRamp": [
+          "oklch(15% 0.12172 9.98)",
+          "oklch(26% 0.12172 9.98)",
+          "oklch(38% 0.12172 9.98)",
+          "oklch(49% 0.12172 9.98)",
+          "oklch(61% 0.12172 9.98)",
+          "oklch(72% 0.12172 9.98)",
+          "oklch(84% 0.12172 9.98)",
+          "oklch(95% 0.12172 9.98)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "error-bg": {
+        "role": "neutral",
+        "displayName": "error-bg",
+        "canonical": "#fff0f0",
+        "tonalRamp": [
+          "oklch(15% 0.01624 17.44)",
+          "oklch(26% 0.01624 17.44)",
+          "oklch(38% 0.01624 17.44)",
+          "oklch(49% 0.01624 17.44)",
+          "oklch(61% 0.01624 17.44)",
+          "oklch(72% 0.01624 17.44)",
+          "oklch(84% 0.01624 17.44)",
+          "oklch(95% 0.01624 17.44)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "error-text": {
+        "role": "neutral",
+        "displayName": "error-text",
+        "canonical": "#ad2435",
+        "tonalRamp": [
+          "oklch(15% 0.17172 20.21)",
+          "oklch(26% 0.17172 20.21)",
+          "oklch(38% 0.17172 20.21)",
+          "oklch(49% 0.17172 20.21)",
+          "oklch(61% 0.17172 20.21)",
+          "oklch(72% 0.17172 20.21)",
+          "oklch(84% 0.17172 20.21)",
+          "oklch(95% 0.17172 20.21)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "error-bg-dark": {
+        "role": "neutral",
+        "displayName": "error-bg-dark",
+        "canonical": "#401e25",
+        "tonalRamp": [
+          "oklch(15% 0.05326 7.92)",
+          "oklch(26% 0.05326 7.92)",
+          "oklch(38% 0.05326 7.92)",
+          "oklch(49% 0.05326 7.92)",
+          "oklch(61% 0.05326 7.92)",
+          "oklch(72% 0.05326 7.92)",
+          "oklch(84% 0.05326 7.92)",
+          "oklch(95% 0.05326 7.92)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "error-text-dark": {
+        "role": "neutral",
+        "displayName": "error-text-dark",
+        "canonical": "#ffc0c9",
+        "tonalRamp": [
+          "oklch(15% 0.07318 9.17)",
+          "oklch(26% 0.07318 9.17)",
+          "oklch(38% 0.07318 9.17)",
+          "oklch(49% 0.07318 9.17)",
+          "oklch(61% 0.07318 9.17)",
+          "oklch(72% 0.07318 9.17)",
+          "oklch(84% 0.07318 9.17)",
+          "oklch(95% 0.07318 9.17)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Título de tarea",
+        "purpose": "Identifica la pantalla de trabajo."
+      },
+      "body": {
+        "displayName": "Texto operativo",
+        "purpose": "Explicaciones y valores editables."
+      }
+    },
+    "shadows": [],
+    "motion": [],
+    "breakpoints": [
+      {
+        "name": "desktop-compact",
+        "value": "1100px"
+      },
+      {
+        "name": "defensive-stack",
+        "value": "760px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Acción primaria",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Guardar la tarea actual.",
+      "html": "<div class=\"ds-sample\"><button class=\"ds-button ds-primary\">Guardar cambios</button></div>",
+      "css": ".ds-sample{--cc-panel:#fff;--cc-text:#182230;--cc-border:#dce2e8;--cc-selected:#e8f7f0;--cc-green:#067451;font-family:Inter,sans-serif;font-size:14px}.ds-button{font:inherit;font-weight:550;border:1px solid var(--cc-border);border-radius:8px;padding:9px 13px;min-height:38px;background:var(--cc-panel);color:var(--cc-text);cursor:pointer}.ds-button:hover{background:var(--cc-selected)}.ds-button:focus-visible{outline:2px solid var(--cc-green);outline-offset:3px}.ds-button:disabled{opacity:.5;cursor:default}.ds-primary{background:#087b58;color:white;border-color:transparent}.ds-primary:hover{background:#066344}"
+    },
+    {
+      "name": "Acción secundaria",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Descartar o consultar sin competir con la acción principal.",
+      "html": "<div class=\"ds-sample\"><button class=\"ds-button\">Descartar cambios</button></div>",
+      "css": ".ds-sample{--cc-panel:#fff;--cc-text:#182230;--cc-border:#dce2e8;--cc-selected:#e8f7f0;--cc-green:#067451;font-family:Inter,sans-serif;font-size:14px}.ds-button{font:inherit;font-weight:550;border:1px solid var(--cc-border);border-radius:8px;padding:9px 13px;min-height:38px;background:var(--cc-panel);color:var(--cc-text);cursor:pointer}.ds-button:hover{background:var(--cc-selected)}.ds-button:focus-visible{outline:2px solid var(--cc-green);outline-offset:3px}.ds-button:disabled{opacity:.5;cursor:default}"
+    },
+    {
+      "name": "Campo de identidad",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Etiqueta visible y valor editable.",
+      "html": "<div class=\"ds-sample\"><label class=\"ds-label\">Razón social<input class=\"ds-input\" value=\"Empresa de ejemplo\" /></label></div>",
+      "css": ".ds-sample{--cc-panel:#fff;--cc-text:#182230;--cc-border:#dce2e8;--cc-selected:#e8f7f0;--cc-green:#067451;font-family:Inter,sans-serif;font-size:14px}.ds-label{display:flex;flex-direction:column;gap:8px;font-size:13px;font-weight:550;color:var(--cc-text)}.ds-input{font:inherit;font-weight:400;min-height:42px;padding:10px 12px;border:1px solid var(--cc-border);border-radius:8px;background:var(--cc-panel);color:var(--cc-text)}.ds-input:focus-visible{outline:2px solid var(--cc-green);outline-offset:3px}"
+    },
+    {
+      "name": "Navegación activa",
+      "kind": "nav",
+      "refersTo": "navigation-selected",
+      "description": "Categoría o perfil seleccionado.",
+      "html": "<nav class=\"ds-sample\"><button class=\"ds-nav\" aria-current=\"page\">Membretes y marcas</button></nav>",
+      "css": ".ds-sample{--cc-panel:#fff;--cc-text:#182230;--cc-border:#dce2e8;--cc-selected:#e8f7f0;--cc-green:#067451;font-family:Inter,sans-serif;font-size:14px}.ds-nav{font:inherit;font-weight:550;text-align:left;min-height:44px;padding:9px 13px;border:0;border-radius:8px;background:var(--cc-selected);color:var(--cc-green);cursor:pointer}.ds-nav:hover{background:var(--cc-selected)}.ds-nav:focus-visible{outline:2px solid var(--cc-green);outline-offset:3px}"
+    },
+    {
+      "name": "Formulario de empresa",
+      "kind": "card",
+      "refersTo": "form-container",
+      "description": "Agrupar una tarea bajo un título claro.",
+      "html": "<section class=\"ds-sample ds-card\"><h3 class=\"ds-title\">Identidad y contacto</h3><p class=\"ds-copy\">Datos usados en nuevas propuestas.</p></section>",
+      "css": ".ds-sample{--cc-panel:#fff;--cc-text:#182230;--cc-border:#dce2e8;--cc-selected:#e8f7f0;--cc-green:#067451;font-family:Inter,sans-serif;font-size:14px}.ds-card{padding:28px;border:1px solid var(--cc-border);border-radius:12px;background:var(--cc-panel);color:var(--cc-text)}.ds-title{font-size:16px;font-weight:600;margin:0 0 16px}.ds-copy{line-height:1.6;color:#536174;margin:0}"
+    },
+    {
+      "name": "Aviso contextual",
+      "kind": "custom",
+      "refersTo": "navigation-selected",
+      "description": "Comunicar un resultado próximo a su tarea.",
+      "html": "<div class=\"ds-sample ds-notice\" role=\"status\">Perfil guardado.</div>",
+      "css": ".ds-sample{--cc-panel:#fff;--cc-text:#182230;--cc-border:#dce2e8;--cc-selected:#e8f7f0;--cc-green:#067451;font-family:Inter,sans-serif;font-size:14px}.ds-notice{padding:13px 16px;border-radius:8px;line-height:1.5;background:var(--cc-selected);color:var(--cc-text)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Centro de trabajo empresarial",
+    "overview": "El centro empresarial extiende la identidad de SolarSim: Inter, superficies neutras y verde para acciones y selección. Su carácter empresarial procede de la jerarquía de formularios, navegación explícita y tablas de miembros, sin decoración de marketing.\n\nEsta extracción documenta la superficie empresarial implementada, no impone sus valores locales al simulador o al dossier PDF. Los colores `cc-*` pertenecen al ámbito del centro; Dashboard y Ajustes conservan sus propios tokens. La fuente normativa es `src/components/companies/company-center.css`, con tipografía heredada de `src/index.css`.",
+    "keyCharacteristics": [
+      "Formularios por propósito y tablas legibles.",
+      "Tema claro y oscuro mediante roles equivalentes.",
+      "Selección verde, bordes finos y superficies planas.",
+      "Acciones explícitas próximas al contenido que modifican."
+    ],
+    "rules": [
+      {
+        "name": "Estado antes que adorno",
+        "body": "El verde identifica selección, foco, estado o acción; la identidad corporativa cargada por el usuario no recolorea los controles de gestión.",
+        "section": "colors"
+      },
+      {
+        "name": "Jerarquía de trabajo",
+        "body": "Los títulos identifican la tarea; las etiquetas permanecen en caja natural y los valores editables usan peso regular.",
+        "section": "typography"
+      },
+      {
+        "name": "Superficie plana",
+        "body": "La separación ordinaria se construye con fondo, borde y espacio; los formularios y tablas del centro no requieren sombras.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do usar los roles del tema para texto, bordes y superficies.",
+      "Do conservar etiquetas visibles, foco por teclado y acciones de guardar y descartar.",
+      "Do reservar el verde de selección para el ámbito activo y las acciones pertinentes.",
+      "Do mantener la lectura compacta de miembros con divisores horizontales y nombres completos."
+    ],
+    "donts": [
+      "Don't reutilizar valores oscuros fijos para una superficie que cambia de tema.",
+      "Don't trasladar la paleta de una empresa al sistema de navegación.",
+      "Don't convertir una captura de QA o su contenido sintético en un recurso del producto.",
+      "Don't extender estas dimensiones del centro al PDF aprobado."
+    ]
+  }
+}

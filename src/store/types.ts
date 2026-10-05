@@ -149,6 +149,9 @@ export interface EquipmentSlice {
 }
 
 export interface SyncAuthSlice {
+  workspaceScope: string;
+  organizationWorkspaces: Record<string, import('./sync/organizationWorkspace').OrganizationWorkspace>;
+  switchOrganization: (organizationId: string) => Promise<{ success: boolean; error?: string }>;
   sessionGeneration: number;
   projectDeletionQueue: Array<{
     scope: string;

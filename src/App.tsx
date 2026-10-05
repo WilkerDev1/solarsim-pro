@@ -23,7 +23,7 @@ import { SplashScreen } from './components/common/SplashScreen';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 export const App: React.FC = () => {
-  const { activeView, setActiveView, sidebarTheme, syncSettings, syncProjectsWithServer, isTrashActive, isSettingsModalOpen, activeConflict, loadOrganizationFeaturePolicy } = useSimulationStore();
+  const { sessionGeneration, activeView, setActiveView, sidebarTheme, syncSettings, syncProjectsWithServer, isTrashActive, isSettingsModalOpen, activeConflict, loadOrganizationFeaturePolicy } = useSimulationStore();
   const isDark = sidebarTheme === 'dark';
 
   // 🔄 Ciclo de Vida Global de Sincronización Automática en Segundo Plano (Heartbeat & Focus)
@@ -109,15 +109,15 @@ export const App: React.FC = () => {
 
       {/* Global Modals Mounted at Root Level */}
       <ConflictResolutionModal />
-      <NewProjectModal />
+      <NewProjectModal key={sessionGeneration} />
       <UpdateModal />
-      <AIInvoiceScannerModal />
-      <AIDatasheetScannerModal />
-      <ImportConflictModal />
-      <ShareProposalModal />
+      <AIInvoiceScannerModal key={sessionGeneration} />
+      <AIDatasheetScannerModal key={sessionGeneration} />
+      <ImportConflictModal key={sessionGeneration} />
+      <ShareProposalModal key={sessionGeneration} />
       <SettingsModal />
-      <AIPriceCatalogScannerModal />
-      <SupplierPricesDetailModal />
+      <AIPriceCatalogScannerModal key={sessionGeneration} />
+      <SupplierPricesDetailModal key={sessionGeneration} />
     </div>
     </Suspense>
   );

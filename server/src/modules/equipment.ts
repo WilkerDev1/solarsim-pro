@@ -1,3 +1,5 @@
+import { REFERENCE_EQUIPMENT_IDS } from "../../../shared/referenceEquipment.js";
+import { lockCurrentMembership } from "../membership.js";
 import { readObjectBody } from "../request.js";
 import type { Hono } from "hono";
 import type { Dependencies } from "../dependencies.js";
@@ -9,8 +11,11 @@ export function registerEquipmentRoutes(
   app.get("/api/equipment", async (c) => {
     const user = await authenticate(c);
     if (!user) return c.json({ error: "No autorizado" }, 401);
-    const params: unknown[] = [user.organizationId];
-    let sql = `SELECT * FROM equipment_catalog e WHERE (e.organization_id=$1 OR e.organization_id='org-electsun-default') AND NOT EXISTS(SELECT 1 FROM equipment_tombstones t WHERE t.id=e.id AND t.organization_id=$1)`;
+    const params: unknown[] = [
+      user.organizationId,
+      [...REFERENCE_EQUIPMENT_IDS],
+    ];
+    let sql = `SELECT * FROM equipment_catalog e WHERE (e.organization_id=$1 OR (e.organization_id='org-electsun-default' AND e.id=ANY($2::varchar[]))) AND NOT EXISTS(SELECT 1 FROM equipment_tombstones t WHERE t.id=e.id AND t.organization_id=$1)`;
     const type = c.req.query("type"),
       brand = c.req.query("brand");
     if (type && type !== "all") {
@@ -55,6 +60,11 @@ export function registerEquipmentRoutes(
     const results: Record<string, any>[] = [];
     try {
       await client.query("BEGIN");
+      const denied = await lockCurrentMembership(client, user);
+      if (denied) {
+        await client.query("ROLLBACK");
+        return c.json({ error: "La sesión o los permisos cambiaron" }, denied);
+      }
       // Stable order avoids deadlocks when two batches contain the same equipment in reverse order.
       for (const item of [...items].sort((a, b) => a.id.localeCompare(b.id))) {
         await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
@@ -170,6 +180,11 @@ export function registerEquipmentRoutes(
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
+      const denied = await lockCurrentMembership(client, user);
+      if (denied) {
+        await client.query("ROLLBACK");
+        return c.json({ error: "La sesión o los permisos cambiaron" }, denied);
+      }
       await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
         `solarsim-equipment:${id}`,
       ]);

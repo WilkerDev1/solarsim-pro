@@ -13,6 +13,7 @@ import { registerEquipmentRoutes } from "./modules/equipment.js";
 import { registerTariffsRoutes } from "./modules/tariffs.js";
 import { registerNotificationsRoutes } from "./modules/notifications.js";
 import { registerOrganizationRoutes } from "./modules/organization.js";
+import { registerCompanyRoutes } from "./modules/companies.js";
 /** Import-safe composition root: tests inject an isolated pool; only index.ts starts HTTP. */
 export function createApp(options: {
   pool: Pool;
@@ -68,6 +69,7 @@ export function createApp(options: {
     }
   });
   registerAuthRoutes(app, deps);
+  registerCompanyRoutes(app, deps);
   registerUsersRoutes(app, deps);
   registerProjectsRoutes(app, deps);
   registerEquipmentRoutes(app, deps);

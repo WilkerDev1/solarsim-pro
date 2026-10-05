@@ -92,6 +92,8 @@ export const createTariffSlice: SimulationSlice<TariffSlice> = (set, get) => ({
       return { success: false, message: 'Inicia sesión para sincronizar pliegos tarifarios en la nube' };
     }
 
+    const generation = get().sessionGeneration;
+    const isCurrent = () => generation === get().sessionGeneration && get().syncSettings.serverUrl === syncSettings.serverUrl && get().syncSettings.currentUser?.organizationId === syncSettings.currentUser?.organizationId;
     set({ tariffSyncStatus: 'syncing', tariffSyncError: null });
 
     try {
@@ -101,6 +103,7 @@ export const createTariffSlice: SimulationSlice<TariffSlice> = (set, get) => ({
         tariffMatrix
       );
 
+      if (!isCurrent()) return { success: false, message: 'La sesión cambió durante la consulta.' };
       if (!res.success) {
         set({ tariffSyncStatus: 'error', tariffSyncError: res.error || 'Error al sincronizar tarifas' });
         return { success: false, message: res.error || 'Error al guardar tarifas' };
@@ -109,6 +112,7 @@ export const createTariffSlice: SimulationSlice<TariffSlice> = (set, get) => ({
       set({ tariffSyncStatus: 'synced', tariffSyncError: null });
       return { success: true, message: 'Pliego tarifario sincronizado en la nube' };
     } catch (err: any) {
+      if (!isCurrent()) return { success: false, message: 'La sesión cambió durante la consulta.' };
       set({ tariffSyncStatus: 'error', tariffSyncError: err.message });
       return { success: false, message: err.message || 'Error de conexión' };
     }
@@ -120,11 +124,14 @@ export const createTariffSlice: SimulationSlice<TariffSlice> = (set, get) => ({
       return { success: false, message: 'Inicia sesión para descargar pliegos tarifarios de la nube' };
     }
 
+    const generation = get().sessionGeneration;
+    const isCurrent = () => generation === get().sessionGeneration && get().syncSettings.serverUrl === syncSettings.serverUrl && get().syncSettings.currentUser?.organizationId === syncSettings.currentUser?.organizationId;
     set({ tariffSyncStatus: 'syncing', tariffSyncError: null });
 
     try {
       const res = await SyncService.fetchTariffMatrix(syncSettings.serverUrl, syncSettings.authToken);
 
+      if (!isCurrent()) return { success: false, message: 'La sesión cambió durante la consulta.' };
       if (!res.success) {
         set({ tariffSyncStatus: 'error', tariffSyncError: res.error || 'Error al consultar tarifas' });
         return { success: false, message: res.error || 'Error al consultar tarifas' };
@@ -139,10 +146,11 @@ export const createTariffSlice: SimulationSlice<TariffSlice> = (set, get) => ({
         });
         return { success: true, message: 'Pliego tarifario actualizado desde la nube' };
       } else {
-        set({ tariffSyncStatus: 'synced', tariffSyncError: null });
+        set({ tariffMatrix: DEFAULT_RD_TARIFF_MATRIX, tariffSyncStatus: 'synced', tariffSyncError: null });
         return { success: true, message: 'La nube usa el pliego base oficial' };
       }
     } catch (err: any) {
+      if (!isCurrent()) return { success: false, message: 'La sesión cambió durante la consulta.' };
       set({ tariffSyncStatus: 'error', tariffSyncError: err.message });
       return { success: false, message: err.message || 'Error de conexión' };
     }

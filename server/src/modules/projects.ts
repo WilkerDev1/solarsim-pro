@@ -1,3 +1,4 @@
+import { lockCurrentMembership } from "../membership.js";
 import { readObjectBody } from "../request.js";
 import type { Hono } from "hono";
 import type { Dependencies } from "../dependencies.js";
@@ -24,6 +25,11 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
     try {
       await client.query("BEGIN");
       await lockOrganization(client, user.organizationId);
+      const denied = await lockCurrentMembership(client, user, false);
+      if (denied) {
+        await client.query("ROLLBACK");
+        return c.json({ error: "La sesión o los permisos cambiaron" }, denied);
+      }
       await hardDelete(client, user, "expired");
       const cursor = (
         await client.query(
@@ -71,6 +77,11 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
     try {
       await client.query("BEGIN");
       await lockOrganization(client, user.organizationId);
+      const denied = await lockCurrentMembership(client, user, true);
+      if (denied) {
+        await client.query("ROLLBACK");
+        return c.json({ error: "La sesión o los permisos cambiaron" }, denied);
+      }
       for (const input of [...projects].sort((a, b) =>
         a.id.localeCompare(b.id),
       )) {
@@ -178,6 +189,11 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
     try {
       await client.query("BEGIN");
       await lockOrganization(client, user.organizationId);
+      const denied = await lockCurrentMembership(client, user, true);
+      if (denied) {
+        await client.query("ROLLBACK");
+        return c.json({ error: "La sesión o los permisos cambiaron" }, denied);
+      }
       const row = (
         await client.query<ProjectRow>(
           "SELECT * FROM projects WHERE id=$1 AND organization_id=$2 FOR UPDATE",
@@ -251,6 +267,11 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
     try {
       await client.query("BEGIN");
       await lockOrganization(client, user.organizationId);
+      const denied = await lockCurrentMembership(client, user, true);
+      if (denied) {
+        await client.query("ROLLBACK");
+        return c.json({ error: "La sesión o los permisos cambiaron" }, denied);
+      }
       const row = (
         await client.query<ProjectRow>(
           "SELECT * FROM projects WHERE id=$1 AND organization_id=$2 FOR UPDATE",
@@ -299,6 +320,11 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
     try {
       await client.query("BEGIN");
       await lockOrganization(client, user.organizationId);
+      const denied = await lockCurrentMembership(client, user, true);
+      if (denied) {
+        await client.query("ROLLBACK");
+        return c.json({ error: "La sesión o los permisos cambiaron" }, denied);
+      }
       const deletedIds = await hardDelete(client, user, "trash");
       await client.query("COMMIT");
       return c.json({
@@ -332,6 +358,11 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
     try {
       await client.query("BEGIN");
       await lockOrganization(client, user.organizationId);
+      const denied = await lockCurrentMembership(client, user, true);
+      if (denied) {
+        await client.query("ROLLBACK");
+        return c.json({ error: "La sesión o los permisos cambiaron" }, denied);
+      }
       const row = (
         await client.query<ProjectRow>(
           "SELECT * FROM projects WHERE id=$1 AND organization_id=$2 FOR UPDATE",
