@@ -7,6 +7,8 @@ if (!asar || !path.isAbsolute(asar) || !asar.endsWith('app.asar')) throw new Err
 app.setPath('userData', path.join(__dirname,'private-profile'));
 // Exercise the production file-loading path while using a disposable harness package.
 Object.defineProperty(app,'isPackaged',{value:true});
+Object.defineProperty(process,'resourcesPath',{value:path.dirname(asar)});
+assert.ok(require('node:fs').existsSync(path.join(process.resourcesPath,'electsun-emblem-transparent.png')),'Installed icon resource exists');
 const timeout = setTimeout(()=>{ console.error('Runtime QA timed out'); app.exit(1); },30000);
 app.on('browser-window-created',(_event,window)=>{
   window.hide();

@@ -19,6 +19,9 @@ if ($LASTEXITCODE -ne 0 -or $oldVersion -ne '2.1.5') { throw 'Previous installed
 Install-QACandidate (Join-Path (Get-Location) "release/SolarSim-Pro-Setup-$version.exe")
 $newVersion = node -e "process.stdout.write(JSON.parse(require('@electron/asar').extractFile(process.argv[1],'package.json').toString()).version)" $asar
 if ($LASTEXITCODE -ne 0 -or $newVersion -ne $version) { throw 'Upgrade did not install the candidate version.' }
+if (-not (Test-Path (Join-Path $installDir 'resources/electsun-emblem-transparent.png'))) { throw 'Packaged application icon is missing.' }
+node scripts/qa/installedStart.mjs (Join-Path $installDir 'SolarSim Pro.exe')
+if ($LASTEXITCODE -ne 0) { throw 'Installed executable failed to start.' }
 node scripts/qa/runElectronRuntime.mjs $asar
 if ($LASTEXITCODE -ne 0) { throw 'Installed ASAR runtime failed.' }
 Write-Output 'PASS: NSIS installation of 2.1.5, upgrade to candidate and installed runtime/IPC.'

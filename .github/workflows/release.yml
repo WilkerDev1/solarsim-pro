@@ -1,0 +1,106 @@
+name: Build official desktop release
+on:
+  push:
+    tags: ['v[0-9]*']
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  contracts:
+    uses: ./.github/workflows/verify.yml
+  desktop:
+    needs: contracts
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+          - os: windows-latest
+            platform: win
+            arch: x64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Validate tag and package version
+        shell: bash
+        run: node -e 'if(process.env.GITHUB_REF_NAME !== "v"+require("./package.json").version) process.exit(1)'
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libarchive-tools
+      - run: npm ci
+      - run: npm run build
+      - run: npm run build:electron
+      - name: Package on native runner
+        run: npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get install -y ./release/SolarSim-Pro-$(node -p "require('./package.json').version").deb
+          test -s "/opt/SolarSim Pro/resources/electsun-emblem-transparent.png"
+          xvfb-run -a node scripts/qa/installedStart.mjs "/opt/SolarSim Pro/solarsim-pro"
+          xvfb-run -a node scripts/qa/runElectronRuntime.mjs "/opt/SolarSim Pro/resources/app.asar"
+      - name: AppImage startup without requiring FUSE on the runner
+        if: runner.os == 'Linux'
+        run: |
+          candidate="$PWD/release/SolarSim-Pro-$(node -p "require('./package.json').version").AppImage"
+          APPIMAGE_EXTRACT_AND_RUN=1 xvfb-run -a node scripts/qa/installedStart.mjs "$candidate"
+      - name: Pacman installation and startup on isolated Arch Linux
+        if: runner.os == 'Linux'
+        run: |
+          docker run --rm -e GITHUB_ACTIONS=true -v "$PWD/release:/packages:ro" -v "$PWD/scripts/qa:/qa:ro" archlinux:base bash -euc '
+            pacman -Syu --noconfirm nodejs xorg-server-xvfb xorg-xauth
+            pacman -U --noconfirm /packages/SolarSim-Pro-*.pacman
+            xvfb-run -a node /qa/installedStart.mjs "/opt/SolarSim Pro/solarsim-pro"
+          '
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/qa/installWindows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            release/SolarSim-Pro-*.exe
+            release/SolarSim-Pro-*.exe.blockmap
+            release/SolarSim-Pro-*.AppImage
+            release/SolarSim-Pro-*.deb
+            release/SolarSim-Pro-*.pacman
+            release/SolarSim-Pro-*.tar.gz
+            release/latest.yml
+            release/latest-linux.yml
+  draft:
+    needs: desktop
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: release
+          merge-multiple: true
+      - run: npm run release:manifests
+      - run: npx tsx scripts/qa/verifyReleaseFiles.ts
+      - name: Create draft awaiting local GPG verification and signing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "SolarSim Pro $GITHUB_REF_NAME" --notes-file "release/release-notes-$GITHUB_REF_NAME.md"
+          gh release upload "$GITHUB_REF_NAME" release/SolarSim-Pro-* release/solarsim-pro-* release/solarsim-pro_*.deb release/latest.json release/update.json release/latest.yml release/latest-linux.yml

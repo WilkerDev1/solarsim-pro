@@ -33,14 +33,14 @@ export function generateManifests() {
   ];
 
   for (const [src, dest] of aliasPairs) {
-    if (fs.existsSync(src) && !fs.existsSync(dest)) {
+    if (fs.existsSync(src)) {
+      // A repeated build must not retain an alias pointing at an older binary.
+      fs.rmSync(dest, { force: true });
       try {
         fs.linkSync(src, dest);
         console.log(`   🔗 Enlace dual creado: ${path.basename(dest)} -> ${path.basename(src)}`);
       } catch {
-        try {
-          fs.copyFileSync(src, dest);
-        } catch {}
+        fs.copyFileSync(src, dest);
       }
     }
   }
@@ -221,7 +221,7 @@ export function bumpVersion(newVersion: string) {
   const serverIndexPath = path.join(rootDir, 'server/src/app.ts');
   if (fs.existsSync(serverIndexPath)) {
     let content = fs.readFileSync(serverIndexPath, 'utf-8');
-    content = content.replace(/version:\s*['"][0-9]+\.[0-9]+\.[0-9]+['"]/, `version: '${newVersion}'`);
+    content = content.replace(/version:\s*['"][0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?['"]/, `version: '${newVersion}'`);
     fs.writeFileSync(serverIndexPath, content);
     console.log(`   ✓ server/src/app.ts (/api/health) -> ${newVersion}`);
   }

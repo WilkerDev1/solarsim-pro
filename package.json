@@ -1,7 +1,7 @@
 {
   "name": "solarsim-pro",
   "private": true,
-  "version": "2.3.0-beta.1",
+  "version": "2.2.1",
   "description": "Simulador Fotovoltaico T\u00e9cnico-Econ\u00f3mico Profesional",
   "author": "WilkerDev1",
   "type": "module",
@@ -125,12 +125,55 @@
       "category": "Science",
       "maintainer": "WilkerDev1 <wilkerdev@github.com>",
       "synopsis": "Simulador Fotovoltaico Profesional",
-      "description": "Simulador de proyectos solares fotovoltaicos con dimensionamiento, an\u00e1lisis financiero y exportaci\u00f3n de propuestas PDF."
+      "description": "Simulador de proyectos solares fotovoltaicos con dimensionamiento, an\u00e1lisis financiero y exportaci\u00f3n de propuestas PDF.",
+      "desktopName": "solarsim-pro.desktop"
     },
     "publish": {
       "provider": "github",
       "owner": "WilkerDev1",
       "repo": "solarsim-pro"
+    },
+    "extraResources": [
+      {
+        "from": "src/assets/electsun-emblem-transparent.png",
+        "to": "electsun-emblem-transparent.png"
+      }
+    ],
+    "pacman": {
+      "depends": [
+        "gtk3",
+        "nss",
+        "alsa-lib",
+        "libnotify",
+        "libxss",
+        "xdg-utils",
+        "mesa",
+        "libcups",
+        "libxkbcommon",
+        "systemd-libs",
+        "gnupg",
+        "polkit"
+      ]
+    },
+    "deb": {
+      "depends": [
+        "libgtk-3-0 | libgtk-3-0t64",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0 | libatspi2.0-0t64",
+        "libuuid1",
+        "libsecret-1-0",
+        "libasound2 | libasound2t64",
+        "libgbm1",
+        "libcups2 | libcups2t64",
+        "libxkbcommon0",
+        "gnupg",
+        "gpgv",
+        "pkexec | policykit-1"
+      ]
     }
   },
   "allowScripts": {

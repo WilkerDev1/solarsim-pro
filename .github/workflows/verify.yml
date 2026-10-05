@@ -1,8 +1,9 @@
 name: Verify modular contracts
 on:
+  workflow_call:
   pull_request:
   push:
-    branches: [beta, 'codex/**']
+    branches: [beta, main]
 permissions:
   contents: read
 concurrency:
@@ -25,6 +26,7 @@ jobs:
       - run: npm ci
       - run: npm --prefix server ci
       - run: npm --prefix workers/share-viewer ci
+      - run: node scripts/qa/devSmoke.mjs
       - run: npm run lint
       - run: npm test
       - run: node scripts/qa/testPrepareSecrets.mjs
