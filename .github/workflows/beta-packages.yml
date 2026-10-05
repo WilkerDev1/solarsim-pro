@@ -22,6 +22,10 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libarchive-tools
       - run: npm ci
       - run: npm run build
       - run: npm run build:electron
@@ -30,9 +34,14 @@ jobs:
       - if: runner.os == 'Windows'
         run: npx electron-builder --win --publish never
       - if: runner.os == 'Linux'
-        run: xvfb-run -a node scripts/qa/runElectronRuntime.mjs
+        run: |
+          sudo apt-get install -y ./release/SolarSim-Pro-$(node -p "require('./package.json').version").deb
+          xvfb-run -a node scripts/qa/runElectronRuntime.mjs "/opt/SolarSim Pro/resources/app.asar"
       - if: runner.os == 'Windows'
-        run: node scripts/qa/runElectronRuntime.mjs
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/qa/installWindows.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ runner.os }}

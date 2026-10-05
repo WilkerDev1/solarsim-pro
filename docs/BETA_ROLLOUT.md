@@ -40,6 +40,8 @@ Solo datos sintéticos: Ana ADMIN, Bruno EDITOR y Vera VIEWER en una organizaci�
 
 `QA_WORKER_URL=https://<tunel-temporal>.trycloudflare.com npx tsx scripts/qa/stagingRehearsal.ts` exige API127.0.0.1 y Worker temporal. Comprueba creación/actualización, dos editores con CAS, rechazo VIEWER, bloqueo del cliente sin baseVersion, publicaciones legacy/físicas con snapshot confirmado, cambio de política y papelera/restauración. Es un ensayo explícito fuera de `npm test`; presupone las cuentas QA provisionadas en la base desechable.
 
+En el navegador de staging se resolvió el conflicto conservando una copia: el original mantuvo40módulos y la copia38; una sincronización posterior confirmó ambos documentos sin conflicto.
+
 La integración con el runtime real de Workers detectó `redirect:'error'` no admitido. Se cambió a `manual`, rechazando respuestas3xx sin reenviar el JWT. La regresión protege rechazo de redirecciones; el ensayo real confirma publicación/autorización. Contrato de plataforma: [Request de Cloudflare](https://developers.cloudflare.com/workers/runtime-apis/request/).
 
 `server/tests/containerSmoke.ts` crea sus propios contenedores y ensaya cambio de contraseña DB/JWT: el secreto DB anterior falla al abrir una conexión nueva, la API reconecta con el nuevo, JWT antiguo y refresh reciben401, login nuevo conserva política/datos. **No basta cambiar POSTGRES_PASSWORD en Compose:** una base existente necesita cambiar el rol con ALTER ROLE o `\password`.
@@ -52,10 +54,10 @@ La integración con el runtime real de Workers detectó `redirect:'error'` no ad
 
 Electron44.5.1, electron-builder26.15.3, Vite7.3.6, pdfjs6.4.299; cliente/API/Worker2.3.0-beta.1. Paquetes Linux AppImage/deb/pacman/tar.gz y Windows NSIS/portable se generan con `--publish never`. El ensayo `node scripts/qa/runElectronRuntime.mjs` usa entrada/main/preload ASAR reales y perfil privado: verifica arranque, aislamiento de Node, IPC de versión/plataforma y eliminación de suscripciones. No reemplaza la instalación del usuario.
 
-`.github/workflows/beta-packages.yml` construye y prueba runtime en Linux/Windows; los artefactos de CI expiran a los7días. Es distinto de probar instalación interactiva, SmartScreen, firma de Windows, pkexec o actualización entre versiones sobre el SO.
+`.github/workflows/beta-packages.yml` construye los formatos Linux/Windows y comprueba el ASAR instalado: instalación deb en Ubuntu y NSIS2.1.5 seguido de actualización a la candidata en Windows. Estos ensayos usan runners efímeros, no el equipo del usuario. Su ejecución final debe pasar antes de entregar; los artefactos CI expiran a los7días. La instalación interactiva, SmartScreen y pkexec siguen siendo comprobaciones manuales distintas.
 
 - [ ] Comprobar instalador/actualización en Windows real y Linux con autorización del sistema.
-- [ ] Firmar paquetes/manifiestos Linux con la clave privada del firmante fijado; firmar Windows si corresponde. Los paquetes locales son candidatos sin firma de release y el updater Linux debe rechazarlos si falta la firma.
+- [x] Paquetes y manifiestos Linux locales firmados con GPG; `npx tsx scripts/qa/verifyCandidate.ts` verificó contra la clave pública fijada ambos manifiestos y los cuatro formatos Linux. También comprobó tamaño/SHA256 de los seis paquetes. Esto no acredita Authenticode en Windows; esa firma sigue pendiente si se requiere para publicar.
 - [ ] Publicar una GitHub prerelease beta. Estables no reciben beta automáticamente; beta admite beta/rc/final y excluye alpha. AppImage indica actualización manual.
 
 Audit actual raíz:6 avisos altos en dependencias de desarrollo Tailwind3/braces; producción0. Backend/Worker se auditan aparte. No se aplicó `audit fix --force`; pasar a Tailwind4 exige otro cambio de UI. No declarar el proyecto libre de vulnerabilidades. Los chunks grandes del PDF siguen como optimización futura, fuera del PDF aprobado.

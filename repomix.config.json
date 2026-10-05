@@ -46,7 +46,7 @@
     "server/src/**/*.ts",
     "server/tests/**/*.ts",
     "server/package.json",
-    "scripts/**/*.{ts,tsx,mjs,cjs,html}",
+    "scripts/**/*.{ts,tsx,mjs,cjs,html,ps1}",
     "PRODUCT.md",
     "shared/package.json",
     "src/index.css",
