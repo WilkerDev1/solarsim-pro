@@ -14,3 +14,7 @@ release/builder-debug.yml
 .wrangler
 repomix-output.xml
 repomix-output.txt
+
+.impeccable/
+
+**/next-secrets.env

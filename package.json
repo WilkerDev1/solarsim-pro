@@ -1,8 +1,8 @@
 {
   "name": "solarsim-pro",
   "private": true,
-  "version": "2.1.5",
-  "description": "Simulador Fotovoltaico Técnico-Económico Profesional",
+  "version": "2.3.0-beta.1",
+  "description": "Simulador Fotovoltaico T\u00e9cnico-Econ\u00f3mico Profesional",
   "author": "WilkerDev1",
   "type": "module",
   "main": "dist-electron/main.cjs",
@@ -11,7 +11,7 @@
     "build": "tsc && vite build",
     "lint": "tsc --noEmit",
     "preview": "vite preview",
-    "build:electron": "esbuild electron/main.ts --bundle --platform=node --target=node18 --external:electron --outfile=dist-electron/main.cjs && esbuild electron/preload.ts --bundle --platform=node --target=node18 --external:electron --outfile=dist-electron/preload.cjs",
+    "build:electron": "esbuild electron/main.ts --bundle --platform=node --target=node22 --external:electron --outfile=dist-electron/main.cjs && esbuild electron/preload.ts --bundle --platform=node --target=node22 --external:electron --outfile=dist-electron/preload.cjs",
     "electron:dev": "npm run build:electron && concurrently \"vite\" \"electron .\"",
     "electron:build": "npm run build && npm run build:electron && electron-builder",
     "build:win": "npm run build && npm run build:electron && electron-builder --win",
@@ -45,7 +45,7 @@
     "jspdf": "^4.2.1",
     "lucide-react": "^0.427.0",
     "pdf-lib": "^1.17.1",
-    "pdfjs-dist": "^4.4.168",
+    "pdfjs-dist": "6.4.299",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -54,20 +54,21 @@
     "zustand": "^4.5.5"
   },
   "devDependencies": {
-    "@types/node": "^22.5.0",
+    "@types/node": "^24.9.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
+    "@vitejs/plugin-react": "5.2.0",
     "autoprefixer": "^10.4.20",
     "concurrently": "^8.2.2",
-    "electron": "^31.7.7",
-    "electron-builder": "^24.13.3",
+    "electron": "44.5.1",
+    "electron-builder": "26.15.3",
+    "esbuild": "0.28.2",
     "postcss": "^8.4.41",
     "repomix": "^1.18.0",
     "tailwindcss": "^3.4.10",
     "tsx": "^4.23.15",
     "typescript": "^5.5.4",
-    "vite": "^5.4.1"
+    "vite": "7.3.6"
   },
   "buildConfig": {
     "appId": "com.solarsim.pro",
@@ -124,7 +125,7 @@
       "category": "Science",
       "maintainer": "WilkerDev1 <wilkerdev@github.com>",
       "synopsis": "Simulador Fotovoltaico Profesional",
-      "description": "Simulador de proyectos solares fotovoltaicos con dimensionamiento, análisis financiero y exportación de propuestas PDF."
+      "description": "Simulador de proyectos solares fotovoltaicos con dimensionamiento, an\u00e1lisis financiero y exportaci\u00f3n de propuestas PDF."
     },
     "publish": {
       "provider": "github",
@@ -133,8 +134,12 @@
     }
   },
   "allowScripts": {
-    "electron@31.7.7": true,
     "esbuild@0.21.5": true,
-    "core-js@3.50.0": true
+    "core-js@3.50.0": true,
+    "electron@44.5.1": true,
+    "esbuild@0.28.2": true
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

@@ -23,7 +23,7 @@ import { SplashScreen } from './components/common/SplashScreen';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 
 export const App: React.FC = () => {
-  const { activeView, setActiveView, sidebarTheme, syncSettings, syncProjectsWithServer, isTrashActive, isSettingsModalOpen, loadOrganizationFeaturePolicy } = useSimulationStore();
+  const { activeView, setActiveView, sidebarTheme, syncSettings, syncProjectsWithServer, isTrashActive, isSettingsModalOpen, activeConflict, loadOrganizationFeaturePolicy } = useSimulationStore();
   const isDark = sidebarTheme === 'dark';
 
   // 🔄 Ciclo de Vida Global de Sincronización Automática en Segundo Plano (Heartbeat & Focus)
@@ -74,7 +74,7 @@ export const App: React.FC = () => {
 
   return (
     <Suspense fallback={<div role="status" className="flex h-screen items-center justify-center text-sm text-slate-600">Cargando SolarSim…</div>}>
-    <div
+    <div aria-hidden={!!activeConflict || undefined} {...(activeConflict ? { inert: '' } : {})}
       className={`h-screen w-screen flex flex-row overflow-hidden transition-colors duration-200 ${
         isDark ? 'dark bg-[#10141d] text-zinc-100' : 'bg-[#f4f6fa] text-slate-900'
       }`}

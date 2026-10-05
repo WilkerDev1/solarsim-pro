@@ -1,0 +1,48 @@
+name: Verify beta desktop packages
+on:
+  pull_request:
+  push:
+    branches: [beta, 'codex/**']
+permissions:
+  contents: read
+concurrency:
+  group: packages-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run build:electron
+      - if: runner.os == 'Linux'
+        run: npx electron-builder --linux --publish never
+      - if: runner.os == 'Windows'
+        run: npx electron-builder --win --publish never
+      - if: runner.os == 'Linux'
+        run: xvfb-run -a node scripts/qa/runElectronRuntime.mjs
+      - if: runner.os == 'Windows'
+        run: node scripts/qa/runElectronRuntime.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ runner.os }}
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            release/SolarSim-Pro-*.exe
+            release/SolarSim-Pro-*.exe.blockmap
+            release/SolarSim-Pro-*.AppImage
+            release/SolarSim-Pro-*.deb
+            release/SolarSim-Pro-*.pacman
+            release/SolarSim-Pro-*.tar.gz
+            release/latest*.yml

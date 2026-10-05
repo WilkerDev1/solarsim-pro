@@ -27,6 +27,7 @@ jobs:
       - run: npm --prefix workers/share-viewer ci
       - run: npm run lint
       - run: npm test
+      - run: node scripts/qa/testPrepareSecrets.mjs
       - run: npm run build
       - run: npm run build:electron
       - run: npm --prefix server test

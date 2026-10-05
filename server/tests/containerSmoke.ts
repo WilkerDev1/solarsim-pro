@@ -93,13 +93,15 @@ try {
   if (!ready) console.error(docker("logs", "--tail", "10", api));
   assert.ok(ready, "Built Node24 image must start and connect to PostgreSQL");
   assert.notEqual(docker("exec", api, "id", "-u"), "0");
+  const loginPassword = randomUUID();
+  const loginEmail = `${suffix}@example.invalid`;
   const registration = await fetch(`${base}/api/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       name: "Synthetic QA",
-      email: `${suffix}@example.invalid`,
-      password: randomUUID(),
+      email: loginEmail,
+      password: loginPassword,
       organizationName: "Isolated QA",
     }),
   });
@@ -130,8 +132,106 @@ try {
       .selfConsumptionProjection,
     true,
   );
+  // Rehearse coordinated DB/JWT rotation on this disposable database and API only.
+  const nextPassword = randomUUID();
+  const nextSecret = randomUUID() + randomUUID();
+  docker(
+    "exec",
+    database,
+    "psql",
+    "-U",
+    "qa_user",
+    "-d",
+    "qa_db",
+    "-c",
+    `ALTER ROLE qa_user PASSWORD '${nextPassword}'`,
+  );
+  assert.equal(
+    docker(
+      "exec",
+      api,
+      "node",
+      "--input-type=module",
+      "-e",
+      "import pg from 'pg'; const client=new pg.Client({host:process.env.DB_HOST,user:process.env.DB_USER,password:process.env.DB_PASSWORD,database:process.env.DB_NAME});try {await client.connect(); process.exitCode=1;} catch {console.log('previous_database_credential_rejected');}finally{await client.end();}",
+    ),
+    "previous_database_credential_rejected",
+  );
+  docker("rm", "-f", api);
+  docker(
+    "run",
+    "-d",
+    "--name",
+    api,
+    "--network",
+    network,
+    "-p",
+    "127.0.0.1::3000",
+    "-e",
+    `DB_HOST=${database}`,
+    "-e",
+    "DB_USER=qa_user",
+    "-e",
+    "DB_NAME=qa_db",
+    "-e",
+    `DB_PASSWORD=${nextPassword}`,
+    "-e",
+    `JWT_SECRET=${nextSecret}`,
+    "solarsim-api:qa-modular",
+  );
+  const rotatedBase = `http://${docker("port", api, "3000").split("\n")[0]}`;
+  ready = false;
+  for (let attempt = 0; attempt < 60; attempt++) {
+    try {
+      if (
+        (
+          await fetch(rotatedBase + "/api/health", {
+            signal: AbortSignal.timeout(1000),
+          })
+        ).ok
+      ) {
+        ready = true;
+        break;
+      }
+    } catch {}
+    await pause();
+  }
+  assert.ok(ready, "Rotated image reconnects using new database credential");
+  assert.equal(
+    (await fetch(rotatedBase + "/api/organization/features", { headers }))
+      .status,
+    401,
+    "Old JWT is revoked",
+  );
+  assert.equal(
+    (
+      await fetch(rotatedBase + "/api/auth/refresh", {
+        method: "POST",
+        headers,
+      })
+    ).status,
+    401,
+    "Old JWT cannot refresh after rotation",
+  );
+  const loggedIn = await fetch(rotatedBase + "/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+  });
+  assert.equal(loggedIn.status, 200);
+  const renewed = (await loggedIn.json()) as { token: string };
+  const retained = await fetch(rotatedBase + "/api/organization/features", {
+    headers: { Authorization: `Bearer ${renewed.token}` },
+  });
+  assert.equal(retained.status, 200);
+  assert.equal(
+    ((await retained.json()) as typeof policy).settings
+      .selfConsumptionProjection,
+    true,
+    "Rotation preserves business data",
+  );
   console.log(
-    "Built image smoke passed: Node24 ESM contracts, non-root, PostgreSQL health, registration and feature CAS.",
+    "Built image smoke passed: Node24 ESM contracts, non-root, PostgreSQL health, registration, feature CAS and DB/JWT rotation.",
   );
 } finally {
   for (const name of [api, database]) {

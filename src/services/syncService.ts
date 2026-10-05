@@ -31,7 +31,7 @@ export interface SyncPullResult {
 }
 
 export type SyncPushOutcome =
-  | { id: string; originalId?: string; status: 'created' | 'updated' | 'forked'; version: number; project?: ProjectSimulation }
+  | { id: string; originalId?: string; status: 'created' | 'updated' | 'forked'; version: number; project?: ProjectSimulation; awaitingConfirmation?: boolean }
   | { id: string; originalId?: string; status: 'conflict'; reason?: string; serverVersion: number; serverProject?: ProjectSimulation; localVersion?: number; lastModifiedByName?: string; lastModifiedAt?: string };
 
 export interface SyncPushResult {
@@ -102,7 +102,7 @@ function validatePushResults(results: unknown, ids: string[], content: 'project'
   for (const result of results) {
     const source = result?.originalId || result?.id;
     if (!expected.delete(source) || !['created', 'updated', ...(content === 'project' ? ['forked'] : []), 'conflict'].includes(result?.status)) throw new Error('Confirmación de sincronización inválida. Actualiza el servidor.');
-    if (result.status !== 'conflict' && (!Number.isSafeInteger(result.version) || result.version < 1 || result[content]?.id !== result.id)) throw new Error('El servidor no devolvió el documento confirmado y su versión.');
+    if (result.status !== 'conflict' && (!Number.isSafeInteger(result.version) || result.version < 1 || (result[content]?.id !== result.id && !(content === 'project' && result.awaitingConfirmation === true)))) throw new Error('El servidor no devolvió el documento confirmado y su versión.');
   }
   return results;
 }
@@ -443,6 +443,23 @@ export class SyncService {
         return { success: false, error: data?.error || `Error al subir proyectos (HTTP ${res.status})` };
       }
 
+      if (Array.isArray(data.results) && data.results.some((result: any) => result.awaitingConfirmation !== undefined)) throw new Error('Confirmación de sincronización inválida.');
+      // Legacy servers acknowledge versions without returning the canonical document.
+      // Read back once; never guess a confirmed document from the submitted payload.
+      if (Array.isArray(data.results) && data.results.some((result: SyncPushOutcome) => result.status !== 'conflict' && !result.project)) {
+        const expected = new Set(projects.map(project => project.id));
+        if (data.results.length !== projects.length || data.results.some((result: SyncPushOutcome) => typeof result.id !== 'string' || !result.id || !expected.delete(result.originalId || result.id) || !['created', 'updated', 'forked', 'conflict'].includes(result.status) || (result.status !== 'conflict' && (!Number.isSafeInteger(result.version) || result.version < 1)))) throw new Error('Confirmación de sincronización inválida.');
+        const readback = await this.pullProjects(serverUrl, token);
+        const receipts = data.results.map((result: SyncPushOutcome) => result.status !== 'conflict' && !result.project ? { ...result, awaitingConfirmation: true } : result);
+        if (!readback.success || !readback.projects) return { success: true, results: receipts, message: 'El servidor guardó cambios; su confirmación sigue pendiente.' };
+        data.results = data.results.map((result: SyncPushOutcome) => {
+          if (result.status === 'conflict' || result.project) return result;
+          const confirmed = readback.projects!.find(project => project.id === result.id);
+          if (!confirmed || !Number.isSafeInteger(confirmed.version) || confirmed.version! < result.version || !confirmed.client || !confirmed.specs || !confirmed.rates || !confirmed.financials) return { ...result, awaitingConfirmation: true };
+          if (confirmed.version !== result.version) return { id: result.id, originalId: result.originalId, status: 'conflict', serverVersion: confirmed.version, localVersion: result.version, serverProject: confirmed };
+          return { ...result, project: confirmed };
+        });
+      }
       return {
         success: true,
         message: data.message,

@@ -1,3 +1,4 @@
+import { selectEligibleRelease } from '../releaseChannel';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -167,3 +168,17 @@ async function main() {
 }
 
 main().catch(error => { console.error(error); process.exitCode = 1; });
+
+const channelReleases = [
+  { tag_name: 'v2.3.0-beta.2', prerelease: true },
+  { tag_name: 'v2.2.1', prerelease: false },
+  { tag_name: 'v2.4.0', draft: true },
+  { tag_name: 'not-a-version' },
+];
+assert.equal(selectEligibleRelease(channelReleases, '2.2.0')?.tag_name, 'v2.2.1');
+assert.equal(selectEligibleRelease(channelReleases, '2.3.0-beta.1')?.tag_name, 'v2.3.0-beta.2');
+assert.equal(selectEligibleRelease(channelReleases, '2.3.0') , null);
+assert.equal(selectEligibleRelease([{ tag_name: 'v2.3.0' }], '2.3.0-beta.2')?.tag_name, 'v2.3.0');
+
+assert.equal(selectEligibleRelease([...channelReleases, {tag_name: 'v2.4.0-alpha.1', prerelease: true}], '2.3.0-beta.1')?.tag_name, 'v2.3.0-beta.2');
+assert.equal(selectEligibleRelease([{tag_name: 'v2.3.0-rc.1', prerelease: true}], '2.3.0-beta.2')?.tag_name, 'v2.3.0-rc.1');

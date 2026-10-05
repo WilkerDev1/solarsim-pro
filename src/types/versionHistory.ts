@@ -26,6 +26,8 @@ export interface DiffFieldChange {
 }
 
 export interface ProjectConflictInfo {
+  scope?: string;
+  reason?: string;
   projectId: string;
   localVersion: number;
   serverVersion: number;

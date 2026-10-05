@@ -71,7 +71,7 @@ export function registerWindowIpcHandlers() {
       const pdfData = await mainWindow.webContents.printToPDF({
         printBackground: true,
         pageSize: 'A4',
-        margins: { marginType: 'none' },
+        margins: { top: 0, bottom: 0, left: 0, right: 0 },
       });
 
       const { filePath } = await dialog.showSaveDialog(mainWindow, {

@@ -3,6 +3,7 @@ import fs from 'fs';
 import https from 'https';
 import { installVerifiedLinuxPackage } from './linuxPackageUpdater';
 import { assertNewerReleaseVersion, compareReleaseVersions } from './releaseVersion';
+import { selectEligibleRelease } from './releaseChannel';
 import { autoUpdater } from 'electron-updater';
 import { getMainWindow } from '../window/windowManager';
 
@@ -22,7 +23,7 @@ function fetchLatestGitHubRelease(): Promise<any> {
   return new Promise((resolve, reject) => {
     const options = {
       hostname: 'api.github.com',
-      path: '/repos/WilkerDev1/solarsim-pro/releases/latest',
+      path: '/repos/WilkerDev1/solarsim-pro/releases?per_page=100',
       headers: { 'User-Agent': 'SolarSim-Pro-Updater' },
     };
 
@@ -46,6 +47,7 @@ function fetchLatestGitHubRelease(): Promise<any> {
 }
 
 export function registerAutoUpdater() {
+  autoUpdater.allowPrerelease = app.getVersion().split('+')[0].includes('-');
   let linuxInstallInProgress = false;
   // AutoUpdater Events
   autoUpdater.on('checking-for-update', () => {
@@ -134,11 +136,13 @@ export function registerAutoUpdater() {
 
       // In development mode, or in Linux non-AppImage (e.g. pacman or deb), query GitHub API directly
       if (!app.isPackaged || process.platform === 'linux') {
-        const release = await fetchLatestGitHubRelease();
-        const latestTag = (release.tag_name || '').replace(/^v/, '');
         const currentVer = app.getVersion().replace(/^v/, '');
+        const releases = await fetchLatestGitHubRelease();
+        if (!Array.isArray(releases)) throw new Error('Respuesta de releases inválida.');
+        const release = selectEligibleRelease(releases, currentVer);
+        const latestTag = release?.tag_name.replace(/^v/, '') || currentVer;
 
-        if (compareReleaseVersions(latestTag, currentVer) > 0) {
+        if (release && compareReleaseVersions(latestTag, currentVer) > 0) {
           sendUpdateStatus({
             state: 'available',
             version: latestTag,

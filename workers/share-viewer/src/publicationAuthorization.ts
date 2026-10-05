@@ -18,7 +18,7 @@ export async function authorizePublication(env: Env, authorization: string | und
   } catch { throw new AuthorizationError('El servicio de autorización no está configurado.', 503); }
   let response: Response;
   try {
-    response = await requestFetch(endpoint, { method: 'POST', headers: { Authorization: authorization }, redirect: 'error', signal: AbortSignal.timeout(8000) });
+    response = await requestFetch(endpoint, { method: 'POST', headers: { Authorization: authorization }, redirect: 'manual', signal: AbortSignal.timeout(8000) });
   } catch { throw new AuthorizationError('No se pudo verificar la sesión. Intenta nuevamente.', 503); }
   if (response.status === 401 || response.status === 403) throw new AuthorizationError('La cuenta no tiene permiso para publicar propuestas.', response.status);
   if (!response.ok) throw new AuthorizationError('El servicio de autorización no está disponible.', 503);

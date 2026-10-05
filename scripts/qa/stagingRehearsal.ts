@@ -1,0 +1,61 @@
+/** Explicit network rehearsal, excluded from npm test. Synthetic accounts only. */
+import assert from 'node:assert/strict';
+import { BENCHMARK_PROJECT } from '../../src/engine/referenceCase';
+import { SyncService } from '../../src/services/syncService';
+import { ShareProposalService } from '../../src/services/shareProposalService';
+import { calculateProjectFinancialSummary } from '../../src/engine/financeEngine';
+import { useSimulationStore } from '../../src/store/useSimulationStore';
+const api = process.env.QA_API_URL || 'http://127.0.0.1:3101';
+const worker = process.env.QA_WORKER_URL;
+if (new URL(api).hostname !== '127.0.0.1' || !worker || !/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(worker)) throw new Error('Use the loopback synthetic API and its temporary HTTPS Worker tunnel. Production is forbidden.');
+const storage = new Map<string,string>();
+Object.defineProperty(globalThis, 'localStorage', {value: {getItem: (key:string) => storage.get(key) ?? null, setItem: (key:string,value:string) => storage.set(key,value), removeItem: (key:string) => storage.delete(key)}, configurable:true});
+const password = 'isolated-qa-only';
+const login = async (email: string) => {
+ const result = await SyncService.login(api, email, password);
+ assert.ok(result.success && result.user && result.token);
+ assert.match(result.user.organizationName || '', /^QA SolarSim/);
+ return { user: result.user!, token: result.token! };
+};
+const a = await login('ana@staging.example.invalid'), b = await login('bruno@staging.example.invalid'), viewer = await login('vera@staging.example.invalid');
+assert.equal(a.user.organizationId, b.user.organizationId); assert.equal(a.user.organizationId, viewer.user.organizationId);
+const original = { ...structuredClone(BENCHMARK_PROJECT), id: crypto.randomUUID(), client: { ...BENCHMARK_PROJECT.client, name: 'QA integrada — Oficina y almacén', company: 'Empresa sintética QA', address: 'Dirección sintética de staging', contactPerson: 'Contacto QA', phone: '', email: 'contacto@example.invalid', rnc: '', projectId: 'SP-QA-INTEGRATION', quoteNumber: 'C-QA-INTEGRATION' }, organizationId: a.user.organizationId, syncServerUrl: api, version: 1, baseVersion: 0, syncStatus: 'pending' as const };
+const created = await SyncService.pushProjects(api, a.token, [original]);
+assert.equal(created.success, true);
+const outcome = created.results![0]; assert.ok(outcome.status !== 'conflict');
+let canonical = outcome.project!;
+const writeA = await SyncService.pushProjects(api, a.token, [{ ...canonical, specs: { ...canonical.specs, panelCount: 44 }, baseVersion: canonical.version }]);
+assert.equal(writeA.success, true); assert.ok(writeA.results![0].status !== 'conflict');
+const writeB = await SyncService.pushProjects(api, b.token, [{ ...canonical, monthlyConsumption: canonical.monthlyConsumption.map((value, index) => index === 0 ? 4000 : value), baseVersion: canonical.version }]);
+assert.equal(writeB.results![0].status, 'conflict');
+if (writeB.results![0].status === 'conflict') { assert.equal(writeB.results![0].serverVersion, 2); assert.equal(writeB.results![0].lastModifiedByName, a.user.name); }
+assert.equal((await SyncService.pushProjects(api, viewer.token, [original])).success, false);
+const noBase = await fetch(api + '/api/sync/push', {method: 'POST', headers: {'Content-Type':'application/json',Authorization:'Bearer '+a.token},body:JSON.stringify({projects:[{...original,baseVersion:undefined}]})});
+assert.equal(noBase.status, 200);
+const rejectedLegacy = await noBase.json();
+assert.equal(rejectedLegacy.results[0].status, 'conflict');
+assert.equal(rejectedLegacy.results[0].reason, 'base_version_required', 'Legacy client cannot bypass mandatory CAS');
+const pull = await SyncService.pullProjects(api, a.token); canonical = pull.projects!.find(project => project.id === original.id)!;
+assert.equal(canonical.specs.panelCount, 44);
+useSimulationStore.setState({ syncSettings: {serverUrl:api,authToken:a.token,currentUser:a.user,autoSyncEnabled:false,lastSyncTimestamp:null} });
+const startPolicy = await fetch(api+'/api/organization/features',{headers:{Authorization:'Bearer '+a.token}}).then(r=>r.json());
+if(startPolicy.settings.selfConsumptionProjection) { const reset=await fetch(api+'/api/organization/features',{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+a.token},body:JSON.stringify({baseVersion:startPolicy.version,settings:{selfConsumptionProjection:false}})}); assert.equal(reset.status,200); }
+const shared = await ShareProposalService.shareProposal(canonical, calculateProjectFinancialSummary(canonical, 'legacy'), 7, worker);
+assert.equal(shared.success, true, shared.error); assert.ok(shared.shareUrl);
+const html = await fetch(shared.shareUrl!); assert.equal(html.status, 200); assert.match(await html.text(), /QA integrada/);
+const unauthorizedShare = await fetch(worker+'/api/share',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+viewer.token},body:'{}'}); assert.equal(unauthorizedShare.status,403);
+const initialPublication = await fetch(worker+'/api/share/'+shared.shareUrl!.split('/').at(-1)).then(r=>r.json());
+assert.equal(initialPublication.calculationSnapshot.mode,'legacy');
+const policy = await fetch(api+'/api/organization/features',{headers:{Authorization:'Bearer '+a.token}}).then(response => response.json());
+const changedPolicy = await fetch(api+'/api/organization/features',{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+a.token},body:JSON.stringify({baseVersion:policy.version,settings:{selfConsumptionProjection:true}})});
+assert.equal(changedPolicy.status,200);
+const physical = await ShareProposalService.shareProposal(canonical, calculateProjectFinancialSummary(canonical,'self_consumption'), 7, worker);
+assert.equal(physical.success,true,physical.error);
+assert.equal((await fetch(physical.shareUrl!)).status,200);
+const physicalPublication = await fetch(worker+'/api/share/'+physical.shareUrl!.split('/').at(-1)).then(r=>r.json());
+assert.equal(physicalPublication.calculationSnapshot.mode,'self_consumption');
+// Put the disposable document in trash through CAS, then restore it.
+const trash = await SyncService.pushProjects(api,a.token,[{...canonical,isDeleted:true,deletedAt:new Date().toISOString(),baseVersion:canonical.version}]); assert.equal(trash.success,true); const trashed=trash.results![0]; assert.ok(trashed.status!=='conflict');
+assert.equal(await SyncService.restoreProject(api,a.token,canonical.id,trashed.version),true);
+const restored=(await SyncService.pullProjects(api,a.token)).projects!.find(project=>project.id===canonical.id)!; assert.equal(restored.isDeleted,false); assert.ok(restored.version!>trashed.version);
+console.log('PASS: HTTP real cliente/API/Worker local+KV aislado; ADMIN/EDITOR CAS, VIEWER, cliente legacy, publicaciones legacy/físico, política, papelera/restauración.');

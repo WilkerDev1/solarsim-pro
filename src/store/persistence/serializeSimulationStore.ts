@@ -28,5 +28,6 @@ export function serializeSimulationStore(state: SimulationStore) {
     localUserProfile: state.localUserProfile,
     snapshotsByProject: state.snapshotsByProject,
     projectDeletionQueue: state.projectDeletionQueue,
+    projectConflicts: state.projectConflicts,
   };
 }

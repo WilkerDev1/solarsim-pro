@@ -26,8 +26,8 @@ export function acknowledgeQueuedProjectDeletions(queue: ProjectDeletionCommand[
     if (!result) return command;
     return {
       ...command, id: result.id, baseVersion: result.version,
-      stage: (result.project?.isDeleted ?? sentMap.get(command.id)?.isDeleted) ? 'delete' : 'trash',
-      project: command.project ? { ...command.project, id: result.id, version: result.version, baseVersion: result.version } : undefined,
+      stage: !result.awaitingConfirmation && (result.project?.isDeleted ?? sentMap.get(command.id)?.isDeleted) ? 'delete' : 'trash',
+      project: command.project ? { ...command.project, id: result.id, version: result.version, baseVersion: result.version, pendingCanonicalAck: result.awaitingConfirmation ? { version: result.version } : undefined } : undefined,
     };
   });
 }

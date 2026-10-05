@@ -183,11 +183,12 @@ async function runTests() {
     specs: { ...testProject.specs, panelCount: 60 },
   };
 
+  useSimulationStore.setState({ syncSettings: { ...store.syncSettings, autoSyncEnabled: false, serverUrl: 'https://qa.example.invalid', authToken: 'synthetic', currentUser: { id: 'qa-editor', name: 'QA', email: 'qa@example.invalid', role: 'EDITOR', organizationId: 'qa-org' } }, projects: useSimulationStore.getState().projects.map(project => project.id === testProject.id ? { ...localVersionProj, organizationId: 'qa-org', syncServerUrl: 'https://qa.example.invalid' } : project) });
   store.setActiveConflict({
     projectId: testProject.id,
     localVersion: 1,
     serverVersion: 3,
-    localProject: localVersionProj,
+    localProject: { ...localVersionProj, organizationId: 'qa-org', syncServerUrl: 'https://qa.example.invalid' },
     serverProject: remoteServerProj,
     lastModifiedByName: 'Ing. Alejandro Santos',
     lastModifiedAt: new Date().toISOString(),
@@ -209,9 +210,9 @@ async function runTests() {
   store.resolveConflict('fork');
   const afterFork = useSimulationStore.getState();
   assert(afterFork.activeConflict === null, 'activeConflict cerrado tras resolución');
-  const forked = afterFork.projects.find((p) => p.id.includes('fork'));
+  const forked = afterFork.projects.find((p) => p.id !== testProject.id && p.client.name === localVersionProj.client.name + ' (copia)');
   assert(forked !== undefined, 'Propuesta bifurcada creada independientemente sin sobreescribir');
-  assert(Boolean(forked?.client.name.includes('Bifurcación Copia')), 'Nombre de bifurcación contiene "(Bifurcación Copia)"');
+  assert(Boolean(forked?.client.projectId && forked?.client.quoteNumber), 'La copia tiene códigos independientes de propuesta y cotización');
 
   // -----------------------------------------------------------------
   // 6. NOTIFICACIONES DE EQUIPO
@@ -236,7 +237,7 @@ async function runTests() {
 
   // Limpiar proyecto de prueba
   useSimulationStore.setState((s) => ({
-    projects: s.projects.filter((p) => p.id !== testProject.id && !p.id.includes('fork')),
+    projects: s.projects.filter((p) => p.id !== testProject.id && p.id !== forked?.id),
   }));
 
   console.log('\n======================================================');

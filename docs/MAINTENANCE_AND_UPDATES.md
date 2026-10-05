@@ -1,6 +1,6 @@
 # Mantenimiento y releases
 
-Trabajar funcionalidades en beta o rama codex/ desde beta; main recibe publicación aprobada. Esta rama no cambia la versión2.1.5 ni publica instaladores.
+Trabajar funcionalidades en beta o rama codex/ desde beta; main recibe publicación aprobada. Esta candidata usa2.3.0-beta.1 y genera paquetes locales sin publicarlos; consultar [plan de beta y rollback](BETA_ROLLOUT.md).
 
 ```bash
 npm ci
@@ -36,6 +36,6 @@ npx tsx scripts/release.ts --sign
 
 ## Dependencias y límites
 
-Hono/Worker y backend se actualizan con sus pruebas aisladas. jsPDF4.2.1 corrige los avisos críticos de su versión anterior (fuente: https://github.com/parallax/jsPDF/releases/tag/v4.2.1), conservando el flujo de canvas y anexos PDF. Electron31 y herramientas de empaquetado siguen requiriendo una actualización mayor separada con matriz Windows/Linux y pruebas de instalador real. npm audit se conserva como evidencia; esta rama no se presenta como libre de toda vulnerabilidad ni certifica todos los formatos de distribución.
+Hono/Worker y backend se actualizan con sus pruebas aisladas. jsPDF4.2.1 corrige los avisos críticos de su versión anterior (fuente: https://github.com/parallax/jsPDF/releases/tag/v4.2.1), conservando el flujo de canvas y anexos PDF. Electron44.5.1 y electron-builder26.15.3 ya están actualizados. La matriz CI prueba paquetes/runtime Windows/Linux; instalación interactiva y actualización del SO siguen pendientes. Estables excluyen beta; beta admite beta/rc/final y excluye alpha. npm audit se conserva como evidencia; esta rama no se presenta como libre de toda vulnerabilidad ni certifica todos los formatos de distribución.
 
 Documentos financieros describen contratos de software, no validación jurídica de normativa futura. Revisar cambios legales con fuentes regulatorias antes de modificar fórmulas.

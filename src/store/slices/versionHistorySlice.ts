@@ -1,3 +1,8 @@
+import { generateDuplicateProjectIdentifiers } from '../initialData';
+import { featureScope } from '../../../shared/applicationFeatures';
+import { ownsProject } from '../sync/projectReconciliation';
+import { projectDifferences } from '../sync/projectDifferences';
+import { SyncService } from '../../services/syncService';
 import { calculateProjectFinancialSummary } from '../../engine/financeEngine';
 import { effectiveFeatureSettings } from '../../features/application/featurePolicy';
 import { energyCalculationMode } from '../../../shared/applicationFeatures';
@@ -15,6 +20,7 @@ export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (
   canRedo: false,
   snapshotsByProject: {},
   activeConflict: null,
+  projectConflicts: {},
 
   recordUndoState: (project) => {
     if (!project || !project.id) return;
@@ -271,57 +277,59 @@ export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (
   },
 
   setActiveConflict: (conflict) => {
-    set({ activeConflict: conflict });
+    if (!conflict) { set({ activeConflict: null }); return; }
+    const { serverUrl, currentUser } = get().syncSettings;
+    if (!currentUser || !ownsProject(conflict.localProject, serverUrl, currentUser.organizationId)) return;
+    const scope = featureScope(serverUrl, currentUser.organizationId);
+    const scoped = { ...conflict, scope };
+    set(state => ({ activeConflict: scoped, projectConflicts: { ...state.projectConflicts, [scope + '|' + conflict.projectId]: scoped } }));
+  },
+
+  openProjectConflict: async (projectId) => {
+    const captured = get();
+    const { serverUrl, authToken, currentUser } = captured.syncSettings;
+    const local = captured.projects.find(project => project.id === projectId);
+    if (!authToken || !currentUser || !local || !ownsProject(local, serverUrl, currentUser.organizationId)) return { success: false, error: 'Inicia sesión en la organización de esta propuesta.' };
+    const scope = featureScope(serverUrl, currentUser.organizationId);
+    const result = await SyncService.pullProjects(serverUrl, authToken);
+    const fresh = get();
+    if (fresh.sessionGeneration !== captured.sessionGeneration || fresh.syncSettings.serverUrl !== serverUrl || fresh.syncSettings.currentUser?.id !== currentUser.id || fresh.syncSettings.currentUser?.organizationId !== currentUser.organizationId || !fresh.syncSettings.authToken) return { success: false, error: 'La sesión cambió. Vuelve a abrir el conflicto.' };
+    const latest = fresh.projects.find(project => project.id === projectId);
+    if (!latest || latest.syncStatus !== 'conflict' || !ownsProject(latest, serverUrl, currentUser.organizationId)) return { success: false, error: 'El estado de la propuesta cambió. Actualiza la lista.' };
+    const previous = fresh.projectConflicts[scope + '|' + projectId];
+    if (!result.success) return { success: false, error: result.error || 'No se pudo consultar la nube. Tu copia local se conserva.' };
+    const server = result.projects?.find(project => project.id === projectId);
+    const deleted = result.deletedIds?.includes(projectId) || (!server && previous?.reason === 'deleted');
+    if (!server && !deleted) return { success: false, error: 'La propuesta ya no está disponible en la nube. Tu copia local se conserva.' };
+    get().setActiveConflict({ projectId, scope, reason: deleted ? 'deleted' : undefined, localVersion: latest.baseVersion ?? 0, serverVersion: server?.version ?? 0, localProject: latest, serverProject: server || { ...latest, isDeleted: true },
+      lastModifiedByName: !deleted && previous?.serverVersion === server?.version ? previous.lastModifiedByName : '', lastModifiedAt: server?.updatedAt || '', diffs: deleted ? [] : projectDifferences(server!, latest) });
+    return { success: true };
   },
 
   resolveConflict: (resolution) => {
-    const { activeConflict, projects } = get();
-    if (!activeConflict) return;
-
+    const { activeConflict: opened, projectConflicts, projects, syncSettings } = get();
+    const activeConflict = opened ? projectConflicts[(opened.scope || '') + '|' + opened.projectId] : null;
+    if (!activeConflict || !syncSettings.currentUser || !syncSettings.authToken) return;
     const { projectId, serverProject } = activeConflict;
-    const localProject = projects.find((project) => project.id === projectId) || activeConflict.localProject;
-
-    if (resolution === 'keep_local') {
-      // Force next push to increment over server version
-      const bumpedLocal = {
-        ...localProject,
-        version: serverProject.version || 1,
-        baseVersion: serverProject.version,
-        syncStatus: 'pending' as const,
-      };
-      set((state) => ({
-        projects: state.projects.map((p) => (p.id === projectId ? bumpedLocal : p)),
-        activeConflict: null,
-      }));
-    } else if (resolution === 'accept_server') {
-      // Overwrite local with server
-      set((state) => ({
-        projects: state.projects.map((p) => (p.id === projectId ? { ...serverProject, baseVersion: serverProject.version, syncStatus: 'synced' as const } : p)),
-        activeConflict: null,
-      }));
-    } else if (resolution === 'fork') {
-      // Keep server as is, and save local as a new forked project
-      const forkedId = `${projectId}-fork-${Date.now().toString(36).substring(2, 6)}`;
-      const forkedProject: ProjectSimulation = {
-        ...localProject,
-        id: forkedId,
-        client: {
-          ...localProject.client,
-          name: `${localProject.client.name} (Bifurcación Copia)`,
-          projectId: `${localProject.client.projectId || 'SP'}-FORK`,
-        },
-        version: 1,
-        baseVersion: 0,
-        syncStatus: 'pending',
-      };
-      set((state) => ({
-        projects: [
-          ...state.projects.map((p) => (p.id === projectId ? { ...serverProject, baseVersion: serverProject.version, syncStatus: 'synced' as const } : p)),
-          forkedProject,
-        ],
-        activeConflict: null,
-      }));
-    }
+    const localProject = projects.find(project => project.id === projectId);
+    const scope = featureScope(syncSettings.serverUrl, syncSettings.currentUser.organizationId);
+    if (!localProject || !ownsProject(localProject, syncSettings.serverUrl, syncSettings.currentUser.organizationId) || activeConflict.scope !== scope) return;
+    if (!['ADMIN', 'EDITOR'].includes(syncSettings.currentUser.role) && resolution !== 'accept_server') return;
+    if (activeConflict.reason === 'deleted' && resolution !== 'fork') return;
+    // A local checkpoint keeps discarded content recoverable in the version history.
+    get().createSnapshot(projectId, 'Antes de resolver conflicto', undefined, 'manual');
+    const canonical: ProjectSimulation = { ...serverProject, organizationId: localProject.organizationId, syncServerUrl: localProject.syncServerUrl, folderId: localProject.folderId, baseVersion: activeConflict.serverVersion, version: activeConflict.serverVersion, syncStatus: 'synced' };
+    let next = canonical;
+    let copy: ProjectSimulation | undefined;
+    if (resolution === 'keep_local') next = { ...localProject, version: activeConflict.serverVersion, baseVersion: activeConflict.serverVersion, syncStatus: 'pending' };
+    const identifiers = generateDuplicateProjectIdentifiers(localProject, projects);
+    const now = new Date().toISOString();
+    if (resolution === 'fork') copy = { ...localProject, id: crypto.randomUUID(), client: { ...localProject.client, name: localProject.client.name + ' (copia)', projectId: identifiers.projectId, quoteNumber: identifiers.quoteNumber }, createdAt: now, updatedAt: now, authorId: syncSettings.currentUser.id, authorName: syncSettings.currentUser.name, authorEmail: syncSettings.currentUser.email, lastModifiedBy: syncSettings.currentUser.name, lastModifiedAt: now, version: 1, baseVersion: 0, pendingCanonicalAck: undefined, syncStatus: 'pending', isDeleted: false, deletedAt: undefined, deletedBy: undefined };
+    set(state => {
+      const projectConflicts = { ...state.projectConflicts };
+      delete projectConflicts[scope + '|' + projectId];
+      return { projects: [...(activeConflict.reason === 'deleted' ? state.projects.filter(project => project.id !== projectId) : state.projects.map(project => project.id === projectId ? next : project)), ...(copy ? [copy] : [])], projectConflicts, activeConflict: null };
+    });
     get().triggerAutoSync();
   },
 });

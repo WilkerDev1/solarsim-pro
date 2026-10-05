@@ -4,7 +4,7 @@ import { featureScope } from '../../../shared/applicationFeatures';
 import { ownsProject, reconcilePulledProjects, acknowledgeProjectPush } from '../sync/projectReconciliation';
 import { SyncService, registerTokenRenewedListener } from '../../services/syncService';
 import { acknowledgeQueuedProjectDeletions, createProjectDeletion, ProjectDeletionCommand } from '../sync/projectDeletion';
-import type { ProjectSimulation } from '../../types';
+import type { ProjectConflictInfo, ProjectSimulation } from '../../types';
 
 let autoSyncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -45,7 +45,7 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
 
   setSyncSettings: (settingsPartial) => {
     if (settingsPartial.serverUrl || settingsPartial.currentUser !== undefined || settingsPartial.authToken === null) sessionEpoch++;
-    set((state) => ({ syncSettings: { ...state.syncSettings, ...settingsPartial }, sessionGeneration: sessionEpoch, isSyncing: false }));
+    set((state) => ({ syncSettings: { ...state.syncSettings, ...settingsPartial }, sessionGeneration: sessionEpoch, isSyncing: false, activeConflict: null }));
     if (settingsPartial.autoSyncEnabled && get().syncSettings.authToken) {
       get().triggerAutoSync(true);
     }
@@ -150,22 +150,38 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
         projects: local ? [...state.projects.filter((project) => project.id !== command.id), { ...local, syncStatus: 'conflict' as const }] : state.projects,
         activeConflict: local && server ? {
           projectId: command.id, localVersion: command.baseVersion, serverVersion: server.version ?? 1,
-          localProject: local, serverProject: server, lastModifiedByName: server.lastModifiedBy || 'Otro miembro',
+          localProject: local, serverProject: server, scope, lastModifiedByName: '',
           lastModifiedAt: server.updatedAt, diffs: projectDifferences(server, local),
         } : state.activeConflict,
       }));
+      if (get().activeConflict) get().setActiveConflict(get().activeConflict);
     };
     try {
       const pull = await SyncService.pullProjects(serverUrl, token());
       ensureCurrent();
       if (!pull.success || !pull.projects) throw new Error(pull.error || 'No se pudieron descargar los proyectos.');
-      set((state) => ({ projects: reconcilePulledProjects(state.projects, pull.projects!, pull.deletedIds || [], new Set(state.projectDeletionQueue.filter((item) => item.scope === scope).map((item) => item.id)), serverUrl, currentUser.organizationId) }));
+      set((state) => {
+        const projects = reconcilePulledProjects(state.projects, pull.projects!, pull.deletedIds || [], new Set(state.projectDeletionQueue.filter((item) => item.scope === scope).map((item) => item.id)), serverUrl, currentUser.organizationId);
+        const projectConflicts = Object.fromEntries(Object.entries(state.projectConflicts).filter(([, conflict]) => conflict.scope !== scope || projects.some(project => project.id === conflict.projectId && project.syncStatus === 'conflict')));
+        for (const project of projects) {
+          if (project.syncStatus === 'conflict' && ownsProject(project, serverUrl, currentUser.organizationId) && pull.deletedIds?.includes(project.id)) {
+            projectConflicts[scope + '|' + project.id] = { scope, reason: 'deleted', projectId: project.id, localVersion: project.baseVersion ?? 0, serverVersion: 0, localProject: project, serverProject: { ...project, isDeleted: true }, lastModifiedByName: '', lastModifiedAt: '', diffs: [] };
+          }
+        }
+        const activeConflict = state.activeConflict?.scope === scope ? projectConflicts[scope + '|' + state.activeConflict.projectId] ?? null : state.activeConflict;
+        return { projects, projectConflicts, activeConflict };
+      });
       // Confirm trash through CAS before physical deletion, including documents created offline.
       // A failed command remains durable without preventing unrelated documents from syncing.
       if (canWrite) for (const captured of get().projectDeletionQueue.filter((item) => item.scope === scope)) {
         let command = captured;
         if ((pull.deletedIds || []).includes(command.id)) { releaseDeletion(command); continue; }
         const server = pull.projects.find((project) => project.id === command.id);
+        if (command.project?.pendingCanonicalAck) {
+          if (!server || !Number.isSafeInteger(server.version) || server.version! < command.project.pendingCanonicalAck.version) { deletionErrors++; continue; }
+          command = { ...command, stage: server.isDeleted ? 'delete' : 'trash', project: { ...command.project, pendingCanonicalAck: undefined } };
+          set(state => ({ projectDeletionQueue: state.projectDeletionQueue.map(item => item.scope === scope && item.id === command.id ? command : item) }));
+        }
         if (!command.project) {
           if (!server) { deletionErrors++; continue; }
           command = { ...command, project: { ...server, isDeleted: true, baseVersion: command.baseVersion, syncStatus: 'pending' }, stage: server.isDeleted ? 'delete' : 'trash' };
@@ -187,6 +203,7 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
           const acknowledged = get().projectDeletionQueue.find((item) => item.scope === scope && item.id === outcome.id);
           if (!acknowledged) continue;
           command = acknowledged;
+          if (command.project?.pendingCanonicalAck) { deletionErrors++; continue; }
         }
         const success = await SyncService.deleteProject(serverUrl, token(), command.id, true, command.baseVersion);
         ensureCurrent();
@@ -199,7 +216,7 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
         if (changed && (changed.version !== command.baseVersion || !changed.isDeleted)) recoverDeletion(command, changed);
         else deletionErrors++;
       }
-      const sent = canWrite ? get().projects.filter((project) => project.syncStatus === 'pending' && ownsProject(project, serverUrl, currentUser.organizationId)) : [];
+      const sent = canWrite ? get().projects.filter((project) => project.syncStatus === 'pending' && !project.pendingCanonicalAck && ownsProject(project, serverUrl, currentUser.organizationId)) : [];
       if (sent.length) {
         const push = await SyncService.pushProjects(serverUrl, token(), sent);
         ensureCurrent();
@@ -207,30 +224,40 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
         set((state) => {
           const reconciled = acknowledgeProjectPush(state.projects, sent, push.results!, serverUrl, currentUser.organizationId);
           conflicts += reconciled.conflicts.length;
-          const first = reconciled.conflicts.find((conflict) => conflict.result.serverProject);
-          const activeConflict = first ? {
-            projectId: first.local.id, localVersion: first.local.version ?? 1, serverVersion: first.result.serverVersion,
-            localProject: first.local, serverProject: first.result.serverProject!,
-            lastModifiedByName: first.result.lastModifiedByName || 'Otro miembro', lastModifiedAt: first.result.lastModifiedAt || '', diffs: projectDifferences(first.result.serverProject!, first.local),
-          } : state.activeConflict;
+          const projectConflicts = { ...state.projectConflicts };
+          let activeConflict = state.activeConflict;
+          for (const conflict of reconciled.conflicts) {
+            if (!conflict.result.serverProject && conflict.result.reason !== 'deleted') continue;
+            const serverProject = conflict.result.serverProject || { ...conflict.local, isDeleted: true };
+            const info: ProjectConflictInfo = {
+              scope, reason: conflict.result.reason, projectId: conflict.local.id, localVersion: conflict.result.localVersion ?? conflict.local.baseVersion ?? 0, serverVersion: conflict.result.serverVersion,
+              localProject: conflict.local, serverProject,
+              lastModifiedByName: ['Otro consultor', 'Otro miembro'].includes(conflict.result.lastModifiedByName || '') ? '' : conflict.result.lastModifiedByName || '',
+              lastModifiedAt: conflict.result.lastModifiedAt || '', diffs: conflict.result.reason === 'deleted' ? [] : projectDifferences(serverProject, conflict.local),
+            };
+            projectConflicts[scope + '|' + info.projectId] = info;
+            if (!activeConflict) activeConflict = info;
+          }
           const snapshotsByProject = { ...state.snapshotsByProject };
           for (const [oldId, newId] of Object.entries(reconciled.idChanges)) {
+            if (oldId !== newId) delete projectConflicts[scope + '|' + oldId];
             if (oldId !== newId && snapshotsByProject[oldId]) {
               snapshotsByProject[newId] = snapshotsByProject[oldId].map((snapshot) => ({ ...snapshot, projectId: newId, data: { ...snapshot.data, id: newId } }));
               delete snapshotsByProject[oldId];
             }
           }
-          return { projects: reconciled.projects, projectDeletionQueue: acknowledgeQueuedProjectDeletions(state.projectDeletionQueue, push.results!, scope, sent), activeProjectId: reconciled.idChanges[state.activeProjectId] || state.activeProjectId, activeConflict, snapshotsByProject };
+          return { projects: reconciled.projects, projectDeletionQueue: acknowledgeQueuedProjectDeletions(state.projectDeletionQueue, push.results!, scope, sent), activeProjectId: reconciled.idChanges[state.activeProjectId] || state.activeProjectId, activeConflict, projectConflicts, snapshotsByProject };
         });
         if (push.results.length !== sent.length) throw new Error('El servidor no confirmó todos los documentos enviados.');
       }
       const equipment = await get().syncEquipmentWithServer();
       ensureCurrent();
       if (!equipment.success) throw new Error(`Proyectos procesados; catálogo pendiente: ${equipment.message}`);
-      const message = deletionErrors ? `${deletionErrors} eliminación(es) pendientes de confirmar; otros proyectos procesados.` : conflicts ? `${conflicts} proyecto(s) requieren resolver conflictos.` : 'Sincronización completada.';
+      const pendingConfirmations = get().projects.filter(project => project.pendingCanonicalAck && ownsProject(project, serverUrl, currentUser.organizationId)).length;
+      const message = pendingConfirmations ? `${pendingConfirmations} documento(s) guardados en la nube, pendientes de verificar. Vuelve a sincronizar.` : deletionErrors ? `${deletionErrors} eliminación(es) pendientes de confirmar; otros proyectos procesados.` : conflicts ? `${conflicts} proyecto(s) requieren resolver conflictos.` : 'Sincronización completada.';
       set((state) => ({ isSyncing: false, syncFeedbackMessage: silent ? null : message, syncSettings: { ...state.syncSettings, lastSyncTimestamp: deletionErrors ? state.syncSettings.lastSyncTimestamp : pull.serverTimestamp || state.syncSettings.lastSyncTimestamp } }));
-      if (get().projects.some((project) => project.syncStatus === 'pending' && ownsProject(project, serverUrl, currentUser.organizationId)) || (!deletionErrors && get().projectDeletionQueue.some((command) => command.scope === scope))) get().triggerAutoSync();
-      return { success: conflicts === 0 && deletionErrors === 0, message };
+      if (get().projects.some((project) => project.syncStatus === 'pending' && !project.pendingCanonicalAck && ownsProject(project, serverUrl, currentUser.organizationId)) || (!deletionErrors && get().projectDeletionQueue.some((command) => command.scope === scope))) get().triggerAutoSync();
+      return { success: conflicts === 0 && deletionErrors === 0 && pendingConfirmations === 0, message };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo sincronizar.';
       if (session.isCurrent()) set({ isSyncing: false, syncFeedbackMessage: message });

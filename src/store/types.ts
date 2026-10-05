@@ -273,6 +273,8 @@ export interface VersionHistorySlice {
   canRedo: boolean;
   snapshotsByProject: Record<string, ProjectSnapshot[]>;
   activeConflict: ProjectConflictInfo | null;
+  projectConflicts: Record<string, ProjectConflictInfo>;
+  openProjectConflict: (projectId: string) => Promise<{ success: boolean; error?: string }>;
 
   recordUndoState: (project: ProjectSimulation) => void;
   undo: () => void;

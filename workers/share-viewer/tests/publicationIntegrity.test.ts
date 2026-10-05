@@ -24,7 +24,7 @@ const requestFetch: typeof fetch = async (input, init) => {
   authCalls++;
   assert.equal(String(input), 'https://solarsim.electsun.net/api/auth/share-authorization');
   assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer session.test.token');
-  assert.equal(init?.redirect, 'error');
+  assert.equal(init?.redirect, 'manual');
   if (authUnavailable) throw new Error('offline');
   return Response.json({ success: authStatus === 200, userId: 'user-test', organizationId: 'org-test', featurePolicy: { version: 2, settings: { selfConsumptionProjection: enabled } } }, { status: authStatus });
 };
@@ -43,6 +43,9 @@ async function main() {
   assert.equal(writes, 0);
   authStatus = 403;
   assert.equal((await publish(payload())).status, 403);
+  assert.equal(writes, 0);
+  authStatus = 302;
+  assert.equal((await publish(payload())).status, 503, 'Authorization redirects are rejected without forwarding credentials');
   assert.equal(writes, 0);
   authStatus = 200; authUnavailable = true;
   assert.equal((await publish(payload())).status, 503);

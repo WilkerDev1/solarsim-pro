@@ -9,6 +9,7 @@ Las fuentes canónicas de esta rama son:
 - [Escáneres IA](AI_SCANNERS_SPECIFICATION.md): extracción y catálogo.
 - [Infraestructura](INFRASTRUCTURE_ARCHITECTURE.md): topología y despliegue protegido.
 - [Mantenimiento y releases](MAINTENANCE_AND_UPDATES.md): comandos, firmas y compatibilidad.
+- [Beta, revisión del CT, recuperación y rollback](BETA_ROLLOUT.md): evidencias aisladas y pendientes de puesta en producción.
 - [QA](QA.md): gates automatizados y recorridos manuales. [Resultados](QA_RESULTS.md): evidencia y límites de esta entrega.
 - [Auditoría de partida](ANALISIS_TECNICO_2026-10-03.md) y [plan](PLAN_MODULARIZACION.md): evidencia histórica y alcance de la rama.
 
