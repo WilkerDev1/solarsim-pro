@@ -23,13 +23,9 @@ export function generateManifests() {
   const version = pkg.version;
   console.log(`\n📋 Generando manifiestos de actualización para SolarSim Pro v${version}...`);
 
-  // Asegurar nombres alternativos / enlaces duales para Linux (compatibilidad total)
+  // GitHub rejects assets differing only by case. Keep only the distinct Debian alias.
   const aliasPairs: [string, string][] = [
     [path.join(releaseDir, `SolarSim-Pro-${version}.deb`), path.join(releaseDir, `solarsim-pro_${version}_amd64.deb`)],
-    [path.join(releaseDir, `SolarSim-Pro-${version}.deb`), path.join(releaseDir, `solarsim-pro-${version}.deb`)],
-    [path.join(releaseDir, `SolarSim-Pro-${version}.pacman`), path.join(releaseDir, `solarsim-pro-${version}.pacman`)],
-    [path.join(releaseDir, `SolarSim-Pro-${version}.tar.gz`), path.join(releaseDir, `solarsim-pro-${version}.tar.gz`)],
-    [path.join(releaseDir, `SolarSim-Pro-${version}.AppImage`), path.join(releaseDir, `solarsim-pro-${version}.AppImage`)],
   ];
 
   for (const [src, dest] of aliasPairs) {
@@ -165,14 +161,10 @@ export function signLinuxPackages() {
 
   const potentialTargets = [
     path.join(releaseDir, `SolarSim-Pro-${version}.AppImage`),
-    path.join(releaseDir, `solarsim-pro-${version}.AppImage`),
     path.join(releaseDir, `SolarSim-Pro-${version}.pacman`),
-    path.join(releaseDir, `solarsim-pro-${version}.pacman`),
     path.join(releaseDir, `SolarSim-Pro-${version}.tar.gz`),
-    path.join(releaseDir, `solarsim-pro-${version}.tar.gz`),
     path.join(releaseDir, `SolarSim-Pro-${version}.deb`),
     path.join(releaseDir, `solarsim-pro_${version}_amd64.deb`),
-    path.join(releaseDir, `solarsim-pro-${version}.deb`),
   ];
 
   const uniqueExistingTargets = Array.from(new Set(potentialTargets.filter((t) => fs.existsSync(t))));

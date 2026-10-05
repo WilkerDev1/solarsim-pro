@@ -14,5 +14,9 @@ for(const item of descriptors) {
   await verifyPackageHash(path.join('release',item.fileName),item.sha256,item.size);
 }
 for(const file of ['latest.yml','latest-linux.yml',`SolarSim-Pro-Setup-${pkg.version}.exe.blockmap`]) assert.ok((await stat(path.join('release',file))).size>0);
+const alias=`solarsim-pro_${pkg.version}_amd64.deb`;
+await verifyPackageHash(path.join('release',alias),manifest.downloads.linux.deb.sha256,manifest.downloads.linux.deb.size);
+const uploadNames=[...descriptors.map(item=>item!.fileName),alias,'latest.json','update.json','latest.yml','latest-linux.yml',`SolarSim-Pro-Setup-${pkg.version}.exe.blockmap`];
+assert.equal(new Set(uploadNames.map(name=>name.toLowerCase())).size,uploadNames.length,'GitHub asset names must be unique ignoring case');
 assert.equal(await readFile('release/update.json','utf8'),await readFile('release/latest.json','utf8'));
 console.log('PASS: six native packages, hashes/sizes, Windows blockmap and updater metadata.');

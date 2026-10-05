@@ -103,4 +103,4 @@ jobs:
         shell: bash
         run: |
           gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "SolarSim Pro $GITHUB_REF_NAME" --notes-file "release/release-notes-$GITHUB_REF_NAME.md"
-          gh release upload "$GITHUB_REF_NAME" release/SolarSim-Pro-* release/solarsim-pro-* release/solarsim-pro_*.deb release/latest.json release/update.json release/latest.yml release/latest-linux.yml
+          gh release upload "$GITHUB_REF_NAME" release/SolarSim-Pro-* release/solarsim-pro_*.deb release/latest.json release/update.json release/latest.yml release/latest-linux.yml
