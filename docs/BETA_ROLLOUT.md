@@ -54,9 +54,10 @@ La integración con el runtime real de Workers detectó `redirect:'error'` no ad
 
 Electron44.5.1, electron-builder26.15.3, Vite7.3.6, pdfjs6.4.299; cliente/API/Worker2.3.0-beta.1. Paquetes Linux AppImage/deb/pacman/tar.gz y Windows NSIS/portable se generan con `--publish never`. El ensayo `node scripts/qa/runElectronRuntime.mjs` usa entrada/main/preload ASAR reales y perfil privado: verifica arranque, aislamiento de Node, IPC de versión/plataforma y eliminación de suscripciones. No reemplaza la instalación del usuario.
 
-`.github/workflows/beta-packages.yml` construye los formatos Linux/Windows y comprueba el ASAR instalado: instalación deb en Ubuntu y NSIS2.1.5 seguido de actualización a la candidata en Windows. Estos ensayos usan runners efímeros, no el equipo del usuario. Su ejecución final debe pasar antes de entregar; los artefactos CI expiran a los7días. La instalación interactiva, SmartScreen y pkexec siguen siendo comprobaciones manuales distintas.
+`.github/workflows/beta-packages.yml` construye los formatos Linux/Windows y comprueba el ASAR instalado mediante Electron de node_modules de la misma versión (no arranca directamente el binario instalado): instalación deb en Ubuntu y NSIS2.1.5 seguido de actualización a la candidata en Windows. Estos ensayos usan runners efímeros, no el equipo del usuario. El [run37300154064](https://github.com/WilkerDev1/solarsim-pro/actions/runs/37300154064) pasó en ambos sistemas para el commit56af783; los artefactos CI expiran a los7días. La instalación interactiva, SmartScreen y pkexec siguen siendo comprobaciones manuales distintas.
 
-- [ ] Comprobar instalador/actualización en Windows real y Linux con autorización del sistema.
+- [x] Instalación deb en Ubuntu y NSIS2.1.5 →2.3.0-beta.1 en Windows, en runners efímeros.
+- [ ] Comprobar interacción del instalador, SmartScreen y actualización Linux mediante autorización del sistema en un equipo de usuario.
 - [x] Paquetes y manifiestos Linux locales firmados con GPG; `npx tsx scripts/qa/verifyCandidate.ts` verificó contra la clave pública fijada ambos manifiestos y los cuatro formatos Linux. También comprobó tamaño/SHA256 de los seis paquetes. Esto no acredita Authenticode en Windows; esa firma sigue pendiente si se requiere para publicar.
 - [ ] Publicar una GitHub prerelease beta. Estables no reciben beta automáticamente; beta admite beta/rc/final y excluye alpha. AppImage indica actualización manual.
 
