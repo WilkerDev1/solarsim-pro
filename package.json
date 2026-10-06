@@ -1,8 +1,8 @@
 {
   "name": "solarsim-pro",
   "private": true,
-  "version": "2.2.1",
-  "description": "Simulador Fotovoltaico T\u00e9cnico-Econ\u00f3mico Profesional",
+  "version": "2.3.0",
+  "description": "Simulador Fotovoltaico Técnico-Económico Profesional",
   "author": "WilkerDev1",
   "type": "module",
   "main": "dist-electron/main.cjs",
@@ -126,7 +126,7 @@
       "category": "Science",
       "maintainer": "WilkerDev1 <wilkerdev@github.com>",
       "synopsis": "Simulador Fotovoltaico Profesional",
-      "description": "Simulador de proyectos solares fotovoltaicos con dimensionamiento, an\u00e1lisis financiero y exportaci\u00f3n de propuestas PDF.",
+      "description": "Simulador de proyectos solares fotovoltaicos con dimensionamiento, análisis financiero y exportación de propuestas PDF.",
       "syncDesktopName": true
     },
     "publish": {

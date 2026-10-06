@@ -1,6 +1,6 @@
 {
   "name": "solarsim-share-viewer",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "description": "Cloudflare Worker & Web Proposal Viewer for SolarSim Pro",
   "main": "src/index.ts",
   "scripts": {

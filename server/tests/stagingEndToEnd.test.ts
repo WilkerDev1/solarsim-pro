@@ -513,7 +513,8 @@ test("Staging E2E: Demostración rigurosa del recorrido autenticado de 10 pasos"
       "Paso 7: Pull debe traer los proyectos sincronizados",
     );
     assert.ok(
-      pullResult.projects.some((p) => p.id === "proj-staging-e2e-1"),
+      Array.isArray(pullResult.projects) &&
+        pullResult.projects.some((p) => p.id === "proj-staging-e2e-1"),
       "Paso 7: Proyecto debe estar presente en pull",
     );
 
