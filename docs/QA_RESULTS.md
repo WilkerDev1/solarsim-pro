@@ -163,3 +163,15 @@ Implementación y certificación de la invalidación de sesión segura, preserva
 | Aislamiento estricto de datos multi-inquilino | En proceso / In-memory | PASS | `npx tsx src/tests/testAuthInvalidationLoop.ts` (Test 5) | N/A |
 | Ciclo autenticado completo de 10 pasos | Staging aislado (Docker Postgres 16 + Worker) | PASS | `npm --prefix server test` (`stagingEndToEnd.test.ts`) | Ensayo con datos y usuarios sintéticos en puerto loopback efímero |
 | Verificación de endpoints reales de producción | Producción (`solarsim.electsun.net`) | PASS | `npm run verify:compatibility` (9/9 checks OK) | Solo lecturas autorizadas y verificación anónima 401 |
+| Compilación oficial multiplataforma v2.3.0 (Win/Linux) | GitHub Actions CI (Run 37511270355) | PASS | Tag `v2.3.0`, release draft con 12 assets | Compilación x64 nativa en runners Windows y Linux; macOS no contemplado |
+
+## Compilación Oficial y Empaquetado Multiplataforma v2.3.0 (6 de octubre 2026)
+
+- **Workflow GitHub Actions**: `Build official desktop release` ([Run 37511270355](https://github.com/WilkerDev1/solarsim-pro/actions/runs/37511270355)).
+- **Tag Oficial**: `v2.3.0` (commit `d1aa0f4`).
+- **Resultados de CI en Runners Nativos**:
+  - `contracts / verify` (Ubuntu 24.04): PASSED (2m 40s) — lint, tests de cliente, servidor, worker, build y smoke containers.
+  - `desktop (windows-latest)`: PASSED (2m 56s) — generación de instalador NSIS (`SolarSim-Pro-Setup-2.3.0.exe`) y versión portable (`SolarSim-Pro-2.3.0.exe`), prueba de instalación ejecutada.
+  - `desktop (ubuntu-latest)`: PASSED (8m 18s) — generación de `AppImage`, `.deb`, `.pacman` y `.tar.gz`; prueba de arranque del `.deb` con Xvfb, ejecución de `AppImage` sin FUSE, e instalación/arranque de `.pacman` en contenedor aislado de Arch Linux (`archlinux:base`).
+  - `draft`: PASSED (1m 31s) — cálculo y validación de sumas SHA256/SHA512 de los 6 binarios (`verifyReleaseFiles.ts`), generación de `latest.json`, `update.json`, `latest.yml`, `latest-linux.yml` y creación del release draft en GitHub con 12 assets asociados.
+

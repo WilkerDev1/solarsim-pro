@@ -70,7 +70,20 @@ Audit del ensayo del4 de octubre:6 avisos altos en dependencias de desarrollo Ta
 - `verifyReleaseFiles.ts` comprueba seis paquetes, alias Debian, blockmap, versión/path/SHA512/tamaños de ambos YAML y unicidad de nombres sin distinguir mayúsculas. La regresión rechazó el YAML2.3.0-beta.1 mezclado durante la agregación. Cada runner ahora aporta únicamente el YAML de su plataforma.
 - `verifyCandidate.ts` pasó con los binarios reales descargados: firmas fijadas GPG de ambos JSON y los cuatro formatos Linux; seis SHA256/tamaños. Clave privada local, nunca enviada a GitHub. Authenticode/SmartScreen y autorización interactiva Linux no se acreditan.
 - Audit npm del5 de octubre: raíz7 altos en dependencias dev (Tailwind3/braces y cadena de Repomix), raíz producción0, backend0 y Worker0. No se forzó Tailwind4.
-- Acceso directo SSH a app-server: health API2.2.0 y BD conectada, solo lectura. El despliegue coordinado y la rotación siguen pendientes; no actualizar el volumen PostgreSQL ni ejecutar pruebas de escritura en producción.
+- Acceso directo SSH a app-server: health API 2.2.0 y BD conectada, solo lectura. El despliegue coordinado y la rotación siguen pendientes; no actualizar el volumen PostgreSQL ni ejecutar pruebas de escritura en producción.
+
+## Release oficial 2.3.0 — 6 de octubre
+
+- **Tag `v2.3.0` generado y compilado en GitHub Actions**: [CI Release 37511270355](https://github.com/WilkerDev1/solarsim-pro/actions/runs/37511270355) completó los 4 jobs (`contracts/verify`, `desktop-win`, `desktop-linux`, `draft`) exitosamente.
+- **Borrador de Release Creado**: Tag `v2.3.0` con 12 assets oficiales en GitHub Releases, incluyendo:
+  - Windows x64: `SolarSim-Pro-Setup-2.3.0.exe` (136.39 MiB), `SolarSim-Pro-2.3.0.exe` (136.17 MiB) y blockmap.
+  - Linux x64: `SolarSim-Pro-2.3.0.AppImage` (161.95 MiB), `SolarSim-Pro-2.3.0.deb` / `solarsim-pro_2.3.0_amd64.deb` (125.25 MiB), `SolarSim-Pro-2.3.0.pacman` (112.23 MiB) y `SolarSim-Pro-2.3.0.tar.gz` (153.47 MiB).
+  - Manifiestos de actualización y metadatos: `latest.json`, `update.json`, `latest.yml`, `latest-linux.yml`.
+- **Novedades de la versión**:
+  - Centro Empresarial y gestión multi-organización con RBAC.
+  - Invalidación de sesión completa y segura con monotonicidad estricta y preservación durable offline.
+  - Corrección de descripciones técnicas de equipos multimodelo en el visor web (Cloudflare Worker) con retrocompatibilidad.
+  - Alineación de KPIs y métricas en la cápsula 02 de inversores del dossier ejecutivo PDF.
 
 ## Ventana de despliegue y rollback
 
