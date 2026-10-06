@@ -49,9 +49,12 @@ export function resolveDynamicProjectSummaryParagraph1(
   }
 
   let text = customText.trim();
+  const isPreformattedPanels = /^\d+\s+M[oó]dulo/i.test(panelModel) || panelModel.includes(' y ');
   const rawModel = panelModel.replace(/^m[oó]dulos?\s+/i, '').trim();
   const modLabel = project.specs.panelCount > 1 ? 'Módulos' : 'Módulo';
-  const formattedPanelDesc = `${modLabel} ${rawModel}`;
+  const formattedPanelDesc = isPreformattedPanels
+    ? panelModel
+    : `${modLabel} ${rawModel}`;
 
   // 1. Support explicit placeholders:
   text = text
@@ -65,8 +68,8 @@ export function resolveDynamicProjectSummaryParagraph1(
 
   // 2. Dynamically update numeric values if paragraph follows standard proposal wording:
   text = text.replace(
-    /\*\*\s*\d+\s+(?:M[oó]dulos?\s+)?[^*]+\*\*/i,
-    `**${project.specs.panelCount} ${formattedPanelDesc}**`
+    /\*\*\s*(?:\d+\s+)?(?:M[oó]dulos?\s+)?[^*]+\*\*/i,
+    `**${isPreformattedPanels ? formattedPanelDesc : `${project.specs.panelCount} ${formattedPanelDesc}`}**`
   );
 
   text = text.replace(
@@ -121,13 +124,19 @@ export function resolveDynamicProjectSummaryParagraph2(
   const invCount = project.specs.inverterCount || 1;
   const batCount = project.specs.batteryCount || 1;
 
+  const isPreformattedInverters = /^\d+\s+Inversor/i.test(inverterModel) || inverterModel.includes(' y ');
   const rawInverter = inverterModel.replace(/^inversor(?:es)?\s+/i, '').trim();
   const invLabel = invCount > 1 ? 'Inversores' : 'Inversor';
-  const formattedInverterDesc = `${invLabel} ${rawInverter}`;
+  const formattedInverterDesc = isPreformattedInverters
+    ? inverterModel
+    : `${invLabel} ${rawInverter}`;
 
+  const isPreformattedBatteries = /^\d+\s+Bater[íi]a/i.test(batteryModel) || batteryModel.includes(' y ');
   const rawBattery = batteryModel.replace(/^bater[íi]as?\s+/i, '').trim();
   const batLabel = batCount > 1 ? 'Baterías' : 'Batería';
-  const formattedBatteryDesc = `${batLabel} ${rawBattery}`;
+  const formattedBatteryDesc = isPreformattedBatteries
+    ? batteryModel
+    : `${batLabel} ${rawBattery}`;
 
   // 1. Support placeholders:
   text = text
@@ -139,16 +148,16 @@ export function resolveDynamicProjectSummaryParagraph2(
 
   // 2. Keep inverter count and model synchronized:
   text = text.replace(
-    /instalación\s+de\s+\*\*\s*\d+\s+(?:Inversor(?:es)?\s+)?[^*]+\*\*/i,
-    `instalación de **${invCount} ${formattedInverterDesc}**`
+    /instalación\s+de\s+\*\*\s*(?:\d+\s+)?(?:Inversor(?:es)?\s+)?[^*]+\*\*/i,
+    `instalación de **${isPreformattedInverters ? formattedInverterDesc : `${invCount} ${formattedInverterDesc}`}**`
   );
 
   // 3. Keep battery count and model synchronized if has battery:
   if (project.specs.hasBattery && (project.specs.batteryCapacityKWh || 0) > 0) {
     if (/Bater[íi]a/i.test(text)) {
       text = text.replace(
-        /y\s+\*\*\s*\d+\s+(?:Bater[íi]as?\s+)?[^*]+\*\*/i,
-        `y **${batCount} ${formattedBatteryDesc}**`
+        /y\s+\*\*\s*(?:\d+\s+)?(?:Bater[íi]as?\s+)?[^*]+\*\*/i,
+        `y **${isPreformattedBatteries ? formattedBatteryDesc : `${batCount} ${formattedBatteryDesc}`}**`
       );
     }
   }
