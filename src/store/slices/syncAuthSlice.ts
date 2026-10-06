@@ -4,7 +4,7 @@ import { projectDifferences } from '../sync/projectDifferences';
 import { SimulationSlice, SyncAuthSlice } from '../types';
 import { featureScope } from '../../../shared/applicationFeatures';
 import { ownsProject, reconcilePulledProjects, acknowledgeProjectPush } from '../sync/projectReconciliation';
-import { SyncService, registerTokenRenewedListener } from '../../services/syncService';
+import { SyncService, registerTokenRenewedListener, registerSessionInvalidatedListener, clearInvalidToken } from '../../services/syncService';
 import { acknowledgeQueuedProjectDeletions, createProjectDeletion, ProjectDeletionCommand } from '../sync/projectDeletion';
 import type { ProjectConflictInfo, ProjectSimulation } from '../../types';
 
@@ -24,6 +24,23 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
   registerTokenRenewedListener((newToken, origin) => {
     const session = get().syncSettings;
     if (origin && origin.serverUrl === session.serverUrl.trim().replace(/\/+$/, '') && origin.token === session.authToken) set({ syncSettings: { ...session, authToken: newToken } });
+  });
+  registerSessionInvalidatedListener((origin) => {
+    const session = get().syncSettings;
+    if (origin && origin.serverUrl === session.serverUrl.trim().replace(/\/+$/, '') && origin.token === session.authToken) {
+      if (autoSyncDebounceTimer) {
+        clearTimeout(autoSyncDebounceTimer);
+        autoSyncDebounceTimer = null;
+      }
+      set((state) => ({
+        syncSettings: {
+          ...state.syncSettings,
+          authToken: null,
+        },
+        isSyncing: false,
+        syncFeedbackMessage: 'La sesión expiró o fue revocada. Inicia sesión nuevamente.',
+      }));
+    }
   });
 
   return {
@@ -79,6 +96,7 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
     const res = await SyncService.login(serverUrl, email, password);
     if (epoch !== sessionEpoch || serverUrl !== get().syncSettings.serverUrl) return { success: false, error: 'La sesión cambió mientras se iniciaba el acceso.' };
     if (res.success && res.token && res.user) {
+      clearInvalidToken(serverUrl, res.token!);
       set((state) => ({
         ...changeWorkspace(state, { ...state.syncSettings, authToken: res.token!, currentUser: res.user! }),
         syncSettings: {
@@ -326,6 +344,13 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
       return { valid: true, user: refreshRes.user };
     }
 
+    if (session.isCurrent()) {
+      set((state) => ({
+        syncSettings: { ...state.syncSettings, authToken: null },
+        isSyncing: false,
+        syncFeedbackMessage: 'La sesión expiró en el servidor. Inicia sesión nuevamente.',
+      }));
+    }
     return { valid: false, error: refreshRes.error || 'La sesión ha expirado en el servidor' };
   },
 };

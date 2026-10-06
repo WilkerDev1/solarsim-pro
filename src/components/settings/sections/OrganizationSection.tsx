@@ -19,6 +19,7 @@ export function OrganizationSection() {
   const [inviteError, setInviteError] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
   const [invitationCode, setInvitationCode] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<UserRole>("EDITOR");
@@ -37,6 +38,7 @@ export function OrganizationSection() {
     setInviteState("loading");
     setInvitations([]);
     setInviteError("");
+    setError("");
     const [users, invites] = await Promise.all([
       SyncService.getCompanyUsers(
         syncSettings.serverUrl,
@@ -48,8 +50,13 @@ export function OrganizationSection() {
       ),
     ]);
     if (!isCurrent()) return;
-    if (users.success) setMembers(users.users);
-    else setMessage(users.error || "No se pudo consultar el equipo.");
+    if (users.success) {
+      setMembers(users.users);
+      setError("");
+    } else {
+      setMembers([]);
+      setError(users.error || "No se pudo consultar el equipo.");
+    }
     if (invites.success) {
       setInvitations(invites.invitations || []);
       setInviteState("ready");
@@ -68,9 +75,10 @@ export function OrganizationSection() {
     setMode("none");
     setInvitationCode("");
     setMessage("");
+    setError("");
     setBusy(false);
     void load();
-  }, [sessionGeneration, user?.role]);
+  }, [sessionGeneration, user?.role, syncSettings.authToken]);
   const resetForm = () => {
     setEditing(null);
     setName("");
@@ -86,21 +94,35 @@ export function OrganizationSection() {
   ) => {
     setBusy(true);
     setMessage("");
+    setError("");
     const result = await operation();
     if (!isCurrent()) return;
     setBusy(false);
-    setMessage(
-      result.success
-        ? success
-        : result.error || "No se pudo completar la operación.",
-    );
     if (result.success) {
+      setMessage(success);
+      setError("");
       resetForm();
       await load();
+    } else {
+      setError(result.error || "No se pudo completar la operación.");
+      setMessage("");
     }
   };
-  if (!user)
-    return <p>Inicia sesión para consultar tu organización y sus permisos.</p>;
+  if (!user || !syncSettings.authToken)
+    return (
+      <div className="company-center" data-theme={sidebarTheme}>
+        <h3>Equipo de {user?.organizationName || "tu organización"}</h3>
+        <p>
+          Inicia sesión con una cuenta de Administrador para consultar y gestionar el equipo de tu organización.
+        </p>
+        <button
+          className="cc-primary"
+          onClick={() => useSimulationStore.getState().openSettingsModal("sync")}
+        >
+          Ir a Cuenta y perfiles
+        </button>
+      </div>
+    );
   if (user.role !== "ADMIN")
     return (
       <>
@@ -163,6 +185,19 @@ export function OrganizationSection() {
       {message && (
         <div className="cc-notice" role="status">
           {message}
+        </div>
+      )}
+      {error && (
+        <div className="cc-notice cc-error" role="alert" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>{error}</span>
+          {/no autorizad/i.test(error) && (
+            <button
+              style={{ padding: "4px 10px", minHeight: "auto", fontSize: 13 }}
+              onClick={() => useSimulationStore.getState().openSettingsModal("sync")}
+            >
+              Iniciar sesión
+            </button>
+          )}
         </div>
       )}
       {invitationCode && (

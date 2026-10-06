@@ -109,15 +109,15 @@ export const App: React.FC = () => {
 
       {/* Global Modals Mounted at Root Level */}
       <ConflictResolutionModal />
-      <NewProjectModal key={sessionGeneration} />
+      <NewProjectModal key={`new-project-${sessionGeneration}`} />
       <UpdateModal />
-      <AIInvoiceScannerModal key={sessionGeneration} />
-      <AIDatasheetScannerModal key={sessionGeneration} />
-      <ImportConflictModal key={sessionGeneration} />
-      <ShareProposalModal key={sessionGeneration} />
+      <AIInvoiceScannerModal key={`ai-invoice-${sessionGeneration}`} />
+      <AIDatasheetScannerModal key={`ai-datasheet-${sessionGeneration}`} />
+      <ImportConflictModal key={`import-conflict-${sessionGeneration}`} />
+      <ShareProposalModal key={`share-proposal-${sessionGeneration}`} />
       <SettingsModal />
-      <AIPriceCatalogScannerModal key={sessionGeneration} />
-      <SupplierPricesDetailModal key={sessionGeneration} />
+      <AIPriceCatalogScannerModal key={`ai-catalog-${sessionGeneration}`} />
+      <SupplierPricesDetailModal key={`supplier-prices-${sessionGeneration}`} />
     </div>
     </Suspense>
   );

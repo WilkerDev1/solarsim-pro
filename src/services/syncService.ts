@@ -62,32 +62,88 @@ export function notifyTokenRenewed(newToken: string, origin?: { serverUrl: strin
   });
 }
 
+export type SessionInvalidatedCallback = (origin: { serverUrl: string; token: string }) => void;
+let sessionInvalidatedListeners: SessionInvalidatedCallback[] = [];
+
+export function registerSessionInvalidatedListener(cb: SessionInvalidatedCallback): () => void {
+  sessionInvalidatedListeners.push(cb);
+  return () => {
+    sessionInvalidatedListeners = sessionInvalidatedListeners.filter((l) => l !== cb);
+  };
+}
+
+export function notifySessionInvalidated(origin: { serverUrl: string; token: string }) {
+  sessionInvalidatedListeners.forEach((cb) => {
+    try {
+      cb(origin);
+    } catch (err) {
+      console.error('Error en listener de invalidación de sesión:', err);
+    }
+  });
+}
+
+const invalidTokens = new Set<string>();
+
+export function markTokenInvalid(serverUrl: string, token: string) {
+  const base = SyncService.cleanUrl(serverUrl);
+  invalidTokens.add(`${base}|${token}`);
+}
+
+export function clearInvalidToken(serverUrl: string, token: string) {
+  const base = SyncService.cleanUrl(serverUrl);
+  invalidTokens.delete(`${base}|${token}`);
+}
+
 const refreshRequests = new Map<string, Promise<string | null>>();
 
 /** One bounded refresh on 401. A revoked account or forbidden role is never retried. */
 export async function fetchWithSessionRetry(url: string, init: RequestInit = {}): Promise<Response> {
   const send = (options: RequestInit) => fetch(url, { ...options, signal: options.signal ?? AbortSignal.timeout(12000) });
-  const response = await send(init);
   const authorization = new Headers(init.headers).get('Authorization');
-  if (response.status !== 401 || !authorization?.startsWith('Bearer ') || /\/api\/auth\/(?:refresh|login|register)$/.test(url)) return response;
-  const token = authorization.slice(7);
   const base = url.slice(0, url.indexOf('/api/'));
-  if (!base) return response;
-  const key = `${base}|${token}`;
-  let renewal = refreshRequests.get(key);
+  const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
+  const key = base && token ? `${base}|${token}` : null;
+
+  // Si el token ya fue marcado como definitivamente inválido, no enviamos solicitudes ni refrescos inútiles
+  if (key && invalidTokens.has(key)) {
+    return new Response(JSON.stringify({ success: false, error: 'Sesión no válida o expirada' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const response = await send(init);
+  if (response.status !== 401 || !token || !base || /\/api\/auth\/(?:refresh|login|register)$/.test(url)) return response;
+
+  let renewal = refreshRequests.get(key!);
   if (!renewal) {
     renewal = (async () => {
-      const refreshed = await fetch(`${base}/api/auth/refresh`, { method: 'POST', headers: { Authorization: authorization }, signal: AbortSignal.timeout(8000) });
-      if (!refreshed.ok) return null;
-      const data = await refreshed.json();
-      if (!data.success || typeof data.token !== 'string') return null;
-      notifyTokenRenewed(data.token, { serverUrl: base, token });
-      return data.token as string;
-    })().catch(() => null);
-    refreshRequests.set(key, renewal);
+      try {
+        const refreshed = await fetch(`${base}/api/auth/refresh`, {
+          method: 'POST',
+          headers: { Authorization: authorization! },
+          signal: AbortSignal.timeout(8000),
+        });
+        if (refreshed.status === 401 || refreshed.status === 403) {
+          // El token fue definitivamente rechazado por la API (firma inválida tras rotación o sesión revocada)
+          invalidTokens.add(key!);
+          notifySessionInvalidated({ serverUrl: base, token });
+          return null;
+        }
+        if (!refreshed.ok) return null;
+        const data = await refreshed.json().catch(() => null);
+        if (!data?.success || typeof data.token !== 'string') return null;
+        notifyTokenRenewed(data.token, { serverUrl: base, token });
+        return data.token as string;
+      } catch {
+        // Error de red transitorio; no invalidar la sesión permanentemente
+        return null;
+      }
+    })();
+    refreshRequests.set(key!, renewal);
   }
   const renewed = await renewal;
-  if (refreshRequests.get(key) === renewal) refreshRequests.delete(key);
+  if (refreshRequests.get(key!) === renewal) refreshRequests.delete(key!);
   if (!renewed) return response;
   const headers = new Headers(init.headers);
   headers.set('Authorization', `Bearer ${renewed}`);
@@ -111,7 +167,7 @@ export class SyncService {
   /**
    * Limpia y normaliza la URL base del servidor
    */
-  private static cleanUrl(url: string): string {
+  static cleanUrl(url: string): string {
     return (url || 'https://solarsim.electsun.net').trim().replace(/\/+$/, '');
   }
 
