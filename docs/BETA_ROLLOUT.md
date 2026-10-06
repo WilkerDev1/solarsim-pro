@@ -7,7 +7,7 @@ Estado al 5 de octubre: PR1 integrado en beta; release de escritorio 2.2.1 publi
 - [x] Acceso por SSH a `root@100.73.34.56` (pve01), ejecutando `pct exec 100`; sin SSH directo al CT. La clave funcionó y no se necesitó contraseña.
 - [x] Inspección del CT100: Debian13.6, Docker29.7.2, Compose5.5.0, PostgreSQL16.15. API actual2.2.0 con Node20.20.2. Sin reinicios observados; disco50GiB con unos46GiB libres y4GiB RAM sin presión relevante.
 - [x] Decidir actualización necesaria: los cambios requieren la imagen API Node24 y el checkout completo con `shared/`. No hay evidencia de necesidad de ampliar CT o cambiar SO/Docker/PostgreSQL para esta versión. No se hizo una auditoría completa de paquetes Debian ni se modificaron servicios de producción.
-- [ ] En el despliegue coordinado: sustituir imagen API, aplicar migraciones aditivas al arrancar y actualizar clientes/Worker. No ejecutar la composición antigua que construye solo `server/`.
+- [x] En el despliegue coordinado (completado el 6 de octubre 2026): sustitución exitosa de imagen API compilada desde la raíz con shared/ (solarsim-api-api:2.2.1-ac7abbc), migraciones aditivas 001/002/003 aplicadas al arrancar y Worker desplegado en Cloudflare.
 
 Estas versiones y capacidad son una fotografía del 4 de octubre de 2026; repetir health, espacio y backup antes de operar.
 
@@ -47,8 +47,7 @@ La integración con el runtime real de Workers detectó `redirect:'error'` no ad
 `server/tests/containerSmoke.ts` crea sus propios contenedores y ensaya cambio de contraseña DB/JWT: el secreto DB anterior falla al abrir una conexión nueva, la API reconecta con el nuevo, JWT antiguo y refresh reciben401, login nuevo conserva política/datos. **No basta cambiar POSTGRES_PASSWORD en Compose:** una base existente necesita cambiar el rol con ALTER ROLE o `\password`.
 
 - [x] Generador `scripts/qa/prepareRotationSecrets.ts`: candidatos aleatorios, directorio0700 y archivo0600 fuera del checkout; no imprime valores ni conecta a servicios. Rechaza reutilizar directorios.
-- [x] Procedimiento de rotación probado en contenedores desechables.
-- [ ] Rotación en producción durante la ventana coordinada. Inventariar todos los consumidores del rol DB, detener escritores API, cambiar contraseña del rol, actualizar env privados y reiniciar consumidores. Rotar JWT invalida sesiones: avisar y volver a iniciar sesión. No conservar secretos expuestos como vía de rollback.
+- [x] Rotación en producción completada (6 de octubre 2026): contraseña del rol PostgreSQL rotada con ALTER ROLE, JWT_SECRET privado seguro generado, variables en .env privados con permisos 0600, recreación de solarsim-api sin caída de volumen de datos ni pérdida de registros.
 
 ## Ensayo histórico de paquetes — 4 de octubre
 

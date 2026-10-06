@@ -36,6 +36,7 @@
     "test:features": "tsx src/tests/testApplicationFeatures.ts",
     "test:sync": "tsx src/tests/testSyncReconciliation.ts",
     "test:updater": "tsx electron/updater/tests/updaterIntegrity.test.ts",
+    "verify:compatibility": "npx tsx scripts/qa/verifyDeploymentCompatibility.ts",
     "release:sign": "tsx scripts/release.ts --sign"
   },
   "dependencies": {

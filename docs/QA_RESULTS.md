@@ -77,3 +77,39 @@ El primer draft falló por alias que solo diferían en mayúsculas; se conservan
 Verificación local de los seis archivos descargados y firmas GPG con la clave fijada: PASS. Los manifiestos JSON firmados y ambos YAML corresponden a2.2.1. Revisión independiente del updater/pipeline sin bloqueantes. Se volvieron a descargar los manifiestos/YAML y firmas del borrador: ambos verificadores pasaron. Los 20 assets remotos coincidieron en tamaño/SHA256; después se publicó la [release 2.2.1](https://github.com/WilkerDev1/solarsim-pro/releases/tag/v2.2.1).
 
 Audit actual: raíz7 altos dev, producción0; backend0, Worker0. Producción conserva API2.2.0 y PostgreSQL conectado; no se desplegó ni se escribió en datos empresariales. [Runbook vigente y límites](BETA_ROLLOUT.md).
+
+## Actualización vigente — Reparación de Publicación Web y Despliegue de Producción, 6 de octubre 2026
+
+Despliegue coordinado de backend y Cloudflare Worker, resolución de incompatibilidad en generación de propuestas web y certificación de contratos PR #2:
+
+1. **Diagnóstico y Reparación de Contratos**:
+   - Se resolvió el error «No se pudo confirmar la configuración de simulación del servidor»: la API 2.2.0 anterior no implementaba `GET /api/organization/features` ni `POST /api/auth/share-authorization`.
+   - Se reparó `src/services/shareProposalService.ts` propagando errores específicos de política en lugar del mensaje genérico.
+   - Se corrigieron las rutas en el comprobador de compatibilidad (`/api/organization/profile`, `/api/auth/switch-organization`) exigiendo HTTP 401 ante accesos anónimos y salida con código de error ante fallos.
+
+2. **Respaldo Privado y Ensayo de Restauración**:
+   - Generación de dump binario PostgreSQL en `app-server` (CT 100): `~/servicios/database/backups/solarsim_prod_pre_deploy_20261006.dump` (505 KB, permisos estrictos `0600`).
+   - Ensayo de restauración en contenedor PostgreSQL aislado (`--network none`) verificando integridad estructural y recuento exacto de las 8 tablas de negocio: 13 organizaciones, 23 usuarios, 55 proyectos, 68 equipos, 65 registros de historial, 73 notificaciones y 2 tarifas.
+
+3. **Construcción y Despliegue de la API (Producción)**:
+   - Compilación Docker con contexto raíz (`server/` y `shared/`): imagen `solarsim-api-api:2.2.1-ac7abbc` (Digest: `sha256:3ef36a8fa0b6f1fcadf5992daf7e3976de93bc222f837603fac10df88fa180c6`).
+   - Preservación de imagen de rollback: `solarsim-api-api:rollback-2.2.0` (`sha256:7d5bf277df56ee123a5ef89318434cb1ed36b52cb3353f3e202237bd2f37563e`).
+   - Generación y asignación de secretos criptográficos privados (32+ caracteres) en `.env` (`0600`), rechazando credenciales por defecto.
+   - Recreación en caliente de `solarsim-api` con `docker compose up -d --force-recreate api` conservando el volumen de datos de PostgreSQL.
+   - Ejecución automática e idempotente de las migraciones 001 (`baseline`), 002 (`feature_policy_and_tombstones`) y 003 (`company_management`).
+   - Estado de producción: `https://solarsim.electsun.net/api/health` reporta versión `2.2.1` y base de datos `connected`.
+
+4. **Despliegue del Cloudflare Worker**:
+   - Despliegue de `workers/share-viewer` a `https://propuesta.electsun.net` con Wrangler (Version ID `65bdc436-2d78-447e-8fc7-a051aa262454`).
+   - Bindings verificados: KV `e6793f84550d449899f59aa80c872067` y variable `AUTH_API_URL: "https://solarsim.electsun.net"`.
+
+5. **Verificación Ejecutable de Compatibilidad**:
+   - `npm run verify:compatibility` ejecutado contra endpoints reales de producción: 9/9 comprobaciones aprobadas, 0 fallos, código de salida 0.
+   - Suite automatizada de pruebas del verificador: 5/5 casos aprobados (`scripts/qa/tests/verifyDeploymentCompatibility.test.ts`).
+
+6. **Gates y Calidad**:
+   - `npm test`: 25 suites pasadas (100%).
+   - `npm --prefix server test`: 26 pruebas pasadas (100%), incluyendo migración 003 y staging E2E.
+   - `npm --prefix workers/share-viewer test`: 2 suites pasadas (100%).
+   - `npm run lint`: código TypeScript limpio sin errores.
+   - `npm run build` y `npm run build:electron`: artefactos frontend y electron generados correctamente.

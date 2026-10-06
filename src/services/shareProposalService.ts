@@ -82,7 +82,15 @@ export class ShareProposalService {
       const session = state.syncSettings;
       if (session.currentUser?.id !== initialSession.currentUser.id || session.currentUser.organizationId !== initialSession.currentUser.organizationId || session.serverUrl !== initialSession.serverUrl || !session.authToken) return { success: false, error: 'La sesión cambió. Vuelve a intentar la publicación.' };
       const policy = state.organizationFeaturePolicies[featureScope(session.serverUrl, session.currentUser.organizationId)];
-      if (!policy || state.featurePolicyRequest?.status === 'error') return { success: false, error: 'No se pudo confirmar la configuración de simulación del servidor.' };
+      if (!policy || state.featurePolicyRequest?.status === 'error') {
+        const detail = state.featurePolicyRequest?.error;
+        return {
+          success: false,
+          error: detail
+            ? `No se pudo confirmar la configuración de simulación del servidor: ${detail}`
+            : 'No se pudo confirmar la configuración de simulación del servidor.',
+        };
+      }
       const mode = energyCalculationMode(effectiveFeatureSettings(state));
       // One immutable publication captures both the confirmed policy and its financial result.
       // The caller's preview may have been calculated before settings changed.
