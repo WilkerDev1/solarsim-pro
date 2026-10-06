@@ -82,16 +82,32 @@ export function notifySessionInvalidated(origin: { serverUrl: string; token: str
   });
 }
 
+function computeTokenKey(serverUrl: string, token: string): string {
+  const base = SyncService.cleanUrl(serverUrl);
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < token.length; i++) {
+    hash ^= token.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `${base}:${(hash >>> 0).toString(16)}`;
+}
+
+const MAX_INVALID_TOKENS = 50;
 const invalidTokens = new Set<string>();
 
 export function markTokenInvalid(serverUrl: string, token: string) {
-  const base = SyncService.cleanUrl(serverUrl);
-  invalidTokens.add(`${base}|${token}`);
+  if (!serverUrl || !token) return;
+  const key = computeTokenKey(serverUrl, token);
+  if (invalidTokens.size >= MAX_INVALID_TOKENS) {
+    const oldest = invalidTokens.values().next().value;
+    if (oldest) invalidTokens.delete(oldest);
+  }
+  invalidTokens.add(key);
 }
 
 export function clearInvalidToken(serverUrl: string, token: string) {
-  const base = SyncService.cleanUrl(serverUrl);
-  invalidTokens.delete(`${base}|${token}`);
+  if (!serverUrl || !token) return;
+  invalidTokens.delete(computeTokenKey(serverUrl, token));
 }
 
 const refreshRequests = new Map<string, Promise<string | null>>();
@@ -102,7 +118,7 @@ export async function fetchWithSessionRetry(url: string, init: RequestInit = {})
   const authorization = new Headers(init.headers).get('Authorization');
   const base = url.slice(0, url.indexOf('/api/'));
   const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
-  const key = base && token ? `${base}|${token}` : null;
+  const key = base && token ? computeTokenKey(base, token) : null;
 
   // Si el token ya fue marcado como definitivamente inválido, no enviamos solicitudes ni refrescos inútiles
   if (key && invalidTokens.has(key)) {
@@ -126,7 +142,7 @@ export async function fetchWithSessionRetry(url: string, init: RequestInit = {})
         });
         if (refreshed.status === 401 || refreshed.status === 403) {
           // El token fue definitivamente rechazado por la API (firma inválida tras rotación o sesión revocada)
-          invalidTokens.add(key!);
+          if (base && token) markTokenInvalid(base, token);
           notifySessionInvalidated({ serverUrl: base, token });
           return null;
         }

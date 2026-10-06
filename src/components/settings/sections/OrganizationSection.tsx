@@ -117,7 +117,7 @@ export function OrganizationSection() {
         </p>
         <button
           className="cc-primary"
-          onClick={() => useSimulationStore.getState().openSettingsModal("sync")}
+          onClick={() => useSimulationStore.getState().openSettingsModal("account")}
         >
           Ir a Cuenta y perfiles
         </button>

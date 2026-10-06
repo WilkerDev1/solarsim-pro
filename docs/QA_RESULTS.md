@@ -108,8 +108,58 @@ Despliegue coordinado de backend y Cloudflare Worker, resolución de incompatibi
    - Suite automatizada de pruebas del verificador: 5/5 casos aprobados (`scripts/qa/tests/verifyDeploymentCompatibility.test.ts`).
 
 6. **Gates y Calidad**:
-   - `npm test`: 25 suites pasadas (100%).
-   - `npm --prefix server test`: 26 pruebas pasadas (100%), incluyendo migración 003 y staging E2E.
+   - `npm test`: 26 suites pasadas (100%), incluyendo tarifas SIE, descuentos web, catálogo, borrado outbox, conflictos, migración y tests de invalidación.
+   - `npm --prefix server test`: 27 pruebas pasadas (100%), incluyendo migración 003 y ambos recorridos de staging E2E.
+   - `npm --prefix server run format:check`: 100% de archivos formateados según Prettier.
    - `npm --prefix workers/share-viewer test`: 2 suites pasadas (100%).
-   - `npm run lint`: código TypeScript limpio sin errores.
-   - `npm run build` y `npm run build:electron`: artefactos frontend y electron generados correctamente.
+   - `npm --prefix workers/share-viewer run build`: tipos y bundling generados correctamente.
+   - `npm run lint`: código TypeScript limpio sin errores (`tsc --noEmit`).
+   - `npm run build` y `npm run build:electron`: artefactos cliente y electron generados correctamente.
+
+## Actualización vigente — Perfeccionamiento y Cierre de Autenticación, Sincronización y Conservación (PR #2), 6 de octubre 2026
+
+Implementación y certificación de la invalidación de sesión segura, preservación durable del espacio de trabajo y ciclo autenticado completo:
+
+1. **Invalidación de Sesión Segura y Monotonicidad de Épocas**:
+   - Se corrigió la inconsistencia en el listener de invalidación: ahora incrementa `sessionEpoch` mediante `bumpSessionEpoch = () => Math.max(sessionEpoch, get()?.sessionGeneration || 0) + 1` y actualiza `sessionGeneration` monótonamente en el store.
+   - Se desmontan y remontan los diálogos sensibles dependientes de sesión (`key={...-${sessionGeneration}}` en `ConflictResolutionModal`, `SettingsModal`, `NewProjectModal`, `AIInvoiceScannerModal`, `AIDatasheetScannerModal`, `ShareProposalModal`, etc.), descartando respuestas tardías.
+   - Se cancela el temporizador de sincronización automática (`autoSyncDebounceTimer`) y se limpian `isSyncing: false`, `activeConflict: null` y `featurePolicyRequest: null`.
+   - Preservación íntegra de proyectos, borradores abiertos, carpetas, historial de snapshots, conflictos y colas de borrado sin mutar destructivamente el workspace a `'local'` ni vaciar `localStorage`.
+   - Distinción visual y funcional entre **identidad recordada** (`currentUser` sin token) y **sesión autenticada** (`authToken` activo): en `ProfileSection`, `SimulatorView` y `ProjectActionsMenu` los permisos cacheados ya no se presentan como vigentes. Se despliega un banner ámbar explicativo con formulario in-situ para ingresar la contraseña y reanudar la sesión sin pérdida de contexto.
+   - Registro seguro de tokens inválidos con clave acotada (`computeTokenKey` usando normalización de URL y hash FNV-1a de 32 bits, límite FIFO de 50 entradas) sin registrar valores de token en texto plano en memoria ni permitir crecimiento desmedido.
+
+2. **Suite de Pruebas de Conservación Real (`src/tests/testAuthInvalidationLoop.ts`)**:
+   - Se amplió la suite con un estado sintético durable completo (2 organizaciones, proyectos pendientes y confirmados, carpetas, snapshots, conflictos, colas de borrado de proyectos y equipos, ofertas de proveedores privadas y membretes).
+   - 5/5 pruebas automatizadas aprobadas (100% éxito):
+     - **Test 1**: Preservación del estado sintético durable completo tras 401 definitivo y verificación de serialización/rehidratación.
+     - **Test 2**: Concurrencia de sesiones y protección contra respuestas 401 tardías de sesiones anteriores (401 de sesión A no invalida sesión B).
+     - **Test 3**: Deduplicación de renovaciones concurrentes compartidas (4 solicitudes simultáneas con 401 comparten 1 única llamada a `/api/auth/refresh`).
+     - **Test 4**: Fallos transitorios de red / HTTP 5xx no invalidan la sesión permanentemente.
+     - **Test 5**: Re-login recupera el ámbito correcto y aísla estrictamente los datos entre empresas (Org A vs Org B).
+
+3. **Demostración del Recorrido Autenticado Real de 10 Pasos (`server/tests/stagingEndToEnd.test.ts`)**:
+   - Verificado con PostgreSQL 16 y Cloudflare Worker reales en entorno de ensayo aislado:
+     1. Token anterior rechazado con 401 terminal tras refresh fallido.
+     2. Aviso claro de reautenticación sin bucles infinitos de sincronización.
+     3. Inicio de sesión nuevo con credenciales válidas retornando nuevo token y usuario.
+     4. `/api/auth/me` confirma cuenta, organización y rol vigentes desde BD.
+     5. Ajustes → Organización y equipo carga miembros desde `/api/users` e invitaciones desde `/api/organization/invitations`.
+     6. Centro empresarial → Organizaciones y equipo lista organizaciones y pertenencias.
+     7. Sincronización completa con PostgreSQL mediante `pushProjects` (confirmación CAS `created` v1) y `pullProjects`.
+     8. Publicación web genera enlace (`https://propuesta.electsun.net/p/:id`) y código QR.
+     9. Enlace abre con HTTP 200 y contiene el snapshot exacto (`mode: 'self_consumption'`, capacidad y datos del cliente).
+     10. Propuesta existente en KV sigue siendo legible e inmutable sin modificaciones.
+
+### Matriz de Casos Comprobados
+
+| Caso comprobado | Entorno | Resultado | Evidencia reproducible | Limitaciones conocidas |
+| --- | --- | --- | --- | --- |
+| Monotonicidad de `sessionEpoch` y desmontaje de modales | Cliente / Store Zustand | PASS | `src/store/slices/syncAuthSlice.ts`, `src/App.tsx` | N/A |
+| Registro FIFO de tokens con hash FNV-1a (máx 50) | Cliente / Memoria | PASS | `src/services/syncService.ts` | En reinicio de app se limpia caché en RAM (comportamiento esperado) |
+| Preservación durable tras 401 definitivo (2 orgs) | En proceso / In-memory | PASS | `npx tsx src/tests/testAuthInvalidationLoop.ts` (Test 1) | Requiere que el almacenamiento local tenga cuota disponible |
+| 401 tardío de sesión A no invalida sesión B | En proceso / In-memory | PASS | `npx tsx src/tests/testAuthInvalidationLoop.ts` (Test 2) | N/A |
+| Deduplicación de renovación concurrente | En proceso / In-memory | PASS | `npx tsx src/tests/testAuthInvalidationLoop.ts` (Test 3) | Límite de timeout de renovación fijado en 8s |
+| Fallos de red / 5xx preservan la sesión | En proceso / In-memory | PASS | `npx tsx src/tests/testAuthInvalidationLoop.ts` (Test 4) | N/A |
+| Aislamiento estricto de datos multi-inquilino | En proceso / In-memory | PASS | `npx tsx src/tests/testAuthInvalidationLoop.ts` (Test 5) | N/A |
+| Ciclo autenticado completo de 10 pasos | Staging aislado (Docker Postgres 16 + Worker) | PASS | `npm --prefix server test` (`stagingEndToEnd.test.ts`) | Ensayo con datos y usuarios sintéticos en puerto loopback efímero |
+| Verificación de endpoints reales de producción | Producción (`solarsim.electsun.net`) | PASS | `npm run verify:compatibility` (9/9 checks OK) | Solo lecturas autorizadas y verificación anónima 401 |

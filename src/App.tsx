@@ -108,14 +108,14 @@ export const App: React.FC = () => {
       </div>
 
       {/* Global Modals Mounted at Root Level */}
-      <ConflictResolutionModal />
+      <ConflictResolutionModal key={`conflict-resolution-${sessionGeneration}`} />
       <NewProjectModal key={`new-project-${sessionGeneration}`} />
       <UpdateModal />
       <AIInvoiceScannerModal key={`ai-invoice-${sessionGeneration}`} />
       <AIDatasheetScannerModal key={`ai-datasheet-${sessionGeneration}`} />
       <ImportConflictModal key={`import-conflict-${sessionGeneration}`} />
       <ShareProposalModal key={`share-proposal-${sessionGeneration}`} />
-      <SettingsModal />
+      <SettingsModal key={`settings-modal-${sessionGeneration}`} />
       <AIPriceCatalogScannerModal key={`ai-catalog-${sessionGeneration}`} />
       <SupplierPricesDetailModal key={`supplier-prices-${sessionGeneration}`} />
     </div>

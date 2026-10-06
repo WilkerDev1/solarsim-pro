@@ -13,6 +13,10 @@ let autoSyncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) => {
   let sessionEpoch = 0;
+  const bumpSessionEpoch = () => {
+    sessionEpoch = Math.max(sessionEpoch, get()?.sessionGeneration || 0) + 1;
+    return sessionEpoch;
+  };
   const captureSession = () => {
     const captured = get().syncSettings;
     const epoch = sessionEpoch;
@@ -32,12 +36,16 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
         clearTimeout(autoSyncDebounceTimer);
         autoSyncDebounceTimer = null;
       }
+      const epoch = bumpSessionEpoch();
       set((state) => ({
         syncSettings: {
           ...state.syncSettings,
           authToken: null,
         },
+        sessionGeneration: epoch,
         isSyncing: false,
+        activeConflict: null,
+        featurePolicyRequest: null,
         syncFeedbackMessage: 'La sesión expiró o fue revocada. Inicia sesión nuevamente.',
       }));
     }
@@ -53,9 +61,9 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
     const result = await CompanyService.switch(session.serverUrl, session.authToken, organizationId);
     if (!session.isCurrent()) return { success: false, error: 'La sesión cambió.' };
     if (!result.success || !result.token || !result.user) return { success: false, error: result.error || 'Respuesta de sesión inválida.' };
-    sessionEpoch++;
+    const epoch = bumpSessionEpoch();
     if (autoSyncDebounceTimer) { clearTimeout(autoSyncDebounceTimer); autoSyncDebounceTimer = null; }
-    set(state => { const syncSettings = { ...state.syncSettings, authToken: result.token!, currentUser: result.user!, lastSyncTimestamp: null }; return { ...changeWorkspace(state, syncSettings), syncSettings, sessionGeneration: sessionEpoch, isSyncing: false }; });
+    set(state => { const syncSettings = { ...state.syncSettings, authToken: result.token!, currentUser: result.user!, lastSyncTimestamp: null }; return { ...changeWorkspace(state, syncSettings), syncSettings, sessionGeneration: epoch, isSyncing: false }; });
     void get().loadOrganizationFeaturePolicy();
     void get().syncProjectsWithServer(false);
     return { success: true };
@@ -78,7 +86,7 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
   syncFeedbackMessage: null,
 
   setSyncSettings: (settingsPartial) => {
-    if (settingsPartial.serverUrl || settingsPartial.currentUser !== undefined || settingsPartial.authToken === null) sessionEpoch++;
+    if (settingsPartial.serverUrl || settingsPartial.currentUser !== undefined || settingsPartial.authToken === null) bumpSessionEpoch();
     set((state) => {
       const syncSettings = { ...state.syncSettings, ...settingsPartial };
       if (settingsPartial.serverUrl && settingsPartial.serverUrl !== state.syncSettings.serverUrl && settingsPartial.authToken === undefined && settingsPartial.currentUser === undefined) { syncSettings.authToken = null; syncSettings.currentUser = null; }
@@ -91,7 +99,7 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
 
   loginUser: async (email, password) => {
     const { serverUrl } = get().syncSettings;
-    const epoch = ++sessionEpoch;
+    const epoch = bumpSessionEpoch();
     set({ sessionGeneration: epoch, isSyncing: false });
     const res = await SyncService.login(serverUrl, email, password);
     if (epoch !== sessionEpoch || serverUrl !== get().syncSettings.serverUrl) return { success: false, error: 'La sesión cambió mientras se iniciaba el acceso.' };
@@ -115,7 +123,7 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
 
   registerUser: async (name, email, password, organizationName) => {
     const { serverUrl } = get().syncSettings;
-    const epoch = ++sessionEpoch;
+    const epoch = bumpSessionEpoch();
     set({ sessionGeneration: epoch, isSyncing: false });
     const res = await SyncService.register(serverUrl, { name, email, password, organizationName });
     if (epoch !== sessionEpoch || serverUrl !== get().syncSettings.serverUrl) return { success: false, error: 'La sesión cambió mientras se iniciaba el acceso.' };
@@ -137,8 +145,8 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
   },
 
   logoutUser: () => {
-    sessionEpoch++;
-    set({ sessionGeneration: sessionEpoch, isSyncing: false, featurePolicyRequest: null, activeConflict: null });
+    const epoch = bumpSessionEpoch();
+    set({ sessionGeneration: epoch, isSyncing: false, featurePolicyRequest: null, activeConflict: null });
     if (autoSyncDebounceTimer) {
       clearTimeout(autoSyncDebounceTimer);
       autoSyncDebounceTimer = null;
@@ -345,9 +353,13 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
     }
 
     if (session.isCurrent()) {
+      const epoch = bumpSessionEpoch();
       set((state) => ({
         syncSettings: { ...state.syncSettings, authToken: null },
+        sessionGeneration: epoch,
         isSyncing: false,
+        activeConflict: null,
+        featurePolicyRequest: null,
         syncFeedbackMessage: 'La sesión expiró en el servidor. Inicia sesión nuevamente.',
       }));
     }
