@@ -1,15 +1,15 @@
-version: 2.2.1
+version: 2.3.0
 files:
-  - url: SolarSim-Pro-2.2.1.AppImage
-    sha512: 6cprSryTdkhQhF7Ou6DrBQmYrPS3Xj+TOG8kLThwUyt4IiN54HDsNNdWJKittyWFO60ngxf3dC4lWFhc0AM8pQ==
-    size: 169818876
-    blockMapSize: 178960
-  - url: SolarSim-Pro-2.2.1.deb
-    sha512: hIIcbZBorCvr6bHD1EC/K5VnjvlmlwOXbxkr86tnZu6ix8k+gsiFaBswtp6XtD82/bjZggdniHQ+fKzlklUP/g==
-    size: 131335960
-  - url: SolarSim-Pro-2.2.1.pacman
-    sha512: nR5lQUqncbX7SviEFh5n3cEakbhXqa1vrai1w2X+tXC7fMazwvYfJQd4qUk0b+p23X4jIIlU0QW0K6V+qgwrUA==
-    size: 117659360
-path: SolarSim-Pro-2.2.1.AppImage
-sha512: 6cprSryTdkhQhF7Ou6DrBQmYrPS3Xj+TOG8kLThwUyt4IiN54HDsNNdWJKittyWFO60ngxf3dC4lWFhc0AM8pQ==
-releaseDate: '2026-10-05T13:26:02.248Z'
+  - url: SolarSim-Pro-2.3.0.AppImage
+    sha512: 03HdhqxUjd2ZWrtx2ztlq+9HjZfXNGdcJxM+7v7M0FY3mTKKk2ys2oKddkvMeoh9DkPQhW2S0I3q7iIWNN629g==
+    size: 169822622
+    blockMapSize: 178610
+  - url: SolarSim-Pro-2.3.0.deb
+    sha512: cYuU4NFQTm7WAmesbFay6Fb3lI4CZkwIq+juMIrvKt90ot0qhGPoy3JDOTr6bs7Vjh3dxutU9jSxmEnbD9uhww==
+    size: 131340848
+  - url: SolarSim-Pro-2.3.0.pacman
+    sha512: LiFm/EHHThVybjUbichhWkglqSDwEX3Eq7igsSFrBTckFPuQid+azoAZww2wM/tuGfSmjgDRCQaH6iNH+1S0Pw==
+    size: 117683412
+path: SolarSim-Pro-2.3.0.AppImage
+sha512: 03HdhqxUjd2ZWrtx2ztlq+9HjZfXNGdcJxM+7v7M0FY3mTKKk2ys2oKddkvMeoh9DkPQhW2S0I3q7iIWNN629g==
+releaseDate: '2026-10-06T18:35:29.670Z'
