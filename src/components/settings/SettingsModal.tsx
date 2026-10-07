@@ -28,7 +28,9 @@ export const SettingsModal: React.FC = () => {
     if (!isSettingsModalOpen) return;
     const section = resolveSettingsSection(settingsActiveTab);
     setActiveSection(section);
-    setVisitedSections(new Set([section]));
+    // Reauthentication can navigate to Account while the workspace is open.
+    // Keep other visited forms mounted until their owner actually changes.
+    setVisitedSections((previous) => new Set([...previous, section]));
   }, [isSettingsModalOpen, settingsActiveTab]);
   useEffect(() => {
     if (!isSettingsModalOpen) return;

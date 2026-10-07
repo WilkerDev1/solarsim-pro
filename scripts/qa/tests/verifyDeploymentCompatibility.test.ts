@@ -161,7 +161,7 @@ test('Compatibility Checker: detecta endpoint desprotegido (responde 200 sin cre
   }
 });
 
-test('Compatibility Checker: confirma éxito total cuando todos los contratos están satisfechos', async () => {
+test('Compatibility Checker: no confunde sondeo autenticado parcial con un ensayo completo', async () => {
   const mockApi = await createMockServer((req, res) => {
     if (req.url === '/api/health') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -217,9 +217,21 @@ test('Compatibility Checker: confirma éxito total cuando todos los contratos es
       silent: true,
     });
 
-    assert.equal(result.success, true, 'Fully compatible mock environment should pass');
+    assert.equal(result.success, false, 'Policy alone cannot establish all deployment contracts');
     const failures = result.results.filter((r) => r.status === 'FAIL');
     assert.equal(failures.length, 0);
+    const coverage = result.results.find((r) => r.name === 'Authenticated Contract Coverage');
+    assert.equal(coverage?.status, 'WARN');
+    assert.equal(coverage?.details?.endToEndChecked, false);
+    assert.match(coverage!.message, /faltan contratos/);
+    const anonymous = result.results.filter((r) => r.category === 'API_ROUTES' && r.status === 'PASS');
+    assert.ok(anonymous.every((r) => r.message.includes('no comprobados')));
+
+    const anonymousOnly = await runCompatibilityChecks({ apiUrl: mockApi.url, workerUrl: mockWorker.url, silent: true });
+    assert.equal(anonymousOnly.success, false);
+    const anonymousCoverage = anonymousOnly.results.find((r) => r.name === 'Authenticated Contract Coverage');
+    assert.match(anonymousCoverage!.message, /sin token/);
+    assert.equal(anonymousCoverage?.details?.authenticatedPolicyChecked, false);
   } finally {
     await mockApi.close();
     await mockWorker.close();

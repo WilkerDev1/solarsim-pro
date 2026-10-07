@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CompanyService,
   OrganizationSummary,
@@ -19,6 +19,11 @@ export function OrganizationManagement({
   const [draft, setDraft] = useState<Partial<CompanyProfile>>({});
   const [savedDraft, setSavedDraft] = useState<Partial<CompanyProfile>>({});
   const dirty = JSON.stringify(draft) !== JSON.stringify(savedDraft);
+  const draftRef = useRef(draft);
+  const dirtyRef = useRef(dirty);
+  draftRef.current = draft;
+  dirtyRef.current = dirty;
+  const loadRequest = useRef(0);
   const allowDiscard = () =>
     !dirty ||
     window.confirm(
@@ -30,51 +35,60 @@ export function OrganizationManagement({
   }, [dirty, registerLeaveGuard]);
   const [version, setVersion] = useState<number | null>(null);
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [view, setView] = useState<"profile" | "team" | "other">("profile");
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; loadRequest.current++; }; }, []);
   const user = syncSettings.currentUser;
   const valid = () =>
-    useSimulationStore.getState().sessionGeneration === sessionGeneration;
-  const load = async () => {
+    mounted.current && useSimulationStore.getState().sessionGeneration === sessionGeneration;
+  const load = async (discardDraft = false) => {
     if (!syncSettings.authToken) return;
+    const request = ++loadRequest.current;
+    const previousDraft = draftRef.current;
     const [list, profile] = await Promise.all([
       CompanyService.list(syncSettings.serverUrl, syncSettings.authToken),
       CompanyService.profile(syncSettings.serverUrl, syncSettings.authToken),
     ]);
-    if (!valid()) return;
+    if (!valid() || request !== loadRequest.current) return;
     if (list.success && profile.success && profile.profile && profile.version) {
       setOrganizations(list.organizations || []);
-      setDraft(profile.profile);
-      setSavedDraft(profile.profile);
-      setVersion(profile.version);
+      if (!dirtyRef.current || (discardDraft && draftRef.current === previousDraft)) {
+        setDraft(profile.profile);
+        setSavedDraft(profile.profile);
+        setVersion(profile.version);
+      } else if (profile.version !== version) {
+        setMessage("Se conserva tu borrador. El perfil del servidor cambió; descarta y actualiza los datos antes de guardar.");
+      }
+      setError("");
       setLoaded(true);
     } else {
-      setLoaded(false);
-      setMessage(
+      setError(
         list.error || profile.error || "No se pudieron consultar las empresas.",
       );
     }
   };
   useEffect(() => {
     void load();
-  }, [sessionGeneration]);
+  }, [sessionGeneration, syncSettings.authToken]);
+  useEffect(() => { setBusy(false); }, [sessionGeneration]);
   const run = async (
     operation: () => Promise<{ success: boolean; error?: string }>,
     success: string,
   ) => {
+    loadRequest.current++;
     setBusy(true);
     setMessage("");
+    setError("");
     const result = await operation();
     if (!valid()) return;
     setBusy(false);
-    setMessage(
-      result.success
-        ? success
-        : result.error || "No se pudo completar la operación.",
-    );
+    if (result.success) setMessage(success);
+    else setError(result.error || "No se pudo completar la operación.");
   };
   if (!user || !syncSettings.authToken)
     return (
@@ -109,6 +123,7 @@ export function OrganizationManagement({
           {message}
         </div>
       )}
+      {error && <div className="cc-notice cc-error" role="alert">{error}</div>}
       <div className="cc-inline">
         <label>
           Organización activa{" "}
@@ -138,7 +153,7 @@ export function OrganizationManagement({
         <button
           disabled={busy}
           onClick={() => {
-            if (allowDiscard()) void load();
+            if (allowDiscard()) void load(true);
           }}
         >
           Actualizar datos
@@ -217,7 +232,7 @@ export function OrganizationManagement({
           )}
           {view === "team" && (
             <section className="cc-section">
-              <OrganizationSection key={sessionGeneration} />
+              <OrganizationSection />
             </section>
           )}
           {view === "other" && (

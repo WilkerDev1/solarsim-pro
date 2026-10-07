@@ -18,3 +18,5 @@ repomix-output.txt
 .impeccable/
 
 **/next-secrets.env
+
+scripts/qa/fixtures/runtime-config.json

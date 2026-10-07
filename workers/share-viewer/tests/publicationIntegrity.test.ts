@@ -290,6 +290,23 @@ async function main() {
   assert.ok(!multiHtml.includes('JA Solar JAM66D45-630/LB (630W) JA Solar JAM66D45-630/LB (630W)'));
   assert.ok(multiHtml.includes('156 Módulos JA Solar JAM66D45-630/LB (630W)'));
 
+  // Equipment must not replace a preceding bold client or a numeric energy value.
+  const paragraphCase = structuredClone(multiEquipProposal);
+  paragraphCase.project.specs.panels = [
+    { count: 100, powerW: 630, brandModel: 'Modelo A (630W)' },
+    { count: 56, powerW: 620, brandModel: 'Modelo B (620W)' },
+  ];
+  paragraphCase.project.customization!.customProjectSummaryParagraph1 = 'Oferta para **CLIENTE 2026**: consumo **12000 kWh**. Se propone la instalación de **156 Módulos Anteriores (630W)**.';
+  const paragraphHtml = renderProposalPage(paragraphCase);
+  assert.ok(paragraphHtml.includes('<strong class="font-bold text-slate-950">CLIENTE 2026</strong>'));
+  assert.ok(paragraphHtml.includes('<strong class="font-bold text-slate-950">12000 kWh</strong>'));
+  assert.ok(paragraphHtml.includes('100 Módulos Modelo A (630W) y 56 Módulos Modelo B (620W)'));
+  assert.ok(!paragraphHtml.includes('Módulos Anteriores'));
+  paragraphCase.project.customization!.customProjectSummaryParagraph1 = 'Texto libre: **12 equipos auxiliares**, **12000 kWh** y **CLIENTE 2026**.';
+  const customHtml = renderProposalPage(paragraphCase);
+  assert.ok(customHtml.includes('<strong class="font-bold text-slate-950">12 equipos auxiliares</strong>'));
+  assert.ok(customHtml.includes('<strong class="font-bold text-slate-950">12000 kWh</strong>'));
+
   console.log('PASS: publicación autenticada, límites, esquema, escape HTML/atributos/JSON/Markdown, snapshots, retroactividad multi-equipos y expiración.');
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

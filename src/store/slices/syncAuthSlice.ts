@@ -13,6 +13,7 @@ let autoSyncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) => {
   let sessionEpoch = 0;
+  let authenticationAttempt: number | null = null;
   const bumpSessionEpoch = () => {
     sessionEpoch = Math.max(sessionEpoch, get()?.sessionGeneration || 0) + 1;
     return sessionEpoch;
@@ -36,7 +37,7 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
         clearTimeout(autoSyncDebounceTimer);
         autoSyncDebounceTimer = null;
       }
-      const epoch = bumpSessionEpoch();
+      const epoch = authenticationAttempt === sessionEpoch ? sessionEpoch : bumpSessionEpoch();
       set((state) => ({
         syncSettings: {
           ...state.syncSettings,
@@ -100,11 +101,13 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
   loginUser: async (email, password) => {
     const { serverUrl } = get().syncSettings;
     const epoch = bumpSessionEpoch();
+    authenticationAttempt = epoch;
     set({ sessionGeneration: epoch, isSyncing: false });
     const res = await SyncService.login(serverUrl, email, password);
     if (epoch !== sessionEpoch || serverUrl !== get().syncSettings.serverUrl) return { success: false, error: 'La sesión cambió mientras se iniciaba el acceso.' };
     if (res.success && res.token && res.user) {
-      clearInvalidToken(serverUrl, res.token!);
+      await clearInvalidToken(serverUrl, res.token!);
+      if (epoch !== sessionEpoch || serverUrl !== get().syncSettings.serverUrl) return { success: false, error: 'La sesión cambió mientras se iniciaba el acceso.' };
       set((state) => ({
         ...changeWorkspace(state, { ...state.syncSettings, authToken: res.token!, currentUser: res.user! }),
         syncSettings: {
@@ -116,14 +119,17 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
       }));
       void get().loadOrganizationFeaturePolicy();
       get().syncProjectsWithServer(false);
+      if (authenticationAttempt === epoch) authenticationAttempt = null;
       return { success: true };
     }
+    if (authenticationAttempt === epoch) authenticationAttempt = null;
     return { success: false, error: res.error || 'Error al iniciar sesión' };
   },
 
   registerUser: async (name, email, password, organizationName) => {
     const { serverUrl } = get().syncSettings;
     const epoch = bumpSessionEpoch();
+    authenticationAttempt = epoch;
     set({ sessionGeneration: epoch, isSyncing: false });
     const res = await SyncService.register(serverUrl, { name, email, password, organizationName });
     if (epoch !== sessionEpoch || serverUrl !== get().syncSettings.serverUrl) return { success: false, error: 'La sesión cambió mientras se iniciaba el acceso.' };
@@ -139,8 +145,10 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
       }));
       void get().loadOrganizationFeaturePolicy();
       get().syncProjectsWithServer(false);
+      if (authenticationAttempt === epoch) authenticationAttempt = null;
       return { success: true };
     }
+    if (authenticationAttempt === epoch) authenticationAttempt = null;
     return { success: false, error: res.error || 'Error al registrar usuario' };
   },
 
@@ -323,34 +331,17 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
       return { valid: false, error: 'No hay token de sesión configurado' };
     }
 
-    // 1. Intentar validar con /api/auth/me (aprovecha auto-renovación silenciosa)
-    const freshUser = await SyncService.getMe(serverUrl, authToken);
+    const result = await SyncService.getSessionIdentity(serverUrl, authToken);
     if (!session.isCurrent()) return { valid: false, error: 'La sesión cambió durante la verificación.' };
-    if (freshUser) {
+    if (result.success && result.user) {
+      const freshUser = result.user;
       set((state) => ({
         ...changeWorkspace(state, { ...state.syncSettings, currentUser: freshUser }),
-        syncSettings: {
-          ...state.syncSettings,
-          currentUser: freshUser,
-        },
+        syncSettings: { ...state.syncSettings, currentUser: freshUser },
       }));
       return { valid: true, user: freshUser };
     }
-
-    // 2. Si getMe falló (ej. expiración o formato), intentar refresh explícito
-    const refreshRes = await SyncService.refreshToken(serverUrl, authToken);
-    if (!session.isCurrent()) return { valid: false, error: 'La sesión cambió durante la renovación.' };
-    if (refreshRes.success && refreshRes.token && refreshRes.user) {
-      set((state) => ({
-        ...changeWorkspace(state, { ...state.syncSettings, authToken: refreshRes.token!, currentUser: refreshRes.user! }),
-        syncSettings: {
-          ...state.syncSettings,
-          authToken: refreshRes.token!,
-          currentUser: refreshRes.user!,
-        },
-      }));
-      return { valid: true, user: refreshRes.user };
-    }
+    if (result.failure !== 'rejected') return { valid: false, error: result.error };
 
     if (session.isCurrent()) {
       const epoch = bumpSessionEpoch();
@@ -363,7 +354,7 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
         syncFeedbackMessage: 'La sesión expiró en el servidor. Inicia sesión nuevamente.',
       }));
     }
-    return { valid: false, error: refreshRes.error || 'La sesión ha expirado en el servidor' };
+    return { valid: false, error: result.error || 'La sesión ha expirado en el servidor' };
   },
 };
 };

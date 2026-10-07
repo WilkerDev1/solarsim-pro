@@ -67,9 +67,11 @@ export function resolveDynamicProjectSummaryParagraph1(
     .replace(/{energyCoveragePct}/gi, `${summary.energyCoveragePct.toFixed(1)}%`);
 
   // 2. Dynamically update numeric values if paragraph follows standard proposal wording:
+  // Only update an explicitly labelled panel block. A client name or an energy
+  // value can also be bold and must never be mistaken for technical equipment.
   text = text.replace(
-    /\*\*\s*(?:\d+\s+)?(?:M[oó]dulos?\s+)?[^*]+\*\*/i,
-    `**${isPreformattedPanels ? formattedPanelDesc : `${project.specs.panelCount} ${formattedPanelDesc}`}**`
+    /\*\*\s*\d+\s+M[oó]dulos?\s+[^*]+\*\*/i,
+    () => `**${isPreformattedPanels ? formattedPanelDesc : `${project.specs.panelCount} ${formattedPanelDesc}`}**`
   );
 
   text = text.replace(

@@ -343,8 +343,9 @@ export function renderProposalPage(stored: StoredProposal): string {
       .replace(/{annualConsumptionKWh}/gi, `${annualConsumptionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh`)
       .replace(/{energyCoveragePct}/gi, `${coveragePct.toFixed(1)}%`);
 
-    // Sincronizar bloque de paneles reemplazando el contenido completo entre negritas
-    text = text.replace(/(\*\*?\s*)\d+\s+(?:M[oó]dulos?\s+)?[^*]+(\*\*?)/i, `$1${multiPanelsDesc}$2`);
+    // El nombre del cliente y el consumo también están en negrita: exigir la
+    // etiqueta de módulos antes de actualizar un bloque de equipamiento.
+    text = text.replace(/\*\*\s*\d+\s+M[oó]dulos?\s+[^*]+\*\*/i, () => `**${multiPanelsDesc}**`);
     text = text.replace(/(potencia\s+DC\s+instalada\s+de\s+\*\*?)[^*]+?(\*\*?)/i, `$1${systemCapacityKWp} kWp$2`);
     text = text.replace(/(producción\s+energética\s+estimada\s+para\s+este\s+sistema\s+es\s+de\s+\*\*?)[^*]+?(\*\*?)/i, `$1${annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh anuales$2`);
     text = text.replace(/(representando\s+el\s+\*\*?)[^*]+?(\*\*?\s*del\s+consumo|\*\*?\s*de\s+cobertura)/i, `$1${coveragePct.toFixed(1)}%$2`);

@@ -11,6 +11,7 @@ Las fuentes canónicas de esta rama son:
 - [Infraestructura](INFRASTRUCTURE_ARCHITECTURE.md): topología y despliegue protegido.
 - [Mantenimiento y releases](MAINTENANCE_AND_UPDATES.md): comandos, firmas y compatibilidad.
 - [Beta, revisión del CT, recuperación y rollback](BETA_ROLLOUT.md): evidencias aisladas y pendientes de puesta en producción.
+- [Revisión del 7 de octubre de 2026](REVIEW_2026_10_07.md): hallazgos corregidos, salud observada, recuperación aislada, runtime real y pendientes verificables.
 - [QA](QA.md): gates automatizados y recorridos manuales. [Resultados](QA_RESULTS.md): evidencia y límites de esta entrega.
 - [Auditoría de partida](ANALISIS_TECNICO_2026-10-03.md) y [plan](PLAN_MODULARIZACION.md): evidencia histórica y alcance de la rama.
 

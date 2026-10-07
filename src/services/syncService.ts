@@ -19,6 +19,7 @@ export interface AuthResponse {
   token?: string;
   user?: UserProfile;
   error?: string;
+  failure?: 'rejected' | 'unavailable';
 }
 
 export interface SyncPullResult {
@@ -82,32 +83,27 @@ export function notifySessionInvalidated(origin: { serverUrl: string; token: str
   });
 }
 
-function computeTokenKey(serverUrl: string, token: string): string {
-  const base = SyncService.cleanUrl(serverUrl);
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < token.length; i++) {
-    hash ^= token.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  return `${base}:${(hash >>> 0).toString(16)}`;
+async function computeTokenKey(serverUrl: string, token: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+  return `${SyncService.cleanUrl(serverUrl)}:${Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')}`;
 }
 
 const MAX_INVALID_TOKENS = 50;
 const invalidTokens = new Set<string>();
 
-export function markTokenInvalid(serverUrl: string, token: string) {
+export async function markTokenInvalid(serverUrl: string, token: string): Promise<void> {
   if (!serverUrl || !token) return;
-  const key = computeTokenKey(serverUrl, token);
-  if (invalidTokens.size >= MAX_INVALID_TOKENS) {
+  const key = await computeTokenKey(serverUrl, token);
+  if (!invalidTokens.has(key) && invalidTokens.size >= MAX_INVALID_TOKENS) {
     const oldest = invalidTokens.values().next().value;
     if (oldest) invalidTokens.delete(oldest);
   }
   invalidTokens.add(key);
 }
 
-export function clearInvalidToken(serverUrl: string, token: string) {
+export async function clearInvalidToken(serverUrl: string, token: string): Promise<void> {
   if (!serverUrl || !token) return;
-  invalidTokens.delete(computeTokenKey(serverUrl, token));
+  invalidTokens.delete(await computeTokenKey(serverUrl, token));
 }
 
 const refreshRequests = new Map<string, Promise<string | null>>();
@@ -118,7 +114,7 @@ export async function fetchWithSessionRetry(url: string, init: RequestInit = {})
   const authorization = new Headers(init.headers).get('Authorization');
   const base = url.slice(0, url.indexOf('/api/'));
   const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
-  const key = base && token ? computeTokenKey(base, token) : null;
+  const key = base && token ? await computeTokenKey(base, token) : null;
 
   // Si el token ya fue marcado como definitivamente inválido, no enviamos solicitudes ni refrescos inútiles
   if (key && invalidTokens.has(key)) {
@@ -142,7 +138,7 @@ export async function fetchWithSessionRetry(url: string, init: RequestInit = {})
         });
         if (refreshed.status === 401 || refreshed.status === 403) {
           // El token fue definitivamente rechazado por la API (firma inválida tras rotación o sesión revocada)
-          if (base && token) markTokenInvalid(base, token);
+          await markTokenInvalid(base, token);
           notifySessionInvalidated({ serverUrl: base, token });
           return null;
         }
@@ -160,10 +156,21 @@ export async function fetchWithSessionRetry(url: string, init: RequestInit = {})
   }
   const renewed = await renewal;
   if (refreshRequests.get(key!) === renewal) refreshRequests.delete(key!);
-  if (!renewed) return response;
+  if (!renewed) {
+    if (invalidTokens.has(key!)) return response;
+    // A refresh outage is not evidence that the original session was revoked.
+    const headers = new Headers(response.headers);
+    headers.set('x-solarsim-session-status', 'unavailable');
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+  }
   const headers = new Headers(init.headers);
   headers.set('Authorization', `Bearer ${renewed}`);
-  return send({ ...init, headers });
+  const retried = await send({ ...init, headers });
+  if (retried.status === 401) {
+    await markTokenInvalid(base, renewed);
+    notifySessionInvalidated({ serverUrl: base, token: renewed });
+  }
+  return retried;
 }
 
 function validatePushResults(results: unknown, ids: string[], content: 'project'): SyncPushOutcome[];
@@ -300,19 +307,31 @@ export class SyncService {
   /**
    * Obtener perfil actual y verificar validez de token (con auto-renovación)
    */
-  static async getMe(serverUrl: string, token: string): Promise<UserProfile | null> {
+  static async getSessionIdentity(serverUrl: string, token: string): Promise<AuthResponse> {
     const base = this.cleanUrl(serverUrl);
     try {
       const res = await fetchWithSessionRetry(`${base}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       this.checkRenewedToken(res, serverUrl, token);
-      if (!res.ok) return null;
+      if (!res.ok) {
+        const rejected = (res.status === 401 || res.status === 403) && res.headers.get('x-solarsim-session-status') !== 'unavailable';
+        return { success: false, failure: rejected ? 'rejected' : 'unavailable', error: rejected ? 'La sesión expiró o fue revocada. Inicia sesión nuevamente.' : 'No se pudo verificar la sesión. Reintenta cuando haya conexión.' };
+      }
       const data = await res.json();
-      return data.user || null;
+      const user = data?.user;
+      if (!data?.success || !user || typeof user.id !== 'string' || typeof user.organizationId !== 'string' || !['ADMIN', 'EDITOR', 'LECTOR', 'VIEWER'].includes(user.role)) {
+        return { success: false, failure: 'unavailable', error: 'El servidor devolvió un perfil de sesión inválido.' };
+      }
+      return { success: true, user };
     } catch {
-      return null;
+      return { success: false, failure: 'unavailable', error: 'No se pudo verificar la sesión. Reintenta cuando haya conexión.' };
     }
+  }
+
+  static async getMe(serverUrl: string, token: string): Promise<UserProfile | null> {
+    const result = await this.getSessionIdentity(serverUrl, token);
+    return result.success ? result.user ?? null : null;
   }
 
   /**
@@ -323,19 +342,21 @@ export class SyncService {
     try {
       const res = await fetchWithSessionRetry(`${base}/api/auth/refresh`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       });
-      this.checkRenewedToken(res, serverUrl, token);
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.error || 'No se pudo renovar la sesión' };
+      if (res.status === 401 || res.status === 403) {
+        await markTokenInvalid(base, token);
+        notifySessionInvalidated({ serverUrl: base, token });
+        return { success: false, failure: 'rejected', error: 'La sesión expiró o fue revocada.' };
       }
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success || typeof data.token !== 'string' || !data.token) {
+        return { success: false, failure: 'unavailable', error: data?.error || 'No se pudo renovar la sesión. Reintenta cuando haya conexión.' };
+      }
+      this.checkRenewedToken(res, serverUrl, token);
       return { success: true, token: data.token, user: data.user };
-    } catch (err: any) {
-      return { success: false, error: err.message || 'Fallo de red al renovar sesión' };
+    } catch {
+      return { success: false, failure: 'unavailable', error: 'Fallo de red al renovar sesión' };
     }
   }
 

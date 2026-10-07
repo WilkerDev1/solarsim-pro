@@ -1,4 +1,8 @@
-# Resultados de la rama de pruebas — actualización 4 octubre 2026
+# Resultados de QA — evidencia histórica y revisión del 7 de octubre de 2026
+
+El estado actual y sus límites están en [REVIEW_2026_10_07.md](REVIEW_2026_10_07.md). Las secciones por fecha conservan evidencia histórica; no representan automáticamente el checkout actual ni un despliegue de todas las correcciones.
+
+## Evidencia histórica — 4 de octubre de 2026
 
 Rama `codex/modular-audit-feature-controls`, desde `beta` en `8cdcfec`. Estos resultados certifican los casos ejecutados en el checkout de la rama; no constituyen un despliegue ni una certificación de producción.
 
@@ -55,18 +59,18 @@ Electron44.5.1/builder26.15.3 y paquetes2.3.0-beta.1 Linux/Windows generados sin
 
 El commit56af783 pasó en GitHub [contratos](https://github.com/WilkerDev1/solarsim-pro/actions/runs/37300154074) e [instalación/empaquetado nativo](https://github.com/WilkerDev1/solarsim-pro/actions/runs/37300154064), Ubuntu y Windows.
 
-## Riesgos y operaciones pendientes
+## Riesgos y operaciones pendientes al 4 de octubre
 
 - Despliegue coordinado y rotación de secretos de producción pendientes. No desplegar API aislada mientras clientes antiguos escriban. El volumen PostgreSQL se conserva; no requiere cambio de major/SO según la revisión del CT.
 - Las firmas GPG de ambos manifiestos y cuatro formatos Linux se verificaron con la clave fijada; tamaño/SHA256 de los seis paquetes también pasó. Authenticode, SmartScreen e instalación interactiva/pkexec siguen pendientes; AppImage usa sustitución manual. Instalación deb y actualización NSIS desde2.1.5 pasaron en runners efímeros.
-- Auditoría npm raíz actual:6 avisos altos en dependencias dev de Tailwind/braces; producción0. No se aplicó upgrade forzado de Tailwind4. Auditorías actuales de backend y Worker:0 avisos. Son resultados de esta ejecución, no garantía permanente.
+- Auditoría npm raíz del 4 de octubre:6 avisos altos en dependencias dev de Tailwind/braces; producción0. No se aplicó upgrade forzado de Tailwind4. Auditorías de backend y Worker de esa ejecución:0 avisos. Son resultados de esta ejecución, no garantía permanente.
 - Chunks grandes siguen como optimización futura; PDF aprobado sin rediseño. Drag-and-drop real e impresión nativa no acreditados por este ensayo.
 
 Revisiones independientes de sincronización, updater e interfaz cerraron conformes después de corregir los hallazgos y sus regresiones. El revisor operativo detectó una ruta insegura al preparar secretos; el guard corregido se verificó desde repo, subdirectorio, carpeta externa y enlace simbólico.
 
-Estado histórico al4 de octubre: PR a beta y paquetes locales, sin merge ni deploy. El estado vigente está en la actualización siguiente. El plan operativo registra las tareas abiertas con protección del dato y rollback.
+Estado histórico al4 de octubre: PR a beta y paquetes locales, sin merge ni deploy. El estado vigente está en la revisión del 7 de octubre. El plan operativo registra las tareas abiertas con protección del dato y rollback.
 
-## Actualización vigente — release 2.2.1, 5 de octubre
+## Evidencia histórica — release 2.2.1, 5 de octubre
 
 PR1 integrado en beta; macOS excluido por decisión del usuario. Windows/Linuxx64 compilados en [GitHub CI37315592565](https://github.com/WilkerDev1/solarsim-pro/actions/runs/37315592565), todos los jobs correctos. Betas sin empaquetado de SO: `verify.yml` comprueba dev/gates y el antiguo workflow de paquetes beta se retiró/desactivó. Los checks push cancelados de PR1 eran ejecuciones duplicadas por concurrencia; ahora las ramas codex reciben solo el check de PR.
 
@@ -76,16 +80,16 @@ El primer draft falló por alias que solo diferían en mayúsculas; se conservan
 
 Verificación local de los seis archivos descargados y firmas GPG con la clave fijada: PASS. Los manifiestos JSON firmados y ambos YAML corresponden a2.2.1. Revisión independiente del updater/pipeline sin bloqueantes. Se volvieron a descargar los manifiestos/YAML y firmas del borrador: ambos verificadores pasaron. Los 20 assets remotos coincidieron en tamaño/SHA256; después se publicó la [release 2.2.1](https://github.com/WilkerDev1/solarsim-pro/releases/tag/v2.2.1).
 
-Audit actual: raíz7 altos dev, producción0; backend0, Worker0. Producción conserva API2.2.0 y PostgreSQL conectado; no se desplegó ni se escribió en datos empresariales. [Runbook vigente y límites](BETA_ROLLOUT.md).
+Audit del 5 de octubre: raíz7 altos dev, producción0; backend0, Worker0. Producción conserva API2.2.0 y PostgreSQL conectado; no se desplegó ni se escribió en datos empresariales. [Runbook vigente y límites](BETA_ROLLOUT.md).
 
-## Actualización vigente — Reparación de Publicación Web y Despliegue de Producción, 6 de octubre 2026
+## Evidencia histórica — publicación web y despliegue, 6 de octubre de 2026
 
-Despliegue coordinado de backend y Cloudflare Worker, resolución de incompatibilidad en generación de propuestas web y certificación de contratos PR #2:
+Despliegue coordinado de backend y Cloudflare Worker, resolución de incompatibilidad en generación de propuestas web. El sondeo anónimo de aquel día no certificaba los contratos autenticados de PR #2:
 
 1. **Diagnóstico y Reparación de Contratos**:
    - Se resolvió el error «No se pudo confirmar la configuración de simulación del servidor»: la API 2.2.0 anterior no implementaba `GET /api/organization/features` ni `POST /api/auth/share-authorization`.
    - Se reparó `src/services/shareProposalService.ts` propagando errores específicos de política en lugar del mensaje genérico.
-   - Se corrigieron las rutas en el comprobador de compatibilidad (`/api/organization/profile`, `/api/auth/switch-organization`) exigiendo HTTP 401 ante accesos anónimos y salida con código de error ante fallos.
+   - Se corrigieron las rutas en el comprobador de compatibilidad (`/api/organization/profile`, `/api/auth/switch-organization`) comprobando HTTP 401 ante accesos anónimos. La revisión posterior detectó que el middleware también rechaza rutas inexistentes; esa respuesta no prueba la existencia ni el esquema del handler.
 
 2. **Respaldo Privado y Ensayo de Restauración**:
    - Generación de dump binario PostgreSQL en `app-server` (CT 100): `~/servicios/database/backups/solarsim_prod_pre_deploy_20261006.dump` (505 KB, permisos estrictos `0600`).
@@ -93,7 +97,7 @@ Despliegue coordinado de backend y Cloudflare Worker, resolución de incompatibi
 
 3. **Construcción y Despliegue de la API (Producción)**:
    - Compilación Docker con contexto raíz (`server/` y `shared/`): imagen `solarsim-api-api:2.2.1-ac7abbc` (Digest: `sha256:3ef36a8fa0b6f1fcadf5992daf7e3976de93bc222f837603fac10df88fa180c6`).
-   - Preservación de imagen de rollback: `solarsim-api-api:rollback-2.2.0` (`sha256:7d5bf277df56ee123a5ef89318434cb1ed36b52cb3353f3e202237bd2f37563e`).
+   - Preservación del artefacto anterior `solarsim-api-api:rollback-2.2.0` (`sha256:7d5bf277df56ee123a5ef89318434cb1ed36b52cb3353f3e202237bd2f37563e`). No es un rollback operativo seguro después de usar membresías secundarias y revocaciones de la migración 003.
    - Generación y asignación de secretos criptográficos privados (32+ caracteres) en `.env` (`0600`), rechazando credenciales por defecto.
    - Recreación en caliente de `solarsim-api` con `docker compose up -d --force-recreate api` conservando el volumen de datos de PostgreSQL.
    - Ejecución automática e idempotente de las migraciones 001 (`baseline`), 002 (`feature_policy_and_tombstones`) y 003 (`company_management`).
@@ -104,7 +108,7 @@ Despliegue coordinado de backend y Cloudflare Worker, resolución de incompatibi
    - Bindings verificados: KV `e6793f84550d449899f59aa80c872067` y variable `AUTH_API_URL: "https://solarsim.electsun.net"`.
 
 5. **Verificación Ejecutable de Compatibilidad**:
-   - `npm run verify:compatibility` ejecutado contra endpoints reales de producción: 9/9 comprobaciones aprobadas, 0 fallos, código de salida 0.
+   - El verificador de entonces informó 9/9 comprobaciones y salida 0 contra producción. Era un sondeo de salud y rechazo anónimo, con cobertura insuficiente para acreditar compatibilidad completa. El verificador corregido el 7 de octubre informa `WARN`/salida 1 por contratos pendientes; no autoriza despliegue.
    - Suite automatizada de pruebas del verificador: 5/5 casos aprobados (`scripts/qa/tests/verifyDeploymentCompatibility.test.ts`).
 
 6. **Gates y Calidad**:
@@ -116,54 +120,19 @@ Despliegue coordinado de backend y Cloudflare Worker, resolución de incompatibi
    - `npm run lint`: código TypeScript limpio sin errores (`tsc --noEmit`).
    - `npm run build` y `npm run build:electron`: artefactos cliente y electron generados correctamente.
 
-## Actualización vigente — Perfeccionamiento y Cierre de Autenticación, Sincronización y Conservación (PR #2), 6 de octubre 2026
+## Evidencia histórica — autenticación y conservación, 6 de octubre de 2026
 
-Implementación y certificación de la invalidación de sesión segura, preservación durable del espacio de trabajo y ciclo autenticado completo:
+Se implementaron épocas monótonas de sesión, descarte de respuestas tardías, cancelación del temporizador de sincronización e identidad recordada sin token. Las cinco pruebas originales de `testAuthInvalidationLoop.ts` cubrían estado durable serializado, respuesta tardía, deduplicación de refresh y cambios de organización.
 
-1. **Invalidación de Sesión Segura y Monotonicidad de Épocas**:
-   - Se corrigió la inconsistencia en el listener de invalidación: ahora incrementa `sessionEpoch` mediante `bumpSessionEpoch = () => Math.max(sessionEpoch, get()?.sessionGeneration || 0) + 1` y actualiza `sessionGeneration` monótonamente en el store.
-   - Se desmontan y remontan los diálogos sensibles dependientes de sesión (`key={...-${sessionGeneration}}` en `ConflictResolutionModal`, `SettingsModal`, `NewProjectModal`, `AIInvoiceScannerModal`, `AIDatasheetScannerModal`, `ShareProposalModal`, etc.), descartando respuestas tardías.
-   - Se cancela el temporizador de sincronización automática (`autoSyncDebounceTimer`) y se limpian `isSyncing: false`, `activeConflict: null` y `featurePolicyRequest: null`.
-   - Preservación íntegra de proyectos, borradores abiertos, carpetas, historial de snapshots, conflictos y colas de borrado sin mutar destructivamente el workspace a `'local'` ni vaciar `localStorage`.
-   - Distinción visual y funcional entre **identidad recordada** (`currentUser` sin token) y **sesión autenticada** (`authToken` activo): en `ProfileSection`, `SimulatorView` y `ProjectActionsMenu` los permisos cacheados ya no se presentan como vigentes. Se despliega un banner ámbar explicativo con formulario in-situ para ingresar la contraseña y reanudar la sesión sin pérdida de contexto.
-   - Registro seguro de tokens inválidos con clave acotada (`computeTokenKey` usando normalización de URL y hash FNV-1a de 32 bits, límite FIFO de 50 entradas) sin registrar valores de token en texto plano en memoria ni permitir crecimiento desmedido.
+La revisión del 7 de octubre encontró límites que esas pruebas no demostraban:
 
-2. **Suite de Pruebas de Conservación Real (`src/tests/testAuthInvalidationLoop.ts`)**:
-   - Se amplió la suite con un estado sintético durable completo (2 organizaciones, proyectos pendientes y confirmados, carpetas, snapshots, conflictos, colas de borrado de proyectos y equipos, ofertas de proveedores privadas y membretes).
-   - 5/5 pruebas automatizadas aprobadas (100% éxito):
-     - **Test 1**: Preservación del estado sintético durable completo tras 401 definitivo y verificación de serialización/rehidratación.
-     - **Test 2**: Concurrencia de sesiones y protección contra respuestas 401 tardías de sesiones anteriores (401 de sesión A no invalida sesión B).
-     - **Test 3**: Deduplicación de renovaciones concurrentes compartidas (4 solicitudes simultáneas con 401 comparten 1 única llamada a `/api/auth/refresh`).
-     - **Test 4**: Fallos transitorios de red / HTTP 5xx no invalidan la sesión permanentemente.
-     - **Test 5**: Re-login recupera el ámbito correcto y aísla estrictamente los datos entre empresas (Org A vs Org B).
+- El hash FNV-1a de 32 bits de la caché de tokens admitía colisiones reproducibles. Se sustituyó por SHA-256; se conserva el límite FIFO de 50 entradas.
+- La prueba transitoria cubría el transporte de sincronización, pero `validateSession` todavía cerraba la sesión ante una caída de red/5xx. Se corrigió esa ruta y se añadieron regresiones específicas.
+- La preservación del store no garantizaba los formularios montados. Las claves por `sessionGeneration` remontaban Ajustes y el centro, perdiendo borradores incluso dentro de la misma organización. El ciclo de vida ahora depende de identidad y ámbito; la época sigue protegiendo solicitudes.
+- `server/tests/stagingEndToEnd.test.ts` usa PostgreSQL Docker real, Hono en proceso, un adaptador KV en memoria (`Map`) y fetch interceptado. Prueba contratos y contenido, pero no ejecuta workerd, sockets HTTP reales ni el renderizado/decodificación de QR. El enlace esperado no es prueba de un QR generado.
+- El sondeo de producción verificaba salud y rechazo anónimo, sin demostrar la existencia o esquema de cada ruta autenticada.
 
-3. **Demostración del Recorrido Autenticado Real de 10 Pasos (`server/tests/stagingEndToEnd.test.ts`)**:
-   - Verificado con PostgreSQL 16 y Cloudflare Worker reales en entorno de ensayo aislado:
-     1. Token anterior rechazado con 401 terminal tras refresh fallido.
-     2. Aviso claro de reautenticación sin bucles infinitos de sincronización.
-     3. Inicio de sesión nuevo con credenciales válidas retornando nuevo token y usuario.
-     4. `/api/auth/me` confirma cuenta, organización y rol vigentes desde BD.
-     5. Ajustes → Organización y equipo carga miembros desde `/api/users` e invitaciones desde `/api/organization/invitations`.
-     6. Centro empresarial → Organizaciones y equipo lista organizaciones y pertenencias.
-     7. Sincronización completa con PostgreSQL mediante `pushProjects` (confirmación CAS `created` v1) y `pullProjects`.
-     8. Publicación web genera enlace (`https://propuesta.electsun.net/p/:id`) y código QR.
-     9. Enlace abre con HTTP 200 y contiene el snapshot exacto (`mode: 'self_consumption'`, capacidad y datos del cliente).
-     10. Propuesta existente en KV sigue siendo legible e inmutable sin modificaciones.
-
-### Matriz de Casos Comprobados
-
-| Caso comprobado | Entorno | Resultado | Evidencia reproducible | Limitaciones conocidas |
-| --- | --- | --- | --- | --- |
-| Monotonicidad de `sessionEpoch` y desmontaje de modales | Cliente / Store Zustand | PASS | `src/store/slices/syncAuthSlice.ts`, `src/App.tsx` | N/A |
-| Registro FIFO de tokens con hash FNV-1a (máx 50) | Cliente / Memoria | PASS | `src/services/syncService.ts` | En reinicio de app se limpia caché en RAM (comportamiento esperado) |
-| Preservación durable tras 401 definitivo (2 orgs) | En proceso / In-memory | PASS | `npx tsx src/tests/testAuthInvalidationLoop.ts` (Test 1) | Requiere que el almacenamiento local tenga cuota disponible |
-| 401 tardío de sesión A no invalida sesión B | En proceso / In-memory | PASS | `npx tsx src/tests/testAuthInvalidationLoop.ts` (Test 2) | N/A |
-| Deduplicación de renovación concurrente | En proceso / In-memory | PASS | `npx tsx src/tests/testAuthInvalidationLoop.ts` (Test 3) | Límite de timeout de renovación fijado en 8s |
-| Fallos de red / 5xx preservan la sesión | En proceso / In-memory | PASS | `npx tsx src/tests/testAuthInvalidationLoop.ts` (Test 4) | N/A |
-| Aislamiento estricto de datos multi-inquilino | En proceso / In-memory | PASS | `npx tsx src/tests/testAuthInvalidationLoop.ts` (Test 5) | N/A |
-| Ciclo autenticado completo de 10 pasos | Staging aislado (Docker Postgres 16 + Worker) | PASS | `npm --prefix server test` (`stagingEndToEnd.test.ts`) | Ensayo con datos y usuarios sintéticos en puerto loopback efímero |
-| Verificación de endpoints reales de producción | Producción (`solarsim.electsun.net`) | PASS | `npm run verify:compatibility` (9/9 checks OK) | Solo lecturas autorizadas y verificación anónima 401 |
-| Compilación oficial multiplataforma v2.3.0 (Win/Linux) | GitHub Actions CI (Run 37511270355) | PASS | Tag `v2.3.0`, release draft con 12 assets | Compilación x64 nativa en runners Windows y Linux; macOS no contemplado |
+El ensayo real añadido el 7 de octubre se ejecuta por separado mediante `scripts/qa/runRuntimeStaging.ts`: API HTTP, PostgreSQL desechable, workerd y KV locales, túneles HTTPS temporales y aplicación completa en navegador. Sus resultados y límites están en [la revisión actual](REVIEW_2026_10_07.md).
 
 ## Compilación Oficial y Empaquetado Multiplataforma v2.3.0 (6 de octubre 2026)
 
@@ -173,5 +142,13 @@ Implementación y certificación de la invalidación de sesión segura, preserva
   - `contracts / verify` (Ubuntu 24.04): PASSED (2m 40s) — lint, tests de cliente, servidor, worker, build y smoke containers.
   - `desktop (windows-latest)`: PASSED (2m 56s) — generación de instalador NSIS (`SolarSim-Pro-Setup-2.3.0.exe`) y versión portable (`SolarSim-Pro-2.3.0.exe`), prueba de instalación ejecutada.
   - `desktop (ubuntu-latest)`: PASSED (8m 18s) — generación de `AppImage`, `.deb`, `.pacman` y `.tar.gz`; prueba de arranque del `.deb` con Xvfb, ejecución de `AppImage` sin FUSE, e instalación/arranque de `.pacman` en contenedor aislado de Arch Linux (`archlinux:base`).
-  - `draft`: PASSED (1m 31s) — cálculo y validación de sumas SHA256/SHA512 de los 6 binarios (`verifyReleaseFiles.ts`), generación de `latest.json`, `update.json`, `latest.yml`, `latest-linux.yml` y creación del release draft en GitHub con 12 assets asociados.
+  - `draft`: PASSED (1m 31s) — cálculo y validación de sumas SHA256/SHA512 de los 6 binarios (`verifyReleaseFiles.ts`), generación de `latest.json`, `update.json`, `latest.yml`, `latest-linux.yml` y creación inicial de un borrador en GitHub. El 7 de octubre se verificó que la release [v2.3.0](https://github.com/WilkerDev1/solarsim-pro/releases/tag/v2.3.0) ya estaba publicada como estable; su tag no contiene las correcciones posteriores de esta revisión.
 
+
+## Revisión del 7 de octubre de 2026
+
+Se corrigieron fallos de invalidación/transporte, ciclo de vida de formularios, aislamiento del historial web, respuestas tardías del modal de publicación y sustitución de descripciones técnicas. Las regresiones automatizadas y el ensayo real se documentan en [REVIEW_2026_10_07.md](REVIEW_2026_10_07.md).
+
+La inspección de `app-server` fue de solo lectura. API y PostgreSQL estaban saludables, con migraciones 001/002/003 y sin reinicios observados. El respaldo privado del 6 de octubre pasó una nueva restauración aislada, migraciones repetidas, comparación de contenido/conteos, comprobación de huérfanos y `pg_amcheck`. No se restauró ni escribió en producción.
+
+El ensayo de navegador usó la aplicación completa con usuarios sintéticos y servicios reales de staging. El ensayo de borradores utilizó componentes reales con transporte simulado: no se presenta como evidencia de API. Los gates finales, QR decodificado y despliegue Worker con snapshot KV intacto constan en la revisión actual; el estado de GitHub CI se registra sobre el nuevo commit.

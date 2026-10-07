@@ -21,9 +21,11 @@ const AIPriceCatalogScannerModal = lazy(() => import('./components/common/AIPric
 import { SupplierPricesDetailModal } from './components/common/SupplierPricesDetailModal';
 import { SplashScreen } from './components/common/SplashScreen';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { draftOwnerKey } from './utils/draftOwnerKey';
 
 export const App: React.FC = () => {
-  const { sessionGeneration, activeView, setActiveView, sidebarTheme, syncSettings, syncProjectsWithServer, isTrashActive, isSettingsModalOpen, activeConflict, loadOrganizationFeaturePolicy } = useSimulationStore();
+  const { sessionGeneration, workspaceScope, activeView, setActiveView, sidebarTheme, syncSettings, syncProjectsWithServer, isTrashActive, isSettingsModalOpen, activeConflict, loadOrganizationFeaturePolicy } = useSimulationStore();
+  const settingsOwner = draftOwnerKey(workspaceScope, syncSettings, true);
   const isDark = sidebarTheme === 'dark';
 
   // 🔄 Ciclo de Vida Global de Sincronización Automática en Segundo Plano (Heartbeat & Focus)
@@ -115,7 +117,7 @@ export const App: React.FC = () => {
       <AIDatasheetScannerModal key={`ai-datasheet-${sessionGeneration}`} />
       <ImportConflictModal key={`import-conflict-${sessionGeneration}`} />
       <ShareProposalModal key={`share-proposal-${sessionGeneration}`} />
-      <SettingsModal key={`settings-modal-${sessionGeneration}`} />
+      <SettingsModal key={`settings-modal-${settingsOwner}`} />
       <AIPriceCatalogScannerModal key={`ai-catalog-${sessionGeneration}`} />
       <SupplierPricesDetailModal key={`supplier-prices-${sessionGeneration}`} />
     </div>

@@ -1,15 +1,16 @@
 /**
  * SolarSim Pro — Verificador Ejecutable de Compatibilidad Previa al Despliegue.
  *
- * Valida de forma rigurosa los contratos entre Cliente de escritorio, Sync API y Cloudflare Worker:
+ * Sondeo de lectura entre Cliente de escritorio, Sync API y Cloudflare Worker:
  *  1. Salud de la API y conectividad con PostgreSQL.
- *  2. Presencia y protección de rutas (/api/organization/features, /api/auth/share-authorization, etc.).
+ *  2. Rechazo de acceso anónimo (/api/organization/features, /api/auth/share-authorization, etc.).
  *  3. Salud del Cloudflare Worker y protección de /api/share.
- *  4. Compatibilidad en staging con autenticación sintética (opcional mediante flags/env).
+ *  4. Consulta de política con autenticación sintética (opcional mediante flags/env).
  *
  * Salida:
- *  - Exit code 0: Todos los contratos obligatorios pasan.
- *  - Exit code 1: Se detectan fallos o incompatibilidades.
+ *  - Exit code 1: Fallos, incompatibilidades o cobertura pendiente.
+ *    Este sondeo no acredita despliegue: siempre informa los contratos autenticados
+ *    y de escritura omitidos, que deben verificarse en el ensayo aislado de staging.
  */
 
 export interface CompatibilityCheckResult {
@@ -110,8 +111,8 @@ export async function runCompatibilityChecks(
   }
 
   // --- 2. API Routes Presence and Protection ---
-  // A protected route MUST return 401 Unauthorized when requested without a token.
-  // Returning 404 indicates missing endpoint. Returning 200/400 without token indicates broken protection.
+  // Authentication middleware can reject even unknown paths. A 401/403 proves
+  // anonymous rejection, not that the handler exists or its contract is correct.
   async function testProtectedEndpoint(
     path: string,
     method: 'GET' | 'POST' | 'PATCH',
@@ -135,12 +136,12 @@ export async function runCompatibilityChecks(
           message: `404 Not Found — La ruta no existe en el backend. Requerida para: ${requiredFor}.`,
         });
       } else if (res.status === 401) {
-        // Correctly guarded route
+        // Anonymous rejection only; middleware may run before route matching.
         results.push({
           name: `Ruta API: ${method} ${path}`,
           category: 'API_ROUTES',
           status: 'PASS',
-          message: `Ruta presente y protegida contra acceso anónimo (HTTP 401). Compatible con: ${requiredFor}.`,
+          message: `Acceso anónimo rechazado (HTTP 401). Existencia y esquema del handler no comprobados. Contrato pendiente: ${requiredFor}.`,
         });
       } else if (res.status >= 200 && res.status < 300) {
         results.push({
@@ -154,7 +155,7 @@ export async function runCompatibilityChecks(
           name: `Ruta API: ${method} ${path}`,
           category: 'API_ROUTES',
           status: 'PASS',
-          message: `Ruta presente y restringida (HTTP 403). Compatible con: ${requiredFor}.`,
+          message: `Acceso anónimo restringido (HTTP 403). Existencia y esquema del handler no comprobados. Contrato pendiente: ${requiredFor}.`,
         });
       } else {
         results.push({
@@ -395,6 +396,19 @@ export async function runCompatibilityChecks(
     }
   }
 
+  results.push({
+    name: 'Authenticated Contract Coverage',
+    category: 'SUMMARY',
+    status: 'WARN',
+    message: authToken
+      ? 'Cobertura parcial: se consulta la política autenticada, pero faltan contratos de perfil, organizaciones, cambio de organización, roles, CAS y publicación real con KV. Ejecutar el ensayo aislado antes de desplegar.'
+      : 'Cobertura parcial: sin token no se comprueban existencia ni esquemas de handlers autenticados, roles, CAS o publicación real con KV. Los rechazos 401/403 no demuestran compatibilidad funcional.',
+    details: {
+      authenticatedPolicyChecked: results.some((result) => result.name === 'Staging Feature Policy Schema' && result.status === 'PASS'),
+      endToEndChecked: false,
+    },
+  });
+
   // --- 5. Analysis and Summary ---
   log('\n--- RESULTADOS DETALLADOS ---');
   for (const r of results) {
@@ -434,12 +448,12 @@ export async function runCompatibilityChecks(
   }
 
   if (warnings.length > 0) {
-    log('\n⚠️  ESTADO: ADVERTENCIAS DETECTADAS. Requiere revisión antes de producción.');
+    log('\n⚠️  ESTADO: COBERTURA PARCIAL O ADVERTENCIAS. No acredita compatibilidad completa para producción.');
     log('================================================================\n');
     return { success: false, results };
   }
 
-  log('\n✅ ESTADO: TODOS LOS CONTRATOS DE COMPATIBILIDAD ESTÁN SATISFECHOS.');
+  log('\n✅ ESTADO: COMPROBACIONES EJECUTADAS APROBADAS.');
   log('================================================================\n');
   return { success: true, results };
 }

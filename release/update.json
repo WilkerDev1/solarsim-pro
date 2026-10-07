@@ -1,7 +1,7 @@
 {
   "version": "2.3.0",
   "name": "SolarSim Pro v2.3.0",
-  "releaseDate": "2026-10-06T19:32:36.961Z",
+  "releaseDate": "2026-10-06T18:58:24.626Z",
   "notes": "Actualización mayor con Centro Empresarial multi-organización, ciclo de autenticación y sincronización con preservación durable, y mejoras de compatibilidad para propuestas web interactivas.",
   "downloads": {
     "windows": {

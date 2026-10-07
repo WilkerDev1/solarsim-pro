@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSimulationStore } from "../../../store/useSimulationStore";
 import { SyncService } from "../../../services/syncService";
 import {
@@ -7,10 +7,15 @@ import {
 } from "../../../services/companyService";
 import type { UserProfile, UserRole } from "../../../types";
 import "../../../components/companies/company-center.css";
+import { draftOwnerKey } from "../../../utils/draftOwnerKey";
 
 export function OrganizationSection() {
-  const { syncSettings, sessionGeneration, sidebarTheme } =
+  const { syncSettings, workspaceScope, sessionGeneration, sidebarTheme } =
     useSimulationStore();
+  const ownerKey = draftOwnerKey(workspaceScope, syncSettings, true);
+  const mounted = useRef(true);
+  const loadRequest = useRef(0);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; loadRequest.current++; }; }, []);
   const [members, setMembers] = useState<UserProfile[]>([]);
   const [invitations, setInvitations] = useState<OrganizationInvitation[]>([]);
   const [inviteState, setInviteState] = useState<"loading" | "ready" | "error">(
@@ -32,9 +37,10 @@ export function OrganizationSection() {
   );
   const user = syncSettings.currentUser;
   const isCurrent = (generation = sessionGeneration) =>
-    useSimulationStore.getState().sessionGeneration === generation;
+    mounted.current && useSimulationStore.getState().sessionGeneration === generation;
   const load = async () => {
     if (!syncSettings.authToken || user?.role !== "ADMIN") return;
+    const request = ++loadRequest.current;
     setInviteState("loading");
     setInvitations([]);
     setInviteError("");
@@ -49,7 +55,7 @@ export function OrganizationSection() {
         syncSettings.authToken,
       ),
     ]);
-    if (!isCurrent()) return;
+    if (!isCurrent() || request !== loadRequest.current) return;
     if (users.success) {
       setMembers(users.users);
       setError("");
@@ -71,14 +77,27 @@ export function OrganizationSection() {
     setMembers([]);
     setInvitations([]);
     setEditing(null);
+    setName("");
+    setEmail("");
+    setRole("EDITOR");
+    setActive(true);
     setPassword("");
     setMode("none");
     setInvitationCode("");
     setMessage("");
     setError("");
     setBusy(false);
+  }, [ownerKey]);
+  useEffect(() => {
+    if (!syncSettings.authToken) {
+      setPassword("");
+      setInvitationCode("");
+      setMembers([]);
+      setInvitations([]);
+    }
     void load();
-  }, [sessionGeneration, user?.role, syncSettings.authToken]);
+  }, [sessionGeneration, syncSettings.authToken, ownerKey]);
+  useEffect(() => { setBusy(false); }, [sessionGeneration]);
   const resetForm = () => {
     setEditing(null);
     setName("");
@@ -92,6 +111,7 @@ export function OrganizationSection() {
     operation: () => Promise<{ success: boolean; error?: string }>,
     success: string,
   ) => {
+    loadRequest.current++;
     setBusy(true);
     setMessage("");
     setError("");

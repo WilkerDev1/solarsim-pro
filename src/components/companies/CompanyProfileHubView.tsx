@@ -13,6 +13,7 @@ import { DEFAULT_LOCAL_COMPANY, CompanyProfile } from "../../types";
 import { CompanyFields } from "./CompanyFields";
 import { OrganizationManagement } from "./OrganizationManagement";
 import "./company-center.css";
+import { draftOwnerKey } from "../../utils/draftOwnerKey";
 
 type Section = "profiles" | "organization" | "consultant";
 export function CompanyProfileHubView() {
@@ -24,6 +25,7 @@ export function CompanyProfileHubView() {
     sidebarTheme,
     sessionGeneration,
   } = store;
+  const ownerKey = draftOwnerKey(store.workspaceScope, store.syncSettings);
   const [section, setSection] = useState<Section>("profiles");
   const [selected, setSelected] = useState(activeCompanyId);
   const [creating, setCreating] = useState(false);
@@ -64,7 +66,7 @@ export function CompanyProfileHubView() {
     setConsultant({ ...localUserProfile });
     setMessage("");
     setError("");
-  }, [sessionGeneration]);
+  }, [ownerKey]);
   const select = (company: CompanyProfile) => {
     if (!allowLeave()) return;
     draftEpoch.current++;
@@ -98,12 +100,12 @@ export function CompanyProfileHubView() {
       return;
     }
     const captured = selected,
-      generation = sessionGeneration,
+      owner = ownerKey,
       uploadEpoch = ++draftEpoch.current;
     const reader = new FileReader();
     reader.onload = () => {
       if (
-        useSimulationStore.getState().sessionGeneration !== generation ||
+        draftOwnerKey(useSimulationStore.getState().workspaceScope, useSimulationStore.getState().syncSettings) !== owner ||
         draftEpoch.current !== uploadEpoch
       )
         return;
@@ -113,7 +115,10 @@ export function CompanyProfileHubView() {
           : previous,
       );
     };
-    reader.onerror = () => setError("No se pudo leer la imagen.");
+    reader.onerror = () => {
+      if (draftOwnerKey(useSimulationStore.getState().workspaceScope, useSimulationStore.getState().syncSettings) === owner && draftEpoch.current === uploadEpoch)
+        setError("No se pudo leer la imagen.");
+    };
     reader.readAsDataURL(file);
   };
   const save = () => {
@@ -356,7 +361,7 @@ export function CompanyProfileHubView() {
           <div className="cc-content">
             {section === "organization" ? (
               <OrganizationManagement
-                key={sessionGeneration}
+                key={draftOwnerKey(store.workspaceScope, store.syncSettings, true)}
                 registerLeaveGuard={(guard) => {
                   organizationLeaveGuard.current = guard;
                 }}

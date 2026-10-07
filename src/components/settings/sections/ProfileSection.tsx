@@ -1,10 +1,16 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { User, Edit3, LogOut, RefreshCw, CheckCircle2, AlertCircle, Shield, Building2, Eye, EyeOff } from 'lucide-react';
 
 export const ProfileSection: React.FC = () => {
   const { syncSettings, loginUser, registerUser, logoutUser, validateSession } = useSimulationStore();
   const currentUser = syncSettings.currentUser;
+  const mounted = useRef(true);
+  const authRequest = useRef(0);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const requestCurrent = (generation: number, request?: number) => mounted.current &&
+    useSimulationStore.getState().sessionGeneration === generation &&
+    (request === undefined || request === authRequest.current);
 
   // Local state for Auth Form
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -14,7 +20,7 @@ export const ProfileSection: React.FC = () => {
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
-  const [regOrgName, setRegOrgName] = useState('Electsun Dominicana');
+  const [regOrgName, setRegOrgName] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authSuccess, setAuthSuccess] = useState<string | null>(null);
@@ -26,14 +32,17 @@ export const ProfileSection: React.FC = () => {
   const handleVerifySession = async () => {
     setValidatingSession(true);
     setSessionFeedback(null);
-    const res = await validateSession();
+    const pending = validateSession();
+    const generation = useSimulationStore.getState().sessionGeneration;
+    const res = await pending;
+    if (!requestCurrent(generation)) { if (mounted.current) setValidatingSession(false); return; }
     setValidatingSession(false);
     if (res.valid) {
       setSessionFeedback({
         type: 'success',
         message: '¡Sesión activa y verificada con el servidor! Token renovado correctamente.',
       });
-      setTimeout(() => setSessionFeedback(null), 4000);
+      setTimeout(() => { if (requestCurrent(generation)) setSessionFeedback(null); }, 4000);
     } else {
       setSessionFeedback({
         type: 'error',
@@ -47,29 +56,36 @@ export const ProfileSection: React.FC = () => {
     setAuthLoading(true);
     setAuthError(null);
     setAuthSuccess(null);
+    const request = ++authRequest.current;
 
     if (authMode === 'login') {
-      const res = await loginUser(loginEmail.trim(), loginPassword.trim());
+      const pending = loginUser(loginEmail.trim(), loginPassword);
+      const generation = useSimulationStore.getState().sessionGeneration;
+      const res = await pending;
+      if (!requestCurrent(generation, request)) { if (mounted.current) setAuthLoading(false); return; }
       setAuthLoading(false);
       if (res.success) {
         setAuthSuccess('¡Sesión iniciada con éxito! Proyectos sincronizados con la empresa.');
         setLoginPassword('');
-        setTimeout(() => setAuthSuccess(null), 3500);
+        setTimeout(() => { if (requestCurrent(generation, request)) setAuthSuccess(null); }, 3500);
       } else {
         setAuthError(res.error || 'Error al iniciar sesión');
       }
     } else {
-      if (!regName.trim() || !regEmail.trim() || !regPassword.trim()) {
+      if (!regName.trim() || !regEmail.trim() || !regPassword.length) {
         setAuthLoading(false);
         setAuthError('Por favor completa todos los campos requeridos.');
         return;
       }
-      const res = await registerUser(regName, regEmail, regPassword, regOrgName);
+      const pending = registerUser(regName.trim(), regEmail.trim(), regPassword, regOrgName.trim());
+      const generation = useSimulationStore.getState().sessionGeneration;
+      const res = await pending;
+      if (!requestCurrent(generation, request)) { if (mounted.current) setAuthLoading(false); return; }
       setAuthLoading(false);
       if (res.success) {
         setAuthSuccess('¡Cuenta registrada con éxito! Bienvenido a SolarSim Pro.');
         setRegPassword('');
-        setTimeout(() => setAuthSuccess(null), 3500);
+        setTimeout(() => { if (requestCurrent(generation, request)) setAuthSuccess(null); }, 3500);
       } else {
         setAuthError(res.error || 'Error al registrar usuario');
       }
@@ -83,10 +99,14 @@ export const ProfileSection: React.FC = () => {
 
   const handleReauthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentUser?.email || !reauthPassword.trim()) return;
+    if (!currentUser?.email || !reauthPassword.length) return;
     setReauthLoading(true);
     setReauthError(null);
-    const res = await loginUser(currentUser.email, reauthPassword.trim());
+    const request = ++authRequest.current;
+    const pending = loginUser(currentUser.email, reauthPassword);
+    const generation = useSimulationStore.getState().sessionGeneration;
+    const res = await pending;
+    if (!requestCurrent(generation, request)) { if (mounted.current) setReauthLoading(false); return; }
     setReauthLoading(false);
     if (res.success) {
       setReauthPassword('');
@@ -94,7 +114,7 @@ export const ProfileSection: React.FC = () => {
         type: 'success',
         message: '¡Sesión reanudada con éxito! Sincronización activa.',
       });
-      setTimeout(() => setSessionFeedback(null), 3500);
+      setTimeout(() => { if (requestCurrent(generation, request)) setSessionFeedback(null); }, 3500);
     } else {
       setReauthError(res.error || 'Contraseña incorrecta o fallo al reanudar sesión');
     }
@@ -183,7 +203,7 @@ export const ProfileSection: React.FC = () => {
               <div className="p-3 rounded-xl bg-slate-50/80 dark:bg-[#121214] border border-slate-200/60 dark:border-[#27272a] flex flex-wrap items-center justify-between gap-3 text-xs">
                 <div className="flex items-center gap-2 text-slate-700 dark:text-zinc-300">
                   <Building2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  <span>Empresa: <strong>{currentUser.organizationName || 'Electsun Dominicana'}</strong></span>
+                  <span>Empresa: <strong>{currentUser.organizationName || 'tu organización'}</strong></span>
                 </div>
                 <div className="flex items-center gap-2 text-slate-500 dark:text-zinc-400">
                   <span className={`w-2 h-2 rounded-full ${isAuthenticated ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
@@ -320,7 +340,7 @@ export const ProfileSection: React.FC = () => {
                     <input
                       type="text"
                       required
-                      placeholder="Electsun Dominicana"
+                      placeholder="Nombre de tu empresa"
                       value={regOrgName}
                       onChange={(e) => setRegOrgName(e.target.value)}
                       className="w-full px-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-900 dark:text-zinc-100"
