@@ -49,3 +49,7 @@ Documentos financieros describen contratos de software, no validación jurídica
 La clave privada GPG se conserva en el equipo del firmante. Descargar los assets del borrador, copiarlos a release/, ejecutar `npm run release:sign` y `npx tsx scripts/qa/verifyCandidate.ts`, subir manifiestos/firmas y publicar el borrador. Ninguna compilación de binarios ocurre en ese paso local. Windows no dispone de Authenticode; macOS no forma parte de los formatos mantenidos. Los runners prueban el ejecutable instalado con un perfil nuevo, además del ASAR/IPC. El icono de ventana se incluye como recurso del paquete.
 
 No repetir un tag/release existente para sustituir silenciosamente sus binarios. Corregir mediante una versión nueva. La release de escritorio no despliega API, Worker ni modifica la base empresarial.
+
+### Recuperar un runner de release
+
+Si una dependencia del runner se bloquea, cancelar esa ejecución y usar `gh workflow run release.yml --ref main -f tag=vX.Y.Z`. El modo manual obtiene explícitamente `refs/tags/vX.Y.Z` en contratos, empaquetado y manifiestos; exige coincidencia con package.json. No reescribir el tag ni subir paquetes de otra revisión. Linux usa el mirror oficial Ubuntu HTTPS con tiempos APT limitados. Los contratos del tag tienen un grupo de concurrencia separado de la CI de main/beta. El resultado sigue siendo un borrador que debe firmarse/verificarse antes de publicar.

@@ -2,14 +2,24 @@ name: Build official desktop release
 on:
   push:
     tags: ['v[0-9]*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing official tag to compile, e.g. v2.3.1'
+        required: true
+        type: string
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 permissions:
   contents: read
 concurrency:
-  group: release-${{ github.ref_name }}
+  group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 jobs:
   contracts:
     uses: ./.github/workflows/verify.yml
+    with:
+      ref: ${{ format('refs/tags/{0}', inputs.tag || github.ref_name) }}
   desktop:
     needs: contracts
     strategy:
@@ -28,15 +38,31 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
       - name: Validate tag and package version
         shell: bash
-        run: node -e 'if(process.env.GITHUB_REF_NAME !== "v"+require("./package.json").version) process.exit(1)'
+        run: node -e 'if(!/^v\d+\.\d+\.\d+$/.test(process.env.RELEASE_TAG) || process.env.RELEASE_TAG !== "v"+require("./package.json").version) process.exit(1)'
       - if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libarchive-tools
+        name: Install Linux packaging tools with bounded official mirrors
+        timeout-minutes: 5
+        run: |
+          sudo python3 - <<'PY'
+          from pathlib import Path
+          sources = [Path('/etc/apt/sources.list'), *Path('/etc/apt/sources.list.d').glob('*.list'), *Path('/etc/apt/sources.list.d').glob('*.sources')]
+          for source in sources:
+              if source.is_file():
+                  text = source.read_text()
+                  updated = text.replace('http://azure.archive.ubuntu.com/ubuntu', 'https://archive.ubuntu.com/ubuntu').replace('https://azure.archive.ubuntu.com/ubuntu', 'https://archive.ubuntu.com/ubuntu')
+                  if updated != text:
+                      source.write_text(updated)
+          PY
+          sudo timeout 120s apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update
+          sudo timeout 120s apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -y libarchive-tools
       - run: npm ci
       - run: npm run build
       - run: npm run build:electron
@@ -86,6 +112,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -103,5 +131,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "SolarSim Pro $GITHUB_REF_NAME" --notes-file "release/release-notes-$GITHUB_REF_NAME.md"
-          gh release upload "$GITHUB_REF_NAME" release/SolarSim-Pro-* release/solarsim-pro_*.deb release/latest.json release/update.json release/latest.yml release/latest-linux.yml
+          gh release create "$RELEASE_TAG" --verify-tag --draft --title "SolarSim Pro $RELEASE_TAG" --notes-file "release/release-notes-$RELEASE_TAG.md"
+          gh release upload "$RELEASE_TAG" release/SolarSim-Pro-* release/solarsim-pro_*.deb release/latest.json release/update.json release/latest.yml release/latest-linux.yml
