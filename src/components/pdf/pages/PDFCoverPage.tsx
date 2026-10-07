@@ -25,13 +25,13 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
   updateClient,
 }) => {
   const cust = project.customization || {};
-  const companyName = cust.companyName || DEFAULT_DOCUMENT_CUSTOMIZATION.companyName || 'electsun';
-  const companySlogan = cust.companySlogan || DEFAULT_DOCUMENT_CUSTOMIZATION.companySlogan || 'El sol a tu favor';
-  const rawPhone = cust.companyPhone || DEFAULT_DOCUMENT_CUSTOMIZATION.companyPhone || '+1 (809) 378-6590';
+  const companyName = cust.companyName ?? DEFAULT_DOCUMENT_CUSTOMIZATION.companyName ?? 'electsun';
+  const companySlogan = cust.companySlogan ?? DEFAULT_DOCUMENT_CUSTOMIZATION.companySlogan ?? 'El sol a tu favor';
+  const rawPhone = cust.companyPhone ?? DEFAULT_DOCUMENT_CUSTOMIZATION.companyPhone ?? '+1 (809) 378-6590';
   const companyPhone = (rawPhone.includes('555-0199') || rawPhone.includes('5550199')) ? '+1 (809) 378-6590' : rawPhone;
-  const companyFooterText = cust.companyFooterText || DEFAULT_DOCUMENT_CUSTOMIZATION.companyFooterText || 'Calle Ercilia Pepín #1, Plaza Toledo, Local 307, Arroyo Manzano, Sto. Dgo. Rep. Dom.';
-  const companyWebsite = cust.companyWebsite || DEFAULT_DOCUMENT_CUSTOMIZATION.companyWebsite || 'electsun.com.do';
-  const companyInstagram = cust.companyInstagram || DEFAULT_DOCUMENT_CUSTOMIZATION.companyInstagram || 'Electsunrd';
+  const companyFooterText = cust.companyFooterText ?? DEFAULT_DOCUMENT_CUSTOMIZATION.companyFooterText ?? 'Calle Ercilia Pepín #1, Plaza Toledo, Local 307, Arroyo Manzano, Sto. Dgo. Rep. Dom.';
+  const companyWebsite = cust.companyWebsite ?? DEFAULT_DOCUMENT_CUSTOMIZATION.companyWebsite ?? 'electsun.com.do';
+  const companyInstagram = cust.companyInstagram ?? DEFAULT_DOCUMENT_CUSTOMIZATION.companyInstagram ?? 'Electsunrd';
 
   const isDefaultElectsun = companyName.toLowerCase().trim() === 'electsun';
   // Use dedicated cover logo, fallback to header logo, or default color logo

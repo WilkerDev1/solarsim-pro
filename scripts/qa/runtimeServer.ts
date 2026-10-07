@@ -1,0 +1,20 @@
+/** Real Hono HTTP listener, restricted to loopback and a disposable QA database. */
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
+import { createApp } from '../../server/src/app';
+import { createDatabase, initDatabase } from '../../server/src/db';
+import { readConfig } from '../../server/src/config';
+const config = readConfig();
+if (config.database.host !== '127.0.0.1' || config.database.database !== 'solarsim_runtime_qa') throw new Error('Disposable loopback QA database required.');
+if (!/^[a-f0-9]{64}$/.test(process.env.QA_INSTANCE_ID ?? '')) throw new Error('QA instance marker required.');
+const require = createRequire(new URL('../../server/package.json', import.meta.url));
+const { serve } = await import(pathToFileURL(require.resolve('@hono/node-server')).href);
+const pool = createDatabase(config.database);
+await initDatabase(pool);
+const app = createApp({ pool, jwtSecret: config.jwtSecret, logging: false });
+app.get('/qa-instance', c => c.json({ qaInstance: process.env.QA_INSTANCE_ID }));
+const server = serve({ fetch: app.fetch, port: config.port, hostname: '127.0.0.1' });
+const stop = () => server.close(() => { void pool.end().finally(() => process.exit(0)); });
+process.once('SIGTERM', stop);
+process.once('SIGINT', stop);
+console.log('QA API ready on loopback; migrations applied.');

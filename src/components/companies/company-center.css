@@ -1,0 +1,367 @@
+.company-center {
+  --cc-bg: #f6f8fa;
+  --cc-panel: #fff;
+  --cc-input: #fff;
+  --cc-border: #dce2e8;
+  --cc-text: #182230;
+  --cc-muted: #536174;
+  --cc-selected: #e8f7f0;
+  --cc-green: #067451;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--cc-bg);
+  color: var(--cc-text);
+  font-size: 14px;
+}
+.company-center[data-theme="dark"] {
+  --cc-bg: #141619;
+  --cc-panel: #1c1f23;
+  --cc-input: #141619;
+  --cc-border: #363b43;
+  --cc-text: #f1f3f5;
+  --cc-muted: #abb4c0;
+  --cc-selected: #123d30;
+  --cc-green: #6be0b5;
+  color-scheme: dark;
+}
+.company-center * {
+  box-sizing: border-box;
+}
+.company-center header {
+  height: 64px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  background: var(--cc-panel);
+  border-bottom: 1px solid var(--cc-border);
+  flex-shrink: 0;
+}
+.company-center h1 {
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+.company-center h2 {
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  margin: 0 0 8px;
+}
+.company-center h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 16px;
+}
+.company-center p {
+  line-height: 1.6;
+  max-width: 72ch;
+  margin: 0 0 20px;
+  color: var(--cc-muted);
+}
+.company-center button,
+.company-center input,
+.company-center select,
+.company-center textarea {
+  font: inherit;
+}
+.company-center button {
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 9px 13px;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--cc-border);
+  background: var(--cc-panel);
+  color: var(--cc-text);
+  font-weight: 550;
+}
+.company-center button:hover {
+  background: var(--cc-selected);
+}
+.company-center button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.company-center button.cc-primary {
+  background: #087b58;
+  color: white;
+  border-color: transparent;
+}
+.company-center button.cc-primary:hover {
+  background: #066344;
+}
+.company-center button.cc-danger {
+  color: #c93545;
+}
+.company-center[data-theme="dark"] button.cc-danger {
+  color: #ff9aaa;
+}
+.company-center :focus-visible {
+  outline: 2px solid var(--cc-green);
+  outline-offset: 3px;
+}
+.company-center ::selection {
+  background: var(--cc-selected);
+  color: var(--cc-text);
+}
+.company-center-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+.company-center aside {
+  width: 264px;
+  flex-shrink: 0;
+  padding: 24px 16px;
+  border-right: 1px solid var(--cc-border);
+  background: var(--cc-panel);
+  overflow: auto;
+}
+.company-center aside h3 {
+  padding: 0 8px;
+  margin-bottom: 12px;
+}
+.company-center aside nav {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.company-center aside button {
+  justify-content: flex-start;
+  border: 0;
+  min-height: 44px;
+  text-align: left;
+}
+.company-center aside button[aria-current="page"] {
+  background: var(--cc-selected);
+  color: var(--cc-green);
+}
+.company-center aside .cc-aside-divider {
+  margin: 24px 8px;
+  border-top: 1px solid var(--cc-border);
+}
+.company-center aside small {
+  display: block;
+  color: var(--cc-muted);
+  font-weight: 400;
+  margin-top: 4px;
+}
+.company-center main {
+  overflow: auto;
+  flex: 1;
+  padding: 36px 40px;
+}
+.company-center .cc-content {
+  max-width: 980px;
+  margin: 0 auto;
+}
+.company-center .cc-section {
+  padding: 24px 0;
+  border-top: 1px solid var(--cc-border);
+  margin-top: 24px;
+}
+.company-center .cc-form {
+  background: var(--cc-panel);
+  border: 1px solid var(--cc-border);
+  border-radius: 12px;
+  padding: 28px;
+  margin-top: 24px;
+}
+.company-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.company-field-wide {
+  grid-column: 1/-1;
+}
+.company-center label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--cc-text);
+  font-size: 13px;
+  font-weight: 550;
+}
+.company-center input:not([type="checkbox"]):not([type="color"]),
+.company-center select,
+.company-center textarea {
+  width: 100%;
+  background: var(--cc-input);
+  border: 1px solid var(--cc-border);
+  color: var(--cc-text);
+  border-radius: 8px;
+  padding: 10px 12px;
+  min-height: 42px;
+}
+.company-center textarea {
+  resize: vertical;
+  min-height: 90px;
+}
+.company-center input::placeholder {
+  color: var(--cc-muted);
+}
+.company-center input:read-only {
+  color: var(--cc-muted);
+}
+.company-center .cc-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 24px;
+}
+.company-center .cc-inline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.company-center .cc-inline label {
+  flex-direction: row;
+  align-items: center;
+}
+.company-center .cc-status {
+  color: var(--cc-green);
+  font-size: 12px;
+  font-weight: 550;
+}
+.company-center .cc-notice {
+  padding: 13px 16px;
+  background: var(--cc-selected);
+  border-radius: 8px;
+  margin: 18px 0;
+  line-height: 1.5;
+}
+.company-center .cc-error {
+  background: #fff0f0;
+  color: #ad2435;
+}
+.company-center[data-theme="dark"] .cc-error {
+  background: #401e25;
+  color: #ffc0c9;
+}
+.company-center .cc-logo {
+  height: 70px;
+  max-width: 200px;
+  object-fit: contain;
+}
+.company-center .cc-upload {
+  padding: 18px 0;
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.company-center table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.company-center th {
+  color: var(--cc-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.company-center th,
+.company-center td {
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--cc-border);
+}
+.company-center td button {
+  font-size: 12px;
+}
+.company-center .cc-table-scroll {
+  overflow: auto;
+}
+.company-center .cc-muted {
+  color: var(--cc-muted);
+}
+.company-center .cc-subtitle {
+  margin: 0 0 22px;
+}
+.company-center .cc-member-form {
+  margin: 24px 0;
+  padding: 24px 0;
+  border-block: 1px solid var(--cc-border);
+}
+.company-center .cc-code {
+  overflow-wrap: anywhere;
+  user-select: all;
+  font-family: monospace;
+  line-height: 1.7;
+}
+@media (max-width: 1100px) {
+  .company-center aside {
+    width: 220px;
+  }
+  .company-center main {
+    padding: 28px 24px;
+  }
+  .company-center .cc-form {
+    padding: 22px;
+  }
+}
+@media (max-width: 760px) {
+  .company-center-body {
+    flex-direction: column;
+  }
+  .company-center aside {
+    width: 100%;
+    max-height: 190px;
+    border-right: 0;
+    border-bottom: 1px solid var(--cc-border);
+    padding: 12px;
+  }
+  .company-center aside nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .company-center aside h3,
+  .company-center aside .cc-aside-divider {
+    display: none;
+  }
+  .company-fields {
+    grid-template-columns: 1fr;
+  }
+  .company-center main {
+    padding: 24px 16px;
+  }
+  .company-center header {
+    padding: 0 16px;
+    gap: 14px;
+  }
+  .company-center h1 {
+    font-size: 16px;
+  }
+}
+
+.company-center .cc-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 24px;
+  border-bottom: 1px solid var(--cc-border);
+  padding-bottom: 12px;
+}
+.company-center .cc-tabs button {
+  background: transparent;
+  border-color: transparent;
+}
+.company-center .cc-tabs button[aria-current="page"] {
+  background: var(--cc-selected);
+  color: var(--cc-green);
+}
+.company-center input,
+.company-center select,
+.company-center textarea {
+  font-weight: 400;
+}

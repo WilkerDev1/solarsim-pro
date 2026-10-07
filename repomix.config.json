@@ -30,9 +30,11 @@
     ]
   },
   "include": [
-    "src/**/*.{ts,tsx}",
+    "src/**/*.{ts,tsx,css}",
     "electron/**/*.ts",
     "workers/share-viewer/src/**/*.ts",
+    "workers/share-viewer/tests/**/*.ts",
+    "workers/share-viewer/package.json",
     "workers/share-viewer/wrangler.toml",
     "docs/**/*.md",
     ".agents/**/*.md",
@@ -46,12 +48,13 @@
     "server/src/**/*.ts",
     "server/tests/**/*.ts",
     "server/package.json",
-    "scripts/**/*.{ts,tsx,mjs,cjs,html,ps1}",
+    "scripts/**/*.{ts,tsx,mjs,cjs,html,ps1,py}",
     "PRODUCT.md",
     "shared/package.json",
     "src/index.css",
     ".github/workflows/*.yml",
     "infra/services/**/*.yml",
-    "server/Dockerfile"
+    "server/Dockerfile",
+    "DESIGN.md"
   ]
 }

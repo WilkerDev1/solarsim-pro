@@ -1,3 +1,5 @@
+import { normalizeCompanyProfiles } from './companyProfiles';
+import { initializeWorkspaces } from '../sync/organizationWorkspace';
 import type { SimulationStore } from '../types';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../../data/defaultEquipmentCatalog';
 import { DEFAULT_RD_TARIFF_MATRIX } from '../../data/rdTariffs';
@@ -170,6 +172,11 @@ export function hydrateSimulationStore(state: SimulationStore | undefined): void
         ...state.defaultDocumentCustomization,
       };
     }
+
+    state.companies = normalizeCompanyProfiles(state.companies, true);
+    if (!state.companies.some(c => c.id === state.activeCompanyId)) state.activeCompanyId = state.companies.find(c => c.isDefault)!.id;
+    state.localUserProfile = { ...state.localUserProfile, activeCompanyId: state.activeCompanyId };
+    initializeWorkspaces(state);
 
     // Validación y auto-renovación silenciosa de sesión en segundo plano al iniciar la app
     if (state.syncSettings?.authToken && typeof window !== 'undefined') {

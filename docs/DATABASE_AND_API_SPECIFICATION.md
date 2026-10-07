@@ -17,7 +17,12 @@ JWT_SECRET y DB_PASSWORD son obligatorios, privados y sin fallback conocido. PAT
 | GET /api/auth/me | Usuario actual; estado/rol desde BD. |
 | GET/PATCH /api/organization/features | GET autenticado; PATCH ADMIN con `{settings,baseVersion}`. Política `{organizationId,version,settings}`. 409 si cambió. |
 | POST /api/auth/share-authorization | Introspección JWT para publicación, rol escritor y política actual. |
-| GET/POST/PATCH/DELETE /api/users | Administración de miembros del tenant actual. |
+| GET/POST /api/organizations | Listado y creación de organizaciones; creador obtiene ADMIN. |
+| POST /api/auth/switch-organization | Cambio de tenant activo para el usuario actual. |
+| GET/PATCH /api/organization/profile | Perfil compartido de empresa; PATCH con `baseVersion` CAS (ADMIN). |
+| GET/POST/DELETE /api/organization/invitations | Invitaciones con token cifrado y vencimiento a 7 días (ADMIN). |
+| POST /api/auth/accept-invitation | Aceptación de invitación y asignación de rol contextual. |
+| GET/POST/PATCH/DELETE /api/users | Administración de miembros del tenant actual (no usar ruta legacy). |
 | POST /api/sync/pull | `{lastSyncTimestamp?}`; devuelve proyectos completos, deletedIds y watermark SQL textual. No convertir cursor a Date ni truncar microsegundos. |
 | POST /api/sync/push | `{projects}` con baseVersion. Nuevo=0; existente=última versión confirmada. |
 | DELETE /api/projects/:id | `?baseVersion=N`, eliminación suave CAS. |

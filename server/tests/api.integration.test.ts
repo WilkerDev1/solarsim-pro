@@ -578,26 +578,26 @@ test("catalog ownership, CAS, supplier offers and tombstones survive races and f
 });
 test("shared reference catalog prices stay private; hiding a shared model affects only requesting tenant", async () => {
   await pool.query(
-    `INSERT INTO equipment_catalog(id,organization_id,type,brand,model_series,display_name,supplier_prices,details) VALUES('shared-panel','org-electsun-default','panel','Canadian Solar','TEST','Shared','[{"priceUSD":123}]','{"supplierPrices":[{"priceUSD":123}],"preferredSupplierId":"private"}')`,
+    `INSERT INTO equipment_catalog(id,organization_id,type,brand,model_series,display_name,supplier_prices,details) VALUES('eq-mod-cs-620','org-electsun-default','panel','Canadian Solar','TEST','Shared','[{"priceUSD":123}]','{"supplierPrices":[{"priceUSD":123}],"preferredSupplierId":"private"}')`,
   );
   const item = (await request("GET", "/api/equipment", other)).body.items.find(
-    (i) => i.id === "shared-panel",
+    (i) => i.id === "eq-mod-cs-620",
   );
   assert.deepEqual(item.supplierPrices, []);
   assert.equal(item.preferredSupplierId, undefined);
   assert.equal(
-    (await request("DELETE", "/api/equipment/shared-panel", other)).status,
+    (await request("DELETE", "/api/equipment/eq-mod-cs-620", other)).status,
     200,
   );
   assert.equal(
     (await request("GET", "/api/equipment", other)).body.items.some(
-      (i) => i.id === "shared-panel",
+      (i) => i.id === "eq-mod-cs-620",
     ),
     false,
   );
   assert.equal(
     (await request("GET", "/api/equipment", admin)).body.items.some(
-      (i) => i.id === "shared-panel",
+      (i) => i.id === "eq-mod-cs-620",
     ),
     true,
   );
@@ -743,4 +743,337 @@ test("malformed JSON object bodies are rejected before touching data", async () 
     (await request("POST", "/api/auth/register", undefined, 42)).status,
     400,
   );
+});
+
+test("independent organizations use contextual roles and isolated project data", async () => {
+  const owner = await register("multi-owner", "Empresa inicial");
+  const foreign = await register("multi-foreign", "Otra empresa");
+  const created = await request("POST", "/api/organizations", owner, {
+    name: "Empresa independiente",
+  });
+  assert.equal(created.status, 200);
+  const target = created.body.organization.id;
+  const switched = await request(
+    "POST",
+    "/api/auth/switch-organization",
+    owner,
+    { organizationId: target },
+  );
+  assert.equal(switched.status, 200);
+  const context = { ...switched.body.user, token: switched.body.token };
+  assert.equal(context.organizationId, target);
+  assert.equal(
+    (await request("GET", "/api/auth/me", context)).body.user.organizationId,
+    target,
+  );
+  assert.equal(
+    (
+      await request("POST", "/api/auth/switch-organization", foreign, {
+        organizationId: target,
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await request("POST", "/api/sync/push", context, {
+        projects: [project("multi-private-project")],
+      })
+    ).status,
+    200,
+  );
+  const sourceProjects = (await request("POST", "/api/sync/pull", owner, {}))
+    .body.projects;
+  assert.ok(!sourceProjects.some((p: any) => p.id === "multi-private-project"));
+  const list = (await request("GET", "/api/organizations", owner)).body
+    .organizations;
+  assert.equal(list.length, 2);
+  assert.ok(!list.some((o: any) => o.id === foreign.organizationId));
+});
+
+test("company profile uses CAS, preserves omitted RNC, and rejects foreign/editor writes", async () => {
+  const owner = await register("profile-owner");
+  const member = await provision("EDITOR", "profile-editor", owner);
+  const profile = (await request("GET", "/api/organization/profile", owner))
+    .body;
+  const saved = await request("PATCH", "/api/organization/profile", owner, {
+    baseVersion: profile.version,
+    profile: {
+      name: "Empresa fiscal",
+      rncOrId: "TEST-123",
+      phone: "8091234567",
+    },
+  });
+  assert.equal(saved.status, 200);
+  assert.equal(
+    (
+      await request("PATCH", "/api/organization/profile", owner, {
+        baseVersion: profile.version,
+        profile: { name: "Vieja" },
+      })
+    ).status,
+    409,
+  );
+  const renamed = await request("PATCH", "/api/organization/profile", owner, {
+    baseVersion: saved.body.version,
+    profile: { name: "Nueva razón social" },
+  });
+  assert.equal(renamed.body.profile.rncOrId, "TEST-123");
+  assert.equal(
+    (
+      await request("PATCH", "/api/organization/profile", member, {
+        baseVersion: renamed.body.version,
+        profile: { name: "Editor" },
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await request("PATCH", "/api/organization/profile", owner, {
+        baseVersion: renamed.body.version,
+        profile: { name: "Mal color", primaryColor: ["#123456"] },
+      })
+    ).status,
+    400,
+  );
+  assert.notEqual(
+    (await request("GET", "/api/organization/profile", other)).body.profile
+      .name,
+    "Nueva razón social",
+  );
+});
+
+test("invitations bind email and role; revocation cannot be bypassed with a pending code", async () => {
+  const owner = await register("invite-owner");
+  const invited = await register("invite-member");
+  const stranger = await register("invite-stranger");
+  const issue = async () => {
+    const r = await request("POST", "/api/organization/invitations", owner, {
+      email: invited.email,
+      role: "EDITOR",
+    });
+    assert.equal(r.status, 200);
+    return r.body;
+  };
+  const first = await issue();
+  const spare = await issue();
+  assert.equal(
+    (
+      await request("POST", "/api/auth/accept-invitation", stranger, {
+        code: first.code,
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await request("POST", "/api/auth/accept-invitation", invited, {
+        code: first.code,
+      })
+    ).status,
+    200,
+  );
+  const session = (
+    await request("POST", "/api/auth/switch-organization", invited, {
+      organizationId: owner.organizationId,
+    })
+  ).body;
+  const contextual = { ...session.user, token: session.token };
+  assert.equal(contextual.role, "EDITOR");
+  assert.equal((await request("GET", "/api/users", contextual)).status, 403);
+  const members = (await request("GET", "/api/users", owner)).body.users;
+  assert.equal(
+    members.find((u: any) => u.id === invited.id).canEditIdentity,
+    false,
+  );
+  assert.equal(
+    (
+      await request("PATCH", "/api/users/" + invited.id, owner, {
+        name: "Nombre ajeno",
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await request("PATCH", "/api/users/" + invited.id, owner, {
+        password: "foreign-password",
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (await request("DELETE", "/api/users/" + invited.id, owner)).status,
+    200,
+  );
+  assert.equal((await request("GET", "/api/auth/me", contextual)).status, 401);
+  assert.equal(
+    (
+      await request("POST", "/api/auth/accept-invitation", invited, {
+        code: spare.code,
+      })
+    ).status,
+    403,
+  );
+  assert.equal((await request("GET", "/api/auth/me", invited)).status, 200);
+  const stored = (
+    await pool.query(
+      "SELECT token_hash FROM organization_invitations WHERE id=$1",
+      [first.invitation.id],
+    )
+  ).rows[0].token_hash;
+  assert.notEqual(stored, first.code);
+});
+
+test("password reset invalidates previously issued access and refresh tokens", async () => {
+  const owner = await register("reset-owner");
+  const member = await provision("EDITOR", "reset-member", owner);
+  assert.equal(
+    (
+      await request("PATCH", "/api/users/" + member.id, owner, {
+        password: "replacement-password",
+      })
+    ).status,
+    200,
+  );
+  assert.equal((await request("GET", "/api/auth/me", member)).status, 401);
+  assert.equal(
+    (await request("POST", "/api/auth/refresh", member, {})).status,
+    401,
+  );
+  assert.equal(
+    (
+      await request("POST", "/api/auth/login", undefined, {
+        email: member.email,
+        password: "isolated-password",
+      })
+    ).status,
+    401,
+  );
+  assert.equal(
+    (
+      await request("POST", "/api/auth/login", undefined, {
+        email: member.email,
+        password: "replacement-password",
+      })
+    ).status,
+    200,
+  );
+});
+
+test("queued project push rechecks secondary membership after removal", async () => {
+  const owner = await register("queued-owner");
+  const invited = await register("queued-invited");
+  const invite = (
+    await request("POST", "/api/organization/invitations", owner, {
+      email: invited.email,
+      role: "EDITOR",
+    })
+  ).body;
+  assert.equal(
+    (
+      await request("POST", "/api/auth/accept-invitation", invited, {
+        code: invite.code,
+      })
+    ).status,
+    200,
+  );
+  const session = (
+    await request("POST", "/api/auth/switch-organization", invited, {
+      organizationId: owner.organizationId,
+    })
+  ).body;
+  const context = { token: session.token };
+  const blocker = await pool.connect();
+  let pending: Promise<any> | undefined;
+  try {
+    await blocker.query("BEGIN");
+    await blocker.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+      `solarsim-projects:${owner.organizationId}`,
+    ]);
+    pending = request("POST", "/api/sync/push", context, {
+      projects: [project("queued-revoked-project")],
+    });
+    let waiting = false;
+    for (let i = 0; i < 100; i++) {
+      const result = await pool.query(
+        "SELECT 1 FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE 'SELECT pg_advisory_xact_lock%' AND pid<>pg_backend_pid()",
+      );
+      if (result.rows.length) {
+        waiting = true;
+        break;
+      }
+      await delay(10);
+    }
+    assert.ok(waiting, "Push reached its lock before membership removal");
+    assert.equal(
+      (await request("DELETE", "/api/users/" + invited.id, owner)).status,
+      200,
+    );
+  } finally {
+    await blocker.query("ROLLBACK");
+    blocker.release();
+  }
+  assert.equal((await pending!).status, 401);
+  assert.equal(
+    (
+      await pool.query("SELECT id FROM projects WHERE id=$1", [
+        "queued-revoked-project",
+      ])
+    ).rows.length,
+    0,
+  );
+});
+
+test("private custom Electsun equipment does not become a public reference", async () => {
+  await pool.query(
+    "INSERT INTO equipment_catalog(id,organization_id,type,brand,model_series,display_name) VALUES('private-electsun-model','org-electsun-default','panel','Private','Private','Private company model')",
+  );
+  const catalog = (await request("GET", "/api/equipment", other)).body.items;
+  assert.ok(!catalog.some((item: any) => item.id === "private-electsun-model"));
+});
+
+test("retiring primary access preserves identity and attribution from past secondary work", async () => {
+  const owner = await register("retirement-owner");
+  const member = await provision("EDITOR", "retirement-member", owner);
+  const foreign = await register("retirement-foreign");
+  const invite = (
+    await request("POST", "/api/organization/invitations", foreign, {
+      email: member.email,
+      role: "EDITOR",
+    })
+  ).body;
+  await request("POST", "/api/auth/accept-invitation", member, {
+    code: invite.code,
+  });
+  const switched = (
+    await request("POST", "/api/auth/switch-organization", member, {
+      organizationId: foreign.organizationId,
+    })
+  ).body;
+  const contextual = { token: switched.token };
+  await request("POST", "/api/sync/push", contextual, {
+    projects: [project("retirement-attribution")],
+  });
+  assert.equal(
+    (await request("DELETE", "/api/users/" + member.id, foreign)).status,
+    200,
+  );
+  assert.equal(
+    (await request("DELETE", "/api/users/" + member.id, owner)).status,
+    200,
+  );
+  const account = (
+    await pool.query("SELECT id,is_active FROM users WHERE id=$1", [member.id])
+  ).rows[0];
+  assert.equal(account.id, member.id);
+  assert.equal(account.is_active, false);
+  assert.equal((await request("GET", "/api/auth/me", member)).status, 401);
+  const row = (
+    await pool.query("SELECT created_by_id FROM projects WHERE id=$1", [
+      "retirement-attribution",
+    ])
+  ).rows[0];
+  assert.equal(row.created_by_id, member.id);
 });

@@ -15,6 +15,9 @@ export interface ShareResult {
 }
 
 export interface SharedProposalRecord {
+  /** Missing only on legacy records retained without assigning an organization. */
+  serverUrl?: string;
+  organizationId?: string;
   id: string;
   projectId: string;
   projectCode: string;
@@ -44,8 +47,111 @@ export interface RemainingTimeInfo {
 const STORAGE_WORKER_URL_KEY = 'solarsim_share_worker_url';
 export const STORAGE_SHARED_HISTORY_KEY = 'solarsim_shared_links_history';
 export const DEFAULT_WORKER_URL = 'https://propuesta.electsun.net';
+const SCOPED_HISTORY_PREFIX = `${STORAGE_SHARED_HISTORY_KEY}_v2_`;
+
+interface HistoryContext {
+  key: string;
+  serverUrl: string;
+  organizationId: string;
+  userId: string;
+  generation: number;
+}
+
+function canonicalServer(url: string): string {
+  try {
+    const parsed = new URL(url.trim());
+    return `${parsed.origin}${parsed.pathname.replace(/\/+$/, '')}`;
+  } catch { return url.trim().replace(/\/+$/, ''); }
+}
+
 
 export class ShareProposalService {
+  private static historyContext(): HistoryContext | null {
+    const state = useSimulationStore.getState();
+    const user = state.syncSettings.currentUser;
+    if (!user?.organizationId) return null;
+    const serverUrl = canonicalServer(state.syncSettings.serverUrl);
+    return { serverUrl, organizationId: user.organizationId, userId: user.id,
+      generation: state.sessionGeneration,
+      key: `${SCOPED_HISTORY_PREFIX}${encodeURIComponent(serverUrl)}|${encodeURIComponent(user.organizationId)}` };
+  }
+
+  public static getHistoryScopeKey(): string | null {
+    return this.historyContext()?.key || null;
+  }
+
+  private static contextIsCurrent(context: HistoryContext): boolean {
+    const active = this.historyContext();
+    return !!active && active.key === context.key && active.userId === context.userId && active.generation === context.generation;
+  }
+
+  public static hasQuarantinedLegacyHistory(): boolean {
+    try {
+    if (this.readRecords(STORAGE_SHARED_HISTORY_KEY).some((record) => !record.organizationId || !record.serverUrl)) return true;
+    for (let index = 0; index < localStorage.length; index++) {
+      const key = localStorage.key(index);
+      if (!key?.startsWith('solarsim_last_share_')) continue;
+      try {
+        const record = JSON.parse(localStorage.getItem(key) || 'null');
+        if (record?.id && (!record.organizationId || !record.serverUrl)) return true;
+      } catch { /* Keep malformed data for manual recovery. */ }
+    }
+    return false;
+    } catch { return false; }
+  }
+
+  private static recordBelongsTo(record: SharedProposalRecord, context: HistoryContext): boolean {
+    return !!record.serverUrl && record.organizationId === context.organizationId && canonicalServer(record.serverUrl) === context.serverUrl;
+  }
+
+  private static readRecords(key: string): SharedProposalRecord[] {
+    try {
+      const records: unknown = JSON.parse(localStorage.getItem(key) || '[]');
+      return Array.isArray(records) ? records.filter((record) => record && typeof record === 'object' && typeof record.id === 'string' && typeof record.shareUrl === 'string') : [];
+    } catch { return []; }
+  }
+
+  private static writeRecords(context: HistoryContext, records: SharedProposalRecord[]): boolean {
+    try { localStorage.setItem(context.key, JSON.stringify(records)); return true; }
+    catch { return false; }
+  }
+
+  private static notifyHistoryUpdated(): void {
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('solarsim_shared_links_updated'));
+  }
+
+  private static lastShareKey(context: HistoryContext, projectId: string): string {
+    return `${context.key}:last:${encodeURIComponent(projectId)}`;
+  }
+
+  /** Legacy entries stay untouched unless they carry explicit, verifiable scope metadata. */
+  private static readScopedRecords(context: HistoryContext): SharedProposalRecord[] {
+    const records = this.readRecords(context.key).filter((record) => this.recordBelongsTo(record, context));
+    try { if (localStorage.getItem(context.key) !== null) return records; } catch { return records; }
+    const legacy = this.readRecords(STORAGE_SHARED_HISTORY_KEY);
+    for (let index = 0; index < localStorage.length; index++) {
+      const key = localStorage.key(index);
+      if (!key?.startsWith('solarsim_last_share_')) continue;
+      try {
+        const item = JSON.parse(localStorage.getItem(key) || 'null');
+        if (item?.id && typeof item.shareUrl === 'string') legacy.push({ ...item,
+          projectId: key.slice('solarsim_last_share_'.length),
+          projectCode: item.projectCode || key.slice('solarsim_last_share_'.length),
+          quoteNumber: item.quoteNumber || 'C-0001', clientName: item.clientName || 'Propuesta Solar',
+          createdAt: item.savedAt || item.createdAt || new Date().toISOString(),
+          validityDays: item.validityDays || 7, systemKWp: item.systemKWp || 0,
+          workerUrl: item.workerUrl || this.getWorkerUrl() });
+      } catch { /* Preserve malformed legacy data as well. */ }
+    }
+    for (const record of legacy) {
+      if (this.recordBelongsTo(record, context) && !records.some((existing) => existing.id === record.id)) {
+        records.push({ ...record, serverUrl: context.serverUrl });
+      }
+    }
+    this.writeRecords(context, records);
+    return records;
+  }
+
   public static getWorkerUrl(): string {
     const customUrl = localStorage.getItem(STORAGE_WORKER_URL_KEY);
     if (customUrl && customUrl.trim()) {
@@ -72,17 +178,27 @@ export class ShareProposalService {
     const endpoint = `${baseUrl}/api/share`;
 
     try {
-      const initialSession = useSimulationStore.getState().syncSettings;
-      if (!initialSession.currentUser || !initialSession.authToken) return { success: false, error: 'Inicia sesión en tu organización para publicar una propuesta.' };
+      const initialState = useSimulationStore.getState();
+      const initialSession = initialState.syncSettings;
+      const publicationContext = this.historyContext();
+      if (!publicationContext || !initialSession.currentUser || !initialSession.authToken) return { success: false, error: 'Inicia sesión en tu organización para publicar una propuesta.' };
       if (!['ADMIN', 'EDITOR'].includes(initialSession.currentUser.role)) return { success: false, error: 'Esta cuenta no tiene permiso para publicar propuestas.' };
       const destination = new URL(baseUrl);
-      if (destination.protocol !== 'https:') return { success: false, error: 'La publicación autenticada requiere una URL HTTPS.' };
+      if (destination.protocol !== 'https:' || destination.username || destination.password || destination.search || destination.hash) return { success: false, error: 'La publicación autenticada requiere una URL HTTPS.' };
       await useSimulationStore.getState().loadOrganizationFeaturePolicy();
       const state = useSimulationStore.getState();
       const session = state.syncSettings;
-      if (session.currentUser?.id !== initialSession.currentUser.id || session.currentUser.organizationId !== initialSession.currentUser.organizationId || session.serverUrl !== initialSession.serverUrl || !session.authToken) return { success: false, error: 'La sesión cambió. Vuelve a intentar la publicación.' };
+      if (!this.contextIsCurrent(publicationContext) || session.currentUser?.id !== initialSession.currentUser.id || session.currentUser.organizationId !== initialSession.currentUser.organizationId || session.serverUrl !== initialSession.serverUrl || !session.authToken) return { success: false, error: 'La sesión cambió. Vuelve a intentar la publicación.' };
       const policy = state.organizationFeaturePolicies[featureScope(session.serverUrl, session.currentUser.organizationId)];
-      if (!policy || state.featurePolicyRequest?.status === 'error') return { success: false, error: 'No se pudo confirmar la configuración de simulación del servidor.' };
+      if (!policy || state.featurePolicyRequest?.status === 'error') {
+        const detail = state.featurePolicyRequest?.error;
+        return {
+          success: false,
+          error: detail
+            ? `No se pudo confirmar la configuración de simulación del servidor: ${detail}`
+            : 'No se pudo confirmar la configuración de simulación del servidor.',
+        };
+      }
       const mode = energyCalculationMode(effectiveFeatureSettings(state));
       // One immutable publication captures both the confirmed policy and its financial result.
       // The caller's preview may have been calculated before settings changed.
@@ -145,6 +261,7 @@ export class ShareProposalService {
         }),
       });
 
+      if (!this.contextIsCurrent(publicationContext)) return { success: false, error: 'La sesión cambió durante la publicación. Vuelve a consultar el historial de la organización original.' };
       if (!response.ok) {
         let errorMsg = `Error en el servidor (${response.status})`;
         try {
@@ -157,18 +274,24 @@ export class ShareProposalService {
       }
 
       const result = await response.json();
+      if (!this.contextIsCurrent(publicationContext)) return { success: false, error: 'La sesión cambió durante la publicación. Vuelve a consultar el historial de la organización original.' };
       if (result && result.success && result.shareUrl && typeof result.id === 'string' && /^[a-zA-Z0-9_-]{7,64}$/.test(result.id)) {
         const resolvedExpiresAt =
           result.expiresAt || new Date(Date.now() + validityDays * 86400 * 1000).toISOString();
         const resolvedId = result.id;
+        // Use the selected HTTPS publication origin. Proxy transport URLs or an
+        // unrelated URL in a response must never become a QR/link destination.
+        const shareUrl = `${baseUrl}/p/${resolvedId}`;
 
         // Cache locally for the current project
         try {
           localStorage.setItem(
-            `solarsim_last_share_${project.id}`,
+            this.lastShareKey(publicationContext, project.id),
             JSON.stringify({
+              serverUrl: publicationContext.serverUrl,
+              organizationId: publicationContext.organizationId,
               id: resolvedId,
-              shareUrl: result.shareUrl,
+              shareUrl,
               expiresAt: resolvedExpiresAt,
               validityDays: result.validityDays || validityDays,
               savedAt: new Date().toISOString(),
@@ -184,6 +307,8 @@ export class ShareProposalService {
 
         // Guardar en el historial centralizado de enlaces
         const newRecord: SharedProposalRecord = {
+          serverUrl: publicationContext.serverUrl,
+          organizationId: publicationContext.organizationId,
           id: resolvedId,
           projectId: project.id,
           projectCode: project.client?.projectId || project.id,
@@ -192,7 +317,7 @@ export class ShareProposalService {
           companyName: project.client?.company || '',
           location: project.client?.location || project.client?.province || 'República Dominicana',
           systemKWp: Number(summary?.systemCapacityKWp || 0),
-          shareUrl: result.shareUrl,
+          shareUrl,
           createdAt: new Date().toISOString(),
           expiresAt: resolvedExpiresAt,
           validityDays: result.validityDays || validityDays,
@@ -200,7 +325,7 @@ export class ShareProposalService {
         };
         this.saveSharedRecord(newRecord);
 
-        return result;
+        return { ...result, shareUrl };
       }
 
       return {
@@ -217,386 +342,175 @@ export class ShareProposalService {
   }
 
   public static getLastSharedInfo(projectId: string): {
-    id: string;
-    shareUrl: string;
-    expiresAt: string;
-    validityDays: number;
-    savedAt: string;
+    id: string; shareUrl: string; expiresAt: string; validityDays: number; savedAt: string;
   } | null {
+    const context = this.historyContext();
+    if (!context) return null;
     try {
-      const raw = localStorage.getItem(`solarsim_last_share_${projectId}`);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        // Check if not expired yet
-        if (parsed?.expiresAt && new Date(parsed.expiresAt) > new Date()) {
-          return parsed;
-        }
-      }
-    } catch {
-      // ignore
-    }
-    return null;
+      const parsed = JSON.parse(localStorage.getItem(this.lastShareKey(context, projectId)) || 'null');
+      if (parsed && this.recordBelongsTo(parsed, context) && new Date(parsed.expiresAt) > new Date()) return parsed;
+      // Explicitly scoped migrated history can replace an old single-project cache.
+      const record = this.getSharedHistory().find((entry) => entry.projectId === projectId && new Date(entry.expiresAt) > new Date());
+      return record ? { ...record, savedAt: record.createdAt } : null;
+    } catch { return null; }
   }
 
-  /**
-   * Obtiene la lista completa de todas las propuestas web generadas en Cloudflare.
-   * Auto-migra cualquier clave suelta de tipo solarsim_last_share_* presente en el navegador.
-   */
-  /**
-   * Obtiene la lista completa de todas las propuestas web generadas en Cloudflare.
-   * Auto-migra cualquier clave suelta de tipo solarsim_last_share_* presente en el navegador
-   * y reconcilia retroactivamente los nombres y códigos de proyectos locales existentes.
-   */
+  /** Lists only the remembered authenticated organization's own links. Unscoped legacy is quarantined. */
   public static getSharedHistory(): SharedProposalRecord[] {
     try {
-      const raw = localStorage.getItem(STORAGE_SHARED_HISTORY_KEY);
-      let history: SharedProposalRecord[] = raw ? JSON.parse(raw) : [];
-
-      // Auto-migración de registros antiguos en localStorage
-      let hasMigration = false;
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('solarsim_last_share_')) {
-          try {
-            const rawItem = localStorage.getItem(key);
-            if (rawItem) {
-              const parsed = JSON.parse(rawItem);
-              if (parsed?.id && !history.some((h) => h.id === parsed.id || (h.shareUrl && h.shareUrl === parsed.shareUrl))) {
-                const projId = key.replace('solarsim_last_share_', '');
-                history.push({
-                  id: parsed.id,
-                  projectId: projId,
-                  projectCode: parsed.projectCode || projId,
-                  quoteNumber: parsed.quoteNumber || 'C-0001',
-                  clientName: parsed.clientName || 'Propuesta Solar',
-                  systemKWp: parsed.systemKWp || 0,
-                  shareUrl: parsed.shareUrl,
-                  createdAt: parsed.savedAt || new Date().toISOString(),
-                  expiresAt: parsed.expiresAt,
-                  validityDays: parsed.validityDays || 7,
-                  workerUrl: parsed.workerUrl || this.getWorkerUrl(),
-                });
-                hasMigration = true;
-              }
-            }
-          } catch {
-            // ignore
-          }
-        }
-      }
-
-      // Reconciliación local automática con proyectos de la tienda Zustand
-      const { updatedRecords, hasChanges } = this.reconcileWithLocalProjects(history);
-      if (hasChanges) {
-        history = updatedRecords;
-        hasMigration = true;
-      }
-
-      if (hasMigration) {
-        localStorage.setItem(STORAGE_SHARED_HISTORY_KEY, JSON.stringify(history));
-      }
-
-      return history.sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-    } catch (err) {
-      console.error('Error al leer el historial de propuestas compartidas:', err);
-      return [];
-    }
+    const context = this.historyContext();
+    if (!context) return [];
+    const records = this.readScopedRecords(context);
+    const reconciled = this.reconcileWithLocalProjects(records);
+    if (reconciled.hasChanges) this.writeRecords(context, reconciled.updatedRecords);
+    return reconciled.updatedRecords.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch { return []; }
   }
 
-  /**
-   * Reconcilia registros del historial con los proyectos locales de la tienda Zustand.
-   * Si un registro contiene valores genéricos/marcador ('Propuesta Solar', 'proj-...', 'C-0001')
-   * y el proyecto correspondiente existe localmente, enriquece los metadatos reales al instante.
-   */
   public static reconcileWithLocalProjects(records?: SharedProposalRecord[]): {
-    updatedRecords: SharedProposalRecord[];
-    hasChanges: boolean;
+    updatedRecords: SharedProposalRecord[]; hasChanges: boolean;
   } {
-    try {
-      let localProjects: ProjectSimulation[] = [];
-      try {
-        const store = useSimulationStore.getState();
-        if (store && Array.isArray(store.projects)) {
-          localProjects = store.projects;
-        }
-      } catch {
-        // Entorno sin Zustand (tests unitarios aislados)
-      }
-
-      const list = records ? [...records] : (JSON.parse(localStorage.getItem(STORAGE_SHARED_HISTORY_KEY) || '[]') as SharedProposalRecord[]);
-      if (!localProjects.length || !list.length) {
-        return { updatedRecords: list, hasChanges: false };
-      }
-
-      let hasChanges = false;
-      const updated = list.map((record) => {
-        const matched = localProjects.find((p) => p.id === record.projectId);
-        if (!matched) return record;
-
-        let changed = false;
-        const newRec = { ...record };
-
-        const isGenericName =
-          !newRec.clientName ||
-          newRec.clientName === 'Propuesta Solar' ||
-          newRec.clientName === 'Cliente Solar' ||
-          newRec.clientName === 'Cliente';
-
-        if (isGenericName && matched.client?.name) {
-          newRec.clientName = matched.client.name;
-          changed = true;
-        }
-
-        const isGenericCode =
-          !newRec.projectCode ||
-          newRec.projectCode === newRec.projectId ||
-          newRec.projectCode.startsWith('proj-');
-
-        if (isGenericCode && matched.client?.projectId) {
-          newRec.projectCode = matched.client.projectId;
-          changed = true;
-        }
-
-        const isGenericQuote =
-          !newRec.quoteNumber ||
-          newRec.quoteNumber === 'C-0001';
-
-        if (isGenericQuote && matched.client?.quoteNumber && matched.client.quoteNumber !== 'C-0001') {
-          newRec.quoteNumber = matched.client.quoteNumber;
-          changed = true;
-        }
-
-        if (!newRec.systemKWp || newRec.systemKWp === 0) {
-          const kwp = Number(
-            (((matched.specs?.panelCount || 0) * (matched.specs?.panelPowerW || 0)) / 1000).toFixed(2)
-          );
-          if (kwp > 0) {
-            newRec.systemKWp = kwp;
-            changed = true;
-          }
-        }
-
-        if (!newRec.location && (matched.client?.province || matched.client?.location)) {
-          newRec.location = matched.client.province || matched.client.location;
-          changed = true;
-        }
-
-        if (!newRec.companyName && matched.client?.company) {
-          newRec.companyName = matched.client.company;
-          changed = true;
-        }
-
-        if (changed) {
-          hasChanges = true;
-          return newRec;
-        }
-        return record;
-      });
-
-      if (hasChanges && !records) {
-        localStorage.setItem(STORAGE_SHARED_HISTORY_KEY, JSON.stringify(updated));
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('solarsim_shared_links_updated'));
-        }
-      }
-
-      return { updatedRecords: updated, hasChanges };
-    } catch (err) {
-      console.error('Error reconciliando historial con proyectos locales:', err);
-      return { updatedRecords: records || [], hasChanges: false };
+    const context = this.historyContext();
+    if (!context) return { updatedRecords: [], hasChanges: false };
+    const projects = useSimulationStore.getState().projects.filter((project) =>
+      project.organizationId === context.organizationId && !!project.syncServerUrl && canonicalServer(project.syncServerUrl) === context.serverUrl);
+    const list = (records || this.readScopedRecords(context)).filter((record) => this.recordBelongsTo(record, context));
+    let hasChanges = false;
+    const updatedRecords = list.map((record) => {
+      const project = projects.find((item) => item.id === record.projectId);
+      if (!project) return record;
+      const result = { ...record };
+      if ((!result.clientName || ['Propuesta Solar', 'Cliente Solar', 'Cliente'].includes(result.clientName)) && project.client?.name) result.clientName = project.client.name;
+      if ((!result.projectCode || result.projectCode === result.projectId || result.projectCode.startsWith('proj-')) && project.client?.projectId) result.projectCode = project.client.projectId;
+      if ((!result.quoteNumber || result.quoteNumber === 'C-0001') && project.client?.quoteNumber) result.quoteNumber = project.client.quoteNumber;
+      if (!result.systemKWp) result.systemKWp = Number(((project.specs.panelCount * project.specs.panelPowerW) / 1000).toFixed(2));
+      if (!result.location) result.location = project.client.province || project.client.location;
+      if (!result.companyName) result.companyName = project.client.company;
+      if (JSON.stringify(result) !== JSON.stringify(record)) hasChanges = true;
+      return result;
+    });
+    if (hasChanges && !records) {
+      if (this.writeRecords(context, updatedRecords)) this.notifyHistoryUpdated();
     }
+    return { updatedRecords, hasChanges };
   }
 
-  /**
-   * Consulta el Worker de Cloudflare para enriquecer metadatos reales de propuestas activas
-   * (nombres de cliente, IDs formales SP-2026-..., números de cotización C-010X y potencias kWp).
-   */
-  public static async hydrateFromCloudflare(
-    customWorkerUrl?: string
-  ): Promise<{ updatedCount: number; errors: number }> {
-    try {
-      const history = this.getSharedHistory();
-      if (!history.length) return { updatedCount: 0, errors: 0 };
-
-      // Identificar propuestas que aún tengan nombres o códigos de marcador de posición
-      const needsHydration = history.filter((r) => {
-        const isGenericName =
-          !r.clientName ||
-          r.clientName === 'Propuesta Solar' ||
-          r.clientName === 'Cliente Solar' ||
-          r.clientName === 'Cliente';
-        const isGenericCode =
-          !r.projectCode ||
-          r.projectCode === r.projectId ||
-          r.projectCode.startsWith('proj-');
-        const isGenericQuote = !r.quoteNumber || r.quoteNumber === 'C-0001';
-        return isGenericName || isGenericCode || isGenericQuote || !r.systemKWp;
-      });
-
-      if (!needsHydration.length) {
-        return { updatedCount: 0, errors: 0 };
+  /** Hydrates the captured scope only; changes of identity, organization or session discard pending responses. */
+  public static async hydrateFromCloudflare(customWorkerUrl?: string): Promise<{ updatedCount: number; errors: number }> {
+    const context = this.historyContext();
+    if (!context) return { updatedCount: 0, errors: 0 };
+    const history = this.getSharedHistory();
+    const candidates = history.filter((record) => !record.clientName || ['Propuesta Solar', 'Cliente Solar', 'Cliente'].includes(record.clientName) || !record.projectCode || record.projectCode === record.projectId || record.projectCode.startsWith('proj-') || !record.quoteNumber || record.quoteNumber === 'C-0001' || !record.systemKWp);
+    const groups = new Map<string, SharedProposalRecord[]>();
+    for (const record of candidates) {
+      const base = (customWorkerUrl || record.workerUrl || this.getWorkerUrl()).replace(/\/+$/, '');
+      const group = groups.get(base) || [];
+      group.push(record);
+      groups.set(base, group);
+    }
+    let updatedCount = 0;
+    let errors = 0;
+    const apply = (metadata: Record<string, unknown>, expectedId: string): boolean => {
+      if (!this.contextIsCurrent(context)) return false;
+      // Read latest storage so late hydration never restores a deleted link or discards a newer publication.
+      const latest = this.readScopedRecords(context);
+      const index = latest.findIndex((record) => record.id === expectedId);
+      if (index < 0) return false;
+      const previous = latest[index];
+      const next = { ...previous };
+      for (const field of ['clientName', 'projectCode', 'quoteNumber', 'location', 'companyName'] as const) {
+        if (typeof metadata[field] === 'string' && metadata[field]) next[field] = metadata[field];
       }
-
-      const baseUrl = (customWorkerUrl || this.getWorkerUrl()).replace(/\/+$/, '');
-      const ids = needsHydration.map((r) => r.id);
-
-      let updatedCount = 0;
-      let errors = 0;
-
-      // 1. Intentar con el endpoint de lote POST /api/share/hydrate
+      if (typeof metadata.systemKWp === 'number' && Number.isFinite(metadata.systemKWp) && metadata.systemKWp > 0) next.systemKWp = metadata.systemKWp;
+      if (JSON.stringify(next) === JSON.stringify(previous)) return false;
+      latest[index] = next;
+      if (!this.writeRecords(context, latest)) return false;
+      this.notifyHistoryUpdated();
+      return true;
+    };
+    const batches = [...groups.entries()].flatMap(([base, records]) => {
+      const result: [string, SharedProposalRecord[]][] = [];
+      for (let offset = 0; offset < records.length; offset += 50) result.push([base, records.slice(offset, offset + 50)]);
+      return result;
+    });
+    for (const [base, records] of batches) {
+      if (!this.contextIsCurrent(context)) return { updatedCount: 0, errors: 0 };
+      let hydrated = false;
       try {
-        const res = await fetch(`${baseUrl}/api/share/hydrate`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ids }),
+        if (new URL(base).protocol !== 'https:') throw new Error('HTTPS requerido para consultar enlaces.');
+        const response = await fetch(`${base}/api/share/hydrate`, {
+          signal: AbortSignal.timeout(8000), method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: records.map((record) => record.id) }),
         });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.success && Array.isArray(data.proposals)) {
-            let hasChanges = false;
-            for (const prop of data.proposals) {
-              const idx = history.findIndex((h) => h.id === prop.id);
-              if (idx >= 0) {
-                history[idx] = {
-                  ...history[idx],
-                  clientName: prop.clientName || history[idx].clientName,
-                  projectCode: prop.projectCode || history[idx].projectCode,
-                  quoteNumber: prop.quoteNumber || history[idx].quoteNumber,
-                  systemKWp: prop.systemKWp || history[idx].systemKWp,
-                  location: prop.location || history[idx].location,
-                  companyName: prop.companyName || history[idx].companyName,
-                };
-                updatedCount++;
-                hasChanges = true;
-              }
-            }
-            if (hasChanges) {
-              localStorage.setItem(STORAGE_SHARED_HISTORY_KEY, JSON.stringify(history));
-              if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('solarsim_shared_links_updated'));
-              }
-              return { updatedCount, errors };
-            }
+        const data = response.ok ? await response.json() : null;
+        if (!this.contextIsCurrent(context)) return { updatedCount: 0, errors: 0 };
+        if (data?.success && Array.isArray(data.proposals)) {
+          const expected = new Set(records.map((record) => record.id));
+          const received = new Set<string>();
+          for (const metadata of data.proposals) {
+            if (!metadata || !expected.has(metadata.id) || received.has(metadata.id)) continue;
+            received.add(metadata.id);
+            if (apply(metadata, metadata.id)) updatedCount++;
           }
+          errors += expected.size - received.size;
+          hydrated = true;
         }
-      } catch (batchErr) {
-        console.warn('Batch hydration fallo, intentando fallback individual:', batchErr);
-      }
-
-      // 2. Fallback individual GET /api/share/:id para cualquier elemento pendiente
-      for (const rec of needsHydration) {
+      } catch { /* Older Workers may require the individual endpoint. */ }
+      if (hydrated) continue;
+      for (const record of records) {
+        if (!this.contextIsCurrent(context)) return { updatedCount: 0, errors: 0 };
         try {
-          const res = await fetch(`${baseUrl}/api/share/${rec.id}`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data && data.success) {
-              const idx = history.findIndex((h) => h.id === rec.id);
-              if (idx >= 0) {
-                history[idx] = {
-                  ...history[idx],
-                  clientName: data.clientName || history[idx].clientName,
-                  projectCode: data.projectCode || history[idx].projectCode,
-                  quoteNumber: data.quoteNumber || history[idx].quoteNumber,
-                  systemKWp: data.systemKWp || history[idx].systemKWp,
-                  location: data.location || history[idx].location,
-                  companyName: data.companyName || history[idx].companyName,
-                };
-                updatedCount++;
-              }
-            }
-          } else {
-            errors++;
-          }
-        } catch {
-          errors++;
-        }
+          if (new URL(base).protocol !== 'https:') throw new Error('HTTPS requerido.');
+          const response = await fetch(`${base}/api/share/${encodeURIComponent(record.id)}`, { signal: AbortSignal.timeout(8000) });
+          const data = response.ok ? await response.json() : null;
+          if (!this.contextIsCurrent(context)) return { updatedCount: 0, errors: 0 };
+          if (data?.success) { if (apply(data, record.id)) updatedCount++; }
+          else errors++;
+        } catch { errors++; }
       }
-
-      if (updatedCount > 0) {
-        localStorage.setItem(STORAGE_SHARED_HISTORY_KEY, JSON.stringify(history));
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('solarsim_shared_links_updated'));
-        }
-      }
-
-      return { updatedCount, errors };
-    } catch (err) {
-      console.error('Error general durante la hidratación de Cloudflare:', err);
-      return { updatedCount: 0, errors: 1 };
     }
+    return { updatedCount, errors };
   }
 
-  /**
-   * Guarda o actualiza un registro en el historial compartido.
-   */
   public static saveSharedRecord(record: SharedProposalRecord): void {
-    try {
-      const history = this.getSharedHistory();
-      const existingIdx = history.findIndex((h) => h.id === record.id);
-      if (existingIdx >= 0) {
-        history[existingIdx] = { ...history[existingIdx], ...record };
-      } else {
-        history.unshift(record);
-      }
-      localStorage.setItem(STORAGE_SHARED_HISTORY_KEY, JSON.stringify(history));
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('solarsim_shared_links_updated'));
-      }
-    } catch (err) {
-      console.error('Error guardando registro de propuesta compartida:', err);
-    }
+    const context = this.historyContext();
+    if (!context) return;
+    // This method creates new local records; existing legacy storage is never passed here for migration.
+    const scoped = { ...record, serverUrl: record.serverUrl ? canonicalServer(record.serverUrl) : context.serverUrl, organizationId: record.organizationId || context.organizationId };
+    if (!this.recordBelongsTo(scoped, context)) return;
+    const records = this.readScopedRecords(context);
+    const index = records.findIndex((entry) => entry.id === record.id);
+    if (index >= 0) records[index] = { ...records[index], ...scoped };
+    else records.unshift(scoped);
+    if (this.writeRecords(context, records)) this.notifyHistoryUpdated();
   }
 
-  /**
-   * Elimina un enlace del historial.
-   */
   public static deleteSharedRecord(id: string): void {
-    try {
-      const history = this.getSharedHistory().filter((h) => h.id !== id);
-      localStorage.setItem(STORAGE_SHARED_HISTORY_KEY, JSON.stringify(history));
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('solarsim_shared_links_updated'));
-      }
-    } catch (err) {
-      console.error('Error eliminando enlace del historial:', err);
-    }
+    const context = this.historyContext();
+    if (!context) return;
+    const history = this.getSharedHistory();
+    const record = history.find((entry) => entry.id === id);
+    if (!this.writeRecords(context, history.filter((entry) => entry.id !== id))) return;
+    if (record) localStorage.removeItem(this.lastShareKey(context, record.projectId));
+    this.notifyHistoryUpdated();
   }
 
-  /**
-   * Elimina del historial todos los enlaces que hayan expirado.
-   */
   public static clearExpiredRecords(): number {
-    try {
-      const now = new Date();
-      const history = this.getSharedHistory();
-      const active = history.filter((h) => new Date(h.expiresAt) > now);
-      const removedCount = history.length - active.length;
-      localStorage.setItem(STORAGE_SHARED_HISTORY_KEY, JSON.stringify(active));
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('solarsim_shared_links_updated'));
-      }
-      return removedCount;
-    } catch (err) {
-      console.error('Error limpiando enlaces expirados:', err);
-      return 0;
-    }
+    const context = this.historyContext();
+    if (!context) return 0;
+    const history = this.getSharedHistory();
+    const active = history.filter((record) => new Date(record.expiresAt) > new Date());
+    if (!this.writeRecords(context, active)) return 0;
+    for (const record of history.filter((record) => !active.includes(record))) localStorage.removeItem(this.lastShareKey(context, record.projectId));
+    this.notifyHistoryUpdated();
+    return history.length - active.length;
   }
 
-  /**
-   * Limpia todo el historial de enlaces generados.
-   */
   public static clearAllSharedRecords(): void {
-    try {
-      localStorage.removeItem(STORAGE_SHARED_HISTORY_KEY);
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('solarsim_shared_links_updated'));
-      }
-    } catch (err) {
-      console.error('Error borrando historial completo:', err);
-    }
+    const context = this.historyContext();
+    if (!context) return;
+    for (const record of this.getSharedHistory()) localStorage.removeItem(this.lastShareKey(context, record.projectId));
+    this.writeRecords(context, []);
+    this.notifyHistoryUpdated();
   }
 
   /**

@@ -12,7 +12,7 @@ export function ProjectActionsMenu({ project }: { project: ProjectSimulation }) 
   const [position, setPosition] = useState<{ top: number; right: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const readOnly = ['VIEWER', 'LECTOR'].includes(syncSettings.currentUser?.role ?? '');
+  const readOnly = !!syncSettings.authToken && ['VIEWER', 'LECTOR'].includes(syncSettings.currentUser?.role ?? '');
   const close = () => { setPosition(null); triggerRef.current?.focus(); };
 
   useEffect(() => {

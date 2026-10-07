@@ -1,5 +1,6 @@
 export interface CompanyProfile {
   id: string;
+  dataVersion?: number;
   name: string;
   commercialName?: string;
   rncOrId: string;
@@ -29,17 +30,18 @@ export interface LocalUserProfile {
 
 export const DEFAULT_LOCAL_COMPANY: CompanyProfile = {
   id: 'comp-default-rd',
-  name: 'Electsun Dominicana S.R.L.',
-  commercialName: 'ELECTSUN',
-  rncOrId: '1-31-12345-6',
-  phone: '809-555-0100',
-  email: 'contacto@electsun.com.do',
-  address: 'Av. Winston Churchill, Torre Empresarial, Santo Domingo, D.N.',
-  website: 'electsun.com.do',
+  dataVersion: 1,
+  name: 'Mi empresa',
+  commercialName: '',
+  rncOrId: '',
+  phone: '',
+  email: '',
+  address: '',
+  website: '',
   primaryColor: '#059669', // Emerald 600
   accentColor: '#0284c7',  // Sky 600
-  defaultPaymentTerms: '60% anticipo al ordenar, 30% contra entrega de equipos en sitio, 10% tras interconexión con distribuidora.',
-  defaultWarrantyNotes: '25 años en paneles solares, 10 años en inversores híbridos, 10 años en baterías BESS y 1 año en mano de obra.',
+  defaultPaymentTerms: '',
+  defaultWarrantyNotes: '',
   isDefault: true,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),

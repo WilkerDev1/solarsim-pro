@@ -203,6 +203,110 @@ async function main() {
       }
     }
   }
-  console.log('PASS: publicación autenticada, límites, esquema, escape HTML/atributos/JSON/Markdown, snapshots y expiración.');
+
+  // Verificación de múltiples modelos de inversores, baterías y paneles con retroactividad
+  const multiEquipProposal: StoredProposal = {
+    id: 'multi-equip-test',
+    project: {
+      id: 'proj-vicente-noble',
+      createdAt: '2026-03-01T00:00:00Z',
+      updatedAt: '2026-03-01T00:00:00Z',
+      client: {
+        name: 'ESTACION DE SERVICIO, VICENTE NOBLE SRL',
+        projectId: 'P-001',
+        quoteNumber: 'COT-001',
+        province: 'Barahona',
+        address: 'Vicente Noble',
+        contactPhone: '8090000000',
+        coordinates: '',
+        solarSourceMode: 'manual',
+        distributor: 'EDESUR',
+        tariffCode: 'BTD',
+      },
+      specs: {
+        panelCount: 156,
+        panelPowerW: 630,
+        panelBrandModel: 'JA Solar JAM66D45-630/LB (630W)',
+        panels: [
+          { count: 156, powerW: 630, brandModel: 'JA Solar JAM66D45-630/LB (630W)' },
+        ],
+        inverterCount: 7,
+        inverterPowerKW: 16,
+        inverterBrandModel: 'Luxpower GEN-LB-US 16K (16.0Kw)',
+        inverters: [
+          { count: 1, powerKW: 16, brandModel: 'Luxpower GEN-LB-US 16K (16.0Kw)' },
+          { count: 6, powerKW: 10, brandModel: 'Huawei SUN2000-10KTL-M1 (10.0Kw)' },
+        ],
+        hasBattery: true,
+        batteryCount: 6,
+        batteryCapacityKWh: 15,
+        batteryBrandModel: 'HinaESS HI-15e (15kWh)',
+        batteries: [
+          { count: 6, capacityKWh: 15, brandModel: 'HinaESS HI-15e (15kWh)' },
+        ],
+        installationServicesDesc: 'junto con todos los componentes de ingeniería complementarios (estructuras de montaje en aluminio anodizado de alta resistencia, cableado fotovoltaico resistente a rayos UV, protecciones en CC/CA, interruptores de desconexión y supresores de sobretensión) para garantizar un funcionamiento seguro, eficiente y duradero del sistema.',
+      },
+      rates: {
+        distributor: 'EDESUR',
+        tariffCode: 'BTD',
+        energyRateUSD: 0.22,
+        gridExportFeePct: 25,
+      },
+      financials: {
+        customItems: [],
+        applyITBISExemption: true,
+        applyLey5707: true,
+      },
+      monthlyConsumption: [12584, 12584, 12584, 12584, 12584, 12584, 12584, 12584, 12584, 12584, 12584, 12584],
+      customization: {
+        companyName: 'Electsun',
+        customProjectSummaryParagraph1: 'El consumo promedio anual de **ESTACION DE SERVICIO, VICENTE NOBLE SRL** es de **151,008.0 kWh** (aprox. 12,584 kWh/mes), por lo que se le propone la instalación de **156 Módulos JA Solar JAM66D45-630/LB (630W) JA Solar JAM66D45-630/LB (630W)**, alcanzando una potencia DC instalada de **98.28 kWp**. La producción energética estimada para este sistema es de **155,152.4 kWh anuales**, representando el **102.7%** de cobertura del consumo total.',
+        customProjectSummaryParagraph2: 'Adicionalmente, se contempla la instalación de **7 Inversores Luxpower GEN-LB-US 16K (16.0Kw) y 6 Baterías HinaESS HI-15e (15kWh)**, junto con todos los componentes de ingeniería complementarios (estructuras de montaje en aluminio anodizado de alta resistencia, cableado fotovoltaico resistente a rayos UV, protecciones en CC/CA, interruptores de desconexión y supresores de sobretensión) para garantizar un funcionamiento seguro, eficiente y duradero del sistema..',
+      },
+    },
+    summary: {
+      systemCapacityKWp: 98.28,
+      annualProductionKWh: 155152.4,
+      annualConsumptionKWh: 151008.0,
+      energyCoveragePct: 102.7,
+      grossInvestmentUSD: 100000,
+      totalEffectiveAnnualSavingsUSD: 25000,
+      paybackYears: 4,
+      irrPct: 25,
+      npvUSD: 50000,
+      roi25YrPct: 300,
+      monthlyBreakdown: [],
+      cashFlow25Years: [],
+    } as any,
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 86400000).toISOString(),
+    validityDays: 7,
+  };
+
+  rows.set(`proposal:${multiEquipProposal.id}`, JSON.stringify(multiEquipProposal));
+  const multiHtml = await (await app.request(`https://test.local/p/${multiEquipProposal.id}`, {}, env as never)).text();
+  assert.ok(multiHtml.includes('1 Inversor Luxpower GEN-LB-US 16K (16.0Kw) y 6 Inversores Huawei SUN2000-10KTL-M1 (10.0Kw)'));
+  assert.ok(!multiHtml.includes('7 Inversores Luxpower'));
+  assert.ok(!multiHtml.includes('JA Solar JAM66D45-630/LB (630W) JA Solar JAM66D45-630/LB (630W)'));
+  assert.ok(multiHtml.includes('156 Módulos JA Solar JAM66D45-630/LB (630W)'));
+
+  // Equipment must not replace a preceding bold client or a numeric energy value.
+  const paragraphCase = structuredClone(multiEquipProposal);
+  paragraphCase.project.specs.panels = [
+    { count: 100, powerW: 630, brandModel: 'Modelo A (630W)' },
+    { count: 56, powerW: 620, brandModel: 'Modelo B (620W)' },
+  ];
+  paragraphCase.project.customization!.customProjectSummaryParagraph1 = 'Oferta para **CLIENTE 2026**: consumo **12000 kWh**. Se propone la instalación de **156 Módulos Anteriores (630W)**.';
+  const paragraphHtml = renderProposalPage(paragraphCase);
+  assert.ok(paragraphHtml.includes('<strong class="font-bold text-slate-950">CLIENTE 2026</strong>'));
+  assert.ok(paragraphHtml.includes('<strong class="font-bold text-slate-950">12000 kWh</strong>'));
+  assert.ok(paragraphHtml.includes('100 Módulos Modelo A (630W) y 56 Módulos Modelo B (620W)'));
+  assert.ok(!paragraphHtml.includes('Módulos Anteriores'));
+  paragraphCase.project.customization!.customProjectSummaryParagraph1 = 'Texto libre: **12 equipos auxiliares**, **12000 kWh** y **CLIENTE 2026**.';
+  const customHtml = renderProposalPage(paragraphCase);
+  assert.ok(customHtml.includes('<strong class="font-bold text-slate-950">12 equipos auxiliares</strong>'));
+  assert.ok(customHtml.includes('<strong class="font-bold text-slate-950">12000 kWh</strong>'));
+
+  console.log('PASS: publicación autenticada, límites, esquema, escape HTML/atributos/JSON/Markdown, snapshots, retroactividad multi-equipos y expiración.');
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

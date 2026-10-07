@@ -26,6 +26,7 @@ const initial = useSimulationStore.getState();
 const fetchOriginal = globalThis.fetch;
 const pullOriginal = SyncService.pullProjects;
 try {
+  initial.setSyncSettings(session);
   // Legacy successful ACK requires canonical read-back, not guessing from the payload.
   globalThis.fetch = async (input) => String(input).endsWith('/push') ? Response.json({ success: true, results: [{ id: local.id, status: 'created', version: 1 }] }) : Response.json({ success: true, projects: [remote] });
   const result = await SyncService.pushProjects(url, 'synthetic', [local]);

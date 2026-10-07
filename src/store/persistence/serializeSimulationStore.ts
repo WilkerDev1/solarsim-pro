@@ -3,6 +3,8 @@ import type { SimulationStore } from '../types';
 /** Only durable domain data belongs in storage, never pending requests or feedback. */
 export function serializeSimulationStore(state: SimulationStore) {
   return {
+    workspaceScope: state.workspaceScope,
+    organizationWorkspaces: state.organizationWorkspaces,
     projects: state.projects,
     activeProjectId: state.activeProjectId,
     activeView: state.activeView,

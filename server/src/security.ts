@@ -2,12 +2,8 @@ import jwt from "jsonwebtoken";
 import type { Context } from "hono";
 import type { Pool } from "pg";
 import type { AuthUser } from "./dependencies.js";
-export function normalizeRole(role?: string): AuthUser["role"] {
-  const value = String(role ?? "")
-    .trim()
-    .toUpperCase();
-  return value === "ADMIN" ? "ADMIN" : value === "EDITOR" ? "EDITOR" : "LECTOR";
-}
+import { resolveMembership } from "./membership.js";
+export { normalizeRole } from "./membership.js";
 export function createAuthenticator(pool: Pool, secret: string) {
   return async function authenticate(c: Context): Promise<AuthUser | null> {
     const header = c.req.header("Authorization");
@@ -42,21 +38,18 @@ export function createAuthenticator(pool: Pool, secret: string) {
         return null;
       }
     }
-    if (typeof payload.id !== "string") return null;
-    const result = await pool.query(
-      "SELECT u.id,u.organization_id,u.name,u.email,u.role,u.is_active,o.name AS org_name FROM users u JOIN organizations o ON o.id=u.organization_id WHERE u.id=$1",
-      [payload.id],
-    );
-    const row = result.rows[0];
-    if (!row?.is_active || payload.organizationId !== row.organization_id)
+    if (
+      typeof payload.id !== "string" ||
+      typeof payload.organizationId !== "string"
+    )
       return null;
-    return {
-      id: row.id,
-      name: row.name,
-      email: row.email,
-      role: normalizeRole(row.role),
-      organizationId: row.organization_id,
-      organizationName: row.org_name,
-    };
+    const user = await resolveMembership(
+      pool,
+      payload.id,
+      payload.organizationId,
+    );
+    return user && (payload.authVersion ?? 0) === (user.authVersion ?? 0)
+      ? user
+      : null;
   };
 }

@@ -3,7 +3,7 @@ import type { Hono } from "hono";
 import type { Dependencies } from "../dependencies.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { normalizeRole } from "../security.js";
+import { resolveMembership } from "../membership.js";
 
 export function registerAuthRoutes(app: Hono, deps: Dependencies): void {
   const { pool, authenticate, jwtSecret: JWT_SECRET } = deps;
@@ -88,7 +88,7 @@ export function registerAuthRoutes(app: Hono, deps: Dependencies): void {
       }
 
       const res = await pool.query(
-        `SELECT u.id, u.organization_id, u.name, u.email, u.password_hash, u.role, u.is_active, o.name as org_name
+        `SELECT u.id, u.organization_id, u.name, u.email, u.password_hash, u.auth_version, u.role, u.is_active, o.name as org_name
        FROM users u
        JOIN organizations o ON u.organization_id = o.id
        WHERE u.email = $1`,
@@ -112,30 +112,35 @@ export function registerAuthRoutes(app: Hono, deps: Dependencies): void {
         return c.json({ error: "Credenciales inválidas" }, 401);
       }
 
-      const token = jwt.sign(
-        {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: normalizeRole(user.role),
-          organizationId: user.organization_id,
-        },
-        JWT_SECRET,
-        { expiresIn: "7d", algorithm: "HS256" },
+      let context = await resolveMembership(
+        pool,
+        user.id,
+        user.organization_id,
       );
-
-      return c.json({
-        success: true,
-        token,
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: normalizeRole(user.role),
-          organizationId: user.organization_id,
-          organizationName: user.org_name,
-        },
+      if (!context || (context.authVersion ?? 0) !== (user.auth_version ?? 0)) {
+        const candidates = await pool.query(
+          "SELECT organization_id FROM organization_memberships WHERE user_id=$1 AND is_active=TRUE ORDER BY created_at",
+          [user.id],
+        );
+        for (const candidate of candidates.rows) {
+          context = await resolveMembership(
+            pool,
+            user.id,
+            candidate.organization_id,
+          );
+          if (context) break;
+        }
+      }
+      if (!context || (context.authVersion ?? 0) !== (user.auth_version ?? 0))
+        return c.json(
+          { error: "No tienes acceso activo a una organización" },
+          403,
+        );
+      const token = jwt.sign(context, JWT_SECRET, {
+        expiresIn: "7d",
+        algorithm: "HS256",
       });
+      return c.json({ success: true, token, user: context });
     } catch (error: any) {
       throw error;
     }
@@ -150,44 +155,12 @@ export function registerAuthRoutes(app: Hono, deps: Dependencies): void {
       );
     }
 
-    const res = await pool.query(
-      `SELECT u.id, u.organization_id, u.name, u.email, u.role, u.is_active, o.name as org_name
-     FROM users u
-     JOIN organizations o ON u.organization_id = o.id
-     WHERE u.id = $1`,
-      [authUser.id],
-    );
-
-    if (res.rows.length === 0 || !res.rows[0].is_active) {
-      return c.json({ error: "Usuario no encontrado o inactivo" }, 404);
-    }
-
-    const user = res.rows[0];
-    const freshToken = jwt.sign(
-      {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: normalizeRole(user.role),
-        organizationId: user.organization_id,
-      },
-      JWT_SECRET,
-      { expiresIn: "7d", algorithm: "HS256" },
-    );
-    c.header("X-Renewed-Token", freshToken);
-
-    return c.json({
-      success: true,
-      token: freshToken,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: normalizeRole(user.role),
-        organizationId: user.organization_id,
-        organizationName: user.org_name,
-      },
+    const freshToken = jwt.sign(authUser, JWT_SECRET, {
+      expiresIn: "7d",
+      algorithm: "HS256",
     });
+    c.header("X-Renewed-Token", freshToken);
+    return c.json({ success: true, token: freshToken, user: authUser });
   });
 
   app.post("/api/auth/refresh", async (c) => {

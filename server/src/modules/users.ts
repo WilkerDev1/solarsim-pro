@@ -1,52 +1,67 @@
 import { readObjectBody } from "../request.js";
 import type { Hono } from "hono";
-import type { AuthUser, Dependencies } from "../dependencies.js";
-import type { PoolClient } from "pg";
+import type { Dependencies } from "../dependencies.js";
 import bcrypt from "bcryptjs";
-import { normalizeRole } from "../security.js";
+import { normalizeRole, lockOrganizationAdmin } from "../membership.js";
 const knownRole = (role: unknown) =>
   typeof role === "string" &&
   ["ADMIN", "EDITOR", "LECTOR", "VIEWER"].includes(role.toUpperCase());
-/** Serialize membership changes, then recheck the actor after any queued change. */
-async function lockAdministrator(client: PoolClient, user: AuthUser) {
-  await client.query("SELECT id FROM organizations WHERE id=$1 FOR UPDATE", [
-    user.organizationId,
-  ]);
-  const actor = (
-    await client.query(
-      "SELECT role,is_active FROM users WHERE id=$1 AND organization_id=$2 FOR UPDATE",
-      [user.id, user.organizationId],
-    )
-  ).rows[0];
-  if (!actor?.is_active) return 401;
-  if (normalizeRole(actor.role) !== "ADMIN") return 403;
-  return null;
-}
+const roster = `SELECT u.id,u.name,u.email,u.password_hash,u.organization_id,u.created_at,
+  CASE WHEN u.organization_id=$1 THEN u.role ELSE m.role END AS role,
+  (u.is_active AND COALESCE(m.is_active,TRUE)) AS is_active,
+  (u.organization_id=$1 AND NOT EXISTS(SELECT 1 FROM organization_memberships x WHERE x.user_id=u.id AND x.organization_id<>u.organization_id)) AS can_edit_identity
+  FROM users u LEFT JOIN organization_memberships m ON m.user_id=u.id AND m.organization_id=$1
+  WHERE (u.organization_id=$1 OR m.user_id IS NOT NULL)`;
+const publicMember = (row: any, org: string) => ({
+  id: row.id,
+  name: row.name,
+  email: row.email,
+  role: normalizeRole(row.role),
+  isActive: row.is_active,
+  organizationId: org,
+  createdAt: row.created_at,
+  canEditIdentity: row.can_edit_identity,
+});
 export function registerUsersRoutes(
   app: Hono,
   { pool, authenticate }: Dependencies,
 ): void {
   app.get("/api/users", async (c) => {
-    const user = await authenticate(c);
-    if (!user) return c.json({ error: "No autorizado" }, 401);
-    if (user.role !== "ADMIN")
+    const actor = await authenticate(c);
+    if (!actor) return c.json({ error: "No autorizado" }, 401);
+    if (actor.role !== "ADMIN")
       return c.json({ error: "Solo ADMIN puede consultar los miembros" }, 403);
-    const result = await pool.query(
-      "SELECT id,name,email,role,is_active,created_at FROM users WHERE organization_id=$1 ORDER BY created_at",
-      [user.organizationId],
-    );
-    return c.json({ success: true, users: result.rows });
+    const result = await pool.query(roster + " ORDER BY u.created_at", [
+      actor.organizationId,
+    ]);
+    // Preserve the legacy snake-case fields while exposing contextual membership restrictions.
+    return c.json({
+      success: true,
+      users: result.rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        email: r.email,
+        role: normalizeRole(r.role),
+        is_active: r.is_active,
+        created_at: r.created_at,
+        canEditIdentity: r.can_edit_identity,
+        organizationId: actor.organizationId,
+      })),
+    });
   });
   app.post("/api/users", async (c) => {
-    const user = await authenticate(c);
-    if (!user) return c.json({ error: "No autorizado" }, 401);
-    if (user.role !== "ADMIN")
+    const actor = await authenticate(c);
+    if (!actor) return c.json({ error: "No autorizado" }, 401);
+    if (actor.role !== "ADMIN")
       return c.json({ error: "Solo ADMIN puede crear usuarios" }, 403);
     const { name, email, password, role } = await readObjectBody(c);
     if (
       ![name, email, password].every(
         (v) => typeof v === "string" && v.trim(),
       ) ||
+      name.length > 255 ||
+      email.length > 255 ||
+      !/^\S+@\S+\.\S+$/.test(email.trim()) ||
       password.length < 8 ||
       (role !== undefined && !knownRole(role))
     )
@@ -57,20 +72,32 @@ export function registerUsersRoutes(
         },
         400,
       );
-    const id = `usr-${crypto.randomUUID()}`,
+    const passwordHash = await bcrypt.hash(password, 12),
+      id = "usr-" + crypto.randomUUID(),
       resolvedRole = normalizeRole(role ?? "EDITOR");
+    const client = await pool.connect();
     try {
-      await pool.query(
+      await client.query("BEGIN");
+      const denied = await lockOrganizationAdmin(client, actor);
+      if (denied) {
+        await client.query("ROLLBACK");
+        return c.json(
+          { error: "La cuenta ya no tiene permisos ADMIN" },
+          denied,
+        );
+      }
+      await client.query(
         "INSERT INTO users(id,organization_id,name,email,password_hash,role,is_active) VALUES($1,$2,$3,$4,$5,$6,TRUE)",
         [
           id,
-          user.organizationId,
+          actor.organizationId,
           name.trim(),
           email.trim().toLowerCase(),
-          await bcrypt.hash(password, 12),
+          passwordHash,
           resolvedRole,
         ],
       );
+      await client.query("COMMIT");
       return c.json({
         success: true,
         user: {
@@ -79,30 +106,48 @@ export function registerUsersRoutes(
           email: email.trim().toLowerCase(),
           role: resolvedRole,
           isActive: true,
+          canEditIdentity: true,
         },
       });
     } catch (error: any) {
+      await client.query("ROLLBACK");
       if (error.code === "23505")
-        return c.json({ error: "Correo ya registrado" }, 409);
+        return c.json(
+          {
+            error:
+              "Correo ya registrado. Usa una invitación para incorporar una cuenta existente.",
+          },
+          409,
+        );
       throw error;
+    } finally {
+      client.release();
     }
   });
   app.patch("/api/users/:id", async (c) => {
-    const user = await authenticate(c);
-    if (!user) return c.json({ error: "No autorizado" }, 401);
-    if (user.role !== "ADMIN")
-      return c.json({ error: "Solo ADMIN puede editar usuarios" }, 403);
+    const actor = await authenticate(c);
+    if (!actor) return c.json({ error: "No autorizado" }, 401);
+    if (actor.role !== "ADMIN")
+      return c.json({ error: "Solo ADMIN puede editar miembros" }, 403);
     const body = await readObjectBody(c);
     if (
       (body.role !== undefined && !knownRole(body.role)) ||
       (body.password !== undefined &&
-        (typeof body.password !== "string" || body.password.length < 8))
+        (typeof body.password !== "string" || body.password.length < 8)) ||
+      (body.name !== undefined &&
+        (typeof body.name !== "string" ||
+          !body.name.trim() ||
+          body.name.length > 255)) ||
+      (body.isActive !== undefined && typeof body.isActive !== "boolean")
     )
-      return c.json({ error: "Rol o contraseña inválidos" }, 400);
+      return c.json(
+        { error: "Nombre, rol, estado o contraseña inválidos" },
+        400,
+      );
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      const denied = await lockAdministrator(client, user);
+      const denied = await lockOrganizationAdmin(client, actor);
       if (denied) {
         await client.query("ROLLBACK");
         return c.json(
@@ -110,34 +155,50 @@ export function registerUsersRoutes(
           denied,
         );
       }
+      await client.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [
+        c.req.param("id"),
+      ]);
       const current = (
-        await client.query(
-          "SELECT * FROM users WHERE id=$1 AND organization_id=$2 FOR UPDATE",
-          [c.req.param("id"), user.organizationId],
-        )
+        await client.query(roster + " AND u.id=$2", [
+          actor.organizationId,
+          c.req.param("id"),
+        ])
       ).rows[0];
       if (!current) {
         await client.query("ROLLBACK");
-        return c.json({ error: "Usuario no encontrado" }, 404);
+        return c.json({ error: "Miembro no encontrado" }, 404);
+      }
+      if (
+        !current.can_edit_identity &&
+        (body.password !== undefined ||
+          (body.name !== undefined && body.name.trim() !== current.name))
+      ) {
+        await client.query("ROLLBACK");
+        return c.json(
+          {
+            error:
+              "Esta cuenta pertenece a otras empresas. Aquí solo puedes editar sus permisos y acceso a esta organización.",
+          },
+          403,
+        );
       }
       const nextRole =
           body.role === undefined
             ? normalizeRole(current.role)
             : normalizeRole(body.role),
-        nextActive =
-          typeof body.isActive === "boolean"
-            ? body.isActive
-            : current.is_active;
+        nextActive = body.isActive ?? current.is_active;
       if (
         current.is_active &&
         normalizeRole(current.role) === "ADMIN" &&
         (!nextActive || nextRole !== "ADMIN")
       ) {
-        const others = await client.query(
-          "SELECT id FROM users WHERE organization_id=$1 AND id<>$2 AND is_active=TRUE AND UPPER(TRIM(role))='ADMIN'",
-          [user.organizationId, current.id],
-        );
-        if (!others.rows.length) {
+        const others = (
+          await client.query(roster + " AND u.id<>$2", [
+            actor.organizationId,
+            current.id,
+          ])
+        ).rows.filter((r) => r.is_active && normalizeRole(r.role) === "ADMIN");
+        if (!others.length) {
           await client.query("ROLLBACK");
           return c.json(
             { error: "La organización debe conservar un administrador activo" },
@@ -145,36 +206,47 @@ export function registerUsersRoutes(
           );
         }
       }
-      const passwordHash =
-        body.password === undefined
-          ? current.password_hash
-          : await bcrypt.hash(body.password, 12);
-      const result = await client.query(
-        "UPDATE users SET name=$1,role=$2,is_active=$3,password_hash=$4,updated_at=clock_timestamp() WHERE id=$5 AND organization_id=$6 RETURNING id,name,email,role,is_active,organization_id,created_at",
-        [
-          typeof body.name === "string" && body.name.trim()
-            ? body.name.trim()
-            : current.name,
-          nextRole,
-          nextActive,
-          passwordHash,
-          current.id,
-          user.organizationId,
-        ],
+      if (current.organization_id === actor.organizationId) {
+        await client.query(
+          "UPDATE users SET name=$1,role=$2,is_active=$3,password_hash=$4,auth_version=auth_version+$5,updated_at=clock_timestamp() WHERE id=$6",
+          [
+            current.can_edit_identity && body.name
+              ? body.name.trim()
+              : current.name,
+            nextRole,
+            current.can_edit_identity ? nextActive : true,
+            body.password
+              ? await bcrypt.hash(body.password, 12)
+              : current.password_hash,
+            body.password ? 1 : 0,
+            current.id,
+          ],
+        );
+      }
+      await client.query(
+        "INSERT INTO organization_memberships(organization_id,user_id,role,is_active) VALUES($1,$2,$3,$4) ON CONFLICT(organization_id,user_id) DO UPDATE SET role=EXCLUDED.role,is_active=EXCLUDED.is_active",
+        [actor.organizationId, current.id, nextRole, nextActive],
       );
+      if (!nextActive || nextRole !== normalizeRole(current.role))
+        await client.query(
+          "UPDATE organization_invitations SET revoked_at=clock_timestamp() WHERE organization_id=$1 AND email=$2 AND accepted_at IS NULL AND revoked_at IS NULL",
+          [actor.organizationId, current.email.toLowerCase()],
+        );
       await client.query("COMMIT");
-      const row = result.rows[0];
       return c.json({
         success: true,
-        user: {
-          id: row.id,
-          name: row.name,
-          email: row.email,
-          role: row.role,
-          isActive: row.is_active,
-          organizationId: row.organization_id,
-          createdAt: row.created_at,
-        },
+        user: publicMember(
+          {
+            ...current,
+            name:
+              current.can_edit_identity && body.name
+                ? body.name.trim()
+                : current.name,
+            role: nextRole,
+            is_active: nextActive,
+          },
+          actor.organizationId,
+        ),
       });
     } catch (error) {
       await client.query("ROLLBACK");
@@ -184,16 +256,16 @@ export function registerUsersRoutes(
     }
   });
   app.delete("/api/users/:id", async (c) => {
-    const user = await authenticate(c);
-    if (!user) return c.json({ error: "No autorizado" }, 401);
-    if (user.role !== "ADMIN")
-      return c.json({ error: "Solo ADMIN puede eliminar usuarios" }, 403);
-    if (c.req.param("id") === user.id)
-      return c.json({ error: "No puedes eliminar tu propia cuenta" }, 400);
+    const actor = await authenticate(c);
+    if (!actor) return c.json({ error: "No autorizado" }, 401);
+    if (actor.role !== "ADMIN")
+      return c.json({ error: "Solo ADMIN puede retirar miembros" }, 403);
+    if (c.req.param("id") === actor.id)
+      return c.json({ error: "No puedes retirar tu propio acceso" }, 400);
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      const denied = await lockAdministrator(client, user);
+      const denied = await lockOrganizationAdmin(client, actor);
       if (denied) {
         await client.query("ROLLBACK");
         return c.json(
@@ -201,22 +273,27 @@ export function registerUsersRoutes(
           denied,
         );
       }
+      await client.query("SELECT id FROM users WHERE id=$1 FOR UPDATE", [
+        c.req.param("id"),
+      ]);
       const current = (
-        await client.query(
-          "SELECT id,role,is_active FROM users WHERE id=$1 AND organization_id=$2 FOR UPDATE",
-          [c.req.param("id"), user.organizationId],
-        )
+        await client.query(roster + " AND u.id=$2", [
+          actor.organizationId,
+          c.req.param("id"),
+        ])
       ).rows[0];
       if (!current) {
         await client.query("ROLLBACK");
-        return c.json({ error: "Usuario no encontrado" }, 404);
+        return c.json({ error: "Miembro no encontrado" }, 404);
       }
       if (current.is_active && normalizeRole(current.role) === "ADMIN") {
-        const others = await client.query(
-          "SELECT id FROM users WHERE organization_id=$1 AND id<>$2 AND is_active=TRUE AND UPPER(TRIM(role))='ADMIN'",
-          [user.organizationId, current.id],
-        );
-        if (!others.rows.length) {
+        const others = (
+          await client.query(roster + " AND u.id<>$2", [
+            actor.organizationId,
+            current.id,
+          ])
+        ).rows.filter((r) => r.is_active && normalizeRole(r.role) === "ADMIN");
+        if (!others.length) {
           await client.query("ROLLBACK");
           return c.json(
             { error: "La organización debe conservar un administrador activo" },
@@ -225,9 +302,24 @@ export function registerUsersRoutes(
         }
       }
       await client.query(
-        "DELETE FROM users WHERE id=$1 AND organization_id=$2",
-        [current.id, user.organizationId],
+        "UPDATE organization_invitations SET revoked_at=clock_timestamp() WHERE organization_id=$1 AND email=$2 AND accepted_at IS NULL AND revoked_at IS NULL",
+        [actor.organizationId, current.email.toLowerCase()],
       );
+      if (current.can_edit_identity)
+        await client.query(
+          "UPDATE users SET is_active=FALSE,updated_at=clock_timestamp() WHERE id=$1",
+          [current.id],
+        );
+      else if (current.organization_id === actor.organizationId)
+        await client.query(
+          "INSERT INTO organization_memberships(organization_id,user_id,role,is_active) VALUES($1,$2,$3,FALSE) ON CONFLICT(organization_id,user_id) DO UPDATE SET is_active=FALSE",
+          [actor.organizationId, current.id, normalizeRole(current.role)],
+        );
+      else
+        await client.query(
+          "DELETE FROM organization_memberships WHERE organization_id=$1 AND user_id=$2",
+          [actor.organizationId, current.id],
+        );
       await client.query("COMMIT");
       return c.json({ success: true, deletedId: current.id });
     } catch (error) {

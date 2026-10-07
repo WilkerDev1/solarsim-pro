@@ -39,19 +39,20 @@ const pull = await SyncService.pullProjects(api, a.token); canonical = pull.proj
 assert.equal(canonical.specs.panelCount, 44);
 useSimulationStore.setState({ syncSettings: {serverUrl:api,authToken:a.token,currentUser:a.user,autoSyncEnabled:false,lastSyncTimestamp:null} });
 const startPolicy = await fetch(api+'/api/organization/features',{headers:{Authorization:'Bearer '+a.token}}).then(r=>r.json());
-if(startPolicy.settings.selfConsumptionProjection) { const reset=await fetch(api+'/api/organization/features',{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+a.token},body:JSON.stringify({baseVersion:startPolicy.version,settings:{selfConsumptionProjection:false}})}); assert.equal(reset.status,200); }
+if(startPolicy.settings.selfConsumptionProjection) { const reset=await fetch(api+'/api/organization/features',{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+a.token},body:JSON.stringify({baseVersion:startPolicy.version,settings:{selfConsumptionProjection:false}})}); assert.equal(reset.status,200); await reset.text(); }
 const shared = await ShareProposalService.shareProposal(canonical, calculateProjectFinancialSummary(canonical, 'legacy'), 7, worker);
 assert.equal(shared.success, true, shared.error); assert.ok(shared.shareUrl);
 const html = await fetch(shared.shareUrl!); assert.equal(html.status, 200); assert.match(await html.text(), /QA integrada/);
-const unauthorizedShare = await fetch(worker+'/api/share',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+viewer.token},body:'{}'}); assert.equal(unauthorizedShare.status,403);
+const unauthorizedShare = await fetch(worker+'/api/share',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+viewer.token},body:'{}'}); assert.equal(unauthorizedShare.status,403); await unauthorizedShare.text();
 const initialPublication = await fetch(worker+'/api/share/'+shared.shareUrl!.split('/').at(-1)).then(r=>r.json());
 assert.equal(initialPublication.calculationSnapshot.mode,'legacy');
 const policy = await fetch(api+'/api/organization/features',{headers:{Authorization:'Bearer '+a.token}}).then(response => response.json());
 const changedPolicy = await fetch(api+'/api/organization/features',{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+a.token},body:JSON.stringify({baseVersion:policy.version,settings:{selfConsumptionProjection:true}})});
 assert.equal(changedPolicy.status,200);
+await changedPolicy.text();
 const physical = await ShareProposalService.shareProposal(canonical, calculateProjectFinancialSummary(canonical,'self_consumption'), 7, worker);
 assert.equal(physical.success,true,physical.error);
-assert.equal((await fetch(physical.shareUrl!)).status,200);
+const physicalHtml = await fetch(physical.shareUrl!); assert.equal(physicalHtml.status,200); await physicalHtml.text();
 const physicalPublication = await fetch(worker+'/api/share/'+physical.shareUrl!.split('/').at(-1)).then(r=>r.json());
 assert.equal(physicalPublication.calculationSnapshot.mode,'self_consumption');
 // Put the disposable document in trash through CAS, then restore it.
@@ -59,3 +60,5 @@ const trash = await SyncService.pushProjects(api,a.token,[{...canonical,isDelete
 assert.equal(await SyncService.restoreProject(api,a.token,canonical.id,trashed.version),true);
 const restored=(await SyncService.pullProjects(api,a.token)).projects!.find(project=>project.id===canonical.id)!; assert.equal(restored.isDeleted,false); assert.ok(restored.version!>trashed.version);
 console.log('PASS: HTTP real cliente/API/Worker local+KV aislado; ADMIN/EDITOR CAS, VIEWER, cliente legacy, publicaciones legacy/físico, política, papelera/restauración.');
+// This opt-in CLI has finished all assertions and writes. Close undici's idle sockets promptly.
+process.exit(0);

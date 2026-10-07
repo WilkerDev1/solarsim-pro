@@ -288,66 +288,102 @@ export function renderProposalPage(stored: StoredProposal): string {
     : `${rawBatteryDesc} (${batteryCapacityKWh} kWh)`;
 
   const multiPanelsDesc = rawPanels.length > 1
-    ? rawPanels.map((p: any) => `${p.count} Módulos ${(p.brandModel || `${p.powerW}W`).replace(/^m[oó]dulos?\s+/i, '').trim()}`).join(' y ')
-    : `${panelCount} Módulos ${cleanPanelModel}`;
+    ? rawPanels.map((p: any) => {
+        const rawBrand = (p.brandModel || `${p.powerW}W`).replace(/^m[oó]dulos?\s+/i, '').trim();
+        const cleanBrand = (rawBrand.toLowerCase().includes('w') || (p.powerW || 0) <= 0)
+          ? rawBrand
+          : `${rawBrand} (${p.powerW}W)`;
+        return `${p.count} ${p.count === 1 ? 'Módulo' : 'Módulos'} ${cleanBrand}`;
+      }).join(' y ')
+    : `${panelCount} ${panelCount === 1 ? 'Módulo' : 'Módulos'} ${cleanPanelModel}`;
 
   const multiInvertersDesc = rawInverters.length > 1
-    ? rawInverters.map((inv: any) => `${inv.count} ${inv.count === 1 ? 'Inversor' : 'Inversores'} ${(inv.brandModel || `${inv.powerKW} kW`).replace(/^inversor(?:es)?\s+/i, '').trim()}`).join(' y ')
-    : `${inverterCount} Inversor${inverterCount > 1 ? 'es' : ''} ${cleanInverterModel}`;
+    ? rawInverters.map((inv: any) => {
+        const rawBrand = (inv.brandModel || `${inv.powerKW} kW`).replace(/^inversor(?:es)?\s+/i, '').trim();
+        const cleanBrand = (rawBrand.toLowerCase().includes('kw') || (inv.powerKW || 0) <= 0)
+          ? rawBrand
+          : `${rawBrand} (${inv.powerKW} kW)`;
+        return `${inv.count} ${inv.count === 1 ? 'Inversor' : 'Inversores'} ${cleanBrand}`;
+      }).join(' y ')
+    : `${inverterCount} ${inverterCount === 1 ? 'Inversor' : 'Inversores'} ${cleanInverterModel}`;
 
   const multiBatteriesDesc = rawBatteries.length > 1
-    ? rawBatteries.map((b: any) => `${b.count} ${b.count === 1 ? 'Batería' : 'Baterías'} ${(b.brandModel || `${b.capacityKWh} kWh`).replace(/^bater[íi]as?\s+/i, '').trim()}`).join(' y ')
-    : `${batteryCount} Batería${batteryCount > 1 ? 's' : ''} ${cleanBatteryModel}`;
+    ? rawBatteries.map((b: any) => {
+        const rawBrand = (b.brandModel || `${b.capacityKWh} kWh`).replace(/^bater[íi]as?\s+/i, '').trim();
+        const cleanBrand = (rawBrand.toLowerCase().includes('kwh') || (b.capacityKWh || 0) <= 0)
+          ? rawBrand
+          : `${rawBrand} (${b.capacityKWh} kWh)`;
+        return `${b.count} ${b.count === 1 ? 'Batería' : 'Baterías'} ${cleanBrand}`;
+      }).join(' y ')
+    : `${batteryCount} ${batteryCount === 1 ? 'Batería' : 'Baterías'} ${cleanBatteryModel}`;
+
+  const rawEngineeringScope = custom.projectEngineeringScopeText?.trim() || specs.installationServicesDesc?.trim() || 'junto con todos los componentes de ingeniería complementarios (estructuras de montaje en aluminio anodizado de alta resistencia, cableado fotovoltaico resistente a rayos UV, protecciones en CC/CA, interruptores de desconexión y supresores de sobretensión) para garantizar un funcionamiento seguro, eficiente y duradero del sistema.';
+  const engineeringScopeText = rawEngineeringScope.replace(/\.+$/, '');
+
+  const equipmentSummary = [
+    multiInvertersDesc,
+    hasBattery && totalBESSKWh > 0 ? multiBatteriesDesc : null,
+  ].filter(Boolean).join(' y ');
 
   const defaultP1 = `El consumo promedio anual de **${clientName}** es de **${annualConsumptionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh** (aprox. ${monthlyAvgConsumption.toLocaleString()} kWh/mes), por lo que se le propone la instalación de **${multiPanelsDesc}**, alcanzando una potencia DC instalada de **${systemCapacityKWp} kWp**. La producción energética estimada para este sistema es de **${annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh anuales**, representando el **${coveragePct.toFixed(1)}%** de cobertura del consumo total.`;
 
-  const defaultP2 = `Adicionalmente, se contempla la instalación de **${multiInvertersDesc}**${hasBattery && totalBESSKWh > 0 ? ` y **${multiBatteriesDesc}**` : ''}, ${custom.projectEngineeringScopeText || specs.installationServicesDesc || 'junto con todos los componentes de ingeniería complementarios (estructuras de montaje en aluminio anodizado de alta resistencia, cableado fotovoltaico resistente a rayos UV, protecciones en CC/CA, interruptores de desconexión y supresores de sobretensión) para garantizar un funcionamiento seguro, eficiente y duradero del sistema.'}.`;
+  const defaultP2 = `Adicionalmente, se contempla la instalación de **${equipmentSummary}** ${engineeringScopeText}.`;
 
   const resolvedP1 = (() => {
-    let text = custom.customProjectSummaryParagraph1 && custom.customProjectSummaryParagraph1.trim()
-      ? custom.customProjectSummaryParagraph1.trim()
-      : defaultP1;
+    if (!custom.customProjectSummaryParagraph1 || !custom.customProjectSummaryParagraph1.trim()) {
+      return defaultP1;
+    }
+    let text = custom.customProjectSummaryParagraph1.trim();
     text = text
       .replace(/{clientName}/gi, clientName)
       .replace(/{panelCount}/gi, String(panelCount))
-      .replace(/{panelModel}/gi, `Módulos ${cleanPanelModel}`)
+      .replace(/{panelModel}/gi, multiPanelsDesc)
       .replace(/{systemCapacityKWp}/gi, `${systemCapacityKWp} kWp`)
       .replace(/{annualProductionKWh}/gi, `${annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh`)
       .replace(/{annualConsumptionKWh}/gi, `${annualConsumptionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh`)
       .replace(/{energyCoveragePct}/gi, `${coveragePct.toFixed(1)}%`);
-    text = text.replace(/(\*\*?\s*)\d+\s+Módulos[^*]*?(\s*\*?\*?)/i, `$1${panelCount} Módulos ${cleanPanelModel}$2`);
-    text = text.replace(/(potencia\s+DC\s+instalada\s+de\s+\*\*?)\d+(?:\.\d+)?\s*kWp(\*\*?)/i, `$1${systemCapacityKWp} kWp$2`);
-    text = text.replace(/(producción\s+energética\s+estimada\s+para\s+este\s+sistema\s+es\s+de\s+\*\*?)[\d,.]+\s*kWh\s+anuales(\*\*?)/i, `$1${annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh anuales$2`);
-    text = text.replace(/(representando\s+el\s+\*\*?)[\d,.]+%\s*(\*\*?\s*del\s+consumo|\*\*?\s*de\s+cobertura)/i, `$1${coveragePct.toFixed(1)}%$2`);
+
+    // El nombre del cliente y el consumo también están en negrita: exigir la
+    // etiqueta de módulos antes de actualizar un bloque de equipamiento.
+    text = text.replace(/\*\*\s*\d+\s+M[oó]dulos?\s+[^*]+\*\*/i, () => `**${multiPanelsDesc}**`);
+    text = text.replace(/(potencia\s+DC\s+instalada\s+de\s+\*\*?)[^*]+?(\*\*?)/i, `$1${systemCapacityKWp} kWp$2`);
+    text = text.replace(/(producción\s+energética\s+estimada\s+para\s+este\s+sistema\s+es\s+de\s+\*\*?)[^*]+?(\*\*?)/i, `$1${annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh anuales$2`);
+    text = text.replace(/(representando\s+el\s+\*\*?)[^*]+?(\*\*?\s*del\s+consumo|\*\*?\s*de\s+cobertura)/i, `$1${coveragePct.toFixed(1)}%$2`);
+
+    // Desduplicar repeticiones accidentales previas
     text = text.replace(/M[oó]dulos?\s+M[oó]dulos?/gi, 'Módulos');
-    text = text.replace(/(\(\d+W\))\s+\1/gi, '$1');
+    text = text.replace(/(\b[A-Za-z0-9\-_\/\.\s]+\(\d+(?:\.\d+)?\s*k?W(?:h)?\))\s+\1/gi, '$1');
+    text = text.replace(/(JA Solar[^(]+?\(\d+W\))\s+\1/gi, '$1');
     text = text.replace(/(Canadian Solar[^(]+?\(\d+W\))\s+\1/gi, '$1');
     return text;
   })();
 
   const resolvedP2 = (() => {
-    let text = custom.customProjectSummaryParagraph2 && custom.customProjectSummaryParagraph2.trim()
-      ? custom.customProjectSummaryParagraph2.trim()
-      : defaultP2;
+    if (!custom.customProjectSummaryParagraph2 || !custom.customProjectSummaryParagraph2.trim()) {
+      return defaultP2;
+    }
+    let text = custom.customProjectSummaryParagraph2.trim();
     text = text
       .replace(/{inverterCount}/gi, String(inverterCount))
-      .replace(/{inverterModel}/gi, `Inversor${inverterCount > 1 ? 'es' : ''} ${cleanInverterModel}`)
+      .replace(/{inverterModel}/gi, multiInvertersDesc)
       .replace(/{batteryCount}/gi, String(batteryCount))
-      .replace(/{batteryModel}/gi, `Batería${batteryCount > 1 ? 's' : ''} ${cleanBatteryModel}`);
-    text = text.replace(/(instalación\s+de\s+\*\*?)\d+\s+Inversor[^*]*?(\*\*?)/i, `$1${inverterCount} Inversor${inverterCount > 1 ? 'es' : ''} ${cleanInverterModel}$2`);
-    if (hasBattery && batteryCapacityKWh > 0 && /Batería/i.test(text)) {
-      text = text.replace(/(y\s+\*\*?)\d+\s+Batería[^*]*?(\*\*?)/i, `$1${batteryCount} Batería${batteryCount > 1 ? 's' : ''} ${cleanBatteryModel}$2`);
+      .replace(/{batteryModel}/gi, multiBatteriesDesc);
+
+    // Si el texto incluye inversor y batería en el mismo bloque de negritas:
+    if (/instalación\s+de\s+\*\*?[^*]*?bater[íi]a/i.test(text)) {
+      text = text.replace(/(instalación\s+de\s+\*\*?)[^*]+(\*\*?)/i, `$1${equipmentSummary}$2`);
+    } else {
+      text = text.replace(/(instalación\s+de\s+\*\*?)[^*]+(\*\*?)/i, `$1${multiInvertersDesc}$2`);
+      if (hasBattery && totalBESSKWh > 0 && /Bater[íi]a/i.test(text)) {
+        text = text.replace(/(y\s+\*\*?)[^*]+(\*\*?)/i, `$1${multiBatteriesDesc}$2`);
+      }
     }
+
     text = text.replace(/Inversor(?:es)?\s+Inversor(?:es)?/gi, inverterCount > 1 ? 'Inversores' : 'Inversor');
     text = text.replace(/Bater[íi]as?\s+Bater[íi]as?/gi, batteryCount > 1 ? 'Baterías' : 'Batería');
-    text = text.replace(/(\(\d+(?:\.\d+)?\s*k?W\))\s+\1/gi, '$1');
-    text = text.replace(/(\(\d+(?:\.\d+)?\s*kWh\))\s+\1/gi, '$1');
+    text = text.replace(/(\b[A-Za-z0-9\-_\/\.\s]+\(\d+(?:\.\d+)?\s*k?W(?:h)?\))\s+\1/gi, '$1');
     return text;
   })();
-
-  const engineeringScopeText = custom.projectEngineeringScopeText !== undefined && custom.projectEngineeringScopeText.trim() !== ''
-    ? custom.projectEngineeringScopeText.trim()
-    : (specs.installationServicesDesc || 'junto con todos los componentes de ingeniería complementarios (estructuras de montaje en aluminio anodizado de alta resistencia, cableado fotovoltaico resistente a rayos UV, protecciones en CC/CA, interruptores de desconexión y supresores de sobretensión) para garantizar un funcionamiento seguro, eficiente y duradero del sistema.');
 
   const customRegNote = custom.regulatoryNote;
   const regParagraphs: string[] = (customRegNote && customRegNote.trim() !== '')

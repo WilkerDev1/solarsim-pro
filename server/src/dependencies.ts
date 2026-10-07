@@ -7,6 +7,7 @@ export interface AuthUser {
   role: "ADMIN" | "EDITOR" | "LECTOR";
   organizationId: string;
   organizationName?: string;
+  authVersion?: number;
 }
 export interface Dependencies {
   pool: Pool;

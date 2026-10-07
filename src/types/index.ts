@@ -389,6 +389,7 @@ export interface UserProfile {
   organizationId: string;
   organizationName?: string;
   isActive?: boolean;
+  canEditIdentity?: boolean;
 }
 
 export interface SyncSettings {

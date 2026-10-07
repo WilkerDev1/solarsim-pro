@@ -1,686 +1,533 @@
-import React, { useState, useEffect } from 'react';
-import { useSimulationStore } from '../../../store/useSimulationStore';
-import { SyncService } from '../../../services/syncService';
-import { UserProfile, UserRole } from '../../../types';
+import { useEffect, useRef, useState } from "react";
+import { useSimulationStore } from "../../../store/useSimulationStore";
+import { SyncService } from "../../../services/syncService";
 import {
-  Building2,
-  Users,
-  Shield,
-  UserPlus,
-  RefreshCw,
-  CheckCircle2,
-  AlertCircle,
-  X,
-  Lock,
-  Mail,
-  User as UserIcon,
-  Pencil,
-  Trash2,
-  Eye,
-  EyeOff,
-  AlertTriangle,
-} from 'lucide-react';
+  CompanyService,
+  OrganizationInvitation,
+} from "../../../services/companyService";
+import type { UserProfile, UserRole } from "../../../types";
+import "../../../components/companies/company-center.css";
+import { draftOwnerKey } from "../../../utils/draftOwnerKey";
 
-export const OrganizationSection: React.FC = () => {
-  const { syncSettings } = useSimulationStore();
-  const currentUser = syncSettings.currentUser;
-  const isAdmin = currentUser?.role === 'ADMIN';
-
-  // Member list state
-  const [companyUsers, setCompanyUsers] = useState<UserProfile[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-  const [userActionMsg, setUserActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  // Invite Member Modal State
-  const [showAddUserModal, setShowAddUserModal] = useState(false);
-  const [newUserName, setNewUserName] = useState('');
-  const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserPassword, setNewUserPassword] = useState('');
-  const [newUserRole, setNewUserRole] = useState<UserRole>('EDITOR');
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [creatingUser, setCreatingUser] = useState(false);
-
-  // Edit Member Modal State
-  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editRole, setEditRole] = useState<UserRole>('EDITOR');
-  const [editIsActive, setEditIsActive] = useState(true);
-  const [editPassword, setEditPassword] = useState('');
-  const [showEditPassword, setShowEditPassword] = useState(false);
-  const [savingEdit, setSavingEdit] = useState(false);
-
-  // Delete Member Modal State
-  const [deletingUser, setDeletingUser] = useState<UserProfile | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const loadUsers = async () => {
-    if (!syncSettings.authToken) return;
-    setLoadingUsers(true);
-    const res = await SyncService.getCompanyUsers(syncSettings.serverUrl, syncSettings.authToken);
-    setLoadingUsers(false);
-    if (res.success) {
-      setCompanyUsers(res.users);
+export function OrganizationSection() {
+  const { syncSettings, workspaceScope, sessionGeneration, sidebarTheme } =
+    useSimulationStore();
+  const ownerKey = draftOwnerKey(workspaceScope, syncSettings, true);
+  const mounted = useRef(true);
+  const loadRequest = useRef(0);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; loadRequest.current++; }; }, []);
+  const [members, setMembers] = useState<UserProfile[]>([]);
+  const [invitations, setInvitations] = useState<OrganizationInvitation[]>([]);
+  const [inviteState, setInviteState] = useState<"loading" | "ready" | "error">(
+    "loading",
+  );
+  const [inviteError, setInviteError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [invitationCode, setInvitationCode] = useState("");
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<UserRole>("EDITOR");
+  const [editing, setEditing] = useState<UserProfile | null>(null);
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [active, setActive] = useState(true);
+  const [mode, setMode] = useState<"none" | "invite" | "create" | "edit">(
+    "none",
+  );
+  const user = syncSettings.currentUser;
+  const isCurrent = (generation = sessionGeneration) =>
+    mounted.current && useSimulationStore.getState().sessionGeneration === generation;
+  const load = async () => {
+    if (!syncSettings.authToken || user?.role !== "ADMIN") return;
+    const request = ++loadRequest.current;
+    setInviteState("loading");
+    setInvitations([]);
+    setInviteError("");
+    setError("");
+    const [users, invites] = await Promise.all([
+      SyncService.getCompanyUsers(
+        syncSettings.serverUrl,
+        syncSettings.authToken,
+      ),
+      CompanyService.invitations(
+        syncSettings.serverUrl,
+        syncSettings.authToken,
+      ),
+    ]);
+    if (!isCurrent() || request !== loadRequest.current) return;
+    if (users.success) {
+      setMembers(users.users);
+      setError("");
     } else {
-      setUserActionMsg({ type: 'error', text: res.error || 'Error al obtener usuarios del servidor' });
+      setMembers([]);
+      setError(users.error || "No se pudo consultar el equipo.");
+    }
+    if (invites.success) {
+      setInvitations(invites.invitations || []);
+      setInviteState("ready");
+    } else {
+      setInviteState("error");
+      setInviteError(
+        invites.error || "No se pudieron consultar las invitaciones.",
+      );
     }
   };
-
   useEffect(() => {
-    if (syncSettings.authToken && isAdmin) {
-      loadUsers();
+    setMembers([]);
+    setInvitations([]);
+    setEditing(null);
+    setName("");
+    setEmail("");
+    setRole("EDITOR");
+    setActive(true);
+    setPassword("");
+    setMode("none");
+    setInvitationCode("");
+    setMessage("");
+    setError("");
+    setBusy(false);
+  }, [ownerKey]);
+  useEffect(() => {
+    if (!syncSettings.authToken) {
+      setPassword("");
+      setInvitationCode("");
+      setMembers([]);
+      setInvitations([]);
     }
-  }, [syncSettings.authToken, isAdmin]);
-
-  const handleCreateUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newUserName.trim() || !newUserEmail.trim() || !newUserPassword.trim()) {
-      setUserActionMsg({ type: 'error', text: 'Todos los campos son obligatorios' });
-      return;
-    }
-    setCreatingUser(true);
-    const res = await SyncService.createCompanyUser(syncSettings.serverUrl, syncSettings.authToken!, {
-      name: newUserName.trim(),
-      email: newUserEmail.trim().toLowerCase(),
-      password: newUserPassword.trim(),
-      role: newUserRole,
-    });
-    setCreatingUser(false);
-    if (res.success) {
-      setUserActionMsg({ type: 'success', text: `¡Usuario ${newUserName} creado con éxito!` });
-      setShowAddUserModal(false);
-      setNewUserName('');
-      setNewUserEmail('');
-      setNewUserPassword('');
-      loadUsers();
-      setTimeout(() => setUserActionMsg(null), 3500);
+    void load();
+  }, [sessionGeneration, syncSettings.authToken, ownerKey]);
+  useEffect(() => { setBusy(false); }, [sessionGeneration]);
+  const resetForm = () => {
+    setEditing(null);
+    setName("");
+    setEmail("");
+    setPassword("");
+    setRole("EDITOR");
+    setActive(true);
+    setMode("none");
+  };
+  const run = async (
+    operation: () => Promise<{ success: boolean; error?: string }>,
+    success: string,
+  ) => {
+    loadRequest.current++;
+    setBusy(true);
+    setMessage("");
+    setError("");
+    const result = await operation();
+    if (!isCurrent()) return;
+    setBusy(false);
+    if (result.success) {
+      setMessage(success);
+      setError("");
+      resetForm();
+      await load();
     } else {
-      setUserActionMsg({ type: 'error', text: res.error || 'Error al crear usuario' });
+      setError(result.error || "No se pudo completar la operación.");
+      setMessage("");
     }
   };
-
-  const openEditModal = (user: UserProfile) => {
-    setEditingUser(user);
-    setEditName(user.name);
-    setEditRole(user.role === 'VIEWER' ? 'LECTOR' : user.role);
-    setEditIsActive(user.isActive !== false);
-    setEditPassword('');
-    setShowEditPassword(false);
-  };
-
-  const handleSaveEditUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingUser) return;
-    if (!editName.trim()) {
-      setUserActionMsg({ type: 'error', text: 'El nombre no puede estar vacío' });
-      return;
-    }
-
-    setSavingEdit(true);
-    const payload: { name?: string; role?: UserRole; isActive?: boolean; password?: string } = {
-      name: editName.trim(),
-      role: editRole,
-      isActive: editIsActive,
-    };
-    if (editPassword.trim()) {
-      if (editPassword.trim().length < 6) {
-        setSavingEdit(false);
-        setUserActionMsg({ type: 'error', text: 'La contraseña debe tener al menos 6 caracteres' });
-        return;
-      }
-      payload.password = editPassword.trim();
-    }
-
-    const res = await SyncService.updateCompanyUser(
-      syncSettings.serverUrl,
-      syncSettings.authToken!,
-      editingUser.id,
-      payload
-    );
-    setSavingEdit(false);
-
-    if (res.success) {
-      setUserActionMsg({
-        type: 'success',
-        text: `Información de ${editName} actualizada correctamente.`,
-      });
-      setEditingUser(null);
-      loadUsers();
-      setTimeout(() => setUserActionMsg(null), 3500);
-    } else {
-      setUserActionMsg({ type: 'error', text: res.error || 'Error al actualizar usuario' });
-    }
-  };
-
-  const handleDeleteUser = async () => {
-    if (!deletingUser) return;
-    setIsDeleting(true);
-    const res = await SyncService.deleteCompanyUser(
-      syncSettings.serverUrl,
-      syncSettings.authToken!,
-      deletingUser.id
-    );
-    setIsDeleting(false);
-
-    if (res.success) {
-      setUserActionMsg({
-        type: 'success',
-        text: `La cuenta de ${deletingUser.name} ha sido eliminada correctamente.`,
-      });
-      setDeletingUser(null);
-      loadUsers();
-      setTimeout(() => setUserActionMsg(null), 3500);
-    } else {
-      setUserActionMsg({ type: 'error', text: res.error || 'Error al eliminar usuario' });
-    }
-  };
-
-  const handleToggleUserActive = async (user: UserProfile) => {
-    const res = await SyncService.updateCompanyUser(syncSettings.serverUrl, syncSettings.authToken!, user.id, {
-      isActive: !user.isActive,
-    });
-    if (res.success) {
-      setUserActionMsg({
-        type: 'success',
-        text: `Usuario ${user.name} ${!user.isActive ? 'activado' : 'desactivado'} correctamente.`,
-      });
-      loadUsers();
-      setTimeout(() => setUserActionMsg(null), 3000);
-    } else {
-      setUserActionMsg({ type: 'error', text: res.error || 'Error al actualizar usuario' });
-    }
-  };
-
-  return (
-    <section id="sec-organizacion" className="flex flex-col gap-6 scroll-mt-6">
-      <div>
-        <h3 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Organización & Equipo</h3>
-        <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-          Gestión de roles de acceso (RBAC), miembros colaboradores y seguridad de la empresa.
+  if (!user || !syncSettings.authToken)
+    return (
+      <div className="company-center" data-theme={sidebarTheme}>
+        <h3>Equipo de {user?.organizationName || "tu organización"}</h3>
+        <p>
+          Inicia sesión con una cuenta de Administrador para consultar y gestionar el equipo de tu organización.
         </p>
+        <button
+          className="cc-primary"
+          onClick={() => useSimulationStore.getState().openSettingsModal("account")}
+        >
+          Ir a Cuenta y perfiles
+        </button>
       </div>
-
-      <div className="bg-white dark:bg-[#18181b] border border-slate-200/80 dark:border-[#27272a] rounded-2xl p-6 shadow-xs flex flex-col gap-6">
-        {/* Identidad de la Empresa */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-slate-100 dark:border-[#27272a]">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 flex items-center justify-center shadow-2xs font-bold text-lg">
-              <Building2 className="w-6 h-6" />
-            </div>
-            <div>
-              <h4 className="text-base font-bold text-slate-900 dark:text-white">
-                {currentUser?.organizationName || 'Electsun Dominicana'}
-              </h4>
-              <p className="text-xs text-slate-500 dark:text-zinc-400">
-                Plan Empresarial Multi-Usuario • Licencia Activa
-              </p>
-            </div>
-          </div>
-          {isAdmin && (
+    );
+  if (user.role !== "ADMIN")
+    return (
+      <>
+        <h3>Equipo de {user.organizationName || "tu organización"}</h3>
+        <p>
+          Tu rol es {user.role}. Un administrador gestiona miembros e
+          invitaciones.
+        </p>
+      </>
+    );
+  const token = syncSettings.authToken!;
+  const roles = (
+    <>
+      <option value="ADMIN">Administrador</option>
+      <option value="EDITOR">Editor</option>
+      <option value="LECTOR">Lector</option>
+    </>
+  );
+  return (
+    <div
+      className="company-center"
+      data-theme={sidebarTheme}
+      style={{
+        height: "auto",
+        overflow: "visible",
+        background: "transparent",
+        display: "block",
+      }}
+    >
+      <div className="cc-inline" style={{ justifyContent: "space-between" }}>
+        <h3>Equipo de {user.organizationName || "tu organización"}</h3>
+        <div className="cc-inline">
+          <button
+            disabled={busy}
+            onClick={() => {
+              resetForm();
+              setMode("invite");
+            }}
+          >
+            Invitar cuenta existente
+          </button>
+          <button
+            disabled={busy}
+            onClick={() => {
+              resetForm();
+              setMode("create");
+            }}
+          >
+            Crear cuenta
+          </button>
+          <button disabled={busy} onClick={() => void load()}>
+            Actualizar
+          </button>
+        </div>
+      </div>
+      <p>
+        Administradores gestionan la empresa y el equipo. Editores crean y
+        sincronizan propuestas. Lectores consultan los datos.
+      </p>
+      {message && (
+        <div className="cc-notice" role="status">
+          {message}
+        </div>
+      )}
+      {error && (
+        <div className="cc-notice cc-error" role="alert" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>{error}</span>
+          {/no autorizad/i.test(error) && (
             <button
-              onClick={() => setShowAddUserModal(true)}
-              className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+              style={{ padding: "4px 10px", minHeight: "auto", fontSize: 13 }}
+              onClick={() => useSimulationStore.getState().openSettingsModal("sync")}
             >
-              <UserPlus className="w-3.5 h-3.5" />
-              <span>Invitar Miembro</span>
+              Iniciar sesión
             </button>
           )}
         </div>
-
-        {userActionMsg && (
-          <div
-            className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
-              userActionMsg.type === 'success'
-                ? 'bg-emerald-50 border border-emerald-200 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800'
-                : 'bg-rose-50 border border-rose-200 text-rose-700 dark:bg-rose-950/40 dark:border-rose-800'
-            }`}
+      )}
+      {invitationCode && (
+        <div className="cc-notice">
+          <strong>Invitación creada</strong>
+          <p>
+            No se envió un correo. Comparte este código con la persona invitada;
+            vence en siete días.
+          </p>
+          <div className="cc-code">{invitationCode}</div>
+          <button
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(invitationCode);
+                setMessage("Código copiado.");
+              } catch {
+                setMessage("Selecciona el código y cópialo manualmente.");
+              }
+            }}
           >
-            {userActionMsg.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
-            <span className="font-medium">{userActionMsg.text}</span>
-          </div>
-        )}
-
-        {/* Tabla de Usuarios */}
-        {isAdmin ? (
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-slate-500 dark:text-zinc-400" />
-                <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">
-                  Miembros de la Organización ({companyUsers.length})
-                </span>
-              </div>
-              <button
-                onClick={loadUsers}
-                disabled={loadingUsers}
-                className="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
+            Copiar código
+          </button>
+          <button onClick={() => setInvitationCode("")}>Ocultar código</button>
+        </div>
+      )}
+      {mode !== "none" && (
+        <form
+          className="cc-member-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (mode === "invite")
+              void run(async () => {
+                const result = await CompanyService.invite(
+                  syncSettings.serverUrl,
+                  token,
+                  email.trim(),
+                  role,
+                );
+                if (isCurrent() && result.code) setInvitationCode(result.code);
+                return result;
+              }, "Invitación preparada.");
+            if (mode === "create")
+              void run(
+                () =>
+                  SyncService.createCompanyUser(syncSettings.serverUrl, token, {
+                    name: name.trim(),
+                    email: email.trim(),
+                    password,
+                    role,
+                  }),
+                "Cuenta creada.",
+              );
+            if (mode === "edit" && editing)
+              void run(
+                () =>
+                  SyncService.updateCompanyUser(
+                    syncSettings.serverUrl,
+                    token,
+                    editing.id,
+                    {
+                      role,
+                      isActive: active,
+                      ...(editing.canEditIdentity !== false
+                        ? {
+                            name: name.trim(),
+                            ...(password ? { password } : {}),
+                          }
+                        : {}),
+                    },
+                  ),
+                "Permisos guardados.",
+              );
+          }}
+        >
+          <h3>
+            {mode === "invite"
+              ? "Invitar a una persona con cuenta"
+              : mode === "create"
+                ? "Crear una cuenta del equipo"
+                : "Editar acceso al equipo"}
+          </h3>
+          {mode === "edit" && editing?.canEditIdentity === false && (
+            <p>
+              Esta cuenta pertenece a otras empresas. Aquí se modifica
+              únicamente su acceso a esta organización.
+            </p>
+          )}
+          <div className="company-fields">
+            {mode !== "invite" && (
+              <label>
+                Nombre
+                <input
+                  required
+                  maxLength={255}
+                  value={name}
+                  readOnly={
+                    mode === "edit" && editing?.canEditIdentity === false
+                  }
+                  onChange={(event) => setName(event.target.value)}
+                />
+              </label>
+            )}
+            {mode !== "edit" && (
+              <label>
+                Correo
+                <input
+                  type="email"
+                  required
+                  maxLength={255}
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                />
+              </label>
+            )}
+            <label>
+              Rol
+              <select
+                value={role === "VIEWER" ? "LECTOR" : role}
+                onChange={(event) => setRole(event.target.value as UserRole)}
               >
-                <RefreshCw className={`w-3 h-3 ${loadingUsers ? 'animate-spin' : ''}`} />
-                <span>Actualizar Lista</span>
-              </button>
-            </div>
-
-            {loadingUsers && companyUsers.length === 0 ? (
-              <div className="py-12 text-center text-xs text-slate-400 dark:text-zinc-500 flex flex-col items-center gap-2">
-                <RefreshCw className="w-5 h-5 animate-spin text-emerald-500" />
-                <span>Cargando miembros del equipo...</span>
-              </div>
-            ) : companyUsers.length === 0 ? (
-              <div className="py-10 text-center text-xs text-slate-400 dark:text-zinc-500 flex flex-col items-center gap-3">
-                <Users className="w-8 h-8 text-slate-300 dark:text-zinc-600 stroke-[1.5]" />
-                <p>No se encontraron otros miembros registrados en esta organización.</p>
-                <button
-                  onClick={loadUsers}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-[#27272a] text-xs font-medium hover:bg-slate-50 dark:hover:bg-[#222226] text-slate-700 dark:text-zinc-300 cursor-pointer"
-                >
-                  Reintentar Carga
-                </button>
-              </div>
-            ) : (
-              <div className="overflow-x-auto rounded-xl border border-slate-200/80 dark:border-[#27272a]">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 dark:bg-[#222226] text-slate-600 dark:text-zinc-400 font-semibold border-b border-slate-200/80 dark:border-[#27272a]">
-                    <tr>
-                      <th className="px-4 py-3">Nombre</th>
-                      <th className="px-4 py-3">Email</th>
-                      <th className="px-4 py-3">Rol (Permisos RBAC)</th>
-                      <th className="px-4 py-3">Estado</th>
-                      <th className="px-4 py-3 text-right">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-[#27272a]">
-                    {companyUsers.map((u) => {
-                      const isSelf = u.id === currentUser?.id;
-                      const displayRole = u.role === 'VIEWER' ? 'LECTOR' : u.role;
-                      return (
-                        <tr key={u.id} className="hover:bg-slate-50/50 dark:hover:bg-[#222226]/50 transition-colors">
-                          <td className="px-4 py-3 font-semibold text-slate-800 dark:text-zinc-200">
-                            <div className="flex items-center gap-2">
-                              <span>{u.name}</span>
-                              {isSelf && (
-                                <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-slate-100 dark:bg-[#27272a] text-slate-500 font-normal">
-                                  Tú
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-slate-500 dark:text-zinc-400 font-mono text-[11px]">{u.email}</td>
-                          <td className="px-4 py-3">
-                            <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
-                                u.role === 'ADMIN'
-                                  ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800'
-                                  : u.role === 'LECTOR' || u.role === 'VIEWER'
-                                  ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
-                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
-                              }`}
-                            >
-                              {displayRole}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="flex items-center gap-1.5 text-slate-600 dark:text-zinc-400">
-                              <span
-                                className={`w-2 h-2 rounded-full ${
-                                  u.isActive !== false ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-zinc-600'
-                                }`}
-                              />
-                              <span>{u.isActive !== false ? 'Activo' : 'Inactivo'}</span>
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            {!isSelf ? (
-                              <div className="flex items-center justify-end gap-1.5">
-                                <button
-                                  onClick={() => openEditModal(u)}
-                                  className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-slate-200 dark:border-[#27272a] hover:bg-slate-100 dark:hover:bg-[#27272a] text-slate-700 dark:text-zinc-300 transition-colors cursor-pointer flex items-center gap-1"
-                                  title="Editar información y contraseña del miembro"
-                                >
-                                  <Pencil className="w-3 h-3 text-slate-500 dark:text-zinc-400" />
-                                  <span>Editar</span>
-                                </button>
-                                <button
-                                  onClick={() => handleToggleUserActive(u)}
-                                  className={`px-2 py-1 rounded-lg text-[11px] font-semibold border transition-colors cursor-pointer ${
-                                    u.isActive !== false
-                                      ? 'border-slate-200 dark:border-[#27272a] text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-[#27272a]'
-                                      : 'border-emerald-200 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100'
-                                  }`}
-                                  title={u.isActive !== false ? 'Suspender acceso' : 'Habilitar acceso'}
-                                >
-                                  {u.isActive !== false ? 'Desactivar' : 'Activar'}
-                                </button>
-                                <button
-                                  onClick={() => setDeletingUser(u)}
-                                  className="p-1 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-transparent hover:border-rose-200 dark:hover:border-rose-900/40 transition-colors cursor-pointer"
-                                  title="Eliminar cuenta de miembro"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            ) : (
-                              <span className="text-[11px] text-slate-400 italic">Sesión actual</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                {roles}
+              </select>
+            </label>
+            {mode !== "invite" &&
+              (mode === "create" || editing?.canEditIdentity !== false) && (
+                <label>
+                  {mode === "create"
+                    ? "Contraseña (mínimo 8 caracteres)"
+                    : "Nueva contraseña (opcional, mínimo 8 caracteres)"}
+                  <input
+                    type="password"
+                    required={mode === "create"}
+                    minLength={8}
+                    maxLength={200}
+                    value={password}
+                    autoComplete="new-password"
+                    onChange={(event) => setPassword(event.target.value)}
+                  />
+                </label>
+              )}
+            {mode === "edit" && (
+              <label className="cc-inline">
+                <input
+                  type="checkbox"
+                  checked={active}
+                  onChange={(event) => setActive(event.target.checked)}
+                />
+                Acceso activo a esta organización
+              </label>
             )}
           </div>
-        ) : (
-          <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#121214] border border-slate-200/60 dark:border-[#27272a] text-xs text-slate-500 dark:text-zinc-400 flex items-center gap-3">
-            <Shield className="w-5 h-5 text-slate-400 shrink-0" />
-            <span>
-              Has iniciado sesión con el rol de <strong>{currentUser?.role || 'Lector'}</strong>. La administración de cuentas de usuario y permisos RBAC está reservada para el rol <strong>ADMIN</strong>.
-            </span>
+          <div className="cc-actions">
+            <button type="button" disabled={busy} onClick={resetForm}>
+              Cancelar
+            </button>
+            <button type="submit" className="cc-primary" disabled={busy}>
+              {busy
+                ? "Guardando…"
+                : mode === "invite"
+                  ? "Crear invitación"
+                  : "Guardar"}
+            </button>
           </div>
-        )}
+        </form>
+      )}
+      <div className="cc-table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Persona</th>
+              <th>Rol</th>
+              <th>Acceso</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {members.map((member) => (
+              <tr key={member.id}>
+                <td>
+                  <strong>{member.name}</strong>
+                  <div className="cc-muted">{member.email}</div>
+                </td>
+                <td>{member.role}</td>
+                <td>{member.isActive === false ? "Suspendido" : "Activo"}</td>
+                <td>
+                  <div className="cc-inline">
+                    <button
+                      disabled={busy}
+                      onClick={() => {
+                        resetForm();
+                        setEditing(member);
+                        setName(member.name);
+                        setRole(member.role);
+                        setActive(member.isActive !== false);
+                        setMode("edit");
+                      }}
+                    >
+                      Editar
+                    </button>
+                    {member.id !== user.id && (
+                      <button
+                        className="cc-danger"
+                        disabled={busy}
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              "¿Retirar el acceso de " +
+                                member.name +
+                                "? Sus propuestas se conservan.",
+                            )
+                          )
+                            void run(
+                              () =>
+                                SyncService.deleteCompanyUser(
+                                  syncSettings.serverUrl,
+                                  token,
+                                  member.id,
+                                ),
+                              "Acceso retirado.",
+                            );
+                        }}
+                      >
+                        Retirar
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-
-      {/* Modal para Crear/Invitar Usuario */}
-      {showAddUserModal && (
-        <div className="fixed inset-0 z-60 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-2xl p-6 w-full max-w-md shadow-2xl flex flex-col gap-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#27272a]">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400">
-                  <UserPlus className="w-4 h-4" />
-                </div>
-                <h4 className="text-sm font-bold text-slate-900 dark:text-white">Invitar Nuevo Miembro</h4>
-              </div>
-              <button
-                onClick={() => setShowAddUserModal(false)}
-                className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateUser} className="flex flex-col gap-3.5">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">
-                  Nombre Completo
-                </label>
-                <div className="relative">
-                  <UserIcon className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    required
-                    placeholder="Ing. Miguel Rodríguez"
-                    value={newUserName}
-                    onChange={(e) => setNewUserName(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 rounded-xl text-xs border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">
-                  Correo Electrónico
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type="email"
-                    required
-                    placeholder="miguel@electsun.com"
-                    value={newUserEmail}
-                    onChange={(e) => setNewUserEmail(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 rounded-xl text-xs border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">
-                  Contraseña Inicial
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type={showNewPassword ? 'text' : 'password'}
-                    required
-                    placeholder="Mínimo 6 caracteres"
-                    value={newUserPassword}
-                    onChange={(e) => setNewUserPassword(e.target.value)}
-                    className="w-full pl-9 pr-10 py-2 rounded-xl text-xs border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowNewPassword(!showNewPassword)}
-                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer"
-                  >
-                    {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">
-                  Rol de Acceso (Permisos)
-                </label>
-                <select
-                  value={newUserRole}
-                  onChange={(e) => setNewUserRole(e.target.value as UserRole)}
-                  className="w-full px-3 py-2 rounded-xl text-xs border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
-                >
-                  <option value="EDITOR">EDITOR (Crear, simular y sincronizar proyectos)</option>
-                  <option value="LECTOR">LECTOR (Solo lectura y descarga de propuestas)</option>
-                  <option value="ADMIN">ADMIN (Control total y gestión de usuarios)</option>
-                </select>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#27272a]">
-                <button
-                  type="button"
-                  onClick={() => setShowAddUserModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:text-zinc-400 dark:hover:bg-[#27272a] cursor-pointer transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={creatingUser}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer transition-colors flex items-center gap-1.5"
-                >
-                  {creatingUser && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                  <span>Crear Usuario</span>
-                </button>
-              </div>
-            </form>
-          </div>
+      {!members.length && (
+        <p>Sin miembros cargados. Usa Actualizar para consultar el servidor.</p>
+      )}
+      {inviteState === "loading" && (
+        <p role="status">Consultando invitaciones…</p>
+      )}
+      {inviteState === "error" && (
+        <div className="cc-notice cc-error" role="alert">
+          {inviteError}{" "}
+          <button onClick={() => void load()}>Reintentar consulta</button>
         </div>
       )}
-
-      {/* Modal para Editar Miembro */}
-      {editingUser && (
-        <div className="fixed inset-0 z-60 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-2xl p-6 w-full max-w-md shadow-2xl flex flex-col gap-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#27272a]">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400">
-                  <Pencil className="w-4 h-4" />
-                </div>
-                <h4 className="text-sm font-bold text-slate-900 dark:text-white">Editar Información del Miembro</h4>
-              </div>
-              <button
-                onClick={() => setEditingUser(null)}
-                className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveEditUser} className="flex flex-col gap-3.5">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">
-                  Nombre Completo
-                </label>
-                <div className="relative">
-                  <UserIcon className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    required
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 rounded-xl text-xs border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-sky-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">
-                  Correo Electrónico (No modificable)
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type="email"
-                    readOnly
-                    value={editingUser.email}
-                    className="w-full pl-9 pr-3 py-2 rounded-xl text-xs border border-slate-200/80 dark:border-[#27272a] bg-slate-50 dark:bg-[#121214]/60 text-slate-500 dark:text-zinc-400 focus:outline-hidden cursor-not-allowed"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">
-                  Rol de Acceso (Permisos RBAC)
-                </label>
-                <select
-                  value={editRole}
-                  onChange={(e) => setEditRole(e.target.value as UserRole)}
-                  className="w-full px-3 py-2 rounded-xl text-xs border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-sky-500"
-                >
-                  <option value="EDITOR">EDITOR (Crear, editar y sincronizar proyectos)</option>
-                  <option value="LECTOR">LECTOR (Solo lectura y descarga de propuestas)</option>
-                  <option value="ADMIN">ADMIN (Control total y gestión de usuarios)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">
-                  Estado de la Cuenta
-                </label>
-                <div className="flex items-center gap-3 pt-1">
-                  <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-700 dark:text-zinc-300">
-                    <input
-                      type="radio"
-                      name="editStatus"
-                      checked={editIsActive}
-                      onChange={() => setEditIsActive(true)}
-                      className="text-emerald-600 focus:ring-emerald-500"
-                    />
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                      Activo
-                    </span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-700 dark:text-zinc-300">
-                    <input
-                      type="radio"
-                      name="editStatus"
-                      checked={!editIsActive}
-                      onChange={() => setEditIsActive(false)}
-                      className="text-rose-600 focus:ring-rose-500"
-                    />
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-slate-400" />
-                      Inactivo (Acceso suspendido)
-                    </span>
-                  </label>
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-slate-100 dark:border-[#27272a]">
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">
-                  Cambiar Contraseña (Opcional)
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type={showEditPassword ? 'text' : 'password'}
-                    placeholder="Dejar en blanco para conservar actual"
-                    value={editPassword}
-                    onChange={(e) => setEditPassword(e.target.value)}
-                    className="w-full pl-9 pr-10 py-2 rounded-xl text-xs border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-sky-500"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowEditPassword(!showEditPassword)}
-                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 cursor-pointer"
-                  >
-                    {showEditPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                <p className="text-[10px] text-slate-400 dark:text-zinc-500 mt-1">
-                  Solo llena este campo si deseas cambiar la contraseña de acceso del miembro.
-                </p>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#27272a]">
-                <button
-                  type="button"
-                  onClick={() => setEditingUser(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:text-zinc-400 dark:hover:bg-[#27272a] cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={savingEdit}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-sky-600 hover:bg-sky-500 text-white shadow-xs cursor-pointer flex items-center gap-1.5"
-                >
-                  {savingEdit && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                  <span>Guardar Cambios</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {inviteState === "ready" && !invitations.length && (
+        <p>No hay invitaciones registradas.</p>
       )}
-
-      {/* Modal para Confirmar Eliminación de Miembro */}
-      {deletingUser && (
-        <div className="fixed inset-0 z-60 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-2xl p-6 w-full max-w-sm shadow-2xl flex flex-col gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <div>
-                <h4 className="text-sm font-bold text-slate-900 dark:text-white">¿Eliminar Miembro?</h4>
-                <p className="text-xs text-slate-500 dark:text-zinc-400">Esta acción no se puede deshacer.</p>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-600 dark:text-zinc-300">
-              ¿Estás seguro de que deseas eliminar permanentemente la cuenta de <strong>{deletingUser.name}</strong> ({deletingUser.email})? El usuario ya no podrá iniciar sesión en la plataforma.
-            </p>
-
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-[#27272a]">
-              <button
-                type="button"
-                onClick={() => setDeletingUser(null)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:text-zinc-400 dark:hover:bg-[#27272a] cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={handleDeleteUser}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-xs cursor-pointer flex items-center gap-1.5"
-              >
-                {isDeleting && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                <span>Eliminar Cuenta</span>
-              </button>
-            </div>
+      {invitations.length > 0 && (
+        <section className="cc-section">
+          <h3>Invitaciones</h3>
+          <div className="cc-table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Correo</th>
+                  <th>Rol</th>
+                  <th>Estado</th>
+                  <th>Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invitations.map((invite) => {
+                  const pending =
+                    !invite.acceptedAt &&
+                    !invite.revokedAt &&
+                    new Date(invite.expiresAt).getTime() > Date.now();
+                  return (
+                    <tr key={invite.id}>
+                      <td>{invite.email}</td>
+                      <td>{invite.role}</td>
+                      <td>
+                        {invite.acceptedAt
+                          ? "Aceptada"
+                          : invite.revokedAt
+                            ? "Revocada"
+                            : pending
+                              ? "Pendiente · vence " +
+                                new Date(invite.expiresAt).toLocaleDateString(
+                                  "es-DO",
+                                )
+                              : "Caducada"}
+                      </td>
+                      <td>
+                        {pending && (
+                          <button
+                            disabled={busy}
+                            onClick={() =>
+                              void run(
+                                () =>
+                                  CompanyService.revokeInvitation(
+                                    syncSettings.serverUrl,
+                                    token,
+                                    invite.id,
+                                  ),
+                                "Invitación revocada.",
+                              )
+                            }
+                          >
+                            Revocar
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        </div>
+        </section>
       )}
-    </section>
+    </div>
   );
-};
+}

@@ -19,6 +19,7 @@ export interface AuthResponse {
   token?: string;
   user?: UserProfile;
   error?: string;
+  failure?: 'rejected' | 'unavailable';
 }
 
 export interface SyncPullResult {
@@ -62,36 +63,114 @@ export function notifyTokenRenewed(newToken: string, origin?: { serverUrl: strin
   });
 }
 
+export type SessionInvalidatedCallback = (origin: { serverUrl: string; token: string }) => void;
+let sessionInvalidatedListeners: SessionInvalidatedCallback[] = [];
+
+export function registerSessionInvalidatedListener(cb: SessionInvalidatedCallback): () => void {
+  sessionInvalidatedListeners.push(cb);
+  return () => {
+    sessionInvalidatedListeners = sessionInvalidatedListeners.filter((l) => l !== cb);
+  };
+}
+
+export function notifySessionInvalidated(origin: { serverUrl: string; token: string }) {
+  sessionInvalidatedListeners.forEach((cb) => {
+    try {
+      cb(origin);
+    } catch (err) {
+      console.error('Error en listener de invalidación de sesión:', err);
+    }
+  });
+}
+
+async function computeTokenKey(serverUrl: string, token: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+  return `${SyncService.cleanUrl(serverUrl)}:${Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')}`;
+}
+
+const MAX_INVALID_TOKENS = 50;
+const invalidTokens = new Set<string>();
+
+export async function markTokenInvalid(serverUrl: string, token: string): Promise<void> {
+  if (!serverUrl || !token) return;
+  const key = await computeTokenKey(serverUrl, token);
+  if (!invalidTokens.has(key) && invalidTokens.size >= MAX_INVALID_TOKENS) {
+    const oldest = invalidTokens.values().next().value;
+    if (oldest) invalidTokens.delete(oldest);
+  }
+  invalidTokens.add(key);
+}
+
+export async function clearInvalidToken(serverUrl: string, token: string): Promise<void> {
+  if (!serverUrl || !token) return;
+  invalidTokens.delete(await computeTokenKey(serverUrl, token));
+}
+
 const refreshRequests = new Map<string, Promise<string | null>>();
 
 /** One bounded refresh on 401. A revoked account or forbidden role is never retried. */
 export async function fetchWithSessionRetry(url: string, init: RequestInit = {}): Promise<Response> {
   const send = (options: RequestInit) => fetch(url, { ...options, signal: options.signal ?? AbortSignal.timeout(12000) });
-  const response = await send(init);
   const authorization = new Headers(init.headers).get('Authorization');
-  if (response.status !== 401 || !authorization?.startsWith('Bearer ') || /\/api\/auth\/(?:refresh|login|register)$/.test(url)) return response;
-  const token = authorization.slice(7);
   const base = url.slice(0, url.indexOf('/api/'));
-  if (!base) return response;
-  const key = `${base}|${token}`;
-  let renewal = refreshRequests.get(key);
+  const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
+  const key = base && token ? await computeTokenKey(base, token) : null;
+
+  // Si el token ya fue marcado como definitivamente inválido, no enviamos solicitudes ni refrescos inútiles
+  if (key && invalidTokens.has(key)) {
+    return new Response(JSON.stringify({ success: false, error: 'Sesión no válida o expirada' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const response = await send(init);
+  if (response.status !== 401 || !token || !base || /\/api\/auth\/(?:refresh|login|register)$/.test(url)) return response;
+
+  let renewal = refreshRequests.get(key!);
   if (!renewal) {
     renewal = (async () => {
-      const refreshed = await fetch(`${base}/api/auth/refresh`, { method: 'POST', headers: { Authorization: authorization }, signal: AbortSignal.timeout(8000) });
-      if (!refreshed.ok) return null;
-      const data = await refreshed.json();
-      if (!data.success || typeof data.token !== 'string') return null;
-      notifyTokenRenewed(data.token, { serverUrl: base, token });
-      return data.token as string;
-    })().catch(() => null);
-    refreshRequests.set(key, renewal);
+      try {
+        const refreshed = await fetch(`${base}/api/auth/refresh`, {
+          method: 'POST',
+          headers: { Authorization: authorization! },
+          signal: AbortSignal.timeout(8000),
+        });
+        if (refreshed.status === 401 || refreshed.status === 403) {
+          // El token fue definitivamente rechazado por la API (firma inválida tras rotación o sesión revocada)
+          await markTokenInvalid(base, token);
+          notifySessionInvalidated({ serverUrl: base, token });
+          return null;
+        }
+        if (!refreshed.ok) return null;
+        const data = await refreshed.json().catch(() => null);
+        if (!data?.success || typeof data.token !== 'string') return null;
+        notifyTokenRenewed(data.token, { serverUrl: base, token });
+        return data.token as string;
+      } catch {
+        // Error de red transitorio; no invalidar la sesión permanentemente
+        return null;
+      }
+    })();
+    refreshRequests.set(key!, renewal);
   }
   const renewed = await renewal;
-  if (refreshRequests.get(key) === renewal) refreshRequests.delete(key);
-  if (!renewed) return response;
+  if (refreshRequests.get(key!) === renewal) refreshRequests.delete(key!);
+  if (!renewed) {
+    if (invalidTokens.has(key!)) return response;
+    // A refresh outage is not evidence that the original session was revoked.
+    const headers = new Headers(response.headers);
+    headers.set('x-solarsim-session-status', 'unavailable');
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+  }
   const headers = new Headers(init.headers);
   headers.set('Authorization', `Bearer ${renewed}`);
-  return send({ ...init, headers });
+  const retried = await send({ ...init, headers });
+  if (retried.status === 401) {
+    await markTokenInvalid(base, renewed);
+    notifySessionInvalidated({ serverUrl: base, token: renewed });
+  }
+  return retried;
 }
 
 function validatePushResults(results: unknown, ids: string[], content: 'project'): SyncPushOutcome[];
@@ -111,7 +190,7 @@ export class SyncService {
   /**
    * Limpia y normaliza la URL base del servidor
    */
-  private static cleanUrl(url: string): string {
+  static cleanUrl(url: string): string {
     return (url || 'https://solarsim.electsun.net').trim().replace(/\/+$/, '');
   }
 
@@ -228,19 +307,31 @@ export class SyncService {
   /**
    * Obtener perfil actual y verificar validez de token (con auto-renovación)
    */
-  static async getMe(serverUrl: string, token: string): Promise<UserProfile | null> {
+  static async getSessionIdentity(serverUrl: string, token: string): Promise<AuthResponse> {
     const base = this.cleanUrl(serverUrl);
     try {
       const res = await fetchWithSessionRetry(`${base}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       this.checkRenewedToken(res, serverUrl, token);
-      if (!res.ok) return null;
+      if (!res.ok) {
+        const rejected = (res.status === 401 || res.status === 403) && res.headers.get('x-solarsim-session-status') !== 'unavailable';
+        return { success: false, failure: rejected ? 'rejected' : 'unavailable', error: rejected ? 'La sesión expiró o fue revocada. Inicia sesión nuevamente.' : 'No se pudo verificar la sesión. Reintenta cuando haya conexión.' };
+      }
       const data = await res.json();
-      return data.user || null;
+      const user = data?.user;
+      if (!data?.success || !user || typeof user.id !== 'string' || typeof user.organizationId !== 'string' || !['ADMIN', 'EDITOR', 'LECTOR', 'VIEWER'].includes(user.role)) {
+        return { success: false, failure: 'unavailable', error: 'El servidor devolvió un perfil de sesión inválido.' };
+      }
+      return { success: true, user };
     } catch {
-      return null;
+      return { success: false, failure: 'unavailable', error: 'No se pudo verificar la sesión. Reintenta cuando haya conexión.' };
     }
+  }
+
+  static async getMe(serverUrl: string, token: string): Promise<UserProfile | null> {
+    const result = await this.getSessionIdentity(serverUrl, token);
+    return result.success ? result.user ?? null : null;
   }
 
   /**
@@ -251,19 +342,21 @@ export class SyncService {
     try {
       const res = await fetchWithSessionRetry(`${base}/api/auth/refresh`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       });
-      this.checkRenewedToken(res, serverUrl, token);
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.error || 'No se pudo renovar la sesión' };
+      if (res.status === 401 || res.status === 403) {
+        await markTokenInvalid(base, token);
+        notifySessionInvalidated({ serverUrl: base, token });
+        return { success: false, failure: 'rejected', error: 'La sesión expiró o fue revocada.' };
       }
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success || typeof data.token !== 'string' || !data.token) {
+        return { success: false, failure: 'unavailable', error: data?.error || 'No se pudo renovar la sesión. Reintenta cuando haya conexión.' };
+      }
+      this.checkRenewedToken(res, serverUrl, token);
       return { success: true, token: data.token, user: data.user };
-    } catch (err: any) {
-      return { success: false, error: err.message || 'Fallo de red al renovar sesión' };
+    } catch {
+      return { success: false, failure: 'unavailable', error: 'Fallo de red al renovar sesión' };
     }
   }
 
@@ -291,6 +384,7 @@ export class SyncService {
         email: u.email,
         role: u.role,
         organizationId: u.organization_id || u.organizationId,
+        canEditIdentity: u.canEditIdentity,
         isActive: u.isActive !== undefined ? u.isActive : u.is_active !== undefined ? u.is_active : true,
         createdAt: u.created_at || u.createdAt,
       }));

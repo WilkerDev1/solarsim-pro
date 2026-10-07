@@ -1,3 +1,4 @@
+import { lockCurrentMembership } from "../membership.js";
 import { readObjectBody } from "../request.js";
 import type { Hono } from "hono";
 import type { Dependencies } from "../dependencies.js";
@@ -17,7 +18,7 @@ export function registerTariffsRoutes(app: Hono, deps: Dependencies): void {
               effective_date as "effectiveDate", tariffs_json as "tariffsJson",
               updated_by as "updatedBy", updated_at as "updatedAt"
        FROM utility_tariffs
-       WHERE (organization_id = $1 OR organization_id = 'org-electsun-default')
+       WHERE organization_id = $1
        ORDER BY updated_at DESC
        LIMIT 1`,
         [authUser.organizationId],
@@ -86,6 +87,12 @@ export function registerTariffsRoutes(app: Hono, deps: Dependencies): void {
 
     const client = await pool.connect();
     try {
+      await client.query("BEGIN");
+      const denied = await lockCurrentMembership(client, authUser);
+      if (denied) {
+        await client.query("ROLLBACK");
+        return c.json({ error: "Permisos cambiaron" }, denied);
+      }
       await client.query(
         `INSERT INTO utility_tariffs (id, organization_id, resolution_code, effective_date, tariffs_json, updated_by, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, NOW())
@@ -105,12 +112,14 @@ export function registerTariffsRoutes(app: Hono, deps: Dependencies): void {
         ],
       );
 
+      await client.query("COMMIT");
       return c.json({
         success: true,
         message: "Pliego tarifario actualizado y sincronizado exitosamente",
         serverTimestamp: new Date().toISOString(),
       });
     } catch (error: any) {
+      await client.query("ROLLBACK");
       console.error("Error al sincronizar tarifas:", error);
       return c.json(
         {
