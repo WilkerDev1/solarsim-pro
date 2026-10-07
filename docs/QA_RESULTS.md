@@ -152,3 +152,7 @@ Se corrigieron fallos de invalidación/transporte, ciclo de vida de formularios,
 La inspección de `app-server` fue de solo lectura. API y PostgreSQL estaban saludables, con migraciones 001/002/003 y sin reinicios observados. El respaldo privado del 6 de octubre pasó una nueva restauración aislada, migraciones repetidas, comparación de contenido/conteos, comprobación de huérfanos y `pg_amcheck`. No se restauró ni escribió en producción.
 
 El ensayo de navegador usó la aplicación completa con usuarios sintéticos y servicios reales de staging. El ensayo de borradores utilizó componentes reales con transporte simulado: no se presenta como evidencia de API. Los gates finales, QR decodificado y despliegue Worker con snapshot KV intacto constan en la revisión actual; el estado de GitHub CI se registra sobre el nuevo commit.
+
+## Release estable 2.3.1 — 7 de octubre
+
+[Publicada](https://github.com/WilkerDev1/solarsim-pro/releases/tag/v2.3.1) desde el tag `6299625`, con CI y matriz Linux/Windows aprobadas en [37677768886](https://github.com/WilkerDev1/solarsim-pro/actions/runs/37677768886). Paquetes y metadata coherentes; firmas GPG fijadas verificadas; los 20 assets remotos coinciden en tamaño/SHA-256. Linux pasó arranque Debian/AppImage/Arch y Windows instalación/actualización/runtime. Authenticode e interacción en hardware real siguen siendo comprobaciones distintas. La recuperación del runner corrigió las listas de mirrors APT Azure sin alterar el tag. Véase el informe del 7 de octubre para fuentes, límites y operaciones de solo lectura.

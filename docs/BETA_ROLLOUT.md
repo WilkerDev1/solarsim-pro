@@ -107,3 +107,7 @@ El sondeo `npm run verify:compatibility` informa cobertura parcial con `WARN` y 
 6. Si el rollback de aplicación no resuelve un fallo de datos, restaurar a una base nueva, verificarla y reconciliar explícitamente las escrituras posteriores al checkpoint antes de cambiar el destino. Un snapshot CT anterior no es rollback seguro de datos que recibieron escrituras nuevas.
 
 Criterios de abortar: health/BD fallido, migración fallida, permisos incorrectos, pérdida de contenido o recuentos no explicada, clientes antiguos todavía escribiendo, firmas ausentes o fallo de instalación. El despliegue del 6 de octubre está realizado. Para correcciones posteriores, exigir gates y ensayo real antes de otra publicación; no presentar la release 2.3.0 ya publicada como si incluyera cambios posteriores a su tag.
+
+## Parche estable 2.3.1
+
+Los PR #2 y #3 se integraron en beta/main. El tag v2.3.1 conserva `6299625`; [release publicada](https://github.com/WilkerDev1/solarsim-pro/releases/tag/v2.3.1) con compilación y pruebas nativas aprobadas en GitHub. Incluye el parche auditado de sesión, borradores e historial por organización. Manifiestos exactos firmados y 20 assets verificados. La compilación de release no despliega API ni modifica la base de producción. Consultar [revisión](REVIEW_2026_10_07.md) para evidencia y recuperación del runner Linux.
