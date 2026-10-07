@@ -53,7 +53,7 @@ jobs:
         run: |
           sudo python3 - <<'PY'
           from pathlib import Path
-          sources = [Path('/etc/apt/sources.list'), *Path('/etc/apt/sources.list.d').glob('*.list'), *Path('/etc/apt/sources.list.d').glob('*.sources')]
+          sources = [Path('/etc/apt/sources.list'), *Path('/etc/apt/sources.list.d').glob('*.list'), *Path('/etc/apt/sources.list.d').glob('*.sources'), *Path('/etc/apt').glob('*mirrors*.txt')]
           for source in sources:
               if source.is_file():
                   text = source.read_text()
