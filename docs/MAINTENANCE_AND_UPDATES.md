@@ -1,6 +1,6 @@
 # Mantenimiento y releases
 
-Trabajar funcionalidades en beta o rama codex/ desde beta; main recibe publicación aprobada. La release oficial solicitada usa2.2.1; las betas se prueban con npm run dev y los gates de código, sin generar instaladores automáticamente; consultar [plan de beta y rollback](BETA_ROLLOUT.md).
+Trabajar funcionalidades en beta o rama codex/ desde beta; main recibe publicación aprobada. La versión oficial se consulta en GitHub Releases; el parche 2.3.1 incorpora las correcciones auditadas del 7 de octubre; las betas se prueban con npm run dev y los gates de código, sin generar instaladores automáticamente; consultar [plan de beta y rollback](BETA_ROLLOUT.md).
 
 ```bash
 npm ci
