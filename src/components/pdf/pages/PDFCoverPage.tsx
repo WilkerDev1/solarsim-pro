@@ -1,16 +1,19 @@
 import React from 'react';
-import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
+import { ProjectSimulation, FinancialSummaryResult, ClientInfo } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
 import { Phone, MapPin, Globe, Instagram, MapPinned } from 'lucide-react';
 import { ELECTSUN_LOGO_COLOR_BASE64, ELECTSUN_LOGO_WHITE_BASE64 } from '../../../assets/electsunLogo';
 import { PDF_COVER_HERO_BASE64 } from '../../../assets/pdfGraphicAssets';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
+import { InlineEditableText } from '../common/InlineEditableText';
 
 interface PDFCoverPageProps {
   project: ProjectSimulation;
   summary: FinancialSummaryResult;
   activeTheme: PDFColorTheme;
   currentDateStr: string;
+  isEditMode?: boolean;
+  updateClient?: (client: Partial<ClientInfo>) => void;
 }
 
 export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
@@ -18,15 +21,17 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
   summary,
   activeTheme,
   currentDateStr,
+  isEditMode = false,
+  updateClient,
 }) => {
   const cust = project.customization || {};
-  const companyName = cust.companyName || DEFAULT_DOCUMENT_CUSTOMIZATION.companyName || 'electsun';
-  const companySlogan = cust.companySlogan || DEFAULT_DOCUMENT_CUSTOMIZATION.companySlogan || 'El sol a tu favor';
-  const rawPhone = cust.companyPhone || DEFAULT_DOCUMENT_CUSTOMIZATION.companyPhone || '+1 (809) 378-6590';
+  const companyName = cust.companyName ?? DEFAULT_DOCUMENT_CUSTOMIZATION.companyName ?? 'electsun';
+  const companySlogan = cust.companySlogan ?? DEFAULT_DOCUMENT_CUSTOMIZATION.companySlogan ?? 'El sol a tu favor';
+  const rawPhone = cust.companyPhone ?? DEFAULT_DOCUMENT_CUSTOMIZATION.companyPhone ?? '+1 (809) 378-6590';
   const companyPhone = (rawPhone.includes('555-0199') || rawPhone.includes('5550199')) ? '+1 (809) 378-6590' : rawPhone;
-  const companyFooterText = cust.companyFooterText || DEFAULT_DOCUMENT_CUSTOMIZATION.companyFooterText || 'Calle Ercilia Pepín #1, Plaza Toledo, Local 307, Arroyo Manzano, Sto. Dgo. Rep. Dom.';
-  const companyWebsite = cust.companyWebsite || DEFAULT_DOCUMENT_CUSTOMIZATION.companyWebsite || 'electsun.com.do';
-  const companyInstagram = cust.companyInstagram || DEFAULT_DOCUMENT_CUSTOMIZATION.companyInstagram || 'Electsunrd';
+  const companyFooterText = cust.companyFooterText ?? DEFAULT_DOCUMENT_CUSTOMIZATION.companyFooterText ?? 'Calle Ercilia Pepín #1, Plaza Toledo, Local 307, Arroyo Manzano, Sto. Dgo. Rep. Dom.';
+  const companyWebsite = cust.companyWebsite ?? DEFAULT_DOCUMENT_CUSTOMIZATION.companyWebsite ?? 'electsun.com.do';
+  const companyInstagram = cust.companyInstagram ?? DEFAULT_DOCUMENT_CUSTOMIZATION.companyInstagram ?? 'Electsunrd';
 
   const isDefaultElectsun = companyName.toLowerCase().trim() === 'electsun';
   // Use dedicated cover logo, fallback to header logo, or default color logo
@@ -203,12 +208,26 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
               <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-0.5">
                 Fecha Emisión
               </span>
-              <span
-                className="text-base font-black block"
-                style={{ color: activeTheme.primary }}
-              >
-                {currentDateStr}
-              </span>
+              {isEditMode && updateClient ? (
+                <InlineEditableText
+                  value={project.client.quoteDate || currentDateStr}
+                  defaultValue={currentDateStr}
+                  onSave={(val) => updateClient({ quoteDate: val })}
+                  isEditMode={isEditMode}
+                  multiline={false}
+                  label="Fecha de Emisión"
+                  placeholder="DD/MM/AAAA o YYYY-MM-DD"
+                  className="text-base font-black block tracking-tight"
+                  boldClassName="text-base font-black"
+                />
+              ) : (
+                <span
+                  className="text-base font-black block"
+                  style={{ color: activeTheme.primary }}
+                >
+                  {currentDateStr}
+                </span>
+              )}
             </div>
 
             {/* Validez */}
@@ -220,12 +239,29 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
               <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-0.5">
                 Validez
               </span>
-              <span
-                className="text-base font-black block"
-                style={{ color: activeTheme.secondary }}
-              >
-                {project.client.quoteValidityDays || 7} Días Laborables
-              </span>
+              {isEditMode && updateClient ? (
+                <InlineEditableText
+                  value={project.client.quoteValidityDays ? `${project.client.quoteValidityDays} Días Laborables` : '7 Días Laborables'}
+                  defaultValue="7 Días Laborables"
+                  onSave={(val) => {
+                    const num = parseInt(val.replace(/\D/g, ''), 10);
+                    updateClient({ quoteValidityDays: isNaN(num) ? 7 : num });
+                  }}
+                  isEditMode={isEditMode}
+                  multiline={false}
+                  label="Días de Validez"
+                  placeholder="7 Días Laborables"
+                  className="text-base font-black block tracking-tight"
+                  boldClassName="text-base font-black"
+                />
+              ) : (
+                <span
+                  className="text-base font-black block"
+                  style={{ color: activeTheme.secondary }}
+                >
+                  {project.client.quoteValidityDays || 7} Días Laborables
+                </span>
+              )}
             </div>
 
             {/* Configuración */}

@@ -14,8 +14,10 @@ export interface ClientInfo {
   tariffCode?: string;
   contactEmail?: string;
   contactPhone?: string;
+  contactPerson?: string; // e.g. "Ing. Juan Pérez" / "Atención a"
   quoteNumber?: string; // e.g. "C-0030"
   quoteValidityDays?: number; // e.g. 7
+  quoteDate?: string; // Fecha de emisión/cotización personalizada (ej. "2026-10-02" o "02/10/2026")
 }
 
 export interface PanelItemSpec {
@@ -304,6 +306,7 @@ export interface DocumentCustomization {
   contactName?: string;           // Default: project.client.name
   clientPhone?: string;           // Default: project.client.contactPhone
   clientEmail?: string;           // Default: project.client.contactEmail
+  quoteDate?: string;             // Fecha personalizada de emisión/cotización para todo el PDF
   validityNote?: string;          // Default: 'Precios sujetos a disponibilidad de inventario. Cotización válida por 7 días laborables.'
   
   // Warranties & Guarantees
@@ -376,7 +379,7 @@ export interface ExtraTOCItem {
   pageCount?: number; // Number of pages this extra section occupies (default: 1)
 }
 
-export type UserRole = 'ADMIN' | 'EDITOR' | 'LECTOR';
+export type UserRole = 'ADMIN' | 'EDITOR' | 'LECTOR' | 'VIEWER';
 
 export interface UserProfile {
   id: string;
@@ -386,6 +389,7 @@ export interface UserProfile {
   organizationId: string;
   organizationName?: string;
   isActive?: boolean;
+  canEditIdentity?: boolean;
 }
 
 export interface SyncSettings {
@@ -397,6 +401,8 @@ export interface SyncSettings {
 }
 
 export interface ProjectSimulation {
+  organizationId?: string;
+  syncServerUrl?: string;
   id: string;
   createdAt: string;
   updatedAt: string;
@@ -419,9 +425,15 @@ export interface ProjectSimulation {
   deletedAt?: string | null; // ISO 8601 timestamp cuando se envió a papelera
   deletedBy?: string | null; // Nombre o identificador del usuario que lo eliminó
   folderId?: string; // Optional custom folder assignment
+  pendingCanonicalAck?: { version: number }; // Durable sparse ACK; never re-send before authoritative readback
+  baseVersion?: number; // Base version when editing started for optimistic concurrency
+  companyProfileId?: string; // Associated Company Profile ID
 }
 
 export * from './folder';
+export * from './companyProfile';
+export * from './versionHistory';
+export * from './notification';
 
 export type UpdateState = 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'installing' | 'error';
 
@@ -465,4 +477,3 @@ declare global {
     };
   }
 }
-

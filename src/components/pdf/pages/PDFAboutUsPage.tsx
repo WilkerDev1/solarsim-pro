@@ -20,6 +20,7 @@ interface PDFAboutUsPageProps {
   totalPages: number;
   isEditMode?: boolean;
   updateDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
+  updateDefaultDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
 }
 
 export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
@@ -32,6 +33,7 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
   totalPages,
   isEditMode = false,
   updateDocumentCustomization,
+  updateDefaultDocumentCustomization,
 }) => {
   const cust = project.customization || {};
   const companyName = cust.companyName || DEFAULT_DOCUMENT_CUSTOMIZATION.companyName || 'ELECTSUN';
@@ -91,6 +93,7 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
               value={cust.aboutUsIntroText}
               defaultValue={aboutUsIntroText}
               onSave={(val) => updateDocumentCustomization?.({ aboutUsIntroText: val })}
+              onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ aboutUsIntroText: val })}
               isEditMode={isEditMode}
               multiline={true}
               label="Texto ¿Quiénes Somos?"
@@ -219,6 +222,7 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
             value={cust.aboutUsTransitionText}
             defaultValue={aboutUsTransitionText}
             onSave={(val) => updateDocumentCustomization?.({ aboutUsTransitionText: val })}
+            onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ aboutUsTransitionText: val })}
             isEditMode={isEditMode}
             multiline={true}
             label="Texto de Transición"
@@ -243,6 +247,7 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
               value={cust.whyChooseUsText}
               defaultValue={whyChooseUsText}
               onSave={(val) => updateDocumentCustomization?.({ whyChooseUsText: val })}
+              onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ whyChooseUsText: val })}
               isEditMode={isEditMode}
               multiline={true}
               label="Texto ¿Por Qué Elegirnos?"

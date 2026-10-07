@@ -4,6 +4,7 @@ import {
   DEFAULT_WORKER_URL,
   STORAGE_SHARED_HISTORY_KEY,
 } from '../services/shareProposalService';
+import { useSimulationStore } from '../store/useSimulationStore';
 
 // Polyfill localStorage para entorno Node si no está disponible
 if (typeof localStorage === 'undefined' || !localStorage.getItem) {
@@ -32,6 +33,9 @@ console.log('=====================================================\n');
 
 // Limpiar estado inicial
 localStorage.clear();
+useSimulationStore.setState({ syncSettings: { ...useSimulationStore.getState().syncSettings,
+  serverUrl: 'https://qa.example.invalid', authToken: 'synthetic-share-test',
+  currentUser: { id: 'synthetic-user', email: 'qa@example.invalid', name: 'Synthetic', role: 'ADMIN', organizationId: 'synthetic-org' } }, sessionGeneration: 0 });
 
 // --- TEST 1: Default Worker URL and Custom URL ---
 console.log('--- TEST 1: Worker URL Management ---');
@@ -183,15 +187,10 @@ const migratedHistory = ShareProposalService.getSharedHistory();
 console.log(`History count after legacy key insertion: ${migratedHistory.length}`);
 
 const foundLegacy = migratedHistory.find((r) => r.id === 'legacy-hash-777');
-if (!foundLegacy) {
-  throw new Error('❌ Legacy key was not auto-migrated into shared history');
-}
+if (foundLegacy) throw new Error('❌ Unscoped legacy link must not be assigned to the current organization');
+if (!localStorage.getItem(`solarsim_last_share_${legacyProjectId}`)) throw new Error('❌ Legacy cache must be preserved for recovery');
 
-if (foundLegacy.clientName !== 'Cliente Migrado Automático') {
-  throw new Error(`❌ Expected clientName "Cliente Migrado Automático", got "${foundLegacy.clientName}"`);
-}
-
-console.log(' ✅ PASS: Auto-migración de registros previos realizada con éxito\n');
+console.log(' ✅ PASS: Registros legacy sin ámbito conservados en cuarentena\n');
 
 // --- TEST 6: Record Deletion and Clear Expired Records ---
 console.log('--- TEST 6: Record Deletion and Purge of Expired Proposals ---');

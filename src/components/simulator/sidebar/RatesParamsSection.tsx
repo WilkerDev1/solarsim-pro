@@ -1,3 +1,4 @@
+import { useSelfConsumptionProjection } from '../../../features/application/useApplicationFeatures';
 import React from 'react';
 import { ProjectSimulation, UtilityRates, SystemSpecs } from '../../../types';
 import { Receipt, ChevronDown, Sparkles, Check, Home, Building2, Factory, BatteryCharging, Sliders, Sun, Zap } from 'lucide-react';
@@ -30,6 +31,7 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
   updateRates,
   updateSpecs,
 }) => {
+  const projectionEnabled = useSelfConsumptionProjection();
   const { tariffMatrix } = useSimulationStore();
 
   const avgMonthlyConsumption =
@@ -305,7 +307,7 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
           </div>
 
           {/* Perfil de Carga del Cliente & Partición Diurna vs Nocturna */}
-          {(() => {
+          {projectionEnabled && (() => {
             const totalBatteryKWh = calculateTotalBatteryCapacityKWh(project.specs);
             const hasBattery = !!(project.specs.hasBattery && totalBatteryKWh > 0);
             const batteryDodPct = project.specs.batteryDOD !== undefined ? project.specs.batteryDOD : 90;

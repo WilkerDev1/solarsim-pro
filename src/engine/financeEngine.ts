@@ -1,4 +1,5 @@
-import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem, CustomQuotationItem, CustomQuotationDiscount } from '../types';
+import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
+import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem, CustomQuotationItem, CustomQuotationDiscount, ProjectSimulation } from '../types';
 import { calculateDCCapacityKWp, calculateMonthlySolarProduction } from './solarEngine';
 import {
   getProjectPanels,
@@ -376,7 +377,8 @@ export function calculateFinancialSummary(
   rates: UtilityRates,
   financials: FinancialParams,
   monthlyConsumptionKWh: number[],
-  customMonthlyHSP?: number[]
+  customMonthlyHSP?: number[],
+  calculationMode: EnergyCalculationMode = 'legacy'
 ): FinancialSummaryResult {
   const dcCapacityKWp = calculateTotalDCCapacityKWp(specs);
 
@@ -565,7 +567,8 @@ export function calculateFinancialSummary(
     rates.gridExportFeePct,
     customMonthlyHSP,
     rates.tariffCode,
-    rates.isZeroExport
+    rates.isZeroExport,
+    calculationMode
   );
 
   const annualConsumptionKWh = monthlyResults.reduce((sum, m) => sum + m.consumptionKWh, 0);
@@ -713,3 +716,19 @@ export function calculateFinancialSummary(
     customDiscountsList: customDiscounts,
   };
 }
+
+/**
+ * Convenience helper to calculate complete financial summary directly from a ProjectSimulation object.
+ */
+export function calculateProjectFinancialSummary(p: ProjectSimulation, calculationMode: EnergyCalculationMode = 'legacy'): FinancialSummaryResult {
+  return calculateFinancialSummary(
+    p.client?.province || 'Santo Domingo / Distrito Nacional',
+    p.specs,
+    p.rates,
+    p.financials,
+    p.monthlyConsumption,
+    p.client?.customMonthlyHSP,
+    calculationMode
+  );
+}
+

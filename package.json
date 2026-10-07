@@ -1,7 +1,7 @@
 {
   "name": "solarsim-pro",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.3.1",
   "description": "Simulador Fotovoltaico Técnico-Económico Profesional",
   "author": "WilkerDev1",
   "type": "module",
@@ -11,7 +11,7 @@
     "build": "tsc && vite build",
     "lint": "tsc --noEmit",
     "preview": "vite preview",
-    "build:electron": "esbuild electron/main.ts --bundle --platform=node --target=node18 --external:electron --outfile=dist-electron/main.cjs && esbuild electron/preload.ts --bundle --platform=node --target=node18 --external:electron --outfile=dist-electron/preload.cjs",
+    "build:electron": "esbuild electron/main.ts --bundle --platform=node --target=node22 --external:electron --outfile=dist-electron/main.cjs && esbuild electron/preload.ts --bundle --platform=node --target=node22 --external:electron --outfile=dist-electron/preload.cjs",
     "electron:dev": "npm run build:electron && concurrently \"vite\" \"electron .\"",
     "electron:build": "npm run build && npm run build:electron && electron-builder",
     "build:win": "npm run build && npm run build:electron && electron-builder --win",
@@ -28,19 +28,25 @@
     "test:multiequipment": "npx tsx src/tests/testMultiEquipment.ts",
     "test:pdf-reorder": "npx tsx src/tests/testPDFSectionReordering.ts",
     "test:energy": "npx tsx src/tests/testEnergyBalanceTransparency.ts",
-    "test": "npx tsx src/tests/testBenchmark.ts && npx tsx src/tests/testFinancialEngineComprehensive.ts && npx tsx src/tests/testAISmartProposal.ts && npx tsx src/tests/testEquipmentCatalog.ts && npx tsx src/tests/testFolderHidingAndSync.ts && npx tsx src/tests/testTrashAndReadOnly.ts && npx tsx src/tests/testTariffEngine.ts && npx tsx src/tests/testGeminiFamily3Cascade.ts && npx tsx src/tests/testCloudflareShareHistory.ts && npx tsx src/tests/testMultiEquipment.ts && npx tsx src/tests/testPDFSectionReordering.ts && npx tsx src/tests/testEnergyBalanceTransparency.ts",
+    "test:client-sync": "npx tsx src/tests/testClientContactDataSync.ts",
+    "test": "tsx scripts/test.ts",
     "release:manifests": "npx tsx scripts/release.ts --manifests",
     "release:bump": "npx tsx scripts/release.ts --bump",
-    "context:pack": "repomix"
+    "context:pack": "repomix",
+    "test:features": "tsx src/tests/testApplicationFeatures.ts",
+    "test:sync": "tsx src/tests/testSyncReconciliation.ts",
+    "test:updater": "tsx electron/updater/tests/updaterIntegrity.test.ts",
+    "verify:compatibility": "npx tsx scripts/qa/verifyDeploymentCompatibility.ts",
+    "release:sign": "tsx scripts/release.ts --sign"
   },
   "dependencies": {
     "clsx": "^2.1.1",
     "electron-updater": "^6.8.9",
     "html2canvas": "^1.4.1",
-    "jspdf": "^2.5.2",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.427.0",
     "pdf-lib": "^1.17.1",
-    "pdfjs-dist": "^4.4.168",
+    "pdfjs-dist": "6.4.299",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -49,19 +55,21 @@
     "zustand": "^4.5.5"
   },
   "devDependencies": {
-    "@types/node": "^22.5.0",
+    "@types/node": "^24.9.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
+    "@vitejs/plugin-react": "5.2.0",
     "autoprefixer": "^10.4.20",
     "concurrently": "^8.2.2",
-    "electron": "^31.7.7",
-    "electron-builder": "^24.13.3",
+    "electron": "44.5.1",
+    "electron-builder": "26.15.3",
+    "esbuild": "0.28.2",
     "postcss": "^8.4.41",
     "repomix": "^1.18.0",
     "tailwindcss": "^3.4.10",
+    "tsx": "^4.23.15",
     "typescript": "^5.5.4",
-    "vite": "^5.4.1"
+    "vite": "7.3.6"
   },
   "buildConfig": {
     "appId": "com.solarsim.pro",
@@ -118,17 +126,68 @@
       "category": "Science",
       "maintainer": "WilkerDev1 <wilkerdev@github.com>",
       "synopsis": "Simulador Fotovoltaico Profesional",
-      "description": "Simulador de proyectos solares fotovoltaicos con dimensionamiento, análisis financiero y exportación de propuestas PDF."
+      "description": "Simulador de proyectos solares fotovoltaicos con dimensionamiento, análisis financiero y exportación de propuestas PDF.",
+      "syncDesktopName": true
     },
     "publish": {
       "provider": "github",
       "owner": "WilkerDev1",
       "repo": "solarsim-pro"
+    },
+    "extraResources": [
+      {
+        "from": "src/assets/electsun-emblem-transparent.png",
+        "to": "electsun-emblem-transparent.png"
+      }
+    ],
+    "pacman": {
+      "depends": [
+        "gtk3",
+        "nss",
+        "alsa-lib",
+        "libnotify",
+        "libxss",
+        "xdg-utils",
+        "mesa",
+        "libcups",
+        "libxkbcommon",
+        "systemd-libs",
+        "gnupg",
+        "polkit"
+      ]
+    },
+    "deb": {
+      "depends": [
+        "libgtk-3-0 | libgtk-3-0t64",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0 | libatspi2.0-0t64",
+        "libuuid1",
+        "libsecret-1-0",
+        "libasound2 | libasound2t64",
+        "libgbm1",
+        "libcups2 | libcups2t64",
+        "libxkbcommon0",
+        "gnupg",
+        "gpgv",
+        "pkexec | policykit-1"
+      ]
     }
   },
   "allowScripts": {
-    "electron@31.7.7": true,
     "esbuild@0.21.5": true,
-    "core-js@3.50.0": true
+    "core-js@3.50.0": true,
+    "electron@44.5.1": true,
+    "esbuild@0.28.2": true
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "desktopName": "solarsim-pro.desktop",
+  "overrides": {
+    "postcss-selector-parser": "7.1.6"
   }
 }

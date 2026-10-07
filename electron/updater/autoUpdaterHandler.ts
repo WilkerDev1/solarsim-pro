@@ -1,14 +1,15 @@
 import { app, ipcMain, shell } from 'electron';
-import path from 'path';
 import fs from 'fs';
 import https from 'https';
-import { exec } from 'child_process';
+import { installVerifiedLinuxPackage } from './linuxPackageUpdater';
+import { assertNewerReleaseVersion, compareReleaseVersions } from './releaseVersion';
+import { selectEligibleRelease } from './releaseChannel';
 import { autoUpdater } from 'electron-updater';
 import { getMainWindow } from '../window/windowManager';
 
 // Configure autoUpdater
 autoUpdater.autoDownload = false;
-autoUpdater.autoInstallOnAppQuit = true;
+autoUpdater.autoInstallOnAppQuit = process.platform !== 'linux';
 
 function sendUpdateStatus(statusPayload: any) {
   const mainWindow = getMainWindow();
@@ -17,50 +18,12 @@ function sendUpdateStatus(statusPayload: any) {
   }
 }
 
-// Helper for downloading files with HTTP redirect support
-function downloadFile(url: string, destPath: string, onProgress: (transferred: number, total: number) => void): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const request = (currentUrl: string) => {
-      https.get(currentUrl, { headers: { 'User-Agent': 'SolarSim-Pro-Updater' } }, (res) => {
-        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          return request(res.headers.location);
-        }
-        if (res.statusCode !== 200) {
-          return reject(new Error(`Error de descarga HTTP ${res.statusCode}`));
-        }
-
-        const totalBytes = parseInt(res.headers['content-length'] || '0', 10);
-        let transferredBytes = 0;
-        const fileStream = fs.createWriteStream(destPath);
-
-        res.on('data', (chunk) => {
-          transferredBytes += chunk.length;
-          onProgress(transferredBytes, totalBytes);
-        });
-
-        res.pipe(fileStream);
-
-        fileStream.on('finish', () => {
-          fileStream.close(() => resolve());
-        });
-
-        fileStream.on('error', (err) => {
-          fs.unlink(destPath, () => {});
-          reject(err);
-        });
-      }).on('error', reject);
-    };
-
-    request(url);
-  });
-}
-
 // Fetch GitHub Releases via HTTPS directly
 function fetchLatestGitHubRelease(): Promise<any> {
   return new Promise((resolve, reject) => {
     const options = {
       hostname: 'api.github.com',
-      path: '/repos/WilkerDev1/solarsim-pro/releases/latest',
+      path: '/repos/WilkerDev1/solarsim-pro/releases?per_page=100',
       headers: { 'User-Agent': 'SolarSim-Pro-Updater' },
     };
 
@@ -69,7 +32,9 @@ function fetchLatestGitHubRelease(): Promise<any> {
         return reject(new Error(`GitHub API HTTP ${res.statusCode}`));
       }
       let rawData = '';
-      res.on('data', (chunk) => { rawData += chunk; });
+      let received = 0;
+      res.on('data', (chunk) => { received += chunk.length; if (received > 2 * 1024 * 1024) res.destroy(new Error('Respuesta de release demasiado grande.')); else rawData += chunk; });
+      res.on('error', reject);
       res.on('end', () => {
         try {
           resolve(JSON.parse(rawData));
@@ -77,11 +42,13 @@ function fetchLatestGitHubRelease(): Promise<any> {
           reject(e);
         }
       });
-    }).on('error', reject);
+    }).on('error', reject).setTimeout(12000, function (this: import('http').ClientRequest) { this.destroy(new Error('Timeout al consultar la release.')); });
   });
 }
 
 export function registerAutoUpdater() {
+  autoUpdater.allowPrerelease = app.getVersion().split('+')[0].includes('-');
+  let linuxInstallInProgress = false;
   // AutoUpdater Events
   autoUpdater.on('checking-for-update', () => {
     sendUpdateStatus({ state: 'checking' });
@@ -168,12 +135,14 @@ export function registerAutoUpdater() {
       sendUpdateStatus({ state: 'checking' });
 
       // In development mode, or in Linux non-AppImage (e.g. pacman or deb), query GitHub API directly
-      if (!app.isPackaged || (process.platform === 'linux' && !process.env.APPIMAGE)) {
-        const release = await fetchLatestGitHubRelease();
-        const latestTag = (release.tag_name || '').replace(/^v/, '');
+      if (!app.isPackaged || process.platform === 'linux') {
         const currentVer = app.getVersion().replace(/^v/, '');
+        const releases = await fetchLatestGitHubRelease();
+        if (!Array.isArray(releases)) throw new Error('Respuesta de releases inválida.');
+        const release = selectEligibleRelease(releases, currentVer);
+        const latestTag = release?.tag_name.replace(/^v/, '') || currentVer;
 
-        if (latestTag && latestTag !== currentVer) {
+        if (release && compareReleaseVersions(latestTag, currentVer) > 0) {
           sendUpdateStatus({
             state: 'available',
             version: latestTag,
@@ -205,6 +174,7 @@ export function registerAutoUpdater() {
 
   ipcMain.handle('download-update', async () => {
     try {
+      if (process.platform === 'linux') throw new Error('La actualización automática Linux requiere un paquete .pacman o .deb verificado. Para AppImage, abre la release y verifica su firma antes de sustituir el archivo.');
       await autoUpdater.downloadUpdate();
       return { success: true };
     } catch (err: any) {
@@ -214,53 +184,28 @@ export function registerAutoUpdater() {
   });
 
   ipcMain.handle('quit-and-install', async () => {
+    if (process.platform === 'linux') return { success: false, error: 'Instala un paquete Linux con firma verificada.' };
     autoUpdater.quitAndInstall();
   });
 
   ipcMain.handle('install-linux-package', async (_event, packageType: 'pacman' | 'deb', version: string) => {
+    if (linuxInstallInProgress) return { success: false, error: 'Ya hay una actualización Linux en curso.' };
+    linuxInstallInProgress = true;
     try {
-      if (packageType !== 'pacman' && packageType !== 'deb') {
-        throw new Error('Tipo de paquete Linux no soportado.');
+      if (process.platform !== 'linux' || process.arch !== 'x64') {
+        throw new Error('La actualización de paquetes está disponible únicamente en Linux x64.');
       }
-
-      const cleanVersion = (version || '').replace(/[^0-9a-zA-Z._-]/g, '').trim();
-      if (!cleanVersion || !/^[0-9]+\.[0-9]+\.[0-9]+/.test(cleanVersion)) {
-        throw new Error('Formato de versión semántica inválido.');
-      }
-
-      const filename = packageType === 'pacman'
-        ? `solarsim-pro-${cleanVersion}.pacman`
-        : `solarsim-pro_${cleanVersion}_amd64.deb`;
-      const downloadUrl = `https://github.com/WilkerDev1/solarsim-pro/releases/download/v${cleanVersion}/${filename}`;
-      const tmpDest = path.join('/tmp', filename);
-
+      const installedVersion = app.getVersion();
+      assertNewerReleaseVersion(version, installedVersion);
       sendUpdateStatus({ state: 'downloading', progressPct: 0, transferredBytes: 0, totalBytes: 0 });
-
-      await downloadFile(downloadUrl, tmpDest, (transferred, total) => {
-        const pct = total > 0 ? Math.round((transferred / total) * 100) : 0;
+      await installVerifiedLinuxPackage(packageType, version, installedVersion, (transferred, total) => {
         sendUpdateStatus({
           state: 'downloading',
-          progressPct: pct,
+          progressPct: total > 0 ? Math.round((transferred / total) * 100) : 0,
           transferredBytes: transferred,
           totalBytes: total,
         });
-      });
-
-      sendUpdateStatus({ state: 'installing' });
-
-      // Execute with pkexec
-      const cmd = packageType === 'pacman'
-        ? `pkexec pacman -U --noconfirm "${tmpDest}"`
-        : `pkexec dpkg -i "${tmpDest}"`;
-
-      await new Promise<void>((resolve, reject) => {
-        exec(cmd, (error, _stdout, stderr) => {
-          if (error) {
-            return reject(new Error(stderr || error.message));
-          }
-          resolve();
-        });
-      });
+      }, () => sendUpdateStatus({ state: 'installing' }));
 
       // Installation successful, restart app
       app.relaunch();
@@ -273,6 +218,8 @@ export function registerAutoUpdater() {
         error: `Error durante la instalación del paquete: ${err?.message || err}`,
       });
       return { success: false, error: err?.message };
+    } finally {
+      linuxInstallInProgress = false;
     }
   });
 

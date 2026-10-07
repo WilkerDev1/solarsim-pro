@@ -1,6 +1,16 @@
-import { calculateMonthlySolarProduction } from '../engine/solarEngine';
-import { calculateFinancialSummary } from '../engine/financeEngine';
+import { calculateMonthlySolarProduction as calculateMonthlySolarProductionBase } from '../engine/solarEngine';
+import { calculateFinancialSummary as calculateFinancialSummaryBase } from '../engine/financeEngine';
 import { SystemSpecs, UtilityRates, FinancialParams } from '../types';
+
+// These audited fixtures exercise the physical model explicitly; legacy is covered separately.
+function calculateMonthlySolarProduction(...args: Parameters<typeof calculateMonthlySolarProductionBase>) {
+  args[8] = 'self_consumption';
+  return calculateMonthlySolarProductionBase(...args);
+}
+function calculateFinancialSummary(...args: Parameters<typeof calculateFinancialSummaryBase>) {
+  args[6] = 'self_consumption';
+  return calculateFinancialSummaryBase(...args);
+}
 
 console.log('=====================================================');
 console.log('🧪 RUNNING ENERGY BALANCE & TRANSPARENCY TEST SUITE');

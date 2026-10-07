@@ -1,179 +1,51 @@
-# 📚 Guía de Mantenimiento, Dependencias & Servicio de Actualizaciones
-**SolarSim Pro** — Simulador Fotovoltaico Técnico-Económico Profesional
+# Mantenimiento y releases
 
----
+Trabajar funcionalidades en beta o rama codex/ desde beta; main recibe publicación aprobada. La versión oficial se consulta en GitHub Releases; el parche 2.3.1 incorpora las correcciones auditadas del 7 de octubre; las betas se prueban con npm run dev y los gates de código, sin generar instaladores automáticamente; consultar [plan de beta y rollback](BETA_ROLLOUT.md).
 
-## 1. 🏗️ Arquitectura del Sistema & Stack Tecnológico
-
-El proyecto está diseñado bajo una arquitectura híbrida de alto rendimiento que combina aplicaciones web modernas con un runtime de escritorio nativo, servicios serverless y un backend auto-hospedado:
-
-```mermaid
-graph TD
-    A[React 18 + TypeScript + Zustand Slices] -->|Vite Build| B[dist/ Web Bundle]
-    C[Electron 31 Main & Preload] -->|esbuild| D[dist-electron/ Node Bundle]
-    B --> E[Electron Desktop Runtime]
-    D --> E
-    E -->|electron-builder| F[Windows NSIS / Portable .exe]
-    E -->|electron-builder| G[Linux .pacman / .deb / .AppImage / .tar.gz]
-    E -->|electron-updater| H[GitHub Releases API / Auto-Updates]
-    I[Cloudflare Worker & KV] -->|Hono API| J[Visor Web Propuestas /p/:id]
-    B -->|REST API /api/share| I
-    B -->|REST API Sync & Auth| K[solarsim-api Node.js / Docker]
-    K -->|PostgreSQL 16| L[(solarsim-db CT 100 10.0.0.103)]
-```
-000d
-### Componentes Clave:
-* **Frontend**: React 18, TypeScript, Tailwind CSS, Lucide React, Recharts (gráficos solares e inversión), Zustand con Arquitectura de Slices (`projectSlice`, `equipmentSlice`, `syncAuthSlice`, `importExportSlice`, `aiSlice`, `uiSlice`).
-* **Motor de Simulación**: Módulos puros en TypeScript (`src/engine/`) para cálculo de balance de energía horaria/mensual, degradación de paneles, autoconsumo, tarifas EDES (BTS1/BTS2/MTD1/MTD2/etc.), Ley 57-07, Payback, VAN, TIR y ROI a 25 años.
-* **Inteligencia Artificial Multimodal**: Google Gemini Vision (`gemini-3.5-flash-lite`) para escaneo de facturas eléctricas dominicanas y extracción de fichas técnicas (*datasheets*) de módulos fotovoltaicos, inversores y almacenamiento BESS.
-* **Backend de Sincronización & Auth**: Servidor Node.js + Hono (`server/`) en contenedor Docker conectado a PostgreSQL 16 Alpine en Proxmox LXC CT 100 (`10.0.0.103`), con autenticación JWT, RBAC y sincronización delta de proyectos y catálogo.
-* **Generador de Documentos PDF**: `jspdf` + `html2canvas`. Todos los activos visuales están pre-convertidos a Base64 en `src/assets/pdfGraphicAssets.ts` para garantizar renderizado instantáneo y evitar tainting de canvas.
-* **Servicio Serverless de Propuestas Web**: Cloudflare Workers + KV (`workers/share-viewer/`) con Hono, generación de códigos QR y renderizado interactivo en la nube con TTL de expiración automática.
-* **Desktop & Actualizador**: Electron 31 + `electron-updater` conectado al repositorio `WilkerDev1/solarsim-pro`.
-
----
-
-## 2. 🛡️ Política de Dependencias & Matriz de Compatibilidad
-
-Para evitar roturas graves en el simulador y en los empaquetadores de escritorio, se debe seguir esta matriz de compatibilidad:
-
-| Paquete / Área | Versión Bloqueada / Rango | Motivo Técnico / Restricción |
-| :--- | :--- | :--- |
-| `react` / `react-dom` | `^18.3.1` (React 18) | Recharts 2.x y varias utilidades de UI dependen del reconciliador de React 18. **No actualizar a React 19** hasta que el ecosistema Recharts 3 sea completamente estable. |
-| `electron` | `^31.7.7` | Probado y validado para Wayland en Linux y compatibilidad con NSIS en Windows. |
-| `electron-builder` | `^24.13.3` | Genera paquetes nativos (`pacman`, `deb`, `AppImage`, `nsis`) de forma consistente con Wine y librerías del sistema. |
-| `tailwindcss` | `^3.4.10` | Tailwind v3 con configuración personalizada de temas y plugins. **No migrar a v4** sin adaptar la configuración CSS y selectores dinámicos. |
-| `jspdf` | `^2.5.2` | Compatible con el renderizado modular de páginas por canvas. |
-
-### 🔍 Procedimiento para Actualizar Dependencias con Seguridad
-
-1. **Auditoría de Versiones**:
-   ```bash
-   npm outdated
-   ```
-2. **Actualizaciones de Parches y Menores Seguras**:
-   ```bash
-   npm update
-   ```
-3. **Verificación Obligatoria de Tipos y Pruebas**:
-   ```bash
-   npm run lint                                            # tsc --noEmit (Cero errores)
-   npx tsx src/tests/testBenchmark.ts                     # Validación contra benchmark oficial
-   npx tsx src/tests/testFinancialEngineComprehensive.ts  # Suite integral de 9 pruebas financieras
-   npm test                                               # Ejecutar todas las pruebas unitarias
-   npm run build && npm run build:electron                 # Compilación completa de bundles
-   npm run context:pack                                    # Snapshot empaquetado Repomix
-   ```
-4. **Si hay Advertencias de Scripts (`allowScripts`)**:
-   Revisar el listado en `package.json` bajo la clave `"allowScripts"` antes de aprobar nuevos paquetes con scripts de post-instalación:
-   ```json
-   "allowScripts": {
-     "electron@31.7.7": true,
-     "esbuild@0.21.5": true,
-     "core-js@3.50.0": true
-   }
-   ```
-
----
-
-## 3. 🔄 Arquitectura del Servicio de Actualizaciones (`electron-updater`)
-
-El servicio de auto-actualización permite que cualquier usuario en Windows o Linux reciba las nuevas versiones sin necesidad de descargar el instalador manualmente de la web.
-
-### 🌐 Flujo de Funcionamiento:
-
-```
-[ SolarSim Pro Cliente (v2.X) ]
-            │
-            ▼ (1. Al pulsar 'Buscar Actualizaciones' o en segundo plano)
-[ GitHub Releases API: WilkerDev1/solarsim-pro ]
-            │
-            ├─► Windows: Descarga 'latest.yml' ──► Compara versión (ej. 2.0.0 vs 1.6.0)
-            │      └─► Si hay nueva versión: Descarga 'SolarSim-Pro-Setup-2.0.0.exe'
-            │             └─► Ejecuta instalador NSIS silencioso al reiniciar la app.
-            │
-            └─► Linux: Descarga 'latest-linux.yml' ──► Detecta distro (Arch, Debian, Universal)
-                   ├─► Arch / Manjaro: Ofrece comando `sudo pacman -U <url.pacman>` o 1-clic.
-                   └─► AppImage / Deb: Descarga paquete verificado con firma criptográfica GPG.
+```bash
+npm ci
+npm run lint
+npm test
+npm run build
+npm run build:electron
+npm --prefix server ci
+npm --prefix server test
+npm --prefix server run build
+npm --prefix workers/share-viewer ci
+npm --prefix workers/share-viewer test
+npm --prefix workers/share-viewer run build
+npm run context:pack
 ```
 
-### ⚠️ Reglas Críticas de Nombrado de Archivos & Nomenclatura Canónica:
+Node24 y Docker permiten reproducir integración. Tests de cliente bloquean transporte real por defecto; las suites reemplazan fetch cuando prueban HTTP. No ejecutar pruebas contra solarsim.electsun.net ni app-server. Consultar QA.md.
 
-* **Nomenclatura Unificada sin Espacios**: Todos los paquetes oficiales generados por `electron-builder` utilizan nombres estandarizados mediante `artifactName` en `package.json`:
-  - **Windows (Instalador NSIS)**: `SolarSim-Pro-Setup-${version}.exe` y `SolarSim-Pro-Setup-${version}.exe.blockmap`
-  - **Windows (Portable)**: `SolarSim-Pro-${version}.exe`
-  - **Linux (AppImage)**: `SolarSim-Pro-${version}.AppImage`
-  - **Linux (Arch / Pacman)**: `solarsim-pro-${version}.pacman`
-  - **Linux (Debian / DEB)**: `solarsim-pro_${version}_amd64.deb`
-  - **Linux (Tarball)**: `solarsim-pro-${version}.tar.gz`
-* **Eliminación de Aliases Legacy**: Las versiones antiguas (v1.1.0/v1.4.0) utilizaban enlaces simbólicos y duplicados con espacios (`SolarSim Pro...`). A partir de la versión **v2.0.0**, se eliminó esta sobrecarga de mantenimiento; todos los clientes y actualizadores leen exclusivamente la nomenclatura estándar con guiones.
-* **Consistencia con Manifiestos**: El valor de `url` y `path` en `latest.yml` y `latest-linux.yml` coincide directamente con estos archivos sin necesidad de scripts de copiado.
+## Actualizaciones firmadas
 
----
+`.pacman` y `.deb` se instalan solo tras verificar latest.json.sig, versión superior a la instalada, descriptor de formato/archivo/origen, firma del paquete, SHA256 y tamaño. Clave pública fijada en `electron/updater/trustedReleaseKey.ts`; GPG/GPGV ausentes o firmas inválidas bloquean instalación. Descargas HTTPS usan hosts permitidos, límites, timeout y archivos temporales privados. pkexec recibe argumentos mediante execFile; no cadena de shell. Archivos temporales se eliminan al terminar o fallar.
 
-## 4. 📋 Manifiestos de Actualización: YAML & JSON
+AppImage ya no utiliza descarga/instalación automática sin firma: se sustituye manualmente desde la release tras verificar su .sig. Windows conserva electron-updater y su flujo de plataforma; la garantía GPG descrita aquí corresponde a paquetes Linux. No asumir que un hash por sí solo autentica al autor.
 
-SolarSim Pro soporta tanto actualizadores basados en YAML de `electron-updater` como clientes HTTP y scripts de terceros que consumen JSON:
+```bash
+npm run release:bump -- X.Y.Z
+npm run build:win
+npm run build:linux
+npx tsx scripts/release.ts --sign
+```
 
-| Archivo Manifiesto | Propósito & Consumidor | Ubicación en Release |
-| :--- | :--- | :--- |
-| `latest.yml` | Manifiesto nativo de `electron-updater` para Windows (NSIS). Contiene versión, SHA-512 y tamaño en bytes de `SolarSim-Pro-Setup-X.Y.Z.exe`. | `release/latest.yml` |
-| `latest-linux.yml` | Manifiesto nativo de `electron-updater` para Linux (`AppImage`, `.deb`). | `release/latest-linux.yml` |
-| `latest.json` | Manifiesto JSON estructurado con enlaces directos, hashes SHA-256 / SHA-512 y notas de versión para todos los instaladores (Windows, Pacman, Deb, AppImage, Tarball). | `release/latest.json` |
-| `update.json` | Alias JSON de `latest.json` para clientes heredados y scripts de auto-despliegue. | `release/update.json` |
+`--manifests` genera hashes sin firmar y sirve para inspección; **no habilita** instalación Linux. `--sign` genera manifiestos, firma todos los paquetes anunciados y latest.json/update.json con la clave privada correspondiente a la clave pública fijada. No se guarda clave privada en repo. Publicar paquetes y sus .sig, latest.json y latest.json.sig, update.json y update.json.sig, metadata YAML/blockmaps requeridos por electron-updater y clave pública. Inspeccionar `release/*.json` antes de publicar: ningún artefacto anunciado debe faltar. Crear una GitHub Release; un tag solo no es una release disponible.
 
----
+## Dependencias y límites
 
-## 5. 🚀 Flujo Oficial de Compilación, Firma y Publicación de Releases
+Hono/Worker y backend se actualizan con sus pruebas aisladas. jsPDF4.2.1 corrige los avisos críticos de su versión anterior (fuente: https://github.com/parallax/jsPDF/releases/tag/v4.2.1), conservando el flujo de canvas y anexos PDF. Electron44.5.1 y electron-builder26.15.3 ya están actualizados. La matriz de releases compila y prueba ASAR nativo Linux y Windows; instalación interactiva y actualización del SO siguen pendientes. Estables excluyen beta; beta admite beta/rc/final y excluye alpha. npm audit se conserva como evidencia; esta rama no se presenta como libre de toda vulnerabilidad ni certifica todos los formatos de distribución.
 
-### ⚠️ Causa Raíz de Versiones Desfasadas al Actualizar:
-Si únicamente se crea y empuja un tag de Git (`git push origin v2.0.0`), la API de GitHub (`/repos/WilkerDev1/solarsim-pro/releases/latest`) **NO** reconoce el nuevo tag como un lanzamiento disponible hasta que se cree formalmente el **GitHub Release**. Si el usuario pulsa *"Buscar Actualizaciones"* en la app antes de que el release esté publicado en GitHub, la app consultará la API, obtendrá la versión anterior (ej. v1.6.0) y descargará el paquete antiguo, sobreescribiendo la instalación.
+Documentos financieros describen contratos de software, no validación jurídica de normativa futura. Revisar cambios legales con fuentes regulatorias antes de modificar fórmulas.
 
-### 🛠️ Protocolo Paso a Paso para Nuevas Versiones:
+## Compilación oficial en GitHub
 
-1. **Sincronización de Versión en Archivos JSON (1 Comando)**:
-   ```bash
-   npm run release:bump 2.1.0
-   ```
-   *(Actualiza automáticamente `package.json`, `server/package.json`, `workers/share-viewer/package.json`, `/api/health`, UI y sincroniza todos los lockfiles).*
+`verify.yml` comprueba PRs y ramas beta/main sin empaquetar sistemas operativos. Las ramas codex no disparan además otro push check: se evita la duplicación observada en PR1. `npm run dev` se comprueba con un puerto aislado y sin autenticar ni escribir datos.
 
-2. **Compilación de Producción Multiplataforma**:
-   ```bash
-   npm run build && npm run build:electron
-   npx electron-builder --win --linux
-   ```
-   *(Los binarios se generan directamente con nombres canónicos sin espacios gracias a `artifactName` en `package.json`).*
+`release.yml` se ejecuta al publicar un tag vX.Y.Z cuya versión coincide con package.json. Ejecuta primero los contratos y después dos runners nativos. Genera seis archivos (Windows2 y Linux4) y crea una release **borrador**, con tamaños/hashes verificados. No publica automáticamente archivos sin firma Linux. Los artefactos temporales expiran a los7días; los assets de una release permanecen.
 
-3. **Firma Criptográfica GPG y Manifiestos JSON Automáticos (1 Comando)**:
-   ```bash
-   npm run release:manifests
-   ```
-   *(Firma con GPG los paquetes Linux y calcula instantáneamente los hashes SHA-256 / SHA-512 y tamaños, generando `latest.json` y `update.json`).*
+La clave privada GPG se conserva en el equipo del firmante. Descargar los assets del borrador, copiarlos a release/, ejecutar `npm run release:sign` y `npx tsx scripts/qa/verifyCandidate.ts`, subir manifiestos/firmas y publicar el borrador. Ninguna compilación de binarios ocurre en ese paso local. Windows no dispone de Authenticode; macOS no forma parte de los formatos mantenidos. Los runners prueban el ejecutable instalado con un perfil nuevo, además del ASAR/IPC. El icono de ventana se incluye como recurso del paquete.
 
-4. **Crear y Publicar el Release Oficial en GitHub**:
-   ```bash
-   gh release create vX.Y.Z \
-     --title "⚡ SolarSim Pro vX.Y.Z — <Título de la Versión>" \
-     --notes-file release/release-notes-vX.Y.Z.md \
-     release/SolarSim-Pro-Setup-X.Y.Z.exe \
-     release/SolarSim-Pro-Setup-X.Y.Z.exe.blockmap \
-     release/SolarSim-Pro-X.Y.Z.exe \
-     release/SolarSim-Pro-X.Y.Z.AppImage \
-     release/SolarSim-Pro-X.Y.Z.AppImage.sig \
-     release/solarsim-pro_X.Y.Z_amd64.deb \
-     release/solarsim-pro-X.Y.Z.pacman \
-     release/solarsim-pro-X.Y.Z.pacman.sig \
-     release/solarsim-pro-X.Y.Z.tar.gz \
-     release/solarsim-pro-X.Y.Z.tar.gz.sig \
-     release/solarsim-public-key.asc \
-     release/latest.yml \
-     release/latest-linux.yml \
-     release/latest.json \
-     release/update.json
-   ```
-
-5. **Instalación Local para Validación Inmediata**:
-   ```bash
-   sudo pacman -U --noconfirm release/solarsim-pro-X.Y.Z.pacman
-   ```
-
+No repetir un tag/release existente para sustituir silenciosamente sus binarios. Corregir mediante una versión nueva. La release de escritorio no despliega API, Worker ni modifica la base empresarial.

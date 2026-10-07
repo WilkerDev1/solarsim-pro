@@ -1,6 +1,6 @@
 import React from 'react';
 import { ShieldCheck, CheckCircle2, Check } from 'lucide-react';
-import { ProjectSimulation, FinancialSummaryResult, DocumentCustomization } from '../../../types';
+import { ProjectSimulation, FinancialSummaryResult, DocumentCustomization, ClientInfo } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
 import { PDFHeaderBanner } from '../PDFHeaderBanner';
 import { PDFFooter } from '../PDFFooter';
@@ -20,6 +20,8 @@ interface PDFPage2QuotationProps {
   totalPages: number;
   isEditMode?: boolean;
   updateDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
+  updateDefaultDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
+  updateClient?: (client: Partial<ClientInfo>) => void;
 }
 
 const cleanInstallationDesc = (desc?: string): string => {
@@ -42,13 +44,21 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
   totalPages,
   isEditMode = false,
   updateDocumentCustomization,
+  updateDefaultDocumentCustomization,
+  updateClient,
 }) => {
   const cust = project.customization || {};
 
   const cleanClientName = (project.client.name || 'Cliente').replace(/\s*\((?:Copia|Copia Importada|COPIA|V\d+|C\d+)\)\s*/gi, '').trim();
-  const contactName = cust.contactName || cleanClientName || 'Contacto';
-  const rawClientPhone = cust.clientPhone || project.client.contactPhone || '809-378-6590';
-  const clientPhone = (rawClientPhone.includes('555-0199') || rawClientPhone.includes('5550199')) ? (project.client.contactPhone || '809-378-6590') : rawClientPhone;
+  const contactName = cust.contactName !== undefined 
+    ? cust.contactName 
+    : (project.client.contactPerson || project.client.company || cleanClientName || '');
+  const rawClientPhone = cust.clientPhone !== undefined 
+    ? cust.clientPhone 
+    : (project.client.contactPhone || '');
+  const clientPhone = (rawClientPhone.includes('555-0199') || rawClientPhone.includes('5550199') || rawClientPhone === '+1 (809) 000-0000') 
+    ? '' 
+    : rawClientPhone;
   const defaultValidityNote = `* Equipos según disponibilidad de inventario | * Propuesta válida por ${project.client.quoteValidityDays || 7} días | * Precios en USD *`;
 
   // Dynamic services included
@@ -100,32 +110,125 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
           </h3>
           <div className="grid grid-cols-2 gap-4 px-2 text-[10px]">
             <div className="space-y-0.5">
-              <div>
-                <span className="font-bold text-slate-600">Cliente:</span>{' '}
-                <span className="font-bold text-slate-900">{cleanClientName}</span>
+              <div className="flex items-center gap-1.5 leading-snug">
+                <span className="font-bold text-slate-600 shrink-0">Cliente:</span>{' '}
+                <InlineEditableText
+                  value={project.client.name}
+                  defaultValue="Cliente"
+                  onSave={(val) => updateClient?.({ name: val })}
+                  isEditMode={isEditMode}
+                  multiline={false}
+                  label="Nombre del Cliente"
+                  placeholder="Nombre del cliente"
+                  className="font-bold text-slate-900 inline-block"
+                  boldClassName="font-bold text-slate-950"
+                />
               </div>
-              <div>
-                <span className="font-bold text-slate-600">Contacto:</span> {contactName}
+              <div className="flex items-center gap-1.5 leading-snug">
+                <span className="font-bold text-slate-600 shrink-0">Contacto:</span>{' '}
+                <InlineEditableText
+                  value={contactName}
+                  defaultValue=""
+                  onSave={(val) => {
+                    updateDocumentCustomization?.({ contactName: val });
+                    updateClient?.({ contactPerson: val });
+                  }}
+                  onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ contactName: val })}
+                  isEditMode={isEditMode}
+                  multiline={false}
+                  label="Contacto (Atención a)"
+                  placeholder="(Agregar contacto)"
+                  className="font-medium inline-block text-slate-800"
+                  boldClassName="font-bold text-slate-950"
+                  isCustomized={!!cust.contactName}
+                  onReset={() => {
+                    updateDocumentCustomization?.({ contactName: '' });
+                    updateClient?.({ contactPerson: '' });
+                  }}
+                />
               </div>
-              <div>
-                <span className="font-bold text-slate-600">Teléfono:</span> {clientPhone}
+              <div className="flex items-center gap-1.5 leading-snug">
+                <span className="font-bold text-slate-600 shrink-0">Teléfono:</span>{' '}
+                <InlineEditableText
+                  value={clientPhone}
+                  defaultValue=""
+                  onSave={(val) => {
+                    updateDocumentCustomization?.({ clientPhone: val });
+                    updateClient?.({ contactPhone: val });
+                  }}
+                  isEditMode={isEditMode}
+                  multiline={false}
+                  label="Teléfono del Cliente"
+                  placeholder="(Agregar teléfono)"
+                  className="font-medium inline-block text-slate-800"
+                  boldClassName="font-bold text-slate-950"
+                  isCustomized={!!cust.clientPhone}
+                  onReset={() => {
+                    updateDocumentCustomization?.({ clientPhone: '' });
+                    updateClient?.({ contactPhone: '' });
+                  }}
+                />
               </div>
-              <div>
-                <span className="font-bold text-slate-600">Dirección:</span>{' '}
-                {project.client.address || 'Santo Domingo, República Dominicana'}
+              <div className="flex items-center gap-1.5 leading-snug">
+                <span className="font-bold text-slate-600 shrink-0">Dirección:</span>{' '}
+                <InlineEditableText
+                  value={project.client.address || ''}
+                  defaultValue={`${project.client.province || project.client.location || 'Santo Domingo'}, República Dominicana`}
+                  onSave={(val) => updateClient?.({ address: val })}
+                  isEditMode={isEditMode}
+                  multiline={false}
+                  label="Dirección del Cliente"
+                  placeholder="Dirección del cliente"
+                  className="font-medium inline-block text-slate-800"
+                  boldClassName="font-bold text-slate-950"
+                />
               </div>
             </div>
             <div className="space-y-0.5 text-right">
-              <div>
-                <span className="font-bold text-slate-600">N° Cotización:</span>{' '}
-                <span className="font-bold font-mono text-slate-900">{project.client.quoteNumber || 'C-0030'}</span>
+              <div className="flex items-center justify-end gap-1.5 leading-snug">
+                <span className="font-bold text-slate-600 shrink-0">N° Cotización:</span>{' '}
+                <InlineEditableText
+                  value={project.client.quoteNumber || 'C-0001'}
+                  defaultValue="C-0001"
+                  onSave={(val) => updateClient?.({ quoteNumber: val })}
+                  isEditMode={isEditMode}
+                  multiline={false}
+                  label="N° Cotización"
+                  placeholder="C-0001"
+                  className="font-bold font-mono text-slate-900 inline-block"
+                  boldClassName="font-bold font-mono text-slate-950"
+                />
               </div>
-              <div>
-                <span className="font-bold text-slate-600">Fecha:</span> {currentDateStr}
+              <div className="flex items-center justify-end gap-1.5 leading-snug">
+                <span className="font-bold text-slate-600 shrink-0">Fecha:</span>{' '}
+                <InlineEditableText
+                  value={project.client.quoteDate || currentDateStr}
+                  defaultValue={currentDateStr}
+                  onSave={(val) => updateClient?.({ quoteDate: val })}
+                  isEditMode={isEditMode}
+                  multiline={false}
+                  label="Fecha de Cotización"
+                  placeholder="DD/MM/AAAA o YYYY-MM-DD"
+                  className="font-semibold text-slate-800 inline-block"
+                  boldClassName="font-semibold text-slate-900"
+                />
               </div>
-              <div>
-                <span className="font-bold text-slate-600">Válido por:</span>{' '}
-                <span className="font-bold text-slate-900">{project.client.quoteValidityDays || 7} Días</span>
+              <div className="flex items-center justify-end gap-1.5 leading-snug">
+                <span className="font-bold text-slate-600 shrink-0">Válido por:</span>{' '}
+                <InlineEditableText
+                  value={project.client.quoteValidityDays ? `${project.client.quoteValidityDays} Días` : '7 Días'}
+                  defaultValue="7 Días"
+                  onSave={(val) => {
+                    const num = parseInt(val.replace(/\D/g, ''), 10);
+                    updateClient?.({ quoteValidityDays: isNaN(num) ? 7 : num });
+                  }}
+                  isEditMode={isEditMode}
+                  multiline={false}
+                  label="Días de Validez"
+                  placeholder="7 Días"
+                  className="font-bold text-slate-900 inline-block"
+                  boldClassName="font-bold text-slate-950"
+                />
               </div>
             </div>
           </div>
@@ -369,6 +472,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                 value={cust.panelWarrantyText}
                 defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.panelWarrantyText || '25 Años de Producción Lineal'}
                 onSave={(val) => updateDocumentCustomization?.({ panelWarrantyText: val })}
+                onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ panelWarrantyText: val })}
                 isEditMode={isEditMode}
                 multiline={false}
                 label="Garantía Paneles"
@@ -384,6 +488,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                 value={cust.inverterWarrantyText}
                 defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.inverterWarrantyText || '5 a 10 Años de Fábrica'}
                 onSave={(val) => updateDocumentCustomization?.({ inverterWarrantyText: val })}
+                onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ inverterWarrantyText: val })}
                 isEditMode={isEditMode}
                 multiline={false}
                 label="Garantía Inversor"
@@ -400,6 +505,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                   value={cust.batteryWarrantyText}
                   defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.batteryWarrantyText || '5 a 10 Años (según fabricante)'}
                   onSave={(val) => updateDocumentCustomization?.({ batteryWarrantyText: val })}
+                  onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ batteryWarrantyText: val })}
                   isEditMode={isEditMode}
                   multiline={false}
                   label="Garantía Batería"
@@ -416,6 +522,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                 value={cust.workmanshipWarrantyText}
                 defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.workmanshipWarrantyText || '1 Año en Instalación y Soporte Técnico'}
                 onSave={(val) => updateDocumentCustomization?.({ workmanshipWarrantyText: val })}
+                onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ workmanshipWarrantyText: val })}
                 isEditMode={isEditMode}
                 multiline={false}
                 label="Garantía Mano de Obra"
@@ -449,6 +556,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                 value={cust.servicesIncludedText}
                 defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.servicesIncludedText}
                 onSave={(val) => updateDocumentCustomization?.({ servicesIncludedText: val })}
+                onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ servicesIncludedText: val })}
                 isEditMode={isEditMode}
                 multiline={true}
                 label="Servicios Gestionados"
@@ -467,6 +575,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
             value={cust.validityNote}
             defaultValue={defaultValidityNote}
             onSave={(val) => updateDocumentCustomization?.({ validityNote: val })}
+            onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ validityNote: val })}
             isEditMode={isEditMode}
             multiline={false}
             label="Nota Legal y Términos"

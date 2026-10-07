@@ -13,6 +13,12 @@ import {
   UserProfile,
   UserRole,
   ProjectFolder,
+  CompanyProfile,
+  LocalUserProfile,
+  ProjectSnapshot,
+  DiffFieldChange,
+  ProjectConflictInfo,
+  TeamNotification,
 } from '../types';
 import { SolarEquipmentItem } from '../types/equipment';
 
@@ -71,19 +77,23 @@ export interface DefaultSimulationSettings {
 export interface ProjectSlice {
   projects: ProjectSimulation[];
   activeProjectId: string;
-  activeView: 'dashboard' | 'simulator' | 'pdf-preview';
+  activeView: 'dashboard' | 'simulator' | 'pdf-preview' | 'project-hub' | 'companies-hub';
   searchQuery: string;
   statusFilter: string;
   defaultSimulationSettings: DefaultSimulationSettings;
+  defaultDocumentCustomization: DocumentCustomization;
 
   isTrashActive: boolean;
   setIsTrashActive: (active: boolean) => void;
 
-  setActiveView: (view: 'dashboard' | 'simulator' | 'pdf-preview') => void;
-  setActiveProject: (id: string) => void;
+  setActiveView: (view: 'dashboard' | 'simulator' | 'pdf-preview' | 'project-hub' | 'companies-hub') => void;
+  setActiveProject: (id: string, targetView?: 'simulator' | 'project-hub') => void;
   setSearchQuery: (query: string) => void;
   setStatusFilter: (filter: string) => void;
   updateDefaultSimulationSettings: (settings: Partial<DefaultSimulationSettings>) => void;
+  updateDefaultDocumentCustomization: (customization: Partial<DocumentCustomization>) => void;
+  saveCurrentProjectAsDefaultDocumentTemplate: () => void;
+  resetDefaultDocumentCustomization: () => void;
 
   createNewProject: (payload?: string | NewProjectPayload) => void;
   duplicateProject: (id: string) => void;
@@ -114,6 +124,11 @@ export interface ProjectSlice {
 }
 
 export interface EquipmentSlice {
+  equipmentChanges: Record<string, { scope: string; baseVersion: number; revision: string }>;
+  equipmentDeletionQueue: Array<{ scope: string; id: string; baseVersion: number; item?: SolarEquipmentItem }>;
+  equipmentSyncFeedback: string | null;
+  equipmentConflicts: Record<string, { serverItem?: SolarEquipmentItem; serverVersion?: number; reason: string }>;
+  resolveEquipmentConflict: (id: string, resolution: 'accept_server' | 'keep_local' | 'fork') => void;
   equipmentCatalog: SolarEquipmentItem[];
   deletedEquipmentIds?: string[];
 
@@ -134,6 +149,19 @@ export interface EquipmentSlice {
 }
 
 export interface SyncAuthSlice {
+  workspaceScope: string;
+  organizationWorkspaces: Record<string, import('./sync/organizationWorkspace').OrganizationWorkspace>;
+  switchOrganization: (organizationId: string) => Promise<{ success: boolean; error?: string }>;
+  sessionGeneration: number;
+  projectDeletionQueue: Array<{
+    scope: string;
+    id: string;
+    baseVersion: number;
+    /** Durable recovery copy; optional only for queues saved by older versions. */
+    project?: ProjectSimulation;
+    stage?: 'trash' | 'delete';
+  }>;
+  queueProjectDeletion: (project: ProjectSimulation) => void;
   syncSettings: SyncSettings;
   isSyncing: boolean;
   syncFeedbackMessage: string | null;
@@ -144,6 +172,7 @@ export interface SyncAuthSlice {
   logoutUser: () => void;
   syncProjectsWithServer: (silent?: boolean) => Promise<{ success: boolean; message: string }>;
   triggerAutoSync: (immediate?: boolean) => void;
+  validateSession: () => Promise<{ valid: boolean; user?: UserProfile | null; error?: string }>;
 }
 
 export interface ImportExportSlice {
@@ -177,7 +206,7 @@ export interface UISlice {
   isAIPriceCatalogModalOpen: boolean;
   isShareModalOpen: boolean;
   isSettingsModalOpen: boolean;
-  settingsActiveTab: 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare';
+  settingsActiveTab: 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare' | 'features';
   updateInfo: UpdateInfo;
   saveFeedbackMessage: string | null;
 
@@ -185,6 +214,8 @@ export interface UISlice {
 
   sidebarTheme: 'dark' | 'light';
   sidebarWidth: number;
+  dashboardViewMode: 'cards' | 'list';
+  setDashboardViewMode: (mode: 'cards' | 'list') => void;
 
   openNewProjectModal: () => void;
   closeNewProjectModal: () => void;
@@ -202,9 +233,9 @@ export interface UISlice {
   closeAISettingsModal: () => void;
   openShareModal: () => void;
   closeShareModal: () => void;
-  openSettingsModal: (tab?: 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare') => void;
+  openSettingsModal: (tab?: 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare' | 'features') => void;
   closeSettingsModal: () => void;
-  setSettingsActiveTab: (tab: 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare') => void;
+  setSettingsActiveTab: (tab: 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare' | 'features') => void;
   setUpdateInfo: (info: UpdateInfo) => void;
 
   toggleSidebarTheme: () => void;
@@ -225,7 +256,53 @@ export interface FolderSlice {
   moveProjectToFolder: (projectId: string, targetFolderId: string | null) => void;
 }
 
+export interface CompanyProfileSlice {
+  companies: CompanyProfile[];
+  activeCompanyId: string;
+  localUserProfile: LocalUserProfile;
+
+  addCompany: (companyData: Omit<CompanyProfile, 'id' | 'createdAt' | 'updatedAt'> & { id?: string; createdAt?: string; updatedAt?: string }) => string;
+  updateCompany: (id: string, partial: Partial<CompanyProfile>) => void;
+  deleteCompany: (id: string) => void;
+  setActiveCompany: (id: string) => void;
+  updateLocalUserProfile: (partial: Partial<LocalUserProfile>) => void;
+  getActiveCompany: () => CompanyProfile;
+}
+
+export interface VersionHistorySlice {
+  undoStack: ProjectSimulation[];
+  redoStack: ProjectSimulation[];
+  canUndo: boolean;
+  canRedo: boolean;
+  snapshotsByProject: Record<string, ProjectSnapshot[]>;
+  activeConflict: ProjectConflictInfo | null;
+  projectConflicts: Record<string, ProjectConflictInfo>;
+  openProjectConflict: (projectId: string) => Promise<{ success: boolean; error?: string }>;
+
+  recordUndoState: (project: ProjectSimulation) => void;
+  undo: () => void;
+  redo: () => void;
+  createSnapshot: (projectId: string, label: string, notes?: string, type?: 'auto' | 'manual') => ProjectSnapshot;
+  restoreSnapshot: (projectId: string, snapshotId: string) => boolean;
+  getProjectSnapshots: (projectId: string) => ProjectSnapshot[];
+  deleteSnapshot: (projectId: string, snapshotId: string) => void;
+  compareSnapshots: (oldSnap: ProjectSnapshot, newSnap: ProjectSnapshot) => DiffFieldChange[];
+  setActiveConflict: (conflict: ProjectConflictInfo | null) => void;
+  resolveConflict: (resolution: 'keep_local' | 'accept_server' | 'fork') => void;
+}
+
+export interface NotificationSlice {
+  notifications: TeamNotification[];
+  unreadNotificationsCount: number;
+
+  addNotification: (notification: Omit<TeamNotification, 'id' | 'timestamp' | 'read'>) => void;
+  markAsRead: (id: string) => void;
+  markAllAsRead: () => void;
+  clearNotifications: () => void;
+}
+
 import { TariffSlice } from './slices/tariffSlice';
+import { FeatureSettingsSlice } from './slices/featureSettingsSlice';
 
 export type SimulationStore = ProjectSlice &
   EquipmentSlice &
@@ -234,8 +311,11 @@ export type SimulationStore = ProjectSlice &
   AISlice &
   UISlice &
   FolderSlice &
-  TariffSlice;
+  TariffSlice &
+  CompanyProfileSlice &
+  VersionHistorySlice &
+  NotificationSlice &
+  FeatureSettingsSlice;
 
 export type SimulationState = SimulationStore;
 export type SimulationSlice<T> = StateCreator<SimulationStore, [], [], T>;
-

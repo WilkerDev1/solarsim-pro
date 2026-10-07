@@ -284,7 +284,7 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
                     Inversores kW/AC
                   </span>
                 </div>
-                <span className="text-[12.5px] font-black text-slate-900 font-mono block my-0.5 leading-snug pb-0.5">
+                <span className="text-sm font-black text-slate-900 font-mono block my-0.5 whitespace-nowrap">
                   {totalInverterPowerKW > 0 ? `${totalInverterPowerKW} kW AC` : `${systemCapacityKWp.toFixed(1)} kW AC`}
                 </span>
                 {inverters.length > 1 ? (
@@ -317,7 +317,7 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
                     Régimen de Inyección
                   </span>
                 </div>
-                <span className="text-[12.5px] font-black text-slate-900 block my-0.5 leading-snug pb-0.5 truncate">
+                <span className="text-sm font-black text-slate-900 font-mono block my-0.5 whitespace-nowrap">
                   {isZeroExport ? 'Inyección Cero' : 'Bidireccional'}
                 </span>
                 <span className="text-[9.5px] text-slate-500 font-medium block leading-normal pb-0.5 whitespace-nowrap">
@@ -332,7 +332,7 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
                       Almacenamiento BESS
                     </span>
                   </div>
-                  <span className="text-[12.5px] font-black text-emerald-700 font-mono block my-0.5 leading-snug pb-0.5 truncate">
+                  <span className="text-sm font-black text-emerald-700 font-mono block my-0.5 whitespace-nowrap">
                     {totalBatteryKWh} kWh LiFePO4
                   </span>
                   {batteries.length > 1 ? (
@@ -405,7 +405,7 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
                 <span className="text-base font-black text-slate-950 font-mono leading-tight mt-0.5">
                   ${totalBeforeLeyUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
-                <span className="text-[9.5px] text-amber-950 font-semibold block mt-0.5 truncate">
+                <span className="text-[9.5px] text-amber-950 font-semibold block mt-0.5 whitespace-nowrap">
                   {(summary.totalDiscountUSD || 0) > 0
                     ? `Desc: -$${summary.totalDiscountUSD?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`
                     : 'Total antes de ley'}

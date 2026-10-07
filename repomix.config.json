@@ -30,9 +30,11 @@
     ]
   },
   "include": [
-    "src/**/*.{ts,tsx}",
+    "src/**/*.{ts,tsx,css}",
     "electron/**/*.ts",
     "workers/share-viewer/src/**/*.ts",
+    "workers/share-viewer/tests/**/*.ts",
+    "workers/share-viewer/package.json",
     "workers/share-viewer/wrangler.toml",
     "docs/**/*.md",
     ".agents/**/*.md",
@@ -41,6 +43,18 @@
     "tsconfig*.json",
     "vite.config.ts",
     "tailwind.config.js",
-    "index.html"
+    "index.html",
+    "shared/**/*.ts",
+    "server/src/**/*.ts",
+    "server/tests/**/*.ts",
+    "server/package.json",
+    "scripts/**/*.{ts,tsx,mjs,cjs,html,ps1,py}",
+    "PRODUCT.md",
+    "shared/package.json",
+    "src/index.css",
+    ".github/workflows/*.yml",
+    "infra/services/**/*.yml",
+    "server/Dockerfile",
+    "DESIGN.md"
   ]
 }

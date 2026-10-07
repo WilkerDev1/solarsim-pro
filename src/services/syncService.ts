@@ -1,4 +1,9 @@
 import { ProjectSimulation, UserProfile, UserRole } from '../types';
+import type { SolarEquipmentItem } from '../types/equipment';
+
+export type EquipmentPushOutcome =
+  | { id: string; status: 'created' | 'updated'; version: number; item: SolarEquipmentItem }
+  | { id: string; status: 'conflict'; reason: string; serverVersion?: number; serverItem?: SolarEquipmentItem };
 
 export interface PingResult {
   online: boolean;
@@ -14,9 +19,11 @@ export interface AuthResponse {
   token?: string;
   user?: UserProfile;
   error?: string;
+  failure?: 'rejected' | 'unavailable';
 }
 
 export interface SyncPullResult {
+  deletedIds?: string[];
   success: boolean;
   projects?: ProjectSimulation[];
   serverTimestamp?: string;
@@ -24,20 +31,179 @@ export interface SyncPullResult {
   error?: string;
 }
 
+export type SyncPushOutcome =
+  | { id: string; originalId?: string; status: 'created' | 'updated' | 'forked'; version: number; project?: ProjectSimulation; awaitingConfirmation?: boolean }
+  | { id: string; originalId?: string; status: 'conflict'; reason?: string; serverVersion: number; serverProject?: ProjectSimulation; localVersion?: number; lastModifiedByName?: string; lastModifiedAt?: string };
+
 export interface SyncPushResult {
   success: boolean;
   message?: string;
   serverTimestamp?: string;
-  results?: Array<{ id: string; originalId?: string; status: string; version: number }>;
+  results?: SyncPushOutcome[];
   error?: string;
+}
+
+export type TokenRenewedCallback = (newToken: string, origin?: { serverUrl: string; token: string }) => void;
+let tokenRenewedListeners: TokenRenewedCallback[] = [];
+
+export function registerTokenRenewedListener(cb: TokenRenewedCallback): () => void {
+  tokenRenewedListeners.push(cb);
+  return () => {
+    tokenRenewedListeners = tokenRenewedListeners.filter((l) => l !== cb);
+  };
+}
+
+export function notifyTokenRenewed(newToken: string, origin?: { serverUrl: string; token: string }) {
+  tokenRenewedListeners.forEach((cb) => {
+    try {
+      cb(newToken, origin);
+    } catch (err) {
+      console.error('Error en listener de renovación de token:', err);
+    }
+  });
+}
+
+export type SessionInvalidatedCallback = (origin: { serverUrl: string; token: string }) => void;
+let sessionInvalidatedListeners: SessionInvalidatedCallback[] = [];
+
+export function registerSessionInvalidatedListener(cb: SessionInvalidatedCallback): () => void {
+  sessionInvalidatedListeners.push(cb);
+  return () => {
+    sessionInvalidatedListeners = sessionInvalidatedListeners.filter((l) => l !== cb);
+  };
+}
+
+export function notifySessionInvalidated(origin: { serverUrl: string; token: string }) {
+  sessionInvalidatedListeners.forEach((cb) => {
+    try {
+      cb(origin);
+    } catch (err) {
+      console.error('Error en listener de invalidación de sesión:', err);
+    }
+  });
+}
+
+async function computeTokenKey(serverUrl: string, token: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token));
+  return `${SyncService.cleanUrl(serverUrl)}:${Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')}`;
+}
+
+const MAX_INVALID_TOKENS = 50;
+const invalidTokens = new Set<string>();
+
+export async function markTokenInvalid(serverUrl: string, token: string): Promise<void> {
+  if (!serverUrl || !token) return;
+  const key = await computeTokenKey(serverUrl, token);
+  if (!invalidTokens.has(key) && invalidTokens.size >= MAX_INVALID_TOKENS) {
+    const oldest = invalidTokens.values().next().value;
+    if (oldest) invalidTokens.delete(oldest);
+  }
+  invalidTokens.add(key);
+}
+
+export async function clearInvalidToken(serverUrl: string, token: string): Promise<void> {
+  if (!serverUrl || !token) return;
+  invalidTokens.delete(await computeTokenKey(serverUrl, token));
+}
+
+const refreshRequests = new Map<string, Promise<string | null>>();
+
+/** One bounded refresh on 401. A revoked account or forbidden role is never retried. */
+export async function fetchWithSessionRetry(url: string, init: RequestInit = {}): Promise<Response> {
+  const send = (options: RequestInit) => fetch(url, { ...options, signal: options.signal ?? AbortSignal.timeout(12000) });
+  const authorization = new Headers(init.headers).get('Authorization');
+  const base = url.slice(0, url.indexOf('/api/'));
+  const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
+  const key = base && token ? await computeTokenKey(base, token) : null;
+
+  // Si el token ya fue marcado como definitivamente inválido, no enviamos solicitudes ni refrescos inútiles
+  if (key && invalidTokens.has(key)) {
+    return new Response(JSON.stringify({ success: false, error: 'Sesión no válida o expirada' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const response = await send(init);
+  if (response.status !== 401 || !token || !base || /\/api\/auth\/(?:refresh|login|register)$/.test(url)) return response;
+
+  let renewal = refreshRequests.get(key!);
+  if (!renewal) {
+    renewal = (async () => {
+      try {
+        const refreshed = await fetch(`${base}/api/auth/refresh`, {
+          method: 'POST',
+          headers: { Authorization: authorization! },
+          signal: AbortSignal.timeout(8000),
+        });
+        if (refreshed.status === 401 || refreshed.status === 403) {
+          // El token fue definitivamente rechazado por la API (firma inválida tras rotación o sesión revocada)
+          await markTokenInvalid(base, token);
+          notifySessionInvalidated({ serverUrl: base, token });
+          return null;
+        }
+        if (!refreshed.ok) return null;
+        const data = await refreshed.json().catch(() => null);
+        if (!data?.success || typeof data.token !== 'string') return null;
+        notifyTokenRenewed(data.token, { serverUrl: base, token });
+        return data.token as string;
+      } catch {
+        // Error de red transitorio; no invalidar la sesión permanentemente
+        return null;
+      }
+    })();
+    refreshRequests.set(key!, renewal);
+  }
+  const renewed = await renewal;
+  if (refreshRequests.get(key!) === renewal) refreshRequests.delete(key!);
+  if (!renewed) {
+    if (invalidTokens.has(key!)) return response;
+    // A refresh outage is not evidence that the original session was revoked.
+    const headers = new Headers(response.headers);
+    headers.set('x-solarsim-session-status', 'unavailable');
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+  }
+  const headers = new Headers(init.headers);
+  headers.set('Authorization', `Bearer ${renewed}`);
+  const retried = await send({ ...init, headers });
+  if (retried.status === 401) {
+    await markTokenInvalid(base, renewed);
+    notifySessionInvalidated({ serverUrl: base, token: renewed });
+  }
+  return retried;
+}
+
+function validatePushResults(results: unknown, ids: string[], content: 'project'): SyncPushOutcome[];
+function validatePushResults(results: unknown, ids: string[], content: 'item'): EquipmentPushOutcome[];
+function validatePushResults(results: unknown, ids: string[], content: 'project' | 'item'): any[] {
+  const expected = new Set(ids);
+  if (!Array.isArray(results) || results.length !== ids.length) throw new Error('El servidor no confirmó todos los documentos.');
+  for (const result of results) {
+    const source = result?.originalId || result?.id;
+    if (!expected.delete(source) || !['created', 'updated', ...(content === 'project' ? ['forked'] : []), 'conflict'].includes(result?.status)) throw new Error('Confirmación de sincronización inválida. Actualiza el servidor.');
+    if (result.status !== 'conflict' && (!Number.isSafeInteger(result.version) || result.version < 1 || (result[content]?.id !== result.id && !(content === 'project' && result.awaitingConfirmation === true)))) throw new Error('El servidor no devolvió el documento confirmado y su versión.');
+  }
+  return results;
 }
 
 export class SyncService {
   /**
    * Limpia y normaliza la URL base del servidor
    */
-  private static cleanUrl(url: string): string {
+  static cleanUrl(url: string): string {
     return (url || 'https://solarsim.electsun.net').trim().replace(/\/+$/, '');
+  }
+
+  /**
+   * Detecta y propaga tokens renovados automáticamente por el servidor
+   */
+  private static checkRenewedToken(res: Response, serverUrl: string, token: string) {
+    try {
+      const renewed = res.headers.get('x-renewed-token');
+      if (renewed) {
+        notifyTokenRenewed(renewed, { serverUrl: this.cleanUrl(serverUrl), token });
+      }
+    } catch {}
   }
 
   /**
@@ -50,7 +216,7 @@ export class SyncService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 4000);
 
-      const res = await fetch(`${base}/api/health`, {
+      const res = await fetchWithSessionRetry(`${base}/api/health`, {
         method: 'GET',
         signal: controller.signal,
       });
@@ -90,7 +256,7 @@ export class SyncService {
   static async login(serverUrl: string, email: string, password: string): Promise<AuthResponse> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/auth/login`, {
+      const res = await fetchWithSessionRetry(`${base}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -117,7 +283,7 @@ export class SyncService {
   static async register(serverUrl: string, payload: { name: string; email: string; password: string; organizationName?: string }): Promise<AuthResponse> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/auth/register`, {
+      const res = await fetchWithSessionRetry(`${base}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -139,36 +305,92 @@ export class SyncService {
   }
 
   /**
-   * Obtener perfil actual y verificar validez de token
+   * Obtener perfil actual y verificar validez de token (con auto-renovación)
    */
-  static async getMe(serverUrl: string, token: string): Promise<UserProfile | null> {
+  static async getSessionIdentity(serverUrl: string, token: string): Promise<AuthResponse> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/auth/me`, {
+      const res = await fetchWithSessionRetry(`${base}/api/auth/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) return null;
+      this.checkRenewedToken(res, serverUrl, token);
+      if (!res.ok) {
+        const rejected = (res.status === 401 || res.status === 403) && res.headers.get('x-solarsim-session-status') !== 'unavailable';
+        return { success: false, failure: rejected ? 'rejected' : 'unavailable', error: rejected ? 'La sesión expiró o fue revocada. Inicia sesión nuevamente.' : 'No se pudo verificar la sesión. Reintenta cuando haya conexión.' };
+      }
       const data = await res.json();
-      return data.user || null;
+      const user = data?.user;
+      if (!data?.success || !user || typeof user.id !== 'string' || typeof user.organizationId !== 'string' || !['ADMIN', 'EDITOR', 'LECTOR', 'VIEWER'].includes(user.role)) {
+        return { success: false, failure: 'unavailable', error: 'El servidor devolvió un perfil de sesión inválido.' };
+      }
+      return { success: true, user };
     } catch {
-      return null;
+      return { success: false, failure: 'unavailable', error: 'No se pudo verificar la sesión. Reintenta cuando haya conexión.' };
+    }
+  }
+
+  static async getMe(serverUrl: string, token: string): Promise<UserProfile | null> {
+    const result = await this.getSessionIdentity(serverUrl, token);
+    return result.success ? result.user ?? null : null;
+  }
+
+  /**
+   * Renovar sesión y obtener token fresco
+   */
+  static async refreshToken(serverUrl: string, token: string): Promise<AuthResponse> {
+    const base = this.cleanUrl(serverUrl);
+    try {
+      const res = await fetchWithSessionRetry(`${base}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 401 || res.status === 403) {
+        await markTokenInvalid(base, token);
+        notifySessionInvalidated({ serverUrl: base, token });
+        return { success: false, failure: 'rejected', error: 'La sesión expiró o fue revocada.' };
+      }
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success || typeof data.token !== 'string' || !data.token) {
+        return { success: false, failure: 'unavailable', error: data?.error || 'No se pudo renovar la sesión. Reintenta cuando haya conexión.' };
+      }
+      this.checkRenewedToken(res, serverUrl, token);
+      return { success: true, token: data.token, user: data.user };
+    } catch {
+      return { success: false, failure: 'unavailable', error: 'Fallo de red al renovar sesión' };
     }
   }
 
   /**
    * Obtener listado de usuarios de la organización (Solo ADMIN)
    */
-  static async getCompanyUsers(serverUrl: string, token: string): Promise<UserProfile[]> {
+  static async getCompanyUsers(serverUrl: string, token: string): Promise<{ success: boolean; users: UserProfile[]; error?: string }> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/users`, {
+      const res = await fetchWithSessionRetry(`${base}/api/users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) return [];
-      const data = await res.json();
-      return data.users || [];
-    } catch {
-      return [];
+      this.checkRenewedToken(res, serverUrl, token);
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        return {
+          success: false,
+          users: [],
+          error: data?.error || `Error al obtener usuarios (HTTP ${res.status})`,
+        };
+      }
+      const users: UserProfile[] = (data.users || []).map((u: any) => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        organizationId: u.organization_id || u.organizationId,
+        canEditIdentity: u.canEditIdentity,
+        isActive: u.isActive !== undefined ? u.isActive : u.is_active !== undefined ? u.is_active : true,
+        createdAt: u.created_at || u.createdAt,
+      }));
+      return { success: true, users };
+    } catch (err: any) {
+      return { success: false, users: [], error: err.message || 'Error de conexión al obtener usuarios' };
     }
   }
 
@@ -182,7 +404,7 @@ export class SyncService {
   ): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/users`, {
+      const res = await fetchWithSessionRetry(`${base}/api/users`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -190,10 +412,11 @@ export class SyncService {
         },
         body: JSON.stringify(payload),
       });
+      this.checkRenewedToken(res, serverUrl, token);
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.error || 'Error al crear usuario' };
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        return { success: false, error: data?.error || `Error al crear usuario (HTTP ${res.status})` };
       }
       return { success: true, user: data.user };
     } catch (err: any) {
@@ -208,11 +431,11 @@ export class SyncService {
     serverUrl: string,
     token: string,
     userId: string,
-    payload: { role?: UserRole; isActive?: boolean; password?: string }
-  ): Promise<{ success: boolean; error?: string }> {
+    payload: { name?: string; role?: UserRole; isActive?: boolean; password?: string }
+  ): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/users/${userId}`, {
+      const res = await fetchWithSessionRetry(`${base}/api/users/${userId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -220,14 +443,43 @@ export class SyncService {
         },
         body: JSON.stringify(payload),
       });
+      this.checkRenewedToken(res, serverUrl, token);
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.error || 'Error al actualizar usuario' };
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        return { success: false, error: data?.error || `Error al actualizar usuario (HTTP ${res.status})` };
+      }
+      return { success: true, user: data.user };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Fallo de red al actualizar usuario' };
+    }
+  }
+
+  /**
+   * Eliminar usuario de equipo de la organización (Solo ADMIN)
+   */
+  static async deleteCompanyUser(
+    serverUrl: string,
+    token: string,
+    userId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const base = this.cleanUrl(serverUrl);
+    try {
+      const res = await fetchWithSessionRetry(`${base}/api/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      this.checkRenewedToken(res, serverUrl, token);
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        return { success: false, error: data?.error || `Error al eliminar usuario (HTTP ${res.status})` };
       }
       return { success: true };
     } catch (err: any) {
-      return { success: false, error: err.message || 'Fallo de red al actualizar usuario' };
+      return { success: false, error: err.message || 'Fallo de red al eliminar usuario' };
     }
   }
 
@@ -237,7 +489,7 @@ export class SyncService {
   static async pullProjects(serverUrl: string, token: string, lastSyncTimestamp?: string | null): Promise<SyncPullResult> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/sync/pull`, {
+      const res = await fetchWithSessionRetry(`${base}/api/sync/pull`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -245,15 +497,17 @@ export class SyncService {
         },
         body: JSON.stringify({ lastSyncTimestamp: lastSyncTimestamp || '1970-01-01T00:00:00.000Z' }),
       });
+      this.checkRenewedToken(res, serverUrl, token);
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.error || 'Error al descargar proyectos' };
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        return { success: false, error: data?.error || `Error al descargar proyectos (HTTP ${res.status})` };
       }
 
       return {
         success: true,
-        projects: data.projects || [],
+        projects: Array.isArray(data.projects) ? data.projects : (() => { throw new Error('Respuesta de proyectos inválida.'); })(),
+        deletedIds: data.deletedIds || [],
         serverTimestamp: data.serverTimestamp,
         count: data.count || 0,
       };
@@ -268,7 +522,7 @@ export class SyncService {
   static async pushProjects(serverUrl: string, token: string, projects: ProjectSimulation[]): Promise<SyncPushResult> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/sync/push`, {
+      const res = await fetchWithSessionRetry(`${base}/api/sync/push`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -276,17 +530,35 @@ export class SyncService {
         },
         body: JSON.stringify({ projects }),
       });
+      this.checkRenewedToken(res, serverUrl, token);
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.error || 'Error al subir proyectos' };
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        return { success: false, error: data?.error || `Error al subir proyectos (HTTP ${res.status})` };
       }
 
+      if (Array.isArray(data.results) && data.results.some((result: any) => result.awaitingConfirmation !== undefined)) throw new Error('Confirmación de sincronización inválida.');
+      // Legacy servers acknowledge versions without returning the canonical document.
+      // Read back once; never guess a confirmed document from the submitted payload.
+      if (Array.isArray(data.results) && data.results.some((result: SyncPushOutcome) => result.status !== 'conflict' && !result.project)) {
+        const expected = new Set(projects.map(project => project.id));
+        if (data.results.length !== projects.length || data.results.some((result: SyncPushOutcome) => typeof result.id !== 'string' || !result.id || !expected.delete(result.originalId || result.id) || !['created', 'updated', 'forked', 'conflict'].includes(result.status) || (result.status !== 'conflict' && (!Number.isSafeInteger(result.version) || result.version < 1)))) throw new Error('Confirmación de sincronización inválida.');
+        const readback = await this.pullProjects(serverUrl, token);
+        const receipts = data.results.map((result: SyncPushOutcome) => result.status !== 'conflict' && !result.project ? { ...result, awaitingConfirmation: true } : result);
+        if (!readback.success || !readback.projects) return { success: true, results: receipts, message: 'El servidor guardó cambios; su confirmación sigue pendiente.' };
+        data.results = data.results.map((result: SyncPushOutcome) => {
+          if (result.status === 'conflict' || result.project) return result;
+          const confirmed = readback.projects!.find(project => project.id === result.id);
+          if (!confirmed || !Number.isSafeInteger(confirmed.version) || confirmed.version! < result.version || !confirmed.client || !confirmed.specs || !confirmed.rates || !confirmed.financials) return { ...result, awaitingConfirmation: true };
+          if (confirmed.version !== result.version) return { id: result.id, originalId: result.originalId, status: 'conflict', serverVersion: confirmed.version, localVersion: result.version, serverProject: confirmed };
+          return { ...result, project: confirmed };
+        });
+      }
       return {
         success: true,
         message: data.message,
         serverTimestamp: data.serverTimestamp,
-        results: data.results,
+        results: validatePushResults(data.results, projects.map((item) => item.id), 'project'),
       };
     } catch (err: any) {
       return { success: false, error: err.message || 'Error de conexión al enviar proyectos' };
@@ -296,16 +568,18 @@ export class SyncService {
   /**
    * Eliminar un proyecto en el servidor (Soft-Delete a papelera o eliminación definitiva física)
    */
-  static async deleteProject(serverUrl: string, token: string, projectId: string, permanent: boolean = false): Promise<boolean> {
+  static async deleteProject(serverUrl: string, token: string, projectId: string, permanent: boolean = false, baseVersion?: number): Promise<boolean> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const url = permanent ? `${base}/api/projects/${projectId}?permanent=true` : `${base}/api/projects/${projectId}`;
-      const res = await fetch(url, {
+      const versionQuery = baseVersion !== undefined ? `&baseVersion=${baseVersion}` : '';
+      const url = `${base}/api/projects/${encodeURIComponent(projectId)}?permanent=${permanent}${versionQuery}`;
+      const res = await fetchWithSessionRetry(url, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
+      this.checkRenewedToken(res, serverUrl, token);
       return res.ok;
     } catch {
       return false;
@@ -315,15 +589,16 @@ export class SyncService {
   /**
    * Restaurar un proyecto desde la papelera de reciclaje en el servidor
    */
-  static async restoreProject(serverUrl: string, token: string, projectId: string): Promise<boolean> {
+  static async restoreProject(serverUrl: string, token: string, projectId: string, baseVersion?: number): Promise<boolean> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/projects/${projectId}/restore`, {
+      const res = await fetchWithSessionRetry(`${base}/api/projects/${encodeURIComponent(projectId)}/restore?baseVersion=${baseVersion ?? ''}`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
+      this.checkRenewedToken(res, serverUrl, token);
       return res.ok;
     } catch {
       return false;
@@ -336,12 +611,13 @@ export class SyncService {
   static async emptyTrash(serverUrl: string, token: string): Promise<boolean> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/trash`, {
+      const res = await fetchWithSessionRetry(`${base}/api/trash`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
+      this.checkRenewedToken(res, serverUrl, token);
       return res.ok;
     } catch {
       return false;
@@ -351,24 +627,26 @@ export class SyncService {
   /**
    * Pull: Descargar catálogo global de equipos desde el servidor
    */
-  static async pullEquipment(serverUrl: string, token: string): Promise<{ success: boolean; items?: import('../types/equipment').SolarEquipmentItem[]; error?: string }> {
+  static async pullEquipment(serverUrl: string, token: string): Promise<{ success: boolean; items?: SolarEquipmentItem[]; deletedIds?: string[]; error?: string }> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/equipment`, {
+      const res = await fetchWithSessionRetry(`${base}/api/equipment`, {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
+      this.checkRenewedToken(res, serverUrl, token);
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.error || 'Error al descargar catálogo de equipos' };
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        return { success: false, error: data?.error || `Error al descargar catálogo de equipos (HTTP ${res.status})` };
       }
 
       return {
         success: true,
         items: data.items || [],
+        deletedIds: data.deletedIds || [],
       };
     } catch (err: any) {
       return { success: false, error: err.message || 'Error de conexión al obtener equipos' };
@@ -378,10 +656,10 @@ export class SyncService {
   /**
    * Push: Subir lote de equipos locales hacia el servidor
    */
-  static async pushEquipmentBatch(serverUrl: string, token: string, items: import('../types/equipment').SolarEquipmentItem[]): Promise<{ success: boolean; count?: number; error?: string }> {
+  static async pushEquipmentBatch(serverUrl: string, token: string, items: SolarEquipmentItem[]): Promise<{ success: boolean; count?: number; results?: EquipmentPushOutcome[]; error?: string }> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/equipment/batch`, {
+      const res = await fetchWithSessionRetry(`${base}/api/equipment/batch`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -389,15 +667,17 @@ export class SyncService {
         },
         body: JSON.stringify({ items }),
       });
+      this.checkRenewedToken(res, serverUrl, token);
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.error || 'Error al subir equipos' };
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        return { success: false, error: data?.error || `Error al subir equipos (HTTP ${res.status})` };
       }
 
       return {
         success: true,
         count: data.count,
+        results: validatePushResults(data.results, items.map((item) => item.id), 'item'),
       };
     } catch (err: any) {
       return { success: false, error: err.message || 'Error de conexión al enviar equipos' };
@@ -407,15 +687,16 @@ export class SyncService {
   /**
    * Delete: Eliminar un equipo del catálogo en el servidor
    */
-  static async deleteEquipment(serverUrl: string, token: string, equipmentId: string): Promise<boolean> {
+  static async deleteEquipment(serverUrl: string, token: string, equipmentId: string, baseVersion?: number): Promise<boolean> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/equipment/${equipmentId}`, {
+      const res = await fetchWithSessionRetry(`${base}/api/equipment/${encodeURIComponent(equipmentId)}${baseVersion !== undefined ? `?baseVersion=${baseVersion}` : ''}`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
+      this.checkRenewedToken(res, serverUrl, token);
       return res.ok;
     } catch {
       return false;
@@ -457,7 +738,7 @@ export class SyncService {
   static async fetchTariffMatrix(serverUrl: string, token: string): Promise<{ success: boolean; matrix?: import('../types/tariffs').GlobalTariffMatrix | null; error?: string }> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/tariffs`, {
+      const res = await fetchWithSessionRetry(`${base}/api/tariffs`, {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -484,7 +765,7 @@ export class SyncService {
   static async syncTariffMatrix(serverUrl: string, token: string, matrix: import('../types/tariffs').GlobalTariffMatrix): Promise<{ success: boolean; message?: string; error?: string }> {
     const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetch(`${base}/api/tariffs/sync`, {
+      const res = await fetchWithSessionRetry(`${base}/api/tariffs/sync`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -507,4 +788,3 @@ export class SyncService {
     }
   }
 }
-

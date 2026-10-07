@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import {
   ShareProposalService,
@@ -38,11 +38,19 @@ export const CloudflareProposalsSection: React.FC = () => {
     setActiveView,
     closeSettingsModal,
     sidebarTheme,
+    syncSettings,
+    sessionGeneration,
   } = useSimulationStore();
+  const historyScope = ShareProposalService.getHistoryScopeKey();
+  const requestIdentity = `${historyScope}|${syncSettings.currentUser?.id || ""}|${sessionGeneration}`;
+  const activeIdentity = useRef(requestIdentity);
+  activeIdentity.current = requestIdentity;
   const isDark = sidebarTheme === 'dark';
 
   // Estado de lista de propuestas
-  const [history, setHistory] = useState<SharedProposalRecord[]>([]);
+  const [storedHistory, setHistory] = useState<SharedProposalRecord[]>([]);
+  const [loadedScope, setLoadedScope] = useState<string | null>(null);
+  const history = loadedScope === historyScope ? storedHistory : [];
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'expired'>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -71,16 +79,24 @@ export const CloudflareProposalsSection: React.FC = () => {
   const loadHistory = () => {
     const list = ShareProposalService.getSharedHistory();
     setHistory(list);
+    setLoadedScope(historyScope);
   };
 
   useEffect(() => {
+    let active = true;
+    setSelectedQRRecord(null);
+    setDeleteConfirmId(null);
+    setShowClearExpiredConfirm(false);
+    setCopiedId(null);
+    setToastMessage(null);
+    setIsSyncing(false);
     loadHistory();
 
     // Auto-hidratación retroactiva en segundo plano para recuperar datos reales desde Cloudflare KV
     const autoEnrich = async () => {
       try {
         const res = await ShareProposalService.hydrateFromCloudflare();
-        if (res.updatedCount > 0) {
+        if (active && res.updatedCount > 0) {
           loadHistory();
           showToast(`¡${res.updatedCount} propuesta${res.updatedCount > 1 ? 's' : ''} actualizada${res.updatedCount > 1 ? 's' : ''} con datos reales desde Cloudflare! ✨`);
         }
@@ -100,13 +116,18 @@ export const CloudflareProposalsSection: React.FC = () => {
     }, 60000);
 
     return () => {
+      active = false;
       window.removeEventListener('solarsim_shared_links_updated', handleStorageUpdate);
       clearInterval(intervalId);
     };
-  }, []);
+  }, [requestIdentity]);
 
   // Sincronización manual forzada bajo demanda
   const handleSyncRealData = async () => {
+    const capturedScope = historyScope;
+    const capturedGeneration = sessionGeneration;
+    const capturedUserId = syncSettings.currentUser?.id;
+    const current = () => ShareProposalService.getHistoryScopeKey() === capturedScope && useSimulationStore.getState().sessionGeneration === capturedGeneration && useSimulationStore.getState().syncSettings.currentUser?.id === capturedUserId;
     setIsSyncing(true);
     try {
       // 1. Reconciliar con proyectos locales
@@ -115,17 +136,20 @@ export const CloudflareProposalsSection: React.FC = () => {
 
       // 2. Hidratar desde Cloudflare Workers
       const res = await ShareProposalService.hydrateFromCloudflare();
+      if (!current()) return;
       loadHistory();
 
       if (res.updatedCount > 0) {
         showToast(`¡${res.updatedCount} propuesta${res.updatedCount > 1 ? 's' : ''} sincronizada${res.updatedCount > 1 ? 's' : ''} con datos reales! ✨`);
+      } else if (res.errors > 0) {
+        showToast('No se pudieron consultar algunos enlaces. Puede que hayan vencido o que el servicio no esté disponible.');
       } else {
         showToast('Todas las propuestas activas ya tienen sus datos reales sincronizados ✅');
       }
     } catch {
-      showToast('Error al conectar con Cloudflare Workers para sincronizar ⚠️');
+      if (current()) showToast('Error al conectar con Cloudflare Workers para sincronizar ⚠️');
     } finally {
-      setIsSyncing(false);
+      if (current()) setIsSyncing(false);
     }
   };
 
@@ -276,12 +300,14 @@ export const CloudflareProposalsSection: React.FC = () => {
     const svgElement = document.getElementById('qr-code-svg-element') as SVGSVGElement | null;
     if (!svgElement) return;
 
+    const capturedIdentity = requestIdentity;
     const svgData = new XMLSerializer().serializeToString(svgElement);
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     const img = new Image();
 
     img.onload = () => {
+      if (activeIdentity.current !== capturedIdentity) return;
       canvas.width = img.width + 40;
       canvas.height = img.height + 40;
       if (ctx) {
@@ -347,6 +373,12 @@ export const CloudflareProposalsSection: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {ShareProposalService.hasQuarantinedLegacyHistory() && (
+        <p role="note" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+          Los enlaces antiguos sin organización identificada se conservan en este dispositivo. Por seguridad, no se mezclan con el historial de esta organización.
+        </p>
+      )}
 
       {/* 📊 Cuadrícula de Métricas y KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
@@ -806,7 +838,7 @@ export const CloudflareProposalsSection: React.FC = () => {
       </div>
 
       {/* 📱 Modal Popover de Código QR */}
-      {selectedQRRecord && (
+      {selectedQRRecord && loadedScope === historyScope && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="w-full max-w-sm rounded-3xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-[#18181b] p-6 shadow-2xl flex flex-col items-center text-center gap-4 relative">
             <button

@@ -2,6 +2,7 @@ import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import { ShieldCheck, CheckCircle2, Check } from 'lucide-react';
 import { getProjectPanels, getProjectInverters, getProjectBatteries } from '../../../utils/equipmentSpecsUtils';
+import { formatProposalDate } from '../../../utils/formatDateUtils';
 
 interface QuotationEquipmentsTabProps {
   project: ProjectSimulation;
@@ -26,11 +27,10 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
   costTableCurrency,
   setCostTableCurrency,
 }) => {
-  const currentDateStr = new Date().toLocaleDateString('es-DO', {
-    day: '2-digit',
-    month: 'numeric',
-    year: 'numeric',
-  });
+  const currentDateStr = React.useMemo(
+    () => formatProposalDate(project?.client?.quoteDate || project?.customization?.quoteDate),
+    [project?.client?.quoteDate, project?.customization?.quoteDate]
+  );
 
   return (
     <div className="space-y-6 shrink-0">
@@ -90,9 +90,9 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
             <div className="grid grid-cols-2 gap-4 px-2 text-[11px]">
               <div className="space-y-1">
                 <div><span className="font-bold text-slate-600">Cliente:</span> <span className="font-bold text-slate-900">{project.client.name}</span></div>
-                <div><span className="font-bold text-slate-600">Contacto:</span> {project.client.company || project.client.name}</div>
-                <div><span className="font-bold text-slate-600">Teléfono:</span> {project.client.contactPhone || '809-378-6590'}</div>
-                <div><span className="font-bold text-slate-600">Dirección:</span> {project.client.address || 'Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.'}</div>
+                <div><span className="font-bold text-slate-600">Contacto:</span> {project.customization?.contactName || project.client.contactPerson || project.client.company || project.client.name}</div>
+                <div><span className="font-bold text-slate-600">Teléfono:</span> {project.customization?.clientPhone || (project.client.contactPhone && !project.client.contactPhone.includes('555-0199') ? project.client.contactPhone : '') || '—'}</div>
+                <div><span className="font-bold text-slate-600">Dirección:</span> {project.client.address || `${project.client.province || project.client.location || 'Santo Domingo'}, RD`}</div>
               </div>
               <div className="space-y-1 text-right">
                 <div><span className="font-bold text-slate-600">N° Cotización:</span> <span className="font-bold text-slate-900">{project.client.quoteNumber || 'C-0030'}</span></div>

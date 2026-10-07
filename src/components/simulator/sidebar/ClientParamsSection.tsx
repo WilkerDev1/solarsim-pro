@@ -2,7 +2,8 @@ import React from 'react';
 import { ProjectSimulation, ClientInfo } from '../../../types';
 import { RD_PROVINCES } from '../../../data/rdProvinces';
 import { generateNextProjectSequence, findDuplicateProjectInfo } from '../../../store/useSimulationStore';
-import { User, ChevronDown, Globe, Loader2, CheckCircle2, Lock, Unlock, AlertTriangle } from 'lucide-react';
+import { User, ChevronDown, Globe, Loader2, CheckCircle2, Lock, Unlock, AlertTriangle, Calendar } from 'lucide-react';
+import { getProposalDateInputValue, formatProposalDate } from '../../../utils/formatDateUtils';
 
 interface ClientParamsSectionProps {
   project: ProjectSimulation;
@@ -99,14 +100,55 @@ export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
             </label>
             <input
               type="text"
-              value={project.client.address || 'Calle Marginal Triangulo 26 Alma Rosa 2da, Santo Domingo RD.'}
+              value={project.client.address ?? ''}
               onChange={(e) => updateClient({ address: e.target.value })}
+              placeholder="Ej: Av. 27 de Febrero #45, Santo Domingo"
               className={`w-full border rounded-lg px-3 py-1.5 text-xs transition-all ${
                 isDark
                   ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:ring-1 focus:ring-emerald-500'
                   : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600'
               }`}
             />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                Teléfono del Cliente
+              </label>
+              <input
+                type="text"
+                value={
+                  project.client.contactPhone && !project.client.contactPhone.includes('555-0199')
+                    ? project.client.contactPhone
+                    : ''
+                }
+                onChange={(e) => updateClient({ contactPhone: e.target.value })}
+                placeholder="Ej: 809-000-0000"
+                className={`w-full border rounded-lg px-3 py-1.5 text-xs transition-all ${
+                  isDark
+                    ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:ring-1 focus:ring-emerald-500'
+                    : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600'
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                Atención / Contacto
+              </label>
+              <input
+                type="text"
+                value={project.client.contactPerson ?? project.customization?.contactName ?? project.client.company ?? ''}
+                onChange={(e) => updateClient({ contactPerson: e.target.value })}
+                placeholder="Persona o dpto."
+                className={`w-full border rounded-lg px-3 py-1.5 text-xs transition-all ${
+                  isDark
+                    ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:ring-1 focus:ring-emerald-500'
+                    : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600'
+                }`}
+              />
+            </div>
           </div>
 
           {/* Selector de Fuente de Radiación Solar: Provincia vs GPS Satelital */}
@@ -307,6 +349,43 @@ export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
                           : 'bg-white border-slate-300 text-slate-800 focus:border-emerald-600'
                       }`}
                     />
+                  </div>
+                </div>
+
+                {/* Fecha de Emisión / Cotización */}
+                <div className="pt-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className={`text-xs font-medium flex items-center gap-1.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                      <Calendar className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>Fecha de Cotización / Emisión</span>
+                    </label>
+                    {project.client.quoteDate && (
+                      <button
+                        type="button"
+                        onClick={() => updateClient({ quoteDate: undefined })}
+                        className="text-[10.5px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+                        title="Restablecer a fecha actual"
+                      >
+                        Restablecer a Hoy
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={getProposalDateInputValue(project.client.quoteDate)}
+                      onChange={(e) => updateClient({ quoteDate: e.target.value })}
+                      className={`flex-1 border rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
+                        isDark
+                          ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:border-emerald-500'
+                          : 'bg-white border-slate-300 text-slate-800 focus:border-emerald-600'
+                      }`}
+                    />
+                    <span className={`text-xs font-bold font-mono px-2 py-1.5 rounded-lg border shrink-0 ${
+                      isDark ? 'bg-[#181820] border-[#333344] text-emerald-400' : 'bg-slate-100 border-slate-200 text-slate-800'
+                    }`}>
+                      {formatProposalDate(project.client.quoteDate, 'numeric')}
+                    </span>
                   </div>
                 </div>
 

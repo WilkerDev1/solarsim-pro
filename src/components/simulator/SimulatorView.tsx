@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { fetchSolarRadiationByCoordinates } from '../../services/solarRadiationApi';
-import { Shield, Trash2, RotateCcw, ArrowLeft } from 'lucide-react';
+import { Shield, Trash2, RotateCcw, ArrowLeft, Undo2, Redo2 } from 'lucide-react';
 import { ParameterSidebar } from './sidebar/ParameterSidebar';
 import { EnergyAnalysisTab } from './tabs/EnergyAnalysisTab';
 import { QuotationEquipmentsTab } from './tabs/QuotationEquipmentsTab';
@@ -30,6 +30,10 @@ export const SimulatorView: React.FC = () => {
     hardDeleteProject,
     setActiveView,
     setIsTrashActive,
+    canUndo,
+    canRedo,
+    undo,
+    redo,
   } = useSimulationStore();
 
   const project = getActiveProject();
@@ -79,6 +83,32 @@ export const SimulatorView: React.FC = () => {
       window.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
+
+  // ⌨️ Global Keyboard Listeners for Live Undo / Redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        if (e.shiftKey) {
+          e.preventDefault();
+          if (canRedo) redo();
+        } else {
+          e.preventDefault();
+          if (canUndo) undo();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        if (canRedo) redo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [canUndo, canRedo, undo, redo]);
 
   // Handler for GPS satellite solar radiation fetching
   const handleFetchSolarApi = async () => {
@@ -179,8 +209,8 @@ export const SimulatorView: React.FC = () => {
           </div>
         )}
 
-        {/* Lector Role Notice Banner */}
-        {syncSettings.currentUser?.role === 'LECTOR' && !project.isDeleted && (
+        {/* Lector / Viewer Role Notice Banner */}
+        {syncSettings.authToken && (syncSettings.currentUser?.role === 'LECTOR' || syncSettings.currentUser?.role === 'VIEWER') && !project.isDeleted && (
           <div className="bg-blue-900 text-blue-100 px-6 py-2 text-xs font-semibold flex items-center justify-between border-b border-blue-800 shrink-0">
             <div className="flex items-center gap-2">
               <Shield className="w-4 h-4 text-blue-300" />
@@ -223,6 +253,31 @@ export const SimulatorView: React.FC = () => {
               }`}
             >
               Retorno de Inversión y Flujo 25 Años
+            </button>
+          </div>
+
+          {/* Right: Live Undo / Redo & Hub Jump */}
+          <div className="flex items-center gap-1.5 pb-2">
+            <button
+              type="button"
+              onClick={undo}
+              disabled={!canUndo}
+              className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1 text-xs font-semibold"
+              title="Deshacer último cambio (Ctrl+Z)"
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Deshacer</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={redo}
+              disabled={!canRedo}
+              className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center gap-1 text-xs font-semibold"
+              title="Rehacer cambio (Ctrl+Y)"
+            >
+              <Redo2 className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Rehacer</span>
             </button>
           </div>
         </div>

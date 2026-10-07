@@ -25,8 +25,8 @@ export const PDFHeaderBanner: React.FC<PDFHeaderBannerProps> = ({
   pageTitle,
   customization,
 }) => {
-  const companyName = customization?.companyName || DEFAULT_DOCUMENT_CUSTOMIZATION.companyName || 'electsun';
-  const companySlogan = customization?.companySlogan || DEFAULT_DOCUMENT_CUSTOMIZATION.companySlogan || 'El sol a tu favor';
+  const companyName = customization?.companyName ?? DEFAULT_DOCUMENT_CUSTOMIZATION.companyName ?? 'electsun';
+  const companySlogan = customization?.companySlogan ?? DEFAULT_DOCUMENT_CUSTOMIZATION.companySlogan ?? 'El sol a tu favor';
   const isDefaultElectsun = companyName.toLowerCase().trim() === 'electsun';
 
   const cleanClientName = (clientName || 'Cliente').replace(/\s*\((?:Copia|Copia Importada|COPIA|V\d+|C\d+)\)\s*/gi, '').trim();

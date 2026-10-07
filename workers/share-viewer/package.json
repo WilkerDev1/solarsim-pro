@@ -1,20 +1,27 @@
 {
   "name": "solarsim-share-viewer",
-  "version": "2.0.0",
+  "version": "2.3.1",
   "description": "Cloudflare Worker & Web Proposal Viewer for SolarSim Pro",
   "main": "src/index.ts",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "types": "wrangler types",
-    "build": "wrangler types && tsc"
+    "build": "wrangler types && tsc",
+    "test": "tsx tests/publicationIntegrity.test.ts && tsx tests/shareSnapshot.test.ts"
   },
   "dependencies": {
-    "hono": "^4.5.8"
+    "hono": "^4.13.12"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260819.1",
+    "tsx": "^4.23.15",
     "typescript": "^5.5.4",
     "wrangler": "^4.124.0"
+  },
+  "overrides": {
+    "miniflare": {
+      "sharp": "0.35.5"
+    }
   }
 }

@@ -1,10 +1,74 @@
+import { changeWorkspace } from '../sync/organizationWorkspace';
+import { CompanyService } from '../../services/companyService';
+import { projectDifferences } from '../sync/projectDifferences';
 import { SimulationSlice, SyncAuthSlice } from '../types';
-import { ProjectSimulation } from '../../types';
-import { SyncService } from '../../services/syncService';
+import { featureScope } from '../../../shared/applicationFeatures';
+import { ownsProject, reconcilePulledProjects, acknowledgeProjectPush } from '../sync/projectReconciliation';
+import { SyncService, registerTokenRenewedListener, registerSessionInvalidatedListener, clearInvalidToken } from '../../services/syncService';
+import { acknowledgeQueuedProjectDeletions, createProjectDeletion, ProjectDeletionCommand } from '../sync/projectDeletion';
+import type { ProjectConflictInfo, ProjectSimulation } from '../../types';
 
 let autoSyncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) => ({
+
+export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) => {
+  let sessionEpoch = 0;
+  let authenticationAttempt: number | null = null;
+  const bumpSessionEpoch = () => {
+    sessionEpoch = Math.max(sessionEpoch, get()?.sessionGeneration || 0) + 1;
+    return sessionEpoch;
+  };
+  const captureSession = () => {
+    const captured = get().syncSettings;
+    const epoch = sessionEpoch;
+    return { ...captured, isCurrent: () => {
+      const current = get().syncSettings;
+      return epoch === sessionEpoch && current.serverUrl === captured.serverUrl && current.currentUser?.id === captured.currentUser?.id && current.currentUser?.organizationId === captured.currentUser?.organizationId && !!current.authToken;
+    } };
+  };
+  registerTokenRenewedListener((newToken, origin) => {
+    const session = get().syncSettings;
+    if (origin && origin.serverUrl === session.serverUrl.trim().replace(/\/+$/, '') && origin.token === session.authToken) set({ syncSettings: { ...session, authToken: newToken } });
+  });
+  registerSessionInvalidatedListener((origin) => {
+    const session = get().syncSettings;
+    if (origin && origin.serverUrl === session.serverUrl.trim().replace(/\/+$/, '') && origin.token === session.authToken) {
+      if (autoSyncDebounceTimer) {
+        clearTimeout(autoSyncDebounceTimer);
+        autoSyncDebounceTimer = null;
+      }
+      const epoch = authenticationAttempt === sessionEpoch ? sessionEpoch : bumpSessionEpoch();
+      set((state) => ({
+        syncSettings: {
+          ...state.syncSettings,
+          authToken: null,
+        },
+        sessionGeneration: epoch,
+        isSyncing: false,
+        activeConflict: null,
+        featurePolicyRequest: null,
+        syncFeedbackMessage: 'La sesión expiró o fue revocada. Inicia sesión nuevamente.',
+      }));
+    }
+  });
+
+  return {
+  sessionGeneration: 0,
+  workspaceScope: '',
+  organizationWorkspaces: {},
+  switchOrganization: async (organizationId) => {
+    const session = captureSession();
+    if (!session.authToken) return { success: false, error: 'Inicia sesión primero.' };
+    const result = await CompanyService.switch(session.serverUrl, session.authToken, organizationId);
+    if (!session.isCurrent()) return { success: false, error: 'La sesión cambió.' };
+    if (!result.success || !result.token || !result.user) return { success: false, error: result.error || 'Respuesta de sesión inválida.' };
+    const epoch = bumpSessionEpoch();
+    if (autoSyncDebounceTimer) { clearTimeout(autoSyncDebounceTimer); autoSyncDebounceTimer = null; }
+    set(state => { const syncSettings = { ...state.syncSettings, authToken: result.token!, currentUser: result.user!, lastSyncTimestamp: null }; return { ...changeWorkspace(state, syncSettings), syncSettings, sessionGeneration: epoch, isSyncing: false }; });
+    void get().loadOrganizationFeaturePolicy();
+    void get().syncProjectsWithServer(false);
+    return { success: true };
+  },
   syncSettings: {
     serverUrl: 'https://solarsim.electsun.net',
     autoSyncEnabled: true,
@@ -12,11 +76,23 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
     authToken: null,
     currentUser: null,
   },
+  projectDeletionQueue: [],
+  queueProjectDeletion: (project) => {
+    const { serverUrl, currentUser } = get().syncSettings;
+    if (!currentUser || !ownsProject(project, serverUrl, currentUser.organizationId)) return;
+    const scope = featureScope(serverUrl, currentUser.organizationId);
+    set((state) => ({ projectDeletionQueue: [...state.projectDeletionQueue.filter((item) => item.scope !== scope || item.id !== project.id), createProjectDeletion(project, scope)] }));
+  },
   isSyncing: false,
   syncFeedbackMessage: null,
 
   setSyncSettings: (settingsPartial) => {
-    set((state) => ({ syncSettings: { ...state.syncSettings, ...settingsPartial } }));
+    if (settingsPartial.serverUrl || settingsPartial.currentUser !== undefined || settingsPartial.authToken === null) bumpSessionEpoch();
+    set((state) => {
+      const syncSettings = { ...state.syncSettings, ...settingsPartial };
+      if (settingsPartial.serverUrl && settingsPartial.serverUrl !== state.syncSettings.serverUrl && settingsPartial.authToken === undefined && settingsPartial.currentUser === undefined) { syncSettings.authToken = null; syncSettings.currentUser = null; }
+      return { ...changeWorkspace(state, syncSettings), syncSettings, sessionGeneration: sessionEpoch, isSyncing: false, activeConflict: null };
+    });
     if (settingsPartial.autoSyncEnabled && get().syncSettings.authToken) {
       get().triggerAutoSync(true);
     }
@@ -24,46 +100,70 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
 
   loginUser: async (email, password) => {
     const { serverUrl } = get().syncSettings;
+    const epoch = bumpSessionEpoch();
+    authenticationAttempt = epoch;
+    set({ sessionGeneration: epoch, isSyncing: false });
     const res = await SyncService.login(serverUrl, email, password);
+    if (epoch !== sessionEpoch || serverUrl !== get().syncSettings.serverUrl) return { success: false, error: 'La sesión cambió mientras se iniciaba el acceso.' };
     if (res.success && res.token && res.user) {
+      await clearInvalidToken(serverUrl, res.token!);
+      if (epoch !== sessionEpoch || serverUrl !== get().syncSettings.serverUrl) return { success: false, error: 'La sesión cambió mientras se iniciaba el acceso.' };
       set((state) => ({
+        ...changeWorkspace(state, { ...state.syncSettings, authToken: res.token!, currentUser: res.user! }),
         syncSettings: {
           ...state.syncSettings,
           authToken: res.token!,
           currentUser: res.user!,
+          lastSyncTimestamp: null,
         },
       }));
+      void get().loadOrganizationFeaturePolicy();
       get().syncProjectsWithServer(false);
+      if (authenticationAttempt === epoch) authenticationAttempt = null;
       return { success: true };
     }
+    if (authenticationAttempt === epoch) authenticationAttempt = null;
     return { success: false, error: res.error || 'Error al iniciar sesión' };
   },
 
   registerUser: async (name, email, password, organizationName) => {
     const { serverUrl } = get().syncSettings;
+    const epoch = bumpSessionEpoch();
+    authenticationAttempt = epoch;
+    set({ sessionGeneration: epoch, isSyncing: false });
     const res = await SyncService.register(serverUrl, { name, email, password, organizationName });
+    if (epoch !== sessionEpoch || serverUrl !== get().syncSettings.serverUrl) return { success: false, error: 'La sesión cambió mientras se iniciaba el acceso.' };
     if (res.success && res.token && res.user) {
       set((state) => ({
+        ...changeWorkspace(state, { ...state.syncSettings, authToken: res.token!, currentUser: res.user! }),
         syncSettings: {
           ...state.syncSettings,
           authToken: res.token!,
           currentUser: res.user!,
+          lastSyncTimestamp: null,
         },
       }));
+      void get().loadOrganizationFeaturePolicy();
       get().syncProjectsWithServer(false);
+      if (authenticationAttempt === epoch) authenticationAttempt = null;
       return { success: true };
     }
+    if (authenticationAttempt === epoch) authenticationAttempt = null;
     return { success: false, error: res.error || 'Error al registrar usuario' };
   },
 
   logoutUser: () => {
+    const epoch = bumpSessionEpoch();
+    set({ sessionGeneration: epoch, isSyncing: false, featurePolicyRequest: null, activeConflict: null });
     if (autoSyncDebounceTimer) {
       clearTimeout(autoSyncDebounceTimer);
       autoSyncDebounceTimer = null;
     }
     set((state) => ({
+      ...changeWorkspace(state, { ...state.syncSettings, authToken: null, currentUser: null }),
       syncSettings: {
         ...state.syncSettings,
+        lastSyncTimestamp: null,
         authToken: null,
         currentUser: null,
       },
@@ -89,183 +189,172 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
   },
 
   syncProjectsWithServer: async (silent = false) => {
-    const { serverUrl, authToken, lastSyncTimestamp } = get().syncSettings;
-    if (!authToken) {
-      return { success: false, message: 'Inicia sesión para sincronizar proyectos con la nube' };
-    }
-
-    if (!silent) {
-      set({ isSyncing: true, syncFeedbackMessage: 'Sincronizando con el servidor...' });
-    } else {
-      set({ isSyncing: true });
-    }
-
+    if (get().isSyncing) return { success: false, message: 'Ya hay una sincronización en curso.' };
+    const session = captureSession();
+    const { serverUrl, currentUser } = session;
+    if (!session.authToken || !currentUser) return { success: false, message: 'Inicia sesión para sincronizar proyectos.' };
+    const scope = featureScope(serverUrl, currentUser.organizationId);
+    const canWrite = currentUser.role === 'ADMIN' || currentUser.role === 'EDITOR';
+    const ensureCurrent = () => { if (!session.isCurrent()) throw new Error('La sesión cambió durante la sincronización.'); };
+    const token = () => get().syncSettings.authToken!;
+    set({ isSyncing: true, syncFeedbackMessage: silent ? null : 'Sincronizando…' });
+    let conflicts = 0;
+    let deletionErrors = 0;
+    const releaseDeletion = (command: ProjectDeletionCommand) => set((state) => ({ projectDeletionQueue: state.projectDeletionQueue.filter((item) => item.scope !== command.scope || item.id !== command.id) }));
+    const recoverDeletion = (command: ProjectDeletionCommand, server?: ProjectSimulation) => {
+      conflicts++;
+      const local = command.project;
+      set((state) => ({
+        projectDeletionQueue: state.projectDeletionQueue.filter((item) => item.scope !== command.scope || item.id !== command.id),
+        projects: local ? [...state.projects.filter((project) => project.id !== command.id), { ...local, syncStatus: 'conflict' as const }] : state.projects,
+        activeConflict: local && server ? {
+          projectId: command.id, localVersion: command.baseVersion, serverVersion: server.version ?? 1,
+          localProject: local, serverProject: server, scope, lastModifiedByName: '',
+          lastModifiedAt: server.updatedAt, diffs: projectDifferences(server, local),
+        } : state.activeConflict,
+      }));
+      if (get().activeConflict) get().setActiveConflict(get().activeConflict);
+    };
     try {
-      // 1. Pull: Descargar propuestas autoritativas de toda la organización (Servidor como Fuente de Verdad)
-      const pullRes = await SyncService.pullProjects(serverUrl, authToken);
-      let currentProjects = [...get().projects];
-
-      if (pullRes.success && pullRes.projects) {
-        const serverProjectsMap = new Map(pullRes.projects.map((p) => [p.id, p]));
-
-        // Actualizar o preservar propuestas locales
-        currentProjects = currentProjects
-          .map((local) => {
-            if (serverProjectsMap.has(local.id)) {
-              const serverVersion = serverProjectsMap.get(local.id)!;
-              serverProjectsMap.delete(local.id);
-
-              // Si el proyecto local tiene cambios pendientes (ej. pendiente de borrar), se conserva
-              if (local.syncStatus === 'pending') {
-                return local;
-              }
-              // De lo contrario, adopta la versión autoritativa del servidor preservando la carpeta local
-              return {
-                ...serverVersion,
-                folderId: local.folderId !== undefined ? local.folderId : serverVersion.folderId,
-                syncStatus: 'synced' as const,
-              };
-            }
-
-            // Si el proyecto estaba 'synced' localmente pero el servidor ya NO lo tiene
-            // (por ejemplo por pertenecer a otra organización, sesión o sincronización parcial),
-            // NUNCA eliminarlo automáticamente del dispositivo local: se preserva intacto
-            // cambiándolo a 'local_only' para blindar el trabajo del usuario contra pérdidas.
-            if (local.syncStatus === 'synced') {
-              return { ...local, syncStatus: 'local_only' as const };
-            }
-
-            return local;
-          });
-
-        // Incorporar propuestas nuevas creadas por otros compañeros de la empresa
-        for (const newServerProj of serverProjectsMap.values()) {
-          // Si el ID ya existiera de forma duplicada por algún motivo, forzar ID único
-          if (!currentProjects.some((p) => p.id === newServerProj.id)) {
-            currentProjects.unshift({ ...newServerProj, syncStatus: 'synced' as const });
-          }
-        }
-      }
-
-      // 2. Push: Subir cambios locales pendientes hacia el servidor
-      const pendingProjects = currentProjects.filter((p) => p.syncStatus !== 'synced');
-      const pushedSnapshots = new Map(pendingProjects.map((p) => [p.id, p.updatedAt]));
-
-      if (pendingProjects.length > 0) {
-        const pushRes = await SyncService.pushProjects(serverUrl, authToken, pendingProjects);
-        if (pushRes.success) {
-          const resultsMap = new Map((pushRes.results || []).map((r) => [r.originalId || r.id, r]));
-
-          currentProjects = currentProjects.map((p) => {
-            if (resultsMap.has(p.id)) {
-              const resInfo = resultsMap.get(p.id)!;
-              return {
-                ...p,
-                id: resInfo.id || p.id,
-                version: resInfo.version || p.version || 1,
-                syncStatus: 'synced' as const,
-              };
-            }
-            return p;
-          });
-        }
-      }
-
-      // Filtrar proyectos en papelera con más de 30 días de antigüedad (retención cumplida)
-      const CUTOFF_30_DAYS = 30 * 24 * 60 * 60 * 1000;
-      const isExpiredTrash = (p: ProjectSimulation) => {
-        if (!p.isDeleted) return false;
-        if (!p.deletedAt && !p.updatedAt) return false;
-        const raw = p.deletedAt || p.updatedAt;
-        const t = new Date(raw).getTime();
-        if (isNaN(t) || t <= 0) return false;
-        return Date.now() - t > CUTOFF_30_DAYS;
-      };
-      currentProjects = currentProjects.filter((p) => !isExpiredTrash(p));
-
-      // 3. Sincronizar catálogo de equipos bidireccionalmente con la nube
-      try {
-        await get().syncEquipmentWithServer();
-      } catch (eqErr) {
-        console.warn('Auto-sync equipment warning:', eqErr);
-      }
-
-      const newTimestamp = pullRes.serverTimestamp || new Date().toISOString();
-      let hasPendingRemaining = false;
-
+      const pull = await SyncService.pullProjects(serverUrl, token());
+      ensureCurrent();
+      if (!pull.success || !pull.projects) throw new Error(pull.error || 'No se pudieron descargar los proyectos.');
       set((state) => {
-        // Combinar de manera segura con el estado fresco de Zustand:
-        // - Si un proyecto fue editado localmente mientras el push estaba en vuelo (freshLocal.updatedAt !== pushedUpdatedAt),
-        //   se preserva la versión fresca local con status 'pending' para que se suba en el próximo ciclo.
-        // - Si no hubo ediciones concurrentes, se aplica la versión confirmada con syncStatus: 'synced'.
-        const syncedMap = new Map(currentProjects.map((p) => [p.id, p]));
-        const mergedProjects: ProjectSimulation[] = [];
-
-        for (const syncedP of currentProjects) {
-          const freshLocal = state.projects.find((p) => p.id === syncedP.id);
-          if (freshLocal) {
-            const pushedUpdatedAt = pushedSnapshots.get(syncedP.id);
-            const wasModifiedConcurrently =
-              pushedUpdatedAt !== undefined &&
-              freshLocal.updatedAt !== undefined &&
-              freshLocal.updatedAt !== pushedUpdatedAt;
-
-            if (wasModifiedConcurrently) {
-              // Edición local concurrente en vuelo (ej. adjuntos de PDF mientras sincronizaba):
-              // Conservar versión local fresca con 'pending'
-              hasPendingRemaining = true;
-              mergedProjects.push(freshLocal);
-            } else {
-              // El push confirmó esta versión con éxito: marcar 'synced'
-              mergedProjects.push({
-                ...freshLocal,
-                id: syncedP.id,
-                version: syncedP.version || freshLocal.version || 1,
-                syncStatus: syncedP.syncStatus,
-              });
-            }
-          } else {
-            mergedProjects.push(syncedP);
+        const projects = reconcilePulledProjects(state.projects, pull.projects!, pull.deletedIds || [], new Set(state.projectDeletionQueue.filter((item) => item.scope === scope).map((item) => item.id)), serverUrl, currentUser.organizationId);
+        const projectConflicts = Object.fromEntries(Object.entries(state.projectConflicts).filter(([, conflict]) => conflict.scope !== scope || projects.some(project => project.id === conflict.projectId && project.syncStatus === 'conflict')));
+        for (const project of projects) {
+          if (project.syncStatus === 'conflict' && ownsProject(project, serverUrl, currentUser.organizationId) && pull.deletedIds?.includes(project.id)) {
+            projectConflicts[scope + '|' + project.id] = { scope, reason: 'deleted', projectId: project.id, localVersion: project.baseVersion ?? 0, serverVersion: 0, localProject: project, serverProject: { ...project, isDeleted: true }, lastModifiedByName: '', lastModifiedAt: '', diffs: [] };
           }
         }
-
-        // Preservar proyectos recién creados localmente durante el sync (que no estaban en currentProjects)
-        for (const localP of state.projects) {
-          if (isExpiredTrash(localP)) {
+        const activeConflict = state.activeConflict?.scope === scope ? projectConflicts[scope + '|' + state.activeConflict.projectId] ?? null : state.activeConflict;
+        return { projects, projectConflicts, activeConflict };
+      });
+      // Confirm trash through CAS before physical deletion, including documents created offline.
+      // A failed command remains durable without preventing unrelated documents from syncing.
+      if (canWrite) for (const captured of get().projectDeletionQueue.filter((item) => item.scope === scope)) {
+        let command = captured;
+        if ((pull.deletedIds || []).includes(command.id)) { releaseDeletion(command); continue; }
+        const server = pull.projects.find((project) => project.id === command.id);
+        if (command.project?.pendingCanonicalAck) {
+          if (!server || !Number.isSafeInteger(server.version) || server.version! < command.project.pendingCanonicalAck.version) { deletionErrors++; continue; }
+          command = { ...command, stage: server.isDeleted ? 'delete' : 'trash', project: { ...command.project, pendingCanonicalAck: undefined } };
+          set(state => ({ projectDeletionQueue: state.projectDeletionQueue.map(item => item.scope === scope && item.id === command.id ? command : item) }));
+        }
+        if (!command.project) {
+          if (!server) { deletionErrors++; continue; }
+          command = { ...command, project: { ...server, isDeleted: true, baseVersion: command.baseVersion, syncStatus: 'pending' }, stage: server.isDeleted ? 'delete' : 'trash' };
+          set((state) => ({ projectDeletionQueue: state.projectDeletionQueue.map((item) => item === captured ? command : item) }));
+        }
+        if (server && server.version !== command.baseVersion) { recoverDeletion(command, server); continue; }
+        if (command.stage !== 'delete') {
+          const sentDeletion = { ...command.project!, baseVersion: command.baseVersion, isDeleted: true, syncStatus: 'pending' as const };
+          const pushed = await SyncService.pushProjects(serverUrl, token(), [sentDeletion]);
+          ensureCurrent();
+          const outcome = pushed.results?.find((result) => (result.originalId || result.id) === command.id);
+          if (!pushed.success || !outcome) { deletionErrors++; continue; }
+          if (outcome.status === 'conflict') {
+            if (outcome.reason === 'deleted') releaseDeletion(command);
+            else recoverDeletion(command, outcome.serverProject);
             continue;
           }
-          if (!syncedMap.has(localP.id)) {
-            mergedProjects.push(localP);
-            if (localP.syncStatus !== 'synced') {
-              hasPendingRemaining = true;
+          set((state) => ({ projectDeletionQueue: acknowledgeQueuedProjectDeletions(state.projectDeletionQueue, [outcome], scope, [sentDeletion]) }));
+          const acknowledged = get().projectDeletionQueue.find((item) => item.scope === scope && item.id === outcome.id);
+          if (!acknowledged) continue;
+          command = acknowledged;
+          if (command.project?.pendingCanonicalAck) { deletionErrors++; continue; }
+        }
+        const success = await SyncService.deleteProject(serverUrl, token(), command.id, true, command.baseVersion);
+        ensureCurrent();
+        if (success) { releaseDeletion(command); continue; }
+        // DELETE may race a teammate or lose its response; re-read before deciding.
+        const latest = await SyncService.pullProjects(serverUrl, token());
+        ensureCurrent();
+        if (latest.success && latest.deletedIds?.includes(command.id)) { releaseDeletion(command); continue; }
+        const changed = latest.projects?.find((project) => project.id === command.id);
+        if (changed && (changed.version !== command.baseVersion || !changed.isDeleted)) recoverDeletion(command, changed);
+        else deletionErrors++;
+      }
+      const sent = canWrite ? get().projects.filter((project) => project.syncStatus === 'pending' && !project.pendingCanonicalAck && ownsProject(project, serverUrl, currentUser.organizationId)) : [];
+      if (sent.length) {
+        const push = await SyncService.pushProjects(serverUrl, token(), sent);
+        ensureCurrent();
+        if (!push.success || !push.results) throw new Error(push.error || 'No se pudo confirmar el envío de proyectos.');
+        set((state) => {
+          const reconciled = acknowledgeProjectPush(state.projects, sent, push.results!, serverUrl, currentUser.organizationId);
+          conflicts += reconciled.conflicts.length;
+          const projectConflicts = { ...state.projectConflicts };
+          let activeConflict = state.activeConflict;
+          for (const conflict of reconciled.conflicts) {
+            if (!conflict.result.serverProject && conflict.result.reason !== 'deleted') continue;
+            const serverProject = conflict.result.serverProject || { ...conflict.local, isDeleted: true };
+            const info: ProjectConflictInfo = {
+              scope, reason: conflict.result.reason, projectId: conflict.local.id, localVersion: conflict.result.localVersion ?? conflict.local.baseVersion ?? 0, serverVersion: conflict.result.serverVersion,
+              localProject: conflict.local, serverProject,
+              lastModifiedByName: ['Otro consultor', 'Otro miembro'].includes(conflict.result.lastModifiedByName || '') ? '' : conflict.result.lastModifiedByName || '',
+              lastModifiedAt: conflict.result.lastModifiedAt || '', diffs: conflict.result.reason === 'deleted' ? [] : projectDifferences(serverProject, conflict.local),
+            };
+            projectConflicts[scope + '|' + info.projectId] = info;
+            if (!activeConflict) activeConflict = info;
+          }
+          const snapshotsByProject = { ...state.snapshotsByProject };
+          for (const [oldId, newId] of Object.entries(reconciled.idChanges)) {
+            if (oldId !== newId) delete projectConflicts[scope + '|' + oldId];
+            if (oldId !== newId && snapshotsByProject[oldId]) {
+              snapshotsByProject[newId] = snapshotsByProject[oldId].map((snapshot) => ({ ...snapshot, projectId: newId, data: { ...snapshot.data, id: newId } }));
+              delete snapshotsByProject[oldId];
             }
           }
-        }
-
-        return {
-          projects: mergedProjects,
-          isSyncing: false,
-          syncFeedbackMessage: silent ? null : '¡Proyectos sincronizados con éxito! ✨',
-          syncSettings: {
-            ...state.syncSettings,
-            lastSyncTimestamp: newTimestamp,
-          },
-        };
-      });
-
-      // Si quedaron cambios pendientes generados durante el sync, programar push inmediato
-      if (hasPendingRemaining) {
-        get().triggerAutoSync(false);
+          return { projects: reconciled.projects, projectDeletionQueue: acknowledgeQueuedProjectDeletions(state.projectDeletionQueue, push.results!, scope, sent), activeProjectId: reconciled.idChanges[state.activeProjectId] || state.activeProjectId, activeConflict, projectConflicts, snapshotsByProject };
+        });
+        if (push.results.length !== sent.length) throw new Error('El servidor no confirmó todos los documentos enviados.');
       }
-
-      if (!silent) {
-        setTimeout(() => set({ syncFeedbackMessage: null }), 3000);
-      }
-
-      return { success: true, message: 'Sincronización completada exitosamente' };
-    } catch (err: any) {
-      set({ isSyncing: false, syncFeedbackMessage: null });
-      return { success: false, message: err.message || 'Error durante la sincronización' };
+      const equipment = await get().syncEquipmentWithServer();
+      ensureCurrent();
+      if (!equipment.success) throw new Error(`Proyectos procesados; catálogo pendiente: ${equipment.message}`);
+      const pendingConfirmations = get().projects.filter(project => project.pendingCanonicalAck && ownsProject(project, serverUrl, currentUser.organizationId)).length;
+      const message = pendingConfirmations ? `${pendingConfirmations} documento(s) guardados en la nube, pendientes de verificar. Vuelve a sincronizar.` : deletionErrors ? `${deletionErrors} eliminación(es) pendientes de confirmar; otros proyectos procesados.` : conflicts ? `${conflicts} proyecto(s) requieren resolver conflictos.` : 'Sincronización completada.';
+      set((state) => ({ isSyncing: false, syncFeedbackMessage: silent ? null : message, syncSettings: { ...state.syncSettings, lastSyncTimestamp: deletionErrors ? state.syncSettings.lastSyncTimestamp : pull.serverTimestamp || state.syncSettings.lastSyncTimestamp } }));
+      if (get().projects.some((project) => project.syncStatus === 'pending' && !project.pendingCanonicalAck && ownsProject(project, serverUrl, currentUser.organizationId)) || (!deletionErrors && get().projectDeletionQueue.some((command) => command.scope === scope))) get().triggerAutoSync();
+      return { success: conflicts === 0 && deletionErrors === 0 && pendingConfirmations === 0, message };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No se pudo sincronizar.';
+      if (session.isCurrent()) set({ isSyncing: false, syncFeedbackMessage: message });
+      return { success: false, message };
     }
   },
-});
+
+  validateSession: async () => {
+    const session = captureSession();
+    const { serverUrl, authToken } = session;
+    if (!authToken) {
+      return { valid: false, error: 'No hay token de sesión configurado' };
+    }
+
+    const result = await SyncService.getSessionIdentity(serverUrl, authToken);
+    if (!session.isCurrent()) return { valid: false, error: 'La sesión cambió durante la verificación.' };
+    if (result.success && result.user) {
+      const freshUser = result.user;
+      set((state) => ({
+        ...changeWorkspace(state, { ...state.syncSettings, currentUser: freshUser }),
+        syncSettings: { ...state.syncSettings, currentUser: freshUser },
+      }));
+      return { valid: true, user: freshUser };
+    }
+    if (result.failure !== 'rejected') return { valid: false, error: result.error };
+
+    if (session.isCurrent()) {
+      const epoch = bumpSessionEpoch();
+      set((state) => ({
+        syncSettings: { ...state.syncSettings, authToken: null },
+        sessionGeneration: epoch,
+        isSyncing: false,
+        activeConflict: null,
+        featurePolicyRequest: null,
+        syncFeedbackMessage: 'La sesión expiró en el servidor. Inicia sesión nuevamente.',
+      }));
+    }
+    return { valid: false, error: result.error || 'La sesión ha expirado en el servidor' };
+  },
+};
+};

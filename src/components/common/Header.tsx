@@ -8,7 +8,9 @@ import {
   Share2,
   Globe,
   MoreVertical,
+  FolderKanban,
 } from 'lucide-react';
+import { NotificationDropdown } from './NotificationDropdown';
 import electsunEmblem from '../../assets/electsun-emblem-transparent.png';
 
 export const Header: React.FC = () => {
@@ -119,6 +121,23 @@ export const Header: React.FC = () => {
                 }`}
               >
                 <button
+                  onClick={() => setActiveView('project-hub')}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    activeView === 'project-hub'
+                      ? isDark
+                        ? 'bg-[#27272a] text-white shadow-xs'
+                        : 'bg-white text-emerald-900 shadow-xs'
+                      : isDark
+                      ? 'text-zinc-400 hover:text-zinc-100'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="Ver resumen y hub del proyecto"
+                >
+                  <FolderKanban className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Hub</span>
+                </button>
+
+                <button
                   onClick={() => setActiveView('simulator')}
                   className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     activeView === 'simulator'
@@ -150,6 +169,9 @@ export const Header: React.FC = () => {
                   <span>Propuesta PDF</span>
                 </button>
               </div>
+
+              {/* 🔔 Organization Notifications Dropdown */}
+              <NotificationDropdown />
 
               {/* Botón de 3 Puntos Desplegable (Guardar, Compartir, Exportar) */}
               <div className="relative" ref={actionsMenuRef}>

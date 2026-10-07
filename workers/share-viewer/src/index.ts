@@ -1,212 +1,79 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { Env, ShareProposalPayload, StoredProposal } from './types';
+import type { StoredProposal } from './types';
+import type { Env } from './bindings';
 import { renderExpiredPage, renderProposalPage } from './template';
+import { AuthorizationError, authorizePublication } from './publicationAuthorization';
+import { generateProposalId, proposalMetadata, readProposal, storeProposal } from './proposalRepository';
+import { isRecord, parseSharePayload, readBoundedJson, RequestValidationError, validProposalId } from './validation';
 
+/** Construct an app without deployment or network side effects; tests inject authorization fetch. */
+export function createShareViewer(requestFetch: typeof fetch = fetch) {
 const app = new Hono<{ Bindings: Env }>();
-
-// Enable CORS for desktop app & browser requests
-app.use('*', cors({
-  origin: '*',
-  allowMethods: ['GET', 'POST', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization'],
-}));
-
-function generateShortId(length = 7): string {
-  const chars = '23456789abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ';
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-}
-
-// Health Check
-app.get('/api/health', (c) => {
-  return c.json({
-    status: 'ok',
-    service: 'SolarSim Pro Share Viewer',
-    timestamp: new Date().toISOString(),
-  });
+app.use('*', cors({ origin: '*', allowMethods: ['GET', 'POST', 'OPTIONS'], allowHeaders: ['Content-Type', 'Authorization'] }));
+app.use('*', async (c, next) => {
+  c.header('X-Content-Type-Options', 'nosniff');
+  c.header('Referrer-Policy', 'no-referrer');
+  c.header('X-Frame-Options', 'DENY');
+  c.header('Cache-Control', 'no-store');
+  await next();
 });
-
-// Create & Store a Shared Proposal
+app.onError((error, c) => {
+  if (error instanceof RequestValidationError || error instanceof AuthorizationError) return c.json({ success: false, error: error.message }, error.status);
+  // Do not echo stack traces, token claims, project contents or storage errors to the caller.
+  console.error(JSON.stringify({ event: 'share_request_failed', name: error.name }));
+  return c.json({ success: false, error: 'El servicio de propuestas no pudo completar la solicitud.' }, 500);
+});
+app.get('/api/health', (c) => c.json({ status: 'ok', service: 'SolarSim Pro Share Viewer', timestamp: new Date().toISOString() }));
 app.post('/api/share', async (c) => {
-  try {
-    const body = await c.req.json<ShareProposalPayload>();
-    if (!body || !body.project) {
-      return c.json({ success: false, error: 'Project data is required.' }, 400);
-    }
-
-    const validityDays = Math.max(1, Math.min(Number(body.validityDays) || 7, 90));
-    const id = generateShortId(7);
-    const ttlSeconds = validityDays * 86400;
-    const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
-
-    const storedProposal: StoredProposal = {
-      id,
-      createdAt: new Date().toISOString(),
-      expiresAt,
-      validityDays,
-      project: body.project,
-      summary: body.summary || null,
-    };
-
-    // Save in Cloudflare KV with expiration TTL
-    await c.env.PROPOSALS_KV.put(
-      `proposal:${id}`,
-      JSON.stringify(storedProposal),
-      { expirationTtl: ttlSeconds }
-    );
-
-    const url = new URL(c.req.url);
-    const shareUrl = `${url.protocol}//${url.host}/p/${id}`;
-
-    return c.json({
-      success: true,
-      id,
-      shareUrl,
-      expiresAt,
-      validityDays,
-    });
-  } catch (err: any) {
-    console.error('Error sharing proposal in Cloudflare Worker:', err);
-    return c.json({
-      success: false,
-      error: err?.message || 'Internal Server Error storing proposal.',
-    }, 500);
+  const identity = await authorizePublication(c.env, c.req.header('Authorization'), requestFetch);
+  const body = parseSharePayload(await readBoundedJson(c.req.raw));
+  const policy = identity.featurePolicy;
+  const mode = policy.settings.selfConsumptionProjection ? 'self_consumption' : 'legacy';
+  if (body.calculationSnapshot.organizationId !== identity.organizationId || body.calculationSnapshot.policyVersion !== policy.version || body.calculationSnapshot.mode !== mode) {
+    return c.json({ success: false, error: 'La configuración de simulación cambió. Actualízala antes de publicar.' }, 409);
   }
+  const createdAt = new Date().toISOString();
+  const stored: StoredProposal = {
+    id: generateProposalId(), createdAt, validityDays: body.validityDays,
+    expiresAt: new Date(Date.now() + body.validityDays * 86400000).toISOString(),
+    project: body.project, summary: body.summary, calculationSnapshot: body.calculationSnapshot,
+    publishedBy: { userId: identity.userId, organizationId: identity.organizationId },
+  };
+  // Rendering is validated before storage; malformed supported payloads never produce a broken link.
+  renderProposalPage(stored);
+  await storeProposal(c.env, stored);
+  return c.json({ success: true, id: stored.id, shareUrl: `${new URL(c.req.url).origin}/p/${stored.id}`, expiresAt: stored.expiresAt, validityDays: stored.validityDays });
 });
-
-// Get Proposal Metadata as JSON
 app.get('/api/share/:id', async (c) => {
   const id = c.req.param('id');
-  if (!id) {
-    return c.json({ success: false, error: 'Proposal ID is required.' }, 400);
-  }
-
-  try {
-    const raw = await c.env.PROPOSALS_KV.get(`proposal:${id}`);
-    if (!raw) {
-      return c.json({ success: false, error: 'Proposal not found or expired.' }, 404);
-    }
-
-    const stored: StoredProposal = JSON.parse(raw);
-    const client = stored.project?.client;
-    const specs = stored.project?.specs;
-    const systemKWp =
-      stored.summary?.systemCapacityKWp ||
-      (specs && specs.panelCount && specs.panelPowerW
-        ? Number(((specs.panelCount * specs.panelPowerW) / 1000).toFixed(2))
-        : 0);
-
-    const url = new URL(c.req.url);
-    const shareUrl = `${url.protocol}//${url.host}/p/${id}`;
-
-    return c.json({
-      success: true,
-      id: stored.id,
-      projectId: stored.project?.id || '',
-      clientName: client?.name || 'Cliente Solar',
-      projectCode: client?.projectId || stored.project?.id || 'SP-XXXX',
-      quoteNumber: client?.quoteNumber || 'C-0001',
-      systemKWp,
-      location: client?.province || client?.location || 'República Dominicana',
-      companyName: stored.project?.customization?.companyName || 'electsun',
-      createdAt: stored.createdAt,
-      expiresAt: stored.expiresAt,
-      validityDays: stored.validityDays,
-      shareUrl,
-    });
-  } catch (err: any) {
-    console.error(`Error retrieving proposal metadata for ${id}:`, err);
-    return c.json({ success: false, error: err?.message || 'Error fetching proposal.' }, 500);
-  }
+  if (!validProposalId(id)) return c.json({ success: false, error: 'El identificador no es válido.' }, 400);
+  const stored = await readProposal(c.env, id);
+  if (!stored) return c.json({ success: false, error: 'La propuesta no existe o ha vencido.' }, 404);
+  return c.json({ success: true, ...proposalMetadata(stored, new URL(c.req.url).origin) });
 });
-
-// Batch Hydrate Metadata for multiple Proposal IDs
 app.post('/api/share/hydrate', async (c) => {
-  try {
-    const body = await c.req.json<{ ids: string[] }>();
-    if (!body || !Array.isArray(body.ids)) {
-      return c.json({ success: false, error: 'Array of proposal IDs is required.' }, 400);
-    }
-
-    const safeIds = body.ids.slice(0, 50);
-    const url = new URL(c.req.url);
-
-    const proposals = await Promise.all(
-      safeIds.map(async (id) => {
-        try {
-          const raw = await c.env.PROPOSALS_KV.get(`proposal:${id}`);
-          if (!raw) return null;
-          const stored: StoredProposal = JSON.parse(raw);
-          const client = stored.project?.client;
-          const specs = stored.project?.specs;
-          const systemKWp =
-            stored.summary?.systemCapacityKWp ||
-            (specs && specs.panelCount && specs.panelPowerW
-              ? Number(((specs.panelCount * specs.panelPowerW) / 1000).toFixed(2))
-              : 0);
-
-          return {
-            id: stored.id,
-            projectId: stored.project?.id || '',
-            clientName: client?.name || 'Cliente Solar',
-            projectCode: client?.projectId || stored.project?.id || 'SP-XXXX',
-            quoteNumber: client?.quoteNumber || 'C-0001',
-            systemKWp,
-            location: client?.province || client?.location || 'República Dominicana',
-            companyName: stored.project?.customization?.companyName || 'electsun',
-            createdAt: stored.createdAt,
-            expiresAt: stored.expiresAt,
-            validityDays: stored.validityDays,
-            shareUrl: `${url.protocol}//${url.host}/p/${id}`,
-          };
-        } catch {
-          return null;
-        }
-      })
-    );
-
-    return c.json({
-      success: true,
-      proposals: proposals.filter(Boolean),
-    });
-  } catch (err: any) {
-    console.error('Error hydrating proposals:', err);
-    return c.json({ success: false, error: err?.message || 'Internal Server Error' }, 500);
-  }
+  const body = await readBoundedJson(c.req.raw, 8192);
+  if (!isRecord(body) || !Array.isArray(body.ids) || body.ids.length > 50 || !body.ids.every(validProposalId)) throw new RequestValidationError('Se requiere una lista de hasta 50 identificadores válidos.');
+  const origin = new URL(c.req.url).origin;
+  const proposals = await Promise.all([...new Set(body.ids)].map(async (id) => {
+    const stored = await readProposal(c.env, id);
+    return stored ? proposalMetadata(stored, origin) : null;
+  }));
+  return c.json({ success: true, proposals: proposals.filter(Boolean) });
 });
-
-// Render the Interactive Proposal View
 app.get('/p/:id', async (c) => {
   const id = c.req.param('id');
-  if (!id) {
-    return c.html(renderExpiredPage(), 404);
-  }
-
+  if (!validProposalId(id)) return c.html(renderExpiredPage(), 404);
   try {
-    const raw = await c.env.PROPOSALS_KV.get(`proposal:${id}`);
-    if (!raw) {
-      return c.html(renderExpiredPage(), 404);
-    }
-
-    const storedProposal: StoredProposal = JSON.parse(raw);
-    try {
-      return c.html(renderProposalPage(storedProposal));
-    } catch (renderErr) {
-      console.error('Error rendering proposal page:', renderErr);
-      const compName = storedProposal?.project?.customization?.companyName || 'electsun';
-      const compPhone = storedProposal?.project?.customization?.companyPhone || '+1 (809) 378-6590';
-      return c.html(renderExpiredPage(compName, compPhone), 500);
-    }
-  } catch (err) {
-    console.error('Error fetching proposal from KV:', err);
+    const stored = await readProposal(c.env, id);
+    if (!stored) return c.html(renderExpiredPage(), 404);
+    return c.html(renderProposalPage(stored));
+  } catch {
+    console.error(JSON.stringify({ event: 'proposal_render_failed' }));
     return c.html(renderExpiredPage(), 500);
   }
 });
-
 // Root Landing Page
 app.get('/', (c) => {
   return c.html(`<!DOCTYPE html>
@@ -232,4 +99,7 @@ app.get('/', (c) => {
 </html>`);
 });
 
-export default app;
+return app;
+}
+
+export default createShareViewer();

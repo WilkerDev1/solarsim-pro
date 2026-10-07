@@ -15,6 +15,10 @@ import {
   Sparkles,
   Check,
   EyeOff,
+  Building2,
+  Laptop,
+  CloudOff,
+  LogIn,
 } from 'lucide-react';
 import { CreateFolderModal } from './CreateFolderModal';
 import { ProjectFolder } from '../../../types';
@@ -36,9 +40,13 @@ export const SolarCoreTreeSidebar: React.FC = () => {
     isTrashActive,
     setIsTrashActive,
     moveToTrash,
+    localUserProfile,
+    getActiveCompany,
+    setActiveView,
   } = useSimulationStore();
 
   const currentUser = syncSettings.currentUser;
+  const activeCompany = getActiveCompany();
   const isAdmin = currentUser?.role === 'ADMIN' || !currentUser; // Default full admin capabilities in standalone mode
 
   // Tree collapsible section states
@@ -86,10 +94,10 @@ export const SolarCoreTreeSidebar: React.FC = () => {
       }
     });
     if (memberSet.size === 0) {
-      memberSet.add(currentUser?.email || 'Usuario Principal');
+      memberSet.add(localUserProfile?.name || 'Consultor Local');
     }
     return Array.from(memberSet);
-  }, [activeProjects, currentUser]);
+  }, [activeProjects, currentUser, localUserProfile]);
 
   // Resize sidebar state with mouse drag
   const [sidebarWidth, setSidebarWidth] = useState(290);
@@ -236,7 +244,7 @@ export const SolarCoreTreeSidebar: React.FC = () => {
                   {isProjectsOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                 </button>
                 <Folder className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                <span className="font-semibold text-sm">Projects</span>
+                <span className="font-semibold text-sm">Propuestas</span>
               </div>
               <span className="text-[11px] px-2 py-0.5 rounded-full font-mono bg-slate-100 dark:bg-[#242b3b] text-slate-600 dark:text-zinc-400 font-semibold">
                 {generalProjects.length}
@@ -279,7 +287,7 @@ export const SolarCoreTreeSidebar: React.FC = () => {
                   {isTeamOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                 </span>
                 <Users className="w-4 h-4 text-slate-500 dark:text-zinc-400" />
-                <span className="font-semibold text-sm">Team</span>
+                <span className="font-semibold text-sm">Equipo</span>
               </div>
               <span className="text-[11px] text-slate-400 font-mono">{teamMembers.length}</span>
             </div>
@@ -325,7 +333,7 @@ export const SolarCoreTreeSidebar: React.FC = () => {
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between px-3 pt-2">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500">
-                Folders
+                Carpetas
               </span>
               {isAdmin && (
                 <button
@@ -584,35 +592,85 @@ export const SolarCoreTreeSidebar: React.FC = () => {
         </div>
       </div>
 
-      {/* 👤 Área Inferior: Invitar Miembros & Perfil de Usuario */}
+      {/* 👤 Área Inferior: Invitar Miembros & Perfil de Usuario / Modo Offline */}
       <div className="p-4 border-t border-slate-100 dark:border-[#222734] flex flex-col gap-3 shrink-0">
-        {/* Botón Invitar Teammates */}
-        <button
-          onClick={() => openSettingsModal('account')}
-          className="w-full py-2 px-3 rounded-xl text-xs font-semibold text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-[#202634] transition-colors flex items-center gap-2 cursor-pointer"
-        >
-          <UserPlus className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-          <span>Invite teammates</span>
-        </button>
+        {currentUser ? (
+          <>
+            {/* Botón Invitar Teammates */}
+            <button
+              onClick={() => openSettingsModal('account')}
+              className="w-full py-2 px-3 rounded-xl text-xs font-semibold text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-[#202634] transition-colors flex items-center gap-2 cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Gestionar equipo</span>
+            </button>
 
-        {/* Píldora de Perfil del Usuario Activo */}
-        <div
-          onClick={() => openSettingsModal('account')}
-          className="p-2.5 rounded-xl bg-slate-50 dark:bg-[#1f2532] border border-slate-200/70 dark:border-[#2a3344] flex items-center gap-3 cursor-pointer hover:bg-slate-100/80 dark:hover:bg-[#252c3c] transition-all shadow-2xs"
-          title="Ver perfil y ajustes"
-        >
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-400 to-sky-500 text-white font-bold text-xs flex items-center justify-center shadow-xs">
-            {currentUser?.name ? currentUser.name.charAt(0).toUpperCase() : 'J'}
-          </div>
-          <div className="flex-1 min-w-0">
-            <span className="block font-bold text-xs text-slate-900 dark:text-white truncate font-mono">
-              {currentUser?.name || 'James W.'}
-            </span>
-            <span className="block text-[10px] text-slate-500 dark:text-zinc-400 truncate">
-              {currentUser?.email || 'admin@solarsim.pro'}
-            </span>
-          </div>
-        </div>
+            {/* Píldora de Perfil del Usuario Activo */}
+            <div
+              onClick={() => openSettingsModal('account')}
+              className="p-2.5 rounded-xl bg-slate-50 dark:bg-[#1f2532] border border-slate-200/70 dark:border-[#2a3344] flex items-center gap-3 cursor-pointer hover:bg-slate-100/80 dark:hover:bg-[#252c3c] transition-all shadow-2xs group"
+              title="Cuenta de organización conectada"
+            >
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-emerald-400 to-sky-500 text-white font-bold text-xs flex items-center justify-center shadow-xs">
+                {currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'U'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-xs text-slate-900 dark:text-white truncate font-mono">
+                    {currentUser.name}
+                  </span>
+                  <span className="text-[9px] px-1 py-0.2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded font-mono font-semibold">
+                    {currentUser.role}
+                  </span>
+                </div>
+                <span className="block text-[10px] text-slate-500 dark:text-zinc-400 truncate">
+                  {currentUser.email}
+                </span>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Botón Acceso Rápido a Empresas */}
+            <button
+              onClick={() => setActiveView('companies-hub')}
+              className="w-full py-2 px-3 rounded-xl text-xs font-semibold text-slate-700 dark:text-zinc-300 bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/40 hover:bg-emerald-100/60 dark:hover:bg-emerald-900/40 transition-colors flex items-center justify-between cursor-pointer"
+              title="Gestionar empresas, logos y membretes"
+            >
+              <div className="flex items-center gap-2 truncate">
+                <Building2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span className="truncate">{activeCompany.commercialName || activeCompany.name}</span>
+              </div>
+              <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-mono font-semibold shrink-0">
+                Perfiles
+              </span>
+            </button>
+
+            {/* Píldora de Modo Local (Sin Cuenta) */}
+            <div
+              onClick={() => openSettingsModal('sync')}
+              className="p-2.5 rounded-xl bg-slate-50 dark:bg-[#1f2532] border border-slate-200/70 dark:border-[#2a3344] flex items-center gap-3 cursor-pointer hover:bg-slate-100/80 dark:hover:bg-[#252c3c] transition-all shadow-2xs group"
+              title="Modo local sin cuenta. Clic para conectar con organización en la nube."
+            >
+              <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-[#283244] text-slate-600 dark:text-zinc-300 font-bold text-xs flex items-center justify-center shrink-0">
+                <Laptop className="w-4 h-4 text-slate-500 dark:text-zinc-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-xs text-slate-800 dark:text-zinc-200 truncate">
+                    {localUserProfile.name || 'Modo Local'}
+                  </span>
+                  <span className="text-[9px] px-1 py-0.2 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded font-mono font-semibold">
+                    Sin Cuenta
+                  </span>
+                </div>
+                <span className="block text-[10px] text-emerald-600 dark:text-emerald-400 truncate flex items-center gap-1 mt-0.5 font-medium group-hover:underline">
+                  <LogIn className="w-3 h-3 inline" /> Conectar Nube / Login
+                </span>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Modal de Creación / Edición de Carpeta */}

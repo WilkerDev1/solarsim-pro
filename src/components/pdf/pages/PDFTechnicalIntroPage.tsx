@@ -18,6 +18,7 @@ interface PDFTechnicalIntroPageProps {
   totalPages: number;
   isEditMode?: boolean;
   updateDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
+  updateDefaultDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
 }
 
 export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
@@ -30,6 +31,7 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
   totalPages,
   isEditMode = false,
   updateDocumentCustomization,
+  updateDefaultDocumentCustomization,
 }) => {
   const cust = project.customization || {};
 
@@ -73,6 +75,7 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
             value={cust.techIntroWhatIsText}
             defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.techIntroWhatIsText}
             onSave={(val) => updateDocumentCustomization?.({ techIntroWhatIsText: val })}
+            onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ techIntroWhatIsText: val })}
             isEditMode={isEditMode}
             multiline={true}
             label="¿Qué es un Sistema FV? (Párrafo)"
@@ -108,6 +111,7 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
             value={cust.techIntroHowItWorksParagraph1}
             defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.techIntroHowItWorksParagraph1}
             onSave={(val) => updateDocumentCustomization?.({ techIntroHowItWorksParagraph1: val })}
+            onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ techIntroHowItWorksParagraph1: val })}
             isEditMode={isEditMode}
             multiline={true}
             label="¿Cómo Funciona? (Párrafo 1)"
@@ -120,6 +124,7 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
             value={cust.techIntroHowItWorksParagraph2}
             defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.techIntroHowItWorksParagraph2}
             onSave={(val) => updateDocumentCustomization?.({ techIntroHowItWorksParagraph2: val })}
+            onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ techIntroHowItWorksParagraph2: val })}
             isEditMode={isEditMode}
             multiline={true}
             label="¿Cómo Funciona? (Párrafo 2)"

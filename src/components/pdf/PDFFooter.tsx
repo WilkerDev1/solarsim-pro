@@ -14,8 +14,8 @@ export const PDFFooter: React.FC<PDFFooterProps> = ({
   customization,
 }) => {
   const footerText =
-    customization?.companyFooterText ||
-    DEFAULT_DOCUMENT_CUSTOMIZATION.companyFooterText ||
+    customization?.companyFooterText ??
+    DEFAULT_DOCUMENT_CUSTOMIZATION.companyFooterText ??
     '';
 
   return (

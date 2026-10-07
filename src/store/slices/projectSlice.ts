@@ -1,10 +1,15 @@
+import { companyDocumentSnapshot } from '../../utils/companyDocumentSnapshot';
+import { DEFAULT_SIMULATION_SETTINGS } from '../defaultSimulationSettings';
+import { energyCalculationMode } from '../../../shared/applicationFeatures';
+import { effectiveFeatureSettings } from '../../features/application/featurePolicy';
 import { SimulationSlice, ProjectSlice } from '../types';
 import { ProjectSimulation } from '../../types';
 import { BENCHMARK_PROJECT } from '../../engine/referenceCase';
 import { INITIAL_PROJECTS, generateNextProjectSequence, generateDuplicateProjectIdentifiers } from '../initialData';
 import { calculateFinancialSummary, calculateCostMatrixSummary } from '../../engine/financeEngine';
 import { calculateRecommendedPanelCount } from '../../engine/solarEngine';
-import { SyncService } from '../../services/syncService';
+import { projectMutationMetadata } from '../sync/projectMutation';
+import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
 
 export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => ({
   projects: INITIAL_PROJECTS,
@@ -12,53 +17,20 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
   activeView: 'simulator',
   searchQuery: '',
   statusFilter: 'All',
-  defaultSimulationSettings: {
-    // 1. Proyecto y Cliente
-    defaultProvince: 'Santo Domingo / Distrito Nacional',
-    defaultDistributor: 'EDEESTE',
-    defaultTariffCode: 'BTS2',
-    defaultQuoteValidityDays: 7,
-
-    // 2. Tarifas y Distribuidora
-    defaultTargetCoveragePct: 95,
-    defaultZeroExport: false,
-    defaultApplySieRetention: true,
-    defaultEstimatedEnergyRateDOP: 10.35,
-    defaultEstimatedExportRateDOP: 5.50,
-
-    // 3. Equipamiento y Sistema
-    defaultPanelPowerW: 620,
-    defaultPanelModel: 'Canadian Solar TOPBiHiKu6 CS6W-620TB-AG (620W)',
-    defaultInverterPowerKW: 8.0,
-    defaultSystemLosses: 25.0,
-    defaultAnnualDegradation: 0.40,
-    defaultAutoCalculatePanels: false,
-    defaultHasBattery: false,
-    defaultBatteryCapacityKWh: 16.08,
-    defaultBatteryDOD: 90,
-
-    // 4. Costos y Margen de Venta
-    defaultPricingMode: 'direct',
-    defaultDirectPriceUSDPerWp: 1.05,
-    defaultTargetMarginPct: 28,
-    defaultExcessEnergyDestiny: 'net_metering',
-
-    // 5. Finanzas e Incentivos (Ley 57-07)
-    currency: 'USD',
-    taxRatePct: 18,
-    discountRatePct: 12,
-    applyITBISExemption: true,
-    applyLey5707: true,
-    ley5707AmortizationYears: 3,
-    lifespanYears: 25,
-    annualEnergyTariffEscalationPct: 3.5,
-  },
+  defaultSimulationSettings: DEFAULT_SIMULATION_SETTINGS,
+  defaultDocumentCustomization: DEFAULT_DOCUMENT_CUSTOMIZATION,
 
   isTrashActive: false,
   setIsTrashActive: (active) => set({ isTrashActive: active }),
 
   setActiveView: (view) => set({ activeView: view }),
-  setActiveProject: (id) => set({ activeProjectId: id, activeView: 'simulator' }),
+  setActiveProject: (id, targetView = 'project-hub') => {
+    set({ activeProjectId: id, activeView: targetView });
+    const p = get().projects.find((proj) => proj.id === id);
+    if (p) {
+      get().recordUndoState(p);
+    }
+  },
   setSearchQuery: (query) => set({ searchQuery: query }),
   setStatusFilter: (filter) => set({ statusFilter: filter }),
   updateDefaultSimulationSettings: (settingsPartial) =>
@@ -68,6 +40,39 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
         ...settingsPartial,
       },
     })),
+
+  updateDefaultDocumentCustomization: (customizationPartial) => {
+    set((state) => ({
+      defaultDocumentCustomization: {
+        ...(state.defaultDocumentCustomization || DEFAULT_DOCUMENT_CUSTOMIZATION),
+        ...customizationPartial,
+      },
+      saveFeedbackMessage: '¡Plantilla de propuesta actualizada para futuros proyectos! 📑',
+    }));
+    setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
+  },
+
+  saveCurrentProjectAsDefaultDocumentTemplate: () => {
+    const active = get().getActiveProject();
+    if (!active) return;
+    const currentCust = active.customization || {};
+    set((state) => ({
+      defaultDocumentCustomization: {
+        ...(state.defaultDocumentCustomization || DEFAULT_DOCUMENT_CUSTOMIZATION),
+        ...currentCust,
+      },
+      saveFeedbackMessage: '¡Configuración actual guardada como plantilla permanente para futuras propuestas! 🌟',
+    }));
+    setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
+  },
+
+  resetDefaultDocumentCustomization: () => {
+    set({
+      defaultDocumentCustomization: DEFAULT_DOCUMENT_CUSTOMIZATION,
+      saveFeedbackMessage: 'Plantilla de propuesta restablecida a los valores de fábrica originales 🔄',
+    });
+    setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
+  },
 
   createNewProject: (payload) => {
     const defs = get().defaultSimulationSettings;
@@ -93,6 +98,9 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
       lastModifiedBy: currentUser?.name || 'Ing. Solar',
       lastModifiedAt: new Date().toISOString(),
       version: 1,
+      baseVersion: 0,
+      organizationId: currentUser?.organizationId,
+      syncServerUrl: currentUser ? get().syncSettings.serverUrl.trim().replace(/\/+$/, '') : undefined,
       syncStatus: currentUser ? 'pending' : 'local_only',
       client: {
         ...BENCHMARK_PROJECT.client,
@@ -103,6 +111,9 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
         address,
         distributor,
         tariffCode,
+        contactEmail: '',
+        contactPhone: '',
+        contactPerson: company || '',
         projectId: seq.projectId,
         quoteNumber: seq.quoteNumber,
         quoteValidityDays: defs?.defaultQuoteValidityDays || 7,
@@ -140,6 +151,14 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
         projectLifespanYears: defs?.lifespanYears || 25,
         co2FactorKgPerKWh: BENCHMARK_PROJECT.financials?.co2FactorKgPerKWh || 0.481,
         customItems: [],
+      },
+      companyProfileId: get().activeCompanyId,
+      customization: {
+        ...(get().defaultDocumentCustomization || DEFAULT_DOCUMENT_CUSTOMIZATION),
+        ...companyDocumentSnapshot(get().getActiveCompany(), get().defaultDocumentCustomization),
+        contactName: company || name,
+        clientPhone: '',
+        clientEmail: '',
       },
     };
 
@@ -182,6 +201,9 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
       lastModifiedBy: currentUser?.name || 'Ing. Solar',
       lastModifiedAt: new Date().toISOString(),
       version: 1,
+      baseVersion: 0,
+      organizationId: currentUser?.organizationId,
+      syncServerUrl: currentUser ? get().syncSettings.serverUrl.trim().replace(/\/+$/, '') : undefined,
       syncStatus: currentUser ? 'pending' : 'local_only',
       client: {
         ...original.client,
@@ -222,7 +244,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
             isDeleted: true,
             deletedAt: nowIso,
             deletedBy: currentUser?.name || 'Ing. Solar',
-            syncStatus: currentUser ? ('pending' as const) : ('local_only' as const),
+            ...projectMutationMetadata(p, get().syncSettings),
             updatedAt: nowIso,
           }
         : p
@@ -240,9 +262,6 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     setTimeout(() => set({ saveFeedbackMessage: null }), 2500);
 
     if (hasSyncAuth) {
-      if (serverUrl && authToken) {
-        SyncService.deleteProject(serverUrl, authToken, id, false).catch(() => {});
-      }
       get().triggerAutoSync(true);
     }
   },
@@ -268,7 +287,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
             isDeleted: false,
             deletedAt: null,
             deletedBy: null,
-            syncStatus: currentUser ? ('pending' as const) : ('local_only' as const),
+            ...projectMutationMetadata(p, get().syncSettings),
             updatedAt: nowIso,
           }
         : p
@@ -283,9 +302,6 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
 
     if (hasSyncAuth) {
-      if (serverUrl && authToken) {
-        SyncService.restoreProject(serverUrl, authToken, id).catch(() => {});
-      }
       get().triggerAutoSync(true);
     }
   },
@@ -298,6 +314,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     const authToken = get().syncSettings?.authToken;
     const hasSyncAuth = !!(authToken && get().syncSettings?.autoSyncEnabled);
 
+    get().queueProjectDeletion(target);
     const nextProjects = get().projects.filter((p) => p.id !== id);
     const activeRemaining = nextProjects.filter((p) => !p.isDeleted);
     const nextActiveId = activeRemaining.length > 0 ? activeRemaining[0].id : '';
@@ -311,7 +328,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     setTimeout(() => set({ saveFeedbackMessage: null }), 2500);
 
     if (hasSyncAuth && serverUrl && authToken) {
-      SyncService.deleteProject(serverUrl, authToken, id, true).catch(() => {});
+
       get().triggerAutoSync(true);
     }
   },
@@ -324,6 +341,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     const trashedCount = get().projects.filter((p) => p.isDeleted).length;
     if (trashedCount === 0) return;
 
+    get().projects.filter((p) => p.isDeleted).forEach((project) => get().queueProjectDeletion(project));
     const nextProjects = get().projects.filter((p) => !p.isDeleted);
     const nextActiveId = nextProjects.length > 0 ? nextProjects[0].id : '';
 
@@ -338,7 +356,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
 
     if (hasSyncAuth && serverUrl && authToken) {
-      SyncService.emptyTrash(serverUrl, authToken).catch(() => {});
+
       get().triggerAutoSync(true);
     }
   },
@@ -346,7 +364,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
   setProjectStatus: (id, status) => {
     set((state) => ({
       projects: state.projects.map((p) =>
-        p.id === id ? { ...p, status, syncStatus: 'pending' as const, updatedAt: new Date().toISOString() } : p
+        p.id === id ? { ...p, status, ...projectMutationMetadata(p, get().syncSettings), updatedAt: new Date().toISOString() } : p
       ),
       saveFeedbackMessage: `Estado actualizado a "${status}"`,
     }));
@@ -360,7 +378,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
   saveActiveProject: () => {
     set((state) => ({
       projects: state.projects.map((p) =>
-        p.id === state.activeProjectId ? { ...p, syncStatus: 'pending' as const, updatedAt: new Date().toISOString() } : p
+        p.id === state.activeProjectId ? { ...p, ...projectMutationMetadata(p, get().syncSettings), updatedAt: new Date().toISOString() } : p
       ),
       saveFeedbackMessage: '¡Proyecto guardado con éxito! ✨',
     }));
@@ -378,6 +396,14 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
         if (p.id === state.activeProjectId) {
           const updatedClient = { ...p.client, ...clientPartial };
           const updatedSpecs = { ...p.specs };
+          const updatedCustomization = { ...(p.customization || {}) };
+
+          if (clientPartial.contactPhone !== undefined) {
+            updatedCustomization.clientPhone = clientPartial.contactPhone;
+          }
+          if (clientPartial.contactPerson !== undefined) {
+            updatedCustomization.contactName = clientPartial.contactPerson;
+          }
 
           if (updatedSpecs.autoCalculatePanels && clientPartial.province) {
             const panelW = updatedSpecs.panelPowerW || 620;
@@ -396,10 +422,11 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
 
           return {
             ...p,
-            syncStatus: 'pending' as const,
+            ...projectMutationMetadata(p, get().syncSettings),
             updatedAt: new Date().toISOString(),
             client: updatedClient,
             specs: updatedSpecs,
+            customization: updatedCustomization,
           };
         }
         return p;
@@ -407,6 +434,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     }));
 
     get().triggerAutoSync(false);
+    const active = get().getActiveProject();
+    if (active) get().recordUndoState(active);
   },
 
   updateSpecs: (specsPartial) => {
@@ -507,7 +536,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
             }
             return {
               ...p,
-              syncStatus: 'pending' as const,
+              ...projectMutationMetadata(p, get().syncSettings),
               updatedAt: new Date().toISOString(),
               specs: mergedSpecs,
               financials: nextFinancials,
@@ -519,6 +548,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     });
 
     get().triggerAutoSync(false);
+    const active = get().getActiveProject();
+    if (active) get().recordUndoState(active);
   },
 
   updateRates: (ratesPartial) => {
@@ -544,7 +575,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
 
           return {
             ...p,
-            syncStatus: 'pending' as const,
+            ...projectMutationMetadata(p, get().syncSettings),
             updatedAt: new Date().toISOString(),
             rates: updatedRates,
             specs: updatedSpecs,
@@ -555,6 +586,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     }));
 
     get().triggerAutoSync(false);
+    const active = get().getActiveProject();
+    if (active) get().recordUndoState(active);
   },
 
   updateFinancials: (finPartial) => {
@@ -569,7 +602,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
           }
           return {
             ...p,
-            syncStatus: 'pending' as const,
+            ...projectMutationMetadata(p, get().syncSettings),
             updatedAt: new Date().toISOString(),
             financials: nextFinancials,
           };
@@ -579,6 +612,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     }));
 
     get().triggerAutoSync(false);
+    const active = get().getActiveProject();
+    if (active) get().recordUndoState(active);
   },
 
   updateMonthlyConsumption: (index, value) => {
@@ -606,7 +641,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
 
           return {
             ...p,
-            syncStatus: 'pending' as const,
+            ...projectMutationMetadata(p, get().syncSettings),
             updatedAt: new Date().toISOString(),
             monthlyConsumption: newConsumption,
             specs: updatedSpecs,
@@ -617,6 +652,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     }));
 
     get().triggerAutoSync(false);
+    const active = get().getActiveProject();
+    if (active) get().recordUndoState(active);
   },
 
   updateAllMonthlyConsumption: (value) => {
@@ -643,7 +680,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
 
           return {
             ...p,
-            syncStatus: 'pending' as const,
+            ...projectMutationMetadata(p, get().syncSettings),
             updatedAt: new Date().toISOString(),
             monthlyConsumption: newConsumption,
             specs: updatedSpecs,
@@ -654,6 +691,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     }));
 
     get().triggerAutoSync(false);
+    const active = get().getActiveProject();
+    if (active) get().recordUndoState(active);
   },
 
   setMonthlyConsumption: (monthlyConsumption, lockAutoPanels = false) => {
@@ -682,7 +721,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
 
           return {
             ...p,
-            syncStatus: 'pending' as const,
+            ...projectMutationMetadata(p, get().syncSettings),
             updatedAt: new Date().toISOString(),
             monthlyConsumption: newConsumption,
             specs: updatedSpecs,
@@ -693,22 +732,33 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     }));
 
     get().triggerAutoSync(false);
+    const active = get().getActiveProject();
+    if (active) get().recordUndoState(active);
   },
 
   updateDocumentCustomization: (customizationPartial) => {
     set((state) => {
       const targetId = state.activeProjectId || state.getActiveProject()?.id;
       return {
-        projects: state.projects.map((p) =>
-          p.id === targetId
-            ? {
-                ...p,
-                syncStatus: 'pending' as const,
-                updatedAt: new Date().toISOString(),
-                customization: { ...(p.customization || {}), ...customizationPartial },
-              }
-            : p
-        ),
+        projects: state.projects.map((p) => {
+          if (p.id === targetId) {
+            const updatedClient = { ...p.client };
+            if (customizationPartial.clientPhone !== undefined) {
+              updatedClient.contactPhone = customizationPartial.clientPhone;
+            }
+            if (customizationPartial.contactName !== undefined) {
+              updatedClient.contactPerson = customizationPartial.contactName;
+            }
+            return {
+              ...p,
+              ...projectMutationMetadata(p, get().syncSettings),
+              updatedAt: new Date().toISOString(),
+              client: updatedClient,
+              customization: { ...(p.customization || {}), ...customizationPartial },
+            };
+          }
+          return p;
+        }),
       };
     });
 
@@ -773,7 +823,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
 
           return {
             ...p,
-            syncStatus: 'pending' as const,
+            ...projectMutationMetadata(p, get().syncSettings),
             updatedAt: new Date().toISOString(),
             specs: updatedSpecs,
           };
@@ -803,7 +853,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
       p.rates || BENCHMARK_PROJECT.rates,
       p.financials || BENCHMARK_PROJECT.financials,
       p.monthlyConsumption || BENCHMARK_PROJECT.monthlyConsumption,
-      p.client?.customMonthlyHSP
+      p.client?.customMonthlyHSP,
+      energyCalculationMode(effectiveFeatureSettings(get()))
     );
   },
 });

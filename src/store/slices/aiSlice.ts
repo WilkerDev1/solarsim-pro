@@ -1,8 +1,11 @@
+import { companyDocumentSnapshot } from '../../utils/companyDocumentSnapshot';
+import { projectMutationMetadata } from '../sync/projectMutation';
 import { SimulationSlice, AISlice } from '../types';
 import { ProjectSimulation } from '../../types';
 import { BENCHMARK_PROJECT } from '../../engine/referenceCase';
 import { generateNextProjectSequence } from '../initialData';
 import { calculateRecommendedPanelCount } from '../../engine/solarEngine';
+import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
 
 const normalizeProvinceName = (raw?: string): string => {
   if (!raw) return 'Santo Domingo / Distrito Nacional';
@@ -74,6 +77,9 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
           lastModifiedBy: currentUser?.name || 'Ing. Solar',
           lastModifiedAt: new Date().toISOString(),
           version: 1,
+          baseVersion: 0,
+          organizationId: currentUser?.organizationId,
+          syncServerUrl: currentUser ? get().syncSettings.serverUrl.trim().replace(/\/+$/, '') : undefined,
           syncStatus: currentUser ? 'pending' : 'local_only',
           client: {
             ...BENCHMARK_PROJECT.client,
@@ -159,6 +165,14 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
             data.monthlyConsumptionKWh && data.monthlyConsumptionKWh.length === 12
               ? [...data.monthlyConsumptionKWh]
               : [...BENCHMARK_PROJECT.monthlyConsumption],
+          companyProfileId: get().activeCompanyId,
+      customization: {
+            ...(get().defaultDocumentCustomization || DEFAULT_DOCUMENT_CUSTOMIZATION),
+        ...companyDocumentSnapshot(get().getActiveCompany(), get().defaultDocumentCustomization),
+            contactName: data.clientName || undefined,
+            clientPhone: data.phone || undefined,
+            clientEmail: data.email || undefined,
+          },
         };
 
         projects = [newProj, ...projects];
@@ -191,7 +205,7 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
           const count = data.recommendedPanelCount || rec.recommendedPanelCount;
           return {
             ...p,
-            syncStatus: 'pending' as const,
+            ...projectMutationMetadata(p, get().syncSettings),
             updatedAt: new Date().toISOString(),
             lastModifiedBy: get().syncSettings?.currentUser?.name || p.lastModifiedBy || 'Ing. Solar',
             lastModifiedAt: new Date().toISOString(),

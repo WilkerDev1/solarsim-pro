@@ -1,310 +1,533 @@
-import React, { useState, useEffect } from 'react';
-import { useSimulationStore } from '../../../store/useSimulationStore';
-import { SyncService } from '../../../services/syncService';
-import { UserProfile, UserRole } from '../../../types';
+import { useEffect, useRef, useState } from "react";
+import { useSimulationStore } from "../../../store/useSimulationStore";
+import { SyncService } from "../../../services/syncService";
 import {
-  Building2,
-  Users,
-  Shield,
-  UserPlus,
-  RefreshCw,
-  CheckCircle2,
-  AlertCircle,
-  X,
-  UserCheck,
-  UserX,
-} from 'lucide-react';
+  CompanyService,
+  OrganizationInvitation,
+} from "../../../services/companyService";
+import type { UserProfile, UserRole } from "../../../types";
+import "../../../components/companies/company-center.css";
+import { draftOwnerKey } from "../../../utils/draftOwnerKey";
 
-export const OrganizationSection: React.FC = () => {
-  const { syncSettings } = useSimulationStore();
-  const currentUser = syncSettings.currentUser;
-  const isAdmin = currentUser?.role === 'ADMIN';
-
-  // Member list state
-  const [companyUsers, setCompanyUsers] = useState<UserProfile[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-  const [showAddUserModal, setShowAddUserModal] = useState(false);
-  const [newUserName, setNewUserName] = useState('');
-  const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserPassword, setNewUserPassword] = useState('');
-  const [newUserRole, setNewUserRole] = useState<UserRole>('EDITOR');
-  const [userActionMsg, setUserActionMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-
-  const loadUsers = async () => {
-    if (!syncSettings.authToken) return;
-    setLoadingUsers(true);
-    const users = await SyncService.getCompanyUsers(syncSettings.serverUrl, syncSettings.authToken);
-    setLoadingUsers(false);
-    setCompanyUsers(users);
+export function OrganizationSection() {
+  const { syncSettings, workspaceScope, sessionGeneration, sidebarTheme } =
+    useSimulationStore();
+  const ownerKey = draftOwnerKey(workspaceScope, syncSettings, true);
+  const mounted = useRef(true);
+  const loadRequest = useRef(0);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; loadRequest.current++; }; }, []);
+  const [members, setMembers] = useState<UserProfile[]>([]);
+  const [invitations, setInvitations] = useState<OrganizationInvitation[]>([]);
+  const [inviteState, setInviteState] = useState<"loading" | "ready" | "error">(
+    "loading",
+  );
+  const [inviteError, setInviteError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [invitationCode, setInvitationCode] = useState("");
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<UserRole>("EDITOR");
+  const [editing, setEditing] = useState<UserProfile | null>(null);
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [active, setActive] = useState(true);
+  const [mode, setMode] = useState<"none" | "invite" | "create" | "edit">(
+    "none",
+  );
+  const user = syncSettings.currentUser;
+  const isCurrent = (generation = sessionGeneration) =>
+    mounted.current && useSimulationStore.getState().sessionGeneration === generation;
+  const load = async () => {
+    if (!syncSettings.authToken || user?.role !== "ADMIN") return;
+    const request = ++loadRequest.current;
+    setInviteState("loading");
+    setInvitations([]);
+    setInviteError("");
+    setError("");
+    const [users, invites] = await Promise.all([
+      SyncService.getCompanyUsers(
+        syncSettings.serverUrl,
+        syncSettings.authToken,
+      ),
+      CompanyService.invitations(
+        syncSettings.serverUrl,
+        syncSettings.authToken,
+      ),
+    ]);
+    if (!isCurrent() || request !== loadRequest.current) return;
+    if (users.success) {
+      setMembers(users.users);
+      setError("");
+    } else {
+      setMembers([]);
+      setError(users.error || "No se pudo consultar el equipo.");
+    }
+    if (invites.success) {
+      setInvitations(invites.invitations || []);
+      setInviteState("ready");
+    } else {
+      setInviteState("error");
+      setInviteError(
+        invites.error || "No se pudieron consultar las invitaciones.",
+      );
+    }
   };
-
   useEffect(() => {
-    if (syncSettings.authToken && isAdmin) {
-      loadUsers();
+    setMembers([]);
+    setInvitations([]);
+    setEditing(null);
+    setName("");
+    setEmail("");
+    setRole("EDITOR");
+    setActive(true);
+    setPassword("");
+    setMode("none");
+    setInvitationCode("");
+    setMessage("");
+    setError("");
+    setBusy(false);
+  }, [ownerKey]);
+  useEffect(() => {
+    if (!syncSettings.authToken) {
+      setPassword("");
+      setInvitationCode("");
+      setMembers([]);
+      setInvitations([]);
     }
-  }, [syncSettings.authToken, isAdmin]);
-
-  const handleCreateUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newUserName.trim() || !newUserEmail.trim() || !newUserPassword.trim()) {
-      setUserActionMsg({ type: 'error', text: 'Todos los campos son obligatorios' });
-      return;
-    }
-    const res = await SyncService.createCompanyUser(syncSettings.serverUrl, syncSettings.authToken!, {
-      name: newUserName,
-      email: newUserEmail,
-      password: newUserPassword,
-      role: newUserRole,
-    });
-    if (res.success) {
-      setUserActionMsg({ type: 'success', text: `¡Usuario ${newUserName} creado con éxito!` });
-      setShowAddUserModal(false);
-      setNewUserName('');
-      setNewUserEmail('');
-      setNewUserPassword('');
-      loadUsers();
-      setTimeout(() => setUserActionMsg(null), 3500);
+    void load();
+  }, [sessionGeneration, syncSettings.authToken, ownerKey]);
+  useEffect(() => { setBusy(false); }, [sessionGeneration]);
+  const resetForm = () => {
+    setEditing(null);
+    setName("");
+    setEmail("");
+    setPassword("");
+    setRole("EDITOR");
+    setActive(true);
+    setMode("none");
+  };
+  const run = async (
+    operation: () => Promise<{ success: boolean; error?: string }>,
+    success: string,
+  ) => {
+    loadRequest.current++;
+    setBusy(true);
+    setMessage("");
+    setError("");
+    const result = await operation();
+    if (!isCurrent()) return;
+    setBusy(false);
+    if (result.success) {
+      setMessage(success);
+      setError("");
+      resetForm();
+      await load();
     } else {
-      setUserActionMsg({ type: 'error', text: res.error || 'Error al crear usuario' });
+      setError(result.error || "No se pudo completar la operación.");
+      setMessage("");
     }
   };
-
-  const handleToggleUserActive = async (user: UserProfile) => {
-    const res = await SyncService.updateCompanyUser(syncSettings.serverUrl, syncSettings.authToken!, user.id, {
-      isActive: !user.isActive,
-    });
-    if (res.success) {
-      setUserActionMsg({
-        type: 'success',
-        text: `Usuario ${user.name} ${!user.isActive ? 'activado' : 'desactivado'} correctamente.`,
-      });
-      loadUsers();
-      setTimeout(() => setUserActionMsg(null), 3000);
-    } else {
-      setUserActionMsg({ type: 'error', text: res.error || 'Error al actualizar usuario' });
-    }
-  };
-
-  return (
-    <section id="sec-organizacion" className="flex flex-col gap-6 scroll-mt-6">
-      <div>
-        <h3 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">Organización & Equipo</h3>
-        <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">
-          Gestión de roles de acceso (RBAC), miembros colaboradores y datos de la empresa.
+  if (!user || !syncSettings.authToken)
+    return (
+      <div className="company-center" data-theme={sidebarTheme}>
+        <h3>Equipo de {user?.organizationName || "tu organización"}</h3>
+        <p>
+          Inicia sesión con una cuenta de Administrador para consultar y gestionar el equipo de tu organización.
         </p>
+        <button
+          className="cc-primary"
+          onClick={() => useSimulationStore.getState().openSettingsModal("account")}
+        >
+          Ir a Cuenta y perfiles
+        </button>
       </div>
-
-      <div className="bg-white dark:bg-[#18181b] border border-slate-200/80 dark:border-[#27272a] rounded-2xl p-6 shadow-xs flex flex-col gap-6">
-        {/* Identidad de la Empresa */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-slate-100 dark:border-[#27272a]">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 flex items-center justify-center shadow-2xs font-bold text-lg">
-              <Building2 className="w-6 h-6" />
-            </div>
-            <div>
-              <h4 className="text-base font-bold text-slate-900 dark:text-white">
-                {currentUser?.organizationName || 'Electsun Dominicana'}
-              </h4>
-              <p className="text-xs text-slate-500 dark:text-zinc-400">
-                Plan Empresarial Multi-Usuario • Licencia Activa
-              </p>
-            </div>
-          </div>
-          {isAdmin && (
+    );
+  if (user.role !== "ADMIN")
+    return (
+      <>
+        <h3>Equipo de {user.organizationName || "tu organización"}</h3>
+        <p>
+          Tu rol es {user.role}. Un administrador gestiona miembros e
+          invitaciones.
+        </p>
+      </>
+    );
+  const token = syncSettings.authToken!;
+  const roles = (
+    <>
+      <option value="ADMIN">Administrador</option>
+      <option value="EDITOR">Editor</option>
+      <option value="LECTOR">Lector</option>
+    </>
+  );
+  return (
+    <div
+      className="company-center"
+      data-theme={sidebarTheme}
+      style={{
+        height: "auto",
+        overflow: "visible",
+        background: "transparent",
+        display: "block",
+      }}
+    >
+      <div className="cc-inline" style={{ justifyContent: "space-between" }}>
+        <h3>Equipo de {user.organizationName || "tu organización"}</h3>
+        <div className="cc-inline">
+          <button
+            disabled={busy}
+            onClick={() => {
+              resetForm();
+              setMode("invite");
+            }}
+          >
+            Invitar cuenta existente
+          </button>
+          <button
+            disabled={busy}
+            onClick={() => {
+              resetForm();
+              setMode("create");
+            }}
+          >
+            Crear cuenta
+          </button>
+          <button disabled={busy} onClick={() => void load()}>
+            Actualizar
+          </button>
+        </div>
+      </div>
+      <p>
+        Administradores gestionan la empresa y el equipo. Editores crean y
+        sincronizan propuestas. Lectores consultan los datos.
+      </p>
+      {message && (
+        <div className="cc-notice" role="status">
+          {message}
+        </div>
+      )}
+      {error && (
+        <div className="cc-notice cc-error" role="alert" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>{error}</span>
+          {/no autorizad/i.test(error) && (
             <button
-              onClick={() => setShowAddUserModal(true)}
-              className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+              style={{ padding: "4px 10px", minHeight: "auto", fontSize: 13 }}
+              onClick={() => useSimulationStore.getState().openSettingsModal("sync")}
             >
-              <UserPlus className="w-3.5 h-3.5" />
-              <span>Invitar Miembro</span>
+              Iniciar sesión
             </button>
           )}
         </div>
-
-        {userActionMsg && (
-          <div
-            className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
-              userActionMsg.type === 'success'
-                ? 'bg-emerald-50 border border-emerald-200 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800'
-                : 'bg-rose-50 border border-rose-200 text-rose-700 dark:bg-rose-950/40 dark:border-rose-800'
-            }`}
+      )}
+      {invitationCode && (
+        <div className="cc-notice">
+          <strong>Invitación creada</strong>
+          <p>
+            No se envió un correo. Comparte este código con la persona invitada;
+            vence en siete días.
+          </p>
+          <div className="cc-code">{invitationCode}</div>
+          <button
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(invitationCode);
+                setMessage("Código copiado.");
+              } catch {
+                setMessage("Selecciona el código y cópialo manualmente.");
+              }
+            }}
           >
-            {userActionMsg.type === 'success' ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
-            <span>{userActionMsg.text}</span>
-          </div>
-        )}
-
-        {/* Tabla de Usuarios */}
-        {isAdmin ? (
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">
-                Miembros de la Organización ({companyUsers.length})
-              </span>
-              <button
-                onClick={loadUsers}
-                disabled={loadingUsers}
-                className="text-xs text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center gap-1 cursor-pointer"
-              >
-                <RefreshCw className={`w-3 h-3 ${loadingUsers ? 'animate-spin' : ''}`} />
-                <span>Actualizar Lista</span>
-              </button>
-            </div>
-
-            {loadingUsers && companyUsers.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-400">Cargando miembros...</div>
-            ) : companyUsers.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-400">
-                Inicia sesión en el servidor para ver el equipo.
-              </div>
-            ) : (
-              <div className="overflow-x-auto rounded-xl border border-slate-200/80 dark:border-[#27272a]">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 dark:bg-[#222226] text-slate-600 dark:text-zinc-400 font-semibold border-b border-slate-200/80 dark:border-[#27272a]">
-                    <tr>
-                      <th className="px-4 py-3">Nombre</th>
-                      <th className="px-4 py-3">Email</th>
-                      <th className="px-4 py-3">Rol</th>
-                      <th className="px-4 py-3">Estado</th>
-                      <th className="px-4 py-3 text-right">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-[#27272a]">
-                    {companyUsers.map((u) => (
-                      <tr key={u.id} className="hover:bg-slate-50/50 dark:hover:bg-[#222226]/50 transition-colors">
-                        <td className="px-4 py-3 font-semibold text-slate-800 dark:text-zinc-200">{u.name}</td>
-                        <td className="px-4 py-3 text-slate-500 dark:text-zinc-400 font-mono text-[11px]">{u.email}</td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
-                              u.role === 'ADMIN'
-                                ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800'
-                                : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
-                            }`}
-                          >
-                            {u.role}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="flex items-center gap-1.5 text-slate-600 dark:text-zinc-400">
-                            <span
-                              className={`w-2 h-2 rounded-full ${
-                                u.isActive !== false ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-zinc-600'
-                              }`}
-                            />
-                            <span>{u.isActive !== false ? 'Activo' : 'Inactivo'}</span>
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          {u.id !== currentUser?.id && (
-                            <button
-                              onClick={() => handleToggleUserActive(u)}
-                              className="px-2.5 py-1 rounded-lg text-[11px] font-semibold border border-slate-200 dark:border-[#27272a] hover:bg-slate-100 dark:hover:bg-[#27272a] text-slate-700 dark:text-zinc-300 cursor-pointer"
-                            >
-                              {u.isActive !== false ? 'Desactivar' : 'Activar'}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#121214] border border-slate-200/60 dark:border-[#27272a] text-xs text-slate-500 dark:text-zinc-400 flex items-center gap-3">
-            <Shield className="w-5 h-5 text-slate-400" />
-            <span>
-              La administración de usuarios y permisos RBAC está reservada para cuentas con rol de <strong>ADMIN</strong>.
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Modal para Crear Usuario */}
-      {showAddUserModal && (
-        <div className="fixed inset-0 z-60 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-2xl p-6 w-full max-w-md shadow-2xl flex flex-col gap-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#27272a]">
-              <h4 className="text-sm font-bold text-slate-900 dark:text-white">Invitar Nuevo Miembro</h4>
-              <button
-                onClick={() => setShowAddUserModal(false)}
-                className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateUser} className="flex flex-col gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">Nombre Completo</label>
+            Copiar código
+          </button>
+          <button onClick={() => setInvitationCode("")}>Ocultar código</button>
+        </div>
+      )}
+      {mode !== "none" && (
+        <form
+          className="cc-member-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (mode === "invite")
+              void run(async () => {
+                const result = await CompanyService.invite(
+                  syncSettings.serverUrl,
+                  token,
+                  email.trim(),
+                  role,
+                );
+                if (isCurrent() && result.code) setInvitationCode(result.code);
+                return result;
+              }, "Invitación preparada.");
+            if (mode === "create")
+              void run(
+                () =>
+                  SyncService.createCompanyUser(syncSettings.serverUrl, token, {
+                    name: name.trim(),
+                    email: email.trim(),
+                    password,
+                    role,
+                  }),
+                "Cuenta creada.",
+              );
+            if (mode === "edit" && editing)
+              void run(
+                () =>
+                  SyncService.updateCompanyUser(
+                    syncSettings.serverUrl,
+                    token,
+                    editing.id,
+                    {
+                      role,
+                      isActive: active,
+                      ...(editing.canEditIdentity !== false
+                        ? {
+                            name: name.trim(),
+                            ...(password ? { password } : {}),
+                          }
+                        : {}),
+                    },
+                  ),
+                "Permisos guardados.",
+              );
+          }}
+        >
+          <h3>
+            {mode === "invite"
+              ? "Invitar a una persona con cuenta"
+              : mode === "create"
+                ? "Crear una cuenta del equipo"
+                : "Editar acceso al equipo"}
+          </h3>
+          {mode === "edit" && editing?.canEditIdentity === false && (
+            <p>
+              Esta cuenta pertenece a otras empresas. Aquí se modifica
+              únicamente su acceso a esta organización.
+            </p>
+          )}
+          <div className="company-fields">
+            {mode !== "invite" && (
+              <label>
+                Nombre
                 <input
-                  type="text"
                   required
-                  placeholder="Ing. Miguel Rodríguez"
-                  value={newUserName}
-                  onChange={(e) => setNewUserName(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl text-xs border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-900 dark:text-white"
+                  maxLength={255}
+                  value={name}
+                  readOnly={
+                    mode === "edit" && editing?.canEditIdentity === false
+                  }
+                  onChange={(event) => setName(event.target.value)}
                 />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">Correo Electrónico</label>
+              </label>
+            )}
+            {mode !== "edit" && (
+              <label>
+                Correo
                 <input
                   type="email"
                   required
-                  placeholder="miguel@electsun.com"
-                  value={newUserEmail}
-                  onChange={(e) => setNewUserEmail(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl text-xs border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-900 dark:text-white"
+                  maxLength={255}
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
                 />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">Contraseña Inicial</label>
+              </label>
+            )}
+            <label>
+              Rol
+              <select
+                value={role === "VIEWER" ? "LECTOR" : role}
+                onChange={(event) => setRole(event.target.value as UserRole)}
+              >
+                {roles}
+              </select>
+            </label>
+            {mode !== "invite" &&
+              (mode === "create" || editing?.canEditIdentity !== false) && (
+                <label>
+                  {mode === "create"
+                    ? "Contraseña (mínimo 8 caracteres)"
+                    : "Nueva contraseña (opcional, mínimo 8 caracteres)"}
+                  <input
+                    type="password"
+                    required={mode === "create"}
+                    minLength={8}
+                    maxLength={200}
+                    value={password}
+                    autoComplete="new-password"
+                    onChange={(event) => setPassword(event.target.value)}
+                  />
+                </label>
+              )}
+            {mode === "edit" && (
+              <label className="cc-inline">
                 <input
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  value={newUserPassword}
-                  onChange={(e) => setNewUserPassword(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl text-xs border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-900 dark:text-white"
+                  type="checkbox"
+                  checked={active}
+                  onChange={(event) => setActive(event.target.checked)}
                 />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-zinc-300 mb-1">Rol de Acceso</label>
-                <select
-                  value={newUserRole}
-                  onChange={(e) => setNewUserRole(e.target.value as UserRole)}
-                  className="w-full px-3 py-2 rounded-xl text-xs border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-900 dark:text-white"
-                >
-                  <option value="EDITOR">EDITOR (Crear y modificar proyectos)</option>
-                  <option value="VIEWER">VIEWER (Solo lectura de propuestas)</option>
-                  <option value="ADMIN">ADMIN (Control total y gestión de usuarios)</option>
-                </select>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setShowAddUserModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:text-zinc-400 dark:hover:bg-[#27272a] cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs cursor-pointer"
-                >
-                  Crear Usuario
-                </button>
-              </div>
-            </form>
+                Acceso activo a esta organización
+              </label>
+            )}
           </div>
+          <div className="cc-actions">
+            <button type="button" disabled={busy} onClick={resetForm}>
+              Cancelar
+            </button>
+            <button type="submit" className="cc-primary" disabled={busy}>
+              {busy
+                ? "Guardando…"
+                : mode === "invite"
+                  ? "Crear invitación"
+                  : "Guardar"}
+            </button>
+          </div>
+        </form>
+      )}
+      <div className="cc-table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Persona</th>
+              <th>Rol</th>
+              <th>Acceso</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {members.map((member) => (
+              <tr key={member.id}>
+                <td>
+                  <strong>{member.name}</strong>
+                  <div className="cc-muted">{member.email}</div>
+                </td>
+                <td>{member.role}</td>
+                <td>{member.isActive === false ? "Suspendido" : "Activo"}</td>
+                <td>
+                  <div className="cc-inline">
+                    <button
+                      disabled={busy}
+                      onClick={() => {
+                        resetForm();
+                        setEditing(member);
+                        setName(member.name);
+                        setRole(member.role);
+                        setActive(member.isActive !== false);
+                        setMode("edit");
+                      }}
+                    >
+                      Editar
+                    </button>
+                    {member.id !== user.id && (
+                      <button
+                        className="cc-danger"
+                        disabled={busy}
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              "¿Retirar el acceso de " +
+                                member.name +
+                                "? Sus propuestas se conservan.",
+                            )
+                          )
+                            void run(
+                              () =>
+                                SyncService.deleteCompanyUser(
+                                  syncSettings.serverUrl,
+                                  token,
+                                  member.id,
+                                ),
+                              "Acceso retirado.",
+                            );
+                        }}
+                      >
+                        Retirar
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {!members.length && (
+        <p>Sin miembros cargados. Usa Actualizar para consultar el servidor.</p>
+      )}
+      {inviteState === "loading" && (
+        <p role="status">Consultando invitaciones…</p>
+      )}
+      {inviteState === "error" && (
+        <div className="cc-notice cc-error" role="alert">
+          {inviteError}{" "}
+          <button onClick={() => void load()}>Reintentar consulta</button>
         </div>
       )}
-    </section>
+      {inviteState === "ready" && !invitations.length && (
+        <p>No hay invitaciones registradas.</p>
+      )}
+      {invitations.length > 0 && (
+        <section className="cc-section">
+          <h3>Invitaciones</h3>
+          <div className="cc-table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Correo</th>
+                  <th>Rol</th>
+                  <th>Estado</th>
+                  <th>Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invitations.map((invite) => {
+                  const pending =
+                    !invite.acceptedAt &&
+                    !invite.revokedAt &&
+                    new Date(invite.expiresAt).getTime() > Date.now();
+                  return (
+                    <tr key={invite.id}>
+                      <td>{invite.email}</td>
+                      <td>{invite.role}</td>
+                      <td>
+                        {invite.acceptedAt
+                          ? "Aceptada"
+                          : invite.revokedAt
+                            ? "Revocada"
+                            : pending
+                              ? "Pendiente · vence " +
+                                new Date(invite.expiresAt).toLocaleDateString(
+                                  "es-DO",
+                                )
+                              : "Caducada"}
+                      </td>
+                      <td>
+                        {pending && (
+                          <button
+                            disabled={busy}
+                            onClick={() =>
+                              void run(
+                                () =>
+                                  CompanyService.revokeInvitation(
+                                    syncSettings.serverUrl,
+                                    token,
+                                    invite.id,
+                                  ),
+                                "Invitación revocada.",
+                              )
+                            }
+                          >
+                            Revocar
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+    </div>
   );
-};
+}

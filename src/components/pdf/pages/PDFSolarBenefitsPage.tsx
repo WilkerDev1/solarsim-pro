@@ -19,6 +19,7 @@ interface PDFSolarBenefitsPageProps {
   totalPages: number;
   isEditMode?: boolean;
   updateDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
+  updateDefaultDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
 }
 
 export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
@@ -31,6 +32,7 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
   totalPages,
   isEditMode = false,
   updateDocumentCustomization,
+  updateDefaultDocumentCustomization,
 }) => {
   const cust = project.customization || {};
   return (
@@ -147,6 +149,7 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
             value={cust.ley5707ObjectivesIntroText}
             defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.ley5707ObjectivesIntroText}
             onSave={(val) => updateDocumentCustomization?.({ ley5707ObjectivesIntroText: val })}
+            onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ ley5707ObjectivesIntroText: val })}
             isEditMode={isEditMode}
             multiline={true}
             label="Objetivos Ley 57-07 (Intro)"

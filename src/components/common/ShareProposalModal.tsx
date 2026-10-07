@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Share2,
@@ -17,6 +17,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { ProjectSimulation, FinancialSummaryResult } from '../../types';
 import { ShareProposalService, ShareResult, DEFAULT_WORKER_URL } from '../../services/shareProposalService';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { createShareRequestGuard } from './shareRequestGuard';
 
 interface ShareProposalModalProps {
   isOpen?: boolean;
@@ -29,20 +30,35 @@ interface ShareProposalModalProps {
 export const ShareProposalModal: React.FC<ShareProposalModalProps> = (props) => {
   const store = useSimulationStore();
   const isOpen = props.isOpen !== undefined ? props.isOpen : store.isShareModalOpen;
-  const onClose = props.onClose || store.closeShareModal;
+  const closeModal = props.onClose || store.closeShareModal;
   const isDark = props.isDark !== undefined ? props.isDark : store.sidebarTheme === 'dark';
   const project = props.project || store.getActiveProject();
   const summary = props.summary || store.getFinancialSummary();
 
   const [validityDays, setValidityDays] = useState<number>(7);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [shareResult, setShareResult] = useState<ShareResult | null>(null);
+  const [storedShareResult, setShareResult] = useState<ShareResult | null>(null);
+  const [resultScope, setResultScope] = useState<string>('');
+  const requestScope = `${ShareProposalService.getHistoryScopeKey()}|${store.syncSettings.currentUser?.id || ''}|${store.sessionGeneration}|${project.id}`;
+  const requestGuard = useRef(createShareRequestGuard());
+  requestGuard.current.update(requestScope, isOpen);
+  const onClose = () => {
+    requestGuard.current.invalidate();
+    closeModal();
+  };
+  useEffect(() => {
+    requestGuard.current.update(requestScope, isOpen);
+    return () => requestGuard.current.invalidate();
+  }, []);
+  const shareResult = resultScope === requestScope ? storedShareResult : null;
   const [copied, setCopied] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [workerUrl, setWorkerUrl] = useState<string>(ShareProposalService.getWorkerUrl());
 
   useEffect(() => {
     if (isOpen) {
+      setIsLoading(false);
+      setResultScope(requestScope);
       // Check if there is an active cached share link for this project
       const cached = ShareProposalService.getLastSharedInfo(project.id);
       if (cached) {
@@ -61,11 +77,13 @@ export const ShareProposalModal: React.FC<ShareProposalModalProps> = (props) => 
       setCopied(false);
       setShowSettings(false);
     }
-  }, [isOpen, project.id]);
+  }, [isOpen, requestScope]);
 
   if (!isOpen) return null;
 
   const handleGenerateLink = async () => {
+    const capturedScope = requestScope;
+    const current = requestGuard.current.begin();
     setIsLoading(true);
     setCopied(false);
     try {
@@ -75,14 +93,16 @@ export const ShareProposalModal: React.FC<ShareProposalModalProps> = (props) => 
         validityDays,
         workerUrl
       );
-      setShareResult(result);
+      if (current()) { setResultScope(capturedScope); setShareResult(result); }
     } catch (err: any) {
+      if (!current()) return;
+      setResultScope(capturedScope);
       setShareResult({
         success: false,
         error: err?.message || 'Error inesperado al conectar con el servicio.',
       });
     } finally {
-      setIsLoading(false);
+      if (current()) setIsLoading(false);
     }
   };
 
@@ -136,6 +156,7 @@ export const ShareProposalModal: React.FC<ShareProposalModalProps> = (props) => 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
       <div
+        role="dialog" aria-modal="true" aria-label="Compartir propuesta web"
         className={`w-full max-w-lg rounded-3xl border shadow-2xl overflow-hidden transition-all flex flex-col ${
           isDark
             ? 'bg-[#14141a] border-[#2a2a36] text-zinc-100'
@@ -153,13 +174,13 @@ export const ShareProposalModal: React.FC<ShareProposalModalProps> = (props) => 
               <Globe className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="font-extrabold text-base tracking-tight text-white flex items-center gap-2">
+              <h2 className={`font-extrabold text-base tracking-tight flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 Compartir Propuesta Web
                 <span className="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-800/60">
                   Cloudflare
                 </span>
               </h2>
-              <p className="text-xs text-slate-400">
+              <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                 {clientName} • {systemKWp} kWp
               </p>
             </div>
@@ -182,6 +203,7 @@ export const ShareProposalModal: React.FC<ShareProposalModalProps> = (props) => 
 
             <button
               onClick={onClose}
+              aria-label="Cerrar publicación web"
               className={`p-2 rounded-xl border transition-colors cursor-pointer ${
                 isDark
                   ? 'border-[#2e2e3e] text-zinc-400 hover:text-white hover:bg-[#20202c]'
@@ -201,7 +223,7 @@ export const ShareProposalModal: React.FC<ShareProposalModalProps> = (props) => 
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="font-bold text-slate-300">URL del Worker Cloudflare:</span>
+              <span className={`font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>URL del Worker Cloudflare:</span>
               <button
                 onClick={() => setWorkerUrl(DEFAULT_WORKER_URL)}
                 className="text-[11px] text-emerald-500 hover:underline cursor-pointer"
@@ -223,7 +245,7 @@ export const ShareProposalModal: React.FC<ShareProposalModalProps> = (props) => 
               />
               <button
                 onClick={handleSaveWorkerUrl}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                className="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
               >
                 Guardar
               </button>
@@ -235,7 +257,7 @@ export const ShareProposalModal: React.FC<ShareProposalModalProps> = (props) => 
         <div className="p-6 space-y-5 overflow-y-auto max-h-[75vh]">
           {/* Validity Selector */}
           <div>
-            <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <label className={`block text-xs font-bold uppercase tracking-wider mb-2 flex items-center gap-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
               <Clock className="w-3.5 h-3.5 text-emerald-400" />
               Tiempo de Vigencia del Enlace
             </label>
@@ -291,7 +313,7 @@ export const ShareProposalModal: React.FC<ShareProposalModalProps> = (props) => 
           ) : (
             <div className="space-y-5 animate-in fade-in duration-300">
               {/* QR Code Card */}
-              <div className="flex flex-col sm:flex-row items-center gap-5 p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80">
+              <div className={`flex flex-col sm:flex-row items-center gap-5 p-4 rounded-2xl border ${isDark ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
                 <div className="p-3 bg-white rounded-2xl shadow-lg shrink-0 flex items-center justify-center">
                   <QRCodeSVG
                     value={shareResult.shareUrl || ''}
@@ -306,12 +328,12 @@ export const ShareProposalModal: React.FC<ShareProposalModalProps> = (props) => 
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                     Enlace Activo
                   </div>
-                  <h4 className="text-sm font-bold text-white">Escaneo Instantáneo</h4>
-                  <p className="text-xs text-slate-400 leading-relaxed">
+                  <h4 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Escaneo Instantáneo</h4>
+                  <p className={`text-xs leading-relaxed ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                     El cliente puede escanear este código QR con la cámara de su teléfono móvil para ver la propuesta interactiva.
                   </p>
                   {formattedExpiration && (
-                    <p className="text-[11px] text-slate-500 font-mono pt-1">
+                    <p className={`text-[11px] font-mono pt-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                       Expira: {formattedExpiration}
                     </p>
                   )}
@@ -320,12 +342,13 @@ export const ShareProposalModal: React.FC<ShareProposalModalProps> = (props) => 
 
               {/* URL Input with Copy Button */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-slate-400">
+                <label className={`block text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                   Enlace Público Compartible:
                 </label>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
+                    aria-label="Enlace público de la propuesta"
                     readOnly
                     value={shareResult.shareUrl}
                     className={`flex-1 px-3.5 py-2.5 rounded-xl font-mono text-xs border focus:outline-hidden ${
@@ -365,7 +388,7 @@ export const ShareProposalModal: React.FC<ShareProposalModalProps> = (props) => 
                   href={whatsappUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-950/40 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                  className="py-3 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs shadow-md shadow-emerald-950/40 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
                 >
                   <MessageCircle className="w-4 h-4 fill-current" />
                   <span>Enviar por WhatsApp</span>

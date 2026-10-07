@@ -6,6 +6,7 @@ import { PDFColorTheme, PDF_COLOR_THEMES } from '../../constants/pdfThemes';
 import { PDFMergeService } from '../../services/pdfMergeService';
 import { PDFAttachmentStorage } from '../../services/pdfAttachmentStorage';
 import { PDFSectionId, DEFAULT_PDF_SECTION_ORDER } from '../../constants/pdfSections';
+import { formatProposalDate } from '../../utils/formatDateUtils';
 
 // Modular Page Components
 import { PDFSidebarControls } from './controls/PDFSidebarControls';
@@ -31,6 +32,9 @@ export const PDFProposalView: React.FC = () => {
     updateClient,
     updateSpecs,
     updateDocumentCustomization,
+    updateDefaultDocumentCustomization,
+    saveCurrentProjectAsDefaultDocumentTemplate,
+    resetDefaultDocumentCustomization,
     sidebarTheme,
     openShareModal,
     restoreProject,
@@ -207,11 +211,9 @@ export const PDFProposalView: React.FC = () => {
     }
   };
 
-  const currentDateStr = new Date().toLocaleDateString('es-DO', {
-    day: '2-digit',
-    month: 'numeric',
-    year: 'numeric',
-  });
+  const currentDateStr = useMemo(() => {
+    return formatProposalDate(project?.client?.quoteDate || project?.customization?.quoteDate);
+  }, [project?.client?.quoteDate, project?.customization?.quoteDate]);
 
   // Effective Section Order
   const effectiveSectionOrder: PDFSectionId[] = useMemo(() => {
@@ -416,6 +418,9 @@ export const PDFProposalView: React.FC = () => {
         updateClient={updateClient}
         updateSpecs={updateSpecs}
         updateDocumentCustomization={updateDocumentCustomization}
+        updateDefaultDocumentCustomization={updateDefaultDocumentCustomization}
+        saveCurrentProjectAsDefaultDocumentTemplate={saveCurrentProjectAsDefaultDocumentTemplate}
+        resetDefaultDocumentCustomization={resetDefaultDocumentCustomization}
         isEditMode={isEditMode}
         setIsEditMode={setIsEditMode}
       />
@@ -470,7 +475,7 @@ export const PDFProposalView: React.FC = () => {
                   </span>
                 </h4>
                 <p className="text-[11px] text-blue-100 font-medium">
-                  Haz clic sobre cualquier párrafo o subtítulo para modificarlo. Usa <code className="bg-blue-900/60 px-1 py-0.5 rounded text-[10px] text-amber-200">**texto**</code> o <kbd className="bg-blue-900/60 px-1 py-0.5 rounded text-[10px] text-amber-200">Ctrl+B</kbd> para negritas.
+                  Haz clic sobre cualquier párrafo o subtítulo para modificarlo. Usa <code className="bg-blue-900/60 px-1 py-0.5 rounded text-[10px] text-amber-200">**texto**</code> o <kbd className="bg-blue-900/60 px-1 py-0.5 rounded text-[10px] text-amber-200">Ctrl+B</kbd> para negritas, o <strong>Hacer Permanente</strong> para fijar plantillas futuras.
                 </p>
               </div>
             </div>
@@ -497,6 +502,8 @@ export const PDFProposalView: React.FC = () => {
                     summary={summary}
                     activeTheme={activeTheme}
                     currentDateStr={currentDateStr}
+                    isEditMode={isEditMode}
+                    updateClient={updateClient}
                   />
                 );
               case 'tableOfContents':
@@ -539,6 +546,7 @@ export const PDFProposalView: React.FC = () => {
                     totalPages={activePagesCount}
                     isEditMode={isEditMode}
                     updateDocumentCustomization={updateDocumentCustomization}
+                    updateDefaultDocumentCustomization={updateDefaultDocumentCustomization}
                   />
                 );
               case 'benefits':
@@ -554,6 +562,7 @@ export const PDFProposalView: React.FC = () => {
                     totalPages={activePagesCount}
                     isEditMode={isEditMode}
                     updateDocumentCustomization={updateDocumentCustomization}
+                    updateDefaultDocumentCustomization={updateDefaultDocumentCustomization}
                   />
                 );
               case 'techIntro':
@@ -569,6 +578,7 @@ export const PDFProposalView: React.FC = () => {
                     totalPages={activePagesCount}
                     isEditMode={isEditMode}
                     updateDocumentCustomization={updateDocumentCustomization}
+                    updateDefaultDocumentCustomization={updateDefaultDocumentCustomization}
                   />
                 );
               case 'projectDescription':
@@ -584,6 +594,7 @@ export const PDFProposalView: React.FC = () => {
                     totalPages={activePagesCount}
                     isEditMode={isEditMode}
                     updateDocumentCustomization={updateDocumentCustomization}
+                    updateDefaultDocumentCustomization={updateDefaultDocumentCustomization}
                   />
                 );
               case 'energy':
@@ -615,6 +626,8 @@ export const PDFProposalView: React.FC = () => {
                     totalPages={activePagesCount}
                     isEditMode={isEditMode}
                     updateDocumentCustomization={updateDocumentCustomization}
+                    updateDefaultDocumentCustomization={updateDefaultDocumentCustomization}
+                    updateClient={updateClient}
                   />
                 );
               case 'roi':

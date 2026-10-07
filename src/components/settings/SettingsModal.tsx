@@ -1,146 +1,72 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { SettingsSidebar } from './SettingsSidebar';
+import { settingsSections, resolveSettingsSection, SettingsSectionId } from './settingsNavigation';
 import { ProfileSection } from './sections/ProfileSection';
 import { SimulationPreferencesSection } from './sections/SimulationPreferencesSection';
 import { IntegrationsSection } from './sections/IntegrationsSection';
 import { EquipmentSection } from './sections/EquipmentSection';
 import { CloudflareProposalsSection } from './sections/CloudflareProposalsSection';
 import { OrganizationSection } from './sections/OrganizationSection';
+import { ApplicationFeaturesSection } from './sections/ApplicationFeaturesSection';
 import { BackupSection } from './sections/BackupSection';
 
+const sectionComponents: Record<SettingsSectionId, React.ComponentType> = {
+  funciones: ApplicationFeaturesSection, cuenta: ProfileSection, preferencias: SimulationPreferencesSection, integraciones: IntegrationsSection,
+  catalogo: EquipmentSection, cloudflare: CloudflareProposalsSection, organizacion: OrganizationSection, respaldo: BackupSection,
+};
+
 export const SettingsModal: React.FC = () => {
-  const { isSettingsModalOpen, closeSettingsModal, sidebarTheme, setSidebarTheme, settingsActiveTab } = useSimulationStore();
+  const { isSettingsModalOpen, closeSettingsModal, sidebarTheme, toggleSidebarTheme, settingsActiveTab } = useSimulationStore();
+  const [activeSection, setActiveSection] = useState<SettingsSectionId>('cuenta');
+  const [visitedSections, setVisitedSections] = useState<Set<SettingsSectionId>>(new Set());
+  const scrollRef = useRef<HTMLElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const isDark = sidebarTheme === 'dark';
-  const [activeSection, setActiveSection] = useState<string>('cuenta');
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Escuchar tecla Escape para cerrar
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isSettingsModalOpen) {
-        closeSettingsModal();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isSettingsModalOpen, closeSettingsModal]);
-
-  // Navegar a la pestaña solicitada al abrir (ej. 'ai' -> 'integraciones')
-  useEffect(() => {
-    if (isSettingsModalOpen && settingsActiveTab) {
-      const tabToSectionMap: Record<string, string> = {
-        ai: 'integraciones',
-        sync: 'integraciones',
-        share: 'cloudflare',
-        cloudflare: 'cloudflare',
-        equipment: 'catalogo',
-        account: 'cuenta',
-      };
-      const targetSection = tabToSectionMap[settingsActiveTab] || 'cuenta';
-      setActiveSection(targetSection);
-      setTimeout(() => {
-        const target = document.getElementById(`sec-${targetSection}`);
-        if (target && scrollContainerRef.current) {
-          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }, 60);
-    }
-  }, [isSettingsModalOpen, settingsActiveTab]);
-
-  // Scroll Spy para detectar la sección activa automáticamente
   useEffect(() => {
     if (!isSettingsModalOpen) return;
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    const sections = ['cuenta', 'preferencias', 'integraciones', 'catalogo', 'cloudflare', 'organizacion', 'respaldo'];
-
-    const handleScroll = () => {
-      const scrollPos = container.scrollTop + 140;
-      for (let i = sections.length - 1; i >= 0; i--) {
-        const secEl = document.getElementById(`sec-${sections[i]}`);
-        if (secEl && secEl.offsetTop <= scrollPos) {
-          setActiveSection(sections[i]);
-          break;
-        }
-      }
+    const section = resolveSettingsSection(settingsActiveTab);
+    setActiveSection(section);
+    // Reauthentication can navigate to Account while the workspace is open.
+    // Keep other visited forms mounted until their owner actually changes.
+    setVisitedSections((previous) => new Set([...previous, section]));
+  }, [isSettingsModalOpen, settingsActiveTab]);
+  useEffect(() => {
+    if (!isSettingsModalOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented) closeSettingsModal();
     };
-
-    container.addEventListener('scroll', handleScroll, { passive: true });
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, [isSettingsModalOpen]);
-
-  // Desplazamiento suave al hacer clic en un acceso directo del sidebar
-  const handleSelectSection = (sectionId: string) => {
-    setActiveSection(sectionId);
-    const target = document.getElementById(`sec-${sectionId}`);
-    if (target && scrollContainerRef.current) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
-
-  const handleToggleTheme = () => {
-    setSidebarTheme(isDark ? 'light' : 'dark');
-  };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isSettingsModalOpen, closeSettingsModal]);
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    if (isSettingsModalOpen) headingRef.current?.focus();
+  }, [activeSection, isSettingsModalOpen]);
 
   if (!isSettingsModalOpen) return null;
-
+  const section = settingsSections.find((item) => item.id === activeSection)!;
   return (
-    <div
-      className={`fixed inset-y-0 right-0 left-16 z-40 flex ${
-        isDark ? 'dark bg-[#0f0f11] text-zinc-100' : 'bg-[#f8fafc] text-slate-900'
-      } overflow-hidden select-none animate-in fade-in duration-150 border-l border-slate-200/80 dark:border-[#2a3444]`}
-    >
-      {/* 🧭 Sidebar de Accesos Directos y Tema */}
-      <SettingsSidebar
-        activeSection={activeSection}
-        onSelectSection={handleSelectSection}
-        onClose={closeSettingsModal}
-        isDark={isDark}
-        onToggleTheme={handleToggleTheme}
-      />
-
-      {/* 📜 Lienzo Continuo de Todas las Secciones */}
-      <main
-        ref={scrollContainerRef}
-        className="flex-1 h-full overflow-y-auto overflow-x-hidden p-6 md:p-10 lg:p-12 scroll-smooth"
-      >
-        <div className="max-w-4xl mx-auto flex flex-col gap-12 pb-24">
-          {/* 1. Perfil de Usuario */}
-          <ProfileSection />
-
-          <hr className="border-slate-200/60 dark:border-[#27272a]" />
-
-          {/* 2. Preferencias de Simulación */}
-          <SimulationPreferencesSection />
-
-          <hr className="border-slate-200/60 dark:border-[#27272a]" />
-
-          {/* 3. IA & Integraciones */}
-          <IntegrationsSection />
-
-          <hr className="border-slate-200/60 dark:border-[#27272a]" />
-
-          {/* 4. Catálogo de Equipos */}
-          <EquipmentSection />
-
-          <hr className="border-slate-200/60 dark:border-[#27272a]" />
-
-          {/* 5. Propuestas Web (Cloudflare Workers) */}
-          <CloudflareProposalsSection />
-
-          <hr className="border-slate-200/60 dark:border-[#27272a]" />
-
-          {/* 6. Organización & Equipo RBAC */}
-          <OrganizationSection />
-
-          <hr className="border-slate-200/60 dark:border-[#27272a]" />
-
-          {/* 7. Respaldo & Exportación */}
-          <BackupSection />
-        </div>
-      </main>
+    <div className={`settings-workspace fixed inset-y-0 right-0 left-16 z-40 flex overflow-hidden border-l border-slate-200 dark:border-zinc-800 ${isDark ? 'dark bg-zinc-950 text-zinc-100' : 'bg-slate-50 text-slate-900'}`}>
+      <SettingsSidebar activeSection={activeSection} onSelectSection={(id) => {
+        setActiveSection(id);
+        // Keep visited forms mounted so navigating does not discard local edits.
+        setVisitedSections((previous) => new Set([...previous, id]));
+      }} onClose={closeSettingsModal} isDark={isDark} onToggleTheme={toggleSidebarTheme} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex min-h-16 items-center border-b border-slate-200 bg-white px-6 dark:border-zinc-800 dark:bg-zinc-900">
+          <h2 ref={headingRef} tabIndex={-1} className="text-sm font-semibold text-slate-800 dark:text-zinc-100 focus:outline-none">Configuración <span className="mx-3 font-normal text-slate-400" aria-hidden="true">/</span> {section.label}</h2>
+        </header>
+        <main ref={scrollRef} aria-label={section.label} className="min-h-0 flex-1 overflow-y-auto px-6 py-8 lg:px-10">
+          <div className="mx-auto w-full max-w-5xl pb-12">
+            {settingsSections.filter((item) => visitedSections.has(item.id)).map((item) => {
+              const Component = sectionComponents[item.id];
+              return <div key={item.id} hidden={activeSection !== item.id}><Component /></div>;
+            })}
+          </div>
+        </main>
+      </div>
     </div>
   );
 };
