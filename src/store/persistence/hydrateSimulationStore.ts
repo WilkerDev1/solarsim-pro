@@ -173,6 +173,7 @@ export function hydrateSimulationStore(state: SimulationStore | undefined): void
       };
     }
 
+    state.documentTemplatesByCompany ||= {};
     state.companies = normalizeCompanyProfiles(state.companies, true);
     if (!state.companies.some(c => c.id === state.activeCompanyId)) state.activeCompanyId = state.companies.find(c => c.isDefault)!.id;
     state.localUserProfile = { ...state.localUserProfile, activeCompanyId: state.activeCompanyId };

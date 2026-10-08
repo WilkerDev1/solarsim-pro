@@ -1,4 +1,4 @@
-import { companyDocumentSnapshot } from '../../utils/companyDocumentSnapshot';
+import { companyDocumentCustomization, reusableDocumentTemplate } from '../../utils/companyDocumentTemplate';
 import { DEFAULT_SIMULATION_SETTINGS } from '../defaultSimulationSettings';
 import { energyCalculationMode } from '../../../shared/applicationFeatures';
 import { effectiveFeatureSettings } from '../../features/application/featurePolicy';
@@ -19,6 +19,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
   statusFilter: 'All',
   defaultSimulationSettings: DEFAULT_SIMULATION_SETTINGS,
   defaultDocumentCustomization: DEFAULT_DOCUMENT_CUSTOMIZATION,
+  documentTemplatesByCompany: {},
 
   isTrashActive: false,
   setIsTrashActive: (active) => set({ isTrashActive: active }),
@@ -42,10 +43,23 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     })),
 
   updateDefaultDocumentCustomization: (customizationPartial) => {
+    const project = get().projects.find(project => project.id === get().activeProjectId);
+    const companyId = project ? project.companyProfileId || (get().companies.length === 1 ? get().companies[0].id : undefined) : get().activeCompanyId;
+    if (!companyId || !get().companies.some(company => company.id === companyId)) {
+      set({ saveFeedbackMessage: 'Selecciona la empresa emisora de esta propuesta antes de guardar su plantilla.' });
+      return;
+    }
     set((state) => ({
       defaultDocumentCustomization: {
         ...(state.defaultDocumentCustomization || DEFAULT_DOCUMENT_CUSTOMIZATION),
         ...customizationPartial,
+      },
+      documentTemplatesByCompany: {
+        ...state.documentTemplatesByCompany,
+        [companyId]: {
+          ...companyDocumentCustomization(state.companies.find(company => company.id === companyId)!, state.defaultDocumentCustomization, state.documentTemplatesByCompany),
+          ...reusableDocumentTemplate(customizationPartial),
+        },
       },
       saveFeedbackMessage: '¡Plantilla de propuesta actualizada para futuros proyectos! 📑',
     }));
@@ -55,11 +69,20 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
   saveCurrentProjectAsDefaultDocumentTemplate: () => {
     const active = get().getActiveProject();
     if (!active) return;
-    const currentCust = active.customization || {};
+    const companyId = active.companyProfileId || (get().companies.length === 1 ? get().companies[0].id : undefined);
+    if (!companyId || !get().companies.some(company => company.id === companyId)) {
+      set({ saveFeedbackMessage: 'Selecciona la empresa emisora de esta propuesta antes de guardar su plantilla.' });
+      return;
+    }
+    const currentCust = reusableDocumentTemplate(active.customization || {});
     set((state) => ({
       defaultDocumentCustomization: {
         ...(state.defaultDocumentCustomization || DEFAULT_DOCUMENT_CUSTOMIZATION),
         ...currentCust,
+      },
+      documentTemplatesByCompany: {
+        ...state.documentTemplatesByCompany,
+        [companyId]: structuredClone(currentCust),
       },
       saveFeedbackMessage: '¡Configuración actual guardada como plantilla permanente para futuras propuestas! 🌟',
     }));
@@ -67,8 +90,15 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
   },
 
   resetDefaultDocumentCustomization: () => {
+    const project = get().projects.find(project => project.id === get().activeProjectId);
+    const companyId = project ? project.companyProfileId || (get().companies.length === 1 ? get().companies[0].id : undefined) : get().activeCompanyId;
+    if (!companyId || !get().companies.some(company => company.id === companyId)) {
+      set({ saveFeedbackMessage: 'Selecciona la empresa emisora de esta propuesta antes de restablecer su plantilla.' });
+      return;
+    }
     set({
       defaultDocumentCustomization: DEFAULT_DOCUMENT_CUSTOMIZATION,
+      documentTemplatesByCompany: Object.fromEntries(Object.entries(get().documentTemplatesByCompany).filter(([id]) => id !== companyId)),
       saveFeedbackMessage: 'Plantilla de propuesta restablecida a los valores de fábrica originales 🔄',
     });
     setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
@@ -154,8 +184,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
       },
       companyProfileId: get().activeCompanyId,
       customization: {
-        ...(get().defaultDocumentCustomization || DEFAULT_DOCUMENT_CUSTOMIZATION),
-        ...companyDocumentSnapshot(get().getActiveCompany(), get().defaultDocumentCustomization),
+        ...companyDocumentCustomization(get().getActiveCompany(), get().defaultDocumentCustomization, get().documentTemplatesByCompany),
         contactName: company || name,
         clientPhone: '',
         clientEmail: '',

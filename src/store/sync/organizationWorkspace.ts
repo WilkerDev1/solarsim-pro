@@ -26,6 +26,7 @@ const keys = [
   "tariffMatrix",
   "defaultSimulationSettings",
   "defaultDocumentCustomization",
+  "documentTemplatesByCompany",
   "companies",
   "activeCompanyId",
   "localUserProfile",
@@ -61,6 +62,7 @@ export function emptyWorkspace(): OrganizationWorkspace {
     tariffMatrix: DEFAULT_RD_TARIFF_MATRIX,
     defaultSimulationSettings: DEFAULT_SIMULATION_SETTINGS,
     defaultDocumentCustomization: DEFAULT_DOCUMENT_CUSTOMIZATION,
+    documentTemplatesByCompany: {},
     companies: [DEFAULT_LOCAL_COMPANY],
     activeCompanyId: DEFAULT_LOCAL_COMPANY.id,
     localUserProfile: DEFAULT_LOCAL_USER,
@@ -283,7 +285,9 @@ export function changeWorkspace(
     [initialized.workspaceScope]: captureWorkspace(initialized),
   };
   return {
-    ...(archives[nextScope] || emptyWorkspace()),
+    ...emptyWorkspace(),
+    ...(archives[nextScope] || {}),
+    documentTemplatesByCompany: archives[nextScope]?.documentTemplatesByCompany || {},
     workspaceScope: nextScope,
     organizationWorkspaces: archives,
     activeFolderId: null,

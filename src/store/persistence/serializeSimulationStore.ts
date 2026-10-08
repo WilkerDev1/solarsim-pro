@@ -25,6 +25,7 @@ export function serializeSimulationStore(state: SimulationStore) {
     tariffMatrix: state.tariffMatrix,
     defaultSimulationSettings: state.defaultSimulationSettings,
     defaultDocumentCustomization: state.defaultDocumentCustomization,
+    documentTemplatesByCompany: state.documentTemplatesByCompany,
     companies: state.companies,
     activeCompanyId: state.activeCompanyId,
     localUserProfile: state.localUserProfile,
