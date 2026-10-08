@@ -30,15 +30,27 @@ export async function requestGeminiJson(
   const requestedModel = options.model?.trim().replace(/^models\//, '') || DEFAULT_GEMINI_MODEL;
   if (!/^[a-zA-Z0-9._-]+$/.test(requestedModel)) throw new Error('El identificador del modelo Gemini no es válido.');
   const fallback = requestedModel === DEFAULT_GEMINI_MODEL ? 'gemini-3.5-flash-lite' : DEFAULT_GEMINI_MODEL;
-  for (const [index, model] of [requestedModel, fallback].entries()) {
-    if (options.signal?.aborted) throw options.signal.reason || new Error('Solicitud cancelada.');
+  let model=requestedModel;
+  let recovered=false;
+  for(let index=0;index<2;index++) {
+    if(options.signal?.aborted)throw options.signal.reason || new Error('Solicitud cancelada.');
+    const original:any=options.body;
+    const config={...original?.generationConfig};
+    // Google Generate Content: the output budget includes thinking. Use model-specific controls.
+    if(/^gemini-3[.-]/.test(model))config.thinkingConfig={thinkingLevel:'low'};
+    else if(/^gemini-2\.5-(?:flash|pro)/.test(model))config.thinkingConfig={thinkingBudget:1024};
+    if(recovered)config.maxOutputTokens=Math.min(32768,Math.max(16384,(config.maxOutputTokens || 8192)*2));
     try {
-      const response = await transport(`${GEMINI_API_BASE}/models/${model}:generateContent`, options.body,
-        { 'Content-Type': 'application/json', 'x-goog-api-key': options.apiKey.trim() }, options.timeoutMs ?? 60000, options.signal);
-      return { response, modelUsed: model, requestedModel,
-        modelWarning: index ? `El modelo ${requestedModel} no respondió temporalmente. Se utilizó ${model}.` : undefined };
-    } catch (error: any) {
-      if (options.signal?.aborted || index || ![408, 500, 502, 503, 504].includes(error?.statusCode)) throw error;
+      const response=await transport(`${GEMINI_API_BASE}/models/${model}:generateContent`,{...original,generationConfig:config},
+        {'Content-Type':'application/json','x-goog-api-key':options.apiKey.trim()},options.timeoutMs ?? 60000,options.signal);
+      if(response?.candidates?.[0]?.finishReason==='MAX_TOKENS') {
+        if(index===0) {recovered=true;continue;}
+        throw new Error('Gemini agotó el límite de respuesta incluso tras un intento de recuperación. Reduce los adjuntos o divide las instrucciones. Tu borrador anterior se conserva; no se aplicaron datos parciales.');
+      }
+      return {response,modelUsed:model,requestedModel,modelWarning:model!==requestedModel ? `El modelo ${requestedModel} no respondió temporalmente. Se utilizó ${model}.` : recovered ? 'Se recuperó una respuesta truncada con un único intento adicional.' : undefined};
+    } catch(error:any) {
+      if(options.signal?.aborted || index || ![408,500,502,503,504].includes(error?.statusCode))throw error;
+      model=fallback;
     }
   }
   throw new Error('No se recibió una respuesta de Gemini.');

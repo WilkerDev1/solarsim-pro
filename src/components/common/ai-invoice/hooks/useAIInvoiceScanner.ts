@@ -1,7 +1,10 @@
+import { createAIProposalBase, prepareProposalDraftProject } from '../../../../utils/proposalDraftProject';
+import { BENCHMARK_PROJECT } from '../../../../engine/referenceCase';
+import { calculateProjectFinancialSummary } from '../../../../engine/financeEngine';
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useSimulationStore } from '../../../../store/useSimulationStore';
 import { parseProposalWithAI } from '../../../../services/geminiInvoiceService';
-import { calculateRecommendedPanelCount } from '../../../../engine/solarEngine';
+import { calculateRecommendedPanelCount, calculateMonthlySolarProduction } from '../../../../engine/solarEngine';
 import { getProvinceHSP } from '../../../../data/rdProvinces';
 import { ExtractedInvoiceData } from '../../../../types/aiInvoice';
 import { FilePreview } from '../types';
@@ -46,6 +49,8 @@ export function useAIInvoiceScanner() {
       tariffReference: buildAITariffContext(tariffMatrix),
       annualSpecificYieldKWhPerKWp: yieldInfo.annualSpecificYieldKWhPerKWp,
       calculationMode: mode,
+      commercial: {pricingMode:target?.specs.pricingMode || (defaults.defaultPricingMode==='direct'?'direct_watt':'cost_matrix'),markupPct:(target?.specs.saleMarginMultiplier!==undefined?(target.specs.saleMarginMultiplier-1)*100:defaults.defaultTargetMarginPct),installationUnitPriceUSD:target?.specs.installationUnitPriceUSD ?? 0,pricePerWattUSD:target?.specs.pricePerWattUSD ?? defaults.defaultDirectPriceUSDPerWp,directPriceSurplusTarget:target?.specs.directPriceSurplusTarget || 'margin',customItems:target?.financials.customItems || [],customDiscounts:target?.financials.customDiscounts || []},
+      equipmentPrices:target?[...(target.specs.panels || []),...(target.specs.inverters || []),...(target.specs.batteries || [])].filter(g=>g.unitPriceUSD!==undefined).map(g=>({id:g.id,unitPriceUSD:g.unitPriceUSD!})):[],
     } as AIProposalContext;
   }, [extractedData?.province, target, defaults, tariffMatrix, mode]);
   const scope = `${workspace}|${useCurrentProject ? activeProjectId : 'new'}`;
@@ -96,8 +101,8 @@ export function useAIInvoiceScanner() {
       if (!isCurrent()) return;
       const payload = { apiKey:geminiApiKey, model:geminiModel, files:attachments,
         projectRequirementsText: instructions.join('\n\nCorrección del usuario:\n').slice(-24000),
-        equipmentCatalog, dopExchangeRate: target?.rates.usdExchangeRate ?? 60.5,
-        context: { ...context, currentDraft: extractedData || undefined, currentClient: target?.client },
+        equipmentCatalog, dopExchangeRate: extractedData?.dopExchangeRate ?? target?.rates.usdExchangeRate ?? 60.5,
+        context: { ...context, currentDraft: validatedDraft || undefined, currentClient: target?.client },
       };
       let result: ExtractedInvoiceData;
       if (window.electronAPI?.parseInvoiceWithAI) {
@@ -117,6 +122,19 @@ export function useAIInvoiceScanner() {
     finally { if (isCurrent()) setIsProcessing(false); }
   };
   const validatedDraft = useMemo(() => extractedData ? normalizeProposalDraft(extractedData, equipmentCatalog, context) : null, [extractedData, equipmentCatalog, context]);
+  const draftEnergy=useMemo(()=>{
+    if(!validatedDraft || validatedDraft.monthlyConsumptionKWh.length!==12 || !validatedDraft.panels?.length || validatedDraft.panels.some(g=>!g.id||!Number.isFinite(g.powerW)||g.powerW<=0||!Number.isInteger(g.count)||g.count<=0))return null;
+    const base=target || createAIProposalBase(BENCHMARK_PROJECT,defaults,validatedDraft.province || context.province || '');
+    const project=prepareProposalDraftProject(base,{...validatedDraft,commercial:{}},tariffMatrix,{isNew:!target,defaultBatteryDOD:defaults.defaultBatteryDOD});
+    return calculateMonthlySolarProduction(project.client.province,project.specs,project.monthlyConsumption,project.rates.energyCostPerKWh,project.rates.gridExportFeePct,project.client.customMonthlyHSP,project.rates.tariffCode,project.rates.isZeroExport,mode).map(m=>m.productionKWh);
+  },[validatedDraft,target,defaults,tariffMatrix,mode,context.province]);
+  const draftPreview=useMemo(()=>{
+    if(!validatedDraft || validatedDraft.monthlyConsumptionKWh.length!==12 || validatedDraft.validationIssues?.some(i=>i.severity==='error' && /extra|discount|customItems|customDiscounts|commercial|markup|margin|installation|pricing|surplus|price/.test(i.code)))return null;
+    const base=target || createAIProposalBase(BENCHMARK_PROJECT,defaults,validatedDraft.province || context.province || '');
+    const project=prepareProposalDraftProject(base,validatedDraft,tariffMatrix,{isNew:!target,defaultBatteryDOD:defaults.defaultBatteryDOD});
+    const financial=calculateProjectFinancialSummary(project,mode);
+    return {project,financial};
+  },[validatedDraft,target,defaults,tariffMatrix,mode,context.province]);
   const reviewSnapshot = JSON.stringify(validatedDraft);
   useEffect(() => { setReviewConfirmed(false); }, [reviewSnapshot]);
   const blockingIssues = validatedDraft?.validationIssues?.filter(issue => issue.severity === 'error') || [];
@@ -126,12 +144,12 @@ export function useAIInvoiceScanner() {
     if (!canApply || aiWorkspaceKey(current) !== workspace || (!createNew && current.activeProjectId !== activeProjectId)) return;
     current.applyExtractedInvoice(validatedDraft!, createNew);
   };
-  const updateDraft = (updates: Partial<ExtractedInvoiceData>) => { setExtractedData(previous => previous ? {...previous,...updates} : null); setReviewConfirmed(false); };
+  const updateDraft = (updates: Partial<ExtractedInvoiceData>) => { setExtractedData(previous => previous ? {...validatedDraft,...updates} as ExtractedInvoiceData : null); setReviewConfirmed(false); };
   return { isAIInvoiceModalOpen, isDark:state.sidebarTheme === 'dark', geminiApiKey, activeProject,
     closeAIInvoiceModal: () => { cancel(); state.closeAIInvoiceModal(); }, openAISettings: () => state.openSettingsModal('ai'),
     files, addFiles, removeFile:(index:number) => {setFiles(previous=>previous.filter((_,i)=>i!==index));setReviewConfirmed(false);}, fileInputRef,
     isProcessing, cancel, reset, prompt, setPrompt, messages, errorMsg, processSmartProposal,
-    extractedData:validatedDraft, updateDraft, equipmentCatalog, tariffMatrix, context, useCurrentProject,
+    extractedData:validatedDraft, draftPreview, draftEnergy, updateDraft, equipmentCatalog, tariffMatrix, context, useCurrentProject,
     setUseCurrentProject:(value:boolean)=>{cancel();setUseCurrentProject(value);setExtractedData(null);setReviewConfirmed(false);setMessages([]);},
     reviewConfirmed, setReviewConfirmed, blockingIssues, canApply,
     handleApplyAsNew:()=>apply(true), handleApplyToActive:()=>apply(false),

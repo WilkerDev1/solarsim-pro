@@ -28,6 +28,7 @@ export interface ClientInfo {
 }
 
 export interface PanelItemSpec {
+  priceSource?: 'manual' | 'supplier';
   requestedModel?: string;
   id: string;
   brandModel: string;
@@ -42,6 +43,7 @@ export interface PanelItemSpec {
 }
 
 export interface InverterItemSpec {
+  priceSource?: 'manual' | 'supplier';
   requestedModel?: string;
   id: string;
   brandModel: string;
@@ -54,6 +56,7 @@ export interface InverterItemSpec {
 }
 
 export interface BatteryItemSpec {
+  priceSource?: 'manual' | 'supplier';
   requestedModel?: string;
   id: string;
   brandModel: string;

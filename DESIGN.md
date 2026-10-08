@@ -125,7 +125,7 @@ Esta extracción documenta la superficie empresarial implementada, no impone sus
 
 ### Extensión: asistente IA e inventario
 
-La extensión conserva el mismo mundo Operate. La evidencia normativa adicional es `src/components/common/ai-invoice/proposal-workspace.css`, `AIInvoiceScannerModal.tsx`, `ProposalDraftReview.tsx` y `EquipmentManagerSettingsTab.tsx`. Los roles `--pw-*` coinciden con los neutros y verdes del centro; el catálogo usa clases Tailwind equivalentes, sin convertir esas clases en tokens globales. Esta extracción registra únicamente esas superficies, sin reemplazar el sistema empresarial ni canonizar el PDF.
+La extensión conserva el mismo mundo Operate. La evidencia normativa adicional es `src/components/common/ai-invoice/proposal-workspace.css`, `AIInvoiceScannerModal.tsx`, `ProposalDraftReview.tsx`, `ProposalConsumptionReview.tsx`, `ProposalCommercialReview.tsx` y `EquipmentManagerSettingsTab.tsx`. Los roles `--pw-*` coinciden con los neutros y verdes del centro; el catálogo usa clases Tailwind equivalentes, sin convertir esas clases en tokens globales. Esta extracción registra únicamente esas superficies, sin reemplazar el sistema empresarial ni canonizar el PDF.
 
 ## Colors
 
@@ -180,7 +180,7 @@ En el breakpoint implementado (1100px), la navegación pasa a (220px), el paddin
 
 El modal se limita a (1220px) y separa conversación/compositor de revisión mediante una columna de (360px) y otra flexible. Ambas zonas tienen scroll propio; el pie de revisión permanece visible y la confirmación antecede crear/actualizar. Su altura es el menor valor entre (900px) y (94vh). A (1100px), conversación pasa a (320px) y se reducen paddings; el mínimo de producto sigue siendo (1024×700). Bajo (760px), el código apila ambas zonas como defensa, sin afirmar soporte de producto móvil.
 
-Los formularios de revisión usan dos columnas con separación de (16px); campos largos abarcan ambas. Los consumos usan seis columnas y cuatro en el breakpoint compacto. Los grupos de equipos alinean modelo, unidades y quitar; las notas de precio tienen su propia línea. El inventario usa una tabla compacta con nombre/modelo, nominal, ofertas y acciones, precedida por búsqueda y filtros. El flujo concreto queda en `.impeccable/surfaces/ai-proposal-inventory.md`, no como composición obligatoria de toda pantalla futura.
+Los formularios de revisión usan dos columnas con separación de (16px); campos largos abarcan ambas. Los doce consumos editables usan cuatro columnas; el gráfico conserva doce grupos mensuales con dos barras por grupo. Los ítems y descuentos se editan en tres columnas, reducidas a dos a (1100px). Los grupos de equipos alinean modelo, unidades y quitar; las notas de precio tienen su propia línea. El inventario usa una tabla compacta con nombre/modelo, nominal, ofertas y acciones, precedida por búsqueda y filtros. El flujo concreto queda en `.impeccable/surfaces/ai-proposal-inventory.md`, no como composición obligatoria de toda pantalla futura.
 
 ## Elevation & Depth
 
@@ -230,7 +230,21 @@ El aviso contextual usa fondo seleccionado, esquinas de control y padding (13px 
 
 El compositor reúne adjuntos, texto y preparar/refinar; durante análisis ofrece cancelar y comunica que no modifica propuestas. Botones locales tienen altura mínima (36px), padding (8px 12px), foco de dos píxeles con offset de dos y opacidad deshabilitada (0.48). Campos de revisión tienen altura mínima (40px), padding (9px 10px) y etiqueta permanente. Textareas son redimensionables verticalmente. Selección, caret y scrollbar interno siguen los roles del tema.
 
+La revisión se organiza en cuatro pestañas: consumo y diseño, equipos, cotización, cliente y tarifa. La fila de pestañas permanece visible en el scroll de revisión; selección usa verde contextual y fondo seleccionado, con foco por teclado y navegación por flechas, Home y End. Los paneles conservan su estado al cambiar de pestaña.
+
 El pie pide confirmación explícita de datos, equipos, precios y supuestos. Actualizar una propuesta abierta añade confirmación contextual. Errores y carga tienen semántica `alert`/`status`; el diálogo conserva foco y Escape. Las advertencias de referencia histórica, consumo estimado y falta de ofertas se presentan como contenido operativo, no como garantía de precisión.
+
+### Asistente IA: consumo y dimensionamiento
+
+El resumen usa cuatro métricas en dos columnas, etiquetas pequeñas y valores tabulares; distingue datos observados, estimados y pendientes. El gráfico mensual compara consumo gris y generación verde, con leyenda explícita y doce grupos sobre una base común. La tabla editable siguiente mantiene etiquetas de mes y unidades; no completa huecos visualmente con valores inventados. Cambiar datos comerciales no elimina el análisis energético disponible.
+
+La meta de cobertura y el modelo a dimensionar se muestran como campos ordinarios. El resultado explica potencia objetivo e instalada antes de una acción explícita para aplicar la cantidad sugerida al grupo seleccionado. Otros grupos y equipos permanecen visibles y se conservan. El mes pico requiere confirmación y queda identificado como estimación. Producción/consumo describe energía, no promete ahorro facturable.
+
+### Asistente IA: cotización revisable
+
+Costos por modelo, mano de obra, recargo sobre costo o margen sobre venta se editan con etiquetas y unidades explícitas. Los costos particulares de la cotización se distinguen de las ofertas del inventario; restaurar una oferta es una acción visible. Ítems adicionales y descuentos usan filas de formulario separadas por divisores, con añadir/quitar próximos a su lista. Las opciones de exoneración y destino del descuento acompañan los importes, sin esconder su efecto fiscal.
+
+El resumen calculado reutiliza el fondo tonal y pares etiqueta/valor en dos columnas. Cuando faltan costos se denomina subtotal provisional; no trata ausencia de precio como oferta gratuita. La revisión conserva confirmación humana y no modifica el catálogo al editar una cotización.
 
 ### Inventario: modelos y ofertas
 
@@ -255,4 +269,4 @@ Nombre completo clicable, potencia/capacidad con unidad, especificación secunda
 
 No canonizado: las etiquetas nativas del selector de archivos en inglés, visibles en las capturas de QA, son una limitación de localización del artefacto, no una regla visual para nuevas superficies. Las capturas de QA no son assets de distribución.
 
-No canonizado en la extensión IA: 10/11px del editor de equipos heredado, observados por detector como tamaños fuera de rampa; no se convierten en pasos aprobados para nuevas pantallas. Tampoco se canonizan contenido ni controles de fixtures QA.
+No canonizado en la extensión IA: 10/11px del editor de equipos heredado, observados por detector como tamaños fuera de rampa; no se convierten en pasos aprobados para nuevas pantallas. Las anotaciones de mes del gráfico local usan 11px; ese detalle no amplía la rampa tipográfica global. Tampoco se canonizan contenido ni controles de fixtures QA.

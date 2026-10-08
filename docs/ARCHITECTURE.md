@@ -41,3 +41,5 @@ Los perfiles de empresa locales personalizan documentos; las organizaciones aute
 ## Subsistema IA
 
 `shared/aiProposal.ts` concentra prompt, esquema y normalización multi-equipo. El hook de propuesta adapta catálogo, tarifas y contexto de cálculo del espacio actual; el borrador es transitorio y requiere revisión humana antes de aplicar. Los importadores de datasheets/precios preparan el lote y verifican permisos y resultado del store. La procedencia tarifaria acompaña filas y campos conservados. Véanse [escáneres IA](AI_SCANNERS_SPECIFICATION.md) y [tarifas IA](AI_TARIFF_CONTEXT.md).
+
+`shared/aiProposalCommercial.ts` valida el contrato comercial; `src/utils/proposalDraftProject.ts` adapta el mismo borrador normalizado para cálculo previo y aplicación. El hook calcula energía y resumen financiero por separado para que un costo pendiente no invalide la vista energética. Las pestañas de consumo/dimensionamiento y cotización son componentes de presentación; no cambian los motores.

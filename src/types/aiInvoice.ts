@@ -1,3 +1,4 @@
+import type { AIProposalCommercial } from '../../shared/aiProposalCommercial';
 import type { PanelItemSpec, InverterItemSpec, BatteryItemSpec } from './index';
 import type { AIProposalIssue } from '../../shared/aiProposal';
 export interface InvoiceTierBlock {
@@ -13,6 +14,7 @@ export interface EquipmentSubstitutionInfo {
 }
 
 export interface ExtractedInvoiceData {
+  commercial?: AIProposalCommercial;
   panels?: PanelItemSpec[];
   inverters?: InverterItemSpec[];
   batteries?: BatteryItemSpec[];

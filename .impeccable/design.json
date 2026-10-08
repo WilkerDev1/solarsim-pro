@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-08T06:43:11.413985+00:00",
+  "generatedAt": "2026-10-08T11:08:08.989876+00:00",
   "title": "Design System: SolarSim Pro — Centro empresarial",
   "extensions": {
     "colorMeta": {
@@ -450,12 +450,11 @@
       "css": ".ds-ai{--pw-panel:#fff;--pw-text:#182230;--pw-muted:#536174;--pw-border:#dce2e8;--pw-selected:#e8f7f0;--pw-green:#067451;font-family:Inter,sans-serif;font-size:14px;color:var(--pw-text)}.ds-ai-button{display:inline-flex;gap:8px;align-items:center;justify-content:center;min-height:36px;padding:8px 12px;background:var(--pw-panel);border:1px solid var(--pw-border);border-radius:8px;font:inherit;font-size:13px;font-weight:550;color:var(--pw-text);cursor:pointer}.ds-ai-button:hover{background:var(--pw-selected)}.ds-ai-button:focus-visible{outline:2px solid var(--pw-green);outline-offset:2px}.ds-ai-button:disabled{opacity:.48;cursor:not-allowed}.ds-ai-primary{background:#087b58;border-color:#087b58;color:#fff}.ds-ai-primary:hover{background:#066344}"
     },
     {
-      "name": "Asistente: adjuntar",
-      "kind": "button",
-      "refersTo": "ai-button-secondary",
-      "description": "Adjuntos junto a la descripción en la misma entrada.",
-      "html": "<div class=\"ds-ai\"><button class=\"ds-ai-button\">Adjuntar</button></div>",
-      "css": ".ds-ai{--pw-panel:#fff;--pw-text:#182230;--pw-muted:#536174;--pw-border:#dce2e8;--pw-selected:#e8f7f0;--pw-green:#067451;font-family:Inter,sans-serif;font-size:14px;color:var(--pw-text)}.ds-ai-button{display:inline-flex;gap:8px;align-items:center;justify-content:center;min-height:36px;padding:8px 12px;background:var(--pw-panel);border:1px solid var(--pw-border);border-radius:8px;font:inherit;font-size:13px;font-weight:550;color:var(--pw-text);cursor:pointer}.ds-ai-button:hover{background:var(--pw-selected)}.ds-ai-button:focus-visible{outline:2px solid var(--pw-green);outline-offset:2px}.ds-ai-button:disabled{opacity:.48;cursor:not-allowed}"
+      "name": "Asistente: pestañas de revisión",
+      "kind": "nav",
+      "description": "Secciones del borrador con selección explícita; el componente real mantiene los paneles y navega con flechas, Home y End.",
+      "html": "<div class=\"ds-ai-tabs\" role=\"tablist\" aria-label=\"Secciones del borrador\"><button role=\"tab\" aria-selected=\"true\">Consumo y diseño</button><button role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">Equipos</button><button role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">Cotización</button><button role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">Cliente y tarifa</button></div>",
+      "css": ".ds-ai-tabs{--pw-panel:#fff;--pw-text:#182230;--pw-border:#dce2e8;--pw-selected:#e8f7f0;--pw-green:#067451;display:flex;gap:4px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--pw-border);background:var(--pw-panel);font-family:Inter,sans-serif}.ds-ai-tabs button{font:inherit;font-size:13px;font-weight:550;min-height:36px;padding:8px 12px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--pw-text);cursor:pointer}.ds-ai-tabs button[aria-selected=true]{color:var(--pw-green);background:var(--pw-selected);border-color:var(--pw-border)}.ds-ai-tabs button:hover{background:var(--pw-selected)}.ds-ai-tabs button:focus-visible{outline:2px solid var(--pw-green);outline-offset:2px}"
     },
     {
       "name": "Asistente: campo de revisión",
@@ -475,7 +474,7 @@
   ],
   "narrative": {
     "northStar": "Centro de trabajo empresarial",
-    "overview": "El centro empresarial extiende la identidad de SolarSim: Inter, superficies neutras y verde para acciones y selección. Su carácter empresarial procede de la jerarquía de formularios, navegación explícita y tablas de miembros, sin decoración de marketing.\n\nEsta extracción documenta la superficie empresarial implementada, no impone sus valores locales al simulador o al dossier PDF. Los colores `cc-*` pertenecen al ámbito del centro; Dashboard y Ajustes conservan sus propios tokens. La fuente normativa es `src/components/companies/company-center.css`, con tipografía heredada de `src/index.css`.\n\nLa extensión conserva el mismo mundo Operate. La evidencia normativa adicional es `src/components/common/ai-invoice/proposal-workspace.css`, `AIInvoiceScannerModal.tsx`, `ProposalDraftReview.tsx` y `EquipmentManagerSettingsTab.tsx`. Los roles `--pw-*` coinciden con los neutros y verdes del centro; el catálogo usa clases Tailwind equivalentes, sin convertir esas clases en tokens globales. Esta extracción registra únicamente esas superficies, sin reemplazar el sistema empresarial ni canonizar el PDF.",
+    "overview": "El centro empresarial extiende la identidad de SolarSim: Inter, superficies neutras y verde para acciones y selección. Su carácter empresarial procede de la jerarquía de formularios, navegación explícita y tablas de miembros, sin decoración de marketing.\n\nEsta extracción documenta la superficie empresarial implementada, no impone sus valores locales al simulador o al dossier PDF. Los colores `cc-*` pertenecen al ámbito del centro; Dashboard y Ajustes conservan sus propios tokens. La fuente normativa es `src/components/companies/company-center.css`, con tipografía heredada de `src/index.css`.\n\nLa extensión conserva el mismo mundo Operate. La evidencia normativa adicional es `src/components/common/ai-invoice/proposal-workspace.css`, `AIInvoiceScannerModal.tsx`, `ProposalDraftReview.tsx`, `ProposalConsumptionReview.tsx`, `ProposalCommercialReview.tsx` y `EquipmentManagerSettingsTab.tsx`. Los roles `--pw-*` coinciden con los neutros y verdes del centro; el catálogo usa clases Tailwind equivalentes, sin convertir esas clases en tokens globales. Esta extracción registra únicamente esas superficies, sin reemplazar el sistema empresarial ni canonizar el PDF.",
     "keyCharacteristics": [
       "Formularios por propósito y tablas legibles.",
       "Tema claro y oscuro mediante roles equivalentes.",
