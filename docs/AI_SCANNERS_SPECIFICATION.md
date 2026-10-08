@@ -1,350 +1,77 @@
-# 🧠 Manual Técnico de Motores y Escáneres de Inteligencia Artificial Multimodal (Gemini Vision)
-## SolarSim Pro — Automatización Cognitiva de Ingeniería y Costos
+# Subsistema IA: propuestas, fichas técnicas, precios y tarifas
 
-Este documento describe la arquitectura, los modelos de lenguaje visual (VLM), los algoritmos de cotejo inteligente (*Smart Fuzzy Matching*), la normalización de entidades y la lógica de integración de los tres escáneres de Inteligencia Artificial multimodal implementados en **SolarSim Pro**.
+Contrato del código de esta rama, revisado el 8 de octubre de 2026. Describe comportamiento implementado; no garantiza un porcentaje de precisión ni de automatización. Los resultados de Gemini son borradores sujetos a validación local y revisión humana.
 
----
+## Entradas y revisión de propuestas
 
-## 📑 Tabla de Contenido
-1. [Visión General del Subsistema de Inteligencia Artificial](#1-visión-general-del-subsistema-de-inteligencia-artificial)
-2. [Smart Proposal Studio & Escáner de Facturas EDE (Grounding al 95%)](#2-smart-proposal-studio--escáner-de-facturas-ede-grounding-al-95)
-3. [Escáner 2: Fichas Técnicas de Equipos (*Datasheets*)](#3-escáner-2-fichas-técnicas-de-equipos-datasheets)
-4. [Escáner 3: Listas de Precios de Proveedores & Smart Fuzzy Matching](#4-escáner-3-listas-de-precios-de-proveedores--smart-fuzzy-matching)
-5. [Algoritmo de Smart Fuzzy Matching y Deduplicación de Proveedores](#5-algoritmo-de-smart-fuzzy-matching-y-deduplicación-de-proveedores)
-6. [Integración con el Motor Financiero y Modo Auto-Costo](#6-integración-con-el-motor-financiero-y-modo-auto-costo)
-7. [Consideraciones de Seguridad, Tokens y Cuotas de API](#7-consideraciones-de-seguridad-tokens-y-cuotas-de-api)
+`src/components/common/ai-invoice/AIInvoiceScannerModal.tsx` presenta un espacio conversacional con texto y adjuntos en una misma entrada. Admite descripción sola, factura sola o ambos; conserva mensajes y borrador durante la sesión del modal. `workspace.ts` valida PDF, PNG, JPG/JPEG y WebP con extensión y MIME coincidentes: hasta cuatro archivos, cada uno de hasta 8 MB, sin archivos vacíos. No promete seleccionar automáticamente páginas relevantes de un PDF: los adjuntos enviados forman parte de la solicitud a Google.
 
----
+`hooks/useAIInvoiceScanner.ts` combina el catálogo activo, ofertas, configuración del proyecto, irradiación/pérdidas, modo de cálculo y contexto tarifario. El borrador puede refinarse con mensajes posteriores. Cerrar o cambiar sesión/servidor/organización invalida trabajo pendiente; los borradores son transitorios. El usuario elige crear una propuesta o aplicar sobre el proyecto activo, revisa campos y confirma antes de mutar el store. Un cambio de contexto exige conservar la validez del borrador; errores de validación bloquean su aplicación.
 
-## 1. Visión General del Subsistema de Inteligencia Artificial
+`components/ProposalDraftReview.tsx` organiza Consumo y diseño, Equipos, Cotización y Cliente y tarifa en pestañas accesibles. La gráfica compara consumo y generación mensual; la tabla permite editar los doce meses. Los huecos permanecen pendientes. La acción de mes pico requiere confirmar que sustituirá el historial por una estimación. Cambiar cobertura no cambia cantidades: aplicar el cálculo ajusta únicamente el grupo de panel elegido y conserva los demás modelos, inversores y baterías. `shared/aiProposal.ts` construye el prompt/esquema común y normaliza la respuesta; `src/utils/aiProposalNormalization.ts` adapta la referencia local. Electron y navegador utilizan ese contrato, sin copiar reglas incompatibles de selección entre servicios.
 
-SolarSim Pro integra capacidades avanzadas de visión e inferencia multimodal mediante **Google Gemini API** para erradicar la digitación manual y automatizar de extremo a extremo la ingeniería y comercialización solar:
+### Equipos y cantidades
 
-```mermaid
-graph TD
-    subgraph INPUTS ["📥 Entradas Multimodales"]
-        F["📄 Factura Eléctrica EDE\n(PDF / Imagen EDEESTE, EDESUR, EDENORTE, CEPM)"]
-        W["📋 Requisitos del Proyecto\n(Especificaciones de equipos y condiciones)"]
-        D["📑 Datasheets de Fabricantes\n(PDF técnico de panel, inversor o batería)"]
-        P["📊 Listas de Precios de Distribuidores\n(PDF de catálogo o cotización comercial)"]
-    end
+- Paneles, inversores y baterías son arreglos de grupos: cada grupo lleva ID real del catálogo y cantidad. Se admiten varios modelos distintos de cada tipo.
+- IDs, tipo y especificaciones se contrastan contra el catálogo vigente. Solicitudes ambiguas, modelos inexistentes o incompatibilidades de potencia/capacidad quedan como problemas pendientes; no justifican una sustitución silenciosa por una marca más barata.
+- Un modelo sin ofertas sigue siendo seleccionable. Su ausencia de precio requiere revisión comercial; la IA no inventa una cotización.
+- Se distingue potencia unitaria, cantidad, potencia total y energía. Solicitar un inversor de 16 kW no autoriza sustituirlo por dos de 8 kW. Esa distribución necesita una solicitud explícita y revisión de compatibilidad eléctrica.
+- El dimensionamiento local usa los motores existentes y el objetivo configurado. Una meta del 95% es un parámetro de cobertura cuando está seleccionado, no una garantía de calidad de la extracción.
+- Los consumos observados se distinguen de estimaciones y contexto del proyecto. Un promedio mensual puede producir doce valores estimados, señalados como tales; un historial documental incompleto exige completar los meses ausentes.
+- La intención comercial debe revisarse como margen sobre venta o recargo sobre costo. No son equivalentes. Las notas de ingeniería no se concatenan a la descripción estándar de instalación.
 
-    subgraph ENGINE ["🧠 Gemini Vision & Motores de Inferencia Cognitiva"]
-        G["Google Gemini API\n(gemini-2.5-flash / gemini-3.5-flash-lite)"]
-        Grounding["🔗 Smart Catalog Grounding Engine\n(Emparejamiento estricto con modelos reales)"]
-        Fuzzy["🔍 Smart Fuzzy Matcher\n(Normalización y cotejo multi-distribuidor)"]
-    end
+`src/store/slices/aiSlice.ts` vuelve a validar al aplicar y convierte los grupos a las estructuras multi-equipo del proyecto. La creación utiliza el perfil y plantilla documental de la empresa emisora. No se cambian los contratos financieros, el modo legacy predeterminado ni la autorización por organización como efecto de una respuesta IA.
 
-    subgraph SYSTEM ["⚙️ Núcleo SolarSim Pro (Propuesta al 95%)"]
-        Sim["⚡ Simulación Solar & Balance Energético\n(Curva 12 meses, irradiación provincial & pérdidas 25%)"]
-        Equip["📦 Dimensionamiento de Equipos\n(Paneles Tier-1, Inversores en paralelo & BESS)"]
-        Fin["💰 Finanzas Ley 57-07 & Margen Comercial\n(Auto-costo de proveedores & Margen de Venta 40%)"]
-        PDF["📄 Dossier Ejecutivo PDF\n(11 Páginas A4 listas para exportar)"]
-    end
+## Fichas técnicas e inventario
 
-    F --> G
-    W --> G
-    G --> Grounding --> Sim
-    Grounding --> Equip
-    Grounding --> Fin
-    Sim --> PDF
-    Equip --> PDF
-    Fin --> PDF
+`geminiDatasheetService.ts` extrae paneles, inversores o baterías; `utils/datasheetImport.ts` normaliza y prepara el lote. Los valores desconocidos permanecen ausentes. Se convierten W/kW cuando corresponde y se puede derivar kWh de Ah y voltaje nominal; no se convierte kVA a kW sin un factor de potencia documentado.
 
-    D --> G --> Equip
-    P --> G --> Fuzzy --> Fin
-```
+`AIDatasheetScannerModal.tsx` muestra variantes editables y coincidencias de `equipmentMatchingUtils.ts`. Los puntajes de similitud son heurísticos, no probabilidades calibradas ni verificación del fabricante. Coincidencia por potencia o marca no acredita que dos generaciones de equipo sean idénticas.
 
-### Modelos de Inferencia Soportados:
-- **`gemini-2.5-flash`** (Recomendado): Máxima precisión en razonamiento multimodal, extracción de tablas densas y comprensión de requerimientos informales de chat.
-- **`gemini-3.7-flash`**: Modelo de razonamiento híbrido; opera con `thinkingConfig: { thinkingBudget: 512 }`, `maxOutputTokens: 4096` y `temperature: 0.15` con directiva estricta de brevedad para notas técnicas.
-- **`gemini-3.5-flash-lite`**: Inferencia ultrarrápida y económica para entornos de alta concurrencia.
-- **`gemini-2.0-flash`**: Soporte estándar de alta disponibilidad.
+Antes de guardar se valida todo el lote: marca, modelo, nombre, potencia/capacidad positiva, rangos y duplicados. Dos variantes no pueden reemplazar el mismo ID. Actualizar una coincidencia cambia también `displayName` y `modelSeries`, preservando ID, ofertas y campos técnicos no extraídos. Guardar como nuevo crea un ID independiente y requiere un nombre distinto si ya existe. Las mutaciones se contrastan con permisos y ámbito actuales y se comprueba su efecto antes de mostrar éxito.
 
-### Aislamiento de Entorno (Desktop vs Web) y Grounding en Tiempo Real:
-- **Modo Escritorio (Electron)**: El proceso principal (`electron/aiInvoiceHandler.ts`) recibe el catálogo activo (`equipmentCatalog`) transmitido desde `useAIInvoiceScanner.ts`, ejecuta renderizado de alta resolución e implementa reintentos en cascada de modelos con timeout de 45 segundos y parseo JSON seguro con recuperación de truncado.
-- **Modo Web**: Utiliza el API nativo `FileReader` y renderizado vía WebAssembly / Canvas sin depender de binarios nativos del sistema operativo.
+`EquipmentManagerSettingsTab.tsx` permite buscar y filtrar el catálogo, consultar especificaciones y ofertas y editar equipos. Los precios de proveedor y las especificaciones de ingeniería permanecen separados; una fila comercial creada sin datos técnicos requiere completarse antes de dimensionar una propuesta.
 
----
+## Listas de precios
 
-## 2. Smart Proposal Studio & Escáner de Facturas EDE (Grounding al 95%)
+`geminiPriceCatalogService.ts` entrega una extracción revisable. La conversión DOP/USD se recalcula localmente desde el precio original y la tasa indicada. Se rechazan moneda desconocida y precios no positivos/no finitos. Una coincidencia exacta y única por nombre local prevalece sobre un ID incorrecto sugerido por Gemini; el resto de inferencias requiere selección humana. El ID sugerido debe existir y tener el tipo de equipo correcto.
 
-* **Servicios**: [`geminiInvoiceService.ts`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/services/geminiInvoiceService.ts) y [`electron/aiInvoiceHandler.ts`](file:///home/ishiro/Proyectos/1_Principales/solarsim/electron/aiInvoiceHandler.ts)
-* **Arquitectura Modular de Interfaz**: [`src/components/common/ai-invoice/`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/components/common/ai-invoice/)
-  - Hook Central desacoplado: [`useAIInvoiceScanner.ts`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/components/common/ai-invoice/hooks/useAIInvoiceScanner.ts)
-  - Vista 1 (Configuración Dual): [`AIInvoiceInitialConfigView.tsx`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/components/common/ai-invoice/components/AIInvoiceInitialConfigView.tsx)
-  - Vista 2 (Animación de Carga): [`AIInvoiceLoadingState.tsx`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/components/common/ai-invoice/components/AIInvoiceLoadingState.tsx)
-  - Columna Izquierda (Visor & Blueprint): [`AIInvoiceDocViewer.tsx`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/components/common/ai-invoice/components/AIInvoiceDocViewer.tsx)
-  - Pestaña 1 (Cliente & Suministro): [`AIInvoiceClientTab.tsx`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/components/common/ai-invoice/components/AIInvoiceClientTab.tsx)
-  - Pestaña 2 (12 Meses & Mes Pico): [`AIInvoiceConsumptionTab.tsx`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/components/common/ai-invoice/components/AIInvoiceConsumptionTab.tsx)
-  - Pestaña 3 (Propuesta Solar & Cobertura 95%): [`AIInvoiceSolarTab.tsx`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/components/common/ai-invoice/components/AIInvoiceSolarTab.tsx)
-  - Vista 4 (Estado de Error): [`AIInvoiceErrorState.tsx`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/components/common/ai-invoice/components/AIInvoiceErrorState.tsx)
-  - Re-export de Entrada: [`AIInvoiceScannerModal.tsx`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/components/common/AIInvoiceScannerModal.tsx)
-* **Gestión de Estado**: [`src/store/slices/aiSlice.ts`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/store/slices/aiSlice.ts)
+Los proveedores se cotejan por nombre exacto, eliminación de ciertos sufijos y coincidencias de texto. No hay un algoritmo de Levenshtein/Dice ni ponderaciones numéricas de marca/modelo/potencia en este servicio; las antiguas descripciones de esos algoritmos no representaban el código.
 
-El **Smart Proposal Studio** representa una evolución transformadora del escáner tradicional de facturas. Permite generar propuestas técnico-comerciales completas con un **95% de avance automático**, unificando la lectura documental con requerimientos técnicos y comerciales en lenguaje natural y realizando un **Grounding estricto en tiempo real** contra el catálogo de equipos y precios de distribuidores de SolarSim Pro.
+`utils/priceCatalogImport.ts` prepara el lote completo antes de escribir: rechaza nombres nuevos duplicados, varias ofertas del mismo proveedor para un único equipo y coincidencias de otra organización/servidor. Actualizar un proveedor conserva su ID de oferta, importante para referencias preferidas. `isPriceCatalogPlanApplied` comprueba el resultado del store; una escritura rechazada no se presenta como importación completada. La sincronización posterior conserva el contrato CAS del catálogo.
 
-### 📥 Modos de Entrada Dual y Flexibilidad Operativa:
-El estudio admite tres modalidades de trabajo sin fricción:
-1. **Factura EDE + Requisitos del Proyecto (Recomendado)**:
-   - Extrae el consumo real facturado (12 meses en kWh), distribuidora, NIC y tarifa desde el documento.
-   - Aplica los equipos, marcas, inversores, baterías y margen comercial solicitados en la nota técnica.
-2. **Sólo Requisitos del Proyecto (Sin Factura Física)**:
-   - Si no se cuenta con la factura pero el texto indica condiciones como *"diseñado para 40kwh diario"*, la IA calcula automáticamente la energía equivalente ($40 \times 30.416 \approx 1,216\text{ kWh/mes}$) y sintetiza una curva mensual realista para dimensionar la propuesta.
-3. **Sólo Factura Eléctrica EDE**:
-   - Extrae todos los datos de consumo y tarifa, aplicando el pre-dimensionamiento fotovoltaico por defecto para cubrir el **95%** de la demanda anual del cliente.
+## Tarifas y procedencia
 
-### 🎯 Control Interactivo de Cobertura Meta (95% Base):
-En la Pestaña 3 de Propuesta Solar, el usuario dispone de control total interactivo sobre la cobertura solar objetivo:
-- **Valor Base Oficial**: 95% (`targetCoveragePct = 95`).
-- **Redondeo Entero al Alza**: Debido a que los módulos fotovoltaicos no pueden fraccionarse, la cantidad de paneles siempre se redondea hacia arriba ($\lceil N \rceil$), lo cual resulta habitualmente en una cobertura real proyectada entre el 97% y el 100%.
-- **Comparador en Tiempo Real**: La interfaz muestra en paralelo: `Meta: X%` y `Real: ~Y%`.
-- **Selectores Rápidos**: Botones de un clic para `80%`, `90%`, `95% (Base)`, `100%`, `105%`, `110%` y `120%`, acompañados de un input numérico editable para valores arbitrarios (10% a 300%).
+Véase [Tarifas en el flujo IA](AI_TARIFF_CONTEXT.md). El contexto compacto incluye distribuidora, código, moneda, cargos, bloques y fuente. Una tasa leída de la factura se diferencia de la referencia histórica. Dividir el total facturado entre kWh no demuestra el precio de energía porque el total puede contener demanda, cargos fijos y otros conceptos.
 
-### 🛡️ Invariante de Descripción de Mano de Obra e Instalación:
-- Las notas técnicas de campo (`specialTechnicalNotes`) extraídas por la IA se presentan con claridad en la pestaña técnica para referencia del proyectista.
-- **Queda estrictamente prohibido** concatenar `specialTechnicalNotes` en `specs.installationServicesDesc`, preservando la descripción concisa y estándar en la tabla de cotización del simulador y en la propuesta PDF:
-  > `Instalación y Accesorios (Estructura de montaje, cableado, fusibles, registros, protecciones, conexión AC-DC, desconectivo, etc.).`
+La extracción de resoluciones es parcial y requiere revisión documental explícita. Conserva filas y cargos no extraídos con procedencia por campo; no convierte su conservación en evidencia de vigencia. JSON transforma el último límite infinito en `null`; hidratación/descarga lo restauran con validación. Los aliases CEPM apuntan a la fila canónica actual.
 
-### 🏢 Cobertura de Distribuidoras Oficiales en RD:
-Entrenado y auditado para los formatos oficiales de facturación dominicana:
-1. **EDEESTE** (Empresa Distribuidora de Electricidad del Este).
-2. **EDESUR** (Empresa Distribuidora de Electricidad del Sur).
-3. **EDENORTE** (Empresa Distribuidora de Electricidad del Norte).
-4. **CEPM** (Consorcio Energético Punta Cana - Macao).
+La matriz base de las EDEs corresponde a enero-marzo de 2026 y no está certificada para octubre. CEPM tiene su propia fuente de referencia. La sincronización de tarifas todavía reemplaza la matriz por organización sin CAS: las protecciones contra carreras locales y sesiones antiguas no impiden que dos administradores distintos se sobrescriban. Corregir ese contrato requiere coordinar API y clientes.
 
-### 📋 Especificación de Datos Extraídos y Grounding:
-| Campo | Tipo | Origen / Lógica de Grounding |
-| :--- | :--- | :--- |
-| **Distribuidora** | `EDEESTE` \| `EDESUR` \| `EDENORTE` \| `CEPM` | Detectado de la factura o asumido por provincia/dirección en la nota. |
-| **NIS / NIC & RNC** | `string` | Extracción de metadatos de suministro e identidad fiscal. |
-| **Cliente / Empresa** | `string` | Titular extraído de la factura o del saludo/nombre en el mensaje. |
-| **Tarifa Oficial** | `BTS1`, `BTS2`, `BTD`, `MTD1`, `MTD2`, `MTH` | Tarifa regulada SIE detectada o deducida por nivel de consumo. |
-| **Historial 12 Meses** | `number[12]` (kWh) | Curva real leída de la gráfica EDE o sintetizada de los requerimientos. |
-| **Cobertura Meta** | `targetCoveragePct` (Default: `95%`) | Cobertura objetivo para dimensionamiento de paneles e inyección a la red. |
-| **Panel Fotovoltaico** | `selectedPanelModel`, `selectedPanelWatts`, `selectedPanelUnitPriceUSD` | Emparejado con el catálogo oficial (ej: Canadian Solar TOPBiHiKu6 615W/620W) y su mejor precio de compra. |
-| **Inversor Solar** | `selectedInverterModel`, `selectedInverterPowerKW`, `selectedInverterCount`, `selectedInverterUnitPriceUSD` | Modelo del catálogo, cálculo de potencia unitaria y **unidades en paralelo** necesarias. |
-| **Almacenamiento BESS** | `hasBattery`, `selectedBatteryModel`, `selectedBatteryCapacityKWh`, `selectedBatteryCount`, `selectedBatteryUnitPriceUSD` | Detección de bancos de litio (ej: HinaESS PowerGem Max 16.08kWh o Weco), capacidad unitaria y cantidad. |
-| **Margen de Venta** | `targetMarginPct` (ej: `40%`) | Activa automáticamente el modo Matriz de Costos (`cost_matrix`) y fija `saleMarginMultiplier` (ej: `1.40x`). |
-| **Auto-Costo Proveedor**| `autoSupplierPricing = true`, `selectedSupplierInfo` | Asocia el distribuidor más económico registrado en la base de datos para cada equipo emparejado. |
-| **Notas Técnicas** | `specialTechnicalNotes` | Advertencias de disponibilidad de stock, metas de autonomía diaria o condiciones de instalación. |
-| **Razonamiento IA** | `aiReasoningSummary` | Justificación técnica en lenguaje natural de cómo se interpretó la solicitud. |
+## Transporte, cancelación y credenciales
 
-### 🧠 Reglas Críticas de Grounding Estricto, Precedencia y Resolución Eléctrica:
-En los servicios [`geminiInvoiceService.ts`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/services/geminiInvoiceService.ts) y [`electron/aiInvoiceHandler.ts`](file:///home/ishiro/Proyectos/1_Principales/solarsim/electron/aiInvoiceHandler.ts), se aplican heurísticas de ingeniería y re-grounding determinista:
-1. **Precedencia Absoluta de Potencia Fotovoltaica Explícita (kWp o Módulos)**:
-   - Si el usuario indica en los requerimientos una potencia en kWp (ej. *"11 kwp paneles Canadian 615w"*) o una cantidad de módulos (ej. *"21 panel"*), el sistema calcula $\lceil (11,000 / 615) \rceil = 18\text{ paneles}$ y le otorga **prioridad absoluta**.
-   - El cálculo genérico por consumo histórico o autonomía diaria (ej. 40 kWh/día) nunca sobrescribe la cantidad explícita solicitada por el usuario.
-2. **Detección Contextualizada y Selección Exacta de Variantes de Inversor**:
-   - La extracción de potencia del inversor opera estrictamente dentro del contexto de la palabra *"inversor"* o de la marca detectada (`weco`, `luxpower`, `solis`, `huawei`, `growatt`, etc.), evitando colisiones con valores de baterías (kWh) o paneles (kWp).
-   - **Matching de Variantes de la Misma Marca**: Cuando existen múltiples potencias del mismo fabricante en el catálogo (ej: `WeCo XT-6K`, `WeCo XT-8K` y `WeCo XT-10K`), el algoritmo evalúa la diferencia mínima absoluta con la potencia requerida ($|P_{\text{cat}} - P_{\text{req}}|$) y desempata buscando el código de variante en el nombre comercial (`8K`, `8.0Kw`).
-   - **Cantidad Explícita de Inversores**: Si el texto indica *"1 inversor weco de 8kw"*, el sistema asigna de forma fija `selectedInverterCount = 1`, impidiendo que el redondeo automático por capacidad fotovoltaica configure 2 unidades en paralelo innecesariamente.
-3. **Equipos Pendientes de Cotizar (`DISPONIBLE_SIN_PRECIO`) y Cero Falsas Sustituciones**:
-   - Si un equipo solicitado existe en el catálogo pero aún no tiene ofertas comerciales cargadas de distribuidores (`priceStatus: 'DISPONIBLE_SIN_PRECIO'`), el sistema lo selecciona obligatoriamente con su ID y especificaciones técnicas oficiales.
-   - La frase *"Equipos según disponibilidad"* se interpreta como máxima prioridad a los modelos solicitados si figuran en la base de datos, eliminando falsas sustituciones y preservando los modelos pedidos (ej. WeCo, Luxpower, Canadian Solar).
-4. **Resolución de Inversores Split-Phase en RD**:
-   - En República Dominicana, las cotizaciones residenciales y comerciales que solicitan *"1 inversor de 16 kW"* split-phase se configuran técnicamente con **dos unidades de 8 kW en paralelo**. La IA traduce esta solicitud configurando `selectedInverterPowerKW: 8.0` y `selectedInverterCount: 2`.
-5. **Cálculo del Margen Financiero**:
-   - Frases como *"Venta 40%"*, *"Porcentaje de venta 40%"* o *"Margen 35%"* se parsean como números flotantes ($40\%$, $35\%$) y se inyectan en el motor financiero para calcular el precio bruto de venta sobre el costo de adquisición de los equipos.
+`shared/geminiTransport.ts` es la excepción de I/O portátil dentro de `shared/`: usa Fetch/AbortController, sin importar Node, React, Electron ni base de datos. Puede recibir un transporte inyectado para Electron o pruebas. La clave viaja mediante `x-goog-api-key`, no en la URL.
 
-### ⚡ Botones de Carga Rápida para Pruebas Inmediatas:
-La interfaz incorpora dos botones de un solo clic basados en casos de producción reales:
-- **Giovanni Gottardo**:
-  ```text
-  Giovanni Gottardo.
-  21 panel canadian solar 615w
-  1 inversor lux power de 16 kw
-  2 bateria hinaes de 16kw
-  Venta 40%
-  ```
-- **Josia Moscoso**:
-  ```text
-  Josia Moscoso
-  11 kwp paneles Canadian 615w
-  2 bateria de 16k weco
-  1 inversor weco de 8kw
-  Porcentaje de venta 40%
-  Equipos según disponibilidad y especificar que el sistema esta diseñado para 40kwh diario.
-  ```
+Hay como máximo dos intentos totales. Los errores 408/500/502/503/504 permiten un fallback. Un primer MAX_TOKENS permite una recuperación con el mismo modelo y mayor límite de salida (máximo 32768 tokens); consume el mismo presupuesto de dos intentos, no añade un tercer intento tras fallback. Las propuestas comienzan con 16384 tokens; el transporte limita el pensamiento según familia (Gemini 3: low; 2.5 Flash/Pro: 1024). No se encadenan modelos por 401, 403 o 429. Cancelación externa detiene el proceso; cada intento tiene timeout (60 segundos predeterminado). El identificador de modelo se valida. Una respuesta incompleta o sin contenido útil no se aplica como JSON parcial. Los identificadores concretos están en el código/configuración; este documento no promete disponibilidad, cuota gratuita o capacidades del proveedor.
 
-### 🖥️ Experiencia en Pantalla Dividida (Split-View) y Selectores Interactivos:
-1. **Lado Izquierdo**:
-   - Si hay archivo: Visor PDF/imagen con controles de zoom ($50\%$ a $250\%$) y reajuste.
-   - Si no se suministra factura física: Tarjeta ejecutiva *"AI Requirements Blueprint"* con las especificaciones analizadas y la síntesis técnica del asistente.
-2. **Lado Derecho**:
-   - **Pestaña 1 (Cliente & Suministro)**: Validación humana de NIS/NIC, RNC, nombre y distribuidora.
-   - **Pestaña 2 (Consumo 12 Meses)**: Gráfica de barras de consumo mensual, modo Mes Pico y edición individual.
-   - **Pestaña 3 (Propuesta Solar & Equipos)**:
-     - **Módulo Fotovoltaico**: Menú desplegable interactivo (`<select>`) con todos los paneles del catálogo oficial, badge de precio y cuadro comparativo de potencia unitaria, eficiencia STC, tecnología de celda y área en $m^2$.
-     - **Inversor Solar Emparejado**: Menú desplegable interactivo (`<select>`) con todos los inversores del catálogo (`inverterCatalog`), controles de cantidad de unidades en paralelo (stepper `-` y `+`), y cálculo instantáneo de la Capacidad Total en kW AC.
-     - **Banco de Baterías BESS**: Menú desplegable interactivo (`<select>`) con todas las baterías del catálogo (`batteryCatalog`) más la opción *"Sin almacenamiento (Solo FV)"*, controles de cantidad de baterías (stepper `-` y `+`), y cálculo instantáneo de los kWh totales almacenados.
-     - **Accesibilidad y Modo Claro/Oscuro**: Contraste optimizado con tipografía de alta legibilidad (`text-slate-900` / `dark:text-zinc-100`) para visualización cristalina en cualquier tema.
-     - **Margen Comercial**: Badge destacado de margen comercial configurado (ej: $40\% \rightarrow 1.40\text{x}$).
-     - Botón principal de un solo clic: **`"Crear Propuesta (95% Lista) 🚀"`** o **`"Aplicar al Proyecto Activo ✨"`**.
+La clave configurada se persiste con preferencias en almacenamiento local. **localStorage no es una bóveda cifrada**: el contexto del renderizador y quien acceda al perfil local pueden leerlo. Los archivos y datos incluidos en el prompt se transmiten a Google cuando se solicita el análisis. No guardar claves en fixtures, documentos, logs ni commits; usar credenciales sintéticas en regresiones. El header evita exposición en URLs, pero no cambia las condiciones de almacenamiento local o de tratamiento de datos del proveedor.
 
----
+## Evidencia y límites de QA
 
-## 3. Escáner 2: Fichas Técnicas de Equipos (*Datasheets*)
+Las regresiones `testAIProposalCommercial.ts`, `testAIProposalPipeline.ts`, `testAIWorkspaceInputs.ts`, `testDatasheetImport.ts`, `testPriceCatalogImport.ts` y `testAITariffSafety.ts` verifican normalización, revisión, grupos multi-modelo, transporte simulado, lotes y persistencia. La revisión independiente ejecutó las tres suites de importación/tarifas con salida 0 y reprodujo ID real incorrecto frente a nombre exacto y un segundo merge parcial después de JSON con procedencia por campo intacta.
 
-* **Servicio**: [`geminiDatasheetService.ts`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/services/geminiDatasheetService.ts)
-* **Componente de Interfaz**: [`AIDatasheetScannerModal.tsx`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/components/common/AIDatasheetScannerModal.tsx)
+Se registraron dos llamadas reales de prueba de propuestas en esta tarea. Son evidencia de esos casos, no una certificación de exactitud general. La prueba real de extracción/importación de datasheet permanece pendiente; la cobertura sintética no la sustituye. Las pruebas automatizadas no escriben en producción. Gates completos, comprobación visual e integración final se documentan por separado en [QA_RESULTS.md](QA_RESULTS.md); este manual no declara terminada la entrega.
 
-### Clasificación Autónoma del Tipo de Equipo:
-El escáner analiza el encabezado y las curvas características del documento PDF y clasifica automáticamente el componente en una de tres familias:
-1. **Módulo Fotovoltaico (`panel`)**: Paneles monocristalinos, bifaciales, TOPCon, HJT, PERC.
-2. **Inversor Solar (`inverter`)**: Inversores híbridos split-phase, string on-grid, microinversores.
-3. **Almacenamiento BESS (`battery`)**: Baterías de litio ferrofosfato (LiFePO4), alto o bajo voltaje (LV/HV).
+## Evidencia adicional del 8 de octubre
 
-### Especificaciones Extraídas y Unidades Normalizadas:
+La ficha de fabricante `LXP-LB-US-8-10K-datasheet.pdf` de Descargas se analizó con Gemini: la comprobación de las potencias nominales de ambas variantes (8 y 10 kW) pasó. No se enviaron facturas privadas en esta prueba. La primera comprobación falló en el script de QA por acceder a un campo inexistente; se corrigió el script y se repitió una vez. Esta evidencia puntual no garantiza otras fichas.
 
-#### Para Paneles Fotovoltaicos:
-- **Potencia Nominal ($W_p$)**: Normalizada estrictamente a Vatios Pico ($W_p$).
-- **Eficiencia del Módulo ($\%$)**: Valor porcentual STC (ej. $22.2\%$).
-- **Coeficiente de Temperatura de $P_{\text{max}}$ ($\%/\text{°C}$)**: Factor crítico para RD (ej. $-0.29\%/\text{°C}$).
-- **Degradación Anual ($\%$)**: Tasa de degradación garantizada por el fabricante (ej. $0.4\%/\text{año}$).
-- **Tecnología de Celda**: N-Type TOPCon, HJT, Monocristalino PERC, etc.
+Al aplicar se preservan provincia del contexto, precio directo configurado, referencias NIC/NIS/contrato y notas en `project.aiSource`. Los grupos BESS se adaptan a los escalares existentes conservando la suma de energía útil por grupo; no se cambia el motor. La revisión invalida su confirmación si cambia el borrador normalizado. Las notas revisadas quedan visibles en la cotización del simulador.
 
-#### Para Inversores:
-- **Potencia Nominal AC ($kW$)**: Convertida automáticamente de $W$ o $kVA$ a $kW$ activo.
-- **Eficiencia Máxima ($\%$)**: Eficiencia ponderada europea o CEC.
-- **Rango de Voltaje MPPT ($V$)**: Rango operativo en voltios DC (ej: `120V - 500V`).
-- **Capacidad de Sobrecarga DC ($kWp$)**: Potencia solar máxima admitida en entrada DC.
+## Cotización editable antes de aplicar
 
-#### Para Baterías BESS:
-- **Capacidad Nominal de Almacenamiento ($kWh$)**: Energía total útil en kilovatios-hora.
-- **Capacidad de Carga ($Ah$)**: Amperios-hora nominales (ej. $314\text{ Ah}$).
-- **Voltaje Nominal ($V$)**: Tensión nominal DC (ej. $51.2\text{ V}$).
-- **Profundidad de Descarga Recomendada ($DoD\text{ }\%$)**: Porcentaje de descarga segura (ej. $90\%$).
-- **Ciclos Garantizados de Vida**: Número de ciclos a $25\text{°C}$ (ej. $6,000$ u $8,000$ ciclos).
+`shared/aiProposalCommercial.ts` define precios particulares, utilidad, mano de obra, extras y descuentos. El esquema exige representar condiciones comerciales y suministro, con null para valores desconocidos o alternativas inactivas; una ausencia no autoriza inventar datos. La IA y la edición manual pueden reemplazar costos unitarios de equipos para esta propuesta, conservando el inventario y ofertas. El usuario puede restaurar la oferta del inventario. Al cambiar modelo, el costo particular anterior deja de aplicarse.
 
-### 🔍 Detección Inteligente de Coincidencias en Catálogo y Prevención de Duplicados:
-Al escanear un datasheet, es común que existan ligeras variaciones de nomenclatura respecto a un equipo ya registrado en el catálogo (por ejemplo: `"Batería Hinaess 16 KwH-48 vdc."` vs `"Batería HinaESS PowerGem Max (16.08kWh)"`).
+El recargo sobre costo y el margen sobre venta son alternativas excluyentes. Lo mismo ocurre con mano de obra USD/kWp y costo total; el total se adapta a USD/kWp según potencia DC actual. Precio de venta directo USD/Wp debe ser positivo, mientras costo de compra, recargo y mano de obra admiten cero explícito. Extras tienen cantidad, unidad, costo y tratamiento de utilidad/ITBIS. Los descuentos distinguen importe o porcentaje y destino general o equipos/base DGII. Las listas completas conservan filas anteriores no modificadas; [] las elimina explícitamente. Cambios por chat prevalecen sobre defaults; el borrador revisado acompaña la solicitud posterior.
 
-Para evitar la polución y duplicación involuntaria del catálogo, el escáner ejecuta la función [`findCatalogMatchForVariant()`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/components/common/AIDatasheetScannerModal.tsx) antes de presentar los resultados al usuario:
-1. **Cotejo de Familia, Marca Normalizada y Resolución de Alias**:
-   - Utiliza [`equipmentBrandUtils.ts`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/utils/equipmentBrandUtils.ts) para normalizar la marca extraída y resolver alias comunes de la industria (ej: `Luxpower` $\Leftrightarrow$ `LuxpowerTek`, `Canadian` $\Leftrightarrow$ `Canadian Solar`, `JA` $\Leftrightarrow$ `JA Solar`, `WeCo` $\Leftrightarrow$ `We-Co`).
-   - **Inferencia Defensiva**: Si un equipo legacy en la base de datos o almacenamiento local tenía el campo de marca vacío o con el valor por defecto `"Fabricante"`, el algoritmo infiere la marca a partir del `displayName` y `modelSeries` para posibilitar el emparejamiento.
-2. **Cotejo Técnico Cuantitativo**:
-   - **Baterías**: Compara capacidad en kWh ($\pm 0.3\text{ kWh}$) o capacidad en Ah ($\pm 15\text{ Ah}$) y compatibilidad de modelo. Certeza asignada: $95\%$ si coinciden capacidad y modelo/Ah, $85\%$ si coincide capacidad.
-   - **Paneles**: Compara potencia en Vatios ($\pm 3\text{W}$) y serie de modelo. Certeza asignada: $95\%$ con modelo, $85\%$ por potencia nominal.
-   - **Inversores**: Compara potencia AC en kW ($\pm 0.25\text{ kW}$) y serie de modelo. Certeza asignada: $95\%$ con modelo, $85\%$ por potencia.
-3. **Decisión Soberana del Usuario (Dual Action Selector)**:
-   La interfaz resalta la coincidencia detectada con un banner ámbar y proporciona dos opciones explícitas por variante:
-   - **🔄 Actualizar Existente (`action: 'update'`)**: Actualiza las especificaciones técnicas del equipo existente y **asigna la marca canónica oficial extraída**, preservando su identificador único (`id`) y el historial de ofertas de precios por proveedor ya vinculadas.
-   - **➕ Guardar como Nuevo (`action: 'create_new'`)**: Permite forzar la creación de un nuevo equipo independiente con un nuevo ID único y la marca indexada inmediatamente en el catálogo, cubriendo los casos donde dos modelos tienen especificaciones muy similares pero corresponden a generaciones o revisiones distintas de hardware.
-
----
-
-## 4. Escáner 3: Listas de Precios de Proveedores & Smart Fuzzy Matching
-
-* **Servicio**: [`geminiPriceCatalogService.ts`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/services/geminiPriceCatalogService.ts)
-* **Componentes de Interfaz**:
-  - [`AIPriceCatalogScannerModal.tsx`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/components/common/AIPriceCatalogScannerModal.tsx) (Escaneo, revisión interactiva y cotejo)
-  - [`SupplierPricesDetailModal.tsx`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/components/common/SupplierPricesDetailModal.tsx) (Detalle de ofertas por equipo)
-  - [`SupplierManagerSection.tsx`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/components/common/SupplierManagerSection.tsx) (Administración global de proveedores)
-
-### El Desafío del Mercado Fotovoltaico Dominicano:
-Cada distribuidor emite listas de precios con nomenclaturas no estandarizadas (ej: `"Can. 600W BiHiKu"`, `"LXP 8K Split"`, `"Hina PowerGem 16kWh"`). Subir múltiples cotizaciones o repetir la misma cotización sin control genera:
-1. **Duplicación de Proveedores**: `"Unitrade"`, `"Unitrade Dominicana"`, `"Unitrade RD"` creados como entidades independientes.
-2. **Duplicación de Ofertas**: Múltiples precios para el mismo inversor o panel en vez de actualizar el registro existente.
-3. **Desconexión con el Catálogo**: Precios que no se enlazan con los equipos que el simulador utiliza.
-
----
-
-## 5. Algoritmo de Smart Fuzzy Matching y Deduplicación de Proveedores
-
-Para resolver esta problemática, SolarSim Pro implementa una arquitectura de **detección e inferencia en tres etapas**:
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as Ingeniero
-    participant Modal as AIPriceCatalogScannerModal
-    participant Gemini as Gemini Vision API
-    participant Engine as Fuzzy Matcher Local
-    participant Store as equipmentSlice (Store)
-    participant Server as solarsim-api (Postgres)
-
-    User->>Modal: Carga PDF/Foto de Lista de Precios
-    Modal->>Modal: Obtiene proveedores existentes en BD (ej: ["Unitrade Dominicana", "RAAS Solar"])
-    Modal->>Gemini: Envía Documento + existingSuppliers en el Prompt
-    Gemini-->>Modal: JSON con items extraídos + detectedSupplierName ("Unitrade")
-
-    Modal->>Engine: findBestSupplierMatch("Unitrade", existingSuppliers)
-    Engine-->>Modal: Coincidencia detectada: "Unitrade Dominicana" (Confianza: 95%)
-
-    Note over Modal: Paso 2: Interfaz Interactiva de Confirmación
-    Modal->>User: Muestra Selector con opción recomendada:<br/>[✓ Vincular con coincidencia: "Unitrade Dominicana"]
-    User->>Modal: Confirma y presiona "Aplicar Precios al Catálogo"
-
-    Modal->>Store: batchUpdateSupplierPrices(assignedSupplier="Unitrade Dominicana")
-    Note over Store: Deduplicación Estricta:<br/>Normaliza cleanName ("unitrade dominicana").<br/>Actualiza oferta existente sin duplicar registros.
-    Store->>Server: Sincroniza catálogo y supplier_prices (JSONB)
-    Server-->>User: Catálogo actualizado con 0 duplicados
-```
-
-### 1. Inyección de Contexto en el Prompt de Gemini:
-Al invocar a Gemini, el servicio inyecta en el prompt del sistema la lista de proveedores ya registrados en la base de datos:
-```typescript
-const systemPrompt = `
-Eres un analista de compras de energía solar en República Dominicana.
-Proveedores existentes actualmente en la base de datos:
-${existingSuppliers.map(s => `- ${s}`).join('\n')}
-
-Si el documento pertenece a uno de estos distribuidores o a una variante de su nombre,
-indica matchedExistingSupplier con el nombre exacto de la lista anterior.
-`;
-```
-
-### 2. Motor Local de Limpieza y Similitud (`findBestSupplierMatch`):
-Si Gemini no identifica la correspondencia o la conexión es intermitente, el motor local ejecuta una limpieza de sufijos corporativos dominicanos:
-```typescript
-const SUFFIXES_TO_REMOVE = [
-  'dominicana', 'rd', 'r.d.', 'srl', 's.r.l.', 'corp', 'corporation',
-  'sa', 's.a.', 'inc', 'solar', 'energy', 'comercial', 'distribuidora'
-];
-```
-Calcula la distancia de Levenshtein y coeficiente de Dice entre el nombre limpio y los proveedores de la base de datos. Si el puntaje supera el $70\%$, sugiere la vinculación automática.
-
-### 3. Ponderación de Smart Fuzzy Matching para Equipos:
-Para asociar cada fila de la lista de precios con un equipo del catálogo de referencia, el algoritmo evalúa:
-$$\text{Puntaje Total} = W_{\text{marca}} \cdot S_{\text{marca}} + W_{\text{modelo}} \cdot S_{\text{modelo}} + W_{\text{potencia}} \cdot S_{\text{potencia}}$$
-- **Marca ($W_{\text{marca}} = 0.35$)**: Coincidencia de fabricante (`Canadian Solar`, `Luxpower`, `HinaESS`, `Huawei`, etc.).
-- **Modelo y Serie ($W_{\text{modelo}} = 0.40$)**: Coincidencia de tokens alfanuméricos (`CS6.1`, `LXP-LB-US`, `PowerGem`).
-- **Potencia o Capacidad ($W_{\text{potencia}} = 0.25$)**: Coincidencia numérica de capacidad en $W$, $kW$ o $kWh$ con tolerancia del $2\%$.
-
-Si el puntaje supera el umbral de confianza ($0.65$), el ítem se vincula automáticamente en verde (`Coincidencia Alta: 90%`). El usuario puede cambiar la vinculación a cualquier otro equipo o excluirlo del catálogo con un solo clic.
-
-### 4. Deduplicación Estricta en el Store (`equipmentSlice.ts`):
-```typescript
-// Si ya existe una oferta comercial con el mismo nombre normalizado, la actualiza en lugar de duplicar
-const cleanName = supplierPrice.supplierName.toLowerCase().trim();
-const existingIndex = otherPrices.findIndex(
-  (sp) => sp.supplierName.toLowerCase().trim() === cleanName || (supplierPrice.id && sp.id === supplierPrice.id)
-);
-```
-
----
-
-## 6. Integración con el Motor Financiero y Modo Auto-Costo
-
-Una vez registrados los precios de compra de los diferentes distribuidores en el catálogo:
-
-1. **Selector Inteligente de Equipos en el Simulador**:
-   - En la sección de equipamiento del simulador (`ParameterSidebar.tsx`), cada modelo muestra un indicador con el número de distribuidores que lo cotizan (ej: `3 prov.`).
-   - Al hacer clic, se despliega el comparador comercial con las ofertas ordenadas de menor a mayor precio.
-2. **Modo Auto-Costo**:
-   - En la pestaña de Cotización & Matriz de Costos (`PricingParamsSection.tsx` / `QuotationEquipmentsTab.tsx`), el simulador permite activar el modo **Auto-costo desde proveedores**.
-   - El sistema vincula los costos unitarios base del proyecto (`panelUnitPriceUSD`, `inverterUnitPriceUSD`, `batteryUnitPriceUSD`) con la **oferta más económica del mercado** disponible para los modelos seleccionados.
-   - El margen de ganancia comercial de la empresa instaladora se calcula sobre el costo real de compra actualizado.
-
----
-
-## 7. Consideraciones de Seguridad, Tokens y Cuotas de API
-
-1. **Almacenamiento Seguro de la API Key**:
-   - La clave de Google Gemini se almacena en el estado persistente del usuario bajo `localStorage` (`aiSlice.ts`) y **nunca** se envía al servidor central ni se expone a terceros.
-2. **Eficiencia en Consumo de Tokens**:
-   - Para documentos multi-página, el sistema extrae las páginas de tablas comerciales descartando portadas y hojas de términos legales que no contienen precios, optimizando la ventana de contexto.
-3. **Fallback Offline**:
-   - Si no hay conexión a Internet o se agota la cuota de la API de Gemini, la aplicación permite ingresar, editar o importar precios de proveedores manualmente a través de [`SupplierManagerSection.tsx`](file:///home/ishiro/Proyectos/1_Principales/solarsim/src/components/common/SupplierManagerSection.tsx).
+`src/utils/proposalDraftProject.ts` es el adaptador puro compartido por vista previa y aplicación del store. Utiliza los motores vigentes, sin replicar fórmulas financieras. Una propuesta nueva limpia overrides de costo y beneficios fiscales del benchmark. Validar varias veces nunca hace desaparecer errores ni costos inválidos; grupos repetidos con costos contradictorios requieren unificar precios. El resumen señala costos pendientes y la gráfica energética sigue disponible cuando sólo faltan condiciones comerciales. Una edición invalida la confirmación anterior.

@@ -195,11 +195,11 @@ export const PrimaryIconDock: React.FC = () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-bold text-white group-hover:text-purple-300 flex items-center justify-between">
-                      <span>Escanear Factura Eléctrica</span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 font-mono">95% Listo</span>
+                      <span>Asistente de propuestas</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 font-mono">Borrador</span>
                     </div>
                     <p className="text-[11px] text-slate-400 line-clamp-2 mt-0.5 leading-snug">
-                      Extrae NIC, 12 meses de consumo y dimensiona propuesta solar EDE.
+                      Describe el proyecto, adjunta documentos y revisa los equipos antes de crear.
                     </p>
                   </div>
                 </button>

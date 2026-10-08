@@ -1,317 +1,73 @@
+import { prepareProposalDraftProject, createAIProposalBase } from '../../utils/proposalDraftProject';
 import { companyDocumentCustomization } from '../../utils/companyDocumentTemplate';
 import { projectMutationMetadata } from '../sync/projectMutation';
 import { SimulationSlice, AISlice } from '../types';
-import { ProjectSimulation } from '../../types';
+import type { ProjectSimulation } from '../../types';
 import { BENCHMARK_PROJECT } from '../../engine/referenceCase';
 import { generateNextProjectSequence } from '../initialData';
 import { calculateRecommendedPanelCount } from '../../engine/solarEngine';
+import { normalizeProposalDraft } from '../../../shared/aiProposal';
+import { DEFAULT_GEMINI_MODEL } from '../../../shared/geminiTransport';
+import { buildAITariffContext } from '../../utils/aiTariffContext';
+import { RD_PROVINCES, getProvinceHSP } from '../../data/rdProvinces';
 
 const normalizeProvinceName = (raw?: string): string => {
   if (!raw) return 'Santo Domingo / Distrito Nacional';
-  const lower = raw.toLowerCase();
-  if (lower.includes('distrito') || lower.includes('nacional') || lower.includes('santo domingo')) {
-    return 'Santo Domingo / Distrito Nacional';
-  }
-  if (lower.includes('santiago')) return 'Santiago';
-  if (lower.includes('altagracia') || lower.includes('punta cana') || lower.includes('higüey')) {
-    return 'La Altagracia (Punta Cana / Higüey)';
-  }
-  if (lower.includes('puerto plata')) return 'Puerto Plata';
-  if (lower.includes('cristóbal') || lower.includes('cristobal')) return 'San Cristóbal';
-  if (lower.includes('vega')) return 'La Vega';
-  if (lower.includes('duarte') || lower.includes('francisco')) return 'Duarte (San Fco. de Macorís)';
-  if (lower.includes('romana')) return 'La Romana';
-  if (lower.includes('san pedro')) return 'San Pedro de Macorís';
-  if (lower.includes('monseñor') || lower.includes('bonao')) return 'Monseñor Nouel (Bonao)';
-  if (lower.includes('peravia') || lower.includes('baní') || lower.includes('bani')) return 'Peravia (Baní)';
-  if (lower.includes('azua')) return 'Azua';
-  if (lower.includes('barahona')) return 'Barahona';
-  if (lower.includes('samana') || lower.includes('samaná')) return 'Samaná';
-  if (lower.includes('monte cristi')) return 'Monte Cristi';
-  return 'Santo Domingo / Distrito Nacional';
+  const normalize=(value:string)=>value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const query=normalize(raw);
+  return RD_PROVINCES.find(p=>normalize(p.name)===query || normalize(p.name).includes(query))?.name
+    || (query.includes('punta cana') || query.includes('higuey') ? 'La Altagracia (Punta Cana / Higüey)' : getProvinceHSP(raw).name);
 };
 
 export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
-  geminiApiKey: '',
-  geminiModel: 'gemini-3.7-flash',
-
-  setGeminiApiKey: (key) => set({ geminiApiKey: key }),
-  setGeminiModel: (model) => set({ geminiModel: model || 'gemini-3.7-flash' }),
-
-  applyExtractedInvoice: (data, createNewProject = false) => {
-    const resolvedProvince = normalizeProvinceName(data.province || data.municipality);
-
-    set((state) => {
-      let targetProjectId = state.activeProjectId;
-      let projects = [...state.projects];
-
-      if (createNewProject) {
-        targetProjectId = `proj-${Date.now()}`;
-        const panelW = data.selectedPanelWatts || BENCHMARK_PROJECT.specs.panelPowerW || 620;
-        const panelModel = data.selectedPanelModel || BENCHMARK_PROJECT.specs.panelBrandModel;
-        const targetCov = data.targetCoveragePct ?? 95;
-        const sysLosses = 25.0;
-        const rec = calculateRecommendedPanelCount(
-          resolvedProvince,
-          data.monthlyConsumptionKWh && data.monthlyConsumptionKWh.length === 12
-            ? data.monthlyConsumptionKWh
-            : BENCHMARK_PROJECT.monthlyConsumption,
-          panelW,
-          targetCov,
-          sysLosses
-        );
-        const count = data.recommendedPanelCount || rec.recommendedPanelCount;
-        const seq = generateNextProjectSequence(projects);
-
-        const currentUser = get().syncSettings?.currentUser;
-        const newProj: ProjectSimulation = {
-          ...BENCHMARK_PROJECT,
-          id: targetProjectId,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          status: 'Draft',
-          authorId: currentUser?.id || 'local-user',
-          authorName: currentUser?.name || 'Ing. Solar',
-          authorEmail: currentUser?.email || 'usuario@electsun.com',
-          lastModifiedBy: currentUser?.name || 'Ing. Solar',
-          lastModifiedAt: new Date().toISOString(),
-          version: 1,
-          baseVersion: 0,
-          organizationId: currentUser?.organizationId,
-          syncServerUrl: currentUser ? get().syncSettings.serverUrl.trim().replace(/\/+$/, '') : undefined,
-          syncStatus: currentUser ? 'pending' : 'local_only',
-          client: {
-            ...BENCHMARK_PROJECT.client,
-            name: data.clientName || 'Cliente Factura EDE',
-            company: data.companyName || '',
-            location: data.address || `${resolvedProvince}, RD`,
-            province: resolvedProvince,
-            address: data.address || '',
-            distributor: data.distributor,
-            tariffCode: data.tariffCode,
-            contactPhone: data.phone || '',
-            contactEmail: data.email || '',
-            projectId: seq.projectId,
-            quoteNumber: seq.quoteNumber,
-            quoteValidityDays: 7,
-          },
-          specs: {
-            ...BENCHMARK_PROJECT.specs,
-            panelCount: count,
-            panelPowerW: panelW,
-            panelBrandModel: panelModel,
-            inverterBrandModel: (() => {
-              const cat = get().equipmentCatalog || [];
-              const inverters = cat.filter((e) => e.type === 'inverter');
-              const match = inverters.find((e) =>
-                e.id === data.selectedInverterId ||
-                e.displayName === data.selectedInverterModel ||
-                e.modelSeries === data.selectedInverterModel ||
-                (data.selectedInverterModel && e.displayName.toLowerCase().includes(data.selectedInverterModel.toLowerCase()))
-              );
-              if (match) return match.displayName;
-              if (data.selectedInverterModel && !data.selectedInverterModel.toLowerCase().includes('inversor solar híbrido') && !data.selectedInverterModel.toLowerCase().includes('inversor híbrido')) {
-                return data.selectedInverterModel;
-              }
-              const lux = inverters.find((e) => e.brand.toLowerCase().includes('lux') || e.displayName.toLowerCase().includes('lux'));
-              return lux ? lux.displayName : (inverters[0]?.displayName || BENCHMARK_PROJECT.specs.inverterBrandModel);
-            })(),
-            inverterPowerKW: data.selectedInverterPowerKW || 8.0,
-            inverterCount: data.selectedInverterCount || Math.max(1, Math.ceil((count * panelW) / 8000)),
-            inverterUnitPriceUSD: data.selectedInverterUnitPriceUSD ?? BENCHMARK_PROJECT.specs.inverterUnitPriceUSD,
-            hasBattery: data.hasBattery ?? false,
-            batteryBrandModel: (() => {
-              if (!data.hasBattery && !data.selectedBatteryModel) return BENCHMARK_PROJECT.specs.batteryBrandModel;
-              const cat = get().equipmentCatalog || [];
-              const batteries = cat.filter((e) => e.type === 'battery');
-              const match = batteries.find((e) =>
-                e.id === data.selectedBatteryId ||
-                e.displayName === data.selectedBatteryModel ||
-                e.modelSeries === data.selectedBatteryModel ||
-                ((e.brand.toLowerCase().includes('hina') || e.displayName.toLowerCase().includes('hina')) &&
-                 (data.selectedBatteryModel?.toLowerCase().includes('hina') || data.selectedBatteryModel?.toLowerCase().includes('powergem')))
-              );
-              if (match) return match.displayName;
-              if (data.selectedBatteryModel) return data.selectedBatteryModel;
-              const defBat = batteries.find((e) => e.brand.toLowerCase().includes('hina') || e.displayName.toLowerCase().includes('hina'));
-              return defBat ? defBat.displayName : (batteries[0]?.displayName || BENCHMARK_PROJECT.specs.batteryBrandModel);
-            })(),
-            batteryCapacityKWh: data.selectedBatteryCapacityKWh ?? BENCHMARK_PROJECT.specs.batteryCapacityKWh,
-            batteryCount: data.selectedBatteryCount ?? (data.hasBattery ? 1 : 0),
-            batteryUnitPriceUSD: data.selectedBatteryUnitPriceUSD ?? BENCHMARK_PROJECT.specs.batteryUnitPriceUSD,
-            saleMarginMultiplier: data.targetMarginPct
-              ? Math.round((1 + data.targetMarginPct / 100) * 1000) / 1000
-              : BENCHMARK_PROJECT.specs.saleMarginMultiplier,
-            pricingMode: data.targetMarginPct ? 'cost_matrix' : BENCHMARK_PROJECT.specs.pricingMode,
-            autoSupplierPricing: data.autoSupplierPricing ?? false,
-            selectedSupplierInfo: data.selectedSupplierInfo ?? BENCHMARK_PROJECT.specs.selectedSupplierInfo,
-            installationServicesDesc: BENCHMARK_PROJECT.specs.installationServicesDesc,
-            systemLosses: 25.0,
-            autoCalculatePanels: false,
-          },
-          rates: {
-            ...BENCHMARK_PROJECT.rates,
-            targetCoveragePct: data.targetCoveragePct ?? 95,
-            distributor: data.distributor,
-            tariffCode: data.tariffCode,
-            ...(data.energyCostPerKWhUSD
-              ? { energyCostPerKWh: Number(data.energyCostPerKWhUSD.toFixed(4)) }
-              : data.energyCostPerKWhDOP
-                ? { energyCostPerKWh: Number((data.energyCostPerKWhDOP / (data.dopExchangeRate || BENCHMARK_PROJECT.rates.usdExchangeRate || 60.5)).toFixed(4)) }
-                : {}),
-          },
-          monthlyConsumption:
-            data.monthlyConsumptionKWh && data.monthlyConsumptionKWh.length === 12
-              ? [...data.monthlyConsumptionKWh]
-              : [...BENCHMARK_PROJECT.monthlyConsumption],
-          companyProfileId: get().activeCompanyId,
-      customization: {
-            ...companyDocumentCustomization(get().getActiveCompany(), get().defaultDocumentCustomization, get().documentTemplatesByCompany),
-            contactName: data.clientName || undefined,
-            clientPhone: data.phone || undefined,
-            clientEmail: data.email || undefined,
-          },
-        };
-
-        projects = [newProj, ...projects];
-        return {
-          projects,
-          activeProjectId: targetProjectId,
-          activeView: 'simulator',
-          isAIInvoiceModalOpen: false,
-          saveFeedbackMessage: `¡Nueva propuesta ${seq.projectId} creada al 95% con IA! ✨`,
-        };
-      }
-
-      // Update active project
-      projects = projects.map((p) => {
-        if (p.id === targetProjectId) {
-          const panelW = data.selectedPanelWatts || p.specs.panelPowerW || 620;
-          const panelModel = data.selectedPanelModel || p.specs.panelBrandModel;
-          const targetCov = data.targetCoveragePct ?? p.rates.targetCoveragePct ?? 95;
-          const sysLosses = p.specs.systemLosses ?? 25.0;
-          const rec = calculateRecommendedPanelCount(
-            resolvedProvince,
-            data.monthlyConsumptionKWh && data.monthlyConsumptionKWh.length === 12
-              ? data.monthlyConsumptionKWh
-              : p.monthlyConsumption,
-            panelW,
-            targetCov,
-            sysLosses,
-            p.client.customMonthlyHSP
-          );
-          const count = data.recommendedPanelCount || rec.recommendedPanelCount;
-          return {
-            ...p,
-            ...projectMutationMetadata(p, get().syncSettings),
-            updatedAt: new Date().toISOString(),
-            lastModifiedBy: get().syncSettings?.currentUser?.name || p.lastModifiedBy || 'Ing. Solar',
-            lastModifiedAt: new Date().toISOString(),
-            client: {
-              ...p.client,
-              name: data.clientName || p.client.name,
-              company: data.companyName || p.client.company,
-              location: data.address || p.client.location,
-              province: resolvedProvince,
-              address: data.address || p.client.address,
-              distributor: data.distributor || p.client.distributor,
-              tariffCode: data.tariffCode || p.client.tariffCode,
-              contactPhone: data.phone || p.client.contactPhone,
-              contactEmail: data.email || p.client.contactEmail,
-            },
-            specs: {
-              ...p.specs,
-              panelCount: count,
-              panelPowerW: panelW,
-              panelBrandModel: panelModel,
-              ...(data.selectedPanelUnitPriceUSD !== undefined ? { panelUnitPriceUSD: data.selectedPanelUnitPriceUSD } : {}),
-              ...(data.selectedInverterModel ? {
-                inverterBrandModel: (() => {
-                  const cat = get().equipmentCatalog || [];
-                  const inverters = cat.filter((e) => e.type === 'inverter');
-                  const match = inverters.find((e) =>
-                    e.id === data.selectedInverterId ||
-                    e.displayName === data.selectedInverterModel ||
-                    e.modelSeries === data.selectedInverterModel ||
-                    (data.selectedInverterModel && e.displayName.toLowerCase().includes(data.selectedInverterModel.toLowerCase()))
-                  );
-                  if (match) return match.displayName;
-                  if (!data.selectedInverterModel?.toLowerCase().includes('inversor solar híbrido') && !data.selectedInverterModel?.toLowerCase().includes('inversor híbrido')) {
-                    return data.selectedInverterModel;
-                  }
-                  const lux = inverters.find((e) => e.brand.toLowerCase().includes('lux') || e.displayName.toLowerCase().includes('lux'));
-                  return lux ? lux.displayName : (inverters[0]?.displayName || p.specs.inverterBrandModel);
-                })(),
-              } : {}),
-              ...(data.selectedInverterPowerKW ? { inverterPowerKW: data.selectedInverterPowerKW } : {}),
-              ...(data.selectedInverterCount ? { inverterCount: data.selectedInverterCount } : {}),
-              ...(data.selectedInverterUnitPriceUSD !== undefined ? { inverterUnitPriceUSD: data.selectedInverterUnitPriceUSD } : {}),
-              ...(data.hasBattery !== undefined ? { hasBattery: data.hasBattery } : {}),
-              ...((data.hasBattery || data.selectedBatteryModel) ? {
-                batteryBrandModel: (() => {
-                  const cat = get().equipmentCatalog || [];
-                  const batteries = cat.filter((e) => e.type === 'battery');
-                  const match = batteries.find((e) =>
-                    e.id === data.selectedBatteryId ||
-                    e.displayName === data.selectedBatteryModel ||
-                    e.modelSeries === data.selectedBatteryModel ||
-                    ((e.brand.toLowerCase().includes('hina') || e.displayName.toLowerCase().includes('hina')) &&
-                     (data.selectedBatteryModel?.toLowerCase().includes('hina') || data.selectedBatteryModel?.toLowerCase().includes('powergem')))
-                  );
-                  if (match) return match.displayName;
-                  if (data.selectedBatteryModel) return data.selectedBatteryModel;
-                  const defBat = batteries.find((e) => e.brand.toLowerCase().includes('hina') || e.displayName.toLowerCase().includes('hina'));
-                  return defBat ? defBat.displayName : (batteries[0]?.displayName || p.specs.batteryBrandModel);
-                })(),
-              } : {}),
-              ...(data.selectedBatteryCapacityKWh ? { batteryCapacityKWh: data.selectedBatteryCapacityKWh } : {}),
-              ...(data.selectedBatteryCount !== undefined ? { batteryCount: data.selectedBatteryCount } : {}),
-              ...(data.selectedBatteryUnitPriceUSD !== undefined ? { batteryUnitPriceUSD: data.selectedBatteryUnitPriceUSD } : {}),
-              ...(data.targetMarginPct ? {
-                saleMarginMultiplier: Math.round((1 + data.targetMarginPct / 100) * 1000) / 1000,
-                pricingMode: 'cost_matrix',
-              } : {}),
-              ...(data.autoSupplierPricing !== undefined ? { autoSupplierPricing: data.autoSupplierPricing } : {}),
-              ...(data.selectedSupplierInfo ? { selectedSupplierInfo: data.selectedSupplierInfo } : {}),
-              ...(p.specs.installationServicesDesc?.includes('Notas del Sistema:') ? {
-                installationServicesDesc: p.specs.installationServicesDesc.split('Notas del Sistema:')[0].trim().replace(/\.\s*$/, '') + '.',
-              } : {}),
-            },
-            rates: {
-              ...p.rates,
-              targetCoveragePct: data.targetCoveragePct ?? p.rates.targetCoveragePct ?? 95,
-              distributor: data.distributor || p.rates.distributor,
-              tariffCode: data.tariffCode || p.rates.tariffCode,
-              ...(data.energyCostPerKWhUSD
-                ? { energyCostPerKWh: Number(data.energyCostPerKWhUSD.toFixed(4)) }
-                : data.energyCostPerKWhDOP
-                  ? { energyCostPerKWh: Number((data.energyCostPerKWhDOP / (p.rates.usdExchangeRate || data.dopExchangeRate || 60.5)).toFixed(4)) }
-                  : {}),
-            },
-            monthlyConsumption:
-              data.monthlyConsumptionKWh && data.monthlyConsumptionKWh.length === 12
-                ? [...data.monthlyConsumptionKWh]
-                : p.monthlyConsumption,
-          };
-        }
-        return p;
-      });
-
-      const updatedProj = projects.find((p) => p.id === targetProjectId);
-      const projCode = updatedProj?.client?.projectId || targetProjectId;
-      return {
-        projects,
-        isAIInvoiceModalOpen: false,
-        saveFeedbackMessage: `¡Proyecto ${projCode} actualizado con datos de la factura! 🔄`,
-      };
-    });
-
-    if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
-      get().triggerAutoSync(true);
-    }
-
-    setTimeout(() => {
-      set({ saveFeedbackMessage: null });
-    }, 4000);
+  geminiApiKey: '', geminiModel: DEFAULT_GEMINI_MODEL,
+  setGeminiApiKey: key=>set({geminiApiKey:key}),
+  setGeminiModel: model=>set({geminiModel:model || DEFAULT_GEMINI_MODEL}),
+  applyExtractedInvoice: (input,createNewProject=false)=>{
+    const state=get();
+    const current=state.projects.find(p=>p.id===state.activeProjectId);
+    if(['VIEWER','LECTOR'].includes(state.syncSettings.currentUser?.role || '')) {set({saveFeedbackMessage:'Tu rol permite consultar propuestas, no crearlas ni modificarlas.'});return;}
+    if(!createNewProject && (!current || current.isDeleted || current.deletedAt || (current.organizationId && current.organizationId!==state.syncSettings.currentUser?.organizationId))) {set({saveFeedbackMessage:'No se puede actualizar esta propuesta.'});return;}
+    const isGrounded=Array.isArray(input.panels) || Array.isArray(input.inverters) || Array.isArray(input.batteries);
+    const province=normalizeProvinceName(input.province || input.municipality || (!createNewProject?current?.client.province:state.defaultSimulationSettings.defaultProvince));
+    const defaults=state.defaultSimulationSettings;
+    const base:ProjectSimulation=createNewProject?createAIProposalBase(BENCHMARK_PROJECT,defaults,province):current!;
+    const losses=base.specs.systemLosses ?? 25;
+    // Revalidate against today's inventory before committing any change. Legacy callers retain their API.
+    const data=isGrounded?normalizeProposalDraft(input,state.equipmentCatalog,{province,systemLosses:losses,
+      annualSpecificYieldKWhPerKWp:calculateRecommendedPanelCount(province,Array(12).fill(0),620,95,losses,base.client.customMonthlyHSP).annualSpecificYieldKWhPerKWp,
+      tariffReference:buildAITariffContext(state.tariffMatrix)}):input;
+    if(isGrounded && data.requiresReview) {set({saveFeedbackMessage:data.validationIssues?.find(i=>i.severity==='error')?.message || 'Revisa los datos pendientes antes de aplicar.'});return;}
+    if(data.monthlyConsumptionKWh.length!==12 || data.monthlyConsumptionKWh.some(n=>!Number.isFinite(n) || n<0)) {set({saveFeedbackMessage:'Completa los doce consumos mensuales antes de aplicar.'});return;}
+    const now=new Date().toISOString();
+    const prepared=prepareProposalDraftProject(base,data,state.tariffMatrix,{isNew:createNewProject,defaultBatteryDOD:defaults.defaultBatteryDOD});
+    const {specs,rates}=prepared;
+    const seq=createNewProject?generateNextProjectSequence(state.projects):undefined;
+    const user=state.syncSettings.currentUser;
+    if(!createNewProject) state.recordUndoState(current!);
+    const project:ProjectSimulation={...base,
+      ...(createNewProject?{id:`proj-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`,createdAt:now,status:'Draft',
+        authorId:user?.id || 'local-user',authorName:user?.name || 'Ing. Solar',authorEmail:user?.email || '',version:1,baseVersion:0,
+        organizationId:user?.organizationId,syncServerUrl:user?state.syncSettings.serverUrl.trim().replace(/\/+$/,''):undefined,syncStatus:user?'pending':'local_only',companyProfileId:state.activeCompanyId}
+        :projectMutationMetadata(base,state.syncSettings)),
+      updatedAt:now,lastModifiedAt:now,lastModifiedBy:user?.name || base.lastModifiedBy || 'Ing. Solar',
+      client:{...base.client,name:data.clientName || base.client.name,company:data.companyName ?? base.client.company,address:data.address ?? base.client.address,
+        location:data.address || base.client.location,province,distributor:data.distributor,tariffCode:rates.tariffCode,
+        contactPhone:data.phone ?? base.client.contactPhone,contactEmail:data.email ?? base.client.contactEmail,
+        nic:data.nic ?? base.client.nic,nis:data.nis ?? base.client.nis,rnc:data.rnc ?? base.client.rnc,
+        contractNumber:data.contractNumber ?? base.client.contractNumber,circuit:data.circuit ?? base.client.circuit,
+        meterNumber:data.meterNumber ?? base.client.meterNumber,voltagePhase:data.voltagePhase ?? base.client.voltagePhase,
+        ...(seq?{projectId:seq.projectId,quoteNumber:seq.quoteNumber,quoteValidityDays:7}:{}),},
+      financials:prepared.financials,
+      specs,rates,monthlyConsumption:[...data.monthlyConsumptionKWh],
+      aiSource:{...base.aiSource,consumptionSource:data.consumptionSource,energyRateSource:data.energyRateSource,
+        extractedFromFileName:data.extractedFromFileName,modelUsed:data.modelUsed,requestedModel:data.requestedModel,
+        notes:data.specialTechnicalNotes!==undefined || data.aiNotes!==undefined ? ([data.specialTechnicalNotes,data.aiNotes].filter(Boolean).join('\n') || undefined) : base.aiSource?.notes},
+      ...(createNewProject?{customization:{...companyDocumentCustomization(state.getActiveCompany(),state.defaultDocumentCustomization,state.documentTemplatesByCompany),contactName:data.clientName,clientPhone:data.phone,clientEmail:data.email}}:{}),
+    };
+    set({projects:createNewProject?[project,...state.projects]:state.projects.map(p=>p.id===project.id?project:p),activeProjectId:project.id,
+      activeView:'simulator',isAIInvoiceModalOpen:false,saveFeedbackMessage:`Propuesta ${project.client.projectId} ${createNewProject?'creada':'actualizada'}.`});
+    if(get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) get().triggerAutoSync(true);
+    setTimeout(()=>set({saveFeedbackMessage:null}),4000);
   },
 });

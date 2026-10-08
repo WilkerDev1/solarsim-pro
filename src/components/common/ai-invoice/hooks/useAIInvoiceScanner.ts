@@ -1,638 +1,157 @@
-import React, { useState, useRef, useMemo } from 'react';
+import { createAIProposalBase, prepareProposalDraftProject } from '../../../../utils/proposalDraftProject';
+import { BENCHMARK_PROJECT } from '../../../../engine/referenceCase';
+import { calculateProjectFinancialSummary } from '../../../../engine/financeEngine';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useSimulationStore } from '../../../../store/useSimulationStore';
-import { parseInvoiceWithGemini } from '../../../../services/geminiInvoiceService';
-import { calculateRecommendedPanelCount } from '../../../../engine/solarEngine';
+import { parseProposalWithAI } from '../../../../services/geminiInvoiceService';
+import { calculateRecommendedPanelCount, calculateMonthlySolarProduction } from '../../../../engine/solarEngine';
 import { getProvinceHSP } from '../../../../data/rdProvinces';
 import { ExtractedInvoiceData } from '../../../../types/aiInvoice';
-import { ProjectSimulation } from '../../../../types';
-import { SolarEquipmentItem } from '../../../../types/equipment';
-import { FilePreview, ActiveInvoiceTab, INVOICE_MONTH_NAMES } from '../types';
+import { FilePreview } from '../types';
+import { normalizeProposalDraft, AIProposalContext } from '../../../../../shared/aiProposal';
+import { buildAITariffContext } from '../../../../utils/aiTariffContext';
+import { useEnergyCalculationMode } from '../../../../features/application/useApplicationFeatures';
+import { aiWorkspaceKey, proposalFileType, readProposalFile, PROPOSAL_FILES_LIMIT } from '../workspace';
 
+export interface ProposalMessage { role: 'user' | 'assistant'; text: string; files?: string[] }
 export function useAIInvoiceScanner() {
-  const {
-    isAIInvoiceModalOpen,
-    closeAIInvoiceModal,
-    openSettingsModal,
-    geminiApiKey,
-    geminiModel,
-    setGeminiModel,
-    equipmentCatalog,
-    activeProjectId,
-    projects,
-    applyExtractedInvoice,
-    sidebarTheme,
-  } = useSimulationStore();
-
-  const isDark = sidebarTheme === 'dark';
-  const panelCatalog = useMemo(() => equipmentCatalog.filter((item) => item.type === 'panel'), [equipmentCatalog]);
-  const inverterCatalog = useMemo(() => equipmentCatalog.filter((item) => item.type === 'inverter'), [equipmentCatalog]);
-  const batteryCatalog = useMemo(() => equipmentCatalog.filter((item) => item.type === 'battery'), [equipmentCatalog]);
-
-  const activeProject: ProjectSimulation | undefined = projects.find((p: ProjectSimulation) => p.id === activeProjectId);
-  const isInsideProject = Boolean(activeProject && activeProjectId);
-
-  // Estados locales
-  const [selectedFile, setSelectedFile] = useState<FilePreview | null>(null);
+  const state = useSimulationStore();
+  const { isAIInvoiceModalOpen, geminiApiKey, geminiModel, equipmentCatalog, activeProjectId, projects,
+    defaultSimulationSettings: defaults, tariffMatrix } = state;
+  const workspace = aiWorkspaceKey(state);
+  const mode = useEnergyCalculationMode();
+  const activeProject = projects.find(p => p.id === activeProjectId && !p.deletedAt);
+  const [files, setFiles] = useState<FilePreview[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [extractedData, setExtractedData] = useState<ExtractedInvoiceData | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [originalMonthlyConsumption, setOriginalMonthlyConsumption] = useState<number[] | null>(null);
-  const [isPeakModeActive, setIsPeakModeActive] = useState<boolean>(false);
-  const [selectedPanelId, setSelectedPanelId] = useState<string>('');
-
-  // Pestañas y visor
-  const [activeTab, setActiveTab] = useState<ActiveInvoiceTab>('client');
-  const [zoomLevel, setZoomLevel] = useState(100);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  // Requisitos o especificaciones técnicas del proyecto
-  const [projectRequirementsPrompt, setProjectRequirementsPrompt] = useState<string>('');
-
-  // Opción para forzar sistema híbrido con baterías BESS (por defecto false a menos que el usuario lo elija)
-  const [includeBattery, setIncludeBattery] = useState<boolean>(false);
-
-  // Módulo solar seleccionado actualmente
-  const selectedPanel: SolarEquipmentItem | null = useMemo(() => {
-    if (selectedPanelId) {
-      const found = panelCatalog.find((p: SolarEquipmentItem) => p.id === selectedPanelId);
-      if (found) return found;
-    }
-    const targetW = extractedData?.selectedPanelWatts || activeProject?.specs?.panelPowerW || 620;
-    return (
-      panelCatalog.find((p: SolarEquipmentItem) => p.powerW === targetW) ||
-      panelCatalog.find((p: SolarEquipmentItem) => p.powerW === 620) ||
-      panelCatalog[0] ||
-      null
-    );
-  }, [selectedPanelId, panelCatalog, extractedData?.selectedPanelWatts, activeProject?.specs?.panelPowerW]);
-
-  const handleFileSelect = (file: File) => {
-    setErrorMsg(null);
-    const validTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
-    if (!validTypes.includes(file.type) && !file.name.match(/\.(pdf|png|jpe?g|webp)$/i)) {
-      setErrorMsg('Por favor selecciona un documento válido (PDF, PNG o JPG).');
-      return;
-    }
-    const url = URL.createObjectURL(file);
-    setSelectedFile({
-      file,
-      url,
-      name: file.name,
-      type: file.type,
-    });
+  const [prompt, setPrompt] = useState('');
+  const [messages, setMessages] = useState<ProposalMessage[]>([]);
+  const [useCurrentProject, setUseCurrentProject] = useState(false);
+  const [reviewConfirmed, setReviewConfirmed] = useState(false);
+  const [draftScope, setDraftScope] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const sequence = useRef(0);
+  const controller = useRef<AbortController>();
+  const nativeRequestId = useRef<string>();
+  const fileURLs = useRef<string[]>([]);
+  const target = useCurrentProject ? activeProject : undefined;
+  const context = useMemo(() => {
+    const province = extractedData?.province || target?.client.province || defaults.defaultProvince;
+    const losses = target?.specs.systemLosses ?? defaults.defaultSystemLosses;
+    const yieldInfo = calculateRecommendedPanelCount(province, Array(12).fill(0), 620, 95, losses, target?.client.customMonthlyHSP);
+    return {
+      province, systemLosses: losses, targetCoveragePct: target?.rates.targetCoveragePct ?? defaults.defaultTargetCoveragePct,
+      customMonthlyHSP: target?.client.customMonthlyHSP,
+      monthlyConsumptionKWh: target?.monthlyConsumption,
+      distributor: target?.rates.distributor,
+      tariffCode: target?.rates.tariffCode,
+      tariffReference: buildAITariffContext(tariffMatrix),
+      annualSpecificYieldKWhPerKWp: yieldInfo.annualSpecificYieldKWhPerKWp,
+      calculationMode: mode,
+      commercial: {pricingMode:target?.specs.pricingMode || (defaults.defaultPricingMode==='direct'?'direct_watt':'cost_matrix'),markupPct:(target?.specs.saleMarginMultiplier!==undefined?(target.specs.saleMarginMultiplier-1)*100:defaults.defaultTargetMarginPct),installationUnitPriceUSD:target?.specs.installationUnitPriceUSD ?? 0,pricePerWattUSD:target?.specs.pricePerWattUSD ?? defaults.defaultDirectPriceUSDPerWp,directPriceSurplusTarget:target?.specs.directPriceSurplusTarget || 'margin',customItems:target?.financials.customItems || [],customDiscounts:target?.financials.customDiscounts || []},
+      equipmentPrices:target?[...(target.specs.panels || []),...(target.specs.inverters || []),...(target.specs.batteries || [])].filter(g=>g.unitPriceUSD!==undefined).map(g=>({id:g.id,unitPriceUSD:g.unitPriceUSD!})):[],
+    } as AIProposalContext;
+  }, [extractedData?.province, target, defaults, tariffMatrix, mode]);
+  const scope = `${workspace}|${useCurrentProject ? activeProjectId : 'new'}`;
+  const previousScope = useRef(scope);
+  const cancel = () => { sequence.current++; controller.current?.abort();
+    if (nativeRequestId.current) void window.electronAPI?.cancelAIRequest?.(nativeRequestId.current);
+    nativeRequestId.current=undefined; setIsProcessing(false); };
+  const reset = () => {
+    cancel(); setExtractedData(null); setMessages([]); setPrompt(''); setFiles([]);
+    setErrorMsg(null); setReviewConfirmed(false); setDraftScope('');
   };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileSelect(e.dataTransfer.files[0]);
-    }
-  };
-
-  // Alternar entre historial real extraído y dimensionamiento por mes pico
-  const handleTogglePeakMonthMode = () => {
-    if (!extractedData) return;
-
-    const panelWatts = selectedPanel?.powerW || activeProject?.specs?.panelPowerW || 620;
-    const targetCov = extractedData.targetCoveragePct ?? activeProject?.rates?.targetCoveragePct ?? 95;
-    const sysLosses = activeProject?.specs?.systemLosses ?? 25.0;
-
-    if (isPeakModeActive) {
-      // Revertir al consumo original
-      const restored = originalMonthlyConsumption || extractedData.monthlyConsumptionKWh;
-      const restoredTotal = restored.reduce((s: number, v: number) => s + v, 0);
-      const restoredAvg = Math.round(restoredTotal / 12);
-
-      const rec = calculateRecommendedPanelCount(
-        extractedData.province || activeProject?.client?.province || 'Santo Domingo / Distrito Nacional',
-        restored,
-        panelWatts,
-        targetCov,
-        sysLosses,
-        activeProject?.client?.customMonthlyHSP
-      );
-
-      setExtractedData({
-        ...extractedData,
-        monthlyConsumptionKWh: [...restored],
-        annualConsumptionKWh: restoredTotal,
-        averageMonthlyKWh: restoredAvg,
-        recommendedCapacityKWp: rec.recommendedCapacityKWp,
-        recommendedPanelCount: rec.recommendedPanelCount,
-      });
-      setIsPeakModeActive(false);
-    } else {
-      // Modo Mes Pico
-      if (!originalMonthlyConsumption && extractedData.monthlyConsumptionKWh) {
-        setOriginalMonthlyConsumption([...extractedData.monthlyConsumptionKWh]);
-      }
-      const peakVal = Math.max(...extractedData.monthlyConsumptionKWh, 0);
-      const peakArray = Array(12).fill(peakVal);
-      const peakTotal = peakVal * 12;
-
-      const rec = calculateRecommendedPanelCount(
-        extractedData.province || activeProject?.client?.province || 'Santo Domingo / Distrito Nacional',
-        peakArray,
-        panelWatts,
-        targetCov,
-        sysLosses,
-        activeProject?.client?.customMonthlyHSP
-      );
-
-      setExtractedData({
-        ...extractedData,
-        monthlyConsumptionKWh: peakArray,
-        annualConsumptionKWh: peakTotal,
-        averageMonthlyKWh: peakVal,
-        recommendedCapacityKWp: rec.recommendedCapacityKWp,
-        recommendedPanelCount: rec.recommendedPanelCount,
-      });
-      setIsPeakModeActive(true);
-    }
-  };
-
-  // Procesa el documento con Gemini Vision y Smart Proposal Grounding
-  const processSmartProposal = async () => {
-    if (!selectedFile && !projectRequirementsPrompt.trim()) {
-      setErrorMsg('Debes subir una factura o escribir los requisitos del proyecto.');
-      return;
-    }
-
-    if (!geminiApiKey) {
-      setErrorMsg('No tienes una Google Gemini API Key configurada.');
-      openSettingsModal('ai');
-      return;
-    }
-
-    setIsProcessing(true);
-    setErrorMsg(null);
-
+  useEffect(() => { reset(); }, [workspace, isAIInvoiceModalOpen]);
+  useEffect(() => {
+    if (scope !== previousScope.current) { previousScope.current = scope; cancel(); setExtractedData(null); setReviewConfirmed(false); setErrorMsg('Cambió el destino. Prepara otro borrador antes de aplicar.'); }
+  }, [scope]);
+  useEffect(() => {
+    const urls = files.map(f => f.url);
+    fileURLs.current.filter(url => !urls.includes(url)).forEach(url => URL.revokeObjectURL(url));
+    fileURLs.current = urls;
+  }, [files]);
+  useEffect(() => () => { cancel(); fileURLs.current.forEach(url => URL.revokeObjectURL(url)); }, []);
+  const addFiles = (incoming: File[]) => {
+    if (isProcessing) return;
     try {
+      if (incoming.reduce((sum,f)=>sum+f.size,0)+files.reduce((sum,f)=>sum+f.file.size,0)>14*1024*1024) throw new Error('Los adjuntos juntos deben pesar como máximo 14 MB.');
+      if (incoming.length + files.length > PROPOSAL_FILES_LIMIT) throw new Error('Puedes adjuntar hasta 4 archivos por conversación.');
+      const validated = incoming.map(file => ({ file, type: proposalFileType(file) }));
+      setFiles([...files, ...validated.map(({file,type}) => ({file,type,url:URL.createObjectURL(file),name:file.name}))]);
+      setErrorMsg(null); setReviewConfirmed(false);
+    } catch (error) { setErrorMsg((error as Error).message); }
+  };
+  const processSmartProposal = async () => {
+    if (isProcessing) return;
+    if (!prompt.trim() && !files.length) { setErrorMsg('Escribe lo que necesitas o adjunta una factura.'); return; }
+    if (!geminiApiKey) { setErrorMsg('Configura la clave de Gemini en Ajustes de IA para continuar.'); return; }
+    if (prompt.length > 12000) { setErrorMsg('Resume las instrucciones a un máximo de 12.000 caracteres.'); return; }
+    const capturedWorkspace = workspace;
+    const capturedTarget = useCurrentProject ? activeProjectId : null;
+    const id = ++sequence.current;
+    controller.current = new AbortController();
+    setIsProcessing(true); setErrorMsg(null); setReviewConfirmed(false);
+    const instructions = [...messages.filter(m => m.role === 'user').slice(-5).map(m => m.text), prompt.trim()].filter(Boolean);
+    const isCurrent = () => sequence.current === id && useSimulationStore.getState().isAIInvoiceModalOpen
+      && aiWorkspaceKey(useSimulationStore.getState()) === capturedWorkspace
+      && (!capturedTarget || useSimulationStore.getState().activeProjectId === capturedTarget);
+    try {
+      const attachments = await Promise.all(files.map(async f => ({ fileBase64: await readProposalFile(f.file), mimeType:f.type, fileName:f.name })));
+      if (!isCurrent()) return;
+      const payload = { apiKey:geminiApiKey, model:geminiModel, files:attachments,
+        projectRequirementsText: instructions.join('\n\nCorrección del usuario:\n').slice(-24000),
+        equipmentCatalog, dopExchangeRate: extractedData?.dopExchangeRate ?? target?.rates.usdExchangeRate ?? 60.5,
+        context: { ...context, currentDraft: validatedDraft || undefined, currentClient: target?.client },
+      };
       let result: ExtractedInvoiceData;
-      const cleanPrompt = projectRequirementsPrompt.trim() || undefined;
-
-      // Entorno Electron
-      if (window.electronAPI && typeof window.electronAPI.parseInvoiceWithAI === 'function') {
-        let fileBase64 = '';
-        if (selectedFile) {
-          fileBase64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const res = reader.result as string;
-              const b64 = res.split(',')[1] || '';
-              resolve(b64);
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(selectedFile.file);
-          });
-        }
-
-        const modelToRequest = geminiModel?.trim() || 'gemini-3.7-flash';
-
-        try {
-          const res = await window.electronAPI.parseInvoiceWithAI({
-            fileBase64,
-            mimeType: selectedFile?.type || 'application/pdf',
-            fileName: selectedFile?.name || 'factura_desconocida',
-            apiKey: geminiApiKey,
-            model: modelToRequest,
-            projectRequirementsText: cleanPrompt,
-            equipmentCatalog,
-            dopExchangeRate: activeProject?.rates?.usdExchangeRate || 60.0,
-            panelPowerW: activeProject?.specs?.panelPowerW || 620,
-            includeBattery,
-          });
-
-          if (!res.success || !res.data) {
-            throw new Error(res.error || 'Error al procesar la factura con IA en Electron.');
-          }
-          result = res.data;
-        } catch (ipcErr: any) {
-          console.warn('[AIInvoiceScanner] Intento por Electron reportó error o falta de capacidad en el canal nativo. Conectando con fallback web...', ipcErr);
-          result = await parseInvoiceWithGemini({
-            fileBase64,
-            mimeType: selectedFile?.type || 'application/pdf',
-            fileName: selectedFile?.name || 'factura_desconocida',
-            apiKey: geminiApiKey,
-            model: modelToRequest,
-            panelPowerW: activeProject?.specs?.panelPowerW || 620,
-            projectRequirementsText: cleanPrompt,
-            equipmentCatalog,
-            dopExchangeRate: activeProject?.rates?.usdExchangeRate || 60.0,
-            includeBattery,
-          });
-        }
-      } else {
-        // Entorno Web (Fallback directo)
-        let base64 = '';
-        if (selectedFile) {
-          base64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const res = reader.result as string;
-              const b64 = res.split(',')[1] || '';
-              resolve(b64);
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(selectedFile.file);
-          });
-        }
-
-        const modelToRequest = geminiModel?.trim() || 'gemini-3.7-flash';
-
-        result = await parseInvoiceWithGemini({
-          fileBase64: base64,
-          mimeType: selectedFile?.type || 'application/pdf',
-          fileName: selectedFile?.name || 'factura_desconocida',
-          apiKey: geminiApiKey,
-          model: modelToRequest,
-          projectRequirementsText: cleanPrompt,
-          equipmentCatalog,
-          dopExchangeRate: activeProject?.rates?.usdExchangeRate || 60.0,
-          panelPowerW: activeProject?.specs?.panelPowerW || 620,
-          includeBattery,
-        });
-      }
-
-      if (result) {
-        const canonicalProvince = getProvinceHSP(result.province || result.municipality || result.address || '').name;
-        result.province = canonicalProvince;
-      }
-
-      setExtractedData(result);
-      if (result.monthlyConsumptionKWh && result.monthlyConsumptionKWh.length === 12) {
-        setOriginalMonthlyConsumption([...result.monthlyConsumptionKWh]);
-      }
-      setIsPeakModeActive(false);
-
-      if (result.selectedPanelId) {
-        setSelectedPanelId(result.selectedPanelId);
-      }
-    } catch (err: any) {
-      console.error('[AIInvoiceScanner] Error processing:', err);
-      setErrorMsg(err.message || 'Error al procesar con Gemini. Revisa la consola o tu conexión.');
-    } finally {
-      setIsProcessing(false);
-    }
+      if (window.electronAPI?.parseInvoiceWithAI) {
+        // An actual IPC failure is reported once; do not replay a paid request in the renderer.
+        const requestId=globalThis.crypto.randomUUID(); nativeRequestId.current=requestId;
+        const response = await window.electronAPI.parseInvoiceWithAI({...payload,requestId});
+        if (nativeRequestId.current===requestId) nativeRequestId.current=undefined;
+        if (!response.success || !response.data) throw new Error(response.error || 'No se pudo preparar el borrador.');
+        result = response.data;
+      } else result = await parseProposalWithAI(payload, controller.current.signal);
+      if (!isCurrent()) return;
+      if (result.province) result.province = getProvinceHSP(result.province).name;
+      setExtractedData(result); setDraftScope(scope); setPrompt('');
+      setMessages(previous => [...previous.slice(-10), { role:'user', text:prompt.trim() || 'Analizar los documentos adjuntos', files:files.map(f => f.name) },
+        {role:'assistant', text:result.aiReasoningSummary || 'Preparé un borrador. Revisa los datos y los equipos antes de aplicarlo.'}]);
+    } catch (error) { if (isCurrent()) setErrorMsg((error as Error).message || 'No se pudo analizar la entrada. Reintenta.'); }
+    finally { if (isCurrent()) setIsProcessing(false); }
   };
-
-  // Cambio de módulo fotovoltaico desde el catálogo
-  const handlePanelChange = (newPanelId: string) => {
-    setSelectedPanelId(newPanelId);
-    const newPanel = panelCatalog.find((p: SolarEquipmentItem) => p.id === newPanelId);
-    if (!newPanel || !extractedData) return;
-
-    const panelWatts = newPanel.powerW || 620;
-    const targetCov = extractedData.targetCoveragePct ?? activeProject?.rates?.targetCoveragePct ?? 95;
-    const sysLosses = activeProject?.specs?.systemLosses ?? 25.0;
-
-    const rec = calculateRecommendedPanelCount(
-      extractedData.province || activeProject?.client?.province || 'Santo Domingo / Distrito Nacional',
-      extractedData.monthlyConsumptionKWh,
-      panelWatts,
-      targetCov,
-      sysLosses,
-      activeProject?.client?.customMonthlyHSP
-    );
-
-    setExtractedData({
-      ...extractedData,
-      selectedPanelId: newPanel.id,
-      selectedPanelModel: newPanel.displayName || newPanel.modelSeries,
-      selectedPanelWatts: panelWatts,
-      recommendedCapacityKWp: rec.recommendedCapacityKWp,
-      recommendedPanelCount: rec.recommendedPanelCount,
-    });
+  const validatedDraft = useMemo(() => extractedData ? normalizeProposalDraft(extractedData, equipmentCatalog, context) : null, [extractedData, equipmentCatalog, context]);
+  const draftEnergy=useMemo(()=>{
+    if(!validatedDraft || validatedDraft.monthlyConsumptionKWh.length!==12 || !validatedDraft.panels?.length || validatedDraft.panels.some(g=>!g.id||!Number.isFinite(g.powerW)||g.powerW<=0||!Number.isInteger(g.count)||g.count<=0))return null;
+    const base=target || createAIProposalBase(BENCHMARK_PROJECT,defaults,validatedDraft.province || context.province || '');
+    const project=prepareProposalDraftProject(base,{...validatedDraft,commercial:{}},tariffMatrix,{isNew:!target,defaultBatteryDOD:defaults.defaultBatteryDOD});
+    return calculateMonthlySolarProduction(project.client.province,project.specs,project.monthlyConsumption,project.rates.energyCostPerKWh,project.rates.gridExportFeePct,project.client.customMonthlyHSP,project.rates.tariffCode,project.rates.isZeroExport,mode).map(m=>m.productionKWh);
+  },[validatedDraft,target,defaults,tariffMatrix,mode,context.province]);
+  const draftPreview=useMemo(()=>{
+    if(!validatedDraft || validatedDraft.monthlyConsumptionKWh.length!==12 || validatedDraft.validationIssues?.some(i=>i.severity==='error' && /extra|discount|customItems|customDiscounts|commercial|markup|margin|installation|pricing|surplus|price/.test(i.code)))return null;
+    const base=target || createAIProposalBase(BENCHMARK_PROJECT,defaults,validatedDraft.province || context.province || '');
+    const project=prepareProposalDraftProject(base,validatedDraft,tariffMatrix,{isNew:!target,defaultBatteryDOD:defaults.defaultBatteryDOD});
+    const financial=calculateProjectFinancialSummary(project,mode);
+    return {project,financial};
+  },[validatedDraft,target,defaults,tariffMatrix,mode,context.province]);
+  const reviewSnapshot = JSON.stringify(validatedDraft);
+  useEffect(() => { setReviewConfirmed(false); }, [reviewSnapshot]);
+  const blockingIssues = validatedDraft?.validationIssues?.filter(issue => issue.severity === 'error') || [];
+  const canApply = !!validatedDraft && !blockingIssues.length && reviewConfirmed && draftScope === scope && !isProcessing;
+  const apply = (createNew: boolean) => {
+    const current = useSimulationStore.getState();
+    if (!canApply || aiWorkspaceKey(current) !== workspace || (!createNew && current.activeProjectId !== activeProjectId)) return;
+    current.applyExtractedInvoice(validatedDraft!, createNew);
   };
-
-  // Cambio interactivo de cobertura meta (%)
-  const handleCoverageChange = (newCoverage: number) => {
-    if (!extractedData) return;
-    const safeCoverage = Math.max(10, Math.min(300, Math.round(newCoverage)));
-    const panelWatts = selectedPanel?.powerW || activeProject?.specs?.panelPowerW || 620;
-    const sysLosses = activeProject?.specs?.systemLosses ?? 25.0;
-
-    const rec = calculateRecommendedPanelCount(
-      extractedData.province || activeProject?.client?.province || 'Santo Domingo / Distrito Nacional',
-      extractedData.monthlyConsumptionKWh,
-      panelWatts,
-      safeCoverage,
-      sysLosses,
-      activeProject?.client?.customMonthlyHSP
-    );
-
-    setExtractedData({
-      ...extractedData,
-      targetCoveragePct: safeCoverage,
-      recommendedCapacityKWp: rec.recommendedCapacityKWp,
-      recommendedPanelCount: rec.recommendedPanelCount,
-    });
-  };
-
-  // Cambio interactivo de provincia con recálculo solar instantáneo
-  const handleProvinceChange = (newProvinceName: string) => {
-    if (!extractedData) return;
-    const canonicalProvince = getProvinceHSP(newProvinceName).name;
-    const panelWatts = selectedPanel?.powerW || activeProject?.specs?.panelPowerW || 620;
-    const targetCov = extractedData.targetCoveragePct ?? activeProject?.rates?.targetCoveragePct ?? 95;
-    const sysLosses = activeProject?.specs?.systemLosses ?? 25.0;
-
-    const rec = calculateRecommendedPanelCount(
-      canonicalProvince,
-      extractedData.monthlyConsumptionKWh,
-      panelWatts,
-      targetCov,
-      sysLosses,
-      activeProject?.client?.customMonthlyHSP
-    );
-
-    setExtractedData({
-      ...extractedData,
-      province: canonicalProvince,
-      recommendedCapacityKWp: rec.recommendedCapacityKWp,
-      recommendedPanelCount: rec.recommendedPanelCount,
-    });
-  };
-
-  // Cambio interactivo de inversor solar desde el catálogo
-  const handleInverterChange = (newInverterId: string) => {
-    if (!extractedData) return;
-    const inv = inverterCatalog.find((i: SolarEquipmentItem) => i.id === newInverterId);
-    if (!inv) return;
-
-    const bestPrice = inv.supplierPrices && inv.supplierPrices.length > 0
-      ? [...inv.supplierPrices].sort((a, b) => a.priceUSD - b.priceUSD)[0]?.priceUSD
-      : undefined;
-
-    setExtractedData({
-      ...extractedData,
-      selectedInverterId: inv.id,
-      selectedInverterModel: inv.displayName || inv.modelSeries,
-      selectedInverterPowerKW: inv.powerKW || 8.0,
-      selectedInverterUnitPriceUSD: bestPrice,
-    });
-  };
-
-  // Cambio de cantidad de unidades de inversor en paralelo
-  const handleInverterCountChange = (count: number) => {
-    if (!extractedData) return;
-    const safeCount = Math.max(1, Math.min(20, Math.round(count)));
-    setExtractedData({
-      ...extractedData,
-      selectedInverterCount: safeCount,
-    });
-  };
-
-  // Cambio interactivo de batería BESS desde el catálogo
-  const handleBatteryChange = (newBatteryId: string) => {
-    if (!extractedData) return;
-    if (newBatteryId === 'none') {
-      setExtractedData({
-        ...extractedData,
-        hasBattery: false,
-        selectedBatteryId: undefined,
-        selectedBatteryModel: undefined,
-        selectedBatteryCapacityKWh: undefined,
-        selectedBatteryCount: 0,
-        selectedBatteryUnitPriceUSD: undefined,
-      });
-      return;
-    }
-    const bat = batteryCatalog.find((b: SolarEquipmentItem) => b.id === newBatteryId);
-    if (!bat) return;
-
-    const bestPrice = bat.supplierPrices && bat.supplierPrices.length > 0
-      ? [...bat.supplierPrices].sort((a, b) => a.priceUSD - b.priceUSD)[0]?.priceUSD
-      : undefined;
-
-    setExtractedData({
-      ...extractedData,
-      hasBattery: true,
-      selectedBatteryId: bat.id,
-      selectedBatteryModel: bat.displayName || bat.modelSeries,
-      selectedBatteryCapacityKWh: bat.capacityKWh || 16.08,
-      selectedBatteryCount: Math.max(1, extractedData.selectedBatteryCount || 1),
-      selectedBatteryUnitPriceUSD: bestPrice,
-    });
-  };
-
-  // Cambio de cantidad de baterías
-  const handleBatteryCountChange = (count: number) => {
-    if (!extractedData) return;
-    const safeCount = Math.max(0, Math.min(20, Math.round(count)));
-    setExtractedData({
-      ...extractedData,
-      hasBattery: safeCount > 0,
-      selectedBatteryCount: safeCount,
-    });
-  };
-
-  // Ajuste manual de consumo mensual
-  const handleUpdateMonthlyConsumption = (index: number, val: number) => {
-    if (!extractedData) return;
-    setIsPeakModeActive(false);
-    const newArr = [...extractedData.monthlyConsumptionKWh];
-    newArr[index] = Math.max(0, val);
-    const newTotal = newArr.reduce((s: number, v: number) => s + v, 0);
-    const newAvg = Math.round(newTotal / 12);
-    
-    const panelWatts = selectedPanel?.powerW || activeProject?.specs?.panelPowerW || 620;
-    const targetCov = extractedData.targetCoveragePct ?? activeProject?.rates?.targetCoveragePct ?? 95;
-    const sysLosses = activeProject?.specs?.systemLosses ?? 25.0;
-    const rec = calculateRecommendedPanelCount(
-      extractedData.province || activeProject?.client?.province || 'Santo Domingo / Distrito Nacional',
-      newArr,
-      panelWatts,
-      targetCov,
-      sysLosses,
-      activeProject?.client?.customMonthlyHSP
-    );
-
-    setExtractedData({
-      ...extractedData,
-      monthlyConsumptionKWh: newArr,
-      annualConsumptionKWh: newTotal,
-      averageMonthlyKWh: newAvg,
-      recommendedCapacityKWp: rec.recommendedCapacityKWp,
-      recommendedPanelCount: rec.recommendedPanelCount,
-    });
-  };
-
-  const handleApplyToActive = () => {
-    if (!extractedData) return;
-    const resolvedInverter = inverterCatalog.find((i: SolarEquipmentItem) => i.id === extractedData.selectedInverterId)
-      || inverterCatalog.find((i: SolarEquipmentItem) => i.displayName === extractedData.selectedInverterModel)
-      || inverterCatalog[0];
-    const resolvedBattery = extractedData.hasBattery
-      ? (batteryCatalog.find((b: SolarEquipmentItem) => b.id === extractedData.selectedBatteryId)
-         || batteryCatalog.find((b: SolarEquipmentItem) => b.displayName === extractedData.selectedBatteryModel)
-         || batteryCatalog[0])
-      : null;
-
-    const dataToApply: ExtractedInvoiceData = {
-      ...extractedData,
-      selectedPanelId: selectedPanel?.id,
-      selectedPanelModel: selectedPanel?.displayName || selectedPanel?.modelSeries,
-      selectedPanelWatts: selectedPanel?.powerW,
-      selectedInverterId: resolvedInverter?.id,
-      selectedInverterModel: resolvedInverter?.displayName,
-      selectedInverterPowerKW: resolvedInverter?.powerKW || extractedData.selectedInverterPowerKW,
-      hasBattery: extractedData.hasBattery,
-      selectedBatteryId: resolvedBattery?.id,
-      selectedBatteryModel: resolvedBattery?.displayName,
-      selectedBatteryCapacityKWh: resolvedBattery?.capacityKWh || extractedData.selectedBatteryCapacityKWh,
-    };
-    applyExtractedInvoice(dataToApply, false);
-  };
-
-  const handleApplyAsNew = () => {
-    if (!extractedData) return;
-    const resolvedInverter = inverterCatalog.find((i: SolarEquipmentItem) => i.id === extractedData.selectedInverterId)
-      || inverterCatalog.find((i: SolarEquipmentItem) => i.displayName === extractedData.selectedInverterModel)
-      || inverterCatalog[0];
-    const resolvedBattery = extractedData.hasBattery
-      ? (batteryCatalog.find((b: SolarEquipmentItem) => b.id === extractedData.selectedBatteryId)
-         || batteryCatalog.find((b: SolarEquipmentItem) => b.displayName === extractedData.selectedBatteryModel)
-         || batteryCatalog[0])
-      : null;
-
-    const dataToApply: ExtractedInvoiceData = {
-      ...extractedData,
-      selectedPanelId: selectedPanel?.id,
-      selectedPanelModel: selectedPanel?.displayName || selectedPanel?.modelSeries,
-      selectedPanelWatts: selectedPanel?.powerW,
-      selectedInverterId: resolvedInverter?.id,
-      selectedInverterModel: resolvedInverter?.displayName,
-      selectedInverterPowerKW: resolvedInverter?.powerKW || extractedData.selectedInverterPowerKW,
-      hasBattery: extractedData.hasBattery,
-      selectedBatteryId: resolvedBattery?.id,
-      selectedBatteryModel: resolvedBattery?.displayName,
-      selectedBatteryCapacityKWh: resolvedBattery?.capacityKWh || extractedData.selectedBatteryCapacityKWh,
-    };
-    applyExtractedInvoice(dataToApply, true);
-  };
-
-  const handleResetDocument = () => {
-    setSelectedFile(null);
-    setExtractedData(null);
-    setOriginalMonthlyConsumption(null);
-    setIsPeakModeActive(false);
-    setErrorMsg(null);
-    setZoomLevel(100);
-  };
-
-  const handleZoomIn = () => setZoomLevel((prev) => Math.min(prev + 25, 250));
-  const handleZoomOut = () => setZoomLevel((prev) => Math.max(prev - 25, 50));
-  const handleZoomReset = () => setZoomLevel(100);
-
-  // Mes de mayor consumo (pico) para cálculos y UI
-  const peakConsumptionVal = useMemo(() => {
-    if (!extractedData || !extractedData.monthlyConsumptionKWh) return 0;
-    return Math.max(...extractedData.monthlyConsumptionKWh, 0);
-  }, [extractedData]);
-
-  const peakMonthIndex = useMemo(() => {
-    if (!extractedData || !extractedData.monthlyConsumptionKWh) return -1;
-    return extractedData.monthlyConsumptionKWh.indexOf(peakConsumptionVal);
-  }, [extractedData, peakConsumptionVal]);
-
-  const peakMonthName = peakMonthIndex >= 0 ? INVOICE_MONTH_NAMES[peakMonthIndex] : '';
-
-  // Cobertura real estimada resultante con la cantidad entera de paneles
-  const estimatedRealCoveragePct = useMemo(() => {
-    if (!extractedData || !extractedData.monthlyConsumptionKWh || !extractedData.recommendedCapacityKWp) return null;
-    const totalAnnual = extractedData.annualConsumptionKWh || extractedData.monthlyConsumptionKWh.reduce((s: number, v: number) => s + (Number(v) || 0), 0);
-    if (totalAnnual <= 0) return null;
-
-    const panelWatts = selectedPanel?.powerW || activeProject?.specs?.panelPowerW || 620;
-    const sysLosses = activeProject?.specs?.systemLosses ?? 25.0;
-    const rec = calculateRecommendedPanelCount(
-      extractedData.province || activeProject?.client?.province || 'Santo Domingo / Distrito Nacional',
-      extractedData.monthlyConsumptionKWh,
-      panelWatts,
-      extractedData.targetCoveragePct ?? 95,
-      sysLosses,
-      activeProject?.client?.customMonthlyHSP
-    );
-
-    const activeCapacityKWp = extractedData.recommendedCapacityKWp || rec.recommendedCapacityKWp;
-    const annualProd = activeCapacityKWp * rec.annualSpecificYieldKWhPerKWp;
-    return Math.round((annualProd / totalAnnual) * 1000) / 10;
-  }, [extractedData, selectedPanel, activeProject]);
-
-  // Consumo máximo para escalar la gráfica visual de barras
-  const maxConsumptionVal = extractedData
-    ? Math.max(...extractedData.monthlyConsumptionKWh, 100)
-    : 1000;
-
-  return {
-    // Store
-    isAIInvoiceModalOpen,
-    closeAIInvoiceModal,
-    openAISettingsModal: () => openSettingsModal('ai'),
-    openSettingsModal,
-    geminiApiKey,
-    geminiModel,
-    panelCatalog,
-    inverterCatalog,
-    batteryCatalog,
-    activeProject,
-    isInsideProject,
-    isDark,
-    dopExchangeRate: activeProject?.rates?.usdExchangeRate || 60.50,
-
-    // State
-    selectedFile,
-    setSelectedFile,
-    isProcessing,
-    extractedData,
-    setExtractedData,
-    errorMsg,
-    isPeakModeActive,
-    selectedPanelId,
-    selectedPanel,
-    activeTab,
-    setActiveTab,
-    zoomLevel,
-    setZoomLevel,
-    fileInputRef,
-    projectRequirementsPrompt,
-    setProjectRequirementsPrompt,
-    includeBattery,
-    setIncludeBattery,
-
-    // Computados
-    peakConsumptionVal,
-    peakMonthIndex,
-    peakMonthName,
-    maxConsumptionVal,
-    estimatedRealCoveragePct,
-
-    // Handlers
-    handleFileSelect,
-    handleDragOver,
-    handleDrop,
-    processSmartProposal,
-    handleTogglePeakMonthMode,
-    handlePanelChange,
-    handleCoverageChange,
-    handleProvinceChange,
-    handleInverterChange,
-    handleInverterCountChange,
-    handleBatteryChange,
-    handleBatteryCountChange,
-    handleUpdateMonthlyConsumption,
-    handleApplyToActive,
-    handleApplyAsNew,
-    handleResetDocument,
-    handleZoomIn,
-    handleZoomOut,
-    handleZoomReset,
+  const updateDraft = (updates: Partial<ExtractedInvoiceData>) => { setExtractedData(previous => previous ? {...validatedDraft,...updates} as ExtractedInvoiceData : null); setReviewConfirmed(false); };
+  return { isAIInvoiceModalOpen, isDark:state.sidebarTheme === 'dark', geminiApiKey, activeProject,
+    closeAIInvoiceModal: () => { cancel(); state.closeAIInvoiceModal(); }, openAISettings: () => state.openSettingsModal('ai'),
+    files, addFiles, removeFile:(index:number) => {setFiles(previous=>previous.filter((_,i)=>i!==index));setReviewConfirmed(false);}, fileInputRef,
+    isProcessing, cancel, reset, prompt, setPrompt, messages, errorMsg, processSmartProposal,
+    extractedData:validatedDraft, draftPreview, draftEnergy, updateDraft, equipmentCatalog, tariffMatrix, context, useCurrentProject,
+    setUseCurrentProject:(value:boolean)=>{cancel();setUseCurrentProject(value);setExtractedData(null);setReviewConfirmed(false);setMessages([]);},
+    reviewConfirmed, setReviewConfirmed, blockingIssues, canApply,
+    handleApplyAsNew:()=>apply(true), handleApplyToActive:()=>apply(false),
   };
 }

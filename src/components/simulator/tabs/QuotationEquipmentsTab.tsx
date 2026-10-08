@@ -82,6 +82,8 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
         </div>
 
         <div className="p-8 space-y-6 text-xs text-slate-800">
+          {project.specs.pricingMode !== "direct_watt" && [...(project.specs.panels || []),...(project.specs.inverters || []),...(project.specs.batteries || [])].some(item=>item.unitPriceUSD === undefined) && <p role="alert" className="border border-amber-300 bg-amber-50 text-amber-900 p-3">Hay equipos sin costo registrado. Completa los precios antes de emitir esta cotización.</p>}
+          {project.aiSource?.notes && <section aria-label="Notas técnicas del borrador"><h3 className="font-semibold mb-2">Notas técnicas revisadas</h3><p className="whitespace-pre-wrap">{project.aiSource.notes}</p></section>}
           {/* DATOS DEL CLIENTE */}
           <div>
             <h3 className="bg-slate-100 px-3 py-1 text-[11px] font-bold text-emerald-900 uppercase border-l-4 border-emerald-800 mb-2">

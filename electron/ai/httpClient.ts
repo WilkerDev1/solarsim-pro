@@ -6,8 +6,9 @@ export interface HttpError extends Error {
   responseBody?: string;
 }
 
-export function httpsPostJson(url: string, data: any, timeoutMs = 50000): Promise<any> {
+export function httpsPostJson(url: string, data: any, timeoutMs = 50000, extraHeaders: Record<string, string> = {}, signal?: AbortSignal): Promise<any> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(signal.reason || new Error('Solicitud cancelada.')); return; }
     const u = new URL(url);
     const postData = JSON.stringify(data);
 
@@ -20,6 +21,7 @@ export function httpsPostJson(url: string, data: any, timeoutMs = 50000): Promis
         headers: {
           'Content-Type': 'application/json',
           'Content-Length': Buffer.byteLength(postData),
+          ...extraHeaders,
         },
         timeout: timeoutMs,
       },
@@ -54,8 +56,11 @@ export function httpsPostJson(url: string, data: any, timeoutMs = 50000): Promis
       }
     );
 
+    const abort = () => req.destroy(signal?.reason instanceof Error ? signal.reason : new Error('Solicitud cancelada.'));
+    signal?.addEventListener('abort', abort, { once: true });
+    req.once('close', () => signal?.removeEventListener('abort', abort));
     req.on('timeout', () => {
-      const timeoutErr: HttpError = new Error('Tiempo de espera agotado (timeout 50s) al conectar con la API de Google Gemini.');
+      const timeoutErr: HttpError = new Error('Tiempo de espera agotado al conectar con la API de Google Gemini.');
       timeoutErr.statusCode = 408;
       req.destroy(timeoutErr);
     });
@@ -66,9 +71,9 @@ export function httpsPostJson(url: string, data: any, timeoutMs = 50000): Promis
   });
 }
 
-export function httpsGetJson(url: string): Promise<any> {
+export function httpsGetJson(url: string, headers: Record<string, string> = {}): Promise<any> {
   return new Promise((resolve, reject) => {
-    https.get(url, (res) => {
+    const req = https.get(url, { headers, timeout: 15000 }, (res) => {
       let body = '';
       res.on('data', (chunk) => { body += chunk; });
       res.on('end', () => {
@@ -92,5 +97,6 @@ export function httpsGetJson(url: string): Promise<any> {
         }
       });
     }).on('error', reject);
+    req.on('timeout', () => req.destroy(new Error('Tiempo de espera agotado consultando Google Gemini.')));
   });
 }

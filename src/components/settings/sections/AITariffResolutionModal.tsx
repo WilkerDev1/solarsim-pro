@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { GlobalTariffMatrix, UtilityDistributor } from '../../../types/tariffs';
+import { getTariffSource, tariffSourceFieldLabel } from '../../../utils/aiTariffContext';
 import { GeminiTariffService } from '../../../services/geminiTariffService';
 import {
   X,
@@ -8,14 +9,10 @@ import {
   Upload,
   FileText,
   CheckCircle2,
-  AlertTriangle,
   AlertCircle,
   RefreshCw,
   Cloud,
-  Layers,
-  ChevronRight,
   Receipt,
-  Info,
 } from 'lucide-react';
 
 interface AITariffResolutionModalProps {
@@ -30,6 +27,8 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
     setTariffMatrix,
     syncTariffsWithServer,
     syncSettings,
+    tariffMatrix,
+    sessionGeneration,
   } = useSimulationStore();
 
   const [file, setFile] = useState<File | null>(null);
@@ -43,6 +42,16 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
   const [isSyncingCloud, setIsSyncingCloud] = useState<boolean>(false);
   const [appliedSuccess, setAppliedSuccess] = useState<boolean>(false);
 
+  const [reviewConfirmed, setReviewConfirmed] = useState(false);
+  const draftBasis = useRef<GlobalTariffMatrix | null>(null);
+  const operation = useRef(0);
+  const request = useRef<AbortController | null>(null);
+  useEffect(() => {
+    operation.current++; request.current?.abort(); setIsProcessing(false);
+    setIsSyncingCloud(false); setExtractedMatrix(null); setReviewConfirmed(false); setAppliedSuccess(false); draftBasis.current = null;
+    return () => { operation.current++; request.current?.abort(); };
+  }, [isOpen, sessionGeneration]);
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   if (!isOpen) return null;
@@ -51,6 +60,13 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
     const selected = e.target.files?.[0];
     if (!selected) return;
 
+    operation.current++;
+    request.current?.abort();
+    setIsProcessing(false);
+    setFileBase64(null);
+    setReviewConfirmed(false);
+    const fileOperation = operation.current;
+    if (selected.size > 20 * 1024 * 1024) { setFile(null); setErrorMessage('El documento no puede superar 20 MB.'); return; }
     setFile(selected);
     setErrorMessage(null);
     setExtractedMatrix(null);
@@ -61,11 +77,13 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
 
     const reader = new FileReader();
     reader.onload = () => {
+      if (operation.current !== fileOperation) return;
       const result = reader.result as string;
       const base64Data = result.split(',')[1];
       setFileBase64(base64Data);
     };
     reader.onerror = () => {
+      if (operation.current !== fileOperation) return;
       setErrorMessage('Error al leer el archivo seleccionado.');
     };
     reader.readAsDataURL(selected);
@@ -82,6 +100,13 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
       return;
     }
 
+    request.current?.abort();
+    request.current = new AbortController();
+    const scanOperation = ++operation.current;
+    const sessionGeneration = useSimulationStore.getState().sessionGeneration;
+    const isCurrent = () => operation.current === scanOperation && sessionGeneration === useSimulationStore.getState().sessionGeneration;
+    setReviewConfirmed(false);
+    draftBasis.current = tariffMatrix;
     setIsProcessing(true);
     setErrorMessage(null);
     setExtractedMatrix(null);
@@ -93,43 +118,48 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
         mimeType,
         userPromptNotes: userNotes,
         apiKey: geminiApiKey,
-        preferredModel: geminiModel || 'gemini-2.5-flash',
+        preferredModel: geminiModel || undefined,
+        currentMatrix: tariffMatrix,
+        signal: request.current.signal,
       });
 
-      setExtractedMatrix(matrix);
+      if (isCurrent()) { setExtractedMatrix(matrix); setSelectedDistributorTab(Object.keys(matrix.schedules).find((dist) => Object.values(matrix.schedules[dist as UtilityDistributor].tariffs).some((tariff) => tariff.source?.resolutionCode === matrix.resolutionCode)) as UtilityDistributor || 'EDEESTE'); }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Error al procesar el pliego tarifario con Gemini IA.');
+      if (isCurrent()) setErrorMessage(err.message || 'Error al procesar el pliego tarifario con Gemini IA.');
     } finally {
-      setIsProcessing(false);
+      if (isCurrent()) setIsProcessing(false);
     }
   };
 
   const handleApplyLocal = () => {
-    if (!extractedMatrix) return;
+    if (!extractedMatrix || !reviewConfirmed) return;
+    if (draftBasis.current !== useSimulationStore.getState().tariffMatrix) { setErrorMessage('El pliego cambió desde la extracción. Vuelve a escanear para conservar los cambios recientes.'); return; }
     setTariffMatrix(extractedMatrix);
+    draftBasis.current = useSimulationStore.getState().tariffMatrix;
     setAppliedSuccess(true);
-    setTimeout(() => {
-      onClose();
-    }, 1200);
+
   };
 
   const handleApplyAndSyncCloud = async () => {
-    if (!extractedMatrix) return;
+    if (!extractedMatrix || !reviewConfirmed) return;
+    if (draftBasis.current !== useSimulationStore.getState().tariffMatrix) { setErrorMessage('El pliego cambió desde la extracción. Vuelve a escanear para conservar los cambios recientes.'); return; }
     setTariffMatrix(extractedMatrix);
+    draftBasis.current = useSimulationStore.getState().tariffMatrix;
+    const cloudOperation = operation.current;
+    const cloudGeneration = useSimulationStore.getState().sessionGeneration;
     setIsSyncingCloud(true);
 
     try {
       const res = await syncTariffsWithServer();
+      if (cloudOperation !== operation.current || cloudGeneration !== useSimulationStore.getState().sessionGeneration) return;
       if (res.success) {
         setAppliedSuccess(true);
-        setTimeout(() => {
-          onClose();
-        }, 1200);
+
       } else {
         setErrorMessage(`Aplicado localmente, pero falló la sincronización en la nube: ${res.message}`);
       }
     } finally {
-      setIsSyncingCloud(false);
+      if (cloudOperation === operation.current) setIsSyncingCloud(false);
     }
   };
 
@@ -152,7 +182,7 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                 </span>
               </h3>
               <p className="text-xs text-slate-500 dark:text-zinc-400">
-                Sube una resolución de la SIE o tarifario de CEPM para actualizar los cargos de energía y potencia de todas las distribuidoras.
+                Extrae un borrador del documento y revisa sus cargos antes de actualizar el pliego.
               </p>
             </div>
           </div>
@@ -196,7 +226,7 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="application/pdf,image/*"
+                  accept="application/pdf,image/png,image/jpeg,image/webp"
                   onChange={handleFileChange}
                   className="hidden"
                 />
@@ -213,7 +243,7 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                 ) : (
                   <div>
                     <p className="text-sm font-semibold text-slate-700 dark:text-zinc-300">
-                      Arrastra y suelta aquí el PDF o imagen de la resolución
+                      Selecciona el PDF o imagen de la resolución
                     </p>
                     <p className="text-xs text-slate-400 mt-1">
                       Resoluciones de la SIE (ej. SIE-079-2026-TF) o tarifarios de CEPM (PDF, JPG, PNG)
@@ -290,6 +320,7 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                 </button>
               </div>
 
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">Solo las tarifas documentadas se actualizan. Las restantes conservan su fuente anterior; la fecha de inicio no garantiza vigencia actual.</div>
               {/* Tabs por Distribuidora */}
               <div className="flex items-center gap-2 border-b border-slate-200 dark:border-[#27272a] pb-2">
                 {distributors.map((dist) => (
@@ -318,6 +349,7 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                         <th className="p-3">Cargo Fijo</th>
                         <th className="p-3">Cargo Potencia</th>
                         <th className="p-3">Retención Excedentes</th>
+                        <th className="p-3">Fuente de la fila</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-[#222226] text-slate-700 dark:text-zinc-300">
@@ -335,7 +367,7 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                             )}
                             {tariff.blocks && tariff.blocks.length > 0 && (
                               <span className="block text-[10px] text-amber-600 dark:text-amber-400 font-sans">
-                                Escalonada (4 bloques)
+                                Escalonada ({tariff.blocks.length} bloques)
                               </span>
                             )}
                           </td>
@@ -353,9 +385,11 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                           </td>
                           <td className="p-3">
                             <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-[#27272a] text-[11px] font-semibold text-slate-600 dark:text-zinc-400">
-                              {tariff.netMeteringRetentionPct || 25}%
+                              {tariff.netMeteringRetentionPct ?? 25}%
                             </span>
+                            {tariff.source?.fields && !tariff.source.fields.includes('netMeteringRetentionPct') && <span className="block text-[10px] mt-1">Política conservada; no extraída</span>}
                           </td>
+                          <td className="p-3 text-xs">{getTariffSource(extractedMatrix, tariff).resolutionCode}<br />{getTariffSource(extractedMatrix, tariff).effectiveDate}{getTariffSource(extractedMatrix,tariff).fieldSources && <ul className="mt-2 space-y-1">{Object.entries(getTariffSource(extractedMatrix,tariff).fieldSources!).map(([field,source])=><li key={field}>{tariffSourceFieldLabel(field)}: {source.resolutionCode} · {source.effectiveDate}</li>)}</ul>}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -363,18 +397,19 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                 </div>
               )}
 
+              <label className="flex items-start gap-2 text-xs text-slate-700 dark:text-zinc-300"><input type="checkbox" checked={reviewConfirmed} onChange={(event) => setReviewConfirmed(event.target.checked)} />He contrastado cargos, moneda, bloques y fechas con el documento.</label>
               {/* Botones de Aplicación */}
               <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-[#27272a]">
                 <button
                   onClick={handleApplyLocal}
-                  disabled={isSyncingCloud}
+                  disabled={isSyncingCloud || !reviewConfirmed}
                   className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold border border-slate-300 dark:border-[#3f3f46] text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-[#27272a] transition-all cursor-pointer"
                 >
-                  Aplicar Localmente
+                  Aplicar tarifas revisadas
                 </button>
                 <button
                   onClick={handleApplyAndSyncCloud}
-                  disabled={isSyncingCloud}
+                  disabled={isSyncingCloud || !reviewConfirmed || !syncSettings.authToken || ['LECTOR', 'VIEWER'].includes(syncSettings.currentUser?.role || '')}
                   className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
                 >
                   {isSyncingCloud ? (
