@@ -1,11 +1,10 @@
-import { companyDocumentSnapshot } from '../../utils/companyDocumentSnapshot';
+import { companyDocumentCustomization } from '../../utils/companyDocumentTemplate';
 import { projectMutationMetadata } from '../sync/projectMutation';
 import { SimulationSlice, AISlice } from '../types';
 import { ProjectSimulation } from '../../types';
 import { BENCHMARK_PROJECT } from '../../engine/referenceCase';
 import { generateNextProjectSequence } from '../initialData';
 import { calculateRecommendedPanelCount } from '../../engine/solarEngine';
-import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
 
 const normalizeProvinceName = (raw?: string): string => {
   if (!raw) return 'Santo Domingo / Distrito Nacional';
@@ -167,8 +166,7 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
               : [...BENCHMARK_PROJECT.monthlyConsumption],
           companyProfileId: get().activeCompanyId,
       customization: {
-            ...(get().defaultDocumentCustomization || DEFAULT_DOCUMENT_CUSTOMIZATION),
-        ...companyDocumentSnapshot(get().getActiveCompany(), get().defaultDocumentCustomization),
+            ...companyDocumentCustomization(get().getActiveCompany(), get().defaultDocumentCustomization, get().documentTemplatesByCompany),
             contactName: data.clientName || undefined,
             clientPhone: data.phone || undefined,
             clientEmail: data.email || undefined,

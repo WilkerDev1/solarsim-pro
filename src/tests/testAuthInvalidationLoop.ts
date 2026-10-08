@@ -178,6 +178,7 @@ async function runAuthInvalidationTests() {
           tariffMatrix: {} as any,
           defaultSimulationSettings: {} as any,
           defaultDocumentCustomization: {} as any,
+          documentTemplatesByCompany: {},
           companies: [],
           activeCompanyId: '',
           localUserProfile: {} as any,

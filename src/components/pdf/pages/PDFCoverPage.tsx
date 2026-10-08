@@ -2,7 +2,7 @@ import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult, ClientInfo } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
 import { Phone, MapPin, Globe, Instagram, MapPinned } from 'lucide-react';
-import { ELECTSUN_LOGO_COLOR_BASE64, ELECTSUN_LOGO_WHITE_BASE64 } from '../../../assets/electsunLogo';
+import { documentLogo } from '../../../utils/documentLogo';
 import { PDF_COVER_HERO_BASE64 } from '../../../assets/pdfGraphicAssets';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
 import { InlineEditableText } from '../common/InlineEditableText';
@@ -33,10 +33,8 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
   const companyWebsite = cust.companyWebsite ?? DEFAULT_DOCUMENT_CUSTOMIZATION.companyWebsite ?? 'electsun.com.do';
   const companyInstagram = cust.companyInstagram ?? DEFAULT_DOCUMENT_CUSTOMIZATION.companyInstagram ?? 'Electsunrd';
 
-  const isDefaultElectsun = companyName.toLowerCase().trim() === 'electsun';
-  // Use dedicated cover logo, fallback to header logo, or default color logo
-  const coverLogoSrc = cust.coverLogoBase64 || cust.headerLogoBase64 || ELECTSUN_LOGO_COLOR_BASE64;
-  const hasLogoImage = Boolean(cust.coverLogoBase64 || cust.headerLogoBase64 || isDefaultElectsun);
+  const coverLogoSrc = documentLogo(cust, 'cover');
+  const hasLogoImage = Boolean(coverLogoSrc);
 
   const rawClientName = project.client.name || 'Centro Médico Hispánico';
   const clientName = rawClientName.replace(/\s*\((?:Copia|Copia Importada|COPIA|V\d+|C\d+)\)\s*/gi, '').trim().toUpperCase();

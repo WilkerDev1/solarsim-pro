@@ -14,7 +14,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
 
     const exportPayload = {
       app: 'SolarSim Pro',
-      version: '2.3.1',
+      version: '2.3.2',
       exportedAt: new Date().toISOString(),
       type: 'single_project',
       project,
@@ -45,7 +45,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
     const { projects } = get();
     const exportPayload = {
       app: 'SolarSim Pro',
-      version: '2.3.1',
+      version: '2.3.2',
       exportedAt: new Date().toISOString(),
       type: 'projects_backup',
       totalProjects: projects.length,

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Check, X, Bold, RotateCcw, Pencil, BookmarkCheck } from 'lucide-react';
+import { useSimulationStore } from '../../../store/useSimulationStore';
 import { renderFormattedMarkdown } from '../../../utils/textFormatter';
 
 interface InlineEditableTextProps {
@@ -90,7 +91,9 @@ export const InlineEditableText: React.FC<InlineEditableTextProps> = ({
     if (!onSavePermanent) return;
     const finalVal = tempValue.trim();
     onSave(finalVal);
+    const previousTemplates = useSimulationStore.getState().documentTemplatesByCompany;
     onSavePermanent(finalVal);
+    if (previousTemplates === useSimulationStore.getState().documentTemplatesByCompany) return;
     setJustSavedPermanent(true);
     setTimeout(() => {
       setJustSavedPermanent(false);

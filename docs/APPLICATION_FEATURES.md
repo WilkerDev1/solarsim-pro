@@ -23,3 +23,9 @@ Las respuestas de una sesión anterior se descartan aunque se vuelva a iniciar s
 ## Explorador y Ajustes
 
 Tarjetas y lista compacta comparten búsqueda, filtros, acciones y arrastre. La preferencia de visualización se persiste. Ajustes muestra una categoría con navegación agrupada y conserva los formularios visitados mientras permanece abierto; Escape vuelve al espacio de trabajo. Verde identifica selección/acción principal; los avisos usan colores de estado.
+
+## Plantillas de propuesta por empresa
+
+El modo edición PDF permite guardar una plantilla local por empresa emisora (`companyProfileId`), dentro del espacio aislado de cada organización. La creación manual y desde factura IA usan esa plantilla después del snapshot del perfil: dirección/pie, teléfono, enlaces y logos guardados no son sobrescritos por los datos del perfil al crear otro documento. Cambios posteriores de perfil o plantilla no reescriben propuestas existentes.
+
+Los datos particulares del cliente, fecha de emisión y anexos/entradas extra de índice no pasan a la plantilla. Portada, cabecera y editor resuelven el mismo logo independientemente del nombre escrito; un logo explícito tiene prioridad y un valor vacío indica ausencia. Si la empresa de una propuesta antigua resulta ambigua o fue eliminada, se rechaza guardar/restablecer su plantilla en otra empresa. La plantilla se conserva al recargar y cambiar de organización; no se publica ni sincroniza como perfil compartido. Los JSON de exportación de propuestas conservan sus snapshots, pero no son un respaldo de estas preferencias locales.

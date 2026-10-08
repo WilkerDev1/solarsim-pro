@@ -1,3 +1,4 @@
+import { documentLogo } from '../../../utils/documentLogo';
 import React, { useState, useRef } from 'react';
 import {
   Building2,
@@ -21,8 +22,6 @@ import { ProjectSimulation, DocumentCustomization, ExtraTOCItem } from '../../..
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
 import { getProposalDateInputValue, formatProposalDate } from '../../../utils/formatDateUtils';
 import {
-  ELECTSUN_LOGO_WHITE_BASE64,
-  ELECTSUN_LOGO_COLOR_BASE64,
   ELECTSUN_EMBLEM_WATERMARK_BASE64,
 } from '../../../assets/electsunLogo';
 
@@ -161,8 +160,8 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
     reader.readAsDataURL(file);
   };
 
-  const activeCoverLogo = cust.coverLogoBase64 || cust.headerLogoBase64 || ELECTSUN_LOGO_COLOR_BASE64;
-  const activeHeaderLogo = cust.headerLogoBase64 || ELECTSUN_LOGO_WHITE_BASE64;
+  const activeCoverLogo = documentLogo(cust, 'cover');
+  const activeHeaderLogo = documentLogo(cust, 'header');
   const activeWatermarkLogo = cust.watermarkLogoBase64 || ELECTSUN_EMBLEM_WATERMARK_BASE64;
 
   return (
@@ -216,7 +215,7 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
         </p>
       </div>
 
-      {/* TARJETA DE PLANTILLA PERMANENTE PARA FUTURAS PROPUESTAS */}
+      {/* TARJETA DE PLANTILLA DE EMPRESA PARA FUTURAS PROPUESTAS */}
       <div className={`p-3.5 rounded-2xl border transition-all ${
         isDark
           ? 'bg-[#181822] border-[#2e2e42]'
@@ -230,11 +229,11 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
             <h4 className={`text-xs font-black uppercase tracking-tight flex items-center gap-1.5 ${isDark ? 'text-zinc-100' : 'text-slate-900'}`}>
               <span>Plantilla Permanente</span>
               <span className="text-[9px] bg-indigo-500/20 text-indigo-400 font-extrabold px-1.5 py-0.2 rounded-full border border-indigo-400/30">
-                Global
+                Empresa
               </span>
             </h4>
             <p className={`text-[10.5px] leading-relaxed mt-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
-              Aplica los datos y textos de esta propuesta como la plantilla predeterminada permanente para cualquier propuesta futura.
+              Aplica los datos y textos de esta propuesta como la plantilla permanente de su empresa emisora para sus futuras propuestas.
             </p>
           </div>
         </div>
@@ -243,12 +242,13 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
           <button
             type="button"
             onClick={() => {
+              const previousTemplates = useSimulationStore.getState().documentTemplatesByCompany;
               if (saveCurrentProjectAsDefaultDocumentTemplate) {
                 saveCurrentProjectAsDefaultDocumentTemplate();
               } else {
                 useSimulationStore.getState().saveCurrentProjectAsDefaultDocumentTemplate();
               }
-              setTemplateSavedFeedback(true);
+              setTemplateSavedFeedback(previousTemplates !== useSimulationStore.getState().documentTemplatesByCompany);
               setTimeout(() => setTemplateSavedFeedback(false), 2500);
             }}
             className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 shadow-md transition-all cursor-pointer active:scale-95 ${
@@ -417,11 +417,13 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
 
               <div className="flex items-center gap-3">
                 <div className="w-24 h-12 rounded-lg bg-slate-900 border border-slate-700 p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
-                  <img
+                  {activeCoverLogo ? (
+                    <img
                     src={activeCoverLogo}
                     alt="Cover logo preview"
                     className="max-h-full max-w-full object-contain"
                   />
+                  ) : <span className="text-[10px] text-white">Sin logotipo</span>}
                 </div>
                 <div className="flex-1">
                   <input
@@ -469,11 +471,13 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
 
               <div className="flex items-center gap-3">
                 <div className="w-24 h-12 rounded-lg bg-emerald-950/80 border border-emerald-800/60 p-1 flex items-center justify-center overflow-hidden shrink-0 shadow-inner">
-                  <img
+                  {activeHeaderLogo ? (
+                    <img
                     src={activeHeaderLogo}
                     alt="Header logo preview"
                     className="max-h-full max-w-full object-contain"
                   />
+                  ) : <span className="text-[10px] text-white">Sin logotipo</span>}
                 </div>
                 <div className="flex-1">
                   <input

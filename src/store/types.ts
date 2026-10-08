@@ -82,6 +82,7 @@ export interface ProjectSlice {
   statusFilter: string;
   defaultSimulationSettings: DefaultSimulationSettings;
   defaultDocumentCustomization: DocumentCustomization;
+  documentTemplatesByCompany: Record<string, DocumentCustomization>;
 
   isTrashActive: boolean;
   setIsTrashActive: (active: boolean) => void;

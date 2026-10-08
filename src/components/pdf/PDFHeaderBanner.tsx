@@ -1,7 +1,7 @@
 import React from 'react';
 import { PDFColorTheme } from '../../constants/pdfThemes';
 import { DocumentCustomization } from '../../types';
-import { ELECTSUN_LOGO_WHITE_BASE64 } from '../../assets/electsunLogo';
+import { documentLogo } from '../../utils/documentLogo';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
 
 interface PDFHeaderBannerProps {
@@ -27,7 +27,7 @@ export const PDFHeaderBanner: React.FC<PDFHeaderBannerProps> = ({
 }) => {
   const companyName = customization?.companyName ?? DEFAULT_DOCUMENT_CUSTOMIZATION.companyName ?? 'electsun';
   const companySlogan = customization?.companySlogan ?? DEFAULT_DOCUMENT_CUSTOMIZATION.companySlogan ?? 'El sol a tu favor';
-  const isDefaultElectsun = companyName.toLowerCase().trim() === 'electsun';
+  const headerLogo = documentLogo(customization || {}, 'header');
 
   const cleanClientName = (clientName || 'Cliente').replace(/\s*\((?:Copia|Copia Importada|COPIA|V\d+|C\d+)\)\s*/gi, '').trim();
 
@@ -51,16 +51,10 @@ export const PDFHeaderBanner: React.FC<PDFHeaderBannerProps> = ({
         </div>
 
         <div className="text-right flex items-center justify-end pl-6">
-          {customization?.headerLogoBase64 ? (
+          {headerLogo ? (
             <img
-              src={customization.headerLogoBase64}
+              src={headerLogo}
               alt={companyName}
-              className="h-[62px] max-h-[64px] w-auto object-contain drop-shadow-xs"
-            />
-          ) : isDefaultElectsun ? (
-            <img
-              src={ELECTSUN_LOGO_WHITE_BASE64}
-              alt="electsun - El sol a tu favor"
               className="h-[62px] max-h-[64px] w-auto object-contain drop-shadow-xs"
             />
           ) : (

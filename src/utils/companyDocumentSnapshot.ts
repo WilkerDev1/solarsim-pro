@@ -12,6 +12,7 @@ export function companyDocumentSnapshot(
     companyRnc: company.rncOrId,
     companyFooterText: company.address,
     companyWebsite: company.website || "",
+    companyInstagram: "",
     companySlogan:
       template?.companySlogan !== DEFAULT_DOCUMENT_CUSTOMIZATION.companySlogan
         ? template?.companySlogan || ""
