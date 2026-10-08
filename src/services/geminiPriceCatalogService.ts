@@ -3,20 +3,12 @@ import {
   ExtractedPriceCatalogItem,
   SolarEquipmentItem,
   EquipmentType,
-} from '../types/equipment';
+} from "../types/equipment";
 
-const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-
-// Modelos candidatos en cascada para tolerancia a fallos y alta demanda (503/429)
-const FALLBACK_MODELS_CASCADE = [
-  'gemini-3.7-flash',
-  'gemini-2.5-flash',
-  'gemini-3.5-flash-lite',
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
-];
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+import {
+  requestGeminiJson,
+  geminiResponseText,
+} from "../../shared/geminiTransport";
 
 const PRICE_CATALOG_SYSTEM_INSTRUCTION = `Eres un auditor comercial e ingeniero fotovoltaico de élite especializado en compras, cotizaciones y listas de precios de distribuidores de equipos solares (paneles fotovoltaicos, inversores y baterías BESS).
 
@@ -91,13 +83,15 @@ export interface ScanPriceCatalogOptions {
   currentCatalog: SolarEquipmentItem[];
   dopExchangeRate?: number;
   onProgress?: (status: string) => void;
+  signal?: AbortSignal;
 }
 
 export function findBestSupplierMatch(
   detectedName: string,
-  existingSuppliers: string[]
+  existingSuppliers: string[],
 ): { matchedName: string; confidence: number } | null {
-  if (!detectedName || !existingSuppliers || existingSuppliers.length === 0) return null;
+  if (!detectedName || !existingSuppliers || existingSuppliers.length === 0)
+    return null;
   const cleanDetected = detectedName.toLowerCase().trim();
 
   // 1. Coincidencia exacta
@@ -111,8 +105,11 @@ export function findBestSupplierMatch(
   const stripNoise = (s: string) =>
     s
       .toLowerCase()
-      .replace(/\b(dominicana|s\.r\.l\.|srl|r\.d\.|rd|corp|corp\.|sa|s\.a\.|inc|llc|solar|distribuidora|group|grupo)\b/gi, ' ')
-      .replace(/[^a-z0-9]/g, '')
+      .replace(
+        /\b(dominicana|s\.r\.l\.|srl|r\.d\.|rd|corp|corp\.|sa|s\.a\.|inc|llc|solar|distribuidora|group|grupo)\b/gi,
+        " ",
+      )
+      .replace(/[^a-z0-9]/g, "")
       .trim();
 
   const coreDetected = stripNoise(cleanDetected);
@@ -136,7 +133,10 @@ export function findBestSupplierMatch(
       if (!bestMatch || conf > bestMatch.confidence) {
         bestMatch = { matchedName: existing, confidence: conf };
       }
-    } else if (cleanDetected.includes(cleanExisting) || cleanExisting.includes(cleanDetected)) {
+    } else if (
+      cleanDetected.includes(cleanExisting) ||
+      cleanExisting.includes(cleanDetected)
+    ) {
       const conf = 0.82;
       if (!bestMatch || conf > bestMatch.confidence) {
         bestMatch = { matchedName: existing, confidence: conf };
@@ -148,7 +148,9 @@ export function findBestSupplierMatch(
 }
 
 export class GeminiPriceCatalogService {
-  static async scanAndMatchPriceCatalog(options: ScanPriceCatalogOptions): Promise<ExtractedPriceCatalogResult> {
+  static async scanAndMatchPriceCatalog(
+    options: ScanPriceCatalogOptions,
+  ): Promise<ExtractedPriceCatalogResult> {
     const {
       fileBase64,
       mimeType,
@@ -163,17 +165,19 @@ export class GeminiPriceCatalogService {
     } = options;
 
     if (!apiKey) {
-      throw new Error('No se ha configurado la clave API de Google Gemini en Ajustes.');
+      throw new Error(
+        "No se ha configurado la clave API de Google Gemini en Ajustes.",
+      );
     }
 
     // Normalizar base64
     let cleanBase64 = fileBase64;
-    if (fileBase64.includes('base64,')) {
-      cleanBase64 = fileBase64.split('base64,')[1];
+    if (fileBase64.includes("base64,")) {
+      cleanBase64 = fileBase64.split("base64,")[1];
     }
 
-    const primaryModel = customModel?.trim() || 'gemini-2.5-flash';
-    const candidateModels = Array.from(new Set([primaryModel, ...FALLBACK_MODELS_CASCADE])).filter(Boolean);
+    if (!Number.isFinite(dopExchangeRate) || dopExchangeRate <= 0)
+      throw new Error("La tasa USD/DOP debe ser positiva.");
 
     // Preparar catálogo de referencia condensado para el prompt
     const referenceCatalogCondensed = currentCatalog.map((e) => ({
@@ -188,13 +192,13 @@ export class GeminiPriceCatalogService {
     }));
 
     const promptText = `Por favor analiza esta lista de precios / catálogo comercial de equipos fotovoltaicos ("${fileName}").
-${manualSupplierName ? `PROVEEDOR DECLARADO POR EL USUARIO: "${manualSupplierName}". Si el documento no especifica otro suplidor claramente, asigna este proveedor.` : ''}
+${manualSupplierName ? `PROVEEDOR DECLARADO POR EL USUARIO: "${manualSupplierName}". Si el documento no especifica otro suplidor claramente, asigna este proveedor.` : ""}
 ${
   existingSuppliers.length > 0
     ? `PROVEEDORES YA REGISTRADOS EN LA BASE DE DATOS (Para identificar y cotejar coincidencias sin duplicar):
 ${JSON.stringify(existingSuppliers, null, 2)}
 Si el documento corresponde a uno de estos distribuidores o a una variante/sucursal (ej: "Unitrade" vs "Unitrade Dominicana"), indica el nombre del documento en "detectedSupplierName", pero enlaza el proveedor exacto en "matchedExistingSupplier" con confianza (0.0 a 1.0).`
-    : ''
+    : ""
 }
 TASA DE CAMBIO DE REFERENCIA: 1 USD = ${dopExchangeRate} DOP. (Si los precios están en DOP, conviértelos a USD dividiendo entre ${dopExchangeRate}).
 
@@ -206,7 +210,7 @@ Extrae todos los modelos de paneles, inversores y baterías con sus precios unit
     const requestBody = {
       contents: [
         {
-          role: 'user',
+          role: "user",
           parts: [
             {
               text: promptText,
@@ -230,151 +234,151 @@ Extrae todos los modelos de paneles, inversores y baterías con sus precios unit
       generationConfig: {
         temperature: 0.1,
         topP: 0.95,
-        response_mime_type: 'application/json',
+        response_mime_type: "application/json",
       },
     };
 
-    let lastError: any = null;
-
-    // Probar modelos en cascada
-    for (let mIdx = 0; mIdx < candidateModels.length; mIdx++) {
-      const currentModel = candidateModels[mIdx];
-      const url = `${GEMINI_API_BASE}/models/${currentModel}:generateContent?key=${apiKey}`;
-
-      for (let attempt = 1; attempt <= 2; attempt++) {
-        try {
-          if (mIdx > 0 || attempt > 1) {
-            onProgress?.(
-              attempt > 1
-                ? `Reintentando con ${currentModel} (intento ${attempt}/2)...`
-                : `Conectando con modelo de respaldo ${currentModel}...`
-            );
-          } else {
-            onProgress?.(`Analizando lista de precios con ${currentModel}...`);
-          }
-
-          const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestBody),
-          });
-
-          if (response.ok) {
-            const result = await response.json();
-            const rawText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-
-            if (!rawText) {
-              throw new Error('La IA no devolvió contenido interpretable para esta lista de precios.');
-            }
-
-            let parsed: any;
-            try {
-              parsed = JSON.parse(rawText);
-            } catch (e: any) {
-              const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-              if (jsonMatch) {
-                parsed = JSON.parse(jsonMatch[0]);
-              } else {
-                throw new Error(`No se pudo decodificar el formato JSON de la respuesta: ${e.message}`);
-              }
-            }
-
-            const supplierName =
-              manualSupplierName?.trim() ||
-              parsed.detectedSupplierName ||
-              'Proveedor Fotovoltaico';
-
-            const rawItems: any[] = Array.isArray(parsed.items) ? parsed.items : [];
-
-            const items: ExtractedPriceCatalogItem[] = rawItems.map((raw, idx) => {
-              const eqType: EquipmentType = ['panel', 'inverter', 'battery'].includes(raw.equipmentType)
-                ? raw.equipmentType
-                : 'panel';
-
-              // Fallback match local si la IA no vinculó pero hay coincidencia exacta de ID o displayName
-              let matchedId = raw.matchedEquipmentId || undefined;
-              let matchedName = raw.matchedDisplayName || undefined;
-              let confidence = typeof raw.matchConfidence === 'number' ? raw.matchConfidence : 0;
-
-              if (!matchedId) {
-                const exactMatch = currentCatalog.find(
-                  (c) =>
-                    c.type === eqType &&
-                    (c.displayName.toLowerCase().includes(raw.extractedModelName.toLowerCase()) ||
-                      raw.extractedModelName.toLowerCase().includes(c.displayName.toLowerCase()) ||
-                      (raw.sku && c.modelSeries.toLowerCase().includes(raw.sku.toLowerCase())))
-                );
-                if (exactMatch) {
-                  matchedId = exactMatch.id;
-                  matchedName = exactMatch.displayName;
-                  confidence = 0.85;
-                }
-              }
-
-              const priceUSD = typeof raw.priceUSD === 'number' && !isNaN(raw.priceUSD) && raw.priceUSD > 0
-                ? Math.round(raw.priceUSD * 100) / 100
-                : raw.originalPrice && raw.originalCurrency === 'DOP'
-                ? Math.round((raw.originalPrice / dopExchangeRate) * 100) / 100
-                : 0;
-
-              return {
-                id: `extracted-${idx}-${Date.now()}`,
-                extractedModelName: raw.extractedModelName || `Equipo #${idx + 1}`,
-                brand: raw.brand || 'Fabricante',
-                equipmentType: eqType,
-                priceUSD,
-                originalCurrency: raw.originalCurrency || 'USD',
-                originalPrice: raw.originalPrice || priceUSD,
-                sku: raw.sku || undefined,
-                notes: raw.notes || undefined,
-                matchedEquipmentId: matchedId,
-                matchedDisplayName: matchedName,
-                matchConfidence: confidence,
-                action: matchedId ? 'update_price' : 'create_new',
-                selected: true, // Seleccionado por defecto para aplicar
-              };
-            });
-
-            let matchedSupplier = parsed.matchedExistingSupplier || null;
-            let supplierConfidence = typeof parsed.supplierMatchConfidence === 'number' ? parsed.supplierMatchConfidence : 0;
-
-            // Si la IA no vinculó o si hay un mejor match local con proveedores existentes
-            if ((!matchedSupplier || supplierConfidence < 0.7) && existingSuppliers.length > 0) {
-              const localMatch = findBestSupplierMatch(parsed.detectedSupplierName || supplierName, existingSuppliers);
-              if (localMatch && localMatch.confidence >= 0.7) {
-                matchedSupplier = localMatch.matchedName;
-                supplierConfidence = localMatch.confidence;
-              }
-            }
-
-            return {
-              detectedSupplierName: parsed.detectedSupplierName || supplierName,
-              matchedExistingSupplier: matchedSupplier,
-              supplierMatchConfidence: supplierConfidence,
-              documentDate: parsed.documentDate || new Date().toISOString().split('T')[0],
-              documentTitle: parsed.documentTitle || fileName,
-              currencyDetected: parsed.currencyDetected || 'USD',
-              items,
-            };
-          }
-
-          if (response.status === 429 || response.status === 503) {
-            lastError = new Error(`Servicio de Google Gemini ocupado temporalmente (${response.status})`);
-            await sleep(1500 * attempt);
-            continue;
-          }
-
-          const errBody = await response.json().catch(() => ({}));
-          throw new Error(errBody?.error?.message || `Error HTTP ${response.status} en la API de Gemini`);
-        } catch (err: any) {
-          lastError = err;
-          if (attempt === 2) break;
-        }
+    onProgress?.("Analizando precios y referencias del catálogo…");
+    const result = await requestGeminiJson({
+      apiKey,
+      model: customModel,
+      body: requestBody,
+      signal: options.signal,
+    });
+    if (result.modelWarning) onProgress?.(result.modelWarning);
+    const rawText = geminiResponseText(result.response)
+      .replace(/^```(?:json)?\s*|\s*```$/g, "")
+      .trim();
+    let parsed: any;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch (e: any) {
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error(
+          `No se pudo decodificar el formato JSON de la respuesta: ${e.message}`,
+        );
       }
     }
 
-    throw lastError || new Error('No se pudo procesar la lista de precios con los modelos disponibles.');
+    const supplierName =
+      manualSupplierName?.trim() ||
+      parsed.detectedSupplierName ||
+      "Proveedor Fotovoltaico";
+
+    const rawItems: any[] = Array.isArray(parsed.items) ? parsed.items : [];
+    if (!rawItems.length || rawItems.length > 500)
+      throw new Error(
+        "La lista no contiene entre 1 y 500 equipos con precios.",
+      );
+
+    const items: ExtractedPriceCatalogItem[] = rawItems.map((raw, idx) => {
+      const eqType: EquipmentType = ["panel", "inverter", "battery"].includes(
+        raw.equipmentType,
+      )
+        ? raw.equipmentType
+        : "panel";
+
+      if (
+        !raw ||
+        typeof raw.extractedModelName !== "string" ||
+        !raw.extractedModelName.trim()
+      )
+        throw new Error("Una fila carece de nombre de modelo.");
+      if (!["panel", "inverter", "battery"].includes(raw.equipmentType))
+        throw new Error("Una fila tiene un tipo de equipo desconocido.");
+      const target = currentCatalog.find(
+        (c) => c.id === raw.matchedEquipmentId && c.type === eqType,
+      );
+      const exactMatches = currentCatalog.filter(
+        (c) =>
+          c.type === eqType &&
+          c.displayName.trim().toLowerCase() ===
+            raw.extractedModelName.trim().toLowerCase(),
+      );
+      const exact = exactMatches.length === 1 ? exactMatches[0] : undefined;
+      const matched = exact || target;
+      const matchedId = matched?.id;
+      const matchedName = matched?.displayName;
+      const confidence = exact
+        ? 1
+        : matched
+          ? Math.min(1, Math.max(0, Number(raw.matchConfidence) || 0))
+          : 0;
+
+      const currency = raw.originalCurrency || parsed.currencyDetected;
+      if (!["USD", "DOP"].includes(currency))
+        throw new Error(`Moneda desconocida para ${raw.extractedModelName}.`);
+      const originalPrice = Number(
+        raw.originalPrice ?? (currency === "USD" ? raw.priceUSD : undefined),
+      );
+      if (!Number.isFinite(originalPrice) || originalPrice <= 0)
+        throw new Error(
+          `Precio original inválido para ${raw.extractedModelName}.`,
+        );
+      const priceUSD =
+        Math.round(
+          (currency === "DOP"
+            ? originalPrice / dopExchangeRate
+            : originalPrice) * 100,
+        ) / 100;
+
+      if (!Number.isFinite(priceUSD) || priceUSD <= 0)
+        throw new Error(`Precio inválido para ${raw.extractedModelName}.`);
+      return {
+        id: `extracted-${idx}-${Date.now()}`,
+        extractedModelName: raw.extractedModelName || `Equipo #${idx + 1}`,
+        brand: raw.brand || "Fabricante",
+        equipmentType: eqType,
+        priceUSD,
+        originalCurrency: currency,
+        originalPrice,
+        sku: raw.sku || undefined,
+        notes: raw.notes || undefined,
+        matchedEquipmentId: matchedId,
+        matchedDisplayName: matchedName,
+        matchConfidence: confidence,
+        action: matchedId ? "update_price" : "create_new",
+        selected: !!exact, // La inferencia de la IA requiere revisión antes de aplicar.
+      };
+    });
+
+    let matchedSupplier = existingSuppliers.includes(
+      parsed.matchedExistingSupplier,
+    )
+      ? parsed.matchedExistingSupplier
+      : null;
+    let supplierConfidence =
+      typeof parsed.supplierMatchConfidence === "number"
+        ? parsed.supplierMatchConfidence
+        : 0;
+
+    // Si la IA no vinculó o si hay un mejor match local con proveedores existentes
+    if (
+      (!matchedSupplier || supplierConfidence < 0.7) &&
+      existingSuppliers.length > 0
+    ) {
+      const localMatch = findBestSupplierMatch(
+        parsed.detectedSupplierName || supplierName,
+        existingSuppliers,
+      );
+      if (localMatch && localMatch.confidence >= 0.7) {
+        matchedSupplier = localMatch.matchedName;
+        supplierConfidence = localMatch.confidence;
+      }
+    }
+
+    return {
+      detectedSupplierName: supplierName,
+      matchedExistingSupplier: matchedSupplier,
+      supplierMatchConfidence: supplierConfidence,
+      documentDate:
+        parsed.documentDate || new Date().toISOString().split("T")[0],
+      documentTitle: parsed.documentTitle || fileName,
+      currencyDetected: parsed.currencyDetected || "USD",
+      items,
+    };
   }
 }

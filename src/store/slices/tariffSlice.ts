@@ -1,6 +1,7 @@
 import { GlobalTariffMatrix, UtilityDistributor, UtilityTariffDetails } from '../../types/tariffs';
 import { DEFAULT_RD_TARIFF_MATRIX } from '../../data/rdTariffs';
 import { SimulationSlice } from '../types';
+import { normalizeStoredTariffMatrix } from '../../utils/tariffExtraction';
 import { SyncService } from '../../services/syncService';
 
 export interface TariffSlice {
@@ -46,6 +47,7 @@ export const createTariffSlice: SimulationSlice<TariffSlice> = (set, get) => ({
       const updatedTariff: UtilityTariffDetails = {
         ...currentTariff,
         ...updates,
+        code: tariffCode,
       } as UtilityTariffDetails;
 
       const updatedSchedule = {
@@ -72,7 +74,7 @@ export const createTariffSlice: SimulationSlice<TariffSlice> = (set, get) => ({
   setTariffMatrix: (matrix) => {
     set({
       tariffMatrix: {
-        ...matrix,
+        ...normalizeStoredTariffMatrix(matrix),
         lastUpdatedAt: new Date().toISOString(),
       },
     });
@@ -109,6 +111,10 @@ export const createTariffSlice: SimulationSlice<TariffSlice> = (set, get) => ({
         return { success: false, message: res.error || 'Error al guardar tarifas' };
       }
 
+      if (get().tariffMatrix !== tariffMatrix) {
+        set({ tariffSyncStatus: 'idle', tariffSyncError: null });
+        return { success: true, message: 'Se guardó el pliego enviado. Hay cambios locales posteriores pendientes de sincronizar.' };
+      }
       set({ tariffSyncStatus: 'synced', tariffSyncError: null });
       return { success: true, message: 'Pliego tarifario sincronizado en la nube' };
     } catch (err: any) {
@@ -119,7 +125,7 @@ export const createTariffSlice: SimulationSlice<TariffSlice> = (set, get) => ({
   },
 
   fetchTariffsFromServer: async () => {
-    const { syncSettings } = get();
+    const { syncSettings, tariffMatrix: initialMatrix } = get();
     if (!syncSettings.authToken) {
       return { success: false, message: 'Inicia sesión para descargar pliegos tarifarios de la nube' };
     }
@@ -138,16 +144,20 @@ export const createTariffSlice: SimulationSlice<TariffSlice> = (set, get) => ({
       }
 
 
+      if (get().tariffMatrix !== initialMatrix) {
+        set({ tariffSyncStatus: 'idle', tariffSyncError: null });
+        return { success: false, message: 'El pliego cambió localmente durante la descarga. Reintenta para revisar la versión de la nube.' };
+      }
       if (res.matrix) {
         set({
-          tariffMatrix: res.matrix,
+          tariffMatrix: normalizeStoredTariffMatrix(res.matrix),
           tariffSyncStatus: 'synced',
           tariffSyncError: null,
         });
         return { success: true, message: 'Pliego tarifario actualizado desde la nube' };
       } else {
         set({ tariffMatrix: DEFAULT_RD_TARIFF_MATRIX, tariffSyncStatus: 'synced', tariffSyncError: null });
-        return { success: true, message: 'La nube usa el pliego base oficial' };
+        return { success: true, message: 'La nube no tiene un pliego personalizado. Se usa el pliego base de referencia; confirma su vigencia.' };
       }
     } catch (err: any) {
       if (!isCurrent()) return { success: false, message: 'La sesión cambió durante la consulta.' };

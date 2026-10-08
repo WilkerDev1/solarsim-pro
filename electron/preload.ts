@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('install-linux-package', packageType, version),
   parseInvoiceWithAI: (payload: any) =>
     ipcRenderer.invoke('parse-invoice-with-ai', payload),
+  cancelAIRequest: (requestId: string) => ipcRenderer.invoke('cancel-ai-request', requestId),
   parseDatasheetWithAI: (payload: any) =>
     ipcRenderer.invoke('parse-datasheet-with-ai', payload),
   validateGeminiApiKey: (apiKey: string, model?: string) =>

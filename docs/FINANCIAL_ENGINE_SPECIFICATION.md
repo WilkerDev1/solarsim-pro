@@ -455,3 +455,7 @@ npx tsx src/tests/testBenchmark.ts
 # Ejecutar la suite integral de 15 pruebas unitarias financieras (incluyendo ítems extra, ITBIS y descuentos comerciales)
 npx tsx src/tests/testFinancialEngineComprehensive.ts
 ```
+
+## Costos de grupos explícitos (8 de octubre de 2026)
+
+Cada grupo multi-equipo utiliza su propia oferta. Un grupo sin `unitPriceUSD` no hereda el precio del primer modelo ni un precio de referencia: aporta cero al subtotal provisional y la cotización muestra que falta registrar costos. Ese subtotal no es una oferta completa. Los proyectos antiguos sin arreglos de grupos conservan su resolución escalar histórica. El modo de venta directa utiliza el precio por W configurado, sin heredar el caso benchmark al crear desde IA.

@@ -1,6 +1,6 @@
 ---
 name: SolarSim Pro — Centro empresarial
-description: Sistema operativo de formularios y equipos, extendido desde Dashboard y Ajustes.
+description: Sistema operativo de formularios y equipos, extendido desde Dashboard y Ajustes; asistente IA e inventario conservan el mundo heredado.
 colors:
   cc-bg: "#f6f8fa"
   cc-panel: "#fff"
@@ -87,6 +87,24 @@ components:
     textColor: "{colors.cc-green}"
     rounded: "{rounded.control}"
     padding: "9px 13px"
+  ai-button-primary:
+    backgroundColor: "{colors.action-green}"
+    textColor: "{colors.cc-panel}"
+    rounded: "{rounded.control}"
+    padding: "8px 12px"
+    height: "36px"
+  ai-button-secondary:
+    backgroundColor: "{colors.cc-panel}"
+    textColor: "{colors.cc-text}"
+    rounded: "{rounded.control}"
+    padding: "8px 12px"
+    height: "36px"
+  ai-review-input:
+    backgroundColor: "{colors.cc-panel}"
+    textColor: "{colors.cc-text}"
+    rounded: "{rounded.control}"
+    padding: "9px 10px"
+    height: "40px"
 ---
 
 # Design System: SolarSim Pro — Centro empresarial
@@ -104,6 +122,10 @@ Esta extracción documenta la superficie empresarial implementada, no impone sus
 - Tema claro y oscuro mediante roles equivalentes.
 - Selección verde, bordes finos y superficies planas.
 - Acciones explícitas próximas al contenido que modifican.
+
+### Extensión: asistente IA e inventario
+
+La extensión conserva el mismo mundo Operate. La evidencia normativa adicional es `src/components/common/ai-invoice/proposal-workspace.css`, `AIInvoiceScannerModal.tsx`, `ProposalDraftReview.tsx` y `EquipmentManagerSettingsTab.tsx`. Los roles `--pw-*` coinciden con los neutros y verdes del centro; el catálogo usa clases Tailwind equivalentes, sin convertir esas clases en tokens globales. Esta extracción registra únicamente esas superficies, sin reemplazar el sistema empresarial ni canonizar el PDF.
 
 ## Colors
 
@@ -123,6 +145,10 @@ Los roles de fondo, panel, borde, texto y texto secundario distinguen estructura
 
 Los rojos registrados corresponden a acciones destructivas y avisos de error, con variantes específicas de fondo y texto por tema; no son acentos decorativos.
 
+### Extensión IA
+
+Conversación propia y foco usan verde contextual; el botón de preparar/aplicar conserva verde de acción y blanco. Los avisos de revisión usan superficie de fondo y texto secundario; los bloqueadores usan el rol de error. El estado deshabilitado reduce opacidad: no expresa disponibilidad comercial ni resultados del análisis.
+
 ## Typography
 
 **Body Font:** Inter con fallback sans-serif. La misma familia se utiliza en títulos; no hay un display editorial independiente en esta superficie. Los códigos de invitación usan monospace nativo como datos técnicos, no como lenguaje de marca.
@@ -140,11 +166,21 @@ Los rojos registrados corresponden a acciones destructivas y avisos de error, co
 
 **The Jerarquía de trabajo Rule.** Los títulos identifican la tarea; las etiquetas permanecen en caja natural y los valores editables usan peso regular.
 
+### Extensión IA e inventario
+
+El asistente reutiliza texto operativo de (14px), títulos de sección de (16px), etiquetas de (13px) y contexto/nota de (12px). El encabezado local del modal usa (21px) y no redefine el título de pantalla del centro. Valores de consumo, cantidades y potencia usan numerales tabulares. El inventario mantiene nombre destacado y una línea secundaria de marca/modelo/tipo, sin convertir todo el catálogo en mayúsculas.
+
 ## Layout
 
 La cabecera ocupa (64px); el cuerpo separa navegación lateral y contenido con scroll propio. En escritorio amplio, la navegación mide (264px), el área principal usa padding (36px 40px) y el contenido se limita a (980px), centrado en el espacio disponible. Los formularios agrupan dos columnas iguales con separación de campo; dirección y campos largos pueden abarcar ambas columnas. Las acciones se alinean al final y permiten wrap.
 
 En el breakpoint implementado (1100px), la navegación pasa a (220px), el padding principal a (28px 24px) y el del formulario a (22px). Es una aplicación Electron para Linux y Windows, verificada desde (1024×700). El CSS también contiene una disposición defensiva bajo (760px): navegación superior envolvente y campos de una columna. Esto describe el código existente; no constituye un compromiso de producto móvil.
+
+### Extensión IA e inventario
+
+El modal se limita a (1220px) y separa conversación/compositor de revisión mediante una columna de (360px) y otra flexible. Ambas zonas tienen scroll propio; el pie de revisión permanece visible y la confirmación antecede crear/actualizar. Su altura es el menor valor entre (900px) y (94vh). A (1100px), conversación pasa a (320px) y se reducen paddings; el mínimo de producto sigue siendo (1024×700). Bajo (760px), el código apila ambas zonas como defensa, sin afirmar soporte de producto móvil.
+
+Los formularios de revisión usan dos columnas con separación de (16px); campos largos abarcan ambas. Los consumos usan seis columnas y cuatro en el breakpoint compacto. Los grupos de equipos alinean modelo, unidades y quitar; las notas de precio tienen su propia línea. El inventario usa una tabla compacta con nombre/modelo, nominal, ofertas y acciones, precedida por búsqueda y filtros. El flujo concreto queda en `.impeccable/surfaces/ai-proposal-inventory.md`, no como composición obligatoria de toda pantalla futura.
 
 ## Elevation & Depth
 
@@ -154,9 +190,15 @@ La superficie empresarial usa capas tonales, bordes de un píxel y espacio. No h
 
 **The Superficie plana Rule.** La separación ordinaria se construye con fondo, borde y espacio; los formularios y tablas del centro no requieren sombras.
 
+### Extensión modal IA
+
+El asistente usa una sombra ambiental sólo para separar el modal del trabajo subyacente; el interior conserva divisores y capas tonales. La sombra no se traslada a filas de inventario ni a formularios del centro. El punto de actividad pulsa únicamente durante una solicitud y pierde animación con `prefers-reduced-motion`; no es un acento decorativo persistente.
+
 ## Shapes
 
 Los controles, avisos y elementos seleccionados usan esquinas de control; los formularios usan esquinas de contenedor. La tabla mantiene filas rectangulares separadas por líneas horizontales, sin cápsulas por celda. El contrato inicial hablaba de formas de 12px; el código final distingue deliberadamente contenedores de 12px y controles de 8px.
+
+La extensión IA mantiene contenedor de (12px), controles y avisos de (8px) y filas rectangulares con divisores. El inventario conserva filas de tabla; no añade cápsulas por modelo o métricas decorativas.
 
 ## Components
 
@@ -184,6 +226,16 @@ Cabeceras pequeñas en texto secundario; filas con padding (14px 12px), borde in
 
 El aviso contextual usa fondo seleccionado, esquinas de control y padding (13px 16px). La variante de error usa los roles rojos por tema. La presencia de un componente no sustituye el contenido: los mensajes deben comunicar resultado o siguiente paso. La variante de error conserva su distinción de estado frente al aviso contextual.
 
+### Asistente IA: compositor y revisión
+
+El compositor reúne adjuntos, texto y preparar/refinar; durante análisis ofrece cancelar y comunica que no modifica propuestas. Botones locales tienen altura mínima (36px), padding (8px 12px), foco de dos píxeles con offset de dos y opacidad deshabilitada (0.48). Campos de revisión tienen altura mínima (40px), padding (9px 10px) y etiqueta permanente. Textareas son redimensionables verticalmente. Selección, caret y scrollbar interno siguen los roles del tema.
+
+El pie pide confirmación explícita de datos, equipos, precios y supuestos. Actualizar una propuesta abierta añade confirmación contextual. Errores y carga tienen semántica `alert`/`status`; el diálogo conserva foco y Escape. Las advertencias de referencia histórica, consumo estimado y falta de ofertas se presentan como contenido operativo, no como garantía de precisión.
+
+### Inventario: modelos y ofertas
+
+Nombre completo clicable, potencia/capacidad con unidad, especificación secundaria y ofertas junto a editar/eliminar. Sin precio disponible es un estado visible, no un importe cero inventado. Acciones de importar ficha, importar precios y nuevo equipo preceden búsqueda/filtros. Los modelos usan contraste equivalente claro/oscuro y acciones de icono con nombre accesible.
+
 ## Do's and Don'ts
 
 ### Do:
@@ -202,3 +254,5 @@ El aviso contextual usa fondo seleccionado, esquinas de control y padding (13px 
 
 
 No canonizado: las etiquetas nativas del selector de archivos en inglés, visibles en las capturas de QA, son una limitación de localización del artefacto, no una regla visual para nuevas superficies. Las capturas de QA no son assets de distribución.
+
+No canonizado en la extensión IA: 10/11px del editor de equipos heredado, observados por detector como tamaños fuera de rampa; no se convierten en pasos aprobados para nuevas pantallas. Tampoco se canonizan contenido ni controles de fixtures QA.

@@ -2,6 +2,7 @@ import { normalizeCompanyProfiles } from './companyProfiles';
 import { initializeWorkspaces } from '../sync/organizationWorkspace';
 import type { SimulationStore } from '../types';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../../data/defaultEquipmentCatalog';
+import { normalizeStoredTariffMatrix } from '../../utils/tariffExtraction';
 import { DEFAULT_RD_TARIFF_MATRIX } from '../../data/rdTariffs';
 import { normalizeBrandName, inferBrandFromText } from '../../utils/equipmentBrandUtils';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
@@ -154,14 +155,19 @@ export function hydrateSimulationStore(state: SimulationStore | undefined): void
       if (!cepmSchedule || !cepmSchedule.tariffs || !cepmSchedule.tariffs['RBT-1']) {
         state.tariffMatrix = {
           ...state.tariffMatrix,
-          resolutionCode: 'SIE-176-2025-TF',
           schedules: {
             ...state.tariffMatrix.schedules,
-            CEPM: DEFAULT_RD_TARIFF_MATRIX.schedules.CEPM,
-            EDEESTE: DEFAULT_RD_TARIFF_MATRIX.schedules.EDEESTE,
+            CEPM: { ...DEFAULT_RD_TARIFF_MATRIX.schedules.CEPM, ...cepmSchedule, tariffs: { ...DEFAULT_RD_TARIFF_MATRIX.schedules.CEPM.tariffs, ...cepmSchedule?.tariffs } },
           },
         };
       }
+    }
+
+    try {
+      state.tariffMatrix = normalizeStoredTariffMatrix(state.tariffMatrix);
+    } catch {
+      state.tariffSyncStatus = 'error';
+      state.tariffSyncError = 'El pliego guardado requiere revisión: contiene datos incompletos o inválidos. Se conserva para corregirlo.';
     }
 
     if (!state.defaultDocumentCustomization) {

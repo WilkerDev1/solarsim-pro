@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-05T17:00:22.581304+00:00",
+  "generatedAt": "2026-10-08T06:43:11.413985+00:00",
   "title": "Design System: SolarSim Pro — Centro empresarial",
   "extensions": {
     "colorMeta": {
@@ -367,8 +367,20 @@
         "purpose": "Explicaciones y valores editables."
       }
     },
-    "shadows": [],
-    "motion": [],
+    "shadows": [
+      {
+        "name": "ai-modal-ambient",
+        "value": "0 20px 70px rgba(0,0,0,.22)",
+        "purpose": "Sólo modal del asistente: separación del trabajo subyacente, sin extender sombra a tablas/formularios del centro."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ai-processing-pulse",
+        "value": "proposal-pulse 1.5s ease-in-out infinite; 50% opacity .3",
+        "purpose": "Punto de actividad durante solicitud; animación desactivada con prefers-reduced-motion."
+      }
+    ],
     "breakpoints": [
       {
         "name": "desktop-compact",
@@ -428,11 +440,42 @@
       "description": "Comunicar un resultado próximo a su tarea.",
       "html": "<div class=\"ds-sample ds-notice\" role=\"status\">Perfil guardado.</div>",
       "css": ".ds-sample{--cc-panel:#fff;--cc-text:#182230;--cc-border:#dce2e8;--cc-selected:#e8f7f0;--cc-green:#067451;font-family:Inter,sans-serif;font-size:14px}.ds-notice{padding:13px 16px;border-radius:8px;line-height:1.5;background:var(--cc-selected);color:var(--cc-text)}"
+    },
+    {
+      "name": "Asistente: preparar borrador",
+      "kind": "button",
+      "refersTo": "ai-button-primary",
+      "description": "Solicitud de análisis; no crea la propuesta.",
+      "html": "<div class=\"ds-ai\"><button class=\"ds-ai-button ds-ai-primary\">Preparar borrador</button></div>",
+      "css": ".ds-ai{--pw-panel:#fff;--pw-text:#182230;--pw-muted:#536174;--pw-border:#dce2e8;--pw-selected:#e8f7f0;--pw-green:#067451;font-family:Inter,sans-serif;font-size:14px;color:var(--pw-text)}.ds-ai-button{display:inline-flex;gap:8px;align-items:center;justify-content:center;min-height:36px;padding:8px 12px;background:var(--pw-panel);border:1px solid var(--pw-border);border-radius:8px;font:inherit;font-size:13px;font-weight:550;color:var(--pw-text);cursor:pointer}.ds-ai-button:hover{background:var(--pw-selected)}.ds-ai-button:focus-visible{outline:2px solid var(--pw-green);outline-offset:2px}.ds-ai-button:disabled{opacity:.48;cursor:not-allowed}.ds-ai-primary{background:#087b58;border-color:#087b58;color:#fff}.ds-ai-primary:hover{background:#066344}"
+    },
+    {
+      "name": "Asistente: adjuntar",
+      "kind": "button",
+      "refersTo": "ai-button-secondary",
+      "description": "Adjuntos junto a la descripción en la misma entrada.",
+      "html": "<div class=\"ds-ai\"><button class=\"ds-ai-button\">Adjuntar</button></div>",
+      "css": ".ds-ai{--pw-panel:#fff;--pw-text:#182230;--pw-muted:#536174;--pw-border:#dce2e8;--pw-selected:#e8f7f0;--pw-green:#067451;font-family:Inter,sans-serif;font-size:14px;color:var(--pw-text)}.ds-ai-button{display:inline-flex;gap:8px;align-items:center;justify-content:center;min-height:36px;padding:8px 12px;background:var(--pw-panel);border:1px solid var(--pw-border);border-radius:8px;font:inherit;font-size:13px;font-weight:550;color:var(--pw-text);cursor:pointer}.ds-ai-button:hover{background:var(--pw-selected)}.ds-ai-button:focus-visible{outline:2px solid var(--pw-green);outline-offset:2px}.ds-ai-button:disabled{opacity:.48;cursor:not-allowed}"
+    },
+    {
+      "name": "Asistente: campo de revisión",
+      "kind": "input",
+      "refersTo": "ai-review-input",
+      "description": "Dato editable con etiqueta persistente.",
+      "html": "<div class=\"ds-ai\"><label class=\"ds-ai-label\">Nombre del cliente<input class=\"ds-ai-input\" value=\"Cliente de ejemplo\" /></label></div>",
+      "css": ".ds-ai{--pw-panel:#fff;--pw-text:#182230;--pw-muted:#536174;--pw-border:#dce2e8;--pw-selected:#e8f7f0;--pw-green:#067451;font-family:Inter,sans-serif;font-size:14px;color:var(--pw-text)}.ds-ai-label{display:flex;flex-direction:column;gap:7px;font-size:13px;font-weight:550}.ds-ai-input{font:inherit;font-weight:400;min-height:40px;padding:9px 10px;background:var(--pw-panel);color:var(--pw-text);border:1px solid var(--pw-border);border-radius:8px;caret-color:var(--pw-green)}.ds-ai-input:focus-visible{outline:2px solid var(--pw-green);outline-offset:2px}"
+    },
+    {
+      "name": "Asistente: confirmar revisión",
+      "kind": "custom",
+      "description": "Confirmación explícita previa a aplicar el borrador.",
+      "html": "<div class=\"ds-ai ds-ai-footer\"><label class=\"ds-ai-check\"><input type=\"checkbox\"/>Revisé los datos, equipos, precios y supuestos del borrador.</label></div>",
+      "css": ".ds-ai{--pw-panel:#fff;--pw-text:#182230;--pw-muted:#536174;--pw-border:#dce2e8;--pw-selected:#e8f7f0;--pw-green:#067451;font-family:Inter,sans-serif;font-size:14px;color:var(--pw-text)}.ds-ai-footer{padding:16px 24px;border-top:1px solid var(--pw-border);background:var(--pw-panel)}.ds-ai-check{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.5}.ds-ai-check input{accent-color:#087b58;width:16px;height:16px;margin-top:2px;flex-shrink:0}.ds-ai-check input:focus-visible{outline:2px solid var(--pw-green);outline-offset:2px}"
     }
   ],
   "narrative": {
     "northStar": "Centro de trabajo empresarial",
-    "overview": "El centro empresarial extiende la identidad de SolarSim: Inter, superficies neutras y verde para acciones y selección. Su carácter empresarial procede de la jerarquía de formularios, navegación explícita y tablas de miembros, sin decoración de marketing.\n\nEsta extracción documenta la superficie empresarial implementada, no impone sus valores locales al simulador o al dossier PDF. Los colores `cc-*` pertenecen al ámbito del centro; Dashboard y Ajustes conservan sus propios tokens. La fuente normativa es `src/components/companies/company-center.css`, con tipografía heredada de `src/index.css`.",
+    "overview": "El centro empresarial extiende la identidad de SolarSim: Inter, superficies neutras y verde para acciones y selección. Su carácter empresarial procede de la jerarquía de formularios, navegación explícita y tablas de miembros, sin decoración de marketing.\n\nEsta extracción documenta la superficie empresarial implementada, no impone sus valores locales al simulador o al dossier PDF. Los colores `cc-*` pertenecen al ámbito del centro; Dashboard y Ajustes conservan sus propios tokens. La fuente normativa es `src/components/companies/company-center.css`, con tipografía heredada de `src/index.css`.\n\nLa extensión conserva el mismo mundo Operate. La evidencia normativa adicional es `src/components/common/ai-invoice/proposal-workspace.css`, `AIInvoiceScannerModal.tsx`, `ProposalDraftReview.tsx` y `EquipmentManagerSettingsTab.tsx`. Los roles `--pw-*` coinciden con los neutros y verdes del centro; el catálogo usa clases Tailwind equivalentes, sin convertir esas clases en tokens globales. Esta extracción registra únicamente esas superficies, sin reemplazar el sistema empresarial ni canonizar el PDF.",
     "keyCharacteristics": [
       "Formularios por propósito y tablas legibles.",
       "Tema claro y oscuro mediante roles equivalentes.",

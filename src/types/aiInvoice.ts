@@ -1,3 +1,5 @@
+import type { PanelItemSpec, InverterItemSpec, BatteryItemSpec } from './index';
+import type { AIProposalIssue } from '../../shared/aiProposal';
 export interface InvoiceTierBlock {
   kwh: number;
   rateDOP: number;
@@ -11,6 +13,16 @@ export interface EquipmentSubstitutionInfo {
 }
 
 export interface ExtractedInvoiceData {
+  panels?: PanelItemSpec[];
+  inverters?: InverterItemSpec[];
+  batteries?: BatteryItemSpec[];
+  validationIssues?: AIProposalIssue[];
+  requiresReview?: boolean;
+  unresolvedRequests?: string[];
+  observedMonthlyConsumptionKWh?: (number | null)[];
+  consumptionSource?: 'observed' | 'estimated' | 'context';
+  energyRateSource?: 'invoice' | 'reference' | 'manual';
+
   // Client & Company Identity
   clientName: string;
   companyName?: string;
