@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-12T19:14:42.433351+00:00",
+  "generatedAt": "2026-10-12T21:21:18.951004+00:00",
   "title": "Design System: SolarSim Pro — Centro empresarial",
   "extensions": {
     "colorMeta": {
@@ -531,6 +531,22 @@
           "oklch(95% 0.05447 255.25)"
         ],
         "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "assistant-message-bg": {
+        "role": "neutral",
+        "displayName": "Burbuja de usuario"
+      },
+      "assistant-muted": {
+        "role": "neutral",
+        "displayName": "Texto auxiliar del chat compartido"
+      },
+      "assistant-control-border": {
+        "role": "neutral",
+        "displayName": "Borde de controles flotantes"
+      },
+      "assistant-focus": {
+        "role": "primary",
+        "displayName": "Foco y divisor de conversación"
       }
     },
     "typographyMeta": {
@@ -543,7 +559,13 @@
         "purpose": "Explicaciones y valores editables."
       }
     },
-    "shadows": [],
+    "shadows": [
+      {
+        "name": "assistant-floating-panel",
+        "value": "0 12px 40px rgba(0,0,0,.25)",
+        "purpose": "Panel flotante experimental, no tablas ni revisión de propuestas."
+      }
+    ],
     "motion": [
       {
         "name": "ai-processing-pulse",
@@ -555,7 +577,7 @@
       {
         "name": "desktop-compact",
         "value": "1100px",
-        "purpose": "Centro empresarial: navegación 220px. Asistente: conversación 300px dentro del cuerpo que sigue al dock compartido de 64px."
+        "purpose": "Centro empresarial: navegación 220px. Asistente: ancho automático de conversación 300px; ancho ajustado tiene precedencia. Dock compartido 64px."
       },
       {
         "name": "defensive-stack",
@@ -613,11 +635,11 @@
       "css": ".ds-sample{--cc-panel:#fff;--cc-text:#182230;--cc-border:#dce2e8;--cc-selected:#e8f7f0;--cc-green:#067451;font-family:Inter,sans-serif;font-size:14px}.ds-notice{padding:13px 16px;border-radius:8px;line-height:1.5;background:var(--cc-selected);color:var(--cc-text)}"
     },
     {
-      "name": "Asistente: preparar borrador",
+      "name": "Asistente: enviar",
       "kind": "button",
-      "description": "Solicitar análisis desde el chat permanentemente oscuro; no crea la propuesta.",
-      "html": "<div class=\"ds-ai\"><button class=\"ds-ai-button ds-ai-primary\">Preparar borrador</button></div>",
-      "css": ".ds-ai{--pw-panel:#192536;--pw-text:#f1f5fa;--pw-border:#40536b;--pw-green:#75e4bc;--pw-selected:#163b32;background:#121b28;padding:16px;font-family:Inter,sans-serif;font-size:14px;color:var(--pw-text)}.ds-ai-button{display:inline-flex;gap:8px;align-items:center;justify-content:center;min-height:36px;padding:8px 12px;border:1px solid #77e2bd;border-radius:8px;font:550 13px Inter,sans-serif;cursor:pointer}.ds-ai-primary{background:#77e2bd;color:#102f27}.ds-ai-primary:hover{background:#066344}.ds-ai-button:focus-visible{outline:2px solid var(--pw-green);outline-offset:2px}.ds-ai-button:disabled{opacity:.55;cursor:not-allowed}"
+      "description": "Enviar una consulta o solicitar un borrador desde el chat; no aplica cambios.",
+      "html": "<div class=\"ds-ai\"><button class=\"ds-ai-button ds-ai-primary\">Enviar</button></div>",
+      "css": ".ds-ai{--pw-panel:#192536;--pw-text:#f1f5fa;--pw-border:#40536b;--pw-green:#75e4bc;--pw-selected:#163b32;background:#121b28;padding:16px;font-family:Inter,sans-serif;font-size:14px;color:var(--pw-text)}.ds-ai-button{display:inline-flex;gap:8px;align-items:center;justify-content:center;min-height:36px;padding:8px 12px;border:1px solid #77e2bd;border-radius:20px;font:550 13px Inter,sans-serif;cursor:pointer}.ds-ai-primary{background:#77e2bd;color:#102f27}.ds-ai-primary:hover{background:#066344}.ds-ai-button:focus-visible{outline:2px solid var(--pw-green);outline-offset:2px}.ds-ai-button:disabled{opacity:.55;cursor:not-allowed}"
     },
     {
       "name": "Asistente: pestañas de revisión",
@@ -651,9 +673,16 @@
     {
       "name": "Asistente: conversación permanente",
       "kind": "custom",
-      "description": "Chat azul marino en ambos temas, mensajes delimitados y compositor con campo y controles visibles.",
-      "html": "<section class=\"ds-ai-chat\"><article class=\"ds-ai-message\"><strong>Asistente</strong><p>Revisa los datos del borrador.</p></article><label class=\"ds-ai-chat-label\">Mensaje al asistente<textarea placeholder=\"Describe los ajustes…\"></textarea></label><button>Adjuntar archivo</button></section>",
-      "css": ".ds-ai-chat{--pw-bg:#121b28;--pw-panel:#192536;--pw-text:#f1f5fa;--pw-muted:#bccbdd;--pw-border:#40536b;--pw-green:#75e4bc;--pw-selected:#163b32;font:14px Inter,sans-serif;background:var(--pw-bg);color:var(--pw-text);padding:20px}.ds-ai-message{background:var(--pw-panel);border:1px solid var(--pw-border);border-radius:10px;padding:16px;margin:14px 0}.ds-ai-message strong{font-size:12px;color:#a7efda}.ds-ai-message p{line-height:1.6;margin:6px 0 0}.ds-ai-chat-label{font-size:13px;font-weight:550;display:flex;flex-direction:column;gap:7px}.ds-ai-chat textarea{font:14px Inter,sans-serif;min-height:100px;background:#213047;border:1px solid #597087;border-radius:8px;color:#f1f5fa;padding:9px 10px;resize:vertical;caret-color:var(--pw-green)}.ds-ai-chat textarea::placeholder{color:#bac9db}.ds-ai-chat button{font:550 13px Inter,sans-serif;padding:8px 12px;min-height:36px;background:#253850;color:#f1f5fa;border:1px solid #5b7290;border-radius:8px;margin-top:10px;cursor:pointer}.ds-ai-chat button:hover{background:var(--pw-selected)}.ds-ai-chat :is(button,textarea):focus-visible{outline:2px solid var(--pw-green);outline-offset:2px}.ds-ai-chat button:disabled{opacity:.55;cursor:not-allowed}"
+      "description": "Chat compartido: usuario en burbuja, asistente en prosa y privacidad desplegable; código y fixtures locales revisados, finish reviewer ship al alcance sintético documentado.",
+      "html": "<section class=\"ds-ai-chat\"><article class=\"ds-message ds-user\"><span>Necesito revisar una propuesta.</span></article><article class=\"ds-message ds-assistant\"><span>Revisa los datos del borrador.</span></article><label class=\"ds-chat-label\" for=\"ds-chat-input\">Mensaje al asistente</label><textarea id=\"ds-chat-input\" placeholder=\"Describe la propuesta, pregunta o pide un cambio…\"></textarea><button>Adjuntar</button><details><summary>Archivos y privacidad</summary><p>Texto y documentos se envían a Google Gemini al analizar.</p></details></section>",
+      "css": ".ds-ai-chat{font:14px Inter,sans-serif;background:#121b28;color:#f1f5fa;padding:24px}.ds-message{margin:0 0 22px;line-height:1.65;overflow-wrap:anywhere;white-space:pre-wrap}.ds-user{margin-left:auto;max-width:88%;width:fit-content;background:#26374d;color:#f4f7fc;padding:12px 16px;border-radius:18px 18px 4px 18px}.ds-assistant{padding:0 2px}.ds-chat-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}.ds-ai-chat textarea{width:100%;font:14px Inter,sans-serif;min-height:72px;max-height:150px;background:#213047;border:1px solid #597087;border-radius:14px;color:#f1f5fa;padding:9px 10px;resize:vertical}.ds-ai-chat textarea::placeholder{color:#bac9db}.ds-ai-chat button{font:550 13px Inter,sans-serif;padding:8px 12px;min-height:36px;background:#253850;color:#f1f5fa;border:1px solid #5b7290;border-radius:20px;margin-top:10px;cursor:pointer}.ds-ai-chat button:hover{background:#163b32}.ds-ai-chat :is(button,textarea):focus-visible{outline:2px solid #70dbb4;outline-offset:3px}.ds-ai-chat button:disabled{opacity:.55;cursor:not-allowed}.ds-ai-chat details{font-size:12px;color:#bac7d8;margin-top:10px}.ds-ai-chat summary{cursor:pointer}"
+    },
+    {
+      "name": "Asistente general: panel experimental",
+      "kind": "custom",
+      "description": "Panel local opcional con log, resultados React y compositor. Código y fixtures locales revisados; finish reviewer ship al alcance sintético documentado. Fichas PDF: miniatura de primera página mediante PDF.js y descarga completa; sin iframe.",
+      "html": "<section class=\"ds-widget\"><header><h2>Asistente</h2><button aria-label=\"Cerrar asistente\">Cerrar</button></header><div class=\"ds-log\"><article class=\"ds-result\"><h3>Equipo del catálogo</h3><p>Modelo y especificaciones disponibles.</p><button>Abrir inventario</button></article></div><form><label for=\"ds-widget-text\">Mensaje al asistente</label><textarea id=\"ds-widget-text\" placeholder=\"Pregunta o pide un cambio…\"></textarea><button class=\"ds-send\">Enviar</button><details><summary>Contexto y privacidad</summary><p>Texto y resultados se envían a Google Gemini. Los cambios requieren confirmar.</p></details></form></section>",
+      "css": ".ds-widget{font:14px Inter,sans-serif;color:#edf2f8;width:390px;max-width:calc(100vw - 90px);height:min(660px,calc(100dvh - 110px));min-height:340px;background:#18212d;border:1px solid #374458;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.25);display:flex;flex-direction:column;overflow:hidden}.ds-widget header{padding:14px 16px;display:flex;align-items:center;border-bottom:1px solid #374458;gap:8px}.ds-widget h2{font-size:14px;font-weight:600;flex:1}.ds-log{flex:1;min-height:0;overflow:auto;padding:20px 16px}.ds-result{border:1px solid #374458;border-radius:10px;padding:12px;margin-top:10px;font-size:12px;line-height:1.5}.ds-result h3{font-size:13px;font-weight:600;margin:0 0 4px}.ds-result p{color:#bac7d8;margin:0 0 8px}.ds-widget button{border:1px solid #52647b;background:#26374d;color:#eef3fb;padding:5px 9px;border-radius:7px;font-size:12px;cursor:pointer}.ds-widget button:hover{background:#283749;color:#fff}.ds-widget form{padding:12px;border-top:1px solid #374458}.ds-widget textarea{display:block;width:calc(100% - 26px);min-height:64px;max-height:160px;resize:vertical;background:#243247;color:#f1f5fb;border:1px solid #52647b;border-radius:12px;padding:10px 12px;font:14px Inter,sans-serif}.ds-widget textarea::placeholder{color:#b9c6d6}.ds-widget button.ds-send{border:1px solid #168763;background:#087b58;color:#fff;border-radius:18px;padding:8px 14px;font-size:13px;margin-top:8px}.ds-widget :is(button,textarea):focus-visible{outline:2px solid #70dbb4;outline-offset:3px}.ds-widget button:disabled{opacity:.5;cursor:not-allowed}.ds-widget details{font-size:12px;color:#bac7d8;margin-top:10px}.ds-widget summary{cursor:pointer}"
     }
   ],
   "narrative": {

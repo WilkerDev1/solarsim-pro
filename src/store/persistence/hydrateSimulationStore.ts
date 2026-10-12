@@ -100,6 +100,7 @@ export function hydrateSimulationStore(state: SimulationStore | undefined): void
     }
   }
   if (state) {
+    state.appAssistantEnabled = state.appAssistantEnabled === true;
     if (!state.equipmentCatalog || !Array.isArray(state.equipmentCatalog) || state.equipmentCatalog.length === 0) {
       state.equipmentCatalog = DEFAULT_EQUIPMENT_CATALOG.filter((equipment) => !(state.deletedEquipmentIds || []).includes(equipment.id));
     } else {

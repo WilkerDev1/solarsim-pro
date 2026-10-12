@@ -1,12 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Paperclip, Send, FileText, RotateCcw, Square, ArrowRight } from 'lucide-react';
+import { X, Paperclip, Send, FileText, RotateCcw, Square } from 'lucide-react';
 import { useAIInvoiceScanner } from './hooks/useAIInvoiceScanner';
 import { ProposalDraftReview } from './components/ProposalDraftReview';
 import './proposal-workspace.css';
+import { useResizablePanel } from '../../../features/assistant/useResizablePanel';
+import { ChatMessage } from '../../../features/assistant/components/ChatMessage';
+import '../../../features/assistant/chat.css';
 import { PrimaryIconDock } from '../../layout/PrimaryIconDock';
 
 export const AIInvoiceScannerModal: React.FC = () => {
   const ai = useAIInvoiceScanner();
+  const resize = useResizablePanel();
   const [confirmUpdate, setConfirmUpdate] = useState(false);
   const dialog = useRef<HTMLDivElement>(null);
   const conversation = useRef<HTMLDivElement>(null);
@@ -33,13 +37,13 @@ export const AIInvoiceScannerModal: React.FC = () => {
       }}>
       <h2 id="proposal-assistant-title" className="sr-only">Asistente de propuestas</h2>
       <PrimaryIconDock beforeNavigate={ai.closeAIInvoiceModal} assistantActive />
-      <div className="proposal-body">
+      <div className="proposal-body" style={resize.width ? {'--pw-chat-width':`${resize.width}px`} as React.CSSProperties : undefined}>
         <div className="proposal-conversation">
-          <div className="proposal-context"><span>{ai.equipmentCatalog.length} equipos disponibles</span><span>Tarifas de 4 distribuidoras</span></div>
+          <div className="proposal-resize-handle" {...resize.separatorProps} />
           {ai.activeProject && <label className="proposal-context-choice"><input type="checkbox" checked={ai.useCurrentProject} disabled={ai.isProcessing} onChange={e=>ai.setUseCurrentProject(e.target.checked)}/><span>Usar datos de {ai.activeProject.client.projectId}<small>Permite actualizar la propuesta abierta.</small></span></label>}
           <div className="proposal-chat-scroll" ref={conversation} role="log" aria-label="Conversación del borrador">
-            {!ai.messages.length && <div className="proposal-welcome"><h3>Cuéntame qué necesitas cotizar</h3><p>Adjunta facturas y describe cliente, consumo, equipos y condiciones. Puedes pedir varios modelos y corregir el resultado antes de crear la propuesta.</p><button type="button" className="proposal-example" onClick={()=>{ai.setPrompt('Cliente: Oficina de ejemplo en Santiago. Consumo: 900 kWh al mes. Cubrir 95%. Usa equipos del catálogo y muestra lo que falta confirmar.');promptInput.current?.focus();}}>Probar con una descripción de ejemplo <ArrowRight size={16}/></button></div>}
-            {ai.messages.map((message,i)=><article className={`proposal-message proposal-${message.role}`} key={i}><strong>{message.role==='user'?'Tú':'Asistente'}</strong><p>{message.text}</p>{message.files?.length ? <small>{message.files.join(' · ')}</small>:null}</article>)}
+            {!ai.messages.length && <div className="proposal-welcome"><h3>¿Qué necesitas cotizar?</h3><p>Describe el proyecto o adjunta un documento.</p></div>}
+            {ai.messages.map((message,i)=><ChatMessage role={message.role} text={message.text} key={i}>{message.files?.length ? <small>{message.files.join(' · ')}</small>:null}</ChatMessage>)}
             {!!ai.attentionIssues.length&&<article className="proposal-chat-attention" aria-label="Pendientes del borrador"><h3>Revisemos estos detalles</h3><p>Podemos corregirlos aquí o en el borrador. Los avisos se actualizan mientras editas.</p><ul>{ai.attentionIssues.map((issue,i)=><li key={`${issue.code}-${i}`} className={issue.severity==='error'?'proposal-chat-blocker':''}>{issue.message}</li>)}</ul></article>}
             {ai.isProcessing && <div role="status" className="proposal-processing"><span className="proposal-working-dot"/>Analizando entrada y preparando el borrador…<p>Puedes cancelar. No se modifica ninguna propuesta durante el análisis.</p></div>}
           </div>
@@ -47,12 +51,12 @@ export const AIInvoiceScannerModal: React.FC = () => {
             {ai.errorMsg && <div className="proposal-error" role="alert">{ai.errorMsg}</div>}
             {!ai.geminiApiKey && <div className="proposal-notice">Configura Gemini para analizar documentos.<button type="button" onClick={ai.openAISettings}>Abrir ajustes de IA</button></div>}
             <div className="proposal-attachments">{ai.files.map((file,i)=><div key={`${file.name}-${i}`}><FileText size={15}/><span title={file.name}>{file.name}</span><button type="button" aria-label={`Quitar ${file.name}`} disabled={ai.isProcessing} onClick={()=>ai.removeFile(i)}><X size={14}/></button></div>)}</div>
-            <label htmlFor="proposal-prompt">Mensaje al asistente</label>
+            <label className="sr-only" htmlFor="proposal-prompt">Mensaje al asistente</label>
             <textarea ref={promptInput} id="proposal-prompt" value={ai.prompt} disabled={ai.isProcessing} maxLength={12000} onChange={e=>ai.setPrompt(e.target.value)} placeholder="Describe la propuesta, pregunta o pide un cambio…" onKeyDown={e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();void ai.processSmartProposal();}}}/>
             <input ref={ai.fileInputRef} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp" hidden onChange={e=>{ai.addFiles(Array.from(e.target.files || []));e.target.value='';}}/>
             <div className="proposal-composer-actions"><button type="button" disabled={ai.isProcessing} onClick={()=>ai.fileInputRef.current?.click()}><Paperclip size={17}/>Adjuntar</button>
-              {ai.isProcessing ? <button key="cancel-analysis" type="button" onClick={event=>{event.preventDefault();ai.cancel();}}><Square size={15}/>Cancelar análisis</button>:<button key="prepare-draft" type="submit" className="proposal-primary" disabled={!ai.geminiApiKey||(!ai.prompt.trim()&&!ai.files.length)}><Send size={16}/>{ai.extractedData?'Enviar mensaje':'Conversar y preparar'}</button>}
-            </div><p className="proposal-note">Hasta 4 archivos · 8 MB por archivo · 14 MB en total · PDF, PNG, JPG, WebP<br/>Los documentos y el texto se envían a Google Gemini al analizar.</p>
+              {ai.isProcessing ? <button key="cancel-analysis" type="button" onClick={event=>{event.preventDefault();ai.cancel();}}><Square size={15}/>Cancelar análisis</button>:<button key="prepare-draft" type="submit" className="proposal-primary" disabled={!ai.geminiApiKey||(!ai.prompt.trim()&&!ai.files.length)}><Send size={16}/>Enviar</button>}
+            </div><details className="proposal-note-details"><summary>Archivos y privacidad</summary><p>Hasta 4 archivos · 8 MB por archivo · 14 MB en total · PDF, PNG, JPG, WebP. Texto y documentos se envían a Google Gemini al analizar.</p></details>
           </form>
         </div>
         <div className="proposal-draft-panel" aria-busy={ai.isProcessing}>

@@ -1,6 +1,8 @@
 import { SimulationSlice, UISlice } from '../types';
 
 export const createUISlice: SimulationSlice<UISlice> = (set) => ({
+  appAssistantEnabled: false,
+  setAppAssistantEnabled: (enabled) => set({ appAssistantEnabled: enabled === true }),
   isNewProjectModalOpen: false,
   isUpdateModalOpen: false,
   isAIInvoiceModalOpen: false,

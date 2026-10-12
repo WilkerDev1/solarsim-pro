@@ -200,6 +200,8 @@ export interface AISlice {
 }
 
 export interface UISlice {
+  appAssistantEnabled: boolean;
+  setAppAssistantEnabled: (enabled: boolean) => void;
   isNewProjectModalOpen: boolean;
   isUpdateModalOpen: boolean;
   isAIInvoiceModalOpen: boolean;

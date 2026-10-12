@@ -35,6 +35,10 @@ colors:
   ai-chat-control-border: "#597087"
   ai-chat-button-bg: "#253850"
   ai-chat-button-border: "#5b7290"
+  assistant-message-bg: "#26374d"
+  assistant-muted: "#bac7d8"
+  assistant-control-border: "#52647b"
+  assistant-focus: "#70dbb4"
 typography:
   headline:
     fontFamily: "Inter, sans-serif"
@@ -195,7 +199,7 @@ En el breakpoint implementado (1100px), la navegación pasa a (220px), el paddin
 
 ### Extensión IA e inventario
 
-El asistente ocupa toda la ventana (100vw × 100dvh), sin margen exterior ni ancho máximo. El dock principal compartido ocupa (64px) y toda la altura a la izquierda, sin cabecera horizontal exterior. En el cuerpo restante, conversación/compositor ocupa el mayor valor entre (330px) y (30%) y la revisión el espacio restante. Ambas zonas tienen scroll propio; el pie de revisión queda fuera del scroll y la confirmación antecede crear/actualizar. A (1100px), conversación pasa a (300px) y se reducen paddings; la vista principal de referencia es (1280×720) y el mínimo de producto sigue siendo (1024×700). Bajo (760px), el código apila ambas zonas como defensa, sin afirmar soporte de producto móvil.
+El asistente ocupa toda la ventana (100vw × 100dvh), sin margen exterior ni ancho máximo. El dock principal compartido ocupa (64px) y toda la altura a la izquierda, sin cabecera horizontal exterior. En el cuerpo restante, conversación/compositor comienza con ancho (360px), ajustable con divisor por puntero o teclado. El ajuste limita el ancho entre (280px) y el menor de (720px) o ventana menos dock (64px) y revisión reservada (400px). Flechas cambian el ancho en (24px); Home recupera el ancho automático, el mayor valor entre (330px) y (30%). La revisión ocupa el espacio restante. Ambas zonas tienen scroll propio; el pie de revisión queda fuera del scroll y la confirmación antecede crear/actualizar. A (1100px), el ancho automático del chat pasa a (300px); un ancho ajustado tiene precedencia y se reducen paddings; la vista principal de referencia es (1280×720) y el mínimo de producto sigue siendo (1024×700). Bajo (760px), el código apila ambas zonas como defensa, sin afirmar soporte de producto móvil.
 
 Los formularios de revisión usan dos columnas con separación de (16px); campos largos abarcan ambas. Los doce consumos editables usan cuatro columnas; el gráfico conserva doce grupos mensuales con dos barras por grupo. Los ítems y descuentos se editan en tres columnas, reducidas a dos a (1100px). Los grupos de equipos alinean modelo, unidades y quitar; las notas de precio tienen su propia línea. El inventario usa una tabla compacta con nombre/modelo, nominal, ofertas y acciones, precedida por búsqueda y filtros. El flujo concreto queda en `.impeccable/surfaces/ai-proposal-inventory.md`, no como composición obligatoria de toda pantalla futura.
 
@@ -257,7 +261,9 @@ El aviso contextual usa fondo seleccionado, esquinas de control y padding (13px 
 
 ### Asistente IA: compositor y revisión
 
-El compositor reúne adjuntos, texto y preparar/refinar; durante análisis ofrece cancelar y comunica que no modifica propuestas. Botones locales tienen altura mínima (36px), padding (8px 12px), foco de dos píxeles con offset de dos y opacidad deshabilitada (0.48) en la revisión, (0.55) en el chat. La conversación conserva campos y botones delimitados sobre azul marino; su acción principal usa texto oscuro sobre verde claro. Campos de revisión tienen altura mínima (40px), padding (9px 10px) y etiqueta permanente. Textareas son redimensionables verticalmente. Selección, caret y scrollbar interno siguen los roles del tema.
+El compositor reúne adjuntos, texto y enviar; durante análisis ofrece cancelar y comunica que no modifica propuestas. Botones locales tienen altura mínima (36px), padding (8px 12px), foco de dos píxeles con offset de dos y opacidad deshabilitada (0.48) en la revisión, (0.55) en el chat. La conversación conserva campos y botones delimitados sobre azul marino; su acción principal usa texto oscuro sobre verde claro. Campos de revisión tienen altura mínima (40px), padding (9px 10px) y etiqueta permanente. El compositor usa una etiqueta accesible oculta y textarea de altura (72–150px), radio (14px), redimensionable verticalmente; sus botones tienen radio (20px). Selección, caret y scrollbar interno siguen los roles del tema.
+
+La conversación usa `ChatMessage` compartido: usuario en burbuja alineada a la derecha, ancho máximo (88%), padding (12px 16px), esquinas (18px 18px 4px 18px); asistente como texto continuo sin tarjeta. Ambos conservan texto escapado, saltos de línea, tamaño (14px) e interlínea (1.65). La entrada inicial contiene una invitación breve; ejemplo y contador de catálogo/tarifas se retiraron. Límites de archivos y privacidad se consultan en un detalle desplegable.
 
 La revisión se organiza en cuatro pestañas: consumo y diseño, equipos, cotización, cliente y tarifa. La fila de pestañas permanece visible en el scroll de revisión; selección usa relleno verde contextual y texto del color del panel, con foco por teclado y navegación por flechas, Home y End. Los paneles conservan su estado al cambiar de pestaña.
 
@@ -288,6 +294,14 @@ Ficha e imágenes se agrupan después de ofertas: selección de archivo, nombre 
 ### Inventario: revisión de ficha importada
 
 Cada variante ofrece selección explícita, nombre/modelo editables y campos con unidades; los valores ausentes muestran «Sin dato». Las especificaciones adicionales se despliegan debajo de la misma variante. Una posible coincidencia usa aviso ámbar con explicación y opciones visibles para actualizar el equipo o crear un modelo independiente. La selección y el resultado no se comunican sólo por color. El pie mantiene analizar/importar próximos al estado y permite cerrar; errores y resultados usan semántica de alerta/estado.
+
+### Asistente general experimental
+
+La misma conversación se reutiliza en un panel flotante local, desactivado por defecto y disponible en Inicio, Hub y Simulador. El control de apertura aparece abajo a la derecha, a (24px) de ambos bordes. El panel usa ancho (390px), ampliable a (580px), con límite de ancho de ventana menos (90px); altura normal hasta (660px) y ampliada hasta (800px), limitadas por viewport. Bajo (760px), el margen pasa a (12px) y el límite de ancho a ventana menos (24px). Cabecera, log desplazable y compositor permanecen en columna. La superficie azul marino usa radio (16px), borde fino y sombra ambiental; esta elevación pertenece al panel flotante, no a las tablas de gestión.
+
+La cabecera conserva el estilo operativo existente: padding (14px 16px), divisor inferior, título (14px/600), contexto secundario y controles de icono (32px), sin introducir una nueva rampa global. Ofrece reiniciar, ampliar/comprimir y cerrar; durante consulta el envío pasa a cancelar. El textarea tiene altura (64–160px), radio (12px) y foco visible. Contexto y privacidad se presentan en un detalle desplegable. Resultados y sugerencias usan tarjetas React propias con divisor perimetral, radio (10px) y padding (12px); títulos, detalle y acciones se leen en orden. Las sugerencias muestran campos y requieren confirmar o descartar. Las vistas previas pertenecen a esas tarjetas: las imágenes conservan proporción con object-fit contain y altura máxima (220px). La ficha PDF muestra su primera página renderizada con `PDFThumbnailService`/PDF.js y ofrece «Descargar ficha completa» mediante enlace subrayado con foco visible. Si no se genera la miniatura, se mantiene una explicación y la descarga. La vista PDF en iframe fue retirada tras observarse en blanco. Este registro deriva de `src/features/assistant/chat.css`, `ChatMessage.tsx`, `AppAssistant.tsx`, `AssistantResultCard.tsx` y `useResizablePanel.ts`; no declara integración MCP-UI.
+
+La estructura y valores anteriores se contrastaron con código y fixtures locales. El finish reviewer emitió `ship` sobre cinco capturas a resolución nativa (1280×720, 1286×900 y mínimo 1024×700): `confirmed-light.jpg`, `equipment-dark-expanded.jpg`, `proposal-chat-light.jpg`, `proposal-minimum-dark.jpg` y `global-minimum-dark.jpg`, en `/tmp/solarsim-global-qa/`. `assets-preview.jpg` documenta además imagen y primera página PDF sintéticas después de corregir el iframe. La evidencia cubre esas superficies y estados de QA; solo se hicieron GET a archivos del servidor local, sin llamadas Gemini ni escrituras en producción. Las capturas son evidencia de prueba, no recursos del producto; los adjuntos empresariales y el modelo real quedan fuera de esta verificación.
 
 ## Do's and Don'ts
 

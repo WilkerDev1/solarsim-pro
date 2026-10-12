@@ -31,3 +31,14 @@ La procedencia de consumo distingue observado, estimado, del proyecto y teórico
 El asistente reutiliza `PrimaryIconDock` completo, con tema, proyectos, simulador, herramientas IA, nueva simulación, papelera, actualizaciones y ajustes. `assistantActive` marca IA como página actual con el tratamiento violeta heredado y evita marcar el proyecto o simulador de fondo. `beforeNavigate` llama al cierre del asistente antes de cambiar de destino; ese cierre cancela el análisis en curso. Los estilos de campos y botones del asistente se limitan al cuerpo de propuesta, de modo que el dock conserva sus clases y estados compartidos.
 
 Esta actualización registra la implementación del dock reutilizable y su geometría. Las revisiones y capturas anteriores describen sus estados anteriores; no se presentan como revisión visual completada del nuevo dock.
+
+## Extensión de chat experimental
+
+THESIS: Chat que consulta datos reales y propone cambios revisables sin sustituir la simulación.
+OWN-WORLD: Conserva dock principal y chat azul marino; burbujas de usuario y texto de asistente, sin contadores ni ejemplo.
+STORY: Consultar → resultados con tarjetas → propuesta de campos → confirmación → recálculo por store.
+FIRST VIEWPORT: Editor con divisor arrastrable; chat flotante compacto en esquina inferior derecha de Inicio/Hub/Simulador, oculto por defecto hasta activar el experimento.
+FORM: Extensión code-led Operate heredada; sin nueva identidad ni comp. Ancho inicial chat 360px, arrastre 280–720px reservando 400px de revisión. Panel flotante 390px, ampliado 580px.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+
+QA visual sintética completada tras reintento solicitado: divisor/teclado, flotante en tres vistas, switch, confirmación, temas y mínimos 1024×700. Finish reviewer independiente: `ship` a este alcance, sin fixes materiales. Capturas en docs/qa/global-assistant-2026-10-12; adjuntos PDF muestran primera página con PDF.js y descarga completa. No se amplía soporte móvil ni se afirma prueba Gemini/producción.

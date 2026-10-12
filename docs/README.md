@@ -9,6 +9,7 @@ Las fuentes canónicas de esta rama son:
 - [API y base de datos](DATABASE_AND_API_SPECIFICATION.md): autenticación, versiones, sincronización y migraciones.
 - [Motor financiero](FINANCIAL_ENGINE_SPECIFICATION.md) y [balance físico](ENERGY_BALANCE_AND_SELF_CONSUMPTION_SPECIFICATION.md): contratos matemáticos existentes; el balance físico requiere activar la función.
 - [Subsistema IA](AI_SCANNERS_SPECIFICATION.md): asistente con texto/adjuntos, revisión de borradores multi-modelo, importación de fichas/precios y transporte común.
+- [Asistente general experimental](APP_ASSISTANT.md): herramientas, confirmación, scopes y evaluación de MCP-UI.
 - [Tarifas en el flujo IA](AI_TARIFF_CONTEXT.md): fuentes históricas, procedencia por campo, persistencia y límites de concurrencia.
 - [Infraestructura](INFRASTRUCTURE_ARCHITECTURE.md): topología y despliegue protegido.
 - [Mantenimiento y releases](MAINTENANCE_AND_UPDATES.md): comandos, firmas y compatibilidad.

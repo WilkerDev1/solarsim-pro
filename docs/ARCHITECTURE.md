@@ -45,3 +45,7 @@ El perfil empresarial de la organización sincroniza el membrete principal; los 
 `shared/aiProposalCommercial.ts` valida el contrato comercial; `src/utils/proposalDraftProject.ts` adapta el mismo borrador normalizado para cálculo previo y aplicación. El hook calcula energía y resumen financiero por separado para que un costo pendiente no invalide la vista energética. Las pestañas de consumo/dimensionamiento y cotización son componentes de presentación; no cambian los motores.
 
 El contrato conversacional distingue respuesta informativa de borrador mutable. El consumo teórico usa factores sin redondear exportados por el motor solar, sin duplicar una fórmula asociada a documentos comerciales. Hook, normalización de transporte y store comparten esa referencia; el store sigue verificando antes de aplicar. Totales documentales son referencias informativas, nunca overrides del motor.
+
+## Asistente general experimental
+
+`src/features/assistant/` separa transporte conversacional, registro de herramientas, validación, hooks y tarjetas React. Las herramientas solo consultan el espacio actual y proponen ediciones para confirmar; no ejecutan funciones arbitrarias, código ni HTML. Cada aplicación revalida servidor/organización, sesión/rol, flag y fingerprint. App monta el panel de forma diferida; conversación/divisor se comparten con el borrador de propuestas. No incorpora un servidor MCP ni MCP-UI en esta entrega. Ver [APP_ASSISTANT.md](APP_ASSISTANT.md).
