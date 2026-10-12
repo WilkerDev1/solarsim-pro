@@ -27,6 +27,7 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({
   const [name, setName] = useState(folderToEdit?.name || '');
   const [color, setColor] = useState(folderToEdit?.color || '#10b981');
   const [description, setDescription] = useState(folderToEdit?.description || '');
+  const [visibility, setVisibility] = useState<'public' | 'private'>('public');
   const [hideFromGeneral, setHideFromGeneral] = useState(folderToEdit?.hideFromGeneral || false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,6 +37,7 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({
       setColor(folderToEdit?.color || '#10b981');
       setDescription(folderToEdit?.description || '');
       setHideFromGeneral(folderToEdit?.hideFromGeneral || false);
+      setVisibility(folderToEdit?.visibility || 'public');
       setError(null);
     }
   }, [isOpen, folderToEdit]);
@@ -55,9 +57,10 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({
         color,
         description: description.trim(),
         hideFromGeneral,
+        visibility,
       });
     } else {
-      createFolder(name.trim(), color, description.trim(), hideFromGeneral);
+      createFolder(name.trim(), color, description.trim(), hideFromGeneral, visibility);
     }
 
     setName('');
@@ -140,6 +143,14 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({
             />
           </div>
 
+          <label className="block text-sm text-slate-700 dark:text-zinc-300">
+            Visibilidad de la carpeta
+            <select value={visibility} onChange={e => setVisibility(e.target.value as 'public' | 'private')} className="mt-2 w-full p-2 rounded-lg border bg-white dark:bg-zinc-900 dark:border-zinc-700">
+              <option value="public">Pública · miembros de la organización</option>
+              <option value="private">Privada · solo yo</option>
+            </select>
+            <span className="block mt-2 text-xs">La privacidad aplica a la carpeta; los permisos de los proyectos se conservan.</span>
+          </label>
           {/* Opción para ocultar propuestas del menú principal y proyectos generales */}
           <div className="p-3.5 rounded-xl border border-slate-200 dark:border-[#27272a] bg-slate-50/70 dark:bg-[#121214]/60 flex items-start justify-between gap-3">
             <div className="flex items-start gap-2.5">

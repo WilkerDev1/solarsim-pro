@@ -1,0 +1,19 @@
+/** Disposable synthetic fixture: all requests are intercepted locally. */
+import { createRoot } from 'react-dom/client';
+import { EquipmentManagerSettingsTab } from '../../../src/components/common/EquipmentManagerSettingsTab';
+import { AIDatasheetScannerModal } from '../../../src/components/common/AIDatasheetScannerModal';
+import { useSimulationStore } from '../../../src/store/useSimulationStore';
+import '../../../src/index.css';
+const dark = new URLSearchParams(location.search).get('theme') === 'dark';
+const item = { id: 'qa-panel', organizationId: 'qa-org', syncServerUrl: 'https://qa.example.invalid', type: 'panel' as const, displayName: 'Módulo QA Solar Serie A (600W)', brand: 'QA Solar', modelSeries: 'Serie A-600', category: 'Bifacial N-Type TOPCon', powerW: 600, efficiencyPct: 22.2, tempCoeff: -0.29, annualDegradation: 0.4, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), supplierPrices: [{ id: 'offer-qa', supplierName: 'Proveedor de prueba', priceUSD: 90, currency: 'USD' as const, stockStatus: 'in_stock' as const, sku: 'QA-600', notes: 'Precio unitario de prueba', updatedAt: new Date().toISOString() }], datasheetAssetId: 'qa-datasheet', datasheetName: 'Familia QA Solar.pdf' };
+useSimulationStore.setState({ equipmentCatalog: [item], projects: [], sidebarTheme: dark ? 'dark' : 'light', workspaceScope: 'https://qa.example.invalid|qa-org', geminiApiKey: 'synthetic-qa-only', syncSettings: { serverUrl: 'https://qa.example.invalid', authToken: 'synthetic-qa-only', autoSyncEnabled: false, lastSyncTimestamp: null, currentUser: { id: 'qa-user', name: 'Consultora QA', email: 'qa@example.invalid', role: 'ADMIN', organizationId: 'qa-org' } } });
+Object.assign(window, { qaCatalogStore: useSimulationStore });
+const extraction = { equipmentType: 'panel', brand: 'QA Solar', modelSeries: 'Serie B', documentTitle: 'Familia QA', category: 'TOPCon', variants: [610, 620].map(powerW => ({ modelCode: `QA-B-${powerW}`, displayName: `Módulo QA Solar Serie B (${powerW}W)`, powerW, efficiencyPct: 22.5 })) };
+window.fetch = async (url, init) => {
+  if (String(url).includes('generativelanguage.googleapis.com')) return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(extraction) }] }, finishReason: 'STOP' }] }));
+  if (String(url).endsWith('/api/equipment-assets') && init?.method === 'POST') { const file = (init.body as FormData).get('file') as File; return new Response(JSON.stringify({ success: true, asset: { id: 'qa-shared-asset', name: file.name, kind: (init.body as FormData).get('kind') } })); }
+  if (String(url).includes('/api/equipment-assets/')) return new Response('%PDF-1.7 synthetic', { headers: { 'Content-Type': 'application/pdf' } });
+  if (String(url).endsWith('/api/equipment/batch')) return new Response(JSON.stringify({ success: true, syncedCount: 1, equipment: [] }));
+  throw new Error(`Unexpected network in fixture: ${String(url)}`);
+};
+createRoot(document.getElementById('root')!).render(<div className={`min-h-screen p-6 ${dark ? 'bg-[#141619] text-zinc-100' : 'bg-slate-50 text-slate-900'}`}><EquipmentManagerSettingsTab isDark={dark}/><AIDatasheetScannerModal/></div>);

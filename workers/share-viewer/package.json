@@ -8,7 +8,7 @@
     "deploy": "wrangler deploy",
     "types": "wrangler types",
     "build": "wrangler types && tsc",
-    "test": "tsx tests/publicationIntegrity.test.ts && tsx tests/shareSnapshot.test.ts"
+    "test": "tsx tests/publicationIntegrity.test.ts && tsx tests/shareSnapshot.test.ts && tsx tests/sharedHistory.test.ts"
   },
   "dependencies": {
     "hono": "^4.13.12"

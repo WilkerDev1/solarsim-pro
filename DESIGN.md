@@ -125,7 +125,7 @@ Esta extracción documenta la superficie empresarial implementada, no impone sus
 
 ### Extensión: asistente IA e inventario
 
-La extensión conserva el mismo mundo Operate. La evidencia normativa adicional es `src/components/common/ai-invoice/proposal-workspace.css`, `AIInvoiceScannerModal.tsx`, `ProposalDraftReview.tsx`, `ProposalConsumptionReview.tsx`, `ProposalCommercialReview.tsx` y `EquipmentManagerSettingsTab.tsx`. Los roles `--pw-*` coinciden con los neutros y verdes del centro; el catálogo usa clases Tailwind equivalentes, sin convertir esas clases en tokens globales. Esta extracción registra únicamente esas superficies, sin reemplazar el sistema empresarial ni canonizar el PDF.
+La extensión conserva el mismo mundo Operate. La evidencia normativa adicional es `src/components/common/ai-invoice/proposal-workspace.css`, `AIInvoiceScannerModal.tsx`, `ProposalDraftReview.tsx`, `ProposalConsumptionReview.tsx`, `ProposalCommercialReview.tsx` y `EquipmentManagerSettingsTab.tsx`. Los roles `--pw-*` coinciden con los neutros y verdes del centro; el catálogo usa clases Tailwind equivalentes, sin convertir esas clases en tokens globales. Esta extracción registra únicamente esas superficies, sin reemplazar el sistema empresarial ni canonizar el PDF. La edición final del catálogo se evidencia además en `common/equipment/EquipmentOffersEditor.tsx`, `EquipmentAssetsEditor.tsx`, `EquipmentImagePreview.tsx` y `AIDatasheetScannerModal.tsx`.
 
 ## Colors
 
@@ -148,6 +148,10 @@ Los rojos registrados corresponden a acciones destructivas y avisos de error, co
 ### Extensión IA
 
 Conversación propia y foco usan verde contextual; el botón de preparar/aplicar conserva verde de acción y blanco. Los avisos de revisión usan superficie de fondo y texto secundario; los bloqueadores usan el rol de error. El estado deshabilitado reduce opacidad: no expresa disponibilidad comercial ni resultados del análisis.
+
+### Extensión de catálogo
+
+Los enlaces de ficha e imágenes y la nota de conversión monetaria usan un verde más oscuro sobre blanco y más luminoso sobre grafito. La potencia del inversor conserva la misma equivalencia de contraste. Guardar e importar usan verde de acción con texto blanco y un hover más oscuro. Son variantes locales del catálogo; no sustituyen los roles `cc-*` ni `--pw-*`.
 
 ## Typography
 
@@ -182,6 +186,12 @@ El modal se limita a (1220px) y separa conversación/compositor de revisión med
 
 Los formularios de revisión usan dos columnas con separación de (16px); campos largos abarcan ambas. Los doce consumos editables usan cuatro columnas; el gráfico conserva doce grupos mensuales con dos barras por grupo. Los ítems y descuentos se editan en tres columnas, reducidas a dos a (1100px). Los grupos de equipos alinean modelo, unidades y quitar; las notas de precio tienen su propia línea. El inventario usa una tabla compacta con nombre/modelo, nominal, ofertas y acciones, precedida por búsqueda y filtros. El flujo concreto queda en `.impeccable/surfaces/ai-proposal-inventory.md`, no como composición obligatoria de toda pantalla futura.
 
+### Editor de catálogo e importación de fichas
+
+El editor limita su ancho a (768px) y su altura a (90vh); cabecera, formulario desplazable y pie se distribuyen en columna. El formulario usa padding de (20px) y separación de (16px). El pie queda fuera del scroll, no se contrae y mantiene cancelar/guardar accesibles después de editar especificaciones, ofertas o adjuntos. Ofertas y documentos comparten contenedores de sección con padding de (16px), no modales comerciales adicionales.
+
+El importador de fichas limita su ancho a (896px) y su altura a (92vh); cabecera y pie rodean el contenido desplazable. Las variantes se separan con divisores, nombre y modelo se alinean en dos columnas y las especificaciones principales en cuatro columnas; la disposición defensiva reduce estas a dos. Más especificaciones se abre mediante un control de detalle. Estas dimensiones describen los diálogos locales y no amplían el mínimo de producto.
+
 ## Elevation & Depth
 
 La superficie empresarial usa capas tonales, bordes de un píxel y espacio. No hay sombras en sus formularios, controles o navegación. El foco es una señal de interacción: contorno de dos píxeles en verde contextual y offset de tres píxeles. No es elevación ornamental.
@@ -193,6 +203,10 @@ La superficie empresarial usa capas tonales, bordes de un píxel y espacio. No h
 ### Extensión modal IA
 
 El asistente usa una sombra ambiental sólo para separar el modal del trabajo subyacente; el interior conserva divisores y capas tonales. La sombra no se traslada a filas de inventario ni a formularios del centro. El punto de actividad pulsa únicamente durante una solicitud y pierde animación con `prefers-reduced-motion`; no es un acento decorativo persistente.
+
+### Extensión de catálogo
+
+**The Ofertas en contexto Rule.** Las ofertas de un modelo se editan en su misma sección, separadas por divisores horizontales; el contenedor agrupa la tarea sin añadir una tarjeta elevada por proveedor. El importador también separa variantes con divisores y reserva el fondo de aviso para coincidencias o resultados. La sombra pertenece al diálogo completo.
 
 ## Shapes
 
@@ -249,6 +263,16 @@ El resumen calculado reutiliza el fondo tonal y pares etiqueta/valor en dos colu
 ### Inventario: modelos y ofertas
 
 Nombre completo clicable, potencia/capacidad con unidad, especificación secundaria y ofertas junto a editar/eliminar. Sin precio disponible es un estado visible, no un importe cero inventado. Acciones de importar ficha, importar precios y nuevo equipo preceden búsqueda/filtros. Los modelos usan contraste equivalente claro/oscuro y acciones de icono con nombre accesible.
+
+### Inventario: edición de ofertas y adjuntos
+
+La sección de precios mantiene proveedor y SKU en dos columnas; moneda, precio unitario y existencias en tres. Notas y quitar cierran cada fila. Añadir oferta permanece junto al título de sección y el estado vacío explica el siguiente paso. Campos operativos usan texto de (14px) y etiquetas/contexto de (12px), con bordes y superficies equivalentes por tema. La conversión DOP muestra la tasa editable y el importe almacenado en USD en su propia línea, sin esconderlo en un tooltip. Las ofertas quedan en el formulario hasta confirmar el equipo.
+
+Ficha e imágenes se agrupan después de ofertas: selección de archivo, nombre descargable y desvincular quedan próximos. Las imágenes usan miniaturas contenidas de (64px), con nombre alternativo y reserva neutra cuando la vista previa no está disponible. La interfaz distingue catálogo local de adjuntos del servidor, informa el requisito de sesión y muestra procesamiento/error junto a la tarea. Guardar queda deshabilitado mientras se procesa un adjunto; el pie visible conserva cancelar.
+
+### Inventario: revisión de ficha importada
+
+Cada variante ofrece selección explícita, nombre/modelo editables y campos con unidades; los valores ausentes muestran «Sin dato». Las especificaciones adicionales se despliegan debajo de la misma variante. Una posible coincidencia usa aviso ámbar con explicación y opciones visibles para actualizar el equipo o crear un modelo independiente. La selección y el resultado no se comunican sólo por color. El pie mantiene analizar/importar próximos al estado y permite cerrar; errores y resultados usan semántica de alerta/estado.
 
 ## Do's and Don'ts
 

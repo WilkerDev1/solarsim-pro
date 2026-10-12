@@ -22,6 +22,8 @@ export function serializeSimulationStore(state: SimulationStore) {
     equipmentDeletionQueue: state.equipmentDeletionQueue,
     equipmentConflicts: state.equipmentConflicts,
     folders: state.folders,
+    folderChanges: state.folderChanges,
+    folderDeletionQueue: state.folderDeletionQueue,
     tariffMatrix: state.tariffMatrix,
     defaultSimulationSettings: state.defaultSimulationSettings,
     defaultDocumentCustomization: state.defaultDocumentCustomization,

@@ -12,13 +12,13 @@ export function companyDocumentSnapshot(
     companyRnc: company.rncOrId,
     companyFooterText: company.address,
     companyWebsite: company.website || "",
-    companyInstagram: "",
-    companySlogan:
+    companyInstagram: company.instagram || "",
+    companySlogan: company.slogan || (
       template?.companySlogan !== DEFAULT_DOCUMENT_CUSTOMIZATION.companySlogan
         ? template?.companySlogan || ""
-        : "",
+        : ""),
     coverLogoBase64: company.logoBase64 || "",
     headerLogoBase64: company.logoBase64 || "",
-    watermarkLogoBase64: "",
+    watermarkLogoBase64: company.watermarkLogoBase64 || "",
   };
 }

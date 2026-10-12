@@ -36,7 +36,7 @@ flowchart LR
 
 Una nueva función se registra en `shared/applicationFeatures.ts`, define su default/etapa/visibilidad/disponibilidad y usa el selector efectivo. Cambiar solo una etiqueta de UI nunca cambia el modelo de cálculo. Una nueva ruta registra su módulo desde app y usa la autorización actual en BD. Las migraciones se numeran y no se ejecutan desde el renderizador.
 
-Los perfiles de empresa locales personalizan documentos; las organizaciones autenticadas delimitan autorización y sincronización. Son conceptos distintos. No se adjudican automáticamente propuestas locales o de otra organización al iniciar sesión: para mover contenido se exporta/importa una copia de forma explícita.
+El perfil empresarial de la organización sincroniza el membrete principal; los membretes locales adicionales personalizan documentos. Las organizaciones autenticadas delimitan autorización y sincronización. Carpetas, registro de propuestas web y adjuntos del catálogo siguen el contrato de [recursos compartidos](SHARED_RESOURCES.md). Son conceptos distintos. No se adjudican automáticamente propuestas locales o de otra organización al iniciar sesión: para mover contenido se exporta/importa una copia de forma explícita.
 
 ## Subsistema IA
 

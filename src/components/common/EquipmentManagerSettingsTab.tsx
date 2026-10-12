@@ -25,6 +25,8 @@ import {
   Tag,
   FileText,
 } from "lucide-react";
+import { EquipmentOffersEditor } from "./equipment/EquipmentOffersEditor";
+import { EquipmentAssetsEditor } from "./equipment/EquipmentAssetsEditor";
 import { normalizeBrandName } from "../../utils/equipmentBrandUtils";
 
 interface EquipmentManagerSettingsTabProps {
@@ -67,6 +69,9 @@ export const EquipmentManagerSettingsTab: React.FC<
   } | null>(null);
 
   // Modal State for Edit / Add
+  const [assetBusy, setAssetBusy] = useState(false);
+  const sessionGeneration = useSimulationStore(s => s.sessionGeneration);
+  useEffect(() => { setIsEditorOpen(false); setEditingItem(null); setItemToDelete(null); setAssetBusy(false); }, [sessionGeneration]);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingItem, setEditingItem] =
     useState<Partial<SolarEquipmentItem> | null>(null);
@@ -245,6 +250,7 @@ export const EquipmentManagerSettingsTab: React.FC<
 
   const handleSaveEditor = (e: React.FormEvent) => {
     e.preventDefault();
+    if (assetBusy) return;
     if (
       !editingItem ||
       !editingItem.displayName?.trim() ||
@@ -310,6 +316,9 @@ export const EquipmentManagerSettingsTab: React.FC<
         text: "No puedes modificar este modelo en el ámbito actual.",
       });
       return;
+    }
+    if ((editingItem.supplierPrices || []).some(price => !price.supplierName.trim() || !Number.isFinite(price.priceUSD) || price.priceUSD < 0)) {
+      setFeedbackMessage({ type: "error", text: "Completa el proveedor y un precio válido para cada oferta." }); return;
     }
     const itemToSave: SolarEquipmentItem = {
       ...editingItem,
@@ -869,7 +878,7 @@ export const EquipmentManagerSettingsTab: React.FC<
             aria-label={
               isNewItem ? "Agregar equipo" : "Consultar o editar equipo"
             }
-            className={`w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 ${
+            className={`w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 ${
               isDark
                 ? "bg-[#181820] border-[#2e2e38] text-zinc-100"
                 : "bg-white border-slate-200 text-slate-900"
@@ -887,18 +896,18 @@ export const EquipmentManagerSettingsTab: React.FC<
                   <h4 className="text-sm font-bold">
                     {isNewItem
                       ? "Agregar Nuevo Equipo al Catálogo"
-                      : "Editar Especificaciones del Equipo"}
+                      : "Editar equipo"}
                   </h4>
                   <p
                     className={`text-[11px] ${isDark ? "text-zinc-400" : "text-slate-500"}`}
                   >
-                    Define los parámetros técnicos y el nombre con el que
-                    aparecerá en el simulador.
+                    Administra especificaciones, precios de compra y documentos del modelo.
                   </p>
                 </div>
               </div>
               <button
                 type="button"
+                aria-label="Cerrar editor"
                 onClick={() => {
                   setIsEditorOpen(false);
                   setEditingItem(null);
@@ -911,6 +920,7 @@ export const EquipmentManagerSettingsTab: React.FC<
 
             {/* Modal Body / Form */}
             <form
+              id="equipment-editor-form"
               onSubmit={handleSaveEditor}
               className="p-5 overflow-y-auto space-y-4 flex-1"
             >
@@ -1505,93 +1515,12 @@ export const EquipmentManagerSettingsTab: React.FC<
                 </div>
               )}
 
-              {/* 🏷️ Sección de Precios y Proveedores en Formulario de Edición */}
-              <div
-                className={`p-4 rounded-xl border space-y-3 ${
-                  isDark
-                    ? "bg-[#15151e] border-[#2c2c3e]"
-                    : "bg-amber-50/40 border-amber-200"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Building2 className="w-4 h-4 text-amber-500" />
-                    <h5
-                      className={`text-xs font-bold uppercase tracking-wider ${isDark ? "text-amber-300" : "text-amber-900"}`}
-                    >
-                      Precios y Proveedores Registrados
-                    </h5>
-                  </div>
-                  <span
-                    className={`text-[11px] ${isDark ? "text-zinc-400" : "text-slate-500"}`}
-                  >
-                    {(editingItem.supplierPrices || []).length} oferta(s)
-                  </span>
-                </div>
+              <EquipmentOffersEditor prices={editingItem.supplierPrices || []} onChange={prices => setEditingItem({ ...editingItem, supplierPrices: prices, preferredSupplierId: prices.some(p => p.id === editingItem.preferredSupplierId) ? editingItem.preferredSupplierId : undefined })} dark={isDark} disabled={!canEdit || assetBusy} suppliers={Array.from(new Set(equipmentCatalog.flatMap(item => (item.supplierPrices || []).map(price => price.supplierName))))}/>
+              <EquipmentAssetsEditor item={editingItem} onChange={patch => setEditingItem(previous => previous ? { ...previous, ...patch } : previous)} dark={isDark} disabled={!canEdit} onBusy={setAssetBusy}/>
 
-                {!editingItem.supplierPrices ||
-                editingItem.supplierPrices.length === 0 ? (
-                  <p
-                    className={`text-xs ${isDark ? "text-zinc-500" : "text-slate-500"}`}
-                  >
-                    No hay proveedores registrados aún. Puedes agregar precios
-                    ahora o usar el botón "Precios" en la tabla principal.
-                  </p>
-                ) : (
-                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                    {editingItem.supplierPrices.map((sp, sIdx) => (
-                      <div
-                        key={sp.id || sIdx}
-                        className={`p-2 rounded-lg border text-xs flex items-center justify-between ${
-                          isDark
-                            ? "bg-[#1a1a26] border-[#36364a]"
-                            : "bg-white border-slate-200"
-                        }`}
-                      >
-                        <div>
-                          <strong
-                            className={
-                              isDark ? "text-zinc-200" : "text-slate-800"
-                            }
-                          >
-                            {sp.supplierName}
-                          </strong>
-                          {sp.sku && (
-                            <span className="text-[10px] text-zinc-500 ml-2">
-                              SKU: {sp.sku}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-bold text-emerald-400">
-                            ${sp.priceUSD.toFixed(2)} USD
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const updated =
-                                editingItem.supplierPrices?.filter(
-                                  (_, idx) => idx !== sIdx,
-                                ) || [];
-                              setEditingItem({
-                                ...editingItem,
-                                supplierPrices: updated,
-                              });
-                            }}
-                            className="text-red-400 hover:text-red-300 p-1 cursor-pointer"
-                            title="Quitar oferta"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
+            </form>
               {/* Botones de Footer Modal */}
-              <div className="pt-3 flex items-center justify-end gap-2 border-t border-zinc-700/40">
+              <div className={`shrink-0 p-4 flex items-center justify-end gap-2 border-t ${isDark ? "border-zinc-700" : "border-slate-200"}`}>
                 <button
                   type="button"
                   onClick={() => {
@@ -1608,8 +1537,9 @@ export const EquipmentManagerSettingsTab: React.FC<
                 </button>
                 <button
                   type="submit"
-                  disabled={!canEdit}
-                  className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5 cursor-pointer"
+                  form="equipment-editor-form"
+                  disabled={!canEdit || assetBusy}
+                  className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
                 >
                   <Check className="w-4 h-4" />
                   <span>
@@ -1617,7 +1547,6 @@ export const EquipmentManagerSettingsTab: React.FC<
                   </span>
                 </button>
               </div>
-            </form>
           </div>
         </div>
       )}

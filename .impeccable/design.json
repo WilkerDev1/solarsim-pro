@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-08T11:08:08.989876+00:00",
+  "generatedAt": "2026-10-08T20:50:47.483149Z",
   "title": "Design System: SolarSim Pro — Centro empresarial",
   "extensions": {
     "colorMeta": {
@@ -470,11 +470,18 @@
       "description": "Confirmación explícita previa a aplicar el borrador.",
       "html": "<div class=\"ds-ai ds-ai-footer\"><label class=\"ds-ai-check\"><input type=\"checkbox\"/>Revisé los datos, equipos, precios y supuestos del borrador.</label></div>",
       "css": ".ds-ai{--pw-panel:#fff;--pw-text:#182230;--pw-muted:#536174;--pw-border:#dce2e8;--pw-selected:#e8f7f0;--pw-green:#067451;font-family:Inter,sans-serif;font-size:14px;color:var(--pw-text)}.ds-ai-footer{padding:16px 24px;border-top:1px solid var(--pw-border);background:var(--pw-panel)}.ds-ai-check{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.5}.ds-ai-check input{accent-color:#087b58;width:16px;height:16px;margin-top:2px;flex-shrink:0}.ds-ai-check input:focus-visible{outline:2px solid var(--pw-green);outline-offset:2px}"
+    },
+    {
+      "name": "Inventario: oferta en contexto",
+      "kind": "custom",
+      "description": "Oferta inline en la sección del modelo; controles con etiqueta y fila separada por divisor, sin tarjeta por proveedor.",
+      "html": "<fieldset class=\"ds-catalog-offers\"><div class=\"ds-catalog-heading\"><h5>Precios y proveedores</h5><button type=\"button\" class=\"ds-catalog-add\">Agregar oferta</button></div><p class=\"ds-catalog-note\">Ofertas de compra por unidad; se guardan al confirmar el equipo.</p><div class=\"ds-catalog-offer\"><div class=\"ds-catalog-grid\"><label>Proveedor<input value=\"Proveedor de ejemplo\" /></label><label>SKU<input value=\"\" /></label></div><div class=\"ds-catalog-grid ds-catalog-three\"><label>Moneda<select><option>USD</option><option>DOP</option></select></label><label>Precio unitario<input type=\"number\" min=\"0\" step=\"0.01\" /></label><label>Existencias<select><option>Consultar</option><option>Disponible</option><option>Por encargo</option><option>Agotado</option></select></label></div><label class=\"ds-catalog-notes\">Notas<input /></label></div></fieldset>",
+      "css": ".ds-catalog-offers{font-family:Inter,sans-serif;font-size:14px;color:#0f172a;border:1px solid #e2e8f0;border-radius:12px;padding:16px;background:#fff}.ds-catalog-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.ds-catalog-heading h5{font-size:14px;font-weight:600;margin:0}.ds-catalog-add{font:inherit;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;background:transparent;color:inherit;cursor:pointer}.ds-catalog-note{font-size:12px;line-height:16px;color:#64748b}.ds-catalog-offer{border-top:1px solid #e2e8f0;padding-top:16px}.ds-catalog-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:12px}.ds-catalog-three{grid-template-columns:repeat(3,minmax(0,1fr))}.ds-catalog-offers label{display:block;font-size:12px;line-height:16px}.ds-catalog-offers input,.ds-catalog-offers select{display:block;width:calc(100% - 26px);font-family:inherit;font-size:14px;line-height:20px;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;background:#fff;color:#0f172a}.ds-catalog-offers button:focus-visible,.ds-catalog-offers input:focus-visible,.ds-catalog-offers select:focus-visible{outline:2px solid #059669;outline-offset:3px}"
     }
   ],
   "narrative": {
     "northStar": "Centro de trabajo empresarial",
-    "overview": "El centro empresarial extiende la identidad de SolarSim: Inter, superficies neutras y verde para acciones y selección. Su carácter empresarial procede de la jerarquía de formularios, navegación explícita y tablas de miembros, sin decoración de marketing.\n\nEsta extracción documenta la superficie empresarial implementada, no impone sus valores locales al simulador o al dossier PDF. Los colores `cc-*` pertenecen al ámbito del centro; Dashboard y Ajustes conservan sus propios tokens. La fuente normativa es `src/components/companies/company-center.css`, con tipografía heredada de `src/index.css`.\n\nLa extensión conserva el mismo mundo Operate. La evidencia normativa adicional es `src/components/common/ai-invoice/proposal-workspace.css`, `AIInvoiceScannerModal.tsx`, `ProposalDraftReview.tsx`, `ProposalConsumptionReview.tsx`, `ProposalCommercialReview.tsx` y `EquipmentManagerSettingsTab.tsx`. Los roles `--pw-*` coinciden con los neutros y verdes del centro; el catálogo usa clases Tailwind equivalentes, sin convertir esas clases en tokens globales. Esta extracción registra únicamente esas superficies, sin reemplazar el sistema empresarial ni canonizar el PDF.",
+    "overview": "El centro empresarial extiende la identidad de SolarSim: Inter, superficies neutras y verde para acciones y selección. Su carácter empresarial procede de la jerarquía de formularios, navegación explícita y tablas de miembros, sin decoración de marketing.\n\nEsta extracción documenta la superficie empresarial implementada, no impone sus valores locales al simulador o al dossier PDF. Los colores `cc-*` pertenecen al ámbito del centro; Dashboard y Ajustes conservan sus propios tokens. La fuente normativa es `src/components/companies/company-center.css`, con tipografía heredada de `src/index.css`.\n\nLa extensión conserva el mismo mundo Operate. La evidencia normativa adicional es `src/components/common/ai-invoice/proposal-workspace.css`, `AIInvoiceScannerModal.tsx`, `ProposalDraftReview.tsx`, `ProposalConsumptionReview.tsx`, `ProposalCommercialReview.tsx` y `EquipmentManagerSettingsTab.tsx`. Los roles `--pw-*` coinciden con los neutros y verdes del centro; el catálogo usa clases Tailwind equivalentes, sin convertir esas clases en tokens globales. Esta extracción registra únicamente esas superficies, sin reemplazar el sistema empresarial ni canonizar el PDF. La edición final del catálogo se evidencia además en `common/equipment/EquipmentOffersEditor.tsx`, `EquipmentAssetsEditor.tsx`, `EquipmentImagePreview.tsx` y `AIDatasheetScannerModal.tsx`.",
     "keyCharacteristics": [
       "Formularios por propósito y tablas legibles.",
       "Tema claro y oscuro mediante roles equivalentes.",
@@ -495,6 +502,11 @@
       {
         "name": "Superficie plana",
         "body": "La separación ordinaria se construye con fondo, borde y espacio; los formularios y tablas del centro no requieren sombras.",
+        "section": "elevation"
+      },
+      {
+        "name": "Ofertas en contexto",
+        "body": "Las ofertas de un modelo se editan en su misma sección, separadas por divisores horizontales; el contenedor agrupa la tarea sin añadir una tarjeta elevada por proveedor. El importador también separa variantes con divisores y reserva el fondo de aviso para coincidencias o resultados. La sombra pertenece al diálogo completo.",
         "section": "elevation"
       }
     ],

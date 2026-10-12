@@ -50,6 +50,10 @@ export interface SolarEquipmentItem {
   dimensions?: string;           // ej: "2382 x 1134 x 30 mm" o "900 x 445 x 230 mm"
   weightKg?: number;             // ej: 33.6 o 120
   datasheetUrl?: string;
+  datasheetAssetId?: string;
+  datasheetName?: string;
+  imageAssetIds?: string[];
+  imageNames?: string[];
   isCustom?: boolean;            // Creado por el usuario / escaneado con IA
   createdAt: string;
   updatedAt: string;

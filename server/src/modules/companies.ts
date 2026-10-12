@@ -18,6 +18,8 @@ const stringFields = [
   "website",
   "defaultPaymentTerms",
   "defaultWarrantyNotes",
+  "slogan",
+  "instagram",
 ];
 const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");
@@ -131,6 +133,7 @@ export function registerCompanyRoutes(app: Hono, deps: Dependencies) {
         [actor.organizationId],
       )
     ).rows[0];
+    if (!row) return c.json({ error: "Organización no disponible" }, 404);
     return c.json({
       success: true,
       organizationId: actor.organizationId,
@@ -187,7 +190,7 @@ export function registerCompanyRoutes(app: Hono, deps: Dependencies) {
           return c.json({ error: "Color inválido" }, 400);
         clean[key] = profile[key];
       }
-    for (const key of ["logoBase64", "signatureSealBase64"])
+    for (const key of ["logoBase64", "signatureSealBase64", "watermarkLogoBase64"])
       if (profile[key] !== undefined) {
         if (
           typeof profile[key] !== "string" ||

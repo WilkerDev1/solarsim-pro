@@ -1,4 +1,5 @@
 import type { Pool } from "pg";
+import { sharedResources } from "./004_shared_resources.js";
 import { baselineSchema } from "./001_baseline.js";
 import { featurePolicyAndTombstones } from "./002_feature_policy_and_tombstones.js";
 import { companyManagement } from "./003_company_management.js";
@@ -28,6 +29,7 @@ export async function migrateDatabase(pool: Pool): Promise<void> {
         run: featurePolicyAndTombstones,
       },
       { version: 3, name: "company_management", run: companyManagement },
+      { version: 4, name: "shared_resources", run: sharedResources },
     ]) {
       if (applied.has(migration.version)) continue;
       await migration.run(client);

@@ -15,6 +15,7 @@ import {
 } from "../../types/equipment";
 import { parseDatasheetWithGemini } from "../../services/geminiDatasheetService";
 import { findCatalogMatchForVariant } from "../../utils/equipmentMatchingUtils";
+import { uploadEquipmentAsset } from "../../services/equipmentAssetService";
 import { planDatasheetImport } from "../../utils/datasheetImport";
 
 const technicalFields = {
@@ -136,9 +137,9 @@ export const AIDatasheetScannerModal: React.FC = () => {
       setError("Sube un PDF o una imagen PNG, JPG o WebP.");
       return;
     }
-    if (next.size > 20 * 1024 * 1024) {
+    if (next.size > 8 * 1024 * 1024) {
       setError(
-        "El archivo supera 20 MB. Divide el PDF o usa una imagen más pequeña.",
+        "El archivo supera 8 MB. Divide el PDF o usa una imagen más pequeña.",
       );
       return;
     }
@@ -229,8 +230,12 @@ export const AIDatasheetScannerModal: React.FC = () => {
         : old,
     );
   };
-  const save = () => {
-    if (!data || !canEdit) return;
+  const save = async () => {
+    if (!data || !canEdit || busy || !file) return;
+    const request = ++generation.current;
+    const session = useSimulationStore.getState().sessionGeneration;
+    setBusy(true); setSaved(null); setError(null);
+    abort.current = new AbortController();
     try {
       const live = useSimulationStore.getState();
       const plan = planDatasheetImport(data, live.equipmentCatalog);
@@ -252,6 +257,19 @@ export const AIDatasheetScannerModal: React.FC = () => {
           throw new Error(
             "Una coincidencia pertenece a otro ámbito. Guarda un modelo independiente con un nombre diferente.",
           );
+      }
+      let attachment: { datasheetAssetId: string; datasheetName: string } | undefined;
+      if (activeUser) {
+        if (!live.syncSettings.authToken) throw new Error("Inicia sesión para adjuntar la ficha al catálogo.");
+        setProgress("Guardando una copia de la ficha en el servidor…");
+        const asset = await uploadEquipmentAsset(server, live.syncSettings.authToken, file, "datasheet", abort.current.signal);
+        if (request !== generation.current || session !== useSimulationStore.getState().sessionGeneration) return;
+        const currentRole = useSimulationStore.getState().syncSettings.currentUser?.role;
+        if (!currentRole || !["ADMIN", "EDITOR"].includes(currentRole)) throw new Error("Ya no tienes permisos para modificar el catálogo.");
+        attachment = { datasheetAssetId: asset.id, datasheetName: asset.name };
+        // Cada variante referencia el mismo activo; no se sube una copia por modelo.
+        plan.updates.forEach(entry => Object.assign(entry.patch, attachment));
+        plan.creates.forEach(entry => Object.assign(entry.item, attachment));
       }
       for (const update of plan.updates)
         live.updateEquipmentItem(update.id, update.patch);
@@ -277,15 +295,14 @@ export const AIDatasheetScannerModal: React.FC = () => {
             "No tienes permisos para modificar estos equipos.",
         );
       setSaved(
-        `${plan.updates.length} actualizados y ${plan.creates.length} nuevos. Revisa los modelos y precios en el catálogo.`,
+        `${plan.updates.length} actualizados y ${plan.creates.length} nuevos. ${attachment ? "Ficha adjunta y compartida entre las variantes." : "Guardado local: la ficha no se ha adjuntado al servidor; requiere iniciar sesión."} Revisa los modelos y precios en el catálogo.`,
       );
       setError(null);
     } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "No se pudo guardar el catálogo.",
-      );
+      if (request === generation.current && session === useSimulationStore.getState().sessionGeneration)
+        setError(cause instanceof Error ? cause.message : "No se pudo guardar el catálogo.");
+    } finally {
+      if (request === generation.current) setBusy(false);
     }
   };
   const count = data?.variants.filter((v) => v.selected).length || 0;
@@ -371,7 +388,7 @@ export const AIDatasheetScannerModal: React.FC = () => {
                 >
                   {file
                     ? `${(file.size / 1024 / 1024).toFixed(1)} MB · Cambiar archivo`
-                    : "PDF, PNG, JPG o WebP · Hasta 20 MB"}
+                    : "PDF, PNG, JPG o WebP · Hasta 8 MB"}
                 </span>
               </button>
               <p
@@ -649,10 +666,10 @@ export const AIDatasheetScannerModal: React.FC = () => {
             <button
               type="button"
               onClick={save}
-              disabled={!count || !canEdit || !!saved}
+              disabled={!count || !canEdit || !!saved || busy}
               className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-50"
             >
-              Guardar {count} variantes
+              {busy ? "Guardando…" : `Guardar ${count} variantes`}
             </button>
           ) : (
             <button

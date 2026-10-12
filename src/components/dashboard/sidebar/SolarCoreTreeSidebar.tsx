@@ -19,6 +19,8 @@ import {
   Laptop,
   CloudOff,
   LogIn,
+  Lock,
+  RefreshCw,
 } from 'lucide-react';
 import { CreateFolderModal } from './CreateFolderModal';
 import { ProjectFolder } from '../../../types';
@@ -28,6 +30,10 @@ export const SolarCoreTreeSidebar: React.FC = () => {
   const {
     projects,
     folders,
+    folderSyncFeedback,
+    folderChanges,
+    resolveFolderConflict,
+    syncFoldersWithServer,
     activeFolderId,
     setActiveFolderId,
     activeTeamMemberFilter,
@@ -352,6 +358,17 @@ export const SolarCoreTreeSidebar: React.FC = () => {
 
             {/* Listado de Carpetas */}
             <div className="flex flex-col gap-1">
+              {folderSyncFeedback && <div role="status" className="px-3 py-2 text-xs text-amber-700 dark:text-amber-200">
+                <p>{folderSyncFeedback}</p>
+                <button type="button" onClick={() => void syncFoldersWithServer()} className="mt-2 flex gap-2 items-center underline"><RefreshCw size={12} /> Sincronizar carpetas</button>
+              </div>}
+              {Object.entries(folderChanges).filter(([,change]) => change.serverFolder).map(([id,change]) => <div key={id} role="alert" className="px-3 py-2 text-xs text-amber-700 dark:text-amber-200">
+                <p>La carpeta «{change.serverFolder!.name}» cambió en el servidor.</p>
+                <div className="flex flex-wrap gap-3 mt-2">
+                  <button type="button" className="underline" onClick={() => resolveFolderConflict(id,'accept_server')}>Usar versión del servidor</button>
+                  <button type="button" className="underline" onClick={() => resolveFolderConflict(id,'keep_local')}>Guardar mis cambios</button>
+                </div>
+              </div>)}
               {folders.length === 0 ? (
                 <div className="px-3 py-3 text-center border border-dashed border-slate-200 dark:border-[#272f3e] rounded-xl my-1">
                   <p className="text-[11px] text-slate-400 dark:text-zinc-500">Sin carpetas creadas</p>
@@ -425,6 +442,7 @@ export const SolarCoreTreeSidebar: React.FC = () => {
                             />
                           )}
                           <span className="font-semibold truncate text-xs">{folder.name}</span>
+                          {folder.visibility === 'private' && <Lock className="w-3 h-3 shrink-0" aria-label="Carpeta privada" />}
                         </div>
 
                         <div className="flex items-center gap-1.5 shrink-0">

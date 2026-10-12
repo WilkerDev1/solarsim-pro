@@ -8,7 +8,7 @@ THESIS: Tareas de ingeniería con datos y evidencia revisables antes de confirma
 OWN-WORLD: Mundo heredado Inter, gris neutro por tema y verde funcional, interfaces empresariales de operación cotidiana.
 STORY: Texto/archivos → borrador enlazado al catálogo y tarifas → pestañas consumo/diseño, equipos, cotización y cliente/tarifa → corrección manual o por chat → revisión confirmada → crear o actualizar.
 FIRST VIEWPORT: Entrada/compositor y revisión visibles simultáneamente; pie de confirmación fijo en la zona de revisión y pestañas persistentes en su scroll. Contexto y errores preceden los campos.
-FORM: Paneles planos, formularios etiquetados y tabla compacta de inventario; escritorio 1024×700 mínimo, 1400×900 principal. Sin comp aprobado ni reemplazo de identidad; código actual como autoridad.
+FORM: Extensión local especificada del editor de inventario; exenta de concept-seed según reference/new-work.md:39 (identidad heredada, sin reemplazo visual). Paneles planos, formularios etiquetados y tabla compacta de inventario; escritorio 1024×700 mínimo, 1400×900 principal. Sin comp aprobado ni reemplazo de identidad; código actual como autoridad.
 
 ## Quality bar y evidencia
 

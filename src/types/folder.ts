@@ -1,5 +1,11 @@
 export interface ProjectFolder {
   id: string;
+  organizationId?: string;
+  visibility?: 'public' | 'private';
+  createdById?: string;
+  version?: number;
+  baseVersion?: number;
+  updatedAt?: string;
   name: string;
   color?: string; // Hex or tailwind color
   description?: string;

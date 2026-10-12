@@ -1,3 +1,5 @@
+import { registerFolderRoutes } from "./modules/folders.js";
+import { registerEquipmentAssetRoutes } from "./modules/equipmentAssets.js";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
@@ -73,6 +75,8 @@ export function createApp(options: {
   registerUsersRoutes(app, deps);
   registerProjectsRoutes(app, deps);
   registerEquipmentRoutes(app, deps);
+  registerFolderRoutes(app, deps);
+  registerEquipmentAssetRoutes(app, deps);
   registerTariffsRoutes(app, deps);
   registerNotificationsRoutes(app, deps);
   registerOrganizationRoutes(app, deps);
