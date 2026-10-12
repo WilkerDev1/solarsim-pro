@@ -177,14 +177,33 @@ export function registerAuthRoutes(app: Hono, deps: Dependencies): void {
     c.header("X-Renewed-Token", token);
     return c.json({ success: true, token, user });
   });
-  app.post("/api/auth/share-history-authorization", async c => {
+  app.post("/api/auth/share-history-authorization", async (c) => {
     const user = await authenticate(c);
-    if (!user) return c.json({ error: 'No autorizado' },401);
-    const policy = (await pool.query('SELECT feature_policy_version,feature_settings FROM organizations WHERE id=$1',[user.organizationId])).rows[0];
-    if (!policy) return c.json({ error: 'Organización no disponible' },403);
-    const authors = (await pool.query(`SELECT u.id,u.name FROM users u WHERE u.organization_id=$1 OR EXISTS(SELECT 1 FROM organization_memberships m WHERE m.organization_id=$1 AND m.user_id=u.id)`,[user.organizationId])).rows;
-    return c.json({ success:true,userId:user.id,userName:user.name,organizationId:user.organizationId,authors,
-      featurePolicy:{ version:policy.feature_policy_version,settings:policy.feature_settings } });
+    if (!user) return c.json({ error: "No autorizado" }, 401);
+    const policy = (
+      await pool.query(
+        "SELECT feature_policy_version,feature_settings FROM organizations WHERE id=$1",
+        [user.organizationId],
+      )
+    ).rows[0];
+    if (!policy) return c.json({ error: "Organización no disponible" }, 403);
+    const authors = (
+      await pool.query(
+        `SELECT u.id,u.name FROM users u WHERE u.organization_id=$1 OR EXISTS(SELECT 1 FROM organization_memberships m WHERE m.organization_id=$1 AND m.user_id=u.id)`,
+        [user.organizationId],
+      )
+    ).rows;
+    return c.json({
+      success: true,
+      userId: user.id,
+      userName: user.name,
+      organizationId: user.organizationId,
+      authors,
+      featurePolicy: {
+        version: policy.feature_policy_version,
+        settings: policy.feature_settings,
+      },
+    });
   });
   app.post("/api/auth/share-authorization", async (c) => {
     const user = await authenticate(c);

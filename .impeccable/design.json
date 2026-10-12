@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-08T20:50:47.483149Z",
+  "generatedAt": "2026-10-12T14:56:58.796863+00:00",
   "title": "Design System: SolarSim Pro — Centro empresarial",
   "extensions": {
     "colorMeta": {
@@ -355,6 +355,182 @@
           "oklch(95% 0.07318 9.17)"
         ],
         "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "ai-chat-bg": {
+        "role": "neutral",
+        "displayName": "ai-chat-bg",
+        "canonical": "#121b28",
+        "tonalRamp": [
+          "oklch(15% 0.02889 257.53)",
+          "oklch(26% 0.02889 257.53)",
+          "oklch(38% 0.02889 257.53)",
+          "oklch(49% 0.02889 257.53)",
+          "oklch(61% 0.02889 257.53)",
+          "oklch(72% 0.02889 257.53)",
+          "oklch(84% 0.02889 257.53)",
+          "oklch(95% 0.02889 257.53)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "ai-chat-panel": {
+        "role": "neutral",
+        "displayName": "ai-chat-panel",
+        "canonical": "#192536",
+        "tonalRamp": [
+          "oklch(15% 0.03629 257.13)",
+          "oklch(26% 0.03629 257.13)",
+          "oklch(38% 0.03629 257.13)",
+          "oklch(49% 0.03629 257.13)",
+          "oklch(61% 0.03629 257.13)",
+          "oklch(72% 0.03629 257.13)",
+          "oklch(84% 0.03629 257.13)",
+          "oklch(95% 0.03629 257.13)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "ai-chat-text": {
+        "role": "neutral",
+        "displayName": "ai-chat-text",
+        "canonical": "#f1f5fa",
+        "tonalRamp": [
+          "oklch(15% 0.00794 253.85)",
+          "oklch(26% 0.00794 253.85)",
+          "oklch(38% 0.00794 253.85)",
+          "oklch(49% 0.00794 253.85)",
+          "oklch(61% 0.00794 253.85)",
+          "oklch(72% 0.00794 253.85)",
+          "oklch(84% 0.00794 253.85)",
+          "oklch(95% 0.00794 253.85)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "ai-chat-muted": {
+        "role": "neutral",
+        "displayName": "ai-chat-muted",
+        "canonical": "#bccbdd",
+        "tonalRamp": [
+          "oklch(15% 0.03008 252.97)",
+          "oklch(26% 0.03008 252.97)",
+          "oklch(38% 0.03008 252.97)",
+          "oklch(49% 0.03008 252.97)",
+          "oklch(61% 0.03008 252.97)",
+          "oklch(72% 0.03008 252.97)",
+          "oklch(84% 0.03008 252.97)",
+          "oklch(95% 0.03008 252.97)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "ai-chat-border": {
+        "role": "neutral",
+        "displayName": "ai-chat-border",
+        "canonical": "#40536b",
+        "tonalRamp": [
+          "oklch(15% 0.04641 254.54)",
+          "oklch(26% 0.04641 254.54)",
+          "oklch(38% 0.04641 254.54)",
+          "oklch(49% 0.04641 254.54)",
+          "oklch(61% 0.04641 254.54)",
+          "oklch(72% 0.04641 254.54)",
+          "oklch(84% 0.04641 254.54)",
+          "oklch(95% 0.04641 254.54)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "ai-chat-green": {
+        "role": "neutral",
+        "displayName": "ai-chat-green",
+        "canonical": "#75e4bc",
+        "tonalRamp": [
+          "oklch(15% 0.11815 167.70)",
+          "oklch(26% 0.11815 167.70)",
+          "oklch(38% 0.11815 167.70)",
+          "oklch(49% 0.11815 167.70)",
+          "oklch(61% 0.11815 167.70)",
+          "oklch(72% 0.11815 167.70)",
+          "oklch(84% 0.11815 167.70)",
+          "oklch(95% 0.11815 167.70)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "ai-chat-selected": {
+        "role": "neutral",
+        "displayName": "ai-chat-selected",
+        "canonical": "#163b32",
+        "tonalRamp": [
+          "oklch(15% 0.04557 174.97)",
+          "oklch(26% 0.04557 174.97)",
+          "oklch(38% 0.04557 174.97)",
+          "oklch(49% 0.04557 174.97)",
+          "oklch(61% 0.04557 174.97)",
+          "oklch(72% 0.04557 174.97)",
+          "oklch(84% 0.04557 174.97)",
+          "oklch(95% 0.04557 174.97)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "ai-chat-control-bg": {
+        "role": "neutral",
+        "displayName": "ai-chat-control-bg",
+        "canonical": "#213047",
+        "tonalRamp": [
+          "oklch(15% 0.04642 258.72)",
+          "oklch(26% 0.04642 258.72)",
+          "oklch(38% 0.04642 258.72)",
+          "oklch(49% 0.04642 258.72)",
+          "oklch(61% 0.04642 258.72)",
+          "oklch(72% 0.04642 258.72)",
+          "oklch(84% 0.04642 258.72)",
+          "oklch(95% 0.04642 258.72)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "ai-chat-control-border": {
+        "role": "neutral",
+        "displayName": "ai-chat-control-border",
+        "canonical": "#597087",
+        "tonalRamp": [
+          "oklch(15% 0.04537 248.69)",
+          "oklch(26% 0.04537 248.69)",
+          "oklch(38% 0.04537 248.69)",
+          "oklch(49% 0.04537 248.69)",
+          "oklch(61% 0.04537 248.69)",
+          "oklch(72% 0.04537 248.69)",
+          "oklch(84% 0.04537 248.69)",
+          "oklch(95% 0.04537 248.69)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "ai-chat-button-bg": {
+        "role": "neutral",
+        "displayName": "ai-chat-button-bg",
+        "canonical": "#253850",
+        "tonalRamp": [
+          "oklch(15% 0.04926 254.73)",
+          "oklch(26% 0.04926 254.73)",
+          "oklch(38% 0.04926 254.73)",
+          "oklch(49% 0.04926 254.73)",
+          "oklch(61% 0.04926 254.73)",
+          "oklch(72% 0.04926 254.73)",
+          "oklch(84% 0.04926 254.73)",
+          "oklch(95% 0.04926 254.73)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
+      },
+      "ai-chat-button-border": {
+        "role": "neutral",
+        "displayName": "ai-chat-button-border",
+        "canonical": "#5b7290",
+        "tonalRamp": [
+          "oklch(15% 0.05447 255.25)",
+          "oklch(26% 0.05447 255.25)",
+          "oklch(38% 0.05447 255.25)",
+          "oklch(49% 0.05447 255.25)",
+          "oklch(61% 0.05447 255.25)",
+          "oklch(72% 0.05447 255.25)",
+          "oklch(84% 0.05447 255.25)",
+          "oklch(95% 0.05447 255.25)"
+        ],
+        "rampPurpose": "Vista sintética del panel; no tokens utilizados por la aplicación."
       }
     },
     "typographyMeta": {
@@ -367,13 +543,7 @@
         "purpose": "Explicaciones y valores editables."
       }
     },
-    "shadows": [
-      {
-        "name": "ai-modal-ambient",
-        "value": "0 20px 70px rgba(0,0,0,.22)",
-        "purpose": "Sólo modal del asistente: separación del trabajo subyacente, sin extender sombra a tablas/formularios del centro."
-      }
-    ],
+    "shadows": [],
     "motion": [
       {
         "name": "ai-processing-pulse",
@@ -444,17 +614,16 @@
     {
       "name": "Asistente: preparar borrador",
       "kind": "button",
-      "refersTo": "ai-button-primary",
-      "description": "Solicitud de análisis; no crea la propuesta.",
+      "description": "Solicitar análisis desde el chat permanentemente oscuro; no crea la propuesta.",
       "html": "<div class=\"ds-ai\"><button class=\"ds-ai-button ds-ai-primary\">Preparar borrador</button></div>",
-      "css": ".ds-ai{--pw-panel:#fff;--pw-text:#182230;--pw-muted:#536174;--pw-border:#dce2e8;--pw-selected:#e8f7f0;--pw-green:#067451;font-family:Inter,sans-serif;font-size:14px;color:var(--pw-text)}.ds-ai-button{display:inline-flex;gap:8px;align-items:center;justify-content:center;min-height:36px;padding:8px 12px;background:var(--pw-panel);border:1px solid var(--pw-border);border-radius:8px;font:inherit;font-size:13px;font-weight:550;color:var(--pw-text);cursor:pointer}.ds-ai-button:hover{background:var(--pw-selected)}.ds-ai-button:focus-visible{outline:2px solid var(--pw-green);outline-offset:2px}.ds-ai-button:disabled{opacity:.48;cursor:not-allowed}.ds-ai-primary{background:#087b58;border-color:#087b58;color:#fff}.ds-ai-primary:hover{background:#066344}"
+      "css": ".ds-ai{--pw-panel:#192536;--pw-text:#f1f5fa;--pw-border:#40536b;--pw-green:#75e4bc;--pw-selected:#163b32;background:#121b28;padding:16px;font-family:Inter,sans-serif;font-size:14px;color:var(--pw-text)}.ds-ai-button{display:inline-flex;gap:8px;align-items:center;justify-content:center;min-height:36px;padding:8px 12px;border:1px solid #77e2bd;border-radius:8px;font:550 13px Inter,sans-serif;cursor:pointer}.ds-ai-primary{background:#77e2bd;color:#102f27}.ds-ai-primary:hover{background:#066344}.ds-ai-button:focus-visible{outline:2px solid var(--pw-green);outline-offset:2px}.ds-ai-button:disabled{opacity:.55;cursor:not-allowed}"
     },
     {
       "name": "Asistente: pestañas de revisión",
       "kind": "nav",
       "description": "Secciones del borrador con selección explícita; el componente real mantiene los paneles y navega con flechas, Home y End.",
       "html": "<div class=\"ds-ai-tabs\" role=\"tablist\" aria-label=\"Secciones del borrador\"><button role=\"tab\" aria-selected=\"true\">Consumo y diseño</button><button role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">Equipos</button><button role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">Cotización</button><button role=\"tab\" aria-selected=\"false\" tabindex=\"-1\">Cliente y tarifa</button></div>",
-      "css": ".ds-ai-tabs{--pw-panel:#fff;--pw-text:#182230;--pw-border:#dce2e8;--pw-selected:#e8f7f0;--pw-green:#067451;display:flex;gap:4px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--pw-border);background:var(--pw-panel);font-family:Inter,sans-serif}.ds-ai-tabs button{font:inherit;font-size:13px;font-weight:550;min-height:36px;padding:8px 12px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--pw-text);cursor:pointer}.ds-ai-tabs button[aria-selected=true]{color:var(--pw-green);background:var(--pw-selected);border-color:var(--pw-border)}.ds-ai-tabs button:hover{background:var(--pw-selected)}.ds-ai-tabs button:focus-visible{outline:2px solid var(--pw-green);outline-offset:2px}"
+      "css": ".ds-ai-tabs{--pw-panel:#fff;--pw-text:#182230;--pw-border:#dce2e8;--pw-selected:#e8f7f0;--pw-green:#067451;display:flex;gap:4px;flex-wrap:wrap;padding:12px 0;border-bottom:2px solid var(--pw-border);background:var(--pw-panel);font-family:Inter,sans-serif}.ds-ai-tabs button{font:inherit;font-size:13px;font-weight:550;min-height:36px;padding:8px 12px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--pw-text);cursor:pointer}.ds-ai-tabs button[aria-selected=true]{color:var(--pw-panel);background:var(--pw-green);border-color:var(--pw-border)}.ds-ai-tabs button:hover{background:var(--pw-selected)}.ds-ai-tabs button:focus-visible{outline:2px solid var(--pw-green);outline-offset:2px}"
     },
     {
       "name": "Asistente: campo de revisión",
@@ -469,7 +638,7 @@
       "kind": "custom",
       "description": "Confirmación explícita previa a aplicar el borrador.",
       "html": "<div class=\"ds-ai ds-ai-footer\"><label class=\"ds-ai-check\"><input type=\"checkbox\"/>Revisé los datos, equipos, precios y supuestos del borrador.</label></div>",
-      "css": ".ds-ai{--pw-panel:#fff;--pw-text:#182230;--pw-muted:#536174;--pw-border:#dce2e8;--pw-selected:#e8f7f0;--pw-green:#067451;font-family:Inter,sans-serif;font-size:14px;color:var(--pw-text)}.ds-ai-footer{padding:16px 24px;border-top:1px solid var(--pw-border);background:var(--pw-panel)}.ds-ai-check{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.5}.ds-ai-check input{accent-color:#087b58;width:16px;height:16px;margin-top:2px;flex-shrink:0}.ds-ai-check input:focus-visible{outline:2px solid var(--pw-green);outline-offset:2px}"
+      "css": ".ds-ai{--pw-panel:#fff;--pw-bg:#f6f8fa;--pw-text:#182230;--pw-muted:#536174;--pw-border:#dce2e8;--pw-selected:#e8f7f0;--pw-green:#067451;font-family:Inter,sans-serif;font-size:14px;color:var(--pw-text)}.ds-ai-footer{padding:16px 24px;border-top:2px solid var(--pw-border);background:var(--pw-bg)}.ds-ai-check{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.5}.ds-ai-check input{accent-color:#087b58;width:16px;height:16px;margin-top:2px;flex-shrink:0}.ds-ai-check input:focus-visible{outline:2px solid var(--pw-green);outline-offset:2px}"
     },
     {
       "name": "Inventario: oferta en contexto",
@@ -477,11 +646,18 @@
       "description": "Oferta inline en la sección del modelo; controles con etiqueta y fila separada por divisor, sin tarjeta por proveedor.",
       "html": "<fieldset class=\"ds-catalog-offers\"><div class=\"ds-catalog-heading\"><h5>Precios y proveedores</h5><button type=\"button\" class=\"ds-catalog-add\">Agregar oferta</button></div><p class=\"ds-catalog-note\">Ofertas de compra por unidad; se guardan al confirmar el equipo.</p><div class=\"ds-catalog-offer\"><div class=\"ds-catalog-grid\"><label>Proveedor<input value=\"Proveedor de ejemplo\" /></label><label>SKU<input value=\"\" /></label></div><div class=\"ds-catalog-grid ds-catalog-three\"><label>Moneda<select><option>USD</option><option>DOP</option></select></label><label>Precio unitario<input type=\"number\" min=\"0\" step=\"0.01\" /></label><label>Existencias<select><option>Consultar</option><option>Disponible</option><option>Por encargo</option><option>Agotado</option></select></label></div><label class=\"ds-catalog-notes\">Notas<input /></label></div></fieldset>",
       "css": ".ds-catalog-offers{font-family:Inter,sans-serif;font-size:14px;color:#0f172a;border:1px solid #e2e8f0;border-radius:12px;padding:16px;background:#fff}.ds-catalog-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.ds-catalog-heading h5{font-size:14px;font-weight:600;margin:0}.ds-catalog-add{font:inherit;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;background:transparent;color:inherit;cursor:pointer}.ds-catalog-note{font-size:12px;line-height:16px;color:#64748b}.ds-catalog-offer{border-top:1px solid #e2e8f0;padding-top:16px}.ds-catalog-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:12px}.ds-catalog-three{grid-template-columns:repeat(3,minmax(0,1fr))}.ds-catalog-offers label{display:block;font-size:12px;line-height:16px}.ds-catalog-offers input,.ds-catalog-offers select{display:block;width:calc(100% - 26px);font-family:inherit;font-size:14px;line-height:20px;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;background:#fff;color:#0f172a}.ds-catalog-offers button:focus-visible,.ds-catalog-offers input:focus-visible,.ds-catalog-offers select:focus-visible{outline:2px solid #059669;outline-offset:3px}"
+    },
+    {
+      "name": "Asistente: conversación permanente",
+      "kind": "custom",
+      "description": "Chat azul marino en ambos temas, mensajes delimitados y compositor con campo y controles visibles.",
+      "html": "<section class=\"ds-ai-chat\"><article class=\"ds-ai-message\"><strong>Asistente</strong><p>Revisa los datos del borrador.</p></article><label class=\"ds-ai-chat-label\">Mensaje al asistente<textarea placeholder=\"Describe los ajustes…\"></textarea></label><button>Adjuntar archivo</button></section>",
+      "css": ".ds-ai-chat{--pw-bg:#121b28;--pw-panel:#192536;--pw-text:#f1f5fa;--pw-muted:#bccbdd;--pw-border:#40536b;--pw-green:#75e4bc;--pw-selected:#163b32;font:14px Inter,sans-serif;background:var(--pw-bg);color:var(--pw-text);padding:20px}.ds-ai-message{background:var(--pw-panel);border:1px solid var(--pw-border);border-radius:10px;padding:16px;margin:14px 0}.ds-ai-message strong{font-size:12px;color:#a7efda}.ds-ai-message p{line-height:1.6;margin:6px 0 0}.ds-ai-chat-label{font-size:13px;font-weight:550;display:flex;flex-direction:column;gap:7px}.ds-ai-chat textarea{font:14px Inter,sans-serif;min-height:100px;background:#213047;border:1px solid #597087;border-radius:8px;color:#f1f5fa;padding:9px 10px;resize:vertical;caret-color:var(--pw-green)}.ds-ai-chat textarea::placeholder{color:#bac9db}.ds-ai-chat button{font:550 13px Inter,sans-serif;padding:8px 12px;min-height:36px;background:#253850;color:#f1f5fa;border:1px solid #5b7290;border-radius:8px;margin-top:10px;cursor:pointer}.ds-ai-chat button:hover{background:var(--pw-selected)}.ds-ai-chat :is(button,textarea):focus-visible{outline:2px solid var(--pw-green);outline-offset:2px}.ds-ai-chat button:disabled{opacity:.55;cursor:not-allowed}"
     }
   ],
   "narrative": {
     "northStar": "Centro de trabajo empresarial",
-    "overview": "El centro empresarial extiende la identidad de SolarSim: Inter, superficies neutras y verde para acciones y selección. Su carácter empresarial procede de la jerarquía de formularios, navegación explícita y tablas de miembros, sin decoración de marketing.\n\nEsta extracción documenta la superficie empresarial implementada, no impone sus valores locales al simulador o al dossier PDF. Los colores `cc-*` pertenecen al ámbito del centro; Dashboard y Ajustes conservan sus propios tokens. La fuente normativa es `src/components/companies/company-center.css`, con tipografía heredada de `src/index.css`.\n\nLa extensión conserva el mismo mundo Operate. La evidencia normativa adicional es `src/components/common/ai-invoice/proposal-workspace.css`, `AIInvoiceScannerModal.tsx`, `ProposalDraftReview.tsx`, `ProposalConsumptionReview.tsx`, `ProposalCommercialReview.tsx` y `EquipmentManagerSettingsTab.tsx`. Los roles `--pw-*` coinciden con los neutros y verdes del centro; el catálogo usa clases Tailwind equivalentes, sin convertir esas clases en tokens globales. Esta extracción registra únicamente esas superficies, sin reemplazar el sistema empresarial ni canonizar el PDF. La edición final del catálogo se evidencia además en `common/equipment/EquipmentOffersEditor.tsx`, `EquipmentAssetsEditor.tsx`, `EquipmentImagePreview.tsx` y `AIDatasheetScannerModal.tsx`.",
+    "overview": "El centro empresarial extiende la identidad de SolarSim: Inter, superficies neutras y verde para acciones y selección. Su carácter empresarial procede de la jerarquía de formularios, navegación explícita y tablas de miembros, sin decoración de marketing.\n\nEsta extracción documenta la superficie empresarial implementada, no impone sus valores locales al simulador o al dossier PDF. Los colores `cc-*` pertenecen al ámbito del centro; Dashboard y Ajustes conservan sus propios tokens. La fuente normativa es `src/components/companies/company-center.css`, con tipografía heredada de `src/index.css`.\n\nLa extensión conserva el mismo mundo Operate. La evidencia normativa adicional es `src/components/common/ai-invoice/proposal-workspace.css`, `AIInvoiceScannerModal.tsx`, `ProposalDraftReview.tsx`, `ProposalConsumptionReview.tsx`, `ProposalCommercialReview.tsx` y `EquipmentManagerSettingsTab.tsx`. Los roles `--pw-*` de la revisión coinciden con los neutros y verdes del centro; la conversación tiene un ámbito azul marino permanente confirmado por el usuario y tokens locales `ai-chat-*`; el catálogo usa clases Tailwind equivalentes, sin convertir esas clases en tokens globales. Esta extracción registra únicamente esas superficies, sin reemplazar el sistema empresarial ni canonizar el PDF. La edición final del catálogo se evidencia además en `common/equipment/EquipmentOffersEditor.tsx`, `EquipmentAssetsEditor.tsx`, `EquipmentImagePreview.tsx` y `AIDatasheetScannerModal.tsx`.",
     "keyCharacteristics": [
       "Formularios por propósito y tablas legibles.",
       "Tema claro y oscuro mediante roles equivalentes.",
@@ -506,7 +682,7 @@
       },
       {
         "name": "Ofertas en contexto",
-        "body": "Las ofertas de un modelo se editan en su misma sección, separadas por divisores horizontales; el contenedor agrupa la tarea sin añadir una tarjeta elevada por proveedor. El importador también separa variantes con divisores y reserva el fondo de aviso para coincidencias o resultados. La sombra pertenece al diálogo completo.",
+        "body": "Las ofertas de un modelo se editan en su misma sección, separadas por divisores horizontales; el contenedor agrupa la tarea sin añadir una tarjeta elevada por proveedor. El importador también separa variantes con divisores y reserva el fondo de aviso para coincidencias o resultados. La sombra pertenece al diálogo completo.\n",
         "section": "elevation"
       }
     ],
@@ -517,7 +693,7 @@
       "Do mantener la lectura compacta de miembros con divisores horizontales y nombres completos."
     ],
     "donts": [
-      "Don't reutilizar valores oscuros fijos para una superficie que cambia de tema.",
+      "Don't reutilizar valores oscuros fijos para una superficie que cambia de tema; la conversación IA constituye el ámbito oscuro permanente confirmado por el usuario.",
       "Don't trasladar la paleta de una empresa al sistema de navegación.",
       "Don't convertir una captura de QA o su contenido sintético en un recurso del producto.",
       "Don't extender estas dimensiones del centro al PDF aprobado."

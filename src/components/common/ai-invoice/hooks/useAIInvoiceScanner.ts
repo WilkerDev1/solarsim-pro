@@ -1,10 +1,10 @@
-import { createAIProposalBase, prepareProposalDraftProject } from '../../../../utils/proposalDraftProject';
+import { createAIProposalBase, prepareProposalDraftProject, proposalReconciliationIssues } from '../../../../utils/proposalDraftProject';
 import { BENCHMARK_PROJECT } from '../../../../engine/referenceCase';
 import { calculateProjectFinancialSummary } from '../../../../engine/financeEngine';
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useSimulationStore } from '../../../../store/useSimulationStore';
 import { parseProposalWithAI } from '../../../../services/geminiInvoiceService';
-import { calculateRecommendedPanelCount, calculateMonthlySolarProduction } from '../../../../engine/solarEngine';
+import { calculateRecommendedPanelCount, calculateMonthlySolarProduction, getMonthlySolarProductionFactors } from '../../../../engine/solarEngine';
 import { getProvinceHSP } from '../../../../data/rdProvinces';
 import { ExtractedInvoiceData } from '../../../../types/aiInvoice';
 import { FilePreview } from '../types';
@@ -13,7 +13,7 @@ import { buildAITariffContext } from '../../../../utils/aiTariffContext';
 import { useEnergyCalculationMode } from '../../../../features/application/useApplicationFeatures';
 import { aiWorkspaceKey, proposalFileType, readProposalFile, PROPOSAL_FILES_LIMIT } from '../workspace';
 
-export interface ProposalMessage { role: 'user' | 'assistant'; text: string; files?: string[] }
+export interface ProposalMessage { role: 'user' | 'assistant'; text: string; files?: string[]; kind?: 'error' }
 export function useAIInvoiceScanner() {
   const state = useSimulationStore();
   const { isAIInvoiceModalOpen, geminiApiKey, geminiModel, equipmentCatalog, activeProjectId, projects,
@@ -48,6 +48,7 @@ export function useAIInvoiceScanner() {
       tariffCode: target?.rates.tariffCode,
       tariffReference: buildAITariffContext(tariffMatrix),
       annualSpecificYieldKWhPerKWp: yieldInfo.annualSpecificYieldKWhPerKWp,
+      monthlySpecificYieldKWhPerKWp:getMonthlySolarProductionFactors(province,losses ?? 25,target?.client.customMonthlyHSP),
       calculationMode: mode,
       commercial: {pricingMode:target?.specs.pricingMode || (defaults.defaultPricingMode==='direct'?'direct_watt':'cost_matrix'),markupPct:(target?.specs.saleMarginMultiplier!==undefined?(target.specs.saleMarginMultiplier-1)*100:defaults.defaultTargetMarginPct),installationUnitPriceUSD:target?.specs.installationUnitPriceUSD ?? 0,pricePerWattUSD:target?.specs.pricePerWattUSD ?? defaults.defaultDirectPriceUSDPerWp,directPriceSurplusTarget:target?.specs.directPriceSurplusTarget || 'margin',customItems:target?.financials.customItems || [],customDiscounts:target?.financials.customDiscounts || []},
       equipmentPrices:target?[...(target.specs.panels || []),...(target.specs.inverters || []),...(target.specs.batteries || [])].filter(g=>g.unitPriceUSD!==undefined).map(g=>({id:g.id,unitPriceUSD:g.unitPriceUSD!})):[],
@@ -62,9 +63,9 @@ export function useAIInvoiceScanner() {
     cancel(); setExtractedData(null); setMessages([]); setPrompt(''); setFiles([]);
     setErrorMsg(null); setReviewConfirmed(false); setDraftScope('');
   };
-  useEffect(() => { reset(); }, [workspace, isAIInvoiceModalOpen]);
+  useEffect(() => { reset(); }, [workspace]);
   useEffect(() => {
-    if (scope !== previousScope.current) { previousScope.current = scope; cancel(); setExtractedData(null); setReviewConfirmed(false); setErrorMsg('Cambió el destino. Prepara otro borrador antes de aplicar.'); }
+    if (scope !== previousScope.current) { previousScope.current = scope; reset(); setErrorMsg('Cambió el destino. Prepara otro borrador antes de aplicar.'); }
   }, [scope]);
   useEffect(() => {
     const urls = files.map(f => f.url);
@@ -92,7 +93,8 @@ export function useAIInvoiceScanner() {
     const id = ++sequence.current;
     controller.current = new AbortController();
     setIsProcessing(true); setErrorMsg(null); setReviewConfirmed(false);
-    const instructions = [...messages.filter(m => m.role === 'user').slice(-5).map(m => m.text), prompt.trim()].filter(Boolean);
+    const userMessage:ProposalMessage={role:'user',text:prompt.trim() || 'Analizar los documentos adjuntos',files:files.map(f=>f.name)};
+    setMessages(previous=>[...previous,userMessage]);
     const isCurrent = () => sequence.current === id && useSimulationStore.getState().isAIInvoiceModalOpen
       && aiWorkspaceKey(useSimulationStore.getState()) === capturedWorkspace
       && (!capturedTarget || useSimulationStore.getState().activeProjectId === capturedTarget);
@@ -100,9 +102,9 @@ export function useAIInvoiceScanner() {
       const attachments = await Promise.all(files.map(async f => ({ fileBase64: await readProposalFile(f.file), mimeType:f.type, fileName:f.name })));
       if (!isCurrent()) return;
       const payload = { apiKey:geminiApiKey, model:geminiModel, files:attachments,
-        projectRequirementsText: instructions.join('\n\nCorrección del usuario:\n').slice(-24000),
+        projectRequirementsText:prompt.trim() || 'Analiza los documentos adjuntos conservando los acuerdos del borrador.',
         equipmentCatalog, dopExchangeRate: extractedData?.dopExchangeRate ?? target?.rates.usdExchangeRate ?? 60.5,
-        context: { ...context, currentDraft: validatedDraft || undefined, currentClient: target?.client },
+        context: { ...context, reviewNotes:attentionIssues.map(i=>i.message),conversation:[...messages.filter(m=>!m.kind),userMessage].slice(-20).map(m=>({role:m.role,text:m.text.slice(-1800)})), currentDraft: validatedDraft || undefined, currentClient: target?.client },
       };
       let result: ExtractedInvoiceData;
       if (window.electronAPI?.parseInvoiceWithAI) {
@@ -115,10 +117,10 @@ export function useAIInvoiceScanner() {
       } else result = await parseProposalWithAI(payload, controller.current.signal);
       if (!isCurrent()) return;
       if (result.province) result.province = getProvinceHSP(result.province).name;
-      setExtractedData(result); setDraftScope(scope); setPrompt('');
-      setMessages(previous => [...previous.slice(-10), { role:'user', text:prompt.trim() || 'Analizar los documentos adjuntos', files:files.map(f => f.name) },
-        {role:'assistant', text:result.aiReasoningSummary || 'Preparé un borrador. Revisa los datos y los equipos antes de aplicarlo.'}]);
-    } catch (error) { if (isCurrent()) setErrorMsg((error as Error).message || 'No se pudo analizar la entrada. Reintenta.'); }
+      if(result.responseKind!=='discussion'){setExtractedData(result);setDraftScope(scope);}
+      setPrompt('');
+      setMessages(previous => [...previous,{role:'assistant',text:result.assistantMessage || result.aiReasoningSummary || 'Preparé un borrador. Revisemos los datos antes de aplicarlo.'}]);
+    } catch (error) { if (isCurrent()) {const text=(error as Error).message || 'No se pudo analizar la entrada. Reintenta.';setErrorMsg(text);setMessages(previous=>[...previous,{role:'assistant',kind:'error',text}]);} }
     finally { if (isCurrent()) setIsProcessing(false); }
   };
   const validatedDraft = useMemo(() => extractedData ? normalizeProposalDraft(extractedData, equipmentCatalog, context) : null, [extractedData, equipmentCatalog, context]);
@@ -129,12 +131,13 @@ export function useAIInvoiceScanner() {
     return calculateMonthlySolarProduction(project.client.province,project.specs,project.monthlyConsumption,project.rates.energyCostPerKWh,project.rates.gridExportFeePct,project.client.customMonthlyHSP,project.rates.tariffCode,project.rates.isZeroExport,mode).map(m=>m.productionKWh);
   },[validatedDraft,target,defaults,tariffMatrix,mode,context.province]);
   const draftPreview=useMemo(()=>{
-    if(!validatedDraft || validatedDraft.monthlyConsumptionKWh.length!==12 || validatedDraft.validationIssues?.some(i=>i.severity==='error' && /extra|discount|customItems|customDiscounts|commercial|markup|margin|installation|pricing|surplus|price/.test(i.code)))return null;
+    if(!validatedDraft || validatedDraft.validationIssues?.some(i=>i.severity==='error' && /extra|discount|customItems|customDiscounts|commercial|markup|margin|installation|pricing|surplus|price|count|spec|source_totals|exchange/.test(i.code)))return null;
     const base=target || createAIProposalBase(BENCHMARK_PROJECT,defaults,validatedDraft.province || context.province || '');
     const project=prepareProposalDraftProject(base,validatedDraft,tariffMatrix,{isNew:!target,defaultBatteryDOD:defaults.defaultBatteryDOD});
-    const financial=calculateProjectFinancialSummary(project,mode);
+    const financial=calculateProjectFinancialSummary({...project,monthlyConsumption:project.monthlyConsumption.length===12?project.monthlyConsumption:Array(12).fill(0)},mode);
     return {project,financial};
   },[validatedDraft,target,defaults,tariffMatrix,mode,context.province]);
+  const attentionIssues=[...(validatedDraft?.validationIssues || []),...(validatedDraft&&draftPreview?proposalReconciliationIssues(validatedDraft,draftPreview.financial):[])];
   const reviewSnapshot = JSON.stringify(validatedDraft);
   useEffect(() => { setReviewConfirmed(false); }, [reviewSnapshot]);
   const blockingIssues = validatedDraft?.validationIssues?.filter(issue => issue.severity === 'error') || [];
@@ -142,7 +145,8 @@ export function useAIInvoiceScanner() {
   const apply = (createNew: boolean) => {
     const current = useSimulationStore.getState();
     if (!canApply || aiWorkspaceKey(current) !== workspace || (!createNew && current.activeProjectId !== activeProjectId)) return;
-    current.applyExtractedInvoice(validatedDraft!, createNew);
+    const before=current.projects;current.applyExtractedInvoice(validatedDraft!, createNew);
+    if(useSimulationStore.getState().projects!==before)reset();else setErrorMsg(useSimulationStore.getState().saveFeedbackMessage || 'No se pudo aplicar; tu borrador y conversación se conservan.');
   };
   const updateDraft = (updates: Partial<ExtractedInvoiceData>) => { setExtractedData(previous => previous ? {...validatedDraft,...updates} as ExtractedInvoiceData : null); setReviewConfirmed(false); };
   return { isAIInvoiceModalOpen, isDark:state.sidebarTheme === 'dark', geminiApiKey, activeProject,
@@ -151,7 +155,7 @@ export function useAIInvoiceScanner() {
     isProcessing, cancel, reset, prompt, setPrompt, messages, errorMsg, processSmartProposal,
     extractedData:validatedDraft, draftPreview, draftEnergy, updateDraft, equipmentCatalog, tariffMatrix, context, useCurrentProject,
     setUseCurrentProject:(value:boolean)=>{cancel();setUseCurrentProject(value);setExtractedData(null);setReviewConfirmed(false);setMessages([]);},
-    reviewConfirmed, setReviewConfirmed, blockingIssues, canApply,
+    reviewConfirmed, setReviewConfirmed, blockingIssues, attentionIssues, canApply,
     handleApplyAsNew:()=>apply(true), handleApplyToActive:()=>apply(false),
   };
 }

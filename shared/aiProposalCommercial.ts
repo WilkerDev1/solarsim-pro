@@ -1,5 +1,7 @@
 import type { CustomQuotationItem, CustomQuotationDiscount } from '../src/types';
 export interface AIProposalCommercial {
+  priceBasis?: 'purchase' | 'sale' | 'unknown';
+  sourceTotals?: { subtotalUSD?: number; taxUSD?: number; totalCostUSD?: number; saleUSD?: number };
   pricingMode?: 'cost_matrix' | 'direct_watt';
   markupPct?: number;
   marginOnSalePct?: number;
@@ -11,10 +13,12 @@ export interface AIProposalCommercial {
   customDiscounts?: CustomQuotationDiscount[];
 }
 export const COMMERCIAL_SCHEMA = {type:'OBJECT',description:'Condiciones comerciales completas. Los requisitos actuales prevalecen sobre context.commercial y currentDraft. Devuelve los valores explícitos de utilidad, mano de obra, extras y descuentos; nunca omitas cambios solicitados.',properties:{
+  priceBasis:{type:'STRING',nullable:true,enum:['purchase','sale','unknown'],description:'Costos proyectos/costo unitario = purchase. Precio de venta = sale. Precios ambiguos = unknown: pregunta antes de tratarlos como compra.'},
+  sourceTotals:{type:'OBJECT',properties:{subtotalUSD:{type:'NUMBER'},taxUSD:{type:'NUMBER'},totalCostUSD:{type:'NUMBER'},saleUSD:{type:'NUMBER'}},description:'Totales leídos de la hoja en USD, sólo conciliación; no son extras ni reemplazan cálculo fiscal.'},
   pricingMode:{type:'STRING',enum:['cost_matrix','direct_watt']},markupPct:{type:'NUMBER',nullable:true,description:'Recargo sobre costo solicitado; 40 significa40%. null cuando se utiliza margen sobre venta.'},marginOnSalePct:{type:'NUMBER',nullable:true,description:'Margen sobre venta solicitado. null cuando se utiliza recargo sobre costo.'},installationUnitPriceUSD:{type:'NUMBER',nullable:true,description:'Mano de obra USD/kWp. null si se pide un importe total.'},installationTotalUSD:{type:'NUMBER',nullable:true,description:'Mano de obra total USD del proyecto, por ejemplo500. null si se usa USD/kWp.'},directPriceSurplusTarget:{type:'STRING',enum:['margin','labor']},pricePerWattUSD:{type:'NUMBER'},
   customItems:{type:'ARRAY',items:{type:'OBJECT',properties:{id:{type:'STRING'},description:{type:'STRING'},quantity:{type:'NUMBER'},unit:{type:'STRING'},unitPriceUSD:{type:'NUMBER'},exonerateITBIS:{type:'BOOLEAN'},applyMargin:{type:'BOOLEAN'}},required:['description','quantity','unitPriceUSD','exonerateITBIS','applyMargin']}},
   customDiscounts:{type:'ARRAY',items:{type:'OBJECT',properties:{id:{type:'STRING'},description:{type:'STRING'},type:{type:'STRING',enum:['fixed','percentage']},value:{type:'NUMBER'},target:{type:'STRING',enum:['general','equipment']}},required:['description','type','value','target']}},
-},required:['markupPct','marginOnSalePct','installationUnitPriceUSD','installationTotalUSD','customItems','customDiscounts']};
+},required:['priceBasis','markupPct','marginOnSalePct','installationUnitPriceUSD','installationTotalUSD','customItems','customDiscounts']};
 /** Omission retains context, explicit [] clears lists; invalid financial data blocks application. */
 export function normalizeCommercial(raw: any, base: AIProposalCommercial | undefined, issue:(code:string,message:string)=>void): AIProposalCommercial {
   raw=raw && typeof raw==='object'&&!Array.isArray(raw)?Object.fromEntries(Object.entries(raw).filter(([,v])=>v!==null)):{};
@@ -24,6 +28,9 @@ export function normalizeCommercial(raw: any, base: AIProposalCommercial | undef
   if(raw?.installationTotalUSD!==undefined && raw?.installationUnitPriceUSD===undefined)value.installationUnitPriceUSD=undefined;
   if(raw?.installationUnitPriceUSD!==undefined && raw?.installationTotalUSD===undefined)value.installationTotalUSD=undefined;
   const out:AIProposalCommercial={};
+  if(value.priceBasis!==undefined){out.priceBasis=value.priceBasis;if(!['purchase','sale','unknown'].includes(value.priceBasis))issue('invalid_price_basis','Aclara si los precios son costos de compra o de venta.');else if(value.priceBasis!=='purchase')issue('ambiguous_price_basis',value.priceBasis==='sale'?'Los precios de venta no son costos de compra. Confirma los costos o la modalidad de venta antes de aplicar.':'¿Estos importes son costos de compra o precios de venta? Acláralo en el chat o en Cotización.');}
+  if(value.sourceTotals!==undefined){out.sourceTotals={};if(!value.sourceTotals||typeof value.sourceTotals!=='object'||Array.isArray(value.sourceTotals)){out.sourceTotals=value.sourceTotals;issue('invalid_source_totals','Revisa los totales del documento.');}else for(const key of ['subtotalUSD','taxUSD','totalCostUSD','saleUSD'] as const){const n=value.sourceTotals?.[key];if(n!==undefined){out.sourceTotals[key]=n;if(typeof n!=='number'||!Number.isFinite(n)||n<0)issue('invalid_source_totals','Revisa los totales del documento.');}}}
+
   if(value.directPriceSurplusTarget!==undefined){if(['margin','labor'].includes(value.directPriceSurplusTarget))out.directPriceSurplusTarget=value.directPriceSurplusTarget;else {out.directPriceSurplusTarget=value.directPriceSurplusTarget;issue('invalid_surplus','Selecciona el destino del excedente de precio directo.');}}
   if(value.pricingMode!==undefined) {if(['cost_matrix','direct_watt'].includes(value.pricingMode))out.pricingMode=value.pricingMode;else {out.pricingMode=value.pricingMode;issue('invalid_pricing_mode','Selecciona una modalidad de precio válida.');}}
   for(const key of ['markupPct','marginOnSalePct','installationUnitPriceUSD','installationTotalUSD','pricePerWattUSD'] as const){

@@ -5,7 +5,7 @@ import { SimulationSlice, AISlice } from '../types';
 import type { ProjectSimulation } from '../../types';
 import { BENCHMARK_PROJECT } from '../../engine/referenceCase';
 import { generateNextProjectSequence } from '../initialData';
-import { calculateRecommendedPanelCount } from '../../engine/solarEngine';
+import { calculateRecommendedPanelCount, getMonthlySolarProductionFactors } from '../../engine/solarEngine';
 import { normalizeProposalDraft } from '../../../shared/aiProposal';
 import { DEFAULT_GEMINI_MODEL } from '../../../shared/geminiTransport';
 import { buildAITariffContext } from '../../utils/aiTariffContext';
@@ -36,6 +36,7 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
     // Revalidate against today's inventory before committing any change. Legacy callers retain their API.
     const data=isGrounded?normalizeProposalDraft(input,state.equipmentCatalog,{province,systemLosses:losses,
       annualSpecificYieldKWhPerKWp:calculateRecommendedPanelCount(province,Array(12).fill(0),620,95,losses,base.client.customMonthlyHSP).annualSpecificYieldKWhPerKWp,
+      monthlySpecificYieldKWhPerKWp:getMonthlySolarProductionFactors(province,losses,base.client.customMonthlyHSP),
       tariffReference:buildAITariffContext(state.tariffMatrix)}):input;
     if(isGrounded && data.requiresReview) {set({saveFeedbackMessage:data.validationIssues?.find(i=>i.severity==='error')?.message || 'Revisa los datos pendientes antes de aplicar.'});return;}
     if(data.monthlyConsumptionKWh.length!==12 || data.monthlyConsumptionKWh.some(n=>!Number.isFinite(n) || n<0)) {set({saveFeedbackMessage:'Completa los doce consumos mensuales antes de aplicar.'});return;}

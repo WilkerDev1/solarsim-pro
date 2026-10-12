@@ -190,7 +190,11 @@ export function registerCompanyRoutes(app: Hono, deps: Dependencies) {
           return c.json({ error: "Color inválido" }, 400);
         clean[key] = profile[key];
       }
-    for (const key of ["logoBase64", "signatureSealBase64", "watermarkLogoBase64"])
+    for (const key of [
+      "logoBase64",
+      "signatureSealBase64",
+      "watermarkLogoBase64",
+    ])
       if (profile[key] !== undefined) {
         if (
           typeof profile[key] !== "string" ||

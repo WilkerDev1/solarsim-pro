@@ -6,6 +6,12 @@ import { calculateTotalDCCapacityKWp, calculateTotalBatteryCapacityKWh } from '.
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
+/** Unrounded monthly generation per kWp, shared with theoretical draft consumption. */
+export function getMonthlySolarProductionFactors(provinceName:string,systemLosses=25,customMonthlyHSP?:number[]):number[]{
+  const province=getProvinceHSP(provinceName);
+  return DAYS_IN_MONTH.map((days,i)=>{const hsp=customMonthlyHSP?.length===12&&customMonthlyHSP[i]>0?customMonthlyHSP[i]:province.monthlyHSP[i];return hsp*days*(1-systemLosses/100);});
+}
+
 /**
  * Calculates DC system capacity in kWp.
  */
@@ -134,6 +140,8 @@ export function calculateMonthlySolarProduction(
   const systemLossesPct = specs.systemLosses !== undefined ? specs.systemLosses : (specs.isDetailed ? 14.0 : 25.0);
   const derateFactor = 1 - (systemLossesPct / 100);
 
+  const generationFactors=getMonthlySolarProductionFactors(provinceName,systemLossesPct,customMonthlyHSP);
+
   // SIE-007-2026-REG / Net Metering Regulations:
   // - Grid export fee / retention (~25%) applies to all exported energy across all tariffs (BTS1, BTS2, BTD, MTD1, MTD2, etc.).
   // - Zero-Export systems (antivertido) do not inject to grid, resulting in 0 exported kWh and 0 export fees.
@@ -180,7 +188,7 @@ export function calculateMonthlySolarProduction(
     const consumption = monthlyConsumptionKWh[i] ?? 3000;
 
     // Dynamic monthly solar production formula: kWp * HSP * days * derateFactor
-    const production = Math.round(dcCapacityKWp * hsp * days * derateFactor * 10) / 10;
+    const production = Math.round(dcCapacityKWp * generationFactors[i] * 10) / 10;
 
     // Daily averages for the month
     const dailyCons = consumption / days;

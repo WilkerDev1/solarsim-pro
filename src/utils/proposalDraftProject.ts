@@ -80,3 +80,12 @@ export function createAIProposalBase(template:ProjectSimulation,defaults:Default
       base.client={...base.client,company:'',address:'',contactPhone:'',contactEmail:'',contactPerson:'',location:province,customMonthlyHSP:undefined,coordinates:undefined};
  return base;
 }
+
+/** Document totals are references for dialogue, never inputs that override engine results. */
+export function proposalReconciliationIssues(data:ExtractedInvoiceData,summary:import('../types').FinancialSummaryResult){
+ const matrix=summary.costMatrix;
+ return ([['subtotalUSD','compra antes de ITBIS',matrix.precioNetoUSD],['taxUSD','ITBIS de costos',matrix.itbisUSD],['totalCostUSD','costo total',matrix.totalNetoUSD],['saleUSD','precio de lista',matrix.listPorcentajeVentaUSD]] as const).flatMap(([key,label,value])=>{
+  const source=data.commercial?.sourceTotals?.[key];
+  return typeof source==='number'&&Number.isFinite(source)&&typeof value==='number'&&Number.isFinite(value)&&Math.abs(source-value)>.05?[{code:`document_${key}_difference`,severity:'warning' as const,message:`Revisa ${label}: documento USD ${source.toFixed(2)}, cálculo USD ${value.toFixed(2)}. Es una referencia informativa; podemos aclarar la diferencia sin sustituir fórmulas.`}]:[];
+ });
+}

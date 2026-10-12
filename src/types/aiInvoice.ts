@@ -14,6 +14,8 @@ export interface EquipmentSubstitutionInfo {
 }
 
 export interface ExtractedInvoiceData {
+  responseKind?: 'discussion' | 'draft';
+  assistantMessage?: string;
   commercial?: AIProposalCommercial;
   panels?: PanelItemSpec[];
   inverters?: InverterItemSpec[];
@@ -22,7 +24,7 @@ export interface ExtractedInvoiceData {
   requiresReview?: boolean;
   unresolvedRequests?: string[];
   observedMonthlyConsumptionKWh?: (number | null)[];
-  consumptionSource?: 'observed' | 'estimated' | 'context';
+  consumptionSource?: 'observed' | 'estimated' | 'context' | 'theoretical';
   energyRateSource?: 'invoice' | 'reference' | 'manual';
 
   // Client & Company Identity

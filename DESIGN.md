@@ -24,6 +24,17 @@ colors:
   error-text: "#ad2435"
   error-bg-dark: "#401e25"
   error-text-dark: "#ffc0c9"
+  ai-chat-bg: "#121b28"
+  ai-chat-panel: "#192536"
+  ai-chat-text: "#f1f5fa"
+  ai-chat-muted: "#bccbdd"
+  ai-chat-border: "#40536b"
+  ai-chat-green: "#75e4bc"
+  ai-chat-selected: "#163b32"
+  ai-chat-control-bg: "#213047"
+  ai-chat-control-border: "#597087"
+  ai-chat-button-bg: "#253850"
+  ai-chat-button-border: "#5b7290"
 typography:
   headline:
     fontFamily: "Inter, sans-serif"
@@ -125,7 +136,7 @@ Esta extracción documenta la superficie empresarial implementada, no impone sus
 
 ### Extensión: asistente IA e inventario
 
-La extensión conserva el mismo mundo Operate. La evidencia normativa adicional es `src/components/common/ai-invoice/proposal-workspace.css`, `AIInvoiceScannerModal.tsx`, `ProposalDraftReview.tsx`, `ProposalConsumptionReview.tsx`, `ProposalCommercialReview.tsx` y `EquipmentManagerSettingsTab.tsx`. Los roles `--pw-*` coinciden con los neutros y verdes del centro; el catálogo usa clases Tailwind equivalentes, sin convertir esas clases en tokens globales. Esta extracción registra únicamente esas superficies, sin reemplazar el sistema empresarial ni canonizar el PDF. La edición final del catálogo se evidencia además en `common/equipment/EquipmentOffersEditor.tsx`, `EquipmentAssetsEditor.tsx`, `EquipmentImagePreview.tsx` y `AIDatasheetScannerModal.tsx`.
+La extensión conserva el mismo mundo Operate. La evidencia normativa adicional es `src/components/common/ai-invoice/proposal-workspace.css`, `AIInvoiceScannerModal.tsx`, `ProposalDraftReview.tsx`, `ProposalConsumptionReview.tsx`, `ProposalCommercialReview.tsx` y `EquipmentManagerSettingsTab.tsx`. Los roles `--pw-*` de la revisión coinciden con los neutros y verdes del centro; la conversación tiene un ámbito azul marino permanente confirmado por el usuario y tokens locales `ai-chat-*`; el catálogo usa clases Tailwind equivalentes, sin convertir esas clases en tokens globales. Esta extracción registra únicamente esas superficies, sin reemplazar el sistema empresarial ni canonizar el PDF. La edición final del catálogo se evidencia además en `common/equipment/EquipmentOffersEditor.tsx`, `EquipmentAssetsEditor.tsx`, `EquipmentImagePreview.tsx` y `AIDatasheetScannerModal.tsx`.
 
 ## Colors
 
@@ -147,7 +158,7 @@ Los rojos registrados corresponden a acciones destructivas y avisos de error, co
 
 ### Extensión IA
 
-Conversación propia y foco usan verde contextual; el botón de preparar/aplicar conserva verde de acción y blanco. Los avisos de revisión usan superficie de fondo y texto secundario; los bloqueadores usan el rol de error. El estado deshabilitado reduce opacidad: no expresa disponibilidad comercial ni resultados del análisis.
+La revisión usa verde contextual para foco y pestaña activa; preparar/aplicar conserva verde de acción y blanco. El chat mantiene azul marino en ambos temas: fondo, panel de mensaje y campo se separan tonalmente, con texto claro, bordes visibles y controles secundarios de azul más luminoso. Su acción primaria usa verde claro y texto oscuro. Estos roles pertenecen al chat y no recolorean el centro empresarial. Los avisos de revisión usan superficie de fondo y texto secundario; los bloqueadores usan el rol de error. El estado deshabilitado reduce opacidad: no expresa disponibilidad comercial ni resultados del análisis.
 
 ### Extensión de catálogo
 
@@ -182,7 +193,7 @@ En el breakpoint implementado (1100px), la navegación pasa a (220px), el paddin
 
 ### Extensión IA e inventario
 
-El modal se limita a (1220px) y separa conversación/compositor de revisión mediante una columna de (360px) y otra flexible. Ambas zonas tienen scroll propio; el pie de revisión permanece visible y la confirmación antecede crear/actualizar. Su altura es el menor valor entre (900px) y (94vh). A (1100px), conversación pasa a (320px) y se reducen paddings; el mínimo de producto sigue siendo (1024×700). Bajo (760px), el código apila ambas zonas como defensa, sin afirmar soporte de producto móvil.
+El asistente ocupa toda la ventana (100vw × 100dvh), sin margen exterior ni ancho máximo. Conversación/compositor ocupa el mayor valor entre (330px) y (30%) y la revisión el espacio restante. Ambas zonas tienen scroll propio; cabecera y pie de revisión quedan fuera del scroll y la confirmación antecede crear/actualizar. A (1100px), conversación pasa a (320px) y se reducen paddings; la vista principal revisada es (1280×720) y el mínimo de producto sigue siendo (1024×700). Bajo (760px), el código apila ambas zonas como defensa, sin afirmar soporte de producto móvil.
 
 Los formularios de revisión usan dos columnas con separación de (16px); campos largos abarcan ambas. Los doce consumos editables usan cuatro columnas; el gráfico conserva doce grupos mensuales con dos barras por grupo. Los ítems y descuentos se editan en tres columnas, reducidas a dos a (1100px). Los grupos de equipos alinean modelo, unidades y quitar; las notas de precio tienen su propia línea. El inventario usa una tabla compacta con nombre/modelo, nominal, ofertas y acciones, precedida por búsqueda y filtros. El flujo concreto queda en `.impeccable/surfaces/ai-proposal-inventory.md`, no como composición obligatoria de toda pantalla futura.
 
@@ -202,7 +213,7 @@ La superficie empresarial usa capas tonales, bordes de un píxel y espacio. No h
 
 ### Extensión modal IA
 
-El asistente usa una sombra ambiental sólo para separar el modal del trabajo subyacente; el interior conserva divisores y capas tonales. La sombra no se traslada a filas de inventario ni a formularios del centro. El punto de actividad pulsa únicamente durante una solicitud y pierde animación con `prefers-reduced-motion`; no es un acento decorativo persistente.
+El asistente de ventana completa no tiene sombra exterior. Cabecera, pestañas, secciones y pie se separan con divisores de dos píxeles; filas de tabla y mensajes mantienen bordes de un píxel. La conversación usa capas tonales y mensajes delimitados. No se trasladan esas dimensiones de divisor a formularios del centro ni a filas de inventario. El punto de actividad pulsa únicamente durante una solicitud y pierde animación con `prefers-reduced-motion`; no es un acento decorativo persistente.
 
 ### Extensión de catálogo
 
@@ -212,7 +223,7 @@ El asistente usa una sombra ambiental sólo para separar el modal del trabajo su
 
 Los controles, avisos y elementos seleccionados usan esquinas de control; los formularios usan esquinas de contenedor. La tabla mantiene filas rectangulares separadas por líneas horizontales, sin cápsulas por celda. El contrato inicial hablaba de formas de 12px; el código final distingue deliberadamente contenedores de 12px y controles de 8px.
 
-La extensión IA mantiene contenedor de (12px), controles y avisos de (8px) y filas rectangulares con divisores. El inventario conserva filas de tabla; no añade cápsulas por modelo o métricas decorativas.
+La extensión IA usa una envolvente de ventana completa sin redondeo, controles y avisos de (8px), mensajes de conversación de (10px) y filas rectangulares con divisores. El inventario conserva filas de tabla; no añade cápsulas por modelo o métricas decorativas.
 
 ## Components
 
@@ -242,21 +253,21 @@ El aviso contextual usa fondo seleccionado, esquinas de control y padding (13px 
 
 ### Asistente IA: compositor y revisión
 
-El compositor reúne adjuntos, texto y preparar/refinar; durante análisis ofrece cancelar y comunica que no modifica propuestas. Botones locales tienen altura mínima (36px), padding (8px 12px), foco de dos píxeles con offset de dos y opacidad deshabilitada (0.48). Campos de revisión tienen altura mínima (40px), padding (9px 10px) y etiqueta permanente. Textareas son redimensionables verticalmente. Selección, caret y scrollbar interno siguen los roles del tema.
+El compositor reúne adjuntos, texto y preparar/refinar; durante análisis ofrece cancelar y comunica que no modifica propuestas. Botones locales tienen altura mínima (36px), padding (8px 12px), foco de dos píxeles con offset de dos y opacidad deshabilitada (0.48) en la revisión, (0.55) en el chat. La conversación conserva campos y botones delimitados sobre azul marino; su acción principal usa texto oscuro sobre verde claro. Campos de revisión tienen altura mínima (40px), padding (9px 10px) y etiqueta permanente. Textareas son redimensionables verticalmente. Selección, caret y scrollbar interno siguen los roles del tema.
 
-La revisión se organiza en cuatro pestañas: consumo y diseño, equipos, cotización, cliente y tarifa. La fila de pestañas permanece visible en el scroll de revisión; selección usa verde contextual y fondo seleccionado, con foco por teclado y navegación por flechas, Home y End. Los paneles conservan su estado al cambiar de pestaña.
+La revisión se organiza en cuatro pestañas: consumo y diseño, equipos, cotización, cliente y tarifa. La fila de pestañas permanece visible en el scroll de revisión; selección usa relleno verde contextual y texto del color del panel, con foco por teclado y navegación por flechas, Home y End. Los paneles conservan su estado al cambiar de pestaña.
 
-El pie pide confirmación explícita de datos, equipos, precios y supuestos. Actualizar una propuesta abierta añade confirmación contextual. Errores y carga tienen semántica `alert`/`status`; el diálogo conserva foco y Escape. Las advertencias de referencia histórica, consumo estimado y falta de ofertas se presentan como contenido operativo, no como garantía de precisión.
+El pie pide confirmación explícita de datos, equipos, precios y supuestos. Actualizar una propuesta abierta añade confirmación contextual. Errores y carga tienen semántica `alert`/`status`; el diálogo conserva foco y Escape. Las advertencias de referencia histórica, consumo estimado y falta de ofertas se presentan como contenido operativo, no como garantía de precisión. Los pendientes aparecen también en la conversación bajo «Revisemos estos detalles», con divisor fuerte y lista que se actualiza al editar; los bloqueadores tienen tratamiento cálido y texto explícito.
 
 ### Asistente IA: consumo y dimensionamiento
 
 El resumen usa cuatro métricas en dos columnas, etiquetas pequeñas y valores tabulares; distingue datos observados, estimados y pendientes. El gráfico mensual compara consumo gris y generación verde, con leyenda explícita y doce grupos sobre una base común. La tabla editable siguiente mantiene etiquetas de mes y unidades; no completa huecos visualmente con valores inventados. Cambiar datos comerciales no elimina el análisis energético disponible.
 
-La meta de cobertura y el modelo a dimensionar se muestran como campos ordinarios. El resultado explica potencia objetivo e instalada antes de una acción explícita para aplicar la cantidad sugerida al grupo seleccionado. Otros grupos y equipos permanecen visibles y se conservan. El mes pico requiere confirmación y queda identificado como estimación. Producción/consumo describe energía, no promete ahorro facturable.
+La meta de cobertura y el modelo a dimensionar se muestran como campos ordinarios. El resultado explica potencia objetivo e instalada antes de una acción explícita para aplicar la cantidad sugerida al grupo seleccionado. Otros grupos y equipos permanecen visibles y se conservan. El mes pico requiere confirmación y queda identificado como estimación. La procedencia visible distingue historial observado, estimado, del proyecto y consumo teórico temporal igual a producción. La opción teórica queda etiquetada como «sin factura» y conserva la explicación de que la demanda deriva de equipos; el dimensionamiento contra esa misma producción se deshabilita. Producción/consumo describe energía, no promete ahorro facturable.
 
 ### Asistente IA: cotización revisable
 
-Costos por modelo, mano de obra, recargo sobre costo o margen sobre venta se editan con etiquetas y unidades explícitas. Los costos particulares de la cotización se distinguen de las ofertas del inventario; restaurar una oferta es una acción visible. Ítems adicionales y descuentos usan filas de formulario separadas por divisores, con añadir/quitar próximos a su lista. Las opciones de exoneración y destino del descuento acompañan los importes, sin esconder su efecto fiscal.
+La tabla de costos detalla componente, cantidad, unitario USD, total USD e ITBIS USD; cantidad y costo se editan en la fila, con origen particular del borrador u oferta del inventario debajo del modelo. Las cabeceras usan fondo tonal y divisor de dos píxeles; los modelos largos se envuelven, sin truncamiento. El documento distingue costos de compra, precios de venta por aclarar y base pendiente. Los totales documentados se concilian en USD con el cálculo y las diferencias se señalan como revisión, sin sumarlas como extras. Mano de obra, recargo sobre costo o margen sobre venta se editan con etiquetas y unidades explícitas. Los costos particulares de la cotización se distinguen de las ofertas del inventario; restaurar una oferta es una acción visible. Ítems adicionales y descuentos usan filas de formulario separadas por divisores, con añadir/quitar próximos a su lista. Las opciones de exoneración y destino del descuento acompañan los importes, sin esconder su efecto fiscal.
 
 El resumen calculado reutiliza el fondo tonal y pares etiqueta/valor en dos columnas. Cuando faltan costos se denomina subtotal provisional; no trata ausencia de precio como oferta gratuita. La revisión conserva confirmación humana y no modifica el catálogo al editar una cotización.
 
@@ -285,7 +296,7 @@ Cada variante ofrece selección explícita, nombre/modelo editables y campos con
 
 ### Don't:
 
-- **Don't** reutilizar valores oscuros fijos para una superficie que cambia de tema.
+- **Don't** reutilizar valores oscuros fijos para una superficie que cambia de tema; la conversación IA constituye el ámbito oscuro permanente confirmado por el usuario.
 - **Don't** trasladar la paleta de una empresa al sistema de navegación.
 - **Don't** convertir una captura de QA o su contenido sintético en un recurso del producto.
 - **Don't** extender estas dimensiones del centro al PDF aprobado.
