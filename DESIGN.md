@@ -138,6 +138,8 @@ Esta extracción documenta la superficie empresarial implementada, no impone sus
 
 La extensión conserva el mismo mundo Operate. La evidencia normativa adicional es `src/components/common/ai-invoice/proposal-workspace.css`, `AIInvoiceScannerModal.tsx`, `ProposalDraftReview.tsx`, `ProposalConsumptionReview.tsx`, `ProposalCommercialReview.tsx` y `EquipmentManagerSettingsTab.tsx`. Los roles `--pw-*` de la revisión coinciden con los neutros y verdes del centro; la conversación tiene un ámbito azul marino permanente confirmado por el usuario y tokens locales `ai-chat-*`; el catálogo usa clases Tailwind equivalentes, sin convertir esas clases en tokens globales. Esta extracción registra únicamente esas superficies, sin reemplazar el sistema empresarial ni canonizar el PDF. La edición final del catálogo se evidencia además en `common/equipment/EquipmentOffersEditor.tsx`, `EquipmentAssetsEditor.tsx`, `EquipmentImagePreview.tsx` y `AIDatasheetScannerModal.tsx`.
 
+La navegación del asistente reutiliza el dock principal completo, con su estado IA violeta heredado; no contiene una cabecera horizontal exterior. La fuente de ese patrón compartido es `src/components/layout/PrimaryIconDock.tsx`.
+
 ## Colors
 
 Neutros fríos en claro, grafito en oscuro y un acento verde funcional. El frontmatter registra los valores literales de la implementación; los sufijos `-dark` describen sus equivalentes de tema, no una segunda identidad.
@@ -193,7 +195,7 @@ En el breakpoint implementado (1100px), la navegación pasa a (220px), el paddin
 
 ### Extensión IA e inventario
 
-El asistente ocupa toda la ventana (100vw × 100dvh), sin margen exterior ni ancho máximo. Conversación/compositor ocupa el mayor valor entre (330px) y (30%) y la revisión el espacio restante. Ambas zonas tienen scroll propio; cabecera y pie de revisión quedan fuera del scroll y la confirmación antecede crear/actualizar. A (1100px), conversación pasa a (320px) y se reducen paddings; la vista principal revisada es (1280×720) y el mínimo de producto sigue siendo (1024×700). Bajo (760px), el código apila ambas zonas como defensa, sin afirmar soporte de producto móvil.
+El asistente ocupa toda la ventana (100vw × 100dvh), sin margen exterior ni ancho máximo. El dock principal compartido ocupa (64px) y toda la altura a la izquierda, sin cabecera horizontal exterior. En el cuerpo restante, conversación/compositor ocupa el mayor valor entre (330px) y (30%) y la revisión el espacio restante. Ambas zonas tienen scroll propio; el pie de revisión queda fuera del scroll y la confirmación antecede crear/actualizar. A (1100px), conversación pasa a (300px) y se reducen paddings; la vista principal de referencia es (1280×720) y el mínimo de producto sigue siendo (1024×700). Bajo (760px), el código apila ambas zonas como defensa, sin afirmar soporte de producto móvil.
 
 Los formularios de revisión usan dos columnas con separación de (16px); campos largos abarcan ambas. Los doce consumos editables usan cuatro columnas; el gráfico conserva doce grupos mensuales con dos barras por grupo. Los ítems y descuentos se editan en tres columnas, reducidas a dos a (1100px). Los grupos de equipos alinean modelo, unidades y quitar; las notas de precio tienen su propia línea. El inventario usa una tabla compacta con nombre/modelo, nominal, ofertas y acciones, precedida por búsqueda y filtros. El flujo concreto queda en `.impeccable/surfaces/ai-proposal-inventory.md`, no como composición obligatoria de toda pantalla futura.
 
@@ -242,6 +244,8 @@ Etiqueta encima del campo con separación (8px). Altura mínima (42px), borde fi
 ### Navigation
 
 La navegación lateral usa botones de ancho disponible y altura mínima (44px), alineados a la izquierda. El estado `aria-current=page` se refleja con fondo seleccionado y texto verde contextual. Las subsecciones de organización se muestran como botones agrupados sobre un divisor, con el mismo tratamiento activo.
+
+El asistente reutiliza `PrimaryIconDock` completo, con tema, proyectos, simulador, herramientas IA, nueva simulación, papelera, actualizaciones y ajustes. `assistantActive` marca IA como página actual con el tratamiento violeta heredado y evita marcar el proyecto o simulador de fondo. `beforeNavigate` llama al cierre del asistente antes de cambiar de destino; ese cierre cancela el análisis en curso. Los estilos de campos y botones del asistente se limitan al cuerpo de propuesta, de modo que el dock conserva sus clases y estados compartidos.
 
 ### Member table
 

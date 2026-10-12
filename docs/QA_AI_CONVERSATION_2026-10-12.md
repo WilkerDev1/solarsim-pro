@@ -25,3 +25,11 @@ El modelo sigue necesitando revisión: costos de venta no se convierten silencio
 Revisión funcional independiente cerrada: aplicación real, consumo igual a producción, aislamiento de destino, nombres genéricos/códigos específicos y referencias de tarifa. Finish reviewer nuevo: fidelidad/legibilidad válidas en las tres capturas; pidió únicamente actualizar persistencia de diseño. El documenter actualizó sistema/sidecar/brief y el veredicto puntuó ese hallazgo resuelto (`ship` a ese alcance). Detector: 15 advisories de tokens/rampa, cero hallazgos primarios.
 
 Lint, 42 suites de aplicación, builds frontend/Electron, 32 pruebas de API, format:check/build de servidor y test/build Worker aprobados localmente. Repomix se regenera después de los documentos finales, manteniendo el filtro de seguridad. GitHub CI se comprueba por commit; no se confunde éxito local con estado remoto.
+
+## Dock principal reutilizable
+
+El asistente elimina su cabecera horizontal y reutiliza `PrimaryIconDock`, completo y de altura total. `beforeNavigate` cancela el análisis y cierra la vista antes de abrir otro destino; tema y menú de IA mantienen el asistente. `assistantActive` marca la sección actual sin marcar Proyectos detrás. Escape cierra primero el menú desplegable. Estilos de formulario se limitan a `.proposal-body` para conservar el dock compartido.
+
+QA sintética en navegador: 1280×720 claro y 1024×700 oscuro; dock medido x=0, y=0, ancho=64, alto=700 y sin overflow horizontal al mínimo. Menú de IA completo, cambio de tema y navegación Home comprobados. No llamadas Gemini ni escrituras de producción en esta comprobación.
+
+La comprobación visual de dock corresponde a la sesión anterior; en la reanudación el navegador rechazó la URL local por política y no se renovaron capturas. Revisión independiente de código detectó Escape desde el chat con menú abierto; corregido con listener en captura y limpieza de la misma fase. El revisor confirmó la corrección estática sin otros hallazgos. Falta repetir ese caso de teclado en navegador. No se atribuye un nuevo veredicto visual a esta reanudación.

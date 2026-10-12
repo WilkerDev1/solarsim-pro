@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Settings, Paperclip, Send, FileText, RotateCcw, Square, ArrowRight } from 'lucide-react';
+import { X, Paperclip, Send, FileText, RotateCcw, Square, ArrowRight } from 'lucide-react';
 import { useAIInvoiceScanner } from './hooks/useAIInvoiceScanner';
 import { ProposalDraftReview } from './components/ProposalDraftReview';
 import './proposal-workspace.css';
+import { PrimaryIconDock } from '../../layout/PrimaryIconDock';
 
 export const AIInvoiceScannerModal: React.FC = () => {
   const ai = useAIInvoiceScanner();
@@ -30,10 +31,8 @@ export const AIInvoiceScannerModal: React.FC = () => {
           else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}
         }
       }}>
-      <header className="proposal-header"><div><h2 id="proposal-assistant-title">Asistente de propuestas</h2><p>Conversa, revisa y configura tu propuesta antes de aplicarla.</p></div><div className="proposal-actions">
-        <button type="button" onClick={ai.openAISettings} aria-label="Ajustes de IA"><Settings size={18}/></button>
-        <button type="button" onClick={ai.closeAIInvoiceModal} aria-label="Cerrar asistente"><X size={19}/></button>
-      </div></header>
+      <h2 id="proposal-assistant-title" className="sr-only">Asistente de propuestas</h2>
+      <PrimaryIconDock beforeNavigate={ai.closeAIInvoiceModal} assistantActive />
       <div className="proposal-body">
         <div className="proposal-conversation">
           <div className="proposal-context"><span>{ai.equipmentCatalog.length} equipos disponibles</span><span>Tarifas de 4 distribuidoras</span></div>
