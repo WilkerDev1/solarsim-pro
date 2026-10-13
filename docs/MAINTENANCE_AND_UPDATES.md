@@ -2,6 +2,14 @@
 
 Trabajar funcionalidades en beta o rama codex/ desde beta; main recibe publicación aprobada. La versión oficial se consulta en GitHub Releases; el parche 2.3.1 incorpora las correcciones auditadas del 7 de octubre; las betas se prueban con npm run dev y los gates de código, sin generar instaladores automáticamente; consultar [plan de beta y rollback](BETA_ROLLOUT.md).
 
+## Publicación 2.5.0
+
+[SolarSim Pro 2.5.0](https://github.com/WilkerDev1/solarsim-pro/releases/tag/v2.5.0) está publicada como versión estable más reciente. El tag conserva la revisión `7947070c6ab214f59dcab62edd83a58ca1196907`; [GitHub Actions 38313219525](https://github.com/WilkerDev1/solarsim-pro/actions/runs/38313219525) aprobó contratos, empaquetado nativo Windows/Linux y creación del borrador.
+
+Los seis formatos x64 son instalador y portable Windows, y AppImage, `.deb`, `.pacman` y `.tar.gz` Linux. Se comprobó el arranque del instalador Windows y de `.deb`, AppImage y `.pacman`; portable y `.tar.gz` recibieron verificación de archivos y hashes. No se compiló macOS ni ARM. Los binarios se construyeron exclusivamente en GitHub; la firma se realizó localmente con la clave GPG fijada, sin exportar la clave privada.
+
+`verifyReleaseFiles.ts` y `verifyCandidate.ts` aprobaron tamaños, hashes, metadata del updater y firmas de ambos manifiestos y paquetes Linux. Los 20 assets remotos coincidieron con los tamaños y SHA256 locales antes de publicar. Windows no tiene Authenticode. Las [notas de versión](../release/release-notes-v2.5.0.md) describen las novedades y límites del asistente experimental. Esta publicación no desplegó API, Worker ni cambios de base de datos, y no integró PR #5 en beta/main.
+
 ```bash
 npm ci
 npm run lint

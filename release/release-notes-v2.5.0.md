@@ -40,7 +40,7 @@ Esta versión amplía el trabajo asistido por IA y la colaboración empresarial:
 
 - Windows x64: instalador y versión portable.
 - Linux x64: AppImage, Debian/Ubuntu `.deb`, Arch `.pacman` y archivo `.tar.gz`.
-- Electron 44.5.1 incluido. Los binarios se construyen y prueban en runners nativos de GitHub Actions; no se incluye macOS ni ARM en esta distribución.
+- Electron 44.5.1 incluido. Todos los binarios se construyen en runners nativos de GitHub Actions. Se comprueba el arranque del instalador Windows y de `.deb`, AppImage y `.pacman`; portable y `.tar.gz` reciben verificación de archivos y hashes; no se incluye macOS ni ARM en esta distribución.
 - Linux incluye firmas GPG de paquetes y manifiestos con la clave de confianza de SolarSim. Windows no incorpora firma Authenticode; puede mostrar advertencias del sistema.
 - Se conserva el cálculo clásico por defecto. La proyección física de autoconsumo continúa siendo opcional.
 
