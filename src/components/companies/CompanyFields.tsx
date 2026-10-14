@@ -23,6 +23,8 @@ export function CompanyFields({
     { key: "email", label: "Correo de la empresa", type: "email", max: 255 },
     { key: "website", label: "Sitio web", max: 255 },
     { key: "address", label: "Dirección", max: 500, wide: true },
+    { key: "slogan", label: "Lema", max: 255 },
+    { key: "instagram", label: "Instagram", max: 255 },
   ];
   return (
     <div className="company-fields">

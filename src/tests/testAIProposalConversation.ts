@@ -1,0 +1,100 @@
+import assert from 'node:assert/strict';
+import {normalizeProposalDraft,requestedModelMatches,buildProposalRequest} from '../../shared/aiProposal';
+import {processExtractedInvoice} from '../utils/aiProposalNormalization';
+import {buildAITariffContext} from '../utils/aiTariffContext';
+import {useSimulationStore} from '../store/useSimulationStore';
+import {calculateMonthlySolarProduction,getMonthlySolarProductionFactors} from '../engine/solarEngine';
+import {calculateCostMatrixSummary,calculateProjectFinancialSummary} from '../engine/financeEngine';
+import {createAIProposalBase,prepareProposalDraftProject,proposalReconciliationIssues} from '../utils/proposalDraftProject';
+import {BENCHMARK_PROJECT} from '../engine/referenceCase';
+import type {SolarEquipmentItem} from '../types/equipment';
+const row=(id:string,type:any,brand:string,displayName:string,extra:any):SolarEquipmentItem=>({id,type,brand,displayName,modelSeries:displayName,createdAt:'',updatedAt:'',...extra});
+const catalog=[row('p','panel','JA Solar','JA Solar JAM66D45-630/LB',{powerW:630}),row('i1','inverter','LuxpowerTek','LuxpowerTek 16K',{powerKW:16}),row('i2','inverter','Huawei','Huawei 10K',{powerKW:10}),row('b','battery','HinaESS','HinaESS Hi-15e',{capacityKWh:15})];
+assert(requestedModelMatches('Panel JA Solar 630 watts.',catalog[0]));
+assert(requestedModelMatches('Batería Hinaess 15.0 kWh (5 años garantía)',catalog[3]));
+assert(!requestedModelMatches('Panel JA Solar 620 watts',catalog[0]));
+assert(!requestedModelMatches('Batería HinaESS PowerGem Max 15kWh',catalog[3]));
+assert(!requestedModelMatches('Canadian Solar630W',catalog[0]));
+assert(!requestedModelMatches('Luxpower 8kW',catalog[1]));
+const state=useSimulationStore.getState();
+const yields=getMonthlySolarProductionFactors('Santiago',25);
+const context={province:'Santiago',systemLosses:25,monthlySpecificYieldKWhPerKWp:yields,tariffReference:buildAITariffContext(state.tariffMatrix)};
+// Synthetic quantities/prices exercise ordinary input; no client-specific rule or engine change.
+const raw={clientName:'QA documental',province:'Santiago',distributor:'EDESUR',tariffCode:'BTD',dopExchangeRate:60,consumptionSource:'theoretical',monthlyConsumptionKWh:[],panels:[{equipmentId:'p',quantity:156,requestedModel:'Panel JA Solar 630 watts',unitPriceUSD:100.8}],inverters:[{equipmentId:'i1',quantity:1,unitPriceUSD:2700},{equipmentId:'i2',quantity:6,unitPriceUSD:1335}],batteries:[{equipmentId:'b',quantity:6,requestedModel:'Batería HinaESS15.0kWh',unitPriceUSD:1685}],commercial:{priceBasis:'purchase',markupPct:35,installationUnitPriceUSD:170,customItems:[],customDiscounts:[],sourceTotals:{subtotalUSD:53252.4,taxUSD:4827.17,totalCostUSD:58079.57,saleUSD:78407.42}}};
+const normalized=normalizeProposalDraft(raw,catalog,context);
+assert.equal(normalized.requiresReview,false,JSON.stringify(normalized.validationIssues));
+assert.equal(normalized.consumptionSource,'theoretical');
+assert.equal(normalized.energyRateSource,'reference');
+assert.equal(normalized.monthlyConsumptionKWh.length,12);
+normalized.monthlyConsumptionKWh.forEach((n,i)=>assert(Math.abs(n-Math.round(yields[i]*98.28*10)/10)<1e-8));
+const twice=normalizeProposalDraft(normalized,catalog,context);
+assert.deepEqual(twice.monthlyConsumptionKWh,normalized.monthlyConsumptionKWh);
+const larger=normalizeProposalDraft({...normalized,panels:[{...normalized.panels![0],count:160}]},catalog,context);
+assert(larger.monthlyConsumptionKWh[0]>normalized.monthlyConsumptionKWh[0]);
+const base=createAIProposalBase(BENCHMARK_PROJECT,state.defaultSimulationSettings,'Santiago');
+const project=prepareProposalDraftProject(base,normalized,state.tariffMatrix,{isNew:true});
+const cost=calculateCostMatrixSummary(project.specs,98.28,project.financials.customItems,project.financials.customDiscounts);
+assert(Math.abs(cost.precioNetoUSD-53252.4)<.001);
+assert(Math.abs(cost.itbisUSD-4827.168)<.001);
+assert(Math.abs(cost.totalNetoUSD-58079.568)<.001);
+assert.equal(cost.listPorcentajeVentaUSD,78407.42);
+assert.equal(project.financials.customItems?.length,0,'totals and taxes cannot become extras');
+const noHistory=normalizeProposalDraft({...raw,consumptionSource:'observed'},catalog,context);
+assert(noHistory.requiresReview);
+const measured=normalizeProposalDraft({...raw,consumptionSource:'observed',monthlyConsumptionKWh:Array(12).fill(300)},catalog,context);
+assert.deepEqual(measured.monthlyConsumptionKWh,Array(12).fill(300));
+const ambiguous=normalizeProposalDraft({...raw,commercial:{...raw.commercial,priceBasis:'unknown'}},catalog,context);
+assert(ambiguous.requiresReview);
+assert(normalizeProposalDraft(ambiguous,catalog,context).requiresReview);
+const parsed=processExtractedInvoice(JSON.stringify({...raw,responseKind:'draft',assistantMessage:'Seleccioné los modelos de la misma marca y potencia.'}),{dopExchangeRate:60.5,equipmentCatalog:catalog,context});
+assert.equal(parsed.dopExchangeRate,60,'document FX takes precedence over default; USD untouched');
+assert.equal(parsed.panels![0].unitPriceUSD,100.8);
+const discussion=processExtractedInvoice(JSON.stringify({responseKind:'discussion',assistantMessage:'¿Estos importes son costos de compra o venta?'}),{equipmentCatalog:catalog,context});
+assert.equal(discussion.responseKind,'discussion');
+assert.equal(discussion.assistantMessage,'¿Estos importes son costos de compra o venta?');
+const request=buildProposalRequest({projectRequirementsText:'Baja sólo el precio Huawei.',equipmentCatalog:catalog,context:{...context,currentDraft:normalized,conversation:[{role:'user',text:'Son costos de compra.'},{role:'assistant',text:'Conservo el recargo del35%.'}]}});
+assert(request.contents[0].parts[0].text.includes('Son costos de compra.'));
+assert(request.contents[0].parts[0].text.includes('currentDraft'));
+assert.equal(calculateProjectFinancialSummary(project,'legacy').costMatrix.listPorcentajeVentaUSD,78407.42);
+console.log('Conversation, generic model names, document costs/FX, theoretical provenance and tariff reference passed.');
+
+const previous=useSimulationStore.getState();
+useSimulationStore.setState({projects:[],activeProjectId:'',equipmentCatalog:catalog,syncSettings:{...previous.syncSettings,authToken:null,currentUser:null,autoSyncEnabled:false}});
+useSimulationStore.getState().applyExtractedInvoice(normalized,true);
+const committed=useSimulationStore.getState().projects[0];
+assert(committed,'theoretical draft survives store revalidation and is actually created');
+assert.equal(committed.aiSource?.consumptionSource,'theoretical');
+assert.deepEqual(committed.monthlyConsumption,normalized.monthlyConsumptionKWh);
+assert.equal(calculateProjectFinancialSummary(committed,'legacy').costMatrix.listPorcentajeVentaUSD,78407.42);
+assert.deepEqual(useSimulationStore.getState().equipmentCatalog,catalog);
+useSimulationStore.setState(previous);
+
+assert.deepEqual(committed.monthlyConsumption,calculateMonthlySolarProduction(committed.client.province,committed.specs,committed.monthlyConsumption,0,0).map(m=>m.productionKWh));
+assert(!requestedModelMatches('HinaESS Hi-5',catalog[3]));
+const bts1=normalizeProposalDraft({...raw,consumptionSource:'observed',monthlyConsumptionKWh:Array(12).fill(200),tariffCode:'BTS1'},catalog,context);
+const bts1Edited=normalizeProposalDraft({...bts1,monthlyConsumptionKWh:Array(12).fill(1000),observedMonthlyConsumptionKWh:Array(12).fill(1000)},catalog,context);
+assert(bts1Edited.energyCostPerKWhDOP!>bts1.energyCostPerKWhDOP!,'reference rate recalculates after consumption edit');
+const manual=normalizeProposalDraft({...bts1Edited,energyRateSource:'manual',energyCostPerKWhDOP:13},catalog,context);
+assert.equal(manual.energyCostPerKWhDOP,13);
+
+assert(requestedModelMatches('JA Solar0.63kWp',catalog[0]));
+assert(!requestedModelMatches('HinaESS15kW',catalog[3]));
+assert(!requestedModelMatches('Luxpower16kWh',catalog[1]));
+
+const toggle=normalizeProposalDraft({...measured,consumptionSource:'theoretical',observedMonthlyConsumptionKWh:[],monthlyConsumptionKWh:[]},catalog,context);
+assert.equal(toggle.consumptionSource,'theoretical','existing average cannot override an explicit theoretical mode');
+assert.equal(toggle.monthlyConsumptionKWh[0],normalized.monthlyConsumptionKWh[0]);
+
+for(const [province,losses,hsp] of [['Santiago',25,undefined],['Samaná',30,undefined],['Santo Domingo / Distrito Nacional',10,Array(12).fill(5.3)]] as const){
+ const localContext={...context,province,systemLosses:losses,customMonthlyHSP:hsp as number[]|undefined,monthlySpecificYieldKWhPerKWp:getMonthlySolarProductionFactors(province,losses,hsp as number[]|undefined)};
+ const theoretical=normalizeProposalDraft({...raw,province},catalog,localContext);
+ const actual=calculateMonthlySolarProduction(province,{...project.specs,systemLosses:losses},theoretical.monthlyConsumptionKWh,0,0,hsp as number[]|undefined).map(m=>m.productionKWh);
+ assert.deepEqual(theoretical.monthlyConsumptionKWh,actual);
+}
+const invalidFx=normalizeProposalDraft({...raw,dopExchangeRate:0},catalog,context);
+assert(invalidFx.requiresReview);assert(normalizeProposalDraft(invalidFx,catalog,context).requiresReview);
+const invalidTotals=normalizeProposalDraft({...raw,commercial:{...raw.commercial,sourceTotals:'bad'}},catalog,context);
+assert(invalidTotals.requiresReview);assert(normalizeProposalDraft(invalidTotals,catalog,context).requiresReview);
+
+assert.equal(proposalReconciliationIssues(normalized,calculateProjectFinancialSummary(project,'legacy')).length,0);
+assert(proposalReconciliationIssues({...normalized,commercial:{...normalized.commercial,sourceTotals:{saleUSD:1}}},calculateProjectFinancialSummary(project,'legacy')).length===1);

@@ -130,6 +130,40 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
           conflict("organization_mismatch");
           continue;
         }
+        // Unknown legacy local folders remain compatible until they are published.
+        // Known server folders must belong to this tenant and remain accessible.
+        if (input.folderId != null) {
+          if (
+            typeof input.folderId !== "string" ||
+            !input.folderId ||
+            input.folderId.length > 64
+          ) {
+            conflict("invalid_folder");
+            continue;
+          }
+          const folders = (
+            await client.query(
+              "SELECT organization_id,visibility,created_by_id,deleted_at FROM project_folders WHERE id=$1",
+              [input.folderId],
+            )
+          ).rows;
+          const ownFolder = folders.find(
+            (folder) => folder.organization_id === user.organizationId,
+          );
+          const unchanged =
+            existing?.data_json?.folderId === input.folderId &&
+            !input.forceNewVersion;
+          if (
+            (folders.length > 0 && !ownFolder) ||
+            ownFolder?.deleted_at ||
+            (ownFolder?.visibility === "private" &&
+              ownFolder.created_by_id !== user.id &&
+              !unchanged)
+          ) {
+            conflict("invalid_folder", existing);
+            continue;
+          }
+        }
         if (existing && input.forceNewVersion) {
           const id = `${input.id.slice(0, 80)}-fork-${crypto.randomUUID()}`;
           const project = await saveProject(client, user, {

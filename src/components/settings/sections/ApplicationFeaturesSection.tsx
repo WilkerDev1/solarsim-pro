@@ -31,6 +31,13 @@ export function ApplicationFeaturesSection() {
     </div>
     {user && user.role !== 'ADMIN' && <p className="flex items-start gap-2 text-sm text-slate-600 dark:text-zinc-400"><LockKeyhole className="mt-0.5 h-4 w-4 shrink-0" />El administrador define las funciones para todos los miembros de la organización.</p>}
     {request?.status === 'error' && <p role="alert" className="rounded-lg bg-amber-50 p-4 text-sm text-amber-900 dark:bg-amber-950/50 dark:text-amber-200">{request.error} {policy ? 'Se mantiene la última configuración confirmada.' : 'Se mantiene el modo clásico.'}</p>}
+    <div className="flex items-start justify-between gap-6 rounded-xl border border-slate-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="max-w-2xl"><div className="flex flex-wrap items-center gap-2"><h4 id="feature-title-app-assistant" className="text-sm font-semibold text-slate-900 dark:text-white">Asistente general de IA</h4><span className="rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">Experimental</span></div>
+        <p id="feature-description-app-assistant" className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-zinc-400">Chat flotante en Inicio, Hub y Simulador para consultar propuestas, buscar equipos y preparar cambios revisables. Requiere Gemini; texto y resultados consultados se envían a Google.</p>
+        <p className="mt-3 text-xs text-slate-500 dark:text-zinc-400">Preferencia de este equipo, desactivada por defecto. Respeta tus permisos. No cambia el modo de cálculo ni el asistente de creación de propuestas.</p>
+      </div>
+      <button type="button" role="switch" aria-checked={state.appAssistantEnabled} aria-labelledby="feature-title-app-assistant" aria-describedby="feature-description-app-assistant" onClick={()=>state.setAppAssistantEnabled(!state.appAssistantEnabled)} className={`mt-1 flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition-colors ${state.appAssistantEnabled?'bg-emerald-700':'bg-slate-300 ring-1 ring-slate-500 dark:bg-zinc-600 dark:ring-zinc-400'}`}><span className={`h-5 w-5 rounded-full bg-white transition-transform ${state.appAssistantEnabled?'translate-x-5':''}`}/></button>
+    </div>
     <div className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
       {APPLICATION_FEATURES.map((feature) => <div key={feature.id} className="flex items-start justify-between gap-6 p-5">
         <div className="max-w-2xl">

@@ -1,12 +1,16 @@
 # Centro empresarial
 
-Los membretes locales y las organizaciones autenticadas son ámbitos distintos. Un membrete define el emisor de nuevas propuestas; no concede permisos ni cambia la organización del servidor. Cada organización autenticada mantiene sus propuestas, equipos personalizados, tarifas, configuración y permisos separados.
+El membrete compartido de la organización autenticada se sincroniza desde `/api/organization/profile` y define el emisor predeterminado de nuevas propuestas para sus miembros. También se conservan membretes locales adicionales; se identifican como Local y no se publican automáticamente. Un membrete no concede permisos ni cambia la organización del servidor. Cada organización autenticada mantiene sus propuestas, equipos personalizados, tarifas, configuración y permisos separados.
 
 ## Uso
 
 El centro ofrece Membretes y marcas, Organizaciones y equipo y Perfil del consultor. Admite los temas claro/oscuro del escritorio Electron Linux/Windows, desde 1024×700. No se entrega una superficie móvil.
 
 Los membretes permiten identidad fiscal, contacto, logo, recursos de marca, predeterminado, selección para nuevas propuestas y respaldo/importación como copias. No se incluyen contactos ni RNC ficticios en nuevos perfiles. La migración limpia únicamente valores de ejemplo conocidos de perfiles antiguos, una sola vez. El logo y la identidad se capturan al crear propuestas; editar o eliminar un membrete no reescribe propuestas existentes. Sellos, colores y condiciones del perfil se conservan como recursos/notas internas; no se anuncia su aplicación automática al PDF aprobado.
+
+El membrete compartido usa `org-company:<organizationId>` y la versión confirmada del servidor. Se descarga al iniciar sesión, cambiar organización y sincronizar proyectos. El servidor guarda identidad, contacto, logo, sello, colores, lema, Instagram y marca de agua en `company_profile`. EDITOR/LECTOR lo consultan; el store bloquea mutaciones locales de ese perfil y el guardado emplea PATCH con `baseVersion` y comprobación ADMIN actual en BD. Un conflicto conserva el borrador para revisarlo; una respuesta de una sesión anterior o una organización distinta se descarta. Si la API no está disponible, se conserva el perfil confirmado del ámbito sin presentar un cambio local como sincronizado. Cambiar el perfil no reescribe propuestas previas ni plantillas particulares de PDF.
+
+La identidad de Electsun está preparada en `src/services/electsunCompanyProfile.ts` a partir de los contactos y logos del repositorio: Electsun Dominicana S.R.L., 809 378-6590, info@electsun.com.do, electsun.com.do y dirección en Plaza Toledo. No incluye el RNC ficticio de los defaults históricos. Su aplicación en servidor debe seleccionar explícitamente el ID de la organización verificada, con respaldo y CAS; no se crea otra organización ni se detecta pertenencia por el nombre. El registro público continúa creando organizaciones independientes.
 
 El perfil del consultor es local y distinto de la cuenta autenticada. Los formularios ofrecen guardar/descartar y protegen cambios pendientes en la navegación del centro.
 
@@ -24,7 +28,7 @@ La API conserva `users.organization_id` como pertenencia primaria por compatibil
 
 ## Despliegue
 
-La API compatible se desplegó el 6 de octubre de 2026 como `2.2.1-ac7abbc`, con migración 003 y rotación de secretos. La revisión de producción del 7 de octubre fue de solo lectura; los ensayos de escritura usan una base desechable. El código de servidor posterior revisado solo difiere en la versión de health, por lo que no exige actualizar el CT por estos cambios. Las correcciones de cliente posteriores al tag 2.3.0 deben pasar sus gates y staging antes de distribuirse. Véase [estado de la revisión](REVIEW_2026_10_07.md).
+La API compatible se desplegó el 6 de octubre de 2026 como `2.2.1-ac7abbc`, con migración 003 y rotación de secretos. La revisión de producción del 7 de octubre fue de solo lectura; los ensayos de escritura usan una base desechable. Esta extensión del perfil incorpora lema, Instagram y marca de agua en la API; requiere desplegar la API actual para guardar esos campos. No requiere una migración de esquema adicional para el perfil: utiliza el JSONB existente. Las correcciones de cliente posteriores al tag 2.3.0 deben pasar sus gates y staging antes de distribuirse. Véase [estado de la revisión](REVIEW_2026_10_07.md).
 
 No volver a API 2.2.0 después de usar membresías secundarias o revocaciones nuevas: desconoce esos permisos y podría conceder acceso indebido. El rollback debe usar una API compatible con la migración y los controles actuales. No revertir ni eliminar tablas para restaurar binarios. Conservar respaldo y probar recuperación antes del despliegue.
 

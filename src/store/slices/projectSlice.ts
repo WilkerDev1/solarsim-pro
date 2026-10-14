@@ -673,6 +673,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
             ...projectMutationMetadata(p, get().syncSettings),
             updatedAt: new Date().toISOString(),
             monthlyConsumption: newConsumption,
+            aiSource:p.aiSource?.consumptionSource==='theoretical'?{...p.aiSource,consumptionSource:'estimated'}:p.aiSource,
             specs: updatedSpecs,
           };
         }
@@ -712,6 +713,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
             ...projectMutationMetadata(p, get().syncSettings),
             updatedAt: new Date().toISOString(),
             monthlyConsumption: newConsumption,
+            aiSource:p.aiSource?.consumptionSource==='theoretical'?{...p.aiSource,consumptionSource:'estimated'}:p.aiSource,
             specs: updatedSpecs,
           };
         }
@@ -753,6 +755,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
             ...projectMutationMetadata(p, get().syncSettings),
             updatedAt: new Date().toISOString(),
             monthlyConsumption: newConsumption,
+            aiSource:p.aiSource?.consumptionSource==='theoretical'?{...p.aiSource,consumptionSource:'estimated'}:p.aiSource,
             specs: updatedSpecs,
           };
         }

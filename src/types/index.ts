@@ -1,6 +1,13 @@
 import type { ExtractedInvoiceData, GeminiModelInfo } from './aiInvoice';
 
 export interface ClientInfo {
+  nic?: string;
+  nis?: string;
+  rnc?: string;
+  contractNumber?: string;
+  circuit?: string;
+  meterNumber?: string;
+  voltagePhase?: string;
   name: string;
   company?: string;
   location: string;
@@ -21,6 +28,8 @@ export interface ClientInfo {
 }
 
 export interface PanelItemSpec {
+  priceSource?: 'manual' | 'supplier';
+  requestedModel?: string;
   id: string;
   brandModel: string;
   powerW: number;
@@ -34,6 +43,8 @@ export interface PanelItemSpec {
 }
 
 export interface InverterItemSpec {
+  priceSource?: 'manual' | 'supplier';
+  requestedModel?: string;
   id: string;
   brandModel: string;
   powerKW: number;
@@ -45,6 +56,8 @@ export interface InverterItemSpec {
 }
 
 export interface BatteryItemSpec {
+  priceSource?: 'manual' | 'supplier';
+  requestedModel?: string;
   id: string;
   brandModel: string;
   capacityKWh: number;
@@ -401,6 +414,7 @@ export interface SyncSettings {
 }
 
 export interface ProjectSimulation {
+  aiSource?: { consumptionSource?: ExtractedInvoiceData["consumptionSource"]; energyRateSource?: ExtractedInvoiceData["energyRateSource"]; extractedFromFileName?: string; modelUsed?: string; requestedModel?: string; notes?: string };
   organizationId?: string;
   syncServerUrl?: string;
   id: string;
@@ -470,7 +484,8 @@ declare global {
       getPlatformInfo: () => Promise<PlatformInfo>;
       openExternalUrl: (url: string) => Promise<void>;
       installLinuxPackage: (packageType: 'pacman' | 'deb', version: string) => Promise<{ success: boolean; error?: string }>;
-      parseInvoiceWithAI?: (payload: { fileBase64?: string; mimeType?: string; fileName?: string; apiKey?: string; model?: string; panelPowerW?: number; projectRequirementsText?: string; equipmentCatalog?: import('./equipment').SolarEquipmentItem[]; dopExchangeRate?: number; includeBattery?: boolean }) => Promise<{ success: boolean; data?: ExtractedInvoiceData; error?: string }>;
+      parseInvoiceWithAI?: (payload: import('../../shared/aiProposal').AIProposalPayload) => Promise<{ success: boolean; data?: ExtractedInvoiceData; error?: string }>;
+      cancelAIRequest?: (requestId: string) => Promise<void>;
       parseDatasheetWithAI?: (payload: { fileBase64: string; mimeType: string; fileName: string; apiKey?: string; model?: string }) => Promise<{ success: boolean; data?: import('./equipment').ExtractedDatasheetData; error?: string }>;
       validateGeminiApiKey?: (apiKey: string, model?: string) => Promise<{ success: boolean; error?: string; modelName?: string; models?: GeminiModelInfo[] }>;
       listGeminiModels?: (apiKey: string) => Promise<{ success: boolean; error?: string; models?: GeminiModelInfo[] }>;

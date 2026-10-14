@@ -121,6 +121,47 @@ export function registerEquipmentRoutes(
           conflict("version_conflict", true);
           continue;
         }
+        // Each model references at most one datasheet; several models can reference the same stored blob.
+        const images = item.imageAssetIds ?? [];
+        if (
+          (item.datasheetAssetId != null &&
+            (typeof item.datasheetAssetId !== "string" ||
+              item.datasheetAssetId.length > 64)) ||
+          !Array.isArray(images) ||
+          images.length > 6 ||
+          images.some(
+            (id: unknown) => typeof id !== "string" || !id || id.length > 64,
+          ) ||
+          new Set(images).size !== images.length
+        ) {
+          conflict("invalid_assets");
+          continue;
+        }
+        const references = [
+          ...(item.datasheetAssetId
+            ? [{ id: item.datasheetAssetId, kind: "datasheet" }]
+            : []),
+          ...images.map((id: string) => ({ id, kind: "image" })),
+        ];
+        if (references.length) {
+          const assets = (
+            await client.query(
+              "SELECT id,kind FROM equipment_assets WHERE organization_id=$1 AND id=ANY($2::varchar[])",
+              [user.organizationId, references.map((r) => r.id)],
+            )
+          ).rows;
+          if (
+            references.some(
+              (ref) =>
+                !assets.some(
+                  (asset) => asset.id === ref.id && asset.kind === ref.kind,
+                ),
+            )
+          ) {
+            conflict("invalid_assets");
+            continue;
+          }
+        }
         const details = Object.fromEntries(
           EQUIPMENT_DETAIL_KEYS.filter((key) => item[key] !== undefined).map(
             (key) => [key, item[key]],

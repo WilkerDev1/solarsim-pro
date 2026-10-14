@@ -13,14 +13,14 @@ flowchart LR
   A --> D[(PostgreSQL)]
   H --> W[Worker: autorización, validación, plantilla]
   W --> K[(KV)]
-  C[shared: contratos puros] --> S
+  C[shared: contratos y utilidades portátiles] --> S
   C --> A
   C --> W
 ```
 
 ## Dependencias permitidas
 
-- `shared/`: contratos TypeScript puros. Sin React, Electron, acceso a red ni base de datos.
+- `shared/`: contratos y normalizadores TypeScript puros, sin React, Electron ni base de datos. Excepción explícita: `geminiTransport.ts` realiza I/O HTTP portátil mediante Fetch/AbortController y transporte inyectable; no importa módulos Node ni decide permisos o estado de UI. La política de cancelación, timeout y reintentos se comparte entre navegador y Electron.
 - `src/engine/`: cálculos puros con argumentos explícitos. No importa el store ni decide permisos.
 - `src/features/application/`: selección del modo efectivo; adapta política del store al motor.
 - `src/services/`: transporte, validación de respuestas y publicación. Sin componentes de UI.
@@ -36,4 +36,16 @@ flowchart LR
 
 Una nueva función se registra en `shared/applicationFeatures.ts`, define su default/etapa/visibilidad/disponibilidad y usa el selector efectivo. Cambiar solo una etiqueta de UI nunca cambia el modelo de cálculo. Una nueva ruta registra su módulo desde app y usa la autorización actual en BD. Las migraciones se numeran y no se ejecutan desde el renderizador.
 
-Los perfiles de empresa locales personalizan documentos; las organizaciones autenticadas delimitan autorización y sincronización. Son conceptos distintos. No se adjudican automáticamente propuestas locales o de otra organización al iniciar sesión: para mover contenido se exporta/importa una copia de forma explícita.
+El perfil empresarial de la organización sincroniza el membrete principal; los membretes locales adicionales personalizan documentos. Las organizaciones autenticadas delimitan autorización y sincronización. Carpetas, registro de propuestas web y adjuntos del catálogo siguen el contrato de [recursos compartidos](SHARED_RESOURCES.md). Son conceptos distintos. No se adjudican automáticamente propuestas locales o de otra organización al iniciar sesión: para mover contenido se exporta/importa una copia de forma explícita.
+
+## Subsistema IA
+
+`shared/aiProposal.ts` concentra prompt, esquema y normalización multi-equipo. El hook de propuesta adapta catálogo, tarifas y contexto de cálculo del espacio actual; el borrador es transitorio y requiere revisión humana antes de aplicar. Los importadores de datasheets/precios preparan el lote y verifican permisos y resultado del store. La procedencia tarifaria acompaña filas y campos conservados. Véanse [escáneres IA](AI_SCANNERS_SPECIFICATION.md) y [tarifas IA](AI_TARIFF_CONTEXT.md).
+
+`shared/aiProposalCommercial.ts` valida el contrato comercial; `src/utils/proposalDraftProject.ts` adapta el mismo borrador normalizado para cálculo previo y aplicación. El hook calcula energía y resumen financiero por separado para que un costo pendiente no invalide la vista energética. Las pestañas de consumo/dimensionamiento y cotización son componentes de presentación; no cambian los motores.
+
+El contrato conversacional distingue respuesta informativa de borrador mutable. El consumo teórico usa factores sin redondear exportados por el motor solar, sin duplicar una fórmula asociada a documentos comerciales. Hook, normalización de transporte y store comparten esa referencia; el store sigue verificando antes de aplicar. Totales documentales son referencias informativas, nunca overrides del motor.
+
+## Asistente general experimental
+
+`src/features/assistant/` separa transporte conversacional, registro de herramientas, validación, hooks y tarjetas React. Las herramientas solo consultan el espacio actual y proponen ediciones para confirmar; no ejecutan funciones arbitrarias, código ni HTML. Cada aplicación revalida servidor/organización, sesión/rol, flag y fingerprint. App monta el panel de forma diferida; conversación/divisor se comparten con el borrador de propuestas. No incorpora un servidor MCP ni MCP-UI en esta entrega. Ver [APP_ASSISTANT.md](APP_ASSISTANT.md).

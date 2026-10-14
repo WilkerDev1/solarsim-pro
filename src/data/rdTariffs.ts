@@ -382,7 +382,8 @@ export function getReferenceEnergyRateUSD(
   const sched = matrix.schedules[distKey] || matrix.schedules.EDESUR;
 
   // Si no existe la tarifa exacta, buscar por clave directa o alias
-  let tariff: UtilityTariffDetails | undefined = sched.tariffs[tariffCode];
+  const canonical = distKey === 'CEPM' ? ({BTS1:'RBT-1',BTS2:'RBT-1',BTD:'RBT-2',MTD1:'RMT-1',MTD2:'RMT-1'} as Record<string,string>)[tariffCode] || tariffCode : tariffCode;
+  let tariff: UtilityTariffDetails | undefined = sched.tariffs[canonical];
 
   if (!tariff) {
     // Si estamos en CEPM y vino código BTS1/BTS2
@@ -395,7 +396,7 @@ export function getReferenceEnergyRateUSD(
 
   if (!tariff) return 0.20;
 
-  if (tariff.currency === 'USD' && tariff.baseEnergyRateUSD) {
+  if (tariff.currency === 'USD' && typeof tariff.baseEnergyRateUSD === 'number' && Number.isFinite(tariff.baseEnergyRateUSD)) {
     return Math.round(tariff.baseEnergyRateUSD * 1000) / 1000;
   }
 
@@ -403,16 +404,18 @@ export function getReferenceEnergyRateUSD(
   if (tariff.blocks && tariff.blocks.length > 0 && monthlyKWh > 0) {
     let remaining = monthlyKWh;
     let totalDOP = 0;
+    let previousMax = 0;
 
     for (const block of tariff.blocks) {
       if (remaining <= 0) break;
-      const lower = block.minKWh > 0 && (block.minKWh === 201 || block.minKWh === 301 || block.minKWh === 701)
-        ? block.minKWh - 1
+      const lower = block.minKWh > 0 && block.minKWh === previousMax + 1
+        ? previousMax
         : block.minKWh;
       const blockSize = block.maxKWh === Infinity ? Infinity : Math.max(0, block.maxKWh - lower);
       const consumedInBlock = Math.min(remaining, blockSize);
       totalDOP += consumedInBlock * block.rateDOP;
       remaining -= consumedInBlock;
+      previousMax = block.maxKWh;
     }
 
     const effectiveDOPPerKWh = totalDOP / monthlyKWh;
@@ -421,7 +424,7 @@ export function getReferenceEnergyRateUSD(
   }
 
   // Tarifa monómica plana (ej. RBT-1 en CEPM = 22.90 DOP)
-  const rateDOP = tariff.baseEnergyRateDOP || 12.0;
+  const rateDOP = tariff.baseEnergyRateDOP ?? 12.0;
   const rateUSD = rateDOP / (usdExchangeRate > 0 ? usdExchangeRate : 60.0);
   return Math.round(rateUSD * 1000) / 1000;
 }

@@ -109,10 +109,11 @@ export async function clearInvalidToken(serverUrl: string, token: string): Promi
 const refreshRequests = new Map<string, Promise<string | null>>();
 
 /** One bounded refresh on 401. A revoked account or forbidden role is never retried. */
-export async function fetchWithSessionRetry(url: string, init: RequestInit = {}): Promise<Response> {
+export async function fetchWithSessionRetry(url: string, init: RequestInit = {}, sessionServerUrl?: string): Promise<Response> {
   const send = (options: RequestInit) => fetch(url, { ...options, signal: options.signal ?? AbortSignal.timeout(12000) });
   const authorization = new Headers(init.headers).get('Authorization');
-  const base = url.slice(0, url.indexOf('/api/'));
+  // Worker requests authenticate against the API, so their renewal origin must be explicit.
+  const base = sessionServerUrl?.trim().replace(/\/+$/, '') || url.slice(0, url.indexOf('/api/'));
   const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
   const key = base && token ? await computeTokenKey(base, token) : null;
 

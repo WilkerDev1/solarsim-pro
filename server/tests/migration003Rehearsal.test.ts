@@ -319,7 +319,7 @@ test("Comprehensive Migration 003 rehearsal: preserves all 8 business tables, co
   // 2. Execute migration sequence (001 baseline -> 002 feature policy -> 003 company management)
   await migrateDatabase(pool);
 
-  // 3. Verify schema_migrations has recorded all 3 migrations in correct sequence
+  // 3. Verify schema_migrations has recorded all migrations in correct sequence
   const appliedMigrations = (
     await pool.query(
       "SELECT version, name FROM schema_migrations ORDER BY version",
@@ -330,6 +330,7 @@ test("Comprehensive Migration 003 rehearsal: preserves all 8 business tables, co
     { version: 1, name: "baseline" },
     { version: 2, name: "feature_policy_and_tombstones" },
     { version: 3, name: "company_management" },
+    { version: 4, name: "shared_resources" },
   ]);
 
   // 4. Verify ZERO data loss: row counts of all 8 tables are strictly preserved

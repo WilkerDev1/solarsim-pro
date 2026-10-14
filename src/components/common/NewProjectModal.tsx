@@ -157,13 +157,13 @@ export const NewProjectModal: React.FC = () => {
               </div>
               <div className="space-y-0.5">
                 <h4 className="font-extrabold text-xs flex items-center gap-1.5">
-                  <span>¿Tienes la factura eléctrica EDE?</span>
+                  <span>Crear con el asistente de IA</span>
                   <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 font-mono font-bold text-emerald-300">
                     IA
                   </span>
                 </h4>
                 <p className="text-[10px] opacity-80">
-                  Escanéala para autocompletar cliente, distribuidora y 12 meses de consumo.
+                  Usa una descripción o documentos y revisa el borrador antes de crear.
                 </p>
               </div>
             </div>
