@@ -373,6 +373,7 @@ export interface DocumentCustomization {
 }
 
 export interface AttachedPDFDocument {
+  sourceDatasheetKey?: string; // Deduplicate catalog assets across equipment variants.
   id: string;                    // ID único (ej. 'att-1725370000000-xyz')
   fileName: string;              // Nombre original del archivo (ej. 'Canadian_Solar_600W.pdf')
   fileSize: number;              // Tamaño en bytes

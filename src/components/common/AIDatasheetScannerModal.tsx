@@ -69,6 +69,7 @@ export const AIDatasheetScannerModal: React.FC = () => {
   const [saved, setSaved] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<DatasheetImportReceipt | null>(null);
   const [attachmentPending, setAttachmentPending] = useState(false);
+  const [linkDatasheet, setLinkDatasheet] = useState(true);
   const user = state.syncSettings.currentUser;
   const canEdit = !user || user.role === "ADMIN" || user.role === "EDITOR";
   const control = `w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 ${dark ? "bg-[#141619] border-[#363b43] text-zinc-100 placeholder:text-zinc-400" : "bg-white border-slate-300 text-slate-900 placeholder:text-slate-500"}`;
@@ -87,6 +88,7 @@ export const AIDatasheetScannerModal: React.FC = () => {
     setSaved(null);
     setReceipt(null);
     setAttachmentPending(false);
+    setLinkDatasheet(true);
     setError(null);
     dialog.current?.focus();
     const keyboard = (event: KeyboardEvent) => {
@@ -264,7 +266,7 @@ export const AIDatasheetScannerModal: React.FC = () => {
       const imported = saveDatasheetLocally(data);
       setReceipt(imported);
       setSaved(`${imported.updated} actualizados y ${imported.created} nuevos guardados en este dispositivo. ${imported.userId ? "Pendientes de sincronizar cuando el servidor esté disponible." : "Sin cuenta: la ficha no se adjunta al servidor."}`);
-      if (imported.userId) {
+      if (imported.userId && linkDatasheet) {
         setAttachmentPending(true);
         void attach(imported);
       }
@@ -400,6 +402,12 @@ export const AIDatasheetScannerModal: React.FC = () => {
           )}
           {data && (
             <fieldset disabled={busy || !!receipt} className="space-y-5 min-w-0">
+              <label className="flex items-start gap-2 text-sm">
+                <input type="checkbox" checked={linkDatasheet} onChange={event => setLinkDatasheet(event.target.checked)} />
+                <span>Vincular este documento a los equipos guardados
+                  <small className="block opacity-75">Requiere cuenta y conexión para subirlo. Los equipos se guardan localmente aunque falle la conexión.</small>
+                </span>
+              </label>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="text-sm font-medium">
                   Fabricante
