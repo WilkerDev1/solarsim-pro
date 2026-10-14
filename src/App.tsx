@@ -50,6 +50,7 @@ export const App: React.FC = () => {
     };
 
     window.addEventListener('focus', handleFocus);
+    window.addEventListener('online', handleFocus);
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') handleFocus();
     };
@@ -58,6 +59,7 @@ export const App: React.FC = () => {
     return () => {
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('online', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [syncSettings.authToken, syncSettings.autoSyncEnabled]);

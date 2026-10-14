@@ -54,7 +54,7 @@ function mockServer(initial: ProjectSimulation[]) {
 function reset(projects: ProjectSimulation[]) {
   store.getState().setSyncSettings({ serverUrl, authToken: 'synthetic-token', currentUser: user, autoSyncEnabled: false });
   store.setState({ projects, activeProjectId: projects[0]?.id || '', projectDeletionQueue: [], activeConflict: null,
-    snapshotsByProject: {}, isSyncing: false, syncEquipmentWithServer: async () => ({ success: true, message: 'Synthetic catalog' }) });
+    snapshotsByProject: {}, isSyncing: false, syncFoldersWithServer: async () => ({ success: true, message: 'Synthetic folders' }), syncEquipmentWithServer: async () => ({ success: true, message: 'Synthetic catalog' }) });
 }
 
 async function run() {

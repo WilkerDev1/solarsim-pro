@@ -320,7 +320,7 @@ export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (
     if (activeConflict.reason === 'deleted' && resolution !== 'fork') return;
     // A local checkpoint keeps discarded content recoverable in the version history.
     get().createSnapshot(projectId, 'Antes de resolver conflicto', undefined, 'manual');
-    const canonical: ProjectSimulation = { ...serverProject, organizationId: localProject.organizationId, syncServerUrl: localProject.syncServerUrl, folderId: localProject.folderId, baseVersion: activeConflict.serverVersion, version: activeConflict.serverVersion, syncStatus: 'synced' };
+    const canonical: ProjectSimulation = { ...serverProject, organizationId: localProject.organizationId, syncServerUrl: localProject.syncServerUrl, baseVersion: activeConflict.serverVersion, version: activeConflict.serverVersion, syncStatus: 'synced' };
     let next = canonical;
     let copy: ProjectSimulation | undefined;
     if (resolution === 'keep_local') next = { ...localProject, version: activeConflict.serverVersion, baseVersion: activeConflict.serverVersion, syncStatus: 'pending' };

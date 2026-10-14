@@ -2,6 +2,16 @@ import { SimulationSlice, FolderSlice } from "../types";
 import { ProjectFolder } from "../../types";
 import { fetchWithSessionRetry } from "../../services/syncService";
 import { ownsProject } from "../sync/projectReconciliation";
+import { contentEqual } from "../sync/projectDifferences";
+
+// Compare the editable definition, excluding server attribution and receipt metadata.
+const folderContent = (folder: ProjectFolder) => ({
+  name: folder.name,
+  color: folder.color || "#10b981",
+  description: folder.description || "",
+  hideFromGeneral: folder.hideFromGeneral ?? false,
+  visibility: folder.visibility ?? "public",
+});
 
 export const createFolderSlice: SimulationSlice<FolderSlice> = (set, get) => {
   let running: {
@@ -339,13 +349,23 @@ export const createFolderSlice: SimulationSlice<FolderSlice> = (set, get) => {
               failures++;
               continue;
             }
-            if (remote.has(id) && change.baseVersion === 0) {
-              // A pre-sync definition from an older client is not an edit of the server version.
+            const serverFolder = remote.get(id);
+            if (serverFolder && contentEqual(folderContent(serverFolder), folderContent(f))) {
+              // Recover a lost PUT receipt only from identical authoritative content.
               set((s) => {
                 const changes = { ...s.folderChanges };
                 delete changes[id];
                 return { folderChanges: changes };
               });
+              continue;
+            }
+            if (serverFolder && change.baseVersion === 0) {
+              // A lost creation ACK or legacy definition must not discard divergent local work.
+              failures++;
+              set((s) => ({ folderChanges: {
+                ...s.folderChanges,
+                [id]: { ...s.folderChanges[id], serverFolder },
+              } }));
               continue;
             }
             const r = await request(`/${encodeURIComponent(id)}`, {

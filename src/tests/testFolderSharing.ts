@@ -147,7 +147,7 @@ async function run() {
           )
         : json({
             success: true,
-            folders: [folder("conflicted")],
+            folders: [{ ...folder("conflicted"), name: "Servidor", version: 2, baseVersion: 2 }],
             deletedIds: [],
           });
     assert.equal(
