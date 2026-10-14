@@ -269,7 +269,6 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
           })();
       const now = useSimulationStore.getState();
       if (now.sessionGeneration !== session || now.activeProjectId !== target) throw new Error('La propuesta o sesión cambió.');
-      const existing = now.projects.find(p => p.id === target)?.customization?.attachedPdfs?.find(att => att.sourceDatasheetKey === source.key);
       if (blob.size > 8 * 1024 * 1024 || !blob.size) throw new Error('La ficha está vacía o supera 8 MB.');
       if (!(await blob.slice(0, 5).text()).startsWith('%PDF-')) throw new Error('El documento vinculado no es un PDF. Adjunta una ficha PDF.');
       const bytes = await blob.arrayBuffer();
@@ -278,9 +277,10 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
       if (latest.sessionGeneration !== session || latest.activeProjectId !== target || !proposal ||
           !proposalDatasheets(proposal, latest.equipmentCatalog).some(candidate => candidate.key === source.key && candidate.item.id === source.item.id))
         throw new Error('La propuesta, el equipo o la sesión cambió. Revisa sus fichas y vuelve a intentar.');
+      const existing = proposal.customization?.attachedPdfs?.find(att => att.sourceDatasheetKey === source.key);
       if (existing) {
         await PDFAttachmentStorage.saveAttachment(existing.id, target, existing.fileName, bytes);
-        if (useSimulationStore.getState().sessionGeneration !== session || useSimulationStore.getState().activeProjectId !== target) return;
+        if (useSimulationStore.getState().sessionGeneration !== session || useSimulationStore.getState().activeProjectId !== target || !useSimulationStore.getState().projects.find(p => p.id === target)?.customization?.attachedPdfs?.some(att => att.id === existing.id && att.sourceDatasheetKey === source.key)) return;
         setCachedDatasheets(keys => [...keys, source.key]);
         setFeedbackMsg('Ficha recuperada en este dispositivo, sin duplicar el anexo.');
         return;

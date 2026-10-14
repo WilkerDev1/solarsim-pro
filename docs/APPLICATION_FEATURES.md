@@ -48,6 +48,6 @@ El asistente general flotante es una función experimental local y apagada por d
 
 ### BESS y fichas técnicas en propuestas (2026-10-14)
 
-Activar almacenamiento confirma al menos una unidad real; conserva cantidades positivas previas. La cantidad del editor refleja el estado usado por el motor. Aplicar ofertas actualiza también el grupo principal de equipos cuando hay múltiples modelos. El cálculo financiero y la diferencia entre recargo sobre costo y margen sobre venta conservan sus contratos.
+Activar almacenamiento confirma al menos una unidad real; conserva cantidades positivas previas. La cantidad del editor refleja el estado usado por el motor. Aplicar ofertas actualiza también el grupo principal de equipos cuando hay múltiples modelos. Cambiar ofertas invalida los totales financieros manuales antiguos fuera del benchmark, igual que editar parámetros. El cálculo financiero y la diferencia entre recargo sobre costo y margen sobre venta conservan sus contratos.
 
 El importador permite elegir si vincular el documento escaneado a los equipos creados/actualizados. Guardar el catálogo sigue siendo local primero; vincular requiere cuenta y conexión, con reintento del adjunto independiente. En anexos PDF se detectan coincidencias exactas del catálogo entre equipos activos, se deduplican documentos y se ofrece adjuntarlos. Las fichas de imagen no se añaden como PDF. Un segundo dispositivo puede recuperar el binario sin duplicar la metadata. Cambiar de propuesta o sesión durante una descarga impide aplicar su resultado.

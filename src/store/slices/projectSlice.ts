@@ -876,12 +876,19 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
             });
           }
           updatedSpecs.selectedSupplierInfo = selectedSupplierInfo;
+          const nextFinancials = { ...p.financials };
+          if (p.id !== 'benchmark-centro-medico') {
+            delete nextFinancials.customITBISSavedUSD;
+            delete nextFinancials.customLey5707CreditUSD;
+            delete nextFinancials.customCostUSD;
+          }
 
           return {
             ...p,
             ...projectMutationMetadata(p, get().syncSettings),
             updatedAt: new Date().toISOString(),
             specs: normalizeEnabledBatteries(updatedSpecs),
+            financials: nextFinancials,
           };
         }
         return p;
