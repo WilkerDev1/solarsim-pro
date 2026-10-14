@@ -578,13 +578,15 @@ test("catalog ownership, CAS, supplier offers and tombstones survive races and f
 });
 test("shared reference catalog prices stay private; hiding a shared model affects only requesting tenant", async () => {
   await pool.query(
-    `INSERT INTO equipment_catalog(id,organization_id,type,brand,model_series,display_name,supplier_prices,details) VALUES('eq-mod-cs-620','org-electsun-default','panel','Canadian Solar','TEST','Shared','[{"priceUSD":123}]','{"supplierPrices":[{"priceUSD":123}],"preferredSupplierId":"private"}')`,
+    `INSERT INTO equipment_catalog(id,organization_id,type,brand,model_series,display_name,supplier_prices,details) VALUES('eq-mod-cs-620','org-electsun-default','panel','Canadian Solar','TEST','Shared','[{"priceUSD":123}]','{"supplierPrices":[{"priceUSD":123}],"preferredSupplierId":"private","datasheetAssetId":"tenant-private-file","imageAssetIds":["tenant-private-image"]}')`,
   );
   const item = (await request("GET", "/api/equipment", other)).body.items.find(
     (i) => i.id === "eq-mod-cs-620",
   );
   assert.deepEqual(item.supplierPrices, []);
   assert.equal(item.preferredSupplierId, undefined);
+  assert.equal(item.datasheetAssetId, undefined);
+  assert.equal(item.imageAssetIds, undefined);
   assert.equal(
     (await request("DELETE", "/api/equipment/eq-mod-cs-620", other)).status,
     200,
@@ -1076,4 +1078,367 @@ test("retiring primary access preserves identity and attribution from past secon
     ])
   ).rows[0];
   assert.equal(row.created_by_id, member.id);
+});
+
+test("folders default to public, private folders belong to their creator and writes use CAS", async () => {
+  const owner = await register("folders-owner");
+  const member = await provision("EDITOR", "folders-member", owner);
+  const view = await provision("LECTOR", "folders-reader", owner);
+  const created = await request("PUT", "/api/folders/shared", owner, {
+    name: "Compartida",
+    baseVersion: 0,
+  });
+  assert.equal(created.status, 200);
+  assert.equal(created.body.folder.visibility, "public");
+  assert.equal(
+    (await request("GET", "/api/folders", member)).body.folders[0].id,
+    "shared",
+  );
+  assert.equal(
+    (await request("GET", "/api/folders", other)).body.folders.some(
+      (f: any) => f.organizationId === owner.organizationId,
+    ),
+    false,
+  );
+  assert.equal(
+    (
+      await request("PUT", "/api/folders/shared", member, {
+        name: "Privada ajena",
+        baseVersion: 1,
+        visibility: "private",
+      })
+    ).status,
+    403,
+  );
+  const races = await Promise.all(
+    [owner, member].map((u) =>
+      request("PUT", "/api/folders/shared", u, {
+        name: "Editada",
+        baseVersion: 1,
+      }),
+    ),
+  );
+  assert.deepEqual(races.map((r) => r.status).sort(), [200, 409]);
+  assert.equal(
+    (
+      await request("PUT", "/api/folders/denied", view, {
+        name: "Denegada",
+        baseVersion: 0,
+      })
+    ).status,
+    403,
+  );
+  assert.equal(
+    (
+      await request("PUT", "/api/folders/personal", owner, {
+        name: "Personal",
+        baseVersion: 0,
+        visibility: "private",
+      })
+    ).status,
+    200,
+  );
+  assert.equal(
+    (await request("GET", "/api/folders", member)).body.folders.some(
+      (f: any) => f.id === "personal",
+    ),
+    false,
+  );
+  assert.equal(
+    (
+      await request("PUT", "/api/folders/personal", member, {
+        name: "Invadida",
+        baseVersion: 1,
+      })
+    ).status,
+    404,
+  );
+  assert.equal(
+    (await request("DELETE", "/api/folders/personal?baseVersion=1", member))
+      .status,
+    404,
+  );
+  assert.equal(
+    (await request("DELETE", "/api/folders/shared?baseVersion=1", owner))
+      .status,
+    409,
+  );
+  assert.equal(
+    (await request("DELETE", "/api/folders/shared?baseVersion=2", owner))
+      .status,
+    200,
+  );
+  assert.ok(
+    (await request("GET", "/api/folders", member)).body.deletedIds.includes(
+      "shared",
+    ),
+  );
+  assert.equal(
+    (
+      await request("PUT", "/api/folders/shared", owner, {
+        name: "Resucitada",
+        baseVersion: 0,
+      })
+    ).status,
+    409,
+  );
+});
+
+async function uploadAsset(
+  user: any,
+  kind: string,
+  content: Uint8Array,
+  name = "document.pdf",
+  mime = "application/pdf",
+) {
+  const data = new FormData();
+  data.append("kind", kind);
+  data.append("file", new Blob([content as BlobPart], { type: mime }), name);
+  const response = await app.request("/api/equipment-assets", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${user.token}` },
+    body: data,
+  });
+  return { status: response.status, body: (await response.json()) as any };
+}
+
+test("equipment attachments deduplicate within tenant, preserve sharing across models, and reject foreign or wrong-kind references", async () => {
+  const owner = await register("assets-owner");
+  const member = await provision("EDITOR", "assets-member", owner);
+  const view = await provision("LECTOR", "assets-reader", owner);
+  const pdf = new TextEncoder().encode("%PDF-1.4\n test fixture");
+  const uploads = await Promise.all(
+    [owner, member].map((u) => uploadAsset(u, "datasheet", pdf)),
+  );
+  assert.equal(uploads[0].status, 200);
+  const asset = uploads[0].body.asset;
+  assert.equal(asset.id, uploads[1].body.asset.id);
+  assert.equal(
+    (
+      await pool.query(
+        "SELECT count(*)::int AS n FROM equipment_assets WHERE organization_id=$1",
+        [owner.organizationId],
+      )
+    ).rows[0].n,
+    1,
+  );
+  const foreign = await uploadAsset(other, "datasheet", pdf);
+  assert.notEqual(foreign.body.asset.id, asset.id);
+  assert.equal((await uploadAsset(view, "datasheet", pdf)).status, 403);
+  assert.equal((await uploadAsset(owner, "image", pdf)).status, 400);
+  assert.equal(
+    (
+      await uploadAsset(
+        owner,
+        "datasheet",
+        new TextEncoder().encode("<script>bad</script>"),
+      )
+    ).status,
+    400,
+  );
+  assert.equal(
+    (await uploadAsset(owner, "image", new Uint8Array(8 * 1024 * 1024 + 1)))
+      .status,
+    400,
+  );
+  const downloaded = await app.request(`/api/equipment-assets/${asset.id}`, {
+    headers: { Authorization: `Bearer ${view.token}` },
+  });
+  assert.equal(downloaded.status, 200);
+  assert.equal(downloaded.headers.get("content-type"), "application/pdf");
+  assert.equal(downloaded.headers.get("x-content-type-options"), "nosniff");
+  assert.deepEqual(new Uint8Array(await downloaded.arrayBuffer()), pdf);
+  assert.equal(
+    (await request("GET", `/api/equipment-assets/${asset.id}`, other)).status,
+    404,
+  );
+  const saved = await request("POST", "/api/equipment/batch", member, {
+    items: ["asset-model-a", "asset-model-b"].map((id) => ({
+      ...equipment(id),
+      datasheetAssetId: asset.id,
+    })),
+  });
+  assert.equal(saved.body.count, 2);
+  for (const invalid of [
+    { datasheetAssetId: foreign.body.asset.id },
+    { imageAssetIds: [asset.id] },
+    { imageAssetIds: ["", ""] },
+    { datasheetAssetId: 15 },
+  ]) {
+    const rejected = await request("POST", "/api/equipment/batch", owner, {
+      items: [{ ...equipment("asset-model-invalid"), ...invalid }],
+    });
+    assert.equal(rejected.body.results[0].reason, "invalid_assets");
+  }
+});
+
+test("queued folder writes and asset uploads recheck revoked permissions", async () => {
+  const owner = await register("resource-revoked-owner");
+  const member = await provision("EDITOR", "resource-revoked-member", owner);
+  const blocker = await pool.connect();
+  let writes: Promise<any>[] = [];
+  try {
+    await blocker.query("BEGIN");
+    await blocker.query("SELECT id FROM organizations WHERE id=$1 FOR UPDATE", [
+      owner.organizationId,
+    ]);
+    writes = [
+      request("PUT", "/api/folders/queued", member, {
+        name: "Denegada",
+        baseVersion: 0,
+      }),
+      uploadAsset(
+        member,
+        "datasheet",
+        new TextEncoder().encode("%PDF-1.4\n queued"),
+      ),
+    ];
+    await waitForMembershipLocks(2);
+    await blocker.query("UPDATE users SET role='LECTOR' WHERE id=$1", [
+      member.id,
+    ]);
+    await blocker.query("COMMIT");
+  } finally {
+    await blocker.query("ROLLBACK");
+    blocker.release();
+  }
+  assert.deepEqual(
+    (await Promise.all(writes)).map((r) => r.status),
+    [403, 403],
+  );
+  assert.equal(
+    (
+      await pool.query(
+        "SELECT count(*)::int AS n FROM equipment_assets WHERE organization_id=$1",
+        [owner.organizationId],
+      )
+    ).rows[0].n,
+    0,
+  );
+});
+
+test("projects cannot revive deleted folders or newly assign private/foreign folders; legacy local assignments remain compatible", async () => {
+  const owner = await register("project-folder-owner");
+  const member = await provision("EDITOR", "project-folder-member", owner);
+  await request("PUT", "/api/folders/project-private", owner, {
+    name: "Personal",
+    visibility: "private",
+    baseVersion: 0,
+  });
+  await request("PUT", "/api/folders/project-shared", owner, {
+    name: "Equipo",
+    baseVersion: 0,
+  });
+  const push = async (
+    id: string,
+    user: any,
+    folderId: string,
+    baseVersion?: number,
+  ) =>
+    request("POST", "/api/sync/push", user, {
+      projects: [{ ...project(id), folderId, baseVersion }],
+    });
+  assert.equal(
+    (await push("folder-private-project", owner, "project-private")).body
+      .results[0].status,
+    "created",
+  );
+  assert.equal(
+    (await push("folder-private-project", member, "project-private", 1)).body
+      .results[0].status,
+    "updated",
+  );
+  assert.equal(
+    (await push("folder-invaded-project", member, "project-private")).body
+      .results[0].reason,
+    "invalid_folder",
+  );
+  assert.equal(
+    (await push("folder-foreign-project", other, "project-shared")).body
+      .results[0].reason,
+    "invalid_folder",
+  );
+  assert.equal(
+    (await push("folder-legacy-project", member, "old-offline-folder")).body
+      .results[0].status,
+    "created",
+  );
+  await push("folder-unlinked-project", member, "project-shared");
+  assert.equal(
+    (
+      await request(
+        "DELETE",
+        "/api/folders/project-shared?baseVersion=1",
+        owner,
+      )
+    ).status,
+    200,
+  );
+  const row = (
+    await pool.query("SELECT version,data_json FROM projects WHERE id=$1", [
+      "folder-unlinked-project",
+    ])
+  ).rows[0];
+  assert.equal(row.data_json.folderId, undefined);
+  assert.equal(row.version, 2);
+  assert.equal(
+    (await push("folder-unlinked-project", member, "project-shared", 2)).body
+      .results[0].reason,
+    "invalid_folder",
+  );
+});
+
+test("folder deletion waits for project lock before membership lock and emits coherent project deltas", async () => {
+  const owner = await register("folder-lock-owner");
+  await request("PUT", "/api/folders/lock-folder", owner, {
+    name: "Coherente",
+    baseVersion: 0,
+  });
+  await request("POST", "/api/sync/push", owner, {
+    projects: [{ ...project("folder-lock-project"), folderId: "lock-folder" }],
+  });
+  const cursor = (await request("POST", "/api/sync/pull", owner, {})).body
+    .serverTimestamp;
+  const blocker = await pool.connect();
+  let pending: Promise<any> | undefined;
+  try {
+    await blocker.query("BEGIN");
+    await blocker.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+      `solarsim-projects:${owner.organizationId}`,
+    ]);
+    pending = request(
+      "DELETE",
+      "/api/folders/lock-folder?baseVersion=1",
+      owner,
+    );
+    let waiting = false;
+    for (let i = 0; i < 100; i++) {
+      const r = await pool.query(
+        "SELECT 1 FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE 'SELECT pg_advisory_xact_lock%' AND pid<>pg_backend_pid()",
+      );
+      if (r.rows.length) {
+        waiting = true;
+        break;
+      }
+      await delay(10);
+    }
+    assert.ok(waiting);
+    // This can acquire organization row only when delete follows the canonical ordering.
+    await blocker.query("SET LOCAL lock_timeout='1s'");
+    await blocker.query("SELECT id FROM organizations WHERE id=$1 FOR UPDATE", [
+      owner.organizationId,
+    ]);
+  } finally {
+    await blocker.query("ROLLBACK");
+    blocker.release();
+  }
+  assert.equal((await pending!).status, 200);
+  const delta = (
+    await request("POST", "/api/sync/pull", owner, {
+      lastSyncTimestamp: cursor,
+    })
+  ).body.projects.find((p: any) => p.id === "folder-lock-project");
+  assert.ok(delta);
+  assert.equal(delta.folderId, undefined);
+  assert.equal(delta.version, 2);
 });

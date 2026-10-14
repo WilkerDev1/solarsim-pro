@@ -26,6 +26,8 @@ export interface TariffBlock {
 
 export interface UtilityTariffDetails {
   code: TariffCode;
+  /** Provenance for rows retained when a document updates only part of the matrix. */
+  source?: { resolutionCode: string; effectiveDate: string; publishedBy: string; fields?: string[]; fieldSources?: Record<string, { resolutionCode: string; effectiveDate: string; publishedBy: string }> };
   name: string;
   description: string;
   currency: 'DOP' | 'USD';
@@ -78,17 +80,17 @@ export function getDistributorTariffOptions(distributor: UtilityDistributor | st
     return [
       {
         value: 'RBT-1',
-        label: 'RBT-1 — Baja Tensión Regular (RD$ 22.90/kWh)',
+        label: 'RBT-1 — Baja Tensión Regular',
         description: 'Tarifa monómica regular para residencias y comercios pequeños sin medición de potencia.',
       },
       {
         value: 'RBT-2',
-        label: 'RBT-2 — Baja Tensión con Demanda (RD$ 14.1278/kWh + RD$ 2,342.83/kW)',
+        label: 'RBT-2 — Baja Tensión con Demanda',
         description: 'Suministro en baja tensión con medición de demanda máxima de potencia para plazas y comercios en zona CEPM.',
       },
       {
         value: 'ESTRBT-2',
-        label: 'ESTRBT-2 — Baja Tensión con Demanda CEB Bayahíbe (RD$ 14.1278/kWh)',
+        label: 'ESTRBT-2 — Baja Tensión con Demanda CEB Bayahíbe',
         description: 'Suministro en baja tensión con demanda en la concesión de Bayahíbe (CEB).',
       },
       {

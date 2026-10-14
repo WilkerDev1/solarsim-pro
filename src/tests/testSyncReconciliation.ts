@@ -38,6 +38,8 @@ const pushProjects = SyncService.pushProjects;
 const pullEquipment = SyncService.pullEquipment;
 const pushEquipment = SyncService.pushEquipmentBatch;
 try {
+  globalThis.fetch = async () => { throw new Error("Real network forbidden in client reconciliation QA"); };
+  useSimulationStore.setState({ syncFoldersWithServer: async () => ({ success: true, message: "Folders isolated in project QA" }) });
   initial.setSyncSettings(session);
   useSimulationStore.setState({ syncSettings: session, projects: [local], equipmentCatalog: [], equipmentChanges: {}, projectDeletionQueue: [], equipmentDeletionQueue: [], isSyncing: false });
   SyncService.pullProjects = async () => ({ success: false, error: 'Network unavailable' });
@@ -47,8 +49,11 @@ try {
   assert.equal(useSimulationStore.getState().projects[0].syncStatus, 'pending');
 
   let completePull!: (value: any) => void;
-  SyncService.pullProjects = () => new Promise(resolve => { completePull = resolve; });
+  let pullStarted!: () => void;
+  const reachedPull = new Promise<void>(resolve => { pullStarted = resolve; });
+  SyncService.pullProjects = () => new Promise(resolve => { completePull = resolve; pullStarted(); });
   const pending = initial.syncProjectsWithServer(true);
+  await reachedPull; // Invalidate after the old session actually dispatched its request.
   initial.logoutUser();
   initial.setSyncSettings(session);
   completePull({ success: true, projects: [remote], serverTimestamp: '2030-01-01T00:00:00.123456Z' });

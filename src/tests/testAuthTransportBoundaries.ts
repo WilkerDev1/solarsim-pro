@@ -13,6 +13,7 @@ const reset = (token: string) => useSimulationStore.setState({
   syncSettings: { serverUrl, authToken: token, currentUser: user, autoSyncEnabled: false, lastSyncTimestamp: null },
   workspaceScope: featureScope(serverUrl, user.organizationId),
   loadOrganizationFeaturePolicy: async () => undefined,
+  syncOrganizationCompanyProfile: async () => ({ success: true, message: "QA profile only" }),
   syncProjectsWithServer: async () => ({ success: true, message: 'QA only' }),
 });
 try {

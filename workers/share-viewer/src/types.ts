@@ -20,5 +20,5 @@ export interface StoredProposal {
   project: ShareProposalPayload['project'];
   summary: FinancialSummaryResult | null;
   calculationSnapshot?: CalculationSnapshot;
-  publishedBy?: { userId: string; organizationId: string };
+  publishedBy?: { userId: string; userName?: string; organizationId: string };
 }

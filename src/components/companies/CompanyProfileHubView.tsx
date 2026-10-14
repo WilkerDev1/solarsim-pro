@@ -50,7 +50,16 @@ export function CompanyProfileHubView() {
           );
   const importInput = useRef<HTMLInputElement>(null);
   const original = companies.find((company) => company.id === selected);
+  const sharedProfile = !!original?.organizationId;
+  const readOnlyProfile = sharedProfile && store.syncSettings.currentUser?.role !== "ADMIN";
+  const [saving, setSaving] = useState(false);
   const dirty = creating || JSON.stringify(draft) !== JSON.stringify(original);
+  const originalRef = useRef(original);
+  useEffect(() => {
+    const previous = originalRef.current;
+    originalRef.current = original;
+    if (original && !creating && JSON.stringify(draft) === JSON.stringify(previous)) setDraft({ ...original });
+  }, [original]);
   const allowLeave = () =>
     !dirty ||
     window.confirm(
@@ -89,7 +98,7 @@ export function CompanyProfileHubView() {
   };
   const upload = (
     file: File | undefined,
-    field: "logoBase64" | "signatureSealBase64",
+    field: "logoBase64" | "signatureSealBase64" | "watermarkLogoBase64",
   ) => {
     if (!file) return;
     if (
@@ -121,7 +130,9 @@ export function CompanyProfileHubView() {
     };
     reader.readAsDataURL(file);
   };
-  const save = () => {
+  const save = async () => {
+    if (saving || readOnlyProfile) return;
+    const generation = store.sessionGeneration;
     if (!draft.name?.trim()) {
       setError("Completa la razón social para guardar.");
       return;
@@ -135,7 +146,15 @@ export function CompanyProfileHubView() {
       address: draft.address || "",
       isDefault: !!draft.isDefault,
     };
-    if (creating) {
+    if (sharedProfile) {
+      if (!original?.organizationProfileVersion) return;
+      setSaving(true);
+      const result = await store.saveOrganizationCompanyProfile(saved, original.organizationProfileVersion);
+      if (generation !== useSimulationStore.getState().sessionGeneration) { setSaving(false); return; }
+      setSaving(false);
+      if (!result.success) { setError(result.error || "No se pudo guardar."); return; }
+      setDraft({ ...useSimulationStore.getState().companies.find(c => c.id === selected)! });
+    } else if (creating) {
       const id = store.addCompany(
         saved as Omit<CompanyProfile, "id" | "createdAt" | "updatedAt">,
       );
@@ -215,6 +234,8 @@ export function CompanyProfileHubView() {
           "website",
           "defaultPaymentTerms",
           "defaultWarrantyNotes",
+          "slogan",
+          "instagram",
         ]) {
           if (
             company[key] !== undefined &&
@@ -223,7 +244,7 @@ export function CompanyProfileHubView() {
             throw new Error("Campo inválido en el respaldo.");
           safe[key] = company[key] || "";
         }
-        for (const key of ["logoBase64", "signatureSealBase64"]) {
+        for (const key of ["logoBase64", "signatureSealBase64", "watermarkLogoBase64"]) {
           if (
             company[key] &&
             (typeof company[key] !== "string" ||
@@ -344,6 +365,7 @@ export function CompanyProfileHubView() {
                     <span>
                       <strong>{company.commercialName || company.name}</strong>
                       <small>
+                        {company.organizationId ? "Compartido · " : "Local · "}
                         {company.id === activeCompanyId
                           ? "En uso para nuevas propuestas"
                           : company.isDefault
@@ -460,18 +482,19 @@ export function CompanyProfileHubView() {
                   className="cc-form"
                   onSubmit={(event) => {
                     event.preventDefault();
-                    save();
+                    void save();
                   }}
                 >
                   <h3>Identidad y contacto</h3>
-                  <CompanyFields draft={draft} setDraft={setDraft} />
+                  <CompanyFields draft={draft} setDraft={setDraft} readOnly={readOnlyProfile || saving} />
+                  <fieldset disabled={readOnlyProfile || saving} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
                   <section className="cc-section">
                     <h3>Logo y recursos de marca</h3>
                     <p>
                       El logo se incorpora a las nuevas propuestas. El sello y
                       los colores se conservan como recursos del perfil.
                     </p>
-                    {(["logoBase64", "signatureSealBase64"] as const).map(
+                    {(["logoBase64", "signatureSealBase64", "watermarkLogoBase64"] as const).map(
                       (field, index) => (
                         <div className="cc-upload" key={field}>
                           {draft[field] && (
@@ -481,12 +504,12 @@ export function CompanyProfileHubView() {
                               alt={
                                 index === 0
                                   ? "Logo de empresa"
-                                  : "Sello de empresa"
+                                  : index === 1 ? "Sello de empresa" : "Marca de agua"
                               }
                             />
                           )}
                           <label>
-                            {index === 0 ? "Logo" : "Sello o firma"}
+                            {index === 0 ? "Logo" : index === 1 ? "Sello o firma" : "Marca de agua"}
                             <input
                               type="file"
                               accept="image/png,image/jpeg,image/webp"
@@ -506,7 +529,7 @@ export function CompanyProfileHubView() {
                                 }))
                               }
                             >
-                              Quitar {index === 0 ? "logo" : "sello"}
+                              Quitar {index === 0 ? "logo" : index === 1 ? "sello" : "marca de agua"}
                             </button>
                           )}
                         </div>
@@ -587,13 +610,15 @@ export function CompanyProfileHubView() {
                       Membrete predeterminado
                     </label>
                   </div>
+                  </fieldset>
+                  {sharedProfile && <p className="cc-notice">Membrete compartido con todos los miembros de la organización. Solo ADMIN puede modificarlo.</p>}
                   {error && (
                     <div className="cc-notice cc-error" role="alert">
                       {error}
                     </div>
                   )}
                   <div className="cc-actions">
-                    {!creating && companies.length > 1 && (
+                    {!creating && !sharedProfile && companies.length > 1 && (
                       <button
                         type="button"
                         className="cc-danger"
@@ -624,7 +649,7 @@ export function CompanyProfileHubView() {
                     )}
                     <button
                       type="button"
-                      disabled={!dirty}
+                      disabled={!dirty || readOnlyProfile || saving}
                       onClick={() => {
                         draftEpoch.current++;
                         setCreating(false);
@@ -637,7 +662,7 @@ export function CompanyProfileHubView() {
                     <button
                       className="cc-primary"
                       type="submit"
-                      disabled={!dirty}
+                      disabled={!dirty || readOnlyProfile || saving}
                     >
                       Guardar membrete
                     </button>

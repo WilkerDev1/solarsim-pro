@@ -1,3 +1,4 @@
+import { fetchWithSessionRetry } from './syncService';
 import { ProjectSimulation, FinancialSummaryResult } from '../types';
 import { ELECTSUN_LOGO_COLOR_BASE64 } from '../assets/electsunLogo';
 import { useSimulationStore } from '../store/useSimulationStore';
@@ -18,6 +19,8 @@ export interface SharedProposalRecord {
   /** Missing only on legacy records retained without assigning an organization. */
   serverUrl?: string;
   organizationId?: string;
+  createdById?: string;
+  createdByName?: string;
   id: string;
   projectId: string;
   projectCode: string;
@@ -125,8 +128,15 @@ export class ShareProposalService {
   }
 
   /** Legacy entries stay untouched unless they carry explicit, verifiable scope metadata. */
+  private static hiddenIds(context: HistoryContext): Set<string> {
+    try { return new Set(JSON.parse(localStorage.getItem(context.key + ':hidden') || '[]')); } catch { return new Set(); }
+  }
+  private static hideRecords(context: HistoryContext, ids: string[]): void {
+    const hidden = this.hiddenIds(context); ids.forEach(id => hidden.add(id));
+    localStorage.setItem(context.key + ':hidden', JSON.stringify([...hidden]));
+  }
   private static readScopedRecords(context: HistoryContext): SharedProposalRecord[] {
-    const records = this.readRecords(context.key).filter((record) => this.recordBelongsTo(record, context));
+    const records = this.readRecords(context.key).filter((record) => this.recordBelongsTo(record, context) && !this.hiddenIds(context).has(record.id));
     try { if (localStorage.getItem(context.key) !== null) return records; } catch { return records; }
     const legacy = this.readRecords(STORAGE_SHARED_HISTORY_KEY);
     for (let index = 0; index < localStorage.length; index++) {
@@ -310,6 +320,8 @@ export class ShareProposalService {
           serverUrl: publicationContext.serverUrl,
           organizationId: publicationContext.organizationId,
           id: resolvedId,
+          createdById: session.currentUser.id,
+          createdByName: session.currentUser.name,
           projectId: project.id,
           projectCode: project.client?.projectId || project.id,
           quoteNumber: project.client?.quoteNumber || 'C-0001',
@@ -395,6 +407,52 @@ export class ShareProposalService {
     return { updatedRecords, hasChanges };
   }
 
+  /** Discover the organization's server register, including links created on other devices. */
+  public static async syncSharedHistory(recoverLegacy = false): Promise<{ updatedCount: number; errors: number; message?: string }> {
+    const context = this.historyContext();
+    const session = useSimulationStore.getState().syncSettings;
+    if (!context || !session.authToken) return { updatedCount:0,errors:1,message:'Inicia sesión para consultar las propuestas de la organización.' };
+    const base = this.getWorkerUrl();
+    let updatedCount = 0;
+    try {
+      const url = new URL(base);
+      if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) throw new Error('Se requiere una URL HTTPS válida.');
+      for (const route of recoverLegacy ? ['history-recover','history'] : ['history']) {
+        let cursor: string | null = null;
+        const cursors = new Set<string>();
+        // A bounded page size and a loop keep KV discovery complete without one unbounded request.
+        do {
+          if (!this.contextIsCurrent(context)) return { updatedCount:0,errors:0 };
+          const response = await fetchWithSessionRetry(`${base}/api/share/${route}${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`, {
+            headers:{ Authorization:`Bearer ${useSimulationStore.getState().syncSettings.authToken}` },signal:AbortSignal.timeout(12000),
+          }, context.serverUrl);
+          const data = await response.json().catch(() => null);
+          if (!this.contextIsCurrent(context)) return { updatedCount:0,errors:0 };
+          if (!response.ok || !data?.success || !Array.isArray(data.proposals)) throw new Error(data?.error || 'Actualiza el Worker y la API para consultar el historial compartido.');
+          for (const record of data.proposals) {
+            if (!record || record.organizationId !== context.organizationId || typeof record.id !== 'string' || !/^[a-zA-Z0-9_-]{7,64}$/.test(record.id) || !Number.isFinite(Date.parse(record.expiresAt)) || !Number.isFinite(Date.parse(record.createdAt))) continue;
+            if (this.hiddenIds(context).has(record.id)) continue;
+            const scoped = { ...record,serverUrl:context.serverUrl,organizationId:context.organizationId,workerUrl:base,shareUrl:`${base}/p/${record.id}` } as SharedProposalRecord;
+            const old = this.readScopedRecords(context).find(r => r.id === record.id);
+            const confirmed = old ? { ...old, ...scoped } : scoped;
+            if (JSON.stringify(old) !== JSON.stringify(confirmed)) {
+              const records = this.readScopedRecords(context);
+              const index = records.findIndex(r => r.id === record.id);
+              if (index >= 0) records[index] = confirmed; else records.unshift(confirmed);
+              if (!this.writeRecords(context, records)) throw new Error('No se pudo guardar el historial en este dispositivo.');
+              this.notifyHistoryUpdated();
+              updatedCount++;
+            }
+          }
+          cursor = typeof data.cursor === 'string' && data.cursor ? data.cursor : null;
+          if (cursor && cursors.has(cursor)) throw new Error('El servicio repitió una página del historial.');
+          if (cursor) cursors.add(cursor);
+        } while (cursor);
+      }
+      return { updatedCount,errors:0 };
+    } catch(error) { return { updatedCount,errors:1,message:error instanceof Error ? error.message : 'No se pudo consultar el historial.' }; }
+  }
+
   /** Hydrates the captured scope only; changes of identity, organization or session discard pending responses. */
   public static async hydrateFromCloudflare(customWorkerUrl?: string): Promise<{ updatedCount: number; errors: number }> {
     const context = this.historyContext();
@@ -474,6 +532,7 @@ export class ShareProposalService {
   public static saveSharedRecord(record: SharedProposalRecord): void {
     const context = this.historyContext();
     if (!context) return;
+    if (this.hiddenIds(context).has(record.id)) return;
     // This method creates new local records; existing legacy storage is never passed here for migration.
     const scoped = { ...record, serverUrl: record.serverUrl ? canonicalServer(record.serverUrl) : context.serverUrl, organizationId: record.organizationId || context.organizationId };
     if (!this.recordBelongsTo(scoped, context)) return;
@@ -489,6 +548,7 @@ export class ShareProposalService {
     if (!context) return;
     const history = this.getSharedHistory();
     const record = history.find((entry) => entry.id === id);
+    this.hideRecords(context, [id]);
     if (!this.writeRecords(context, history.filter((entry) => entry.id !== id))) return;
     if (record) localStorage.removeItem(this.lastShareKey(context, record.projectId));
     this.notifyHistoryUpdated();
@@ -500,6 +560,7 @@ export class ShareProposalService {
     const history = this.getSharedHistory();
     const active = history.filter((record) => new Date(record.expiresAt) > new Date());
     if (!this.writeRecords(context, active)) return 0;
+    this.hideRecords(context, history.filter(record => !active.includes(record)).map(record => record.id));
     for (const record of history.filter((record) => !active.includes(record))) localStorage.removeItem(this.lastShareKey(context, record.projectId));
     this.notifyHistoryUpdated();
     return history.length - active.length;
@@ -508,6 +569,7 @@ export class ShareProposalService {
   public static clearAllSharedRecords(): void {
     const context = this.historyContext();
     if (!context) return;
+    this.hideRecords(context, this.getSharedHistory().map(record => record.id));
     for (const record of this.getSharedHistory()) localStorage.removeItem(this.lastShareKey(context, record.projectId));
     this.writeRecords(context, []);
     this.notifyHistoryUpdated();

@@ -16,10 +16,14 @@ export function companyDocumentCustomization(
   // Once company-scoped templates exist, the compatibility mirror is never another
   // company's fallback. Older global templates retain their reusable text settings.
   const base = Object.keys(templates).length ? DEFAULT_DOCUMENT_CUSTOMIZATION : legacyTemplate;
-  return {
+  const result = {
     ...DEFAULT_DOCUMENT_CUSTOMIZATION,
     ...reusableDocumentTemplate(base),
     ...companyDocumentSnapshot(company, base),
     ...reusableDocumentTemplate(templates[company.id] || {}),
   };
+  // Old reusable templates may retain the former factory example. Do not copy
+  // that placeholder into a new proposal; existing document snapshots stay intact.
+  if (result.companyRnc === '1-31-12345-6') result.companyRnc = company.rncOrId === '1-31-12345-6' ? '' : company.rncOrId;
+  return result;
 }

@@ -21,6 +21,7 @@ const AIPriceCatalogScannerModal = lazy(() => import('./components/common/AIPric
 import { SupplierPricesDetailModal } from './components/common/SupplierPricesDetailModal';
 import { SplashScreen } from './components/common/SplashScreen';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
+const AppAssistant = lazy(() => import('./features/assistant/components/AppAssistant').then(module => ({ default: module.AppAssistant })));
 import { draftOwnerKey } from './utils/draftOwnerKey';
 
 export const App: React.FC = () => {
@@ -49,6 +50,7 @@ export const App: React.FC = () => {
     };
 
     window.addEventListener('focus', handleFocus);
+    window.addEventListener('online', handleFocus);
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') handleFocus();
     };
@@ -57,6 +59,7 @@ export const App: React.FC = () => {
     return () => {
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('online', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [syncSettings.authToken, syncSettings.autoSyncEnabled]);
@@ -108,6 +111,8 @@ export const App: React.FC = () => {
           </ErrorBoundary>
         </main>
       </div>
+
+      <AppAssistant />
 
       {/* Global Modals Mounted at Root Level */}
       <ConflictResolutionModal key={`conflict-resolution-${sessionGeneration}`} />

@@ -74,6 +74,7 @@ export const CloudflareProposalsSection: React.FC = () => {
   const [showClearExpiredConfirm, setShowClearExpiredConfirm] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   // Cargar historial
   const loadHistory = () => {
@@ -90,12 +91,14 @@ export const CloudflareProposalsSection: React.FC = () => {
     setCopiedId(null);
     setToastMessage(null);
     setIsSyncing(false);
+    setHistoryError(null);
     loadHistory();
 
     // Auto-hidratación retroactiva en segundo plano para recuperar datos reales desde Cloudflare KV
     const autoEnrich = async () => {
       try {
-        const res = await ShareProposalService.hydrateFromCloudflare();
+        const res = await ShareProposalService.syncSharedHistory(true);
+        if (active && res.errors) setHistoryError(res.message || "No se pudo cargar el registro compartido.");
         if (active && res.updatedCount > 0) {
           loadHistory();
           showToast(`¡${res.updatedCount} propuesta${res.updatedCount > 1 ? 's' : ''} actualizada${res.updatedCount > 1 ? 's' : ''} con datos reales desde Cloudflare! ✨`);
@@ -135,9 +138,10 @@ export const CloudflareProposalsSection: React.FC = () => {
       loadHistory();
 
       // 2. Hidratar desde Cloudflare Workers
-      const res = await ShareProposalService.hydrateFromCloudflare();
+      const res = await ShareProposalService.syncSharedHistory(true);
       if (!current()) return;
       loadHistory();
+      setHistoryError(res.errors ? res.message || "No se pudo consultar el registro compartido." : null);
 
       if (res.updatedCount > 0) {
         showToast(`¡${res.updatedCount} propuesta${res.updatedCount > 1 ? 's' : ''} sincronizada${res.updatedCount > 1 ? 's' : ''} con datos reales! ✨`);
@@ -199,7 +203,7 @@ export const CloudflareProposalsSection: React.FC = () => {
     ShareProposalService.deleteSharedRecord(id);
     setDeleteConfirmId(null);
     loadHistory();
-    showToast('Enlace eliminado del historial.');
+    showToast('Enlace ocultado en este dispositivo. El registro compartido se conserva.');
   };
 
   // Limpiar todos los expirados
@@ -330,6 +334,7 @@ export const CloudflareProposalsSection: React.FC = () => {
 
   return (
     <section id="sec-cloudflare" className="flex flex-col gap-6 scroll-mt-6">
+      {historyError && <p role="alert" className="p-3 rounded-lg border border-amber-300 bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-100">{historyError}</p>}
       {/* Toast Feedback */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-zinc-900 text-xs font-bold shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
@@ -619,7 +624,7 @@ export const CloudflareProposalsSection: React.FC = () => {
                   ? 'No se encontraron enlaces para esta búsqueda'
                   : statusFilter !== 'all'
                   ? `No hay propuestas en estado "${statusFilter}"`
-                  : 'Aún no has generado propuestas web en Cloudflare'}
+                  : 'Aún no hay propuestas web registradas para esta organización'}
               </h4>
               <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-md">
                 {searchQuery
@@ -673,6 +678,7 @@ export const CloudflareProposalsSection: React.FC = () => {
                               </span>
                             )}
                           </div>
+                          <p className="text-xs text-slate-600 dark:text-zinc-300">Generado por {record.createdByName || record.createdById || 'Autor no registrado'}</p>
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-mono font-bold text-[10px]">
                               {record.projectCode}
@@ -822,7 +828,7 @@ export const CloudflareProposalsSection: React.FC = () => {
                             type="button"
                             onClick={() => setDeleteConfirmId(record.id)}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                            title="Eliminar este enlace del historial"
+                            title="Ocultar este enlace en este dispositivo"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -954,7 +960,7 @@ export const CloudflareProposalsSection: React.FC = () => {
                   ¿Limpiar Enlaces Expirados?
                 </h4>
                 <p className="text-xs text-slate-500 dark:text-zinc-400">
-                  Se removerán del historial todas las propuestas cuya fecha de vigencia haya terminado ({expiredCount} enlaces).
+                  Se ocultarán en este dispositivo todas las propuestas cuya fecha de vigencia haya terminado ({expiredCount} enlaces).
                 </p>
               </div>
             </div>

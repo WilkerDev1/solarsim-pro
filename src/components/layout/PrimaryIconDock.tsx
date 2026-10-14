@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useSimulationStore } from '../../store/useSimulationStore';
+import React, { useState, useRef, useEffect } from "react";
+import { useSimulationStore } from "../../store/useSimulationStore";
 import {
   Sun,
   Moon,
@@ -13,9 +13,17 @@ import {
   Trash2,
   X,
   Building2,
-} from 'lucide-react';
+} from "lucide-react";
 
-export const PrimaryIconDock: React.FC = () => {
+interface PrimaryIconDockProps {
+  beforeNavigate?: () => void;
+  assistantActive?: boolean;
+}
+
+export const PrimaryIconDock: React.FC<PrimaryIconDockProps> = ({
+  beforeNavigate,
+  assistantActive = false,
+}) => {
   const {
     activeView,
     setActiveView,
@@ -41,29 +49,38 @@ export const PrimaryIconDock: React.FC = () => {
   const [isAIMenuOpen, setIsAIMenuOpen] = useState(false);
   const aiMenuRef = useRef<HTMLDivElement>(null);
 
-  const isDark = sidebarTheme === 'dark';
-  const hasUpdate = updateInfo.state === 'downloaded' || updateInfo.state === 'downloading';
-  const trashedCount = React.useMemo(() => projects.filter((p) => p.isDeleted).length, [projects]);
+  const isDark = sidebarTheme === "dark";
+  const hasUpdate =
+    updateInfo.state === "downloaded" || updateInfo.state === "downloading";
+  const trashedCount = React.useMemo(
+    () => projects.filter((p) => p.isDeleted).length,
+    [projects],
+  );
 
   // Close AI flyout when clicking outside or pressing Escape
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (aiMenuRef.current && !aiMenuRef.current.contains(event.target as Node)) {
+      if (
+        aiMenuRef.current &&
+        !aiMenuRef.current.contains(event.target as Node)
+      ) {
         setIsAIMenuOpen(false);
       }
     };
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
         setIsAIMenuOpen(false);
       }
     };
     if (isAIMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('keydown', handleKeyDown);
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown, true);
     }
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown, true);
     };
   }, [isAIMenuOpen]);
 
@@ -71,6 +88,13 @@ export const PrimaryIconDock: React.FC = () => {
     <aside
       className="w-16 h-full bg-slate-900 border-r border-slate-800 flex flex-col items-center justify-between py-4 shrink-0 z-40 select-none relative"
       aria-label="Barra de Navegación Principal"
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && isAIMenuOpen) {
+          event.preventDefault();
+          event.stopPropagation();
+          setIsAIMenuOpen(false);
+        }
+      }}
     >
       {/* Zona Superior: Theme Toggle & Navegación */}
       <div className="flex flex-col items-center gap-5 w-full">
@@ -78,7 +102,7 @@ export const PrimaryIconDock: React.FC = () => {
         <button
           onClick={toggleSidebarTheme}
           className="w-10 h-10 rounded-lg bg-[#2e3748] hover:bg-[#384358] text-amber-400 border border-[#3e4b62] flex items-center justify-center transition-all cursor-pointer group"
-          title={`Cambiar a ${isDark ? 'Modo Claro' : 'Modo Oscuro'}`}
+          title={`Cambiar a ${isDark ? "Modo Claro" : "Modo Oscuro"}`}
         >
           {isDark ? (
             <Sun className="w-5 h-5 group-hover:rotate-45 transition-transform" />
@@ -95,62 +119,82 @@ export const PrimaryIconDock: React.FC = () => {
           {/* 1. Proyectos / Dashboard */}
           <button
             onClick={() => {
+              beforeNavigate?.();
               if (isSettingsModalOpen) closeSettingsModal();
-              setActiveView('dashboard');
+              setActiveView("dashboard");
               setIsTrashActive(false);
               setActiveFolderId(null);
               setActiveTeamMemberFilter(null);
               setIsAIMenuOpen(false);
             }}
             className={`w-11 h-11 rounded-lg flex items-center justify-center transition-all cursor-pointer relative ${
-              !isSettingsModalOpen && activeView === 'dashboard' && !isTrashActive
-                ? 'bg-emerald-900/60 text-emerald-300'
-                : 'text-slate-400 hover:text-white hover:bg-[#283243]'
+              !assistantActive &&
+              !isSettingsModalOpen &&
+              activeView === "dashboard" &&
+              !isTrashActive
+                ? "bg-emerald-900/60 text-emerald-300"
+                : "text-slate-400 hover:text-white hover:bg-[#283243]"
             }`}
-            aria-current={!isSettingsModalOpen && activeView === 'dashboard' && !isTrashActive ? 'page' : undefined}
+            aria-current={
+              !assistantActive &&
+              !isSettingsModalOpen &&
+              activeView === "dashboard" &&
+              !isTrashActive
+                ? "page"
+                : undefined
+            }
             title="Catálogo de Proyectos (Home)"
           >
             <FileText className="w-5 h-5" />
-            {!isSettingsModalOpen && activeView === 'dashboard' && !isTrashActive && (
-              <span className="absolute -left-2 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-emerald-400 rounded-r-full" />
-            )}
+            {!assistantActive &&
+              !isSettingsModalOpen &&
+              activeView === "dashboard" &&
+              !isTrashActive && (
+                <span className="absolute -left-2 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-emerald-400 rounded-r-full" />
+              )}
           </button>
 
           {/* 2. Centro de Empresas & Perfiles (Logos, Membretes y Firmas) */}
           <button
             onClick={() => {
+              beforeNavigate?.();
               if (isSettingsModalOpen) closeSettingsModal();
-              setActiveView('companies-hub');
+              setActiveView("companies-hub");
               setIsTrashActive(false);
               setIsAIMenuOpen(false);
             }}
             className={`w-11 h-11 rounded-lg flex items-center justify-center transition-all cursor-pointer relative ${
-              !isSettingsModalOpen && activeView === 'companies-hub'
-                ? 'bg-emerald-900/60 text-emerald-300'
-                : 'text-slate-400 hover:text-white hover:bg-[#283243]'
+              !assistantActive &&
+              !isSettingsModalOpen &&
+              activeView === "companies-hub"
+                ? "bg-emerald-900/60 text-emerald-300"
+                : "text-slate-400 hover:text-white hover:bg-[#283243]"
             }`}
             title="Centro de Empresas & Perfiles (Logos, Membretes y Firmas)"
           >
             <Building2 className="w-5 h-5" />
-            {!isSettingsModalOpen && activeView === 'companies-hub' && (
-              <span className="absolute -left-2 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-emerald-400 rounded-r-full" />
-            )}
+            {!assistantActive &&
+              !isSettingsModalOpen &&
+              activeView === "companies-hub" && (
+                <span className="absolute -left-2 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-emerald-400 rounded-r-full" />
+              )}
           </button>
 
           {/* 3. Botón Unificado de IA Gemini con Menú Selector */}
           <div className="relative">
             <button
               aria-expanded={isAIMenuOpen}
+              aria-current={assistantActive ? "page" : undefined}
               onClick={() => setIsAIMenuOpen(!isAIMenuOpen)}
               className={`w-11 h-11 rounded-lg flex items-center justify-center transition-all cursor-pointer group relative ${
-                isAIMenuOpen
-                  ? 'bg-purple-500/25 text-purple-300 border border-purple-500/50 shadow-md shadow-purple-950/50 font-bold'
-                  : 'text-slate-400 hover:text-purple-300 hover:bg-[#283243]'
+                isAIMenuOpen || assistantActive
+                  ? "bg-purple-500/25 text-purple-300 border border-purple-500/50 shadow-md shadow-purple-950/50 font-bold"
+                  : "text-slate-400 hover:text-purple-300 hover:bg-[#283243]"
               }`}
               title="Herramientas de Inteligencia Artificial (Facturas, Datasheets y Precios)"
             >
               <Sparkles className="w-5 h-5 transition-colors" />
-              {isAIMenuOpen && (
+              {(isAIMenuOpen || assistantActive) && (
                 <span className="absolute -left-2 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-purple-400 rounded-r-full" />
               )}
             </button>
@@ -168,8 +212,12 @@ export const PrimaryIconDock: React.FC = () => {
                       <Sparkles className="w-3.5 h-3.5" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-white tracking-wide">Herramientas de IA</h4>
-                      <p className="text-[10px] text-slate-400">Google Gemini Multimodal</p>
+                      <h4 className="text-xs font-bold text-white tracking-wide">
+                        Herramientas de IA
+                      </h4>
+                      <p className="text-[10px] text-slate-400">
+                        Google Gemini Multimodal
+                      </p>
                     </div>
                   </div>
                   <button
@@ -195,11 +243,14 @@ export const PrimaryIconDock: React.FC = () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-bold text-white group-hover:text-purple-300 flex items-center justify-between">
-                      <span>Escanear Factura Eléctrica</span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 font-mono">95% Listo</span>
+                      <span>Asistente de propuestas</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 font-mono">
+                        Borrador
+                      </span>
                     </div>
                     <p className="text-[11px] text-slate-400 line-clamp-2 mt-0.5 leading-snug">
-                      Extrae NIC, 12 meses de consumo y dimensiona propuesta solar EDE.
+                      Describe el proyecto, adjunta documentos y revisa los
+                      equipos antes de crear.
                     </p>
                   </div>
                 </button>
@@ -207,6 +258,7 @@ export const PrimaryIconDock: React.FC = () => {
                 {/* Opción 2: Fichas Técnicas (Datasheets) */}
                 <button
                   onClick={() => {
+                    beforeNavigate?.();
                     if (isSettingsModalOpen) closeSettingsModal();
                     setIsAIMenuOpen(false);
                     openAIDatasheetModal();
@@ -219,7 +271,9 @@ export const PrimaryIconDock: React.FC = () => {
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-bold text-white group-hover:text-cyan-300 flex items-center justify-between">
                       <span>Escanear Ficha Técnica</span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 font-mono">Datasheet</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 font-mono">
+                        Datasheet
+                      </span>
                     </div>
                     <p className="text-[11px] text-slate-400 line-clamp-2 mt-0.5 leading-snug">
                       Extrae parámetros de paneles, inversores y baterías BESS.
@@ -230,6 +284,7 @@ export const PrimaryIconDock: React.FC = () => {
                 {/* Opción 3: Listas de Precios de Proveedores */}
                 <button
                   onClick={() => {
+                    beforeNavigate?.();
                     if (isSettingsModalOpen) closeSettingsModal();
                     setIsAIMenuOpen(false);
                     openAIPriceCatalogModal();
@@ -242,10 +297,13 @@ export const PrimaryIconDock: React.FC = () => {
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-bold text-white group-hover:text-emerald-300 flex items-center justify-between">
                       <span>Escanear Lista de Precios</span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-mono">Precios</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-mono">
+                        Precios
+                      </span>
                     </div>
                     <p className="text-[11px] text-slate-400 line-clamp-2 mt-0.5 leading-snug">
-                      Procesa cotizaciones y listas de distribuidores con coincidencia inteligente.
+                      Procesa cotizaciones y listas de distribuidores con
+                      coincidencia inteligente.
                     </p>
                   </div>
                 </button>
@@ -253,12 +311,16 @@ export const PrimaryIconDock: React.FC = () => {
                 {/* Pie de Menú: Configuración de IA */}
                 <div className="pt-2 mt-1 border-t border-[#242c3b] flex items-center justify-between px-2.5">
                   <span className="text-[10px] text-slate-400 truncate max-w-[170px]">
-                    Modelo: <span className="text-zinc-300 font-mono">{geminiModel || 'gemini-3.5-flash-lite'}</span>
+                    Modelo:{" "}
+                    <span className="text-zinc-300 font-mono">
+                      {geminiModel || "gemini-3.5-flash-lite"}
+                    </span>
                   </span>
                   <button
                     onClick={() => {
+                      beforeNavigate?.();
                       setIsAIMenuOpen(false);
-                      openSettingsModal('ai');
+                      openSettingsModal("ai");
                     }}
                     className="text-[10px] font-semibold text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1 cursor-pointer"
                   >
@@ -273,6 +335,7 @@ export const PrimaryIconDock: React.FC = () => {
           {/* 3. Acción Rápida: Crear Nueva Simulación */}
           <button
             onClick={() => {
+              beforeNavigate?.();
               if (isSettingsModalOpen) closeSettingsModal();
               setIsAIMenuOpen(false);
               openNewProjectModal();
@@ -290,33 +353,41 @@ export const PrimaryIconDock: React.FC = () => {
         {/* Papelera de Reciclaje */}
         <button
           onClick={() => {
+            beforeNavigate?.();
             if (isSettingsModalOpen) closeSettingsModal();
-            setActiveView('dashboard');
+            setActiveView("dashboard");
             setIsTrashActive(true);
             setActiveFolderId(null);
             setActiveTeamMemberFilter(null);
           }}
           className={`w-11 h-11 rounded-lg flex items-center justify-center transition-all cursor-pointer relative group ${
-            !isSettingsModalOpen && activeView === 'dashboard' && isTrashActive
-              ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 shadow-xs font-bold'
-              : 'text-slate-400 hover:text-rose-400 hover:bg-[#283243]'
+            !assistantActive &&
+            !isSettingsModalOpen &&
+            activeView === "dashboard" &&
+            isTrashActive
+              ? "bg-rose-500/20 text-rose-400 border border-rose-500/40 shadow-xs font-bold"
+              : "text-slate-400 hover:text-rose-400 hover:bg-[#283243]"
           }`}
-          title={`Papelera de Reciclaje (${trashedCount} propuesta${trashedCount === 1 ? '' : 's'})`}
+          title={`Papelera de Reciclaje (${trashedCount} propuesta${trashedCount === 1 ? "" : "s"})`}
         >
           <Trash2 className="w-5 h-5 group-hover:scale-105 transition-transform" />
           {trashedCount > 0 && (
             <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center shadow-xs">
-              {trashedCount > 99 ? '99+' : trashedCount}
+              {trashedCount > 99 ? "99+" : trashedCount}
             </span>
           )}
-          {!isSettingsModalOpen && activeView === 'dashboard' && isTrashActive && (
-            <span className="absolute -left-2 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-rose-400 rounded-r-full" />
-          )}
+          {!assistantActive &&
+            !isSettingsModalOpen &&
+            activeView === "dashboard" &&
+            isTrashActive && (
+              <span className="absolute -left-2 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-rose-400 rounded-r-full" />
+            )}
         </button>
 
         {/* Botón de Actualizaciones */}
         <button
           onClick={() => {
+            beforeNavigate?.();
             if (isSettingsModalOpen) closeSettingsModal();
             openUpdateModal();
           }}
@@ -325,7 +396,7 @@ export const PrimaryIconDock: React.FC = () => {
         >
           <RefreshCw
             className={`w-5 h-5 transition-colors ${
-              hasUpdate ? 'text-emerald-400' : 'text-slate-400'
+              hasUpdate ? "text-emerald-400" : "text-slate-400"
             }`}
           />
           {hasUpdate && (
@@ -336,23 +407,28 @@ export const PrimaryIconDock: React.FC = () => {
         {/* Centro de Ajustes y Configuración */}
         <button
           onClick={() => {
+            beforeNavigate?.();
             if (isSettingsModalOpen) {
               closeSettingsModal();
             } else {
-              openSettingsModal('account');
+              openSettingsModal("account");
             }
           }}
           className={`w-11 h-11 rounded-lg flex items-center justify-center transition-all cursor-pointer group relative ${
             isSettingsModalOpen
-              ? 'bg-emerald-900/60 text-emerald-300'
-              : 'text-slate-400 hover:text-white hover:bg-[#283243]'
+              ? "bg-emerald-900/60 text-emerald-300"
+              : "text-slate-400 hover:text-white hover:bg-[#283243]"
           }`}
-          aria-current={isSettingsModalOpen ? 'page' : undefined}
-          title={isSettingsModalOpen ? 'Cerrar Configuración (Esc)' : 'Centro de Configuración'}
+          aria-current={isSettingsModalOpen ? "page" : undefined}
+          title={
+            isSettingsModalOpen
+              ? "Cerrar Configuración (Esc)"
+              : "Centro de Configuración"
+          }
         >
           <Settings
             className={`w-5 h-5 transition-transform duration-300 ${
-              isSettingsModalOpen ? 'text-emerald-300' : ''
+              isSettingsModalOpen ? "text-emerald-300" : ""
             }`}
           />
           {isSettingsModalOpen && (

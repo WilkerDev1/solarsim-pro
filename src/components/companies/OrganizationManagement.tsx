@@ -57,6 +57,8 @@ export function OrganizationManagement({
     if (!valid() || request !== loadRequest.current) return;
     if (list.success && profile.success && profile.profile && profile.version) {
       setOrganizations(list.organizations || []);
+      await useSimulationStore.getState().syncOrganizationCompanyProfile();
+      if (!valid() || request !== loadRequest.current) return;
       if (!dirtyRef.current || (discardDraft && draftRef.current === previousDraft)) {
         setDraft(profile.profile);
         setSavedDraft(profile.profile);
@@ -185,16 +187,10 @@ export function OrganizationManagement({
                 event.preventDefault();
                 if (!version) return;
                 void run(async () => {
-                  const result = await CompanyService.saveProfile(
-                    syncSettings.serverUrl,
-                    token,
-                    draft,
-                    version,
-                  );
-                  if (valid() && result.success && result.version) {
-                    setVersion(result.version);
-                    setDraft(result.profile || draft);
-                    setSavedDraft(result.profile || draft);
+                  const result = await useSimulationStore.getState().saveOrganizationCompanyProfile(draft, version);
+                  if (valid() && result.success) {
+                    const confirmed = useSimulationStore.getState().companies.find(c => c.organizationId === user.organizationId);
+                    if (confirmed) { setVersion(confirmed.organizationProfileVersion!); setDraft(confirmed); setSavedDraft(confirmed); }
                   }
                   return result;
                 }, "Perfil de organización guardado.");
@@ -202,8 +198,7 @@ export function OrganizationManagement({
             >
               <h3>Perfil compartido de la organización</h3>
               <p>
-                Estos datos pertenecen a la organización del servidor. Los
-                membretes del dispositivo se gestionan por separado.
+                Estos datos se sincronizan con el membrete compartido y todos los miembros de esta organización. Las propuestas existentes conservan su identidad.
               </p>
               <CompanyFields
                 draft={draft}

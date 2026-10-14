@@ -406,6 +406,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
         ...updatedBatteries[0],
         brandModel: item.displayName,
         capacityKWh: item.capacityKWh || 16.08,
+        dodPct: item.dodPct || 90,
         unitPriceUSD: specsUpdate.batteryUnitPriceUSD ?? updatedBatteries[0].unitPriceUSD,
       };
       specsUpdate.batteries = updatedBatteries;
@@ -1278,7 +1279,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                         type="number"
                         step="1"
                         min="1"
-                        value={project.specs.batteryCount || 1}
+                        value={project.specs.batteryCount ?? 0}
                         onChange={(e) => {
                           const count = parseInt(e.target.value) || 1;
                           if (project.specs.batteries && project.specs.batteries.length > 0) {
@@ -1395,7 +1396,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                           type="number"
                           step="1"
                           min="1"
-                          value={project.specs.batteryCount || 1}
+                          value={project.specs.batteryCount ?? 0}
                           onChange={(e) => updateSpecs({ batteryCount: parseInt(e.target.value) || 1 })}
                           className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
                             isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'

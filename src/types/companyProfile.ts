@@ -1,6 +1,12 @@
 export interface CompanyProfile {
   id: string;
   dataVersion?: number;
+  /** Server organization profile, read-only locally and updated through CAS. */
+  organizationId?: string;
+  organizationProfileVersion?: number;
+  slogan?: string;
+  instagram?: string;
+  watermarkLogoBase64?: string;
   name: string;
   commercialName?: string;
   rncOrId: string;

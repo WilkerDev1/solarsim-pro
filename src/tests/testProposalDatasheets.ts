@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import { BENCHMARK_PROJECT } from '../engine/referenceCase';
+import { proposalDatasheets } from '../utils/proposalDatasheets';
+import type { SolarEquipmentItem } from '../types/equipment';
+const p = structuredClone(BENCHMARK_PROJECT);
+p.specs.panels = [{ id: 'a', brandModel: 'QA A', powerW: 600, count: 10 }, { id: 'b', brandModel: 'QA B', powerW: 620, count: 5 }];
+p.specs.inverters = [{ id: 'c', brandModel: 'QA I', powerKW: 8, count: 0 }];
+p.specs.hasBattery = false;
+p.specs.batteryBrandModel = 'QA Battery';
+const item = (id: string, name: string, asset: string, type: SolarEquipmentItem['type'] = 'panel'): SolarEquipmentItem => ({ id, displayName: name, type, brand: 'QA', modelSeries: 'QA', datasheetAssetId: asset, datasheetName: 'QA.pdf', createdAt: '2026-10-14', updatedAt: '2026-10-14' });
+const catalog = [item('a', 'QA A', 'shared'), item('b', 'QA B', 'shared'), item('c', 'QA I', 'unused', 'inverter'), item('d', 'QA Battery', 'battery', 'battery')];
+assert.deepEqual(proposalDatasheets(p, catalog).map(s => s.key), ['shared']);
+p.specs.hasBattery = true; p.specs.batteryCount = 1;
+assert.deepEqual(proposalDatasheets(p, catalog).map(s => s.key), ['shared', 'battery']);
+assert.equal(proposalDatasheets(p, [...catalog, item('duplicate', 'QA Battery', 'wrong', 'battery')]).length, 1, 'Ambiguous catalog model is never guessed');
+catalog[0].datasheetName = 'photo.png'; catalog[1].datasheetName = 'photo.png';
+assert.deepEqual(proposalDatasheets(p, catalog).map(s => s.key), ['battery'], 'Images are not PDF annexes');
+console.log('Proposal datasheet detection, shared-document deduplication and inactive equipment passed.');

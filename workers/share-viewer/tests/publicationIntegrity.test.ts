@@ -81,7 +81,7 @@ async function main() {
   assert.equal(response.status, 200, await response.clone().text());
   const result = await response.json() as { id: string; shareUrl: string };
   assert.match(result.id, /^[a-f0-9]{32}$/);
-  assert.equal(writes, 1);
+  assert.equal(writes, 2);
   const stored = JSON.parse(rows.get(`proposal:${result.id}`)!) as StoredProposal;
   assert.equal(stored.calculationSnapshot?.mode, 'legacy');
   assert.equal(stored.publishedBy?.organizationId, 'org-test');

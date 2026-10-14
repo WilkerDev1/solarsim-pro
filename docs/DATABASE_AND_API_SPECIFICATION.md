@@ -45,3 +45,8 @@ Catálogo conserva ofertas como parte del documento versionado; una revisión st
 ## Migraciones y pruebas
 
 Las migraciones aditivas 1/2 registran progreso y añaden tablas/columnas/índices sin vaciar proyectos, usuarios ni equipos. `npm --prefix server test` crea un contenedor PostgreSQL16 efímero, con puerto aleatorio de loopback y credenciales sintéticas, ejecuta API inyectada y destruye solo su contenedor en finally. No usa la BD empresarial.
+
+
+## Recursos compartidos de esta rama
+
+La migración aditiva 004 incorpora `project_folders` y `equipment_assets`. Las carpetas distinguen visibilidad pública de la organización y privada del creador, con CAS y tombstones. Los adjuntos guardan bytes y se deduplican por organización/tipo/SHA-256; la API valida pertenencia y referencias al guardar el equipo. El Worker consulta la API para autorizar lectura del registro organizacional; conserva su índice de metadatos separado del contenido temporal. Véase [contrato de recursos compartidos](SHARED_RESOURCES.md) para endpoints, permisos, paginación y límites de recuperación. Esta descripción del código no certifica su despliegue en producción.

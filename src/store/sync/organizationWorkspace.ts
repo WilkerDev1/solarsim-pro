@@ -15,6 +15,8 @@ const keys = [
   "projects",
   "activeProjectId",
   "folders",
+  "folderChanges",
+  "folderDeletionQueue",
   "equipmentCatalog",
   "deletedEquipmentIds",
   "equipmentChanges",
@@ -35,8 +37,10 @@ export type OrganizationWorkspace = Pick<
   SimulationStore,
   (typeof keys)[number]
 >;
+// Cached identity keeps the offline workspace selected even when its token expires.
+// Only explicit logout (no currentUser) returns to the personal local workspace.
 export const workspaceScope = (session: SyncSettings): string =>
-  session.currentUser && session.authToken
+  session.currentUser
     ? featureScope(session.serverUrl, session.currentUser.organizationId)
     : "local";
 export function captureWorkspace(
@@ -51,6 +55,8 @@ export function emptyWorkspace(): OrganizationWorkspace {
     projects: [],
     activeProjectId: "",
     folders: [],
+    folderChanges: {},
+    folderDeletionQueue: [],
     equipmentCatalog: DEFAULT_EQUIPMENT_CATALOG,
     deletedEquipmentIds: [],
     equipmentChanges: {},
@@ -274,20 +280,54 @@ export function changeWorkspace(
   const initialized = { ...state };
   initializeWorkspaces(initialized);
   const nextScope = workspaceScope(nextSession);
+  const previousArchive =
+    initialized.organizationWorkspaces[initialized.workspaceScope];
+  const captured = captureWorkspace(initialized);
+  captured.folders = [
+    ...(previousArchive?.folders || []).filter(
+      (f) =>
+        f.visibility === "private" &&
+        f.createdById !== state.syncSettings.currentUser?.id &&
+        !captured.folders.some((v) => v.id === f.id),
+    ),
+    ...captured.folders,
+  ];
+  const accessible = (workspace: OrganizationWorkspace) => ({
+    ...workspace,
+    folderChanges: workspace.folderChanges || {},
+    folderDeletionQueue: workspace.folderDeletionQueue || [],
+    folders: workspace.folders.filter(
+      (f) =>
+        f.visibility !== "private" ||
+        !f.createdById ||
+        f.createdById === nextSession.currentUser?.id,
+    ),
+  });
   if (nextScope === initialized.workspaceScope)
     return {
-      ...captureWorkspace(initialized),
+      ...accessible(captured),
+      activeFolderId: accessible(captured).folders.some(
+        (f) => f.id === state.activeFolderId,
+      )
+        ? state.activeFolderId
+        : null,
+      activeTeamMemberFilter: null,
+      folderSyncFeedback: null,
       workspaceScope: initialized.workspaceScope,
-      organizationWorkspaces: initialized.organizationWorkspaces,
+      organizationWorkspaces: {
+        ...initialized.organizationWorkspaces,
+        [nextScope]: captured,
+      },
     };
   const archives = {
     ...initialized.organizationWorkspaces,
-    [initialized.workspaceScope]: captureWorkspace(initialized),
+    [initialized.workspaceScope]: captured,
   };
   return {
     ...emptyWorkspace(),
-    ...(archives[nextScope] || {}),
-    documentTemplatesByCompany: archives[nextScope]?.documentTemplatesByCompany || {},
+    ...accessible(archives[nextScope] || emptyWorkspace()),
+    documentTemplatesByCompany:
+      archives[nextScope]?.documentTemplatesByCompany || {},
     workspaceScope: nextScope,
     organizationWorkspaces: archives,
     activeFolderId: null,

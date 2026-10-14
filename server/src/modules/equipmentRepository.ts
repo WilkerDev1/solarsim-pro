@@ -7,6 +7,10 @@ export function equipmentItem(
   if (!own) {
     delete details.supplierPrices;
     delete details.preferredSupplierId;
+    delete details.datasheetAssetId;
+    delete details.datasheetName;
+    delete details.imageAssetIds;
+    delete details.imageNames;
   }
   const numeric = (value: unknown) =>
     value == null ? undefined : Number(value);
@@ -57,4 +61,12 @@ export const EQUIPMENT_DETAIL_KEYS = [
   "weightKg",
   "isCustom",
   "preferredSupplierId",
+  "datasheetAssetId",
+  "datasheetName",
+  "imageAssetIds",
+  "imageNames",
+  "datasheetUrl",
+  "mpptEfficiencyPct",
+  "batteryVoltageRange",
+  "chargeVoltageV",
 ] as const;

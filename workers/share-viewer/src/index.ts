@@ -38,12 +38,45 @@ app.post('/api/share', async (c) => {
     id: generateProposalId(), createdAt, validityDays: body.validityDays,
     expiresAt: new Date(Date.now() + body.validityDays * 86400000).toISOString(),
     project: body.project, summary: body.summary, calculationSnapshot: body.calculationSnapshot,
-    publishedBy: { userId: identity.userId, organizationId: identity.organizationId },
+    publishedBy: { userId: identity.userId, userName: identity.userName, organizationId: identity.organizationId },
   };
   // Rendering is validated before storage; malformed supported payloads never produce a broken link.
   renderProposalPage(stored);
   await storeProposal(c.env, stored);
   return c.json({ success: true, id: stored.id, shareUrl: `${new URL(c.req.url).origin}/p/${stored.id}`, expiresAt: stored.expiresAt, validityDays: stored.validityDays });
+});
+// Index entries have no expiration: expired proposals remain visible in the team's register.
+app.get('/api/share/history', async c => {
+  const identity = await authorizePublication(c.env,c.req.header('Authorization'),requestFetch,true);
+  const cursor = c.req.query('cursor');
+  const origin = new URL(c.req.url).origin;
+  const prefix = `history:${identity.organizationId}:`;
+  const page = await c.env.PROPOSALS_KV.list({ prefix, limit: 100, ...(cursor ? { cursor } : {}) });
+  const proposals = (await Promise.all(page.keys.map(async key => {
+    const raw = await c.env.PROPOSALS_KV.get(key.name);
+    if (!raw) return null;
+    const value: unknown = (() => { try { return JSON.parse(raw); } catch { return null; } })();
+    if (!isRecord(value) || value.organizationId !== identity.organizationId || !validProposalId(value.id)) return null;
+    return { ...value,shareUrl:`${origin}/p/${value.id}`,createdByName:value.createdByName || identity.authors?.find(a => a.id === value.createdById)?.name || 'Autor no disponible' };
+  }))).filter(Boolean);
+  return c.json({ success:true,proposals,cursor:page.list_complete ? null : page.cursor });
+});
+// Bounded recovery of pre-index links. Ownership must already be present in KV; no tenant is guessed.
+app.get('/api/share/history-recover', async c => {
+  const identity = await authorizePublication(c.env,c.req.header('Authorization'),requestFetch,true);
+  const cursor = c.req.query('cursor');
+  const page = await c.env.PROPOSALS_KV.list({ prefix:'proposal:',limit:100,...(cursor ? { cursor } : {}) });
+  const origin = new URL(c.req.url).origin;
+  const proposals = [];
+  for (const key of page.keys) {
+    const stored = await readProposal(c.env,key.name.slice('proposal:'.length));
+    if (!stored || stored.publishedBy?.organizationId !== identity.organizationId) continue;
+    const metadata = { ...proposalMetadata(stored,origin),createdByName:stored.publishedBy.userName || identity.authors?.find(a => a.id === stored.publishedBy?.userId)?.name || 'Autor no disponible' };
+    const indexKey = `history:${identity.organizationId}:${stored.id}`;
+    if (!(await c.env.PROPOSALS_KV.get(indexKey))) await c.env.PROPOSALS_KV.put(indexKey,JSON.stringify(metadata));
+    proposals.push(metadata);
+  }
+  return c.json({ success:true,proposals,cursor:page.list_complete ? null : page.cursor });
 });
 app.get('/api/share/:id', async (c) => {
   const id = c.req.param('id');

@@ -6,14 +6,14 @@ export function contentEqual(left: unknown, right: unknown): boolean {
     : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => [key, canonical(item)])) : value;
   return JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
 }
-const sections = { client: 'Cliente', specs: 'Equipos', rates: 'Tarifas', financials: 'Finanzas', monthlyConsumption: 'Consumo mensual', customization: 'Documento', status: 'Estado', isDeleted: 'Papelera' };
+const sections = { client: 'Cliente', specs: 'Equipos', rates: 'Tarifas', financials: 'Finanzas', monthlyConsumption: 'Consumo mensual', customization: 'Documento', status: 'Estado', isDeleted: 'Papelera', folderId: 'Organización', companyProfileId: 'Empresa emisora' };
 const labels: Record<string, string> = {
   name: 'Nombre', address: 'Dirección', company: 'Empresa', projectId: 'Código de propuesta', province: 'Provincia', email: 'Correo electrónico', phone: 'Teléfono',
   panelCount: 'Cantidad de módulos', panelPowerW: 'Potencia del módulo (W)', hasBattery: 'Baterías', batteryCapacityKWh: 'Capacidad de baterías (kWh)', systemLosses: 'Pérdidas del sistema',
   energyCostPerKWh: 'Precio de energía', distributor: 'Distribuidora', tariffCode: 'Tarifa', currency: 'Moneda', exchangeRate: 'Tasa de cambio',
   annualConsumption: 'Consumo anual', inverterCount: 'Cantidad de inversores', inverterPowerKW: 'Potencia del inversor (kW)', applyLey5707: 'Incentivos Ley 57-07',
   customITBISSavedUSD: 'ITBIS exonerado personalizado (USD)', customLey5707CreditUSD: 'Crédito fiscal personalizado (USD)', customCostUSD: 'Inversión personalizada (USD)',
-  applyITBISExemption: 'Exoneración ITBIS', monthlyConsumption: 'Consumo mensual', isDeleted: 'En papelera', status: 'Estado',
+  applyITBISExemption: 'Exoneración ITBIS', monthlyConsumption: 'Consumo mensual', isDeleted: 'En papelera', status: 'Estado', folderId: 'Carpeta', companyProfileId: 'Empresa emisora',
 };
 function format(value: unknown): string {
   if (value === undefined || value === null) return 'Sin valor';

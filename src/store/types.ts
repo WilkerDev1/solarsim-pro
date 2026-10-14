@@ -200,6 +200,8 @@ export interface AISlice {
 }
 
 export interface UISlice {
+  appAssistantEnabled: boolean;
+  setAppAssistantEnabled: (enabled: boolean) => void;
   isNewProjectModalOpen: boolean;
   isUpdateModalOpen: boolean;
   isAIInvoiceModalOpen: boolean;
@@ -246,12 +248,17 @@ export interface UISlice {
 
 export interface FolderSlice {
   folders: ProjectFolder[];
+  folderChanges: Record<string, { revision: string; ownerId?: string; baseVersion: number; serverFolder?: ProjectFolder }>;
+  folderDeletionQueue: { id: string; ownerId?: string; baseVersion: number }[];
+  folderSyncFeedback: string | null;
+  resolveFolderConflict: (id: string, resolution: 'accept_server' | 'keep_local') => void;
+  syncFoldersWithServer: () => Promise<{ success: boolean; message: string }>;
   activeFolderId: string | null;
   activeTeamMemberFilter: string | null;
 
   setActiveFolderId: (folderId: string | null) => void;
   setActiveTeamMemberFilter: (member: string | null) => void;
-  createFolder: (name: string, color?: string, description?: string, hideFromGeneral?: boolean) => ProjectFolder | null;
+  createFolder: (name: string, color?: string, description?: string, hideFromGeneral?: boolean, visibility?: 'public' | 'private') => ProjectFolder | null;
   updateFolder: (id: string, updates: Partial<ProjectFolder>) => void;
   deleteFolder: (id: string) => void;
   moveProjectToFolder: (projectId: string, targetFolderId: string | null) => void;
@@ -268,6 +275,9 @@ export interface CompanyProfileSlice {
   setActiveCompany: (id: string) => void;
   updateLocalUserProfile: (partial: Partial<LocalUserProfile>) => void;
   getActiveCompany: () => CompanyProfile;
+  syncOrganizationCompanyProfile: () => Promise<{ success: boolean; error?: string }>;
+  saveOrganizationCompanyProfile: (profile: Partial<CompanyProfile>, baseVersion: number) => Promise<{ success: boolean; error?: string }>;
+
 }
 
 export interface VersionHistorySlice {
