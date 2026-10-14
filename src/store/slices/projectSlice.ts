@@ -4,6 +4,7 @@ import { energyCalculationMode } from '../../../shared/applicationFeatures';
 import { effectiveFeatureSettings } from '../../features/application/featurePolicy';
 import { SimulationSlice, ProjectSlice } from '../types';
 import { ProjectSimulation } from '../../types';
+import { normalizeEnabledBatteries } from '../../utils/batteryState';
 import { BENCHMARK_PROJECT } from '../../engine/referenceCase';
 import { INITIAL_PROJECTS, generateNextProjectSequence, generateDuplicateProjectIdentifiers } from '../initialData';
 import { calculateFinancialSummary, calculateCostMatrixSummary } from '../../engine/financeEngine';
@@ -472,7 +473,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
       const activeProj = state.projects.find((p) => p.id === state.activeProjectId);
       if (!activeProj) return state;
 
-      const mergedSpecs = { ...activeProj.specs, ...specsPartial };
+      const mergedSpecs = normalizeEnabledBatteries({ ...activeProj.specs, ...specsPartial });
       const shouldAutoCalc = specsPartial.autoCalculatePanels !== undefined
         ? specsPartial.autoCalculatePanels
         : (activeProj.specs.autoCalculatePanels && specsPartial.panelCount === undefined);
@@ -851,13 +852,43 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
             };
           }
 
+          // Group arrays drive the engines. Keep their primary row in sync with the sidebar.
+          if (equipmentType === 'panel' && updatedSpecs.panels?.length) {
+            updatedSpecs.panels = updatedSpecs.panels.map((item, index) => index ? item : {
+              ...item, brandModel: updatedSpecs.panelBrandModel || item.brandModel,
+              powerW: updatedSpecs.panelPowerW, unitPriceUSD: supplierPrice.priceUSD,
+              selectedSupplierInfo: selectedSupplierInfo.panel,
+            });
+          }
+          if (equipmentType === 'inverter' && updatedSpecs.inverters?.length) {
+            updatedSpecs.inverters = updatedSpecs.inverters.map((item, index) => index ? item : {
+              ...item, brandModel: updatedSpecs.inverterBrandModel || item.brandModel,
+              powerKW: updatedSpecs.inverterPowerKW, unitPriceUSD: supplierPrice.priceUSD,
+              selectedSupplierInfo: selectedSupplierInfo.inverter,
+            });
+          }
+          if (equipmentType === 'battery' && updatedSpecs.batteries?.length) {
+            updatedSpecs.batteries = updatedSpecs.batteries.map((item, index) => index ? item : {
+              ...item, brandModel: updatedSpecs.batteryBrandModel || item.brandModel,
+              capacityKWh: updatedSpecs.batteryCapacityKWh || item.capacityKWh,
+              dodPct: updatedSpecs.batteryDOD, unitPriceUSD: supplierPrice.priceUSD,
+              selectedSupplierInfo: selectedSupplierInfo.battery,
+            });
+          }
           updatedSpecs.selectedSupplierInfo = selectedSupplierInfo;
+          const nextFinancials = { ...p.financials };
+          if (p.id !== 'benchmark-centro-medico') {
+            delete nextFinancials.customITBISSavedUSD;
+            delete nextFinancials.customLey5707CreditUSD;
+            delete nextFinancials.customCostUSD;
+          }
 
           return {
             ...p,
             ...projectMutationMetadata(p, get().syncSettings),
             updatedAt: new Date().toISOString(),
-            specs: updatedSpecs,
+            specs: normalizeEnabledBatteries(updatedSpecs),
+            financials: nextFinancials,
           };
         }
         return p;

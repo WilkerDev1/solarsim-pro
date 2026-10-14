@@ -14,6 +14,8 @@ import { ProjectSimulation, DocumentCustomization, AttachedPDFDocument } from '.
 import { PDFMergeService } from '../../../services/pdfMergeService';
 import { PDFAttachmentStorage } from '../../../services/pdfAttachmentStorage';
 import { PDFThumbnailService } from '../../../services/pdfThumbnailService';
+import { proposalDatasheets } from '../../../utils/proposalDatasheets';
+import { fetchEquipmentAsset } from '../../../services/equipmentAssetService';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 
 interface PDFAttachmentsSectionProps {
@@ -35,6 +37,7 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [cachedDatasheets, setCachedDatasheets] = useState<string[]>([]);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -43,6 +46,8 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
 
   // Obtener referencia reactiva directa del store para evitar cualquier desfase por props
   const activeProjectId = useSimulationStore((s) => s.activeProjectId);
+  const catalog = useSimulationStore(s => s.equipmentCatalog);
+  const sync = useSimulationStore(s => s.syncSettings);
   const storeProject = useSimulationStore((s) =>
     s.projects.find((p) => p.id === s.activeProjectId) || s.getActiveProject()
   );
@@ -52,7 +57,9 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
   const attemptedThumbnailsRef = useRef<Set<string>>(new Set());
 
   const doUpdateDoc = (partial: Partial<DocumentCustomization>) => {
-    useSimulationStore.getState().updateDocumentCustomization(partial);
+    const live = useSimulationStore.getState();
+    if (live.activeProjectId !== currentProject?.id || live.projects.find(p => p.id === currentProject.id)?.isDeleted) return;
+    live.updateDocumentCustomization(partial);
     if (updateDocumentCustomization) {
       try {
         updateDocumentCustomization(partial);
@@ -108,7 +115,8 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
       }
 
       if (updated && isMounted) {
-        doUpdateDoc({ attachedPdfs: newList });
+        const thumbnails = new Map(newList.map(item => [item.id, item.thumbnailDataUrl]));
+        doUpdateDoc({ attachedPdfs: getLatestAttachments().map(item => ({ ...item, thumbnailDataUrl: item.thumbnailDataUrl || thumbnails.get(item.id) })) });
       }
     };
 
@@ -116,7 +124,18 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [currentProject?.customization?.attachedPdfs?.length]);
+  }, [currentProject?.id, currentProject?.customization?.attachedPdfs?.length]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    setCachedDatasheets([]);
+    const attachments = currentProject?.customization?.attachedPdfs || [];
+    void Promise.all(attachments.filter(att => att.sourceDatasheetKey).map(async att => {
+      const bytes = await PDFAttachmentStorage.getAttachment(att.id);
+      return bytes ? att.sourceDatasheetKey! : null;
+    })).then(keys => { if (!cancelled) setCachedDatasheets(keys.filter((key): key is string => !!key)); });
+    return () => { cancelled = true; };
+  }, [currentProject?.id, currentProject?.customization?.attachedPdfs]);
 
   if (!currentProject) {
     return null;
@@ -126,7 +145,19 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
   const enabledAttachments = attachedPdfs.filter((att) => att.enabled);
   const totalAttachedPages = enabledAttachments.reduce((sum, att) => sum + (att.pageCount || 1), 0);
 
-  const handleProcessFiles = async (files: FileList | File[]) => {
+  const detected = proposalDatasheets(currentProject, catalog.filter(item =>
+    (!item.organizationId || item.organizationId === sync.currentUser?.organizationId) &&
+    (!item.syncServerUrl || item.syncServerUrl.replace(/\/+$/, '') === sync.serverUrl.replace(/\/+$/, ''))
+  )).filter(source => !cachedDatasheets.includes(source.key));
+
+  const handleProcessFiles = async (files: FileList | File[], sourceKeys: string[] = []) => {
+    const session = useSimulationStore.getState().sessionGeneration;
+    const ensureTarget = () => {
+      const live = useSimulationStore.getState();
+      if (live.sessionGeneration !== session || live.activeProjectId !== currentProject.id ||
+          !live.projects.some(p => p.id === currentProject.id && !p.isDeleted))
+        throw new Error('La propuesta o sesión cambió. Vuelve a adjuntar en la propuesta elegida.');
+    };
     setUploadError(null);
     setFeedbackMsg(null);
     setIsUploading(true);
@@ -144,7 +175,7 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
     try {
       const newItems: AttachedPDFDocument[] = [];
 
-      for (const file of pdfFiles) {
+      for (const [fileIndex, file] of pdfFiles.entries()) {
         const fileBuffer = await file.arrayBuffer();
         // Clonar buffer para que nunca se desvincule al procesarlo
         const bufferCopy = fileBuffer.slice(0);
@@ -175,10 +206,12 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
 
         // Guardar binario en IndexedDB y caché
         const targetProjId = currentProject.id || activeProjectId || 'default-proj';
+        ensureTarget();
         await PDFAttachmentStorage.saveAttachment(docId, targetProjId, file.name, fileBuffer);
 
         newItems.push({
           id: docId,
+          sourceDatasheetKey: sourceKeys[fileIndex],
           fileName: file.name,
           fileSize: file.size,
           pageCount: pageCount > 0 ? pageCount : 1,
@@ -191,6 +224,7 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
         });
       }
 
+      ensureTarget();
       // Tomar la lista más fresca directamente del store para no sobrescribir nada
       const latestProj = useSimulationStore.getState().projects.find((p) => p.id === currentProject.id) || currentProject;
       const currentList = latestProj.customization?.attachedPdfs || [];
@@ -213,6 +247,52 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
     }
   };
 
+
+  const handleAddCatalogDatasheet = async (source: typeof detected[number]) => {
+    if (isUploading) return;
+    const live = useSimulationStore.getState();
+    const session = live.sessionGeneration;
+    const target = currentProject.id;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    setIsUploading(true);
+    setUploadError(null);
+    try {
+      const blob = source.item.datasheetAssetId
+        ? await fetchEquipmentAsset(sync.serverUrl, sync.authToken || '', source.item.datasheetAssetId, controller.signal)
+        : await (async () => {
+            const url = new URL(source.item.datasheetUrl!);
+            if (url.protocol !== 'https:') throw new Error('La ficha debe tener un enlace HTTPS.');
+            const response = await fetch(url.href, { signal: controller.signal, credentials: 'omit' });
+            if (!response.ok) throw new Error(`No se pudo descargar la ficha (HTTP ${response.status}).`);
+            return response.blob();
+          })();
+      const now = useSimulationStore.getState();
+      if (now.sessionGeneration !== session || now.activeProjectId !== target) throw new Error('La propuesta o sesión cambió.');
+      if (blob.size > 8 * 1024 * 1024 || !blob.size) throw new Error('La ficha está vacía o supera 8 MB.');
+      if (!(await blob.slice(0, 5).text()).startsWith('%PDF-')) throw new Error('El documento vinculado no es un PDF. Adjunta una ficha PDF.');
+      const bytes = await blob.arrayBuffer();
+      const latest = useSimulationStore.getState();
+      const proposal = latest.projects.find(p => p.id === target && !p.isDeleted);
+      if (latest.sessionGeneration !== session || latest.activeProjectId !== target || !proposal ||
+          !proposalDatasheets(proposal, latest.equipmentCatalog).some(candidate => candidate.key === source.key && candidate.item.id === source.item.id))
+        throw new Error('La propuesta, el equipo o la sesión cambió. Revisa sus fichas y vuelve a intentar.');
+      const existing = proposal.customization?.attachedPdfs?.find(att => att.sourceDatasheetKey === source.key);
+      if (existing) {
+        await PDFAttachmentStorage.saveAttachment(existing.id, target, existing.fileName, bytes);
+        if (useSimulationStore.getState().sessionGeneration !== session || useSimulationStore.getState().activeProjectId !== target || !useSimulationStore.getState().projects.find(p => p.id === target)?.customization?.attachedPdfs?.some(att => att.id === existing.id && att.sourceDatasheetKey === source.key)) return;
+        setCachedDatasheets(keys => [...keys, source.key]);
+        setFeedbackMsg('Ficha recuperada en este dispositivo, sin duplicar el anexo.');
+        return;
+      }
+      await handleProcessFiles([new File([blob], source.item.datasheetName || 'Ficha técnica.pdf', { type: 'application/pdf' })], [source.key]);
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : 'No se pudo adjuntar la ficha del catálogo.');
+    } finally {
+      clearTimeout(timeout);
+      setIsUploading(false);
+    }
+  };
 
   const handleToggleEnabled = (id: string, enabled: boolean) => {
     const list = getLatestAttachments();
@@ -288,6 +368,17 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
         Adjunta fichas técnicas de paneles/inversores, planos o certificados. Se conservarán en el dock y se fusionarán vectorialmente en alta resolución al final de tu propuesta al exportar el PDF.
       </p>
 
+      {detected.length > 0 && (
+        <div className="space-y-2 rounded-lg border border-emerald-500/40 p-3">
+          <p className="text-xs font-semibold">Fichas del catálogo para esta propuesta</p>
+          {detected.map(source => <button key={source.key} type="button" disabled={isUploading || currentProject.isDeleted}
+            onClick={() => void handleAddCatalogDatasheet(source)}
+            className="block w-full rounded border border-emerald-500/40 px-2 py-2 text-left text-xs disabled:opacity-50">
+            {attachedPdfs.some(att => att.sourceDatasheetKey === source.key) ? '↻ Recuperar' : '+ Adjuntar'} {source.item.datasheetName || source.item.displayName}
+          </button>)}
+          <p className="text-[11px] opacity-70">Se descargan una vez y quedan disponibles como anexos en este dispositivo.</p>
+        </div>
+      )}
       {/* Feedback de Éxito Instantáneo */}
       {feedbackMsg && (
         <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center justify-between gap-2 animate-in fade-in">
