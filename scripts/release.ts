@@ -213,7 +213,7 @@ export function bumpVersion(newVersion: string) {
   const serverIndexPath = path.join(rootDir, 'server/src/app.ts');
   if (fs.existsSync(serverIndexPath)) {
     let content = fs.readFileSync(serverIndexPath, 'utf-8');
-    content = content.replace(/version:\s*['"][0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?['"]/, `version: '${newVersion}'`);
+    content = content.replace(/(version:\s*)(['"])[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?\2/, (_match, prefix, quote) => `${prefix}${quote}${newVersion}${quote}`);
     fs.writeFileSync(serverIndexPath, content);
     console.log(`   ✓ server/src/app.ts (/api/health) -> ${newVersion}`);
   }
