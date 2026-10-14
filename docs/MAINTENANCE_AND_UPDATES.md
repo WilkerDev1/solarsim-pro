@@ -2,9 +2,15 @@
 
 Trabajar funcionalidades en beta o rama codex/ desde beta; main recibe publicación aprobada. La versión oficial se consulta en GitHub Releases; el parche 2.3.1 incorpora las correcciones auditadas del 7 de octubre; las betas se prueban con npm run dev y los gates de código, sin generar instaladores automáticamente; consultar [plan de beta y rollback](BETA_ROLLOUT.md).
 
+## Publicación 2.5.1
+
+[2.5.1](https://github.com/WilkerDev1/solarsim-pro/releases/tag/v2.5.1) es la versión estable Latest. El tag fija `3e2e441a6c6a4817deab8a4326f7b169f0201aee`; [Actions 38599799763](https://github.com/WilkerDev1/solarsim-pro/actions/runs/38599799763) aprobó contratos y empaquetado/pruebas nativas Windows/Linux. Se verificaron firmas fijadas GPG, hashes y tamaños; los 20 assets remotos coincidieron con los archivos locales antes de publicar.
+
+Beta se integró en main sin eliminar beta. La API de app-server se alineó a 2.5.1 tras restaurar un dump reciente en PostgreSQL aislado y verificar integridad/conteos; solo se reemplazó API. [Entrega y rollback](RELEASE_2_5_1.md) registra la revisión, el checkpoint privado, evidencias y límites. [Notas](../release/release-notes-v2.5.1.md) describen BESS/costos, catálogo/datasheets y sincronización offline. Windows sigue sin Authenticode.
+
 ## Publicación 2.5.0
 
-[SolarSim Pro 2.5.0](https://github.com/WilkerDev1/solarsim-pro/releases/tag/v2.5.0) está publicada como versión estable más reciente. El tag conserva la revisión `7947070c6ab214f59dcab62edd83a58ca1196907`; [GitHub Actions 38313219525](https://github.com/WilkerDev1/solarsim-pro/actions/runs/38313219525) aprobó contratos, empaquetado nativo Windows/Linux y creación del borrador.
+[SolarSim Pro 2.5.0](https://github.com/WilkerDev1/solarsim-pro/releases/tag/v2.5.0) se publicó como versión estable anterior. El tag conserva la revisión `7947070c6ab214f59dcab62edd83a58ca1196907`; [GitHub Actions 38313219525](https://github.com/WilkerDev1/solarsim-pro/actions/runs/38313219525) aprobó contratos, empaquetado nativo Windows/Linux y creación del borrador.
 
 Los seis formatos x64 son instalador y portable Windows, y AppImage, `.deb`, `.pacman` y `.tar.gz` Linux. Se comprobó el arranque del instalador Windows y de `.deb`, AppImage y `.pacman`; portable y `.tar.gz` recibieron verificación de archivos y hashes. No se compiló macOS ni ARM. Los binarios se construyeron exclusivamente en GitHub; la firma se realizó localmente con la clave GPG fijada, sin exportar la clave privada.
 
