@@ -15,8 +15,7 @@ import {
 } from "../../types/equipment";
 import { parseDatasheetWithGemini } from "../../services/geminiDatasheetService";
 import { findCatalogMatchForVariant } from "../../utils/equipmentMatchingUtils";
-import { uploadEquipmentAsset } from "../../services/equipmentAssetService";
-import { planDatasheetImport } from "../../utils/datasheetImport";
+import { attachImportedDatasheet, saveDatasheetLocally, type DatasheetImportReceipt } from "../../services/datasheetImportService";
 
 const technicalFields = {
   panel: [
@@ -68,6 +67,8 @@ export const AIDatasheetScannerModal: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ExtractedDatasheetData | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<DatasheetImportReceipt | null>(null);
+  const [attachmentPending, setAttachmentPending] = useState(false);
   const user = state.syncSettings.currentUser;
   const canEdit = !user || user.role === "ADMIN" || user.role === "EDITOR";
   const control = `w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 ${dark ? "bg-[#141619] border-[#363b43] text-zinc-100 placeholder:text-zinc-400" : "bg-white border-slate-300 text-slate-900 placeholder:text-slate-500"}`;
@@ -84,6 +85,8 @@ export const AIDatasheetScannerModal: React.FC = () => {
     setBusy(false);
     setData(null);
     setSaved(null);
+    setReceipt(null);
+    setAttachmentPending(false);
     setError(null);
     dialog.current?.focus();
     const keyboard = (event: KeyboardEvent) => {
@@ -230,79 +233,43 @@ export const AIDatasheetScannerModal: React.FC = () => {
         : old,
     );
   };
-  const save = async () => {
-    if (!data || !canEdit || busy || !file) return;
+  const attach = async (imported: DatasheetImportReceipt) => {
+    if (!file) return;
     const request = ++generation.current;
-    const session = useSimulationStore.getState().sessionGeneration;
-    setBusy(true); setSaved(null); setError(null);
-    abort.current = new AbortController();
+    const controller = new AbortController();
+    abort.current?.abort();
+    abort.current = controller;
+    setBusy(true);
+    setProgress("Equipos guardados localmente. Adjuntando la ficha al servidor…");
+    setError(null);
+    const timeout = setTimeout(() => controller.abort(), 12000);
     try {
-      const live = useSimulationStore.getState();
-      const plan = planDatasheetImport(data, live.equipmentCatalog);
-      const activeUser = live.syncSettings.currentUser;
-      if (activeUser && !["ADMIN", "EDITOR"].includes(activeUser.role))
-        throw new Error("Tu cuenta solo puede consultar el catálogo.");
-      const server = live.syncSettings.serverUrl.trim().replace(/\/+$/, "");
-      for (const update of plan.updates) {
-        const target = live.equipmentCatalog.find(
-          (item) => item.id === update.id,
-        )!;
-        if (
-          activeUser &&
-          ((target.organizationId &&
-            target.organizationId !== activeUser.organizationId) ||
-            (target.syncServerUrl &&
-              target.syncServerUrl.trim().replace(/\/+$/, "") !== server))
-        )
-          throw new Error(
-            "Una coincidencia pertenece a otro ámbito. Guarda un modelo independiente con un nombre diferente.",
-          );
-      }
-      let attachment: { datasheetAssetId: string; datasheetName: string } | undefined;
-      if (activeUser) {
-        if (!live.syncSettings.authToken) throw new Error("Inicia sesión para adjuntar la ficha al catálogo.");
-        setProgress("Guardando una copia de la ficha en el servidor…");
-        const asset = await uploadEquipmentAsset(server, live.syncSettings.authToken, file, "datasheet", abort.current.signal);
-        if (request !== generation.current || session !== useSimulationStore.getState().sessionGeneration) return;
-        const currentRole = useSimulationStore.getState().syncSettings.currentUser?.role;
-        if (!currentRole || !["ADMIN", "EDITOR"].includes(currentRole)) throw new Error("Ya no tienes permisos para modificar el catálogo.");
-        attachment = { datasheetAssetId: asset.id, datasheetName: asset.name };
-        // Cada variante referencia el mismo activo; no se sube una copia por modelo.
-        plan.updates.forEach(entry => Object.assign(entry.patch, attachment));
-        plan.creates.forEach(entry => Object.assign(entry.item, attachment));
-      }
-      for (const update of plan.updates)
-        live.updateEquipmentItem(update.id, update.patch);
-      if (plan.creates.length)
-        live.addEquipmentBatch(plan.creates.map((entry) => entry.item));
-      const fresh = useSimulationStore.getState();
-      const changed =
-        plan.updates.every((entry) =>
-          fresh.equipmentCatalog.some(
-            (item) =>
-              item.id === entry.id &&
-              Object.entries(entry.patch).every(
-                ([key, value]) => item[key as keyof typeof item] === value,
-              ),
-          ),
-        ) &&
-        plan.creates.every((entry) =>
-          fresh.equipmentCatalog.some((item) => item.id === entry.item.id),
-        );
-      if (!changed)
-        throw new Error(
-          fresh.equipmentSyncFeedback ||
-            "No tienes permisos para modificar estos equipos.",
-        );
-      setSaved(
-        `${plan.updates.length} actualizados y ${plan.creates.length} nuevos. ${attachment ? "Ficha adjunta y compartida entre las variantes." : "Guardado local: la ficha no se ha adjuntado al servidor; requiere iniciar sesión."} Revisa los modelos y precios en el catálogo.`,
-      );
-      setError(null);
+      await attachImportedDatasheet(imported, file, controller.signal);
+      if (request !== generation.current) return;
+      setAttachmentPending(false);
+      setSaved(`${imported.updated} actualizados y ${imported.created} nuevos guardados localmente. Ficha adjunta; los cambios del catálogo se sincronizarán con el servidor.`);
     } catch (cause) {
-      if (request === generation.current && session === useSimulationStore.getState().sessionGeneration)
-        setError(cause instanceof Error ? cause.message : "No se pudo guardar el catálogo.");
+      if (request !== generation.current || imported.session !== useSimulationStore.getState().sessionGeneration) return;
+      setAttachmentPending(true);
+      setError(`Los equipos ya están guardados en este dispositivo. No se pudo adjuntar la ficha al servidor. ${controller.signal.aborted ? "La conexión tardó demasiado." : cause instanceof Error ? cause.message : "Revisa la conexión."} Puedes reintentar solo el adjunto o volver al catálogo. Si cierras, podrás seleccionar la ficha desde la edición del equipo.`);
     } finally {
+      clearTimeout(timeout);
       if (request === generation.current) setBusy(false);
+    }
+  };
+  const save = () => {
+    if (!data || !canEdit || busy || !file || receipt) return;
+    setError(null);
+    try {
+      const imported = saveDatasheetLocally(data);
+      setReceipt(imported);
+      setSaved(`${imported.updated} actualizados y ${imported.created} nuevos guardados en este dispositivo. ${imported.userId ? "Pendientes de sincronizar cuando el servidor esté disponible." : "Sin cuenta: la ficha no se adjunta al servidor."}`);
+      if (imported.userId) {
+        setAttachmentPending(true);
+        void attach(imported);
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No se pudo guardar el catálogo.");
     }
   };
   const count = data?.variants.filter((v) => v.selected).length || 0;
@@ -350,6 +317,28 @@ export const AIDatasheetScannerModal: React.FC = () => {
             </button>
           </div>
         </header>
+        {(error || saved) && (
+          <div className="shrink-0 max-h-48 overflow-y-auto space-y-2 px-5 pt-4">
+          {error && (
+            <p
+              role="alert"
+              className={`flex gap-2 rounded-lg p-3 text-sm ${dark ? "bg-rose-950 text-rose-100" : "bg-rose-50 text-rose-800"}`}
+            >
+              <AlertCircle size={18} className="shrink-0" />
+              {error}
+            </p>
+          )}
+          {saved && (
+            <p
+              role="status"
+              className={`flex gap-2 rounded-lg p-3 text-sm ${dark ? "bg-emerald-950 text-emerald-100" : "bg-emerald-50 text-emerald-900"}`}
+            >
+              <Check size={18} className="shrink-0" />
+              {saved}
+            </p>
+          )}
+          </div>
+        )}
         <main className="flex-1 space-y-5 overflow-y-auto p-5">
           {!geminiApiKey && (
             <p
@@ -410,7 +399,7 @@ export const AIDatasheetScannerModal: React.FC = () => {
             </p>
           )}
           {data && (
-            <>
+            <fieldset disabled={busy || !!receipt} className="space-y-5 min-w-0">
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="text-sm font-medium">
                   Fabricante
@@ -630,25 +619,7 @@ export const AIDatasheetScannerModal: React.FC = () => {
                   </section>
                 ))}
               </div>
-            </>
-          )}
-          {error && (
-            <p
-              role="alert"
-              className={`flex gap-2 rounded-lg p-3 text-sm ${dark ? "bg-rose-950 text-rose-100" : "bg-rose-50 text-rose-800"}`}
-            >
-              <AlertCircle size={18} className="shrink-0" />
-              {error}
-            </p>
-          )}
-          {saved && (
-            <p
-              role="status"
-              className={`flex gap-2 rounded-lg p-3 text-sm ${dark ? "bg-emerald-950 text-emerald-100" : "bg-emerald-50 text-emerald-900"}`}
-            >
-              <Check size={18} className="shrink-0" />
-              {saved}
-            </p>
+            </fieldset>
           )}
           {!canEdit && (
             <p className="text-sm">
@@ -662,7 +633,16 @@ export const AIDatasheetScannerModal: React.FC = () => {
           <button className={secondary} onClick={closeAIDatasheetModal}>
             {saved ? "Volver al catálogo" : "Cerrar"}
           </button>
-          {data ? (
+          {receipt ? (
+            <div className="flex items-center gap-3 text-sm" role="status">
+              <span>{busy ? "Guardado local · Adjuntando ficha…" : "Equipos guardados localmente"}</span>
+              {attachmentPending && !busy && canEdit && (
+                <button type="button" className={secondary} onClick={() => void attach(receipt)}>
+                  Reintentar adjunto
+                </button>
+              )}
+            </div>
+          ) : data ? (
             <button
               type="button"
               onClick={save}
