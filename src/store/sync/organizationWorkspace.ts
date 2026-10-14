@@ -37,8 +37,10 @@ export type OrganizationWorkspace = Pick<
   SimulationStore,
   (typeof keys)[number]
 >;
+// Cached identity keeps the offline workspace selected even when its token expires.
+// Only explicit logout (no currentUser) returns to the personal local workspace.
 export const workspaceScope = (session: SyncSettings): string =>
-  session.currentUser && session.authToken
+  session.currentUser
     ? featureScope(session.serverUrl, session.currentUser.organizationId)
     : "local";
 export function captureWorkspace(

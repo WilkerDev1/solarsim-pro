@@ -321,10 +321,12 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
       ensureCurrent();
       if (!equipment.success) throw new Error(`Proyectos procesados; catálogo pendiente: ${equipment.message}`);
       const pendingConfirmations = get().projects.filter(project => project.pendingCanonicalAck && ownsProject(project, serverUrl, currentUser.organizationId)).length;
+      const unresolvedConflicts = get().projects.filter(project => project.syncStatus === 'conflict' && ownsProject(project, serverUrl, currentUser.organizationId)).length;
+      conflicts = Math.max(conflicts, unresolvedConflicts);
       const message = !folders.success ? `Proyectos descargados; carpetas pendientes: ${folders.message}` : pendingConfirmations ? `${pendingConfirmations} documento(s) guardados en la nube, pendientes de verificar. Vuelve a sincronizar.` : deletionErrors ? `${deletionErrors} eliminación(es) pendientes de confirmar; otros proyectos procesados.` : conflicts ? `${conflicts} proyecto(s) requieren resolver conflictos.` : 'Sincronización completada.';
       set((state) => ({ isSyncing: false, syncFeedbackMessage: silent ? null : message, syncSettings: { ...state.syncSettings, lastSyncTimestamp: deletionErrors ? state.syncSettings.lastSyncTimestamp : pull.serverTimestamp || state.syncSettings.lastSyncTimestamp } }));
-      if (get().projects.some((project) => project.syncStatus === 'pending' && !project.pendingCanonicalAck && ownsProject(project, serverUrl, currentUser.organizationId)) || (!deletionErrors && get().projectDeletionQueue.some((command) => command.scope === scope))) get().triggerAutoSync();
-      return { success: conflicts === 0 && deletionErrors === 0 && pendingConfirmations === 0, message };
+      if (folders.success && (get().projects.some((project) => project.syncStatus === 'pending' && !project.pendingCanonicalAck && ownsProject(project, serverUrl, currentUser.organizationId)) || (!deletionErrors && get().projectDeletionQueue.some((command) => command.scope === scope)))) get().triggerAutoSync();
+      return { success: folders.success && conflicts === 0 && deletionErrors === 0 && pendingConfirmations === 0, message };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'No se pudo sincronizar.';
       if (session.isCurrent()) set({ isSyncing: false, syncFeedbackMessage: message });

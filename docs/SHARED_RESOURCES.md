@@ -39,3 +39,23 @@ El perfil compartido y el membrete principal se sincronizan por organización co
 ## Verificación y operación
 
 Las pruebas usan transportes sintéticos y PostgreSQL efímero. No deben escribir en producción. Gates obligatorios: frontend lint/test/build, build Electron, test/build API y test/build Worker. Los cambios estructurales requieren regenerar Repomix. Para despliegue, usar el contexto raíz del repositorio, respaldo y procedimientos de [infraestructura](INFRASTRUCTURE_ARCHITECTURE.md).
+
+## Copia offline y reconciliación de carpetas (2026-10-14)
+
+Las definiciones, asignaciones de propuestas y cambios pendientes se conservan en el almacenamiento durable del escritorio por servidor/organización. Un fallo de red no sustituye ese caché por una lista vacía. La identidad empresarial guardada mantiene seleccionado su espacio aunque expire el token; las solicitudes siguen requiriendo autenticación y cerrar sesión explícitamente vuelve al espacio personal. Con sincronización automática activa, recuperar conexión, enfocar la aplicación y el ciclo periódico intentan reconciliar cambios.
+
+La carpeta y empresa emisora son contenido versionado de la propuesta: una edición que solo mueve una propuesta no se interpreta como una confirmación perdida. Una propuesta confirmada adopta la carpeta canónica del servidor, incluso cuando fue retirada; aceptar nube restaura ese mismo documento completo y conserva previamente el contenido local en historial. Los conflictos pendientes o fallos de carpetas impiden informar sincronización completa. Los fallos de carpetas esperan el siguiente intento periódico/manual sin iniciar un bucle inmediato de reintentos.
+
+La recuperación de una confirmación de carpeta perdida exige contenido editable idéntico al descargado. Si una creación local sin confirmación difiere de la carpeta ya publicada, se conserva como conflicto para aceptar nube o rebasar explícitamente; no se descarta en silencio.
+
+### Evidencia y límite de recuperación histórica
+
+En la revisión de solo lectura del servidor del 14 de octubre se observaron API 2.3.2 saludable, 53 propuestas, dos carpetas activas y cinco propuestas activas con referencias a dos IDs de carpeta ausentes en `project_folders`. Los módulos compilados desplegados de carpetas y proyectos coincidían por SHA-256 con esta rama. No se modificó producción ni se necesitó desplegar esas rutas para corregir la reconciliación del cliente.
+
+Las referencias históricas sin definición no permiten inferir nombre, privacidad ni `hideFromGeneral`. Deben recuperarse de un dispositivo o respaldo que conserve la definición original, publicar esa definición con su mismo ID y ámbito y después reconciliar. No crear nombres supuestos, mezclar organizaciones ni quitar automáticamente esas asignaciones. La migración de carpetas locales existentes conserva sus IDs al publicarlas.
+
+La regresión `testOfflineFolderSync.ts` ejercita almacenamiento Zustand real, recarga sin red, token vencido, reconexión, movimiento como único cambio, adopción de carpeta remota, aceptación de nube con checkpoint, estado de error y confirmaciones perdidas. Las pruebas usan únicamente transporte sintético; las integraciones API emplean PostgreSQL efímero.
+
+El usuario confirmó que las carpetas antiguas ya no aparecen en ningún equipo. El caché local de escritorio revisado tampoco conservaba esas dos definiciones. El único dump encontrado en `/home/agente/backups` era previo a la migración de recursos compartidos y su índice no contiene `project_folders`; no se restauró ni modificó la base productiva para esta consulta. La recuperación histórica continúa limitada por esa ausencia de metadatos.
+
+Validación de la corrección: lint, 47 suites de cliente, 32 integraciones API, suites Worker, builds frontend/Electron/API/Worker, empaquetado de contexto y `git diff --check` satisfactorios. Se añadió además una regresión de dos escritores donde una nueva edición remota posterior a «Enviar mis cambios» vuelve a producir conflicto CAS y conserva el trabajo local. Estos resultados verifican el código corregido; el cliente instalado en cada PC requiere actualizarse para usarlos.

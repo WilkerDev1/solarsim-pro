@@ -31,11 +31,11 @@ export function reconcilePulledProjects(local: ProjectSimulation[], remote: Proj
     }
     if ((project.syncStatus === 'pending' || project.syncStatus === 'conflict') && ownsProject(project, serverUrl, organizationId) && Number.isSafeInteger(server.version) && server.version! >= (project.baseVersion ?? 0) && projectDifferences(server, project).length === 0) {
       // A lost/legacy ACK is recoverable only after an authoritative, identical read.
-      next.push({ ...server, organizationId, syncServerUrl: serverUrl, baseVersion: server.version, folderId: project.folderId ?? server.folderId, syncStatus: 'synced' });
+      next.push({ ...server, organizationId, syncServerUrl: serverUrl, baseVersion: server.version, syncStatus: 'synced' });
     } else if (project.syncStatus === 'pending' || project.syncStatus === 'conflict') {
       next.push({ ...project, organizationId, syncServerUrl: serverUrl, baseVersion: project.baseVersion ?? project.version ?? 1 });
     } else {
-      next.push({ ...server, organizationId, syncServerUrl: serverUrl, baseVersion: server.version ?? 1, folderId: project.folderId ?? server.folderId, syncStatus: 'synced' });
+      next.push({ ...server, organizationId, syncServerUrl: serverUrl, baseVersion: server.version ?? 1, syncStatus: 'synced' });
     }
   }
   for (const project of remoteMap.values()) {
@@ -67,7 +67,7 @@ export function acknowledgeProjectPush(fresh: ProjectSimulation[], sent: Project
     }
     // Identity of immutable documents detects changes even within one millisecond.
     if (project !== captured) return { ...project, id: result.id, organizationId, syncServerUrl: serverUrl, version: result.version, baseVersion: result.version, syncStatus: 'pending' };
-    return { ...project, ...result.project, id: result.id, organizationId, syncServerUrl: serverUrl, folderId: project.folderId, pendingCanonicalAck: undefined, version: result.version, baseVersion: result.version, syncStatus: 'synced' };
+    return { ...project, ...result.project, id: result.id, organizationId, syncServerUrl: serverUrl, folderId: result.project?.folderId, pendingCanonicalAck: undefined, version: result.version, baseVersion: result.version, syncStatus: 'synced' };
   });
   return { projects, idChanges, conflicts };
 }
