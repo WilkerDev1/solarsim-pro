@@ -2,9 +2,15 @@
 
 Trabajar funcionalidades en beta o rama codex/ desde beta; main recibe publicación aprobada. La versión oficial se consulta en GitHub Releases; el parche 2.3.1 incorpora las correcciones auditadas del 7 de octubre; las betas se prueban con npm run dev y los gates de código, sin generar instaladores automáticamente; consultar [plan de beta y rollback](BETA_ROLLOUT.md).
 
+## Publicación 2.6.0
+
+[2.6.0](https://github.com/WilkerDev1/solarsim-pro/releases/tag/v2.6.0) es la versión estable Latest. El tag fija `cdc3772820e88003ffed3a4076ecd69166307bae`; [Actions 38913577753](https://github.com/WilkerDev1/solarsim-pro/actions/runs/38913577753) aprobó contratos, compilación e instalación/arranque nativos Windows/Linux. Los paquetes Linux y manifiestos están firmados con la clave GPG fijada, y los 20 assets remotos se verificaron por tamaño y SHA256 antes de publicar.
+
+Desarrollo integrado en beta (PR #9) y beta en main (PR #10), conservando las ramas. API desplegada en 2.6.0 y visor actualizado tras ensayo de respaldo/restauración aislado. [Entrega y estado operativo](RELEASE_2_6_0.md) registra también la pérdida posterior de conectividad de pve01: la comprobación pública de API debe repetirse al recuperar el host. [Notas](../release/release-notes-v2.6.0.md) detallan proveedores, familias de propuestas, reportes comerciales, logos independientes y correcciones de sincronización/importación.
+
 ## Publicación 2.5.1
 
-[2.5.1](https://github.com/WilkerDev1/solarsim-pro/releases/tag/v2.5.1) es la versión estable Latest. El tag fija `3e2e441a6c6a4817deab8a4326f7b169f0201aee`; [Actions 38599799763](https://github.com/WilkerDev1/solarsim-pro/actions/runs/38599799763) aprobó contratos y empaquetado/pruebas nativas Windows/Linux. Se verificaron firmas fijadas GPG, hashes y tamaños; los 20 assets remotos coincidieron con los archivos locales antes de publicar.
+[2.5.1](https://github.com/WilkerDev1/solarsim-pro/releases/tag/v2.5.1) es una versión estable anterior. El tag fija `3e2e441a6c6a4817deab8a4326f7b169f0201aee`; [Actions 38599799763](https://github.com/WilkerDev1/solarsim-pro/actions/runs/38599799763) aprobó contratos y empaquetado/pruebas nativas Windows/Linux. Se verificaron firmas fijadas GPG, hashes y tamaños; los 20 assets remotos coincidieron con los archivos locales antes de publicar.
 
 Beta se integró en main sin eliminar beta. La API de app-server se alineó a 2.5.1 tras restaurar un dump reciente en PostgreSQL aislado y verificar integridad/conteos; solo se reemplazó API. [Entrega y rollback](RELEASE_2_5_1.md) registra la revisión, el checkpoint privado, evidencias y límites. [Notas](../release/release-notes-v2.5.1.md) describen BESS/costos, catálogo/datasheets y sincronización offline. Windows sigue sin Authenticode.
 
