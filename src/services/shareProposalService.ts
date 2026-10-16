@@ -1,3 +1,4 @@
+import { webHeaderLogo } from '../utils/documentLogo';
 import { fetchWithSessionRetry } from './syncService';
 import { ProjectSimulation, FinancialSummaryResult } from '../types';
 import { ELECTSUN_LOGO_COLOR_BASE64 } from '../assets/electsunLogo';
@@ -233,8 +234,9 @@ export class ShareProposalService {
           companyRnc: project.customization?.companyRnc,
           companyWebsite: project.customization?.companyWebsite,
           companyInstagram: project.customization?.companyInstagram,
-          headerLogoBase64: project.customization?.headerLogoBase64 || project.customization?.coverLogoBase64 || ELECTSUN_LOGO_COLOR_BASE64,
-          coverLogoBase64: project.customization?.coverLogoBase64 || project.customization?.headerLogoBase64 || ELECTSUN_LOGO_COLOR_BASE64,
+          webHeaderLogoBase64: webHeaderLogo(project.customization || {}) || "",
+          headerLogoBase64: webHeaderLogo(project.customization || {}) || "",
+          coverLogoBase64: project.customization?.coverLogoBase64 ?? ELECTSUN_LOGO_COLOR_BASE64,
           contactName: project.customization?.contactName,
           clientPhone: project.customization?.clientPhone,
           clientEmail: project.customization?.clientEmail,

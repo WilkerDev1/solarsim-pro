@@ -92,7 +92,7 @@ export const App: React.FC = () => {
 
       {/* 🖼️ 2. Contenedor Principal con Header Adaptativo y Vistas */}
       <div className="flex-1 flex flex-col h-full overflow-hidden min-w-0" aria-hidden={isSettingsModalOpen || undefined} {...(isSettingsModalOpen ? { inert: '' } : {})}>
-        {(activeView === 'simulator' || activeView === 'pdf-preview') && <Header />}
+        {(activeView === 'project-hub' || activeView === 'simulator' || activeView === 'pdf-preview') && <Header />}
 
         <main className="flex-1 flex overflow-hidden min-h-0 w-full">
           <ErrorBoundary onReset={() => setActiveView('dashboard')}>

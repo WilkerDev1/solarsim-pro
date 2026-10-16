@@ -131,14 +131,15 @@ export const Header: React.FC = () => {
                       ? 'text-zinc-400 hover:text-zinc-100'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
-                  title="Ver resumen y hub del proyecto"
+                  title="Ver resumen de la propuesta" aria-current={activeView === 'project-hub' ? 'page' : undefined}
                 >
                   <FolderKanban className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Hub</span>
+                  <span>Resumen</span>
                 </button>
 
                 <button
                   onClick={() => setActiveView('simulator')}
+                  aria-current={activeView === 'simulator' ? 'page' : undefined}
                   className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     activeView === 'simulator'
                       ? isDark
@@ -155,6 +156,7 @@ export const Header: React.FC = () => {
 
                 <button
                   onClick={() => setActiveView('pdf-preview')}
+                  aria-current={activeView === 'pdf-preview' ? 'page' : undefined}
                   className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     activeView === 'pdf-preview'
                       ? isDark

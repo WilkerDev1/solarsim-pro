@@ -51,3 +51,15 @@ El asistente general flotante es una función experimental local y apagada por d
 Activar almacenamiento confirma al menos una unidad real; conserva cantidades positivas previas. La cantidad del editor refleja el estado usado por el motor. Aplicar ofertas actualiza también el grupo principal de equipos cuando hay múltiples modelos. Cambiar ofertas invalida los totales financieros manuales antiguos fuera del benchmark, igual que editar parámetros. El cálculo financiero y la diferencia entre recargo sobre costo y margen sobre venta conservan sus contratos.
 
 El importador permite elegir si vincular el documento escaneado a los equipos creados/actualizados. Guardar el catálogo sigue siendo local primero; vincular requiere cuenta y conexión, con reintento del adjunto independiente. En anexos PDF se detectan coincidencias exactas del catálogo entre equipos activos, se deduplican documentos y se ofrece adjuntarlos. Las fichas de imagen no se añaden como PDF. Un segundo dispositivo puede recuperar el binario sin duplicar la metadata. Cambiar de propuesta o sesión durante una descarga impide aplicar su resultado.
+
+### Resumen y seguimiento comercial (2026-10-15)
+
+Resumen, Simulador y Propuesta PDF comparten navegación sobre la propuesta activa. El estado comercial (en espera, aprobada, rechazada o de prueba) es independiente del estado documental y de la sincronización. Se modifica directamente en tarjetas/lista; el resumen y su sección Finanzas permiten guardar responsable y nota interna. Inicio filtra por decisión y compara propuestas aprobadas por responsable, excluyendo pruebas y papelera. Los importes son cotizaciones actuales, no ingresos cobrados. [Contrato de seguimiento y compatibilidad API](PROPOSAL_COMMERCIAL_TRACKING.md).
+
+### Ofertas, logotipos y propuestas relacionadas (2026-10-15)
+
+Ofertas de un equipo usa un diálogo con lista o formulario, sin superponer un aviso vacío al editor. Permite seleccionar un proveedor existente, registrar precio USD, disponibilidad, SKU y notas; comprueba cambios concurrentes y muestra el resultado local del guardado. Los controles respetan permisos y conflictos.
+
+El dock PDF separa logotipo de encabezado PDF y web. El primero puede ser blanco sobre fondo oscuro; el segundo a color sobre fondo blanco. Tienen carga/restauración independientes y pasan a la plantilla y snapshot del documento. Publicaciones nuevas nunca toman el logo del encabezado PDF como respaldo web: usan el web específico, el de portada o el predeterminado a color. Los enlaces ya publicados conservan su snapshot. La API/Worker de esta revisión debe desplegarse antes de usar todas las protecciones nuevas.
+
+Inicio conserva familias de propuestas independientes con línea de color y sangría; clic derecho/Shift+F10 abre su organización. Enlazar por arrastre requiere mantener y soltar sobre la propuesta destino. El seguimiento conserva un estado actual y múltiples reportes históricos fechados; el más reciente queda abierto y los anteriores se expanden por separado. No se añadieron métricas ni filtros históricos futuros. [Contrato](PROPOSAL_COMMERCIAL_TRACKING.md).

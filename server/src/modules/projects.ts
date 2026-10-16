@@ -1,3 +1,10 @@
+import { isProposalLink } from "../../../shared/proposalLinks.js";
+import {
+  commercialCopy,
+  isProposalCommercial,
+  reportContent,
+} from "../../../shared/proposalCommercial.js";
+import { resolveMembership } from "../membership.js";
 import { lockCurrentMembership } from "../membership.js";
 import { readObjectBody } from "../request.js";
 import type { Hono } from "hono";
@@ -6,6 +13,7 @@ import {
   canonicalProject,
   checkpoint,
   hardDelete,
+  isLegacyCommercialReport,
   lockOrganization,
   saveProject,
   type ProjectRow,
@@ -82,13 +90,22 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
         await client.query("ROLLBACK");
         return c.json({ error: "La sesión o los permisos cambiaron" }, denied);
       }
-      for (const input of [...projects].sort((a, b) =>
-        a.id.localeCompare(b.id),
-      )) {
-        // Also serialize an unused global ID across tenants, preventing concurrent insert races.
+      // Lock IDs in a stable order across tenants, then publish parents before their children.
+      const ordered = [...projects].sort((a, b) => a.id.localeCompare(b.id));
+      for (const input of ordered)
         await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
           `solarsim-project-id:${input.id}`,
         ]);
+      const rank = (input: any, seen = new Set<string>()): number => {
+        if (seen.has(input.id)) return 0;
+        seen.add(input.id);
+        const parent = ordered.find(
+          (p) => p.id === input.proposalLink?.parentId,
+        );
+        return parent ? 1 + rank(parent, seen) : 0;
+      };
+      ordered.sort((a, b) => rank(a) - rank(b) || a.id.localeCompare(b.id));
+      for (const input of ordered) {
         const existing = (
           await client.query<ProjectRow>(
             "SELECT * FROM projects WHERE id=$1 FOR UPDATE",
@@ -130,6 +147,106 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
           conflict("organization_mismatch");
           continue;
         }
+        if (input.commercial !== undefined) {
+          if (!isProposalCommercial(input.commercial)) {
+            conflict("invalid_commercial", existing);
+            continue;
+          }
+          // A legacy proposal already attributes ownership to its stored author.
+          // Preserve that identity on first migration, even after deactivation.
+          const previousOwnerId = existing?.data_json.commercial
+            ? existing.data_json.commercial.ownerId
+            : existing?.created_by_id;
+          if (
+            input.commercial.ownerId &&
+            input.commercial.ownerId !== previousOwnerId &&
+            !(await resolveMembership(
+              client,
+              input.commercial.ownerId,
+              user.organizationId,
+            ))
+          ) {
+            conflict("invalid_commercial_owner", existing);
+            continue;
+          }
+        }
+        if (input.commercial?.reports) {
+          const prior = existing?.data_json.commercial?.reports || [];
+          const invalid = input.commercial.reports.some(
+            (report: any) =>
+              report.projectId !== input.id ||
+              prior.some(
+                (old: any) =>
+                  old.id === report.id &&
+                  JSON.stringify(reportContent(old)) !==
+                    JSON.stringify(reportContent(report)),
+              ),
+          );
+          if (
+            invalid ||
+            new Set(
+              [...prior, ...input.commercial.reports].map(
+                (report: any) => report.id,
+              ),
+            ).size > 500
+          ) {
+            conflict("invalid_commercial_report", existing);
+            continue;
+          }
+          let invalidOwner = false;
+          for (const report of input.commercial.reports)
+            if (
+              report.ownerId &&
+              !prior.some((old: any) => old.id === report.id) &&
+              !isLegacyCommercialReport(report, existing) &&
+              !(await resolveMembership(
+                client,
+                report.ownerId,
+                user.organizationId,
+              ))
+            )
+              invalidOwner = true;
+          if (invalidOwner) {
+            conflict("invalid_commercial_owner", existing);
+            continue;
+          }
+        }
+        if (input.proposalLink !== undefined) {
+          if (!isProposalLink(input.proposalLink)) {
+            conflict("invalid_proposal_link", existing);
+            continue;
+          }
+          let cursor = input.proposalLink.parentId;
+          const visited = new Set([input.id]);
+          let invalid = false;
+          while (cursor) {
+            if (visited.has(cursor) || visited.size > 50) {
+              invalid = true;
+              break;
+            }
+            visited.add(cursor);
+            const parent = (
+              await client.query<ProjectRow>(
+                "SELECT * FROM projects WHERE id=$1 AND organization_id=$2",
+                [cursor, user.organizationId],
+              )
+            ).rows[0];
+            if (!parent || parent.is_deleted) {
+              if (
+                input.proposalLink.parentId ===
+                existing?.data_json.proposalLink?.parentId
+              )
+                break;
+              invalid = true;
+              break;
+            }
+            cursor = parent.data_json.proposalLink?.parentId;
+          }
+          if (invalid) {
+            conflict("invalid_proposal_link", existing);
+            continue;
+          }
+        }
         // Unknown legacy local folders remain compatible until they are published.
         // Known server folders must belong to this tenant and remain accessible.
         if (input.folderId != null) {
@@ -170,6 +287,8 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
             ...input,
             id,
             forceNewVersion: false,
+            commercial: commercialCopy(input, user),
+            proposalLink: { parentId: input.id },
           });
           results.push({
             id,
@@ -431,7 +550,13 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
       const project = await saveProject(
         client,
         user,
-        { ...snapshot.data_json, id: row.id, isDeleted: row.is_deleted },
+        {
+          ...snapshot.data_json,
+          commercial: row.data_json.commercial,
+          proposalLink: row.data_json.proposalLink,
+          id: row.id,
+          isDeleted: row.is_deleted,
+        },
         row,
       );
       await client.query("COMMIT");

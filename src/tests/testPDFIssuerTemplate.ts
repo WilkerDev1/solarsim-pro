@@ -3,7 +3,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { useSimulationStore } from '../store/useSimulationStore';
 import { DEFAULT_LOCAL_COMPANY } from '../types/companyProfile';
-import { documentLogo } from '../utils/documentLogo';
+import { documentLogo, webHeaderLogo } from '../utils/documentLogo';
 import { PDFCoverPage } from '../components/pdf/pages/PDFCoverPage';
 import { PDFHeaderBanner } from '../components/pdf/PDFHeaderBanner';
 import { companyDocumentCustomization } from '../utils/companyDocumentTemplate';
@@ -16,7 +16,7 @@ const issuerA = { ...DEFAULT_LOCAL_COMPANY, id: 'issuer-a', name: 'Empresa A', a
 const issuerB = { ...DEFAULT_LOCAL_COMPANY, id: 'issuer-b', name: 'Empresa B', address: 'Perfil B' };
 useSimulationStore.setState({ companies: [issuerA, issuerB], activeCompanyId: issuerA.id, projects: [], activeProjectId: '', documentTemplatesByCompany: {} });
 store().createNewProject('Cliente original');
-store().updateDocumentCustomization({ companyName: 'Empresa A S.R.L.', companyFooterText: 'Dirección completa A | contacto A', companyPhone: '+1 809 123 4567', companyWebsite: 'empresa-a.example', companyInstagram: 'empresa_a', companySlogan: 'El lema exclusivo A', aboutUsIntroText: 'Presentación de A', coverLogoBase64: 'data:image/png;base64,YQ==', headerLogoBase64: 'data:image/png;base64,Yg==', contactName: 'Contacto privado', clientEmail: 'privado@example.test', quoteDate: '2020-01-01' });
+store().updateDocumentCustomization({ companyName: 'Empresa A S.R.L.', companyFooterText: 'Dirección completa A | contacto A', companyPhone: '+1 809 123 4567', companyWebsite: 'empresa-a.example', companyInstagram: 'empresa_a', companySlogan: 'El lema exclusivo A', aboutUsIntroText: 'Presentación de A', coverLogoBase64: 'data:image/png;base64,YQ==', headerLogoBase64: 'data:image/png;base64,Yg==', webHeaderLogoBase64: 'data:image/png;base64,d2Vi', contactName: 'Contacto privado', clientEmail: 'privado@example.test', quoteDate: '2020-01-01' });
 const original = structuredClone(store().getActiveProject());
 // The edited document's issuer wins even if another company is selected.
 store().setActiveCompany(issuerB.id);
@@ -34,7 +34,7 @@ store().setActiveCompany(issuerA.id);
 await new Promise(resolve => setTimeout(resolve, 5));
 store().createNewProject('Cliente nuevo');
 const next = store().getActiveProject();
-for (const key of ['companyName', 'companyFooterText', 'companyPhone', 'companyWebsite', 'companyInstagram', 'coverLogoBase64', 'headerLogoBase64'] as const) {
+for (const key of ['companyName', 'companyFooterText', 'companyPhone', 'companyWebsite', 'companyInstagram', 'coverLogoBase64', 'headerLogoBase64', 'webHeaderLogoBase64'] as const) {
   assert.equal(next.customization?.[key], original.customization?.[key], key);
 }
 assert.notEqual(next.customization?.contactName, 'Contacto privado');
@@ -90,3 +90,14 @@ assert.equal(store().documentTemplatesByCompany, beforeAmbiguousSave);
 store().resetDefaultDocumentCustomization();
 assert.equal(store().documentTemplatesByCompany, beforeAmbiguousSave);
 console.log('PDF issuer templates, isolation, persistence and cover rendering passed.');
+
+const independentLogos={headerLogoBase64:'pdf-white',coverLogoBase64:'cover-color',webHeaderLogoBase64:'web-color'};
+assert.equal(documentLogo(independentLogos,'header'),'pdf-white');
+assert.equal(webHeaderLogo(independentLogos),'web-color');
+assert.equal(webHeaderLogo({...independentLogos,headerLogoBase64:'different-white'}),'web-color');
+assert.equal(webHeaderLogo({headerLogoBase64:'pdf-white',coverLogoBase64:'cover-color'}),'cover-color');
+assert.notEqual(webHeaderLogo({headerLogoBase64:'pdf-white'}),'pdf-white');
+
+assert.equal(webHeaderLogo({ headerLogoBase64: 'pdf-white', coverLogoBase64: '', webHeaderLogoBase64: '' }), undefined);
+assert.equal(webHeaderLogo({ headerLogoBase64: 'pdf-white', coverLogoBase64: '' }), undefined);
+assert.equal(restored.documentTemplatesByCompany[issuerA.id].webHeaderLogoBase64, 'data:image/png;base64,d2Vi');

@@ -1,6 +1,6 @@
 ---
 name: SolarSim Pro — Centro empresarial
-description: Sistema operativo de formularios y equipos, extendido desde Dashboard y Ajustes; asistente IA e inventario conservan el mundo heredado.
+description: Sistema operativo de formularios y equipos, extendido desde Dashboard y Ajustes; asistente IA, inventario y resumen comercial conservan el mundo heredado.
 colors:
   cc-bg: "#f6f8fa"
   cc-panel: "#fff"
@@ -66,6 +66,16 @@ typography:
     fontFamily: "Inter, sans-serif"
     fontSize: "12px"
     fontWeight: 600
+  summary-metric:
+    fontFamily: "Inter, sans-serif"
+    fontSize: "23px"
+    fontWeight: 600
+    letterSpacing: "-.02em"
+  summary-metric-compact:
+    fontFamily: "Inter, sans-serif"
+    fontSize: "20px"
+    fontWeight: 600
+    letterSpacing: "-.02em"
 rounded:
   control: "8px"
   container: "12px"
@@ -144,6 +154,10 @@ La extensión conserva el mismo mundo Operate. La evidencia normativa adicional 
 
 La navegación del asistente reutiliza el dock principal completo, con su estado IA violeta heredado; no contiene una cabecera horizontal exterior. La fuente de ese patrón compartido es `src/components/layout/PrimaryIconDock.tsx`.
 
+### Extensión: resumen de propuesta y seguimiento comercial
+
+El resumen conserva el mundo Operate existente. La fuente adicional es `src/components/hub/project-summary.css`, `ProjectHubView.tsx`, `components/ProposalEnergyOverview.tsx`, `components/ProposalHistory.tsx`, `src/features/proposals/`, las vistas de tarjetas/lista de Dashboard y `common/Header.tsx`. Los roles locales `--ps-*` y `--pc-*` reutilizan los valores de fondo, panel, borde, texto, texto secundario y verde ya registrados; no crean otra identidad. El contrato concreto de esta superficie permanece en `.impeccable/surfaces/proposal-summary.md`.
+
 ## Colors
 
 Neutros fríos en claro, grafito en oscuro y un acento verde funcional. El frontmatter registra los valores literales de la implementación; los sufijos `-dark` describen sus equivalentes de tema, no una segunda identidad.
@@ -170,6 +184,10 @@ La revisión usa verde contextual para foco y pestaña activa; preparar/aplicar 
 
 Los enlaces de ficha e imágenes y la nota de conversión monetaria usan un verde más oscuro sobre blanco y más luminoso sobre grafito. La potencia del inversor conserva la misma equivalencia de contraste. Guardar e importar usan verde de acción con texto blanco y un hover más oscuro. Son variantes locales del catálogo; no sustituyen los roles `cc-*` ni `--pw-*`.
 
+### Extensión de resumen y decisión
+
+Aprobada usa verde contextual sobre fondo seleccionado; rechazada usa los roles de error. En espera y de prueba conservan selector neutro con texto explícito: el color no sustituye la decisión. El consumo del gráfico usa azul grisáceo y la generación verde, con leyenda y tabla mensual. Los literales locales de consumo se mantienen en el componente, sin incorporarlos como un acento global. La interfaz comercial distingue visualmente decisión, permisos y sincronización.
+
 ## Typography
 
 **Body Font:** Inter con fallback sans-serif. La misma familia se utiliza en títulos; no hay un display editorial independiente en esta superficie. Los códigos de invitación usan monospace nativo como datos técnicos, no como lenguaje de marca.
@@ -191,6 +209,10 @@ Los enlaces de ficha e imágenes y la nota de conversión monetaria usan un verd
 
 El asistente reutiliza texto operativo de (14px), títulos de sección de (16px), etiquetas de (13px) y contexto/nota de (12px). El encabezado local del modal usa (21px) y no redefine el título de pantalla del centro. Valores de consumo, cantidades y potencia usan numerales tabulares. El inventario mantiene nombre destacado y una línea secundaria de marca/modelo/tipo, sin convertir todo el catálogo en mayúsculas.
 
+### Extensión de cifras de resumen
+
+Las cuatro métricas repiten el rol `summary-metric`, con cifras tabulares, peso seminegrita y unidades subordinadas. El rol `summary-metric-compact` entra hasta (1150px); la defensa bajo (600px) reutiliza el tamaño de título de cabecera. Son roles de cifras del resumen, no nuevos tamaños para campos o navegación. Los títulos de sección conservan (16px/600), las etiquetas y botones (13px/550), las ayudas y cabeceras de tabla (12px). Los datos permanecen separados de sus unidades.
+
 ## Layout
 
 La cabecera ocupa (64px); el cuerpo separa navegación lateral y contenido con scroll propio. En escritorio amplio, la navegación mide (264px), el área principal usa padding (36px 40px) y el contenido se limita a (980px), centrado en el espacio disponible. Los formularios agrupan dos columnas iguales con separación de campo; dirección y campos largos pueden abarcar ambas columnas. Las acciones se alinean al final y permiten wrap.
@@ -209,6 +231,12 @@ El editor limita su ancho a (768px) y su altura a (90vh); cabecera, formulario d
 
 El importador de fichas limita su ancho a (896px) y su altura a (92vh); cabecera y pie rodean el contenido desplazable. Las variantes se separan con divisores, nombre y modelo se alinean en dos columnas y las especificaciones principales en cuatro columnas; la disposición defensiva reduce estas a dos. Más especificaciones se abre mediante un control de detalle. Estas dimensiones describen los diálogos locales y no amplían el mínimo de producto.
 
+### Resumen de propuesta y lista de inicio
+
+El resumen ocupa el espacio restante del shell y tiene scroll vertical propio, padding (28px 32px) y columnas de contenido flexible más seguimiento comercial (340px), con separación (24px). Las secciones usan padding (24px). Hasta (1150px), el padding general pasa a (24px), el panel lateral a (300px), la separación a (16px) y las secciones a (20px). Hasta (1000px), las columnas se apilan y seguimiento aparece primero; los campos de estado/responsable se alinean en dos columnas y la nota/acciones abarcan el ancho. Las cuatro métricas pasan a dos columnas. Bajo (600px), campos y datos descriptivos pasan a una columna; las pestañas permiten scroll horizontal. A partir de (1700px), el padding lateral crece alrededor de un contenido de referencia de (1500px). Estas defensas no amplían el mínimo Electron de (1024×700).
+
+Tarjetas y lista mantienen el selector comercial cerca de la identidad. El selector rápido reserva ancho entre (210px) y (230px), con altura mínima (36px); en lista, su celda reserva al menos (244px). La tabla admite desplazamiento horizontal y conserva ancho mínimo (760px), aumentado a (1120px) en el breakpoint `xl` de Tailwind (1280px). Bajo ese breakpoint, distribuidora/tipo/fecha aparecen bajo el documento en vez de ocupar columnas independientes. La decisión y sus acciones permanecen disponibles.
+
 ## Elevation & Depth
 
 La superficie empresarial usa capas tonales, bordes de un píxel y espacio. No hay sombras en sus formularios, controles o navegación. El foco es una señal de interacción: contorno de dos píxeles en verde contextual y offset de tres píxeles. No es elevación ornamental.
@@ -225,11 +253,17 @@ El asistente de ventana completa no tiene sombra exterior. Cabecera, pestañas, 
 
 **The Ofertas en contexto Rule.** Las ofertas de un modelo se editan en su misma sección, separadas por divisores horizontales; el contenedor agrupa la tarea sin añadir una tarjeta elevada por proveedor. El importador también separa variantes con divisores y reserva el fondo de aviso para coincidencias o resultados. La sombra pertenece al diálogo completo.
 
+### Extensión de resumen
+
+Las secciones técnicas, energéticas y comerciales permanecen planas, con borde fino y capas tonales. El foco visible usa contorno de dos píxeles con offset de dos; no expresa guardado ni sincronización. La cabecera compartida conserva su sombra tenue heredada para la vista activa; esa excepción de navegación no convierte los paneles del resumen en tarjetas elevadas.
+
 ## Shapes
 
 Los controles, avisos y elementos seleccionados usan esquinas de control; los formularios usan esquinas de contenedor. La tabla mantiene filas rectangulares separadas por líneas horizontales, sin cápsulas por celda. El contrato inicial hablaba de formas de 12px; el código final distingue deliberadamente contenedores de 12px y controles de 8px.
 
 La extensión IA usa una envolvente de ventana completa sin redondeo, controles y avisos de (8px), mensajes de conversación de (10px) y filas rectangulares con divisores. El inventario conserva filas de tabla; no añade cápsulas por modelo o métricas decorativas.
+
+El resumen conserva contenedores de (12px), controles de (8px), filas rectangulares y divisores horizontales. Sus pestañas redondean sólo las esquinas superiores; las barras energéticas tienen un pequeño remate superior propio del gráfico, no una nueva escala de contenedores.
 
 ## Components
 
@@ -303,6 +337,52 @@ La cabecera conserva el estilo operativo existente: padding (14px 16px), divisor
 
 La estructura y valores anteriores se contrastaron con código y fixtures locales. El finish reviewer emitió `ship` sobre cinco capturas a resolución nativa (1280×720, 1286×900 y mínimo 1024×700): `confirmed-light.jpg`, `equipment-dark-expanded.jpg`, `proposal-chat-light.jpg`, `proposal-minimum-dark.jpg` y `global-minimum-dark.jpg`, en `/tmp/solarsim-global-qa/`. `assets-preview.jpg` documenta además imagen y primera página PDF sintéticas después de corregir el iframe. La evidencia cubre esas superficies y estados de QA; solo se hicieron GET a archivos del servidor local, sin llamadas Gemini ni escrituras en producción. Las capturas son evidencia de prueba, no recursos del producto; los adjuntos empresariales y el modelo real quedan fuera de esta verificación.
 
+### Navegación de propuesta y secciones del resumen
+
+La cabecera compartida ofrece Resumen, Simulador y Propuesta PDF sobre la misma propuesta activa, con `aria-current=page`, texto y SVG. El resumen contiene su navegación local Vista general, Finanzas e Historial y versiones; fondo seleccionado y verde contextual identifican la sección activa. Finanzas presenta sus paneles y el seguimiento comercial explícito, sin repetir el selector segmentado del simulador. Ver documento y compartir quedan como acciones próximas a la identidad; las herramientas de edición/exportación PDF conservan su vista propia.
+
+### Resumen técnico, energía y finanzas
+
+Las cifras principales separan potencia instalada, precio cotizado, ahorro estimado del primer año y retorno simple estimado. El sistema propuesto usa tabla de modelo, cantidad y nominal unitario, con tipo subordinado. Balance energético combina totales anuales, gráfica de (240px), leyenda y detalle mensual desplegable; consumo y producción tienen nombre y unidades. Un texto accesible resume el gráfico. No se presenta cobertura energética como ahorro monetario. Finanzas usa pares etiqueta/valor y separa precio pagable, ITBIS, crédito fiscal e inversión neta; la aclaración fiscal acompaña los importes. Los cálculos vienen del motor y del modo energético efectivo.
+
+### Seguimiento comercial y resultados de inicio
+
+El selector rápido compartido entre tarjeta y lista cambia sólo la decisión; detener propagación evita abrir o arrastrar la propuesta al operarlo. Su nombre accesible identifica la propuesta y los errores aparecen junto al campo con semántica de alerta. El panel detallado separa el estado actual del registro de reportes. El selector actual sigue siendo independiente; cada reporte conserva estado, responsable, autor, fecha, identificador y nota propios. El formulario de nuevo reporte mantiene etiquetas visibles, separación de campos (16px), textarea redimensionable de al menos (100px), guardar y cancelar. La casilla explícita permite actualizar también el estado y responsable actuales; registrar un reporte no reescribe los anteriores. Los controles deshabilitados comunican solo lectura, conflicto o falta de permiso.
+
+**The Decisión independiente Rule.** Estado comercial, estado documental y sincronización se muestran por separado. Guardar un reporte confirma el equipo local y anuncia envío posterior al sincronizar; no presenta esa operación como confirmación del servidor. Las cifras aprobadas describen cotizaciones actuales y conservan esa aclaración junto a los resultados.
+
+Inicio ofrece filtros con estado presionado, etiqueta y contador. Resultados por responsable se abre mediante un detalle desplegable y usa tabla compacta de números tabulares con scroll horizontal. Su texto aclara el ámbito de búsqueda/carpeta, la exclusión de pruebas y papelera y el denominador de aprobación. Las propuestas de prueba conservan contador/filtro, pero no entran en la comparación comercial.
+
+### Historial local y límites de evidencia
+
+El historial se denomina local y separa las versiones con divisores, autor/fecha y acciones próximas: guardar, comparar y restaurar contenido. La comparación usa tabla con valores guardados y actuales; restaurar pide confirmación y explica que conserva el seguimiento comercial. Cambiar proyecto, espacio o sesión reinicia el ámbito de edición/comparación mediante claves de propietario; la documentación visual no sustituye las comprobaciones de permiso del store/API.
+
+La evidencia de acabado aportada para esta extensión está en `.impeccable/review/hub-{light,dark}-{1400,1024}.png`, `hub-finance.png`, `dashboard-cards.png`, `dashboard-list.png` y `dashboard-list-1024.png`. El revisor cerró en `ship` tras resolver anchura del selector/lista y selector duplicado de Finanzas. Este registro se contrastó con las fuentes construidas; no verifica un despliegue de servidor ni sincronización entre dispositivos y no amplía la evidencia a otros estados o al PDF.
+
+### Ofertas de un equipo: lista y editor excluyentes
+
+`SupplierPricesDetailModal.tsx` y `suppliers/equipment-offers.css` mantienen un diálogo nativo con los roles `--sp-*` de proveedores. Lista y editor ocupan alternativamente el mismo cuerpo; editar no abre otro modal ni deja una segunda lista debajo. La cabecera identifica equipo y precio de compra unitario USD; las filas separadas por divisores mantienen proveedor, importe, stock y acciones próximas. El formulario usa dos columnas, separación (20px), campos de al menos (40px) y notas a ancho completo. Volver a ofertas y cancelar protegen cambios sin guardar. Proveedor, precio positivo, duplicados y cambios concurrentes se validan antes de indicar guardado; el mensaje distingue persistencia local de sincronización pendiente.
+
+El diálogo mide hasta (720px), limitado al viewport menos (32px), con altura máxima (90vh), cabecera y pie propios y cuerpo desplazable. Bajo (600px), formulario y filas pasan a una columna. Los roles claros/oscuros equivalen a los neutros existentes; el pie usa la capa tenue de proveedores. Ofertas y organización de propuestas comparten sombra modal (`0 20px 64px #0004`) y backdrop (`#0008`); su radio local de (14px) no amplía la escala global de contenedores.
+
+### Logotipos de encabezado por destino
+
+`PDFDocumentDataEditor.tsx` conserva dos controles independientes: encabezado PDF, con vista previa sobre fondo oscuro, y encabezado web, con vista previa blanca para la versión a color. Ambos mantienen selección de archivo, cambiar y restaurar próximos a su vista previa, con nombres accesibles propios. La miniatura web contenida mide (96×48px). El texto explica que su cambio se aplica al publicar un enlace nuevo. Estos controles no extienden su tipografía compacta heredada ni rediseñan las páginas PDF.
+
+### Familias de propuestas y menú contextual
+
+`ProposalGroupControls.tsx`, `proposalGroups.ts` y `proposal-groups.css` reutilizan los neutros y el verde del mundo Operate. El menú se abre mediante clic derecho, gesto contextual del trackpad, tecla de menú o Shift+F10; dirige el foco a su acción y se descarta con Escape, Tab, clic exterior, scroll o cambio de tamaño. El diálogo ofrece principal, color editable y guardar/cancelar, con foco visible y errores próximos. Elegir otro principal muestra el color del destino; guardar ese enlace no cambia el color del grupo salvo una edición explícita del color.
+
+**The Familia visible Rule.** La línea de color de (3px) identifica parentesco entre propuestas y está solicitada expresamente; no es un adorno de selección ni un patrón para formularios ajenos. La lista añade sangría de (20px) por nivel, limitada a seis niveles; las tarjetas conservan el desplazamiento local de (16px) para vinculadas. Texto e icono distinguen Principal, Vinculada y Principal no disponible. Los colores editables de familia pertenecen al contenido organizado, no recolorean navegación o acciones. La jerarquía conserva los filtros: ordena coincidencias por familias sin reinsertar antecesores ocultos y mantiene el orden visible de las vinculadas.
+
+El arrastre espera (850ms) sobre destino antes de activar contorno, fondo contextual y «Soltar para enlazar»; sólo soltar después confirma el enlace. Salir del destino, Escape, fin del arrastre o perder foco cancela la preparación. El feedback permanece textual; hover y color no equivalen a un enlace guardado.
+
+### Reportes comerciales conservados
+
+`ProposalCommercialPanel.tsx` y `proposal-commercial.css` muestran primero el estado actual y después Reportes con contador y Nuevo reporte. El último reporte permanece abierto; los anteriores se consultan mediante detalles desplegables, con estado y fecha en el resumen. Nota preserva saltos de línea; responsable, autor e ID quedan en el cuerpo. Divisores finos y espaciado separan registros sin tarjetas anidadas. El formulario asigna ID y fecha al guardar; cancelar pide descartar si hay nota escrita. Una nota anterior se presenta como registro compatible cuando aún no existe colección de reportes. La colección persistida admite hasta (500); alcanzar ese límite deshabilita añadir, sin presentar los registros como actividad de servidor verificada.
+
+Esta actualización documental se basa en las fuentes construidas citadas. No atribuye revisión visual a las capturas nuevas de `.impeccable/review/four-updates/`, que no se abrieron en este registro, ni confirma despliegue o sincronización entre dispositivos. No añade seguimiento comercial a Finanzas del simulador.
+
 ## Do's and Don'ts
 
 ### Do:
@@ -323,3 +403,9 @@ La estructura y valores anteriores se contrastaron con código y fixtures locale
 No canonizado: las etiquetas nativas del selector de archivos en inglés, visibles en las capturas de QA, son una limitación de localización del artefacto, no una regla visual para nuevas superficies. Las capturas de QA no son assets de distribución.
 
 No canonizado en la extensión IA: 10/11px del editor de equipos heredado, observados por detector como tamaños fuera de rampa; no se convierten en pasos aprobados para nuevas pantallas. Las anotaciones de mes del gráfico local usan 11px; ese detalle no amplía la rampa tipográfica global. Tampoco se canonizan contenido ni controles de fixtures QA.
+
+No canonizado en resumen: el texto del selector rápido en tema oscuro (`#d0d7e0`) y la banda de hover del gráfico (`#2a3037`) son variantes locales observadas, no nuevos roles globales; los ticks de (11px) siguen siendo una limitación local de legibilidad del gráfico. Los tamaños de métricas (23px/20px) sí se registran por su uso repetido en cuatro cifras y su adaptación compacta, no para eliminar avisos del detector.
+
+No canonizado en las cuatro extensiones: radios modales locales de (14px), microtexto heredado del editor PDF y el ID de reporte a (11px) no amplían la rampa global. La línea familiar de (3px) es una excepción funcional solicitada expresamente, no un defecto ni una prohibición general.
+
+Las tarjetas de cada familia ocupan una columna y se apilan en orden principal/hijas, sin panel exterior adicional. La sangría permanece en cada hija; familias distintas comparten la cuadrícula existente. El pie del diálogo de ofertas mantiene Cancelar/Guardar visibles mientras se desplazan los campos.

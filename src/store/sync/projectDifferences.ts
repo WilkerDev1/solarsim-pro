@@ -1,3 +1,4 @@
+import { commercialContent, commercialState } from '../../../shared/proposalCommercial';
 import type { DiffFieldChange, ProjectSimulation } from '../../types';
 
 /** JSON semantics: object order is immaterial; array order is significant. */
@@ -6,8 +7,9 @@ export function contentEqual(left: unknown, right: unknown): boolean {
     : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => [key, canonical(item)])) : value;
   return JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
 }
-const sections = { client: 'Cliente', specs: 'Equipos', rates: 'Tarifas', financials: 'Finanzas', monthlyConsumption: 'Consumo mensual', customization: 'Documento', status: 'Estado', isDeleted: 'Papelera', folderId: 'Organización', companyProfileId: 'Empresa emisora' };
+const sections = { client: 'Cliente', specs: 'Equipos', rates: 'Tarifas', financials: 'Finanzas', monthlyConsumption: 'Consumo mensual', customization: 'Documento', status: 'Estado', isDeleted: 'Papelera', folderId: 'Organización', companyProfileId: 'Empresa emisora', commercial: 'Seguimiento comercial', proposalLink: 'Grupo de propuestas' };
 const labels: Record<string, string> = {
+  note: 'Nota comercial', ownerName: 'Responsable comercial', ownerId: 'Responsable (ID)',
   name: 'Nombre', address: 'Dirección', company: 'Empresa', projectId: 'Código de propuesta', province: 'Provincia', email: 'Correo electrónico', phone: 'Teléfono',
   panelCount: 'Cantidad de módulos', panelPowerW: 'Potencia del módulo (W)', hasBattery: 'Baterías', batteryCapacityKWh: 'Capacidad de baterías (kWh)', systemLosses: 'Pérdidas del sistema',
   energyCostPerKWh: 'Precio de energía', distributor: 'Distribuidora', tariffCode: 'Tarifa', currency: 'Moneda', exchangeRate: 'Tasa de cambio',
@@ -40,6 +42,7 @@ export function projectDifferences(server: ProjectSimulation, local: ProjectSimu
   };
   for (const [key, section] of Object.entries(sections)) {
     const field = key as keyof ProjectSimulation;
+    if (key === 'commercial') { visit(commercialContent(commercialState(server)), commercialContent(commercialState(local)), ['commercial'], section); continue; }
     visit(key === 'isDeleted' ? server.isDeleted === true : server[field], key === 'isDeleted' ? local.isDeleted === true : local[field], [key], section);
   }
   return differences;

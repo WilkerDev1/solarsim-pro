@@ -63,7 +63,7 @@ export function createApp(options: {
       return c.json({
         status: "ok",
         service: "SolarSim Pro Sync API",
-        version: "2.5.1",
+        version: "2.6.0",
         database: "connected",
       });
     } catch {

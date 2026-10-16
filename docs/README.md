@@ -2,9 +2,12 @@
 
 Las fuentes canónicas de esta rama son:
 
+- [Entrega 2.6.0](RELEASE_2_6_0.md): publicación de escritorio y actualización coordinada de API.
+
 - [Arquitectura modular](ARCHITECTURE.md): límites, dependencias y puntos de entrada.
 - [Funciones y modos de cálculo](APPLICATION_FEATURES.md): preferencia local, política de organización, compatibilidad y proyección experimental.
 - [Recursos compartidos](SHARED_RESOURCES.md): carpetas públicas/privadas, registro de propuestas web, ofertas y adjuntos de equipos.
+- [Resumen y seguimiento comercial](PROPOSAL_COMMERCIAL_TRACKING.md): decisiones del cliente, notas, responsables, filtros y resultados.
 - [Centro empresarial](COMPANY_CENTER.md): membretes, organizaciones independientes, equipos, aislamiento y despliegue.
 - [API y base de datos](DATABASE_AND_API_SPECIFICATION.md): autenticación, versiones, sincronización y migraciones.
 - [Motor financiero](FINANCIAL_ENGINE_SPECIFICATION.md) y [balance físico](ENERGY_BALANCE_AND_SELF_CONSUMPTION_SPECIFICATION.md): contratos matemáticos existentes; el balance físico requiere activar la función.

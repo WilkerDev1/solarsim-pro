@@ -1,3 +1,6 @@
+import { orderProposalFamilies } from '../../features/proposals/proposalGroups';
+import { PROPOSAL_DECISIONS, commercialState } from '../../../shared/proposalCommercial';
+import { ProposalSalesSummary } from '../../features/proposals/ProposalSalesSummary';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import {
@@ -19,7 +22,7 @@ import {
   LayoutGrid,
   List,
 } from 'lucide-react';
-import { ProjectCard } from './ProjectCard';
+import { ProposalFamilyCards } from '../../features/proposals/ProposalFamilyCards';
 import { ProjectDocumentList } from './ProjectDocumentList';
 import { FoldersResumeGrid } from './FoldersResumeGrid';
 import { CreateFolderModal } from './sidebar/CreateFolderModal';
@@ -108,7 +111,7 @@ export const DashboardView: React.FC = () => {
   }, [folders]);
 
   // Filter and Sort Projects
-  const filteredAndSortedProjects = useMemo(() => {
+  const { projects: filteredAndSortedProjects, commercialPool } = useMemo(() => {
     const list = projects.filter((project) => {
       if (project.isDeleted) return false;
 
@@ -140,9 +143,6 @@ export const DashboardView: React.FC = () => {
         ? (project.authorName || '').toLowerCase() === effectiveMember.toLowerCase()
         : true;
 
-      // 4. Status Filter
-      const matchesStatus = statusFilter === 'All' ? true : project.status === statusFilter;
-
       // 5. Distributor Filter
       const matchesDistributor =
         distributorFilter === 'All' ? true : project.rates.distributor === distributorFilter;
@@ -157,11 +157,12 @@ export const DashboardView: React.FC = () => {
         matchesType = !project.specs.hasBattery && !project.rates.isZeroExport;
       }
 
-      return matchesSearch && matchesFolder && matchesTeam && matchesStatus && matchesDistributor && matchesType;
+      return matchesSearch && matchesFolder && matchesTeam && matchesDistributor && matchesType;
     });
 
+    const filtered = list.filter(project => statusFilter === 'All' || commercialState(project).status === statusFilter);
     // Sorting
-    list.sort((a, b) => {
+    filtered.sort((a, b) => {
       if (sortBy === 'oldest') {
         return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
       }
@@ -187,7 +188,7 @@ export const DashboardView: React.FC = () => {
       return timeB - timeA;
     });
 
-    return list;
+    return { projects: orderProposalFamilies(filtered, projects), commercialPool: list };
   }, [
     projects,
     searchQuery,
@@ -412,8 +413,8 @@ export const DashboardView: React.FC = () => {
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-zinc-500 mb-2">
                       Estado de la Propuesta
                     </label>
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {['All', 'Draft', 'Final', 'Archived'].map((st) => (
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {['All', ...Object.keys(PROPOSAL_DECISIONS)].map((st) => (
                         <button
                           key={st}
                           onClick={() => setStatusFilter(st)}
@@ -423,7 +424,7 @@ export const DashboardView: React.FC = () => {
                               : 'bg-slate-50 dark:bg-[#1f2532] text-slate-700 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-[#252c3c]'
                           }`}
                         >
-                          {st === 'All' ? 'Todos' : st}
+                          {st === 'All' ? 'Todos' : PROPOSAL_DECISIONS[st as keyof typeof PROPOSAL_DECISIONS]}
                         </button>
                       ))}
                     </div>
@@ -476,6 +477,9 @@ export const DashboardView: React.FC = () => {
           </div>
         </div>
 
+        <ProposalSalesSummary projects={commercialPool} value={statusFilter} onChange={setStatusFilter}/>
+        <p className="mt-4 text-xs leading-relaxed text-slate-600 dark:text-zinc-400">Para enlazar, mantén una propuesta sobre otra y suéltala al resaltarse. Clic derecho para organizar el grupo.</p>
+
         {/* 📌 Banner de Filtro Activo (si se seleccionó una carpeta, distribuidora, autor o estado) */}
         {(activeFolderName ||
           activeTeamMemberFilter ||
@@ -523,7 +527,7 @@ export const DashboardView: React.FC = () => {
               )}
               {statusFilter !== 'All' && (
                 <span className="px-2.5 py-1 rounded-lg bg-white dark:bg-[#181d27] border border-slate-300 dark:border-zinc-700 font-bold text-slate-700 dark:text-zinc-300">
-                  Estado: {statusFilter}
+                  Estado: {PROPOSAL_DECISIONS[statusFilter as keyof typeof PROPOSAL_DECISIONS] || statusFilter}
                 </span>
               )}
             </div>
@@ -574,11 +578,7 @@ export const DashboardView: React.FC = () => {
         ) : dashboardViewMode === 'list' ? (
           <ProjectDocumentList projects={filteredAndSortedProjects} />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filteredAndSortedProjects.map((project) => (
-              <ProjectCard key={project.id} project={project} />
-            ))}
-          </div>
+          <ProposalFamilyCards projects={filteredAndSortedProjects} allProjects={projects} />
         )}
 
         {/* ========================================================================= */}

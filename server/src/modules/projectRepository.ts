@@ -1,3 +1,10 @@
+import {
+  commercialContent,
+  reportContent,
+  type ProposalCommercial,
+  type ProposalCommercialReport,
+} from "../../../shared/proposalCommercial.js";
+import { resolveMembership } from "../membership.js";
 import type { PoolClient } from "pg";
 import type { AuthUser } from "../dependencies.js";
 export interface ProjectRow {
@@ -87,16 +94,104 @@ export async function notify(
     ],
   );
 }
+/** Only the exact pre-report note can retain its historical salesperson and attribution. */
+export function isLegacyCommercialReport(
+  report: ProposalCommercialReport,
+  existing?: ProjectRow,
+): boolean {
+  const prior = existing?.data_json.commercial as
+    ProposalCommercial | undefined;
+  if (!existing || !prior?.note.trim() || prior.reports?.length) return false;
+  return (
+    JSON.stringify(reportContent(report)) ===
+    JSON.stringify(
+      reportContent({
+        id: `legacy-${existing.id}`,
+        projectId: existing.id,
+        status: prior.status,
+        note: prior.note,
+        ownerId: prior.ownerId,
+        ownerName: prior.ownerName,
+        createdAt: "",
+      }),
+    )
+  );
+}
 export async function saveProject(
   client: PoolClient,
   user: AuthUser,
   input: Record<string, any>,
   existing?: ProjectRow,
 ) {
+  const priorCommercial = existing?.data_json.commercial as
+    ProposalCommercial | undefined;
+  const suppliedCommercial = (input.commercial ?? priorCommercial) as
+    ProposalCommercial | undefined;
+  let commercial = priorCommercial;
+  if (suppliedCommercial) {
+    const priorReports = priorCommercial?.reports || [];
+    const reports: ProposalCommercialReport[] = [...priorReports];
+    for (const report of suppliedCommercial.reports || []) {
+      if (reports.some((old) => old.id === report.id)) continue;
+      if (isLegacyCommercialReport(report, existing)) {
+        reports.push({
+          ...report,
+          createdAt:
+            priorCommercial!.updatedAt || existing!.updated_at.toISOString(),
+          createdById: priorCommercial!.updatedById,
+          createdByName: priorCommercial!.updatedByName,
+        });
+        continue;
+      }
+      const owner = report.ownerId
+        ? await resolveMembership(client, report.ownerId, user.organizationId)
+        : null;
+      reports.push({
+        ...report,
+        ownerId: owner?.id,
+        ownerName: owner?.name,
+        createdById: user.id,
+        createdByName: user.name,
+      });
+    }
+    if (reports.length > 500) throw new Error("commercial_report_limit");
+    const candidate = { ...suppliedCommercial, reports };
+    if (
+      !priorCommercial ||
+      JSON.stringify(commercialContent(candidate)) !==
+        JSON.stringify(commercialContent(priorCommercial))
+    ) {
+      const owner = suppliedCommercial.ownerId
+        ? await resolveMembership(
+            client,
+            suppliedCommercial.ownerId,
+            user.organizationId,
+          )
+        : null;
+      commercial = {
+        ...suppliedCommercial,
+        reports,
+        ownerId: suppliedCommercial.ownerId || undefined,
+        ownerName:
+          owner?.name ||
+          (suppliedCommercial.ownerId === priorCommercial?.ownerId
+            ? priorCommercial?.ownerName
+            : !priorCommercial &&
+                suppliedCommercial.ownerId === existing?.created_by_id
+              ? existing?.created_by_name
+              : undefined),
+        updatedAt: new Date().toISOString(),
+        updatedById: user.id,
+        updatedByName: user.name,
+      };
+    }
+  }
   const version = existing ? existing.version + 1 : 1;
   // Server-controlled attribution cannot be supplied by a client and foreign company documents cannot be uploaded accidentally.
   const data = {
     ...input,
+    commercial,
+    proposalLink: input.proposalLink ?? existing?.data_json.proposalLink,
     id: input.id,
     organizationId: user.organizationId,
     version,

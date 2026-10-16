@@ -116,6 +116,25 @@ async function main() {
   delete stored.calculationSnapshot;
   assert.ok(!renderProposalPage(stored).includes('data-energy-mode="self_consumption"'));
 
+  // Render the real template with independent PDF/web assets. Legacy snapshots
+  // remain immutable; explicit empty logos never display another company's mark.
+  const logoSnapshot = structuredClone(stored);
+  logoSnapshot.project.customization = {
+    ...logoSnapshot.project.customization,
+    headerLogoBase64: 'data:image/png;base64,cGRmLXdoaXRl',
+    webHeaderLogoBase64: 'data:image/png;base64,d2ViLWNvbG9y',
+    coverLogoBase64: 'data:image/png;base64,Y292ZXItY29sb3I=',
+  };
+  const colorHtml = renderProposalPage(logoSnapshot);
+  assert.ok(colorHtml.includes('src="data:image/png;base64,d2ViLWNvbG9y"'));
+  assert.ok(!colorHtml.includes('src="data:image/png;base64,cGRmLXdoaXRl"'));
+  delete logoSnapshot.project.customization.webHeaderLogoBase64;
+  assert.ok(renderProposalPage(logoSnapshot).includes('src="data:image/png;base64,cGRmLXdoaXRl"'), 'Previously published links retain their stored header');
+  logoSnapshot.project.customization.webHeaderLogoBase64 = '';
+  const unbrandedHtml = renderProposalPage(logoSnapshot);
+  assert.ok(!unbrandedHtml.includes('<img src='), 'Explicitly unbranded header has no broken or fallback image');
+  assert.ok(unbrandedHtml.includes(escapeHtml(logoSnapshot.project.customization.companyName)));
+
   rows.set('proposal:old7abc', JSON.stringify({ ...stored, id: 'old7abc', expiresAt: new Date(Date.now() + 86400000).toISOString() }));
   assert.equal((await app.request('https://test.local/p/old7abc', {}, env as never)).status, 200);
   rows.set('proposal:expired1', JSON.stringify({ ...stored, expiresAt: '2000-01-01T00:00:00Z' }));

@@ -1,4 +1,4 @@
-import { documentLogo } from '../../../utils/documentLogo';
+import { documentLogo, webHeaderLogo } from '../../../utils/documentLogo';
 import React, { useState, useRef } from 'react';
 import {
   Building2,
@@ -54,6 +54,7 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
 
   // File input refs
   const coverLogoInputRef = useRef<HTMLInputElement>(null);
+  const webLogoInputRef = useRef<HTMLInputElement>(null);
   const headerLogoInputRef = useRef<HTMLInputElement>(null);
   const watermarkInputRef = useRef<HTMLInputElement>(null);
 
@@ -119,42 +120,28 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
       companyFooterText: DEFAULT_DOCUMENT_CUSTOMIZATION.companyFooterText,
       coverLogoBase64: undefined,
       headerLogoBase64: undefined,
+      webHeaderLogoBase64: undefined,
       watermarkLogoBase64: undefined,
       watermarkOpacity: DEFAULT_DOCUMENT_CUSTOMIZATION.watermarkOpacity,
     });
   };
 
-  const handleCoverLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  // A file may finish loading after the user changes proposal or organization.
+  // Every logo follows the same guard so it can only update its original document.
+  const handleLogoUpload = (
+    event: React.ChangeEvent<HTMLInputElement>,
+    field: 'coverLogoBase64' | 'headerLogoBase64' | 'webHeaderLogoBase64' | 'watermarkLogoBase64',
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
     if (!file) return;
+    const id = project.id;
+    const generation = useSimulationStore.getState().sessionGeneration;
     const reader = new FileReader();
     reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        updateDocumentCustomization({ coverLogoBase64: reader.result });
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleHeaderLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        updateDocumentCustomization({ headerLogoBase64: reader.result });
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleWatermarkUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        updateDocumentCustomization({ watermarkLogoBase64: reader.result });
+      const state = useSimulationStore.getState();
+      if (typeof reader.result === 'string' && state.activeProjectId === id && state.sessionGeneration === generation) {
+        updateDocumentCustomization({ [field]: reader.result });
       }
     };
     reader.readAsDataURL(file);
@@ -430,7 +417,7 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                     ref={coverLogoInputRef}
                     type="file"
                     accept="image/*"
-                    onChange={handleCoverLogoUpload}
+                    onChange={event => handleLogoUpload(event, 'coverLogoBase64')}
                     className="hidden"
                   />
                   <button
@@ -455,9 +442,9 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
               <div className="flex justify-between items-center mb-1.5">
                 <label className={`text-[10px] font-bold uppercase flex items-center gap-1.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
                   <ImageIcon className="w-3.5 h-3.5 text-emerald-500" />
-                  Logotipo de Encabezado (Header)
+                  Logotipo de encabezado PDF
                 </label>
-                {cust.headerLogoBase64 && (
+                {cust.headerLogoBase64 !== undefined && (
                   <button
                     type="button"
                     onClick={() => updateDocumentCustomization({ headerLogoBase64: undefined })}
@@ -482,9 +469,10 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                 <div className="flex-1">
                   <input
                     ref={headerLogoInputRef}
+                    aria-label="Archivo de logotipo PDF"
                     type="file"
                     accept="image/*"
-                    onChange={handleHeaderLogoUpload}
+                    onChange={event => handleLogoUpload(event, 'headerLogoBase64')}
                     className="hidden"
                   />
                   <button
@@ -499,9 +487,38 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                     <Upload className="w-3.5 h-3.5 text-emerald-500" />
                     {cust.headerLogoBase64 ? 'Cambiar Logotipo' : 'Subir Logotipo'}
                   </button>
-                  <p className="text-[9px] text-zinc-500 mt-1">PNG transparente recomendado (blanco o color).</p>
+                  <p className="text-[9px] text-zinc-500 mt-1">Versión blanca para el fondo oscuro del PDF.</p>
                 </div>
               </div>
+            </div>
+
+            <div className={`p-2.5 rounded-xl border ${isDark ? 'bg-[#1b1b24] border-[#2e2e3e]' : 'bg-slate-100/70 border-slate-200'}`}>
+              <div className="flex justify-between items-start gap-2 mb-1.5">
+                <label className={`text-[10px] font-bold uppercase flex items-center gap-1.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                  <ImageIcon className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
+                  Logotipo de encabezado web
+                </label>
+                {cust.webHeaderLogoBase64 !== undefined && (
+                  <button type="button" onClick={() => updateDocumentCustomization({ webHeaderLogoBase64: undefined })}
+                    title="Restaurar logotipo web" className="text-[10px] font-semibold text-red-500 hover:text-red-400 flex items-center gap-1 cursor-pointer shrink-0">
+                    <Trash2 className="w-3 h-3" /> Restaurar
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-24 h-12 rounded-lg bg-white border border-slate-200 p-1 flex items-center justify-center shrink-0 overflow-hidden">
+                  {webHeaderLogo(cust) ? <img src={webHeaderLogo(cust)} alt="Vista previa del logotipo web" className="max-h-full max-w-full object-contain"/> : <span className="text-xs text-slate-600">Sin logotipo</span>}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <input ref={webLogoInputRef} type="file" accept="image/*" aria-label="Archivo de logotipo web" className="hidden" onChange={event => handleLogoUpload(event, 'webHeaderLogoBase64')}/>
+                  <button type="button" onClick={() => webLogoInputRef.current?.click()}
+                    className={`w-full py-1.5 px-3 rounded-lg border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer ${isDark ? 'bg-[#282836] border-[#3e3e52] text-zinc-200 hover:bg-[#323244]' : 'bg-white border-slate-300 text-slate-800 hover:bg-slate-50'}`}>
+                    <Upload className="w-3.5 h-3.5 shrink-0 text-emerald-500" /> Cambiar logotipo web
+                  </button>
+                  <p className={`text-[10px] mt-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>Versión a color para el fondo blanco.</p>
+                </div>
+              </div>
+              <p className={`text-[10px] mt-2 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>Independiente del PDF. Se aplica al publicar un enlace nuevo.</p>
             </div>
 
             {/* Logotipo de Marca de Agua y Opacidad */}
@@ -536,7 +553,7 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                     ref={watermarkInputRef}
                     type="file"
                     accept="image/*"
-                    onChange={handleWatermarkUpload}
+                    onChange={event => handleLogoUpload(event, 'watermarkLogoBase64')}
                     className="hidden"
                   />
                   <button

@@ -1,3 +1,4 @@
+import { commercialCopy } from '../../../shared/proposalCommercial';
 import { generateDuplicateProjectIdentifiers } from '../initialData';
 import { featureScope } from '../../../shared/applicationFeatures';
 import { ownsProject } from '../sync/projectReconciliation';
@@ -326,7 +327,7 @@ export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (
     if (resolution === 'keep_local') next = { ...localProject, version: activeConflict.serverVersion, baseVersion: activeConflict.serverVersion, syncStatus: 'pending' };
     const identifiers = generateDuplicateProjectIdentifiers(localProject, projects);
     const now = new Date().toISOString();
-    if (resolution === 'fork') copy = { ...localProject, id: crypto.randomUUID(), client: { ...localProject.client, name: localProject.client.name + ' (copia)', projectId: identifiers.projectId, quoteNumber: identifiers.quoteNumber }, createdAt: now, updatedAt: now, authorId: syncSettings.currentUser.id, authorName: syncSettings.currentUser.name, authorEmail: syncSettings.currentUser.email, lastModifiedBy: syncSettings.currentUser.name, lastModifiedAt: now, version: 1, baseVersion: 0, pendingCanonicalAck: undefined, syncStatus: 'pending', isDeleted: false, deletedAt: undefined, deletedBy: undefined };
+    if (resolution === 'fork') copy = { ...localProject, commercial: commercialCopy(localProject, syncSettings.currentUser), proposalLink: activeConflict.reason === 'deleted' ? undefined : { parentId: localProject.id }, id: crypto.randomUUID(), client: { ...localProject.client, name: localProject.client.name + ' (copia)', projectId: identifiers.projectId, quoteNumber: identifiers.quoteNumber }, createdAt: now, updatedAt: now, authorId: syncSettings.currentUser.id, authorName: syncSettings.currentUser.name, authorEmail: syncSettings.currentUser.email, lastModifiedBy: syncSettings.currentUser.name, lastModifiedAt: now, version: 1, baseVersion: 0, pendingCanonicalAck: undefined, syncStatus: 'pending', isDeleted: false, deletedAt: undefined, deletedBy: undefined };
     set(state => {
       const projectConflicts = { ...state.projectConflicts };
       delete projectConflicts[scope + '|' + projectId];
