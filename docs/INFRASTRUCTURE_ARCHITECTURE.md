@@ -1,6 +1,6 @@
 # Infraestructura y despliegue protegido
 
-Topología verificada en la auditoría de 2026-10-03: host Proxmox pve01, CT100 app-server (10.0.0.103), Docker con solarsim-api, PostgreSQL16, Caddy, Cloudflare Tunnel y web corporativa. app-server no tiene Tailscale propio; el acceso autorizado pasa por pve01. No confundir este CT con electsun-core. No se ha modificado producción en esta rama.
+Topología verificada en la auditoría de 2026-10-03: host Proxmox pve01, CT100 app-server (10.0.0.103), Docker con solarsim-api, PostgreSQL16, Caddy, Cloudflare Tunnel y web corporativa. app-server no tiene Tailscale propio; el acceso autorizado pasa por pve01. No confundir este CT con electsun-core. La auditoría original no modificó producción. El despliegue autorizado del 14 de octubre de 2026 alinea la API a 2.5.1; ver [entrega y rollback](RELEASE_2_5_1.md).
 
 El CT dispone de 6 cores, 4GiB y disco50GiB. La carga observada no justificó ampliar recursos ni actualizar el sistema operativo. Estos datos son una fotografía de la auditoría, no estado garantizado futuro. Antes de operar, comprobar CT activo y contenedores desde el nodo; no insistir con SSH directo si está desconectado.
 

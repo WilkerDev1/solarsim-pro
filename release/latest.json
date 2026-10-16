@@ -1,50 +1,50 @@
 {
-  "version": "2.5.0",
-  "name": "SolarSim Pro v2.5.0",
-  "releaseDate": "2026-10-13T00:29:20.094Z",
-  "notes": "Esta versión amplía el trabajo asistido por IA y la colaboración empresarial: permite revisar propuestas con más detalle, consultar la simulación desde un chat flotante y compartir recursos de la organización con mayor control.",
+  "version": "2.5.1",
+  "name": "SolarSim Pro v2.5.1",
+  "releaseDate": "2026-10-14T16:56:47.536Z",
+  "notes": "Actualización de estabilidad para cotizaciones, catálogo y sincronización. Corrige cantidades y costos de baterías, agiliza el uso de fichas técnicas y conserva cambios pendientes cuando el servidor no está disponible.",
   "downloads": {
     "windows": {
       "installer": {
-        "fileName": "SolarSim-Pro-Setup-2.5.0.exe",
-        "url": "https://github.com/WilkerDev1/solarsim-pro/releases/download/v2.5.0/SolarSim-Pro-Setup-2.5.0.exe",
-        "sha256": "8de1ec739df1fc6a86fe7859ae157364140c5f566a9cde80afd7529163f8424c",
-        "sha512": "XSCLGnueiB2o6GfR0cNRhVrta2G0KB0X+G5fbK0raEzqqlpal5os3i0mcn6G7InzcxyMZrMpdeG6swm/0Cz2Ug==",
-        "size": 143043404
+        "fileName": "SolarSim-Pro-Setup-2.5.1.exe",
+        "url": "https://github.com/WilkerDev1/solarsim-pro/releases/download/v2.5.1/SolarSim-Pro-Setup-2.5.1.exe",
+        "sha256": "e097dc89882df21d405f72f0ab0e57e3e0b7576fb19a67ea789146bca5b7ae47",
+        "sha512": "9PQXza1JORcM0HIWBniejtZBvuGv6tCPqTfZw0sLzlijl0miffFSrFSsKI/Hpz5ytokZ7Mn7ac+3VAFgHczqjg==",
+        "size": 143044382
       },
       "portable": {
-        "fileName": "SolarSim-Pro-2.5.0.exe",
-        "url": "https://github.com/WilkerDev1/solarsim-pro/releases/download/v2.5.0/SolarSim-Pro-2.5.0.exe",
-        "sha256": "6e84a9bc04b734e729804d8e11806b53230ee86adaa928709c7308bd21b1ec10",
-        "size": 142813484
+        "fileName": "SolarSim-Pro-2.5.1.exe",
+        "url": "https://github.com/WilkerDev1/solarsim-pro/releases/download/v2.5.1/SolarSim-Pro-2.5.1.exe",
+        "sha256": "7306425e81badc33fafd1dacd19b6fac2595c04d8921c790000124becbc28435",
+        "size": 142814446
       }
     },
     "linux": {
       "appimage": {
-        "fileName": "SolarSim-Pro-2.5.0.AppImage",
-        "url": "https://github.com/WilkerDev1/solarsim-pro/releases/download/v2.5.0/SolarSim-Pro-2.5.0.AppImage",
-        "sha256": "100435ebc40cba0d9ce27057fa6ff7364934b1029a8eef42ac1e0c583598311c",
-        "sha512": "mBhAvTOl7rS5Fx3SAWOqsdRKY4BvqpqgbefigOHfcA1P/rZTjtNn/N27HD5uRKm7g80IrNmDykaM+6/PE9UvIw==",
-        "size": 169847585
+        "fileName": "SolarSim-Pro-2.5.1.AppImage",
+        "url": "https://github.com/WilkerDev1/solarsim-pro/releases/download/v2.5.1/SolarSim-Pro-2.5.1.AppImage",
+        "sha256": "894440cf70e02c1f58bf1a1f4b5744e9b979e94593235d75f25c06300198dd7e",
+        "sha512": "viH/rqy6CIqMmZ5bA3TniS9YD6KKvhElQ0IcVgBuodvdRXEdPszbouQMAbO14uQb1lxVGCBC39VggWt3OwY+TQ==",
+        "size": 169847349
       },
       "deb": {
-        "fileName": "SolarSim-Pro-2.5.0.deb",
-        "url": "https://github.com/WilkerDev1/solarsim-pro/releases/download/v2.5.0/SolarSim-Pro-2.5.0.deb",
-        "sha256": "2eb9110d367c233fbc09f6e0e2e9a6548614b932866501a23a9f1e16962b755d",
-        "sha512": "tWNDq3ZDM4+DOQR6xbs1BUw0kgwJ/EVF2ieeEzZiXPxd2xEvZEIXzVnRa/oG7JyjaWwUFQmqNRZwp6YKsBjxHA==",
-        "size": 131364004
+        "fileName": "SolarSim-Pro-2.5.1.deb",
+        "url": "https://github.com/WilkerDev1/solarsim-pro/releases/download/v2.5.1/SolarSim-Pro-2.5.1.deb",
+        "sha256": "43658cae43a8fcd5618cd0b96037b486808519cd4101da3e37bd49a31ac4c14d",
+        "sha512": "3dSOcspSomqtbHgWroVkcbQ4JhPfpbV7vRm0H5IdAS5hrtezhMyCTLPoNDzSv6eZZGmxxwn3vsDIyXkNr3e08Q==",
+        "size": 131366016
       },
       "pacman": {
-        "fileName": "SolarSim-Pro-2.5.0.pacman",
-        "url": "https://github.com/WilkerDev1/solarsim-pro/releases/download/v2.5.0/SolarSim-Pro-2.5.0.pacman",
-        "sha256": "5fda607fd778cd1fbb510c3f2a4905ecb9882060f255b2cc5f6d2b3eaa9e092d",
-        "size": 117699096
+        "fileName": "SolarSim-Pro-2.5.1.pacman",
+        "url": "https://github.com/WilkerDev1/solarsim-pro/releases/download/v2.5.1/SolarSim-Pro-2.5.1.pacman",
+        "sha256": "02138849667b2108b139e619c941543d02022c8707f90a77ddd8b6937e64fcff",
+        "size": 117692052
       },
       "tar": {
-        "fileName": "SolarSim-Pro-2.5.0.tar.gz",
-        "url": "https://github.com/WilkerDev1/solarsim-pro/releases/download/v2.5.0/SolarSim-Pro-2.5.0.tar.gz",
-        "sha256": "9a83abe12ffafcd8f88c0202fe90ae9d2bee8cfe7835d88a46b7e02e25706e01",
-        "size": 160958658
+        "fileName": "SolarSim-Pro-2.5.1.tar.gz",
+        "url": "https://github.com/WilkerDev1/solarsim-pro/releases/download/v2.5.1/SolarSim-Pro-2.5.1.tar.gz",
+        "sha256": "6404a745d3b8f99d3d156f7444a0b36901657d845071481e99f84a33bf5101a8",
+        "size": 160961533
       }
     }
   }

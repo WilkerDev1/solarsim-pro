@@ -13,6 +13,7 @@ Las fuentes canónicas de esta rama son:
 - [Asistente general experimental](APP_ASSISTANT.md): herramientas, confirmación, scopes y evaluación de MCP-UI.
 - [Tarifas en el flujo IA](AI_TARIFF_CONTEXT.md): fuentes históricas, procedencia por campo, persistencia y límites de concurrencia.
 - [Infraestructura](INFRASTRUCTURE_ARCHITECTURE.md): topología y despliegue protegido.
+- [Entrega 2.5.1 y API desplegada](RELEASE_2_5_1.md): revisión oficial, respaldo restaurado y rollback del contenedor API.
 - [Mantenimiento y releases](MAINTENANCE_AND_UPDATES.md): comandos, firmas y compatibilidad.
 - [Beta, revisión del CT, recuperación y rollback](BETA_ROLLOUT.md): evidencias aisladas y pendientes de puesta en producción.
 - [Revisión del 7 de octubre de 2026](REVIEW_2026_10_07.md): hallazgos corregidos, salud observada, recuperación aislada, runtime real y pendientes verificables.
