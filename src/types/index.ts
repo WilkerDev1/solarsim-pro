@@ -336,6 +336,7 @@ export interface DocumentCustomization {
   
   // Custom Images (Base64 data URLs)
   coverLogoBase64?: string;       // Custom cover page logo (overrides default)
+  webHeaderLogoBase64?: string; // Independent color logo for the web header
   headerLogoBase64?: string;      // Custom header logo (overrides default)
   watermarkLogoBase64?: string;   // Custom watermark image (overrides default)
 
@@ -415,6 +416,8 @@ export interface SyncSettings {
 }
 
 export interface ProjectSimulation {
+  proposalLink?: import("../../shared/proposalLinks").ProposalLink;
+  commercial?: import('../../shared/proposalCommercial').ProposalCommercial;
   aiSource?: { consumptionSource?: ExtractedInvoiceData["consumptionSource"]; energyRateSource?: ExtractedInvoiceData["energyRateSource"]; extractedFromFileName?: string; modelUsed?: string; requestedModel?: string; notes?: string };
   organizationId?: string;
   syncServerUrl?: string;

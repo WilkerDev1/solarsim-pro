@@ -19,6 +19,7 @@ export function companyDocumentSnapshot(
         : ""),
     coverLogoBase64: company.logoBase64 || "",
     headerLogoBase64: company.logoBase64 || "",
+    webHeaderLogoBase64: company.logoBase64 || "",
     watermarkLogoBase64: company.watermarkLogoBase64 || "",
   };
 }

@@ -555,7 +555,7 @@ export const EquipmentManagerSettingsTab: React.FC<
               key={mode}
               onClick={() => setViewMode(mode)}
               aria-pressed={viewMode === mode}
-              className={`${button} ${viewMode === mode ? (isDark ? "bg-emerald-950 text-emerald-200" : "bg-emerald-50 text-emerald-800") : ""}`}
+              className={`${button} ${viewMode === mode ? (isDark ? "!bg-emerald-950 !text-emerald-200" : "!bg-emerald-50 !text-emerald-800") : ""}`}
             >
               {mode === "equipment" ? "Equipos" : "Proveedores"}
             </button>
@@ -587,7 +587,6 @@ export const EquipmentManagerSettingsTab: React.FC<
       {viewMode === "suppliers" ? (
         <SupplierManagerSection
           isDark={isDark}
-          onBackToEquipment={() => setViewMode("equipment")}
         />
       ) : (
         <>

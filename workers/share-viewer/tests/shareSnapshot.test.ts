@@ -19,21 +19,40 @@ async function main() {
     loadOrganizationFeaturePolicy: async () => {},
   };
   useSimulationStore.getState = () => state;
+  const publicationProject = structuredClone(BENCHMARK_PROJECT);
+  publicationProject.customization = {
+    ...publicationProject.customization,
+    headerLogoBase64: 'data:image/png;base64,cGRmLXdoaXRl',
+    webHeaderLogoBase64: 'data:image/png;base64,d2ViLWNvbG9y',
+    coverLogoBase64: 'data:image/png;base64,Y292ZXItY29sb3I=',
+  };
+  publicationProject.commercial = { status: 'approved', note: 'Private sales note' };
+  publicationProject.proposalLink = { parentId: 'private-parent', color: '#abcdef' } as never;
+  let expectedWebLogo = publicationProject.customization.webHeaderLogoBase64;
   let calls = 0;
   globalThis.fetch = async (input, init) => {
     calls++;
     assert.equal(String(input), 'https://propuesta.electsun.net/api/share');
     assert.equal(new Headers(init?.headers).get('authorization'), 'Bearer mock-session');
     const body = JSON.parse(String(init?.body));
+    assert.equal(body.project.customization.webHeaderLogoBase64, expectedWebLogo);
+    assert.equal(body.project.customization.headerLogoBase64, expectedWebLogo, 'Older Workers also receive the color web logo');
+    assert.ok(!String(init?.body).includes('cGRmLXdoaXRl'), 'PDF white logo is never published');
+    assert.equal(body.project.commercial,undefined);
+    assert.equal(body.project.proposalLink,undefined);
     assert.deepEqual(body.calculationSnapshot, { mode: 'legacy', organizationId: 'mock-org', policyVersion: 4, capturedAt: body.calculationSnapshot.capturedAt });
     assert.deepEqual(body.summary, calculateProjectFinancialSummary(BENCHMARK_PROJECT, 'legacy'));
     return Response.json({ success: true, id: 'abcdef1234567890abcdef1234567890', shareUrl: 'https://propuesta.electsun.net/p/abcdef1234567890abcdef1234567890', validityDays: 7, expiresAt: new Date(Date.now() + 7 * 86400000).toISOString() });
   };
   try {
     // Even a stale caller preview must publish a coherent snapshot in the confirmed organization mode.
-    const result = await ShareProposalService.shareProposal(BENCHMARK_PROJECT, calculateProjectFinancialSummary(BENCHMARK_PROJECT, 'self_consumption'));
+    const result = await ShareProposalService.shareProposal(publicationProject, calculateProjectFinancialSummary(publicationProject, 'self_consumption'));
     assert.equal(result.success, true, result.error);
     assert.equal(calls, 1);
+    expectedWebLogo = '';
+    publicationProject.customization.webHeaderLogoBase64 = '';
+    assert.equal((await ShareProposalService.shareProposal(publicationProject, calculateProjectFinancialSummary(publicationProject))).success, true);
+    assert.equal(calls, 2);
     state = { ...state, syncSettings: { ...session, currentUser: { ...session.currentUser, role: 'LECTOR' as never } } };
     assert.equal((await ShareProposalService.shareProposal(BENCHMARK_PROJECT, calculateProjectFinancialSummary(BENCHMARK_PROJECT))).success, false);
     state = { ...state, syncSettings: { ...session, authToken: null as never } };
@@ -42,7 +61,7 @@ async function main() {
     assert.equal((await ShareProposalService.shareProposal(BENCHMARK_PROJECT, calculateProjectFinancialSummary(BENCHMARK_PROJECT), 7, 'http://test.invalid')).success, false);
     state = { ...state, loadOrganizationFeaturePolicy: async () => { state = { ...state, syncSettings: { ...session, currentUser: { ...session.currentUser, organizationId: 'other-org' } } }; } };
     assert.equal((await ShareProposalService.shareProposal(BENCHMARK_PROJECT, calculateProjectFinancialSummary(BENCHMARK_PROJECT))).success, false);
-    assert.equal(calls, 1);
+    assert.equal(calls, 2);
     console.log('PASS: servicio publica resumen y política coherentes; bloquea lector, sin sesión, HTTP y cambio de organización.');
   } finally {
     useSimulationStore.getState = originalGetState;

@@ -86,7 +86,10 @@ export function renderProposalPage(stored: StoredProposal): string {
   const rawClientPhone = custom.clientPhone || client.contactPhone || '809-378-6590';
   const clientPhone = (rawClientPhone.includes('555-0199') || rawClientPhone.includes('5550199')) ? '809-378-6590' : rawClientPhone;
 
-  const logoBase64 = safeLogoUrl(custom.headerLogoBase64 || custom.coverLogoBase64, ELECTSUN_LOGO_COLOR_BASE64);
+  // New publications carry a web-specific snapshot. Existing links keep their
+  // legacy header choice. Explicit empty values mean an unbranded document.
+  const logoSource = custom.webHeaderLogoBase64 ?? custom.headerLogoBase64 ?? custom.coverLogoBase64;
+  const logoBase64 = logoSource === '' ? '' : safeLogoUrl(logoSource, ELECTSUN_LOGO_COLOR_BASE64);
 
   const rawClientName = client.name || 'Cliente Estimado';
   const clientName = rawClientName.replace(/\s*\((?:Copia|Copia Importada|COPIA|V\d+|C\d+)\)\s*/gi, '').trim();
@@ -467,7 +470,9 @@ export function renderProposalPage(stored: StoredProposal): string {
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6 pb-4 sm:pb-6 border-b border-slate-100">
         <!-- Company Identity & Official Logo -->
         <div class="flex items-center">
-          <img src="${escapeHtml(logoBase64)}" alt="${escapeHtml(companyName)}" class="h-12 sm:h-20 max-h-[58px] sm:max-h-[85px] w-auto max-w-[220px] sm:max-w-[320px] object-contain drop-shadow-sm" />
+          ${logoBase64
+            ? `<img src="${escapeHtml(logoBase64)}" alt="${escapeHtml(companyName)}" class="h-12 sm:h-20 max-h-[58px] sm:max-h-[85px] w-auto max-w-[220px] sm:max-w-[320px] object-contain drop-shadow-sm" />`
+            : `<span class="text-xl sm:text-2xl font-bold text-slate-900">${escapeHtml(companyName)}</span>`}
         </div>
 
         <!-- Validity & Quick Print Action -->
