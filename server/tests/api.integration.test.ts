@@ -1442,3 +1442,585 @@ test("folder deletion waits for project lock before membership lock and emits co
   assert.equal(delta.folderId, undefined);
   assert.equal(delta.version, 2);
 });
+
+test("commercial follow-up survives sync, uses CAS and verified attribution, and legacy omissions cannot erase it", async () => {
+  const owner = await register("commercial-owner", "Commercial isolation");
+  const seller = await provision("EDITOR", "commercial-seller", owner);
+  const viewer = await provision("LECTOR", "commercial-reader", owner);
+  const initial = await request("POST", "/api/sync/push", owner, {
+    projects: [
+      {
+        ...project("commercial-proposal"),
+        baseVersion: 0,
+        commercial: {
+          status: "approved",
+          note: "Cliente confirmó alcance",
+          ownerId: seller.id,
+          ownerName: "Forged name",
+          updatedById: "forged",
+          updatedByName: "forged",
+        },
+      },
+    ],
+  });
+  assert.equal(initial.status, 200);
+  const saved = initial.body.results[0].project;
+  assert.equal(saved.commercial.ownerName, seller.name);
+  assert.equal(saved.commercial.updatedById, owner.id);
+  assert.equal(saved.commercial.note, "Cliente confirmó alcance");
+  const pulls = await request("POST", "/api/sync/pull", seller, {});
+  assert.equal(
+    pulls.body.projects.find((p: any) => p.id === saved.id).commercial.status,
+    "approved",
+  );
+  const legacy = { ...saved, baseVersion: 1 };
+  delete legacy.commercial;
+  const legacySave = await request("POST", "/api/sync/push", owner, {
+    projects: [legacy],
+  });
+  assert.deepEqual(
+    legacySave.body.results[0].project.commercial,
+    saved.commercial,
+  );
+  const stale = await request("POST", "/api/sync/push", seller, {
+    projects: [
+      {
+        ...saved,
+        baseVersion: 1,
+        commercial: { ...saved.commercial, status: "rejected" },
+      },
+    ],
+  });
+  assert.equal(stale.body.results[0].status, "conflict");
+  assert.equal(
+    stale.body.results[0].serverProject.commercial.status,
+    "approved",
+  );
+  const invalid = await request("POST", "/api/sync/push", owner, {
+    projects: [
+      { ...saved, baseVersion: 2, commercial: { status: "invalid", note: "" } },
+    ],
+  });
+  assert.equal(invalid.body.results[0].reason, "invalid_commercial");
+  const foreign = await request("POST", "/api/sync/push", owner, {
+    projects: [
+      {
+        ...saved,
+        baseVersion: 2,
+        commercial: { status: "pending", note: "", ownerId: other.id },
+      },
+    ],
+  });
+  assert.equal(foreign.body.results[0].reason, "invalid_commercial_owner");
+  const readOnly = await request("POST", "/api/sync/push", viewer, {
+    projects: [{ ...saved, baseVersion: 2 }],
+  });
+  assert.equal(readOnly.status, 403);
+});
+
+test("proposal families and immutable report histories survive legacy clients and remain organization isolated", async () => {
+  const owner = await register("family-owner", "Family reports");
+  const seller = await provision("EDITOR", "family-seller", owner);
+  const report = {
+    id: "report-1",
+    projectId: "family-child",
+    status: "pending",
+    note: "Visita inicial",
+    ownerId: seller.id,
+    ownerName: "Forged",
+    createdAt: "2026-10-15T10:00:00.000Z",
+    createdById: "forged",
+    createdByName: "forged",
+  };
+  const push = await request("POST", "/api/sync/push", owner, {
+    projects: [
+      {
+        ...project("family-child"),
+        proposalLink: { parentId: "family-root" },
+        commercial: {
+          status: "pending",
+          note: "Visita inicial",
+          reports: [report],
+        },
+      },
+      {
+        ...project("family-root"),
+        proposalLink: { parentId: null, color: "#2563b8" },
+      },
+    ],
+  });
+  const child = push.body.results.find(
+    (r: any) => r.id === "family-child",
+  ).project;
+  assert.ok(child, JSON.stringify(push.body));
+  assert.equal(child.proposalLink.parentId, "family-root");
+  assert.equal(child.commercial.reports[0].createdById, owner.id);
+  assert.equal(child.commercial.reports[0].ownerName, seller.name);
+  const legacy = {
+    ...child,
+    baseVersion: 1,
+    commercial: { status: "approved", note: "Cliente aceptó" },
+  };
+  delete legacy.proposalLink;
+  const saved = (
+    await request("POST", "/api/sync/push", seller, { projects: [legacy] })
+  ).body.results[0].project;
+  assert.equal(saved.proposalLink.parentId, "family-root");
+  assert.equal(saved.commercial.reports.length, 1);
+  assert.equal(saved.commercial.reports[0].status, "pending");
+  const add = (
+    await request("POST", "/api/sync/push", seller, {
+      projects: [
+        {
+          ...saved,
+          baseVersion: 2,
+          commercial: {
+            ...saved.commercial,
+            reports: [
+              ...saved.commercial.reports,
+              {
+                ...report,
+                id: "report-2",
+                status: "approved",
+                note: "Firma confirmada",
+              },
+            ],
+          },
+        },
+      ],
+    })
+  ).body.results[0].project;
+  assert.equal(add.commercial.reports.length, 2);
+  assert.equal(add.commercial.reports[1].createdById, seller.id);
+  const edit = await request("POST", "/api/sync/push", owner, {
+    projects: [
+      {
+        ...add,
+        baseVersion: 3,
+        commercial: {
+          ...add.commercial,
+          reports: [
+            { ...add.commercial.reports[0], note: "Borrado histórico" },
+          ],
+        },
+      },
+    ],
+  });
+  assert.equal(edit.body.results[0].reason, "invalid_commercial_report");
+  const cycle = await request("POST", "/api/sync/push", owner, {
+    projects: [
+      {
+        ...project("family-root"),
+        baseVersion: 1,
+        proposalLink: { parentId: "family-child" },
+      },
+    ],
+  });
+  assert.equal(cycle.body.results[0].reason, "invalid_proposal_link");
+  const otherOrg = await register("family-other", "Different family");
+  const foreign = await request("POST", "/api/sync/push", otherOrg, {
+    projects: [
+      {
+        ...project("family-foreign"),
+        proposalLink: { parentId: "family-root" },
+      },
+    ],
+  });
+  assert.equal(foreign.body.results[0].reason, "invalid_proposal_link");
+  const pull = await request("POST", "/api/sync/pull", owner, {});
+  const pulled = pull.body.projects.find((p: any) => p.id === child.id);
+  assert.equal(pulled.commercial.reports.length, 2);
+  const detach = await request("POST", "/api/sync/push", owner, {
+    projects: [{ ...add, baseVersion: 3, proposalLink: { parentId: null } }],
+  });
+  assert.equal(detach.body.results[0].project.proposalLink.parentId, null);
+});
+
+test("family graph rejects batch and concurrent cycles while preserving children of deleted parents", async () => {
+  const owner = await register("family-graph-owner", "Family graph safety");
+  const initial = await request("POST", "/api/sync/push", owner, {
+    projects: [project("graph-a"), project("graph-b")],
+  });
+  assert.equal(initial.body.syncedCount, 2);
+  const concurrent = await Promise.all([
+    request("POST", "/api/sync/push", owner, {
+      projects: [
+        {
+          ...project("graph-a"),
+          baseVersion: 1,
+          proposalLink: { parentId: "graph-b" },
+        },
+      ],
+    }),
+    request("POST", "/api/sync/push", owner, {
+      projects: [
+        {
+          ...project("graph-b"),
+          baseVersion: 1,
+          proposalLink: { parentId: "graph-a" },
+        },
+      ],
+    }),
+  ]);
+  assert.equal(
+    concurrent.filter((result) => result.body.results[0].status === "updated")
+      .length,
+    1,
+  );
+  assert.equal(
+    concurrent.filter(
+      (result) => result.body.results[0].reason === "invalid_proposal_link",
+    ).length,
+    1,
+  );
+  const freshCycle = await request("POST", "/api/sync/push", owner, {
+    projects: [
+      { ...project("new-cycle-a"), proposalLink: { parentId: "new-cycle-b" } },
+      { ...project("new-cycle-b"), proposalLink: { parentId: "new-cycle-a" } },
+    ],
+  });
+  assert.equal(freshCycle.body.syncedCount, 0);
+  assert.ok(
+    freshCycle.body.results.every(
+      (result: any) => result.reason === "invalid_proposal_link",
+    ),
+  );
+  const create = await request("POST", "/api/sync/push", owner, {
+    projects: [
+      {
+        ...project("orphan-child"),
+        proposalLink: { parentId: "orphan-parent" },
+      },
+      project("orphan-parent"),
+    ],
+  });
+  const child = create.body.results.find(
+    (result: any) => result.id === "orphan-child",
+  ).project;
+  const deleted = await request(
+    "DELETE",
+    "/api/projects/orphan-parent?baseVersion=1",
+    owner,
+  );
+  assert.equal(deleted.status, 200);
+  const saved = await request("POST", "/api/sync/push", owner, {
+    projects: [
+      {
+        ...child,
+        baseVersion: 1,
+        client: { ...child.client, name: "Editar tras baja del padre" },
+      },
+    ],
+  });
+  assert.equal(saved.body.results[0].status, "updated");
+  assert.equal(
+    saved.body.results[0].project.proposalLink.parentId,
+    "orphan-parent",
+  );
+  const invalidNewChild = await request("POST", "/api/sync/push", owner, {
+    projects: [
+      {
+        ...project("invalid-new-child"),
+        proposalLink: { parentId: "orphan-parent" },
+      },
+    ],
+  });
+  assert.equal(invalidNewChild.body.results[0].reason, "invalid_proposal_link");
+});
+
+test("commercial report history is append-only at its accumulated limit, including legacy omissions", async () => {
+  const owner = await register("report-limit-owner", "Report boundary");
+  const reports = Array.from({ length: 500 }, (_, index) => ({
+    id: `report-limit-${index}`,
+    projectId: "report-limit",
+    status: "pending",
+    note: `Nota ${index}`,
+    createdAt: "2026-10-15T10:00:00.000Z",
+  }));
+  const initial = await request("POST", "/api/sync/push", owner, {
+    projects: [
+      {
+        ...project("report-limit"),
+        commercial: { status: "pending", note: "", reports },
+      },
+    ],
+  });
+  assert.equal(initial.body.results[0].status, "created");
+  const saved = initial.body.results[0].project;
+  const overflow = await request("POST", "/api/sync/push", owner, {
+    projects: [
+      {
+        ...saved,
+        baseVersion: 1,
+        commercial: {
+          ...saved.commercial,
+          reports: [{ ...reports[0], id: "report-overflow" }],
+        },
+      },
+    ],
+  });
+  assert.equal(overflow.body.results[0].reason, "invalid_commercial_report");
+  const omission = await request("POST", "/api/sync/push", owner, {
+    projects: [
+      {
+        ...saved,
+        baseVersion: 1,
+        commercial: { status: "approved", note: "Confirmada", reports: [] },
+      },
+    ],
+  });
+  assert.equal(omission.body.results[0].status, "updated");
+  assert.equal(omission.body.results[0].project.commercial.reports.length, 500);
+  assert.equal(omission.body.results[0].project.commercial.status, "approved");
+});
+
+test("technical restores preserve current relationships and reports; conflict copies start a separate decision", async () => {
+  const owner = await register("family-restore-owner", "Restore family");
+  const initial = await request("POST", "/api/sync/push", owner, {
+    projects: [project("restore-family"), project("restore-family-parent")],
+  });
+  const old = initial.body.results.find(
+    (result: any) => result.id === "restore-family",
+  ).project;
+  const report = {
+    id: "restore-report",
+    projectId: old.id,
+    status: "approved",
+    note: "Firma recibida",
+    createdAt: "2026-10-15T10:00:00.000Z",
+    createdById: "forged",
+    createdByName: "forged",
+    ownerName: "Unverified",
+  };
+  const saved = (
+    await request("POST", "/api/sync/push", owner, {
+      projects: [
+        {
+          ...old,
+          baseVersion: 1,
+          client: { ...old.client, name: "Contenido nuevo" },
+          proposalLink: { parentId: "restore-family-parent", color: "#2563b8" },
+          commercial: {
+            status: "approved",
+            note: "Firma recibida",
+            reports: [report],
+          },
+        },
+      ],
+    })
+  ).body.results[0].project;
+  assert.equal(saved.commercial.reports[0].ownerName, undefined);
+  const history = (
+    await request("GET", `/api/projects/${old.id}/history`, owner)
+  ).body.history;
+  const restored = await request(
+    "POST",
+    `/api/projects/${old.id}/history/${history[0].id}/restore`,
+    owner,
+    { baseVersion: 2 },
+  );
+  assert.equal(restored.status, 200);
+  assert.equal(restored.body.project.client.name, "Prueba");
+  assert.deepEqual(restored.body.project.commercial, saved.commercial);
+  assert.deepEqual(restored.body.project.proposalLink, saved.proposalLink);
+  const copied = await request("POST", "/api/sync/push", owner, {
+    projects: [{ ...restored.body.project, forceNewVersion: true }],
+  });
+  const fork = copied.body.results[0].project;
+  assert.equal(copied.body.results[0].status, "forked");
+  assert.equal(fork.commercial.status, "pending");
+  assert.equal(fork.commercial.note, "");
+  assert.equal(fork.commercial.reports.length, 0);
+  assert.equal(fork.proposalLink.parentId, old.id);
+});
+
+test("migration of an exact legacy note preserves inactive historical attribution without allowing new inactive assignments", async () => {
+  const owner = await register("legacy-report-owner", "Legacy reporting");
+  const seller = await provision("EDITOR", "legacy-report-seller", owner);
+  const old = (
+    await request("POST", "/api/sync/push", seller, {
+      projects: [
+        {
+          ...project("legacy-report"),
+          commercial: {
+            status: "pending",
+            note: "Llamada previa",
+            ownerId: seller.id,
+          },
+        },
+      ],
+    })
+  ).body.results[0].project;
+  await pool.query("UPDATE users SET is_active=FALSE WHERE id=$1", [seller.id]);
+  const historical = {
+    id: `legacy-${old.id}`,
+    projectId: old.id,
+    status: old.commercial.status,
+    note: old.commercial.note,
+    ownerId: seller.id,
+    ownerName: seller.name,
+    createdAt: old.commercial.updatedAt,
+    createdById: "forged",
+    createdByName: "Forged",
+  };
+  const report = {
+    id: "new-after-legacy",
+    projectId: old.id,
+    status: "approved",
+    note: "Se retomó contacto",
+    ownerId: owner.id,
+    createdAt: "2026-10-15T10:00:00.000Z",
+  };
+  const migration = await request("POST", "/api/sync/push", owner, {
+    projects: [
+      {
+        ...old,
+        baseVersion: 1,
+        commercial: {
+          ...old.commercial,
+          status: "approved",
+          ownerId: owner.id,
+          note: report.note,
+          reports: [historical, report],
+        },
+      },
+    ],
+  });
+  const saved = migration.body.results[0].project;
+  assert.equal(migration.body.results[0].status, "updated");
+  assert.equal(saved.commercial.reports[0].createdById, seller.id);
+  assert.equal(saved.commercial.reports[0].createdByName, seller.name);
+  assert.equal(saved.commercial.reports[0].ownerName, seller.name);
+  assert.equal(saved.commercial.reports[0].createdAt, old.commercial.updatedAt);
+  assert.equal(saved.commercial.reports[1].createdById, owner.id);
+  const forbidden = await request("POST", "/api/sync/push", owner, {
+    projects: [
+      {
+        ...saved,
+        baseVersion: 2,
+        commercial: {
+          ...saved.commercial,
+          reports: [
+            { ...report, id: "inactive-assignment", ownerId: seller.id },
+          ],
+        },
+      },
+    ],
+  });
+  assert.equal(forbidden.body.results[0].reason, "invalid_commercial_owner");
+});
+
+test("first commercial decision preserves an inactive legacy author without permitting new inactive assignments", async () => {
+  const owner = await register(
+    "legacy-owner-migration",
+    "Legacy default owners",
+  );
+  const seller = await provision("EDITOR", "legacy-default-seller", owner);
+  const inactive = await provision("EDITOR", "legacy-other-inactive", owner);
+  const created = await request("POST", "/api/sync/push", seller, {
+    projects: [
+      project("legacy-default-owner"),
+      {
+        ...project("explicitly-unassigned-owner"),
+        commercial: { status: "pending", note: "" },
+      },
+    ],
+  });
+  const legacy = created.body.results.find(
+    (result: any) => result.id === "legacy-default-owner",
+  ).project;
+  const unassigned = created.body.results.find(
+    (result: any) => result.id === "explicitly-unassigned-owner",
+  ).project;
+  assert.equal(legacy.commercial, undefined);
+  await pool.query(
+    "UPDATE users SET is_active=FALSE WHERE id=ANY($1::text[])",
+    [[seller.id, inactive.id]],
+  );
+  const decision = {
+    status: "approved",
+    note: "",
+    ownerId: seller.id,
+    ownerName: "Forged historical owner",
+  };
+  const rejected = await request("POST", "/api/sync/push", owner, {
+    projects: [
+      {
+        ...legacy,
+        commercial: { ...decision, ownerId: inactive.id },
+      },
+      {
+        ...unassigned,
+        commercial: decision,
+      },
+      {
+        ...project("new-with-forged-author"),
+        authorId: seller.id,
+        authorName: seller.name,
+        commercial: decision,
+      },
+      {
+        ...legacy,
+        commercial: { ...decision, ownerId: other.id },
+      },
+    ],
+  });
+  assert.ok(
+    rejected.body.results.every(
+      (result: any) => result.reason === "invalid_commercial_owner",
+    ),
+    JSON.stringify(rejected.body),
+  );
+  // Keeping an old owner is distinct from assigning that inactive person to a new report.
+  const report = await request("POST", "/api/sync/push", owner, {
+    projects: [
+      {
+        ...legacy,
+        commercial: {
+          ...decision,
+          reports: [
+            {
+              id: "inactive-owner-report",
+              projectId: legacy.id,
+              status: "approved",
+              note: "New assignment",
+              ownerId: seller.id,
+              createdAt: new Date().toISOString(),
+            },
+          ],
+        },
+      },
+    ],
+  });
+  assert.equal(report.body.results[0].reason, "invalid_commercial_owner");
+  const migrated = await request("POST", "/api/sync/push", owner, {
+    projects: [{ ...legacy, commercial: decision }],
+  });
+  assert.equal(migrated.body.results[0].status, "updated");
+  const saved = migrated.body.results[0].project;
+  assert.equal(saved.commercial.status, "approved");
+  assert.equal(saved.commercial.ownerId, seller.id);
+  assert.equal(saved.commercial.ownerName, legacy.authorName);
+  assert.equal(saved.commercial.updatedById, owner.id);
+  const changed = await request("POST", "/api/sync/push", owner, {
+    projects: [
+      {
+        ...saved,
+        commercial: {
+          ...saved.commercial,
+          ownerId: owner.id,
+          ownerName: "Forged active owner",
+        },
+      },
+    ],
+  });
+  assert.equal(changed.body.results[0].status, "updated");
+  assert.equal(
+    changed.body.results[0].project.commercial.ownerName,
+    owner.name,
+  );
+  const reassignment = await request("POST", "/api/sync/push", owner, {
+    projects: [{ ...changed.body.results[0].project, commercial: decision }],
+  });
+  assert.equal(reassignment.body.results[0].reason, "invalid_commercial_owner");
+});

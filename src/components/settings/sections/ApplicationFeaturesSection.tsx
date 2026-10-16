@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { LockKeyhole, RefreshCw } from 'lucide-react';
-import { APPLICATION_FEATURES, featureScope } from '../../../../shared/applicationFeatures';
+import { BUILT_IN_APPLICATION_FEATURES, APPLICATION_FEATURES, featureScope } from '../../../../shared/applicationFeatures';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { effectiveFeatureSettings } from '../../../features/application/featurePolicy';
 
@@ -38,6 +38,7 @@ export function ApplicationFeaturesSection() {
       </div>
       <button type="button" role="switch" aria-checked={state.appAssistantEnabled} aria-labelledby="feature-title-app-assistant" aria-describedby="feature-description-app-assistant" onClick={()=>state.setAppAssistantEnabled(!state.appAssistantEnabled)} className={`mt-1 flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition-colors ${state.appAssistantEnabled?'bg-emerald-700':'bg-slate-300 ring-1 ring-slate-500 dark:bg-zinc-600 dark:ring-zinc-400'}`}><span className={`h-5 w-5 rounded-full bg-white transition-transform ${state.appAssistantEnabled?'translate-x-5':''}`}/></button>
     </div>
+    {BUILT_IN_APPLICATION_FEATURES.map(feature=><div key={feature.id} className="rounded-xl border border-slate-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><h4 className="text-sm font-semibold text-slate-900 dark:text-white">{feature.title} <span className="ml-2 text-xs font-normal text-emerald-700 dark:text-emerald-300">Estable · Siempre disponible</span></h4><p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">{feature.description}</p></div>)}
     <div className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
       {APPLICATION_FEATURES.map((feature) => <div key={feature.id} className="flex items-start justify-between gap-6 p-5">
         <div className="max-w-2xl">

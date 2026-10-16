@@ -1,6 +1,7 @@
 /** Disposable synthetic fixture: all requests are intercepted locally. */
 import { createRoot } from "react-dom/client";
 import { EquipmentManagerSettingsTab } from "../../../src/components/common/EquipmentManagerSettingsTab";
+import { SupplierPricesDetailModal } from "../../../src/components/common/SupplierPricesDetailModal";
 import { AIDatasheetScannerModal } from "../../../src/components/common/AIDatasheetScannerModal";
 import { useSimulationStore } from "../../../src/store/useSimulationStore";
 import "../../../src/index.css";
@@ -76,7 +77,7 @@ useSimulationStore.setState({
             : []),
         ],
       }))
-    : [item],
+    : [{...item,supplierPrices:params.has("emptyOffers")?[]:item.supplierPrices}],
   projects: [],
   sidebarTheme: dark ? "dark" : "light",
   workspaceScope: "https://qa.example.invalid|qa-org",
@@ -158,6 +159,6 @@ createRoot(document.getElementById("root")!).render(
     className={`min-h-screen p-6 ${dark ? "bg-[#141619] text-zinc-100" : "bg-slate-50 text-slate-900"}`}
   >
     <EquipmentManagerSettingsTab isDark={dark} />
-    <AIDatasheetScannerModal />
+    <SupplierPricesDetailModal/><AIDatasheetScannerModal />
   </div>,
 );

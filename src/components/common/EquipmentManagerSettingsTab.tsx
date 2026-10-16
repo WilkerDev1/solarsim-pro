@@ -587,7 +587,6 @@ export const EquipmentManagerSettingsTab: React.FC<
       {viewMode === "suppliers" ? (
         <SupplierManagerSection
           isDark={isDark}
-          onBackToEquipment={() => setViewMode("equipment")}
         />
       ) : (
         <>

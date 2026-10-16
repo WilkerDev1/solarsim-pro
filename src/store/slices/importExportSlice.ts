@@ -1,3 +1,4 @@
+import { commercialCopy } from '../../../shared/proposalCommercial';
 import { projectMutationMetadata } from '../sync/projectMutation';
 import { SimulationSlice, ImportExportSlice } from '../types';
 import { ProjectSimulation } from '../../types';
@@ -203,6 +204,8 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
         const currentUser = get().syncSettings?.currentUser;
         processedProjects.push({
           ...proj,
+          commercial: commercialCopy(proj, currentUser || undefined),
+          proposalLink: undefined,
           id: finalId,
           updatedAt: new Date().toISOString(),
           organizationId: currentUser?.organizationId,
@@ -262,6 +265,8 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
       const newId = `proj-imported-${Date.now()}`;
       const newProj: ProjectSimulation = {
         ...incomingProject,
+        commercial: commercialCopy(incomingProject, currentUser || undefined),
+        proposalLink: undefined,
         id: newId,
         updatedAt: new Date().toISOString(),
         organizationId: currentUser?.organizationId,
@@ -281,6 +286,9 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
     } else if (strategy === 'overwrite') {
       const updatedProj: ProjectSimulation = {
         ...incomingProject,
+        // Importing technical content must not replace destination-owned history or links.
+        commercial: conflictingProject.commercial,
+        proposalLink: conflictingProject.proposalLink,
         id: conflictingProject.id,
         updatedAt: new Date().toISOString(),
         organizationId: conflictingProject.organizationId,
@@ -296,6 +304,8 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
       const dupIdentifiers = generateDuplicateProjectIdentifiers(incomingProject, currentProjects);
       const newProj: ProjectSimulation = {
         ...incomingProject,
+        commercial: commercialCopy(incomingProject, currentUser || undefined),
+        proposalLink: undefined,
         id: newId,
         updatedAt: new Date().toISOString(),
         organizationId: currentUser?.organizationId,

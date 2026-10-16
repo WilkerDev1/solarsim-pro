@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-12T21:21:18.951004+00:00",
+  "generatedAt": "2026-10-15T16:57:44.279532Z",
   "title": "Design System: SolarSim Pro — Centro empresarial",
   "extensions": {
     "colorMeta": {
@@ -557,6 +557,14 @@
       "body": {
         "displayName": "Texto operativo",
         "purpose": "Explicaciones y valores editables."
+      },
+      "summary-metric": {
+        "displayName": "Cifra principal de resumen",
+        "purpose": "Cuatro métricas tabulares de proyecto; unidades subordinadas, no campos ni navegación."
+      },
+      "summary-metric-compact": {
+        "displayName": "Cifra compacta de resumen",
+        "purpose": "Mismas cuatro métricas hasta 1150px; no amplía la rampa de formularios."
       }
     },
     "shadows": [
@@ -564,6 +572,11 @@
         "name": "assistant-floating-panel",
         "value": "0 12px 40px rgba(0,0,0,.25)",
         "purpose": "Panel flotante experimental, no tablas ni revisión de propuestas."
+      },
+      {
+        "name": "offers-and-group-dialog",
+        "value": "0 20px 64px #0004",
+        "purpose": "Diálogos nativos de ofertas y organización; backdrop #0008, sin elevar sus filas internas."
       }
     ],
     "motion": [
@@ -582,6 +595,31 @@
       {
         "name": "defensive-stack",
         "value": "760px"
+      },
+      {
+        "name": "summary-compact",
+        "value": "1150px",
+        "purpose": "Resumen: lateral 300px, gap 16px, secciones 20px y métricas compactas."
+      },
+      {
+        "name": "summary-stack",
+        "value": "1000px",
+        "purpose": "Resumen: una columna, seguimiento primero y métricas en dos columnas."
+      },
+      {
+        "name": "summary-defensive",
+        "value": "600px",
+        "purpose": "Defensa de resumen: campos a una columna y pestañas con scroll; no soporte móvil declarado."
+      },
+      {
+        "name": "document-list-expanded",
+        "value": "1280px",
+        "purpose": "Lista: tabla mínimo 1120px; distribuidora/tipo y actualización recuperan columnas propias."
+      },
+      {
+        "name": "summary-wide",
+        "value": "1700px",
+        "purpose": "Resumen: padding lateral creciente alrededor de referencia de 1500px."
       }
     ]
   },
@@ -683,16 +721,31 @@
       "description": "Panel local opcional con log, resultados React y compositor. Código y fixtures locales revisados; finish reviewer ship al alcance sintético documentado. Fichas PDF: miniatura de primera página mediante PDF.js y descarga completa; sin iframe.",
       "html": "<section class=\"ds-widget\"><header><h2>Asistente</h2><button aria-label=\"Cerrar asistente\">Cerrar</button></header><div class=\"ds-log\"><article class=\"ds-result\"><h3>Equipo del catálogo</h3><p>Modelo y especificaciones disponibles.</p><button>Abrir inventario</button></article></div><form><label for=\"ds-widget-text\">Mensaje al asistente</label><textarea id=\"ds-widget-text\" placeholder=\"Pregunta o pide un cambio…\"></textarea><button class=\"ds-send\">Enviar</button><details><summary>Contexto y privacidad</summary><p>Texto y resultados se envían a Google Gemini. Los cambios requieren confirmar.</p></details></form></section>",
       "css": ".ds-widget{font:14px Inter,sans-serif;color:#edf2f8;width:390px;max-width:calc(100vw - 90px);height:min(660px,calc(100dvh - 110px));min-height:340px;background:#18212d;border:1px solid #374458;border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.25);display:flex;flex-direction:column;overflow:hidden}.ds-widget header{padding:14px 16px;display:flex;align-items:center;border-bottom:1px solid #374458;gap:8px}.ds-widget h2{font-size:14px;font-weight:600;flex:1}.ds-log{flex:1;min-height:0;overflow:auto;padding:20px 16px}.ds-result{border:1px solid #374458;border-radius:10px;padding:12px;margin-top:10px;font-size:12px;line-height:1.5}.ds-result h3{font-size:13px;font-weight:600;margin:0 0 4px}.ds-result p{color:#bac7d8;margin:0 0 8px}.ds-widget button{border:1px solid #52647b;background:#26374d;color:#eef3fb;padding:5px 9px;border-radius:7px;font-size:12px;cursor:pointer}.ds-widget button:hover{background:#283749;color:#fff}.ds-widget form{padding:12px;border-top:1px solid #374458}.ds-widget textarea{display:block;width:calc(100% - 26px);min-height:64px;max-height:160px;resize:vertical;background:#243247;color:#f1f5fb;border:1px solid #52647b;border-radius:12px;padding:10px 12px;font:14px Inter,sans-serif}.ds-widget textarea::placeholder{color:#b9c6d6}.ds-widget button.ds-send{border:1px solid #168763;background:#087b58;color:#fff;border-radius:18px;padding:8px 14px;font-size:13px;margin-top:8px}.ds-widget :is(button,textarea):focus-visible{outline:2px solid #70dbb4;outline-offset:3px}.ds-widget button:disabled{opacity:.5;cursor:not-allowed}.ds-widget details{font-size:12px;color:#bac7d8;margin-top:10px}.ds-widget summary{cursor:pointer}"
+    },
+    {
+      "name": "Decisión comercial rápida",
+      "kind": "input",
+      "description": "Selector compartido de tarjetas/lista; independiente de sincronización y del estado documental.",
+      "html": "<label class=\"ds-decision-label\">Estado de la propuesta<select class=\"ds-decision\" aria-label=\"Estado comercial de propuesta\"><option>En espera de aprobación</option><option>Aprobada</option><option>Rechazada</option><option>De prueba</option></select></label>",
+      "css": ".ds-decision-label{display:grid;gap:6px;font-family:Inter,sans-serif;font-size:12px;color:#536174}.ds-decision{width:100%;min-width:210px;max-width:230px;min-height:36px;padding:7px 24px 7px 10px;border:1px solid #dce2e8;border-radius:8px;background:#fff;color:#536174;font-size:12px;font-weight:550;cursor:pointer;color-scheme:light}.ds-decision:focus-visible{outline:2px solid #087b58;outline-offset:2px}.ds-decision:disabled{cursor:not-allowed;opacity:.7}"
+    },
+    {
+      "name": "Reporte comercial conservado",
+      "kind": "custom",
+      "description": "Último reporte abierto y anteriores en detalles desplegables; estado histórico separado del selector actual. Ejemplo de contenido sintético.",
+      "html": "<section class=\"ds-reports\"><h4>Reportes <span>2</span></h4><article class=\"ds-report\"><header><h4>En espera de aprobación</h4><time>Fecha de registro</time></header><p>Nota de seguimiento registrada.</p><dl><div><dt>Responsable</dt><dd>Consultor de ejemplo</dd></div><div><dt>Registrado por</dt><dd>Autor de ejemplo</dd></div></dl></article><details class=\"ds-report\"><summary><strong>En espera de aprobación</strong><time>Fecha anterior</time></summary><p>Nota anterior conservada.</p></details></section>",
+      "css": ".ds-reports{font-family:Inter,sans-serif;color:#182230;background:#fff;padding:24px;border:1px solid #dce2e8;border-radius:12px}.ds-reports h4{font-size:13px;font-weight:600;margin:0}.ds-reports h4 span,.ds-report time,.ds-report dt{color:#536174}.ds-report{padding:18px 0;border-top:1px solid #dce2e8;margin-top:16px}.ds-report time{display:block;font-size:12px;font-weight:400;margin-top:6px}.ds-report p{font-size:13px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:12px}.ds-report dl{display:grid;gap:8px;margin-top:16px;font-size:12px}.ds-report dl div{display:flex;justify-content:space-between;gap:12px}.ds-report dd{text-align:right;overflow-wrap:anywhere}.ds-report summary{cursor:pointer;font-size:13px}.ds-report summary:focus-visible{outline:2px solid #087b58;outline-offset:2px}"
     }
   ],
   "narrative": {
     "northStar": "Centro de trabajo empresarial",
-    "overview": "El centro empresarial extiende la identidad de SolarSim: Inter, superficies neutras y verde para acciones y selección. Su carácter empresarial procede de la jerarquía de formularios, navegación explícita y tablas de miembros, sin decoración de marketing.\n\nEsta extracción documenta la superficie empresarial implementada, no impone sus valores locales al simulador o al dossier PDF. Los colores `cc-*` pertenecen al ámbito del centro; Dashboard y Ajustes conservan sus propios tokens. La fuente normativa es `src/components/companies/company-center.css`, con tipografía heredada de `src/index.css`.\n\nLa extensión conserva el mismo mundo Operate. La evidencia normativa adicional es `src/components/common/ai-invoice/proposal-workspace.css`, `AIInvoiceScannerModal.tsx`, `ProposalDraftReview.tsx`, `ProposalConsumptionReview.tsx`, `ProposalCommercialReview.tsx` y `EquipmentManagerSettingsTab.tsx`. Los roles `--pw-*` de la revisión coinciden con los neutros y verdes del centro; la conversación tiene un ámbito azul marino permanente confirmado por el usuario y tokens locales `ai-chat-*`; el catálogo usa clases Tailwind equivalentes, sin convertir esas clases en tokens globales. Esta extracción registra únicamente esas superficies, sin reemplazar el sistema empresarial ni canonizar el PDF. La edición final del catálogo se evidencia además en `common/equipment/EquipmentOffersEditor.tsx`, `EquipmentAssetsEditor.tsx`, `EquipmentImagePreview.tsx` y `AIDatasheetScannerModal.tsx`.\n\nLa navegación del asistente reutiliza el dock principal completo, con su estado IA violeta heredado; no contiene una cabecera horizontal exterior. La fuente de ese patrón compartido es `src/components/layout/PrimaryIconDock.tsx`.",
+    "overview": "El centro empresarial extiende la identidad de SolarSim: Inter, superficies neutras y verde para acciones y selección. Su carácter empresarial procede de la jerarquía de formularios, navegación explícita y tablas de miembros, sin decoración de marketing.\n\nEsta extracción documenta la superficie empresarial implementada, no impone sus valores locales al simulador o al dossier PDF. Los colores `cc-*` pertenecen al ámbito del centro; Dashboard y Ajustes conservan sus propios tokens. La fuente normativa es `src/components/companies/company-center.css`, con tipografía heredada de `src/index.css`.\n\nLa extensión conserva el mismo mundo Operate. La evidencia normativa adicional es `src/components/common/ai-invoice/proposal-workspace.css`, `AIInvoiceScannerModal.tsx`, `ProposalDraftReview.tsx`, `ProposalConsumptionReview.tsx`, `ProposalCommercialReview.tsx` y `EquipmentManagerSettingsTab.tsx`. Los roles `--pw-*` de la revisión coinciden con los neutros y verdes del centro; la conversación tiene un ámbito azul marino permanente confirmado por el usuario y tokens locales `ai-chat-*`; el catálogo usa clases Tailwind equivalentes, sin convertir esas clases en tokens globales. Esta extracción registra únicamente esas superficies, sin reemplazar el sistema empresarial ni canonizar el PDF. La edición final del catálogo se evidencia además en `common/equipment/EquipmentOffersEditor.tsx`, `EquipmentAssetsEditor.tsx`, `EquipmentImagePreview.tsx` y `AIDatasheetScannerModal.tsx`.\n\nLa navegación del asistente reutiliza el dock principal completo, con su estado IA violeta heredado; no contiene una cabecera horizontal exterior. La fuente de ese patrón compartido es `src/components/layout/PrimaryIconDock.tsx`.\nEl resumen comercial extiende los mismos neutros y verdes con métricas tabulares, secciones técnicas planas y seguimiento explícito. Sus roles --ps-* y --pc-* reutilizan los valores del centro. La cabecera conecta Resumen, Simulador y Propuesta PDF sobre la misma propuesta; las reglas locales no rediseñan el dossier.\nLas ofertas alternan lista y editor dentro del mismo diálogo. Los logotipos PDF/web tienen controles propios. Las familias de propuestas usan línea funcional de color y menú contextual; el seguimiento distingue estado actual y reportes conservados.",
     "keyCharacteristics": [
       "Formularios por propósito y tablas legibles.",
       "Tema claro y oscuro mediante roles equivalentes.",
       "Selección verde, bordes finos y superficies planas.",
-      "Acciones explícitas próximas al contenido que modifican."
+      "Acciones explícitas próximas al contenido que modifican.",
+      "Decisión comercial, estado documental y sincronización independientes; guardado local explícito."
     ],
     "rules": [
       {
@@ -714,6 +767,16 @@
         "name": "Ofertas en contexto",
         "body": "Las ofertas de un modelo se editan en su misma sección, separadas por divisores horizontales; el contenedor agrupa la tarea sin añadir una tarjeta elevada por proveedor. El importador también separa variantes con divisores y reserva el fondo de aviso para coincidencias o resultados. La sombra pertenece al diálogo completo.\n",
         "section": "elevation"
+      },
+      {
+        "name": "Decisión independiente",
+        "body": "Estado comercial, estado documental y sincronización se muestran por separado. Guardar un reporte confirma el equipo local y anuncia envío posterior al sincronizar; no presenta esa operación como confirmación del servidor. Las cifras aprobadas describen cotizaciones actuales y conservan esa aclaración junto a los resultados.",
+        "section": "components"
+      },
+      {
+        "name": "Familia visible",
+        "body": "La línea de color de 3px identifica parentesco solicitado expresamente. La lista usa sangría de 20px por nivel, limitada a seis niveles; las tarjetas conservan 16px para vinculadas. Los colores editables de familia no recolorean navegación ni acciones y cambiar principal no recolorea el grupo sin edición explícita del color. Las tarjetas de una familia se apilan verticalmente en una misma columna, sin panel exterior.",
+        "section": "components"
       }
     ],
     "dos": [

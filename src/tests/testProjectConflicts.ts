@@ -70,6 +70,7 @@ try {
   assert.notEqual(copies[1].client.projectId, copies[0].client.projectId);
   assert.notEqual(copies[1].client.quoteNumber, copies[0].client.quoteNumber);
   assert.equal(copies[1].authorId, user.id);
+  assert.equal(copies[1].proposalLink?.parentId, local.id, 'Copies of existing proposals remain linked');
   useSimulationStore.setState({ projects: [conflicted], syncEquipmentWithServer: async () => ({success:true,message:'QA'}), isSyncing:false });
   initial.setActiveConflict({ projectId: local.id, localVersion: 0, serverVersion: 1, localProject: conflicted, serverProject: remote, lastModifiedByName: '', lastModifiedAt: '', diffs: [] });
   SyncService.pullProjects = async () => ({ success: true, projects: [], deletedIds: [local.id] });
@@ -85,6 +86,9 @@ try {
   assert.equal(useSimulationStore.getState().projects.length, 1);
   assert.notEqual(useSimulationStore.getState().projects[0].id, local.id);
   assert.equal(useSimulationStore.getState().projects[0].isDeleted, false);
+  assert.equal(useSimulationStore.getState().projects[0].proposalLink, undefined, 'Recovery after remote deletion must not reference a deleted parent');
+  assert.equal(useSimulationStore.getState().projects[0].baseVersion, 0);
+  assert.equal(useSimulationStore.getState().projects[0].syncStatus, 'pending');
 
   useSimulationStore.setState({ projects: [conflicted], activeConflict: null, syncSettings: session });
   let finish!: (result: any) => void;

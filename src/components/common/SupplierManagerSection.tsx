@@ -25,7 +25,7 @@ import {
 import { SupplierOfferRow } from "./suppliers/SupplierOfferRow";
 import "./suppliers/suppliers.css";
 
-type Props = { isDark: boolean; onBackToEquipment: () => void };
+type Props = { isDark: boolean };
 type Offer = { equipment: SolarEquipmentItem; price: EquipmentSupplierPrice };
 const normalized = (name: string) => name.trim().toLocaleLowerCase("es");
 function writable(item?: SolarEquipmentItem) {
@@ -51,7 +51,7 @@ export function SupplierManagerSection(props: Props) {
     />
   );
 }
-function SupplierWorkspace({ isDark, onBackToEquipment }: Props) {
+function SupplierWorkspace({ isDark }: Props) {
   const { equipmentCatalog, equipmentChanges } = useSimulationStore();
   const [supplier, setSupplier] = useState("");
   const [supplierQuery, setSupplierQuery] = useState("");
@@ -403,9 +403,7 @@ function SupplierWorkspace({ isDark, onBackToEquipment }: Props) {
           <h4>Proveedores y ofertas</h4>
           <p>Actualiza precios de compra y disponibilidad por proveedor.</p>
         </div>
-        <button className="supplier-button" onClick={onBackToEquipment}>
-          Ver catálogo de equipos
-        </button>
+
       </header>
       {feedback && (
         <div

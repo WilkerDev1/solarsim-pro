@@ -103,6 +103,10 @@ export interface ProjectSlice {
   restoreProject: (id: string) => void;
   hardDeleteProject: (id: string) => void;
   emptyTrash: () => void;
+  addProposalCommercialReport: (id: string, report: import('../../shared/proposalCommercial').ProposalReportInput, updateCurrent: boolean) => { success: boolean; error?: string };
+  linkProposals: (id: string, parentId: string | null) => { success: boolean; error?: string };
+  setProposalGroupColor: (id: string, color: string) => { success: boolean; error?: string };
+  setProposalCommercialState: (id: string, patch: import('../../shared/proposalCommercial').ProposalCommercialPatch) => { success: boolean; error?: string };
   setProjectStatus: (id: string, status: 'Draft' | 'Final' | 'Archived') => void;
   saveActiveProject: () => void;
 
