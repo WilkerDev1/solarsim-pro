@@ -1,9 +1,10 @@
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-import { setTimeout as delay } from "node:timers/promises";
 import pg from "pg";
+import {
+  startEphemeralPostgres,
+  type EphemeralPostgres,
+} from "./helpers/ephemeralPostgres.js";
 import { createApp } from "../src/app.js";
 import { migrateDatabase } from "../src/database/migrations.js";
 import { createShareViewer } from "../../workers/share-viewer/src/index.js";
@@ -18,10 +19,9 @@ import {
 import { CompanyService } from "../../src/services/companyService.js";
 import type { ProjectSimulation } from "../../src/types/index.js";
 
-const exec = promisify(execFile);
-const container = `solarsim-staging-e2e-${crypto.randomUUID()}`;
 const jwtSecret = "staging-e2e-secret-key-32-chars-long-0123456789";
 
+let database: EphemeralPostgres;
 let pool: pg.Pool;
 let apiApp: ReturnType<typeof createApp>;
 let workerApp: ReturnType<typeof createShareViewer>;
@@ -34,43 +34,8 @@ let veraUser: any;
 
 before(async () => {
   // 1. Launch ephemeral PostgreSQL container
-  await exec("docker", [
-    "run",
-    "--detach",
-    "--rm",
-    "--name",
-    container,
-    "--publish",
-    "127.0.0.1::5432",
-    "--env",
-    "POSTGRES_USER=solarsim_qa",
-    "--env",
-    "POSTGRES_PASSWORD=isolated-qa-password",
-    "--env",
-    "POSTGRES_DB=solarsim_qa",
-    "postgres:16-alpine",
-  ]);
-
-  const portOutput = await exec("docker", ["port", container, "5432/tcp"]);
-  const port = Number(portOutput.stdout.trim().split(":").at(-1));
-
-  pool = new pg.Pool({
-    host: "127.0.0.1",
-    port,
-    user: "solarsim_qa",
-    password: "isolated-qa-password",
-    database: "solarsim_qa",
-    connectionTimeoutMillis: 1000,
-  });
-
-  for (let i = 0; i < 30; i++) {
-    try {
-      await pool.query("SELECT 1");
-      break;
-    } catch {
-      await delay(200);
-    }
-  }
+  database = await startEphemeralPostgres("solarsim-staging-e2e");
+  pool = database.pool;
 
   // 2. Apply all database migrations (001, 002, 003)
   await migrateDatabase(pool);
@@ -133,8 +98,7 @@ before(async () => {
 });
 
 after(async () => {
-  if (pool) await pool.end();
-  await exec("docker", ["rm", "-f", container]).catch(() => {});
+  await database?.stop();
 });
 
 test("Staging E2E: completo ciclo de confirmación de política, publicación web, snapshot y permisos", async () => {

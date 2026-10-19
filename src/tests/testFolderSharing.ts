@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { useSimulationStore as store } from "../store/useSimulationStore";
 import { serializeSimulationStore } from "../store/persistence/serializeSimulationStore";
 import type { ProjectFolder, SyncSettings } from "../types";
+import { hiddenFolderIdSet, isProjectInFolderView } from "../utils/folderVisibility";
 const serverUrl = "https://folders-qa.invalid";
 const session = (id: string, organizationId = "qa-org"): SyncSettings => ({
   serverUrl,
@@ -37,7 +38,27 @@ const json = (value: unknown) =>
     status: 200,
     headers: { "Content-Type": "application/json" },
   });
+function hideFromGeneralScenario() {
+  const normal = store.getState().createFolder("Abierta", "#10b981", "", false);
+  const hidden = store.getState().createFolder("Confidencial", "#8b5cf6", "", true);
+  assert.ok(normal && hidden);
+  assert.equal(normal.hideFromGeneral, false);
+  assert.equal(hidden.hideFromGeneral, true);
+  store.getState().updateFolder(hidden.id, { hideFromGeneral: false });
+  assert.equal(store.getState().folders.find((f) => f.id === hidden.id)?.hideFromGeneral, false);
+  store.getState().updateFolder(hidden.id, { hideFromGeneral: true });
+  const hiddenIds = hiddenFolderIdSet(store.getState().folders);
+  assert.deepEqual([...hiddenIds], [hidden.id]);
+  assert.equal(isProjectInFolderView({ folderId: undefined }, hiddenIds), true);
+  assert.equal(isProjectInFolderView({ folderId: normal.id }, hiddenIds), true);
+  assert.equal(isProjectInFolderView({ folderId: hidden.id }, hiddenIds), false);
+  assert.equal(isProjectInFolderView({ folderId: hidden.id }, hiddenIds, hidden.id), true);
+  assert.equal(isProjectInFolderView({ folderId: normal.id }, hiddenIds, hidden.id), false);
+  store.getState().deleteFolder(normal.id);
+  store.getState().deleteFolder(hidden.id);
+}
 async function run() {
+  hideFromGeneralScenario();
   const originalFetch = globalThis.fetch;
   try {
     globalThis.fetch = async () => {

@@ -38,6 +38,7 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: node scripts/qa/testPrepareSecrets.mjs
+      - run: npx tsx --test scripts/qa/tests/*.test.ts
       - run: npm run build
       - run: npm run build:electron
       - run: npm --prefix server test

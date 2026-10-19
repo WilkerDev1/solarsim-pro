@@ -1,5 +1,4 @@
-import { ProjectSimulation, FinancialSummaryResult } from '../types';
-import { calculateFinancialSummary } from './financeEngine';
+import { ProjectSimulation } from '../types';
 
 export const BENCHMARK_PROJECT: ProjectSimulation = {
   id: 'benchmark-centro-medico',
@@ -71,41 +70,3 @@ export const BENCHMARK_PROJECT: ProjectSimulation = {
   },
   monthlyConsumption: Array(12).fill(3279), // 39,348 kWh total
 };
-
-export function validateReferenceCase(): { pass: boolean; summary: FinancialSummaryResult; diffs: string[] } {
-  const summary = calculateFinancialSummary(
-    BENCHMARK_PROJECT.client.province,
-    BENCHMARK_PROJECT.specs,
-    BENCHMARK_PROJECT.rates,
-    BENCHMARK_PROJECT.financials,
-    BENCHMARK_PROJECT.monthlyConsumption
-  );
-
-  const diffs: string[] = [];
-
-  if (Math.abs(summary.systemCapacityKWp - 23.56) > 0.1) {
-    diffs.push(`Capacidad DC: esperado 23.56 kWp, obtenido ${summary.systemCapacityKWp} kWp`);
-  }
-
-  if (Math.abs(summary.grossInvestmentUSD - 25371.12) > 1.0) {
-    diffs.push(`Inversión bruta: esperada $25,371.12, obtenida $${summary.grossInvestmentUSD}`);
-  }
-
-  if (Math.abs(summary.ley5707CreditUSD - 7785.38) > 1.0) {
-    diffs.push(`Crédito Ley 57-07: esperado $7,785.38, obtenido $${summary.ley5707CreditUSD}`);
-  }
-
-  if (Math.abs(summary.itbisSavedUSD - 1770.46) > 1.0) {
-    diffs.push(`ITBIS exonerado: esperado $1,770.46, obtenido $${summary.itbisSavedUSD}`);
-  }
-
-  if (Math.abs(summary.paybackYears - 2.3) > 0.8) {
-    diffs.push(`Payback: esperado ~2.3 años, obtenido ${summary.paybackYears} años`);
-  }
-
-  return {
-    pass: diffs.length === 0,
-    summary,
-    diffs,
-  };
-}

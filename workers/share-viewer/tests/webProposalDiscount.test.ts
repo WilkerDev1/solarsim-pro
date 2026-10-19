@@ -1,4 +1,4 @@
-import { renderProposalPage } from '../../workers/share-viewer/src/template';
+import { renderProposalPage } from '../src/template';
 
 console.log('=====================================================');
 console.log('🧪 RUNNING WEB PROPOSAL DISCOUNT TEST SUITE');
