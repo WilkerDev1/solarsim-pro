@@ -361,24 +361,41 @@ export class SyncService {
     }
   }
 
+  /** Authenticated request with session retry; propagates a renewed token sent by the server. */
+  private static async send(serverUrl: string, token: string, method: string, path: string, body?: unknown): Promise<Response> {
+    const headers: Record<string, string> = body === undefined ? {} : { 'Content-Type': 'application/json' };
+    headers.Authorization = `Bearer ${token}`;
+    const res = await fetchWithSessionRetry(`${this.cleanUrl(serverUrl)}${path}`, {
+      method,
+      headers,
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+    this.checkRenewedToken(res, serverUrl, token);
+    return res;
+  }
+
+  /** `{ data }` for an ok `{ success: true }` reply; otherwise the server error or `label (HTTP n)`. */
+  private static async readSuccess(res: Response, label: string): Promise<{ data: any; error?: undefined } | { data?: undefined; error: string }> {
+    const data = await res.json().catch(() => null);
+    return res.ok && data?.success ? { data } : { error: data?.error || `${label} (HTTP ${res.status})` };
+  }
+
+  /** For endpoints whose only contract is the HTTP status. */
+  private static async sendOk(serverUrl: string, token: string, method: string, path: string): Promise<boolean> {
+    try {
+      return (await this.send(serverUrl, token, method, path)).ok;
+    } catch {
+      return false;
+    }
+  }
+
   /**
    * Obtener listado de usuarios de la organización (Solo ADMIN)
    */
   static async getCompanyUsers(serverUrl: string, token: string): Promise<{ success: boolean; users: UserProfile[]; error?: string }> {
-    const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetchWithSessionRetry(`${base}/api/users`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      this.checkRenewedToken(res, serverUrl, token);
-      const data = await res.json().catch(() => null);
-      if (!res.ok || !data?.success) {
-        return {
-          success: false,
-          users: [],
-          error: data?.error || `Error al obtener usuarios (HTTP ${res.status})`,
-        };
-      }
+      const { data, error } = await this.readSuccess(await this.send(serverUrl, token, 'GET', '/api/users'), 'Error al obtener usuarios');
+      if (error) return { success: false, users: [], error };
       const users: UserProfile[] = (data.users || []).map((u: any) => ({
         id: u.id,
         name: u.name,
@@ -403,23 +420,9 @@ export class SyncService {
     token: string,
     payload: { name: string; email: string; password: string; role: UserRole }
   ): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
-    const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetchWithSessionRetry(`${base}/api/users`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      this.checkRenewedToken(res, serverUrl, token);
-
-      const data = await res.json().catch(() => null);
-      if (!res.ok || !data?.success) {
-        return { success: false, error: data?.error || `Error al crear usuario (HTTP ${res.status})` };
-      }
-      return { success: true, user: data.user };
+      const { data, error } = await this.readSuccess(await this.send(serverUrl, token, 'POST', '/api/users', payload), 'Error al crear usuario');
+      return error ? { success: false, error } : { success: true, user: data.user };
     } catch (err: any) {
       return { success: false, error: err.message || 'Fallo de red al crear usuario' };
     }
@@ -434,23 +437,9 @@ export class SyncService {
     userId: string,
     payload: { name?: string; role?: UserRole; isActive?: boolean; password?: string }
   ): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
-    const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetchWithSessionRetry(`${base}/api/users/${userId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-      this.checkRenewedToken(res, serverUrl, token);
-
-      const data = await res.json().catch(() => null);
-      if (!res.ok || !data?.success) {
-        return { success: false, error: data?.error || `Error al actualizar usuario (HTTP ${res.status})` };
-      }
-      return { success: true, user: data.user };
+      const { data, error } = await this.readSuccess(await this.send(serverUrl, token, 'PATCH', `/api/users/${userId}`, payload), 'Error al actualizar usuario');
+      return error ? { success: false, error } : { success: true, user: data.user };
     } catch (err: any) {
       return { success: false, error: err.message || 'Fallo de red al actualizar usuario' };
     }
@@ -459,26 +448,10 @@ export class SyncService {
   /**
    * Eliminar usuario de equipo de la organización (Solo ADMIN)
    */
-  static async deleteCompanyUser(
-    serverUrl: string,
-    token: string,
-    userId: string
-  ): Promise<{ success: boolean; error?: string }> {
-    const base = this.cleanUrl(serverUrl);
+  static async deleteCompanyUser(serverUrl: string, token: string, userId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const res = await fetchWithSessionRetry(`${base}/api/users/${userId}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      this.checkRenewedToken(res, serverUrl, token);
-
-      const data = await res.json().catch(() => null);
-      if (!res.ok || !data?.success) {
-        return { success: false, error: data?.error || `Error al eliminar usuario (HTTP ${res.status})` };
-      }
-      return { success: true };
+      const { error } = await this.readSuccess(await this.send(serverUrl, token, 'DELETE', `/api/users/${userId}`), 'Error al eliminar usuario');
+      return error ? { success: false, error } : { success: true };
     } catch (err: any) {
       return { success: false, error: err.message || 'Fallo de red al eliminar usuario' };
     }
@@ -488,23 +461,10 @@ export class SyncService {
    * Pull: Descargar proyectos actualizados en el servidor
    */
   static async pullProjects(serverUrl: string, token: string, lastSyncTimestamp?: string | null): Promise<SyncPullResult> {
-    const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetchWithSessionRetry(`${base}/api/sync/pull`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ lastSyncTimestamp: lastSyncTimestamp || '1970-01-01T00:00:00.000Z' }),
-      });
-      this.checkRenewedToken(res, serverUrl, token);
-
-      const data = await res.json().catch(() => null);
-      if (!res.ok || !data?.success) {
-        return { success: false, error: data?.error || `Error al descargar proyectos (HTTP ${res.status})` };
-      }
-
+      const body = { lastSyncTimestamp: lastSyncTimestamp || '1970-01-01T00:00:00.000Z' };
+      const { data, error } = await this.readSuccess(await this.send(serverUrl, token, 'POST', '/api/sync/pull', body), 'Error al descargar proyectos');
+      if (error) return { success: false, error };
       return {
         success: true,
         projects: Array.isArray(data.projects) ? data.projects : (() => { throw new Error('Respuesta de proyectos inválida.'); })(),
@@ -521,22 +481,9 @@ export class SyncService {
    * Push: Subir proyectos locales modificados hacia el servidor
    */
   static async pushProjects(serverUrl: string, token: string, projects: ProjectSimulation[]): Promise<SyncPushResult> {
-    const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetchWithSessionRetry(`${base}/api/sync/push`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ projects }),
-      });
-      this.checkRenewedToken(res, serverUrl, token);
-
-      const data = await res.json().catch(() => null);
-      if (!res.ok || !data?.success) {
-        return { success: false, error: data?.error || `Error al subir proyectos (HTTP ${res.status})` };
-      }
+      const { data, error } = await this.readSuccess(await this.send(serverUrl, token, 'POST', '/api/sync/push', { projects }), 'Error al subir proyectos');
+      if (error) return { success: false, error };
 
       if (Array.isArray(data.results) && data.results.some((result: any) => result.awaitingConfirmation !== undefined)) throw new Error('Confirmación de sincronización inválida.');
       // Legacy servers acknowledge versions without returning the canonical document.
@@ -570,85 +517,31 @@ export class SyncService {
    * Eliminar un proyecto en el servidor (Soft-Delete a papelera o eliminación definitiva física)
    */
   static async deleteProject(serverUrl: string, token: string, projectId: string, permanent: boolean = false, baseVersion?: number): Promise<boolean> {
-    const base = this.cleanUrl(serverUrl);
-    try {
-      const versionQuery = baseVersion !== undefined ? `&baseVersion=${baseVersion}` : '';
-      const url = `${base}/api/projects/${encodeURIComponent(projectId)}?permanent=${permanent}${versionQuery}`;
-      const res = await fetchWithSessionRetry(url, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      this.checkRenewedToken(res, serverUrl, token);
-      return res.ok;
-    } catch {
-      return false;
-    }
+    const versionQuery = baseVersion !== undefined ? `&baseVersion=${baseVersion}` : '';
+    return this.sendOk(serverUrl, token, 'DELETE', `/api/projects/${encodeURIComponent(projectId)}?permanent=${permanent}${versionQuery}`);
   }
 
   /**
    * Restaurar un proyecto desde la papelera de reciclaje en el servidor
    */
   static async restoreProject(serverUrl: string, token: string, projectId: string, baseVersion?: number): Promise<boolean> {
-    const base = this.cleanUrl(serverUrl);
-    try {
-      const res = await fetchWithSessionRetry(`${base}/api/projects/${encodeURIComponent(projectId)}/restore?baseVersion=${baseVersion ?? ''}`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      this.checkRenewedToken(res, serverUrl, token);
-      return res.ok;
-    } catch {
-      return false;
-    }
+    return this.sendOk(serverUrl, token, 'POST', `/api/projects/${encodeURIComponent(projectId)}/restore?baseVersion=${baseVersion ?? ''}`);
   }
 
   /**
    * Vaciar toda la papelera de reciclaje en el servidor
    */
   static async emptyTrash(serverUrl: string, token: string): Promise<boolean> {
-    const base = this.cleanUrl(serverUrl);
-    try {
-      const res = await fetchWithSessionRetry(`${base}/api/trash`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      this.checkRenewedToken(res, serverUrl, token);
-      return res.ok;
-    } catch {
-      return false;
-    }
+    return this.sendOk(serverUrl, token, 'DELETE', '/api/trash');
   }
 
   /**
    * Pull: Descargar catálogo global de equipos desde el servidor
    */
   static async pullEquipment(serverUrl: string, token: string): Promise<{ success: boolean; items?: SolarEquipmentItem[]; deletedIds?: string[]; error?: string }> {
-    const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetchWithSessionRetry(`${base}/api/equipment`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      this.checkRenewedToken(res, serverUrl, token);
-
-      const data = await res.json().catch(() => null);
-      if (!res.ok || !data?.success) {
-        return { success: false, error: data?.error || `Error al descargar catálogo de equipos (HTTP ${res.status})` };
-      }
-
-      return {
-        success: true,
-        items: data.items || [],
-        deletedIds: data.deletedIds || [],
-      };
+      const { data, error } = await this.readSuccess(await this.send(serverUrl, token, 'GET', '/api/equipment'), 'Error al descargar catálogo de equipos');
+      return error ? { success: false, error } : { success: true, items: data.items || [], deletedIds: data.deletedIds || [] };
     } catch (err: any) {
       return { success: false, error: err.message || 'Error de conexión al obtener equipos' };
     }
@@ -658,28 +551,10 @@ export class SyncService {
    * Push: Subir lote de equipos locales hacia el servidor
    */
   static async pushEquipmentBatch(serverUrl: string, token: string, items: SolarEquipmentItem[]): Promise<{ success: boolean; count?: number; results?: EquipmentPushOutcome[]; error?: string }> {
-    const base = this.cleanUrl(serverUrl);
     try {
-      const res = await fetchWithSessionRetry(`${base}/api/equipment/batch`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ items }),
-      });
-      this.checkRenewedToken(res, serverUrl, token);
-
-      const data = await res.json().catch(() => null);
-      if (!res.ok || !data?.success) {
-        return { success: false, error: data?.error || `Error al subir equipos (HTTP ${res.status})` };
-      }
-
-      return {
-        success: true,
-        count: data.count,
-        results: validatePushResults(data.results, items.map((item) => item.id), 'item'),
-      };
+      const { data, error } = await this.readSuccess(await this.send(serverUrl, token, 'POST', '/api/equipment/batch', { items }), 'Error al subir equipos');
+      if (error) return { success: false, error };
+      return { success: true, count: data.count, results: validatePushResults(data.results, items.map((item) => item.id), 'item') };
     } catch (err: any) {
       return { success: false, error: err.message || 'Error de conexión al enviar equipos' };
     }
@@ -689,19 +564,7 @@ export class SyncService {
    * Delete: Eliminar un equipo del catálogo en el servidor
    */
   static async deleteEquipment(serverUrl: string, token: string, equipmentId: string, baseVersion?: number): Promise<boolean> {
-    const base = this.cleanUrl(serverUrl);
-    try {
-      const res = await fetchWithSessionRetry(`${base}/api/equipment/${encodeURIComponent(equipmentId)}${baseVersion !== undefined ? `?baseVersion=${baseVersion}` : ''}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      this.checkRenewedToken(res, serverUrl, token);
-      return res.ok;
-    } catch {
-      return false;
-    }
+    return this.sendOk(serverUrl, token, 'DELETE', `/api/equipment/${encodeURIComponent(equipmentId)}${baseVersion !== undefined ? `?baseVersion=${baseVersion}` : ''}`);
   }
 
   /**

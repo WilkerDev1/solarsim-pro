@@ -25,6 +25,7 @@ import { PDFColorTheme, PDF_COLOR_THEMES } from '../../../constants/pdfThemes';
 import { ProjectSimulation, DocumentCustomization, ExtraTOCItem } from '../../../types';
 import { PDFAttachmentsSection } from './PDFAttachmentsSection';
 import { PDFSectionId, DEFAULT_PDF_SECTION_ORDER } from '../../../constants/pdfSections';
+import { normalizeSectionOrder } from '../../../utils/pdfLayout';
 
 interface PDFSectionTogglesProps {
   isDark: boolean;
@@ -108,17 +109,10 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
 
   const extraTocItems: ExtraTOCItem[] = project?.customization?.extraTocItems || [];
 
-  const currentOrder: PDFSectionId[] = useMemo(() => {
-    const saved = project?.customization?.sectionOrder;
-    if (saved && Array.isArray(saved) && saved.length > 0) {
-      const validSaved = saved.filter((id): id is PDFSectionId =>
-        DEFAULT_PDF_SECTION_ORDER.includes(id as PDFSectionId)
-      );
-      const missing = DEFAULT_PDF_SECTION_ORDER.filter((id) => !validSaved.includes(id));
-      return [...validSaved, ...missing];
-    }
-    return DEFAULT_PDF_SECTION_ORDER;
-  }, [project?.customization?.sectionOrder]);
+  const currentOrder = useMemo(
+    () => normalizeSectionOrder(project?.customization?.sectionOrder),
+    [project?.customization?.sectionOrder]
+  );
 
   const isOrderModified = useMemo(() => {
     if (currentOrder.length !== DEFAULT_PDF_SECTION_ORDER.length) return true;

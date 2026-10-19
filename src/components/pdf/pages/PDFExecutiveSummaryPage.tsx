@@ -1,3 +1,4 @@
+import { PDFPageShell } from '../PDFPageShell';
 import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
@@ -114,26 +115,16 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
   const freeYears = Math.max(0, Math.round(25 - paybackYearsRaw));
 
   return (
-    <div className="pdf-page w-[850px] h-[1202px] min-h-[1202px] max-h-[1202px] bg-white shadow-xl flex flex-col shrink-0 relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
-      {/* Marca de agua institucional */}
-      <PDFWatermark
-        opacity={project.customization?.watermarkOpacity ?? 0.15}
-        customWatermarkBase64={project.customization?.watermarkLogoBase64}
-      />
-
-      {/* Encabezado Superior Oficial */}
-      {showHeadersFooters && (
-        <PDFHeaderBanner
-          activeTheme={activeTheme}
-          projectId={project.client.projectId}
-          clientName={project.client.name}
-          systemCapacityKWp={summary.systemCapacityKWp}
-          location={project.client.province || project.client.location}
-          currentDateStr={currentDateStr}
-          pageTitle="CUADRO RESUMEN DE INVERSIÓN Y RETORNO"
-          customization={project.customization}
-        />
-      )}
+    <PDFPageShell
+      project={project}
+      summary={summary}
+      activeTheme={activeTheme}
+      showHeadersFooters={showHeadersFooters}
+      currentDateStr={currentDateStr}
+      pageNum={pageNum}
+      totalPages={totalPages}
+      pageTitle="CUADRO RESUMEN DE INVERSIÓN Y RETORNO"
+    >
 
       {/* Contenido Principal de la Página */}
       <div className="px-9 py-6 flex-1 flex flex-col justify-between relative z-10 min-h-0">
@@ -554,15 +545,6 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
           </span>
         </div>
       </div>
-
-      {/* Pie de página Oficial */}
-      {showHeadersFooters && (
-        <PDFFooter
-          pageNum={pageNum}
-          totalPages={totalPages}
-          customization={project.customization}
-        />
-      )}
-    </div>
+    </PDFPageShell>
   );
 };

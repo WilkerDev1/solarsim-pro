@@ -1,3 +1,5 @@
+import { PDFPageShell } from '../PDFPageShell';
+import { cleanClientName } from '../../../../shared/proposalPresentation';
 import React from 'react';
 import {
   BarChart,
@@ -51,26 +53,16 @@ export const PDFPage3ROI: React.FC<PDFPage3ROIProps> = ({
   const year25Obj = cf25[cf25.length - 1] || cf25[0];
 
   return (
-    <div className="pdf-page w-[850px] h-[1202px] min-h-[1202px] max-h-[1202px] bg-white shadow-xl flex flex-col shrink-0 relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
-      {/* Background Watermark */}
-      <PDFWatermark
-        opacity={project.customization?.watermarkOpacity ?? 0.15}
-        customWatermarkBase64={project.customization?.watermarkLogoBase64}
-      />
-
-      {/* Header Banner */}
-      {showHeadersFooters && (
-        <PDFHeaderBanner
-          activeTheme={activeTheme}
-          projectId={project.client.projectId}
-          clientName={project.client.name}
-          systemCapacityKWp={summary.systemCapacityKWp}
-          location={project.client.province || project.client.location}
-          currentDateStr={currentDateStr}
-          pageTitle="RETORNO DE INVERSIÓN - RESUMEN"
-          customization={project.customization}
-        />
-      )}
+    <PDFPageShell
+      project={project}
+      summary={summary}
+      activeTheme={activeTheme}
+      showHeadersFooters={showHeadersFooters}
+      currentDateStr={currentDateStr}
+      pageNum={pageNum}
+      totalPages={totalPages}
+      pageTitle="RETORNO DE INVERSIÓN - RESUMEN"
+    >
 
       {/* Body */}
       <div className="px-10 pt-3 pb-3 flex-1 flex flex-col gap-2.5 relative z-10 min-h-0">
@@ -123,7 +115,7 @@ export const PDFPage3ROI: React.FC<PDFPage3ROIProps> = ({
               <tbody className="divide-y divide-gray-200 text-gray-700 font-semibold">
                 <tr className="bg-gray-50/60">
                   <td className="px-4 py-1.5 text-gray-800 w-1/2">Cliente</td>
-                  <td className="px-4 py-1.5 text-right font-bold uppercase text-gray-900">{(project.client.name || 'Cliente').replace(/\s*\((?:Copia|Copia Importada|COPIA|V\d+|C\d+)\)\s*/gi, '').trim()}</td>
+                  <td className="px-4 py-1.5 text-right font-bold uppercase text-gray-900">{cleanClientName(project.client.name || 'Cliente')}</td>
                 </tr>
                 <tr>
                   <td className="px-4 py-1.5 text-gray-800">Potencia Instalada (kWp)</td>
@@ -244,15 +236,6 @@ export const PDFPage3ROI: React.FC<PDFPage3ROIProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Footer */}
-      {showHeadersFooters && (
-        <PDFFooter
-          pageNum={pageNum}
-          totalPages={totalPages}
-          customization={project.customization}
-        />
-      )}
-    </div>
+    </PDFPageShell>
   );
 };

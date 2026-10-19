@@ -1,3 +1,5 @@
+import { PDFPageShell } from '../PDFPageShell';
+import { cleanClientName, getTariffDisplayName } from '../../../../shared/proposalPresentation';
 import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult, DocumentCustomization } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
@@ -9,7 +11,6 @@ import { FileText, ShieldAlert, Sparkles, Zap, BatteryCharging, Sun } from 'luci
 import { renderFormattedMarkdown, resolveDynamicProjectSummaryParagraph1, resolveDynamicProjectSummaryParagraph2 } from '../../../utils/textFormatter';
 
 import { InlineEditableText } from '../common/InlineEditableText';
-import { getTariffDisplayName } from '../../../types/tariffs';
 import {
   formatPanelsSummary,
   formatInvertersSummary,
@@ -78,7 +79,7 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
   const paragraphs = getRegulatoryParagraphs();
 
   const rawClientName = project.client.name || 'Cliente';
-  const clientName = rawClientName.replace(/\s*\((?:Copia|Copia Importada|COPIA|V\d+|C\d+)\)\s*/gi, '').trim();
+  const clientName = cleanClientName(rawClientName);
   const rawPanelModel = project.specs.panelBrandModel || 'Módulos Monocristalinos TOPCon';
   const panelModel = (rawPanelModel.toLowerCase().includes('w') || (project.specs.panelPowerW || 0) <= 0)
     ? rawPanelModel
@@ -138,26 +139,16 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
   const defaultRegulatoryText = paragraphs.join('\n\n');
 
   return (
-    <div className="pdf-page w-[850px] h-[1202px] min-h-[1202px] max-h-[1202px] bg-white shadow-xl flex flex-col shrink-0 relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
-      {/* Background Watermark */}
-      <PDFWatermark
-        opacity={project.customization?.watermarkOpacity ?? 0.15}
-        customWatermarkBase64={project.customization?.watermarkLogoBase64}
-      />
-
-      {/* Header Banner */}
-      {showHeadersFooters && (
-        <PDFHeaderBanner
-          activeTheme={activeTheme}
-          projectId={project.client.projectId}
-          clientName={project.client.name}
-          systemCapacityKWp={summary.systemCapacityKWp}
-          location={project.client.province || project.client.location}
-          currentDateStr={currentDateStr}
-          pageTitle="4. DESCRIPCIÓN DEL PROYECTO & NORMATIVA SIE"
-          customization={project.customization}
-        />
-      )}
+    <PDFPageShell
+      project={project}
+      summary={summary}
+      activeTheme={activeTheme}
+      showHeadersFooters={showHeadersFooters}
+      currentDateStr={currentDateStr}
+      pageNum={pageNum}
+      totalPages={totalPages}
+      pageTitle="4. DESCRIPCIÓN DEL PROYECTO & NORMATIVA SIE"
+    >
 
       {/* Body */}
       <div className="px-10 pt-3.5 pb-3 flex-1 flex flex-col justify-between text-xs text-slate-800 relative z-10 min-h-0">
@@ -301,15 +292,6 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
           </div>
         </div>
       </div>
-
-      {/* Footer */}
-      {showHeadersFooters && (
-        <PDFFooter
-          pageNum={pageNum}
-          totalPages={totalPages}
-          customization={project.customization}
-        />
-      )}
-    </div>
+    </PDFPageShell>
   );
 };

@@ -1,4 +1,5 @@
 import React from 'react';
+import { cleanClientName } from '../../../../shared/proposalPresentation';
 import { ProjectSimulation, FinancialSummaryResult, ClientInfo } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
 import { Phone, MapPin, Globe, Instagram, MapPinned } from 'lucide-react';
@@ -37,7 +38,7 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
   const hasLogoImage = Boolean(coverLogoSrc);
 
   const rawClientName = project.client.name || 'Centro Médico Hispánico';
-  const clientName = rawClientName.replace(/\s*\((?:Copia|Copia Importada|COPIA|V\d+|C\d+)\)\s*/gi, '').trim().toUpperCase();
+  const clientName = cleanClientName(rawClientName).toUpperCase();
   const clientLocation = project.client.province || project.client.location || 'Santo Domingo / Distrito Nacional';
   const panelModelText = `${project.specs.panelCount} Módulos Tier-1 (${project.specs.panelPowerW}W)`;
 
