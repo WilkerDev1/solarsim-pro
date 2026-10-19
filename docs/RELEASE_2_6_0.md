@@ -22,7 +22,13 @@ Visor Cloudflare desplegado: versión `a64ff1c5-93eb-4b19-bdab-3409de640769`, re
 
 ### Incidencia de conectividad posterior
 
-Al reanudar a las 20:24 UTC, el acceso público a API devolvió HTTP 530 / Cloudflare 1033. `pve01` figuraba desconectado en Tailscale, con última presencia `2026-10-16T14:32:43Z`, y SSH agotó el tiempo de conexión. La API había quedado desplegada y saludable en 2.6.0; su disponibilidad actual requiere recuperar conectividad del host y repetir health/auth/CORS. El visor Cloudflare continúa saludable. No se atribuye esta indisponibilidad a un fallo de la aplicación sin acceso al host.
+Al reanudar a las 20:24 UTC, el acceso público a API devolvió HTTP 530 / Cloudflare 1033. `pve01` figuraba desconectado en Tailscale, con última presencia `2026-10-16T14:32:43Z`, y SSH agotó el tiempo de conexión. La API había quedado desplegada y saludable en 2.6.0; en ese momento quedó pendiente recuperar conectividad del host y repetir health/auth/CORS. El visor Cloudflare continúa saludable. No se atribuye esta indisponibilidad a un fallo de la aplicación sin acceso al host.
+
+### Cierre de conectividad — 19 de octubre de 2026
+
+Verificación de solo lectura completada: acceso SSH a pve01 restablecido, CT100 en ejecución, API `solarsim-api-api:2.6.0-4d51c99` y PostgreSQL saludables. `/api/health` público y local confirmó versión 2.6.0 y base conectada; `/api/auth/me` sin token respondió 401 y la preflight CORS desde `http://localhost:3000` respondió 204. El visor web confirmó health correcto. La imagen en ejecución conserva la revisión de fuente registrada arriba.
+
+La actualización de API del 16 de octubre permanecía instalada; no fue necesario reconstruirla, desplegarla de nuevo ni modificar la base de producción. La incidencia de conectividad queda cerrada. Antes de este cierre, beta y main ya coincidían en `c0d9587516ec288b119ebb3da61d32211c33cbfa`, con ambos workflows de contratos aprobados (runs `38962501305` y `38962498898`); no había cambios locales ni commits de código pendientes. En este cierre se repitieron los ocho gates obligatorios: lint, 50 suites de cliente, compilaciones web/Electron, 39 pruebas API en PostgreSQL efímero y build de servidor, además de tres suites y build del visor. Todos pasaron; no se realizaron escrituras de prueba en producción.
 
 ## Rollback
 

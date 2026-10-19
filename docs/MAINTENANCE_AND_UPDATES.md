@@ -6,7 +6,7 @@ Trabajar funcionalidades en beta o rama codex/ desde beta; main recibe publicaci
 
 [2.6.0](https://github.com/WilkerDev1/solarsim-pro/releases/tag/v2.6.0) es la versión estable Latest. El tag fija `cdc3772820e88003ffed3a4076ecd69166307bae`; [Actions 38913577753](https://github.com/WilkerDev1/solarsim-pro/actions/runs/38913577753) aprobó contratos, compilación e instalación/arranque nativos Windows/Linux. Los paquetes Linux y manifiestos están firmados con la clave GPG fijada, y los 20 assets remotos se verificaron por tamaño y SHA256 antes de publicar.
 
-Desarrollo integrado en beta (PR #9) y beta en main (PR #10), conservando las ramas. API desplegada en 2.6.0 y visor actualizado tras ensayo de respaldo/restauración aislado. [Entrega y estado operativo](RELEASE_2_6_0.md) registra también la pérdida posterior de conectividad de pve01: la comprobación pública de API debe repetirse al recuperar el host. [Notas](../release/release-notes-v2.6.0.md) detallan proveedores, familias de propuestas, reportes comerciales, logos independientes y correcciones de sincronización/importación.
+Desarrollo integrado en beta (PR #9) y beta en main (PR #10), conservando las ramas. API desplegada en 2.6.0 y visor actualizado tras ensayo de respaldo/restauración aislado. [Entrega y estado operativo](RELEASE_2_6_0.md) registra la pérdida posterior de conectividad de pve01 y su cierre el 19 de octubre: API 2.6.0 y PostgreSQL saludables, health público, autenticación y CORS verificados sin nuevo despliegue. [Notas](../release/release-notes-v2.6.0.md) detallan proveedores, familias de propuestas, reportes comerciales, logos independientes y correcciones de sincronización/importación.
 
 ## Publicación 2.5.1
 
