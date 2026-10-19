@@ -186,11 +186,11 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
             <div className="w-[380px] bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1.5 text-[11px]">
               <div className="flex justify-between text-slate-700">
                 <span className="font-semibold">SUB-TOTAL (USD) SIN ITBIS :</span>
-                <span className="font-bold">${(summary.commercialPreTaxSubtotalUSD ?? (summary.grossInvestmentUSD - (summary.customItemsNonExoneratedITBISUSD || 0))).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span className="font-bold">${summary.commercialPreTaxSubtotalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
               <div className="flex justify-between text-slate-900 bg-slate-200/80 px-2 py-1 rounded font-bold">
                 <span>TOTAL GENERAL (USD) :</span>
-                <span>${((summary.listGrossInvestmentUSD ?? summary.grossInvestmentUSD) + (project.financials.applyITBISExemption ? summary.itbisSavedUSD : 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span>${(summary.listGrossInvestmentUSD + (project.financials.applyITBISExemption ? summary.itbisSavedUSD : 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
               <div className="flex justify-between text-emerald-800 font-semibold">
                 <span>ITBIS A DESCONTAR POR LEY 57-07 US$ :</span>

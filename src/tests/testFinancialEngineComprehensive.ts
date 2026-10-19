@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { calculateFinancialSummary } from '../engine/financeEngine';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
+import { ITBIS_RATE, LEY5707_CREDIT_RATE, appliesItemMargin, customItemsTaxBreakdown, isItemItbisExonerated } from '../../shared/financialRules';
 import { SystemSpecs, UtilityRates, FinancialParams } from '../types';
 
 // Base Setup
@@ -223,6 +224,7 @@ const financialsWithCustomItems: FinancialParams = {
       unit: 'UD',
       unitPriceUSD: 500.0,
       exonerateITBIS: true, // ITBIS $90 exonerado por Ley 57-07
+      applyMargin: false, // costo directo: esta prueba mide solo el ITBIS
     },
     {
       id: 'custom_2',
@@ -231,6 +233,7 @@ const financialsWithCustomItems: FinancialParams = {
       unit: 'GL',
       unitPriceUSD: 300.0,
       exonerateITBIS: false, // NO exonerado: se cobra ITBIS 18% ($54) al cliente
+      applyMargin: false,
     },
   ],
 };
@@ -525,10 +528,12 @@ assert(
   Math.abs(resJenny.grossInvestmentUSD - 11810.62) < 0.01,
   `Total General Cotización coincide 100% con Hoja de Costos: $11,810.62 ($${resJenny.grossInvestmentUSD})`
 );
+// Margen activado por defecto: el ITBIS no exonerado del ítem se cobra sobre su precio con margen ($1,680 × 18% = $302.40).
 assert(
-  Math.abs(resJenny.commercialPreTaxSubtotalUSD! - 11594.62) < 0.01,
-  `Sub-total sin ITBIS en Cotización (con margen) es $11,594.62 ($${resJenny.commercialPreTaxSubtotalUSD})`
+  Math.abs(resJenny.commercialPreTaxSubtotalUSD! - 11508.22) < 0.01,
+  `Sub-total sin ITBIS en Cotización (con margen) es $11,508.22 ($${resJenny.commercialPreTaxSubtotalUSD})`
 );
+assert(Math.abs(resJenny.customItemsNonExoneratedITBISUSD - 302.4) < 0.01, `ITBIS no exonerado del ítem con margen es $302.40 ($${resJenny.customItemsNonExoneratedITBISUSD})`);
 
 // 4. Validar modo Pass-Through directo (sin margen)
 const jennyFinancialsPassThrough: FinancialParams = {
@@ -825,3 +830,54 @@ assert(Math.abs(benchmark.grossInvestmentUSD - 25371.12) <= 1, `Referencia: inve
 assert(Math.abs(benchmark.ley5707CreditUSD - 7785.38) <= 1, `Referencia: crédito Ley 57-07 $7,785.38 ($${benchmark.ley5707CreditUSD})`);
 assert(Math.abs(benchmark.itbisSavedUSD - 1770.46) <= 1, `Referencia: ITBIS exonerado $1,770.46 ($${benchmark.itbisSavedUSD})`);
 assert(Math.abs(benchmark.paybackYears - 2.3) <= 0.8, `Referencia: payback ~2.3 años (${benchmark.paybackYears})`);
+
+// TEST 17: El margen de ítems extra está activado por defecto; solo applyMargin === false lo quita (ambos modos de precio).
+for (const pricingMode of ['cost_matrix', 'direct_watt'] as const) {
+  const specs: SystemSpecs = { ...defaultSpecs, pricingMode, isDetailed: pricingMode === 'cost_matrix', panelUnitPriceUSD: 100, inverterUnitPriceUSD: 1500, installationUnitPriceUSD: 150, saleMarginMultiplier: 1.4 };
+  const withItem = (applyMargin?: boolean) => calculateFinancialSummary(
+    'Santo Domingo / Distrito Nacional',
+    specs,
+    defaultRates,
+    { ...defaultFinancials, customItems: [{ id: 'm', description: 'Canaletas', quantity: 2, unit: 'UD', unitPriceUSD: 250, exonerateITBIS: true, applyMargin }] },
+    monthlyConsumption
+  );
+  const unset = withItem(undefined);
+  const enabled = withItem(true);
+  const disabled = withItem(false);
+  assert.equal(unset.grossInvestmentUSD, enabled.grossInvestmentUSD, `${pricingMode}: applyMargin sin definir aplica el margen`);
+  assert.equal(unset.costMatrix.porcentajeVentaUSD, enabled.costMatrix.porcentajeVentaUSD, `${pricingMode}: matriz igual con margen por defecto`);
+  assert.ok(disabled.grossInvestmentUSD < enabled.grossInvestmentUSD, `${pricingMode}: applyMargin=false quita el margen`);
+}
+
+// TEST 18: Regla única de exoneración de ITBIS por ítem: exonerateITBIS manda; sin él, se usa el campo heredado applyITBIS (por defecto exonerado).
+assert.equal(isItemItbisExonerated({ exonerateITBIS: true, applyITBIS: false }), true);
+assert.equal(isItemItbisExonerated({ exonerateITBIS: false, applyITBIS: true }), false);
+assert.equal(isItemItbisExonerated({ applyITBIS: false }), false);
+assert.equal(isItemItbisExonerated({}), true);
+assert.equal(appliesItemMargin({}), true);
+assert.equal(appliesItemMargin({ applyMargin: false }), false);
+assert.equal(ITBIS_RATE, 0.18);
+assert.equal(LEY5707_CREDIT_RATE, 0.4);
+
+// TEST 19: Desglose de ITBIS de ítems extra compartido por motor y visor web.
+const breakdown = customItemsTaxBreakdown([
+  { quantity: 2, unitPriceUSD: 100, exonerateITBIS: true },                    // 200 × 1.4 = 280 → ITBIS exonerado 50.40
+  { quantity: 1, unitPriceUSD: 100, exonerateITBIS: false, applyMargin: false }, // 100 → ITBIS cobrado 18
+  { quantity: 1, unitPriceUSD: 50, applyITBIS: false },                         // 50 × 1.4 = 70 → ITBIS cobrado 12.60
+], 1.4);
+assert.deepEqual(breakdown, { saleTotalUSD: 450, exoneratedITBISUSD: 50.4, nonExoneratedITBISUSD: 30.6 });
+
+// TEST 20: Paneles e inversores (equipos renovables) nunca generan ITBIS, aunque se desactive la exoneración del proyecto.
+for (const applyITBISExemption of [true, false]) {
+  const r = calculateFinancialSummary(
+    'Santo Domingo / Distrito Nacional',
+    { ...defaultSpecs, pricingMode: 'cost_matrix', isDetailed: true, hasBattery: true, batteryCount: 1, batteryCapacityKWh: 16, batteryUnitPriceUSD: 1990, panelUnitPriceUSD: 100, inverterUnitPriceUSD: 1500, installationUnitPriceUSD: 150, saleMarginMultiplier: 1.3 },
+    defaultRates,
+    { ...defaultFinancials, applyITBISExemption },
+    monthlyConsumption
+  );
+  const [panelRow, inverterRow] = r.costMatrix.items;
+  assert.equal(panelRow.itbisUSD, 0, `Paneles sin ITBIS (exoneración del proyecto ${applyITBISExemption})`);
+  assert.equal(inverterRow.itbisUSD, 0, `Inversores sin ITBIS (exoneración del proyecto ${applyITBISExemption})`);
+  assert.ok(r.costMatrix.items.slice(2).some((row) => row.itbisUSD > 0), 'Baterías y mano de obra sí calculan ITBIS');
+}
