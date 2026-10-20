@@ -26,7 +26,8 @@ function withRecommendedPanels(specs: SystemSpecs, client: ClientInfo, monthlyCo
     specs.systemLosses !== undefined ? specs.systemLosses : 25.0,
     client.customMonthlyHSP
   );
-  return { ...specs, panelCount: rec.recommendedPanelCount };
+  // Goes through the group normalizer so a single panel group receives the recommendation too.
+  return normalizeEquipmentEdit(specs, { panelCount: rec.recommendedPanelCount });
 }
 
 /** Keeps equipment groups and their legacy mirror consistent whatever path changed the specs. */

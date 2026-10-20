@@ -80,4 +80,41 @@ delete legacyProject.financials.customITBISSavedUSD; // hydration already strips
 const persisted: any = { ...store(), projects: [structuredClone(legacyProject)] };
 hydrateSimulationStore(persisted);
 assert.deepEqual(persisted.projects[0], legacyProject, 'Hydration does not touch equipment or sync metadata');
+
+// 6. Regressions reported in review (PR #16).
+const { calculateRecommendedPanelCount } = await import('../engine/solarEngine');
+const fresh = (name: string) => {
+  store().createNewProject({ name, province: 'Santiago', distributor: 'EDENORTE', tariffCode: 'BTS2' });
+  store().updateSpecs({ autoCalculatePanels: true });
+  store().updateAllMonthlyConsumption(2500);
+  return store().getActiveProject();
+};
+const recommendedFor = (powerW: number) => {
+  const p = store().getActiveProject();
+  return calculateRecommendedPanelCount(p.client.province, p.monthlyConsumption, powerW, p.rates.targetCoveragePct ?? 95, p.specs.systemLosses ?? 25, p.client.customMonthlyHSP).recommendedPanelCount;
+};
+// 6a. Changing the panel model on a legacy auto-sized project keeps the recommendation.
+fresh('Auto legado');
+store().updateSpecs({ panelBrandModel: 'Panel 400', panelPowerW: 400 });
+specs = store().getActiveProject().specs;
+assert.equal(specs.autoCalculatePanels, true);
+assert.equal(specs.panelCount, recommendedFor(400), 'Legacy auto-sizing recomputes for the new wattage');
+assert.equal(specs.panels![0].count, specs.panelCount);
+// 6b. Editing the primary group's wattage is not a manual quantity override.
+store().updateSpecs(editEquipmentGroup(store().getActiveProject().specs, 'panel', { type: 'update', index: 0, patch: { powerW: 600 } }));
+specs = store().getActiveProject().specs;
+assert.equal(specs.autoCalculatePanels, true, 'A wattage edit keeps automatic sizing on');
+assert.equal(specs.panels![0].count, recommendedFor(600));
+assert.deepEqual(Object.keys(editEquipmentGroup(specs, 'panel', { type: 'update', index: 0, patch: { brandModel: 'Otro' } })).sort(), ['panelBrandModel', 'panels'], 'Only changed mirror fields are patched');
+// 6c. A new supplier selection reaches the group; clearing it also clears the group.
+store().updateSpecs({ panelUnitPriceUSD: 100, selectedSupplierInfo: { panel: { supplierName: 'Viejo', priceUSD: 100, supplierPriceId: 'old' } } });
+store().updateSpecs({ panelUnitPriceUSD: 80, selectedSupplierInfo: { panel: { supplierName: 'Nuevo', priceUSD: 80, supplierPriceId: 'new' } } });
+specs = store().getActiveProject().specs;
+assert.equal(specs.selectedSupplierInfo?.panel?.supplierPriceId, 'new');
+assert.equal(specs.panels![0].selectedSupplierInfo?.supplierPriceId, 'new');
+assert.equal(specs.panels![0].unitPriceUSD, 80);
+store().updateSpecs({ selectedSupplierInfo: {} });
+specs = store().getActiveProject().specs;
+assert.equal(specs.selectedSupplierInfo?.panel, undefined, 'A cleared supplier is not restored from the group');
+assert.equal(specs.panels![0].selectedSupplierInfo, undefined);
 console.log('Equipment groups: migration parity, group edits and legacy mirror passed.');

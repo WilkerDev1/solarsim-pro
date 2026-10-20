@@ -74,7 +74,11 @@ export function editEquipmentGroup<K extends EquipmentKind>(specs: SystemSpecs, 
     if (groups.length <= 1 || !groups[edit.index]) return {};
     groups.splice(edit.index, 1);
   }
-  return { [LIST_KEY[kind]]: groups, ...mirrorOf(specs, kind, groups[0]) } as Partial<SystemSpecs>;
+  // Only mirror fields that change: an unchanged panelCount in the patch would read as a manual quantity override.
+  const changed = Object.entries(mirrorOf(specs, kind, groups[0])).filter(
+    ([key, value]) => JSON.stringify(specs[key as keyof SystemSpecs]) !== JSON.stringify(value)
+  );
+  return { [LIST_KEY[kind]]: groups, ...Object.fromEntries(changed) } as Partial<SystemSpecs>;
 }
 
 /**
@@ -85,8 +89,11 @@ export function editEquipmentGroup<K extends EquipmentKind>(specs: SystemSpecs, 
  */
 export function normalizeEquipmentEdit(current: SystemSpecs, patch: Partial<SystemSpecs>): SystemSpecs {
   const merged: SystemSpecs = { ...current, ...patch };
+  const supplierChanged = (kind: EquipmentKind) =>
+    'selectedSupplierInfo' in patch &&
+    JSON.stringify(patch.selectedSupplierInfo?.[kind]) !== JSON.stringify(current.selectedSupplierInfo?.[kind]);
   const touched = KINDS.filter((kind) =>
-    patch[LIST_KEY[kind]] !== undefined || Object.values(MIRROR[kind]).some((legacy) => legacy && patch[legacy] !== undefined)
+    patch[LIST_KEY[kind]] !== undefined || supplierChanged(kind) || Object.values(MIRROR[kind]).some((legacy) => legacy && patch[legacy] !== undefined)
   ) as EquipmentKind[];
   if (patch.hasBattery !== undefined && !touched.includes('battery')) touched.push('battery');
   if (touched.length === 0) return merged;
@@ -94,15 +101,18 @@ export function normalizeEquipmentEdit(current: SystemSpecs, patch: Partial<Syst
   const lists: Partial<Record<EquipmentKind, unknown[]>> = {};
   for (const kind of touched) {
     if (patch[LIST_KEY[kind]] !== undefined) continue;
-    const groups = groupsOf(current, kind) as GroupItem[typeof kind][];
-    if (groups.length > 1) continue;
-    const fromPatch: Record<string, unknown> = {};
-    for (const [field, legacy] of Object.entries(MIRROR[kind]) as [string, keyof SystemSpecs][]) {
-      if (patch[legacy] !== undefined) fromPatch[field] = patch[legacy];
-    }
-    const single = groups[0] ?? groupsOf(merged, kind)[0];
-    if (single) lists[kind] = [{ ...single, ...fromPatch }];
-    else lists[kind] = groupsOf(merged, kind);
+    let groups = [...groupsOf(current, kind)] as GroupItem[typeof kind][];
+    if (groups.length <= 1) {
+      const fromPatch: Record<string, unknown> = {};
+      for (const [field, legacy] of Object.entries(MIRROR[kind]) as [string, keyof SystemSpecs][]) {
+        if (patch[legacy] !== undefined) fromPatch[field] = patch[legacy];
+      }
+      const single = groups[0] ?? groupsOf(merged, kind)[0];
+      groups = single ? [{ ...single, ...fromPatch }] : groupsOf(merged, kind);
+    } else if (!supplierChanged(kind)) continue;
+    // The selected supplier belongs to the primary group, like supplier pricing does.
+    if (supplierChanged(kind) && groups[0]) groups[0] = { ...groups[0], selectedSupplierInfo: patch.selectedSupplierInfo?.[kind] };
+    lists[kind] = groups;
   }
   return withGroups(merged, touched, lists);
 }
