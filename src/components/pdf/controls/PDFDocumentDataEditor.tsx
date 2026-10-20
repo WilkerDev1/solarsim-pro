@@ -24,6 +24,7 @@ import { getProposalDateInputValue, formatProposalDate } from '../../../utils/fo
 import {
   ELECTSUN_EMBLEM_WATERMARK_BASE64,
 } from '../../../assets/electsunLogo';
+import { confirmAction } from '../../common/confirmAction';
 
 interface PDFDocumentDataEditorProps {
   isDark: boolean;
@@ -259,8 +260,8 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
           </button>
           <button
             type="button"
-            onClick={() => {
-              if (confirm('¿Deseas restablecer la plantilla predeterminada de propuestas a los valores de fábrica originales?')) {
+            onClick={async () => {
+              if (await confirmAction({ title: 'Restablecer plantilla', message: '¿Deseas restablecer la plantilla predeterminada de propuestas a los valores de fábrica originales?', confirmLabel: 'Restablecer', tone: 'danger' })) {
                 if (resetDefaultDocumentCustomization) {
                   resetDefaultDocumentCustomization();
                 } else {

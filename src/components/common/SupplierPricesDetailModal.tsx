@@ -19,6 +19,7 @@ import { canEditCommercial } from "../../features/proposals/commercial";
 import { contentEqual } from "../../store/sync/projectDifferences";
 import "./suppliers/suppliers.css";
 import "./suppliers/equipment-offers.css";
+import { confirmAction } from "./confirmAction";
 
 export function SupplierPricesDetailModal() {
   const { supplierPriceModalEquipment, workspaceScope, sessionGeneration } =
@@ -68,10 +69,10 @@ function EquipmentOffers({ equipmentId }: { equipmentId: string }) {
       sku !== (editor.original?.sku || "") ||
       notes !== (editor.original?.notes || "") ||
       stock !== (editor.original?.stockStatus || "in_stock"));
-  const abandon = () =>
-    !dirty || window.confirm("¿Descartar la oferta sin guardar?");
-  const close = () => {
-    if (abandon()) state.closeSupplierPriceModal();
+  const abandon = async () =>
+    !dirty || confirmAction({ title: "Descartar oferta", message: "¿Descartar la oferta sin guardar?", confirmLabel: "Descartar", tone: "danger" });
+  const close = async () => {
+    if (await abandon()) state.closeSupplierPriceModal();
   };
   const open = (offer?: EquipmentSupplierPrice) => {
     setEditor({
@@ -109,7 +110,7 @@ function EquipmentOffers({ equipmentId }: { equipmentId: string }) {
       aria-labelledby="equipment-offers-title"
       onCancel={(event) => {
         event.preventDefault();
-        close();
+        void close();
       }}
     >
       <header className="offers-header">
@@ -206,8 +207,8 @@ function EquipmentOffers({ equipmentId }: { equipmentId: string }) {
             <button
               type="button"
               className="offers-back"
-              onClick={() => {
-                if (abandon()) {
+              onClick={async () => {
+                if (await abandon()) {
                   setEditor(null);
                   setFeedback("");
                 }
@@ -405,11 +406,14 @@ function EquipmentOffers({ equipmentId }: { equipmentId: string }) {
                             className="supplier-icon"
                             disabled={!writable}
                             aria-label={`Eliminar oferta de ${offer.supplierName}`}
-                            onClick={() => {
+                            onClick={async () => {
                               if (
-                                window.confirm(
-                                  `¿Eliminar la oferta de ${offer.supplierName} para este equipo?`,
-                                )
+                                await confirmAction({
+                                  title: "Eliminar oferta",
+                                  message: `¿Eliminar la oferta de ${offer.supplierName} para este equipo?`,
+                                  confirmLabel: "Eliminar",
+                                  tone: "danger",
+                                })
                               )
                                 state.removeSupplierPrice(
                                   equipmentId,
@@ -443,8 +447,8 @@ function EquipmentOffers({ equipmentId }: { equipmentId: string }) {
               <button
                 type="button"
                 className="supplier-button"
-                onClick={() => {
-                  if (abandon()) setEditor(null);
+                onClick={async () => {
+                  if (await abandon()) setEditor(null);
                 }}
               >
                 Cancelar

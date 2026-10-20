@@ -4,6 +4,7 @@ import { useSimulationStore } from "../../../store/useSimulationStore";
 import { canEditCommercial } from "../../../features/proposals/commercial";
 import { projectDifferences } from "../../../store/sync/projectDifferences";
 import { CreateSnapshotModal } from "./CreateSnapshotModal";
+import { confirmAction } from "../../common/confirmAction";
 export function ProposalHistory({ project }: { project: ProjectSimulation }) {
   const { snapshotsByProject, restoreSnapshot, syncSettings } =
     useSimulationStore();
@@ -52,11 +53,13 @@ export function ProposalHistory({ project }: { project: ProjectSimulation }) {
                 </button>
                 <button
                   disabled={!canEdit}
-                  onClick={() => {
+                  onClick={async () => {
                     if (
-                      window.confirm(
-                        "¿Restaurar el contenido técnico de esta versión? Se guardará un checkpoint del estado actual. El seguimiento comercial se conserva.",
-                      )
+                      await confirmAction({
+                        title: "Restaurar versión",
+                        message: "¿Restaurar el contenido técnico de esta versión? Se guardará un checkpoint del estado actual. El seguimiento comercial se conserva.",
+                        confirmLabel: "Restaurar contenido",
+                      })
                     ) {
                       const ok = restoreSnapshot(project.id, snapshot.id);
                       setFeedback(

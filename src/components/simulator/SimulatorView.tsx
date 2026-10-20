@@ -7,6 +7,7 @@ import { ParameterSidebar } from './sidebar/ParameterSidebar';
 import { EnergyAnalysisTab } from './tabs/EnergyAnalysisTab';
 import { QuotationEquipmentsTab } from './tabs/QuotationEquipmentsTab';
 import { FinancialReturnTab } from './tabs/FinancialReturnTab';
+import { confirmAction } from '../common/confirmAction';
 
 export const SimulatorView: React.FC = () => {
   const {
@@ -184,8 +185,8 @@ export const SimulatorView: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  if (confirm(`¿Eliminar DEFINITIVAMENTE la propuesta "${project.client?.name}"?\n\nEsta acción NO se puede deshacer.`)) {
+                onClick={async () => {
+                  if (await confirmAction({ title: 'Eliminar definitivamente', message: `¿Eliminar DEFINITIVAMENTE la propuesta "${project.client?.name}"?\n\nEsta acción NO se puede deshacer.`, confirmLabel: 'Eliminar definitivo', tone: 'danger' })) {
                     hardDeleteProject(project.id);
                     setActiveView('dashboard');
                   }

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { Receipt, ChevronDown, ChevronUp, Check, Sparkles, Cloud, RefreshCw, Zap, Coins, DollarSign } from 'lucide-react';
 import { UtilityDistributor, getDistributorTariffOptions } from '../../../types/tariffs';
+import { confirmAction } from '../../common/confirmAction';
 
 interface TariffPreferencesPanelProps {
   isOpen: boolean;
@@ -165,8 +166,8 @@ export const TariffPreferencesPanel: React.FC<TariffPreferencesPanelProps> = ({ 
               </button>
 
               <button
-                onClick={() => {
-                  if (window.confirm('¿Restablecer el pliego tarifario a los valores oficiales base?')) {
+                onClick={async () => {
+                  if (await confirmAction({ title: 'Restablecer tarifas', message: '¿Restablecer el pliego tarifario a los valores oficiales base?', confirmLabel: 'Restablecer', tone: 'danger' })) {
                     resetToDefaultTariffs();
                   }
                 }}
