@@ -1,3 +1,4 @@
+import { isAdminRole } from '../../../shared/permissions';
 import { useEffect, useRef, useState } from "react";
 import {
   CompanyService,
@@ -203,9 +204,9 @@ export function OrganizationManagement({
               <CompanyFields
                 draft={draft}
                 setDraft={setDraft}
-                readOnly={user.role !== "ADMIN" || busy}
+                readOnly={!isAdminRole(user.role) || busy}
               />
-              {user.role === "ADMIN" && (
+              {isAdminRole(user.role) && (
                 <div className="cc-actions">
                   <button
                     type="button"
@@ -233,7 +234,7 @@ export function OrganizationManagement({
           {view === "other" && (
             <section className="cc-section">
               <h3>Otras organizaciones</h3>
-              {user.role === "ADMIN" && (
+              {isAdminRole(user.role) && (
                 <form
                   onSubmit={(event) => {
                     event.preventDefault();

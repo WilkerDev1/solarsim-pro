@@ -1,7 +1,7 @@
+import { canEditCommercial } from '../../features/proposals/commercial';
 import { isProposalLink } from '../../../shared/proposalLinks';
 import { normalizeEquipmentEdit, normalizeSpecsChange } from '../../utils/equipmentGroups';
 import { commercialCopy, commercialState, isProposalCommercial } from '../../../shared/proposalCommercial';
-import { ownsProject } from '../sync/projectReconciliation';
 import { companyDocumentCustomization, reusableDocumentTemplate } from '../../utils/companyDocumentTemplate';
 import { DEFAULT_SIMULATION_SETTINGS } from '../defaultSimulationSettings';
 import { energyCalculationMode } from '../../../shared/applicationFeatures';
@@ -47,8 +47,15 @@ function withoutStaleFinancialOverrides(project: ProjectSimulation, financials: 
 }
 
 export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
+  /** Proposals in the trash are read-only until restored, whatever UI or tool calls the store. */
+  const isActiveProjectTrashed = () => {
+    const state = get();
+    return !!state.projects.find((p) => p.id === (state.activeProjectId || state.getActiveProject()?.id))?.isDeleted;
+  };
+
   /** Applies an edit to the active project, stamps mutation metadata, then auto-syncs and records undo. */
   const updateActiveProject = (edit: (project: ProjectSimulation, state: SimulationStore) => Partial<ProjectSimulation>) => {
+    if (isActiveProjectTrashed()) return;
     set((state) => ({
       projects: state.projects.map((p) => p.id === state.activeProjectId
         ? withNormalizedEquipment(p, { ...p, ...projectMutationMetadata(p, get().syncSettings), updatedAt: new Date().toISOString(), ...edit(p, state) })
@@ -454,8 +461,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
   },
 
   linkProposals: (id, parentId) => {
-    const state=get(), project=state.projects.find(p=>p.id===id), user=state.syncSettings.currentUser;
-    const writable=(p: typeof project)=>p && !p.isDeleted && p.syncStatus!=='conflict' && (!user || (['ADMIN','EDITOR'].includes(user.role) && ownsProject(p,state.syncSettings.serverUrl,user.organizationId)));
+    const state=get(), project=state.projects.find(p=>p.id===id);
+    const writable=(p: typeof project)=>p && canEditCommercial(p,state.syncSettings);
     if(!writable(project))return {success:false,error:'La propuesta no permite cambios.'};
     if(parentId===null){set({projects:state.projects.map(p=>p.id===id?{...p,proposalLink:{parentId:null,color:p.proposalLink?.color},...projectMutationMetadata(p,state.syncSettings),updatedAt:new Date().toISOString()}:p)});state.triggerAutoSync();return {success:true};}
     const parent=state.projects.find(p=>p.id===parentId);if(!writable(parent))return {success:false,error:'La propuesta principal no está disponible para enlazar.'};
@@ -466,12 +473,12 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
   setProposalGroupColor: (id,color) => {
     const state=get();if(!isProposalLink({parentId:null,color}))return {success:false,error:'Color de grupo inválido.'};
     let project=state.projects.find(p=>p.id===id);const visited=new Set<string>();while(project?.proposalLink?.parentId && !visited.has(project.id)){visited.add(project.id);const parent=state.projects.find(p=>p.id===project?.proposalLink?.parentId);if(!parent)break;project=parent;}
-    const user=state.syncSettings.currentUser;if(!project || project.isDeleted || project.syncStatus==='conflict' || (user && (!['ADMIN','EDITOR'].includes(user.role) || !ownsProject(project,state.syncSettings.serverUrl,user.organizationId))))return {success:false,error:'El grupo no permite cambios.'};
+    if(!project || !canEditCommercial(project,state.syncSettings))return {success:false,error:'El grupo no permite cambios.'};
     const root=project;set({projects:state.projects.map(p=>p.id===root.id?{...p,proposalLink:{parentId:p.proposalLink?.parentId||null,color},...projectMutationMetadata(p,state.syncSettings),updatedAt:new Date().toISOString()}:p)});state.triggerAutoSync();return {success:true};
   },
   addProposalCommercialReport: (id,report,updateCurrent) => {
     const state=get(), project=state.projects.find(p=>p.id===id), user=state.syncSettings.currentUser;
-    if(!project || project.isDeleted || project.syncStatus==='conflict' || (user && (!['ADMIN','EDITOR'].includes(user.role) || !ownsProject(project,state.syncSettings.serverUrl,user.organizationId))))return {success:false,error:'La propuesta no permite cambios.'};
+    if(!project || !canEditCommercial(project,state.syncSettings))return {success:false,error:'La propuesta no permite cambios.'};
     const current=commercialState(project), now=new Date().toISOString();
     const reports=[...(current.reports||[])];
     // Preserve the pre-history note once, with its original state and attribution.
@@ -484,7 +491,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
   },
   setProposalCommercialState: (id, patch) => {
     const state = get(), project = state.projects.find(p => p.id === id), user = state.syncSettings.currentUser;
-    if (!project || project.isDeleted || project.syncStatus === 'conflict' || (user && (!['ADMIN', 'EDITOR'].includes(user.role) || !ownsProject(project, state.syncSettings.serverUrl, user.organizationId)))) return { success: false, error: 'Esta propuesta no permite cambios. Revisa permisos, papelera o conflictos pendientes.' };
+    if (!project || !canEditCommercial(project, state.syncSettings)) return { success: false, error: 'Esta propuesta no permite cambios. Revisa permisos, papelera o conflictos pendientes.' };
     const previous = commercialState(project);
     const next = { ...previous, ...patch, updatedAt: new Date().toISOString(), updatedById: user?.id, updatedByName: user?.name || state.localUserProfile.name || 'Consultor local' };
     if (!isProposalCommercial(next)) return {success:false,error:'Estado inválido o nota demasiado larga (máximo 4000 caracteres).'};
@@ -594,6 +601,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     updateActiveConsumption(() => monthlyConsumption.map((v) => Math.max(0, v)), lockAutoPanels),
 
   updateDocumentCustomization: (customizationPartial) => {
+    if (isActiveProjectTrashed()) return;
     set((state) => {
       const targetId = state.activeProjectId || state.getActiveProject()?.id;
       return {
@@ -623,6 +631,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
   },
 
   applySupplierPriceToProject: (equipmentType, supplierPrice, equipmentItem) => {
+    if (isActiveProjectTrashed()) return;
     set((state) => ({
       projects: state.projects.map((p) => {
         if (p.id === state.activeProjectId) {

@@ -1,3 +1,4 @@
+import { isWriterRole } from '../../../../shared/permissions';
 import { EquipmentImagePreview } from './EquipmentImagePreview';
 import React, { useEffect, useRef, useState } from 'react';
 import type { SolarEquipmentItem } from '../../../types/equipment';
@@ -24,7 +25,7 @@ export function EquipmentAssetsEditor({ item, onChange, disabled, dark, onBusy }
   const upload = (file: File | undefined, kind: 'datasheet' | 'image') => {
     if (!file || busy || disabled) return;
     void run(async (server, token, signal, valid) => {
-      if (!['ADMIN', 'EDITOR'].includes(useSimulationStore.getState().syncSettings.currentUser?.role || '')) throw new Error('Tu cuenta solo puede consultar adjuntos.');
+      if (!isWriterRole(useSimulationStore.getState().syncSettings.currentUser?.role || '')) throw new Error('Tu cuenta solo puede consultar adjuntos.');
       const asset = await uploadEquipmentAsset(server, token, file, kind, signal);
       if (!valid()) return;
       if (kind === 'datasheet') onChange({ datasheetAssetId: asset.id, datasheetName: asset.name });

@@ -1,3 +1,4 @@
+import { isWriterRole } from '../../../shared/permissions';
 import { SimulationSlice, FolderSlice } from "../types";
 import { ProjectFolder } from "../../types";
 import { fetchWithSessionRetry } from "../../services/syncService";
@@ -21,7 +22,7 @@ export const createFolderSlice: SimulationSlice<FolderSlice> = (set, get) => {
   } | null = null;
   const writable = () =>
     !get().syncSettings.currentUser ||
-    ["ADMIN", "EDITOR"].includes(get().syncSettings.currentUser!.role);
+    isWriterRole(get().syncSettings.currentUser!.role);
   const dirty = (id: string, baseVersion: number) => ({
     ...get().folderChanges,
     [id]: {

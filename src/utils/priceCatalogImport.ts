@@ -1,3 +1,4 @@
+import { isWriterRole } from '../../shared/permissions';
 import type {
   EquipmentSupplierPrice,
   ExtractedPriceCatalogItem,
@@ -23,7 +24,7 @@ export function planPriceCatalogImport(
   if (!supplierName.trim())
     throw new Error("Completa el nombre del proveedor.");
   const { user } = scope;
-  if (user && !["ADMIN", "EDITOR"].includes(user.role))
+  if (user && !isWriterRole(user.role))
     throw new Error("Tu cuenta solo puede consultar el catálogo.");
   const updates: {
     equipmentId: string;

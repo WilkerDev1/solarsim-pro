@@ -1,3 +1,4 @@
+import { isWriterRole } from '../../../shared/permissions';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { draftOwnerKey } from '../../utils/draftOwnerKey';
 import { calculateProjectFinancialSummary } from '../../engine/financeEngine';
@@ -59,7 +60,7 @@ function canWrite() {
   const s = useSimulationStore.getState();
   const user = s.syncSettings.currentUser;
   return user
-    ? !!s.syncSettings.authToken && ['ADMIN', 'EDITOR'].includes(user.role)
+    ? !!s.syncSettings.authToken && isWriterRole(user.role)
     : s.workspaceScope === 'local';
 }
 export function executeAssistantTool(

@@ -1,3 +1,4 @@
+import { isReaderRole } from '../../../../shared/permissions';
 import React, { useState, useRef, useEffect } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { GlobalTariffMatrix, UtilityDistributor } from '../../../types/tariffs';
@@ -409,7 +410,7 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                 </button>
                 <button
                   onClick={handleApplyAndSyncCloud}
-                  disabled={isSyncingCloud || !reviewConfirmed || !syncSettings.authToken || ['LECTOR', 'VIEWER'].includes(syncSettings.currentUser?.role || '')}
+                  disabled={isSyncingCloud || !reviewConfirmed || !syncSettings.authToken || isReaderRole(syncSettings.currentUser?.role)}
                   className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
                 >
                   {isSyncingCloud ? (

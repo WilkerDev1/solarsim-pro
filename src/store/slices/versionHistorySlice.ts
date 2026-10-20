@@ -1,3 +1,4 @@
+import { isWriterRole } from '../../../shared/permissions';
 import { commercialCopy } from '../../../shared/proposalCommercial';
 import { generateDuplicateProjectIdentifiers } from '../initialData';
 import { featureScope } from '../../../shared/applicationFeatures';
@@ -317,7 +318,7 @@ export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (
     const localProject = projects.find(project => project.id === projectId);
     const scope = featureScope(syncSettings.serverUrl, syncSettings.currentUser.organizationId);
     if (!localProject || !ownsProject(localProject, syncSettings.serverUrl, syncSettings.currentUser.organizationId) || activeConflict.scope !== scope) return;
-    if (!['ADMIN', 'EDITOR'].includes(syncSettings.currentUser.role) && resolution !== 'accept_server') return;
+    if (!isWriterRole(syncSettings.currentUser.role) && resolution !== 'accept_server') return;
     if (activeConflict.reason === 'deleted' && resolution !== 'fork') return;
     // A local checkpoint keeps discarded content recoverable in the version history.
     get().createSnapshot(projectId, 'Antes de resolver conflicto', undefined, 'manual');

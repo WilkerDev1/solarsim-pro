@@ -1,3 +1,4 @@
+import { canAdminister } from '../../../shared/permissions';
 import React, { useState } from 'react';
 import { Folder, FolderPlus, Edit3, Trash2, EyeOff } from 'lucide-react';
 import { useSimulationStore } from '../../store/useSimulationStore';
@@ -8,7 +9,7 @@ export const FoldersResumeGrid: React.FC = () => {
   const { folders, projects, activeFolderId, setActiveFolderId, syncSettings, deleteFolder, moveProjectToFolder } = useSimulationStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [folderToEdit, setFolderToEdit] = useState<ProjectFolder | null>(null);
-  const isAdmin = !syncSettings.currentUser || syncSettings.currentUser.role === 'ADMIN';
+  const isAdmin = canAdminister(syncSettings.currentUser);
   const edit = (folder: ProjectFolder | null) => { setFolderToEdit(folder); setIsModalOpen(true); };
   return <section className="space-y-4 border-t border-slate-200 pt-6 dark:border-zinc-800" aria-label="Carpetas de propuestas">
     <div className="flex items-center justify-between gap-3">

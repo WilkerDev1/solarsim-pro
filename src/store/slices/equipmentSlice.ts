@@ -1,3 +1,4 @@
+import { isWriterRole } from '../../../shared/permissions';
 import { featureScope } from '../../../shared/applicationFeatures';
 import { SimulationSlice, EquipmentSlice } from '../types';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../../data/defaultEquipmentCatalog';
@@ -10,7 +11,7 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (baseSet, g
     const patch = typeof update === 'function' ? update(state) : update;
     if (!patch.equipmentCatalog || patch.equipmentCatalog === state.equipmentCatalog) return patch;
     const user = state.syncSettings.currentUser;
-    if (user && user.role !== 'ADMIN' && user.role !== 'EDITOR') return { equipmentSyncFeedback: 'Tu cuenta solo puede consultar el catálogo.' };
+    if (user && !isWriterRole(user.role)) return { equipmentSyncFeedback: 'Tu cuenta solo puede consultar el catálogo.' };
     const scope = user ? featureScope(state.syncSettings.serverUrl, user.organizationId) : 'local';
     const prior = new Map(state.equipmentCatalog.map((item) => [item.id, item]));
     const changes = { ...state.equipmentChanges };
@@ -45,7 +46,7 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (baseSet, g
     const local = state.equipmentCatalog.find((item) => item.id === id);
     if (!conflict || !local) return;
     const user = state.syncSettings.currentUser;
-    if (!user || (user.role !== 'ADMIN' && user.role !== 'EDITOR')) return;
+    if (!user || !isWriterRole(user.role)) return;
     const scope = featureScope(state.syncSettings.serverUrl, user.organizationId);
     const conflicts = { ...state.equipmentConflicts };
     delete conflicts[id];
@@ -164,7 +165,7 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (baseSet, g
     const { serverUrl, authToken, currentUser } = session;
     if (!authToken || !currentUser) return { success: false, message: 'Inicia sesión para sincronizar el catálogo.' };
     const scope = featureScope(serverUrl, currentUser.organizationId);
-    const canWrite = currentUser.role === 'ADMIN' || currentUser.role === 'EDITOR';
+    const canWrite = isWriterRole(currentUser.role);
     const ensureSession = () => {
       const fresh = get().syncSettings;
       if (generation !== get().sessionGeneration || !fresh.authToken || fresh.currentUser?.id !== currentUser.id || fresh.currentUser.organizationId !== currentUser.organizationId || fresh.serverUrl !== serverUrl) throw new Error('La sesión cambió durante la sincronización del catálogo.');
