@@ -39,6 +39,8 @@
     "docs/**/*.md",
     ".agents/**/*.md",
     "AGENTS.md",
+    "README.md",
+    "CLAUDE.md",
     "package.json",
     "tsconfig*.json",
     "vite.config.ts",

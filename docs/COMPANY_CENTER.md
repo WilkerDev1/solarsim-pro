@@ -28,7 +28,7 @@ La API conserva `users.organization_id` como pertenencia primaria por compatibil
 
 ## Despliegue
 
-La API compatible se desplegó el 6 de octubre de 2026 como `2.2.1-ac7abbc`, con migración 003 y rotación de secretos. La revisión de producción del 7 de octubre fue de solo lectura; los ensayos de escritura usan una base desechable. Esta extensión del perfil incorpora lema, Instagram y marca de agua en la API; requiere desplegar la API actual para guardar esos campos. No requiere una migración de esquema adicional para el perfil: utiliza el JSONB existente. Las correcciones de cliente posteriores al tag 2.3.0 deben pasar sus gates y staging antes de distribuirse. Véase [estado de la revisión](REVIEW_2026_10_07.md).
+El perfil (lema, Instagram, marca de agua) se guarda en el JSONB existente de la organización, sin migración adicional; requiere una API que incluya esos campos. Los ensayos de escritura usan bases desechables; el despliegue sigue [infraestructura](INFRASTRUCTURE_ARCHITECTURE.md).
 
 No volver a API 2.2.0 después de usar membresías secundarias o revocaciones nuevas: desconoce esos permisos y podría conceder acceso indebido. El rollback debe usar una API compatible con la migración y los controles actuales. No revertir ni eliminar tablas para restaurar binarios. Conservar respaldo y probar recuperación antes del despliegue.
 
