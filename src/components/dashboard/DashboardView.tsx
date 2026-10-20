@@ -203,9 +203,7 @@ export const DashboardView: React.FC = () => {
 
   return (
     <div
-      className={`flex-1 overflow-y-auto w-full h-full p-6 lg:p-8 font-sans transition-colors duration-200 ${
-        isDark ? 'bg-zinc-950 text-zinc-100' : 'bg-slate-50 text-slate-900'
-      }`}
+      className={`flex-1 overflow-y-auto w-full h-full p-6 lg:p-8 font-sans transition-colors duration-200 bg-slate-50 text-slate-900 dark:bg-zinc-950 dark:text-zinc-100`}
     >
       <div className="max-w-[1500px] mx-auto w-full flex flex-col gap-5 pb-12">
         {/* ========================================================================= */}

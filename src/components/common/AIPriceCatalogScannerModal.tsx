@@ -383,19 +383,11 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
         role="dialog"
         aria-modal="true"
         aria-label="Importar precios de proveedores"
-        className={`w-full max-w-4xl rounded-2xl border shadow-2xl flex flex-col max-h-[92vh] overflow-hidden ${
-          isDark
-            ? "bg-[#181822] border-[#2e2e3e] text-zinc-100"
-            : "bg-white border-slate-200 text-slate-800"
-        }`}
+        className={`w-full max-w-4xl rounded-2xl border shadow-2xl flex flex-col max-h-[92vh] overflow-hidden bg-white border-slate-200 text-slate-800 dark:bg-[#181822] dark:border-[#2e2e3e] dark:text-zinc-100`}
       >
         {/* Header */}
         <div
-          className={`p-5 border-b flex items-start justify-between gap-3 ${
-            isDark
-              ? "border-[#272736] bg-[#14141c]"
-              : "border-slate-100 bg-slate-50/80"
-          }`}
+          className={`p-5 border-b flex items-start justify-between gap-3 border-slate-100 bg-slate-50/80 dark:border-[#272736] dark:bg-[#14141c]`}
         >
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400">
@@ -410,7 +402,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
                 </span>
               </h3>
               <p
-                className={`text-xs mt-0.5 ${isDark ? "text-zinc-400" : "text-slate-500"}`}
+                className={`text-xs mt-0.5 text-slate-500 dark:text-zinc-400`}
               >
                 Extrae modelos y precios de catálogos o cotizaciones de
                 proveedores y compáralos con tu base de datos actual.
@@ -422,11 +414,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
             <button
               type="button"
               onClick={() => openSettingsModal("ai")}
-              className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-                isDark
-                  ? "border-zinc-700 hover:bg-zinc-800 text-zinc-400 hover:text-white"
-                  : "border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-slate-800"
-              }`}
+              className={`p-1.5 rounded-lg border transition-colors cursor-pointer border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-slate-800 dark:border-zinc-700 dark:hover:bg-zinc-800 dark:text-zinc-400 dark:hover:text-white`}
               title="Configurar Modelo y Clave de Inteligencia Artificial"
             >
               <Settings className="w-4 h-4" />
@@ -434,11 +422,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
             <button
               type="button"
               onClick={closeAIPriceCatalogModal}
-              className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-                isDark
-                  ? "border-zinc-700 hover:bg-zinc-800 text-zinc-400"
-                  : "border-slate-200 hover:bg-slate-100 text-slate-500"
-              }`}
+              className={`p-1.5 rounded-lg border transition-colors cursor-pointer border-slate-200 hover:bg-slate-100 text-slate-500 dark:border-zinc-700 dark:hover:bg-zinc-800 dark:text-zinc-400`}
             >
               <X className="w-4 h-4" />
             </button>
@@ -459,11 +443,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
             <div className="space-y-4">
               {/* Selector / Input de Proveedor */}
               <div
-                className={`p-4 rounded-xl border space-y-3 ${
-                  isDark
-                    ? "bg-[#1e1e2c] border-[#323246]"
-                    : "bg-slate-50 border-slate-200"
-                }`}
+                className={`p-4 rounded-xl border space-y-3 bg-slate-50 border-slate-200 dark:bg-[#1e1e2c] dark:border-[#323246]`}
               >
                 <div className="flex items-center gap-2">
                   <Building2 className="w-4 h-4 text-purple-400" />
@@ -478,11 +458,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
                     placeholder="Escribe el nombre del proveedor (ej: Enersys RD, RAAS Solar, Fersan...)"
                     value={manualSupplierName}
                     onChange={(e) => setManualSupplierName(e.target.value)}
-                    className={`flex-1 border rounded-lg px-3 py-2 text-xs font-semibold ${
-                      isDark
-                        ? "bg-[#14141c] border-[#38384a] text-white"
-                        : "bg-white border-slate-300 text-slate-900"
-                    }`}
+                    className={`flex-1 border rounded-lg px-3 py-2 text-xs font-semibold bg-white border-slate-300 text-slate-900 dark:bg-[#14141c] dark:border-[#38384a] dark:text-white`}
                   />
                   {existingSupplierNames.length > 0 && (
                     <select
@@ -490,11 +466,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
                         if (e.target.value)
                           setManualSupplierName(e.target.value);
                       }}
-                      className={`border rounded-lg px-3 py-2 text-xs font-semibold ${
-                        isDark
-                          ? "bg-[#14141c] border-[#38384a] text-zinc-300"
-                          : "bg-white border-slate-300 text-slate-700"
-                      }`}
+                      className={`border rounded-lg px-3 py-2 text-xs font-semibold bg-white border-slate-300 text-slate-700 dark:bg-[#14141c] dark:border-[#38384a] dark:text-zinc-300`}
                       defaultValue=""
                     >
                       <option value="" disabled>
@@ -509,7 +481,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
                   )}
                 </div>
                 <p
-                  className={`text-[11px] ${isDark ? "text-zinc-400" : "text-slate-500"}`}
+                  className={`text-[11px] text-slate-500 dark:text-zinc-400`}
                 >
                   * Si lo dejas vacío, la IA intentará detectarlo
                   automáticamente en el membrete del documento.
@@ -545,7 +517,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
                         {selectedFile.name}
                       </p>
                       <p
-                        className={`text-[11px] mt-0.5 ${isDark ? "text-zinc-400" : "text-slate-500"}`}
+                        className={`text-[11px] mt-0.5 text-slate-500 dark:text-zinc-400`}
                       >
                         {(selectedFile.size / 1024 / 1024).toFixed(2)} MB • Clic
                         para cambiar archivo
@@ -563,7 +535,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
                         de precios
                       </p>
                       <p
-                        className={`text-[11px] mt-1 ${isDark ? "text-zinc-400" : "text-slate-500"}`}
+                        className={`text-[11px] mt-1 text-slate-500 dark:text-zinc-400`}
                       >
                         Soporta listas de distribuidores en PDF, capturas de
                         pantalla o facturas proforma (hasta 20MB)
@@ -634,7 +606,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
 
                     <div className="flex items-center gap-2 mt-1.5 flex-wrap text-xs">
                       <span
-                        className={isDark ? "text-zinc-400" : "text-slate-500"}
+                        className="text-slate-500 dark:text-zinc-400"
                       >
                         Detectado en documento:
                       </span>
@@ -677,11 +649,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
 
                 {/* Asignación y Selección de Proveedor */}
                 <div
-                  className={`mt-3 p-3 rounded-lg border flex flex-col md:flex-row md:items-center justify-between gap-3 ${
-                    isDark
-                      ? "bg-[#12121c] border-[#272738]"
-                      : "bg-slate-50 border-slate-200"
-                  }`}
+                  className={`mt-3 p-3 rounded-lg border flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-50 border-slate-200 dark:bg-[#12121c] dark:border-[#272738]`}
                 >
                   <div className="flex-1 min-w-0">
                     <label className="text-[11px] font-bold text-zinc-300 block mb-1">
@@ -698,11 +666,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
                             setAssignedSupplierName(e.target.value)
                           }
                           placeholder="Nombre del proveedor..."
-                          className={`w-full px-2.5 py-1.5 text-xs font-bold rounded-lg border outline-none ${
-                            isDark
-                              ? "bg-[#181824] border-purple-500/50 text-zinc-100"
-                              : "bg-white border-purple-400 text-slate-800"
-                          }`}
+                          className={`w-full px-2.5 py-1.5 text-xs font-bold rounded-lg border outline-none bg-white border-purple-400 text-slate-800 dark:bg-[#181824] dark:border-purple-500/50 dark:text-zinc-100`}
                           autoFocus
                         />
                         <button
@@ -808,11 +772,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
                 }`}
               >
                 <div
-                  className={`p-3 border-b flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs font-bold ${
-                    isDark
-                      ? "border-[#272736] bg-[#101016]"
-                      : "border-slate-200 bg-slate-100"
-                  }`}
+                  className={`p-3 border-b flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs font-bold border-slate-200 bg-slate-100 dark:border-[#272736] dark:bg-[#101016]`}
                 >
                   <div className="flex items-center gap-3 flex-wrap">
                     <div className="flex items-center gap-2">
@@ -938,7 +898,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
                               </span>
                             </div>
                             <div
-                              className={`text-[10.5px] mt-0.5 ${isDark ? "text-zinc-400" : "text-slate-500"}`}
+                              className={`text-[10.5px] mt-0.5 text-slate-500 dark:text-zinc-400`}
                             >
                               {item.brand} {item.sku && `• SKU: ${item.sku}`}{" "}
                               {item.notes && `• ${item.notes}`}
@@ -1012,7 +972,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
                               ${item.priceUSD.toFixed(2)}
                             </span>
                             <span
-                              className={`text-[10px] ${isDark ? "text-zinc-500" : "text-slate-400"}`}
+                              className={`text-[10px] text-slate-400 dark:text-zinc-500`}
                             >
                               USD/ud
                             </span>
@@ -1027,7 +987,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
               {/* Botón de Aplicar Precios */}
               <div className="flex items-center justify-between pt-2">
                 <p
-                  className={`text-xs ${isDark ? "text-zinc-400" : "text-slate-500"}`}
+                  className={`text-xs text-slate-500 dark:text-zinc-400`}
                 >
                   Se actualizarán las ofertas comerciales para el proveedor{" "}
                   <strong className="text-emerald-400">

@@ -73,9 +73,7 @@ export const Header: React.FC = () => {
               className="w-8 h-8 object-contain transition-transform duration-200 group-hover:scale-105 select-none shrink-0"
             />
             <h1
-              className={`font-bold text-xl tracking-tight transition-colors ${
-                isDark ? 'text-white' : 'text-emerald-950'
-              }`}
+              className={`font-bold text-xl tracking-tight transition-colors text-emerald-950 dark:text-white`}
             >
               SolarSim Pro
             </h1>
@@ -84,11 +82,7 @@ export const Header: React.FC = () => {
           {/* Active Project Context Badge */}
           {activeView !== 'dashboard' && activeProject && (
             <div
-              className={`hidden lg:flex items-center gap-2.5 px-3.5 py-1.5 rounded-full border transition-colors ${
-                isDark
-                  ? 'bg-[#27272a]/90 border-[#3f3f46] text-zinc-200'
-                  : 'bg-slate-100/90 border-slate-200 text-slate-800'
-              }`}
+              className={`hidden lg:flex items-center gap-2.5 px-3.5 py-1.5 rounded-full border transition-colors bg-slate-100/90 border-slate-200 text-slate-800 dark:bg-[#27272a]/90 dark:border-[#3f3f46] dark:text-zinc-200`}
             >
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
@@ -98,11 +92,7 @@ export const Header: React.FC = () => {
                 {activeProject.client.name}
               </span>
               <span
-                className={`text-[10px] px-2 py-0.5 rounded font-mono font-semibold border ${
-                  isDark
-                    ? 'bg-[#18181b] text-zinc-400 border-[#3f3f46]'
-                    : 'bg-white text-slate-600 border-slate-200'
-                }`}
+                className={`text-[10px] px-2 py-0.5 rounded font-mono font-semibold border bg-white text-slate-600 border-slate-200 dark:bg-[#18181b] dark:text-zinc-400 dark:border-[#3f3f46]`}
               >
                 {activeProject.client.projectId}
               </span>
@@ -116,9 +106,7 @@ export const Header: React.FC = () => {
             <div className="flex items-center gap-2.5">
               {/* View Mode Toggle (Simulador vs Propuesta PDF) */}
               <div
-                className={`flex items-center gap-1 p-1 rounded-xl border transition-colors ${
-                  isDark ? 'bg-[#121214] border-[#27272a]' : 'bg-slate-100 border-slate-200'
-                }`}
+                className={`flex items-center gap-1 p-1 rounded-xl border transition-colors bg-slate-100 border-slate-200 dark:bg-[#121214] dark:border-[#27272a]`}
               >
                 <button
                   onClick={() => setActiveView('project-hub')}
@@ -196,11 +184,7 @@ export const Header: React.FC = () => {
 
                 {isActionsOpen && (
                   <div
-                    className={`absolute right-0 top-full mt-2 w-52 rounded-2xl border shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150 backdrop-blur-xl ${
-                      isDark
-                        ? 'bg-[#18181b]/95 border-[#27272a] text-zinc-200'
-                        : 'bg-white/95 border-slate-200 text-slate-800'
-                    }`}
+                    className={`absolute right-0 top-full mt-2 w-52 rounded-2xl border shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150 backdrop-blur-xl bg-white/95 border-slate-200 text-slate-800 dark:bg-[#18181b]/95 dark:border-[#27272a] dark:text-zinc-200`}
                   >
                     {/* Guardar Cambios */}
                     <button
@@ -208,11 +192,7 @@ export const Header: React.FC = () => {
                         setIsActionsOpen(false);
                         saveActiveProject();
                       }}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                        isDark
-                          ? 'hover:bg-emerald-950/60 text-zinc-200 hover:text-emerald-300'
-                          : 'hover:bg-emerald-50 text-slate-700 hover:text-emerald-900'
-                      }`}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer hover:bg-emerald-50 text-slate-700 hover:text-emerald-900 dark:hover:bg-emerald-950/60 dark:text-zinc-200 dark:hover:text-emerald-300`}
                     >
                       <Save className="w-4 h-4 text-emerald-500" />
                       <span>Guardar Cambios</span>
@@ -224,11 +204,7 @@ export const Header: React.FC = () => {
                         setIsActionsOpen(false);
                         openShareModal();
                       }}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                        isDark
-                          ? 'hover:bg-emerald-950/60 text-zinc-200 hover:text-emerald-300'
-                          : 'hover:bg-emerald-50 text-slate-700 hover:text-emerald-900'
-                      }`}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer hover:bg-emerald-50 text-slate-700 hover:text-emerald-900 dark:hover:bg-emerald-950/60 dark:text-zinc-200 dark:hover:text-emerald-300`}
                     >
                       <Globe className="w-4 h-4 text-emerald-500" />
                       <span>Compartir Web</span>
@@ -240,11 +216,7 @@ export const Header: React.FC = () => {
                         setIsActionsOpen(false);
                         exportProjectAsJSON();
                       }}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                        isDark
-                          ? 'hover:bg-[#27272a] text-zinc-200 hover:text-amber-300'
-                          : 'hover:bg-slate-100 text-slate-700 hover:text-amber-800'
-                      }`}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer hover:bg-slate-100 text-slate-700 hover:text-amber-800 dark:hover:bg-[#27272a] dark:text-zinc-200 dark:hover:text-amber-300`}
                     >
                       <Share2 className="w-4 h-4 text-amber-500" />
                       <span>Exportar JSON</span>

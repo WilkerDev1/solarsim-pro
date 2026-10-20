@@ -276,9 +276,7 @@ export const PDFProposalView: React.FC = () => {
 
   return (
     <div
-      className={`flex-1 flex h-full overflow-hidden transition-colors duration-200 ${
-        isDark ? 'bg-[#0d0d10]' : 'bg-slate-200'
-      }`}
+      className={`flex-1 flex h-full overflow-hidden transition-colors duration-200 bg-slate-200 dark:bg-[#0d0d10]`}
     >
       {/* Side Controls Toolbar */}
       <PDFSidebarControls
@@ -334,9 +332,7 @@ export const PDFProposalView: React.FC = () => {
 
       {/* PDF Page Canvas */}
       <main
-        className={`flex-1 overflow-y-auto p-8 flex flex-col items-center gap-8 transition-colors ${
-          isDark ? 'bg-[#0a0a0d]' : 'bg-slate-300/80'
-        }`}
+        className={`flex-1 overflow-y-auto p-8 flex flex-col items-center gap-8 transition-colors bg-slate-300/80 dark:bg-[#0a0a0d]`}
       >
         {/* Banner de Propuesta en Papelera (Modo Solo Lectura) */}
         {project.isDeleted && (

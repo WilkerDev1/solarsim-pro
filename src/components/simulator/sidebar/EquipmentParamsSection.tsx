@@ -297,9 +297,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
       <button
         type="button"
         onClick={onToggle}
-        className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors ${
-          isDark ? 'text-zinc-200 hover:bg-[#222230]' : 'text-slate-800 hover:bg-slate-50'
-        }`}
+        className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors text-slate-800 hover:bg-slate-50 dark:text-zinc-200 dark:hover:bg-[#222230]`}
       >
         <div className="flex items-center gap-2">
           <Sun className="w-4 h-4 text-emerald-500 shrink-0" />
@@ -314,15 +312,11 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
 
       {isOpen && (
         <div
-          className={`p-3.5 pt-2 space-y-3.5 border-t ${
-            isDark ? 'border-[#27272a] bg-[#14141c]/50' : 'border-slate-100 bg-slate-50/50'
-          }`}
+          className={`p-3.5 pt-2 space-y-3.5 border-t border-slate-100 bg-slate-50/50 dark:border-[#27272a] dark:bg-[#14141c]/50`}
         >
           {/* Selector de modo Simple (Catálogo) / Detallado (Manual) */}
           <div
-            className={`flex rounded-lg p-1 border ${
-              isDark ? 'bg-[#121214] border-[#27272a]' : 'bg-slate-200/80 border-slate-300/60'
-            }`}
+            className={`flex rounded-lg p-1 border bg-slate-200/80 border-slate-300/60 dark:bg-[#121214] dark:border-[#27272a]`}
           >
             <button
               type="button"
@@ -360,15 +354,13 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
 
           {/* PARÁMETRO DESTACADO VISIBLE: Pérdidas del Sistema (%) */}
           <div
-            className={`p-2.5 rounded-lg border flex items-center justify-between gap-3 ${
-              isDark ? 'bg-[#1c1c24] border-[#3f3f46]' : 'bg-emerald-50/70 border-emerald-200/80'
-            }`}
+            className={`p-2.5 rounded-lg border flex items-center justify-between gap-3 bg-emerald-50/70 border-emerald-200/80 dark:bg-[#1c1c24] dark:border-[#3f3f46]`}
           >
             <div>
-              <label className={`block text-xs font-bold ${isDark ? 'text-emerald-400' : 'text-emerald-950'}`}>
+              <label className={`block text-xs font-bold text-emerald-950 dark:text-emerald-400`}>
                 Pérdidas del Sistema (%)
               </label>
-              <span className={`text-[10px] block ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+              <span className={`text-[10px] block text-slate-600 dark:text-zinc-400`}>
                 Rendimiento fotovoltaico global (default: 25.0%)
               </span>
             </div>
@@ -381,9 +373,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                 max="50"
                 value={project.specs.systemLosses !== undefined ? project.specs.systemLosses : 25}
                 onChange={(e) => updateSpecs({ systemLosses: parseFloat(e.target.value) || 0 })}
-                className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold text-center ${
-                  isDark ? 'bg-[#121214] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-900'
-                }`}
+                className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold text-center bg-white border-slate-300 text-slate-900 dark:bg-[#121214] dark:border-[#3f3f46] dark:text-zinc-100`}
               />
             </div>
           </div>
@@ -408,12 +398,10 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
 
                 {/* Toggle Auto-Calcular Paneles */}
                 <div
-                  className={`p-2 rounded-lg border space-y-1 ${
-                    isDark ? 'bg-emerald-950/40 border-emerald-800/60' : 'bg-emerald-50/60 border-emerald-200/80'
-                  }`}
+                  className={`p-2 rounded-lg border space-y-1 bg-emerald-50/60 border-emerald-200/80 dark:bg-emerald-950/40 dark:border-emerald-800/60`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className={`text-xs font-semibold ${isDark ? 'text-emerald-300' : 'text-emerald-950'}`}>
+                    <span className={`text-xs font-semibold text-emerald-950 dark:text-emerald-300`}>
                       Auto-Calcular Paneles
                     </span>
                     <input
@@ -424,7 +412,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                     />
                   </div>
                   {project.specs.autoCalculatePanels && (
-                    <p className={`text-[10px] leading-tight ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                    <p className={`text-[10px] leading-tight text-emerald-700 dark:text-emerald-400`}>
                       Calculando automáticamente para cubrir el {project.rates.targetCoveragePct ?? 95}% del consumo (considerando {project.specs.systemLosses ?? 25}% de pérdidas).
                     </p>
                   )}
@@ -432,7 +420,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
 
                 {/* Cantidad de Paneles (Modelo #1) */}
                 <div>
-                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                  <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
                     {projectPanels.length > 1 ? "Cantidad de Paneles (Modelo #1)" : "Cantidad de Paneles"}
                   </label>
                   <input
@@ -449,11 +437,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                         updateSpecs({ panelCount: count });
                       }
                     }}
-                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all disabled:opacity-50 ${
-                      isDark
-                        ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                        : 'bg-slate-50 border-slate-300 text-slate-800'
-                    }`}
+                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all disabled:opacity-50 bg-slate-50 border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
                   />
                 </div>
 
@@ -463,12 +447,10 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                   return (
                     <div
                       key={p.id || actualIdx}
-                      className={`p-2.5 rounded-xl border space-y-2 relative transition-all ${
-                        isDark ? 'bg-[#181822] border-amber-900/40' : 'bg-amber-50/40 border-amber-200'
-                      }`}
+                      className={`p-2.5 rounded-xl border space-y-2 relative transition-all bg-amber-50/40 border-amber-200 dark:bg-[#181822] dark:border-amber-900/40`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className={`text-[11px] font-extrabold flex items-center gap-1 ${isDark ? 'text-amber-400' : 'text-amber-800'}`}>
+                        <span className={`text-[11px] font-extrabold flex items-center gap-1 text-amber-800 dark:text-amber-400`}>
                           <Sun className="w-3.5 h-3.5 text-amber-500" />
                           <span>Módulo Solar (Modelo #{actualIdx + 1})</span>
                         </span>
@@ -501,7 +483,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                       />
 
                       <div>
-                        <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                        <label className={`block text-[10px] font-semibold mb-0.5 text-slate-600 dark:text-zinc-300`}>
                           Cantidad de Paneles
                         </label>
                         <input
@@ -510,9 +492,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                           min="1"
                           value={p.count}
                           onChange={(e) => handleUpdatePanelItem(actualIdx, { count: parseInt(e.target.value) || 1 })}
-                          className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold text-center ${
-                            isDark ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                          }`}
+                          className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold text-center bg-white border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
                         />
                       </div>
                     </div>
@@ -523,11 +503,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                 <button
                   type="button"
                   onClick={handleAddPanelModel}
-                  className={`w-full py-1.5 px-3 rounded-lg border border-dashed flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
-                    isDark
-                      ? 'border-amber-700/50 hover:border-amber-500 bg-amber-950/20 hover:bg-amber-950/40 text-amber-400'
-                      : 'border-amber-300 hover:border-amber-500 bg-amber-50/60 hover:bg-amber-100 text-amber-800'
-                  }`}
+                  className={`w-full py-1.5 px-3 rounded-lg border border-dashed flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer border-amber-300 hover:border-amber-500 bg-amber-50/60 hover:bg-amber-100 text-amber-800 dark:border-amber-700/50 dark:hover:border-amber-500 dark:bg-amber-950/20 dark:hover:bg-amber-950/40 dark:text-amber-400`}
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>+ Agregar otro modelo de panel</span>
@@ -536,11 +512,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                 {/* Resumen Total de Paneles si hay múltiples */}
                 {projectPanels.length > 1 && (
                   <div
-                    className={`p-2 rounded-lg text-[10.5px] font-bold flex items-center justify-between border ${
-                      isDark
-                        ? 'bg-amber-950/30 border-amber-800/40 text-amber-300'
-                        : 'bg-amber-50 border-amber-200 text-amber-900'
-                    }`}
+                    className={`p-2 rounded-lg text-[10.5px] font-bold flex items-center justify-between border bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/30 dark:border-amber-800/40 dark:text-amber-300`}
                   >
                     <span>Capacidad Total DC:</span>
                     <span className="font-extrabold font-mono">
@@ -567,7 +539,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
 
                 {/* Cantidad de Inversores (Modelo #1) */}
                 <div>
-                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                  <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
                     {projectInverters.length > 1 ? "Cantidad de Inversores (Modelo #1)" : "Cantidad de Inversores"}
                   </label>
                   <input
@@ -583,11 +555,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                         updateSpecs({ inverterCount: count });
                       }
                     }}
-                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                      isDark
-                        ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                        : 'bg-slate-50 border-slate-300 text-slate-800'
-                    }`}
+                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all bg-slate-50 border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
                   />
                 </div>
 
@@ -597,12 +565,10 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                   return (
                     <div
                       key={inv.id || actualIdx}
-                      className={`p-2.5 rounded-xl border space-y-2 relative transition-all ${
-                        isDark ? 'bg-[#181822] border-emerald-900/50' : 'bg-emerald-50/40 border-emerald-200'
-                      }`}
+                      className={`p-2.5 rounded-xl border space-y-2 relative transition-all bg-emerald-50/40 border-emerald-200 dark:bg-[#181822] dark:border-emerald-900/50`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className={`text-[11px] font-extrabold flex items-center gap-1 ${isDark ? 'text-emerald-400' : 'text-emerald-800'}`}>
+                        <span className={`text-[11px] font-extrabold flex items-center gap-1 text-emerald-800 dark:text-emerald-400`}>
                           <Zap className="w-3.5 h-3.5 text-emerald-500" />
                           <span>Inversor (Modelo #{actualIdx + 1})</span>
                         </span>
@@ -635,7 +601,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                       />
 
                       <div>
-                        <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                        <label className={`block text-[10px] font-semibold mb-0.5 text-slate-600 dark:text-zinc-300`}>
                           Cantidad de Inversores
                         </label>
                         <input
@@ -644,9 +610,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                           min="1"
                           value={inv.count}
                           onChange={(e) => handleUpdateInverterItem(actualIdx, { count: parseInt(e.target.value) || 1 })}
-                          className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold text-center ${
-                            isDark ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                          }`}
+                          className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold text-center bg-white border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
                         />
                       </div>
                     </div>
@@ -657,11 +621,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                 <button
                   type="button"
                   onClick={handleAddInverterModel}
-                  className={`w-full py-1.5 px-3 rounded-lg border border-dashed flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
-                    isDark
-                      ? 'border-emerald-700/60 hover:border-emerald-500 bg-emerald-950/20 hover:bg-emerald-950/40 text-emerald-400'
-                      : 'border-emerald-300 hover:border-emerald-500 bg-emerald-50/60 hover:bg-emerald-100 text-emerald-800'
-                  }`}
+                  className={`w-full py-1.5 px-3 rounded-lg border border-dashed flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer border-emerald-300 hover:border-emerald-500 bg-emerald-50/60 hover:bg-emerald-100 text-emerald-800 dark:border-emerald-700/60 dark:hover:border-emerald-500 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/40 dark:text-emerald-400`}
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>+ Agregar otro modelo de inversor</span>
@@ -669,11 +629,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
 
                 {/* Badge de Resumen de Inversores Totales */}
                 <div
-                  className={`p-2 rounded-lg text-[10.5px] font-bold flex items-center justify-between border ${
-                    isDark
-                      ? 'bg-emerald-950/30 border-emerald-800/40 text-emerald-300'
-                      : 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                  }`}
+                  className={`p-2 rounded-lg text-[10.5px] font-bold flex items-center justify-between border bg-emerald-50 border-emerald-200 text-emerald-900 dark:bg-emerald-950/30 dark:border-emerald-800/40 dark:text-emerald-300`}
                 >
                   <span>Potencia Total Inversores:</span>
                   <span className="font-extrabold font-mono">
@@ -688,30 +644,26 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
               {/* --- MÓDULOS FOTOVOLTAICOS (MANUAL) --- */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className={`text-xs font-semibold ${isDark ? 'text-zinc-200' : 'text-slate-700'}`}>
+                  <span className={`text-xs font-semibold text-slate-700 dark:text-zinc-200`}>
                     Módulo Solar (Modelo #1 Principal)
                   </span>
                 </div>
 
                 <div>
-                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                  <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
                     Modelo / Marca Módulos (Manual)
                   </label>
                   <input
                     type="text"
                     value={project.specs.panelBrandModel || 'Módulos Canadian Solar CS6.1-72TB-600 (600W)'}
                     onChange={(e) => handleUpdatePanelItem(0, { brandModel: e.target.value })}
-                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                      isDark
-                        ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                        : 'bg-slate-50 border-slate-300 text-slate-800'
-                    }`}
+                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all bg-slate-50 border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                    <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
                       Potencia del Panel (W)
                     </label>
                     <input
@@ -719,16 +671,12 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                       step="5"
                       value={project.specs.panelPowerW}
                       onChange={(e) => handleUpdatePanelItem(0, { powerW: parseFloat(e.target.value) || 0 })}
-                      className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                        isDark
-                          ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                          : 'bg-slate-50 border-slate-300 text-slate-800'
-                      }`}
+                      className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all bg-slate-50 border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
                     />
                   </div>
 
                   <div>
-                    <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                    <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
                       Cantidad de Paneles
                     </label>
                     <input
@@ -737,23 +685,17 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                       disabled={project.specs.autoCalculatePanels}
                       value={project.specs.panelCount}
                       onChange={(e) => handleUpdatePanelItem(0, { count: parseInt(e.target.value) || 0 })}
-                      className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all disabled:opacity-50 ${
-                        isDark
-                          ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                          : 'bg-slate-50 border-slate-300 text-slate-800'
-                      }`}
+                      className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all disabled:opacity-50 bg-slate-50 border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
                     />
                   </div>
                 </div>
 
                 {/* Toggle Auto-Calcular Paneles */}
                 <div
-                  className={`p-2.5 rounded-lg border space-y-1 ${
-                    isDark ? 'bg-emerald-950/40 border-emerald-800/60' : 'bg-emerald-50/60 border-emerald-200/80'
-                  }`}
+                  className={`p-2.5 rounded-lg border space-y-1 bg-emerald-50/60 border-emerald-200/80 dark:bg-emerald-950/40 dark:border-emerald-800/60`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className={`text-xs font-semibold ${isDark ? 'text-emerald-300' : 'text-emerald-950'}`}>
+                    <span className={`text-xs font-semibold text-emerald-950 dark:text-emerald-300`}>
                       Auto-Calcular Paneles
                     </span>
                     <input
@@ -764,7 +706,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                     />
                   </div>
                   {project.specs.autoCalculatePanels && (
-                    <p className={`text-[10px] leading-tight ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                    <p className={`text-[10px] leading-tight text-emerald-700 dark:text-emerald-400`}>
                       Calculando automáticamente para cubrir el {project.rates.targetCoveragePct ?? 95}% del consumo (considerando {project.specs.systemLosses ?? 25}% de pérdidas).
                     </p>
                   )}
@@ -776,12 +718,10 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                   return (
                     <div
                       key={p.id || actualIdx}
-                      className={`p-2.5 rounded-xl border space-y-2 relative transition-all ${
-                        isDark ? 'bg-[#181822] border-amber-900/40' : 'bg-amber-50/40 border-amber-200'
-                      }`}
+                      className={`p-2.5 rounded-xl border space-y-2 relative transition-all bg-amber-50/40 border-amber-200 dark:bg-[#181822] dark:border-amber-900/40`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className={`text-[11px] font-extrabold flex items-center gap-1 ${isDark ? 'text-amber-400' : 'text-amber-800'}`}>
+                        <span className={`text-[11px] font-extrabold flex items-center gap-1 text-amber-800 dark:text-amber-400`}>
                           <Sun className="w-3.5 h-3.5 text-amber-500" />
                           <span>Módulo Solar (Modelo #{actualIdx + 1})</span>
                         </span>
@@ -796,22 +736,20 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                       </div>
 
                       <div>
-                        <label className={`block text-[10px] font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                        <label className={`block text-[10px] font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
                           Modelo / Marca Panel (Manual)
                         </label>
                         <input
                           type="text"
                           value={p.brandModel}
                           onChange={(e) => handleUpdatePanelItem(actualIdx, { brandModel: e.target.value })}
-                          className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                            isDark ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                          }`}
+                          className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold bg-white border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
                         />
                       </div>
 
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                          <label className={`block text-[10px] font-semibold mb-0.5 text-slate-600 dark:text-zinc-300`}>
                             Potencia (W)
                           </label>
                           <input
@@ -820,13 +758,11 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                             min="50"
                             value={p.powerW}
                             onChange={(e) => handleUpdatePanelItem(actualIdx, { powerW: parseFloat(e.target.value) || 0 })}
-                            className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold text-center ${
-                              isDark ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                            }`}
+                            className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold text-center bg-white border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
                           />
                         </div>
                         <div>
-                          <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                          <label className={`block text-[10px] font-semibold mb-0.5 text-slate-600 dark:text-zinc-300`}>
                             Cantidad
                           </label>
                           <input
@@ -835,9 +771,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                             min="1"
                             value={p.count}
                             onChange={(e) => handleUpdatePanelItem(actualIdx, { count: parseInt(e.target.value) || 1 })}
-                            className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold text-center ${
-                              isDark ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                            }`}
+                            className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold text-center bg-white border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
                           />
                         </div>
                       </div>
@@ -849,11 +783,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                 <button
                   type="button"
                   onClick={handleAddPanelModel}
-                  className={`w-full py-1.5 px-3 rounded-lg border border-dashed flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
-                    isDark
-                      ? 'border-amber-700/50 hover:border-amber-500 bg-amber-950/20 hover:bg-amber-950/40 text-amber-400'
-                      : 'border-amber-300 hover:border-amber-500 bg-amber-50/60 hover:bg-amber-100 text-amber-800'
-                  }`}
+                  className={`w-full py-1.5 px-3 rounded-lg border border-dashed flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer border-amber-300 hover:border-amber-500 bg-amber-50/60 hover:bg-amber-100 text-amber-800 dark:border-amber-700/50 dark:hover:border-amber-500 dark:bg-amber-950/20 dark:hover:bg-amber-950/40 dark:text-amber-400`}
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>+ Agregar otro modelo de panel</span>
@@ -876,30 +806,26 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
               {/* --- INVERSORES SOLARES (MANUAL) --- */}
               <div className="space-y-3 pt-3 border-t border-dashed border-zinc-700/50">
                 <div className="flex items-center justify-between">
-                  <span className={`text-xs font-semibold ${isDark ? 'text-zinc-200' : 'text-slate-700'}`}>
+                  <span className={`text-xs font-semibold text-slate-700 dark:text-zinc-200`}>
                     Inversor Solar (Modelo #1 Principal)
                   </span>
                 </div>
 
                 <div>
-                  <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                  <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
                     Modelo / Marca Inversor (Manual)
                   </label>
                   <input
                     type="text"
                     value={project.specs.inverterBrandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)'}
                     onChange={(e) => handleUpdateInverterItem(0, { brandModel: e.target.value })}
-                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                      isDark
-                        ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                        : 'bg-slate-50 border-slate-300 text-slate-800'
-                    }`}
+                    className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all bg-slate-50 border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                    <label className={`block text-[10px] font-semibold mb-0.5 text-slate-700 dark:text-zinc-300`}>
                       Potencia Inversor (kW)
                     </label>
                     <input
@@ -908,14 +834,12 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                       min="0.5"
                       value={project.specs.inverterPowerKW}
                       onChange={(e) => handleUpdateInverterItem(0, { powerKW: parseFloat(e.target.value) || 0 })}
-                      className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold ${
-                        isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                      }`}
+                      className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold bg-white border-slate-300 text-slate-800 dark:bg-[#18181b] dark:border-[#3f3f46] dark:text-zinc-100`}
                     />
                   </div>
 
                   <div>
-                    <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                    <label className={`block text-[10px] font-semibold mb-0.5 text-slate-700 dark:text-zinc-300`}>
                       Cantidad Inversores
                     </label>
                     <input
@@ -924,9 +848,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                       min="1"
                       value={project.specs.inverterCount || 1}
                       onChange={(e) => handleUpdateInverterItem(0, { count: parseInt(e.target.value) || 1 })}
-                      className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold ${
-                        isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                      }`}
+                      className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold bg-white border-slate-300 text-slate-800 dark:bg-[#18181b] dark:border-[#3f3f46] dark:text-zinc-100`}
                     />
                   </div>
                 </div>
@@ -937,12 +859,10 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                   return (
                     <div
                       key={inv.id || actualIdx}
-                      className={`p-2.5 rounded-xl border space-y-2 relative transition-all ${
-                        isDark ? 'bg-[#181822] border-emerald-900/50' : 'bg-emerald-50/40 border-emerald-200'
-                      }`}
+                      className={`p-2.5 rounded-xl border space-y-2 relative transition-all bg-emerald-50/40 border-emerald-200 dark:bg-[#181822] dark:border-emerald-900/50`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className={`text-[11px] font-extrabold flex items-center gap-1 ${isDark ? 'text-emerald-400' : 'text-emerald-800'}`}>
+                        <span className={`text-[11px] font-extrabold flex items-center gap-1 text-emerald-800 dark:text-emerald-400`}>
                           <Zap className="w-3.5 h-3.5 text-emerald-500" />
                           <span>Inversor (Modelo #{actualIdx + 1})</span>
                         </span>
@@ -957,22 +877,20 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                       </div>
 
                       <div>
-                        <label className={`block text-[10px] font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                        <label className={`block text-[10px] font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
                           Modelo / Marca Inversor (Manual)
                         </label>
                         <input
                           type="text"
                           value={inv.brandModel}
                           onChange={(e) => handleUpdateInverterItem(actualIdx, { brandModel: e.target.value })}
-                          className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                            isDark ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                          }`}
+                          className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold bg-white border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
                         />
                       </div>
 
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                          <label className={`block text-[10px] font-semibold mb-0.5 text-slate-700 dark:text-zinc-300`}>
                             Potencia (kW)
                           </label>
                           <input
@@ -981,13 +899,11 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                             min="0.5"
                             value={inv.powerKW}
                             onChange={(e) => handleUpdateInverterItem(actualIdx, { powerKW: parseFloat(e.target.value) || 0 })}
-                            className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold text-center ${
-                              isDark ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                            }`}
+                            className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold text-center bg-white border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
                           />
                         </div>
                         <div>
-                          <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                          <label className={`block text-[10px] font-semibold mb-0.5 text-slate-700 dark:text-zinc-300`}>
                             Cantidad
                           </label>
                           <input
@@ -996,9 +912,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                             min="1"
                             value={inv.count}
                             onChange={(e) => handleUpdateInverterItem(actualIdx, { count: parseInt(e.target.value) || 1 })}
-                            className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold text-center ${
-                              isDark ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                            }`}
+                            className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold text-center bg-white border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
                           />
                         </div>
                       </div>
@@ -1010,11 +924,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                 <button
                   type="button"
                   onClick={handleAddInverterModel}
-                  className={`w-full py-1.5 px-3 rounded-lg border border-dashed flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
-                    isDark
-                      ? 'border-emerald-700/60 hover:border-emerald-500 bg-emerald-950/20 hover:bg-emerald-950/40 text-emerald-400'
-                      : 'border-emerald-300 hover:border-emerald-500 bg-emerald-50/60 hover:bg-emerald-100 text-emerald-800'
-                  }`}
+                  className={`w-full py-1.5 px-3 rounded-lg border border-dashed flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer border-emerald-300 hover:border-emerald-500 bg-emerald-50/60 hover:bg-emerald-100 text-emerald-800 dark:border-emerald-700/60 dark:hover:border-emerald-500 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/40 dark:text-emerald-400`}
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>+ Agregar otro modelo de inversor</span>
@@ -1036,21 +946,17 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
 
               {/* Subsección de Parámetros Técnicos Avanzados */}
               <div
-                className={`space-y-3 p-3 rounded-lg border mt-3 ${
-                  isDark ? 'bg-[#202024] border-[#2e2e34]' : 'bg-emerald-50/50 border-emerald-200'
-                }`}
+                className={`space-y-3 p-3 rounded-lg border mt-3 bg-emerald-50/50 border-emerald-200 dark:bg-[#202024] dark:border-[#2e2e34]`}
               >
                 <h4
-                  className={`text-[11px] font-bold uppercase tracking-wider border-b pb-1 flex items-center gap-1.5 ${
-                    isDark ? 'text-emerald-400 border-[#2e2e34]' : 'text-emerald-900 border-emerald-200'
-                  }`}
+                  className={`text-[11px] font-bold uppercase tracking-wider border-b pb-1 flex items-center gap-1.5 text-emerald-900 border-emerald-200 dark:text-emerald-400 dark:border-[#2e2e34]`}
                 >
                   <Sliders className="w-3.5 h-3.5" /> Parámetros Técnicos Avanzados
                 </h4>
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                    <label className={`block text-[10px] font-semibold mb-0.5 text-slate-700 dark:text-zinc-300`}>
                       Eficiencia Panel (%)
                     </label>
                     <input
@@ -1058,14 +964,12 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                       step="0.1"
                       value={project.specs.panelEfficiency}
                       onChange={(e) => updateSpecs({ panelEfficiency: parseFloat(e.target.value) || 0 })}
-                      className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                        isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                      }`}
+                      className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold bg-white border-slate-300 text-slate-800 dark:bg-[#18181b] dark:border-[#3f3f46] dark:text-zinc-100`}
                     />
                   </div>
 
                   <div>
-                    <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                    <label className={`block text-[10px] font-semibold mb-0.5 text-slate-700 dark:text-zinc-300`}>
                       Coef. Temp (%/°C)
                     </label>
                     <input
@@ -1073,16 +977,14 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                       step="0.01"
                       value={project.specs.tempCoeff}
                       onChange={(e) => updateSpecs({ tempCoeff: parseFloat(e.target.value) || 0 })}
-                      className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                        isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                      }`}
+                      className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold bg-white border-slate-300 text-slate-800 dark:bg-[#18181b] dark:border-[#3f3f46] dark:text-zinc-100`}
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                    <label className={`block text-[10px] font-semibold mb-0.5 text-slate-700 dark:text-zinc-300`}>
                       Degradación Anual (%)
                     </label>
                     <input
@@ -1090,9 +992,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                       step="0.1"
                       value={project.specs.annualDegradation}
                       onChange={(e) => updateSpecs({ annualDegradation: parseFloat(e.target.value) || 0 })}
-                      className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                        isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                      }`}
+                      className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold bg-white border-slate-300 text-slate-800 dark:bg-[#18181b] dark:border-[#3f3f46] dark:text-zinc-100`}
                     />
                   </div>
                 </div>
@@ -1103,11 +1003,11 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
           {/* ========================================== */}
           {/* 🔋 ALMACENAMIENTO (BATERÍA) CON MODO SIMPLE Y DETALLADO */}
           {/* ========================================== */}
-          <div className={`pt-2 border-t space-y-3 ${isDark ? 'border-[#27272a]' : 'border-slate-200'}`}>
+          <div className={`pt-2 border-t space-y-3 border-slate-200 dark:border-[#27272a]`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <BatteryCharging className="w-4 h-4 text-cyan-400" />
-                <label className={`text-xs font-semibold ${isDark ? 'text-zinc-200' : 'text-slate-700'}`}>
+                <label className={`text-xs font-semibold text-slate-700 dark:text-zinc-200`}>
                   Almacenamiento (Batería BESS)
                 </label>
               </div>
@@ -1121,9 +1021,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
 
             {project.specs.hasBattery && (
               <div
-                className={`space-y-3 p-3 rounded-lg border ${
-                  isDark ? 'bg-[#202024] border-[#2e2e34]' : 'bg-cyan-50/40 border-cyan-200'
-                }`}
+                className={`space-y-3 p-3 rounded-lg border bg-cyan-50/40 border-cyan-200 dark:bg-[#202024] dark:border-[#2e2e34]`}
               >
                 {!isDetailed ? (
                   /* MODO SIMPLE PARA BATERÍAS (Catálogo Inteligente con Búsqueda en Tiempo Real) */
@@ -1142,7 +1040,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
 
                     {/* Cantidad de Baterías (Modelo #1) */}
                     <div>
-                      <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                      <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
                         {projectBatteries.length > 1 ? "Cantidad de Baterías (Modelo #1)" : "Cantidad de Baterías"}
                       </label>
                       <input
@@ -1158,9 +1056,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                             updateSpecs({ batteryCount: count });
                           }
                         }}
-                        className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                        }`}
+                        className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all bg-white border-slate-300 text-slate-800 dark:bg-[#18181b] dark:border-[#3f3f46] dark:text-zinc-100`}
                       />
                     </div>
 
@@ -1170,12 +1066,10 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                       return (
                         <div
                           key={bat.id || actualIdx}
-                          className={`p-2.5 rounded-xl border space-y-2 relative transition-all ${
-                            isDark ? 'bg-[#181822] border-cyan-900/40' : 'bg-cyan-50/40 border-cyan-200'
-                          }`}
+                          className={`p-2.5 rounded-xl border space-y-2 relative transition-all bg-cyan-50/40 border-cyan-200 dark:bg-[#181822] dark:border-cyan-900/40`}
                         >
                           <div className="flex items-center justify-between">
-                            <span className={`text-[11px] font-extrabold flex items-center gap-1 ${isDark ? 'text-cyan-400' : 'text-cyan-800'}`}>
+                            <span className={`text-[11px] font-extrabold flex items-center gap-1 text-cyan-800 dark:text-cyan-400`}>
                               <BatteryCharging className="w-3.5 h-3.5 text-cyan-400" />
                               <span>Batería BESS (Modelo #{actualIdx + 1})</span>
                             </span>
@@ -1208,7 +1102,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                           />
 
                           <div>
-                            <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                            <label className={`block text-[10px] font-semibold mb-0.5 text-slate-600 dark:text-zinc-300`}>
                               Cantidad de Baterías
                             </label>
                             <input
@@ -1217,9 +1111,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                               min="1"
                               value={bat.count}
                               onChange={(e) => handleUpdateBatteryItem(actualIdx, { count: parseInt(e.target.value) || 1 })}
-                              className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold text-center ${
-                                isDark ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                              }`}
+                              className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold text-center bg-white border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
                             />
                           </div>
                         </div>
@@ -1230,11 +1122,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                     <button
                       type="button"
                       onClick={handleAddBatteryModel}
-                      className={`w-full py-1.5 px-3 rounded-lg border border-dashed flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
-                        isDark
-                          ? 'border-cyan-700/50 hover:border-cyan-500 bg-cyan-950/20 hover:bg-cyan-950/40 text-cyan-400'
-                          : 'border-cyan-300 hover:border-cyan-500 bg-cyan-50/60 hover:bg-cyan-100 text-cyan-800'
-                      }`}
+                      className={`w-full py-1.5 px-3 rounded-lg border border-dashed flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer border-cyan-300 hover:border-cyan-500 bg-cyan-50/60 hover:bg-cyan-100 text-cyan-800 dark:border-cyan-700/50 dark:hover:border-cyan-500 dark:bg-cyan-950/20 dark:hover:bg-cyan-950/40 dark:text-cyan-400`}
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>+ Agregar otro modelo de batería</span>
@@ -1244,22 +1132,20 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                   /* MODO DETALLADO PARA BATERÍAS (Manual) */
                   <div className="space-y-3">
                     <div>
-                      <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                      <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
                         Modelo / Marca Batería (Manual)
                       </label>
                       <input
                         type="text"
                         value={project.specs.batteryBrandModel || 'Batería Hinaess 16 KwH-48 vdc.'}
                         onChange={(e) => updateSpecs({ batteryBrandModel: e.target.value })}
-                        className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                        }`}
+                        className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all bg-white border-slate-300 text-slate-800 dark:bg-[#18181b] dark:border-[#3f3f46] dark:text-zinc-100`}
                       />
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                        <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
                           Cantidad Baterías
                         </label>
                         <input
@@ -1268,14 +1154,12 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                           min="1"
                           value={project.specs.batteryCount ?? 0}
                           onChange={(e) => updateSpecs({ batteryCount: parseInt(e.target.value) || 1 })}
-                          className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                          }`}
+                          className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all bg-white border-slate-300 text-slate-800 dark:bg-[#18181b] dark:border-[#3f3f46] dark:text-zinc-100`}
                         />
                       </div>
 
                       <div>
-                        <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                        <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
                           Capacidad Unit. (kWh)
                         </label>
                         <input
@@ -1283,9 +1167,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                           step="0.1"
                           value={project.specs.batteryCapacityKWh}
                           onChange={(e) => updateSpecs({ batteryCapacityKWh: parseFloat(e.target.value) || 0 })}
-                          className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                          }`}
+                          className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all bg-white border-slate-300 text-slate-800 dark:bg-[#18181b] dark:border-[#3f3f46] dark:text-zinc-100`}
                         />
                       </div>
                     </div>
@@ -1296,12 +1178,10 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                       return (
                         <div
                           key={bat.id || actualIdx}
-                          className={`p-2.5 rounded-xl border space-y-2 relative transition-all ${
-                            isDark ? 'bg-[#181822] border-cyan-900/40' : 'bg-cyan-50/40 border-cyan-200'
-                          }`}
+                          className={`p-2.5 rounded-xl border space-y-2 relative transition-all bg-cyan-50/40 border-cyan-200 dark:bg-[#181822] dark:border-cyan-900/40`}
                         >
                           <div className="flex items-center justify-between">
-                            <span className={`text-[11px] font-extrabold flex items-center gap-1 ${isDark ? 'text-cyan-400' : 'text-cyan-800'}`}>
+                            <span className={`text-[11px] font-extrabold flex items-center gap-1 text-cyan-800 dark:text-cyan-400`}>
                               <BatteryCharging className="w-3.5 h-3.5 text-cyan-400" />
                               <span>Batería BESS (Modelo #{actualIdx + 1})</span>
                             </span>
@@ -1316,22 +1196,20 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                           </div>
 
                           <div>
-                            <label className={`block text-[10px] font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                            <label className={`block text-[10px] font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
                               Modelo / Marca Batería (Manual)
                             </label>
                             <input
                               type="text"
                               value={bat.brandModel}
                               onChange={(e) => handleUpdateBatteryItem(actualIdx, { brandModel: e.target.value })}
-                              className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold ${
-                                isDark ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                              }`}
+                              className={`w-full border rounded-lg px-2.5 py-1 text-xs font-semibold bg-white border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
                             />
                           </div>
 
                           <div className="grid grid-cols-2 gap-2">
                             <div>
-                              <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                              <label className={`block text-[10px] font-semibold mb-0.5 text-slate-600 dark:text-zinc-300`}>
                                 Capacidad (kWh)
                               </label>
                               <input
@@ -1340,13 +1218,11 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                                 min="0.5"
                                 value={bat.capacityKWh}
                                 onChange={(e) => handleUpdateBatteryItem(actualIdx, { capacityKWh: parseFloat(e.target.value) || 0 })}
-                                className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold text-center ${
-                                  isDark ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                                }`}
+                                className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold text-center bg-white border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
                               />
                             </div>
                             <div>
-                              <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                              <label className={`block text-[10px] font-semibold mb-0.5 text-slate-600 dark:text-zinc-300`}>
                                 Cantidad
                               </label>
                               <input
@@ -1355,9 +1231,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                                 min="1"
                                 value={bat.count}
                                 onChange={(e) => handleUpdateBatteryItem(actualIdx, { count: parseInt(e.target.value) || 1 })}
-                                className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold text-center ${
-                                  isDark ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                                }`}
+                                className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold text-center bg-white border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
                               />
                             </div>
                           </div>
@@ -1369,11 +1243,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                     <button
                       type="button"
                       onClick={handleAddBatteryModel}
-                      className={`w-full py-1.5 px-3 rounded-lg border border-dashed flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
-                        isDark
-                          ? 'border-cyan-700/50 hover:border-cyan-500 bg-cyan-950/20 hover:bg-cyan-950/40 text-cyan-400'
-                          : 'border-cyan-300 hover:border-cyan-500 bg-cyan-50/60 hover:bg-cyan-100 text-cyan-800'
-                      }`}
+                      className={`w-full py-1.5 px-3 rounded-lg border border-dashed flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer border-cyan-300 hover:border-cyan-500 bg-cyan-50/60 hover:bg-cyan-100 text-cyan-800 dark:border-cyan-700/50 dark:hover:border-cyan-500 dark:bg-cyan-950/20 dark:hover:bg-cyan-950/40 dark:text-cyan-400`}
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>+ Agregar otro modelo de batería</span>
@@ -1394,7 +1264,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
 
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                        <label className={`block text-[10px] font-semibold mb-0.5 text-slate-600 dark:text-zinc-300`}>
                           DoD Descarga (%)
                         </label>
                         <input
@@ -1402,13 +1272,11 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                           step="5"
                           value={project.specs.batteryDOD || 90}
                           onChange={(e) => updateSpecs({ batteryDOD: parseFloat(e.target.value) || 90 })}
-                          className={`w-full border rounded-lg px-2 py-1 text-xs font-semibold ${
-                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                          }`}
+                          className={`w-full border rounded-lg px-2 py-1 text-xs font-semibold bg-white border-slate-300 text-slate-800 dark:bg-[#18181b] dark:border-[#3f3f46] dark:text-zinc-100`}
                         />
                       </div>
                       <div>
-                        <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                        <label className={`block text-[10px] font-semibold mb-0.5 text-slate-600 dark:text-zinc-300`}>
                           Eficiencia Carga (%)
                         </label>
                         <input
@@ -1416,15 +1284,13 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                           step="1"
                           value={project.specs.batteryEfficiencyPct || 95}
                           onChange={(e) => updateSpecs({ batteryEfficiencyPct: parseFloat(e.target.value) || 95 })}
-                          className={`w-full border rounded-lg px-2 py-1 text-xs font-semibold ${
-                            isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                          }`}
+                          className={`w-full border rounded-lg px-2 py-1 text-xs font-semibold bg-white border-slate-300 text-slate-800 dark:bg-[#18181b] dark:border-[#3f3f46] dark:text-zinc-100`}
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className={`block text-[10px] font-semibold mb-0.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                      <label className={`block text-[10px] font-semibold mb-0.5 text-slate-600 dark:text-zinc-300`}>
                         Costo Reemplazo Año 10 (USD)
                       </label>
                       <input
@@ -1433,9 +1299,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                         value={project.specs.batteryReplacementCostUSD || 0}
                         onChange={(e) => updateSpecs({ batteryReplacementCostUSD: parseFloat(e.target.value) || 0 })}
                         placeholder="Ej. $3,500 USD"
-                        className={`w-full border rounded-lg px-2 py-1 text-xs font-semibold ${
-                          isDark ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-800'
-                        }`}
+                        className={`w-full border rounded-lg px-2 py-1 text-xs font-semibold bg-white border-slate-300 text-slate-800 dark:bg-[#18181b] dark:border-[#3f3f46] dark:text-zinc-100`}
                       />
                     </div>
                   </div>
@@ -1443,21 +1307,17 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
 
                 {/* Resumen de Autonomía y Energía Útil */}
                 <div
-                  className={`rounded-lg p-2.5 text-[10px] font-bold space-y-1 mt-2 border ${
-                    isDark
-                      ? 'bg-cyan-950/70 border-cyan-800/80 text-cyan-200'
-                      : 'bg-cyan-100/90 border-cyan-300 text-cyan-950'
-                  }`}
+                  className={`rounded-lg p-2.5 text-[10px] font-bold space-y-1 mt-2 border bg-cyan-100/90 border-cyan-300 text-cyan-950 dark:bg-cyan-950/70 dark:border-cyan-800/80 dark:text-cyan-200`}
                 >
                   <div className="flex justify-between">
                     <span>Energía Útil Batería:</span>
-                    <span className={`font-extrabold font-mono ${isDark ? 'text-cyan-100' : 'text-cyan-900'}`}>
+                    <span className={`font-extrabold font-mono text-cyan-900 dark:text-cyan-100`}>
                       {summary.batteryUsableKWh} kWh ({projectBatteries.length > 1 ? `${totalBatteryKWh.toFixed(1)} kWh total en ${totalBatteryCount} unidades` : `${project.specs.batteryCount || 1} x ${project.specs.batteryCapacityKWh || 16.08} kWh`})
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Autonomía Anti-Apagones:</span>
-                    <span className={`font-extrabold font-mono ${isDark ? 'text-cyan-100' : 'text-cyan-900'}`}>
+                    <span className={`font-extrabold font-mono text-cyan-900 dark:text-cyan-100`}>
                       ~{summary.batteryBackupAutonomyHours} Horas
                     </span>
                   </div>

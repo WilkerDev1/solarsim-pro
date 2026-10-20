@@ -83,14 +83,12 @@ export const ParameterSidebar: React.FC<ParameterSidebarProps> = ({
         }`}
       >
         <div
-          className={`p-4 border-b transition-colors ${
-            isDark ? 'border-[#27272a] bg-[#121214]' : 'border-slate-200 bg-slate-50/80'
-          }`}
+          className={`p-4 border-b transition-colors border-slate-200 bg-slate-50/80 dark:border-[#27272a] dark:bg-[#121214]`}
         >
-          <h2 className={`font-bold text-sm uppercase tracking-wider ${isDark ? 'text-zinc-100' : 'text-slate-900'}`}>
+          <h2 className={`font-bold text-sm uppercase tracking-wider text-slate-900 dark:text-zinc-100`}>
             Parámetros
           </h2>
-          <p className={`text-[11px] mt-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+          <p className={`text-[11px] mt-0.5 text-slate-500 dark:text-zinc-400`}>
             Configurar restricciones del sistema
           </p>
         </div>
@@ -98,15 +96,13 @@ export const ParameterSidebar: React.FC<ParameterSidebarProps> = ({
         <div className="p-4 space-y-3 flex-1 overflow-y-auto">
           {/* Barra de control rápido: Expandir / Colapsar Todo */}
           <div className="flex justify-between items-center px-1 pb-0.5">
-            <span className={`text-[11px] font-semibold ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+            <span className={`text-[11px] font-semibold text-slate-500 dark:text-zinc-400`}>
               Categorías de Configuración
             </span>
             <button
               type="button"
               onClick={toggleAllSections}
-              className={`text-[10px] font-bold px-2 py-0.5 rounded transition-colors cursor-pointer ${
-                isDark ? 'text-emerald-400 hover:bg-[#27272a]' : 'text-emerald-700 hover:bg-emerald-50'
-              }`}
+              className={`text-[10px] font-bold px-2 py-0.5 rounded transition-colors cursor-pointer text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-[#27272a]`}
             >
               {allSectionsOpen ? 'Colapsar Todo' : 'Expandir Todo'}
             </button>

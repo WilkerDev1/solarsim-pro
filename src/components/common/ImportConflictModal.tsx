@@ -18,34 +18,28 @@ export const ImportConflictModal: React.FC = () => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-in fade-in duration-200">
       <div
-        className={`w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 transition-colors ${
-          isDark ? 'bg-[#181822] border-[#2e2e42] text-zinc-100' : 'bg-white border-slate-200 text-slate-900'
-        }`}
+        className={`w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 transition-colors bg-white border-slate-200 text-slate-900 dark:bg-[#181822] dark:border-[#2e2e42] dark:text-zinc-100`}
       >
         {/* Header */}
         <div
-          className={`p-5 border-b flex items-start justify-between gap-3 ${
-            isDark ? 'bg-[#1f1f2c] border-[#2e2e42]' : 'bg-slate-50 border-slate-200'
-          }`}
+          className={`p-5 border-b flex items-start justify-between gap-3 bg-slate-50 border-slate-200 dark:bg-[#1f1f2c] dark:border-[#2e2e42]`}
         >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-500 shrink-0">
               <ShieldAlert className="w-5 h-5" />
             </div>
             <div>
-              <h3 className={`font-black text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <h3 className={`font-black text-base text-slate-900 dark:text-white`}>
                 Conflicto de ID al Importar
               </h3>
-              <p className={`text-xs font-medium ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+              <p className={`text-xs font-medium text-slate-500 dark:text-zinc-400`}>
                 El proyecto importado coincide con uno existente en tu catálogo
               </p>
             </div>
           </div>
           <button
             onClick={cancelImportConflict}
-            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-              isDark ? 'text-zinc-400 hover:text-white hover:bg-zinc-800' : 'text-slate-400 hover:text-slate-800 hover:bg-slate-100'
-            }`}
+            className={`p-1.5 rounded-lg transition-colors cursor-pointer text-slate-400 hover:text-slate-800 hover:bg-slate-100 dark:text-zinc-400 dark:hover:text-white dark:hover:bg-zinc-800`}
             title="Cancelar importación"
           >
             <X className="w-4 h-4" />
@@ -56,15 +50,13 @@ export const ImportConflictModal: React.FC = () => {
         <div className="p-5 space-y-4">
           {/* Conflict details card */}
           <div
-            className={`p-3.5 rounded-xl border text-xs space-y-2 ${
-              isDark ? 'bg-[#14141c] border-amber-500/30' : 'bg-amber-50/70 border-amber-200'
-            }`}
+            className={`p-3.5 rounded-xl border text-xs space-y-2 bg-amber-50/70 border-amber-200 dark:bg-[#14141c] dark:border-amber-500/30`}
           >
             <div className="flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
               <div className="space-y-1">
-                <span className={`font-bold ${isDark ? 'text-amber-300' : 'text-amber-900'}`}>{reason}</span>
-                <div className={`grid grid-cols-2 gap-2 pt-1 font-mono text-[11px] ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                <span className={`font-bold text-amber-900 dark:text-amber-300`}>{reason}</span>
+                <div className={`grid grid-cols-2 gap-2 pt-1 font-mono text-[11px] text-slate-700 dark:text-zinc-300`}>
                   <div>
                     <span className="opacity-70 block text-[10px] font-sans font-semibold">Proyecto en Archivo:</span>
                     <span className="font-bold text-emerald-500">{incomingProject.client.name}</span>
@@ -80,7 +72,7 @@ export const ImportConflictModal: React.FC = () => {
             </div>
           </div>
 
-          <p className={`text-xs font-bold ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+          <p className={`text-xs font-bold text-slate-700 dark:text-zinc-300`}>
             ¿Cómo deseas resolver este conflicto?
           </p>
 
@@ -100,14 +92,14 @@ export const ImportConflictModal: React.FC = () => {
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between">
-                  <span className={`font-bold text-xs ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  <span className={`font-bold text-xs text-slate-900 dark:text-white`}>
                     Asignar nuevo número consecutivo
                   </span>
                   <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                     Recomendado
                   </span>
                 </div>
-                <p className={`text-[11px] mt-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                <p className={`text-[11px] mt-0.5 text-slate-500 dark:text-zinc-400`}>
                   Mantiene ambos proyectos intactos asignándole al importado el siguiente ID libre de tu catálogo.
                 </p>
               </div>
@@ -126,10 +118,10 @@ export const ImportConflictModal: React.FC = () => {
                 <Copy className="w-4 h-4" />
               </div>
               <div className="flex-1 min-w-0">
-                <span className={`font-bold text-xs ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <span className={`font-bold text-xs text-slate-900 dark:text-white`}>
                   Guardar como versión / copia ({incomingProject.client.projectId}-B)
                 </span>
-                <p className={`text-[11px] mt-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                <p className={`text-[11px] mt-0.5 text-slate-500 dark:text-zinc-400`}>
                   Conserva el identificador original agregando el sufijo "-B" para diferenciar revisiones.
                 </p>
               </div>
@@ -148,10 +140,10 @@ export const ImportConflictModal: React.FC = () => {
                 <Replace className="w-4 h-4" />
               </div>
               <div className="flex-1 min-w-0">
-                <span className={`font-bold text-xs ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <span className={`font-bold text-xs text-slate-900 dark:text-white`}>
                   Sobrescribir proyecto existente
                 </span>
-                <p className={`text-[11px] mt-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                <p className={`text-[11px] mt-0.5 text-slate-500 dark:text-zinc-400`}>
                   Reemplaza el proyecto actual en tu catálogo por la versión contenida en este archivo JSON.
                 </p>
               </div>
@@ -161,15 +153,11 @@ export const ImportConflictModal: React.FC = () => {
 
         {/* Footer */}
         <div
-          className={`p-4 border-t flex justify-end gap-2 ${
-            isDark ? 'bg-[#1f1f2c] border-[#2e2e42]' : 'bg-slate-50 border-slate-200'
-          }`}
+          className={`p-4 border-t flex justify-end gap-2 bg-slate-50 border-slate-200 dark:bg-[#1f1f2c] dark:border-[#2e2e42]`}
         >
           <button
             onClick={cancelImportConflict}
-            className={`px-4 py-2 rounded-xl border text-xs font-bold transition-colors cursor-pointer ${
-              isDark ? 'border-[#38384c] text-zinc-300 hover:bg-[#28283a]' : 'border-slate-300 text-slate-700 hover:bg-slate-100'
-            }`}
+            className={`px-4 py-2 rounded-xl border text-xs font-bold transition-colors cursor-pointer border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-[#38384c] dark:text-zinc-300 dark:hover:bg-[#28283a]`}
           >
             Cancelar Importación
           </button>
