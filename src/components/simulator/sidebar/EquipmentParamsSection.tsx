@@ -1,4 +1,5 @@
 import React from 'react';
+import { editEquipmentGroup } from '../../../utils/equipmentGroups';
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs, PanelItemSpec, InverterItemSpec, BatteryItemSpec } from '../../../types';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { SearchableEquipmentSelect } from './SearchableEquipmentSelect';
@@ -70,23 +71,10 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
     }
   }, [project.specs.inverterBrandModel, project.specs.panelBrandModel, equipmentCatalog]);
 
-  // --- PANEL HANDLERS ---
+  // --- EQUIPMENT GROUP HANDLERS (lists are the source; editEquipmentGroup keeps the legacy mirror) ---
   const handleAddPanelModel = () => {
-    const primaryPanel: PanelItemSpec = {
-      id: 'panel-primary',
-      brandModel: project.specs.panelBrandModel || 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)',
-      powerW: project.specs.panelPowerW || 620,
-      count: project.specs.panelCount || 20,
-      unitPriceUSD: project.specs.panelUnitPriceUSD,
-      weightKilos: project.specs.panelWeightKilos,
-      efficiencyPct: project.specs.panelEfficiency,
-    };
-    const currentPanels = project.specs.panels && project.specs.panels.length > 0
-      ? [...project.specs.panels]
-      : [primaryPanel];
-
     const candidate = equipmentCatalog.find(
-      (e) => e.type === 'panel' && e.displayName !== currentPanels[0]?.brandModel
+      (e) => e.type === 'panel' && e.displayName !== getProjectPanels(project.specs)[0]?.brandModel
     );
 
     const newPanel: PanelItemSpec = {
@@ -97,59 +85,11 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
       unitPriceUSD: candidate?.supplierPrices?.[0]?.priceUSD || (candidate?.powerW ? candidate.powerW * 0.17 : 105),
     };
 
-    updateSpecs({
-      panels: [...currentPanels, newPanel],
-      autoCalculatePanels: false,
-    });
+    updateSpecs({ ...editEquipmentGroup(project.specs, 'panel', { type: 'add', item: newPanel }), autoCalculatePanels: false });
   };
-
-  const handleUpdatePanelItem = (index: number, updates: Partial<PanelItemSpec>) => {
-    const panels = [...getProjectPanels(project.specs)];
-    if (!panels[index]) return;
-    panels[index] = { ...panels[index], ...updates };
-
-    const specsUpdate: Partial<SystemSpecs> = { panels };
-    if (index === 0) {
-      if (updates.brandModel !== undefined) specsUpdate.panelBrandModel = updates.brandModel;
-      if (updates.powerW !== undefined) specsUpdate.panelPowerW = updates.powerW;
-      if (updates.count !== undefined) specsUpdate.panelCount = updates.count;
-      if (updates.unitPriceUSD !== undefined) specsUpdate.panelUnitPriceUSD = updates.unitPriceUSD;
-    }
-    updateSpecs(specsUpdate);
-  };
-
-  const handleRemovePanelItem = (index: number) => {
-    const panels = [...getProjectPanels(project.specs)];
-    if (panels.length <= 1) return;
-    panels.splice(index, 1);
-    const specsUpdate: Partial<SystemSpecs> = {
-      panels: panels.length > 1 ? panels : undefined,
-    };
-    if (index === 0 && panels[0]) {
-      specsUpdate.panelBrandModel = panels[0].brandModel;
-      specsUpdate.panelPowerW = panels[0].powerW;
-      specsUpdate.panelCount = panels[0].count;
-      specsUpdate.panelUnitPriceUSD = panels[0].unitPriceUSD;
-    }
-    updateSpecs(specsUpdate);
-  };
-
-  // --- INVERTER HANDLERS ---
   const handleAddInverterModel = () => {
-    const primaryInv: InverterItemSpec = {
-      id: 'inv-primary',
-      brandModel: project.specs.inverterBrandModel || 'Inversor Solar Inteligente',
-      powerKW: project.specs.inverterPowerKW || 8.0,
-      count: project.specs.inverterCount || 1,
-      unitPriceUSD: project.specs.inverterUnitPriceUSD,
-      weightKilos: project.specs.inverterWeightKilos,
-    };
-    const currentInverters = project.specs.inverters && project.specs.inverters.length > 0
-      ? [...project.specs.inverters]
-      : [primaryInv];
-
     const candidate = equipmentCatalog.find(
-      (e) => e.type === 'inverter' && e.displayName !== currentInverters[0]?.brandModel
+      (e) => e.type === 'inverter' && e.displayName !== getProjectInverters(project.specs)[0]?.brandModel
     );
 
     const newInv: InverterItemSpec = {
@@ -160,59 +100,11 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
       unitPriceUSD: candidate?.supplierPrices?.[0]?.priceUSD || (candidate?.powerKW ? candidate.powerKW * 220 : 1100),
     };
 
-    updateSpecs({
-      inverters: [...currentInverters, newInv],
-    });
+    updateSpecs({ ...editEquipmentGroup(project.specs, 'inverter', { type: 'add', item: newInv }) });
   };
-
-  const handleUpdateInverterItem = (index: number, updates: Partial<InverterItemSpec>) => {
-    const inverters = [...getProjectInverters(project.specs)];
-    if (!inverters[index]) return;
-    inverters[index] = { ...inverters[index], ...updates };
-
-    const specsUpdate: Partial<SystemSpecs> = { inverters };
-    if (index === 0) {
-      if (updates.brandModel !== undefined) specsUpdate.inverterBrandModel = updates.brandModel;
-      if (updates.powerKW !== undefined) specsUpdate.inverterPowerKW = updates.powerKW;
-      if (updates.count !== undefined) specsUpdate.inverterCount = updates.count;
-      if (updates.unitPriceUSD !== undefined) specsUpdate.inverterUnitPriceUSD = updates.unitPriceUSD;
-    }
-    updateSpecs(specsUpdate);
-  };
-
-  const handleRemoveInverterItem = (index: number) => {
-    const inverters = [...getProjectInverters(project.specs)];
-    if (inverters.length <= 1) return;
-    inverters.splice(index, 1);
-    const specsUpdate: Partial<SystemSpecs> = {
-      inverters: inverters.length > 1 ? inverters : undefined,
-    };
-    if (index === 0 && inverters[0]) {
-      specsUpdate.inverterBrandModel = inverters[0].brandModel;
-      specsUpdate.inverterPowerKW = inverters[0].powerKW;
-      specsUpdate.inverterCount = inverters[0].count;
-      specsUpdate.inverterUnitPriceUSD = inverters[0].unitPriceUSD;
-    }
-    updateSpecs(specsUpdate);
-  };
-
-  // --- BATTERY HANDLERS ---
   const handleAddBatteryModel = () => {
-    const primaryBattery: BatteryItemSpec = {
-      id: 'battery-primary',
-      brandModel: project.specs.batteryBrandModel || 'Batería Hinaess 16.08 kWh',
-      capacityKWh: project.specs.batteryCapacityKWh || 16.08,
-      count: project.specs.batteryCount || 1,
-      unitPriceUSD: project.specs.batteryUnitPriceUSD,
-      weightKilos: project.specs.batteryWeightKilos,
-      dodPct: project.specs.batteryDOD || 90,
-    };
-    const currentBatteries = project.specs.batteries && project.specs.batteries.length > 0
-      ? [...project.specs.batteries]
-      : [primaryBattery];
-
     const candidate = equipmentCatalog.find(
-      (e) => e.type === 'battery' && e.displayName !== currentBatteries[0]?.brandModel
+      (e) => e.type === 'battery' && e.displayName !== getProjectBatteries(project.specs)[0]?.brandModel
     );
 
     const newBattery: BatteryItemSpec = {
@@ -223,42 +115,20 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
       unitPriceUSD: candidate?.supplierPrices?.[0]?.priceUSD || (candidate?.capacityKWh ? candidate.capacityKWh * 160 : 850),
     };
 
-    updateSpecs({
-      hasBattery: true,
-      batteries: [...currentBatteries, newBattery],
-    });
+    updateSpecs({ ...editEquipmentGroup(project.specs, 'battery', { type: 'add', item: newBattery }), hasBattery: true });
   };
-
-  const handleUpdateBatteryItem = (index: number, updates: Partial<BatteryItemSpec>) => {
-    const batteries = [...getProjectBatteries(project.specs)];
-    if (!batteries[index]) return;
-    batteries[index] = { ...batteries[index], ...updates };
-
-    const specsUpdate: Partial<SystemSpecs> = { batteries };
-    if (index === 0) {
-      if (updates.brandModel !== undefined) specsUpdate.batteryBrandModel = updates.brandModel;
-      if (updates.capacityKWh !== undefined) specsUpdate.batteryCapacityKWh = updates.capacityKWh;
-      if (updates.count !== undefined) specsUpdate.batteryCount = updates.count;
-      if (updates.unitPriceUSD !== undefined) specsUpdate.batteryUnitPriceUSD = updates.unitPriceUSD;
-    }
-    updateSpecs(specsUpdate);
-  };
-
-  const handleRemoveBatteryItem = (index: number) => {
-    const batteries = [...getProjectBatteries(project.specs)];
-    if (batteries.length <= 1) return;
-    batteries.splice(index, 1);
-    const specsUpdate: Partial<SystemSpecs> = {
-      batteries: batteries.length > 1 ? batteries : undefined,
-    };
-    if (index === 0 && batteries[0]) {
-      specsUpdate.batteryBrandModel = batteries[0].brandModel;
-      specsUpdate.batteryCapacityKWh = batteries[0].capacityKWh;
-      specsUpdate.batteryCount = batteries[0].count;
-      specsUpdate.batteryUnitPriceUSD = batteries[0].unitPriceUSD;
-    }
-    updateSpecs(specsUpdate);
-  };
+  const handleUpdatePanelItem = (index: number, updates: Partial<PanelItemSpec>) =>
+    updateSpecs(editEquipmentGroup(project.specs, 'panel', { type: 'update', index, patch: updates }));
+  const handleRemovePanelItem = (index: number) =>
+    updateSpecs(editEquipmentGroup(project.specs, 'panel', { type: 'remove', index }));
+  const handleUpdateInverterItem = (index: number, updates: Partial<InverterItemSpec>) =>
+    updateSpecs(editEquipmentGroup(project.specs, 'inverter', { type: 'update', index, patch: updates }));
+  const handleRemoveInverterItem = (index: number) =>
+    updateSpecs(editEquipmentGroup(project.specs, 'inverter', { type: 'remove', index }));
+  const handleUpdateBatteryItem = (index: number, updates: Partial<BatteryItemSpec>) =>
+    updateSpecs(editEquipmentGroup(project.specs, 'battery', { type: 'update', index, patch: updates }));
+  const handleRemoveBatteryItem = (index: number) =>
+    updateSpecs(editEquipmentGroup(project.specs, 'battery', { type: 'remove', index }));
 
   const handleSelectPanel = (item: SolarEquipmentItem) => {
     const suppliers = item.supplierPrices || [];

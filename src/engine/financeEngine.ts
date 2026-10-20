@@ -1,4 +1,5 @@
 import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
+import { DEFAULT_UNIT_PRICE_USD } from '../utils/equipmentGroups';
 import { ITBIS_RATE, LEY5707_CREDIT_RATE, appliesItemMargin, customItemsTaxBreakdown, isItemItbisExonerated } from '../../shared/financialRules';
 import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem, CustomQuotationItem, CustomQuotationDiscount, ProjectSimulation } from '../types';
 import { calculateDCCapacityKWp, calculateMonthlySolarProduction } from './solarEngine';
@@ -38,7 +39,7 @@ export function calculateCostMatrixSummary(
     const qty = p.count || 0;
     const unitUSD = p.unitPriceUSD !== undefined
       ? p.unitPriceUSD
-      : (specs.panels?.length ? 0 : (specs.panelUnitPriceUSD !== undefined ? specs.panelUnitPriceUSD : 103.32));
+      : (specs.panels?.length ? 0 : (specs.panelUnitPriceUSD !== undefined ? specs.panelUnitPriceUSD : DEFAULT_UNIT_PRICE_USD.panel));
     const itemTotalUSD = qty * unitUSD;
     const itemTotalDOP = itemTotalUSD * rate;
     const itemKilos = Math.round((((p.powerW || 620) * qty) / 1000) * 1000) / 1000;
@@ -68,7 +69,7 @@ export function calculateCostMatrixSummary(
     const qty = inv.count !== undefined ? inv.count : 1;
     const unitUSD = inv.unitPriceUSD !== undefined
       ? inv.unitPriceUSD
-      : (specs.inverters?.length ? 0 : (specs.inverterUnitPriceUSD !== undefined ? specs.inverterUnitPriceUSD : 2300.0));
+      : (specs.inverters?.length ? 0 : (specs.inverterUnitPriceUSD !== undefined ? specs.inverterUnitPriceUSD : DEFAULT_UNIT_PRICE_USD.inverter));
     const itemTotalUSD = qty * unitUSD;
     const itemTotalDOP = itemTotalUSD * rate;
     const itemKilos = inv.powerKW || inv.weightKilos || 12;
@@ -99,7 +100,7 @@ export function calculateCostMatrixSummary(
         const qty = b.count !== undefined ? b.count : 1;
         const unitUSD = b.unitPriceUSD !== undefined
           ? b.unitPriceUSD
-          : (specs.batteries?.length ? 0 : (specs.batteryUnitPriceUSD !== undefined ? specs.batteryUnitPriceUSD : 1990.0));
+          : (specs.batteries?.length ? 0 : (specs.batteryUnitPriceUSD !== undefined ? specs.batteryUnitPriceUSD : DEFAULT_UNIT_PRICE_USD.battery));
         const itemTotalUSD = qty * unitUSD;
         const itemTotalDOP = itemTotalUSD * rate;
         const itemItbisDOP = itemTotalDOP * ITBIS_RATE; // 18% ITBIS

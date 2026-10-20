@@ -1,4 +1,5 @@
 import { isProposalLink } from '../../../shared/proposalLinks';
+import { normalizeEquipmentEdit, normalizeSpecsChange } from '../../utils/equipmentGroups';
 import { commercialCopy, commercialState, isProposalCommercial } from '../../../shared/proposalCommercial';
 import { ownsProject } from '../sync/projectReconciliation';
 import { companyDocumentCustomization, reusableDocumentTemplate } from '../../utils/companyDocumentTemplate';
@@ -25,7 +26,13 @@ function withRecommendedPanels(specs: SystemSpecs, client: ClientInfo, monthlyCo
     specs.systemLosses !== undefined ? specs.systemLosses : 25.0,
     client.customMonthlyHSP
   );
-  return { ...specs, panelCount: rec.recommendedPanelCount };
+  // Goes through the group normalizer so a single panel group receives the recommendation too.
+  return normalizeEquipmentEdit(specs, { panelCount: rec.recommendedPanelCount });
+}
+
+/** Keeps equipment groups and their legacy mirror consistent whatever path changed the specs. */
+function withNormalizedEquipment(previous: ProjectSimulation, next: ProjectSimulation): ProjectSimulation {
+  return next.specs === previous.specs ? next : { ...next, specs: normalizeSpecsChange(previous.specs, next.specs) };
 }
 
 /** Manual override fields only survive on the audited reference case; edits elsewhere recompute them. */
@@ -44,7 +51,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
   const updateActiveProject = (edit: (project: ProjectSimulation, state: SimulationStore) => Partial<ProjectSimulation>) => {
     set((state) => ({
       projects: state.projects.map((p) => p.id === state.activeProjectId
-        ? { ...p, ...projectMutationMetadata(p, get().syncSettings), updatedAt: new Date().toISOString(), ...edit(p, state) }
+        ? withNormalizedEquipment(p, { ...p, ...projectMutationMetadata(p, get().syncSettings), updatedAt: new Date().toISOString(), ...edit(p, state) })
         : p),
     }));
     get().triggerAutoSync(false);
@@ -529,7 +536,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
   }),
 
   updateSpecs: (specsPartial) => updateActiveProject((p, state) => {
-    let specs = normalizeEnabledBatteries({ ...p.specs, ...specsPartial });
+    let specs = normalizeEnabledBatteries(normalizeEquipmentEdit(p.specs, specsPartial));
     const shouldAutoCalc = specsPartial.autoCalculatePanels !== undefined
       ? specsPartial.autoCalculatePanels
       : (p.specs.autoCalculatePanels && specsPartial.panelCount === undefined);
@@ -693,12 +700,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
             });
           }
           updatedSpecs.selectedSupplierInfo = selectedSupplierInfo;
-          const nextFinancials = { ...p.financials };
-          if (p.id !== 'benchmark-centro-medico') {
-            delete nextFinancials.customITBISSavedUSD;
-            delete nextFinancials.customLey5707CreditUSD;
-            delete nextFinancials.customCostUSD;
-          }
+          const nextFinancials = withoutStaleFinancialOverrides(p, p.financials);
 
           return {
             ...p,
