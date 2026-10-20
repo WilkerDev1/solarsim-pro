@@ -1,3 +1,4 @@
+import { isWriterRole } from '../../../shared/permissions';
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
 import { SolarEquipmentItem, EquipmentType } from "../../types/equipment";
@@ -54,7 +55,7 @@ export const EquipmentManagerSettingsTab: React.FC<
 
   const canEdit =
     !syncSettings.currentUser ||
-    ["ADMIN", "EDITOR"].includes(syncSettings.currentUser.role);
+    isWriterRole(syncSettings.currentUser.role);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTypeFilter, setSelectedTypeFilter] = useState<
     "all" | EquipmentType
@@ -305,7 +306,7 @@ export const EquipmentManagerSettingsTab: React.FC<
     const activeUser = live.syncSettings.currentUser;
     if (
       activeUser &&
-      (!["ADMIN", "EDITOR"].includes(activeUser.role) ||
+      (!isWriterRole(activeUser.role) ||
         (existing?.organizationId &&
           existing.organizationId !== activeUser.organizationId) ||
         (existing?.syncServerUrl &&

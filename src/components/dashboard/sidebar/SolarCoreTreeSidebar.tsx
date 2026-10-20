@@ -1,3 +1,4 @@
+import { canAdminister } from '../../../../shared/permissions';
 import React, { useState } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import {
@@ -54,7 +55,7 @@ export const SolarCoreTreeSidebar: React.FC = () => {
 
   const currentUser = syncSettings.currentUser;
   const activeCompany = getActiveCompany();
-  const isAdmin = currentUser?.role === 'ADMIN' || !currentUser; // Default full admin capabilities in standalone mode
+  const isAdmin = canAdminister(currentUser); // Default full admin capabilities in standalone mode
 
   // Tree collapsible section states
   const [isProjectsOpen, setIsProjectsOpen] = useState(true);

@@ -1,3 +1,4 @@
+import { isReaderRole } from '../../../shared/permissions';
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, Copy, MoreHorizontal, Loader2, Share2, Trash2 } from 'lucide-react';
@@ -13,7 +14,7 @@ export function ProjectActionsMenu({ project }: { project: ProjectSimulation }) 
   const [position, setPosition] = useState<{ top: number; right: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const readOnly = !!syncSettings.authToken && ['VIEWER', 'LECTOR'].includes(syncSettings.currentUser?.role ?? '');
+  const readOnly = !!syncSettings.authToken && isReaderRole(syncSettings.currentUser?.role);
   const close = () => { setPosition(null); triggerRef.current?.focus(); };
 
   useEffect(() => {

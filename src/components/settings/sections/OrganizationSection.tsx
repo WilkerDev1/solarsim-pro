@@ -1,3 +1,4 @@
+import { isAdminRole, normalizeRole } from '../../../../shared/permissions';
 import { useEffect, useRef, useState } from "react";
 import { useSimulationStore } from "../../../store/useSimulationStore";
 import { SyncService } from "../../../services/syncService";
@@ -40,7 +41,7 @@ export function OrganizationSection() {
   const isCurrent = (generation = sessionGeneration) =>
     mounted.current && useSimulationStore.getState().sessionGeneration === generation;
   const load = async () => {
-    if (!syncSettings.authToken || user?.role !== "ADMIN") return;
+    if (!syncSettings.authToken || !isAdminRole(user?.role)) return;
     const request = ++loadRequest.current;
     setInviteState("loading");
     setInvitations([]);
@@ -144,7 +145,7 @@ export function OrganizationSection() {
         </button>
       </div>
     );
-  if (user.role !== "ADMIN")
+  if (!isAdminRole(user.role))
     return (
       <>
         <h3>Equipo de {user.organizationName || "tu organización"}</h3>
@@ -336,7 +337,7 @@ export function OrganizationSection() {
             <label>
               Rol
               <select
-                value={role === "VIEWER" ? "LECTOR" : role}
+                value={normalizeRole(role)}
                 onChange={(event) => setRole(event.target.value as UserRole)}
               >
                 {roles}

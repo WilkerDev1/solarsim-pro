@@ -1,3 +1,4 @@
+import { isWriterRole } from '../../shared/permissions';
 import { webHeaderLogo } from '../utils/documentLogo';
 import { fetchWithSessionRetry } from './syncService';
 import { ProjectSimulation, FinancialSummaryResult } from '../types';
@@ -193,7 +194,7 @@ export class ShareProposalService {
       const initialSession = initialState.syncSettings;
       const publicationContext = this.historyContext();
       if (!publicationContext || !initialSession.currentUser || !initialSession.authToken) return { success: false, error: 'Inicia sesión en tu organización para publicar una propuesta.' };
-      if (!['ADMIN', 'EDITOR'].includes(initialSession.currentUser.role)) return { success: false, error: 'Esta cuenta no tiene permiso para publicar propuestas.' };
+      if (!isWriterRole(initialSession.currentUser.role)) return { success: false, error: 'Esta cuenta no tiene permiso para publicar propuestas.' };
       const destination = new URL(baseUrl);
       if (destination.protocol !== 'https:' || destination.username || destination.password || destination.search || destination.hash) return { success: false, error: 'La publicación autenticada requiere una URL HTTPS.' };
       await useSimulationStore.getState().loadOrganizationFeaturePolicy();

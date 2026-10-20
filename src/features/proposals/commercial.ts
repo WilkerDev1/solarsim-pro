@@ -1,3 +1,4 @@
+import { isWriterRole } from '../../../shared/permissions';
 import type { ProjectSimulation, SyncSettings } from "../../types";
 import { ownsProject } from "../../store/sync/projectReconciliation";
 import {
@@ -12,7 +13,7 @@ export function canEditCommercial(
     !project.isDeleted &&
     project.syncStatus !== "conflict" &&
     (!session.currentUser ||
-      (["ADMIN", "EDITOR"].includes(session.currentUser.role) &&
+      (isWriterRole(session.currentUser.role) &&
         ownsProject(
           project,
           session.serverUrl,

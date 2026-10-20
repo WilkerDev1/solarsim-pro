@@ -1,3 +1,4 @@
+import { isAdminRole } from '../../../shared/permissions';
 import { useEffect, useState } from "react";
 import { Plus, X } from "lucide-react";
 import {
@@ -38,7 +39,7 @@ export function ProposalCommercialPanel({
     setMembers([]);
     if (
       state.syncSettings.authToken &&
-      state.syncSettings.currentUser?.role === "ADMIN"
+      isAdminRole(state.syncSettings.currentUser?.role)
     )
       void SyncService.getCompanyUsers(
         state.syncSettings.serverUrl,

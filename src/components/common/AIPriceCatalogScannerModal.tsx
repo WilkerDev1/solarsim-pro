@@ -1,3 +1,4 @@
+import { isWriterRole } from '../../../shared/permissions';
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
 import {
@@ -54,7 +55,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
   const isDark = sidebarTheme === "dark";
   const canEdit =
     !syncSettings.currentUser ||
-    ["ADMIN", "EDITOR"].includes(syncSettings.currentUser.role);
+    isWriterRole(syncSettings.currentUser.role);
   const requestGeneration = useRef(0);
   const abort = useRef<AbortController | null>(null);
 

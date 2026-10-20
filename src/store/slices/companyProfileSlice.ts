@@ -1,3 +1,4 @@
+import { isAdminRole } from '../../../shared/permissions';
 import { SimulationSlice, CompanyProfileSlice } from '../types';
 import { CompanyProfile, DEFAULT_LOCAL_COMPANY, DEFAULT_LOCAL_USER } from '../../types';
 import { CompanyService } from '../../services/companyService';
@@ -56,7 +57,7 @@ export const createCompanyProfileSlice: SimulationSlice<CompanyProfileSlice> = (
   },
   saveOrganizationCompanyProfile: async (profile, baseVersion) => {
     const session = capture();
-    if (!session.authToken || !session.currentUser || session.currentUser.role !== 'ADMIN') return { success: false, error: 'Solo ADMIN puede editar la empresa compartida.' };
+    if (!session.authToken || !session.currentUser || !isAdminRole(session.currentUser.role)) return { success: false, error: 'Solo ADMIN puede editar la empresa compartida.' };
     ++requestId;
     const result = await CompanyService.saveProfile(session.serverUrl, session.authToken, profile, baseVersion);
     if (!session.isCurrent()) return { success: false, error: 'La sesión cambió.' };

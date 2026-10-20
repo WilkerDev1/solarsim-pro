@@ -1,3 +1,4 @@
+import { isAdminRole } from '../../../shared/permissions';
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -55,7 +56,7 @@ export function CompanyProfileHubView() {
   const importInput = useRef<HTMLInputElement>(null);
   const original = companies.find((company) => company.id === selected);
   const sharedProfile = !!original?.organizationId;
-  const readOnlyProfile = sharedProfile && store.syncSettings.currentUser?.role !== "ADMIN";
+  const readOnlyProfile = sharedProfile && !isAdminRole(store.syncSettings.currentUser?.role);
   const [saving, setSaving] = useState(false);
   const dirty = creating || JSON.stringify(draft) !== JSON.stringify(original);
   const originalRef = useRef(original);

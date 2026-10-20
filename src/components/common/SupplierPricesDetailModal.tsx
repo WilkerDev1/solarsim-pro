@@ -1,3 +1,4 @@
+import { canWrite } from '../../../shared/permissions';
 import { useEffect, useRef, useState } from "react";
 import {
   X,
@@ -50,7 +51,7 @@ function EquipmentOffers({ equipmentId }: { equipmentId: string }) {
   const writable =
     !!item &&
     !state.equipmentConflicts[equipmentId] &&
-    (!user || ["ADMIN", "EDITOR"].includes(user.role)) &&
+    (canWrite(user)) &&
     (!user ||
       ((!item.organizationId || item.organizationId === user.organizationId) &&
         (!item.syncServerUrl ||

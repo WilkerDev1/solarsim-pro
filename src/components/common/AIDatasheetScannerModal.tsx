@@ -1,3 +1,4 @@
+import { canWrite } from '../../../shared/permissions';
 import React, { useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
@@ -71,7 +72,7 @@ export const AIDatasheetScannerModal: React.FC = () => {
   const [attachmentPending, setAttachmentPending] = useState(false);
   const [linkDatasheet, setLinkDatasheet] = useState(true);
   const user = state.syncSettings.currentUser;
-  const canEdit = !user || user.role === "ADMIN" || user.role === "EDITOR";
+  const canEdit = canWrite(user);
   const control = `w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 ${dark ? "bg-[#141619] border-[#363b43] text-zinc-100 placeholder:text-zinc-400" : "bg-white border-slate-300 text-slate-900 placeholder:text-slate-500"}`;
   const secondary = `rounded-lg border px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-50 ${dark ? "border-[#363b43] hover:bg-zinc-800" : "border-slate-300 hover:bg-slate-100"}`;
 
