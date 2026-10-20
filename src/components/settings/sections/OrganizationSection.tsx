@@ -8,6 +8,7 @@ import {
 import type { UserProfile, UserRole } from "../../../types";
 import "../../../components/companies/company-center.css";
 import { draftOwnerKey } from "../../../utils/draftOwnerKey";
+import { confirmAction } from "../../common/confirmAction";
 
 export function OrganizationSection() {
   const { syncSettings, workspaceScope, sessionGeneration, sidebarTheme } =
@@ -421,13 +422,17 @@ export function OrganizationSection() {
                       <button
                         className="cc-danger"
                         disabled={busy}
-                        onClick={() => {
+                        onClick={async () => {
                           if (
-                            window.confirm(
-                              "¿Retirar el acceso de " +
+                            await confirmAction({
+                              title: "Retirar acceso",
+                              message:
+                                "¿Retirar el acceso de " +
                                 member.name +
                                 "? Sus propuestas se conservan.",
-                            )
+                              confirmLabel: "Retirar acceso",
+                              tone: "danger",
+                            })
                           )
                             void run(
                               () =>
