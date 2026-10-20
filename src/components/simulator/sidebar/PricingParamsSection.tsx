@@ -1,4 +1,5 @@
 import React from 'react';
+import { resolveProjectEquipment, supplierQuotesItem } from '../../../utils/equipmentMatchingUtils';
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs } from '../../../types';
 import { SolarEquipmentItem, EquipmentSupplierPrice } from '../../../types/equipment';
 import { useSimulationStore } from '../../../store/useSimulationStore';
@@ -24,85 +25,23 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
 }) => {
   const { equipmentCatalog, openSupplierPriceModal } = useSimulationStore();
 
-  // Helper resiliente para resolver el equipo del catálogo asociado al proyecto
-  const resolveEquipment = (
-    type: 'panel' | 'inverter' | 'battery',
-    modelName?: string,
-    powerOrCap?: number,
-    supplierPriceId?: string
-  ): SolarEquipmentItem | undefined => {
-    if (!equipmentCatalog || equipmentCatalog.length === 0) return undefined;
 
-    // 1. Coincidencia exacta por displayName
-    if (modelName) {
-      const exact = equipmentCatalog.find((e) => e.type === type && e.displayName === modelName);
-      if (exact) return exact;
-    }
-
-    // 2. Coincidencia por supplierPriceId asignado al proyecto
-    if (supplierPriceId) {
-      const byPrice = equipmentCatalog.find(
-        (e) => e.type === type && e.supplierPrices?.some((sp) => sp.id === supplierPriceId)
-      );
-      if (byPrice) return byPrice;
-    }
-
-    // 3. Coincidencia normalizada sin caracteres especiales
-    if (modelName) {
-      const normModel = modelName.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const byNorm = equipmentCatalog.find((e) => {
-        if (e.type !== type) return false;
-        const normE = e.displayName.toLowerCase().replace(/[^a-z0-9]/g, '');
-        return normE === normModel || normE.includes(normModel) || normModel.includes(normE);
-      });
-      if (byNorm) return byNorm;
-
-      // Especial para Baterías: "HinaESS" o "PowerGem"
-      if (type === 'battery' && (normModel.includes('hina') || normModel.includes('powergem'))) {
-        const hinaMatch = equipmentCatalog.find(
-          (e) => e.type === 'battery' && (e.brand.toLowerCase().includes('hina') || e.displayName.toLowerCase().includes('hina'))
-        );
-        if (hinaMatch) return hinaMatch;
-      }
-    }
-
-    // 4. Coincidencia por especificación técnica (W / kW / kWh)
-    if (powerOrCap && powerOrCap > 0) {
-      if (type === 'battery') {
-        const byCap = equipmentCatalog.find(
-          (e) => e.type === 'battery' && e.capacityKWh && Math.abs(e.capacityKWh - powerOrCap) <= 0.5
-        );
-        if (byCap) return byCap;
-      } else if (type === 'panel') {
-        const byPower = equipmentCatalog.find(
-          (e) => e.type === 'panel' && e.powerW && Math.abs(e.powerW - powerOrCap) <= 5
-        );
-        if (byPower) return byPower;
-      } else if (type === 'inverter') {
-        const byPower = equipmentCatalog.find(
-          (e) => e.type === 'inverter' && e.powerKW && Math.abs(e.powerKW - powerOrCap) <= 0.5
-        );
-        if (byPower) return byPower;
-      }
-    }
-
-    // 5. Fallback al primer equipo disponible del catálogo para este tipo
-    return equipmentCatalog.find((e) => e.type === type);
-  };
-
-  const selectedPanel = resolveEquipment(
+  const selectedPanel = resolveProjectEquipment(
+    equipmentCatalog,
     'panel',
     project.specs.panelBrandModel,
     project.specs.panelPowerW,
     project.specs.selectedSupplierInfo?.panel?.supplierPriceId
   );
-  const selectedInverter = resolveEquipment(
+  const selectedInverter = resolveProjectEquipment(
+    equipmentCatalog,
     'inverter',
     project.specs.inverterBrandModel,
     project.specs.inverterPowerKW,
     project.specs.selectedSupplierInfo?.inverter?.supplierPriceId
   );
-  const selectedBattery = resolveEquipment(
+  const selectedBattery = resolveProjectEquipment(
+    equipmentCatalog,
     'battery',
     project.specs.batteryBrandModel,
     project.specs.batteryCapacityKWh,
@@ -121,26 +60,11 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
   const hasAnySupplierPrices = panelSuppliersCount > 0 || inverterSuppliersCount > 0 || (project.specs.hasBattery && batterySuppliersCount > 0);
 
   // 🏷️ Verificar correspondencia: el proveedor asignado debe existir en el catálogo
-  const panelSupplierMatches = !!selectedPanel?.supplierPrices?.some(
-    (sp: EquipmentSupplierPrice) =>
-      (project.specs.selectedSupplierInfo?.panel?.supplierPriceId && sp.id === project.specs.selectedSupplierInfo.panel.supplierPriceId) ||
-      (project.specs.selectedSupplierInfo?.panel?.supplierName &&
-        sp.supplierName.toLowerCase().trim() === project.specs.selectedSupplierInfo.panel.supplierName.toLowerCase().trim())
-  );
+  const panelSupplierMatches = supplierQuotesItem(selectedPanel, project.specs.selectedSupplierInfo?.panel);
 
-  const inverterSupplierMatches = !!selectedInverter?.supplierPrices?.some(
-    (sp: EquipmentSupplierPrice) =>
-      (project.specs.selectedSupplierInfo?.inverter?.supplierPriceId && sp.id === project.specs.selectedSupplierInfo.inverter.supplierPriceId) ||
-      (project.specs.selectedSupplierInfo?.inverter?.supplierName &&
-        sp.supplierName.toLowerCase().trim() === project.specs.selectedSupplierInfo.inverter.supplierName.toLowerCase().trim())
-  );
+  const inverterSupplierMatches = supplierQuotesItem(selectedInverter, project.specs.selectedSupplierInfo?.inverter);
 
-  const batterySupplierMatches = !!selectedBattery?.supplierPrices?.some(
-    (sp: EquipmentSupplierPrice) =>
-      (project.specs.selectedSupplierInfo?.battery?.supplierPriceId && sp.id === project.specs.selectedSupplierInfo.battery.supplierPriceId) ||
-      (project.specs.selectedSupplierInfo?.battery?.supplierName &&
-        sp.supplierName.toLowerCase().trim() === project.specs.selectedSupplierInfo.battery.supplierName.toLowerCase().trim())
-  );
+  const batterySupplierMatches = supplierQuotesItem(selectedBattery, project.specs.selectedSupplierInfo?.battery);
 
   // Limpieza protectora de proveedores huérfanos solo si el proveedor no existe en ningún equipo del catálogo
   React.useEffect(() => {
@@ -151,36 +75,21 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
     const cleanedInfo = { ...info };
 
     if (info.panel && !panelSupplierMatches) {
-      const existsInCatalog = equipmentCatalog.some((e) =>
-        e.type === 'panel' && e.supplierPrices?.some((sp) =>
-          (info.panel?.supplierPriceId && sp.id === info.panel.supplierPriceId) ||
-          (info.panel?.supplierName && sp.supplierName.toLowerCase().trim() === info.panel.supplierName.toLowerCase().trim())
-        )
-      );
+      const existsInCatalog = equipmentCatalog.some((e) => e.type === 'panel' && supplierQuotesItem(e, info.panel));
       if (!existsInCatalog) {
         delete cleanedInfo.panel;
         needsCleanup = true;
       }
     }
     if (info.inverter && !inverterSupplierMatches) {
-      const existsInCatalog = equipmentCatalog.some((e) =>
-        e.type === 'inverter' && e.supplierPrices?.some((sp) =>
-          (info.inverter?.supplierPriceId && sp.id === info.inverter.supplierPriceId) ||
-          (info.inverter?.supplierName && sp.supplierName.toLowerCase().trim() === info.inverter.supplierName.toLowerCase().trim())
-        )
-      );
+      const existsInCatalog = equipmentCatalog.some((e) => e.type === 'inverter' && supplierQuotesItem(e, info.inverter));
       if (!existsInCatalog) {
         delete cleanedInfo.inverter;
         needsCleanup = true;
       }
     }
     if (info.battery && !batterySupplierMatches) {
-      const existsInCatalog = equipmentCatalog.some((e) =>
-        e.type === 'battery' && e.supplierPrices?.some((sp) =>
-          (info.battery?.supplierPriceId && sp.id === info.battery.supplierPriceId) ||
-          (info.battery?.supplierName && sp.supplierName.toLowerCase().trim() === info.battery.supplierName.toLowerCase().trim())
-        )
-      );
+      const existsInCatalog = equipmentCatalog.some((e) => e.type === 'battery' && supplierQuotesItem(e, info.battery));
       if (!existsInCatalog) {
         delete cleanedInfo.battery;
         needsCleanup = true;
@@ -651,7 +560,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                   {/* Paneles (1 o múltiples) */}
                   <div className="grid grid-cols-2 gap-2">
                     {getProjectPanels(project.specs).map((p, idx, arr) => {
-                      const panelEq = resolveEquipment('panel', p.brandModel, p.powerW, p.selectedSupplierInfo?.supplierPriceId);
+                      const panelEq = resolveProjectEquipment(equipmentCatalog, 'panel', p.brandModel, p.powerW, p.selectedSupplierInfo?.supplierPriceId);
                       const supCount = panelEq?.supplierPrices?.length || 0;
                       return (
                         <div key={p.id || idx}>
@@ -701,7 +610,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
 
                     {/* Inversores (1 o múltiples) */}
                     {getProjectInverters(project.specs).map((inv, idx, arr) => {
-                      const invEq = resolveEquipment('inverter', inv.brandModel, inv.powerKW, inv.selectedSupplierInfo?.supplierPriceId);
+                      const invEq = resolveProjectEquipment(equipmentCatalog, 'inverter', inv.brandModel, inv.powerKW, inv.selectedSupplierInfo?.supplierPriceId);
                       const supCount = invEq?.supplierPrices?.length || 0;
                       return (
                         <div key={inv.id || idx}>
@@ -754,7 +663,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                   {project.specs.hasBattery && (
                     <div className="grid grid-cols-2 gap-2">
                       {getProjectBatteries(project.specs).map((bat, idx, arr) => {
-                        const batEq = resolveEquipment('battery', bat.brandModel, bat.capacityKWh, bat.selectedSupplierInfo?.supplierPriceId);
+                        const batEq = resolveProjectEquipment(equipmentCatalog, 'battery', bat.brandModel, bat.capacityKWh, bat.selectedSupplierInfo?.supplierPriceId);
                         const supCount = batEq?.supplierPrices?.length || 0;
                         return (
                           <div key={bat.id || idx}>

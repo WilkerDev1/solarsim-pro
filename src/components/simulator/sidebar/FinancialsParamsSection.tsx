@@ -1,4 +1,5 @@
 import React from 'react';
+import { ITBIS_RATE, isItemItbisExonerated } from '../../../../shared/financialRules';
 import { ProjectSimulation, FinancialParams, CustomQuotationItem, CustomQuotationDiscount } from '../../../types';
 import { Landmark, ChevronDown, Plus, Trash2, PackagePlus, Tag, Percent, DollarSign } from 'lucide-react';
 import { calculateCostMatrixSummary } from '../../../engine/financeEngine';
@@ -103,13 +104,13 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
   );
 
   const customItemsExoneratedITBISUSD = customItems.reduce((sum, it) => {
-    const isExonerated = it.exonerateITBIS !== undefined ? it.exonerateITBIS : (it.applyITBIS ?? true);
-    return isExonerated ? sum + ((it.quantity || 0) * (it.unitPriceUSD || 0) * 0.18) : sum;
+    const isExonerated = isItemItbisExonerated(it);
+    return isExonerated ? sum + ((it.quantity || 0) * (it.unitPriceUSD || 0) * ITBIS_RATE) : sum;
   }, 0);
 
   const customItemsNonExoneratedITBISUSD = customItems.reduce((sum, it) => {
-    const isExonerated = it.exonerateITBIS !== undefined ? it.exonerateITBIS : (it.applyITBIS ?? true);
-    return !isExonerated ? sum + ((it.quantity || 0) * (it.unitPriceUSD || 0) * 0.18) : sum;
+    const isExonerated = isItemItbisExonerated(it);
+    return !isExonerated ? sum + ((it.quantity || 0) * (it.unitPriceUSD || 0) * ITBIS_RATE) : sum;
   }, 0);
 
   return (
@@ -239,7 +240,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
               <div className="space-y-2.5">
                 {customItems.map((item, index) => {
                   const itemTotalUSD = (item.quantity || 0) * (item.unitPriceUSD || 0);
-                  const isExonerated = item.exonerateITBIS !== undefined ? item.exonerateITBIS : (item.applyITBIS ?? true);
+                  const isExonerated = isItemItbisExonerated(item);
                   return (
                     <div
                       key={item.id || index}
@@ -350,8 +351,8 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
                         </label>
                         <span className={`text-[10px] font-semibold ${isExonerated ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
                           {isExonerated
-                            ? `Exonerado: -$${(itemTotalUSD * 0.18).toFixed(2)} (Ley 57-07)`
-                            : `Se cobra ITBIS: +$${(itemTotalUSD * 0.18).toFixed(2)}`}
+                            ? `Exonerado: -$${(itemTotalUSD * ITBIS_RATE).toFixed(2)} (Ley 57-07)`
+                            : `Se cobra ITBIS: +$${(itemTotalUSD * ITBIS_RATE).toFixed(2)}`}
                         </span>
                       </div>
 

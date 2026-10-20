@@ -236,7 +236,7 @@ export const PDFProposalView: React.FC = () => {
     costMatrix: showPageCostMatrix,
   };
 
-  const { pageNumbers, activePagesCount, footerTotalPages, tocItems } = buildPdfLayout(
+  const { pageNumbers, footerTotalPages, tocItems } = buildPdfLayout(
     effectiveSectionOrder,
     sectionVisibility,
     project.customization?.extraTocItems || [],
@@ -286,7 +286,7 @@ export const PDFProposalView: React.FC = () => {
         project={project}
         activeTheme={activeTheme}
         setActiveTheme={setActiveTheme}
-        activePagesCount={activePagesCount}
+        activePagesCount={footerTotalPages}
         sidebarTab={sidebarTab}
         setSidebarTab={setSidebarTab}
         isExporting={isExporting}

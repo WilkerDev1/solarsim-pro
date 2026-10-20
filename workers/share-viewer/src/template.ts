@@ -1,5 +1,6 @@
 import { StoredProposal } from './types';
 import { cleanClientName, getTariffDisplayName } from '../../../shared/proposalPresentation';
+import { customItemsTaxBreakdown, LEY5707_CREDIT_RATE } from '../../../shared/financialRules';
 import { ELECTSUN_LOGO_COLOR_BASE64 } from '../../../shared/electsunLogoColor';
 import { escapeHtml, formatMarkdown, safeLogoUrl, scriptJson } from './escaping';
 
@@ -164,14 +165,14 @@ export function renderProposalPage(stored: StoredProposal): string {
   const itbisSavedUSD = Number(summary?.itbisSavedUSD || 0);
   // Stored amounts are authoritative, including zero after discounts or disabled incentives.
   // Older publications without this metric use the project preference for the fallback.
-  const ley5707CreditUSD = Number(summary?.ley5707CreditUSD ?? (financials.applyLey5707 === false ? 0 : equipmentPortionUSD * 0.40));
+  const ley5707CreditUSD = Number(summary?.ley5707CreditUSD ?? (financials.applyLey5707 === false ? 0 : equipmentPortionUSD * LEY5707_CREDIT_RATE));
   
   const applyITBISExemption = financials.applyITBISExemption ?? true;
-  const customItemsNonExoneratedITBISUSD = Number(summary?.customItemsNonExoneratedITBISUSD ?? (
-    (financials?.customItems || [])
-      .filter((i: any) => (i.applyITBIS ?? true) && !(i.exonerateITBIS ?? true))
-      .reduce((sum: number, i: any) => sum + ((Number(i.quantity) || 1) * (Number(i.unitPriceUSD) || 0) * 0.18), 0)
-  ));
+  // Older publications lack this amount; recompute it with the engine's item rules.
+  const customItemsNonExoneratedITBISUSD = Number(summary?.customItemsNonExoneratedITBISUSD ?? customItemsTaxBreakdown(
+    financials?.customItems || [],
+    Number(summary?.costMatrix?.saleMarginMultiplier || project.specs?.saleMarginMultiplier || 1.25),
+  ).nonExoneratedITBISUSD);
   const subTotalSinITBIS = Number(
     summary?.commercialPreTaxSubtotalUSD ?? 
     (applyITBISExemption

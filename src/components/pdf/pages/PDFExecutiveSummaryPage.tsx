@@ -92,10 +92,9 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
   // --- 4. Datos Ley 57-07 ---
   const isLeyEligible = project.financials.applyLey5707 !== false;
   const leyCreditUSD = isLeyEligible ? summary.ley5707CreditUSD || 0 : 0;
-  // Base de equipos computables estimada
-  const equipmentCostEst = leyCreditUSD > 0 ? leyCreditUSD / 0.4 : grossInvestmentUSD * 0.4;
+  // Base de equipos computables (Ley 57-07) calculada por el motor
   const equipmentPct =
-    grossInvestmentUSD > 0 ? Math.min(100, Math.max(10, Math.round((equipmentCostEst / grossInvestmentUSD) * 100))) : 40;
+    grossInvestmentUSD > 0 ? Math.min(100, Math.max(10, Math.round((summary.equipmentPortionUSD / grossInvestmentUSD) * 100))) : 40;
 
   // --- 5. Inversión Neta Final ---
   const netInvestmentUSD = summary.netInvestmentUSD || grossInvestmentUSD - leyCreditUSD;
