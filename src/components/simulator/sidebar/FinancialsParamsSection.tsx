@@ -122,9 +122,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
       <button
         type="button"
         onClick={onToggle}
-        className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors ${
-          isDark ? 'text-zinc-200 hover:bg-[#222230]' : 'text-slate-800 hover:bg-slate-50'
-        }`}
+        className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors text-slate-800 hover:bg-slate-50 dark:text-zinc-200 dark:hover:bg-[#222230]`}
       >
         <div className="flex items-center gap-2">
           <Landmark className="w-4 h-4 text-emerald-500 shrink-0" />
@@ -149,16 +147,12 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
 
       {isOpen && (
         <div
-          className={`p-3.5 pt-2 space-y-3.5 border-t ${
-            isDark ? 'border-[#27272a] bg-[#14141c]/50' : 'border-slate-100 bg-slate-50/50'
-          }`}
+          className={`p-3.5 pt-2 space-y-3.5 border-t border-slate-100 bg-slate-50/50 dark:border-[#27272a] dark:bg-[#14141c]/50`}
         >
           {/* Toggles Principales */}
           <label className="flex items-center justify-between cursor-pointer group">
             <span
-              className={`text-xs font-medium transition-colors ${
-                isDark ? 'text-zinc-300 group-hover:text-white' : 'text-slate-600 group-hover:text-slate-900'
-              }`}
+              className={`text-xs font-medium transition-colors text-slate-600 group-hover:text-slate-900 dark:text-zinc-300 dark:group-hover:text-white`}
             >
               Aplicar Ley 57-07 (Crédito ISR 40%)
             </span>
@@ -172,9 +166,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
 
           <label className="flex items-center justify-between cursor-pointer group">
             <span
-              className={`text-xs font-medium transition-colors ${
-                isDark ? 'text-zinc-300 group-hover:text-white' : 'text-slate-600 group-hover:text-slate-900'
-              }`}
+              className={`text-xs font-medium transition-colors text-slate-600 group-hover:text-slate-900 dark:text-zinc-300 dark:group-hover:text-white`}
             >
               Exoneración ITBIS 100% (18%)
             </span>
@@ -187,7 +179,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
           </label>
 
           <div>
-            <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+            <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
               Tasa de Descuento (%)
             </label>
             <input
@@ -195,20 +187,16 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
               step="0.1"
               value={project.financials.discountRatePct}
               onChange={(e) => updateFinancials({ discountRatePct: parseFloat(e.target.value) || 0 })}
-              className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                isDark
-                  ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                  : 'bg-slate-50 border-slate-300 text-slate-800'
-              }`}
+              className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all bg-slate-50 border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
             />
           </div>
 
           {/* Apartado de Otros Ítems y Equipos Personalizados */}
-          <div className={`pt-3 border-t ${isDark ? 'border-zinc-800' : 'border-slate-200'}`}>
+          <div className={`pt-3 border-t border-slate-200 dark:border-zinc-800`}>
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-1.5">
                 <PackagePlus className="w-3.5 h-3.5 text-emerald-500" />
-                <span className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-200' : 'text-slate-700'}`}>
+                <span className={`text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-200`}>
                   Otros Ítems y Materiales
                 </span>
                 {customItems.length > 0 && (
@@ -230,9 +218,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
 
             {customItems.length === 0 ? (
               <div
-                className={`p-2.5 rounded-lg border border-dashed text-center text-[11px] ${
-                  isDark ? 'border-zinc-800 bg-[#1e1e28]/40 text-zinc-400' : 'border-slate-200 bg-slate-50/60 text-slate-500'
-                }`}
+                className={`p-2.5 rounded-lg border border-dashed text-center text-[11px] border-slate-200 bg-slate-50/60 text-slate-500 dark:border-zinc-800 dark:bg-[#1e1e28]/40 dark:text-zinc-400`}
               >
                 Sin ítems adicionales. Haz clic en <span className="font-bold text-emerald-600 dark:text-emerald-400">+ Agregar Ítem</span> para añadir equipos, materiales o servicios extra.
               </div>
@@ -286,9 +272,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
                             min="1"
                             value={item.quantity}
                             onChange={(e) => handleUpdateItem(item.id, { quantity: Math.max(1, parseInt(e.target.value) || 1) })}
-                            className={`w-full text-center px-1.5 py-1 font-bold rounded border ${
-                              isDark ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100' : 'bg-slate-50 border-slate-300 text-slate-900'
-                            }`}
+                            className={`w-full text-center px-1.5 py-1 font-bold rounded border bg-slate-50 border-slate-300 text-slate-900 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
                           />
                         </div>
 
@@ -302,9 +286,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
                             placeholder="UD"
                             value={item.unit || 'UD'}
                             onChange={(e) => handleUpdateItem(item.id, { unit: e.target.value.toUpperCase() })}
-                            className={`w-full text-center px-1 py-1 font-semibold rounded border uppercase ${
-                              isDark ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100' : 'bg-slate-50 border-slate-300 text-slate-900'
-                            }`}
+                            className={`w-full text-center px-1 py-1 font-semibold rounded border uppercase bg-slate-50 border-slate-300 text-slate-900 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
                           />
                         </div>
 
@@ -319,9 +301,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
                             min="0"
                             value={item.unitPriceUSD}
                             onChange={(e) => handleUpdateItem(item.id, { unitPriceUSD: Math.max(0, parseFloat(e.target.value) || 0) })}
-                            className={`w-full px-1.5 py-1 text-right font-bold rounded border ${
-                              isDark ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100' : 'bg-slate-50 border-slate-300 text-slate-900'
-                            }`}
+                            className={`w-full px-1.5 py-1 text-right font-bold rounded border bg-slate-50 border-slate-300 text-slate-900 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
                           />
                         </div>
 
@@ -381,9 +361,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
 
                 {/* Resumen Total de Ítems Adicionales */}
                 <div
-                  className={`p-2 rounded-lg border flex justify-between items-center text-xs font-bold ${
-                    isDark ? 'border-zinc-800 bg-[#181822] text-zinc-200' : 'border-emerald-200 bg-emerald-50/70 text-emerald-900'
-                  }`}
+                  className={`p-2 rounded-lg border flex justify-between items-center text-xs font-bold border-emerald-200 bg-emerald-50/70 text-emerald-900 dark:border-zinc-800 dark:bg-[#181822] dark:text-zinc-200`}
                 >
                   <span>Subtotal Ítems Extra:</span>
                   <div className="text-right">
@@ -405,11 +383,11 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
           </div>
 
           {/* Apartado de Descuentos */}
-          <div className={`pt-3 border-t ${isDark ? 'border-zinc-800' : 'border-slate-200'}`}>
+          <div className={`pt-3 border-t border-slate-200 dark:border-zinc-800`}>
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-1.5">
                 <Tag className="w-3.5 h-3.5 text-rose-500" />
-                <span className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-200' : 'text-slate-700'}`}>
+                <span className={`text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-200`}>
                   Descuentos
                 </span>
                 {customDiscounts.length > 0 && (
@@ -431,9 +409,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
 
             {customDiscounts.length === 0 ? (
               <div
-                className={`p-2.5 rounded-lg border border-dashed text-center text-[11px] ${
-                  isDark ? 'border-zinc-800 bg-[#1e1e28]/40 text-zinc-400' : 'border-slate-200 bg-slate-50/60 text-slate-500'
-                }`}
+                className={`p-2.5 rounded-lg border border-dashed text-center text-[11px] border-slate-200 bg-slate-50/60 text-slate-500 dark:border-zinc-800 dark:bg-[#1e1e28]/40 dark:text-zinc-400`}
               >
                 Sin descuentos. Haz clic en <span className="font-bold text-rose-600 dark:text-rose-400">+ Agregar Descuento</span> para añadir una cortesía comercial, cierre especial o descuento de equipos.
               </div>
@@ -446,9 +422,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
                   return (
                     <div
                       key={disc.id || index}
-                      className={`p-2.5 rounded-lg border space-y-2 transition-all ${
-                        isDark ? 'border-rose-950/40 bg-[#1e161c] text-zinc-200' : 'border-rose-200/70 bg-rose-50/30 text-slate-800'
-                      }`}
+                      className={`p-2.5 rounded-lg border space-y-2 transition-all border-rose-200/70 bg-rose-50/30 text-slate-800 dark:border-rose-950/40 dark:bg-[#1e161c] dark:text-zinc-200`}
                     >
                       {/* Fila 1: Descripción / Motivo y Botón Eliminar */}
                       <div className="flex items-center gap-1.5">
@@ -460,11 +434,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
                           placeholder="Motivo / Nota (ej. Cierre especial, Cortesía comercial...)"
                           value={disc.description}
                           onChange={(e) => handleUpdateDiscount(disc.id, { description: e.target.value })}
-                          className={`flex-1 px-2 py-1 text-xs font-semibold rounded border transition-all ${
-                            isDark
-                              ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:border-rose-500'
-                              : 'bg-white border-slate-300 text-slate-900 focus:border-rose-600'
-                          }`}
+                          className={`flex-1 px-2 py-1 text-xs font-semibold rounded border transition-all bg-white border-slate-300 text-slate-900 focus:border-rose-600 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100 dark:focus:border-rose-500`}
                         />
                         <button
                           type="button"
@@ -523,9 +493,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
                             max={disc.type === 'percentage' ? '100' : undefined}
                             value={disc.value}
                             onChange={(e) => handleUpdateDiscount(disc.id, { value: Math.max(0, parseFloat(e.target.value) || 0) })}
-                            className={`w-full px-2 py-1 text-right font-bold rounded border ${
-                              isDark ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100' : 'bg-white border-slate-300 text-slate-900'
-                            }`}
+                            className={`w-full px-2 py-1 text-right font-bold rounded border bg-white border-slate-300 text-slate-900 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
                           />
                         </div>
 
@@ -592,9 +560,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
 
                 {/* Resumen Total de Descuentos */}
                 <div
-                  className={`p-2.5 rounded-lg border flex justify-between items-center text-xs font-bold ${
-                    isDark ? 'border-rose-950/60 bg-[#20151c] text-zinc-200' : 'border-rose-200 bg-rose-50/80 text-rose-950'
-                  }`}
+                  className={`p-2.5 rounded-lg border flex justify-between items-center text-xs font-bold border-rose-200 bg-rose-50/80 text-rose-950 dark:border-rose-950/60 dark:bg-[#20151c] dark:text-zinc-200`}
                 >
                   <div>
                     <span className="block">Total Descuentos:</span>

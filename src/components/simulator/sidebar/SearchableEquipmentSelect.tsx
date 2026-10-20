@@ -178,10 +178,10 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
   return (
     <div className="relative space-y-1" ref={containerRef}>
       <div className="flex items-center justify-between">
-        <label className={`block text-xs font-medium ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+        <label className={`block text-xs font-medium text-slate-600 dark:text-zinc-300`}>
           {label}
         </label>
-        <span className={`text-[10px] font-mono ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+        <span className={`text-[10px] font-mono text-slate-500 dark:text-zinc-400`}>
           {filteredAndSortedItems.length} en catálogo
         </span>
       </div>
@@ -244,9 +244,7 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
         >
           {/* Input de Búsqueda y Filtrado en Tiempo Real */}
           <div
-            className={`p-2.5 border-b flex items-center gap-2 ${
-              isDark ? 'bg-[#14141c] border-[#27272a]' : 'bg-slate-50 border-slate-200'
-            }`}
+            className={`p-2.5 border-b flex items-center gap-2 bg-slate-50 border-slate-200 dark:bg-[#14141c] dark:border-[#27272a]`}
           >
             <Search className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
             <input
@@ -255,9 +253,7 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={getSearchPlaceholderText()}
-              className={`w-full bg-transparent border-none outline-none text-xs ${
-                isDark ? 'text-zinc-100 placeholder-zinc-500' : 'text-slate-900 placeholder-slate-400'
-              }`}
+              className={`w-full bg-transparent border-none outline-none text-xs text-slate-900 placeholder-slate-400 dark:text-zinc-100 dark:placeholder-zinc-500`}
               onClick={(e) => e.stopPropagation()}
             />
             {searchQuery && (
@@ -278,9 +274,7 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
           {/* Píldoras de Filtro Rápido por Marca */}
           {availableBrands.length > 1 && (
             <div
-              className={`p-1.5 border-b flex items-center gap-1 overflow-x-auto scrollbar-none ${
-                isDark ? 'bg-[#181820] border-[#27272a]' : 'bg-slate-100/80 border-slate-200'
-              }`}
+              className={`p-1.5 border-b flex items-center gap-1 overflow-x-auto scrollbar-none bg-slate-100/80 border-slate-200 dark:bg-[#181820] dark:border-[#27272a]`}
             >
               <button
                 type="button"
@@ -323,7 +317,7 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
           <div className="max-h-[440px] overflow-y-auto p-1.5 space-y-1">
             {filteredAndSortedItems.length === 0 ? (
               <div className="p-4 text-center">
-                <p className={`text-xs ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                <p className={`text-xs text-slate-500 dark:text-zinc-400`}>
                   No se encontraron {isPanel ? 'paneles' : isBattery ? 'baterías' : 'inversores'} coincidentes.
                 </p>
                 <button
@@ -372,7 +366,7 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
                           </span>
                         )}
                       </div>
-                      <div className={`text-[10.5px] flex items-center gap-1.5 flex-wrap mt-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                      <div className={`text-[10.5px] flex items-center gap-1.5 flex-wrap mt-0.5 text-slate-500 dark:text-zinc-400`}>
                         <span className="font-semibold">{item.brand}</span>
                         {item.type === 'battery' && (
                           <>
@@ -438,9 +432,7 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
 
           {/* Footer del Dropdown con botón de Escanear Datasheet con IA, Precios IA y Administrar Catálogo */}
           <div
-            className={`p-2 border-t flex items-center gap-1.5 ${
-              isDark ? 'bg-[#14141c] border-[#27272a]' : 'bg-slate-50 border-slate-200'
-            }`}
+            className={`p-2 border-t flex items-center gap-1.5 bg-slate-50 border-slate-200 dark:bg-[#14141c] dark:border-[#27272a]`}
           >
             <button
               type="button"
@@ -461,11 +453,7 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
                 useSimulationStore.getState().openAIPriceCatalogModal();
               }}
               title="Escanear listas de precios comerciales de proveedores con IA"
-              className={`py-1.5 px-2.5 rounded-lg border text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                isDark
-                  ? 'border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300'
-                  : 'border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900'
-              }`}
+              className={`py-1.5 px-2.5 rounded-lg border text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:hover:bg-amber-500/20 dark:text-amber-300`}
             >
               <DollarSign className="w-3.5 h-3.5 text-amber-400" />
               <span className="text-[11px]">Precios IA</span>
@@ -478,11 +466,7 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
                 useSimulationStore.getState().openSettingsModal('equipment');
               }}
               title="Administrar catálogo en Ajustes"
-              className={`p-1.5 rounded-lg border text-xs transition-all cursor-pointer flex items-center gap-1 ${
-                isDark
-                  ? 'border-[#3f3f46] hover:bg-[#272732] text-zinc-300'
-                  : 'border-slate-300 hover:bg-slate-200 text-slate-700'
-              }`}
+              className={`p-1.5 rounded-lg border text-xs transition-all cursor-pointer flex items-center gap-1 border-slate-300 hover:bg-slate-200 text-slate-700 dark:border-[#3f3f46] dark:hover:bg-[#272732] dark:text-zinc-300`}
             >
               <Layers className="w-3.5 h-3.5 text-emerald-400" />
               <span className="text-[10px] font-semibold">Catálogo</span>

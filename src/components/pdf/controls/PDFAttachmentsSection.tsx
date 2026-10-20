@@ -345,7 +345,7 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Paperclip className="w-4 h-4 text-emerald-500 shrink-0" />
-          <h3 className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+          <h3 className={`text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300`}>
             4. Fusión de PDFs Externos & Datasheets
           </h3>
         </div>
@@ -364,7 +364,7 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
         </span>
       </div>
 
-      <p className={`text-[11px] leading-relaxed ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+      <p className={`text-[11px] leading-relaxed text-slate-500 dark:text-zinc-400`}>
         Adjunta fichas técnicas de paneles/inversores, planos o certificados. Se conservarán en el dock y se fusionarán vectorialmente en alta resolución al final de tu propuesta al exportar el PDF.
       </p>
 
@@ -456,7 +456,7 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
           <span className="text-xs font-bold block text-emerald-400">
             {isUploading ? 'Procesando e inspeccionando PDF...' : '+ Adjuntar Ficha Técnica o PDF Externo'}
           </span>
-          <span className={`text-[10px] block mt-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+          <span className={`text-[10px] block mt-0.5 text-slate-500 dark:text-zinc-400`}>
             Arrastra aquí o haz clic para explorar (.pdf) • Múltiples archivos permitidos
           </span>
         </div>
@@ -465,11 +465,7 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
       {/* Resumen de Fusión Activa */}
       {enabledAttachments.length > 0 && (
         <div
-          className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 text-xs ${
-            isDark
-              ? 'bg-emerald-950/30 border-emerald-800/40 text-emerald-300'
-              : 'bg-emerald-50 border-emerald-200 text-emerald-800'
-          }`}
+          className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 text-xs bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800/40 dark:text-emerald-300`}
         >
           <div className="flex items-center gap-1.5 min-w-0">
             <Sparkles className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
@@ -570,12 +566,10 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
                       value={doc.title}
                       onChange={(e) => handleUpdateTitle(doc.id, e.target.value)}
                       placeholder="Título descriptivo del archivo..."
-                      className={`text-xs font-bold w-full bg-transparent border-b border-transparent hover:border-zinc-500 focus:border-emerald-500 outline-none transition-colors ${
-                        isDark ? 'text-zinc-100' : 'text-slate-900'
-                      }`}
+                      className={`text-xs font-bold w-full bg-transparent border-b border-transparent hover:border-zinc-500 focus:border-emerald-500 outline-none transition-colors text-slate-900 dark:text-zinc-100`}
                     />
                     <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                      <span className={`text-[10px] truncate max-w-[130px] ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                      <span className={`text-[10px] truncate max-w-[130px] text-slate-500 dark:text-zinc-400`}>
                         {doc.fileName}
                       </span>
                       <span className="text-[9.5px] font-mono text-zinc-500">•</span>
@@ -589,11 +583,7 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
                 {/* Badge de Páginas y Botones de Acción */}
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span
-                    className={`text-[10px] font-black font-mono px-2 py-0.5 rounded-md border ${
-                      isDark
-                        ? 'bg-[#242432] border-[#38384a] text-emerald-400'
-                        : 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                    }`}
+                    className={`text-[10px] font-black font-mono px-2 py-0.5 rounded-md border bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-[#242432] dark:border-[#38384a] dark:text-emerald-400`}
                   >
                     {doc.pageCount} {doc.pageCount === 1 ? 'pág' : 'págs'}
                   </span>
@@ -627,7 +617,7 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
                     onChange={(e) => handleToggleEnabled(doc.id, e.target.checked)}
                     className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-0 cursor-pointer"
                   />
-                  <span className={`font-medium ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                  <span className={`font-medium text-slate-700 dark:text-zinc-300`}>
                     ✓ Fusionar al exportar
                   </span>
                 </label>
@@ -639,7 +629,7 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
                     onChange={(e) => handleToggleAddToToc(doc.id, e.target.checked)}
                     className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-0 cursor-pointer"
                   />
-                  <span className={isDark ? 'text-zinc-400' : 'text-slate-500'}>
+                  <span className="text-slate-500 dark:text-zinc-400">
                     Mostrar en el Índice
                   </span>
                 </label>

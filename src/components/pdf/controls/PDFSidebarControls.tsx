@@ -127,9 +127,9 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
       }`}
     >
       {/* Top Actions in Sidebar */}
-      <div className={`p-4 border-b space-y-2.5 ${isDark ? 'border-[#2a2a36] bg-[#131318]' : 'border-slate-200 bg-slate-50'}`}>
+      <div className={`p-4 border-b space-y-2.5 border-slate-200 bg-slate-50 dark:border-[#2a2a36] dark:bg-[#131318]`}>
         <div className="flex items-center justify-between mb-0.5">
-          <span className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+          <span className={`text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400`}>
             Exportación y Enlaces
           </span>
           <span className="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-950/70 px-2 py-0.5 rounded-full border border-emerald-800/60">
@@ -181,7 +181,7 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
       </div>
 
       {/* Tabs Header: "Secciones" vs "Modo Edición" */}
-      <div className={`grid grid-cols-2 p-1.5 m-3 rounded-xl border ${isDark ? 'bg-[#14141a] border-[#2a2a36]' : 'bg-slate-100 border-slate-200'}`}>
+      <div className={`grid grid-cols-2 p-1.5 m-3 rounded-xl border bg-slate-100 border-slate-200 dark:bg-[#14141a] dark:border-[#2a2a36]`}>
         <button
           type="button"
           onClick={() => setSidebarTab('sections')}
@@ -276,7 +276,7 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
       </div>
 
       {/* Bottom Bar in Sidebar */}
-      <div className={`p-4 border-t ${isDark ? 'border-[#2a2a36] bg-[#14141a]' : 'border-slate-200 bg-slate-50'}`}>
+      <div className={`p-4 border-t border-slate-200 bg-slate-50 dark:border-[#2a2a36] dark:bg-[#14141a]`}>
         <button
           type="button"
           onClick={onRefresh}

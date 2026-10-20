@@ -101,11 +101,7 @@ export const NewProjectModal: React.FC = () => {
       onClick={closeNewProjectModal}
     >
       <div
-        className={`border rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col scale-100 animate-in zoom-in-95 duration-200 transition-colors z-50 select-text ${
-          isDark
-            ? 'bg-[#18181f] border-[#2e2e3a] text-zinc-100'
-            : 'bg-white border-slate-200 text-slate-900'
-        }`}
+        className={`border rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col scale-100 animate-in zoom-in-95 duration-200 transition-colors z-50 select-text bg-white border-slate-200 text-slate-900 dark:bg-[#18181f] dark:border-[#2e2e3a] dark:text-zinc-100`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -124,7 +120,7 @@ export const NewProjectModal: React.FC = () => {
             />
             <div>
               <h3 className="font-bold text-base tracking-tight text-white">Nueva Simulación Solar</h3>
-              <p className={`text-xs ${isDark ? 'text-zinc-300' : 'text-emerald-100'}`}>
+              <p className={`text-xs text-emerald-100 dark:text-zinc-300`}>
                 Ingresa el nombre del proyecto para comenzar
               </p>
             </div>
@@ -178,11 +174,7 @@ export const NewProjectModal: React.FC = () => {
 
           {error && (
             <div
-              className={`px-3.5 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 border ${
-                isDark
-                  ? 'bg-red-950/60 border-red-800/80 text-red-300'
-                  : 'bg-red-50 border-red-200 text-red-700'
-              }`}
+              className={`px-3.5 py-2.5 rounded-xl font-semibold text-xs flex items-center gap-2 border bg-red-50 border-red-200 text-red-700 dark:bg-red-950/60 dark:border-red-800/80 dark:text-red-300`}
             >
               <span>⚠️</span>
               <span>{error}</span>
@@ -193,7 +185,7 @@ export const NewProjectModal: React.FC = () => {
           <div>
             <label
               htmlFor="project-name-input"
-              className={`block font-bold mb-1.5 ${isDark ? 'text-zinc-200' : 'text-slate-700'}`}
+              className={`block font-bold mb-1.5 text-slate-700 dark:text-zinc-200`}
             >
               Nombre del Proyecto / Cliente <span className="text-red-500 font-black">*</span>
             </label>
@@ -217,7 +209,7 @@ export const NewProjectModal: React.FC = () => {
                   : 'bg-slate-50 border-slate-300 text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600 placeholder:text-slate-400 font-semibold'
               }`}
             />
-            <p className={`text-[11px] mt-1.5 ${isDark ? 'text-zinc-500' : 'text-slate-400'}`}>
+            <p className={`text-[11px] mt-1.5 text-slate-400 dark:text-zinc-500`}>
               Los parámetros técnicos, tarifas y equipos se pueden personalizar dentro del simulador.
             </p>
           </div>
@@ -248,13 +240,11 @@ export const NewProjectModal: React.FC = () => {
           {/* Collapsible Advanced Fields */}
           {showAdvanced && (
             <div
-              className={`space-y-3.5 p-3.5 rounded-xl border animate-in slide-in-from-top-2 duration-200 ${
-                isDark ? 'bg-[#15151a] border-[#2a2a36]' : 'bg-slate-50/70 border-slate-200'
-              }`}
+              className={`space-y-3.5 p-3.5 rounded-xl border animate-in slide-in-from-top-2 duration-200 bg-slate-50/70 border-slate-200 dark:bg-[#15151a] dark:border-[#2a2a36]`}
             >
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={`block font-bold mb-1 flex items-center gap-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                  <label className={`block font-bold mb-1 flex items-center gap-1 text-slate-700 dark:text-zinc-300`}>
                     <Building2 className="w-3.5 h-3.5 text-zinc-400" /> Empresa / Razón Social
                   </label>
                   <input
@@ -262,26 +252,18 @@ export const NewProjectModal: React.FC = () => {
                     placeholder="Ej. Grupo Ramos SRL"
                     value={company}
                     onChange={(e) => setCompany(e.target.value)}
-                    className={`w-full border rounded-xl px-3 py-2 text-xs font-semibold transition-all select-text cursor-text ${
-                      isDark
-                        ? 'bg-[#22222a] border-[#383846] text-white focus:bg-[#282834]'
-                        : 'bg-white border-slate-300 text-slate-900'
-                    }`}
+                    className={`w-full border rounded-xl px-3 py-2 text-xs font-semibold transition-all select-text cursor-text bg-white border-slate-300 text-slate-900 dark:bg-[#22222a] dark:border-[#383846] dark:text-white dark:focus:bg-[#282834]`}
                   />
                 </div>
 
                 <div>
-                  <label className={`block font-bold mb-1 flex items-center gap-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                  <label className={`block font-bold mb-1 flex items-center gap-1 text-slate-700 dark:text-zinc-300`}>
                     <MapPin className="w-3.5 h-3.5 text-zinc-400" /> Provincia / Región
                   </label>
                   <select
                     value={province}
                     onChange={(e) => handleProvinceChange(e.target.value)}
-                    className={`w-full border rounded-xl px-3 py-2 text-xs font-semibold transition-all cursor-pointer ${
-                      isDark
-                        ? 'bg-[#22222a] border-[#383846] text-white focus:bg-[#282834]'
-                        : 'bg-white border-slate-300 text-slate-900'
-                    }`}
+                    className={`w-full border rounded-xl px-3 py-2 text-xs font-semibold transition-all cursor-pointer bg-white border-slate-300 text-slate-900 dark:bg-[#22222a] dark:border-[#383846] dark:text-white dark:focus:bg-[#282834]`}
                   >
                     {RD_PROVINCES.map((p) => (
                       <option key={p.code} value={p.name} className={isDark ? 'bg-[#18181f] text-white' : ''}>
@@ -294,17 +276,13 @@ export const NewProjectModal: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className={`block font-bold mb-1 flex items-center gap-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                  <label className={`block font-bold mb-1 flex items-center gap-1 text-slate-700 dark:text-zinc-300`}>
                     <Zap className="w-3.5 h-3.5 text-zinc-400" /> Distribuidora
                   </label>
                   <select
                     value={distributor}
                     onChange={(e) => handleDistributorChange(e.target.value as UtilityDistributor)}
-                    className={`w-full border rounded-xl px-3 py-2 text-xs font-semibold transition-all cursor-pointer ${
-                      isDark
-                        ? 'bg-[#22222a] border-[#383846] text-white focus:bg-[#282834]'
-                        : 'bg-white border-slate-300 text-slate-900'
-                    }`}
+                    className={`w-full border rounded-xl px-3 py-2 text-xs font-semibold transition-all cursor-pointer bg-white border-slate-300 text-slate-900 dark:bg-[#22222a] dark:border-[#383846] dark:text-white dark:focus:bg-[#282834]`}
                   >
                     <option value="EDEESTE" className={isDark ? 'bg-[#18181f] text-white' : ''}>EDEESTE</option>
                     <option value="EDESUR" className={isDark ? 'bg-[#18181f] text-white' : ''}>EDESUR</option>
@@ -314,17 +292,13 @@ export const NewProjectModal: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className={`block font-bold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                  <label className={`block font-bold mb-1 text-slate-700 dark:text-zinc-300`}>
                     Tarifa Eléctrica ({distributor})
                   </label>
                   <select
                     value={tariffCode}
                     onChange={(e) => setTariffCode(e.target.value)}
-                    className={`w-full border rounded-xl px-3 py-2 text-xs font-semibold transition-all cursor-pointer ${
-                      isDark
-                        ? 'bg-[#22222a] border-[#383846] text-white focus:bg-[#282834]'
-                        : 'bg-white border-slate-300 text-slate-900'
-                    }`}
+                    className={`w-full border rounded-xl px-3 py-2 text-xs font-semibold transition-all cursor-pointer bg-white border-slate-300 text-slate-900 dark:bg-[#22222a] dark:border-[#383846] dark:text-white dark:focus:bg-[#282834]`}
                   >
                     {getDistributorTariffOptions(distributor).map((opt) => (
                       <option key={opt.value} value={opt.value} className={isDark ? 'bg-[#18181f] text-white' : ''}>
@@ -341,7 +315,7 @@ export const NewProjectModal: React.FC = () => {
               </div>
 
               <div>
-                <label className={`block font-bold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                <label className={`block font-bold mb-1 text-slate-700 dark:text-zinc-300`}>
                   Dirección del Inmueble
                 </label>
                 <input
@@ -349,26 +323,18 @@ export const NewProjectModal: React.FC = () => {
                   placeholder="Ej. Av. 27 de Febrero esq. Winston Churchill"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  className={`w-full border rounded-xl px-3 py-2 text-xs font-medium transition-all select-text cursor-text ${
-                    isDark
-                      ? 'bg-[#22222a] border-[#383846] text-white placeholder:text-zinc-500 focus:bg-[#282834]'
-                      : 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-400'
-                  }`}
+                  className={`w-full border rounded-xl px-3 py-2 text-xs font-medium transition-all select-text cursor-text bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 dark:bg-[#22222a] dark:border-[#383846] dark:text-white dark:placeholder:text-zinc-500 dark:focus:bg-[#282834]`}
                 />
               </div>
             </div>
           )}
 
           {/* Buttons */}
-          <div className={`pt-3 border-t flex justify-end gap-2.5 ${isDark ? 'border-[#2e2e3a]' : 'border-slate-200'}`}>
+          <div className={`pt-3 border-t flex justify-end gap-2.5 border-slate-200 dark:border-[#2e2e3a]`}>
             <button
               type="button"
               onClick={closeNewProjectModal}
-              className={`px-4 py-2.5 rounded-xl border font-semibold text-xs transition-colors cursor-pointer ${
-                isDark
-                  ? 'border-[#383846] text-zinc-300 hover:bg-[#262632]'
-                  : 'border-slate-300 text-slate-700 hover:bg-slate-100'
-              }`}
+              className={`px-4 py-2.5 rounded-xl border font-semibold text-xs transition-colors cursor-pointer border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-[#383846] dark:text-zinc-300 dark:hover:bg-[#262632]`}
             >
               Cancelar
             </button>

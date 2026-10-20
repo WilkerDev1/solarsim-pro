@@ -494,19 +494,19 @@ export const EquipmentManagerSettingsTab: React.FC<
     }
   };
 
-  const control = `rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 ${isDark ? "bg-[#141619] border-[#363b43] text-zinc-100 placeholder:text-zinc-400" : "bg-white border-slate-300 text-slate-900 placeholder:text-slate-500"}`;
-  const button = `inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-50 ${isDark ? "border-[#363b43] text-zinc-200 hover:bg-zinc-800" : "border-slate-300 text-slate-700 hover:bg-slate-50"}`;
+  const control = `rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white border-slate-300 text-slate-900 placeholder:text-slate-500 dark:bg-[#141619] dark:border-[#363b43] dark:text-zinc-100 dark:placeholder:text-zinc-400`;
+  const button = `inline-flex items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-50 border-slate-300 text-slate-700 hover:bg-slate-50 dark:border-[#363b43] dark:text-zinc-200 dark:hover:bg-zinc-800`;
   return (
     <div className="space-y-5">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h3
-            className={`text-lg font-semibold ${isDark ? "text-zinc-100" : "text-slate-900"}`}
+            className={`text-lg font-semibold text-slate-900 dark:text-zinc-100`}
           >
             Catálogo de equipos
           </h3>
           <p
-            className={`mt-1 text-sm ${isDark ? "text-zinc-400" : "text-slate-600"}`}
+            className={`mt-1 text-sm text-slate-600 dark:text-zinc-400`}
           >
             {equipmentCatalog.length} modelos · {supplierCount} proveedores.
             Especificaciones y ofertas usadas en tus propuestas.
@@ -544,7 +544,7 @@ export const EquipmentManagerSettingsTab: React.FC<
         </div>
       </header>
       <div
-        className={`flex flex-wrap items-center justify-between gap-3 border-b pb-3 ${isDark ? "border-[#363b43]" : "border-slate-200"}`}
+        className={`flex flex-wrap items-center justify-between gap-3 border-b pb-3 border-slate-200 dark:border-[#363b43]`}
       >
         <div
           className="flex gap-2"
@@ -580,7 +580,7 @@ export const EquipmentManagerSettingsTab: React.FC<
         </p>
       )}
       {!canEdit && (
-        <p className={`text-sm ${isDark ? "text-zinc-400" : "text-slate-600"}`}>
+        <p className={`text-sm text-slate-600 dark:text-zinc-400`}>
           Tu cuenta puede consultar modelos y ofertas. Un administrador o editor
           puede modificarlos.
         </p>
@@ -641,7 +641,7 @@ export const EquipmentManagerSettingsTab: React.FC<
             </label>
           </div>
           <div
-            className={`overflow-x-auto rounded-xl border ${isDark ? "border-[#363b43] bg-[#1c1f23]" : "border-slate-200 bg-white"}`}
+            className={`overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-[#363b43] dark:bg-[#1c1f23]`}
           >
             <table className="w-full min-w-[690px] border-collapse text-left text-sm">
               <caption className="sr-only">
@@ -649,11 +649,7 @@ export const EquipmentManagerSettingsTab: React.FC<
                 proveedores
               </caption>
               <thead
-                className={
-                  isDark
-                    ? "bg-[#141619] text-zinc-400"
-                    : "bg-slate-50 text-slate-600"
-                }
+                className="bg-slate-50 text-slate-600 dark:bg-[#141619] dark:text-zinc-400"
               >
                 <tr>
                   <th scope="col" className="px-4 py-3 font-medium">
@@ -694,19 +690,17 @@ export const EquipmentManagerSettingsTab: React.FC<
                   return (
                     <React.Fragment key={item.id}>
                       <tr
-                        className={
-                          isDark ? "hover:bg-zinc-800/50" : "hover:bg-slate-50"
-                        }
+                        className="hover:bg-slate-50 dark:hover:bg-zinc-800/50"
                       >
                         <td className="max-w-sm px-4 py-3">
                           <button
                             onClick={() => handleOpenEdit(item)}
-                            className={`text-left font-semibold hover:underline focus-visible:ring-2 focus-visible:ring-emerald-500 ${isDark ? "text-zinc-100" : "text-slate-900"}`}
+                            className={`text-left font-semibold hover:underline focus-visible:ring-2 focus-visible:ring-emerald-500 text-slate-900 dark:text-zinc-100`}
                           >
                             {item.displayName}
                           </button>
                           <p
-                            className={`mt-1 text-xs ${isDark ? "text-zinc-400" : "text-slate-600"}`}
+                            className={`mt-1 text-xs text-slate-600 dark:text-zinc-400`}
                           >
                             {item.brand || "Sin marca"} ·{" "}
                             {item.modelSeries || "Sin modelo"} ·{" "}
@@ -720,7 +714,7 @@ export const EquipmentManagerSettingsTab: React.FC<
                         <td className="px-4 py-3 tabular-nums">
                           <span className="font-medium">{nominal}</span>
                           <p
-                            className={`mt-1 text-xs ${isDark ? "text-zinc-400" : "text-slate-600"}`}
+                            className={`mt-1 text-xs text-slate-600 dark:text-zinc-400`}
                           >
                             {item.type === "panel"
                               ? item.efficiencyPct !== undefined
@@ -745,7 +739,7 @@ export const EquipmentManagerSettingsTab: React.FC<
                               : "Sin precio disponible"}
                           </button>
                           <p
-                            className={`mt-1 text-xs ${isDark ? "text-zinc-400" : "text-slate-600"}`}
+                            className={`mt-1 text-xs text-slate-600 dark:text-zinc-400`}
                           >
                             {item.supplierPrices?.length || 0} ofertas
                             registradas
@@ -774,7 +768,7 @@ export const EquipmentManagerSettingsTab: React.FC<
                         <tr>
                           <td
                             colSpan={4}
-                            className={`px-4 py-3 ${isDark ? "bg-amber-950 text-amber-100" : "bg-amber-50 text-amber-950"}`}
+                            className={`px-4 py-3 bg-amber-50 text-amber-950 dark:bg-amber-950 dark:text-amber-100`}
                           >
                             <p className="mb-2 text-sm">
                               Cambios de este equipo pendientes de resolver con
@@ -826,7 +820,7 @@ export const EquipmentManagerSettingsTab: React.FC<
                     <td colSpan={4} className="px-6 py-10 text-center">
                       <p className="font-medium">No se encontraron equipos</p>
                       <p
-                        className={`mt-1 ${isDark ? "text-zinc-400" : "text-slate-600"}`}
+                        className={`mt-1 text-slate-600 dark:text-zinc-400`}
                       >
                         Cambia la búsqueda o los filtros; también puedes
                         importar una ficha técnica.
@@ -848,7 +842,7 @@ export const EquipmentManagerSettingsTab: React.FC<
             </table>
           </div>
           <div
-            className={`flex flex-wrap items-center justify-between gap-3 text-sm ${isDark ? "text-zinc-400" : "text-slate-600"}`}
+            className={`flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600 dark:text-zinc-400`}
           >
             <p>
               {filteredItems.length} de {equipmentCatalog.length} modelos. Los
@@ -878,15 +872,11 @@ export const EquipmentManagerSettingsTab: React.FC<
             aria-label={
               isNewItem ? "Agregar equipo" : "Consultar o editar equipo"
             }
-            className={`w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 ${
-              isDark
-                ? "bg-[#181820] border-[#2e2e38] text-zinc-100"
-                : "bg-white border-slate-200 text-slate-900"
-            }`}
+            className={`w-full max-w-3xl max-h-[90vh] flex flex-col rounded-2xl border shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 bg-white border-slate-200 text-slate-900 dark:bg-[#181820] dark:border-[#2e2e38] dark:text-zinc-100`}
           >
             {/* Modal Header */}
             <div
-              className={`p-4 border-b flex items-center justify-between ${isDark ? "border-[#282832]" : "border-slate-200"}`}
+              className={`p-4 border-b flex items-center justify-between border-slate-200 dark:border-[#282832]`}
             >
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
@@ -899,7 +889,7 @@ export const EquipmentManagerSettingsTab: React.FC<
                       : "Editar equipo"}
                   </h4>
                   <p
-                    className={`text-[11px] ${isDark ? "text-zinc-400" : "text-slate-500"}`}
+                    className={`text-[11px] text-slate-500 dark:text-zinc-400`}
                   >
                     Administra especificaciones, precios de compra y documentos del modelo.
                   </p>
@@ -912,7 +902,7 @@ export const EquipmentManagerSettingsTab: React.FC<
                   setIsEditorOpen(false);
                   setEditingItem(null);
                 }}
-                className={`p-1.5 rounded-lg cursor-pointer ${isDark ? "hover:bg-zinc-800 text-zinc-400" : "hover:bg-slate-100 text-slate-500"}`}
+                className={`p-1.5 rounded-lg cursor-pointer hover:bg-slate-100 text-slate-500 dark:hover:bg-zinc-800 dark:text-zinc-400`}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -939,12 +929,12 @@ export const EquipmentManagerSettingsTab: React.FC<
               {/* Tipo de Equipo */}
               <div>
                 <label
-                  className={`block text-xs font-semibold mb-1 ${isDark ? "text-zinc-300" : "text-slate-700"}`}
+                  className={`block text-xs font-semibold mb-1 text-slate-700 dark:text-zinc-300`}
                 >
                   Tipo de Equipo
                 </label>
                 <div
-                  className={`flex rounded-xl p-1 border ${isDark ? "bg-[#121216] border-[#282832]" : "bg-slate-100 border-slate-200"}`}
+                  className={`flex rounded-xl p-1 border bg-slate-100 border-slate-200 dark:bg-[#121216] dark:border-[#282832]`}
                 >
                   <button
                     type="button"
@@ -1000,7 +990,7 @@ export const EquipmentManagerSettingsTab: React.FC<
               {/* Nombre Display */}
               <div>
                 <label
-                  className={`block text-xs font-semibold mb-1 ${isDark ? "text-zinc-300" : "text-slate-700"}`}
+                  className={`block text-xs font-semibold mb-1 text-slate-700 dark:text-zinc-300`}
                 >
                   Nombre Mostrado en el Selector (Display Name) *
                 </label>
@@ -1021,11 +1011,7 @@ export const EquipmentManagerSettingsTab: React.FC<
                       displayName: e.target.value,
                     })
                   }
-                  className={`w-full px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
-                    isDark
-                      ? "bg-[#121216] border-[#3f3f46] text-zinc-100"
-                      : "bg-slate-50 border-slate-300 text-slate-900"
-                  }`}
+                  className={`w-full px-3 py-2 rounded-xl text-xs font-bold border transition-all bg-slate-50 border-slate-300 text-slate-900 dark:bg-[#121216] dark:border-[#3f3f46] dark:text-zinc-100`}
                 />
               </div>
 
@@ -1033,7 +1019,7 @@ export const EquipmentManagerSettingsTab: React.FC<
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label
-                    className={`block text-xs font-semibold mb-1 ${isDark ? "text-zinc-300" : "text-slate-700"}`}
+                    className={`block text-xs font-semibold mb-1 text-slate-700 dark:text-zinc-300`}
                   >
                     Fabricante / Marca *
                   </label>
@@ -1046,11 +1032,7 @@ export const EquipmentManagerSettingsTab: React.FC<
                     onChange={(e) =>
                       setEditingItem({ ...editingItem, brand: e.target.value })
                     }
-                    className={`w-full px-3 py-2 rounded-xl text-xs font-semibold border ${
-                      isDark
-                        ? "bg-[#121216] border-[#3f3f46] text-zinc-100"
-                        : "bg-slate-50 border-slate-300 text-slate-900"
-                    }`}
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-semibold border bg-slate-50 border-slate-300 text-slate-900 dark:bg-[#121216] dark:border-[#3f3f46] dark:text-zinc-100`}
                   />
                   <datalist id="equipment-brand-suggestions">
                     {allUniqueBrands.map((b) => (
@@ -1061,7 +1043,7 @@ export const EquipmentManagerSettingsTab: React.FC<
 
                 <div>
                   <label
-                    className={`block text-xs font-semibold mb-1 ${isDark ? "text-zinc-300" : "text-slate-700"}`}
+                    className={`block text-xs font-semibold mb-1 text-slate-700 dark:text-zinc-300`}
                   >
                     Serie / Modelo
                   </label>
@@ -1075,11 +1057,7 @@ export const EquipmentManagerSettingsTab: React.FC<
                         modelSeries: e.target.value,
                       })
                     }
-                    className={`w-full px-3 py-2 rounded-xl text-xs font-semibold border ${
-                      isDark
-                        ? "bg-[#121216] border-[#3f3f46] text-zinc-100"
-                        : "bg-slate-50 border-slate-300 text-slate-900"
-                    }`}
+                    className={`w-full px-3 py-2 rounded-xl text-xs font-semibold border bg-slate-50 border-slate-300 text-slate-900 dark:bg-[#121216] dark:border-[#3f3f46] dark:text-zinc-100`}
                   />
                 </div>
               </div>
@@ -1087,7 +1065,7 @@ export const EquipmentManagerSettingsTab: React.FC<
               {/* Categoría Tecnológica */}
               <div>
                 <label
-                  className={`block text-xs font-semibold mb-1 ${isDark ? "text-zinc-300" : "text-slate-700"}`}
+                  className={`block text-xs font-semibold mb-1 text-slate-700 dark:text-zinc-300`}
                 >
                   Categoría Tecnológica
                 </label>
@@ -1098,21 +1076,17 @@ export const EquipmentManagerSettingsTab: React.FC<
                   onChange={(e) =>
                     setEditingItem({ ...editingItem, category: e.target.value })
                   }
-                  className={`w-full px-3 py-2 rounded-xl text-xs font-medium border ${
-                    isDark
-                      ? "bg-[#121216] border-[#3f3f46] text-zinc-100"
-                      : "bg-slate-50 border-slate-300 text-slate-900"
-                  }`}
+                  className={`w-full px-3 py-2 rounded-xl text-xs font-medium border bg-slate-50 border-slate-300 text-slate-900 dark:bg-[#121216] dark:border-[#3f3f46] dark:text-zinc-100`}
                 />
               </div>
 
               {/* Parámetros Específicos para Paneles */}
               {editingItem.type === "panel" && (
                 <div
-                  className={`p-4 rounded-xl border space-y-3 ${isDark ? "bg-[#14141c] border-[#2e2e38]" : "bg-amber-50/40 border-amber-200"}`}
+                  className={`p-4 rounded-xl border space-y-3 bg-amber-50/40 border-amber-200 dark:bg-[#14141c] dark:border-[#2e2e38]`}
                 >
                   <h5
-                    className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${isDark ? "text-amber-400" : "text-amber-900"}`}
+                    className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-amber-900 dark:text-amber-400`}
                   >
                     <Sun className="w-3.5 h-3.5" /> Parámetros de Rendimiento
                     Fotovoltaico
@@ -1121,7 +1095,7 @@ export const EquipmentManagerSettingsTab: React.FC<
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div>
                       <label
-                        className={`block text-[10px] font-semibold mb-1 ${isDark ? "text-zinc-300" : "text-slate-700"}`}
+                        className={`block text-[10px] font-semibold mb-1 text-slate-700 dark:text-zinc-300`}
                       >
                         Potencia (Wp) *
                       </label>
@@ -1135,17 +1109,13 @@ export const EquipmentManagerSettingsTab: React.FC<
                             powerW: parseFloat(e.target.value) || 0,
                           })
                         }
-                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-bold ${
-                          isDark
-                            ? "bg-[#1e1e28] border-[#3f3f46] text-amber-300"
-                            : "bg-white border-slate-300 text-amber-900"
-                        }`}
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-bold bg-white border-slate-300 text-amber-900 dark:bg-[#1e1e28] dark:border-[#3f3f46] dark:text-amber-300`}
                       />
                     </div>
 
                     <div>
                       <label
-                        className={`block text-[10px] font-semibold mb-1 ${isDark ? "text-zinc-300" : "text-slate-700"}`}
+                        className={`block text-[10px] font-semibold mb-1 text-slate-700 dark:text-zinc-300`}
                       >
                         Eficiencia (%)
                       </label>
@@ -1159,17 +1129,13 @@ export const EquipmentManagerSettingsTab: React.FC<
                             efficiencyPct: parseFloat(e.target.value) || 0,
                           })
                         }
-                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold ${
-                          isDark
-                            ? "bg-[#1e1e28] border-[#3f3f46] text-zinc-100"
-                            : "bg-white border-slate-300 text-slate-800"
-                        }`}
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white border-slate-300 text-slate-800 dark:bg-[#1e1e28] dark:border-[#3f3f46] dark:text-zinc-100`}
                       />
                     </div>
 
                     <div>
                       <label
-                        className={`block text-[10px] font-semibold mb-1 ${isDark ? "text-zinc-300" : "text-slate-700"}`}
+                        className={`block text-[10px] font-semibold mb-1 text-slate-700 dark:text-zinc-300`}
                       >
                         Coef. Temp (%/°C)
                       </label>
@@ -1183,17 +1149,13 @@ export const EquipmentManagerSettingsTab: React.FC<
                             tempCoeff: parseFloat(e.target.value) || 0,
                           })
                         }
-                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold ${
-                          isDark
-                            ? "bg-[#1e1e28] border-[#3f3f46] text-zinc-100"
-                            : "bg-white border-slate-300 text-slate-800"
-                        }`}
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white border-slate-300 text-slate-800 dark:bg-[#1e1e28] dark:border-[#3f3f46] dark:text-zinc-100`}
                       />
                     </div>
 
                     <div>
                       <label
-                        className={`block text-[10px] font-semibold mb-1 ${isDark ? "text-zinc-300" : "text-slate-700"}`}
+                        className={`block text-[10px] font-semibold mb-1 text-slate-700 dark:text-zinc-300`}
                       >
                         Degradación (%/año)
                       </label>
@@ -1207,11 +1169,7 @@ export const EquipmentManagerSettingsTab: React.FC<
                             annualDegradation: parseFloat(e.target.value) || 0,
                           })
                         }
-                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold ${
-                          isDark
-                            ? "bg-[#1e1e28] border-[#3f3f46] text-zinc-100"
-                            : "bg-white border-slate-300 text-slate-800"
-                        }`}
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white border-slate-300 text-slate-800 dark:bg-[#1e1e28] dark:border-[#3f3f46] dark:text-zinc-100`}
                       />
                     </div>
                   </div>
@@ -1221,10 +1179,10 @@ export const EquipmentManagerSettingsTab: React.FC<
               {/* Parámetros Específicos para Inversores */}
               {editingItem.type === "inverter" && (
                 <div
-                  className={`p-4 rounded-xl border space-y-3 ${isDark ? "bg-[#14141c] border-[#2e2e38]" : "bg-emerald-50/40 border-emerald-200"}`}
+                  className={`p-4 rounded-xl border space-y-3 bg-emerald-50/40 border-emerald-200 dark:bg-[#14141c] dark:border-[#2e2e38]`}
                 >
                   <h5
-                    className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${isDark ? "text-emerald-400" : "text-emerald-900"}`}
+                    className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-emerald-900 dark:text-emerald-400`}
                   >
                     <Cpu className="w-3.5 h-3.5" /> Parámetros del Inversor
                   </h5>
@@ -1232,7 +1190,7 @@ export const EquipmentManagerSettingsTab: React.FC<
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div>
                       <label
-                        className={`block text-[10px] font-semibold mb-1 ${isDark ? "text-zinc-300" : "text-slate-700"}`}
+                        className={`block text-[10px] font-semibold mb-1 text-slate-700 dark:text-zinc-300`}
                       >
                         Potencia AC (kW) *
                       </label>
@@ -1246,17 +1204,13 @@ export const EquipmentManagerSettingsTab: React.FC<
                             powerKW: parseFloat(e.target.value) || 0,
                           })
                         }
-                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-bold ${
-                          isDark
-                            ? "bg-[#1e1e28] border-[#3f3f46] text-emerald-300"
-                            : "bg-white border-slate-300 text-emerald-900"
-                        }`}
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-bold bg-white border-slate-300 text-emerald-900 dark:bg-[#1e1e28] dark:border-[#3f3f46] dark:text-emerald-300`}
                       />
                     </div>
 
                     <div>
                       <label
-                        className={`block text-[10px] font-semibold mb-1 ${isDark ? "text-zinc-300" : "text-slate-700"}`}
+                        className={`block text-[10px] font-semibold mb-1 text-slate-700 dark:text-zinc-300`}
                       >
                         Máx DC PV (kW)
                       </label>
@@ -1270,17 +1224,13 @@ export const EquipmentManagerSettingsTab: React.FC<
                             maxPvPowerKW: parseFloat(e.target.value) || 0,
                           })
                         }
-                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold ${
-                          isDark
-                            ? "bg-[#1e1e28] border-[#3f3f46] text-zinc-100"
-                            : "bg-white border-slate-300 text-slate-800"
-                        }`}
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white border-slate-300 text-slate-800 dark:bg-[#1e1e28] dark:border-[#3f3f46] dark:text-zinc-100`}
                       />
                     </div>
 
                     <div>
                       <label
-                        className={`block text-[10px] font-semibold mb-1 ${isDark ? "text-zinc-300" : "text-slate-700"}`}
+                        className={`block text-[10px] font-semibold mb-1 text-slate-700 dark:text-zinc-300`}
                       >
                         Eficiencia (%)
                       </label>
@@ -1294,17 +1244,13 @@ export const EquipmentManagerSettingsTab: React.FC<
                             maxEfficiencyPct: parseFloat(e.target.value) || 0,
                           })
                         }
-                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold ${
-                          isDark
-                            ? "bg-[#1e1e28] border-[#3f3f46] text-zinc-100"
-                            : "bg-white border-slate-300 text-slate-800"
-                        }`}
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white border-slate-300 text-slate-800 dark:bg-[#1e1e28] dark:border-[#3f3f46] dark:text-zinc-100`}
                       />
                     </div>
 
                     <div>
                       <label
-                        className={`block text-[10px] font-semibold mb-1 ${isDark ? "text-zinc-300" : "text-slate-700"}`}
+                        className={`block text-[10px] font-semibold mb-1 text-slate-700 dark:text-zinc-300`}
                       >
                         Cantidad MPPTs
                       </label>
@@ -1318,11 +1264,7 @@ export const EquipmentManagerSettingsTab: React.FC<
                             mpptCount: parseInt(e.target.value) || 1,
                           })
                         }
-                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold ${
-                          isDark
-                            ? "bg-[#1e1e28] border-[#3f3f46] text-zinc-100"
-                            : "bg-white border-slate-300 text-slate-800"
-                        }`}
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white border-slate-300 text-slate-800 dark:bg-[#1e1e28] dark:border-[#3f3f46] dark:text-zinc-100`}
                       />
                     </div>
                   </div>
@@ -1332,10 +1274,10 @@ export const EquipmentManagerSettingsTab: React.FC<
               {/* Parámetros Específicos para Baterías */}
               {editingItem.type === "battery" && (
                 <div
-                  className={`p-4 rounded-xl border space-y-3 ${isDark ? "bg-[#14141c] border-[#2e2e38]" : "bg-cyan-50/40 border-cyan-200"}`}
+                  className={`p-4 rounded-xl border space-y-3 bg-cyan-50/40 border-cyan-200 dark:bg-[#14141c] dark:border-[#2e2e38]`}
                 >
                   <h5
-                    className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${isDark ? "text-cyan-400" : "text-cyan-900"}`}
+                    className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 text-cyan-900 dark:text-cyan-400`}
                   >
                     <BatteryCharging className="w-3.5 h-3.5" /> Parámetros de
                     Almacenamiento (BESS)
@@ -1344,7 +1286,7 @@ export const EquipmentManagerSettingsTab: React.FC<
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div>
                       <label
-                        className={`block text-[10px] font-semibold mb-1 ${isDark ? "text-zinc-300" : "text-slate-700"}`}
+                        className={`block text-[10px] font-semibold mb-1 text-slate-700 dark:text-zinc-300`}
                       >
                         Capacidad (kWh) *
                       </label>
@@ -1358,17 +1300,13 @@ export const EquipmentManagerSettingsTab: React.FC<
                             capacityKWh: parseFloat(e.target.value) || 0,
                           })
                         }
-                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-bold ${
-                          isDark
-                            ? "bg-[#1e1e28] border-[#3f3f46] text-cyan-300"
-                            : "bg-white border-slate-300 text-cyan-900"
-                        }`}
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-bold bg-white border-slate-300 text-cyan-900 dark:bg-[#1e1e28] dark:border-[#3f3f46] dark:text-cyan-300`}
                       />
                     </div>
 
                     <div>
                       <label
-                        className={`block text-[10px] font-semibold mb-1 ${isDark ? "text-zinc-300" : "text-slate-700"}`}
+                        className={`block text-[10px] font-semibold mb-1 text-slate-700 dark:text-zinc-300`}
                       >
                         Voltaje Nominal (V)
                       </label>
@@ -1382,17 +1320,13 @@ export const EquipmentManagerSettingsTab: React.FC<
                             voltageV: parseFloat(e.target.value) || 0,
                           })
                         }
-                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold ${
-                          isDark
-                            ? "bg-[#1e1e28] border-[#3f3f46] text-zinc-100"
-                            : "bg-white border-slate-300 text-slate-800"
-                        }`}
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white border-slate-300 text-slate-800 dark:bg-[#1e1e28] dark:border-[#3f3f46] dark:text-zinc-100`}
                       />
                     </div>
 
                     <div>
                       <label
-                        className={`block text-[10px] font-semibold mb-1 ${isDark ? "text-zinc-300" : "text-slate-700"}`}
+                        className={`block text-[10px] font-semibold mb-1 text-slate-700 dark:text-zinc-300`}
                       >
                         Capacidad (Ah)
                       </label>
@@ -1406,17 +1340,13 @@ export const EquipmentManagerSettingsTab: React.FC<
                             capacityAh: parseFloat(e.target.value) || 0,
                           })
                         }
-                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold ${
-                          isDark
-                            ? "bg-[#1e1e28] border-[#3f3f46] text-zinc-100"
-                            : "bg-white border-slate-300 text-slate-800"
-                        }`}
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white border-slate-300 text-slate-800 dark:bg-[#1e1e28] dark:border-[#3f3f46] dark:text-zinc-100`}
                       />
                     </div>
 
                     <div>
                       <label
-                        className={`block text-[10px] font-semibold mb-1 ${isDark ? "text-zinc-300" : "text-slate-700"}`}
+                        className={`block text-[10px] font-semibold mb-1 text-slate-700 dark:text-zinc-300`}
                       >
                         DoD Descarga (%)
                       </label>
@@ -1430,11 +1360,7 @@ export const EquipmentManagerSettingsTab: React.FC<
                             dodPct: parseFloat(e.target.value) || 0,
                           })
                         }
-                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold ${
-                          isDark
-                            ? "bg-[#1e1e28] border-[#3f3f46] text-zinc-100"
-                            : "bg-white border-slate-300 text-slate-800"
-                        }`}
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white border-slate-300 text-slate-800 dark:bg-[#1e1e28] dark:border-[#3f3f46] dark:text-zinc-100`}
                       />
                     </div>
                   </div>
@@ -1442,7 +1368,7 @@ export const EquipmentManagerSettingsTab: React.FC<
                   <div className="grid grid-cols-3 gap-3 pt-1">
                     <div>
                       <label
-                        className={`block text-[10px] font-semibold mb-1 ${isDark ? "text-zinc-300" : "text-slate-700"}`}
+                        className={`block text-[10px] font-semibold mb-1 text-slate-700 dark:text-zinc-300`}
                       >
                         Eficiencia (%)
                       </label>
@@ -1457,17 +1383,13 @@ export const EquipmentManagerSettingsTab: React.FC<
                               parseFloat(e.target.value) || 0,
                           })
                         }
-                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold ${
-                          isDark
-                            ? "bg-[#1e1e28] border-[#3f3f46] text-zinc-100"
-                            : "bg-white border-slate-300 text-slate-800"
-                        }`}
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white border-slate-300 text-slate-800 dark:bg-[#1e1e28] dark:border-[#3f3f46] dark:text-zinc-100`}
                       />
                     </div>
 
                     <div>
                       <label
-                        className={`block text-[10px] font-semibold mb-1 ${isDark ? "text-zinc-300" : "text-slate-700"}`}
+                        className={`block text-[10px] font-semibold mb-1 text-slate-700 dark:text-zinc-300`}
                       >
                         Ciclos de Vida
                       </label>
@@ -1481,17 +1403,13 @@ export const EquipmentManagerSettingsTab: React.FC<
                             cycles: parseInt(e.target.value) || 0,
                           })
                         }
-                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold ${
-                          isDark
-                            ? "bg-[#1e1e28] border-[#3f3f46] text-zinc-100"
-                            : "bg-white border-slate-300 text-slate-800"
-                        }`}
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white border-slate-300 text-slate-800 dark:bg-[#1e1e28] dark:border-[#3f3f46] dark:text-zinc-100`}
                       />
                     </div>
 
                     <div>
                       <label
-                        className={`block text-[10px] font-semibold mb-1 ${isDark ? "text-zinc-300" : "text-slate-700"}`}
+                        className={`block text-[10px] font-semibold mb-1 text-slate-700 dark:text-zinc-300`}
                       >
                         Química Celdas
                       </label>
@@ -1504,11 +1422,7 @@ export const EquipmentManagerSettingsTab: React.FC<
                             chemistry: e.target.value,
                           })
                         }
-                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold ${
-                          isDark
-                            ? "bg-[#1e1e28] border-[#3f3f46] text-zinc-100"
-                            : "bg-white border-slate-300 text-slate-800"
-                        }`}
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white border-slate-300 text-slate-800 dark:bg-[#1e1e28] dark:border-[#3f3f46] dark:text-zinc-100`}
                       />
                     </div>
                   </div>
@@ -1520,18 +1434,14 @@ export const EquipmentManagerSettingsTab: React.FC<
 
             </form>
               {/* Botones de Footer Modal */}
-              <div className={`shrink-0 p-4 flex items-center justify-end gap-2 border-t ${isDark ? "border-zinc-700" : "border-slate-200"}`}>
+              <div className={`shrink-0 p-4 flex items-center justify-end gap-2 border-t border-slate-200 dark:border-zinc-700`}>
                 <button
                   type="button"
                   onClick={() => {
                     setIsEditorOpen(false);
                     setEditingItem(null);
                   }}
-                  className={`px-4 py-2 rounded-xl text-xs font-semibold border cursor-pointer ${
-                    isDark
-                      ? "border-zinc-700 text-zinc-300 hover:bg-zinc-800"
-                      : "border-slate-300 text-slate-700 hover:bg-slate-100"
-                  }`}
+                  className={`px-4 py-2 rounded-xl text-xs font-semibold border cursor-pointer border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800`}
                 >
                   Cancelar
                 </button>
@@ -1561,11 +1471,7 @@ export const EquipmentManagerSettingsTab: React.FC<
             role="dialog"
             aria-modal="true"
             aria-label="Eliminar equipo"
-            className={`w-full max-w-md p-5 rounded-2xl border shadow-2xl animate-in fade-in zoom-in-95 duration-150 ${
-              isDark
-                ? "bg-[#181820] border-[#2e2e38] text-zinc-100"
-                : "bg-white border-slate-200 text-slate-900"
-            }`}
+            className={`w-full max-w-md p-5 rounded-2xl border shadow-2xl animate-in fade-in zoom-in-95 duration-150 bg-white border-slate-200 text-slate-900 dark:bg-[#181820] dark:border-[#2e2e38] dark:text-zinc-100`}
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shrink-0">
@@ -1576,7 +1482,7 @@ export const EquipmentManagerSettingsTab: React.FC<
                   ¿Eliminar este equipo del catálogo?
                 </h4>
                 <p
-                  className={`text-xs mt-0.5 ${isDark ? "text-zinc-400" : "text-slate-500"}`}
+                  className={`text-xs mt-0.5 text-slate-500 dark:text-zinc-400`}
                 >
                   Esta acción retirará el modelo de la lista de selección del
                   simulador.
@@ -1585,13 +1491,13 @@ export const EquipmentManagerSettingsTab: React.FC<
             </div>
 
             <div
-              className={`mt-4 p-3 rounded-xl border text-xs ${isDark ? "bg-[#121216] border-[#282832]" : "bg-slate-50 border-slate-200"}`}
+              className={`mt-4 p-3 rounded-xl border text-xs bg-slate-50 border-slate-200 dark:bg-[#121216] dark:border-[#282832]`}
             >
-              <strong className={isDark ? "text-zinc-200" : "text-slate-800"}>
+              <strong className="text-slate-800 dark:text-zinc-200">
                 {itemToDelete.displayName}
               </strong>
               <div
-                className={`text-[11px] mt-0.5 ${isDark ? "text-zinc-400" : "text-slate-500"}`}
+                className={`text-[11px] mt-0.5 text-slate-500 dark:text-zinc-400`}
               >
                 {itemToDelete.brand} • {itemToDelete.type.toUpperCase()}
               </div>
@@ -1601,11 +1507,7 @@ export const EquipmentManagerSettingsTab: React.FC<
               <button
                 type="button"
                 onClick={() => setItemToDelete(null)}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold border cursor-pointer ${
-                  isDark
-                    ? "border-zinc-700 text-zinc-300 hover:bg-zinc-800"
-                    : "border-slate-300 text-slate-700 hover:bg-slate-100"
-                }`}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold border cursor-pointer border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800`}
               >
                 Cancelar
               </button>

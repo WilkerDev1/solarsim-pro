@@ -283,7 +283,7 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
     <div className="space-y-4">
       {/* Selector de Color */}
       <div className="space-y-2">
-        <h3 className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+        <h3 className={`text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400`}>
           Paleta de Color Corporativa
         </h3>
         <div className="grid grid-cols-6 gap-1.5">
@@ -316,16 +316,16 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
         </div>
       </div>
 
-      <div className={`h-px w-full ${isDark ? 'bg-[#2a2a36]' : 'bg-slate-200'}`}></div>
+      <div className={`h-px w-full bg-slate-200 dark:bg-[#2a2a36]`}></div>
 
       {/* 1. SECCIÓN: ESTRUCTURA Y ORDEN DE PÁGINAS */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+            <h3 className={`text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400`}>
               1. Estructura y Orden de Páginas
             </h3>
-            <span className={`text-[10px] block ${isDark ? 'text-zinc-500' : 'text-slate-400'}`}>
+            <span className={`text-[10px] block text-slate-400 dark:text-zinc-500`}>
               Arrastra con ⋮⋮ para cambiar el orden en el PDF
             </span>
           </div>
@@ -333,11 +333,7 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
             <button
               type="button"
               onClick={handleResetOrder}
-              className={`text-[10px] font-semibold flex items-center gap-1 px-2 py-0.5 rounded-md border transition-colors cursor-pointer ${
-                isDark
-                  ? 'border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white'
-                  : 'border-slate-300 bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
-              }`}
+              className={`text-[10px] font-semibold flex items-center gap-1 px-2 py-0.5 rounded-md border transition-colors cursor-pointer border-slate-300 bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:hover:text-white`}
               title="Restablecer orden predeterminado"
             >
               <RotateCcw className="w-3 h-3" />
@@ -411,9 +407,7 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     {/* Botón de arrastre de 3 rayas */}
                     <div
-                      className={`cursor-grab active:cursor-grabbing p-1 -ml-0.5 rounded transition-colors shrink-0 ${
-                        isDark ? 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200'
-                      }`}
+                      className={`cursor-grab active:cursor-grabbing p-1 -ml-0.5 rounded transition-colors shrink-0 text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:text-zinc-500 dark:hover:text-zinc-300 dark:hover:bg-zinc-800`}
                       title="Arrastrar arriba o abajo para cambiar el orden"
                     >
                       <GripVertical className="w-4 h-4" />
@@ -465,11 +459,7 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
                         </span>
                         {config.isConfidential && (
                           <span
-                            className={`text-[8.5px] font-extrabold px-1.5 py-0.2 rounded border ${
-                              isDark
-                                ? 'bg-amber-950/90 text-amber-300 border-amber-700/70'
-                                : 'bg-amber-100 text-amber-800 border-amber-300'
-                            }`}
+                            className={`text-[8.5px] font-extrabold px-1.5 py-0.2 rounded border bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/90 dark:text-amber-300 dark:border-amber-700/70`}
                           >
                             CONFIDENCIAL
                           </span>
@@ -495,9 +485,7 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
                 {/* Sub-toggle de Autoconsumo para la sección de Energía */}
                 {projectionEnabled && sectionId === 'energy' && config.visible && (
                   <div
-                    className={`mt-2 pt-1.5 border-t flex items-center justify-between w-full ${
-                      isDark ? 'border-zinc-800/80 text-zinc-400' : 'border-slate-200 text-slate-500'
-                    }`}
+                    className={`mt-2 pt-1.5 border-t flex items-center justify-between w-full border-slate-200 text-slate-500 dark:border-zinc-800/80 dark:text-zinc-400`}
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => e.stopPropagation()}
                   >
@@ -540,14 +528,14 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
         </div>
       </div>
 
-      <div className={`h-px w-full ${isDark ? 'bg-[#2a2a36]' : 'bg-slate-200'}`}></div>
+      <div className={`h-px w-full bg-slate-200 dark:bg-[#2a2a36]`}></div>
 
       {/* 3. PÁGINAS EXTRA / ANEXOS DEL ÍNDICE */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ListPlus className="w-4 h-4 text-amber-500 shrink-0" />
-            <h3 className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+            <h3 className={`text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300`}>
               3. Páginas Extra / Anexos del Índice
             </h3>
           </div>
@@ -566,7 +554,7 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
           </span>
         </div>
 
-        <p className={`text-[11px] leading-relaxed ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+        <p className={`text-[11px] leading-relaxed text-slate-500 dark:text-zinc-400`}>
           Añade puntos adicionales al índice para documentos que insertarás externamente (ej. Fichas técnicas, Planos, Certificaciones). El sistema les asignará automáticamente los números de página finales correlativos.
         </p>
 
@@ -585,12 +573,12 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
                     <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-500 font-black text-[10px] flex items-center justify-center shrink-0">
                       +{idx + 1}
                     </span>
-                    <span className={`text-xs font-bold truncate block ${isDark ? 'text-zinc-100' : 'text-slate-900'}`}>
+                    <span className={`text-xs font-bold truncate block text-slate-900 dark:text-zinc-100`}>
                       {item.title}
                     </span>
                   </div>
                   {item.subtitle && (
-                    <span className={`text-[10.5px] truncate block pl-5.5 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                    <span className={`text-[10.5px] truncate block pl-5.5 text-slate-500 dark:text-zinc-400`}>
                       {item.subtitle}
                     </span>
                   )}
@@ -611,11 +599,9 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
                       max="99"
                       value={item.pageCount || 1}
                       onChange={(e) => handleUpdatePageCount(item.id, parseInt(e.target.value) || 1)}
-                      className={`w-6 text-center font-mono font-black text-xs bg-transparent outline-none p-0 cursor-text ${
-                        isDark ? 'text-amber-400' : 'text-amber-900'
-                      }`}
+                      className={`w-6 text-center font-mono font-black text-xs bg-transparent outline-none p-0 cursor-text text-amber-900 dark:text-amber-400`}
                     />
-                    <span className={`text-[10px] font-bold select-none pl-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                    <span className={`text-[10px] font-bold select-none pl-0.5 text-slate-500 dark:text-zinc-400`}>
                       {(item.pageCount || 1) === 1 ? 'pág' : 'págs'}
                     </span>
                   </div>
@@ -636,18 +622,16 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
 
         {/* Formulario para Agregar Nuevo Punto */}
         <div
-          className={`p-3 rounded-xl border space-y-2.5 ${
-            isDark ? 'bg-[#181822] border-[#2c2c3c]' : 'bg-slate-50 border-slate-200'
-          }`}
+          className={`p-3 rounded-xl border space-y-2.5 bg-slate-50 border-slate-200 dark:bg-[#181822] dark:border-[#2c2c3c]`}
         >
           <div className="flex items-center justify-between">
-            <span className={`text-[10px] font-extrabold uppercase tracking-wider ${isDark ? 'text-amber-400' : 'text-amber-800'}`}>
+            <span className={`text-[10px] font-extrabold uppercase tracking-wider text-amber-800 dark:text-amber-400`}>
               + Agregar Nuevo Punto al Índice
             </span>
           </div>
 
           <div>
-            <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+            <label className={`block text-[10px] font-bold uppercase mb-1 text-slate-600 dark:text-zinc-400`}>
               Título del Punto Extra / Anexo
             </label>
             <input
@@ -655,17 +639,13 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
               placeholder="ej: Fichas Técnicas de Equipos"
               value={newExtraTitle}
               onChange={(e) => setNewExtraTitle(e.target.value)}
-              className={`w-full text-xs px-2.5 py-1.5 rounded-lg border font-medium outline-none transition-colors ${
-                isDark
-                  ? 'bg-[#242432] border-[#38384a] text-zinc-100 focus:border-amber-500'
-                  : 'bg-white border-slate-300 text-slate-800 focus:border-amber-600'
-              }`}
+              className={`w-full text-xs px-2.5 py-1.5 rounded-lg border font-medium outline-none transition-colors bg-white border-slate-300 text-slate-800 focus:border-amber-600 dark:bg-[#242432] dark:border-[#38384a] dark:text-zinc-100 dark:focus:border-amber-500`}
             />
           </div>
 
           <div className="grid grid-cols-3 gap-2">
             <div className="col-span-2">
-              <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+              <label className={`block text-[10px] font-bold uppercase mb-1 text-slate-600 dark:text-zinc-400`}>
                 Subtema / Descripción (Opcional)
               </label>
               <input
@@ -673,15 +653,11 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
                 placeholder="ej: Datasheets de Módulos e Inversores"
                 value={newExtraSubtitle}
                 onChange={(e) => setNewExtraSubtitle(e.target.value)}
-                className={`w-full text-xs px-2.5 py-1.5 rounded-lg border font-medium outline-none transition-colors ${
-                  isDark
-                    ? 'bg-[#242432] border-[#38384a] text-zinc-100 focus:border-amber-500'
-                    : 'bg-white border-slate-300 text-slate-800 focus:border-amber-600'
-                }`}
+                className={`w-full text-xs px-2.5 py-1.5 rounded-lg border font-medium outline-none transition-colors bg-white border-slate-300 text-slate-800 focus:border-amber-600 dark:bg-[#242432] dark:border-[#38384a] dark:text-zinc-100 dark:focus:border-amber-500`}
               />
             </div>
             <div>
-              <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+              <label className={`block text-[10px] font-bold uppercase mb-1 text-slate-600 dark:text-zinc-400`}>
                 Páginas
               </label>
               <input
@@ -690,11 +666,7 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
                 max="50"
                 value={newExtraPageCount}
                 onChange={(e) => setNewExtraPageCount(parseInt(e.target.value) || 1)}
-                className={`w-full text-xs px-2.5 py-1.5 rounded-lg border font-medium outline-none transition-colors ${
-                  isDark
-                    ? 'bg-[#242432] border-[#38384a] text-zinc-100 focus:border-amber-500'
-                    : 'bg-white border-slate-300 text-slate-800 focus:border-amber-600'
-                }`}
+                className={`w-full text-xs px-2.5 py-1.5 rounded-lg border font-medium outline-none transition-colors bg-white border-slate-300 text-slate-800 focus:border-amber-600 dark:bg-[#242432] dark:border-[#38384a] dark:text-zinc-100 dark:focus:border-amber-500`}
               />
             </div>
           </div>
@@ -711,7 +683,7 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
 
           {/* Plantillas / Presets Rápidos */}
           <div className="pt-2 border-t border-dashed border-zinc-700/50">
-            <span className={`text-[9.5px] uppercase font-bold tracking-wider block mb-1.5 ${isDark ? 'text-zinc-500' : 'text-slate-400'}`}>
+            <span className={`text-[9.5px] uppercase font-bold tracking-wider block mb-1.5 text-slate-400 dark:text-zinc-500`}>
               Sugerencias Rápidas:
             </span>
             <div className="flex flex-wrap gap-1">
@@ -725,11 +697,7 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
                   key={pIdx}
                   type="button"
                   onClick={() => handleAddPreset(preset)}
-                  className={`text-[10px] font-semibold px-2 py-1 rounded-md border transition-colors cursor-pointer ${
-                    isDark
-                      ? 'bg-[#242432] border-[#38384a] text-zinc-300 hover:bg-amber-950/40 hover:text-amber-300 hover:border-amber-700/50'
-                      : 'bg-white border-slate-300 text-slate-700 hover:bg-amber-50 hover:text-amber-900 hover:border-amber-300'
-                  }`}
+                  className={`text-[10px] font-semibold px-2 py-1 rounded-md border transition-colors cursor-pointer bg-white border-slate-300 text-slate-700 hover:bg-amber-50 hover:text-amber-900 hover:border-amber-300 dark:bg-[#242432] dark:border-[#38384a] dark:text-zinc-300 dark:hover:bg-amber-950/40 dark:hover:text-amber-300 dark:hover:border-amber-700/50`}
                 >
                   + {preset.title}
                 </button>
@@ -739,7 +707,7 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
         </div>
       </div>
 
-      <div className={`h-px w-full ${isDark ? 'bg-[#2a2a36]' : 'bg-slate-200'}`}></div>
+      <div className={`h-px w-full bg-slate-200 dark:bg-[#2a2a36]`}></div>
 
       {/* 4. ADJUNTAR Y FUSIONAR PDFS EXTERNOS (FICHAS TÉCNICAS / ANEXOS) */}
       <PDFAttachmentsSection
@@ -748,11 +716,11 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
         updateDocumentCustomization={updateDocumentCustomization}
       />
 
-      <div className={`h-px w-full ${isDark ? 'bg-[#2a2a36]' : 'bg-slate-200'}`}></div>
+      <div className={`h-px w-full bg-slate-200 dark:bg-[#2a2a36]`}></div>
 
       {/* Opciones de Formato */}
       <div className="space-y-2">
-        <h3 className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+        <h3 className={`text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400`}>
           Opciones de Formato
         </h3>
         <label
