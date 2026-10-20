@@ -16,7 +16,7 @@ Simulador, hub y PDF usan el selector `useEnergyCalculationMode`; los motores ac
 
 ## Política y persistencia
 
-Sin cuenta, la elección es local y persistente. Con cuenta, prevalece la política de su organización y servidor. ADMIN guarda mediante PATCH con baseVersion; EDITOR/VIEWER/LECTOR consultan y aplican sin modificar. Sin conexión se conserva la última política confirmada de ese ámbito; no se presentan cambios locales como confirmados. Si no existe política o el servidor es antiguo se usa legacy y se informa la limitación.
+Sin cuenta, la elección es local y persistente. Con cuenta, prevalece la política de su organización y servidor. ADMIN guarda mediante PATCH con baseVersion; EDITOR y LECTOR consultan y aplican sin modificar. Sin conexión se conserva la última política confirmada de ese ámbito; no se presentan cambios locales como confirmados. Si no existe política o el servidor es antiguo se usa legacy y se informa la limitación.
 
 Las respuestas de una sesión anterior se descartan aunque se vuelva a iniciar sesión con la misma cuenta. Cambiar de servidor u organización no reutiliza políticas ajenas. La preferencia local sigue disponible al cerrar sesión.
 
@@ -44,7 +44,7 @@ El borrador IA incorpora gráfica mensual y tabla editable, meta de generación 
 
 El asistente ocupa la ventana completa, con conversación oscura independiente del tema y revisión por pestañas. Las consultas pueden responderse sin modificar el borrador. Memoria de conversación/borrador conserva cerrar/reabrir en el mismo espacio; se limpia al aplicar, reiniciar o cambiar contexto/destino. Cotización permite editar renglones USD de equipos, distingue compra/venta y concilia totales informativos de cualquier documento. El consumo teórico igual a producción es explícito y temporal, con procedencia visible y sin dimensionamiento circular. No altera fórmulas, política legacy ni documentos ya publicados.
 
-El asistente general flotante es una función experimental local y apagada por defecto en Funciones de la aplicación; sus permisos siguen siendo los de la cuenta. Está disponible en Inicio, Hub y Simulador, con consultas al espacio cargado y cambios confirmados antes de recalcular. No forma parte de la política energética de organización. [Contrato y límites](APP_ASSISTANT.md).
+El asistente general flotante es una función experimental local y apagada por defecto, con interruptor en Funciones de la aplicación pero guardada como preferencia local (`uiSlice.appAssistantEnabled`), no en `shared/applicationFeatures.ts`; sus permisos siguen siendo los de la cuenta. Está disponible en Inicio, Hub y Simulador, con consultas al espacio cargado y cambios confirmados antes de recalcular. No forma parte de la política energética de organización. [Contrato y límites](APP_ASSISTANT.md).
 
 ### BESS y fichas técnicas en propuestas (2026-10-14)
 

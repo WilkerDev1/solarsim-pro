@@ -8,9 +8,9 @@ Refinar el menú principal, dock y centro de Ajustes con una apariencia empresar
 
 ## Funciones y límites
 
-Proyección de autoconsumo es inicialmente la única función configurable, experimental y apagada por defecto. Legacy usa reparto 75% sin baterías/90% con baterías confirmado por el propietario. ADMIN define política para su organización; miembros la aplican. Preferencia local para trabajo sin cuenta. Ver docs/APPLICATION_FEATURES.md para precedencia y cálculo.
+Proyección de autoconsumo es la función de cálculo configurable: experimental y apagada por defecto. Legacy usa reparto 75% sin baterías/90% con baterías confirmado por el propietario. ADMIN define política para su organización; miembros la aplican. Preferencia local para trabajo sin cuenta. Ver docs/APPLICATION_FEATURES.md para precedencia y cálculo.
 
-Esta entrega es una rama de pruebas desde beta, con PR sin merge ni publicación. No sustituye producción ni modifica la BD empresarial. Plataforma Electron: mínimo 1024×700; se conservan modo claro/oscuro y controles por teclado.
+Plataforma Electron: mínimo 1024×700; se conservan modo claro/oscuro y controles por teclado.
 
 ## Criterio de calidad de estas superficies
 

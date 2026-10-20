@@ -60,7 +60,7 @@ La clave configurada se persiste con preferencias en almacenamiento local. **loc
 
 Las regresiones `testAIProposalCommercial.ts`, `testAIProposalPipeline.ts`, `testAIWorkspaceInputs.ts`, `testDatasheetImport.ts`, `testPriceCatalogImport.ts` y `testAITariffSafety.ts` verifican normalización, revisión, grupos multi-modelo, transporte simulado, lotes y persistencia. La revisión independiente ejecutó las tres suites de importación/tarifas con salida 0 y reprodujo ID real incorrecto frente a nombre exacto y un segundo merge parcial después de JSON con procedencia por campo intacta.
 
-Se registraron dos llamadas reales de prueba de propuestas en esta tarea. Son evidencia de esos casos, no una certificación de exactitud general. La prueba real de extracción/importación de datasheet permanece pendiente; la cobertura sintética no la sustituye. Las pruebas automatizadas no escriben en producción. Gates completos, comprobación visual e integración final se documentan por separado en [QA_RESULTS.md](QA_RESULTS.md); este manual no declara terminada la entrega.
+Se registraron dos llamadas reales de prueba de propuestas en esta tarea. Son evidencia de esos casos, no una certificación de exactitud general. La prueba real de extracción/importación de datasheet permanece pendiente; la cobertura sintética no la sustituye. Las pruebas automatizadas no escriben en producción.
 
 ## Evidencia adicional del 8 de octubre
 

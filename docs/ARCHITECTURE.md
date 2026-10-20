@@ -32,6 +32,8 @@ flowchart LR
 - `server/src/index.ts`: arranque. `app.ts`: composición inyectable. `modules/`: auth, usuarios, organización, proyectos, equipos, tarifas y notificaciones. `database/`: migraciones aditivas y acceso común.
 - `workers/share-viewer/`: validación, autorización de publicación, repositorio KV, escaping y presentación separados.
 
+- PDF: `src/utils/pdfLayout.ts` decide orden de secciones, numeración e índice; `PDFPageShell` aporta marca de agua, cabecera y pie A4. El total de páginas de cada pie ("N de M") incluye los anexos listados en el índice.
+
 ## Extensión
 
 Una nueva función se registra en `shared/applicationFeatures.ts`, define su default/etapa/visibilidad/disponibilidad y usa el selector efectivo. Cambiar solo una etiqueta de UI nunca cambia el modelo de cálculo. Una nueva ruta registra su módulo desde app y usa la autorización actual en BD. Las migraciones se numeran y no se ejecutan desde el renderizador.
@@ -48,4 +50,4 @@ El contrato conversacional distingue respuesta informativa de borrador mutable. 
 
 ## Asistente general experimental
 
-`src/features/assistant/` separa transporte conversacional, registro de herramientas, validación, hooks y tarjetas React. Las herramientas solo consultan el espacio actual y proponen ediciones para confirmar; no ejecutan funciones arbitrarias, código ni HTML. Cada aplicación revalida servidor/organización, sesión/rol, flag y fingerprint. App monta el panel de forma diferida; conversación/divisor se comparten con el borrador de propuestas. No incorpora un servidor MCP ni MCP-UI en esta entrega. Ver [APP_ASSISTANT.md](APP_ASSISTANT.md).
+`src/features/assistant/` separa transporte conversacional, registro de herramientas, validación, hooks y tarjetas React. Las herramientas solo consultan el espacio actual y proponen ediciones para confirmar; no ejecutan funciones arbitrarias, código ni HTML. Cada aplicación revalida servidor/organización, sesión/rol, flag y fingerprint. App monta el panel de forma diferida; conversación/divisor se comparten con el borrador de propuestas. Su activación es una preferencia local (`uiSlice.appAssistantEnabled`, apagada por defecto), no una función de `shared/applicationFeatures.ts` ni parte de la política de organización. No incorpora un servidor MCP ni MCP-UI. Ver [APP_ASSISTANT.md](APP_ASSISTANT.md).

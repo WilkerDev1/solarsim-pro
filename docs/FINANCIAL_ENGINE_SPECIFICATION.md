@@ -1,465 +1,206 @@
-# ☀️ Especificación y Auditoría del Motor Financiero (SolarSim Pro)
+# Especificación del motor financiero
 
-Este documento detalla exhaustivamente la **arquitectura matemática, fórmulas de ingeniería solar, modelos regulatorios dominicanos (Ley 57-07 / DGII / SIE-007-2026-REG), costeo comercial de matriz y proyección de flujo de caja a 25 años** implementados en los motores de cálculo de **SolarSim Pro** (`src/engine/financeEngine.ts` y `src/engine/solarEngine.ts`), así como el **diccionario técnico de todos los parámetros de la barra lateral del simulador**.
+Contrato matemático implementado en `src/engine/financeEngine.ts` (`calculateCostMatrixSummary`, `calculateFinancialSummary`, `calculateProjectFinancialSummary`) y, para la energía, `src/engine/solarEngine.ts`. Describe el comportamiento actual del código; no es una validación jurídica de la normativa. Antes de cambiar fórmulas, revisar este documento y [ENERGY_BALANCE_AND_SELF_CONSUMPTION_SPECIFICATION.md](ENERGY_BALANCE_AND_SELF_CONSUMPTION_SPECIFICATION.md).
 
----
+Todos los importes se calculan en USD; DOP se obtiene con la tasa `dopExchangeRate` (60 si falta). La mayoría de los resultados se redondean a 2 decimales.
 
-## 1. ⚡ Modelo de Generación Solar y Balance Energético
+## 1. Generación y balance energético
 
-### 1.1 Capacidad DC del Sistema ($P_{dc}$)
-La potencia pico instalada en corriente continua (kWp) se calcula multiplicando la potencia nominal unitaria de cada módulo por la cantidad total de paneles:
+### 1.1 Capacidad DC
 
-$$P_{dc} = \frac{P_{panel} \times N_{paneles}}{1,000}$$
+$$P_{dc} = \frac{\sum (P_{panel} \times N_{paneles})}{1000} \quad [\text{kWp}]$$
 
-*Donde:*
-* $P_{panel}$: Potencia nominal del panel fotovoltaico en Watts (ej. $620\text{ W}$).
-* $N_{paneles}$: Cantidad total de módulos fotovoltaicos instalados.
-* $P_{dc}$: Potencia DC total en kilovatios pico ($\text{kWp}$).
+Con varios grupos de paneles se suman todos los grupos.
 
----
-
-### 1.2 Producción Solar Mensual ($E_{m}$)
-La energía solar producida en el mes $m$ ($\text{kWh}$) se calcula a partir de la radiación solar específica de la ubicación (Horas Solar Pico - $\text{HSP}$), los días del mes y el factor de pérdidas globales del sistema:
+### 1.2 Producción mensual
 
 $$E_{m} = P_{dc} \times \text{HSP}_{m} \times D_{m} \times (1 - L_{sys})$$
 
-*Donde:*
-* $\text{HSP}_{m}$: Horas Solar Pico promedio diarias en el mes $m$ (obtenidas de la base de datos de las 32 provincias de RD o por consulta GPS satelital en tiempo real vía NASA POWER / PVGIS).
-* $D_{m}$: Días calendario del mes $m$ ($28, 30 \text{ o } 31$).
-* $L_{sys}$: Factor de pérdidas globales del sistema fotovoltaico (temperatura, suciedad, pérdidas en cableado DC/AC, eficiencia del inversor y desacople; típicamente $14\% = 0.14$).
-* $\text{DerateFactor} = (1 - L_{sys}) = 0.86$.
-
-La producción anual total ($E_{anual}$) es la sumatoria de los 12 meses:
+- $\text{HSP}_m$: horas solar pico de la provincia (`src/data/rdProvinces`) o vector personalizado de 12 valores positivos.
+- $D_m$: días del mes (febrero = 28).
+- $L_{sys}$: `systemLosses`; si falta, 14% en modo detallado y 25% en modo simple.
 
 $$E_{anual} = \sum_{m=1}^{12} E_{m}$$
 
----
-
-### 1.3 Autoconsumo Físico, Partición Diurna de Carga y Medición Neta
-El modelo calcula el balance energético mediante un **balance físico diario equivalente** para cada mes $m$ con $D_m$ días, evitando aproximaciones planas y considerando la partición horaria real de la demanda del cliente:
+### 1.3 Autoconsumo, exportación y ahorro
 
-1. **Promedios Diarios**:
-   $$C_{diario} = \frac{C_{m}}{D_{m}}, \quad P_{diario} = \frac{E_{m}}{D_{m}}$$
+El modo de cálculo se pasa explícitamente a los motores; si se omite se usa **legacy**, que es el predeterminado. La proyección física es opcional (función `selfConsumptionProjection` en `shared/applicationFeatures.ts`) y se describe en el documento de balance energético.
 
-2. **Partición de Demanda Diurna ($R_{diurno}$)**:
-   - **Residencial (`BTS1`, `BTS2`, `RBT-1`)**: $R_{diurno} = 35\%$ día (8:00 AM - 5:00 PM) / $65\%$ noche (aires acondicionados e iluminación).
-   - **Comercial (`BTD`, `CBT-1`, `CBT-2`, `VMT1`)**: $R_{diurno} = 75\%$ día / $25\%$ noche (oficinas, locales, plazas comerciales).
-   - **Industrial (`MTD1`, `MTD2`, `MTH`)**: $R_{diurno} = 90\%$ día / $10\%$ noche (fábricas y naves continuas).
-   - **Personalizado**: Configurable mediante slider interactivo (15% a 95%).
-   $$L_{dia} = C_{diario} \times R_{diurno}, \quad L_{noche} = C_{diario} \times (1 - R_{diurno})$$
+Modo legacy, por mes:
 
-3. **Autoconsumo Solar Directo Instantáneo**:
-   $$E_{solar\_directo, diario} = \min(P_{diario}, L_{dia})$$
-   $$E_{excedente\_solar, diario} = \max(0, P_{diario} - E_{solar\_directo, diario})$$
+$$E_{auto,m} = \min\left(C_m,\ E_m \times k\right), \quad k = \begin{cases} 0.90 & \text{con batería} \\ 0.75 & \text{sin batería} \end{cases}$$
 
-4. **Inyección a Red y Retención SIE-007-2026-REG**:
-   - En régimen de **Medición Neta**:
-     $$E_{exp, diario} = E_{excedente\_solar, diario} - E_{bat\_carga, diario}$$
-     $$E_{exp, m} = E_{exp, diario} \times D_m$$
-     $$E_{net\_credit, m} = E_{exp, m} \times \left(1 - \frac{F_{grid}}{100}\right) = E_{exp, m} \times 0.75$$
-   - En modalidad **Inyección Cero (Zero-Export)**:
-     $$E_{exp, m} = 0, \quad E_{net\_credit, m} = 0$$
+$$E_{exp,m} = \begin{cases} 0 & \text{inyección cero} \\ \max(0,\ E_m - E_{auto,m}) & \text{medición neta} \end{cases}$$
 
-5. **Ahorro Facturable Total y Monetario**:
-   $$E_{saved, m} = E_{auto, m} + E_{net\_credit, m}$$
-   $$S_{m} = E_{saved, m} \times T_{kwh}, \quad S_{yr1} = \sum_{m=1}^{12} S_{m}$$
+En ambos modos, la retención (`gridExportFeePct`, 25 si falta; 0 en inyección cero) se aplica solo a la energía exportada:
 
-*Donde $T_{kwh}$ es la tarifa eléctrica de la distribuidora en $\text{USD/kWh}$.*
+$$E_{net\_credit,m} = E_{exp,m} \times \left(1 - \frac{F_{grid}}{100}\right)$$
 
----
+$$E_{saved,m} = E_{auto,m} + E_{net\_credit,m}, \qquad S_m = E_{saved,m} \times T_{kWh}, \qquad S_{yr1} = \sum_{m} S_m$$
 
-### 1.4 Facturación Eléctrica Neta
-$$\text{Factura Original}_{m} = C_{m} \times T_{kwh}$$
-$$\text{Factura Neta con Solar}_{m} = \max(0, \text{Factura Original}_{m} - S_{m})$$
-$$\text{Cobertura Solar Anual (\%)} = \frac{E_{anual}}{\sum_{m=1}^{12} C_{m}} \times 100$$
-*(Reporta el porcentaje físico y real de generación vs consumo anual sin límites artificiales).*
+$T_{kWh}$ es `energyCostPerKWh` del proyecto.
 
----
-
-## 2. 🔋 Dimensionamiento de Almacenamiento (Baterías & BESS)
-
-Cuando el sistema cuenta con banco de almacenamiento en baterías (`hasBattery: true`), el motor calcula la capacidad útil, las horas de autonomía de respaldo ante fallas del suministro eléctrico y el **ciclado físico real diario**:
-
-### 2.1 Capacidad Útil de Almacenamiento ($E_{bat, util}$)
-$$E_{bat, util} \text{ (kWh)} = \text{Capacidad Nominal Total} \times \left(\frac{\text{DoD}}{100}\right) \times \left(\frac{\eta_{bat}}{100}\right)$$
-
-*Donde:*
-* $\text{DoD}$: Profundidad de descarga permitida (*Depth of Discharge*, típicamente $90\%$).
-* $\eta_{bat}$: Eficiencia de ciclo completo (*Round-Trip Efficiency*, típicamente $90\% - 95\%$).
-
-### 2.2 Autonomía de Respaldo Anti-Apagones ($T_{autonomia}$)
-$$L_{horaria, prom} \text{ (kW)} = \frac{E_{consumo\_anual}}{365 \times 24}$$
-$$T_{autonomia} \text{ (Horas)} = \frac{E_{bat, util}}{L_{horaria, prom}}$$
-
-### 2.3 Ciclado Físico Diario de Energía y Despacho Nocturno ($E_{bat, mes}$)
-En sistemas BESS, la batería no fuerza artificialmente un $100\%$ de autoconsumo ciego; simula el ciclado diario real de absorción del excedente solar diurno para suplir la demanda nocturna real:
-
-1. **Carga Diaria desde el Excedente Solar**:
-   $$E_{bat\_carga, diario} = \min(E_{excedente\_solar, diario}, E_{bat, util})$$
-2. **Descarga Nocturna Limitada por la Carga y la Demanda Nocturna**:
-   $$E_{bat\_descarga, diario} = \min(E_{bat\_carga, diario}, L_{noche})$$
-3. **Aporte Mensual de Almacenamiento BESS**:
-   $$E_{bat\_dispatched, m} = E_{bat\_descarga, diario} \times D_m$$
-4. **Autoconsumo Total en Sitio**:
-   $$E_{auto, diario} = E_{solar\_directo, diario} + E_{bat\_descarga, diario}$$
-   $$E_{auto, m} = \min(C_m, \min(E_m, E_{auto, diario} \times D_m))$$
-5. **Excedente Remanente Exportado a la Red**:
-   $$E_{exp, diario} = \max(0, E_{excedente\_solar, diario} - E_{bat\_carga, diario})$$
-   $$E_{exp, m} = E_{exp, diario} \times D_m$$
-
-*Ventaja Regulatoria*: Cada kWh absorbido por la batería y autoconsumido en sitio ahorra el **$100\%$ del valor de la tarifa**, evitando el peaje regulatorio del **$25\%$ de retención de red** de la Resolución SIE-007-2026-REG. Para un cliente residencial con $853\text{ kWh/mes}$, $8.19\text{ kWp}$ y batería de $5.12\text{ kWh}$, el autoconsumo se sitúa de forma físicamente exacta en $\mathbf{\approx 423\text{ kWh/mes}}$ ($\approx 49.6\%$ de su consumo), inyectando $\approx 564\text{ kWh/mes}$ a la red.
+### 1.4 Factura y cobertura
 
----
+$$\text{Factura original}_m = C_m \times T_{kWh}, \qquad \text{Factura neta}_m = \max(0,\ \text{Factura original}_m - S_m)$$
 
-## 3. 💼 Matriz de Costos Comercial & Precio por Watt (Bottom-Up)
+$$\text{Cobertura (\%)} = \frac{E_{anual}}{\sum_m C_m} \times 100$$
 
-El costeo comercial se fundamenta en una matriz detallada de cuatro renglones operacionales con trazabilidad en Pesos Dominicanos ($\text{DOP}$) y Dólares ($\text{USD}$):
+La cobertura no se limita al 100%; es 0 si el consumo anual es 0.
 
-### 3.1 Renglones de la Matriz de Costos
+## 2. Almacenamiento
 
-1. **Paneles Solares**:
-   $$\text{Costo Paneles (USD)} = N_{pan} \times P_{u,pan} \quad (\text{ITBIS } 0\%)$$
-2. **Inversores Fotovoltaicos**:
-   $$\text{Costo Inversores (USD)} = N_{inv} \times P_{u,inv} \quad (\text{ITBIS } 0\%)$$
-3. **Banco de Baterías**:
-   $$\text{Costo Baterías (USD)} = \begin{cases} N_{bat} \times P_{u,bat} & \text{si } \text{hasBattery} = \text{true} \\ 0 & \text{si } \text{hasBattery} = \text{false} \end{cases} \quad (\text{ITBIS } 18\%)$$
-4. **Mano de Obra, Estructuras y Materiales Locales**:
-   $$\text{Costo Instalación (USD)} = P_{dc} \times P_{u,inst} \quad (\text{ITBIS } 18\%)$$
-5. **Ítems y Servicios Adicionales Personalizados (`customQuotationItems`)**:
-   $$\text{Costo Ítems Extra (USD)} = \sum_{i=1}^{K} (\text{Cantidad}_i \times P_{u,i})$$
-   * Cada ítem adicional cuenta con la opción independiente **`Exonerar ITBIS (18%)`**:
-     * Si `exemptITBIS: true`: Su monto se suma a la base de equipos exonerados de ITBIS por la Ley 57-07.
-     * Si `exemptITBIS: false`: Se le aplica el 18% de ITBIS y se factura en el precio final al cliente.
+Capacidad útil y autonomía informadas en el resumen financiero:
 
----
+$$E_{bat,util} = C_{nominal} \times \frac{\text{DoD}}{100} \times \frac{\eta}{100}$$
 
-### 3.2 Subtotales, ITBIS y Margen Comercial de Venta
+con `batteryDOD` (80 si falta) y `batteryEfficiencyPct` (92 si falta). El despacho físico de `solarEngine.ts` usa sus propios valores por defecto (90/90); ver el documento de balance energético.
 
-$$\text{Precio Neto Base (USD)} = \text{Costo Paneles} + \text{Costo Inversores} + \text{Costo Baterías} + \text{Costo Instalación} + \text{Costo Ítems Extra}$$
-$$\text{ITBIS Exonerado Matriz (USD)} = (\text{Costo Baterías} \times 0.18) + (\text{Costo Instalación} \times 0.18) + \sum_{i \in \text{Exentos}} (\text{Costo Ítem}_i \times 0.18)$$
-$$\text{ITBIS Gravado Facturable (USD)} = \sum_{i \notin \text{Exentos}} (\text{Costo Ítem}_i \times 0.18)$$
-$$\text{Total Neto con ITBIS (USD)} = \text{Precio Neto Base} + \text{ITBIS Exonerado Matriz} + \text{ITBIS Gravado Facturable}$$
+$$L_{prom} = \frac{E_{consumo\_anual}}{365 \times 24}, \qquad T_{autonomía} = \frac{E_{bat,util}}{L_{prom}} \quad [\text{h}]$$
 
-Aplicando el multiplicador de margen de venta $M_{venta}$ (típicamente $1.25\text{x}$ para $25\%$ de ganancia bruta):
+Si el consumo anual es 0 se asume 100 kWh/día para el promedio.
 
-$$I_{bruta} = \text{Precio de Venta Total (USD)} = \text{Total Neto con ITBIS} \times M_{venta}$$
-$$\text{Ganancia Bruta Comercial (USD)} = I_{bruta} - \text{Total Neto con ITBIS}$$
+## 3. Matriz de costos (`calculateCostMatrixSummary`)
 
----
+### 3.1 Renglones
 
-### 3.3 Precio por Watt Llave en Mano ($P_{watt}$) y Reactividad Dinámica
+| Renglón | Costo | ITBIS en la matriz |
+| --- | --- | --- |
+| Paneles | $N \times P_u$ por grupo | 0% |
+| Inversores | $N \times P_u$ por grupo | 0% |
+| Baterías (solo si `hasBattery`) | $N \times P_u$ por grupo | 18% |
+| Mano de obra y materiales | $P_{dc} \times P_{u,inst}$ | 18% |
+| Ítems adicionales (`customItems`) | $\text{cantidad} \times P_u$ | 18% solo si **no** está exonerado |
 
-$$P_{watt} \text{ (USD/W)} = \frac{I_{bruta}}{P_{dc} \times 1,000}$$
+Un ítem adicional se considera exonerado según `exonerateITBIS` (o, en datos antiguos, `applyITBIS`; exonerado si ambos faltan). Precios por defecto cuando un proyecto antiguo no tiene grupos: panel 103.32, inversor 2300, batería 1990 e instalación 170 USD/kWp.
 
-* **Reactividad Automática**: Al agregar baterías ($N_{bat} > 0$) o ítems personalizados, la inversión bruta $I_{bruta}$ y el $P_{watt}$ aumentan de forma proporcional. Al removerlos, se recalcula de inmediato el precio solar puro.
-### 3.4 Descuentos Comerciales y Recálculo de Rentabilidad Real
+Con grupos multi-equipo, cada grupo usa su propio `unitPriceUSD`. Un grupo sin precio no hereda el de otro modelo ni un precio de referencia: aporta 0 y la cotización muestra que faltan costos; ese subtotal es provisional. Los proyectos antiguos sin grupos conservan la resolución escalar.
 
-Los **Descuentos Comerciales** se configuran como deducciones individuales en la **Categoría 5 (Finanzas e Incentivos)** de la barra lateral, aplicándose al final del modelo sobre el **Total General (Inversión Bruta)**:
+### 3.2 Totales, margen y precio de lista
 
-#### 1. Tipos de Descuento
-* **Monto Fijo (`fixed`)**: Deducción directa en dólares (ej. $-\$3,500.00\text{ USD}$).
-* **Porcentaje (`percentage`)**: Deducción porcentual calculada dinámicamente sobre el precio de lista antes de descuentos:
-  $$D_i \text{ (USD)} = I_{lista} \times \left(\frac{\%_i}{100}\right)$$
+$$\text{Neto base} = \text{Paneles} + \text{Inversores} + \text{Baterías} + \text{Instalación}$$
 
-#### 2. Lógica Matemática y Recálculo de Rentabilidad
-1. **Costo Base Mayorista Inalterado**:
-   El costo neto de adquisición ($C_{total} = \text{totalNetoUSD}$) permanece estrictamente inalterado, pues los costos de compra a distribuidores no varían por una concesión comercial al cliente.
-2. **Precio de Lista antes de Descuento**:
-   $$I_{lista} = \text{basePorcentajeVentaUSD} + \text{customItemsVentaUSD}$$
-3. **Inversión Final Descontada**:
-   $$D_{total} = \min\left(I_{lista}, \sum D_i\right)$$
-   $$I_{final} = \max(0, I_{lista} - D_{total})$$
-4. **Recálculo Obligatorio de Rentabilidad Real**:
-   * **Ganancia Real**:
-     $$\text{Ganancia Real (USD)} = I_{final} - C_{total}$$
-   * **Markup Real sobre Costo**:
-     $$\text{Markup Real (\%)} = \left(\frac{\text{Ganancia Real}}{C_{total}}\right) \times 100$$
-   * **Margen Real sobre Venta**:
-     $$\text{Margen sobre Venta (\%)} = \left(\frac{\text{Ganancia Real}}{I_{final}}\right) \times 100$$
-   * **Precio por Watt Real**:
-     $$P_{watt, real} \text{ (USD/W)} = \frac{I_{final}}{P_{dc} \times 1,000}$$
+$$\text{ITBIS base} = 0.18 \times (\text{Baterías} + \text{Instalación})$$
 
-#### 3. Destino de Imputación Tributaria (Ley 57-07 / DGII)
-Cada descuento posee un selector de imputación para cumplir rigurosamente con la normativa de la Dirección General de Impuestos Internos:
-* **Global / Cortesía Comercial (`target: 'general'`)**:
-  Aplica como cortesía de cierre, pronto pago o mano de obra. La base de equipos renovables computables para el crédito fiscal del 40% de Ley 57-07 permanece **100% intacta**.
-* **Descuento en Equipos (`target: 'equipment'`)**:
-  Se imputa directamente a paneles, inversores o baterías. La base elegible ante la DGII se reduce en el monto del descuento:
-  $$\text{Base Equipos Elegible} = \max(0, \text{Base Equipos Bruta} - D_{equipos})$$
-  $$\text{Crédito Ley 57-07} = \text{Base Equipos Elegible} \times 0.40$$
-  *Razón técnica*: Ante la DGII no se puede reclamar crédito fiscal sobre montos que el cliente no pagó en la factura final.
+$$\text{Venta base} = (\text{Neto base} + \text{ITBIS base}) \times M_{venta}$$
 
-#### 4. Impacto en Flujo de Caja (Cash Flow)
-El desembolso inicial de caja en el Año 0 ($CF_0$) se actualiza automáticamente al monto real pagable:
-$$CF_0 = -I_{final}$$
-Esto recalcula automáticamente la **TIR (IRR)**, el **Payback** y el **VAN (NPV)** con la realidad financiera del descuento comercial pactado.
+$M_{venta}$ es `saleMarginMultiplier` (1.25 si falta); es un recargo sobre costo (1.25 = 25% sobre costo), no un margen sobre venta.
 
----
+Ítems adicionales en la matriz:
 
-## 4. 🏛️ Régimen de Incentivos Fiscales (Ley 57-07 / DGII)
+$$\text{Venta ítems} = \sum_i (\text{costo}_i + \text{ITBIS}_i) \times \begin{cases} 1 & \text{si applyMargin} = \text{false} \\ M_{venta} & \text{en otro caso} \end{cases}$$
 
-La **Ley 57-07 sobre Incentivo al Desarrollo de Fuentes Renovables de Energía** concede dos beneficios fiscales en la República Dominicana:
+$$I_{lista} = \text{Venta base} + \text{Venta ítems}$$
 
-### 4.1 Exoneración del 100% de ITBIS (18%)
-Si la opción está habilitada (`applyITBISExemption: true`), el cliente se ahorra el ITBIS aplicable a los renglones gravados:
+$$\text{Total neto} = \text{Neto base} + \sum \text{costo ítems} + \text{ITBIS base} + \sum \text{ITBIS ítems}$$
 
-$$\text{ITBIS Exonerado (USD)} = \begin{cases} \text{ITBIS Matriz} \times M_{venta} \approx I_{bruta} \times 0.18 \times 0.38768 & \text{si } \text{applyITBISExemption} = \text{true} \\ 0 & \text{si } \text{applyITBISExemption} = \text{false} \end{cases}$$
+### 3.3 Descuentos comerciales
 
----
+Cada descuento es fijo (USD) o porcentual (0–100% sobre $I_{lista}$):
 
-### 4.2 Crédito Fiscal del 40% en Impuesto Sobre la Renta (DGII)
-La Ley 57-07 otorga un **crédito fiscal del 40% sobre el costo de los equipos renovables** (paneles, inversores y almacenamiento en baterías), **excluyendo la mano de obra de instalación**. Se deduce del Impuesto Sobre la Renta (ISR) pagadero a la DGII en tres (3) cuotas anuales iguales durante los primeros 3 años ($13.33\%$ anual):
+$$D_{total} = \min\left(I_{lista},\ \sum_i D_i\right), \qquad I_{final} = \max(0,\ I_{lista} - D_{total})$$
 
-$$\text{Base Equipos (USD)} = \text{Costo Equipos Venta} = I_{bruta} - \text{Mano de Obra Venta}$$
-$$\text{Crédito Ley 57-07 Total (USD)} = \begin{cases} \text{Base Equipos (USD)} \times 0.40 & \text{si } \text{applyLey5707} = \text{true} \\ 0 & \text{si } \text{applyLey5707} = \text{false} \end{cases}$$
+El costo de adquisición no cambia por un descuento. Rentabilidad real:
 
-$$\text{Crédito Fiscal Anual Años 1 al 3 (USD)} = \frac{\text{Crédito Ley 57-07 Total}}{3} \quad (13.33\% \text{ anual})$$
+$$G = I_{final} - \text{Total neto}, \qquad \text{Recargo (\%)} = \frac{G}{\text{Total neto}} \times 100, \qquad \text{Margen sobre venta (\%)} = \frac{G}{I_{final}} \times 100$$
 
----
+$$P_{watt} = \frac{I_{final}}{P_{dc} \times 1000} \quad [\text{USD/W}]$$
 
-### 4.3 Estructura de Facturación Comercial vs Crédito Tributario DGII
+Destino del descuento: `general` no altera la base de la Ley 57-07; `equipment` la reduce (sección 4.2).
 
-Es indispensable distinguir entre el **desembolso inmediato en la factura comercial** y el **beneficio tributario diferido en la DGII**:
+### 3.4 Porciones de equipos y mano de obra
 
-1. **Monto a Pagar en la Factura Comercial (Desembolso Inmediato en Año 0)**:
-   * La empresa instaladora factura al cliente aplicando la exoneración de ITBIS aprobada:
-   $$\text{Total a Pagar en Factura (USD)} = I_{bruta} - \text{ITBIS Exonerado} = \mathbf{\$26,739.92}$$
-   *(Este es el monto exacto que el cliente desembolsa a la empresa instaladora).*
+$$\text{Venta equipos} = (\text{Paneles} + \text{Inversores} + \text{Baterías} + \text{ITBIS baterías}) \times M_{venta}$$
 
-2. **Crédito Fiscal del 40% en Impuesto Sobre la Renta (DGII a 3 Años)**:
-   * El 40% de crédito fiscal ($\$7,322.11$) **NO es un descuento comercial en la factura**, sino un crédito tributario que el cliente deduce en su declaración anual de renta ante la **DGII** (formulario IR-1 para personas físicas o IR-2 para sociedades) a razón de $\$2,440.70\text{/año}$ durante los primeros 3 años fiscales.
+$$\text{Venta mano de obra} = (\text{Instalación} + \text{ITBIS instalación}) \times M_{venta}$$
 
-3. **Inversión Neta Final tras los 3 Años de Deducciones Fiscales ($I_{neta}$)**:
-   * Costo real de bolsillo para el cliente una vez completadas las 3 declaraciones de renta ante la DGII:
-   $$I_{neta} = \text{Total Facturado con Ley 57-07} - \text{Crédito DGII (40%)} = \$26,739.92 - \$7,322.11 = \mathbf{\$19,417.81}$$
-   *(O $\$17,551.70$ si se compara contra el precio de lista con ITBIS de $\$28,606.02$).*
+## 4. Resumen financiero (`calculateFinancialSummary`)
 
-| Concepto | Monto (Benchmark Centro Médico) | Entidad / Destino | Momento de Aplicación |
-| :--- | :---: | :---: | :--- |
-| **Precio de Lista con ITBIS** | $\$28,606.02$ USD | Cotización Bruta | Antes de calificar |
-| **ITBIS Exonerado Ley 57-07** | $-\$1,866.11$ USD | CNE / DGII | Inmediato en Factura |
-| **TOTAL A PAGAR EN FACTURA** | **$\$26,739.92$ USD** | **Empresa Instaladora** | **Año 0 (Firma de Contrato)** |
-| **Crédito Fiscal ISR Año 1** | $-\$2,440.70$ USD | DGII (Declaración Renta) | Año 1 fiscal ($13.33\%$) |
-| **Crédito Fiscal ISR Año 2** | $-\$2,440.70$ USD | DGII (Declaración Renta) | Año 2 fiscal ($13.33\%$) |
-| **Crédito Fiscal ISR Año 3** | $-\$2,440.70$ USD | DGII (Declaración Renta) | Año 3 fiscal ($13.33\%$) |
-| **Inversión Neta Final (Año 3)** | **$\$19,417.81$ USD** | **Costo Real de Bolsillo** | **Tras 3 declaraciones DGII** |
+### 4.1 Modo de precio e inversión bruta
 
----
+- **Matriz de costos** (predeterminado en modo detallado): $I_{bruta} = I_{final}$ de la matriz.
+- **Precio directo por W** (`pricingMode: 'direct_watt'`, o modo simple sin `pricingMode: 'cost_matrix'`): base $= P_{dc} \times 1000 \times P_{W}$, con $P_W$ = `specs.pricePerWattUSD`, si no `financials.pricePerWattUSD`, si no 1.13. El precio de lista suma los ítems adicionales y su ITBIS no exonerado, y los descuentos se recalculan sobre ese precio. `directPriceSurplusTarget` (`margin` o `labor`) decide cómo se reparte la diferencia respecto al costo en la matriz mostrada.
+- `financials.customCostUSD > 0` sustituye la inversión en ambos modos.
 
-## 5. 📈 Proyección de Flujo de Caja a 25 Años
+**Ítems adicionales:** llevan $M_{venta}$ salvo `applyMargin === false`, tanto en la matriz de costos como en el total de precio directo y en el desglose de ITBIS (`appliesItemMargin` en `shared/financialRules.ts`). El ITBIS de un ítem se calcula sobre su precio de venta (`customItemsTaxBreakdown`); la exoneración la decide `isItemItbisExonerated` (`exonerateITBIS`, o el campo heredado `applyITBIS`, exonerado por defecto). El visor web usa las mismas funciones para enlaces antiguos sin `customItemsNonExoneratedITBISUSD`.
 
-### 5.1 Desembolso Inicial (Año 0)
-El desembolso inicial de caja en el Año 0 ($CF_0$) es el valor efectivamente pagado por el cliente tras la exoneración inmediata de ITBIS:
+### 4.2 Ley 57-07
 
-$$CF_0 = -(I_{bruta} - \text{ITBIS Exonerado})$$
+**ITBIS exonerado** (si `applyITBISExemption`):
 
----
+$$\text{ITBIS exonerado} = \text{ITBIS base} \times M_{venta} + \sum_{i \in \text{exonerados}} 0.18 \times \text{venta}_i$$
 
-### 5.2 Flujo Neto Anual para los Años $t = 1 \dots 25$
-Para cada año $t$, el flujo neto ($CF_{t}$) incorpora la degradación del panel, la inflación de la tarifa eléctrica, el crédito fiscal y la provisión de reemplazo de baterías:
+En precio directo, $M_{venta}$ es el multiplicador implícito (precio base / costo neto base). `customITBISSavedUSD > 0` sustituye el primer término. Si la exoneración está desactivada vale 0.
 
-$$CF_{t} = S_{t} + \text{TaxCredit}_{t} - \text{ReplacementCost}_{t}$$
+**Crédito fiscal del 40%** (si `applyLey5707`), solo sobre equipos (paneles, inversores y baterías), excluyendo mano de obra e ítems adicionales:
 
-*Donde:*
-1. **Ahorro Energético con Degradación e Inflación**:
-   $$S_{t} = S_{yr1} \times (1 - d_{panel})^{t-1} \times (1 + i_{tarifa})^{t-1}$$
-   * $d_{panel}$: Tasa de degradación anual de los módulos fotovoltaicos ($0.50\%$ anual).
-   * $i_{tarifa}$: Tasa de inflación anual esperada en la tarifa eléctrica ($3.5\% - 4.0\%$ anual).
-2. **Incentivo Fiscal DGII**:
-   $$\text{TaxCredit}_{t} = \begin{cases} \frac{\text{Crédito Ley 57-07}}{3} & \text{si } t \in \{1, 2, 3\} \text{ y applyLey5707} = \text{true} \\ 0 & \text{si } t > 3 \text{ o applyLey5707} = \text{false} \end{cases}$$
-3. **Reemplazo de Baterías**:
-   $$\text{ReplacementCost}_{t} = \begin{cases} C_{reemplazo} & \text{si tiene batería y } t = T_{vida\_bat} \text{ (ej. Año 10)} \\ 0 & \text{en cualquier otro año} \end{cases}$$
+$$\text{Base equipos} = \max(0,\ \text{Venta equipos} - D_{equipos})$$
 
----
+$$\text{Crédito Ley 57-07} = 0.40 \times \text{Base equipos}$$
 
-## 6. 📊 Indicadores de Rentabilidad y Desempeño Financiero
+$D_{equipos}$ es la suma de descuentos con destino `equipment`. `customLey5707CreditUSD` sustituye el cálculo. El crédito se aplica en tres cuotas anuales iguales (años 1 a 3).
 
-### 6.1 Período de Retorno de Inversión (Payback)
-El período de retorno se calcula identificando el año $k$ donde el flujo de caja acumulado pasa de negativo a positivo, aplicando interpolación lineal exacta:
+### 4.3 Precio de contrato e inversión neta
 
-$$\text{Payback} = (k - 1) + \frac{|\text{Flujo Acumulado}_{k-1}|}{CF_{k}}$$
+$$\text{Precio de contrato} = \begin{cases} I_{bruta} & \text{con exoneración de ITBIS} \\ I_{bruta} + \text{ITBIS base} \times M_{venta} & \text{sin exoneración} \end{cases}$$
 
----
+$$I_{neta} = \text{Precio de contrato} - \text{Crédito Ley 57-07}$$
 
-### 6.2 Valor Actual Neto (VAN / NPV)
-El VAN descuenta los flujos netos futuros a la tasa de descuento del inversionista ($r$, típicamente $10\%$):
+(`financeEngine.ts:554-559`). Sin exoneración, `customITBISSavedUSD` también sustituye el término de ITBIS sumado. El crédito no es un descuento en la factura: el cliente lo recupera ante la DGII en tres años.
 
-$$\text{VAN} = CF_0 + \sum_{t=1}^{N} \frac{CF_t}{(1 + r)^t}$$
+## 5. Flujo de caja
 
-* Un $\text{VAN} > 0$ certifica la viabilidad financiera y generación de riqueza neta sobre el costo de oportunidad del capital.
+Desembolso del año 0: $CF_0 = \text{Precio de contrato}$.
 
----
+Para $t = 1 \dots N$ (`projectLifespanYears`):
 
-### 6.3 Tasa Interna de Retorno (TIR / IRR)
-La TIR es la tasa de rendimiento $r_{tir}$ que iguala el VAN a cero:
+$$CF_t = S_{yr1} \times (1 - d)^{t-1} \times (1 + i)^{t-1} + \text{Crédito}_t - \text{Reemplazo}_t$$
 
-$$\text{VAN}(r_{tir}) = 0 \iff -CF_0 = \sum_{t=1}^{N} \frac{CF_t}{(1 + r_{tir})^t}$$
+- $d$: `annualDegradation` en modo detallado; 0.5% en modo simple.
+- $i$: `annualEnergyInflationPct` (3.5% si falta).
+- $\text{Crédito}_t = \text{Crédito Ley 57-07}/3$ para $t \le 3$, si no 0.
+- $\text{Reemplazo}_t$ = `batteryReplacementCostUSD` en el año `batteryLifespanYears` (10 si falta), solo con batería y costo positivo.
 
-* **Algoritmo de Resolución**: Se resuelve numéricamente mediante el método de **Newton-Raphson** con convergencia garantizada:
-  $$r_{n+1} = r_n - \frac{\text{VAN}(r_n)}{\text{VAN}'(r_n)}$$
-  *Donde $\text{VAN}'(r) = -\sum_{t=1}^{N} \frac{t \times CF_t}{(1 + r)^{t+1}}$.*
+## 6. Indicadores
 
----
+**Payback** (interpolación lineal en el primer año $k$ con acumulado $\ge 0$; 25 si no se alcanza):
 
-### 6.4 Retorno sobre la Inversión a 25 Años ($\text{ROI}_{25}$)
-$$\text{ROI}_{25} = \frac{\sum_{t=1}^{25} CF_t - |CF_0|}{|CF_0|} \times 100\%$$
+$$\text{Payback} = (k - 1) + \frac{|\text{Acumulado}_{k-1}|}{CF_k}$$
 
----
+**VAN** con $r$ = `discountRatePct`:
 
-### 6.5 Impacto Ambiental ($CO_2$ Evitado)
-$$\text{CO}_{2, evitado} \text{ (Toneladas/Año)} = \frac{E_{anual} \times F_{co2}}{1,000}$$
+$$\text{VAN} = -CF_0 + \sum_{t=1}^{N} \frac{CF_t}{(1 + r)^t}$$
 
-*Donde $F_{co2} = 0.481 \text{ kg CO}_2/\text{kWh}$ (factor de emisión promedio de la matriz eléctrica de la República Dominicana).*
+**TIR**: Newton-Raphson desde 15%, hasta 100 iteraciones, tolerancia $10^{-6}$:
 
----
+$$r_{n+1} = r_n - \frac{\text{VAN}(r_n)}{\text{VAN}'(r_n)}, \qquad \text{VAN}'(r) = -\sum_{t=1}^{N} \frac{t \times CF_t}{(1 + r)^{t+1}}$$
 
-## 7. 🎛️ Diccionario y Guía Técnica de Parámetros del Simulador
+**ROI**:
 
-Esta sección explica el **significado físico, técnico y financiero de cada parámetro** presente en la barra lateral modular del simulador (`src/components/simulator/sidebar/ParameterSidebar.tsx`), sus componentes desacoplados (`ClientParamsSection`, `RatesParamsSection`, `EquipmentParamsSection`, `PricingParamsSection`, `FinancialsParamsSection`), su unidad de medida, valor por defecto e impacto en los cálculos.
+$$\text{ROI} = \frac{\sum_{t=1}^{N} CF_t - CF_0}{CF_0} \times 100$$
 
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│             ESTRUCTURA DE LA BARRA LATERAL DE PARÁMETROS               │
-├────────────────────────────────────────────────────────────────────────┤
-│  1. Proyecto y Cliente        → Identidad, Ubicación y Radiación Solar │
-│  2. Tarifas y Distribuidora   → Tarifas eléctricas y Medición Neta     │
-│  3. Equipamiento y Marcas     → Paneles, Inversores, Baterías y Modo   │
-│  4. Costos y Margen de Venta  → Tasa DOP/USD, Costos Unitarios y Wp    │
-│  5. Finanzas e Incentivos     → Ley 57-07, Exoneración ITBIS e Ítems   │
-└────────────────────────────────────────────────────────────────────────┘
-```
+**CO₂ evitado** con $F_{CO_2}$ = `co2FactorKgPerKWh` (0.481 si falta):
 
----
+$$\text{CO}_2 = \frac{E_{anual} \times F_{CO_2}}{1000} \quad [\text{t/año}]$$
 
-### 7.1 Sección 1: Proyecto y Cliente (`ClientParamsSection.tsx`)
+## 7. Caso de referencia
 
-| Parámetro | Tipo / Control | Unidad / Formato | Valor por Defecto | Explicación Técnica y Comportamiento |
-| :--- | :--- | :--- | :--- | :--- |
-| **Nombre del Cliente** | Texto | Alfanumérico | `Cliente Ejemplo` | Nombre de la persona física o jurídica titular del proyecto fotovoltaico. Se exporta en portadas, membretes y contratos del PDF. |
-| **Ubicación (Ciudad / Proyecto)** | Texto | Ciudad / Sector | `Santo Domingo, D.N.` | Municipio o zona geográfica donde se ubicará el sistema solar. |
-| **Dirección del Cliente** | Texto | Dirección física | Dirección local | Domicilio exacto de la propiedad para fines de tramitación y cotización oficial. |
-| **Fuente de Radiación Solar** | Selector (2 Opciones) | `Provincia` / `GPS` | `Provincia` | Define cómo obtiene el simulador las Horas Solar Pico ($\text{HSP}$):<br>• **Provincia (Offline)**: Usa la base de datos de satélite histórica NASA SSE para la provincia seleccionada.<br>• **GPS Satelital (Online)**: Consulta la API satelital para las coordenadas exactas. |
-| **Seleccionar Provincia** | Desplegable (32 prov.) | Nombre de provincia | `Distrito Nacional` | Selecciona una de las 32 provincias de RD con su irradiación solar satelital mensual promedio precargada. |
-| **Coordenadas GPS (Lat, Long)** | Texto | Grados decimales | `18.4861, -69.9312` | Coordenadas geográficas decimales (Latitud, Longitud) requeridas en modo GPS para la consulta satelital en alta resolución. |
-| **Obtener Radiación Satelital** | Botón de Acción | Disparador API | — | Realiza la petición HTTP a servidores satelitales (NASA POWER / PVGIS), generando un vector personalizado de 12 meses de $\text{HSP}$. |
-| **ID del Proyecto** | Texto | Código | `PRJ-001` | Identificador único interno para control de expedientes técnicos. |
-| **N° Cotización** | Texto | Código comercial | `C-0030` | Folio comercial correlativo del presupuesto presentado al cliente. |
+`src/engine/referenceCase.ts` define `BENCHMARK_PROJECT` (38 paneles de 620 W = 23.56 kWp, 2 inversores de 8 kW, 3 baterías de 16 kWh, matriz de costos con $M_{venta}$ 1.25, `customITBISSavedUSD` 1770.46, consumo 3279 kWh/mes) y `validateReferenceCase()` comprueba en modo legacy:
 
----
+| Métrica | Esperado | Tolerancia |
+| --- | ---: | ---: |
+| Capacidad DC | 23.56 kWp | ±0.1 |
+| Inversión bruta | 25,371.12 USD | ±1.0 |
+| Crédito Ley 57-07 | 7,785.38 USD | ±1.0 |
+| ITBIS exonerado | 1,770.46 USD | ±1.0 |
+| Payback | 2.3 años | ±0.8 |
 
-### 7.2 Sección 2: Tarifas y Distribuidora (`RatesParamsSection.tsx`)
-
-| Parámetro | Tipo / Control | Unidad / Formato | Valor por Defecto | Explicación Técnica y Comportamiento |
-| :--- | :--- | :--- | :--- | :--- |
-| **Precio por kWh ($ USD)** | Numérico | $\text{USD/kWh}$ | `$0.18` | Tarifa eléctrica unitaria pagada por el cliente antes de la instalación solar. Se utiliza para calcular el valor monetario de la energía generada ($S_m$). |
-| **Empresa Distribuidora** | Desplegable | Distribuidora | `EDESUR` | Empresa distribuidora de electricidad (`EDEESTE`, `EDESUR`, `EDENORTE`, `CEPM`). Establece las condiciones de interconexión. |
-| **Cobertura Objetivo (%)** | Numérico | $\%$ ($0 - 100\%$) | `95%` | Porcentaje de la energía consumida que se desea abastecer con energía solar. El algoritmo de auto-cálculo lo usa para sugerir la cantidad de paneles. |
-| **Tipo de Tarifa** | Desplegable | Código SIE | `BTS2` | Régimen tarifario regulado (`BTS1` residencial bajo, `BTS2` residencial/comercial general, `MTD` media tensión, `BTD` baja tensión demanda). |
-| **Cargo Exportación Red (%)** | Numérico | $\%$ ($0 - 100\%$) | `25%` | Porcentaje de peaje o cargo de uso de red aplicado a los kWh exportados bajo la resolución **SIE-007-2026-REG** de Medición Neta. |
-
----
-
-### 7.3 Sección 3: Equipamiento y Marcas (`EquipmentParamsSection.tsx`)
-
-| Parámetro | Tipo / Control | Unidad / Formato | Valor por Defecto | Explicación Técnica y Comportamiento |
-| :--- | :--- | :--- | :--- | :--- |
-| **Modo Simple / Detallado** | Selector (Pestañas) | `Simple` / `Detallado` | `Simple` | • **Simple**: Interfaz ágil para cotizaciones rápidas.<br>• **Detallado**: Desbloquea coeficientes de temperatura, eficiencias, pérdidas y degradación personalizada. |
-| **Modelo / Marca Módulos** | Texto | Marca y Modelo | *Canadian Solar 620W* | Nombre comercial y ficha técnica del panel fotovoltaico seleccionado. |
-| **Potencia del Panel (W)** | Numérico | Vatios ($\text{W}$) | `620 W` | Potencia nominal pico en corriente continua bajo condiciones estándar de prueba ($\text{STC}: 1,000\text{ W/m}^2, 25^\circ\text{C}$). |
-| **Auto-Calcular Paneles** | Checkbox / Toggle | Booleano | `true` | Cuando está activo, calcula automáticamente la cantidad óptima de paneles para cumplir con la *Cobertura Objetivo* deseada. |
-| **Cantidad de Paneles** | Numérico | Unidades enteras | `38` | Cantidad total de paneles instalados. Al multiplicarse por la potencia unitaria define la capacidad $P_{dc}$. |
-| **Modelo / Marca Inversor** | Texto | Marca y Modelo | *Lux Power 8kW* | Especificación del inversor central o microinversores para la conversión de energía $\text{DC} \rightarrow \text{AC}$. |
-
-#### 🔧 Parámetros Técnicos Avanzados (Modo Detallado)
-| Parámetro | Tipo / Control | Unidad / Formato | Valor por Defecto | Explicación Técnica y Comportamiento |
-| :--- | :--- | :--- | :--- | :--- |
-| **Potencia Inversor (kW)** | Numérico | Kilovatios ($\text{kW}$) | `8.0 kW` | Capacidad nominal máxima de salida en corriente alterna del inversor. |
-| **Cantidad Inversores** | Numérico | Unidades | `2` | Número de inversores acoplados en paralelo en la instalación. |
-| **Eficiencia Panel (%)** | Numérico | $\%$ ($0 - 100\%$) | `21.8%` | Eficiencia de conversión fotovoltaica de las celdas de silicio. |
-| **Coef. Temperatura (%/°C)**| Numérico | $\% / ^\circ\text{C}$ | `-0.35 %/°C` | Tasa de reducción de la potencia del panel por cada grado Celsius por encima de $25^\circ\text{C}$. |
-| **Pérdidas del Sistema (%)**| Numérico | $\%$ ($0 - 100\%$) | `14.0%` | Factor de pérdidas globales ($L_{sys}$): suciedad, cableado, sombreado, desacople y pérdidas del inversor. |
-| **Degradación Anual (%)** | Numérico | $\%$ ($0 - 10\%$) | `0.5%` | Pérdida de potencia anual por envejecimiento de los módulos fotovoltaicos a lo largo de 25 años. |
-
-#### 🔋 Parámetros de Almacenamiento (Baterías)
-| Parámetro | Tipo / Control | Unidad / Formato | Valor por Defecto | Explicación Técnica y Comportamiento |
-| :--- | :--- | :--- | :--- | :--- |
-| **Almacenamiento (Batería)** | Checkbox / Toggle | Booleano | `false` | Activa o desactiva la inclusión de almacenamiento electroquímico en el sistema. |
-| **Modelo / Marca Batería** | Texto | Marca y Modelo | *Hinaess 16 kWh* | Identificación del banco de baterías (química LiFePO4 de alto ciclado). |
-| **Cantidad de Baterías** | Numérico | Unidades | `3` | Número de módulos de batería instalados en el banco. |
-| **Precio Unitario Batería (USD)** | Numérico | $\text{USD}$ | `$1,990.00` | Costo unitario de adquisición de cada módulo de batería. |
-| **Capacidad Total Batería (kWh)** | Numérico | Kilovatios-hora | `16.0 kWh` | Energía nominal total de almacenamiento del banco. |
-| **DoD Descarga (%)** | Numérico | $\%$ ($0 - 100\%$) | `80%` | Profundidad de descarga máxima permitida (*Depth of Discharge*) para preservar la vida útil de las celdas. |
-| **Eficiencia Carga (%)** | Numérico | $\%$ ($0 - 100\%$) | `92%` | Eficiencia de ida y vuelta (*Round-Trip Efficiency*) de carga y descarga de la batería. |
-| **Costo Reemplazo Año 10 (USD)**| Numérico | $\text{USD}$ | `$3,500.00` | Provisión financiera para el reemplazo programado de celdas o módulos al término del Año 10. |
-
----
-
-### 7.4 Sección 4: Costos, Tasa de Cambio y Margen de Venta (`PricingParamsSection.tsx`)
-
-| Parámetro | Tipo / Control | Unidad / Formato | Valor por Defecto | Explicación Técnica y Comportamiento |
-| :--- | :--- | :--- | :--- | :--- |
-| **Tasa Cambio DOP/USD** | Numérico | $\text{RD\$/USD}$ | `60.00` | Tipo de cambio oficial de conversión entre Pesos Dominicanos y Dólares Estadounidenses. |
-| **Factor / Margen Venta** | Numérico | Multiplicador | `1.25x` | Multiplicador comercial de ganancia bruta sobre los costos directos netos ($1.25\text{x} = 25\%$ margen). |
-| **Precio Unit. Panel (USD)** | Numérico | $\text{USD/panel}$ | `$103.32` | Costo directo de adquisición unitario del módulo solar en puerto o suplidor. |
-| **Precio Unit. Inversor (USD)**| Numérico | $\text{USD/inversor}$ | `$2,300.00` | Costo directo unitario del inversor de corriente. |
-| **Precio Unit. Batería (USD)** | Numérico | $\text{USD/batería}$ | `$1,990.00` | Costo directo unitario del módulo de almacenamiento en batería. |
-| **Mano de Obra / kWp (USD)** | Numérico | $\text{USD/kWp}$ | `$170.00` | Costo unitario de instalación, estructuras de aluminio anodizado, protecciones DC/AC, puesta a tierra y cableado. |
-| **Precio Sistema por Vatio (USD/Wp)** | Numérico + Botón Auto | $\text{USD/Wp}$ | `$1.13` | Precio llave en mano final por vatio instalado ($P_{watt}$). Permite sobreescritura directa o cálculo automático (`✨ Auto`). |
-
----
-
-### 7.5 Sección 5: Finanzas, Incentivos e Ítems Personalizados (`FinancialsParamsSection.tsx`)
-
-| Parámetro | Tipo / Control | Unidad / Formato | Valor por Defecto | Explicación Técnica y Comportamiento |
-| :--- | :--- | :--- | :--- | :--- |
-| **Aplicar Ley 57-07 (Crédito ISR 40%)** | Checkbox / Toggle | Booleano | `true` | Aplica el crédito fiscal del 40% sobre los equipos deducible del Impuesto Sobre la Renta (DGII) en 3 años fiscales. |
-| **Exoneración ITBIS 100% (18%)** | Checkbox / Toggle | Booleano | `true` | Aplica la exención del 100% del ITBIS (18%) sobre los equipos solares aprobados por la CNE y la DGII. |
-| **Tasa de Descuento (%)** | Numérico | $\%$ ($0 - 50\%$) | `10.0%` | Tasa de oportunidad o costo del capital ($r$) empleada para descontar los flujos futuros en el cálculo del VAN (NPV). |
-| **Ítems Adicionales en Cotización** | Formulario Dinámico | Lista de ítems | `[]` | Permite agregar renglones personalizados (descripción, cantidad, unidad, precio unitario USD). |
-| **Toggle "Exonerar ITBIS (18%)"** | Checkbox por Ítem | Booleano | `true` | • `true`: Se suma al ahorro fiscal exonerado de Ley 57-07.<br>• `false`: Se factura el 18% de ITBIS directo al cliente en la cotización. |
-| **Toggle "Aplicar margen comercial"** | Checkbox por Ítem | Booleano | `true` | • `true`: Aplica multiplicador de margen del proyecto.<br>• `false`: Pasa costo directo al cliente (pass-through). |
-| **Descuentos Comerciales** | Formulario Dinámico | Lista de descuentos | `[]` | Permite agregar deducciones comerciales al total general (motivo/nota, tipo `$`/`%`, valor y destino DGII). |
-| **Selector Tipo Descuento** | Botones Segmentados | `Fijo ($)` o `Porc. (%)` | `Fijo ($)` | • `Fijo`: Descuento en USD directo.<br>• `Porc`: Porcentaje calculado sobre el precio de lista antes de descuentos. |
-| **Destino de Deducción DGII** | Radio Selector | `general` / `equipment` | `general` | • `Global / Cortesía`: Base elegible 40% Ley 57-07 intacta.<br>• `Descuento Equipos`: Reduce base elegible ante DGII para evitar reclamo fiscal indebido. |
-
----
-
-## 8. 🧪 Suite de Auditoría y Benchmark Oficial
-
-### 8.1 Caso de Referencia Auditado: Centro Médico Hispánico
-* **Configuración**: 38 módulos JA Solar 620W ($23.56\text{ kWp}$), 2 inversores 8kW, 3 baterías Hinaess 16 kWh, $30.75\text{ kWp}$ en mano de obra.
-
-| Métrica Financiera | Benchmark Oficial | Tolerancia Permitida | Resultado Motor | Estado |
-| :--- | :---: | :---: | :---: | :---: |
-| **Capacidad DC ($P_{dc}$)** | `23.56 kWp` | $\pm 0.05 \text{ kWp}$ | `23.56 kWp` | ✅ Aprobado |
-| **Producción Anual ($E_{anual}$)** | `36,307.2 kWh` | $\pm 0.5\%$ | `36,307.2 kWh` | ✅ Aprobado |
-| **Cobertura Solar** | `92.3%` | $\pm 0.2\%$ | `92.3%` | ✅ Aprobado |
-| **Total Facturado Ley 57-07** | `$26,739.92 USD` | $\pm \$0.50 \text{ USD}$ | `$26,739.92 USD` | ✅ Aprobado |
-| **ITBIS Exonerado** | `$1,866.11 USD` | $\pm \$0.50 \text{ USD}$ | `$1,866.11 USD` | ✅ Aprobado |
-| **Crédito Fiscal 40% DGII** | `$7,322.11 USD` | $\pm \$0.50 \text{ USD}$ | `$7,322.11 USD` | ✅ Aprobado |
-| **Inversión Neta Final ($I_{neta}$)**| `$17,551.82 USD` | $\pm \$0.50 \text{ USD}$ | `$17,551.82 USD` | ✅ Aprobado |
-| **Período de Retorno (Payback)** | `2.4 Años` | $\pm 0.1 \text{ Años}$ | `2.4 Años` | ✅ Aprobado |
-| **Tasa Interna de Retorno (TIR)**| `40.21%` | $\pm 0.5\%$ | `40.21%` | ✅ Aprobado |
-| **Valor Actual Neto (VAN 10%)** | `$71,225.94 USD` | $\pm \$1.00 \text{ USD}$ | `$71,225.94 USD` | ✅ Aprobado |
-| **ROI a 25 Años** | `1073.51%` | $\pm 1.0\%$ | `1073.51%` | ✅ Aprobado |
-| **CO2 Evitado Anual** | `17.5 Toneladas` | $\pm 0.1 \text{ Ton}$ | `17.5 Toneladas` | ✅ Aprobado |
-
----
-
-### 8.2 Comandos de Validación Automatizada
+En ese caso $I_{neta} = 25{,}371.12 - 7{,}785.38 = 17{,}585.74$ USD. Estas tolerancias se comprueban en `src/tests/testFinancialEngineComprehensive.ts` (TEST 16), que también cubre ítems adicionales, ITBIS, margen por defecto y descuentos.
 
 ```bash
-# Validar el motor contra el benchmark oficial de Centro Médico
-npx tsx src/tests/testBenchmark.ts
-
-# Ejecutar la suite integral de 15 pruebas unitarias financieras (incluyendo ítems extra, ITBIS y descuentos comerciales)
-npx tsx src/tests/testFinancialEngineComprehensive.ts
+npm test -- testFinancialEngineComprehensive
 ```
 
-## Costos de grupos explícitos (8 de octubre de 2026)
+## 8. Entrada documental del asistente
 
-Cada grupo multi-equipo utiliza su propia oferta. Un grupo sin `unitPriceUSD` no hereda el precio del primer modelo ni un precio de referencia: aporta cero al subtotal provisional y la cotización muestra que falta registrar costos. Ese subtotal no es una oferta completa. Los proyectos antiguos sin arreglos de grupos conservan su resolución escalar histórica. El modo de venta directa utiliza el precio por W configurado, sin heredar el caso benchmark al crear desde IA.
-
-## Entrada documental revisable (octubre 2026)
-
-Una hoja comercial aporta datos de entrada, no fórmulas del motor: cantidades/costos USD, tasa DOP/USD, factor de venta, mano de obra y extras/descuentos. Los totales extraídos sirven para conciliación y no se vuelven a sumar. La tabla del asistente usa el ITBIS de `calculateCostMatrixSummary`; no replica tratamiento fiscal en UI. El origen compra/venta debe estar claro antes de usar precios como costos. Fórmulas financieras, impuestos y bases ISR existentes se conservan.
+Una hoja comercial aporta datos de entrada, no fórmulas: cantidades y costos USD, tasa DOP/USD, factor de venta, mano de obra y extras/descuentos. Los totales extraídos solo sirven para conciliar y no se vuelven a sumar. La tabla del asistente muestra el ITBIS de la matriz de costos del motor; no replica el tratamiento fiscal en la interfaz. El origen compra/venta debe estar claro antes de usar precios como costos.

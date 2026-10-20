@@ -1,26 +1,30 @@
-# Manuales de SolarSim Pro
+# Documentación de SolarSim Pro
 
-Las fuentes canónicas de esta rama son:
+Documentos canónicos y vigentes. No se mantienen documentos fechados: el historial vive en Git, en los PR y en `release/release-notes-vX.Y.Z.md`. Para contribuir, empezar por [AGENTS.md](../AGENTS.md).
 
-- [Entrega 2.6.0](RELEASE_2_6_0.md): publicación de escritorio y actualización coordinada de API.
+## Arquitectura y contratos
 
-- [Arquitectura modular](ARCHITECTURE.md): límites, dependencias y puntos de entrada.
-- [Funciones y modos de cálculo](APPLICATION_FEATURES.md): preferencia local, política de organización, compatibilidad y proyección experimental.
-- [Recursos compartidos](SHARED_RESOURCES.md): carpetas públicas/privadas, registro de propuestas web, ofertas y adjuntos de equipos.
-- [Resumen y seguimiento comercial](PROPOSAL_COMMERCIAL_TRACKING.md): decisiones del cliente, notas, responsables, filtros y resultados.
-- [Centro empresarial](COMPANY_CENTER.md): membretes, organizaciones independientes, equipos, aislamiento y despliegue.
+- [Arquitectura modular](ARCHITECTURE.md): límites, dependencias permitidas y puntos de entrada.
+- [Funciones y modos de cálculo](APPLICATION_FEATURES.md): legacy predeterminado, proyección experimental, política de organización y compatibilidad.
+- [Motor financiero](FINANCIAL_ENGINE_SPECIFICATION.md): matriz de costos, Ley 57-07, flujo de caja e indicadores.
+- [Balance energético físico](ENERGY_BALANCE_AND_SELF_CONSUMPTION_SPECIFICATION.md): autoconsumo y despacho BESS del modelo opcional.
 - [API y base de datos](DATABASE_AND_API_SPECIFICATION.md): autenticación, versiones, sincronización y migraciones.
-- [Motor financiero](FINANCIAL_ENGINE_SPECIFICATION.md) y [balance físico](ENERGY_BALANCE_AND_SELF_CONSUMPTION_SPECIFICATION.md): contratos matemáticos existentes; el balance físico requiere activar la función.
-- [Subsistema IA](AI_SCANNERS_SPECIFICATION.md): asistente con texto/adjuntos, revisión de borradores multi-modelo, importación de fichas/precios y transporte común.
-- [Asistente general experimental](APP_ASSISTANT.md): herramientas, confirmación, scopes y evaluación de MCP-UI.
-- [Tarifas en el flujo IA](AI_TARIFF_CONTEXT.md): fuentes históricas, procedencia por campo, persistencia y límites de concurrencia.
-- [Infraestructura](INFRASTRUCTURE_ARCHITECTURE.md): topología y despliegue protegido.
-- [Entrega 2.5.1 y API desplegada](RELEASE_2_5_1.md): revisión oficial, respaldo restaurado y rollback del contenedor API.
-- [Mantenimiento y releases](MAINTENANCE_AND_UPDATES.md): comandos, firmas y compatibilidad.
-- [Beta, revisión del CT, recuperación y rollback](BETA_ROLLOUT.md): evidencias aisladas y pendientes de puesta en producción.
-- [Revisión del 7 de octubre de 2026](REVIEW_2026_10_07.md): hallazgos corregidos, salud observada, recuperación aislada, runtime real y pendientes verificables.
-- [Asistente conversacional y revisión del 12 de octubre](QA_AI_CONVERSATION_2026-10-12.md): evidencia, salud y límites.
-- [QA](QA.md): gates automatizados y recorridos manuales. [Resultados](QA_RESULTS.md): evidencia y límites de esta entrega.
-- [Auditoría de partida](ANALISIS_TECNICO_2026-10-03.md) y [plan](PLAN_MODULARIZACION.md): evidencia histórica y alcance de la rama.
+- [Recursos compartidos](SHARED_RESOURCES.md): carpetas, registro de propuestas web, ofertas y adjuntos.
+- [Catálogo de equipos](EQUIPMENT_CATALOG.md): modelos, ofertas de proveedores y fichas.
+- [Centro empresarial](COMPANY_CENTER.md): organizaciones, equipos, membretes y aislamiento.
+- [Seguimiento comercial](PROPOSAL_COMMERCIAL_TRACKING.md): decisiones del cliente, responsables y reportes.
+- [Subsistema IA](AI_SCANNERS_SPECIFICATION.md) y [tarifas en el flujo IA](AI_TARIFF_CONTEXT.md).
+- [Asistente general experimental](APP_ASSISTANT.md).
+- [Visor de propuestas (Worker)](../workers/share-viewer/README.md).
+- Reglas de exportación PDF: [.agents/rules/html2canvas_pdf_export_rules.md](../.agents/rules/html2canvas_pdf_export_rules.md).
 
-Se retiró CODEBASE_AUDIT_REPORT.md porque sus conclusiones y calificaciones precedían la auditoría reproducible actual. El mapa de infra enlaza al único manual operativo; ya no mantiene un segundo contrato de despliegue. Los scripts de pruebas que escribían en servidores reales fueron sustituidos por integraciones efímeras y regresiones de cliente.
+## Operaciones
+
+- [Verificación y QA](QA.md): pruebas automatizadas, ensayos de staging y matriz manual.
+- [Mantenimiento y releases](MAINTENANCE_AND_UPDATES.md): ramas, gates, publicación firmada y actualizaciones.
+- [Infraestructura y despliegue](INFRASTRUCTURE_ARCHITECTURE.md): topología, despliegue protegido de la API, rollback, recuperación de respaldos y rotación de secretos.
+
+## Producto y diseño
+
+- [PRODUCT.md](../PRODUCT.md): contexto de producto y criterios de calidad de interfaz.
+- [DESIGN.md](../DESIGN.md): sistema de diseño.
