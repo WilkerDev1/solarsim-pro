@@ -1,8 +1,5 @@
-import {
-  PDFSectionId,
-  DEFAULT_PDF_SECTION_ORDER,
-  PDF_SECTIONS_META,
-} from '../constants/pdfSections';
+import { PDFSectionId, DEFAULT_PDF_SECTION_ORDER } from '../constants/pdfSections';
+import { buildPdfLayout, normalizeSectionOrder } from '../utils/pdfLayout';
 import { AttachedPDFDocument, DocumentCustomization, ProjectSimulation } from '../types';
 import { useSimulationStore } from '../store/useSimulationStore';
 
@@ -17,77 +14,11 @@ function assert(condition: boolean, message: string) {
   }
 }
 
-// Helper to normalize section order as in components
-function normalizeSectionOrder(saved?: string[]): PDFSectionId[] {
-  if (saved && Array.isArray(saved) && saved.length > 0) {
-    const validSaved = saved.filter((id): id is PDFSectionId =>
-      DEFAULT_PDF_SECTION_ORDER.includes(id as PDFSectionId)
-    );
-    const missing = DEFAULT_PDF_SECTION_ORDER.filter((id) => !validSaved.includes(id));
-    return [...validSaved, ...missing];
-  }
-  return DEFAULT_PDF_SECTION_ORDER;
-}
-
-// Helper to compute page numbers
-function computePageNumbers(order: PDFSectionId[], visibility: Record<PDFSectionId, boolean>) {
-  let currentNum = 0;
-  const numbers: Partial<Record<PDFSectionId, number>> = {};
-  order.forEach((id) => {
-    if (visibility[id]) {
-      currentNum++;
-      numbers[id] = currentNum;
-    }
-  });
-  return { totalPages: currentNum, numbers };
-}
-
-// Helper to compute TOC items
-function computeTOCItems(order: PDFSectionId[], visibility: Record<PDFSectionId, boolean>) {
-  const TOC_METADATA: Partial<Record<PDFSectionId, { title: string; subtitle: string }>> = {
-    executiveSummary: { title: 'Cuadro Resumen de Inversión y Retorno', subtitle: 'Pipeline Técnico' },
-    aboutUs: { title: 'Quiénes Somos & Nuestros Servicios', subtitle: 'Por Qué Elegirnos' },
-    benefits: { title: 'Beneficios de la Energía Solar', subtitle: 'Ley 57-07' },
-    techIntro: { title: '¿Qué es un Sistema Fotovoltaico?', subtitle: 'Flujo Técnico' },
-    projectDescription: { title: 'Descripción del Proyecto & Normativa SIE', subtitle: 'SIE-007' },
-    energy: { title: 'Análisis de Energía y Balance', subtitle: 'Generación Solar' },
-    quotation: { title: 'Presupuesto y Cotización de Sistema', subtitle: 'Inversión' },
-    roi: { title: 'Cálculo de Retorno de Inversión', subtitle: 'Payback y TIR' },
-    cashFlow: { title: 'Flujo de Caja y Proyección a 25 Años', subtitle: 'Rendimiento' },
-    costMatrix: { title: 'Matriz de Costos Internos (Confidencial)', subtitle: 'Proveedores' },
-  };
-
-  const { numbers } = computePageNumbers(order, visibility);
-  const items: Array<{ title: string; targetPage: number; sectionIndex: number }> = [];
-  let sectionIndex = 1;
-
-  order.forEach((id) => {
-    if (visibility[id] && TOC_METADATA[id]) {
-      items.push({
-        title: TOC_METADATA[id]!.title,
-        targetPage: numbers[id] || 0,
-        sectionIndex: sectionIndex++,
-      });
-    }
-  });
-
-  return items;
-}
-
-// -------------------------------------------------------------
-// TEST 1: DEFAULT_PDF_SECTION_ORDER integrity
-// -------------------------------------------------------------
-console.log('--- TEST 1: Default Section Order Integrity ---');
-assert(DEFAULT_PDF_SECTION_ORDER.length === 12, 'DEFAULT_PDF_SECTION_ORDER must have exactly 12 pages');
-assert(DEFAULT_PDF_SECTION_ORDER[0] === 'cover', 'First default section must be cover');
-assert(DEFAULT_PDF_SECTION_ORDER[1] === 'tableOfContents', 'Second default section must be tableOfContents');
-assert(DEFAULT_PDF_SECTION_ORDER[2] === 'executiveSummary', 'Third default section must be executiveSummary');
-assert(DEFAULT_PDF_SECTION_ORDER.includes('energy'), 'Must include energy');
-assert(DEFAULT_PDF_SECTION_ORDER.includes('quotation'), 'Must include quotation');
-assert(DEFAULT_PDF_SECTION_ORDER.includes('roi'), 'Must include roi');
-assert(DEFAULT_PDF_SECTION_ORDER.includes('cashFlow'), 'Must include cashFlow');
-assert(DEFAULT_PDF_SECTION_ORDER.includes('costMatrix'), 'Must include costMatrix');
-console.log(' ✅ PASS: Default section order contains all 12 sections in correct initial sequence.');
+const computePageNumbers = (order: PDFSectionId[], visibility: Record<PDFSectionId, boolean>) => {
+  const layout = buildPdfLayout(order, visibility);
+  return { totalPages: layout.activePagesCount, numbers: layout.pageNumbers };
+};
+const computeTOCItems = (order: PDFSectionId[], visibility: Record<PDFSectionId, boolean>) => buildPdfLayout(order, visibility).tocItems;
 
 // -------------------------------------------------------------
 // TEST 2: Normalization handles undefined, partial, or invalid IDs
@@ -172,6 +103,24 @@ assert(tocItems[2].targetPage === 5, 'Third TOC item targets page 5');
 assert(tocItems[3].title === 'Análisis de Energía y Balance', 'Fourth TOC item is Energy');
 assert(tocItems[3].targetPage === 6, 'Fourth TOC item targets page 6');
 console.log(' ✅ PASS: Table of Contents automatically reflects user-defined order and target pages.');
+
+// Annexes follow internal pages; only attachments flagged for the TOC are listed.
+const annexLayout = buildPdfLayout(
+  DEFAULT_PDF_SECTION_ORDER,
+  defaultVisibility,
+  [{ id: 'x1', title: '  Planos  ', pageCount: 3 }, { id: 'x2', title: '   ' }],
+  [
+    { id: 'a1', fileName: 'ficha.pdf', fileSize: 1, pageCount: 2, title: 'Ficha panel', uploadedAt: '', enabled: true, addToTableOfContents: true },
+    { id: 'a2', fileName: 'oculta.pdf', fileSize: 1, pageCount: 5, title: 'Oculta', uploadedAt: '', enabled: true, addToTableOfContents: false },
+  ],
+);
+const annexItems = annexLayout.tocItems.slice(-2);
+assert(annexItems[0].title === 'Planos' && annexItems[0].targetPage === 12, 'Extra TOC entry starts after the 11 internal pages');
+assert(annexItems[1].subtitle === 'Ficha Técnica / Anexo Oficial (ficha.pdf)' && annexItems[1].targetPage === 15, 'Attachment starts after the 3-page extra entry');
+assert(annexLayout.activePagesCount === 11, 'Internal page count excludes annexes');
+// Every page footer ("N de M") counts the annexes as part of the document.
+assert(annexLayout.footerTotalPages === 16, 'Footer total includes annex pages on every page');
+assert(buildPdfLayout(DEFAULT_PDF_SECTION_ORDER, defaultVisibility).footerTotalPages === 11, 'Without annexes the footer total is the internal page count');
 
 // -------------------------------------------------------------
 // TEST 5: Attached External PDFs Reordering via Zustand Store

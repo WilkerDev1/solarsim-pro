@@ -1,3 +1,5 @@
+import { PDFPageShell } from '../PDFPageShell';
+import { cleanClientName, getTariffDisplayName } from '../../../../shared/proposalPresentation';
 import React from 'react';
 import { ShieldCheck, CheckCircle2, Check } from 'lucide-react';
 import { ProjectSimulation, FinancialSummaryResult, DocumentCustomization, ClientInfo } from '../../../types';
@@ -7,7 +9,6 @@ import { PDFFooter } from '../PDFFooter';
 import { PDFWatermark } from '../PDFWatermark';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
 import { InlineEditableText } from '../common/InlineEditableText';
-import { getTariffDisplayName } from '../../../types/tariffs';
 import { getProjectPanels, getProjectInverters, getProjectBatteries } from '../../../utils/equipmentSpecsUtils';
 
 interface PDFPage2QuotationProps {
@@ -49,10 +50,10 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
 }) => {
   const cust = project.customization || {};
 
-  const cleanClientName = (project.client.name || 'Cliente').replace(/\s*\((?:Copia|Copia Importada|COPIA|V\d+|C\d+)\)\s*/gi, '').trim();
+  const clientDisplayName = cleanClientName(project.client.name || 'Cliente');
   const contactName = cust.contactName !== undefined 
     ? cust.contactName 
-    : (project.client.contactPerson || project.client.company || cleanClientName || '');
+    : (project.client.contactPerson || project.client.company || clientDisplayName || '');
   const rawClientPhone = cust.clientPhone !== undefined 
     ? cust.clientPhone 
     : (project.client.contactPhone || '');
@@ -74,26 +75,16 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
   const customItems = project.financials.customItems || [];
 
   return (
-    <div className="pdf-page w-[850px] h-[1202px] min-h-[1202px] max-h-[1202px] bg-white shadow-xl flex flex-col shrink-0 relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
-      {/* Background Watermark */}
-      <PDFWatermark
-        opacity={project.customization?.watermarkOpacity ?? 0.15}
-        customWatermarkBase64={project.customization?.watermarkLogoBase64}
-      />
-
-      {/* Header Banner */}
-      {showHeadersFooters && (
-        <PDFHeaderBanner
-          activeTheme={activeTheme}
-          projectId={project.client.projectId}
-          clientName={project.client.name}
-          systemCapacityKWp={summary.systemCapacityKWp}
-          location={project.client.province || project.client.location}
-          currentDateStr={currentDateStr}
-          pageTitle="COTIZACIÓN DE SISTEMA FOTOVOLTAICO"
-          customization={project.customization}
-        />
-      )}
+    <PDFPageShell
+      project={project}
+      summary={summary}
+      activeTheme={activeTheme}
+      showHeadersFooters={showHeadersFooters}
+      currentDateStr={currentDateStr}
+      pageNum={pageNum}
+      totalPages={totalPages}
+      pageTitle="COTIZACIÓN DE SISTEMA FOTOVOLTAICO"
+    >
 
       {/* Body */}
       <div className="px-10 pt-2 pb-2 flex-1 flex flex-col justify-between text-xs text-slate-800 font-sans relative z-10 min-h-0">
@@ -586,15 +577,6 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
           />
         </div>
       </div>
-
-      {/* Footer */}
-      {showHeadersFooters && (
-        <PDFFooter
-          pageNum={pageNum}
-          totalPages={totalPages}
-          customization={project.customization}
-        />
-      )}
-    </div>
+    </PDFPageShell>
   );
 };

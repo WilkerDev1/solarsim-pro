@@ -1,3 +1,4 @@
+import { getTariffDisplayName } from '../../../../shared/proposalPresentation';
 import { useSelfConsumptionProjection } from '../../../features/application/useApplicationFeatures';
 import React from 'react';
 import { ProjectSimulation, UtilityRates, SystemSpecs } from '../../../types';
@@ -10,7 +11,6 @@ import { calculateTotalDCCapacityKWp, calculateTotalBatteryCapacityKWh } from '.
 import {
   UtilityDistributor,
   getDistributorTariffOptions,
-  getTariffDisplayName,
   mapTariffCodeOnDistributorChange,
 } from '../../../types/tariffs';
 

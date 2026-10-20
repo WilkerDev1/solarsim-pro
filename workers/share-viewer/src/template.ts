@@ -1,27 +1,7 @@
 import { StoredProposal } from './types';
+import { cleanClientName, getTariffDisplayName } from '../../../shared/proposalPresentation';
 import { ELECTSUN_LOGO_COLOR_BASE64 } from '../../../shared/electsunLogoColor';
 import { escapeHtml, formatMarkdown, safeLogoUrl, scriptJson } from './escaping';
-
-function getWorkerTariffDisplayName(dist: string, code: string): string {
-  const c = (code || '').toUpperCase().trim();
-  if (dist === 'CEPM') {
-    if (c === 'RBT-1' || c === 'BTS1' || c === 'BTS2') return 'RBT-1 (Baja Tensión Regular)';
-    if (c === 'RBT-2' || c === 'BTD') return 'RBT-2 (Baja Tensión con Demanda)';
-    if (c === 'ESTRBT-2') return 'ESTRBT-2 (Demanda Bayahíbe)';
-    if (c === 'RMT-1' || c === 'MTD1' || c === 'MTD2') return 'RMT-1 (Media Tensión con Demanda)';
-    return c;
-  }
-  if (c === 'BTS1') return 'BTS1 (Residencial Monómica)';
-  if (c === 'BTS2') return 'BTS2 (Comercial Simple)';
-  if (c === 'BTD') return 'BTD (Baja Tensión con Demanda)';
-  if (c === 'BTH') return 'BTH (Baja Tensión Horaria)';
-  if (c === 'MTD1') return 'MTD1 (Media Tensión con Demanda)';
-  if (c === 'MTD2') return 'MTD2 (Media Tensión Demanda Horaria)';
-  if (c === 'MTH') return 'MTH (Media Tensión Horaria)';
-  if (c === 'RBT-1') return 'BTS1 (Residencial Monómica)';
-  if (c === 'RBT-2') return 'BTD (Baja Tensión con Demanda)';
-  return c || 'BTS2';
-}
 
 export function renderExpiredPage(companyName = 'electsun', companyPhone = '+1 (809) 378-6590'): string {
   return `<!DOCTYPE html>
@@ -92,7 +72,7 @@ export function renderProposalPage(stored: StoredProposal): string {
   const logoBase64 = logoSource === '' ? '' : safeLogoUrl(logoSource, ELECTSUN_LOGO_COLOR_BASE64);
 
   const rawClientName = client.name || 'Cliente Estimado';
-  const clientName = rawClientName.replace(/\s*\((?:Copia|Copia Importada|COPIA|V\d+|C\d+)\)\s*/gi, '').trim();
+  const clientName = cleanClientName(rawClientName);
   const projectId = client.projectId || 'SP-2026-001';
   const quoteNumber = client.quoteNumber || 'C-0001';
   const quoteValidityDays = client.quoteValidityDays || stored.validityDays || 7;
@@ -100,7 +80,7 @@ export function renderProposalPage(stored: StoredProposal): string {
   const clientAddress = client.address || `${province}, República Dominicana`;
   const distributor = rates.distributor || client.distributor || 'EDEESTE';
   const rawTariffCode = rates.tariffCode || client.tariffCode || (distributor === 'CEPM' ? 'RBT-1' : 'BTS2');
-  const tariffDisplayName = getWorkerTariffDisplayName(distributor, rawTariffCode);
+  const tariffDisplayName = getTariffDisplayName(distributor, rawTariffCode);
   const isCEPM = distributor === 'CEPM';
   const isZeroExport = !!rates.isZeroExport;
   const exportFee = rates.gridExportFeePct ?? 25;

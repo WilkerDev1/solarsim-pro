@@ -1,7 +1,7 @@
+import { getTariffDisplayName } from '../../shared/proposalPresentation';
 import { DEFAULT_RD_TARIFF_MATRIX, getReferenceEnergyRateUSD } from '../data/rdTariffs';
 import {
   getDistributorTariffOptions,
-  getTariffDisplayName,
   mapTariffCodeOnDistributorChange,
 } from '../types/tariffs';
 

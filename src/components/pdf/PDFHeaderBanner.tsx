@@ -1,4 +1,5 @@
 import React from 'react';
+import { cleanClientName } from '../../../shared/proposalPresentation';
 import { PDFColorTheme } from '../../constants/pdfThemes';
 import { DocumentCustomization } from '../../types';
 import { documentLogo } from '../../utils/documentLogo';
@@ -29,7 +30,7 @@ export const PDFHeaderBanner: React.FC<PDFHeaderBannerProps> = ({
   const companySlogan = customization?.companySlogan ?? DEFAULT_DOCUMENT_CUSTOMIZATION.companySlogan ?? 'El sol a tu favor';
   const headerLogo = documentLogo(customization || {}, 'header');
 
-  const cleanClientName = (clientName || 'Cliente').replace(/\s*\((?:Copia|Copia Importada|COPIA|V\d+|C\d+)\)\s*/gi, '').trim();
+  const clientDisplayName = cleanClientName(clientName || 'Cliente');
 
   return (
     <>
@@ -42,7 +43,7 @@ export const PDFHeaderBanner: React.FC<PDFHeaderBannerProps> = ({
             PROPUESTA TÉCNICA Y ECONÓMICA • ID: {projectId || 'SP-2024-089'}
           </h2>
           <h1 className="text-xl font-bold uppercase tracking-tight text-white mt-0.5">
-            {cleanClientName} — {systemCapacityKWp.toFixed(2)}kWp
+            {clientDisplayName} — {systemCapacityKWp.toFixed(2)}kWp
           </h1>
           <p className="text-[11px] text-white/80 mt-0.5">
             Ubicación: <span className="font-semibold text-white">{location}</span> | Fecha:{' '}
