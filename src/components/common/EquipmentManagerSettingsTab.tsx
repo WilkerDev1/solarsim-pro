@@ -28,6 +28,7 @@ import {
 import { EquipmentOffersEditor } from "./equipment/EquipmentOffersEditor";
 import { EquipmentAssetsEditor } from "./equipment/EquipmentAssetsEditor";
 import { normalizeBrandName } from "../../utils/equipmentBrandUtils";
+import { confirmAction } from "./confirmAction";
 
 interface EquipmentManagerSettingsTabProps {
   isDark: boolean;
@@ -478,11 +479,14 @@ export const EquipmentManagerSettingsTab: React.FC<
     }
   };
 
-  const handleResetDefaults = () => {
+  const handleResetDefaults = async () => {
     if (
-      window.confirm(
-        "¿Deseas restablecer el catálogo a los modelos verificados de las fichas técnicas oficiales? (Se mantendrán solo los equipos oficiales).",
-      )
+      await confirmAction({
+        title: "Restablecer catálogo",
+        message: "¿Deseas restablecer el catálogo a los modelos verificados de las fichas técnicas oficiales? (Se mantendrán solo los equipos oficiales).",
+        confirmLabel: "Restablecer",
+        tone: "danger",
+      })
     ) {
       resetEquipmentCatalogToDefaults();
       setFeedbackMessage({

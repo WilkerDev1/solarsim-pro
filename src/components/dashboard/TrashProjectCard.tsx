@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   User,
 } from 'lucide-react';
+import { confirmAction } from '../common/confirmAction';
 
 interface TrashProjectCardProps {
   project: ProjectSimulation;
@@ -61,9 +62,9 @@ export const TrashProjectCard: React.FC<TrashProjectCardProps> = ({ project }) =
     restoreProject(project.id);
   };
 
-  const handleHardDelete = (e: React.MouseEvent) => {
+  const handleHardDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (confirm(`¿Estás completamente seguro de eliminar DEFINITIVAMENTE la propuesta "${project.client?.name}"?\n\nEsta acción NO se puede deshacer y borrará los datos permanentemente.`)) {
+    if (await confirmAction({ title: 'Eliminar definitivamente', message: `¿Estás completamente seguro de eliminar DEFINITIVAMENTE la propuesta "${project.client?.name}"?\n\nEsta acción NO se puede deshacer y borrará los datos permanentemente.`, confirmLabel: 'Eliminar definitivo', tone: 'danger' })) {
       hardDeleteProject(project.id);
     }
   };

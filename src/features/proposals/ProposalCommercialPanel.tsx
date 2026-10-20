@@ -12,6 +12,7 @@ import { SyncService } from "../../services/syncService";
 import { canEditCommercial } from "./commercial";
 import { ProposalDecisionField } from "./ProposalDecisionField";
 import "./proposal-commercial.css";
+import { confirmAction } from "../../components/common/confirmAction";
 
 export function ProposalCommercialPanel({
   project,
@@ -176,10 +177,10 @@ export function ProposalCommercialPanel({
             <button
               type="button"
               aria-label="Cancelar nuevo reporte"
-              onClick={() => {
+              onClick={async () => {
                 if (
                   !note.trim() ||
-                  window.confirm("¿Descartar este reporte sin guardar?")
+                  (await confirmAction({ title: "Descartar reporte", message: "¿Descartar este reporte sin guardar?", confirmLabel: "Descartar", tone: "danger" }))
                 )
                   setEditing(false);
               }}
@@ -248,10 +249,10 @@ export function ProposalCommercialPanel({
           <div className="commercial-actions">
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 if (
                   !note.trim() ||
-                  window.confirm("¿Descartar este reporte sin guardar?")
+                  (await confirmAction({ title: "Descartar reporte", message: "¿Descartar este reporte sin guardar?", confirmLabel: "Descartar", tone: "danger" }))
                 )
                   setEditing(false);
               }}

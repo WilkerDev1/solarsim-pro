@@ -19,6 +19,7 @@ import {
 import { RD_PROVINCES } from '../../../data/rdProvinces';
 import { UtilityDistributor, getDistributorTariffOptions } from '../../../types/tariffs';
 import { AITariffResolutionModal } from './AITariffResolutionModal';
+import { confirmAction } from '../../common/confirmAction';
 
 export const SimulationPreferencesSection: React.FC = () => {
   const {
@@ -501,8 +502,8 @@ export const SimulationPreferencesSection: React.FC = () => {
                   </button>
 
                   <button
-                    onClick={() => {
-                      if (window.confirm('¿Restablecer el pliego tarifario a los valores oficiales base?')) {
+                    onClick={async () => {
+                      if (await confirmAction({ title: 'Restablecer tarifas', message: '¿Restablecer el pliego tarifario a los valores oficiales base?', confirmLabel: 'Restablecer', tone: 'danger' })) {
                         resetToDefaultTariffs();
                       }
                     }}

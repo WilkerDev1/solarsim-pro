@@ -14,6 +14,7 @@ import { CompanyFields } from "./CompanyFields";
 import { OrganizationManagement } from "./OrganizationManagement";
 import "./company-center.css";
 import { draftOwnerKey } from "../../utils/draftOwnerKey";
+import { confirmAction } from "../common/confirmAction";
 
 type Section = "profiles" | "organization" | "consultant";
 export function CompanyProfileHubView() {
@@ -36,18 +37,21 @@ export function CompanyProfileHubView() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const draftEpoch = useRef(0);
-  const organizationLeaveGuard = useRef<(() => boolean) | null>(null);
+  const organizationLeaveGuard = useRef<(() => Promise<boolean>) | null>(null);
   const consultantDirty =
     JSON.stringify(consultant) !== JSON.stringify(localUserProfile);
-  const allowActiveLeave = () =>
+  const allowActiveLeave = async () =>
     section === "profiles"
       ? allowLeave()
       : section === "organization"
         ? (organizationLeaveGuard.current?.() ?? true)
         : !consultantDirty ||
-          window.confirm(
-            "El perfil del consultor tiene cambios sin guardar. ¿Descartarlos?",
-          );
+          confirmAction({
+            title: "Descartar cambios",
+            message: "El perfil del consultor tiene cambios sin guardar. ¿Descartarlos?",
+            confirmLabel: "Descartar",
+            tone: "danger",
+          });
   const importInput = useRef<HTMLInputElement>(null);
   const original = companies.find((company) => company.id === selected);
   const sharedProfile = !!original?.organizationId;
@@ -60,11 +64,14 @@ export function CompanyProfileHubView() {
     originalRef.current = original;
     if (original && !creating && JSON.stringify(draft) === JSON.stringify(previous)) setDraft({ ...original });
   }, [original]);
-  const allowLeave = () =>
+  const allowLeave = async () =>
     !dirty ||
-    window.confirm(
-      "Tienes cambios sin guardar en este membrete. ¿Descartarlos?",
-    );
+    confirmAction({
+      title: "Descartar cambios",
+      message: "Tienes cambios sin guardar en este membrete. ¿Descartarlos?",
+      confirmLabel: "Descartar",
+      tone: "danger",
+    });
   useEffect(() => {
     const current =
       companies.find((c) => c.id === activeCompanyId) || companies[0];
@@ -76,8 +83,8 @@ export function CompanyProfileHubView() {
     setMessage("");
     setError("");
   }, [ownerKey]);
-  const select = (company: CompanyProfile) => {
-    if (!allowLeave()) return;
+  const select = async (company: CompanyProfile) => {
+    if (!(await allowLeave())) return;
     draftEpoch.current++;
     setSelected(company.id);
     setCreating(false);
@@ -85,8 +92,8 @@ export function CompanyProfileHubView() {
     setMessage("");
     setError("");
   };
-  const changeSection = (next: Section) => {
-    if (next !== section && !allowActiveLeave()) return;
+  const changeSection = async (next: Section) => {
+    if (next !== section && !(await allowActiveLeave())) return;
     if (next !== section) setConsultant({ ...localUserProfile });
     if (next !== "profiles" && original) {
       setDraft({ ...original });
@@ -286,8 +293,8 @@ export function CompanyProfileHubView() {
       <header>
         <button
           aria-label="Volver a propuestas"
-          onClick={() => {
-            if (allowActiveLeave()) store.setActiveView("dashboard");
+          onClick={async () => {
+            if (await allowActiveLeave()) store.setActiveView("dashboard");
           }}
         >
           <ArrowLeft size={16} />
@@ -335,8 +342,8 @@ export function CompanyProfileHubView() {
                 <strong>Membretes</strong>
                 <button
                   aria-label="Crear membrete"
-                  onClick={() => {
-                    if (!allowLeave()) return;
+                  onClick={async () => {
+                    if (!(await allowLeave())) return;
                     draftEpoch.current++;
                     setCreating(true);
                     setDraft({
@@ -622,11 +629,14 @@ export function CompanyProfileHubView() {
                       <button
                         type="button"
                         className="cc-danger"
-                        onClick={() => {
+                        onClick={async () => {
                           if (
-                            !window.confirm(
-                              "¿Eliminar este membrete del dispositivo? Las propuestas existentes se conservan.",
-                            )
+                            !(await confirmAction({
+                              title: "Eliminar membrete",
+                              message: "¿Eliminar este membrete del dispositivo? Las propuestas existentes se conservan.",
+                              confirmLabel: "Eliminar",
+                              tone: "danger",
+                            }))
                           )
                             return;
                           store.deleteCompany(selected);
