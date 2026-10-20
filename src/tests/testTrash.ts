@@ -1,8 +1,8 @@
 import { useSimulationStore } from '../store/useSimulationStore';
-import { ProjectSimulation } from '../types';
+import { hydrateSimulationStore } from '../store/persistence/hydrateSimulationStore';
 
 console.log('=====================================================');
-console.log('🧪 RUNNING TRASH (RECYCLE BIN) & READ-ONLY TEST SUITE');
+console.log('🧪 RUNNING TRASH (RECYCLE BIN) TEST SUITE');
 console.log('=====================================================\n');
 
 const store = useSimulationStore.getState();
@@ -65,33 +65,25 @@ console.log(` ✅ PASS: Proyecto marcado como isDeleted: true con timestamp ${tr
 console.log(' ✅ PASS: Proyecto excluido de la vista activa y visible exclusivamente en papelera\n');
 
 
-// --- TEST 2: Retention Days Calculation (30 Days Window) ---
-console.log('--- TEST 2: Retention Days Calculation (30 Days Window) ---');
+// --- TEST 2: Purga automática de papelera tras 30 días al rehidratar ---
+console.log('--- TEST 2: Auto-purge of trash older than 30 days on hydration ---');
 
-const now = Date.now();
-const freshDeletedTime = new Date(trashed.deletedAt!).getTime();
-const freshDaysLeft = Math.max(0, 30 - Math.floor((now - freshDeletedTime) / (1000 * 60 * 60 * 24)));
+const dayMs = 24 * 60 * 60 * 1000;
+const persisted = {
+  ...useSimulationStore.getState(),
+  projects: [
+    { ...trashed, id: 'trash-12-days', deletedAt: new Date(Date.now() - 12 * dayMs).toISOString() },
+    { ...trashed, id: 'trash-35-days', deletedAt: new Date(Date.now() - 35 * dayMs).toISOString() },
+    { ...trashed, id: 'active-old', isDeleted: false, deletedAt: null, updatedAt: new Date(Date.now() - 90 * dayMs).toISOString() },
+  ],
+};
+hydrateSimulationStore(persisted);
+const keptIds = persisted.projects.map((p) => p.id);
+if (!keptIds.includes('trash-12-days')) throw new Error('❌ Trash deleted 12 days ago must be kept');
+if (keptIds.includes('trash-35-days')) throw new Error('❌ Trash deleted 35 days ago must be purged');
+if (!keptIds.includes('active-old')) throw new Error('❌ Active projects must never be purged by age');
 
-if (freshDaysLeft !== 30) {
-  throw new Error(`❌ Freshly deleted project should have 30 days remaining, got ${freshDaysLeft}`);
-}
-
-// Simulate a project deleted 12 days ago
-const simulated12DaysAgo = new Date(now - 12 * 24 * 60 * 60 * 1000).toISOString();
-const simulated12DaysLeft = Math.max(0, 30 - Math.floor((now - new Date(simulated12DaysAgo).getTime()) / (1000 * 60 * 60 * 24)));
-if (simulated12DaysLeft !== 18) {
-  throw new Error(`❌ Project deleted 12 days ago should have 18 days remaining, got ${simulated12DaysLeft}`);
-}
-
-// Simulate a project deleted 35 days ago (expired)
-const simulated35DaysAgo = new Date(now - 35 * 24 * 60 * 60 * 1000).toISOString();
-const CUTOFF_30_DAYS = 30 * 24 * 60 * 60 * 1000;
-const isExpired = (now - new Date(simulated35DaysAgo).getTime()) > CUTOFF_30_DAYS;
-if (!isExpired) {
-  throw new Error('❌ Project deleted 35 days ago must be flagged as expired for auto-purge');
-}
-
-console.log(' ✅ PASS: Cálculo de retención de 30 días exacto (30 días hoy, 18 días a los 12 días, expirado a los 35 días)\n');
+console.log(' ✅ PASS: La rehidratación conserva la papelera reciente y purga la de más de 30 días\n');
 
 
 // --- TEST 3: Restore Project from Trash ---
@@ -202,5 +194,5 @@ if (useSimulationStore.getState().isTrashActive !== false) {
 console.log(' ✅ PASS: Conmutación de vista de papelera (setIsTrashActive) validada correctamente\n');
 
 console.log('=====================================================');
-console.log('🎉 ALL TRASH & READ-ONLY TESTS PASSED (100% SUCCESS)');
+console.log('🎉 ALL TRASH TESTS PASSED');
 console.log('=====================================================\n');

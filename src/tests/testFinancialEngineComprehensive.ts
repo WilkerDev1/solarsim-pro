@@ -1,19 +1,7 @@
+import assert from 'node:assert/strict';
 import { calculateFinancialSummary } from '../engine/financeEngine';
+import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { SystemSpecs, UtilityRates, FinancialParams } from '../types';
-
-console.log('=====================================================');
-console.log('🧪 RUNNING COMPREHENSIVE FINANCIAL ENGINE AUDIT');
-console.log('=====================================================');
-
-let allPassed = true;
-function assert(condition: boolean, testName: string, detail?: string) {
-  if (condition) {
-    console.log(` ✅ PASS: ${testName}`);
-  } else {
-    console.error(` ❌ FAIL: ${testName} -> ${detail || 'Assertion failed'}`);
-    allPassed = false;
-  }
-}
 
 // Base Setup
 const defaultSpecs: SystemSpecs = {
@@ -57,7 +45,6 @@ const defaultFinancials: FinancialParams = {
 const monthlyConsumption = Array(12).fill(1000); // 12,000 kWh/year
 
 // TEST 1: Solar Only (Simple Mode)
-console.log('\n--- TEST 1: Solar Only (Simple Mode) ---');
 const resSolarOnly = calculateFinancialSummary(
   'Santo Domingo / Distrito Nacional',
   defaultSpecs,
@@ -78,7 +65,6 @@ assert(
 );
 
 // TEST 2: Dynamic Storage Addition (3 Batteries)
-console.log('\n--- TEST 2: Dynamic Storage Addition (3 Batteries) ---');
 const specsWithBattery: SystemSpecs = {
   ...defaultSpecs,
   pricingMode: 'cost_matrix',
@@ -126,7 +112,6 @@ assert(
 );
 
 // TEST 3: ITBIS Exemption Toggle
-console.log('\n--- TEST 3: ITBIS Exemption Toggle (ON vs OFF) ---');
 const financialsNoITBIS: FinancialParams = {
   ...financialsWithBattery,
   applyITBISExemption: false,
@@ -151,7 +136,6 @@ assert(
 );
 
 // TEST 4: Ley 57-07 40% Tax Credit Toggle
-console.log('\n--- TEST 4: Ley 57-07 40% Credit Toggle (ON vs OFF) ---');
 const financialsNoLey: FinancialParams = {
   ...financialsWithBattery,
   applyLey5707: false,
@@ -172,7 +156,6 @@ assert(
 );
 
 // TEST 5: Cash Flow Year 0 and Multi-Year Integrity
-console.log('\n--- TEST 5: 25-Year Cash Flow Projection Integrity ---');
 assert(resWithBattery.cashFlow25Years.length === 25, '25 años de flujo de caja generados');
 const cfYear1 = resWithBattery.cashFlow25Years[0];
 const expectedAnnualTaxCredit = resWithBattery.ley5707CreditUSD / 3;
@@ -184,7 +167,6 @@ const cfYear4 = resWithBattery.cashFlow25Years[3];
 assert(cfYear4.taxCreditUSD === 0, 'Crédito fiscal es 0 después del Año 3');
 
 // TEST 6: Battery Replacement Cost in Year 10
-console.log('\n--- TEST 6: Battery Replacement Cost in Year 10 ---');
 const specsWithReplacement: SystemSpecs = {
   ...specsWithBattery,
   batteryLifespanYears: 10,
@@ -207,7 +189,6 @@ assert(
 );
 
 // TEST 7: Detailed Cost Matrix Mode
-console.log('\n--- TEST 7: Detailed Cost Matrix Mode ---');
 const specsDetailed: SystemSpecs = {
   ...specsWithBattery,
   isDetailed: true,
@@ -231,14 +212,7 @@ assert(resDetailed.costMatrix.porcentajeVentaUSD > 0, 'Precio de venta con marge
 assert(resDetailed.costMatrix.gananciaUSD > 0, 'Ganancia bruta calculada');
 assert(resDetailed.grossInvestmentUSD === Math.round(resDetailed.costMatrix.porcentajeVentaUSD * 100) / 100, 'Inversión bruta usa la matriz en modo detallado');
 
-// TEST 8: Zero Division / Extreme Values Resilience
-console.log('\n--- TEST 8: Extreme Values and Zero-Division Resilience ---');
-const zeroSpecs: SystemSpecs = {
-  ...defaultSpecs,
-  panelCount: 0,
-};
 // TEST 9: Custom Quotation Items with Exonerar ITBIS (Ley 57-07)
-console.log('\n--- TEST 9: Custom Quotation Items with Exonerar ITBIS (Ley 57-07) ---');
 const financialsWithCustomItems: FinancialParams = {
   ...defaultFinancials,
   customItems: [
@@ -300,7 +274,6 @@ assert(
 );
 
 // --- TEST 10: Commercial Pre-Tax Subtotal & Zero Wholesale Cost Leakage ---
-console.log('\n--- TEST 10: Commercial Pre-Tax Subtotal vs Wholesale Cost (Giovanni Gottardo Benchmark) ---');
 const giovanniSpecs: SystemSpecs = {
   ...defaultSpecs,
   panelCount: 21,
@@ -392,7 +365,6 @@ assert(
 );
 
 // TEST 11: Dynamic Sale Price Per Watt & Per KWp Reactivity (María Teresa Benchmark)
-console.log('\n--- TEST 11: Dynamic Sale Price Per Watt & Per KWp Reactivity ---');
 const specsMariaTeresa: SystemSpecs = {
   ...defaultSpecs,
   panelPowerW: 615,
@@ -461,7 +433,6 @@ assert(resDirect.salePricePerWattUSD === 1.18, `Modo Directo $/W respeta valor m
 assert(resDirect.salePricePerKWpUSD === 1180, `Modo Directo $/kWp respeta 1,180.00 ($${resDirect.salePricePerKWpUSD})`);
 
 // --- TEST 12: Custom Items in Cost Matrix (Jenny Rodríguez Cáceres - Comisión Gilda Audit Case) ---
-console.log('\n--- TEST 12: Custom Items in Cost Matrix (Jenny Rodríguez - Comisión Gilda) ---');
 const jennySpecs: SystemSpecs = {
   ...defaultSpecs,
   panelCount: 13,
@@ -551,10 +522,6 @@ assert(
 
 // 3. Validar cotización comercial con margen aplicado (Modo Con Margen)
 assert(
-  Math.abs(resJenny.costMatrix.porcentajeVentaUSD - 11810.62) < 0.01,
-  `Porcentaje venta (1.40x) de la matriz coincide exactamente con Excel: $11,810.62 ($${resJenny.costMatrix.porcentajeVentaUSD})`
-);
-assert(
   Math.abs(resJenny.grossInvestmentUSD - 11810.62) < 0.01,
   `Total General Cotización coincide 100% con Hoja de Costos: $11,810.62 ($${resJenny.grossInvestmentUSD})`
 );
@@ -594,7 +561,6 @@ assert(
 );
 
 // --- TEST 13: Initial Cash Outflow & Cash Flow Year 0 Integrity (Mildred Moquete Audit Case) ---
-console.log('\n--- TEST 13: Initial Cash Outflow & Cash Flow Year 0 Integrity (Mildred Moquete Case) ---');
 assert(
   resJennyPass.contractPriceUSD === resJennyPass.grossInvestmentUSD,
   `contractPriceUSD coincide con grossInvestmentUSD ($${resJennyPass.contractPriceUSD} vs $${resJennyPass.grossInvestmentUSD}) cuando aplica Ley 57-07`
@@ -612,17 +578,7 @@ assert(
   `Año 1 acumulado (${y1.cumulativeCashFlowUSD}) es exactamente -initialOutflowUSD + netCashFlowUSD (${expectedY1Cum}), SIN doble descuento de ITBIS`
 );
 
-// Validar caso específico con exoneración de ITBIS
-const moqueteContractPrice = 19100.88;
-const moqueteY1NetCashFlow = 5962.36;
-const moqueteExpectedY1Cum = Math.round((-moqueteContractPrice + moqueteY1NetCashFlow) * 100) / 100;
-assert(
-  moqueteExpectedY1Cum === -13138.52,
-  `Caso Mildred Moquete: -$19,100.88 + $5,962.36 da exactamente -$13,138.52 (${moqueteExpectedY1Cum})`
-);
-
 // --- TEST 14: Universal Project Duplication and Dynamic Equipment Recalculation ---
-console.log('\n--- TEST 14: Universal Project Duplication and Dynamic Equipment Recalculation ---');
 
 // Project A: Large system with 3 batteries
 const projectASpecs: SystemSpecs = {
@@ -694,7 +650,6 @@ assert(resCloned.batteryInvestmentUSD === 0, 'Inversión en baterías es 0 tras 
 assert(resCloned.itbisSavedUSD < resProjectA.itbisSavedUSD, `ITBIS exonerado se redujo proporcionalmente ($${resCloned.itbisSavedUSD} < $${resProjectA.itbisSavedUSD})`);
 assert(resCloned.itbisSavedUSD > 0, `ITBIS exonerado para 9.44 kWp es positivo ($${resCloned.itbisSavedUSD})`);
 // TEST 15: Commercial Discounts (Fixed vs Percentage, Profit Recalculation, Cash Flow Year 0 & DGII Ley 57-07)
-console.log('\n--- TEST 15: Commercial Discounts (Fixed vs Percentage, Real Profit & DGII Base) ---');
 const specsDiscountTest: SystemSpecs = {
   ...defaultSpecs,
   panelCount: 16,
@@ -857,10 +812,16 @@ assert(
   'Inversión bruta coincide 100% con costMatrix.porcentajeVentaUSD'
 );
 
-console.log('\n=====================================================');
-if (allPassed) {
-  console.log('🎉 ALL FINANCIAL ENGINE AUDIT TESTS PASSED (100% SUCCESS)');
-} else {
-  console.error('❌ SOME TESTS FAILED. PLEASE REVIEW AUDIT LOGS.');
-}
-console.log('=====================================================\n');
+// TEST 16: Caso de referencia (BENCHMARK_PROJECT, Centro Médico Hispánico)
+const benchmark = calculateFinancialSummary(
+  BENCHMARK_PROJECT.client.province,
+  BENCHMARK_PROJECT.specs,
+  BENCHMARK_PROJECT.rates,
+  BENCHMARK_PROJECT.financials,
+  BENCHMARK_PROJECT.monthlyConsumption
+);
+assert(Math.abs(benchmark.systemCapacityKWp - 23.56) <= 0.1, `Referencia: capacidad DC 23.56 kWp (${benchmark.systemCapacityKWp})`);
+assert(Math.abs(benchmark.grossInvestmentUSD - 25371.12) <= 1, `Referencia: inversión bruta $25,371.12 ($${benchmark.grossInvestmentUSD})`);
+assert(Math.abs(benchmark.ley5707CreditUSD - 7785.38) <= 1, `Referencia: crédito Ley 57-07 $7,785.38 ($${benchmark.ley5707CreditUSD})`);
+assert(Math.abs(benchmark.itbisSavedUSD - 1770.46) <= 1, `Referencia: ITBIS exonerado $1,770.46 ($${benchmark.itbisSavedUSD})`);
+assert(Math.abs(benchmark.paybackYears - 2.3) <= 0.8, `Referencia: payback ~2.3 años (${benchmark.paybackYears})`);

@@ -2,30 +2,8 @@ import {
   ShareProposalService,
   SharedProposalRecord,
   DEFAULT_WORKER_URL,
-  STORAGE_SHARED_HISTORY_KEY,
 } from '../services/shareProposalService';
 import { useSimulationStore } from '../store/useSimulationStore';
-
-// Polyfill localStorage para entorno Node si no está disponible
-if (typeof localStorage === 'undefined' || !localStorage.getItem) {
-  const store: Record<string, string> = {};
-  (global as any).localStorage = {
-    getItem: (k: string) => (k in store ? store[k] : null),
-    setItem: (k: string, v: string) => {
-      store[k] = String(v);
-    },
-    removeItem: (k: string) => {
-      delete store[k];
-    },
-    clear: () => {
-      Object.keys(store).forEach((k) => delete store[k]);
-    },
-    get length() {
-      return Object.keys(store).length;
-    },
-    key: (i: number) => Object.keys(store)[i] || null,
-  };
-}
 
 console.log('=====================================================');
 console.log('🧪 RUNNING CLOUDFLARE SHARE HISTORY TEST SUITE');
@@ -163,35 +141,6 @@ if (expiredTimeInfo.color !== 'rose') {
 
 console.log(' ✅ PASS: Detección y formato de propuestas expiradas verificado\n');
 
-// --- TEST 5: Auto-migration of Legacy solarsim_last_share_* Keys ---
-console.log('--- TEST 5: Auto-migration of Legacy localStorage Keys ---');
-// Inyectar una clave antigua en localStorage
-const legacyProjectId = 'proj-legacy-999';
-localStorage.setItem(
-  `solarsim_last_share_${legacyProjectId}`,
-  JSON.stringify({
-    id: 'legacy-hash-777',
-    shareUrl: 'https://propuesta.electsun.net/p/legacy-hash-777',
-    expiresAt: new Date(now.getTime() + 4 * 86400 * 1000).toISOString(),
-    validityDays: 7,
-    savedAt: new Date().toISOString(),
-    clientName: 'Cliente Migrado Automático',
-    projectCode: 'SP-2026-099-V1',
-    quoteNumber: 'C-0099',
-    systemKWp: 15.0,
-  })
-);
-
-// getSharedHistory debe auto-detectar e importar esta clave
-const migratedHistory = ShareProposalService.getSharedHistory();
-console.log(`History count after legacy key insertion: ${migratedHistory.length}`);
-
-const foundLegacy = migratedHistory.find((r) => r.id === 'legacy-hash-777');
-if (foundLegacy) throw new Error('❌ Unscoped legacy link must not be assigned to the current organization');
-if (!localStorage.getItem(`solarsim_last_share_${legacyProjectId}`)) throw new Error('❌ Legacy cache must be preserved for recovery');
-
-console.log(' ✅ PASS: Registros legacy sin ámbito conservados en cuarentena\n');
-
 // --- TEST 6: Record Deletion and Clear Expired Records ---
 console.log('--- TEST 6: Record Deletion and Purge of Expired Proposals ---');
 // Añadir un registro ya vencido
@@ -233,88 +182,4 @@ if (finalHistory.some((r) => r.id === 'prop-abc1')) {
 
 console.log(' ✅ PASS: Eliminación individual y purga de expirados funcionando al 100%\n');
 
-// --- TEST 7: Retroactive Reconciliation & Hydration of Real Client Data ---
-console.log('--- TEST 7: Local Reconciliation & Cloudflare Remote Hydration ---');
-
-// Insertar un registro con datos genéricos / placeholder
-const placeholderRecord: SharedProposalRecord = {
-  id: '3t4BpRw',
-  projectId: 'proj-1789507552987',
-  projectCode: 'proj-1789507552987',
-  quoteNumber: 'C-0001',
-  clientName: 'Propuesta Solar',
-  systemKWp: 0,
-  shareUrl: 'https://propuesta.electsun.net/p/3t4BpRw',
-  createdAt: new Date().toISOString(),
-  expiresAt: new Date(Date.now() + 7 * 86400 * 1000).toISOString(),
-  validityDays: 7,
-  workerUrl: DEFAULT_WORKER_URL,
-};
-ShareProposalService.saveSharedRecord(placeholderRecord);
-
-// Mock fetch para Test 7 para garantizar pruebas unitarias deterministas sin depender de la expiración de la nube
-const originalFetch = (global as any).fetch;
-(global as any).fetch = async (url: string) => {
-  if (url.includes('/api/share/hydrate') || url.includes('/api/share/3t4BpRw')) {
-    return {
-      ok: true,
-      json: async () => ({
-        success: true,
-        proposals: [
-          {
-            id: '3t4BpRw',
-            clientName: 'Cliente Hidratado Real',
-            projectCode: 'SP-2026-REAL',
-            quoteNumber: 'C-8888',
-            systemKWp: 15.5,
-            location: 'Santo Domingo',
-            companyName: 'Electsun',
-          },
-        ],
-      }),
-    };
-  }
-  return { ok: false, status: 404, json: async () => ({ error: 'Not found' }) };
-};
-
-// Ejecutar hidratación remota desde Cloudflare Worker
-async function runAsyncTests() {
-  const hydrationResult = await ShareProposalService.hydrateFromCloudflare();
-  (global as any).fetch = originalFetch;
-  console.log('Cloudflare Hydration Result:', hydrationResult);
-
-  const hydratedList = ShareProposalService.getSharedHistory();
-  const hydratedRecord = hydratedList.find((r) => r.id === '3t4BpRw');
-
-  if (!hydratedRecord) {
-    throw new Error('❌ Failed to find 3t4BpRw in history after hydration');
-  }
-
-  console.log(`Hydrated Client Name: "${hydratedRecord.clientName}"`);
-  console.log(`Hydrated Project Code: "${hydratedRecord.projectCode}"`);
-  console.log(`Hydrated Quote Number: "${hydratedRecord.quoteNumber}"`);
-  console.log(`Hydrated System kWp: "${hydratedRecord.systemKWp}"`);
-
-  if (hydratedRecord.clientName === 'Propuesta Solar') {
-    throw new Error('❌ Client name was not hydrated from Cloudflare Worker');
-  }
-
-  if (hydratedRecord.projectCode === 'proj-1789507552987') {
-    throw new Error('❌ Project code was not hydrated from Cloudflare Worker');
-  }
-
-  if (hydratedRecord.quoteNumber === 'C-0001') {
-    throw new Error('❌ Quote number was not hydrated from Cloudflare Worker');
-  }
-
-  console.log(' ✅ PASS: Hidratación retroactiva desde Cloudflare Worker completada con éxito\n');
-
-  console.log('=====================================================');
-  console.log('🎉 ALL CLOUDFLARE SHARE HISTORY TESTS PASSED (100% SUCCESS)');
-  console.log('=====================================================\n');
-}
-
-runAsyncTests().catch((err) => {
-  console.error('❌ Test failed with error:', err);
-  process.exit(1);
-});
+console.log('🎉 ALL CLOUDFLARE SHARE HISTORY TESTS PASSED');

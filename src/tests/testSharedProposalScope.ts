@@ -5,13 +5,6 @@ import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { featureScope } from '../../shared/applicationFeatures';
 
-const storage = new Map<string, string>();
-Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
-  getItem: (key: string) => storage.get(key) ?? null,
-  setItem: (key: string, value: string) => storage.set(key, String(value)),
-  removeItem: (key: string) => storage.delete(key), clear: () => storage.clear(),
-  get length() { return storage.size; }, key: (index: number) => [...storage.keys()][index] ?? null,
-} });
 const initial = useSimulationStore.getState();
 const originalFetch = globalThis.fetch;
 const serverA = 'https://api-a.example.invalid';
@@ -48,21 +41,21 @@ try {
   assert.equal(service.getSharedHistory().length, 1);
 
   const legacy = record('legacy-unassigned');
-  storage.set(STORAGE_SHARED_HISTORY_KEY, JSON.stringify([legacy]));
-  storage.set('solarsim_last_share_same-project-id', JSON.stringify({ ...legacy, savedAt: legacy.createdAt }));
+  localStorage.setItem(STORAGE_SHARED_HISTORY_KEY, JSON.stringify([legacy]));
+  localStorage.setItem('solarsim_last_share_same-project-id', JSON.stringify({ ...legacy, savedAt: legacy.createdAt }));
   assert.equal(service.hasQuarantinedLegacyHistory(), true);
   session('new-org');
   assert.deepEqual(service.getSharedHistory(), [], 'A matching project ID cannot establish historical ownership');
-  assert.equal(storage.get(STORAGE_SHARED_HISTORY_KEY), JSON.stringify([legacy]), 'Unscoped history remains recoverable');
-  assert.ok(storage.has('solarsim_last_share_same-project-id'));
+  assert.equal(localStorage.getItem(STORAGE_SHARED_HISTORY_KEY), JSON.stringify([legacy]), 'Unscoped history remains recoverable');
+  assert.ok(localStorage.getItem('solarsim_last_share_same-project-id') !== null);
 
   const scopedLegacy = record('legacy-owned', { serverUrl: serverA, organizationId: 'legacy-org' });
-  storage.set(STORAGE_SHARED_HISTORY_KEY, JSON.stringify([legacy, scopedLegacy]));
+  localStorage.setItem(STORAGE_SHARED_HISTORY_KEY, JSON.stringify([legacy, scopedLegacy]));
   session('legacy-org');
   assert.deepEqual(service.getSharedHistory().map((r) => r.id), ['legacy-owned'], 'Only explicit source and organization migrate');
   service.deleteSharedRecord('legacy-owned');
   assert.deepEqual(service.getSharedHistory(), [], 'Migrated legacy does not reappear after deletion');
-  assert.ok(storage.get(STORAGE_SHARED_HISTORY_KEY)?.includes('legacy-unassigned'));
+  assert.ok(localStorage.getItem(STORAGE_SHARED_HISTORY_KEY)?.includes('legacy-unassigned'));
 
   session('org-a');
   const placeholder = record('late-hydration', { clientName: 'Propuesta Solar', projectCode: 'same-project-id', quoteNumber: 'C-0001', systemKWp: 0 });
@@ -71,10 +64,10 @@ try {
   globalThis.fetch = async () => response.promise;
   const hydration = service.hydrateFromCloudflare();
   session('org-b');
-  const beforeB = storage.get(keyB);
+  const beforeB = localStorage.getItem(keyB);
   response.resolve(Response.json({ success: true, proposals: [{ id: 'late-hydration', clientName: 'Confidential A', systemKWp: 6 }] }));
   assert.equal((await hydration).updatedCount, 0);
-  assert.equal(storage.get(keyB), beforeB, 'Late hydration never mutates B');
+  assert.equal(localStorage.getItem(keyB), beforeB, 'Late hydration never mutates B');
   session('org-a');
   assert.equal(service.getSharedHistory().find((r) => r.id === 'late-hydration')?.clientName, 'Propuesta Solar');
 
