@@ -38,11 +38,7 @@ export class GeminiTariffService {
     const text = geminiResponseText(result.response).trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
     let raw: unknown;
     try { raw = JSON.parse(text); } catch { throw new Error('Gemini devolvió un JSON incompleto. No se aplicaron tarifas.'); }
-    return this.sanitizeAndMergeTariffMatrix(raw, params.currentMatrix);
-  }
-
-  /** Kept for compatibility; partial documents preserve the current rows and their individual sources. */
-  static sanitizeAndMergeTariffMatrix(raw: unknown, current = DEFAULT_RD_TARIFF_MATRIX): GlobalTariffMatrix {
-    return mergeExtractedTariffs(raw, current);
+    // Partial documents preserve the current rows and their individual sources.
+    return mergeExtractedTariffs(raw, params.currentMatrix ?? DEFAULT_RD_TARIFF_MATRIX);
   }
 }

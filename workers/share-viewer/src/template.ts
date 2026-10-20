@@ -1,5 +1,5 @@
 import { StoredProposal } from './types';
-import { ELECTSUN_LOGO_COLOR_BASE64 } from './electsunLogo';
+import { ELECTSUN_LOGO_COLOR_BASE64 } from '../../../shared/electsunLogoColor';
 import { escapeHtml, formatMarkdown, safeLogoUrl, scriptJson } from './escaping';
 
 function getWorkerTariffDisplayName(dist: string, code: string): string {

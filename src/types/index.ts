@@ -490,8 +490,6 @@ declare global {
       installLinuxPackage: (packageType: 'pacman' | 'deb', version: string) => Promise<{ success: boolean; error?: string }>;
       parseInvoiceWithAI?: (payload: import('../../shared/aiProposal').AIProposalPayload) => Promise<{ success: boolean; data?: ExtractedInvoiceData; error?: string }>;
       cancelAIRequest?: (requestId: string) => Promise<void>;
-      parseDatasheetWithAI?: (payload: { fileBase64: string; mimeType: string; fileName: string; apiKey?: string; model?: string }) => Promise<{ success: boolean; data?: import('./equipment').ExtractedDatasheetData; error?: string }>;
-      validateGeminiApiKey?: (apiKey: string, model?: string) => Promise<{ success: boolean; error?: string; modelName?: string; models?: GeminiModelInfo[] }>;
       listGeminiModels?: (apiKey: string) => Promise<{ success: boolean; error?: string; models?: GeminiModelInfo[] }>;
     };
   }

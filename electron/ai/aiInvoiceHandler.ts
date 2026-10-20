@@ -1,10 +1,10 @@
 import { ipcMain } from 'electron';
 import { buildProposalRequest } from '../../shared/aiProposal';
-import { requestGeminiJson, geminiResponseText, GEMINI_API_BASE, DEFAULT_GEMINI_MODEL } from '../../shared/geminiTransport';
+import { requestGeminiJson, geminiResponseText, GEMINI_API_BASE } from '../../shared/geminiTransport';
 import { httpsPostJson, httpsGetJson } from './httpClient';
 import { mapGeminiModels } from '../../src/services/geminiInvoiceService';
-import { processExtractedInvoice } from './invoiceExtractor';
-import type { AIInvoicePayload } from './types';
+import { processExtractedInvoice } from '../../src/utils/aiProposalNormalization';
+import type { AIProposalPayload } from '../../shared/aiProposal';
 export function registerAIInvoiceHandlers() {
   const requests=new Map<string,AbortController>();
   ipcMain.handle('cancel-ai-request', (event, requestId:string)=>{
@@ -17,13 +17,7 @@ export function registerAIInvoiceHandlers() {
     catch(error:any){return {success:false,error:error.message || 'No se pudo consultar Gemini.'};}
   };
   ipcMain.handle('list-gemini-models',(_event,apiKey:string)=>listModels(apiKey));
-  ipcMain.handle('validate-gemini-key',async(_event,apiKey:string,model=DEFAULT_GEMINI_MODEL)=>{
-    const result=await listModels(apiKey);
-    if(!result.success) return result;
-    const matched=result.models?.find((m:any)=>m.id===model.replace(/^models\//,''));
-    return matched?{...result,modelName:matched.name}:{...result,success:false,error:`El modelo ${model} no está disponible para esta cuenta.`};
-  });
-  ipcMain.handle('parse-invoice-with-ai',async(event,payload:AIInvoicePayload)=>{
+  ipcMain.handle('parse-invoice-with-ai',async(event,payload:AIProposalPayload)=>{
     const requestId=payload.requestId;
     if(requestId && (typeof requestId!=='string' || requestId.length>100)) return {success:false,error:'Identificador de solicitud inválido.'};
     const key=`${event.sender.id}:${requestId || 'legacy'}`;
