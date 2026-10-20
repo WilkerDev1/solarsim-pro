@@ -12,9 +12,11 @@ export interface ConfirmOptions {
 
 type FocusTarget = 'cancel' | 'confirm';
 
-interface PendingConfirm { options: ConfirmOptions; resolve: (value: boolean) => void }
+interface Focusable { focus(): void }
+interface PendingConfirm { options: ConfirmOptions; resolve: (value: boolean) => void; opener?: Focusable | null }
 
-export const createConfirmQueue = () => {
+// The opener (focused element when a confirmation is shown) gets focus back once it is answered.
+export const createConfirmQueue = ({ activeElement = () => (typeof document === 'undefined' ? null : (document.activeElement as HTMLElement | null)) }: { activeElement?: () => Focusable | null } = {}) => {
   const pending: PendingConfirm[] = [];
   const listeners = new Set<() => void>();
   const notify = () => listeners.forEach((listener) => listener());
@@ -22,13 +24,15 @@ export const createConfirmQueue = () => {
     request(options: ConfirmOptions): Promise<boolean> {
       return new Promise<boolean>((resolve) => {
         pending.push({ options, resolve });
-        if (pending.length === 1) notify();
+        if (pending.length === 1) { pending[0].opener = activeElement(); notify(); }
       });
     },
     current: (): ConfirmOptions | null => pending[0]?.options ?? null,
     resolve(value: boolean) {
       const head = pending.shift();
       if (!head) return;
+      head.opener?.focus();
+      if (pending[0]) pending[0].opener = activeElement();
       head.resolve(value);
       notify();
     },

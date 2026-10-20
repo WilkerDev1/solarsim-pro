@@ -38,6 +38,23 @@ import { ConfirmDialog } from '../components/common/ConfirmDialog';
   assert.equal(queue.current(), null);
 }
 
+// Focus returns to the control that opened each confirmation once it is answered (cancel or confirm).
+{
+  const focused: string[] = [];
+  const control = (name: string) => ({ focus: () => { focused.push(name); active = control(name); } });
+  let active: { focus(): void } | null = control('borrar');
+  const queue = createConfirmQueue({ activeElement: () => active });
+  const first = queue.request({ title: 'A', message: 'a' });
+  active = control('botón del diálogo');
+  const second = queue.request({ title: 'B', message: 'b' });
+  queue.resolve(false);
+  assert.deepEqual(focused, ['borrar'], 'cancelar devuelve el foco al control que abrió la confirmación');
+  active = control('botón del diálogo');
+  queue.resolve(true);
+  assert.deepEqual(focused, ['borrar', 'borrar'], 'la confirmación encolada también devuelve el foco a su origen');
+  await Promise.all([first, second]);
+}
+
 // Keyboard: Escape cancels, Enter confirms (except on the focused Cancel button, which cancels natively), Tab stays inside.
 assert.equal(confirmKeyAction({ key: 'Escape', shiftKey: false, focused: 'confirm' }), 'cancel');
 assert.equal(confirmKeyAction({ key: 'Escape', shiftKey: false, focused: 'cancel' }), 'cancel');
