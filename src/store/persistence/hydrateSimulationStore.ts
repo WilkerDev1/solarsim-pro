@@ -7,6 +7,7 @@ import { DEFAULT_RD_TARIFF_MATRIX } from '../../data/rdTariffs';
 import { normalizeBrandName, inferBrandFromText } from '../../utils/equipmentBrandUtils';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
 import { normalizeFeatureSettings, featureScope, isFeatureSettings } from '../../../shared/applicationFeatures';
+import { migrateDefaultSimulationSettings } from '../defaultSimulationSettings';
 
 export function hydrateSimulationStore(state: SimulationStore | undefined): void {
   if (state && state.projects && Array.isArray(state.projects)) {
@@ -181,6 +182,10 @@ export function hydrateSimulationStore(state: SimulationStore | undefined): void
     }
 
     state.documentTemplatesByCompany ||= {};
+    if (state.defaultSimulationSettings) state.defaultSimulationSettings = migrateDefaultSimulationSettings(state.defaultSimulationSettings);
+    for (const workspace of Object.values(state.organizationWorkspaces || {})) {
+      if (workspace?.defaultSimulationSettings) workspace.defaultSimulationSettings = migrateDefaultSimulationSettings(workspace.defaultSimulationSettings);
+    }
     state.companies = normalizeCompanyProfiles(state.companies, true);
     if (!state.companies.some(c => c.id === state.activeCompanyId)) state.activeCompanyId = state.companies.find(c => c.isDefault)!.id;
     state.localUserProfile = { ...state.localUserProfile, activeCompanyId: state.activeCompanyId };

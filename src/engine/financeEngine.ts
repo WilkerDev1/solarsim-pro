@@ -372,6 +372,27 @@ function calculateIRR(initialInvestment: number, cashFlows: number[]): number {
 /**
  * Calculates complete financial and regulatory proposal model.
  */
+const isDegradationPct = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 5;
+
+/**
+ * Annual production degradation (%) used by the 25-year cash flow.
+ * Detailed mode uses the configured value. Simple (catalog) mode uses the DC-weighted degradation of the catalog
+ * panel groups, then the configured value, then 0.5%.
+ */
+export function resolveAnnualDegradationPct(specs: SystemSpecs): number {
+  if (specs.isDetailed) return specs.annualDegradation;
+  let weighted = 0;
+  let watts = 0;
+  for (const group of specs.panels || []) {
+    const groupWatts = (group.powerW || 0) * (group.count || 0);
+    if (groupWatts <= 0 || !isDegradationPct(group.annualDegradation)) continue;
+    weighted += group.annualDegradation * groupWatts;
+    watts += groupWatts;
+  }
+  if (watts > 0) return weighted / watts;
+  return isDegradationPct(specs.annualDegradation) ? specs.annualDegradation : 0.5;
+}
+
 export function calculateFinancialSummary(
   provinceName: string,
   specs: SystemSpecs,
@@ -575,7 +596,7 @@ export function calculateFinancialSummary(
     : 0;
 
   // 25-Year Cash Flow Projection
-  const annualDegradationPct = specs.isDetailed ? specs.annualDegradation : 0.5;
+  const annualDegradationPct = resolveAnnualDegradationPct(specs);
   const annualInflationPct = rates.annualEnergyInflationPct || 3.5;
   const annualTaxCredit = financials.applyLey5707 ? ley5707CreditUSD / 3 : 0;
 
