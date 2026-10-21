@@ -2,7 +2,7 @@ import React, { useId } from 'react';
 import { Pencil } from 'lucide-react';
 import { getDocumentTextDefinition } from '../../../../shared/documentTexts';
 import { useDocumentEditor } from './DocumentEditorContext';
-import { InlineTextEditor } from './InlineTextEditor';
+import { RichTextEditor } from './RichTextEditor';
 import { RichText } from './RichText';
 
 type Tag = 'span' | 'p' | 'div' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'li' | 'td' | 'th';
@@ -36,23 +36,17 @@ export const EditableText: React.FC<EditableTextProps> = ({ k, as = 'span', clas
 
   if (editor.activeKey === k && editor.activeInstance === instance) {
     return (
-      <InlineTextEditor
+      <RichTextEditor
+        ref={editor.editorRef}
         definition={definition}
-        resolved={resolved}
+        text={resolved.text}
+        as={definition.multiline && as === 'span' ? 'div' : Tag}
         className={className}
         style={style}
         placeholder={placeholder}
-        onSave={(value) => {
+        onCommit={(value) => {
           if (value !== resolved.text) editor.setText(k, value);
           editor.setActiveKey(null);
-        }}
-        onReset={() => {
-          editor.resetText(k);
-          editor.setActiveKey(null);
-        }}
-        onSaveToTemplate={(value) => {
-          editor.setText(k, value);
-          return editor.saveToTemplate(k);
         }}
         onCancel={() => editor.setActiveKey(null)}
       />
