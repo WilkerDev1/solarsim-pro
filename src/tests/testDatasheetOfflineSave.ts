@@ -71,6 +71,11 @@ async function main() {
     assert.equal(photographed.datasheetAssetId, undefined, 'No PDF annex is invented from a photo');
     await attachImportedDatasheet(photoReceipt, photo, signal);
     assert.deepEqual(store.getState().equipmentCatalog.find(item => item.id === photoReceipt.ids[0])!.imageAssetIds, ['photo-asset'], 'Retrying does not duplicate the image');
+    const full = ['a', 'b', 'c', 'd', 'e', 'f'];
+    store.getState().updateEquipmentItem(photoReceipt.ids[0], { imageAssetIds: full, imageNames: full });
+    globalThis.fetch = async () => new Response(JSON.stringify({ asset: { id: 'seventh-photo', name: 'IMG_0002.jpg' } }));
+    await assert.rejects(attachImportedDatasheet(photoReceipt, photo, signal), /6 imágenes/, 'A full gallery reports the photo was not attached');
+    assert.deepEqual(store.getState().equipmentCatalog.find(item => item.id === photoReceipt.ids[0])!.imageAssetIds, full);
 
     const beforeUpdate = store.getState().equipmentCatalog.find(item => item.id === receipt.ids[0])!;
     const offers = [{ id: 'offer', supplierName: 'QA', priceUSD: 120, updatedAt: '2026-10-13' }];
