@@ -398,34 +398,3 @@ export function applyAssistantAction(action: AssistantAction) {
     if (consumption) s.setMonthlyConsumption(consumption.value as number[]);
   }
 }
-export const assistantToolDescriptions = [
-  [
-    'search_projects',
-    'Busca propuestas del espacio actual por nombre, código o provincia. Máximo12.',
-  ],
-  [
-    'get_project',
-    'Consulta datos y resultados calculados de una propuesta por id.',
-  ],
-  [
-    'get_simulation',
-    'Consulta la simulación actual o indicada; los resultados provienen del motor real.',
-  ],
-  [
-    'search_equipment',
-    'Busca catálogo por marca/modelo. unavailableOnly indica sin oferta confirmada in_stock, no implica agotado.',
-  ],
-  [
-    'get_equipment',
-    'Consulta un equipo con ofertas y referencias de adjuntos.',
-  ],
-  ['get_tariffs', 'Consulta las referencias de tarifa y procedencia.'],
-  [
-    'propose_project_update',
-    `Prepara campos para confirmar en la propuesta abierta. No modifica. Grupos panels/inverters/batteries requieren [{id del catálogo,count,unitPriceUSD confirmado}], no inventes precios. customItems/customDiscounts son listas completas con ids y descripción. Campos: ${JSON.stringify({ ...editableAssistantFields, equipment: undefined })}`,
-  ],
-  [
-    'propose_equipment_update',
-    `Prepara cambios de especificaciones del catálogo para confirmar. Preserva id, ofertas y adjuntos. Campos: ${editableAssistantFields.equipment.join(',')}`,
-  ],
-] as const;
