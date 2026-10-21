@@ -31,6 +31,7 @@ export interface PanelItemSpec {
   priceSource?: 'manual' | 'supplier';
   requestedModel?: string;
   id: string;
+  catalogItemId?: string; // ID del equipo del catálogo; se escribe con utils/equipmentGroups.ts
   brandModel: string;
   powerW: number;
   count: number;
@@ -46,6 +47,7 @@ export interface InverterItemSpec {
   priceSource?: 'manual' | 'supplier';
   requestedModel?: string;
   id: string;
+  catalogItemId?: string;
   brandModel: string;
   powerKW: number;
   count: number;
@@ -59,6 +61,7 @@ export interface BatteryItemSpec {
   priceSource?: 'manual' | 'supplier';
   requestedModel?: string;
   id: string;
+  catalogItemId?: string;
   brandModel: string;
   capacityKWh: number;
   count: number;
@@ -371,6 +374,20 @@ export interface DocumentCustomization {
 
   // ⚡ Visualización de autoconsumo en la propuesta PDF (true por defecto)
   showSelfConsumptionInProposal?: boolean;
+
+  // Textos del editor del documento sin campo heredado (clave estable de shared/documentTexts).
+  texts?: Record<string, string>;
+  // Diseño persistente del documento: visibilidad de secciones, tema y cabecera/pie.
+  layout?: DocumentLayoutSettings;
+  // Fichas automáticas del catálogo que el usuario retiró (sourceDatasheetKey).
+  dismissedDatasheetKeys?: string[];
+}
+
+export interface DocumentLayoutSettings {
+  hiddenSections?: string[];
+  visibleSections?: string[];
+  themeId?: string;
+  showHeadersFooters?: boolean;
 }
 
 export interface AttachedPDFDocument {
@@ -385,6 +402,10 @@ export interface AttachedPDFDocument {
   enabled: boolean;              // Si se fusionará al exportar la propuesta final
   addToTableOfContents: boolean; // Si se reflejará correlativamente en el Índice de la propuesta
   thumbnailDataUrl?: string;     // Preview visual real (Data URL JPEG) de la primera página
+  origin?: 'manual' | 'catalog'; // 'catalog' = ficha anexada automáticamente desde el equipo
+  catalogItemId?: string;
+  assetId?: string;              // Activo del servidor (equipment_assets) para recuperar los bytes
+  pageCountPending?: boolean;
 }
 
 export interface ExtraTOCItem {
@@ -431,6 +452,8 @@ export interface ProjectSimulation {
   financials: FinancialParams;
   monthlyConsumption: number[]; // 12 months in kWh
   customization?: DocumentCustomization;
+  // Cliente del directorio (independiente del nombre impreso en client.name).
+  clientId?: string;
   // Enterprise Sync & Authorship Metadata
   authorId?: string;
   authorName?: string;
@@ -491,6 +514,7 @@ declare global {
       parseInvoiceWithAI?: (payload: import('../../shared/aiProposal').AIProposalPayload) => Promise<{ success: boolean; data?: ExtractedInvoiceData; error?: string }>;
       cancelAIRequest?: (requestId: string) => Promise<void>;
       listGeminiModels?: (apiKey: string) => Promise<{ success: boolean; error?: string; models?: GeminiModelInfo[] }>;
+      mcp?: import('../../shared/agentTools/bridge').ElectronMcpApi;
     };
   }
 }

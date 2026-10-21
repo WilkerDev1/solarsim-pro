@@ -1,10 +1,9 @@
 import React, { useRef, useState, useMemo } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
 import { PDFColorTheme, PDF_COLOR_THEMES } from '../../constants/pdfThemes';
-import { PDFMergeService } from '../../services/pdfMergeService';
-import { PDFAttachmentStorage } from '../../services/pdfAttachmentStorage';
+import { resolveProposalAttachmentBytes } from '../../services/proposalAttachmentResolver';
+import { exportProposalPdf } from './export/exportProposalPdf';
+import { ProposalAnnexSync } from './annexes/ProposalAnnexSync';
 import { PDFSectionId } from '../../constants/pdfSections';
 import { buildPdfLayout, normalizeSectionOrder } from '../../utils/pdfLayout';
 import { formatProposalDate } from '../../utils/formatDateUtils';
@@ -86,124 +85,16 @@ export const PDFProposalView: React.FC = () => {
     setIsExporting(true);
 
     try {
-      const pageElements = pdfRef.current.querySelectorAll<HTMLElement>('.pdf-page');
-      if (!pageElements || pageElements.length === 0) {
-        setIsExporting(false);
-        return;
-      }
-
-      const pdf = new jsPDF({
-        orientation: 'p',
-        unit: 'mm',
-        format: 'a4',
-        compress: true,
-      });
-
-      const pdfWidth = 210;
-      const pdfHeight = 297;
-
-      // Sandbox contenedor aislado fuera del flujo de scroll e invisible al usuario
-      const sandbox = document.createElement('div');
-      sandbox.style.position = 'fixed';
-      sandbox.style.top = '0px';
-      sandbox.style.left = '0px';
-      sandbox.style.width = '850px';
-      sandbox.style.height = '1202px';
-      sandbox.style.overflow = 'hidden';
-      sandbox.style.zIndex = '-9999'; // Invisible detrás del UI
-      sandbox.style.backgroundColor = '#ffffff';
-      sandbox.style.pointerEvents = 'none';
-      sandbox.style.boxSizing = 'border-box';
-      sandbox.style.margin = '0';
-      sandbox.style.padding = '0';
-      document.body.appendChild(sandbox);
-
-      for (let i = 0; i < pageElements.length; i++) {
-        const pageEl = pageElements[i];
-
-        // Clonar la página y montarla en el sandbox limpio
-        const clone = pageEl.cloneNode(true) as HTMLElement;
-        clone.style.width = '850px';
-        clone.style.height = '1202px';
-        clone.style.minHeight = '1202px';
-        clone.style.maxHeight = '1202px';
-        clone.style.margin = '0';
-        clone.style.padding = '0';
-        clone.style.boxSizing = 'border-box';
-        clone.style.overflow = 'hidden';
-        clone.style.transform = 'none';
-        clone.style.boxShadow = 'none';
-        clone.style.display = 'flex';
-        clone.style.flexDirection = 'column';
-        clone.style.justifyContent = 'space-between';
-
-        sandbox.innerHTML = '';
-        sandbox.appendChild(clone);
-
-        // Delay para estabilización completa de layout, imágenes y fuentes
-        await new Promise((resolve) => setTimeout(resolve, 100));
-
-        const canvas = await html2canvas(clone, {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          allowTaint: true,
-          backgroundColor: '#ffffff',
-          width: 850,
-          height: 1202,
-          windowWidth: 850,
-          windowHeight: 1202,
-          x: 0,
-          y: 0,
-          scrollX: 0,
-          scrollY: 0,
-        });
-
-        const imgData = canvas.toDataURL('image/jpeg', 0.98);
-
-        if (i > 0) {
-          pdf.addPage('a4', 'portrait');
-        }
-
-        pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
-
-        // Explicitly release canvas pixel buffer from memory
-        canvas.width = 0;
-        canvas.height = 0;
-      }
-
-      // Limpiar sandbox del DOM
-      if (document.body.contains(sandbox)) {
-        document.body.removeChild(sandbox);
-      }
-
+      const pages = Array.from(pdfRef.current.querySelectorAll<HTMLElement>('.pdf-page'));
       const sanitizedClientName = (project.client.name || 'Cliente').replace(/[^a-zA-Z0-9_-]/g, '_');
-      const filename = `Propuesta_SolarSim_${sanitizedClientName}.pdf`;
-
       // Comprobar si hay documentos externos adjuntos para fusionar (leído fresco del store)
       const currentProj = useSimulationStore.getState().projects.find((p) => p.id === project.id) || project;
-      const enabledAttachments = currentProj.customization?.attachedPdfs?.filter((att) => att.enabled) || [];
-
-      if (enabledAttachments.length > 0) {
-        const proposalBuffer = pdf.output('arraybuffer');
-        const attachmentsToMerge: { name: string; buffer: ArrayBuffer }[] = [];
-
-        for (const att of enabledAttachments) {
-          const buf = await PDFAttachmentStorage.getAttachment(att.id);
-          if (buf) {
-            attachmentsToMerge.push({ name: att.fileName, buffer: buf });
-          }
-        }
-
-        if (attachmentsToMerge.length > 0) {
-          const mergedBytes = await PDFMergeService.mergeProposalWithAttachments(proposalBuffer, attachmentsToMerge);
-          PDFMergeService.downloadPdfBytes(mergedBytes, filename);
-        } else {
-          pdf.save(filename);
-        }
-      } else {
-        pdf.save(filename);
-      }
+      await exportProposalPdf({
+        pages,
+        fileName: `Propuesta_SolarSim_${sanitizedClientName}.pdf`,
+        attachments: currentProj.customization?.attachedPdfs || [],
+        resolveAttachmentBytes: resolveProposalAttachmentBytes,
+      });
     } catch (err) {
       console.error('Error generating multi-page PDF:', err);
       window.print();
@@ -391,6 +282,8 @@ export const PDFProposalView: React.FC = () => {
             </button>
           </div>
         )}
+
+        <ProposalAnnexSync project={project} />
 
         <div ref={pdfRef} className="flex flex-col gap-8 print:gap-0">
           {effectiveSectionOrder.map((sectionId) => (sectionVisibility[sectionId] ? renderSection(sectionId) : null))}

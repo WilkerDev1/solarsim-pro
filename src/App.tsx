@@ -23,6 +23,7 @@ import { ConfirmDialog } from './components/common/ConfirmDialog';
 import { SplashScreen } from './components/common/SplashScreen';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 const AppAssistant = lazy(() => import('./features/assistant/components/AppAssistant').then(module => ({ default: module.AppAssistant })));
+import { AgentRuntimeHost } from './features/agentTools/AgentRuntimeHost';
 import { draftOwnerKey } from './utils/draftOwnerKey';
 
 export const App: React.FC = () => {
@@ -114,6 +115,7 @@ export const App: React.FC = () => {
       </div>
 
       <AppAssistant />
+      <AgentRuntimeHost key={`agent-runtime-${sessionGeneration}`} />
 
       {/* Global Modals Mounted at Root Level */}
       <ConflictResolutionModal key={`conflict-resolution-${sessionGeneration}`} />

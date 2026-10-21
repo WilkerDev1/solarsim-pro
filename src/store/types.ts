@@ -74,10 +74,15 @@ export interface DefaultSimulationSettings {
   annualEnergyTariffEscalationPct: number;
 }
 
+/** Vistas principales de la aplicación. `clients-hub` lo implementa el directorio de clientes. */
+export type AppView = 'dashboard' | 'simulator' | 'pdf-preview' | 'project-hub' | 'companies-hub' | 'clients-hub';
+/** Pestañas del modal de Ajustes. `agents` agrupa permisos, actividad y conexión MCP. */
+export type SettingsTab = 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare' | 'features' | 'agents';
+
 export interface ProjectSlice {
   projects: ProjectSimulation[];
   activeProjectId: string;
-  activeView: 'dashboard' | 'simulator' | 'pdf-preview' | 'project-hub' | 'companies-hub';
+  activeView: AppView;
   searchQuery: string;
   statusFilter: string;
   defaultSimulationSettings: DefaultSimulationSettings;
@@ -87,7 +92,7 @@ export interface ProjectSlice {
   isTrashActive: boolean;
   setIsTrashActive: (active: boolean) => void;
 
-  setActiveView: (view: 'dashboard' | 'simulator' | 'pdf-preview' | 'project-hub' | 'companies-hub') => void;
+  setActiveView: (view: AppView) => void;
   setActiveProject: (id: string, targetView?: 'simulator' | 'project-hub') => void;
   setSearchQuery: (query: string) => void;
   setStatusFilter: (filter: string) => void;
@@ -213,7 +218,7 @@ export interface UISlice {
   isAIPriceCatalogModalOpen: boolean;
   isShareModalOpen: boolean;
   isSettingsModalOpen: boolean;
-  settingsActiveTab: 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare' | 'features';
+  settingsActiveTab: SettingsTab;
   updateInfo: UpdateInfo;
   saveFeedbackMessage: string | null;
 
@@ -240,9 +245,9 @@ export interface UISlice {
   closeAISettingsModal: () => void;
   openShareModal: () => void;
   closeShareModal: () => void;
-  openSettingsModal: (tab?: 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare' | 'features') => void;
+  openSettingsModal: (tab?: SettingsTab) => void;
   closeSettingsModal: () => void;
-  setSettingsActiveTab: (tab: 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare' | 'features') => void;
+  setSettingsActiveTab: (tab: SettingsTab) => void;
   setUpdateInfo: (info: UpdateInfo) => void;
 
   toggleSidebarTheme: () => void;
