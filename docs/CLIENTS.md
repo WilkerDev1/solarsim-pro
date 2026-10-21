@@ -41,6 +41,8 @@ Las escrituras van a `clientChanges` (revisión + `baseVersion`) y los borrados 
 - Un recibo perdido solo se da por bueno si el contenido del servidor es idéntico.
 - Un borrado obsoleto (409) devuelve el registro del servidor para revisarlo.
 - Los borradores nunca publicados se eliminan sin petición.
+- Con sesión, borrar un cliente publicado no desenlaza sus propuestas hasta que el servidor confirma el borrado (llega en `deletedIds`); un 409 conserva los enlaces. En modo local, o si el cliente nunca se publicó, el desenlace es inmediato.
+- El propietario de un conflicto puede aceptar la versión del servidor aunque haya perdido el permiso de escritura; conservar la local exige ese permiso.
 
 `syncProjectsWithServer` sincroniza los clientes justo después de las carpetas. Como el push acepta ids desconocidos, un fallo de clientes no bloquea las propuestas: el mensaje final indica «clientes pendientes». Los `deletedIds` del servidor desenlazan también las copias locales.
 
