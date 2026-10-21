@@ -11,6 +11,7 @@ export function ClientPicker({
   onCreate,
   label = 'Cliente',
   className = '',
+  collapseWhenEmpty = false,
 }: {
   clients: readonly ClientRecord[];
   selectedId: string | null;
@@ -18,13 +19,16 @@ export function ClientPicker({
   onCreate?: (name: string) => void;
   label?: string;
   className?: string;
+  /** Lists results only while searching, for compact forms. */
+  collapseWhenEmpty?: boolean;
 }) {
   const id = useId();
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState(0);
   const matches = useMemo(() => filterClients(clients, query, 'all').slice(0, 8), [clients, query]);
   const canCreate = !!onCreate && !!query.trim() && !matches.some((c) => c.name.trim().toLowerCase() === query.trim().toLowerCase());
-  const options = [...matches.map((client) => ({ key: client.id, client })), ...(canCreate ? [{ key: '__create', client: null }] : [])];
+  const listed = !collapseWhenEmpty || !!query.trim();
+  const options = !listed ? [] : [...matches.map((client) => ({ key: client.id, client })), ...(canCreate ? [{ key: '__create', client: null }] : [])];
   const choose = (index: number) => {
     const option = options[index];
     if (!option) return;
@@ -59,7 +63,7 @@ export function ClientPicker({
           if (event.key === 'Enter' && options.length) { event.preventDefault(); choose(highlight); }
         }}
       />
-      <ul id={`${id}-list`} role="listbox" aria-label="Clientes encontrados" className="client-picker-list">
+      <ul id={`${id}-list`} role="listbox" aria-label="Clientes encontrados" className="client-picker-list" hidden={!listed}>
         {options.map((option, index) => (
           <li
             key={option.key}

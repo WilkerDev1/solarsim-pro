@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CLIENT_KINDS, CLIENT_LIMITS, findDuplicateClients, type ClientInput } from '../../../shared/clients';
 import { RD_PROVINCES } from '../../data/rdProvinces';
 import type { ClientRecord } from '../../types/client';
@@ -25,6 +25,18 @@ export function ClientForm({
 }) {
   const [value, setValue] = useState<ClientInput>(initial);
   const [error, setError] = useState('');
+  const [remoteChanged, setRemoteChanged] = useState(false);
+  // Incoming records (save receipts, other members) replace a pristine form; a dirty draft is kept and flagged.
+  const previous = useRef(initial);
+  useEffect(() => {
+    if (JSON.stringify(previous.current) === JSON.stringify(initial)) return;
+    setValue((current) => {
+      const pristine = JSON.stringify(current) === JSON.stringify(previous.current);
+      setRemoteChanged(!pristine && JSON.stringify(current) !== JSON.stringify(initial));
+      return pristine ? initial : current;
+    });
+    previous.current = initial;
+  }, [initial]);
   const duplicates = useMemo(
     () => findDuplicateClients(clients, { id: editingId, name: value.name, taxId: value.taxId }),
     [clients, editingId, value.name, value.taxId],
@@ -97,11 +109,16 @@ export function ClientForm({
           Puedes guardar igualmente si es otro cliente.
         </p>
       )}
+      {remoteChanged && dirty && (
+        <p className="cl-notice" role="status" style={{ marginTop: 20 }}>
+          El cliente cambió mientras editabas. Tus cambios se conservan; guárdalos o descártalos para ver la versión actual.
+        </p>
+      )}
       {error && <p className="cl-notice cl-error" role="alert" style={{ marginTop: 20 }}>{error}</p>}
       {!readOnly && (
         <div className="cl-actions">
           {onCancel && <button type="button" onClick={onCancel}>Cancelar</button>}
-          {editingId && dirty && <button type="button" onClick={() => { setValue(initial); setError(''); }}>Descartar cambios</button>}
+          {editingId && dirty && <button type="button" onClick={() => { setValue(initial); setError(''); setRemoteChanged(false); }}>Descartar cambios</button>}
           <button type="submit" className="cl-primary" disabled={!value.name.trim() || (!!editingId && !dirty)}>{submitLabel}</button>
         </div>
       )}

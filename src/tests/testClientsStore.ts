@@ -16,7 +16,7 @@ const proposal = (id: string, extra: Partial<ProjectSimulation> = {}): ProjectSi
 });
 
 store.setState({
-  projects: [proposal('p-local'), proposal('p-trash', { isDeleted: true })],
+  projects: [proposal('p-local'), proposal('p-trash', { isDeleted: true }), proposal('p-conflict', { syncStatus: 'conflict' })],
   clients: [],
   clientChanges: {},
   clientDeletionQueue: [],
@@ -64,6 +64,8 @@ assert.equal(store.getState().linkProposalToClient('p-local', 'unknown-client').
 assert.equal(store.getState().linkProposalToClient('missing', client.id).ok, false);
 assert.equal(store.getState().linkProposalToClient('p-trash', client.id).ok, false, 'Trash is read-only');
 assert.equal(store.getState().projects.find((p) => p.id === 'p-trash')!.clientId, undefined);
+assert.equal(store.getState().linkProposalToClient('p-conflict', client.id).ok, false, 'Conflicts are resolved first');
+assert.equal(store.getState().projects.find((p) => p.id === 'p-conflict')!.syncStatus, 'conflict');
 
 // Deleting a client queues the server command and unlinks proposals without touching printed data.
 store.getState().linkProposalToClient('p-local', second.client.id);

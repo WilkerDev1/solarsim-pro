@@ -4,6 +4,7 @@ import { ClientsHubView } from "../../../src/components/clients/ClientsHubView";
 import { ProjectCard } from "../../../src/components/dashboard/ProjectCard";
 import { ProposalClientSection } from "../../../src/components/clients/ProposalClientLink";
 import { ConfirmDialog } from "../../../src/components/common/ConfirmDialog";
+import { NewProjectModal } from "../../../src/components/common/NewProjectModal";
 import { BENCHMARK_PROJECT } from "../../../src/engine/referenceCase";
 import { useSimulationStore } from "../../../src/store/useSimulationStore";
 import type { ProjectSimulation } from "../../../src/types";
@@ -59,6 +60,7 @@ if (params.get("role") === "lector")
 // Keep the fixture offline: navigation between views only changes local state.
 useSimulationStore.setState({ syncClientsWithServer: async () => ({ success: true, message: "QA" }), triggerAutoSync: () => {} });
 const view = params.get("view");
+if (view === "new") useSimulationStore.setState({ isNewProjectModalOpen: true, createNewProject: () => useSimulationStore.setState({ isNewProjectModalOpen: false }) });
 function Cards() {
   const live = useSimulationStore((s) => s.projects);
   return <>{live.map((p) => <ProjectCard key={p.id} project={p} />)}</>;
@@ -70,7 +72,9 @@ function ProposalSection() {
 const root = createRoot(document.getElementById("root")!);
 root.render(
   <>
-    {view === "cards" ? (
+    {view === "new" ? (
+      <NewProjectModal />
+    ) : view === "cards" ? (
       <div className={`${theme} flex-1 overflow-auto bg-slate-50 p-8 dark:bg-zinc-950`}>
         <div className="grid max-w-5xl grid-cols-3 gap-5">
           <Cards />

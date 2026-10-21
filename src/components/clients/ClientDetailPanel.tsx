@@ -9,6 +9,7 @@ import type { ClientRecord } from '../../types/client';
 import { DOCUMENT_STATUS_LABELS, clientProposals, summarizeClient } from '../../utils/clientSummary';
 import { projectDate } from '../dashboard/projectPresentation';
 import { confirmAction } from '../common/confirmAction';
+import { canEditCommercial } from '../../features/proposals/commercial';
 import { ClientForm } from './ClientForm';
 
 const money = (value: number) =>
@@ -16,7 +17,7 @@ const money = (value: number) =>
 
 /** One client: optional data, linked proposals and the summary of their document and commercial states. */
 export function ClientDetailPanel({ client, readOnly }: { client: ClientRecord; readOnly: boolean }) {
-  const { projects, clients, clientChanges, updateClientRecord, deleteClientRecord, resolveClientConflict, linkProposalToClient, setActiveProject } =
+  const { projects, clients, clientChanges, updateClientRecord, deleteClientRecord, resolveClientConflict, linkProposalToClient, setActiveProject, syncSettings } =
     useSimulationStore();
   const mode = useEnergyCalculationMode();
   const linked = useMemo(() => clientProposals(projects, client.id), [projects, client.id]);
@@ -112,7 +113,7 @@ export function ClientDetailPanel({ client, readOnly }: { client: ClientRecord; 
                         <button type="button" onClick={() => setActiveProject(project.id, 'project-hub')} aria-label={`Abrir ${project.client.name || 'propuesta'}`}>
                           <ArrowUpRight className="h-4 w-4" aria-hidden="true" />Abrir
                         </button>{' '}
-                        {!readOnly && (
+                        {!readOnly && canEditCommercial(project, syncSettings) && (
                           <button type="button" onClick={() => linkProposalToClient(project.id, null)} aria-label={`Quitar enlace de ${project.client.name || 'la propuesta'}`}>
                             <Unlink className="h-4 w-4" aria-hidden="true" />Quitar
                           </button>
@@ -128,7 +129,7 @@ export function ClientDetailPanel({ client, readOnly }: { client: ClientRecord; 
       </section>
 
       <ClientForm
-        key={`${client.id}:${client.version ?? 0}:${conflict ? 'c' : ''}`}
+        key={client.id}
         initial={clientContent(client)}
         clients={clients}
         editingId={client.id}

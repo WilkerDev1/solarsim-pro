@@ -4,12 +4,19 @@ import { canWrite } from '../../../shared/permissions';
 import { CLIENT_KINDS, type ClientKind } from '../../../shared/clients';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { filterClients, linkedProposalCounts } from '../../utils/clientSummary';
+import { draftOwnerKey } from '../../utils/draftOwnerKey';
 import { ClientDetailPanel } from './ClientDetailPanel';
 import { ClientForm, EMPTY_CLIENT } from './ClientForm';
 import './clients-hub.css';
 
-/** Clients directory: search, kind filter, duplicate warnings, detail and linked proposals. */
+/** Drafts belong to one workspace owner: switching account or organization remounts the view and drops them. */
 export function ClientsHubView() {
+  const owner = useSimulationStore((s) => draftOwnerKey(s.workspaceScope, s.syncSettings));
+  return <ClientsHub key={owner} />;
+}
+
+/** Clients directory: search, kind filter, duplicate warnings, detail and linked proposals. */
+function ClientsHub() {
   const {
     clients, projects, sidebarTheme, syncSettings, clientSyncFeedback, activeClientId, setActiveClientId,
     createClientRecord, syncClientsWithServer,

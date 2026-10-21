@@ -127,7 +127,7 @@ export const NewProjectModal: React.FC = () => {
       onClick={closeNewProjectModal}
     >
       <div
-        className={`border rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col scale-100 animate-in zoom-in-95 duration-200 transition-colors z-50 select-text bg-white border-slate-200 text-slate-900 dark:bg-[#18181f] dark:border-[#2e2e3a] dark:text-zinc-100`}
+        className={`border rounded-2xl shadow-2xl w-full max-w-md max-h-[calc(100vh-2rem)] overflow-hidden flex flex-col scale-100 animate-in zoom-in-95 duration-200 transition-colors z-50 select-text bg-white border-slate-200 text-slate-900 dark:bg-[#18181f] dark:border-[#2e2e3a] dark:text-zinc-100`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
@@ -160,7 +160,7 @@ export const NewProjectModal: React.FC = () => {
         </div>
 
         {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs overflow-y-auto min-h-0">
           {/* AI Invoice Scan Shortcut */}
           <div
             onClick={() => {
@@ -209,9 +209,9 @@ export const NewProjectModal: React.FC = () => {
 
           {clients.length > 0 && (
             <div className="client-link-scope client-link-dialog" style={{ width: '100%', boxShadow: 'none', padding: 14, gap: 10 }}>
-              <ClientPicker label="Cliente del directorio (opcional)" clients={clients} selectedId={directoryClient?.id ?? null} onSelect={selectDirectoryClient} />
+              <ClientPicker collapseWhenEmpty label="Cliente del directorio (opcional)" clients={clients} selectedId={directoryClient?.id ?? null} onSelect={selectDirectoryClient} />
               {directoryClient && (
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 400 }}>
+                <label style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 8, fontWeight: 400 }}>
                   <input type="checkbox" checked={linkClient} onChange={(e) => setLinkClient(e.target.checked)} style={{ width: 'auto', minHeight: 0, margin: 0 }} />
                   Enlazar la propuesta a este cliente
                 </label>
