@@ -97,7 +97,7 @@ export function clientContent(client: Partial<ClientInput>): ClientInput {
   };
 }
 
-/** Name key for duplicate warnings: case, accents, punctuation and spacing are immaterial. */
+/** Name key for duplicate warnings: case, accents, punctuation, spacing and a trailing legal suffix are immaterial. */
 export function clientNameKey(name: unknown): string {
   return typeof name === "string"
     ? name
@@ -106,6 +106,8 @@ export function clientNameKey(name: unknown): string {
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, " ")
         .trim()
+        // Dominican legal suffixes do not distinguish two clients.
+        .replace(/\s+(s r l|srl|s a s|sas|e i r l|eirl|s a|sa)$/, "")
     : "";
 }
 

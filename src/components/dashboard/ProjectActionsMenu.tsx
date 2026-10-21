@@ -1,16 +1,19 @@
 import { isReaderRole } from '../../../shared/permissions';
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, Copy, MoreHorizontal, Loader2, Share2, Trash2 } from 'lucide-react';
+import { AlertTriangle, Copy, MoreHorizontal, Loader2, Share2, Trash2, UserRound } from 'lucide-react';
 import { ProjectSimulation } from '../../types';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { confirmAction } from '../common/confirmAction';
+import { ClientLinkDialog } from '../clients/ProposalClientLink';
+import { canEditCommercial } from '../../features/proposals/commercial';
 
 /** Shared document actions. Portal keeps menus outside scrolling tables/cards. */
 export function ProjectActionsMenu({ project }: { project: ProjectSimulation }) {
   const { duplicateProject, deleteProject, setActiveProject, openShareModal, syncSettings, sidebarTheme, openProjectConflict } = useSimulationStore();
   const [conflictError, setConflictError] = useState('');
   const [openingConflict, setOpeningConflict] = useState(false);
+  const [linkingClient, setLinkingClient] = useState(false);
   const [position, setPosition] = useState<{ top: number; right: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -42,7 +45,7 @@ export function ProjectActionsMenu({ project }: { project: ProjectSimulation }) 
       onClick={(event) => {
         event.stopPropagation();
         const rect = event.currentTarget.getBoundingClientRect();
-        setPosition(position ? null : { top: Math.min(rect.bottom + 4, window.innerHeight - (project.syncStatus === 'conflict' ? 200 : 152)), right: Math.max(8, window.innerWidth - rect.right) });
+        setPosition(position ? null : { top: Math.min(rect.bottom + 4, window.innerHeight - (project.syncStatus === 'conflict' ? 248 : 200)), right: Math.max(8, window.innerWidth - rect.right) });
       }}
       className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-white">
       {openingConflict ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden="true" /> : <MoreHorizontal className="h-4 w-4" aria-hidden="true" />}
@@ -70,6 +73,7 @@ export function ProjectActionsMenu({ project }: { project: ProjectSimulation }) 
             if (!result.success) setConflictError(result.error || 'No se pudo abrir el conflicto.');
           }}><AlertTriangle className="h-4 w-4 text-amber-600" />Resolver conflicto</button>}
           <button role="menuitem" type="button" disabled={readOnly} className={actionClass} onClick={() => { close(); setActiveProject(project.id); openShareModal(); }}><Share2 className="h-4 w-4" />Compartir web</button>
+          <button role="menuitem" type="button" disabled={!canEditCommercial(project, syncSettings)} className={actionClass} onClick={() => { close(); setLinkingClient(true); }}><UserRound className="h-4 w-4" />{project.clientId ? 'Cambiar cliente' : 'Enlazar cliente'}</button>
           <button role="menuitem" type="button" disabled={readOnly} className={actionClass} onClick={() => { close(); duplicateProject(project.id); }}><Copy className="h-4 w-4" />Duplicar</button>
           <button role="menuitem" type="button" disabled={readOnly} className={`${actionClass} !text-rose-700 dark:!text-rose-400`} onClick={async () => {
             close();
@@ -77,5 +81,6 @@ export function ProjectActionsMenu({ project }: { project: ProjectSimulation }) 
           }}><Trash2 className="h-4 w-4" />Mover a papelera</button>
         </div>
       </div>, document.body)}
+    {linkingClient && <ClientLinkDialog project={project} onClose={() => setLinkingClient(false)} />}
   </>;
 }

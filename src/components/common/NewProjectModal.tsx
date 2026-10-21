@@ -8,9 +8,12 @@ import {
   getDistributorTariffOptions,
   mapTariffCodeOnDistributorChange,
 } from '../../types/tariffs';
+import { ClientPicker } from '../clients/ClientPicker';
+import type { ClientRecord } from '../../types/client';
+import '../clients/client-link.css';
 
 export const NewProjectModal: React.FC = () => {
-  const { isNewProjectModalOpen, closeNewProjectModal, createNewProject, openAIInvoiceModal, sidebarTheme } = useSimulationStore();
+  const { isNewProjectModalOpen, closeNewProjectModal, createNewProject, openAIInvoiceModal, sidebarTheme, clients, linkProposalToClient, updateClient } = useSimulationStore();
   const isDark = sidebarTheme === 'dark';
 
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -22,6 +25,8 @@ export const NewProjectModal: React.FC = () => {
   const [address, setAddress] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [error, setError] = useState('');
+  const [directoryClient, setDirectoryClient] = useState<ClientRecord | null>(null);
+  const [linkClient, setLinkClient] = useState(true);
 
   useEffect(() => {
     if (isNewProjectModalOpen) {
@@ -33,6 +38,8 @@ export const NewProjectModal: React.FC = () => {
       setAddress('');
       setShowAdvanced(false);
       setError('');
+      setDirectoryClient(null);
+      setLinkClient(true);
 
       // Auto focus on next tick to ensure input is ready
       const timer = setTimeout(() => {
@@ -93,6 +100,25 @@ export const NewProjectModal: React.FC = () => {
       tariffCode,
       address: address.trim() || `${province}, República Dominicana`,
     });
+    // The directory only pre-fills printed data; the proposal keeps its own editable copy.
+    if (directoryClient) {
+      const contact = {
+        ...(directoryClient.taxId ? { rnc: directoryClient.taxId } : {}),
+        ...(directoryClient.phone ? { contactPhone: directoryClient.phone } : {}),
+        ...(directoryClient.email ? { contactEmail: directoryClient.email } : {}),
+      };
+      if (Object.keys(contact).length) updateClient(contact);
+      if (linkClient) linkProposalToClient(useSimulationStore.getState().activeProjectId, directoryClient.id);
+    }
+  };
+  const selectDirectoryClient = (client: ClientRecord | null) => {
+    setDirectoryClient(client);
+    if (!client) return;
+    setName(client.name);
+    setCompany(client.kind === 'empresa' ? client.name : '');
+    if (client.province && RD_PROVINCES.some((p) => p.name === client.province)) handleProvinceChange(client.province);
+    setAddress(client.address);
+    setError('');
   };
 
   return (
@@ -178,6 +204,19 @@ export const NewProjectModal: React.FC = () => {
             >
               <span>⚠️</span>
               <span>{error}</span>
+            </div>
+          )}
+
+          {clients.length > 0 && (
+            <div className="client-link-scope client-link-dialog" style={{ width: '100%', boxShadow: 'none', padding: 14, gap: 10 }}>
+              <ClientPicker label="Cliente del directorio (opcional)" clients={clients} selectedId={directoryClient?.id ?? null} onSelect={selectDirectoryClient} />
+              {directoryClient && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 400 }}>
+                  <input type="checkbox" checked={linkClient} onChange={(e) => setLinkClient(e.target.checked)} style={{ width: 'auto', minHeight: 0, margin: 0 }} />
+                  Enlazar la propuesta a este cliente
+                </label>
+              )}
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--clk-muted)' }}>Rellena los datos impresos, que podrás editar después.</p>
             </div>
           )}
 
