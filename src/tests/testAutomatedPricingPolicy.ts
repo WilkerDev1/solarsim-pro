@@ -9,6 +9,8 @@ import { calculateFinancialSummary, resolveAnnualDegradationPct } from '../engin
 import { DEFAULT_SIMULATION_SETTINGS, migrateDefaultSimulationSettings } from '../store/defaultSimulationSettings';
 import { useSimulationStore } from '../store/useSimulationStore';
 import { ASSISTANT_EDITABLE_FIELDS } from '../features/assistant/validation';
+import { catalogPanelGroupPatch } from '../utils/catalogGroupPatch';
+import { assistantOwner, executeAssistantTool, applyAssistantAction } from '../features/assistant/tools';
 
 // 1. Policy helper: automation always quotes in Simple (catalog) mode with the cost matrix.
 assert.deepEqual(AUTOMATED_PRICING, { isDetailed: false, pricingMode: 'cost_matrix' });
@@ -72,5 +74,29 @@ assert.equal(resolveAnnualDegradationPct({ ...groupSpecs, isDetailed: true, annu
 for (const field of ['isDetailed', 'pricingMode', 'pricePerWattUSD', 'pricePerKWpUSD', 'directPriceSurplusTarget']) {
   assert(!ASSISTANT_EDITABLE_FIELDS.specs.includes(field), `${field} is not agent-editable`);
 }
+
+// 8. Selecting another catalog panel replaces model-specific values (no stale degradation in Simple mode).
+const fast = { ...panel, id: 'p-fast', displayName: 'Panel rápido', powerW: 600, annualDegradation: 0.8, efficiencyPct: 21 };
+const slow = { ...panel, id: 'p-slow', displayName: 'Panel lento', powerW: 600, annualDegradation: 0.25, efficiencyPct: undefined };
+const group = { id: 'g', count: 10, ...catalogPanelGroupPatch(fast) };
+const switched = { ...group, ...catalogPanelGroupPatch(slow) };
+assert.equal(switched.annualDegradation, 0.25);
+assert.equal(switched.efficiencyPct, undefined, 'missing catalog values do not inherit the previous model');
+assert.equal(resolveAnnualDegradationPct({ ...BENCHMARK_PROJECT.specs, isDetailed: false, panels: [switched] }), 0.25);
+
+// 9. General-assistant pricing edits on a per-W proposal also move it to the cost matrix, visibly in the plan.
+const perWProject = { ...structuredClone(BENCHMARK_PROJECT), id: 'perw', syncStatus: 'local_only' as const,
+  specs: { ...structuredClone(BENCHMARK_PROJECT.specs), isDetailed: true, pricingMode: 'direct_watt' as const } };
+useSimulationStore.setState({ appAssistantEnabled: true, workspaceScope: 'local', projects: [perWProject], activeProjectId: perWProject.id,
+  activeView: 'simulator', syncSettings: { ...state.syncSettings, currentUser: null, authToken: null, autoSyncEnabled: false }, sessionGeneration: 0 });
+const owner = assistantOwner();
+const plan = executeAssistantTool({ name: 'propose_project_update', args: { id: perWProject.id, edits: [{ section: 'specs', field: 'saleMarginMultiplier', value: 1.3 }] } }, owner).action!;
+assert(plan.edits.some((e) => e.field === 'pricingMode' && e.value === 'cost_matrix'), 'the confirmation shows the pricing change');
+applyAssistantAction(plan);
+const updated = useSimulationStore.getState().getActiveProject();
+assert.equal(updated.specs.pricingMode, 'cost_matrix');
+assert.equal(updated.specs.isDetailed, false);
+const clientOnly = executeAssistantTool({ name: 'propose_project_update', args: { id: perWProject.id, edits: [{ section: 'client', field: 'contactPhone', value: '809-000-0000' }] } }, owner).action!;
+assert(!clientOnly.edits.some((e) => e.field === 'pricingMode'), 'non-pricing edits leave the mode untouched');
 
 console.log('PASS: automated proposals quote in catalog mode with the cost matrix; defaults migrate; degradation follows the catalog.');
