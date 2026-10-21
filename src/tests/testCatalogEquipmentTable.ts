@@ -43,4 +43,9 @@ assert.match(rows[3], /pendientes de resolver/);
 assert.match(rows[3], /Usar servidor/);
 assert.match(rows[3], /Guardar copia/);
 assert.ok(rows.slice(0, 3).every(row => /Editar/.test(row) && /aria-label="Eliminar /.test(row)));
-console.log('Catalog equipment table rows, offers, nominal values and conflict row passed.');
+// Preview icon in the "Equipo / modelo" cell: opens the gallery only when the model has assets.
+assert.ok(rows.slice(0, 3).every(row => /data-preview-status=/.test(row)), 'Every model shows a preview icon');
+assert.match(rows[0], /aria-label="Ver imágenes y ficha técnica de QA Panel 600"/);
+assert.match(rows[1], /aria-label="Ver imágenes y ficha técnica de QA Inversor 8K"/);
+assert.doesNotMatch(rows[2], /Ver imágenes y ficha técnica/, 'Without assets the type icon is not a button');
+console.log('Catalog equipment table rows, offers, nominal values, conflict row and preview icons passed.');

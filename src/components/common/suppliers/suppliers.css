@@ -365,6 +365,16 @@
   margin-top: 4px;
   line-height: 1.5;
 }
+.supplier-model-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.supplier-model .equipment-preview-thumb {
+  display: flex;
+  margin-top: 0;
+  color: var(--sp-green);
+}
 .supplier-model .supplier-note {
   max-width: 45ch;
 }

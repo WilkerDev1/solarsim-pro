@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { SolarEquipmentItem, EquipmentType } from '../../../types/equipment';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { EquipmentPreviewThumb } from '../../common/equipment/EquipmentPreviewThumb';
 import { Search, ChevronDown, Check, Sparkles, Sun, Zap, BatteryCharging, X, Layers, Building2, DollarSign } from 'lucide-react';
 
 interface SearchableEquipmentSelectProps {
@@ -352,6 +353,7 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
                         : 'hover:bg-slate-100 text-slate-800'
                     }`}
                   >
+                    <EquipmentPreviewThumb item={item} size={32} />
                     <div className="flex-1 min-w-0 pr-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span
