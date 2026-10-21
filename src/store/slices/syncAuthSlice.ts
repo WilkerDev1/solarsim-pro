@@ -222,6 +222,9 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
     try {
       const folders = await get().syncFoldersWithServer();
       ensureCurrent();
+      // Clients are independent records: unknown ids are accepted by the push, so their errors never block proposals.
+      const clients = await get().syncClientsWithServer();
+      ensureCurrent();
       // Folder errors must not prevent downloading independent project updates.
       const pull = await SyncService.pullProjects(serverUrl, token());
       ensureCurrent();
@@ -324,7 +327,7 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
       const pendingConfirmations = get().projects.filter(project => project.pendingCanonicalAck && ownsProject(project, serverUrl, currentUser.organizationId)).length;
       const unresolvedConflicts = get().projects.filter(project => project.syncStatus === 'conflict' && ownsProject(project, serverUrl, currentUser.organizationId)).length;
       conflicts = Math.max(conflicts, unresolvedConflicts);
-      const message = !folders.success ? `Proyectos descargados; carpetas pendientes: ${folders.message}` : pendingConfirmations ? `${pendingConfirmations} documento(s) guardados en la nube, pendientes de verificar. Vuelve a sincronizar.` : deletionErrors ? `${deletionErrors} eliminación(es) pendientes de confirmar; otros proyectos procesados.` : conflicts ? `${conflicts} proyecto(s) requieren resolver conflictos.` : 'Sincronización completada.';
+      const message = !folders.success ? `Proyectos descargados; carpetas pendientes: ${folders.message}` : pendingConfirmations ? `${pendingConfirmations} documento(s) guardados en la nube, pendientes de verificar. Vuelve a sincronizar.` : deletionErrors ? `${deletionErrors} eliminación(es) pendientes de confirmar; otros proyectos procesados.` : conflicts ? `${conflicts} proyecto(s) requieren resolver conflictos.` : !clients.success ? `Proyectos sincronizados; clientes pendientes: ${clients.message}` : 'Sincronización completada.';
       set((state) => ({ isSyncing: false, syncFeedbackMessage: silent ? null : message, syncSettings: { ...state.syncSettings, lastSyncTimestamp: deletionErrors ? state.syncSettings.lastSyncTimestamp : pull.serverTimestamp || state.syncSettings.lastSyncTimestamp } }));
       if (folders.success && (get().projects.some((project) => project.syncStatus === 'pending' && !project.pendingCanonicalAck && ownsProject(project, serverUrl, currentUser.organizationId)) || (!deletionErrors && get().projectDeletionQueue.some((command) => command.scope === scope)))) get().triggerAutoSync();
       return { success: folders.success && conflicts === 0 && deletionErrors === 0 && pendingConfirmations === 0, message };

@@ -96,3 +96,33 @@ export function clientContent(client: Partial<ClientInput>): ClientInput {
     notes: client.notes ?? "",
   };
 }
+
+/** Name key for duplicate warnings: case, accents, punctuation and spacing are immaterial. */
+export function clientNameKey(name: unknown): string {
+  return typeof name === "string"
+    ? name
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim()
+    : "";
+}
+
+/** Existing clients that share the tax id or the normalized name; a warning, never a uniqueness rule. */
+export function findDuplicateClients<T extends { id: string; name: string; taxId?: string }>(
+  clients: readonly T[],
+  candidate: { id?: string; name?: string; taxId?: string },
+): { client: T; reason: "taxId" | "name" }[] {
+  const taxId = normalizeTaxId(candidate.taxId);
+  const name = clientNameKey(candidate.name);
+  const matches: { client: T; reason: "taxId" | "name" }[] = [];
+  for (const client of clients) {
+    if (client.id === candidate.id) continue;
+    if (taxId && normalizeTaxId(client.taxId) === taxId)
+      matches.push({ client, reason: "taxId" });
+    else if (name && clientNameKey(client.name) === name)
+      matches.push({ client, reason: "name" });
+  }
+  return matches;
+}

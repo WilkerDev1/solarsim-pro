@@ -17,6 +17,9 @@ const keys = [
   "folders",
   "folderChanges",
   "folderDeletionQueue",
+  "clients",
+  "clientChanges",
+  "clientDeletionQueue",
   "equipmentCatalog",
   "deletedEquipmentIds",
   "equipmentChanges",
@@ -57,6 +60,9 @@ export function emptyWorkspace(): OrganizationWorkspace {
     folders: [],
     folderChanges: {},
     folderDeletionQueue: [],
+    clients: [],
+    clientChanges: {},
+    clientDeletionQueue: [],
     equipmentCatalog: DEFAULT_EQUIPMENT_CATALOG,
     deletedEquipmentIds: [],
     equipmentChanges: {},
@@ -296,6 +302,9 @@ export function changeWorkspace(
     ...workspace,
     folderChanges: workspace.folderChanges || {},
     folderDeletionQueue: workspace.folderDeletionQueue || [],
+    clients: workspace.clients || [],
+    clientChanges: workspace.clientChanges || {},
+    clientDeletionQueue: workspace.clientDeletionQueue || [],
     folders: workspace.folders.filter(
       (f) =>
         f.visibility !== "private" ||
@@ -313,6 +322,7 @@ export function changeWorkspace(
         : null,
       activeTeamMemberFilter: null,
       folderSyncFeedback: null,
+      clientSyncFeedback: null,
       workspaceScope: initialized.workspaceScope,
       organizationWorkspaces: {
         ...initialized.organizationWorkspaces,
@@ -331,6 +341,8 @@ export function changeWorkspace(
     workspaceScope: nextScope,
     organizationWorkspaces: archives,
     activeFolderId: null,
+    activeClientId: null,
+    clientSyncFeedback: null,
     activeConflict: null,
     pendingImportConflict: null,
     undoStack: [],

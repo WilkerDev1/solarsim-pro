@@ -7,7 +7,7 @@ export function contentEqual(left: unknown, right: unknown): boolean {
     : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => [key, canonical(item)])) : value;
   return JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
 }
-const sections = { client: 'Cliente', specs: 'Equipos', rates: 'Tarifas', financials: 'Finanzas', monthlyConsumption: 'Consumo mensual', customization: 'Documento', status: 'Estado', isDeleted: 'Papelera', folderId: 'Organización', companyProfileId: 'Empresa emisora', commercial: 'Seguimiento comercial', proposalLink: 'Grupo de propuestas' };
+const sections = { client: 'Cliente', specs: 'Equipos', rates: 'Tarifas', financials: 'Finanzas', monthlyConsumption: 'Consumo mensual', customization: 'Documento', status: 'Estado', isDeleted: 'Papelera', folderId: 'Organización', clientId: 'Cliente vinculado', companyProfileId: 'Empresa emisora', commercial: 'Seguimiento comercial', proposalLink: 'Grupo de propuestas' };
 const labels: Record<string, string> = {
   note: 'Nota comercial', ownerName: 'Responsable comercial', ownerId: 'Responsable (ID)',
   name: 'Nombre', address: 'Dirección', company: 'Empresa', projectId: 'Código de propuesta', province: 'Provincia', email: 'Correo electrónico', phone: 'Teléfono',
@@ -15,7 +15,7 @@ const labels: Record<string, string> = {
   energyCostPerKWh: 'Precio de energía', distributor: 'Distribuidora', tariffCode: 'Tarifa', currency: 'Moneda', exchangeRate: 'Tasa de cambio',
   annualConsumption: 'Consumo anual', inverterCount: 'Cantidad de inversores', inverterPowerKW: 'Potencia del inversor (kW)', applyLey5707: 'Incentivos Ley 57-07',
   customITBISSavedUSD: 'ITBIS exonerado personalizado (USD)', customLey5707CreditUSD: 'Crédito fiscal personalizado (USD)', customCostUSD: 'Inversión personalizada (USD)',
-  applyITBISExemption: 'Exoneración ITBIS', monthlyConsumption: 'Consumo mensual', isDeleted: 'En papelera', status: 'Estado', folderId: 'Carpeta', companyProfileId: 'Empresa emisora',
+  applyITBISExemption: 'Exoneración ITBIS', monthlyConsumption: 'Consumo mensual', isDeleted: 'En papelera', status: 'Estado', folderId: 'Carpeta', clientId: 'Cliente vinculado', companyProfileId: 'Empresa emisora',
 };
 function format(value: unknown): string {
   if (value === undefined || value === null) return 'Sin valor';
