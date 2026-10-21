@@ -74,6 +74,11 @@ assert.equal(
   serializeEditableDom(root),
   'La **Ley** y **pesada** *cursiva*\nSegunda línea\n\n- uno\n- **dos**\n\nFin\nde texto',
 );
+// Partial-word emphasis survives the DOM → markdown → render round trip.
+assert.equal(serializeEditableDom(el('div', [el('i', [text('solar')]), text('es')])), '*solar*es');
+assert.ok(renderRichTextHtml('*solar*es').includes('<em>solar</em>es'));
+assert.ok(renderRichTextHtml('pane*les sol*ares').includes('pane<em>les sol</em>ares'));
+assert.equal(renderRichTextHtml('Sistema 5*3 y 2*4').includes('<em>'), false, 'Digits keep asterisks literal');
 // Adjacent bold runs merge and whitespace inside markers moves outside.
 assert.equal(serializeEditableDom(el('div', [el('b', [text('Hola ')]), el('b', [text('mundo')])])), '**Hola mundo**');
 assert.equal(serializeEditableDom(el('div', [text('a'), el('b', [text(' b ')]), text('c')])), 'a **b** c');

@@ -271,6 +271,8 @@ assert.equal(compared, 26 * Object.keys(FIXTURES).length);
   const project = FIXTURES.custom;
   const ctx = buildDocumentTextContext(project, summary, { currentDateStr: 'hoy' });
   assert.equal(templatizeText('Propuesta para CENTRO MEDICO HISPANICO (Ing. Pérez, 809-222-3344)', { ...ctx, clientContactPerson: 'Ing. Pérez', clientPhone: '809-222-3344' }), 'Propuesta para {clientName} ({contactName}, {clientPhone})');
+  // Only complete values are replaced: a client called "Sol" must not touch "Canadian Solar".
+  assert.equal(templatizeText('Sol: Canadian Solar para (Sol).', { ...ctx, clientName: 'Sol' }), '{clientName}: Canadian Solar para ({clientName}).');
   const withName = applyDocumentTextPatch(project, documentTextPatch('projectDescription.subtitle', 'Dimensionamiento para CENTRO MEDICO HISPANICO', project, ctx));
   const { patch, skipped } = companyTemplateTextPatch(['projectDescription.subtitle', 'client.contact', 'quotation.warranty.inverter', 'techIntro.whatIs'], withName, ctx);
   assert.equal(patch.projectSummarySubtitle, 'Dimensionamiento para {clientName}');

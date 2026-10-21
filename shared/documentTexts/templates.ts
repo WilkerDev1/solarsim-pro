@@ -22,7 +22,10 @@ export function templatizeText(text: string, ctx: DocumentTextContext): string {
   // Los valores más largos primero, para no partir un nombre que contiene a otro.
   replacements.sort((a, b) => b[0].length - a[0].length);
   let result = text;
-  for (const [literal, placeholder] of replacements) result = result.replace(new RegExp(escapeRegExp(literal), 'g'), placeholder);
+  // Solo valores completos: el cliente «Sol» no debe convertir «Solar» en «{clientName}ar».
+  for (const [literal, placeholder] of replacements) {
+    result = result.replace(new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(literal)}(?![\\p{L}\\p{N}])`, 'gu'), placeholder);
+  }
   return result;
 }
 

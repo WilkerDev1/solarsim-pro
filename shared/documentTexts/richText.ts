@@ -1,8 +1,8 @@
 /**
  * Texto enriquecido del documento: un subconjunto de Markdown que se guarda como string.
  *
- * - `**negrita**` y `*cursiva*` (la cursiva exige marcadores pegados al texto, así que
- *   textos heredados como `* Precios en USD *` siguen siendo literales);
+ * - `**negrita**` y `*cursiva*` (también dentro de una palabra; la cursiva exige marcadores
+ *   pegados al texto, así que textos heredados como `* Precios en USD *` siguen siendo literales);
  * - viñetas con `- ` (o `• `) al inicio de la línea;
  * - párrafos separados por una línea en blanco y saltos de línea simples.
  *
@@ -30,7 +30,9 @@ export interface SanitizeOptions {
 
 const BULLET_LINE = /^\s*(?:-|•)\s+(.*)$/;
 const BOLD = /\*\*((?:\*[^*\n]+\*|[^*\n])+?)\*\*/g;
-const ITALIC = /(?<![\p{L}\p{N}*])\*(?![\s*])([^*\n]*?[^\s*]|[^\s*])\*(?![\p{L}\p{N}*])/gu;
+// Cursiva dentro de palabras («*solar*es») como en CommonMark; los marcadores separados por espacios
+// («* Precios en USD *») o pegados a cifras («5*3») siguen siendo literales.
+const ITALIC = /(?<![\p{N}*])\*(?![\s*])([^*\n]*?[^\s*]|[^\s*])\*(?![\p{N}*])/gu;
 
 function parseItalic(text: string, bold: boolean): RichInline[] {
   const out: RichInline[] = [];
