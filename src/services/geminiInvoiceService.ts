@@ -1,7 +1,7 @@
 import type { ExtractedInvoiceData, GeminiModelInfo } from '../types/aiInvoice';
 import type { AIProposalPayload } from '../../shared/aiProposal';
 import { buildProposalRequest } from '../../shared/aiProposal';
-import { GEMINI_API_BASE, DEFAULT_GEMINI_MODEL, requestGeminiJson, geminiResponseText } from '../../shared/geminiTransport';
+import { GEMINI_API_BASE, requestGeminiJson, geminiResponseText } from '../../shared/geminiTransport';
 import { processExtractedInvoice } from '../utils/aiProposalNormalization';
 
 // Presets are documented endpoints; quotas depend on the account, not this list.
@@ -28,13 +28,6 @@ export async function fetchAvailableGeminiModels(apiKey:string):Promise<{success
   } catch(error:any) {return {success:false,error:error?.message || 'No se pudo consultar Gemini.',models:DEFAULT_POPULAR_MODELS};}
   finally {clearTimeout(timer);}
 }
-export async function validateGeminiApiKey(apiKey:string,model=DEFAULT_GEMINI_MODEL):Promise<{success:boolean;error?:string;modelName?:string;models?:GeminiModelInfo[]}> {
-  const result=await fetchAvailableGeminiModels(apiKey);
-  if(!result.success) return result;
-  const matched=result.models.find(m=>m.id===model.replace(/^models\//,''));
-  if(!matched) return {success:false,error:`La clave es válida, pero el modelo ${model} no está disponible para esta cuenta. Selecciona uno de la lista.`,models:result.models};
-  return {success:true,modelName:matched.name,models:result.models};
-}
 export type ParseProposalOptions=AIProposalPayload & {apiKey:string;onProgress?:(status:string)=>void;signal?:AbortSignal};
 /** Same prompt, transport policy and deterministic grounding in browser and Electron. */
 export async function parseProposalWithAI(payload:ParseProposalOptions, signal?:AbortSignal):Promise<ExtractedInvoiceData> {
@@ -43,4 +36,3 @@ export async function parseProposalWithAI(payload:ParseProposalOptions, signal?:
   payload.onProgress?.('Validando equipos, cantidades y datos del suministro…');
   return processExtractedInvoice(geminiResponseText(result.response),payload,result);
 }
-export const parseInvoiceWithGemini=parseProposalWithAI;

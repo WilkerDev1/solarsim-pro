@@ -1,1 +1,0 @@
-export { PROPOSAL_SYSTEM_INSTRUCTION as INVOICE_EXTRACTION_SYSTEM_INSTRUCTION } from '../../shared/aiProposal';

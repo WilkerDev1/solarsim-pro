@@ -1,3 +1,4 @@
+import { isWriterRole } from '../../../shared/permissions';
 import { useMemo, useState } from "react";
 import { ArrowLeft, MapPin, Share2, FileText } from "lucide-react";
 import { useSimulationStore } from "../../store/useSimulationStore";
@@ -122,7 +123,7 @@ export const ProjectHubView = () => {
         <div className="summary-warning" role="status">
           Esta propuesta está en la papelera y es de solo lectura.
           {(!syncSettings.currentUser ||
-            ["ADMIN", "EDITOR"].includes(syncSettings.currentUser.role)) && (
+            isWriterRole(syncSettings.currentUser.role)) && (
             <button onClick={() => restoreProject(project.id)}>
               Restaurar propuesta
             </button>

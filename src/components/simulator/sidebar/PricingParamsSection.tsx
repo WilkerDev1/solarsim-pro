@@ -1,4 +1,5 @@
 import React from 'react';
+import { resolveProjectEquipment, supplierQuotesItem } from '../../../utils/equipmentMatchingUtils';
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs } from '../../../types';
 import { SolarEquipmentItem, EquipmentSupplierPrice } from '../../../types/equipment';
 import { useSimulationStore } from '../../../store/useSimulationStore';
@@ -24,85 +25,23 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
 }) => {
   const { equipmentCatalog, openSupplierPriceModal } = useSimulationStore();
 
-  // Helper resiliente para resolver el equipo del catálogo asociado al proyecto
-  const resolveEquipment = (
-    type: 'panel' | 'inverter' | 'battery',
-    modelName?: string,
-    powerOrCap?: number,
-    supplierPriceId?: string
-  ): SolarEquipmentItem | undefined => {
-    if (!equipmentCatalog || equipmentCatalog.length === 0) return undefined;
 
-    // 1. Coincidencia exacta por displayName
-    if (modelName) {
-      const exact = equipmentCatalog.find((e) => e.type === type && e.displayName === modelName);
-      if (exact) return exact;
-    }
-
-    // 2. Coincidencia por supplierPriceId asignado al proyecto
-    if (supplierPriceId) {
-      const byPrice = equipmentCatalog.find(
-        (e) => e.type === type && e.supplierPrices?.some((sp) => sp.id === supplierPriceId)
-      );
-      if (byPrice) return byPrice;
-    }
-
-    // 3. Coincidencia normalizada sin caracteres especiales
-    if (modelName) {
-      const normModel = modelName.toLowerCase().replace(/[^a-z0-9]/g, '');
-      const byNorm = equipmentCatalog.find((e) => {
-        if (e.type !== type) return false;
-        const normE = e.displayName.toLowerCase().replace(/[^a-z0-9]/g, '');
-        return normE === normModel || normE.includes(normModel) || normModel.includes(normE);
-      });
-      if (byNorm) return byNorm;
-
-      // Especial para Baterías: "HinaESS" o "PowerGem"
-      if (type === 'battery' && (normModel.includes('hina') || normModel.includes('powergem'))) {
-        const hinaMatch = equipmentCatalog.find(
-          (e) => e.type === 'battery' && (e.brand.toLowerCase().includes('hina') || e.displayName.toLowerCase().includes('hina'))
-        );
-        if (hinaMatch) return hinaMatch;
-      }
-    }
-
-    // 4. Coincidencia por especificación técnica (W / kW / kWh)
-    if (powerOrCap && powerOrCap > 0) {
-      if (type === 'battery') {
-        const byCap = equipmentCatalog.find(
-          (e) => e.type === 'battery' && e.capacityKWh && Math.abs(e.capacityKWh - powerOrCap) <= 0.5
-        );
-        if (byCap) return byCap;
-      } else if (type === 'panel') {
-        const byPower = equipmentCatalog.find(
-          (e) => e.type === 'panel' && e.powerW && Math.abs(e.powerW - powerOrCap) <= 5
-        );
-        if (byPower) return byPower;
-      } else if (type === 'inverter') {
-        const byPower = equipmentCatalog.find(
-          (e) => e.type === 'inverter' && e.powerKW && Math.abs(e.powerKW - powerOrCap) <= 0.5
-        );
-        if (byPower) return byPower;
-      }
-    }
-
-    // 5. Fallback al primer equipo disponible del catálogo para este tipo
-    return equipmentCatalog.find((e) => e.type === type);
-  };
-
-  const selectedPanel = resolveEquipment(
+  const selectedPanel = resolveProjectEquipment(
+    equipmentCatalog,
     'panel',
     project.specs.panelBrandModel,
     project.specs.panelPowerW,
     project.specs.selectedSupplierInfo?.panel?.supplierPriceId
   );
-  const selectedInverter = resolveEquipment(
+  const selectedInverter = resolveProjectEquipment(
+    equipmentCatalog,
     'inverter',
     project.specs.inverterBrandModel,
     project.specs.inverterPowerKW,
     project.specs.selectedSupplierInfo?.inverter?.supplierPriceId
   );
-  const selectedBattery = resolveEquipment(
+  const selectedBattery = resolveProjectEquipment(
+    equipmentCatalog,
     'battery',
     project.specs.batteryBrandModel,
     project.specs.batteryCapacityKWh,
@@ -121,26 +60,11 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
   const hasAnySupplierPrices = panelSuppliersCount > 0 || inverterSuppliersCount > 0 || (project.specs.hasBattery && batterySuppliersCount > 0);
 
   // 🏷️ Verificar correspondencia: el proveedor asignado debe existir en el catálogo
-  const panelSupplierMatches = !!selectedPanel?.supplierPrices?.some(
-    (sp: EquipmentSupplierPrice) =>
-      (project.specs.selectedSupplierInfo?.panel?.supplierPriceId && sp.id === project.specs.selectedSupplierInfo.panel.supplierPriceId) ||
-      (project.specs.selectedSupplierInfo?.panel?.supplierName &&
-        sp.supplierName.toLowerCase().trim() === project.specs.selectedSupplierInfo.panel.supplierName.toLowerCase().trim())
-  );
+  const panelSupplierMatches = supplierQuotesItem(selectedPanel, project.specs.selectedSupplierInfo?.panel);
 
-  const inverterSupplierMatches = !!selectedInverter?.supplierPrices?.some(
-    (sp: EquipmentSupplierPrice) =>
-      (project.specs.selectedSupplierInfo?.inverter?.supplierPriceId && sp.id === project.specs.selectedSupplierInfo.inverter.supplierPriceId) ||
-      (project.specs.selectedSupplierInfo?.inverter?.supplierName &&
-        sp.supplierName.toLowerCase().trim() === project.specs.selectedSupplierInfo.inverter.supplierName.toLowerCase().trim())
-  );
+  const inverterSupplierMatches = supplierQuotesItem(selectedInverter, project.specs.selectedSupplierInfo?.inverter);
 
-  const batterySupplierMatches = !!selectedBattery?.supplierPrices?.some(
-    (sp: EquipmentSupplierPrice) =>
-      (project.specs.selectedSupplierInfo?.battery?.supplierPriceId && sp.id === project.specs.selectedSupplierInfo.battery.supplierPriceId) ||
-      (project.specs.selectedSupplierInfo?.battery?.supplierName &&
-        sp.supplierName.toLowerCase().trim() === project.specs.selectedSupplierInfo.battery.supplierName.toLowerCase().trim())
-  );
+  const batterySupplierMatches = supplierQuotesItem(selectedBattery, project.specs.selectedSupplierInfo?.battery);
 
   // Limpieza protectora de proveedores huérfanos solo si el proveedor no existe en ningún equipo del catálogo
   React.useEffect(() => {
@@ -151,36 +75,21 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
     const cleanedInfo = { ...info };
 
     if (info.panel && !panelSupplierMatches) {
-      const existsInCatalog = equipmentCatalog.some((e) =>
-        e.type === 'panel' && e.supplierPrices?.some((sp) =>
-          (info.panel?.supplierPriceId && sp.id === info.panel.supplierPriceId) ||
-          (info.panel?.supplierName && sp.supplierName.toLowerCase().trim() === info.panel.supplierName.toLowerCase().trim())
-        )
-      );
+      const existsInCatalog = equipmentCatalog.some((e) => e.type === 'panel' && supplierQuotesItem(e, info.panel));
       if (!existsInCatalog) {
         delete cleanedInfo.panel;
         needsCleanup = true;
       }
     }
     if (info.inverter && !inverterSupplierMatches) {
-      const existsInCatalog = equipmentCatalog.some((e) =>
-        e.type === 'inverter' && e.supplierPrices?.some((sp) =>
-          (info.inverter?.supplierPriceId && sp.id === info.inverter.supplierPriceId) ||
-          (info.inverter?.supplierName && sp.supplierName.toLowerCase().trim() === info.inverter.supplierName.toLowerCase().trim())
-        )
-      );
+      const existsInCatalog = equipmentCatalog.some((e) => e.type === 'inverter' && supplierQuotesItem(e, info.inverter));
       if (!existsInCatalog) {
         delete cleanedInfo.inverter;
         needsCleanup = true;
       }
     }
     if (info.battery && !batterySupplierMatches) {
-      const existsInCatalog = equipmentCatalog.some((e) =>
-        e.type === 'battery' && e.supplierPrices?.some((sp) =>
-          (info.battery?.supplierPriceId && sp.id === info.battery.supplierPriceId) ||
-          (info.battery?.supplierName && sp.supplierName.toLowerCase().trim() === info.battery.supplierName.toLowerCase().trim())
-        )
-      );
+      const existsInCatalog = equipmentCatalog.some((e) => e.type === 'battery' && supplierQuotesItem(e, info.battery));
       if (!existsInCatalog) {
         delete cleanedInfo.battery;
         needsCleanup = true;
@@ -258,9 +167,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
       <button
         type="button"
         onClick={onToggle}
-        className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors ${
-          isDark ? 'text-zinc-200 hover:bg-[#222230]' : 'text-slate-800 hover:bg-slate-50'
-        }`}
+        className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors text-slate-800 hover:bg-slate-50 dark:text-zinc-200 dark:hover:bg-[#222230]`}
       >
         <div className="flex items-center gap-2">
           <DollarSign className="w-4 h-4 text-emerald-500 shrink-0" />
@@ -275,15 +182,11 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
 
       {isOpen && (
         <div
-          className={`p-3.5 pt-2 space-y-3 border-t ${
-            isDark ? 'border-[#27272a] bg-[#14141c]/50' : 'border-slate-100 bg-slate-50/50'
-          }`}
+          className={`p-3.5 pt-2 space-y-3 border-t border-slate-100 bg-slate-50/50 dark:border-[#27272a] dark:bg-[#14141c]/50`}
         >
           {/* Selector de Modo de Fijación de Precio */}
           <div
-            className={`flex rounded-xl p-1 border shadow-2xs ${
-              isDark ? 'bg-[#121216] border-[#2b2b3a]' : 'bg-slate-200/70 border-slate-300'
-            }`}
+            className={`flex rounded-xl p-1 border shadow-2xs bg-slate-200/70 border-slate-300 dark:bg-[#121216] dark:border-[#2b2b3a]`}
           >
             <button
               type="button"
@@ -334,7 +237,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${isDark ? 'text-emerald-400' : 'text-emerald-800'}`}>
+                <span className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 text-emerald-800 dark:text-emerald-400`}>
                   <Tag className="w-3.5 h-3.5 text-emerald-500" />
                   Precio de Venta Base Manual
                 </span>
@@ -345,7 +248,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
 
               <div className="grid grid-cols-2 gap-2.5">
                 <div>
-                  <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                  <label className={`block text-[11px] font-semibold mb-1 text-slate-700 dark:text-zinc-300`}>
                     Precio por Vatio ($/Wp)
                   </label>
                   <div className="relative">
@@ -362,18 +265,14 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                           pricePerKWpUSD: Math.round(val * 1000 * 100) / 100,
                         });
                       }}
-                      className={`w-full border rounded-lg pl-7 pr-10 py-1.5 text-xs font-mono font-bold transition-all ${
-                        isDark
-                          ? 'bg-[#121216] border-[#383848] text-emerald-300 focus:border-emerald-500'
-                          : 'bg-emerald-50/40 border-emerald-300 text-emerald-950 focus:border-emerald-600'
-                      }`}
+                      className={`w-full border rounded-lg pl-7 pr-10 py-1.5 text-xs font-mono font-bold transition-all bg-emerald-50/40 border-emerald-300 text-emerald-950 focus:border-emerald-600 dark:bg-[#121216] dark:border-[#383848] dark:text-emerald-300 dark:focus:border-emerald-500`}
                     />
                     <span className="absolute right-2 top-1.5 text-[10px] text-zinc-400 font-bold">/Wp</span>
                   </div>
                 </div>
 
                 <div>
-                  <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                  <label className={`block text-[11px] font-semibold mb-1 text-slate-700 dark:text-zinc-300`}>
                     Precio por Kilovatio ($/kWp)
                   </label>
                   <div className="relative">
@@ -394,11 +293,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                           pricePerWattUSD: Math.round((val / 1000) * 1000) / 1000,
                         });
                       }}
-                      className={`w-full border rounded-lg pl-7 pr-12 py-1.5 text-xs font-mono font-bold transition-all ${
-                        isDark
-                          ? 'bg-[#121216] border-[#383848] text-emerald-300 focus:border-emerald-500'
-                          : 'bg-emerald-50/40 border-emerald-300 text-emerald-950 focus:border-emerald-600'
-                      }`}
+                      className={`w-full border rounded-lg pl-7 pr-12 py-1.5 text-xs font-mono font-bold transition-all bg-emerald-50/40 border-emerald-300 text-emerald-950 focus:border-emerald-600 dark:bg-[#121216] dark:border-[#383848] dark:text-emerald-300 dark:focus:border-emerald-500`}
                     />
                     <span className="absolute right-2 top-1.5 text-[10px] text-zinc-400 font-bold">/kWp</span>
                   </div>
@@ -406,16 +301,14 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
               </div>
 
               {/* Resumen Inversión Total Calculada en Vivo */}
-              <div className={`p-2.5 rounded-lg border space-y-1 text-xs ${
-                isDark ? 'bg-[#121218] border-[#29293a]' : 'bg-slate-50 border-slate-200'
-              }`}>
+              <div className={`p-2.5 rounded-lg border space-y-1 text-xs bg-slate-50 border-slate-200 dark:bg-[#121218] dark:border-[#29293a]`}>
                 <div className="flex justify-between text-slate-400">
                   <span>Potencia del Sistema:</span>
-                  <span className={`font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{summary.systemCapacityKWp.toFixed(2)} kWp</span>
+                  <span className={`font-bold text-slate-800 dark:text-slate-200`}>{summary.systemCapacityKWp.toFixed(2)} kWp</span>
                 </div>
                 <div className="flex justify-between text-slate-400">
                   <span>Precio Unitario Llave en Mano:</span>
-                  <span className={`font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                  <span className={`font-bold text-slate-700 dark:text-slate-200`}>
                     ${(project.specs.pricePerWattUSD !== undefined ? project.specs.pricePerWattUSD : 1.15).toFixed(2)} /Wp (${((project.specs.pricePerWattUSD !== undefined ? project.specs.pricePerWattUSD : 1.15) * 1000).toLocaleString('en-US')} /kWp)
                   </span>
                 </div>
@@ -427,7 +320,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                     </span>
                   </div>
                 )}
-                <div className={`flex justify-between font-bold pt-1 border-t ${isDark ? 'text-white border-slate-700' : 'text-slate-900 border-slate-200'}`}>
+                <div className={`flex justify-between font-bold pt-1 border-t text-slate-900 border-slate-200 dark:text-white dark:border-slate-700`}>
                   <span>Total Venta Proyecto:</span>
                   <span className="text-emerald-500 font-extrabold text-sm">
                     ${(summary.grossInvestmentUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
@@ -435,9 +328,9 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                 </div>
 
                 {/* Sincronización Bidireccional de Margen y Ganancia */}
-                <div className={`pt-2 mt-1 border-t space-y-1.5 ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+                <div className={`pt-2 mt-1 border-t space-y-1.5 border-slate-200 dark:border-slate-800`}>
                   <div className="flex items-center justify-between text-[11px]">
-                    <span className={`font-semibold ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                    <span className={`font-semibold text-slate-700 dark:text-zinc-300`}>
                       Destino Excedente:
                     </span>
                     <div className="flex gap-1">
@@ -469,14 +362,14 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                   </div>
 
                   <div className="flex justify-between text-[11px]">
-                    <span className={isDark ? 'text-zinc-400' : 'text-slate-500'}>Margen Multiplicador:</span>
+                    <span className="text-slate-500 dark:text-zinc-400">Margen Multiplicador:</span>
                     <span className="font-bold text-amber-500">
                       {((summary?.costMatrix?.saleMarginMultiplier) || 1.25).toFixed(2)}x (+{((summary?.costMatrix?.markupOnCostPct) || 0).toFixed(1)}% s/costo)
                     </span>
                   </div>
 
                   <div className="flex justify-between text-[11px]">
-                    <span className={isDark ? 'text-zinc-400' : 'text-slate-500'}>Ganancia Neta:</span>
+                    <span className="text-slate-500 dark:text-zinc-400">Ganancia Neta:</span>
                     <span className="font-extrabold text-emerald-500">
                       +${((summary?.costMatrix?.gananciaUSD) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD
                     </span>
@@ -485,7 +378,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
               </div>
 
               <div className="flex items-center justify-between pt-1">
-                <p className={`text-[10px] italic leading-tight ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                <p className={`text-[10px] italic leading-tight text-slate-500 dark:text-zinc-400`}>
                   * Establece directamente el costo llave en mano por Wp/kWp sin desglosar mano de obra por separado.
                 </p>
                 <button
@@ -497,11 +390,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                       pricePerKWpUSD: Math.round(autoWp * 1000 * 100) / 100,
                     });
                   }}
-                  className={`px-2 py-1 text-[10px] rounded-md font-bold flex items-center gap-1 border transition-all cursor-pointer shrink-0 ml-2 ${
-                    isDark
-                      ? 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-zinc-200'
-                      : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800'
-                  }`}
+                  className={`px-2 py-1 text-[10px] rounded-md font-bold flex items-center gap-1 border transition-all cursor-pointer shrink-0 ml-2 bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 dark:text-zinc-200`}
                   title="Importar el precio sugerido calculado por la matriz de costos y equipos"
                 >
                   <Sparkles className="w-3 h-3 text-amber-400" />
@@ -518,7 +407,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-amber-400' : 'text-amber-800'}`}>
+                  <span className={`text-[11px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-400`}>
                     Parámetros Comerciales
                   </span>
                   <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -528,7 +417,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
 
                 <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                    <label className={`block text-[11px] font-semibold mb-1 text-slate-700 dark:text-zinc-300`}>
                       Tasa Cambio DOP/USD
                     </label>
                     <div className="relative">
@@ -538,17 +427,13 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                         step="0.5"
                         value={project.specs.dopExchangeRate !== undefined ? project.specs.dopExchangeRate : 60.0}
                         onChange={(e) => updateSpecs({ dopExchangeRate: parseFloat(e.target.value) || 0 })}
-                        className={`w-full border rounded-lg pl-9 pr-2.5 py-1.5 text-xs font-bold transition-all ${
-                          isDark
-                            ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100 focus:border-amber-500'
-                            : 'bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-600'
-                        }`}
+                        className={`w-full border rounded-lg pl-9 pr-2.5 py-1.5 text-xs font-bold transition-all bg-slate-50 border-slate-300 text-slate-900 focus:border-amber-600 dark:bg-[#18181b] dark:border-[#3f3f46] dark:text-zinc-100 dark:focus:border-amber-500`}
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                    <label className={`block text-[11px] font-semibold mb-1 text-slate-700 dark:text-zinc-300`}>
                       Margen de Ganancia (%)
                     </label>
                     <div className="relative">
@@ -565,11 +450,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                           const multiplier = Math.round((1 + validPct / 100) * 1000) / 1000;
                           updateSpecs({ saleMarginMultiplier: multiplier });
                         }}
-                        className={`w-full border rounded-lg pl-3 pr-7 py-1.5 text-xs font-extrabold transition-all ${
-                          isDark
-                            ? 'bg-[#18181b] border-[#3f3f46] text-amber-300 focus:border-amber-500'
-                            : 'bg-slate-50 border-slate-300 text-amber-700 focus:border-amber-600'
-                        }`}
+                        className={`w-full border rounded-lg pl-3 pr-7 py-1.5 text-xs font-extrabold transition-all bg-slate-50 border-slate-300 text-amber-700 focus:border-amber-600 dark:bg-[#18181b] dark:border-[#3f3f46] dark:text-amber-300 dark:focus:border-amber-500`}
                       />
                       <span className="absolute right-2.5 top-1.5 text-xs text-zinc-400 font-bold">%</span>
                     </div>
@@ -579,7 +460,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                 {/* Botones de Margen Rápido (1-Clic) + Personalizado Libre */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className={`text-[10px] font-medium ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                    <span className={`text-[10px] font-medium text-slate-500 dark:text-zinc-400`}>
                       Márgenes comerciales sugeridos:
                     </span>
                     <span className="text-[10px] text-amber-500 font-mono font-bold">
@@ -621,7 +502,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className={`block text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                  <span className={`block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-zinc-400`}>
                     Costos Unitarios de Compra (USD)
                   </span>
 
@@ -651,12 +532,12 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                   {/* Paneles (1 o múltiples) */}
                   <div className="grid grid-cols-2 gap-2">
                     {getProjectPanels(project.specs).map((p, idx, arr) => {
-                      const panelEq = resolveEquipment('panel', p.brandModel, p.powerW, p.selectedSupplierInfo?.supplierPriceId);
+                      const panelEq = resolveProjectEquipment(equipmentCatalog, 'panel', p.brandModel, p.powerW, p.selectedSupplierInfo?.supplierPriceId);
                       const supCount = panelEq?.supplierPrices?.length || 0;
                       return (
                         <div key={p.id || idx}>
                           <div className="flex items-center justify-between mb-1">
-                            <label className={`block text-[10px] font-medium truncate max-w-[120px] ${isDark ? 'text-zinc-300' : 'text-slate-700'}`} title={p.brandModel}>
+                            <label className={`block text-[10px] font-medium truncate max-w-[120px] text-slate-700 dark:text-zinc-300`} title={p.brandModel}>
                               {arr.length > 1 ? `Precio Panel #${idx + 1} ($/ud)` : 'Precio Panel ($/ud)'}
                             </label>
                             {panelEq && (
@@ -684,11 +565,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                               if (idx === 0) update.panelUnitPriceUSD = val;
                               updateSpecs(update);
                             }}
-                            className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
-                              isDark
-                                ? 'bg-[#121216] border-[#383848] text-zinc-100'
-                                : 'bg-slate-50 border-slate-300 text-slate-900'
-                            }`}
+                            className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold transition-all bg-slate-50 border-slate-300 text-slate-900 dark:bg-[#121216] dark:border-[#383848] dark:text-zinc-100`}
                           />
                           {p.selectedSupplierInfo && (
                             <span className="text-[9.5px] text-emerald-400 font-semibold block mt-0.5 truncate" title={`Proveedor: ${p.selectedSupplierInfo.supplierName} ($${p.selectedSupplierInfo.priceUSD} USD)`}>
@@ -701,12 +578,12 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
 
                     {/* Inversores (1 o múltiples) */}
                     {getProjectInverters(project.specs).map((inv, idx, arr) => {
-                      const invEq = resolveEquipment('inverter', inv.brandModel, inv.powerKW, inv.selectedSupplierInfo?.supplierPriceId);
+                      const invEq = resolveProjectEquipment(equipmentCatalog, 'inverter', inv.brandModel, inv.powerKW, inv.selectedSupplierInfo?.supplierPriceId);
                       const supCount = invEq?.supplierPrices?.length || 0;
                       return (
                         <div key={inv.id || idx}>
                           <div className="flex items-center justify-between mb-1">
-                            <label className={`block text-[10px] font-medium truncate max-w-[120px] ${isDark ? 'text-zinc-300' : 'text-slate-700'}`} title={inv.brandModel}>
+                            <label className={`block text-[10px] font-medium truncate max-w-[120px] text-slate-700 dark:text-zinc-300`} title={inv.brandModel}>
                               {arr.length > 1 ? `Precio Inversor #${idx + 1} ($/ud)` : 'Precio Inversor ($/ud)'}
                             </label>
                             {invEq && (
@@ -734,11 +611,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                               if (idx === 0) update.inverterUnitPriceUSD = val;
                               updateSpecs(update);
                             }}
-                            className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
-                              isDark
-                                ? 'bg-[#121216] border-[#383848] text-zinc-100'
-                                : 'bg-slate-50 border-slate-300 text-slate-900'
-                            }`}
+                            className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold transition-all bg-slate-50 border-slate-300 text-slate-900 dark:bg-[#121216] dark:border-[#383848] dark:text-zinc-100`}
                           />
                           {inv.selectedSupplierInfo && (
                             <span className="text-[9.5px] text-emerald-400 font-semibold block mt-0.5 truncate" title={`Proveedor: ${inv.selectedSupplierInfo.supplierName} ($${inv.selectedSupplierInfo.priceUSD} USD)`}>
@@ -754,12 +627,12 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                   {project.specs.hasBattery && (
                     <div className="grid grid-cols-2 gap-2">
                       {getProjectBatteries(project.specs).map((bat, idx, arr) => {
-                        const batEq = resolveEquipment('battery', bat.brandModel, bat.capacityKWh, bat.selectedSupplierInfo?.supplierPriceId);
+                        const batEq = resolveProjectEquipment(equipmentCatalog, 'battery', bat.brandModel, bat.capacityKWh, bat.selectedSupplierInfo?.supplierPriceId);
                         const supCount = batEq?.supplierPrices?.length || 0;
                         return (
                           <div key={bat.id || idx}>
                             <div className="flex items-center justify-between mb-1">
-                              <label className={`block text-[10px] font-medium truncate max-w-[120px] ${isDark ? 'text-zinc-300' : 'text-slate-700'}`} title={bat.brandModel}>
+                              <label className={`block text-[10px] font-medium truncate max-w-[120px] text-slate-700 dark:text-zinc-300`} title={bat.brandModel}>
                                 {arr.length > 1 ? `Precio Batería #${idx + 1} ($/ud)` : 'Precio Batería ($/ud)'}
                               </label>
                               {batEq && (
@@ -787,11 +660,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                                 if (idx === 0) update.batteryUnitPriceUSD = val;
                                 updateSpecs(update);
                               }}
-                              className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
-                                isDark
-                                  ? 'bg-[#121216] border-[#383848] text-zinc-100'
-                                  : 'bg-slate-50 border-slate-300 text-slate-900'
-                              }`}
+                              className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold transition-all bg-slate-50 border-slate-300 text-slate-900 dark:bg-[#121216] dark:border-[#383848] dark:text-zinc-100`}
                             />
                             {bat.selectedSupplierInfo && (
                               <span className="text-[9.5px] text-emerald-400 font-semibold block mt-0.5 truncate" title={`Proveedor: ${bat.selectedSupplierInfo.supplierName} ($${bat.selectedSupplierInfo.priceUSD} USD)`}>
@@ -805,7 +674,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                   )}
 
                   <div>
-                    <label className={`block text-[10px] font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                    <label className={`block text-[10px] font-medium mb-1 text-slate-700 dark:text-zinc-300`}>
                       Mano de Obra & Mat. ($/kWp)
                     </label>
                     <input
@@ -813,11 +682,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                       step="5"
                       value={project.specs.installationUnitPriceUSD !== undefined ? project.specs.installationUnitPriceUSD : 170.0}
                       onChange={(e) => updateSpecs({ installationUnitPriceUSD: parseFloat(e.target.value) || 0 })}
-                      className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold transition-all ${
-                        isDark
-                          ? 'bg-[#121216] border-[#383848] text-zinc-100'
-                          : 'bg-slate-50 border-slate-300 text-slate-900'
-                      }`}
+                      className={`w-full border rounded-lg px-2.5 py-1 text-xs font-bold transition-all bg-slate-50 border-slate-300 text-slate-900 dark:bg-[#121216] dark:border-[#383848] dark:text-zinc-100`}
                     />
                   </div>
                 </div>
@@ -832,12 +697,10 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
 
                 return (
                   <div
-                    className={`p-3 rounded-xl border space-y-2.5 ${
-                      isDark ? 'bg-[#181822] border-emerald-900/40' : 'bg-emerald-50/50 border-emerald-200'
-                    }`}
+                    className={`p-3 rounded-xl border space-y-2.5 bg-emerald-50/50 border-emerald-200 dark:bg-[#181822] dark:border-emerald-900/40`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className={`text-[11px] font-bold uppercase tracking-wider ${isDark ? 'text-emerald-400' : 'text-emerald-900'}`}>
+                      <span className={`text-[11px] font-bold uppercase tracking-wider text-emerald-900 dark:text-emerald-400`}>
                         Desglose por Vatio (USD/Wp)
                       </span>
                       <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
@@ -847,15 +710,15 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
 
                     {/* 3 Métricas en Columnas */}
                     <div className="grid grid-cols-3 gap-1.5 text-center">
-                      <div className={`p-2 rounded-lg border ${isDark ? 'bg-[#121218] border-[#2b2b3a]' : 'bg-white border-slate-200'}`}>
+                      <div className={`p-2 rounded-lg border bg-white border-slate-200 dark:bg-[#121218] dark:border-[#2b2b3a]`}>
                         <span className="text-[10px] text-zinc-400 block font-medium">Costo Base</span>
-                        <span className={`font-mono font-bold text-xs ${isDark ? 'text-zinc-200' : 'text-slate-800'}`}>
+                        <span className={`font-mono font-bold text-xs text-slate-800 dark:text-zinc-200`}>
                           ${costWp.toFixed(2)}
                         </span>
                         <span className="text-[9px] text-zinc-500 block">/Wp</span>
                       </div>
 
-                      <div className={`p-2 rounded-lg border ${isDark ? 'bg-[#121218] border-amber-900/30' : 'bg-amber-50 border-amber-200'}`}>
+                      <div className={`p-2 rounded-lg border bg-amber-50 border-amber-200 dark:bg-[#121218] dark:border-amber-900/30`}>
                         <span className="text-[10px] text-amber-500 block font-bold">Tu Ganancia</span>
                         <span className="font-mono font-bold text-xs text-amber-400">
                           +${profitWp.toFixed(2)}
@@ -863,7 +726,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                         <span className="text-[9px] text-amber-500/80 block">/Wp</span>
                       </div>
 
-                      <div className={`p-2 rounded-lg border ${isDark ? 'bg-emerald-950/40 border-emerald-700/50' : 'bg-emerald-100/70 border-emerald-300'}`}>
+                      <div className={`p-2 rounded-lg border bg-emerald-100/70 border-emerald-300 dark:bg-emerald-950/40 dark:border-emerald-700/50`}>
                         <span className="text-[10px] text-emerald-400 block font-extrabold">Precio Venta</span>
                         <span className="font-mono font-extrabold text-xs text-emerald-400">
                           ${autoSaleWp.toFixed(2)}
@@ -877,7 +740,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                       isDark ? 'bg-[#13131a] border-[#282838]' : 'bg-white border-slate-200 shadow-2xs'
                     }`}>
                       <div className="flex-1 min-w-0">
-                        <span className={`text-[10px] font-bold block ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                        <span className={`text-[10px] font-bold block text-slate-700 dark:text-zinc-300`}>
                           Precio de Venta en Factura y Simulación:
                         </span>
                         <span className="text-[10.5px] text-emerald-600 dark:text-emerald-400 font-extrabold block font-mono">

@@ -1,3 +1,4 @@
+import { PDFPageShell } from '../PDFPageShell';
 import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
@@ -6,12 +7,8 @@ import { PDFFooter } from '../PDFFooter';
 import { PDFWatermark } from '../PDFWatermark';
 import { ListOrdered } from 'lucide-react';
 
-export interface TOCItem {
-  number: string;
-  title: string;
-  subtitle?: string;
-  targetPage: number;
-}
+import type { TOCItem } from '../../../utils/pdfLayout';
+export type { TOCItem };
 
 interface PDFTableOfContentsProps {
   project: ProjectSimulation;
@@ -35,26 +32,16 @@ export const PDFTableOfContents: React.FC<PDFTableOfContentsProps> = ({
   tocItems,
 }) => {
   return (
-    <div className="pdf-page w-[850px] h-[1202px] min-h-[1202px] max-h-[1202px] bg-white shadow-xl flex flex-col shrink-0 relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
-      {/* Background Watermark */}
-      <PDFWatermark
-        opacity={project.customization?.watermarkOpacity ?? 0.15}
-        customWatermarkBase64={project.customization?.watermarkLogoBase64}
-      />
-
-      {/* Header Banner */}
-      {showHeadersFooters && (
-        <PDFHeaderBanner
-          activeTheme={activeTheme}
-          projectId={project.client.projectId}
-          clientName={project.client.name}
-          systemCapacityKWp={summary.systemCapacityKWp}
-          location={project.client.province || project.client.location}
-          currentDateStr={currentDateStr}
-          pageTitle="ÍNDICE DE CONTENIDO"
-          customization={project.customization}
-        />
-      )}
+    <PDFPageShell
+      project={project}
+      summary={summary}
+      activeTheme={activeTheme}
+      showHeadersFooters={showHeadersFooters}
+      currentDateStr={currentDateStr}
+      pageNum={pageNum}
+      totalPages={totalPages}
+      pageTitle="ÍNDICE DE CONTENIDO"
+    >
 
       {/* Body */}
       <div className="px-12 pt-6 pb-3 flex-1 flex flex-col justify-between relative z-10 min-h-0">
@@ -143,15 +130,6 @@ export const PDFTableOfContents: React.FC<PDFTableOfContentsProps> = ({
           </span>
         </div>
       </div>
-
-      {/* Footer */}
-      {showHeadersFooters && (
-        <PDFFooter
-          pageNum={pageNum}
-          totalPages={totalPages}
-          customization={project.customization}
-        />
-      )}
-    </div>
+    </PDFPageShell>
   );
 };

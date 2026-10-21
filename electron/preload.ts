@@ -13,10 +13,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   parseInvoiceWithAI: (payload: any) =>
     ipcRenderer.invoke('parse-invoice-with-ai', payload),
   cancelAIRequest: (requestId: string) => ipcRenderer.invoke('cancel-ai-request', requestId),
-  parseDatasheetWithAI: (payload: any) =>
-    ipcRenderer.invoke('parse-datasheet-with-ai', payload),
-  validateGeminiApiKey: (apiKey: string, model?: string) =>
-    ipcRenderer.invoke('validate-gemini-key', apiKey, model),
   listGeminiModels: (apiKey: string) =>
     ipcRenderer.invoke('list-gemini-models', apiKey),
   onUpdateStatus: (callback: (info: any) => void) => {

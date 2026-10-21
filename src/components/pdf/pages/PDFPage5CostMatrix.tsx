@@ -1,3 +1,5 @@
+import { PDFPageShell } from '../PDFPageShell';
+import { cleanClientName } from '../../../../shared/proposalPresentation';
 import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
@@ -25,26 +27,17 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
   totalPages,
 }) => {
   return (
-    <div className="pdf-page bg-white w-[850px] h-[1202px] min-h-[1202px] max-h-[1202px] shadow-2xl relative overflow-hidden flex flex-col font-sans shrink-0 border border-amber-300 print:shadow-none print:w-full print:min-h-screen">
-      {/* Background Watermark */}
-      <PDFWatermark
-        opacity={project.customization?.watermarkOpacity ?? 0.15}
-        customWatermarkBase64={project.customization?.watermarkLogoBase64}
-      />
-
-      {/* Page Header */}
-      {showHeadersFooters && (
-        <PDFHeaderBanner
-          activeTheme={activeTheme}
-          projectId={project.client.projectId}
-          clientName={project.client.name}
-          systemCapacityKWp={summary.systemCapacityKWp}
-          location={project.client.province || project.client.location}
-          currentDateStr={currentDateStr}
-          pageTitle="ANÁLISIS DE COSTOS Y MARGEN DE GANANCIA (INFORMACIÓN CONFIDENCIAL)"
-          customization={project.customization}
-        />
-      )}
+    <PDFPageShell
+      project={project}
+      summary={summary}
+      activeTheme={activeTheme}
+      showHeadersFooters={showHeadersFooters}
+      currentDateStr={currentDateStr}
+      pageNum={pageNum}
+      totalPages={totalPages}
+      pageTitle="ANÁLISIS DE COSTOS Y MARGEN DE GANANCIA (INFORMACIÓN CONFIDENCIAL)"
+      className="pdf-page bg-white w-[850px] h-[1202px] min-h-[1202px] max-h-[1202px] shadow-2xl relative overflow-hidden flex flex-col font-sans shrink-0 border border-amber-300 print:shadow-none print:w-full print:min-h-screen"
+    >
 
       <div className="px-8 pt-3 pb-3 flex-1 flex flex-col justify-start gap-2.5 relative z-10 min-h-0">
         <div className="space-y-2.5">
@@ -52,7 +45,7 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
           <div className="bg-amber-600 text-white p-2.5 rounded-xl flex justify-between items-center shadow-sm">
             <div>
               <h3 className="font-extrabold text-xs uppercase tracking-wider text-white">
-                CLIENTE: {(project.client.name || 'Cliente').replace(/\s*\((?:Copia|Copia Importada|COPIA|V\d+|C\d+)\)\s*/gi, '').trim()} — Desglose de Costos de Proyecto
+                CLIENTE: {cleanClientName(project.client.name || 'Cliente')} — Desglose de Costos de Proyecto
               </h3>
               <p className="text-[10px] text-amber-100 font-medium">
                 Documento de Control Interno de Precios, ITBIS y Margen de Rentabilidad
@@ -186,15 +179,6 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Footer */}
-      {showHeadersFooters && (
-        <PDFFooter
-          pageNum={pageNum}
-          totalPages={totalPages}
-          customization={project.customization}
-        />
-      )}
-    </div>
+    </PDFPageShell>
   );
 };

@@ -1,3 +1,4 @@
+import { PDFPageShell } from '../PDFPageShell';
 import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
@@ -91,10 +92,9 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
   // --- 4. Datos Ley 57-07 ---
   const isLeyEligible = project.financials.applyLey5707 !== false;
   const leyCreditUSD = isLeyEligible ? summary.ley5707CreditUSD || 0 : 0;
-  // Base de equipos computables estimada
-  const equipmentCostEst = leyCreditUSD > 0 ? leyCreditUSD / 0.4 : grossInvestmentUSD * 0.4;
+  // Base de equipos computables (Ley 57-07) calculada por el motor
   const equipmentPct =
-    grossInvestmentUSD > 0 ? Math.min(100, Math.max(10, Math.round((equipmentCostEst / grossInvestmentUSD) * 100))) : 40;
+    grossInvestmentUSD > 0 ? Math.min(100, Math.max(10, Math.round((summary.equipmentPortionUSD / grossInvestmentUSD) * 100))) : 40;
 
   // --- 5. Inversión Neta Final ---
   const netInvestmentUSD = summary.netInvestmentUSD || grossInvestmentUSD - leyCreditUSD;
@@ -114,26 +114,16 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
   const freeYears = Math.max(0, Math.round(25 - paybackYearsRaw));
 
   return (
-    <div className="pdf-page w-[850px] h-[1202px] min-h-[1202px] max-h-[1202px] bg-white shadow-xl flex flex-col shrink-0 relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
-      {/* Marca de agua institucional */}
-      <PDFWatermark
-        opacity={project.customization?.watermarkOpacity ?? 0.15}
-        customWatermarkBase64={project.customization?.watermarkLogoBase64}
-      />
-
-      {/* Encabezado Superior Oficial */}
-      {showHeadersFooters && (
-        <PDFHeaderBanner
-          activeTheme={activeTheme}
-          projectId={project.client.projectId}
-          clientName={project.client.name}
-          systemCapacityKWp={summary.systemCapacityKWp}
-          location={project.client.province || project.client.location}
-          currentDateStr={currentDateStr}
-          pageTitle="CUADRO RESUMEN DE INVERSIÓN Y RETORNO"
-          customization={project.customization}
-        />
-      )}
+    <PDFPageShell
+      project={project}
+      summary={summary}
+      activeTheme={activeTheme}
+      showHeadersFooters={showHeadersFooters}
+      currentDateStr={currentDateStr}
+      pageNum={pageNum}
+      totalPages={totalPages}
+      pageTitle="CUADRO RESUMEN DE INVERSIÓN Y RETORNO"
+    >
 
       {/* Contenido Principal de la Página */}
       <div className="px-9 py-6 flex-1 flex flex-col justify-between relative z-10 min-h-0">
@@ -554,15 +544,6 @@ export const PDFExecutiveSummaryPage: React.FC<PDFExecutiveSummaryPageProps> = (
           </span>
         </div>
       </div>
-
-      {/* Pie de página Oficial */}
-      {showHeadersFooters && (
-        <PDFFooter
-          pageNum={pageNum}
-          totalPages={totalPages}
-          customization={project.customization}
-        />
-      )}
-    </div>
+    </PDFPageShell>
   );
 };

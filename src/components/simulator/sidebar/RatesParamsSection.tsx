@@ -1,3 +1,4 @@
+import { getTariffDisplayName } from '../../../../shared/proposalPresentation';
 import { useSelfConsumptionProjection } from '../../../features/application/useApplicationFeatures';
 import React from 'react';
 import { ProjectSimulation, UtilityRates, SystemSpecs } from '../../../types';
@@ -10,7 +11,6 @@ import { calculateTotalDCCapacityKWp, calculateTotalBatteryCapacityKWh } from '.
 import {
   UtilityDistributor,
   getDistributorTariffOptions,
-  getTariffDisplayName,
   mapTariffCodeOnDistributorChange,
 } from '../../../types/tariffs';
 
@@ -113,9 +113,7 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
       <button
         type="button"
         onClick={onToggle}
-        className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors ${
-          isDark ? 'text-zinc-200 hover:bg-[#222230]' : 'text-slate-800 hover:bg-slate-50'
-        }`}
+        className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors text-slate-800 hover:bg-slate-50 dark:text-zinc-200 dark:hover:bg-[#222230]`}
       >
         <div className="flex items-center gap-2">
           <Receipt className="w-4 h-4 text-emerald-500 shrink-0" />
@@ -130,13 +128,11 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
 
       {isOpen && (
         <div
-          className={`p-3.5 pt-2 space-y-3 border-t ${
-            isDark ? 'border-[#27272a] bg-[#14141c]/50' : 'border-slate-100 bg-slate-50/50'
-          }`}
+          className={`p-3.5 pt-2 space-y-3 border-t border-slate-100 bg-slate-50/50 dark:border-[#27272a] dark:bg-[#14141c]/50`}
         >
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className={`block text-xs font-medium ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+              <label className={`block text-xs font-medium text-slate-600 dark:text-zinc-300`}>
                 Precio por kWh ($ USD)
               </label>
               <button
@@ -158,26 +154,18 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
               step="0.001"
               value={project.rates.energyCostPerKWh}
               onChange={(e) => updateRates({ energyCostPerKWh: parseFloat(e.target.value) || 0 })}
-              className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                isDark
-                  ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                  : 'bg-slate-50 border-slate-300 text-slate-800'
-              }`}
+              className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all bg-slate-50 border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
             />
           </div>
 
           <div>
-            <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+            <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
               Empresa Distribuidora
             </label>
             <select
               value={project.rates.distributor || 'EDESUR'}
               onChange={(e) => handleDistributorChange(e.target.value as UtilityDistributor)}
-              className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer transition-all ${
-                isDark
-                  ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                  : 'bg-slate-50 border-slate-300 text-slate-800'
-              }`}
+              className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer transition-all bg-slate-50 border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
             >
               <option value="EDEESTE">EDEESTE</option>
               <option value="EDESUR">EDESUR</option>
@@ -188,7 +176,7 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
 
 
           <div>
-            <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+            <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
               Cobertura Objetivo (%)
             </label>
             <input
@@ -196,26 +184,18 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
               step="1"
               value={project.rates.targetCoveragePct ?? 95}
               onChange={(e) => updateRates({ targetCoveragePct: parseFloat(e.target.value) || 0 })}
-              className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                isDark
-                  ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                  : 'bg-slate-50 border-slate-300 text-slate-800'
-              }`}
+              className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all bg-slate-50 border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
             />
           </div>
 
           <div>
-            <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+            <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
               Tipo de Tarifa ({currentDistributor})
             </label>
             <select
               value={project.rates.tariffCode || (currentDistributor === 'CEPM' ? 'RBT-1' : 'BTS2')}
               onChange={(e) => handleTariffChange(e.target.value)}
-              className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer transition-all ${
-                isDark
-                  ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                  : 'bg-slate-50 border-slate-300 text-slate-800'
-              }`}
+              className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer transition-all bg-slate-50 border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
             >
               {getDistributorTariffOptions(currentDistributor).map((opt) => (
                 <option key={opt.value} value={opt.value} title={opt.description}>
@@ -233,15 +213,13 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
 
           {/* Casilla Inyección Cero / Antivertido (Zero-Export) */}
           <div
-            className={`flex items-center justify-between p-2.5 rounded-lg border ${
-              isDark ? 'bg-amber-950/30 border-amber-800/50' : 'bg-amber-50/60 border-amber-200'
-            }`}
+            className={`flex items-center justify-between p-2.5 rounded-lg border bg-amber-50/60 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800/50`}
           >
             <div className="pr-2">
-              <span className={`text-xs font-bold block ${isDark ? 'text-amber-300' : 'text-amber-900'}`}>
+              <span className={`text-xs font-bold block text-amber-900 dark:text-amber-300`}>
                 Inyección Cero / Antivertido (Zero-Export)
               </span>
-              <span className={`text-[10px] block leading-tight ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+              <span className={`text-[10px] block leading-tight text-slate-500 dark:text-zinc-400`}>
                 Limita la generación al consumo local, evitando inyección a la red y anulando cargos de exportación.
               </span>
             </div>
@@ -255,7 +233,7 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
 
           <div>
             <div className="flex justify-between items-center mb-1">
-              <label className={`block text-xs font-medium ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+              <label className={`block text-xs font-medium text-slate-600 dark:text-zinc-300`}>
                 Cargo Exportación Red (%) (SIE-007-2026-REG)
               </label>
               {project.rates.isZeroExport ? (
@@ -279,24 +257,20 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
                   : (project.rates.gridExportFeePct ?? 25)
               }
               onChange={(e) => updateRates({ gridExportFeePct: parseFloat(e.target.value) || 0 })}
-              className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
-                isDark
-                  ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100'
-                  : 'bg-slate-50 border-slate-300 text-slate-800'
-              }`}
+              className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all disabled:opacity-60 disabled:cursor-not-allowed bg-slate-50 border-slate-300 text-slate-800 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100`}
             />
 
             {/* Nota explicativa regulatoria debajo del parámetro */}
             <div className="mt-1.5">
               {project.rates.isZeroExport ? (
-                <p className={`text-[10.5px] leading-tight flex items-start gap-1 ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
+                <p className={`text-[10.5px] leading-tight flex items-start gap-1 text-amber-700 dark:text-amber-400`}>
                   <span>⚡</span>
                   <span>
                     <strong>Inyección Cero activa:</strong> El sistema no vuelca excedentes a la red pública; por lo tanto, no aplica retención ni cargo por uso de red.
                   </span>
                 </p>
               ) : (
-                <p className={`text-[10.5px] leading-tight flex items-start gap-1 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                <p className={`text-[10.5px] leading-tight flex items-start gap-1 text-slate-500 dark:text-zinc-400`}>
                   <span>⚡</span>
                   <span>
                     <strong>Medición Neta ({getTariffDisplayName(currentDistributor, project.rates.tariffCode || '')}):</strong> Aplica retención del {project.rates.gridExportFeePct ?? 25}% por derecho de uso de red bajo Res. SIE-007-2026-REG sobre los kWh excedentes exportados a la red de {currentDistributor}.
@@ -365,17 +339,15 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
 
             return (
               <div
-                className={`p-3 rounded-lg border space-y-2.5 transition-all ${
-                  isDark ? 'bg-[#181824] border-[#2e2e42]' : 'bg-blue-50/60 border-blue-200'
-                }`}
+                className={`p-3 rounded-lg border space-y-2.5 transition-all bg-blue-50/60 border-blue-200 dark:bg-[#181824] dark:border-[#2e2e42]`}
               >
                 {/* Cabecera compacta con porcentaje diurno */}
                 <div className="flex justify-between items-start gap-2">
                   <div>
-                    <label className={`block text-xs font-bold ${isDark ? 'text-blue-300' : 'text-blue-950'}`}>
+                    <label className={`block text-xs font-bold text-blue-950 dark:text-blue-300`}>
                       Perfil de Carga & Partición Diurna
                     </label>
-                    <span className={`text-[10px] block ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                    <span className={`text-[10px] block text-slate-500 dark:text-zinc-400`}>
                       Consumo diurno (8am–5pm) vs nocturno (5pm–8am)
                     </span>
                   </div>
@@ -506,17 +478,17 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
                 {/* Desglose de Métricas Compactas */}
                 {hasBattery ? (
                   <div className="grid grid-cols-3 gap-1.5 pt-0.5">
-                    <div className={`p-1.5 rounded border text-center ${isDark ? 'bg-amber-950/20 border-amber-900/40 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
+                    <div className={`p-1.5 rounded border text-center bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/20 dark:border-amber-900/40 dark:text-amber-300`}>
                       <span className="block text-[9px] font-medium text-amber-600 dark:text-amber-400">☀️ Solar Día</span>
                       <span className="text-xs font-bold font-mono block">{solarDirectPct.toFixed(1)}%</span>
                       <span className="text-[8.5px] opacity-75 font-mono">{solarDirectDaily.toFixed(1)} kWh/d</span>
                     </div>
-                    <div className={`p-1.5 rounded border text-center ${isDark ? 'bg-cyan-950/20 border-cyan-900/40 text-cyan-300' : 'bg-cyan-50 border-cyan-200 text-cyan-900'}`}>
+                    <div className={`p-1.5 rounded border text-center bg-cyan-50 border-cyan-200 text-cyan-900 dark:bg-cyan-950/20 dark:border-cyan-900/40 dark:text-cyan-300`}>
                       <span className="block text-[9px] font-medium text-cyan-600 dark:text-cyan-400">🔋 BESS Noche</span>
                       <span className="text-xs font-bold font-mono block">+{bessDischargePct.toFixed(1)}%</span>
                       <span className="text-[8.5px] opacity-75 font-mono">{bessDischargeDaily.toFixed(1)} kWh/d</span>
                     </div>
-                    <div className={`p-1.5 rounded border text-center ${isDark ? 'bg-zinc-900/50 border-zinc-700/50 text-zinc-300' : 'bg-slate-50 border-slate-200 text-slate-800'}`}>
+                    <div className={`p-1.5 rounded border text-center bg-slate-50 border-slate-200 text-slate-800 dark:bg-zinc-900/50 dark:border-zinc-700/50 dark:text-zinc-300`}>
                       <span className="block text-[9px] font-medium text-slate-500">🔌 Red (Noche)</span>
                       <span className="text-xs font-bold font-mono block">{gridImportPct.toFixed(1)}%</span>
                       <span className="text-[8.5px] opacity-75 font-mono">{gridImportDaily.toFixed(1)} kWh/d</span>
@@ -524,12 +496,12 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-1.5 pt-0.5">
-                    <div className={`p-1.5 rounded border text-center ${isDark ? 'bg-amber-950/20 border-amber-900/40 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-900'}`}>
+                    <div className={`p-1.5 rounded border text-center bg-amber-50 border-amber-200 text-amber-900 dark:bg-amber-950/20 dark:border-amber-900/40 dark:text-amber-300`}>
                       <span className="block text-[9px] font-medium text-amber-600 dark:text-amber-400">☀️ Autoconsumo Solar</span>
                       <span className="text-xs font-bold font-mono block">{solarDirectPct.toFixed(1)}%</span>
                       <span className="text-[8.5px] opacity-75 font-mono">{solarDirectDaily.toFixed(1)} kWh/d (sin peaje)</span>
                     </div>
-                    <div className={`p-1.5 rounded border text-center ${isDark ? 'bg-zinc-900/50 border-zinc-700/50 text-zinc-300' : 'bg-slate-50 border-slate-200 text-slate-800'}`}>
+                    <div className={`p-1.5 rounded border text-center bg-slate-50 border-slate-200 text-slate-800 dark:bg-zinc-900/50 dark:border-zinc-700/50 dark:text-zinc-300`}>
                       <span className="block text-[9px] font-medium text-slate-500">🔌 Compra Red Eléctrica</span>
                       <span className="text-xs font-bold font-mono block">{gridImportPct.toFixed(1)}%</span>
                       <span className="text-[8.5px] opacity-75 font-mono">{gridImportDaily.toFixed(1)} kWh/d (tarifa EDE)</span>
@@ -539,9 +511,7 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
 
                 {/* Badge Destacado de Autoconsumo Total */}
                 <div
-                  className={`px-2.5 py-1.5 rounded-md border flex items-center justify-between text-[10.5px] ${
-                    isDark ? 'bg-blue-950/40 border-blue-800/60 text-blue-200' : 'bg-blue-50 border-blue-200 text-blue-950'
-                  }`}
+                  className={`px-2.5 py-1.5 rounded-md border flex items-center justify-between text-[10.5px] bg-blue-50 border-blue-200 text-blue-950 dark:bg-blue-950/40 dark:border-blue-800/60 dark:text-blue-200`}
                 >
                   <div className="flex items-center gap-1.5">
                     <Zap className="w-3.5 h-3.5 text-blue-500 shrink-0" />
@@ -553,13 +523,13 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
                 </div>
 
                 {/* Resumen de Generación (1 sola línea compacta) */}
-                <p className={`text-[9.5px] leading-tight truncate ${isDark ? 'text-zinc-400' : 'text-slate-500'}`} title={`Producción FV: ~${avgDailyProd.toFixed(1)} kWh/d (${genDirectPct}% directo${hasBattery ? `, ${genBessPct}% BESS` : ''}, ${genExportPct}% inyección)`}>
+                <p className={`text-[9.5px] leading-tight truncate text-slate-500 dark:text-zinc-400`} title={`Producción FV: ~${avgDailyProd.toFixed(1)} kWh/d (${genDirectPct}% directo${hasBattery ? `, ${genBessPct}% BESS` : ''}, ${genExportPct}% inyección)`}>
                   🌐 <strong>Gen ~{avgDailyProd.toFixed(1)} kWh/d:</strong> {genDirectPct}% directo {hasBattery ? `· ${genBessPct}% BESS ` : ''}· {genExportPct}% iny. red
                 </p>
 
                 {/* Botón Switch: Mostrar / Ocultar Autoconsumo en Gráficas y Tablas */}
                 <div className="pt-1.5 border-t border-slate-200/60 dark:border-[#2e2e42] flex items-center justify-between">
-                  <span className={`text-[10px] font-medium ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                  <span className={`text-[10px] font-medium text-slate-500 dark:text-zinc-400`}>
                     Autoconsumo en gráficos/tablas:
                   </span>
                   <button

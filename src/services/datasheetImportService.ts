@@ -1,3 +1,4 @@
+import { isWriterRole } from '../../shared/permissions';
 import { useSimulationStore } from '../store/useSimulationStore';
 import type { ExtractedDatasheetData } from '../types/equipment';
 import { planDatasheetImport } from '../utils/datasheetImport';
@@ -19,7 +20,7 @@ export function saveDatasheetLocally(data: ExtractedDatasheetData): DatasheetImp
   const live = useSimulationStore.getState();
   const user = live.syncSettings.currentUser;
   const server = live.syncSettings.serverUrl.trim().replace(/\/+$/, '');
-  if (user && !['ADMIN', 'EDITOR'].includes(user.role))
+  if (user && !isWriterRole(user.role))
     throw new Error('Tu cuenta solo puede consultar el catálogo.');
   const plan = planDatasheetImport(data, live.equipmentCatalog);
   for (const entry of plan.updates) {
@@ -54,7 +55,7 @@ export async function attachImportedDatasheet(receipt: DatasheetImportReceipt, f
       state.syncSettings.serverUrl.trim().replace(/\/+$/, '') !== receipt.server)
       throw new Error('La sesión cambió. Los equipos guardados permanecen en su espacio original.');
     if (!user || !state.syncSettings.authToken) throw new Error('Inicia sesión para adjuntar la ficha al servidor.');
-    if (!['ADMIN', 'EDITOR'].includes(user.role)) throw new Error('Tu cuenta solo puede consultar el catálogo.');
+    if (!isWriterRole(user.role)) throw new Error('Tu cuenta solo puede consultar el catálogo.');
     for (const id of receipt.ids) {
       const item = state.equipmentCatalog.find(item => item.id === id);
       if (!item || item.organizationId !== receipt.organizationId ||

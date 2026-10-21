@@ -1,3 +1,4 @@
+import { isReaderRole } from '../../../shared/permissions';
 import React, { useState, useCallback, useEffect } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { fetchSolarRadiationByCoordinates } from '../../services/solarRadiationApi';
@@ -6,6 +7,7 @@ import { ParameterSidebar } from './sidebar/ParameterSidebar';
 import { EnergyAnalysisTab } from './tabs/EnergyAnalysisTab';
 import { QuotationEquipmentsTab } from './tabs/QuotationEquipmentsTab';
 import { FinancialReturnTab } from './tabs/FinancialReturnTab';
+import { confirmAction } from '../common/confirmAction';
 
 export const SimulatorView: React.FC = () => {
   const {
@@ -183,8 +185,8 @@ export const SimulatorView: React.FC = () => {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  if (confirm(`¿Eliminar DEFINITIVAMENTE la propuesta "${project.client?.name}"?\n\nEsta acción NO se puede deshacer.`)) {
+                onClick={async () => {
+                  if (await confirmAction({ title: 'Eliminar definitivamente', message: `¿Eliminar DEFINITIVAMENTE la propuesta "${project.client?.name}"?\n\nEsta acción NO se puede deshacer.`, confirmLabel: 'Eliminar definitivo', tone: 'danger' })) {
                     hardDeleteProject(project.id);
                     setActiveView('dashboard');
                   }
@@ -210,7 +212,7 @@ export const SimulatorView: React.FC = () => {
         )}
 
         {/* Lector / Viewer Role Notice Banner */}
-        {syncSettings.authToken && (syncSettings.currentUser?.role === 'LECTOR' || syncSettings.currentUser?.role === 'VIEWER') && !project.isDeleted && (
+        {syncSettings.authToken && isReaderRole(syncSettings.currentUser?.role) && !project.isDeleted && (
           <div className="bg-blue-900 text-blue-100 px-6 py-2 text-xs font-semibold flex items-center justify-between border-b border-blue-800 shrink-0">
             <div className="flex items-center gap-2">
               <Shield className="w-4 h-4 text-blue-300" />

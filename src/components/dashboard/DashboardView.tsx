@@ -27,6 +27,7 @@ import { ProjectDocumentList } from './ProjectDocumentList';
 import { FoldersResumeGrid } from './FoldersResumeGrid';
 import { CreateFolderModal } from './sidebar/CreateFolderModal';
 import { calculateTotalDCCapacityKWp, calculateTotalPanelCount } from '../../utils/equipmentSpecsUtils';
+import { hiddenFolderIdSet, isProjectInFolderView } from '../../utils/folderVisibility';
 
 export const DashboardView: React.FC = () => {
   const {
@@ -106,9 +107,7 @@ export const DashboardView: React.FC = () => {
   };
 
   // Conjunto de IDs de carpetas configuradas para ocultarse de la vista general
-  const hiddenFolderIds = useMemo(() => {
-    return new Set(folders.filter((f) => f.hideFromGeneral).map((f) => f.id));
-  }, [folders]);
+  const hiddenFolderIds = useMemo(() => hiddenFolderIdSet(folders), [folders]);
 
   // Filter and Sort Projects
   const { projects: filteredAndSortedProjects, commercialPool } = useMemo(() => {
@@ -131,11 +130,8 @@ export const DashboardView: React.FC = () => {
         projectId.includes(query) ||
         quoteNumber.includes(query);
 
-      // 2. Folder Filter: si hay carpeta activa, mostrar sólo las de esa carpeta.
-      // Si estamos en la vista general (sin carpeta seleccionada), ocultar los proyectos de carpetas con hideFromGeneral.
-      const matchesFolder = activeFolderId
-        ? project.folderId === activeFolderId
-        : (!project.folderId || !hiddenFolderIds.has(project.folderId));
+      // 2. Folder Filter
+      const matchesFolder = isProjectInFolderView(project, hiddenFolderIds, activeFolderId);
 
       // 3. Team Member Filter (from tree sidebar or filter popover)
       const effectiveMember = memberFilter !== 'All' ? memberFilter : activeTeamMemberFilter;
@@ -207,9 +203,7 @@ export const DashboardView: React.FC = () => {
 
   return (
     <div
-      className={`flex-1 overflow-y-auto w-full h-full p-6 lg:p-8 font-sans transition-colors duration-200 ${
-        isDark ? 'bg-zinc-950 text-zinc-100' : 'bg-slate-50 text-slate-900'
-      }`}
+      className={`flex-1 overflow-y-auto w-full h-full p-6 lg:p-8 font-sans transition-colors duration-200 bg-slate-50 text-slate-900 dark:bg-zinc-950 dark:text-zinc-100`}
     >
       <div className="max-w-[1500px] mx-auto w-full flex flex-col gap-5 pb-12">
         {/* ========================================================================= */}

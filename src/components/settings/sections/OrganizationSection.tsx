@@ -1,3 +1,4 @@
+import { isAdminRole, normalizeRole } from '../../../../shared/permissions';
 import { useEffect, useRef, useState } from "react";
 import { useSimulationStore } from "../../../store/useSimulationStore";
 import { SyncService } from "../../../services/syncService";
@@ -8,6 +9,7 @@ import {
 import type { UserProfile, UserRole } from "../../../types";
 import "../../../components/companies/company-center.css";
 import { draftOwnerKey } from "../../../utils/draftOwnerKey";
+import { confirmAction } from "../../common/confirmAction";
 
 export function OrganizationSection() {
   const { syncSettings, workspaceScope, sessionGeneration, sidebarTheme } =
@@ -39,7 +41,7 @@ export function OrganizationSection() {
   const isCurrent = (generation = sessionGeneration) =>
     mounted.current && useSimulationStore.getState().sessionGeneration === generation;
   const load = async () => {
-    if (!syncSettings.authToken || user?.role !== "ADMIN") return;
+    if (!syncSettings.authToken || !isAdminRole(user?.role)) return;
     const request = ++loadRequest.current;
     setInviteState("loading");
     setInvitations([]);
@@ -143,7 +145,7 @@ export function OrganizationSection() {
         </button>
       </div>
     );
-  if (user.role !== "ADMIN")
+  if (!isAdminRole(user.role))
     return (
       <>
         <h3>Equipo de {user.organizationName || "tu organización"}</h3>
@@ -335,7 +337,7 @@ export function OrganizationSection() {
             <label>
               Rol
               <select
-                value={role === "VIEWER" ? "LECTOR" : role}
+                value={normalizeRole(role)}
                 onChange={(event) => setRole(event.target.value as UserRole)}
               >
                 {roles}
@@ -421,13 +423,17 @@ export function OrganizationSection() {
                       <button
                         className="cc-danger"
                         disabled={busy}
-                        onClick={() => {
+                        onClick={async () => {
                           if (
-                            window.confirm(
-                              "¿Retirar el acceso de " +
+                            await confirmAction({
+                              title: "Retirar acceso",
+                              message:
+                                "¿Retirar el acceso de " +
                                 member.name +
                                 "? Sus propuestas se conservan.",
-                            )
+                              confirmLabel: "Retirar acceso",
+                              tone: "danger",
+                            })
                           )
                             void run(
                               () =>

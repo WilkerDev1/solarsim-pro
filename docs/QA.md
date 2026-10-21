@@ -1,20 +1,34 @@
 # Verificación
 
-`npm test` ejecuta las suites de src/tests y el updater mediante `scripts/test.ts`. El runner carga `scripts/testEnvironment.ts`, que bloquea fetch real: una prueba debe proporcionar un transporte sintético. Los antiguos testMultiUserSync y testRBACAndTokenRenewal escribían en servidores reales y se retiraron; su cobertura se sustituye por `server/tests/api.integration.test.ts` y regresiones de reconciliación local. No usar secretos de producción.
+## Pruebas automatizadas
 
-## Gates
+`npm test` ejecuta cada `src/tests/test*.ts` y la prueba del updater (`electron/updater/tests/updaterIntegrity.test.ts`), cada una en su propio proceso, mediante `scripts/test.ts`. Para una sola suite: `npm test -- <filtro>`. El runner siempre carga `scripts/testEnvironment.ts`, que sustituye `fetch` por uno que falla: una prueba que necesite HTTP debe inyectar un transporte sintético. Ninguna prueba escribe en servidores reales ni usa secretos de producción.
 
-Tipos y build frontend/Electron; todas las suites de dominio; integración PostgreSQL efímera del backend; tests del Worker con KV/autoridad simulados; snapshot Repomix. CI reproduce estos gates sin secretos empresariales. Una build correcta no equivale a instalación probada en cada SO.
+- API: `npm --prefix server test` (node:test). Las integraciones (`server/tests/*.test.ts`) arrancan PostgreSQL en un contenedor Docker desechable.
+- Worker: `npm --prefix workers/share-viewer test`, con KV y autorización simulados.
+- `server/tests/containerSmoke.ts`: construye su propia imagen/contenedores y ensaya proceso sin root, health con base, CAS y rotación de secretos.
+
+La lista completa de gates está en [MAINTENANCE_AND_UPDATES.md](MAINTENANCE_AND_UPDATES.md#gates). Una build correcta no equivale a instalación probada en cada sistema operativo.
+
+## Ensayos fuera de `npm test`
+
+- **Staging con runtime real**: `QA_CLOUDFLARED=/ruta/al/cloudflared npx tsx scripts/qa/runRuntimeStaging.ts`. Levanta PostgreSQL desechable, API HTTP real, Wrangler local (workerd y KV privados) y túneles HTTPS temporales; rechaza destinos de producción, aprovisiona usuarios sintéticos `@staging.example.invalid` (Ana ADMIN, Bruno EDITOR, Vera lector y una cuenta de otra organización) y ejecuta `scripts/qa/stagingRehearsal.ts` (CAS entre editores, rechazo del lector y de clientes sin `baseVersion`, snapshots de publicación, papelera). `Ctrl+C` limpia procesos, contenedor, KV y túneles.
+- **Aplicación completa contra ese staging**: en otra terminal `npm run dev` y abrir `/scripts/qa/fixtures/runtimeFlow.html` sobre el origen de Vite.
+- **Fixtures de componentes**: `scripts/qa/fixtures/*.html` montan vistas reales con transporte simulado (catálogo, asistente, centro empresarial, conflictos, borradores, simulador y fichas). Acreditan el comportamiento de UI, no la API.
+- **Electron empaquetado**: `node scripts/qa/runElectronRuntime.mjs [ruta/app.asar]` arranca el ASAR con perfil privado y comprueba aislamiento del renderer e IPC. `release.yml` lo usa tras instalar los paquetes.
+- **Respaldo**: `scripts/qa/restoreBackupRehearsal.py` (ver [infraestructura](INFRASTRUCTURE_ARCHITECTURE.md#despliegue-de-la-api)).
+
+Las capturas de QA se guardan localmente en `docs/qa/` (ignorado por Git) y contienen solo datos sintéticos; nunca credenciales, tokens, URLs privadas ni datos de clientes.
 
 ## Matriz de revisión manual
 
-- Abrir menú con tarjetas y lista, búsqueda/filtros, nombres largos, acciones por teclado y arrastre a carpeta. Recargar y comprobar preferencia. Revisar claro/oscuro a tamaño normal y mínimo Electron1024×700.
-- Ajustes: navegación por categorías, título/foco, Escape, borradores al cambiar categoría y ausencia del espacio subyacente en accesibilidad.
-- Sin cuenta, proyección off: tabla5columnas, gráfica2series, no perfil diurno. Activar: controles y desglose disponibles, ahorro/VAN cambian; desactivar vuelve al cálculo histórico y conserva datos introducidos. Revisar PDF/hub.
-- ADMIN cambia política con CAS; EDITOR/VIEWER solo la aplican; offline mantiene última confirmada; otra organización no hereda modo. Backend antiguo muestra limitación y no confirma un guardado.
-- Dos escritores: mismo baseVersion, un ACK y un conflicto; edición durante push sigue pendiente con base confirmada nueva. Falla pull/push/catálogo no adelanta timestamp.
-- Papelera: nueva propuesta offline, eliminación suave en vuelo y física posterior; copia recuperable ante conflictos; tombstone impide resurrección.
-- Catálogo: lectores descargan, solo items dirty se envían, precios concurrentes producen conflicto, borrar último equipo no reinyecta defaults.
-- Publicación: snapshot de modo/version; inputs HTML hostiles no ejecutan scripts; crédito fiscal desactivado permanece cero; enlace antiguo conserva presentación histórica.
+- Menú con tarjetas y lista: búsqueda/filtros, nombres largos, acciones por teclado y arrastre a carpeta; la preferencia persiste al recargar. Claro/oscuro a tamaño normal y mínimo Electron 1024×700.
+- Ajustes: navegación por categorías, título/foco, Escape, borradores al cambiar de categoría y fondo inerte para accesibilidad.
+- Sin cuenta, proyección desactivada: tabla de 5 columnas, gráfica de 2 series, sin perfil diurno. Al activarla aparecen controles y desglose y cambian ahorro/VAN; al desactivarla vuelve el cálculo clásico y se conservan los datos introducidos. Revisar PDF y hub.
+- ADMIN cambia la política con CAS; EDITOR y LECTOR solo la aplican; sin conexión se mantiene la última confirmada; otra organización no hereda el modo. Un backend antiguo muestra la limitación y no confirma un guardado.
+- Dos escritores con el mismo `baseVersion`: un ACK y un conflicto; una edición durante el push sigue pendiente con la nueva base confirmada. Un fallo de pull/push/catálogo no adelanta el timestamp.
+- Papelera: propuesta nueva sin conexión, eliminación suave en vuelo y física posterior; copia recuperable ante conflictos; el tombstone impide resurrección.
+- Catálogo: lectores descargan, solo se envían ítems modificados, precios concurrentes producen conflicto y borrar el último equipo no reinyecta defaults.
+- Publicación: snapshot de modo/versión; HTML hostil no ejecuta scripts; crédito fiscal desactivado permanece en cero; un enlace antiguo conserva su presentación.
 
-Resultados concretos y limitaciones de esta ejecución se registran en QA_RESULTS.md al cerrar. Los datos de pantalla de QA son sintéticos locales.
+Los resultados de una ejecución concreta se registran en el PR o commit correspondiente, no en documentos fechados.

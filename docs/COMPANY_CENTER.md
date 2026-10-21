@@ -28,10 +28,10 @@ La API conserva `users.organization_id` como pertenencia primaria por compatibil
 
 ## Despliegue
 
-La API compatible se desplegó el 6 de octubre de 2026 como `2.2.1-ac7abbc`, con migración 003 y rotación de secretos. La revisión de producción del 7 de octubre fue de solo lectura; los ensayos de escritura usan una base desechable. Esta extensión del perfil incorpora lema, Instagram y marca de agua en la API; requiere desplegar la API actual para guardar esos campos. No requiere una migración de esquema adicional para el perfil: utiliza el JSONB existente. Las correcciones de cliente posteriores al tag 2.3.0 deben pasar sus gates y staging antes de distribuirse. Véase [estado de la revisión](REVIEW_2026_10_07.md).
+El perfil (lema, Instagram, marca de agua) se guarda en el JSONB existente de la organización, sin migración adicional; requiere una API que incluya esos campos. Los ensayos de escritura usan bases desechables; el despliegue sigue [infraestructura](INFRASTRUCTURE_ARCHITECTURE.md).
 
 No volver a API 2.2.0 después de usar membresías secundarias o revocaciones nuevas: desconoce esos permisos y podría conceder acceso indebido. El rollback debe usar una API compatible con la migración y los controles actuales. No revertir ni eliminar tablas para restaurar binarios. Conservar respaldo y probar recuperación antes del despliegue.
 
 ## Verificación
 
-Las integraciones usan PostgreSQL Docker efímero; ningún test escribe en producción. La suite incluye aislamiento de organizaciones, CAS, invitaciones, revocación, escrituras en espera y conservación de atribución tras retirar acceso. El cliente cubre conservación de colas/historiales/metadatos entre ámbitos, snapshots documentales y respuestas tardías. Las capturas sintéticas iniciales están documentadas en [QA del centro](qa/company-center/README.md). El ensayo posterior de la aplicación completa con API HTTP y workerd reales, y el ensayo separado de borradores con transporte simulado, se distinguen en [QA del 7 de octubre](qa/review-2026-10-07/README.md).
+Las integraciones usan PostgreSQL Docker efímero; ningún test escribe en producción. La suite incluye aislamiento de organizaciones, CAS, invitaciones, revocación, escrituras en espera y conservación de atribución tras retirar acceso. El cliente cubre conservación de colas/historiales/metadatos entre ámbitos, snapshots documentales y respuestas tardías. Las capturas de QA se guardan solo localmente en `docs/qa/` (ver [QA](QA.md)).

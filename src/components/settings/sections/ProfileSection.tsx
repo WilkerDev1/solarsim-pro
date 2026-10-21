@@ -1,3 +1,4 @@
+import { isAdminRole, isReaderRole, normalizeRole } from '../../../../shared/permissions';
 import React, { useEffect, useRef, useState } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { User, Edit3, LogOut, RefreshCw, CheckCircle2, AlertCircle, Shield, Building2, Eye, EyeOff } from 'lucide-react';
@@ -120,7 +121,7 @@ export const ProfileSection: React.FC = () => {
     }
   };
 
-  const displayRole = currentUser?.role === 'VIEWER' ? 'LECTOR' : currentUser?.role;
+  const displayRole = normalizeRole(currentUser?.role);
 
   return (
     <section id="sec-cuenta" className="flex flex-col gap-4 scroll-mt-6">
@@ -149,9 +150,9 @@ export const ProfileSection: React.FC = () => {
                 className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider border ${
                   !isAuthenticated
                     ? 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
-                    : currentUser.role === 'ADMIN'
+                    : isAdminRole(currentUser.role)
                     ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800'
-                    : currentUser.role === 'LECTOR' || currentUser.role === 'VIEWER'
+                    : isReaderRole(currentUser.role)
                     ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800'
                     : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
                 }`}

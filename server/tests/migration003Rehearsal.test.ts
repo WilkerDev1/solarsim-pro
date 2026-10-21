@@ -1,55 +1,19 @@
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-import { setTimeout as delay } from "node:timers/promises";
 import pg from "pg";
+import {
+  startEphemeralPostgres,
+  type EphemeralPostgres,
+} from "./helpers/ephemeralPostgres.js";
 import { migrateDatabase } from "../src/database/migrations.js";
 import { resolveMembership } from "../src/membership.js";
 
-const exec = promisify(execFile);
-const container = `solarsim-migration003-rehearsal-${crypto.randomUUID()}`;
+let database: EphemeralPostgres;
 let pool: pg.Pool;
 
 before(async () => {
-  await exec("docker", [
-    "run",
-    "--detach",
-    "--rm",
-    "--name",
-    container,
-    "--publish",
-    "127.0.0.1::5432",
-    "--env",
-    "POSTGRES_USER=solarsim_test",
-    "--env",
-    "POSTGRES_PASSWORD=isolated-test-only",
-    "--env",
-    "POSTGRES_DB=solarsim_test",
-    "postgres:16-alpine",
-  ]);
-
-  const portOutput = await exec("docker", ["port", container, "5432/tcp"]);
-  const port = Number(portOutput.stdout.trim().split(":").at(-1));
-
-  pool = new pg.Pool({
-    host: "127.0.0.1",
-    port,
-    user: "solarsim_test",
-    password: "isolated-test-only",
-    database: "solarsim_test",
-    connectionTimeoutMillis: 1000,
-  });
-
-  // Wait for postgres to accept connections
-  for (let i = 0; i < 30; i++) {
-    try {
-      await pool.query("SELECT 1");
-      break;
-    } catch {
-      await delay(200);
-    }
-  }
+  database = await startEphemeralPostgres("solarsim-migration003-rehearsal");
+  pool = database.pool;
 
   // Set up the exact legacy production 2.2.0 schema matching solarsim_prod (NO schema_migrations, NO 002/003 columns)
   await pool.query(`
@@ -258,8 +222,7 @@ before(async () => {
 });
 
 after(async () => {
-  if (pool) await pool.end();
-  await exec("docker", ["rm", "-f", container]).catch(() => {});
+  await database?.stop();
 });
 
 test("Comprehensive Migration 003 rehearsal: preserves all 8 business tables, complex JSON, idempotency and memberships", async () => {

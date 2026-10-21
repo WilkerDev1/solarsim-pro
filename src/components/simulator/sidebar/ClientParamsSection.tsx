@@ -41,9 +41,7 @@ export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
       <button
         type="button"
         onClick={onToggle}
-        className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors ${
-          isDark ? 'text-zinc-200 hover:bg-[#222230]' : 'text-slate-800 hover:bg-slate-50'
-        }`}
+        className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors text-slate-800 hover:bg-slate-50 dark:text-zinc-200 dark:hover:bg-[#222230]`}
       >
         <div className="flex items-center gap-2">
           <User className="w-4 h-4 text-emerald-500 shrink-0" />
@@ -58,12 +56,10 @@ export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
 
       {isOpen && (
         <div
-          className={`p-3.5 pt-2 space-y-3 border-t ${
-            isDark ? 'border-[#27272a] bg-[#14141c]/50' : 'border-slate-100 bg-slate-50/50'
-          }`}
+          className={`p-3.5 pt-2 space-y-3 border-t border-slate-100 bg-slate-50/50 dark:border-[#27272a] dark:bg-[#14141c]/50`}
         >
           <div>
-            <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+            <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
               Nombre del Cliente
             </label>
             <input
@@ -79,7 +75,7 @@ export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
           </div>
 
           <div>
-            <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+            <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
               Ubicación (Ciudad / Proyecto)
             </label>
             <input
@@ -95,7 +91,7 @@ export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
           </div>
 
           <div>
-            <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+            <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
               Dirección del Cliente
             </label>
             <input
@@ -113,7 +109,7 @@ export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+              <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
                 Teléfono del Cliente
               </label>
               <input
@@ -134,7 +130,7 @@ export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
             </div>
 
             <div>
-              <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+              <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
                 Atención / Contacto
               </label>
               <input
@@ -153,13 +149,11 @@ export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
 
           {/* Selector de Fuente de Radiación Solar: Provincia vs GPS Satelital */}
           <div>
-            <label className={`block text-xs font-medium mb-1.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+            <label className={`block text-xs font-medium mb-1.5 text-slate-600 dark:text-zinc-300`}>
               Fuente de Radiación Solar
             </label>
             <div
-              className={`flex rounded-lg p-1 border ${
-                isDark ? 'bg-[#121214] border-[#27272a]' : 'bg-slate-200/80 border-slate-300/60'
-              }`}
+              className={`flex rounded-lg p-1 border bg-slate-200/80 border-slate-300/60 dark:bg-[#121214] dark:border-[#27272a]`}
             >
               <button
                 type="button"
@@ -197,7 +191,7 @@ export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
           {/* Opción 1: Selección por Provincia */}
           {(project.client.solarSourceMode || 'province') === 'province' && (
             <div>
-              <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+              <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
                 Seleccionar Provincia
               </label>
               <select
@@ -226,11 +220,9 @@ export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
           {/* Opción 2: Obtener por GPS / Coordenadas */}
           {project.client.solarSourceMode === 'gps' && (
             <div
-              className={`space-y-2 p-3 rounded-lg border ${
-                isDark ? 'bg-[#202024] border-emerald-900/60' : 'bg-emerald-50/50 border-emerald-200'
-              }`}
+              className={`space-y-2 p-3 rounded-lg border bg-emerald-50/50 border-emerald-200 dark:bg-[#202024] dark:border-emerald-900/60`}
             >
-              <label className={`block text-xs font-semibold ${isDark ? 'text-emerald-400' : 'text-emerald-900'}`}>
+              <label className={`block text-xs font-semibold text-emerald-900 dark:text-emerald-400`}>
                 Coordenadas GPS (Latitud, Longitud)
               </label>
               <input
@@ -238,11 +230,7 @@ export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
                 value={project.client.coordinates || '18.4861, -69.9312'}
                 onChange={(e) => updateClient({ coordinates: e.target.value })}
                 placeholder="18.4861, -69.9312"
-                className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                  isDark
-                    ? 'bg-[#18181b] border-[#3f3f46] text-zinc-100'
-                    : 'bg-white border-slate-300 text-slate-800'
-                }`}
+                className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all bg-white border-slate-300 text-slate-800 dark:bg-[#18181b] dark:border-[#3f3f46] dark:text-zinc-100`}
               />
               <button
                 type="button"
@@ -262,9 +250,7 @@ export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
               </button>
               {solarApiStatus && (
                 <p
-                  className={`text-[10px] font-medium mt-1 flex items-center gap-1 ${
-                    isDark ? 'text-emerald-300' : 'text-emerald-700'
-                  }`}
+                  className={`text-[10px] font-medium mt-1 flex items-center gap-1 text-emerald-700 dark:text-emerald-300`}
                 >
                   <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" /> {solarApiStatus}
                 </p>
@@ -284,11 +270,9 @@ export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
             return (
               <div className="space-y-2 pt-1">
                 <div className="flex items-center justify-between">
-                  <span className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                  <span className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 text-slate-500 dark:text-zinc-400`}>
                     <span>Código & Cotización</span>
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold border ${
-                      isDark ? 'bg-emerald-950/60 text-emerald-300 border-emerald-700/50' : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                    }`}>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold border bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-700/50`}>
                       Auto
                     </span>
                   </span>
@@ -311,7 +295,7 @@ export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                    <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
                       ID del Proyecto
                     </label>
                     <input
@@ -331,7 +315,7 @@ export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
                     />
                   </div>
                   <div>
-                    <label className={`block text-xs font-medium mb-1 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                    <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
                       N° Cotización
                     </label>
                     <input
@@ -355,7 +339,7 @@ export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
                 {/* Fecha de Emisión / Cotización */}
                 <div className="pt-1">
                   <div className="flex items-center justify-between mb-1">
-                    <label className={`text-xs font-medium flex items-center gap-1.5 ${isDark ? 'text-zinc-300' : 'text-slate-600'}`}>
+                    <label className={`text-xs font-medium flex items-center gap-1.5 text-slate-600 dark:text-zinc-300`}>
                       <Calendar className="w-3.5 h-3.5 text-emerald-500" />
                       <span>Fecha de Cotización / Emisión</span>
                     </label>
@@ -375,15 +359,9 @@ export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
                       type="date"
                       value={getProposalDateInputValue(project.client.quoteDate)}
                       onChange={(e) => updateClient({ quoteDate: e.target.value })}
-                      className={`flex-1 border rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
-                        isDark
-                          ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:border-emerald-500'
-                          : 'bg-white border-slate-300 text-slate-800 focus:border-emerald-600'
-                      }`}
+                      className={`flex-1 border rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all bg-white border-slate-300 text-slate-800 focus:border-emerald-600 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100 dark:focus:border-emerald-500`}
                     />
-                    <span className={`text-xs font-bold font-mono px-2 py-1.5 rounded-lg border shrink-0 ${
-                      isDark ? 'bg-[#181820] border-[#333344] text-emerald-400' : 'bg-slate-100 border-slate-200 text-slate-800'
-                    }`}>
+                    <span className={`text-xs font-bold font-mono px-2 py-1.5 rounded-lg border shrink-0 bg-slate-100 border-slate-200 text-slate-800 dark:bg-[#181820] dark:border-[#333344] dark:text-emerald-400`}>
                       {formatProposalDate(project.client.quoteDate, 'numeric')}
                     </span>
                   </div>

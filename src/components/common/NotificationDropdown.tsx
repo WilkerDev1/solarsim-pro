@@ -110,17 +110,11 @@ export const NotificationDropdown: React.FC = () => {
       {/* 🪟 Notification Popover Dropdown */}
       {isOpen && (
         <div
-          className={`absolute right-0 top-12 w-80 sm:w-96 rounded-2xl shadow-2xl border z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150 ${
-            isDark
-              ? 'bg-[#18181b] border-[#27272a] text-zinc-100'
-              : 'bg-white border-slate-200 text-slate-900'
-          }`}
+          className={`absolute right-0 top-12 w-80 sm:w-96 rounded-2xl shadow-2xl border z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150 bg-white border-slate-200 text-slate-900 dark:bg-[#18181b] dark:border-[#27272a] dark:text-zinc-100`}
         >
           {/* Header */}
           <div
-            className={`flex items-center justify-between px-4 py-3 border-b ${
-              isDark ? 'border-[#27272a] bg-[#121214]' : 'border-slate-100 bg-slate-50'
-            }`}
+            className={`flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50 dark:border-[#27272a] dark:bg-[#121214]`}
           >
             <div className="flex items-center gap-2">
               <span className="font-bold text-xs uppercase tracking-wider">Actividad de Equipo</span>

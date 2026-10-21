@@ -1,3 +1,4 @@
+import { isReaderRole } from '../../../shared/permissions';
 import { prepareProposalDraftProject, createAIProposalBase } from '../../utils/proposalDraftProject';
 import { companyDocumentCustomization } from '../../utils/companyDocumentTemplate';
 import { projectMutationMetadata } from '../sync/projectMutation';
@@ -26,7 +27,7 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
   applyExtractedInvoice: (input,createNewProject=false)=>{
     const state=get();
     const current=state.projects.find(p=>p.id===state.activeProjectId);
-    if(['VIEWER','LECTOR'].includes(state.syncSettings.currentUser?.role || '')) {set({saveFeedbackMessage:'Tu rol permite consultar propuestas, no crearlas ni modificarlas.'});return;}
+    if(isReaderRole(state.syncSettings.currentUser?.role)) {set({saveFeedbackMessage:'Tu rol permite consultar propuestas, no crearlas ni modificarlas.'});return;}
     if(!createNewProject && (!current || current.isDeleted || current.deletedAt || (current.organizationId && current.organizationId!==state.syncSettings.currentUser?.organizationId))) {set({saveFeedbackMessage:'No se puede actualizar esta propuesta.'});return;}
     const isGrounded=Array.isArray(input.panels) || Array.isArray(input.inverters) || Array.isArray(input.batteries);
     const province=normalizeProvinceName(input.province || input.municipality || (!createNewProject?current?.client.province:state.defaultSimulationSettings.defaultProvince));

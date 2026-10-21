@@ -1,3 +1,4 @@
+import { isWriterRole } from '../../../shared/permissions';
 import { changeWorkspace } from '../sync/organizationWorkspace';
 import { CompanyService } from '../../services/companyService';
 import { projectDifferences } from '../sync/projectDifferences';
@@ -197,7 +198,7 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
     const { serverUrl, currentUser } = session;
     if (!session.authToken || !currentUser) return { success: false, message: 'Inicia sesión para sincronizar proyectos.' };
     const scope = featureScope(serverUrl, currentUser.organizationId);
-    const canWrite = currentUser.role === 'ADMIN' || currentUser.role === 'EDITOR';
+    const canWrite = isWriterRole(currentUser.role);
     const ensureCurrent = () => { if (!session.isCurrent()) throw new Error('La sesión cambió durante la sincronización.'); };
     const token = () => get().syncSettings.authToken!;
     set({ isSyncing: true, syncFeedbackMessage: silent ? null : 'Sincronizando…' });

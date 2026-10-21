@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { normalizeProposalDraft, buildProposalRequest, robustParseJson } from '../../shared/aiProposal';
 import { requestGeminiJson, GeminiRequestError, geminiResponseText, type GeminiTransport } from '../../shared/geminiTransport';
-import { processExtractedInvoice } from '../../electron/ai/invoiceExtractor';
+import { processExtractedInvoice } from '../utils/aiProposalNormalization';
 import { parseProposalWithAI } from '../services/geminiInvoiceService';
 import { useSimulationStore } from '../store/useSimulationStore';
 import https from 'node:https';

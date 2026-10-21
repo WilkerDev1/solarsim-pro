@@ -19,6 +19,7 @@ import { ShareProposalModal } from './components/common/ShareProposalModal';
 import { SettingsModal } from './components/settings/SettingsModal';
 const AIPriceCatalogScannerModal = lazy(() => import('./components/common/AIPriceCatalogScannerModal').then((module) => ({ default: module.AIPriceCatalogScannerModal })));
 import { SupplierPricesDetailModal } from './components/common/SupplierPricesDetailModal';
+import { ConfirmDialog } from './components/common/ConfirmDialog';
 import { SplashScreen } from './components/common/SplashScreen';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 const AppAssistant = lazy(() => import('./features/assistant/components/AppAssistant').then(module => ({ default: module.AppAssistant })));
@@ -125,6 +126,7 @@ export const App: React.FC = () => {
       <SettingsModal key={`settings-modal-${settingsOwner}`} />
       <AIPriceCatalogScannerModal key={`ai-catalog-${sessionGeneration}`} />
       <SupplierPricesDetailModal key={`supplier-prices-${sessionGeneration}`} />
+      <ConfirmDialog />
     </div>
     </Suspense>
   );

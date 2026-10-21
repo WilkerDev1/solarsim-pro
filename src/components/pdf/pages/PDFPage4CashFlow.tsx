@@ -1,3 +1,4 @@
+import { PDFPageShell } from '../PDFPageShell';
 import React from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
@@ -28,26 +29,16 @@ export const PDFPage4CashFlow: React.FC<PDFPage4CashFlowProps> = ({
   const cf25 = summary.cashFlow25Years;
 
   return (
-    <div className="pdf-page w-[850px] h-[1202px] min-h-[1202px] max-h-[1202px] bg-white shadow-xl flex flex-col shrink-0 relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
-      {/* Background Watermark */}
-      <PDFWatermark
-        opacity={project.customization?.watermarkOpacity ?? 0.15}
-        customWatermarkBase64={project.customization?.watermarkLogoBase64}
-      />
-
-      {/* Header Banner */}
-      {showHeadersFooters && (
-        <PDFHeaderBanner
-          activeTheme={activeTheme}
-          projectId={project.client.projectId}
-          clientName={project.client.name}
-          systemCapacityKWp={summary.systemCapacityKWp}
-          location={project.client.province || project.client.location}
-          currentDateStr={currentDateStr}
-          pageTitle="FLUJO DE CAJA Y BENEFICIOS ACUMULADOS (25 AÑOS)"
-          customization={project.customization}
-        />
-      )}
+    <PDFPageShell
+      project={project}
+      summary={summary}
+      activeTheme={activeTheme}
+      showHeadersFooters={showHeadersFooters}
+      currentDateStr={currentDateStr}
+      pageNum={pageNum}
+      totalPages={totalPages}
+      pageTitle="FLUJO DE CAJA Y BENEFICIOS ACUMULADOS (25 AÑOS)"
+    >
 
       {/* Body */}
       <div className="px-10 pt-2 pb-3 flex-1 flex flex-col justify-between gap-2 relative z-10 min-h-0">
@@ -171,15 +162,6 @@ export const PDFPage4CashFlow: React.FC<PDFPage4CashFlowProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Footer */}
-      {showHeadersFooters && (
-        <PDFFooter
-          pageNum={pageNum}
-          totalPages={totalPages}
-          customization={project.customization}
-        />
-      )}
-    </div>
+    </PDFPageShell>
   );
 };

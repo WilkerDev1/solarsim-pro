@@ -271,9 +271,9 @@ export interface FinancialSummaryResult {
   annualConsumptionKWh: number;
   annualProductionKWh: number;
   energyCoveragePct: number;
-  listGrossInvestmentUSD?: number; // Inversión Bruta de Lista antes de descuentos
-  totalDiscountUSD?: number;       // Total descuentos aplicados (USD)
-  equipmentDiscountUSD?: number;   // Descuento imputado a equipos (afecta base Ley 57-07)
+  listGrossInvestmentUSD: number; // Inversión Bruta de Lista antes de descuentos
+  totalDiscountUSD: number;       // Total descuentos aplicados (USD)
+  equipmentDiscountUSD: number;   // Descuento imputado a equipos (afecta base Ley 57-07)
   grossInvestmentUSD: number;      // Inversión Bruta Final tras descuentos
   contractPriceUSD: number;      // Monto acordado y pagable en contrato Año 0 (con ITBIS exonerado si aplica)
   initialOutflowUSD: number;     // Desembolso inicial real para flujo de caja Año 0 (= contractPriceUSD)
@@ -298,12 +298,12 @@ export interface FinancialSummaryResult {
   costMatrix: CostMatrixSummary;
   batteryUsableKWh: number;
   batteryBackupAutonomyHours: number;
-  customItemsTotalUSD?: number;
-  customItemsITBISUSD?: number;
-  customItemsNonExoneratedITBISUSD?: number;
-  commercialPreTaxSubtotalUSD?: number;
-  customItemsList?: CustomQuotationItem[];
-  customDiscountsList?: CustomQuotationDiscount[];
+  customItemsTotalUSD: number;
+  customItemsITBISUSD: number;
+  customItemsNonExoneratedITBISUSD: number;
+  commercialPreTaxSubtotalUSD: number;
+  customItemsList: CustomQuotationItem[];
+  customDiscountsList: CustomQuotationDiscount[];
 }
 
 export interface DocumentCustomization {
@@ -490,8 +490,6 @@ declare global {
       installLinuxPackage: (packageType: 'pacman' | 'deb', version: string) => Promise<{ success: boolean; error?: string }>;
       parseInvoiceWithAI?: (payload: import('../../shared/aiProposal').AIProposalPayload) => Promise<{ success: boolean; data?: ExtractedInvoiceData; error?: string }>;
       cancelAIRequest?: (requestId: string) => Promise<void>;
-      parseDatasheetWithAI?: (payload: { fileBase64: string; mimeType: string; fileName: string; apiKey?: string; model?: string }) => Promise<{ success: boolean; data?: import('./equipment').ExtractedDatasheetData; error?: string }>;
-      validateGeminiApiKey?: (apiKey: string, model?: string) => Promise<{ success: boolean; error?: string; modelName?: string; models?: GeminiModelInfo[] }>;
       listGeminiModels?: (apiKey: string) => Promise<{ success: boolean; error?: string; models?: GeminiModelInfo[] }>;
     };
   }

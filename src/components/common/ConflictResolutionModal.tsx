@@ -1,3 +1,4 @@
+import { isWriterRole } from '../../../shared/permissions';
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, X } from 'lucide-react';
@@ -15,7 +16,7 @@ export const ConflictResolutionModal: React.FC = () => {
   const dialog = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!activeConflict) return;
-    setChoice(activeConflict.reason !== 'deleted' && !['ADMIN', 'EDITOR'].includes(syncSettings.currentUser?.role ?? '') ? 'accept_server' : 'fork');
+    setChoice(activeConflict.reason !== 'deleted' && !isWriterRole(syncSettings.currentUser?.role) ? 'accept_server' : 'fork');
     const previous = document.activeElement as HTMLElement | null;
     dialog.current?.querySelector<HTMLButtonElement>('button')?.focus();
     const overflow = document.body.style.overflow;
@@ -23,7 +24,7 @@ export const ConflictResolutionModal: React.FC = () => {
     return () => { document.body.style.overflow = overflow; previous?.isConnected && previous.focus(); };
   }, [activeConflict?.projectId]);
   if (!activeConflict) return null;
-  const readOnly = !['ADMIN', 'EDITOR'].includes(syncSettings.currentUser?.role ?? '');
+  const readOnly = !isWriterRole(syncSettings.currentUser?.role);
   const visibleChoices = activeConflict.reason === 'deleted' ? (readOnly ? [] : [{ id: 'fork' as Choice, title: 'Guardar como nueva', description: 'Crea una propuesta nueva con los cambios de este equipo.' }]) : choices;
   const close = () => setActiveConflict(null);
   const allowed = (id: Choice) => (!readOnly || id === 'accept_server') && (activeConflict.reason !== 'deleted' || id === 'fork');

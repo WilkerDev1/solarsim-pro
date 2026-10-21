@@ -1,14 +1,16 @@
+import { canAdminister } from '../../../shared/permissions';
 import React, { useState } from 'react';
 import { Folder, FolderPlus, Edit3, Trash2, EyeOff } from 'lucide-react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { ProjectFolder } from '../../types';
 import { CreateFolderModal } from './sidebar/CreateFolderModal';
+import { confirmAction } from '../common/confirmAction';
 
 export const FoldersResumeGrid: React.FC = () => {
   const { folders, projects, activeFolderId, setActiveFolderId, syncSettings, deleteFolder, moveProjectToFolder } = useSimulationStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [folderToEdit, setFolderToEdit] = useState<ProjectFolder | null>(null);
-  const isAdmin = !syncSettings.currentUser || syncSettings.currentUser.role === 'ADMIN';
+  const isAdmin = canAdminister(syncSettings.currentUser);
   const edit = (folder: ProjectFolder | null) => { setFolderToEdit(folder); setIsModalOpen(true); };
   return <section className="space-y-4 border-t border-slate-200 pt-6 dark:border-zinc-800" aria-label="Carpetas de propuestas">
     <div className="flex items-center justify-between gap-3">
@@ -28,7 +30,7 @@ export const FoldersResumeGrid: React.FC = () => {
           </button>
           {isAdmin && <div className="flex shrink-0 items-center gap-1">
             <button type="button" aria-label={`Editar carpeta ${folder.name}`} onClick={() => edit(folder)} className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100 dark:text-zinc-400 dark:hover:bg-zinc-800"><Edit3 className="h-3.5 w-3.5" /></button>
-            <button type="button" aria-label={`Eliminar carpeta ${folder.name}`} onClick={() => { if (confirm(`¿Eliminar la carpeta «${folder.name}»? Sus proyectos se conservarán.`)) deleteFolder(folder.id); }} className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-rose-50 hover:text-rose-700 dark:text-zinc-400 dark:hover:bg-rose-950 dark:hover:text-rose-300"><Trash2 className="h-3.5 w-3.5" /></button>
+            <button type="button" aria-label={`Eliminar carpeta ${folder.name}`} onClick={async () => { if (await confirmAction({ title: 'Eliminar carpeta', message: `¿Eliminar la carpeta «${folder.name}»? Sus proyectos se conservarán.`, confirmLabel: 'Eliminar', tone: 'danger' })) deleteFolder(folder.id); }} className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 hover:bg-rose-50 hover:text-rose-700 dark:text-zinc-400 dark:hover:bg-rose-950 dark:hover:text-rose-300"><Trash2 className="h-3.5 w-3.5" /></button>
           </div>}
         </li>)}
       </ul>}

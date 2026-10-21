@@ -1,103 +1,40 @@
-# ☀️ SolarSim Pro
+# SolarSim Pro
 
-**Simulador Fotovoltaico Técnico-Económico Profesional** diseñado para ingenieros, instaladores y consultorías de energía solar fotovoltaica.
+Simulador técnico-económico de escritorio para diseñar y cotizar sistemas fotovoltaicos con almacenamiento (BESS) en República Dominicana: producción por provincia, balance energético con medición neta, tarifas de las distribuidoras, finanzas con Ley 57-07 (VAN, TIR, payback, flujo a 25 años), propuestas PDF y web, catálogo de equipos y trabajo colaborativo por organización.
 
----
+## Componentes
 
-## 🚀 Características Principales
+- **Aplicación de escritorio** (`src/`, `electron/`): React 18, TypeScript, Zustand, Tailwind y Electron 44. Funciona sin conexión; el trabajo local se conserva. Actualizaciones firmadas para Linux y electron-updater en Windows.
+- **API de sincronización** (`server/`): Hono + PostgreSQL 16 en Docker. Autenticación JWT, organizaciones con roles ADMIN/EDITOR/LECTOR, sincronización con control de versiones (CAS) y migraciones aditivas.
+- **Visor de propuestas** (`workers/share-viewer/`): Cloudflare Worker + KV que publica copias inmutables de propuestas con enlace y QR.
+- **Asistente IA**: lectura de facturas, fichas técnicas y listas de precios, y borradores de propuesta con Google Gemini (clave del usuario). Todo borrador requiere revisión antes de aplicarse.
+- **Contratos compartidos** (`shared/`): tipos y normalizadores usados por app, API y Worker.
 
-* ⚡ **Dimensionamiento Técnico Preciso**:
-  * Simulación de producción anual con irradiación solar por provincias de la República Dominicana.
-  * Análisis de demanda energética horaria y mensual vs curva de generación solar.
-  * Cobertura de autoconsumo e inyección de excedentes a la red bajo el esquema de Medición Neta (**EDES**).
-* 💰 **Ingeniería Financiera & Ley 57-07**:
-  * Cálculo de incentivos fiscales (crédito fiscal del 40% del costo de inversión, 0% ITBIS y aranceles 0%).
-  * Métricas avanzadas de retorno de inversión: **Payback Simple y Descontado**, **VAN (NPV)**, **TIR (IRR)**, **ROI a 25 Años** y **LCOE**.
-  * Proyección de Flujo de Caja detallado a 25 años considerando degradación de paneles e inflación tarifaria.
-* 📄 **Suite Modular de Propuestas PDF Ejecutivas**:
-  * **Portada Ejecutiva Moderna** con renderizado de logotipos transparentes y tipografía complementaria.
-  * **Índice de Contenido Dinámico** con sincronización de páginas en tiempo real.
-  * **1. ¿Quiénes Somos? & Pilares de Servicio**.
-  * **2. Beneficios de la Energía Solar & Ley 57-07** (con render 3D arquitectónico).
-  * **3. ¿Qué es un Sistema FV? & Flujo Técnico** (render frontal 3D de techo y diagrama energético).
-  * **4. Descripción del Proyecto & Normativa SIE** (Resolución SIE-007-2026-REG y tarifas BTS1/BTS2).
-  * **5. Análisis de Energía y Balance**.
-  * **6. Cotización y Presupuesto de Módulos Tier-1**.
-  * **7. Retorno de Inversión y Métricas Financieras**.
-  * **8. Flujo de Caja a 25 Años**.
-  * **9. Matriz de Costos Internos (Confidencial)** con cálculo de margen comercial y proveedores.
-* 🏢 **Panel Multi-Empresa ("Datos del Documento")**:
-  * Personalización instantánea de nombre, eslogan, redes, teléfonos, garantías y notas regulatorias.
-  * Subida independiente de **Logotipo de Portada**, **Logotipo de Cabecera** y **Marca de Agua Central** con control de opacidad.
-* 🗑️ **Papelera de Reciclaje & Modo Solo Lectura**:
-  * Borrado suave con retención de 30 días y auto-purga sincronizada con el servidor.
-  * Exploración segura de propuestas eliminadas en Modo Solo Lectura (Simulador y PDF con alertas visuales).
-  * Restauración en 1-clic o eliminación física definitiva individual y masiva ("Vaciar Papelera").
-  * Soporte para Drag and Drop directamente desde el árbol lateral hacia la papelera.
-* 🔄 **Actualizador Automático Integrado**:
-  * Detección y descarga en 1-clic de nuevas versiones en Windows y Linux.
+## Requisitos
 
----
+- Node.js 24 o superior (`engines` en `package.json`) y npm.
+- Docker, para las pruebas de integración de la API.
 
-## 🛠️ Tecnologías Utilizadas
+## Comandos
 
-* **Frontend**: React 18, TypeScript, Tailwind CSS, Lucide React, Recharts, Zustand.
-* **Desktop Runtime**: Electron 31 + esbuild (compilación ultrarrápida del main y preload).
-* **Exportación Documental**: jsPDF + html2canvas con activos Base64 embebidos.
-* **Empaquetado & Distribución**: electron-builder + electron-updater + GitHub Releases.
-
----
-
-## 💻 Instalación y Desarrollo Local
-
-### Requisitos Previos:
-* Node.js v18 o superior
-* npm v9 o superior
-
-### Clonar e Instalar Dependencias:
 ```bash
-git clone https://github.com/WilkerDev1/solarsim-pro.git
-cd solarsim-pro
-npm install
-```
-
-### Comandos de Desarrollo:
-```bash
-# Iniciar servidor de desarrollo en navegador
-npm run dev
-
-# Iniciar aplicación de escritorio en modo desarrollo
-npm run electron:dev
-
-# Ejecutar verificación de tipos TypeScript
-npm run lint
-
-# Ejecutar validación de cálculos matemáticos del motor
-npx tsx src/tests/testBenchmark.ts
-
-# Compilar bundles para producción
+npm ci
+npm run dev               # aplicación web en Vite
+npm run electron:dev      # aplicación de escritorio en desarrollo
+npm run lint              # verificación de tipos
+npm test                  # suites del cliente (una suite: npm test -- <filtro>)
 npm run build && npm run build:electron
+npm --prefix server ci && npm --prefix server test
+npm --prefix workers/share-viewer ci && npm --prefix workers/share-viewer test
 ```
 
-### Compilar Instaladores de Escritorio:
-```bash
-# Compilar instalador de Windows (.exe / portable)
-npm run build:win
+Los instaladores oficiales se compilan en GitHub Actions al publicar un tag; `npm run build:win` y `npm run build:linux` generan paquetes locales. El procedimiento completo de verificación y publicación está en [docs/MAINTENANCE_AND_UPDATES.md](docs/MAINTENANCE_AND_UPDATES.md).
 
-# Compilar paquetes de Linux (.pacman / .AppImage / .deb / .tar.gz)
-npm run build:linux
-```
+## Documentación
 
----
+- [docs/README.md](docs/README.md): índice de la documentación.
+- [AGENTS.md](AGENTS.md): contratos, invariantes y gates para contribuir.
 
-## 📖 Documentación de Mantenimiento & Releases
+## Licencia
 
-Para detalles sobre políticas de dependencias, firmas criptográficas GPG, configuración del auto-updater y la guía paso a paso para publicar nuevas versiones, consulta:
-
-👉 **[Guía de Mantenimiento & Updates](file:///home/ishiro/Proyectos/1_Principales/solarsim/docs/MAINTENANCE_AND_UPDATES.md)**
-
----
-
-## 📄 Licencia
-
-Desarrollado por **WilkerDev1** — Todos los derechos reservados.
+Desarrollado por WilkerDev1. Todos los derechos reservados.

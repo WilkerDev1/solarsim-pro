@@ -1,17 +1,18 @@
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
 import pg from "pg";
 import jwt from "jsonwebtoken";
 import { createApp } from "../src/app.js";
 import { migrateDatabase } from "../src/database/migrations.js";
 import { readConfig } from "../src/config.js";
-const exec = promisify(execFile);
-const container = `solarsim-integration-${crypto.randomUUID()}`;
+import {
+  startEphemeralPostgres,
+  type EphemeralPostgres,
+} from "./helpers/ephemeralPostgres.js";
 const secret =
   "test-only-private-secret-never-used-outside-local-tests-0123456789";
+let database: EphemeralPostgres;
 let pool: pg.Pool;
 let app: ReturnType<typeof createApp>;
 let admin: any, other: any, editor: any, reader: any;
@@ -73,43 +74,8 @@ const equipment = (id: string) => ({
 });
 before(
   async () => {
-    await exec("docker", [
-      "run",
-      "--detach",
-      "--rm",
-      "--name",
-      container,
-      "--publish",
-      "127.0.0.1::5432",
-      "--env",
-      "POSTGRES_USER=solarsim_test",
-      "--env",
-      "POSTGRES_PASSWORD=isolated-test-only",
-      "--env",
-      "POSTGRES_DB=solarsim_test",
-      "postgres:16-alpine",
-    ]);
-    const mapped = (
-      await exec("docker", ["port", container, "5432/tcp"])
-    ).stdout.trim();
-    pool = new pg.Pool({
-      host: "127.0.0.1",
-      port: Number(mapped.split(":").at(-1)),
-      user: "solarsim_test",
-      password: "isolated-test-only",
-      database: "solarsim_test",
-      connectionTimeoutMillis: 1000,
-    });
-    for (let attempt = 0; attempt < 50; attempt++) {
-      try {
-        await pool.query("SELECT 1");
-        break;
-      } catch {
-        if (attempt === 49)
-          throw new Error("Isolated PostgreSQL did not start");
-        await delay(100);
-      }
-    }
+    database = await startEphemeralPostgres("solarsim-integration");
+    pool = database.pool;
     await migrateDatabase(pool);
     await migrateDatabase(pool); // idempotent upgrades preserve records
     app = createApp({ pool, jwtSecret: secret, logging: false });
@@ -121,8 +87,7 @@ before(
   { timeout: 30000 },
 );
 after(async () => {
-  await pool?.end();
-  await exec("docker", ["stop", container]).catch(() => {});
+  await database?.stop();
 });
 test("startup rejects missing secrets and publicly exposed defaults", () => {
   assert.throws(() => readConfig({}), /JWT_SECRET/);

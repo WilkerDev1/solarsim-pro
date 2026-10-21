@@ -1,12 +1,13 @@
+import { canEditCommercial } from '../../features/proposals/commercial';
 import { isProposalLink } from '../../../shared/proposalLinks';
+import { normalizeEquipmentEdit, normalizeSpecsChange } from '../../utils/equipmentGroups';
 import { commercialCopy, commercialState, isProposalCommercial } from '../../../shared/proposalCommercial';
-import { ownsProject } from '../sync/projectReconciliation';
 import { companyDocumentCustomization, reusableDocumentTemplate } from '../../utils/companyDocumentTemplate';
 import { DEFAULT_SIMULATION_SETTINGS } from '../defaultSimulationSettings';
 import { energyCalculationMode } from '../../../shared/applicationFeatures';
 import { effectiveFeatureSettings } from '../../features/application/featurePolicy';
-import { SimulationSlice, ProjectSlice } from '../types';
-import { ProjectSimulation } from '../../types';
+import { SimulationSlice, ProjectSlice, SimulationStore } from '../types';
+import { ClientInfo, FinancialParams, ProjectSimulation, SystemSpecs } from '../../types';
 import { normalizeEnabledBatteries } from '../../utils/batteryState';
 import { BENCHMARK_PROJECT } from '../../engine/referenceCase';
 import { INITIAL_PROJECTS, generateNextProjectSequence, generateDuplicateProjectIdentifiers } from '../initialData';
@@ -15,7 +16,70 @@ import { calculateRecommendedPanelCount } from '../../engine/solarEngine';
 import { projectMutationMetadata } from '../sync/projectMutation';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
 
-export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => ({
+/** Specs with the panel count the engine recommends for this consumption, province and coverage target. */
+function withRecommendedPanels(specs: SystemSpecs, client: ClientInfo, monthlyConsumption: number[], targetCoveragePct: number): SystemSpecs {
+  const rec = calculateRecommendedPanelCount(
+    client.province,
+    monthlyConsumption,
+    specs.panelPowerW || 620,
+    targetCoveragePct,
+    specs.systemLosses !== undefined ? specs.systemLosses : 25.0,
+    client.customMonthlyHSP
+  );
+  // Goes through the group normalizer so a single panel group receives the recommendation too.
+  return normalizeEquipmentEdit(specs, { panelCount: rec.recommendedPanelCount });
+}
+
+/** Keeps equipment groups and their legacy mirror consistent whatever path changed the specs. */
+function withNormalizedEquipment(previous: ProjectSimulation, next: ProjectSimulation): ProjectSimulation {
+  return next.specs === previous.specs ? next : { ...next, specs: normalizeSpecsChange(previous.specs, next.specs) };
+}
+
+/** Manual override fields only survive on the audited reference case; edits elsewhere recompute them. */
+function withoutStaleFinancialOverrides(project: ProjectSimulation, financials: FinancialParams): FinancialParams {
+  const next = { ...financials };
+  if (project.id !== 'benchmark-centro-medico') {
+    delete next.customITBISSavedUSD;
+    delete next.customLey5707CreditUSD;
+    delete next.customCostUSD;
+  }
+  return next;
+}
+
+export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
+  /** Proposals in the trash are read-only until restored, whatever UI or tool calls the store. */
+  const isActiveProjectTrashed = () => {
+    const state = get();
+    return !!state.projects.find((p) => p.id === (state.activeProjectId || state.getActiveProject()?.id))?.isDeleted;
+  };
+
+  /** Applies an edit to the active project, stamps mutation metadata, then auto-syncs and records undo. */
+  const updateActiveProject = (edit: (project: ProjectSimulation, state: SimulationStore) => Partial<ProjectSimulation>) => {
+    if (isActiveProjectTrashed()) return;
+    set((state) => ({
+      projects: state.projects.map((p) => p.id === state.activeProjectId
+        ? withNormalizedEquipment(p, { ...p, ...projectMutationMetadata(p, get().syncSettings), updatedAt: new Date().toISOString(), ...edit(p, state) })
+        : p),
+    }));
+    get().triggerAutoSync(false);
+    const active = get().getActiveProject();
+    if (active) get().recordUndoState(active);
+  };
+
+  const updateActiveConsumption = (nextConsumption: (current: number[]) => number[], lockAutoPanels = false) =>
+    updateActiveProject((p) => {
+      const monthlyConsumption = nextConsumption(p.monthlyConsumption);
+      let specs = { ...p.specs };
+      if (lockAutoPanels) specs.autoCalculatePanels = false;
+      else if (specs.autoCalculatePanels) specs = withRecommendedPanels(specs, p.client, monthlyConsumption, p.rates.targetCoveragePct ?? 95);
+      return {
+        monthlyConsumption,
+        aiSource: p.aiSource?.consumptionSource === 'theoretical' ? { ...p.aiSource, consumptionSource: 'estimated' } : p.aiSource,
+        specs,
+      };
+    });
+
+  return {
   projects: INITIAL_PROJECTS,
   activeProjectId: '',
   activeView: 'simulator',
@@ -397,8 +461,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
   },
 
   linkProposals: (id, parentId) => {
-    const state=get(), project=state.projects.find(p=>p.id===id), user=state.syncSettings.currentUser;
-    const writable=(p: typeof project)=>p && !p.isDeleted && p.syncStatus!=='conflict' && (!user || (['ADMIN','EDITOR'].includes(user.role) && ownsProject(p,state.syncSettings.serverUrl,user.organizationId)));
+    const state=get(), project=state.projects.find(p=>p.id===id);
+    const writable=(p: typeof project)=>p && canEditCommercial(p,state.syncSettings);
     if(!writable(project))return {success:false,error:'La propuesta no permite cambios.'};
     if(parentId===null){set({projects:state.projects.map(p=>p.id===id?{...p,proposalLink:{parentId:null,color:p.proposalLink?.color},...projectMutationMetadata(p,state.syncSettings),updatedAt:new Date().toISOString()}:p)});state.triggerAutoSync();return {success:true};}
     const parent=state.projects.find(p=>p.id===parentId);if(!writable(parent))return {success:false,error:'La propuesta principal no está disponible para enlazar.'};
@@ -409,12 +473,12 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
   setProposalGroupColor: (id,color) => {
     const state=get();if(!isProposalLink({parentId:null,color}))return {success:false,error:'Color de grupo inválido.'};
     let project=state.projects.find(p=>p.id===id);const visited=new Set<string>();while(project?.proposalLink?.parentId && !visited.has(project.id)){visited.add(project.id);const parent=state.projects.find(p=>p.id===project?.proposalLink?.parentId);if(!parent)break;project=parent;}
-    const user=state.syncSettings.currentUser;if(!project || project.isDeleted || project.syncStatus==='conflict' || (user && (!['ADMIN','EDITOR'].includes(user.role) || !ownsProject(project,state.syncSettings.serverUrl,user.organizationId))))return {success:false,error:'El grupo no permite cambios.'};
+    if(!project || !canEditCommercial(project,state.syncSettings))return {success:false,error:'El grupo no permite cambios.'};
     const root=project;set({projects:state.projects.map(p=>p.id===root.id?{...p,proposalLink:{parentId:p.proposalLink?.parentId||null,color},...projectMutationMetadata(p,state.syncSettings),updatedAt:new Date().toISOString()}:p)});state.triggerAutoSync();return {success:true};
   },
   addProposalCommercialReport: (id,report,updateCurrent) => {
     const state=get(), project=state.projects.find(p=>p.id===id), user=state.syncSettings.currentUser;
-    if(!project || project.isDeleted || project.syncStatus==='conflict' || (user && (!['ADMIN','EDITOR'].includes(user.role) || !ownsProject(project,state.syncSettings.serverUrl,user.organizationId))))return {success:false,error:'La propuesta no permite cambios.'};
+    if(!project || !canEditCommercial(project,state.syncSettings))return {success:false,error:'La propuesta no permite cambios.'};
     const current=commercialState(project), now=new Date().toISOString();
     const reports=[...(current.reports||[])];
     // Preserve the pre-history note once, with its original state and attribution.
@@ -427,7 +491,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
   },
   setProposalCommercialState: (id, patch) => {
     const state = get(), project = state.projects.find(p => p.id === id), user = state.syncSettings.currentUser;
-    if (!project || project.isDeleted || project.syncStatus === 'conflict' || (user && (!['ADMIN', 'EDITOR'].includes(user.role) || !ownsProject(project, state.syncSettings.serverUrl, user.organizationId)))) return { success: false, error: 'Esta propuesta no permite cambios. Revisa permisos, papelera o conflictos pendientes.' };
+    if (!project || !canEditCommercial(project, state.syncSettings)) return { success: false, error: 'Esta propuesta no permite cambios. Revisa permisos, papelera o conflictos pendientes.' };
     const previous = commercialState(project);
     const next = { ...previous, ...patch, updatedAt: new Date().toISOString(), updatedById: user?.id, updatedByName: user?.name || state.localUserProfile.name || 'Consultor local' };
     if (!isProposalCommercial(next)) return {success:false,error:'Estado inválido o nota demasiado larga (máximo 4000 caracteres).'};
@@ -467,356 +531,77 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
     }
   },
 
-  updateClient: (clientPartial) => {
-    set((state) => ({
-      projects: state.projects.map((p) => {
-        if (p.id === state.activeProjectId) {
-          const updatedClient = { ...p.client, ...clientPartial };
-          const updatedSpecs = { ...p.specs };
-          const updatedCustomization = { ...(p.customization || {}) };
+  updateClient: (clientPartial) => updateActiveProject((p) => {
+    const client = { ...p.client, ...clientPartial };
+    const customization = { ...(p.customization || {}) };
+    if (clientPartial.contactPhone !== undefined) customization.clientPhone = clientPartial.contactPhone;
+    if (clientPartial.contactPerson !== undefined) customization.contactName = clientPartial.contactPerson;
+    const specs = p.specs.autoCalculatePanels && clientPartial.province
+      ? withRecommendedPanels(p.specs, client, p.monthlyConsumption, p.rates.targetCoveragePct ?? 95)
+      : { ...p.specs };
+    return { client, specs, customization };
+  }),
 
-          if (clientPartial.contactPhone !== undefined) {
-            updatedCustomization.clientPhone = clientPartial.contactPhone;
-          }
-          if (clientPartial.contactPerson !== undefined) {
-            updatedCustomization.contactName = clientPartial.contactPerson;
-          }
+  updateSpecs: (specsPartial) => updateActiveProject((p, state) => {
+    let specs = normalizeEnabledBatteries(normalizeEquipmentEdit(p.specs, specsPartial));
+    const shouldAutoCalc = specsPartial.autoCalculatePanels !== undefined
+      ? specsPartial.autoCalculatePanels
+      : (p.specs.autoCalculatePanels && specsPartial.panelCount === undefined);
 
-          if (updatedSpecs.autoCalculatePanels && clientPartial.province) {
-            const panelW = updatedSpecs.panelPowerW || 620;
-            const targetCoverage = p.rates.targetCoveragePct ?? 95;
-            const losses = updatedSpecs.systemLosses !== undefined ? updatedSpecs.systemLosses : 25.0;
-            const rec = calculateRecommendedPanelCount(
-              updatedClient.province,
-              p.monthlyConsumption,
-              panelW,
-              targetCoverage,
-              losses,
-              updatedClient.customMonthlyHSP
-            );
-            updatedSpecs.panelCount = rec.recommendedPanelCount;
-          }
+    if (shouldAutoCalc) {
+      specs = { ...withRecommendedPanels(specs, p.client, p.monthlyConsumption, p.rates.targetCoveragePct ?? 95), autoCalculatePanels: true };
+    } else if (specsPartial.panelCount !== undefined && specsPartial.autoCalculatePanels === undefined) {
+      specs.autoCalculatePanels = false;
+    }
 
-          return {
-            ...p,
-            ...projectMutationMetadata(p, get().syncSettings),
-            updatedAt: new Date().toISOString(),
-            client: updatedClient,
-            specs: updatedSpecs,
-            customization: updatedCustomization,
-          };
-        }
-        return p;
-      }),
-    }));
-
-    get().triggerAutoSync(false);
-    const active = get().getActiveProject();
-    if (active) get().recordUndoState(active);
-  },
-
-  updateSpecs: (specsPartial) => {
-    set((state) => {
-      const activeProj = state.projects.find((p) => p.id === state.activeProjectId);
-      if (!activeProj) return state;
-
-      const mergedSpecs = normalizeEnabledBatteries({ ...activeProj.specs, ...specsPartial });
-      const shouldAutoCalc = specsPartial.autoCalculatePanels !== undefined
-        ? specsPartial.autoCalculatePanels
-        : (activeProj.specs.autoCalculatePanels && specsPartial.panelCount === undefined);
-
-      if (shouldAutoCalc) {
-        const panelW = mergedSpecs.panelPowerW || 620;
-        const targetCoverage = activeProj.rates.targetCoveragePct ?? 95;
-        const losses = mergedSpecs.systemLosses !== undefined ? mergedSpecs.systemLosses : 25.0;
-        const rec = calculateRecommendedPanelCount(
-          activeProj.client.province,
-          activeProj.monthlyConsumption,
-          panelW,
-          targetCoverage,
-          losses,
-          activeProj.client.customMonthlyHSP
+    // When any model changes, drop selected suppliers that do not quote the submitted models.
+    const modelKeys = [['panel', 'panelBrandModel'], ['inverter', 'inverterBrandModel'], ['battery', 'batteryBrandModel']] as const;
+    if (!specsPartial.selectedSupplierInfo && modelKeys.some(([, key]) => specsPartial[key] && specsPartial[key] !== p.specs[key])) {
+      const supplierInfo = { ...(specs.selectedSupplierInfo || {}) };
+      let changed = false;
+      for (const [kind, modelKey] of modelKeys) {
+        const model = specsPartial[modelKey];
+        if (!model) continue;
+        const current = supplierInfo[kind];
+        const item = state.equipmentCatalog.find((e) => e.type === kind && e.displayName === model);
+        const quoted = (item?.supplierPrices || []).some(
+          (sp) => sp.id === current?.supplierPriceId || sp.supplierName.toLowerCase().trim() === current?.supplierName?.toLowerCase().trim()
         );
-        mergedSpecs.panelCount = rec.recommendedPanelCount;
-        mergedSpecs.autoCalculatePanels = true;
-      } else if (specsPartial.panelCount !== undefined && specsPartial.autoCalculatePanels === undefined) {
-        mergedSpecs.autoCalculatePanels = false;
-      }
-
-      // 🏷️ Validar coherencia de selectedSupplierInfo si cambió el modelo de equipo
-      if (
-        (specsPartial.panelBrandModel && specsPartial.panelBrandModel !== activeProj.specs.panelBrandModel) ||
-        (specsPartial.inverterBrandModel && specsPartial.inverterBrandModel !== activeProj.specs.inverterBrandModel) ||
-        (specsPartial.batteryBrandModel && specsPartial.batteryBrandModel !== activeProj.specs.batteryBrandModel)
-      ) {
-        const currentSupplierInfo = { ...(mergedSpecs.selectedSupplierInfo || {}) };
-        let infoChanged = false;
-
-        if (specsPartial.inverterBrandModel && !specsPartial.selectedSupplierInfo) {
-          const inv = state.equipmentCatalog.find(
-            (e) => e.type === 'inverter' && e.displayName === specsPartial.inverterBrandModel
-          );
-          const hasMatchingSupplier = (inv?.supplierPrices || []).some(
-            (sp) =>
-              sp.id === currentSupplierInfo.inverter?.supplierPriceId ||
-              sp.supplierName.toLowerCase().trim() === currentSupplierInfo.inverter?.supplierName?.toLowerCase().trim()
-          );
-          if (!hasMatchingSupplier) {
-            delete currentSupplierInfo.inverter;
-            infoChanged = true;
-          }
-        }
-
-        if (specsPartial.panelBrandModel && !specsPartial.selectedSupplierInfo) {
-          const pnl = state.equipmentCatalog.find(
-            (e) => e.type === 'panel' && e.displayName === specsPartial.panelBrandModel
-          );
-          const hasMatchingSupplier = (pnl?.supplierPrices || []).some(
-            (sp) =>
-              sp.id === currentSupplierInfo.panel?.supplierPriceId ||
-              sp.supplierName.toLowerCase().trim() === currentSupplierInfo.panel?.supplierName?.toLowerCase().trim()
-          );
-          if (!hasMatchingSupplier) {
-            delete currentSupplierInfo.panel;
-            infoChanged = true;
-          }
-        }
-
-        if (specsPartial.batteryBrandModel && !specsPartial.selectedSupplierInfo) {
-          const bat = state.equipmentCatalog.find(
-            (e) => e.type === 'battery' && e.displayName === specsPartial.batteryBrandModel
-          );
-          const hasMatchingSupplier = (bat?.supplierPrices || []).some(
-            (sp) =>
-              sp.id === currentSupplierInfo.battery?.supplierPriceId ||
-              sp.supplierName.toLowerCase().trim() === currentSupplierInfo.battery?.supplierName?.toLowerCase().trim()
-          );
-          if (!hasMatchingSupplier) {
-            delete currentSupplierInfo.battery;
-            infoChanged = true;
-          }
-        }
-
-        if (infoChanged) {
-          mergedSpecs.selectedSupplierInfo = currentSupplierInfo;
+        if (!quoted) {
+          delete supplierInfo[kind];
+          changed = true;
         }
       }
+      if (changed) specs.selectedSupplierInfo = supplierInfo;
+    }
 
-      return {
-        projects: state.projects.map((p) => {
-          if (p.id === state.activeProjectId) {
-            const nextFinancials = { ...p.financials };
-            if (p.id !== 'benchmark-centro-medico') {
-              delete nextFinancials.customITBISSavedUSD;
-              delete nextFinancials.customLey5707CreditUSD;
-              delete nextFinancials.customCostUSD;
-            }
-            return {
-              ...p,
-              ...projectMutationMetadata(p, get().syncSettings),
-              updatedAt: new Date().toISOString(),
-              specs: mergedSpecs,
-              financials: nextFinancials,
-            };
-          }
-          return p;
-        }),
-      };
-    });
+    return { specs, financials: withoutStaleFinancialOverrides(p, p.financials) };
+  }),
 
-    get().triggerAutoSync(false);
-    const active = get().getActiveProject();
-    if (active) get().recordUndoState(active);
-  },
+  updateRates: (ratesPartial) => updateActiveProject((p) => ({
+    rates: { ...p.rates, ...ratesPartial },
+    specs: p.specs.autoCalculatePanels && ratesPartial.targetCoveragePct !== undefined
+      ? withRecommendedPanels(p.specs, p.client, p.monthlyConsumption, ratesPartial.targetCoveragePct)
+      : { ...p.specs },
+  })),
 
-  updateRates: (ratesPartial) => {
-    set((state) => ({
-      projects: state.projects.map((p) => {
-        if (p.id === state.activeProjectId) {
-          const updatedRates = { ...p.rates, ...ratesPartial };
-          const updatedSpecs = { ...p.specs };
+  updateFinancials: (finPartial) => updateActiveProject((p) => ({
+    financials: withoutStaleFinancialOverrides(p, { ...p.financials, ...finPartial }),
+  })),
 
-          if (updatedSpecs.autoCalculatePanels && ratesPartial.targetCoveragePct !== undefined) {
-            const panelW = updatedSpecs.panelPowerW || 620;
-            const losses = updatedSpecs.systemLosses !== undefined ? updatedSpecs.systemLosses : 25.0;
-            const rec = calculateRecommendedPanelCount(
-              p.client.province,
-              p.monthlyConsumption,
-              panelW,
-              ratesPartial.targetCoveragePct,
-              losses,
-              p.client.customMonthlyHSP
-            );
-            updatedSpecs.panelCount = rec.recommendedPanelCount;
-          }
+  updateMonthlyConsumption: (index, value) => updateActiveConsumption((current) => {
+    const next = [...current];
+    next[index] = Math.max(0, value);
+    return next;
+  }),
 
-          return {
-            ...p,
-            ...projectMutationMetadata(p, get().syncSettings),
-            updatedAt: new Date().toISOString(),
-            rates: updatedRates,
-            specs: updatedSpecs,
-          };
-        }
-        return p;
-      }),
-    }));
+  updateAllMonthlyConsumption: (value) => updateActiveConsumption(() => Array(12).fill(Math.max(0, value))),
 
-    get().triggerAutoSync(false);
-    const active = get().getActiveProject();
-    if (active) get().recordUndoState(active);
-  },
-
-  updateFinancials: (finPartial) => {
-    set((state) => ({
-      projects: state.projects.map((p) => {
-        if (p.id === state.activeProjectId) {
-          const nextFinancials = { ...p.financials, ...finPartial };
-          if (p.id !== 'benchmark-centro-medico') {
-            delete nextFinancials.customITBISSavedUSD;
-            delete nextFinancials.customLey5707CreditUSD;
-            delete nextFinancials.customCostUSD;
-          }
-          return {
-            ...p,
-            ...projectMutationMetadata(p, get().syncSettings),
-            updatedAt: new Date().toISOString(),
-            financials: nextFinancials,
-          };
-        }
-        return p;
-      }),
-    }));
-
-    get().triggerAutoSync(false);
-    const active = get().getActiveProject();
-    if (active) get().recordUndoState(active);
-  },
-
-  updateMonthlyConsumption: (index, value) => {
-    set((state) => ({
-      projects: state.projects.map((p) => {
-        if (p.id === state.activeProjectId) {
-          const newConsumption = [...p.monthlyConsumption];
-          newConsumption[index] = Math.max(0, value);
-          const updatedSpecs = { ...p.specs };
-
-          if (updatedSpecs.autoCalculatePanels) {
-            const panelW = updatedSpecs.panelPowerW || 620;
-            const targetCoverage = p.rates.targetCoveragePct ?? 95;
-            const losses = updatedSpecs.systemLosses !== undefined ? updatedSpecs.systemLosses : 25.0;
-            const rec = calculateRecommendedPanelCount(
-              p.client.province,
-              newConsumption,
-              panelW,
-              targetCoverage,
-              losses,
-              p.client.customMonthlyHSP
-            );
-            updatedSpecs.panelCount = rec.recommendedPanelCount;
-          }
-
-          return {
-            ...p,
-            ...projectMutationMetadata(p, get().syncSettings),
-            updatedAt: new Date().toISOString(),
-            monthlyConsumption: newConsumption,
-            aiSource:p.aiSource?.consumptionSource==='theoretical'?{...p.aiSource,consumptionSource:'estimated'}:p.aiSource,
-            specs: updatedSpecs,
-          };
-        }
-        return p;
-      }),
-    }));
-
-    get().triggerAutoSync(false);
-    const active = get().getActiveProject();
-    if (active) get().recordUndoState(active);
-  },
-
-  updateAllMonthlyConsumption: (value) => {
-    set((state) => ({
-      projects: state.projects.map((p) => {
-        if (p.id === state.activeProjectId) {
-          const newConsumption = Array(12).fill(Math.max(0, value));
-          const updatedSpecs = { ...p.specs };
-
-          if (updatedSpecs.autoCalculatePanels) {
-            const panelW = updatedSpecs.panelPowerW || 620;
-            const targetCoverage = p.rates.targetCoveragePct ?? 95;
-            const losses = updatedSpecs.systemLosses !== undefined ? updatedSpecs.systemLosses : 25.0;
-            const rec = calculateRecommendedPanelCount(
-              p.client.province,
-              newConsumption,
-              panelW,
-              targetCoverage,
-              losses,
-              p.client.customMonthlyHSP
-            );
-            updatedSpecs.panelCount = rec.recommendedPanelCount;
-          }
-
-          return {
-            ...p,
-            ...projectMutationMetadata(p, get().syncSettings),
-            updatedAt: new Date().toISOString(),
-            monthlyConsumption: newConsumption,
-            aiSource:p.aiSource?.consumptionSource==='theoretical'?{...p.aiSource,consumptionSource:'estimated'}:p.aiSource,
-            specs: updatedSpecs,
-          };
-        }
-        return p;
-      }),
-    }));
-
-    get().triggerAutoSync(false);
-    const active = get().getActiveProject();
-    if (active) get().recordUndoState(active);
-  },
-
-  setMonthlyConsumption: (monthlyConsumption, lockAutoPanels = false) => {
-    set((state) => ({
-      projects: state.projects.map((p) => {
-        if (p.id === state.activeProjectId) {
-          const newConsumption = monthlyConsumption.map((v) => Math.max(0, v));
-          const updatedSpecs = { ...p.specs };
-
-          if (lockAutoPanels) {
-            updatedSpecs.autoCalculatePanels = false;
-          } else if (updatedSpecs.autoCalculatePanels) {
-            const panelW = updatedSpecs.panelPowerW || 620;
-            const targetCoverage = p.rates.targetCoveragePct ?? 95;
-            const losses = updatedSpecs.systemLosses !== undefined ? updatedSpecs.systemLosses : 25.0;
-            const rec = calculateRecommendedPanelCount(
-              p.client.province,
-              newConsumption,
-              panelW,
-              targetCoverage,
-              losses,
-              p.client.customMonthlyHSP
-            );
-            updatedSpecs.panelCount = rec.recommendedPanelCount;
-          }
-
-          return {
-            ...p,
-            ...projectMutationMetadata(p, get().syncSettings),
-            updatedAt: new Date().toISOString(),
-            monthlyConsumption: newConsumption,
-            aiSource:p.aiSource?.consumptionSource==='theoretical'?{...p.aiSource,consumptionSource:'estimated'}:p.aiSource,
-            specs: updatedSpecs,
-          };
-        }
-        return p;
-      }),
-    }));
-
-    get().triggerAutoSync(false);
-    const active = get().getActiveProject();
-    if (active) get().recordUndoState(active);
-  },
+  setMonthlyConsumption: (monthlyConsumption, lockAutoPanels = false) =>
+    updateActiveConsumption(() => monthlyConsumption.map((v) => Math.max(0, v)), lockAutoPanels),
 
   updateDocumentCustomization: (customizationPartial) => {
+    if (isActiveProjectTrashed()) return;
     set((state) => {
       const targetId = state.activeProjectId || state.getActiveProject()?.id;
       return {
@@ -846,6 +631,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
   },
 
   applySupplierPriceToProject: (equipmentType, supplierPrice, equipmentItem) => {
+    if (isActiveProjectTrashed()) return;
     set((state) => ({
       projects: state.projects.map((p) => {
         if (p.id === state.activeProjectId) {
@@ -923,12 +709,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
             });
           }
           updatedSpecs.selectedSupplierInfo = selectedSupplierInfo;
-          const nextFinancials = { ...p.financials };
-          if (p.id !== 'benchmark-centro-medico') {
-            delete nextFinancials.customITBISSavedUSD;
-            delete nextFinancials.customLey5707CreditUSD;
-            delete nextFinancials.customCostUSD;
-          }
+          const nextFinancials = withoutStaleFinancialOverrides(p, p.financials);
 
           return {
             ...p,
@@ -967,4 +748,5 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => (
       energyCalculationMode(effectiveFeatureSettings(get()))
     );
   },
-});
+};
+};

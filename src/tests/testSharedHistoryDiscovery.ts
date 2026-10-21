@@ -1,6 +1,4 @@
 import assert from 'node:assert/strict';
-const storage = new Map<string,string>();
-Object.defineProperty(globalThis,'localStorage',{ configurable:true,value:{ getItem:(k:string)=>storage.get(k) ?? null,setItem:(k:string,v:string)=>storage.set(k,v),removeItem:(k:string)=>storage.delete(k),key:(i:number)=>[...storage.keys()][i],get length(){return storage.size;} } });
 const { useSimulationStore } = await import('../store/useSimulationStore');
 const { ShareProposalService } = await import('../services/shareProposalService');
 const realFetch = globalThis.fetch;

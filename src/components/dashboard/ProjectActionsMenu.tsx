@@ -1,8 +1,10 @@
+import { isReaderRole } from '../../../shared/permissions';
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, Copy, MoreHorizontal, Loader2, Share2, Trash2 } from 'lucide-react';
 import { ProjectSimulation } from '../../types';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { confirmAction } from '../common/confirmAction';
 
 /** Shared document actions. Portal keeps menus outside scrolling tables/cards. */
 export function ProjectActionsMenu({ project }: { project: ProjectSimulation }) {
@@ -12,7 +14,7 @@ export function ProjectActionsMenu({ project }: { project: ProjectSimulation }) 
   const [position, setPosition] = useState<{ top: number; right: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const readOnly = !!syncSettings.authToken && ['VIEWER', 'LECTOR'].includes(syncSettings.currentUser?.role ?? '');
+  const readOnly = !!syncSettings.authToken && isReaderRole(syncSettings.currentUser?.role);
   const close = () => { setPosition(null); triggerRef.current?.focus(); };
 
   useEffect(() => {
@@ -69,9 +71,9 @@ export function ProjectActionsMenu({ project }: { project: ProjectSimulation }) 
           }}><AlertTriangle className="h-4 w-4 text-amber-600" />Resolver conflicto</button>}
           <button role="menuitem" type="button" disabled={readOnly} className={actionClass} onClick={() => { close(); setActiveProject(project.id); openShareModal(); }}><Share2 className="h-4 w-4" />Compartir web</button>
           <button role="menuitem" type="button" disabled={readOnly} className={actionClass} onClick={() => { close(); duplicateProject(project.id); }}><Copy className="h-4 w-4" />Duplicar</button>
-          <button role="menuitem" type="button" disabled={readOnly} className={`${actionClass} !text-rose-700 dark:!text-rose-400`} onClick={() => {
+          <button role="menuitem" type="button" disabled={readOnly} className={`${actionClass} !text-rose-700 dark:!text-rose-400`} onClick={async () => {
             close();
-            if (confirm(`¿Mover a la papelera la propuesta «${project.client.name}»?`)) deleteProject(project.id);
+            if (await confirmAction({ title: 'Mover a papelera', message: `¿Mover a la papelera la propuesta «${project.client.name}»?`, confirmLabel: 'Mover a papelera', tone: 'danger' })) deleteProject(project.id);
           }}><Trash2 className="h-4 w-4" />Mover a papelera</button>
         </div>
       </div>, document.body)}

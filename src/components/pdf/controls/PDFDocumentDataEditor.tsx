@@ -24,6 +24,7 @@ import { getProposalDateInputValue, formatProposalDate } from '../../../utils/fo
 import {
   ELECTSUN_EMBLEM_WATERMARK_BASE64,
 } from '../../../assets/electsunLogo';
+import { confirmAction } from '../../common/confirmAction';
 
 interface PDFDocumentDataEditorProps {
   isDark: boolean;
@@ -213,13 +214,13 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
             <BookmarkCheck className="w-4 h-4 text-amber-300" />
           </div>
           <div className="flex-1">
-            <h4 className={`text-xs font-black uppercase tracking-tight flex items-center gap-1.5 ${isDark ? 'text-zinc-100' : 'text-slate-900'}`}>
+            <h4 className={`text-xs font-black uppercase tracking-tight flex items-center gap-1.5 text-slate-900 dark:text-zinc-100`}>
               <span>Plantilla Permanente</span>
               <span className="text-[9px] bg-indigo-500/20 text-indigo-400 font-extrabold px-1.5 py-0.2 rounded-full border border-indigo-400/30">
                 Empresa
               </span>
             </h4>
-            <p className={`text-[10.5px] leading-relaxed mt-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+            <p className={`text-[10.5px] leading-relaxed mt-0.5 text-slate-600 dark:text-zinc-400`}>
               Aplica los datos y textos de esta propuesta como la plantilla permanente de su empresa emisora para sus futuras propuestas.
             </p>
           </div>
@@ -259,8 +260,8 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
           </button>
           <button
             type="button"
-            onClick={() => {
-              if (confirm('¿Deseas restablecer la plantilla predeterminada de propuestas a los valores de fábrica originales?')) {
+            onClick={async () => {
+              if (await confirmAction({ title: 'Restablecer plantilla', message: '¿Deseas restablecer la plantilla predeterminada de propuestas a los valores de fábrica originales?', confirmLabel: 'Restablecer', tone: 'danger' })) {
                 if (resetDefaultDocumentCustomization) {
                   resetDefaultDocumentCustomization();
                 } else {
@@ -282,13 +283,11 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
       </div>
 
       {/* 1. SECCIÓN: IDENTIDAD DE LA EMPRESA EMISORA Y LOGOS */}
-      <div className={`rounded-xl border overflow-hidden transition-all ${isDark ? 'border-[#2a2a36] bg-[#1a1a24]' : 'border-slate-200 bg-white'}`}>
+      <div className={`rounded-xl border overflow-hidden transition-all border-slate-200 bg-white dark:border-[#2a2a36] dark:bg-[#1a1a24]`}>
         <button
           type="button"
           onClick={() => toggleSection('company')}
-          className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors ${
-            isDark ? 'text-zinc-200 hover:bg-[#222230]' : 'text-slate-800 hover:bg-slate-50'
-          }`}
+          className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors text-slate-800 hover:bg-slate-50 dark:text-zinc-200 dark:hover:bg-[#222230]`}
         >
           <div className="flex items-center gap-2">
             <Building2 className="w-4 h-4 text-emerald-500" />
@@ -298,11 +297,11 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
         </button>
 
         {openSection === 'company' && (
-          <div className={`p-3 pt-1 space-y-3.5 border-t text-xs ${isDark ? 'border-[#2a2a36] bg-[#14141d]' : 'border-slate-200 bg-slate-50/50'}`}>
+          <div className={`p-3 pt-1 space-y-3.5 border-t text-xs border-slate-200 bg-slate-50/50 dark:border-[#2a2a36] dark:bg-[#14141d]`}>
             {/* Nombre y Eslogan */}
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                <label className={`block text-[10px] font-bold uppercase mb-1 text-slate-600 dark:text-zinc-400`}>
                   Nombre Empresa
                 </label>
                 <input
@@ -310,16 +309,12 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                   value={cust.companyName !== undefined ? cust.companyName : DEFAULT_DOCUMENT_CUSTOMIZATION.companyName}
                   onChange={(e) => updateDocumentCustomization({ companyName: e.target.value })}
                   placeholder="electsun"
-                  className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                    isDark
-                      ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                      : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                  }`}
+                  className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors bg-white border-slate-300 text-slate-900 focus:border-emerald-600 dark:bg-[#20202c] dark:border-[#343446] dark:text-white dark:focus:border-emerald-500`}
                 />
               </div>
 
               <div>
-                <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                <label className={`block text-[10px] font-bold uppercase mb-1 text-slate-600 dark:text-zinc-400`}>
                   Eslogan
                 </label>
                 <input
@@ -327,16 +322,12 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                   value={cust.companySlogan !== undefined ? cust.companySlogan : DEFAULT_DOCUMENT_CUSTOMIZATION.companySlogan}
                   onChange={(e) => updateDocumentCustomization({ companySlogan: e.target.value })}
                   placeholder="El sol a tu favor"
-                  className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                    isDark
-                      ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                      : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                  }`}
+                  className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors bg-white border-slate-300 text-slate-900 focus:border-emerald-600 dark:bg-[#20202c] dark:border-[#343446] dark:text-white dark:focus:border-emerald-500`}
                 />
               </div>
 
               <div>
-                <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                <label className={`block text-[10px] font-bold uppercase mb-1 text-slate-600 dark:text-zinc-400`}>
                   Teléfono Empresa (Portada / Web)
                 </label>
                 <input
@@ -344,16 +335,12 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                   value={cust.companyPhone !== undefined ? cust.companyPhone : DEFAULT_DOCUMENT_CUSTOMIZATION.companyPhone}
                   onChange={(e) => updateDocumentCustomization({ companyPhone: e.target.value })}
                   placeholder="+1 (809) 378-6590"
-                  className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                    isDark
-                      ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                      : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                  }`}
+                  className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors bg-white border-slate-300 text-slate-900 focus:border-emerald-600 dark:bg-[#20202c] dark:border-[#343446] dark:text-white dark:focus:border-emerald-500`}
                 />
               </div>
 
               <div>
-                <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                <label className={`block text-[10px] font-bold uppercase mb-1 text-slate-600 dark:text-zinc-400`}>
                   Sitio Web / Instagram
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -362,31 +349,23 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                     value={cust.companyWebsite !== undefined ? cust.companyWebsite : DEFAULT_DOCUMENT_CUSTOMIZATION.companyWebsite}
                     onChange={(e) => updateDocumentCustomization({ companyWebsite: e.target.value })}
                     placeholder="electsun.com.do"
-                    className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                      isDark
-                        ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                        : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                    }`}
+                    className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors bg-white border-slate-300 text-slate-900 focus:border-emerald-600 dark:bg-[#20202c] dark:border-[#343446] dark:text-white dark:focus:border-emerald-500`}
                   />
                   <input
                     type="text"
                     value={cust.companyInstagram !== undefined ? cust.companyInstagram : DEFAULT_DOCUMENT_CUSTOMIZATION.companyInstagram}
                     onChange={(e) => updateDocumentCustomization({ companyInstagram: e.target.value })}
                     placeholder="Electsunrd"
-                    className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                      isDark
-                        ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                        : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                    }`}
+                    className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors bg-white border-slate-300 text-slate-900 focus:border-emerald-600 dark:bg-[#20202c] dark:border-[#343446] dark:text-white dark:focus:border-emerald-500`}
                   />
                 </div>
               </div>
             </div>
 
             {/* Logotipo de Portada */}
-            <div className={`p-2.5 rounded-xl border ${isDark ? 'bg-[#1b1b24] border-[#2e2e3e]' : 'bg-slate-100/70 border-slate-200'}`}>
+            <div className={`p-2.5 rounded-xl border bg-slate-100/70 border-slate-200 dark:bg-[#1b1b24] dark:border-[#2e2e3e]`}>
               <div className="flex justify-between items-center mb-1.5">
-                <label className={`text-[10px] font-bold uppercase flex items-center gap-1.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                <label className={`text-[10px] font-bold uppercase flex items-center gap-1.5 text-slate-700 dark:text-zinc-300`}>
                   <ImageIcon className="w-3.5 h-3.5 text-amber-500" />
                   Logotipo de Portada (Cover)
                 </label>
@@ -438,9 +417,9 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
             </div>
 
             {/* Logotipo del Header */}
-            <div className={`p-2.5 rounded-xl border ${isDark ? 'bg-[#1b1b24] border-[#2e2e3e]' : 'bg-slate-100/70 border-slate-200'}`}>
+            <div className={`p-2.5 rounded-xl border bg-slate-100/70 border-slate-200 dark:bg-[#1b1b24] dark:border-[#2e2e3e]`}>
               <div className="flex justify-between items-center mb-1.5">
-                <label className={`text-[10px] font-bold uppercase flex items-center gap-1.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                <label className={`text-[10px] font-bold uppercase flex items-center gap-1.5 text-slate-700 dark:text-zinc-300`}>
                   <ImageIcon className="w-3.5 h-3.5 text-emerald-500" />
                   Logotipo de encabezado PDF
                 </label>
@@ -492,9 +471,9 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
               </div>
             </div>
 
-            <div className={`p-2.5 rounded-xl border ${isDark ? 'bg-[#1b1b24] border-[#2e2e3e]' : 'bg-slate-100/70 border-slate-200'}`}>
+            <div className={`p-2.5 rounded-xl border bg-slate-100/70 border-slate-200 dark:bg-[#1b1b24] dark:border-[#2e2e3e]`}>
               <div className="flex justify-between items-start gap-2 mb-1.5">
-                <label className={`text-[10px] font-bold uppercase flex items-center gap-1.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                <label className={`text-[10px] font-bold uppercase flex items-center gap-1.5 text-slate-700 dark:text-zinc-300`}>
                   <ImageIcon className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
                   Logotipo de encabezado web
                 </label>
@@ -512,19 +491,19 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                 <div className="min-w-0 flex-1">
                   <input ref={webLogoInputRef} type="file" accept="image/*" aria-label="Archivo de logotipo web" className="hidden" onChange={event => handleLogoUpload(event, 'webHeaderLogoBase64')}/>
                   <button type="button" onClick={() => webLogoInputRef.current?.click()}
-                    className={`w-full py-1.5 px-3 rounded-lg border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer ${isDark ? 'bg-[#282836] border-[#3e3e52] text-zinc-200 hover:bg-[#323244]' : 'bg-white border-slate-300 text-slate-800 hover:bg-slate-50'}`}>
+                    className={`w-full py-1.5 px-3 rounded-lg border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer bg-white border-slate-300 text-slate-800 hover:bg-slate-50 dark:bg-[#282836] dark:border-[#3e3e52] dark:text-zinc-200 dark:hover:bg-[#323244]`}>
                     <Upload className="w-3.5 h-3.5 shrink-0 text-emerald-500" /> Cambiar logotipo web
                   </button>
-                  <p className={`text-[10px] mt-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>Versión a color para el fondo blanco.</p>
+                  <p className={`text-[10px] mt-1 text-slate-600 dark:text-zinc-400`}>Versión a color para el fondo blanco.</p>
                 </div>
               </div>
-              <p className={`text-[10px] mt-2 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>Independiente del PDF. Se aplica al publicar un enlace nuevo.</p>
+              <p className={`text-[10px] mt-2 text-slate-600 dark:text-zinc-400`}>Independiente del PDF. Se aplica al publicar un enlace nuevo.</p>
             </div>
 
             {/* Logotipo de Marca de Agua y Opacidad */}
-            <div className={`p-2.5 rounded-xl border ${isDark ? 'bg-[#1b1b24] border-[#2e2e3e]' : 'bg-slate-100/70 border-slate-200'}`}>
+            <div className={`p-2.5 rounded-xl border bg-slate-100/70 border-slate-200 dark:bg-[#1b1b24] dark:border-[#2e2e3e]`}>
               <div className="flex justify-between items-center mb-1.5">
-                <label className={`text-[10px] font-bold uppercase flex items-center gap-1.5 ${isDark ? 'text-zinc-300' : 'text-slate-700'}`}>
+                <label className={`text-[10px] font-bold uppercase flex items-center gap-1.5 text-slate-700 dark:text-zinc-300`}>
                   <ImageIcon className="w-3.5 h-3.5 text-emerald-500" />
                   Marca de Agua (Fondo de Páginas)
                 </label>
@@ -575,7 +554,7 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
               {/* Slider de Opacidad */}
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <span className={`text-[10px] font-bold uppercase ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                  <span className={`text-[10px] font-bold uppercase text-slate-600 dark:text-zinc-400`}>
                     Graduación de Opacidad
                   </span>
                   <span className="text-[10px] font-bold font-mono text-emerald-500">
@@ -601,27 +580,21 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
 
             {/* Pie de Página Institucional */}
             <div>
-              <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+              <label className={`block text-[10px] font-bold uppercase mb-1 text-slate-600 dark:text-zinc-400`}>
                 Pie de Página Institucional (Dirección / Web)
               </label>
               <textarea
                 rows={2}
                 value={cust.companyFooterText !== undefined ? cust.companyFooterText : DEFAULT_DOCUMENT_CUSTOMIZATION.companyFooterText}
                 onChange={(e) => updateDocumentCustomization({ companyFooterText: e.target.value })}
-                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                  isDark
-                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                    : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                }`}
+                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors bg-white border-slate-300 text-slate-900 focus:border-emerald-600 dark:bg-[#20202c] dark:border-[#343446] dark:text-white dark:focus:border-emerald-500`}
               />
             </div>
 
             <button
               type="button"
               onClick={handleResetCompanyDefaults}
-              className={`text-[10px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                isDark ? 'text-zinc-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-              }`}
+              className={`text-[10px] font-bold flex items-center gap-1.5 transition-colors cursor-pointer text-slate-600 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-white`}
             >
               <RotateCcw className="w-3 h-3" /> Restaurar predeterminados (Electsun)
             </button>
@@ -630,13 +603,11 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
       </div>
 
       {/* 2. SECCIÓN: DATOS DE CONTACTO Y VALIDEZ */}
-      <div className={`rounded-xl border overflow-hidden transition-all ${isDark ? 'border-[#2a2a36] bg-[#1a1a24]' : 'border-slate-200 bg-white'}`}>
+      <div className={`rounded-xl border overflow-hidden transition-all border-slate-200 bg-white dark:border-[#2a2a36] dark:bg-[#1a1a24]`}>
         <button
           type="button"
           onClick={() => toggleSection('contact')}
-          className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors ${
-            isDark ? 'text-zinc-200 hover:bg-[#222230]' : 'text-slate-800 hover:bg-slate-50'
-          }`}
+          className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors text-slate-800 hover:bg-slate-50 dark:text-zinc-200 dark:hover:bg-[#222230]`}
         >
           <div className="flex items-center gap-2">
             <User className="w-4 h-4 text-emerald-500" />
@@ -646,9 +617,9 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
         </button>
 
         {openSection === 'contact' && (
-          <div className={`p-3 pt-1 space-y-3 border-t text-xs ${isDark ? 'border-[#2a2a36] bg-[#14141d]' : 'border-slate-200 bg-slate-50/50'}`}>
+          <div className={`p-3 pt-1 space-y-3 border-t text-xs border-slate-200 bg-slate-50/50 dark:border-[#2a2a36] dark:bg-[#14141d]`}>
             <div>
-              <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+              <label className={`block text-[10px] font-bold uppercase mb-1 text-slate-600 dark:text-zinc-400`}>
                 Nombre de Contacto (Atención a)
               </label>
               <input
@@ -659,17 +630,13 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                   updateClient({ contactPerson: e.target.value });
                 }}
                 placeholder={project.client.name || 'Nombre del cliente'}
-                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                  isDark
-                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                    : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                }`}
+                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors bg-white border-slate-300 text-slate-900 focus:border-emerald-600 dark:bg-[#20202c] dark:border-[#343446] dark:text-white dark:focus:border-emerald-500`}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                <label className={`block text-[10px] font-bold uppercase mb-1 text-slate-600 dark:text-zinc-400`}>
                   Teléfono Cliente
                 </label>
                 <input
@@ -684,39 +651,27 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                     updateClient({ contactPhone: e.target.value });
                   }}
                   placeholder="Ej: 809-000-0000 (Opcional)"
-                  className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                    isDark
-                      ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                      : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                  }`}
+                  className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors bg-white border-slate-300 text-slate-900 focus:border-emerald-600 dark:bg-[#20202c] dark:border-[#343446] dark:text-white dark:focus:border-emerald-500`}
                 />
               </div>
 
               <div>
-                <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                <label className={`block text-[10px] font-bold uppercase mb-1 text-slate-600 dark:text-zinc-400`}>
                   Días de Validez
                 </label>
                 <input
                   type="number"
                   value={project.client.quoteValidityDays || 7}
                   onChange={(e) => updateClient({ quoteValidityDays: Number(e.target.value) })}
-                  className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                    isDark
-                      ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                      : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                  }`}
+                  className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors bg-white border-slate-300 text-slate-900 focus:border-emerald-600 dark:bg-[#20202c] dark:border-[#343446] dark:text-white dark:focus:border-emerald-500`}
                 />
               </div>
             </div>
 
             {/* Fecha de Emisión del Proyecto / Cotización */}
-            <div className={`p-2.5 rounded-xl border space-y-1.5 transition-all ${
-              isDark ? 'border-emerald-500/30 bg-emerald-950/20' : 'border-emerald-200 bg-emerald-50/60'
-            }`}>
+            <div className={`p-2.5 rounded-xl border space-y-1.5 transition-all border-emerald-200 bg-emerald-50/60 dark:border-emerald-500/30 dark:bg-emerald-950/20`}>
               <div className="flex items-center justify-between">
-                <label className={`text-[10.5px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                  isDark ? 'text-emerald-400' : 'text-emerald-900'
-                }`}>
+                <label className={`text-[10.5px] font-bold uppercase tracking-wider flex items-center gap-1.5 text-emerald-900 dark:text-emerald-400`}>
                   <Calendar className="w-3.5 h-3.5 text-emerald-500" />
                   <span>Fecha de Emisión de la Propuesta</span>
                 </label>
@@ -742,25 +697,19 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                     updateClient({ quoteDate: e.target.value });
                     updateDocumentCustomization({ quoteDate: e.target.value });
                   }}
-                  className={`flex-1 text-xs p-2 rounded-lg border font-semibold outline-none transition-colors ${
-                    isDark
-                      ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                      : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                  }`}
+                  className={`flex-1 text-xs p-2 rounded-lg border font-semibold outline-none transition-colors bg-white border-slate-300 text-slate-900 focus:border-emerald-600 dark:bg-[#20202c] dark:border-[#343446] dark:text-white dark:focus:border-emerald-500`}
                 />
-                <span className={`text-xs font-bold font-mono px-2.5 py-2 rounded-lg border shrink-0 ${
-                  isDark ? 'bg-[#181822] border-emerald-500/30 text-emerald-400' : 'bg-emerald-100/70 border-emerald-300 text-emerald-900'
-                }`}>
+                <span className={`text-xs font-bold font-mono px-2.5 py-2 rounded-lg border shrink-0 bg-emerald-100/70 border-emerald-300 text-emerald-900 dark:bg-[#181822] dark:border-emerald-500/30 dark:text-emerald-400`}>
                   {formatProposalDate(project.client.quoteDate || cust.quoteDate, 'numeric')}
                 </span>
               </div>
-              <p className={`text-[10px] leading-tight ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+              <p className={`text-[10px] leading-tight text-slate-500 dark:text-zinc-400`}>
                 Actualiza la fecha en la portada, encabezados y cuadros de cotización de todo el PDF.
               </p>
             </div>
 
             <div>
-              <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+              <label className={`block text-[10px] font-bold uppercase mb-1 text-slate-600 dark:text-zinc-400`}>
                 Nota de Validez y Disponibilidad (Pie Pág 2)
               </label>
               <textarea
@@ -771,11 +720,7 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                     : `* Equipos según disponibilidad de inventario | * Propuesta válida por ${project.client.quoteValidityDays || 7} días | * Precios en USD *`
                 }
                 onChange={(e) => updateDocumentCustomization({ validityNote: e.target.value })}
-                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors ${
-                  isDark
-                    ? 'bg-[#20202c] border-[#343446] text-white focus:border-emerald-500'
-                    : 'bg-white border-slate-300 text-slate-900 focus:border-emerald-600'
-                }`}
+                className={`w-full text-xs p-2 rounded-lg border font-medium outline-none transition-colors bg-white border-slate-300 text-slate-900 focus:border-emerald-600 dark:bg-[#20202c] dark:border-[#343446] dark:text-white dark:focus:border-emerald-500`}
               />
             </div>
           </div>
@@ -791,9 +736,7 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
         <button
           type="button"
           onClick={() => toggleSection('annexes')}
-          className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors ${
-            isDark ? 'text-zinc-200 hover:bg-[#1e1e28]' : 'text-slate-800 hover:bg-slate-50'
-          }`}
+          className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors text-slate-800 hover:bg-slate-50 dark:text-zinc-200 dark:hover:bg-[#1e1e28]`}
         >
           <div className="flex items-center gap-2">
             <ListPlus className="w-4 h-4 text-amber-500 shrink-0" />
@@ -823,7 +766,7 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
 
         {openSection === 'annexes' && (
           <div className="p-3.5 pt-0 space-y-3">
-            <p className={`text-[11px] leading-relaxed ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+            <p className={`text-[11px] leading-relaxed text-slate-500 dark:text-zinc-400`}>
               Agrega temas o secciones adicionales para que aparezcan en el <strong>Índice (Página 2)</strong> con sus números correlativos automáticos, ideal para documentos que adjuntarás externamente al PDF final (ej: Fichas técnicas, Planos, Certificaciones).
             </p>
 
@@ -842,12 +785,12 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                         <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-500 font-black text-[10px] flex items-center justify-center shrink-0">
                           +{idx + 1}
                         </span>
-                        <span className={`text-xs font-bold truncate block ${isDark ? 'text-zinc-100' : 'text-slate-900'}`}>
+                        <span className={`text-xs font-bold truncate block text-slate-900 dark:text-zinc-100`}>
                           {item.title}
                         </span>
                       </div>
                       {item.subtitle && (
-                        <span className={`text-[10.5px] truncate block pl-5.5 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                        <span className={`text-[10.5px] truncate block pl-5.5 text-slate-500 dark:text-zinc-400`}>
                           {item.subtitle}
                         </span>
                       )}
@@ -855,11 +798,7 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
 
                     <div className="flex items-center gap-1.5 shrink-0">
                       <div
-                        className={`flex items-center rounded-lg border px-1.5 py-0.5 transition-all ${
-                          isDark
-                            ? 'bg-[#242432] border-[#38384a] focus-within:border-amber-500'
-                            : 'bg-white border-slate-300 focus-within:border-amber-600'
-                        }`}
+                        className={`flex items-center rounded-lg border px-1.5 py-0.5 transition-all bg-white border-slate-300 focus-within:border-amber-600 dark:bg-[#242432] dark:border-[#38384a] dark:focus-within:border-amber-500`}
                         title="Haz clic para modificar la cantidad de páginas de este anexo"
                       >
                         <input
@@ -868,11 +807,9 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                           max="99"
                           value={item.pageCount || 1}
                           onChange={(e) => handleUpdatePageCount(item.id, parseInt(e.target.value) || 1)}
-                          className={`w-6 text-center font-mono font-black text-xs bg-transparent outline-none p-0 cursor-text ${
-                            isDark ? 'text-amber-400' : 'text-amber-900'
-                          }`}
+                          className={`w-6 text-center font-mono font-black text-xs bg-transparent outline-none p-0 cursor-text text-amber-900 dark:text-amber-400`}
                         />
-                        <span className={`text-[10px] font-bold select-none pl-0.5 ${isDark ? 'text-zinc-400' : 'text-slate-500'}`}>
+                        <span className={`text-[10px] font-bold select-none pl-0.5 text-slate-500 dark:text-zinc-400`}>
                           {(item.pageCount || 1) === 1 ? 'pág' : 'págs'}
                         </span>
                       </div>
@@ -893,12 +830,10 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
 
             {/* Formulario */}
             <div
-              className={`p-3 rounded-xl border space-y-2.5 ${
-                isDark ? 'bg-[#1a1a24] border-[#2c2c3c]' : 'bg-slate-50 border-slate-200'
-              }`}
+              className={`p-3 rounded-xl border space-y-2.5 bg-slate-50 border-slate-200 dark:bg-[#1a1a24] dark:border-[#2c2c3c]`}
             >
               <div>
-                <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                <label className={`block text-[10px] font-bold uppercase mb-1 text-slate-600 dark:text-zinc-400`}>
                   Título del Punto Extra / Anexo
                 </label>
                 <input
@@ -906,17 +841,13 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                   placeholder="ej: Fichas Técnicas de Equipos"
                   value={newExtraTitle}
                   onChange={(e) => setNewExtraTitle(e.target.value)}
-                  className={`w-full text-xs px-2.5 py-1.5 rounded-lg border font-medium outline-none transition-colors ${
-                    isDark
-                      ? 'bg-[#242432] border-[#38384a] text-zinc-100 focus:border-amber-500'
-                      : 'bg-white border-slate-300 text-slate-800 focus:border-amber-600'
-                  }`}
+                  className={`w-full text-xs px-2.5 py-1.5 rounded-lg border font-medium outline-none transition-colors bg-white border-slate-300 text-slate-800 focus:border-amber-600 dark:bg-[#242432] dark:border-[#38384a] dark:text-zinc-100 dark:focus:border-amber-500`}
                 />
               </div>
 
               <div className="grid grid-cols-3 gap-2">
                 <div className="col-span-2">
-                  <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                  <label className={`block text-[10px] font-bold uppercase mb-1 text-slate-600 dark:text-zinc-400`}>
                     Subtema / Descripción (Opcional)
                   </label>
                   <input
@@ -924,15 +855,11 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                     placeholder="ej: Datasheets de Módulos e Inversores"
                     value={newExtraSubtitle}
                     onChange={(e) => setNewExtraSubtitle(e.target.value)}
-                    className={`w-full text-xs px-2.5 py-1.5 rounded-lg border font-medium outline-none transition-colors ${
-                      isDark
-                        ? 'bg-[#242432] border-[#38384a] text-zinc-100 focus:border-amber-500'
-                        : 'bg-white border-slate-300 text-slate-800 focus:border-amber-600'
-                    }`}
+                    className={`w-full text-xs px-2.5 py-1.5 rounded-lg border font-medium outline-none transition-colors bg-white border-slate-300 text-slate-800 focus:border-amber-600 dark:bg-[#242432] dark:border-[#38384a] dark:text-zinc-100 dark:focus:border-amber-500`}
                   />
                 </div>
                 <div>
-                  <label className={`block text-[10px] font-bold uppercase mb-1 ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                  <label className={`block text-[10px] font-bold uppercase mb-1 text-slate-600 dark:text-zinc-400`}>
                     Páginas
                   </label>
                   <input
@@ -941,11 +868,7 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                     max="50"
                     value={newExtraPageCount}
                     onChange={(e) => setNewExtraPageCount(parseInt(e.target.value) || 1)}
-                    className={`w-full text-xs px-2.5 py-1.5 rounded-lg border font-medium outline-none transition-colors ${
-                      isDark
-                        ? 'bg-[#242432] border-[#38384a] text-zinc-100 focus:border-amber-500'
-                        : 'bg-white border-slate-300 text-slate-800 focus:border-amber-600'
-                    }`}
+                    className={`w-full text-xs px-2.5 py-1.5 rounded-lg border font-medium outline-none transition-colors bg-white border-slate-300 text-slate-800 focus:border-amber-600 dark:bg-[#242432] dark:border-[#38384a] dark:text-zinc-100 dark:focus:border-amber-500`}
                   />
                 </div>
               </div>
@@ -962,7 +885,7 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
 
               {/* Plantillas Rápidas */}
               <div className="pt-2 border-t border-dashed border-zinc-700/50">
-                <span className={`text-[9.5px] uppercase font-bold tracking-wider block mb-1.5 ${isDark ? 'text-zinc-500' : 'text-slate-400'}`}>
+                <span className={`text-[9.5px] uppercase font-bold tracking-wider block mb-1.5 text-slate-400 dark:text-zinc-500`}>
                   Sugerencias Rápidas:
                 </span>
                 <div className="flex flex-wrap gap-1">
@@ -976,11 +899,7 @@ export const PDFDocumentDataEditor: React.FC<PDFDocumentDataEditorProps> = ({
                       key={pIdx}
                       type="button"
                       onClick={() => handleAddPreset(preset)}
-                      className={`text-[10px] font-semibold px-2 py-1 rounded-md border transition-colors cursor-pointer ${
-                        isDark
-                          ? 'bg-[#242432] border-[#38384a] text-zinc-300 hover:bg-amber-950/40 hover:text-amber-300 hover:border-amber-700/50'
-                          : 'bg-white border-slate-300 text-slate-700 hover:bg-amber-50 hover:text-amber-900 hover:border-amber-300'
-                      }`}
+                      className={`text-[10px] font-semibold px-2 py-1 rounded-md border transition-colors cursor-pointer bg-white border-slate-300 text-slate-700 hover:bg-amber-50 hover:text-amber-900 hover:border-amber-300 dark:bg-[#242432] dark:border-[#38384a] dark:text-zinc-300 dark:hover:bg-amber-950/40 dark:hover:text-amber-300 dark:hover:border-amber-700/50`}
                     >
                       + {preset.title}
                     </button>

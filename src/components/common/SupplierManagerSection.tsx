@@ -1,3 +1,4 @@
+import { canWrite } from '../../../shared/permissions';
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Building2,
@@ -32,7 +33,7 @@ function writable(item?: SolarEquipmentItem) {
   const { syncSettings } = useSimulationStore.getState();
   const user = syncSettings.currentUser;
   return (
-    (!user || ["ADMIN", "EDITOR"].includes(user.role)) &&
+    (canWrite(user)) &&
     (!item ||
       !user ||
       ((!item.organizationId || item.organizationId === user.organizationId) &&

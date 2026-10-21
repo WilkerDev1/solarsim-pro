@@ -1,4 +1,5 @@
 import { ProjectSimulation } from '../types';
+import { cleanClientName } from '../../shared/proposalPresentation';
 
 export const INITIAL_PROJECTS: ProjectSimulation[] = [];
 
@@ -48,7 +49,7 @@ export function generateDuplicateProjectIdentifiers(
   existingProjects: ProjectSimulation[]
 ): { cleanName: string; projectId: string; quoteNumber: string; versionSuffix: string } {
   const rawName = target.client?.name || 'Cliente';
-  const cleanName = rawName.replace(/\s*\((?:Copia|Copia Importada|COPIA|V\d+|C\d+)\)\s*/gi, '').trim();
+  const cleanName = cleanClientName(rawName);
 
   const rawProjId = target.client?.projectId || 'SP-2026-001';
   const baseProjId = rawProjId.replace(/-(?:V|C)\d+$/i, '').trim();

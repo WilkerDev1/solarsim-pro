@@ -5,13 +5,14 @@ import jsPDF from 'jspdf';
 import { PDFColorTheme, PDF_COLOR_THEMES } from '../../constants/pdfThemes';
 import { PDFMergeService } from '../../services/pdfMergeService';
 import { PDFAttachmentStorage } from '../../services/pdfAttachmentStorage';
-import { PDFSectionId, DEFAULT_PDF_SECTION_ORDER } from '../../constants/pdfSections';
+import { PDFSectionId } from '../../constants/pdfSections';
+import { buildPdfLayout, normalizeSectionOrder } from '../../utils/pdfLayout';
 import { formatProposalDate } from '../../utils/formatDateUtils';
 
 // Modular Page Components
 import { PDFSidebarControls } from './controls/PDFSidebarControls';
 import { PDFCoverPage } from './pages/PDFCoverPage';
-import { PDFTableOfContents, TOCItem } from './pages/PDFTableOfContents';
+import { PDFTableOfContents } from './pages/PDFTableOfContents';
 import { PDFExecutiveSummaryPage } from './pages/PDFExecutiveSummaryPage';
 import { PDFAboutUsPage } from './pages/PDFAboutUsPage';
 import { PDFSolarBenefitsPage } from './pages/PDFSolarBenefitsPage';
@@ -215,18 +216,10 @@ export const PDFProposalView: React.FC = () => {
     return formatProposalDate(project?.client?.quoteDate || project?.customization?.quoteDate);
   }, [project?.client?.quoteDate, project?.customization?.quoteDate]);
 
-  // Effective Section Order
-  const effectiveSectionOrder: PDFSectionId[] = useMemo(() => {
-    const saved = project?.customization?.sectionOrder;
-    if (saved && Array.isArray(saved) && saved.length > 0) {
-      const validSaved = saved.filter((id): id is PDFSectionId =>
-        DEFAULT_PDF_SECTION_ORDER.includes(id as PDFSectionId)
-      );
-      const missing = DEFAULT_PDF_SECTION_ORDER.filter((id) => !validSaved.includes(id));
-      return [...validSaved, ...missing];
-    }
-    return DEFAULT_PDF_SECTION_ORDER;
-  }, [project?.customization?.sectionOrder]);
+  const effectiveSectionOrder = useMemo(
+    () => normalizeSectionOrder(project?.customization?.sectionOrder),
+    [project?.customization?.sectionOrder]
+  );
 
   const sectionVisibility: Record<PDFSectionId, boolean> = {
     cover: showCover,
@@ -243,135 +236,47 @@ export const PDFProposalView: React.FC = () => {
     costMatrix: showPageCostMatrix,
   };
 
-  // Calculate dynamic page numbers according to effectiveSectionOrder
-  const activePagesCount = effectiveSectionOrder.filter((id) => sectionVisibility[id]).length;
+  const { pageNumbers, footerTotalPages, tocItems } = buildPdfLayout(
+    effectiveSectionOrder,
+    sectionVisibility,
+    project.customization?.extraTocItems || [],
+    project.customization?.attachedPdfs || [],
+  );
 
-  let currentNum = 0;
-  const pageNumbers: Record<PDFSectionId, number> = {
-    cover: 0,
-    tableOfContents: 0,
-    executiveSummary: 0,
-    aboutUs: 0,
-    benefits: 0,
-    techIntro: 0,
-    projectDescription: 0,
-    energy: 0,
-    quotation: 0,
-    roi: 0,
-    cashFlow: 0,
-    costMatrix: 0,
+  const renderSection = (id: PDFSectionId) => {
+    const page = { project, summary, activeTheme, showHeadersFooters, currentDateStr, pageNum: pageNumbers[id], totalPages: footerTotalPages };
+    const editable = { isEditMode, updateDocumentCustomization, updateDefaultDocumentCustomization };
+    switch (id) {
+      case 'cover':
+        return <PDFCoverPage key={id} project={project} summary={summary} activeTheme={activeTheme} currentDateStr={currentDateStr} isEditMode={isEditMode} updateClient={updateClient} />;
+      case 'tableOfContents':
+        return <PDFTableOfContents key={id} {...page} tocItems={tocItems} />;
+      case 'executiveSummary':
+        return <PDFExecutiveSummaryPage key={id} {...page} />;
+      case 'aboutUs':
+        return <PDFAboutUsPage key={id} {...page} {...editable} />;
+      case 'benefits':
+        return <PDFSolarBenefitsPage key={id} {...page} {...editable} />;
+      case 'techIntro':
+        return <PDFTechnicalIntroPage key={id} {...page} {...editable} />;
+      case 'projectDescription':
+        return <PDFProjectDescriptionPage key={id} {...page} {...editable} />;
+      case 'energy':
+        return <PDFPage1Energy key={id} {...page} isEditMode={isEditMode} updateDocumentCustomization={updateDocumentCustomization} updateSpecs={updateSpecs} />;
+      case 'quotation':
+        return <PDFPage2Quotation key={id} {...page} {...editable} updateClient={updateClient} />;
+      case 'roi':
+        return <PDFPage3ROI key={id} {...page} />;
+      case 'cashFlow':
+        return <PDFPage4CashFlow key={id} {...page} />;
+      case 'costMatrix':
+        return <PDFPage5CostMatrix key={id} {...page} />;
+    }
   };
-
-  effectiveSectionOrder.forEach((sectionId) => {
-    if (sectionVisibility[sectionId]) {
-      currentNum++;
-      pageNumbers[sectionId] = currentNum;
-    }
-  });
-
-  const TOC_METADATA: Partial<Record<PDFSectionId, { title: string; subtitle: string }>> = {
-    executiveSummary: {
-      title: 'Cuadro Resumen de Inversión y Retorno',
-      subtitle: 'Pipeline Técnico, Beneficio Ley 57-07 y Payback',
-    },
-    aboutUs: {
-      title: 'Quiénes Somos & Nuestros Servicios',
-      subtitle: 'Por Qué Elegirnos y Pilares de Servicio',
-    },
-    benefits: {
-      title: 'Beneficios de la Energía Solar',
-      subtitle: 'Objetivos e Incentivos Fiscales de la Ley 57-07',
-    },
-    techIntro: {
-      title: '¿Qué es un Sistema Fotovoltaico?',
-      subtitle: 'Funcionamiento y Diagrama de Flujo Técnico',
-    },
-    projectDescription: {
-      title: 'Descripción del Proyecto & Normativa SIE',
-      subtitle: 'Criterios de Dimensionamiento y Resolución SIE-007',
-    },
-    energy: {
-      title: 'Análisis de Energía y Balance',
-      subtitle: 'Generación Solar Estimada vs Demanda Mensual',
-    },
-    quotation: {
-      title: 'Presupuesto y Cotización de Sistema',
-      subtitle: 'Equipos Tier-1, Inversión y Términos de Garantías',
-    },
-    roi: {
-      title: 'Cálculo de Retorno de Inversión',
-      subtitle: 'Payback, VAN, TIR y Ahorro Estimado',
-    },
-    cashFlow: {
-      title: 'Flujo de Caja y Proyección a 25 Años',
-      subtitle: 'Análisis Financiero Acumulado y Rendimiento Anual',
-    },
-    costMatrix: {
-      title: 'Matriz de Costos Internos (Confidencial)',
-      subtitle: 'Desglose Detallado de Proveedores y Margen Comercial',
-    },
-  };
-
-  // Build dynamic TOC items in effectiveSectionOrder
-  const tocItems: TOCItem[] = [];
-  let sectionIndex = 1;
-
-  effectiveSectionOrder.forEach((sectionId) => {
-    if (sectionVisibility[sectionId]) {
-      const meta = TOC_METADATA[sectionId];
-      if (meta) {
-        tocItems.push({
-          number: `${sectionIndex}`,
-          title: meta.title,
-          subtitle: `${sectionIndex}.1 ${meta.subtitle}`,
-          targetPage: pageNumbers[sectionId],
-        });
-        sectionIndex++;
-      }
-    }
-  });
-
-  // Append Custom Extra Table of Contents Items (Appended Annexes / Extra Pages)
-  const extraTocItems = project.customization?.extraTocItems || [];
-  let nextExtraPageNum = currentNum + 1;
-
-  extraTocItems.forEach((extra) => {
-    if (extra.title && extra.title.trim()) {
-      tocItems.push({
-        number: `${sectionIndex}`,
-        title: extra.title.trim(),
-        subtitle: extra.subtitle ? extra.subtitle.trim() : undefined,
-        targetPage: nextExtraPageNum,
-      });
-      sectionIndex++;
-      const pCount = typeof extra.pageCount === 'number' && extra.pageCount > 0 ? extra.pageCount : 1;
-      nextExtraPageNum += pCount;
-    }
-  });
-
-  // Append Attached External PDFs to Table of Contents (only if user explicitly enabled it)
-  const attachedPdfs = project.customization?.attachedPdfs?.filter((att) => att.enabled !== false && att.addToTableOfContents === true) || [];
-  attachedPdfs.forEach((att) => {
-    if (att.title && att.title.trim()) {
-      tocItems.push({
-        number: `${sectionIndex}`,
-        title: att.title.trim(),
-        subtitle: att.subtitle ? att.subtitle.trim() : `Ficha Técnica / Anexo Oficial (${att.fileName})`,
-        targetPage: nextExtraPageNum,
-      });
-      sectionIndex++;
-      const pCount = typeof att.pageCount === 'number' && att.pageCount > 0 ? att.pageCount : 1;
-      nextExtraPageNum += pCount;
-    }
-  });
-
-  const totalCalculatedPages = nextExtraPageNum - 1;
 
   return (
     <div
-      className={`flex-1 flex h-full overflow-hidden transition-colors duration-200 ${
-        isDark ? 'bg-[#0d0d10]' : 'bg-slate-200'
-      }`}
+      className={`flex-1 flex h-full overflow-hidden transition-colors duration-200 bg-slate-200 dark:bg-[#0d0d10]`}
     >
       {/* Side Controls Toolbar */}
       <PDFSidebarControls
@@ -379,7 +284,7 @@ export const PDFProposalView: React.FC = () => {
         project={project}
         activeTheme={activeTheme}
         setActiveTheme={setActiveTheme}
-        activePagesCount={activePagesCount}
+        activePagesCount={footerTotalPages}
         sidebarTab={sidebarTab}
         setSidebarTab={setSidebarTab}
         isExporting={isExporting}
@@ -427,9 +332,7 @@ export const PDFProposalView: React.FC = () => {
 
       {/* PDF Page Canvas */}
       <main
-        className={`flex-1 overflow-y-auto p-8 flex flex-col items-center gap-8 transition-colors ${
-          isDark ? 'bg-[#0a0a0d]' : 'bg-slate-300/80'
-        }`}
+        className={`flex-1 overflow-y-auto p-8 flex flex-col items-center gap-8 transition-colors bg-slate-300/80 dark:bg-[#0a0a0d]`}
       >
         {/* Banner de Propuesta en Papelera (Modo Solo Lectura) */}
         {project.isDeleted && (
@@ -490,189 +393,7 @@ export const PDFProposalView: React.FC = () => {
         )}
 
         <div ref={pdfRef} className="flex flex-col gap-8 print:gap-0">
-          {effectiveSectionOrder.map((sectionId) => {
-            if (!sectionVisibility[sectionId]) return null;
-
-            switch (sectionId) {
-              case 'cover':
-                return (
-                  <PDFCoverPage
-                    key="cover"
-                    project={project}
-                    summary={summary}
-                    activeTheme={activeTheme}
-                    currentDateStr={currentDateStr}
-                    isEditMode={isEditMode}
-                    updateClient={updateClient}
-                  />
-                );
-              case 'tableOfContents':
-                return (
-                  <PDFTableOfContents
-                    key="tableOfContents"
-                    project={project}
-                    summary={summary}
-                    activeTheme={activeTheme}
-                    showHeadersFooters={showHeadersFooters}
-                    currentDateStr={currentDateStr}
-                    pageNum={pageNumbers.tableOfContents}
-                    totalPages={totalCalculatedPages > 0 ? totalCalculatedPages : activePagesCount}
-                    tocItems={tocItems}
-                  />
-                );
-              case 'executiveSummary':
-                return (
-                  <PDFExecutiveSummaryPage
-                    key="executiveSummary"
-                    project={project}
-                    summary={summary}
-                    activeTheme={activeTheme}
-                    showHeadersFooters={showHeadersFooters}
-                    currentDateStr={currentDateStr}
-                    pageNum={pageNumbers.executiveSummary}
-                    totalPages={totalCalculatedPages > 0 ? totalCalculatedPages : activePagesCount}
-                  />
-                );
-              case 'aboutUs':
-                return (
-                  <PDFAboutUsPage
-                    key="aboutUs"
-                    project={project}
-                    summary={summary}
-                    activeTheme={activeTheme}
-                    showHeadersFooters={showHeadersFooters}
-                    currentDateStr={currentDateStr}
-                    pageNum={pageNumbers.aboutUs}
-                    totalPages={activePagesCount}
-                    isEditMode={isEditMode}
-                    updateDocumentCustomization={updateDocumentCustomization}
-                    updateDefaultDocumentCustomization={updateDefaultDocumentCustomization}
-                  />
-                );
-              case 'benefits':
-                return (
-                  <PDFSolarBenefitsPage
-                    key="benefits"
-                    project={project}
-                    summary={summary}
-                    activeTheme={activeTheme}
-                    showHeadersFooters={showHeadersFooters}
-                    currentDateStr={currentDateStr}
-                    pageNum={pageNumbers.benefits}
-                    totalPages={activePagesCount}
-                    isEditMode={isEditMode}
-                    updateDocumentCustomization={updateDocumentCustomization}
-                    updateDefaultDocumentCustomization={updateDefaultDocumentCustomization}
-                  />
-                );
-              case 'techIntro':
-                return (
-                  <PDFTechnicalIntroPage
-                    key="techIntro"
-                    project={project}
-                    summary={summary}
-                    activeTheme={activeTheme}
-                    showHeadersFooters={showHeadersFooters}
-                    currentDateStr={currentDateStr}
-                    pageNum={pageNumbers.techIntro}
-                    totalPages={activePagesCount}
-                    isEditMode={isEditMode}
-                    updateDocumentCustomization={updateDocumentCustomization}
-                    updateDefaultDocumentCustomization={updateDefaultDocumentCustomization}
-                  />
-                );
-              case 'projectDescription':
-                return (
-                  <PDFProjectDescriptionPage
-                    key="projectDescription"
-                    project={project}
-                    summary={summary}
-                    activeTheme={activeTheme}
-                    showHeadersFooters={showHeadersFooters}
-                    currentDateStr={currentDateStr}
-                    pageNum={pageNumbers.projectDescription}
-                    totalPages={activePagesCount}
-                    isEditMode={isEditMode}
-                    updateDocumentCustomization={updateDocumentCustomization}
-                    updateDefaultDocumentCustomization={updateDefaultDocumentCustomization}
-                  />
-                );
-              case 'energy':
-                return (
-                  <PDFPage1Energy
-                    key="energy"
-                    project={project}
-                    summary={summary}
-                    activeTheme={activeTheme}
-                    showHeadersFooters={showHeadersFooters}
-                    currentDateStr={currentDateStr}
-                    pageNum={pageNumbers.energy}
-                    totalPages={activePagesCount}
-                    isEditMode={isEditMode}
-                    updateDocumentCustomization={updateDocumentCustomization}
-                    updateSpecs={updateSpecs}
-                  />
-                );
-              case 'quotation':
-                return (
-                  <PDFPage2Quotation
-                    key="quotation"
-                    project={project}
-                    summary={summary}
-                    activeTheme={activeTheme}
-                    showHeadersFooters={showHeadersFooters}
-                    currentDateStr={currentDateStr}
-                    pageNum={pageNumbers.quotation}
-                    totalPages={activePagesCount}
-                    isEditMode={isEditMode}
-                    updateDocumentCustomization={updateDocumentCustomization}
-                    updateDefaultDocumentCustomization={updateDefaultDocumentCustomization}
-                    updateClient={updateClient}
-                  />
-                );
-              case 'roi':
-                return (
-                  <PDFPage3ROI
-                    key="roi"
-                    project={project}
-                    summary={summary}
-                    activeTheme={activeTheme}
-                    showHeadersFooters={showHeadersFooters}
-                    currentDateStr={currentDateStr}
-                    pageNum={pageNumbers.roi}
-                    totalPages={activePagesCount}
-                  />
-                );
-              case 'cashFlow':
-                return (
-                  <PDFPage4CashFlow
-                    key="cashFlow"
-                    project={project}
-                    summary={summary}
-                    activeTheme={activeTheme}
-                    showHeadersFooters={showHeadersFooters}
-                    currentDateStr={currentDateStr}
-                    pageNum={pageNumbers.cashFlow}
-                    totalPages={activePagesCount}
-                  />
-                );
-              case 'costMatrix':
-                return (
-                  <PDFPage5CostMatrix
-                    key="costMatrix"
-                    project={project}
-                    summary={summary}
-                    activeTheme={activeTheme}
-                    showHeadersFooters={showHeadersFooters}
-                    currentDateStr={currentDateStr}
-                    pageNum={pageNumbers.costMatrix}
-                    totalPages={activePagesCount}
-                  />
-                );
-              default:
-                return null;
-            }
-          })}
+          {effectiveSectionOrder.map((sectionId) => (sectionVisibility[sectionId] ? renderSection(sectionId) : null))}
         </div>
       </main>
     </div>

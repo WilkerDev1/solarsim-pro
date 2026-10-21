@@ -1,4 +1,6 @@
 import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
+import { DEFAULT_UNIT_PRICE_USD } from '../utils/equipmentGroups';
+import { ITBIS_RATE, LEY5707_CREDIT_RATE, appliesItemMargin, customItemsTaxBreakdown, isItemItbisExonerated } from '../../shared/financialRules';
 import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem, CustomQuotationItem, CustomQuotationDiscount, ProjectSimulation } from '../types';
 import { calculateDCCapacityKWp, calculateMonthlySolarProduction } from './solarEngine';
 import {
@@ -37,7 +39,7 @@ export function calculateCostMatrixSummary(
     const qty = p.count || 0;
     const unitUSD = p.unitPriceUSD !== undefined
       ? p.unitPriceUSD
-      : (specs.panels?.length ? 0 : (specs.panelUnitPriceUSD !== undefined ? specs.panelUnitPriceUSD : 103.32));
+      : (specs.panels?.length ? 0 : (specs.panelUnitPriceUSD !== undefined ? specs.panelUnitPriceUSD : DEFAULT_UNIT_PRICE_USD.panel));
     const itemTotalUSD = qty * unitUSD;
     const itemTotalDOP = itemTotalUSD * rate;
     const itemKilos = Math.round((((p.powerW || 620) * qty) / 1000) * 1000) / 1000;
@@ -67,7 +69,7 @@ export function calculateCostMatrixSummary(
     const qty = inv.count !== undefined ? inv.count : 1;
     const unitUSD = inv.unitPriceUSD !== undefined
       ? inv.unitPriceUSD
-      : (specs.inverters?.length ? 0 : (specs.inverterUnitPriceUSD !== undefined ? specs.inverterUnitPriceUSD : 2300.0));
+      : (specs.inverters?.length ? 0 : (specs.inverterUnitPriceUSD !== undefined ? specs.inverterUnitPriceUSD : DEFAULT_UNIT_PRICE_USD.inverter));
     const itemTotalUSD = qty * unitUSD;
     const itemTotalDOP = itemTotalUSD * rate;
     const itemKilos = inv.powerKW || inv.weightKilos || 12;
@@ -98,10 +100,10 @@ export function calculateCostMatrixSummary(
         const qty = b.count !== undefined ? b.count : 1;
         const unitUSD = b.unitPriceUSD !== undefined
           ? b.unitPriceUSD
-          : (specs.batteries?.length ? 0 : (specs.batteryUnitPriceUSD !== undefined ? specs.batteryUnitPriceUSD : 1990.0));
+          : (specs.batteries?.length ? 0 : (specs.batteryUnitPriceUSD !== undefined ? specs.batteryUnitPriceUSD : DEFAULT_UNIT_PRICE_USD.battery));
         const itemTotalUSD = qty * unitUSD;
         const itemTotalDOP = itemTotalUSD * rate;
-        const itemItbisDOP = itemTotalDOP * 0.18; // 18% ITBIS
+        const itemItbisDOP = itemTotalDOP * ITBIS_RATE; // 18% ITBIS
         const itemItbisUSD = itemItbisDOP / rate;
         const itemKilos = b.capacityKWh ? Math.round(b.capacityKWh * qty * 100) / 100 : (b.weightKilos || 32);
 
@@ -131,7 +133,7 @@ export function calculateCostMatrixSummary(
 
   const installTotalUSD = installationQty * installationUnitUSD;
   const installTotalDOP = installTotalUSD * rate;
-  const installItbisDOP = installTotalDOP * 0.18; // 18% ITBIS
+  const installItbisDOP = installTotalDOP * ITBIS_RATE; // 18% ITBIS
   const installItbisUSD = installItbisDOP / rate;
 
   const installItem: CostMatrixItem = {
@@ -157,9 +159,9 @@ export function calculateCostMatrixSummary(
     const unitUSD = cItem.unitPriceUSD || 0;
     const itemTotalUSD = qty * unitUSD;
     const itemTotalDOP = itemTotalUSD * rate;
-    const isExonerated = cItem.exonerateITBIS !== undefined ? cItem.exonerateITBIS : (cItem.applyITBIS ?? true);
-    const itemItbisDOP = isExonerated ? 0 : itemTotalDOP * 0.18;
-    const itemItbisUSD = isExonerated ? 0 : itemTotalUSD * 0.18;
+    const isExonerated = isItemItbisExonerated(cItem);
+    const itemItbisDOP = isExonerated ? 0 : itemTotalDOP * ITBIS_RATE;
+    const itemItbisUSD = isExonerated ? 0 : itemTotalUSD * ITBIS_RATE;
 
     customItemsNetUSD += itemTotalUSD;
     customItemsNetDOP += itemTotalDOP;
@@ -219,11 +221,10 @@ export function calculateCostMatrixSummary(
     const qty = cItem.quantity || 1;
     const unitUSD = cItem.unitPriceUSD || 0;
     const itemTotalUSD = qty * unitUSD;
-    const isExonerated = cItem.exonerateITBIS !== undefined ? cItem.exonerateITBIS : (cItem.applyITBIS ?? true);
-    const itemItbisUSD = isExonerated ? 0 : itemTotalUSD * 0.18;
+    const isExonerated = isItemItbisExonerated(cItem);
+    const itemItbisUSD = isExonerated ? 0 : itemTotalUSD * ITBIS_RATE;
     const itemCostWithTaxUSD = itemTotalUSD + itemItbisUSD;
-    // If applyMargin === false: pass-through direct cost (1.00x). If applyMargin !== false: project margin multiplier (e.g. 1.40x)
-    const itemMultiplier = cItem.applyMargin === false ? 1.0 : margin;
+    const itemMultiplier = appliesItemMargin(cItem) ? margin : 1.0;
     customItemsVentaUSD += itemCostWithTaxUSD * itemMultiplier;
   }
   const customItemsVentaDOP = customItemsVentaUSD * rate;
@@ -398,29 +399,10 @@ export function calculateFinancialSummary(
   const customItemsTotalUSD = Math.round(customItems.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPriceUSD || 0)), 0) * 100) / 100;
   
   // ITBIS differentiation: Exonerated by Ley 57-07 vs Charged to Client
-  let customItemsSaleTotalUSD = 0;
-  let exoneratedCustomITBISUSD = 0;
-  let nonExoneratedCustomITBISUSD = 0;
-
-  for (const item of customItems) {
-    const itemTotal = (item.quantity || 0) * (item.unitPriceUSD || 0);
-    const isExonerated = item.exonerateITBIS !== undefined ? item.exonerateITBIS : (item.applyITBIS ?? true);
-    // If applyMargin === true: applies project margin multiplier. If applyMargin === false or undefined: pass-through direct cost
-    const itemMargin = item.applyMargin === true ? (costMatrix.saleMarginMultiplier || specs.saleMarginMultiplier || 1.25) : 1.0;
-    const itemSalePreTax = itemTotal * itemMargin;
-
-    customItemsSaleTotalUSD += itemSalePreTax;
-    if (isExonerated) {
-      exoneratedCustomITBISUSD += itemSalePreTax * 0.18;
-    } else {
-      nonExoneratedCustomITBISUSD += itemSalePreTax * 0.18;
-    }
-  }
-
-  customItemsSaleTotalUSD = Math.round(customItemsSaleTotalUSD * 100) / 100;
-  exoneratedCustomITBISUSD = Math.round(exoneratedCustomITBISUSD * 100) / 100;
-  nonExoneratedCustomITBISUSD = Math.round(nonExoneratedCustomITBISUSD * 100) / 100;
-  const customItemsITBISUSD = exoneratedCustomITBISUSD;
+  const customItemsTaxes = customItemsTaxBreakdown(customItems, costMatrix.saleMarginMultiplier || specs.saleMarginMultiplier || 1.25);
+  const customItemsSaleTotalUSD = customItemsTaxes.saleTotalUSD;
+  const nonExoneratedCustomITBISUSD = customItemsTaxes.nonExoneratedITBISUSD;
+  const customItemsITBISUSD = customItemsTaxes.exoneratedITBISUSD;
 
   // Base Gross Investment:
   // 1. If explicit custom override is set, use it.
@@ -545,7 +527,7 @@ export function calculateFinancialSummary(
   const ley5707CreditUSD = financials.applyLey5707
     ? (financials.customLey5707CreditUSD !== undefined
         ? financials.customLey5707CreditUSD
-        : Math.round(equipmentPortionUSD * 0.40 * 100) / 100)
+        : Math.round(equipmentPortionUSD * LEY5707_CREDIT_RATE * 100) / 100)
     : 0;
 
   // Total Contract Price Payable by Client at Year 0:

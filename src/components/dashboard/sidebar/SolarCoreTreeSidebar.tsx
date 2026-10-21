@@ -1,3 +1,4 @@
+import { canAdminister } from '../../../../shared/permissions';
 import React, { useState } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import {
@@ -24,6 +25,7 @@ import {
 } from 'lucide-react';
 import { CreateFolderModal } from './CreateFolderModal';
 import { ProjectFolder } from '../../../types';
+import { hiddenFolderIdSet, isProjectInFolderView } from '../../../utils/folderVisibility';
 import electsunEmblem from '../../../assets/electsun-emblem-transparent.png';
 
 export const SolarCoreTreeSidebar: React.FC = () => {
@@ -53,7 +55,7 @@ export const SolarCoreTreeSidebar: React.FC = () => {
 
   const currentUser = syncSettings.currentUser;
   const activeCompany = getActiveCompany();
-  const isAdmin = currentUser?.role === 'ADMIN' || !currentUser; // Default full admin capabilities in standalone mode
+  const isAdmin = canAdminister(currentUser); // Default full admin capabilities in standalone mode
 
   // Tree collapsible section states
   const [isProjectsOpen, setIsProjectsOpen] = useState(true);
@@ -79,13 +81,11 @@ export const SolarCoreTreeSidebar: React.FC = () => {
   const trashedProjects = React.useMemo(() => projects.filter((p) => p.isDeleted), [projects]);
 
   // Set of folder IDs that should be hidden from general views
-  const hiddenFolderIds = React.useMemo(() => {
-    return new Set(folders.filter((f) => f.hideFromGeneral).map((f) => f.id));
-  }, [folders]);
+  const hiddenFolderIds = React.useMemo(() => hiddenFolderIdSet(folders), [folders]);
 
   // General projects: active projects that are NOT in a hidden folder
   const generalProjects = React.useMemo(() => {
-    return activeProjects.filter((p) => !p.folderId || !hiddenFolderIds.has(p.folderId));
+    return activeProjects.filter((p) => isProjectInFolderView(p, hiddenFolderIds));
   }, [activeProjects, hiddenFolderIds]);
 
   // Distinct team members based strictly on real registered account or project authors

@@ -1,3 +1,4 @@
+import { isAdminRole } from '../../../shared/permissions';
 import { useEffect, useRef, useState } from "react";
 import {
   CompanyService,
@@ -7,11 +8,12 @@ import { useSimulationStore } from "../../store/useSimulationStore";
 import { CompanyFields } from "./CompanyFields";
 import type { CompanyProfile } from "../../types";
 import { OrganizationSection } from "../settings/sections/OrganizationSection";
+import { confirmAction } from "../common/confirmAction";
 
 export function OrganizationManagement({
   registerLeaveGuard,
 }: {
-  registerLeaveGuard?: (guard: (() => boolean) | null) => void;
+  registerLeaveGuard?: (guard: (() => Promise<boolean>) | null) => void;
 }) {
   const { syncSettings, sessionGeneration, switchOrganization } =
     useSimulationStore();
@@ -24,11 +26,14 @@ export function OrganizationManagement({
   draftRef.current = draft;
   dirtyRef.current = dirty;
   const loadRequest = useRef(0);
-  const allowDiscard = () =>
+  const allowDiscard = async () =>
     !dirty ||
-    window.confirm(
-      "El perfil compartido tiene cambios sin guardar. ¿Descartarlos?",
-    );
+    confirmAction({
+      title: "Descartar cambios",
+      message: "El perfil compartido tiene cambios sin guardar. ¿Descartarlos?",
+      confirmLabel: "Descartar",
+      tone: "danger",
+    });
   useEffect(() => {
     registerLeaveGuard?.(allowDiscard);
     return () => registerLeaveGuard?.(null);
@@ -132,10 +137,11 @@ export function OrganizationManagement({
           <select
             value={user.organizationId}
             disabled={!loaded || busy}
-            onChange={(event) => {
-              if (allowDiscard())
+            onChange={async (event) => {
+              const organizationId = event.target.value;
+              if (await allowDiscard())
                 void run(
-                  () => switchOrganization(event.target.value),
+                  () => switchOrganization(organizationId),
                   "Organización cambiada.",
                 );
             }}
@@ -154,8 +160,8 @@ export function OrganizationManagement({
         </label>
         <button
           disabled={busy}
-          onClick={() => {
-            if (allowDiscard()) void load(true);
+          onClick={async () => {
+            if (await allowDiscard()) void load(true);
           }}
         >
           Actualizar datos
@@ -203,9 +209,9 @@ export function OrganizationManagement({
               <CompanyFields
                 draft={draft}
                 setDraft={setDraft}
-                readOnly={user.role !== "ADMIN" || busy}
+                readOnly={!isAdminRole(user.role) || busy}
               />
-              {user.role === "ADMIN" && (
+              {isAdminRole(user.role) && (
                 <div className="cc-actions">
                   <button
                     type="button"
@@ -233,7 +239,7 @@ export function OrganizationManagement({
           {view === "other" && (
             <section className="cc-section">
               <h3>Otras organizaciones</h3>
-              {user.role === "ADMIN" && (
+              {isAdminRole(user.role) && (
                 <form
                   onSubmit={(event) => {
                     event.preventDefault();

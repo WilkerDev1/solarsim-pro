@@ -15,8 +15,13 @@ release/builder-debug.yml
 repomix-output.xml
 repomix-output.txt
 
-.impeccable/
 
 **/next-secrets.env
 
 scripts/qa/fixtures/runtime-config.json
+
+# Capturas locales de QA (solo datos sintéticos)
+docs/qa/
+
+# Capturas locales de revisión de impeccable
+.impeccable/review/
