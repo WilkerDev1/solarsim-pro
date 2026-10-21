@@ -86,6 +86,8 @@ export const createClientSlice: SimulationSlice<ClientSlice> = (set, get) => {
       const changes = { ...state.clientChanges };
       delete changes[id];
       const now = new Date().toISOString();
+      // A published client may still be rejected by CAS: its links go only when the server confirms (deletedIds).
+      const unlinkNow = !state.syncSettings.currentUser || !(client.baseVersion ?? client.version);
       set({
         clients: state.clients.filter((c) => c.id !== id),
         clientChanges: changes,
@@ -95,9 +97,9 @@ export const createClientSlice: SimulationSlice<ClientSlice> = (set, get) => {
         ],
         activeClientId: state.activeClientId === id ? null : state.activeClientId,
         // The server unlinks its copies in the same transaction; local copies follow without touching printed data.
-        projects: state.projects.map((p) =>
-          p.clientId === id && !p.isDeleted ? { ...p, clientId: undefined, syncStatus: 'pending', updatedAt: now } : p,
-        ),
+        projects: unlinkNow
+          ? state.projects.map((p) => (p.clientId === id && !p.isDeleted ? { ...p, clientId: undefined, syncStatus: 'pending', updatedAt: now } : p))
+          : state.projects,
       });
       sync();
       return true;
@@ -123,7 +125,9 @@ export const createClientSlice: SimulationSlice<ClientSlice> = (set, get) => {
     },
     resolveClientConflict: (id, resolution) => {
       const state = get(), change = state.clientChanges[id];
-      if (!writable() || !change?.serverClient || (change.ownerId && change.ownerId !== state.syncSettings.currentUser?.id)) return;
+      if (!change?.serverClient || (change.ownerId && change.ownerId !== state.syncSettings.currentUser?.id)) return;
+      // Discarding local work is always allowed to its owner; keeping it requires write access.
+      if (resolution === 'keep_local' && !writable()) return;
       const changes = { ...state.clientChanges };
       if (resolution === 'accept_server') {
         delete changes[id];
@@ -230,9 +234,14 @@ export const createClientSlice: SimulationSlice<ClientSlice> = (set, get) => {
             remote.set(id, saved.client);
             set((s) => {
               const changes = { ...s.clientChanges };
-              if (changes[id]?.revision === change.revision) delete changes[id];
+              const acknowledged = changes[id]?.revision === change.revision;
+              if (acknowledged) delete changes[id];
               else if (changes[id]) changes[id] = { ...changes[id], baseVersion: saved.client.version ?? changes[id].baseVersion };
               return {
+                // Store the receipt with the change it clears, so a later failure in this pass cannot orphan it.
+                clients: s.clients.map((c) =>
+                  c.id !== id ? c : acknowledged ? saved.client : { ...c, version: saved.client.version, baseVersion: saved.client.version },
+                ),
                 clientChanges: changes,
                 clientDeletionQueue: s.clientDeletionQueue.map((c) => (c.id === id ? { ...c, baseVersion: saved.client.version ?? c.baseVersion } : c)),
               };

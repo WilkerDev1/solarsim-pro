@@ -15,6 +15,7 @@ const record = (id: string, name: string, version: number, extra: Partial<Client
 let remote = new Map<string, ClientRecord>([['client-a', record('client-a', 'Cliente A', 1)]]);
 let deletedIds = ['client-gone'];
 let online = true;
+let failPutFor: string | null = null;
 const calls: string[] = [];
 const json = (value: unknown, status = 200) => Response.json(value, { status });
 
@@ -35,6 +36,7 @@ ClientSyncService.setTransportFactory((url, token) => async (path, init = {}) =>
     deletedIds = [...deletedIds, id];
     return json({ success: true });
   }
+  if (id === failPutFor) throw new Error('Conexión interrumpida');
   const body = JSON.parse(String(init.body));
   if (deletedIds.includes(id) || (current ? body.baseVersion !== current.version : body.baseVersion !== 0))
     return json({ error: 'conflicto', client: current ?? null }, 409);
@@ -77,6 +79,23 @@ try {
   assert.equal(store.getState().clients.find((c) => c.id === offlineId)!.version, 1);
   assert.equal(store.getState().clientSyncFeedback, null);
 
+  // A partial failure keeps each acknowledged version: later edits do not conflict with this device's own write.
+  const first = store.getState().createClientRecord({ name: 'Primero en cola' });
+  const second = store.getState().createClientRecord({ name: 'Segundo en cola' });
+  assert.ok(first.ok && second.ok);
+  failPutFor = second.client.id;
+  assert.equal((await store.getState().syncClientsWithServer()).success, false);
+  failPutFor = null;
+  const acknowledged = store.getState().clients.find((c) => c.id === first.client.id)!;
+  assert.equal(acknowledged.version, 1);
+  assert.equal(acknowledged.baseVersion, 1);
+  assert.equal(store.getState().clientChanges[first.client.id], undefined);
+  store.getState().updateClientRecord(first.client.id, { phone: '809-555-1111' });
+  assert.equal(store.getState().clientChanges[first.client.id].baseVersion, 1);
+  assert.equal((await store.getState().syncClientsWithServer()).success, true);
+  assert.equal(remote.get(first.client.id)!.version, 2);
+  assert.ok(remote.has(second.client.id));
+
   // A lost creation receipt with identical content is acknowledged without a second write.
   const lost = store.getState().createClientRecord({ name: 'Recibo perdido' });
   assert.ok(lost.ok);
@@ -104,18 +123,30 @@ try {
   assert.equal(store.getState().clientChanges['client-a'], undefined);
 
   // Deletions use the acknowledged version; a stale deletion restores the server record for review.
+  // Published clients are unlinked only once the server confirms the deletion.
+  store.setState((s) => ({ projects: [...s.projects, proposal('p-offline', offlineId)] }));
   store.getState().deleteClientRecord(offlineId);
+  assert.equal(store.getState().projects.find((p) => p.id === 'p-offline')!.clientId, offlineId);
   remote.set('client-a', record('client-a', 'Servidor gana', 5));
   store.getState().deleteClientRecord('client-a');
   assert.equal((await store.getState().syncClientsWithServer()).success, false);
+  assert.equal(store.getState().projects.find((p) => p.id === 'p-offline')!.clientId, undefined, 'Confirmed deletion unlinks');
+  assert.equal(store.getState().projects.find((p) => p.id === 'p-kept')!.clientId, 'client-a', 'A rejected deletion keeps its links');
   assert.ok(!remote.has(offlineId));
   assert.ok(!store.getState().clients.some((c) => c.id === offlineId));
   assert.equal(store.getState().clients.find((c) => c.id === 'client-a')!.version, 5, 'Stale deletion is not applied blindly');
   assert.deepEqual(store.getState().clientDeletionQueue, []);
   assert.ok(store.getState().clientChanges['client-a'].serverClient);
 
-  // Never-published clients are deleted locally without a server request.
+  // A member demoted to reader can still discard local work in favour of the server record, never keep it.
+  store.getState().setSyncSettings({ currentUser: { ...user, role: 'LECTOR' } });
+  store.getState().resolveClientConflict('client-a', 'keep_local');
+  assert.ok(store.getState().clientChanges['client-a'].serverClient);
   store.getState().resolveClientConflict('client-a', 'accept_server');
+  assert.equal(store.getState().clientChanges['client-a'], undefined);
+  store.getState().setSyncSettings({ currentUser: user });
+
+  // Never-published clients are deleted locally without a server request.
   online = false;
   const draft = store.getState().createClientRecord({ name: 'Borrador' });
   assert.ok(draft.ok);
