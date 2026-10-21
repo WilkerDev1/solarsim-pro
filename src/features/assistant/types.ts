@@ -25,6 +25,8 @@ export interface AssistantMessage {
   text: string;
   cards?: AssistantCard[];
   actions?: AssistantAction[];
+  /** Changes already applied under the drafts-free policy; each one can be undone. */
+  applied?: { activityId: string; title: string }[];
 }
 export interface AssistantToolCall {
   name: string;
@@ -34,4 +36,5 @@ export interface AssistantToolResult {
   data: unknown;
   cards?: AssistantCard[];
   action?: AssistantAction;
+  activityId?: string;
 }

@@ -53,6 +53,8 @@ useSimulationStore.setState({
   syncSettings: { ...useSimulationStore.getState().syncSettings, currentUser: null, authToken: null, autoSyncEnabled: false },
 });
 assert.equal(listAgentTools('app-assistant').length, AGENT_TOOL_DEFINITIONS.length);
+useSimulationStore.getState().setAgentPolicy({ external: { read: 'deny', draft: 'deny', guarded: 'deny' } });
+assert.equal(listAgentTools('mcp').length, 0, 'denied kinds are not even listed');
 const ctx = { source: 'app-assistant' as const, owner: assistantOwner() };
 const unknown = await executeAgentTool({ name: 'drop_database', args: {} }, ctx);
 assert.equal(unknown.status, 'error');
@@ -64,6 +66,8 @@ assert.equal(found.cards?.[0].type, 'proposal');
 assert.equal(found.cards?.[0].id, project.id);
 const badJson = await executeAgentTool({ name: 'propose_project_update', args: { id: project.id, edits: [{ section: 'rates', field: 'targetCoveragePct', valueJson: '{' }] } }, ctx);
 assert(badJson.status === 'error' && /JSON/.test(badJson.message));
+// With drafts set to "confirm" the plan waits; the default "allow" path is covered by testAgentPermissions.
+useSimulationStore.getState().setAgentPolicy({ internal: { read: 'allow', draft: 'confirm', guarded: 'confirm' } });
 const pending = await executeAgentTool({ name: 'propose_project_update', args: { id: project.id, title: 'Cobertura', edits: [{ section: 'rates', field: 'targetCoveragePct', valueJson: '90' }] } }, ctx);
 assert(pending.status === 'pending_confirmation');
 assert.equal(getPendingAgentAction(pending.actionId)?.edits[0].value, 90);

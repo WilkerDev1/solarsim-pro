@@ -15,6 +15,7 @@ import { assistantOwner } from '../tools';
 import { ChatMessage } from './ChatMessage';
 import {
   AssistantActionCard,
+  AssistantAppliedCard,
   AssistantResultCard,
 } from './AssistantResultCard';
 import '../chat.css';
@@ -144,6 +145,9 @@ function AssistantPanel({
                     disabled={ai.busy}
                     onApplied={ai.append}
                   />
+                ))}
+                {m.applied?.map((a) => (
+                  <AssistantAppliedCard key={a.activityId} activityId={a.activityId} title={a.title} />
                 ))}
               </ChatMessage>
             ))}

@@ -172,6 +172,19 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
   },
 
+  updateProjectById: (id, edit) => {
+    const target = get().projects.find((p) => p.id === id);
+    if (!target || target.isDeleted || target.deletedAt) return false;
+    set((state) => ({
+      projects: state.projects.map((p) => p.id === id
+        ? withNormalizedEquipment(p, { ...p, ...projectMutationMetadata(p, get().syncSettings), updatedAt: new Date().toISOString(), ...edit(p) })
+        : p),
+    }));
+    get().triggerAutoSync(false);
+    if (id === get().activeProjectId) get().recordUndoState(get().getActiveProject());
+    return true;
+  },
+
   createNewProject: (payload) => {
     const defs = get().defaultSimulationSettings;
     const id = `proj-${Date.now()}`;

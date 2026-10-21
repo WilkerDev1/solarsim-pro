@@ -67,6 +67,11 @@ export const AGENT_TOOL_DEFINITIONS: readonly AgentToolDefinition[] = [
       edits: edits(['equipment']),
     }, ['id', 'edits']),
   },
+  {
+    name: 'get_agent_action_status', title: 'Estado de una acción pendiente', kind: 'read', category: 'reference', surfaces: [...ALL],
+    description: 'Consulta si una acción que esperaba confirmación fue aplicada, rechazada o caducó. waitSeconds espera la decisión hasta 20 s.',
+    inputSchema: object({ actionId: id('ID devuelto como pending_confirmation.'), waitSeconds: { type: 'integer', minimum: 0, maximum: 20 } }, ['actionId']),
+  },
 ];
 
 export function findAgentTool(name: string): AgentToolDefinition | undefined {

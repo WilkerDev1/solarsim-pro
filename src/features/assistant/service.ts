@@ -29,6 +29,7 @@ export async function runAssistant(
 ): Promise<AssistantMessage> {
   const cards: AssistantCard[] = [];
   const actions: AssistantAction[] = [];
+  const applied: { activityId: string; title: string }[] = [];
   const contents: any[] = options.history
     .slice(-12)
     .map((m) => ({
@@ -85,6 +86,7 @@ export async function runAssistant(
           ...new Map(cards.map((c) => [`${c.kind}:${c.id}`, c])).values(),
         ].slice(0, 12),
         actions,
+        ...(applied.length ? { applied } : {}),
       };
     if (calls.length > 4)
       throw new Error(
@@ -99,6 +101,8 @@ export async function runAssistant(
             'Resultado demasiado grande. Consulta un equipo o una propuesta específica.'
           );
         if (result.cards) cards.push(...result.cards);
+        if (result.activityId)
+          applied.push({ activityId: result.activityId, title: String(call.args?.title || 'Cambio aplicado').slice(0, 150) });
         if (result.action) {
           if (actions.length >= 3)
             throw new Error('Máximo tres cambios por mensaje.');
