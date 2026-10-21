@@ -288,9 +288,9 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     }
   },
 
-  duplicateProject: (id) => {
+  duplicateProject: (id, options) => {
     const original = get().projects.find((p) => p.id === id);
-    if (!original) return;
+    if (!original) return undefined;
 
     const dupIdentifiers = generateDuplicateProjectIdentifiers(original, get().projects);
     const newId = `proj-${Date.now()}`;
@@ -329,7 +329,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
 
     set((state) => ({
       projects: [cloned, ...state.projects],
-      activeProjectId: newId,
+      ...(options?.activate === false ? {} : { activeProjectId: newId }),
       saveFeedbackMessage: `¡Proyecto duplicado como versión ${dupIdentifiers.versionSuffix}! ✨`,
     }));
 
@@ -338,6 +338,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
       get().triggerAutoSync(true);
     }
+    return newId;
   },
 
   moveToTrash: (id) => {

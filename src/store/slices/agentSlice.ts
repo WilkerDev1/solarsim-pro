@@ -47,8 +47,12 @@ export interface AgentActivityEntry {
   title: string;
   changes: AgentChange[];
   status: 'applied' | 'undone';
-  /** Only the sections the change touched, plus a fingerprint of their state right after it. */
-  undo?: { before: Record<string, unknown>; fields?: string[]; afterFingerprint: string };
+  /**
+   * `fields` (default): restore the touched sections if they still match the fingerprint taken right after the change;
+   * `fields` lists them so absent values survive JSON persistence.
+   * `trash`: the agent created the proposal, so undo moves it to the trash. `restore`: the agent trashed it, undo restores it.
+   */
+  undo?: { op?: 'fields' | 'trash' | 'restore'; before: Record<string, unknown>; fields?: string[]; afterFingerprint: string };
 }
 
 export type PendingAgentActionStatus = 'pending' | 'applied' | 'rejected' | 'expired' | 'failed';

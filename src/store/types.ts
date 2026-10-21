@@ -106,7 +106,8 @@ export interface ProjectSlice {
   createNewProject: (payload?: string | NewProjectPayload) => void;
   /** Edits any proposal by id (agents); refuses trashed proposals. Returns false when nothing changed. */
   updateProjectById: (id: string, edit: (project: ProjectSimulation) => Partial<ProjectSimulation>) => boolean;
-  duplicateProject: (id: string) => void;
+  /** Returns the new proposal id. `activate: false` keeps the user on the current proposal (agents). */
+  duplicateProject: (id: string, options?: { activate?: boolean }) => string | undefined;
   moveToTrash: (id: string) => void;
   deleteProject: (id: string) => void; // Compatibilidad: delega en moveToTrash
   restoreProject: (id: string) => void;
