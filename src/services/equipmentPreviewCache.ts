@@ -48,6 +48,8 @@ export interface EquipmentPreviewCache {
   put(key: string, blob: Blob): Promise<void>;
   /** Waits for pending storage writes and pruning. */
   flush(): Promise<void>;
+  /** Resident entries and bytes of the memory layer (diagnostics and tests). */
+  stats(): { entries: number; bytes: number };
 }
 
 export function previewCacheKey(scope: string, assetId: string, variant: EquipmentPreviewVariant | string): string {
@@ -82,15 +84,19 @@ export function createEquipmentPreviewCache(options: EquipmentPreviewCacheOption
   const failures = new Map<string, number>();
   const pending = new Set<Promise<void>>();
 
-  const remember = (key: string, blob: Blob) => {
+  const forget = (key: string) => {
     const previous = memory.get(key);
-    if (previous) { memory.delete(key); memorySize -= previous.size; }
+    if (!previous) return;
+    memory.delete(key);
+    memorySize -= previous.size;
+  };
+
+  const remember = (key: string, blob: Blob) => {
+    forget(key);
     memory.set(key, blob);
     memorySize += blob.size;
     while (memory.size > 1 && (memory.size > memoryEntries || memorySize > memoryBytes)) {
-      const [oldest, value] = memory.entries().next().value as [string, Blob];
-      memory.delete(oldest);
-      memorySize -= value.size;
+      forget(memory.keys().next().value as string);
     }
   };
 
@@ -107,7 +113,7 @@ export function createEquipmentPreviewCache(options: EquipmentPreviewCacheOption
     for (const record of [...records].sort((a, b) => a.accessedAt - b.accessedAt)) {
       if (total <= maxPersistentBytes) break;
       await storage.delete(record.key);
-      memory.delete(record.key);
+      forget(record.key);
       total -= record.size;
     }
   };
@@ -180,7 +186,9 @@ export function createEquipmentPreviewCache(options: EquipmentPreviewCacheOption
     while (pending.size) await Promise.all([...pending]);
   };
 
-  return { peek, get, load, put, flush };
+  const stats = () => ({ entries: memory.size, bytes: memorySize });
+
+  return { peek, get, load, put, flush, stats };
 }
 
 export function createMemoryPreviewStorage(): PreviewStorage {

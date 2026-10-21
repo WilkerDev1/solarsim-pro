@@ -95,6 +95,7 @@ assert.notEqual(previewCacheKey('local', 'a', 'thumb'), previewCacheKey(scope, '
   await cache.flush();
   const keys = (await storage.list()).map((entry) => entry.key).sort();
   assert.deepEqual(keys, [k('mid'), k('new')].sort(), 'Oldest record is pruned once the budget is exceeded');
+  assert.deepEqual(cache.stats(), { entries: 2, bytes: 8 }, 'Pruning a resident record also releases its memory bytes');
 }
 
 // Storage failures never break previews: memory keeps working.
