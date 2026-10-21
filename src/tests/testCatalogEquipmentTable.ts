@@ -48,4 +48,10 @@ assert.ok(rows.slice(0, 3).every(row => /data-preview-status=/.test(row)), 'Ever
 assert.match(rows[0], /aria-label="Ver imágenes y ficha técnica de QA Panel 600"/);
 assert.match(rows[1], /aria-label="Ver imágenes y ficha técnica de QA Inversor 8K"/);
 assert.doesNotMatch(rows[2], /Ver imágenes y ficha técnica/, 'Without assets the type icon is not a button');
+// Dropdowns that close on outside clicks must ignore the preview dialog, which lives in a body portal.
+const { isInsideEquipmentPreview, EQUIPMENT_PREVIEW_ATTRIBUTE } = await import('../components/common/equipment/EquipmentPreviewDialog');
+const node = (insideDialog: boolean) => ({ closest: (selector: string) => (insideDialog && selector === `[${EQUIPMENT_PREVIEW_ATTRIBUTE}]` ? {} : null) });
+assert.equal(isInsideEquipmentPreview(node(true) as unknown as EventTarget), true);
+assert.equal(isInsideEquipmentPreview(node(false) as unknown as EventTarget), false);
+assert.equal(isInsideEquipmentPreview(null), false);
 console.log('Catalog equipment table rows, offers, nominal values, conflict row and preview icons passed.');

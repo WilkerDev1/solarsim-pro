@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { SolarEquipmentItem, EquipmentType } from '../../../types/equipment';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { EquipmentPreviewThumb } from '../../common/equipment/EquipmentPreviewThumb';
+import { isInsideEquipmentPreview } from '../../common/equipment/EquipmentPreviewDialog';
 import { Search, ChevronDown, Check, Sparkles, Sun, Zap, BatteryCharging, X, Layers, Building2, DollarSign } from 'lucide-react';
 
 interface SearchableEquipmentSelectProps {
@@ -78,6 +79,8 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
   // Manejar clic afuera para cerrar dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      // The preview dialog opened from an option lives in a body portal: it is not an outside click.
+      if (isInsideEquipmentPreview(event.target)) return;
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
