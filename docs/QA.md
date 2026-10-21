@@ -14,7 +14,7 @@ La lista completa de gates está en [MAINTENANCE_AND_UPDATES.md](MAINTENANCE_AND
 
 - **Staging con runtime real**: `QA_CLOUDFLARED=/ruta/al/cloudflared npx tsx scripts/qa/runRuntimeStaging.ts`. Levanta PostgreSQL desechable, API HTTP real, Wrangler local (workerd y KV privados) y túneles HTTPS temporales; rechaza destinos de producción, aprovisiona usuarios sintéticos `@staging.example.invalid` (Ana ADMIN, Bruno EDITOR, Vera lector y una cuenta de otra organización) y ejecuta `scripts/qa/stagingRehearsal.ts` (CAS entre editores, rechazo del lector y de clientes sin `baseVersion`, snapshots de publicación, papelera). `Ctrl+C` limpia procesos, contenedor, KV y túneles.
 - **Aplicación completa contra ese staging**: en otra terminal `npm run dev` y abrir `/scripts/qa/fixtures/runtimeFlow.html` sobre el origen de Vite.
-- **Fixtures de componentes**: `scripts/qa/fixtures/*.html` montan vistas reales con transporte simulado (catálogo, asistente, centro empresarial, conflictos, borradores, simulador y fichas). Acreditan el comportamiento de UI, no la API.
+- **Fixtures de componentes**: `scripts/qa/fixtures/*.html` montan vistas reales con transporte simulado (catálogo, asistente, centro empresarial, clientes, conflictos, borradores, simulador y fichas). Acreditan el comportamiento de UI, no la API.
 - **Electron empaquetado**: `node scripts/qa/runElectronRuntime.mjs [ruta/app.asar]` arranca el ASAR con perfil privado y comprueba aislamiento del renderer e IPC. `release.yml` lo usa tras instalar los paquetes.
 - **Respaldo**: `scripts/qa/restoreBackupRehearsal.py` (ver [infraestructura](INFRASTRUCTURE_ARCHITECTURE.md#despliegue-de-la-api)).
 
