@@ -3,6 +3,7 @@ import jsPDF from 'jspdf';
 import type { AttachedPDFDocument } from '../../../types';
 import { PDFMergeService } from '../../../services/pdfMergeService';
 import { collectAttachmentBuffers, type AttachmentBytesResolver } from './proposalAttachmentCollection';
+import { isEditorChrome, stripEditorChrome } from './editorChrome';
 
 export interface ExportProposalPdfOptions {
   pages: HTMLElement[];
@@ -29,6 +30,8 @@ function createSandbox(): HTMLDivElement {
 
 function preparePageClone(pageEl: HTMLElement): HTMLElement {
   const clone = pageEl.cloneNode(true) as HTMLElement;
+  // Defensa adicional al modo 'export' del editor: ningún cromo de edición llega al PDF.
+  stripEditorChrome(clone);
   Object.assign(clone.style, {
     width: '850px', height: '1202px', minHeight: '1202px', maxHeight: '1202px', margin: '0', padding: '0',
     boxSizing: 'border-box', overflow: 'hidden', transform: 'none', boxShadow: 'none',
@@ -52,6 +55,7 @@ export async function exportProposalPdf(options: ExportProposalPdfOptions): Prom
       const canvas = await html2canvas(clone, {
         scale: 2, useCORS: true, logging: false, allowTaint: true, backgroundColor: '#ffffff',
         width: 850, height: 1202, windowWidth: 850, windowHeight: 1202, x: 0, y: 0, scrollX: 0, scrollY: 0,
+        ignoreElements: isEditorChrome,
       });
       const imgData = canvas.toDataURL('image/jpeg', 0.98);
       if (i > 0) pdf.addPage('a4', 'portrait');

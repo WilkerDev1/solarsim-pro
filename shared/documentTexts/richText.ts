@@ -293,3 +293,22 @@ export function serializeEditableDom(root: NodeLike, options: SanitizeOptions = 
   const markdown = lines.map((line) => (line.bullet ? '- ' : '') + serializeInline(line.segments)).join('\n');
   return sanitizeRichText(markdown, options);
 }
+
+/** HTML inicial de un `contentEditable` (lo inverso de `serializeEditableDom`), siempre escapado. */
+export function richTextToEditorHtml(source: string | null | undefined): string {
+  const inline = (line: RichLine) => line.map((segment) => {
+    let html = escapeRichHtml(segment.text);
+    if (segment.italic) html = `<em>${html}</em>`;
+    if (segment.bold) html = `<strong>${html}</strong>`;
+    return html;
+  }).join('');
+  const blocks = parseRichText(source);
+  if (!blocks.length) return '<div><br></div>';
+  return blocks
+    .map((block, index) => {
+      const gap = index > 0 && !block.tight ? '<div><br></div>' : '';
+      if (block.type === 'list') return `${gap}<ul>${block.items.map((item) => `<li>${inline(item) || '<br>'}</li>`).join('')}</ul>`;
+      return gap + block.lines.map((line) => `<div>${inline(line) || '<br>'}</div>`).join('');
+    })
+    .join('');
+}
