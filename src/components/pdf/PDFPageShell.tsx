@@ -4,6 +4,7 @@ import { PDFColorTheme } from '../../constants/pdfThemes';
 import { PDFHeaderBanner } from './PDFHeaderBanner';
 import { PDFFooter } from './PDFFooter';
 import { PDFWatermark } from './PDFWatermark';
+import { EnsureDocumentEditor } from './editor/DocumentEditorContext';
 
 export const PDF_PAGE_CLASS =
   'pdf-page w-[850px] h-[1202px] min-h-[1202px] max-h-[1202px] bg-white shadow-xl flex flex-col shrink-0 relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen';
@@ -35,6 +36,7 @@ export const PDFPageShell: React.FC<PDFPageShellProps> = ({
   className = PDF_PAGE_CLASS,
   children,
 }) => (
+  <EnsureDocumentEditor project={project} summary={summary} currentDateStr={currentDateStr}>
   <div className={className}>
     <PDFWatermark
       opacity={project.customization?.watermarkOpacity ?? 0.15}
@@ -57,4 +59,5 @@ export const PDFPageShell: React.FC<PDFPageShellProps> = ({
       <PDFFooter pageNum={pageNum} totalPages={totalPages} customization={project.customization} />
     )}
   </div>
+  </EnsureDocumentEditor>
 );

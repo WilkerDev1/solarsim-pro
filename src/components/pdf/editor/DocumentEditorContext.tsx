@@ -1,0 +1,68 @@
+import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { resolveDocumentText, type DocumentTextContext, type ResolvedDocumentText } from '../../../../shared/documentTexts';
+import type { CompanyProfile, FinancialSummaryResult, ProjectSimulation } from '../../../types';
+import { buildDocumentTextContext } from '../../../utils/documentTextContext';
+import type { DocumentEditorMode } from './documentEditorState';
+
+export interface DocumentEditorActions {
+  setText: (key: string, value: string) => void;
+  resetText: (key: string) => void;
+  /** Guarda el texto en la plantilla de la empresa; devuelve si se guardó. */
+  saveToTemplate: (key: string) => boolean;
+}
+
+export interface DocumentEditorValue extends DocumentEditorActions {
+  project: ProjectSimulation;
+  ctx: DocumentTextContext;
+  mode: DocumentEditorMode;
+  /** Edición activa y permitida (escritor, sin papelera ni conflicto). */
+  canEdit: boolean;
+  resolve: (key: string) => ResolvedDocumentText;
+  activeKey: string | null;
+  setActiveKey: (key: string | null) => void;
+}
+
+const DocumentEditorReactContext = createContext<DocumentEditorValue | null>(null);
+
+const NO_ACTIONS: DocumentEditorActions = { setText: () => {}, resetText: () => {}, saveToTemplate: () => false };
+
+interface ProviderProps {
+  project: ProjectSimulation;
+  summary: Pick<FinancialSummaryResult, 'annualConsumptionKWh' | 'annualProductionKWh' | 'systemCapacityKWp' | 'energyCoveragePct'>;
+  currentDateStr: string;
+  company?: CompanyProfile;
+  mode?: DocumentEditorMode;
+  /** Permiso de escritura ya evaluado (`canEditDocument`). */
+  writable?: boolean;
+  actions?: DocumentEditorActions;
+  children: React.ReactNode;
+}
+
+/** Fuente única de los textos del documento para todas las páginas de la propuesta. */
+export const DocumentEditorProvider: React.FC<ProviderProps> = ({ project, summary, currentDateStr, company, mode = 'view', writable = false, actions = NO_ACTIONS, children }) => {
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const ctx = useMemo(
+    () => buildDocumentTextContext(project, summary, { currentDateStr, company }),
+    [project, summary, currentDateStr, company],
+  );
+  const resolve = useCallback((key: string) => resolveDocumentText(key, project, ctx), [project, ctx]);
+  const canEdit = mode === 'edit' && writable;
+  const value = useMemo<DocumentEditorValue>(
+    () => ({ project, ctx, mode, canEdit, resolve, activeKey: canEdit ? activeKey : null, setActiveKey, ...actions }),
+    [project, ctx, mode, canEdit, resolve, activeKey, actions],
+  );
+  return <DocumentEditorReactContext.Provider value={value}>{children}</DocumentEditorReactContext.Provider>;
+};
+
+export function useDocumentEditor(): DocumentEditorValue {
+  const value = useContext(DocumentEditorReactContext);
+  if (!value) throw new Error('EditableText necesita un DocumentEditorProvider (o EnsureDocumentEditor en la página).');
+  return value;
+}
+
+/** Las páginas también se renderizan sueltas (pruebas, visor): sin proveedor, crean uno de solo lectura. */
+export const EnsureDocumentEditor: React.FC<Omit<ProviderProps, 'mode' | 'writable' | 'actions'>> = ({ children, ...props }) => {
+  const existing = useContext(DocumentEditorReactContext);
+  if (existing) return <>{children}</>;
+  return <DocumentEditorProvider {...props}>{children}</DocumentEditorProvider>;
+};

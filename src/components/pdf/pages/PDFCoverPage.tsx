@@ -1,20 +1,19 @@
 import React from 'react';
 import { cleanClientName } from '../../../../shared/proposalPresentation';
-import { ProjectSimulation, FinancialSummaryResult, ClientInfo } from '../../../types';
+import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
 import { Phone, MapPin, Globe, Instagram, MapPinned } from 'lucide-react';
 import { documentLogo } from '../../../utils/documentLogo';
 import { PDF_COVER_HERO_BASE64 } from '../../../assets/pdfGraphicAssets';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
-import { InlineEditableText } from '../common/InlineEditableText';
+import { EditableText } from '../editor/EditableText';
+import { EnsureDocumentEditor } from '../editor/DocumentEditorContext';
 
 interface PDFCoverPageProps {
   project: ProjectSimulation;
   summary: FinancialSummaryResult;
   activeTheme: PDFColorTheme;
   currentDateStr: string;
-  isEditMode?: boolean;
-  updateClient?: (client: Partial<ClientInfo>) => void;
 }
 
 export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
@@ -22,8 +21,6 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
   summary,
   activeTheme,
   currentDateStr,
-  isEditMode = false,
-  updateClient,
 }) => {
   const cust = project.customization || {};
   const companyName = cust.companyName ?? DEFAULT_DOCUMENT_CUSTOMIZATION.companyName ?? 'electsun';
@@ -43,6 +40,7 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
   const panelModelText = `${project.specs.panelCount} Módulos Tier-1 (${project.specs.panelPowerW}W)`;
 
   return (
+    <EnsureDocumentEditor project={project} summary={summary} currentDateStr={currentDateStr}>
     <div className="pdf-page w-[850px] h-[1202px] min-h-[1202px] max-h-[1202px] bg-white shadow-2xl flex flex-col justify-between shrink-0 relative overflow-hidden font-sans print:shadow-none print:w-full print:min-h-screen">
       {/* 1. Header Overlay (Larger High-Resolution Logo on Top-Right) */}
       <div className="absolute top-0 right-0 w-full flex justify-end p-6 pr-8 z-30 pointer-events-none">
@@ -207,26 +205,7 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
               <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-0.5">
                 Fecha Emisión
               </span>
-              {isEditMode && updateClient ? (
-                <InlineEditableText
-                  value={project.client.quoteDate || currentDateStr}
-                  defaultValue={currentDateStr}
-                  onSave={(val) => updateClient({ quoteDate: val })}
-                  isEditMode={isEditMode}
-                  multiline={false}
-                  label="Fecha de Emisión"
-                  placeholder="DD/MM/AAAA o YYYY-MM-DD"
-                  className="text-base font-black block tracking-tight"
-                  boldClassName="text-base font-black"
-                />
-              ) : (
-                <span
-                  className="text-base font-black block"
-                  style={{ color: activeTheme.primary }}
-                >
-                  {currentDateStr}
-                </span>
-              )}
+              <EditableText k="quote.date" className="text-base font-black block tracking-tight" style={{ color: activeTheme.primary }} boldClassName="text-base font-black" />
             </div>
 
             {/* Validez */}
@@ -238,29 +217,9 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
               <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-0.5">
                 Validez
               </span>
-              {isEditMode && updateClient ? (
-                <InlineEditableText
-                  value={project.client.quoteValidityDays ? `${project.client.quoteValidityDays} Días Laborables` : '7 Días Laborables'}
-                  defaultValue="7 Días Laborables"
-                  onSave={(val) => {
-                    const num = parseInt(val.replace(/\D/g, ''), 10);
-                    updateClient({ quoteValidityDays: isNaN(num) ? 7 : num });
-                  }}
-                  isEditMode={isEditMode}
-                  multiline={false}
-                  label="Días de Validez"
-                  placeholder="7 Días Laborables"
-                  className="text-base font-black block tracking-tight"
-                  boldClassName="text-base font-black"
-                />
-              ) : (
-                <span
-                  className="text-base font-black block"
-                  style={{ color: activeTheme.secondary }}
-                >
-                  {project.client.quoteValidityDays || 7} Días Laborables
-                </span>
-              )}
+              <EditableText k="quote.validityDays" className="text-base font-black block" style={{ color: activeTheme.secondary }}>
+                {(days) => `${days} Días Laborables`}
+              </EditableText>
             </div>
 
             {/* Configuración */}
@@ -336,5 +295,6 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
         </div>
       </footer>
     </div>
+    </EnsureDocumentEditor>
   );
 };

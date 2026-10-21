@@ -7,7 +7,7 @@ import { PDFFooter } from '../PDFFooter';
 import { PDFWatermark } from '../PDFWatermark';
 import { PDF_ROOF_DETAIL_BASE64, PDF_FLOW_DIAGRAM_BASE64 } from '../../../assets/pdfGraphicAssets';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
-import { InlineEditableText } from '../common/InlineEditableText';
+import { EditableText } from '../editor/EditableText';
 
 interface PDFTechnicalIntroPageProps {
   project: ProjectSimulation;
@@ -17,9 +17,6 @@ interface PDFTechnicalIntroPageProps {
   currentDateStr: string;
   pageNum: number;
   totalPages: number;
-  isEditMode?: boolean;
-  updateDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
-  updateDefaultDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
 }
 
 export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
@@ -30,12 +27,7 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
   currentDateStr,
   pageNum,
   totalPages,
-  isEditMode = false,
-  updateDocumentCustomization,
-  updateDefaultDocumentCustomization,
 }) => {
-  const cust = project.customization || {};
-
   return (
     <PDFPageShell
       project={project}
@@ -62,19 +54,7 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
           >
             3. ¿QUÉ ES UN SISTEMA FOTOVOLTAICO?
           </div>
-          <InlineEditableText
-            value={cust.techIntroWhatIsText}
-            defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.techIntroWhatIsText}
-            onSave={(val) => updateDocumentCustomization?.({ techIntroWhatIsText: val })}
-            onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ techIntroWhatIsText: val })}
-            isEditMode={isEditMode}
-            multiline={true}
-            label="¿Qué es un Sistema FV? (Párrafo)"
-            className="text-slate-700 text-[11.5px] leading-relaxed text-justify font-medium block whitespace-pre-line"
-            boldClassName="text-slate-950 font-bold"
-            isCustomized={!!cust.techIntroWhatIsText}
-            onReset={() => updateDocumentCustomization?.({ techIntroWhatIsText: '' })}
-          />
+          <EditableText k="techIntro.whatIs" className="text-slate-700 text-[11.5px] leading-relaxed text-justify font-medium block whitespace-pre-line" boldClassName="text-slate-950 font-bold" />
 
           {/* 3D Roof Tile Solar Array Render (Frontal / Wide View) - Larger & Clearer */}
           <div className="w-full h-52 rounded-2xl border border-slate-200 overflow-hidden bg-slate-50/60 shadow-xs flex items-center justify-center p-3">
@@ -98,32 +78,8 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
           >
             3.1 ¿CÓMO FUNCIONA UN SISTEMA FOTOVOLTAICO?
           </div>
-          <InlineEditableText
-            value={cust.techIntroHowItWorksParagraph1}
-            defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.techIntroHowItWorksParagraph1}
-            onSave={(val) => updateDocumentCustomization?.({ techIntroHowItWorksParagraph1: val })}
-            onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ techIntroHowItWorksParagraph1: val })}
-            isEditMode={isEditMode}
-            multiline={true}
-            label="¿Cómo Funciona? (Párrafo 1)"
-            className="text-slate-700 text-[11.5px] leading-relaxed text-justify font-medium block whitespace-pre-line"
-            boldClassName="text-slate-950 font-bold"
-            isCustomized={!!cust.techIntroHowItWorksParagraph1}
-            onReset={() => updateDocumentCustomization?.({ techIntroHowItWorksParagraph1: '' })}
-          />
-          <InlineEditableText
-            value={cust.techIntroHowItWorksParagraph2}
-            defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.techIntroHowItWorksParagraph2}
-            onSave={(val) => updateDocumentCustomization?.({ techIntroHowItWorksParagraph2: val })}
-            onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ techIntroHowItWorksParagraph2: val })}
-            isEditMode={isEditMode}
-            multiline={true}
-            label="¿Cómo Funciona? (Párrafo 2)"
-            className="text-slate-700 text-[11.5px] leading-relaxed text-justify font-medium block whitespace-pre-line"
-            boldClassName="text-slate-950 font-bold"
-            isCustomized={!!cust.techIntroHowItWorksParagraph2}
-            onReset={() => updateDocumentCustomization?.({ techIntroHowItWorksParagraph2: '' })}
-          />
+          <EditableText k="techIntro.howItWorks1" className="text-slate-700 text-[11.5px] leading-relaxed text-justify font-medium block whitespace-pre-line" boldClassName="text-slate-950 font-bold" />
+          <EditableText k="techIntro.howItWorks2" className="text-slate-700 text-[11.5px] leading-relaxed text-justify font-medium block whitespace-pre-line" boldClassName="text-slate-950 font-bold" />
         </div>
 
         {/* Section 4: Descripción Técnica (Flow Diagram) */}
