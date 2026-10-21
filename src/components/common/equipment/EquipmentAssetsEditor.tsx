@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { SolarEquipmentItem } from '../../../types/equipment';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { fetchEquipmentAsset, uploadEquipmentAsset } from '../../../services/equipmentAssetService';
+import { seedEquipmentAssetBlob } from '../../../features/equipmentPreview/equipmentPreviewLoader';
 
 export function EquipmentAssetsEditor({ item, onChange, disabled, dark, onBusy }: { item: Partial<SolarEquipmentItem>; onChange: (patch: Partial<SolarEquipmentItem>) => void; disabled: boolean; dark: boolean; onBusy: (busy: boolean) => void }) {
   const [busy, setBusy] = useState(false);
@@ -28,6 +29,7 @@ export function EquipmentAssetsEditor({ item, onChange, disabled, dark, onBusy }
       if (!isWriterRole(useSimulationStore.getState().syncSettings.currentUser?.role || '')) throw new Error('Tu cuenta solo puede consultar adjuntos.');
       const asset = await uploadEquipmentAsset(server, token, file, kind, signal);
       if (!valid()) return;
+      void seedEquipmentAssetBlob({ scope: useSimulationStore.getState().workspaceScope || 'local', serverUrl: server, authToken: token }, asset.id, file).catch(() => undefined);
       if (kind === 'datasheet') onChange({ datasheetAssetId: asset.id, datasheetName: asset.name });
       else if (!(item.imageAssetIds || []).includes(asset.id)) onChange({ imageAssetIds: [...(item.imageAssetIds || []), asset.id], imageNames: [...(item.imageAssetIds || []).map((_, index) => item.imageNames?.[index] || `Imagen ${index + 1}`), asset.name] });
     });
