@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   createEquipmentPreviewCache,
   createMemoryPreviewStorage,
+  PreviewUnavailableError,
   parsePreviewCacheKey,
   previewCacheKey,
   type PreviewStorage,
@@ -98,12 +99,52 @@ assert.notEqual(previewCacheKey('local', 'a', 'thumb'), previewCacheKey(scope, '
   assert.deepEqual(cache.stats(), { entries: 2, bytes: 8 }, 'Pruning a resident record also releases its memory bytes');
 }
 
+// Memory hits refresh the persistent access time (throttled), so hot previews outlive cold ones.
+{
+  let now = 0;
+  const storage = createMemoryPreviewStorage();
+  const cache = createEquipmentPreviewCache({ storage, maxPersistentBytes: 8, touchIntervalMs: 0, now: () => ++now });
+  const k = (id: string) => previewCacheKey(scope, id, 'source');
+  await cache.load(k('hot'), async () => blob('1234'));
+  await cache.load(k('cold'), async () => blob('5678'));
+  assert.ok(cache.peek(k('hot')), 'Resident hit');
+  await cache.flush();
+  await cache.load(k('new'), async () => blob('9012'));
+  await cache.flush();
+  assert.deepEqual((await storage.list()).map((entry) => entry.key).sort(), [k('hot'), k('new')].sort(), 'The cold record is pruned, not the hot resident one');
+  assert.ok(cache.peek(k('hot')), 'and the hot entry stays in memory');
+  const writes: string[] = [];
+  const counting = { ...createMemoryPreviewStorage(), touch: async (key: string) => { writes.push(key); } };
+  const throttled = createEquipmentPreviewCache({ storage: counting, touchIntervalMs: 60_000, now: () => 1_000 });
+  await throttled.load(k('x'), async () => blob('x'));
+  throttled.peek(k('x')); throttled.peek(k('x'));
+  await throttled.flush();
+  assert.deepEqual(writes, [], 'Within the interval a hit writes nothing');
+}
+
+// A preview that cannot be fetched without credentials is not a failure: it loads as soon as a session exists.
+{
+  const cache = createEquipmentPreviewCache({ storage: null });
+  const k = previewCacheKey(scope, 'needs-session', 'thumb');
+  assert.equal(await cache.load(k, async () => { throw new PreviewUnavailableError(); }), null);
+  assert.equal(await (await cache.load(k, async () => blob('after login')))?.text(), 'after login', 'Not negatively cached');
+  const session = { scope, serverUrl: 'https://qa.example.invalid', authToken: null };
+  const thumbs = createEquipmentPreviewCache({ storage: null });
+  assert.equal(await loadEquipmentThumbnail(session, { assetId: 'img', kind: 'image' }, 96, thumbs), null);
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => new Response(new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    assert.ok(await loadEquipmentThumbnail({ ...session, authToken: 'synthetic' }, { assetId: 'img', kind: 'image' }, 96, thumbs), 'Signing back in loads at once');
+  } finally { globalThis.fetch = originalFetch; }
+}
+
 // Storage failures never break previews: memory keeps working.
 {
   const broken: PreviewStorage = {
     get: async () => { throw new Error('IndexedDB bloqueado'); },
     put: async () => { throw new Error('IndexedDB lleno'); },
     delete: async () => undefined,
+    touch: async () => { throw new Error('IndexedDB bloqueado'); },
     list: async () => { throw new Error('IndexedDB bloqueado'); },
   };
   const cache = createEquipmentPreviewCache({ storage: broken });

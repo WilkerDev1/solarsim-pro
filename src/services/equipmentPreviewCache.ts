@@ -21,6 +21,8 @@ export interface PreviewStorage {
   get(key: string): Promise<PreviewRecord | null>;
   put(record: PreviewRecord): Promise<void>;
   delete(key: string): Promise<void>;
+  /** Updates only the access time (no blob rewrite). */
+  touch(key: string, accessedAt: number): Promise<void>;
   list(): Promise<Array<Pick<PreviewRecord, 'key' | 'size' | 'accessedAt'>>>;
 }
 
@@ -66,7 +68,16 @@ export function parsePreviewCacheKey(key: string): { scope: string; assetId: str
   return { scope, assetId, variant };
 }
 
-const isAbort = (error: unknown) => error instanceof Error && error.name === 'AbortError' || (error as { name?: string })?.name === 'AbortError';
+/** Thrown by a loader that cannot run yet (e.g. no session): the miss is not remembered as a failure. */
+export class PreviewUnavailableError extends Error {
+  constructor(message = 'Vista previa no disponible sin sesión.') {
+    super(message);
+    this.name = 'PreviewUnavailableError';
+  }
+}
+
+/** Cancellations and "not available yet" are retried at once; only real failures are negatively cached. */
+const isTransient = (error: unknown) => ['AbortError', 'PreviewUnavailableError'].includes((error as { name?: string })?.name ?? '');
 
 export function createEquipmentPreviewCache(options: EquipmentPreviewCacheOptions): EquipmentPreviewCache {
   const storage = options.storage;
@@ -83,6 +94,8 @@ export function createEquipmentPreviewCache(options: EquipmentPreviewCacheOption
   const inFlight = new Map<string, Promise<Blob | null>>();
   const failures = new Map<string, number>();
   const pending = new Set<Promise<void>>();
+  // Last persistent access time this instance wrote or read, per key.
+  const touchedAt = new Map<string, number>();
 
   const forget = (key: string) => {
     const previous = memory.get(key);
@@ -114,13 +127,16 @@ export function createEquipmentPreviewCache(options: EquipmentPreviewCacheOption
       if (total <= maxPersistentBytes) break;
       await storage.delete(record.key);
       forget(record.key);
+      touchedAt.delete(record.key);
       total -= record.size;
     }
   };
 
   const persist = (key: string, blob: Blob) => {
     if (!storage) return Promise.resolve();
-    return track(storage.put({ key, blob, size: blob.size, accessedAt: now() }).then(prune));
+    const accessedAt = now();
+    touchedAt.set(key, accessedAt);
+    return track(storage.put({ key, blob, size: blob.size, accessedAt }).then(prune));
   };
 
   const readStorage = async (key: string): Promise<Blob | null> => {
@@ -128,17 +144,28 @@ export function createEquipmentPreviewCache(options: EquipmentPreviewCacheOption
     try {
       const record = await storage.get(key);
       if (!record?.blob) return null;
-      if (now() - record.accessedAt > touchIntervalMs) void track(storage.put({ ...record, accessedAt: now() }));
+      touchedAt.set(key, record.accessedAt);
+      touch(key);
       return record.blob;
     } catch {
       return null;
     }
   };
 
+  /** Throttled persistent access stamp, so pruning keeps what is actually used (memory hits included). */
+  const touch = (key: string) => {
+    if (!storage) return;
+    const stamp = now();
+    if (stamp - (touchedAt.get(key) ?? -Infinity) <= touchIntervalMs) return;
+    touchedAt.set(key, stamp);
+    void track(storage.touch(key, stamp));
+  };
+
   const peek = (key: string) => {
     const blob = memory.get(key);
     if (!blob) return null;
     remember(key, blob);
+    touch(key);
     return blob;
   };
 
@@ -168,7 +195,7 @@ export function createEquipmentPreviewCache(options: EquipmentPreviewCacheOption
         await persist(key, blob);
         return blob;
       } catch (error) {
-        if (!isAbort(error)) failures.set(key, now());
+        if (!isTransient(error)) failures.set(key, now());
         return null;
       }
     })().finally(() => inFlight.delete(key));
@@ -197,6 +224,7 @@ export function createMemoryPreviewStorage(): PreviewStorage {
     get: async (key) => records.get(key) ?? null,
     put: async (record) => { records.set(record.key, record); },
     delete: async (key) => { records.delete(key); },
+    touch: async (key, accessedAt) => { const record = records.get(key); if (record) records.set(key, { ...record, accessedAt }); },
     list: async () => [...records.values()].map(({ key, size, accessedAt }) => ({ key, size, accessedAt })),
   };
 }
@@ -243,6 +271,10 @@ export function createIndexedDbPreviewStorage(): PreviewStorage | null {
       meta.put({ key: record.key, size: record.size, accessedAt: record.accessedAt });
     }),
     delete: (key) => write((blobs, meta) => { blobs.delete(key); meta.delete(key); }),
+    touch: async (key, accessedAt) => {
+      const entry = await read<Pick<PreviewRecord, 'key' | 'size' | 'accessedAt'> | undefined>(META, (store) => store.get(key));
+      if (entry) await write((_blobs, meta) => { meta.put({ ...entry, accessedAt }); });
+    },
     list: () => read<Array<Pick<PreviewRecord, 'key' | 'size' | 'accessedAt'>>>(META, (store) => store.getAll()),
   };
 }

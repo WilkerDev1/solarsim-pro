@@ -1,4 +1,4 @@
-import { equipmentPreviewCache, previewCacheKey, type EquipmentPreviewCache } from '../../services/equipmentPreviewCache';
+import { equipmentPreviewCache, previewCacheKey, PreviewUnavailableError, type EquipmentPreviewCache } from '../../services/equipmentPreviewCache';
 import { fetchEquipmentAsset } from '../../services/equipmentAssetService';
 import { sniffAssetMimeType, type EquipmentPreviewSource } from './previewSource';
 
@@ -68,6 +68,8 @@ export function loadEquipmentThumbnail(session: PreviewSession, source: Equipmen
   const key = thumbKey(session, source.assetId, width);
   const render = async () => {
     const original = await loadEquipmentAssetBlob(session, source.assetId, cache);
+    // Without a session an uncached asset is "not yet", not a failure: signing in must load it at once.
+    if (!original && !session.authToken) throw new PreviewUnavailableError();
     if (!original) return null;
     if (original.type === 'application/pdf') {
       if (source.kind === 'image') return null;
