@@ -1,6 +1,6 @@
 import { canEditCommercial } from '../../features/proposals/commercial';
 import { isProposalLink } from '../../../shared/proposalLinks';
-import { normalizeEquipmentEdit, normalizeSpecsChange } from '../../utils/equipmentGroups';
+import { normalizeEquipmentEdit, normalizeSpecsChange, selectCatalogEquipment } from '../../utils/equipmentGroups';
 import { commercialCopy, commercialState, isProposalCommercial } from '../../../shared/proposalCommercial';
 import { companyDocumentCustomization, reusableDocumentTemplate } from '../../utils/companyDocumentTemplate';
 import { DEFAULT_SIMULATION_SETTINGS } from '../defaultSimulationSettings';
@@ -709,6 +709,10 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
             });
           }
           updatedSpecs.selectedSupplierInfo = selectedSupplierInfo;
+          // The primary group remembers its catalog item (datasheet annexes); unmigrated projects migrate here.
+          if (targetItem) Object.assign(updatedSpecs, selectCatalogEquipment(updatedSpecs, equipmentType, 0, targetItem, {
+            unitPriceUSD: supplierPrice.priceUSD, selectedSupplierInfo: selectedSupplierInfo[equipmentType],
+          }));
           const nextFinancials = withoutStaleFinancialOverrides(p, p.financials);
 
           return {

@@ -117,4 +117,61 @@ store().updateSpecs({ selectedSupplierInfo: {} });
 specs = store().getActiveProject().specs;
 assert.equal(specs.selectedSupplierInfo?.panel, undefined, 'A cleared supplier is not restored from the group');
 assert.equal(specs.panels![0].selectedSupplierInfo, undefined);
-console.log('Equipment groups: migration parity, group edits and legacy mirror passed.');
+// 7. Catalog identity: groups remember the catalog item they came from (datasheets, previews, audits).
+{
+  const { resolveGroupCatalogItem, selectCatalogEquipment } = await import('../utils/equipmentGroups');
+  const entry = (id: string, displayName: string, type: 'panel' | 'inverter' | 'battery' = 'panel', extra: Record<string, unknown> = {}) =>
+    ({ id, displayName, type, brand: 'QA', modelSeries: 'QA', createdAt: '2026-10-21', updatedAt: '2026-10-21', ...extra }) as any;
+  const catalog = [entry('cat-a', 'QA 600', 'panel', { powerW: 600 }), entry('cat-b', 'QA 620', 'panel', { powerW: 620 }), entry('cat-b2', 'QA 620', 'panel'),
+    entry('cat-i', 'QA 8K', 'inverter', { powerKW: 8 }), entry('cat-bat', 'QA 16 kWh', 'battery', { capacityKWh: 16 })];
+  assert.equal(resolveGroupCatalogItem({ id: 'g', catalogItemId: 'cat-a', brandModel: 'Nombre editado' }, 'panel', catalog)?.id, 'cat-a', 'catalogItemId wins over the name');
+  assert.equal(resolveGroupCatalogItem({ id: 'cat-i', brandModel: 'Otro nombre' }, 'inverter', catalog)?.id, 'cat-i', 'AI proposals use the catalog id as group id');
+  assert.equal(resolveGroupCatalogItem({ id: 'g', brandModel: 'QA 600' }, 'panel', catalog)?.id, 'cat-a', 'Unique exact name');
+  assert.equal(resolveGroupCatalogItem({ id: 'g', brandModel: 'QA 620' }, 'panel', catalog), null, 'Ambiguous names are never guessed');
+  assert.equal(resolveGroupCatalogItem({ id: 'g', brandModel: 'QA 8K' }, 'panel', catalog), null, 'Type must match');
+  assert.equal(resolveGroupCatalogItem({ id: 'g', catalogItemId: 'cat-i', brandModel: 'QA 600' }, 'panel', catalog)?.id, 'cat-a', 'A catalog id of another type is ignored');
+  assert.equal(resolveGroupCatalogItem({ id: 'g', catalogItemId: 'deleted', brandModel: 'QA 600' }, 'panel', catalog)?.id, 'cat-a', 'A removed catalog item falls back to the name');
+
+  // Selecting on an unmigrated project migrates it (first edit) and records the catalog id.
+  const legacy = structuredClone(BENCHMARK_PROJECT.specs);
+  delete legacy.panels; delete legacy.inverters; delete legacy.batteries;
+  const patch = selectCatalogEquipment(legacy, 'panel', 0, catalog[0], { unitPriceUSD: 91 });
+  assert.equal(patch.panels?.[0].catalogItemId, 'cat-a');
+  assert.equal(patch.panels?.[0].brandModel, 'QA 600');
+  assert.equal(patch.panels?.[0].powerW, 600);
+  assert.equal(patch.panels?.[0].count, legacy.panelCount, 'Quantity is kept');
+  assert.equal(patch.panelBrandModel, 'QA 600');
+  assert.equal(patch.panelUnitPriceUSD, 91, 'Extra fields are mirrored like any group edit');
+  const second = { ...withEquipmentGroups(legacy), ...editEquipmentGroup(withEquipmentGroups(legacy), 'inverter', { type: 'add', item: { id: 'i2', brandModel: 'Viejo', powerKW: 3, count: 1 } }) };
+  const detailed = selectCatalogEquipment(second, 'inverter', 1, catalog[3]);
+  assert.equal(detailed.inverters?.[1].catalogItemId, 'cat-i');
+  assert.equal(detailed.inverters?.[1].powerKW, 8);
+  assert.equal(detailed.inverterBrandModel, undefined, 'A secondary group never touches the mirror');
+  const noBattery = { ...withEquipmentGroups(legacy), hasBattery: false, batteries: [] };
+  const battery = selectCatalogEquipment(noBattery, 'battery', 0, catalog[4], { count: 1 });
+  assert.equal(battery.batteries?.length, 1, 'Selecting into an empty battery list adds the group');
+  assert.equal(battery.batteries?.[0].catalogItemId, 'cat-bat');
+  assert.equal(battery.batteries?.[0].capacityKWh, 16);
+  const missing = selectCatalogEquipment(legacy, 'panel', 0, entry('cat-z', 'Sin potencia'));
+  assert.equal(missing.panels?.[0].powerW, legacy.panelPowerW, 'A catalog item without magnitude keeps the current one');
+
+  // Store: a model change on an auto-sized project is still not a manual quantity override.
+  fresh('Catálogo auto');
+  store().updateSpecs(selectCatalogEquipment(store().getActiveProject().specs, 'panel', 0, entry('cat-400', 'Panel 400', 'panel', { powerW: 400 })));
+  specs = store().getActiveProject().specs;
+  assert.equal(specs.autoCalculatePanels, true);
+  assert.equal(specs.panels![0].catalogItemId, 'cat-400');
+  assert.equal(specs.panels![0].count, recommendedFor(400));
+
+  // Supplier price application records the catalog item on the primary group.
+  fresh('Precio proveedor');
+  const offer = { id: 'sp-a', supplierName: 'Dist QA', priceUSD: 88, updatedAt: '2026-10-21' };
+  store().applySupplierPriceToProject('panel', offer, entry('cat-sp', 'QA Proveedor 610', 'panel', { powerW: 610, supplierPrices: [offer] }));
+  specs = store().getActiveProject().specs;
+  assert.equal(specs.panels?.[0].catalogItemId, 'cat-sp', 'Unmigrated projects migrate on this first equipment edit');
+  assert.equal(specs.panels?.[0].brandModel, 'QA Proveedor 610');
+  assert.equal(specs.panels?.[0].unitPriceUSD, 88);
+  assert.equal(specs.panelUnitPriceUSD, 88);
+  assert.equal(specs.selectedSupplierInfo?.panel?.supplierPriceId, 'sp-a');
+}
+console.log('Equipment groups: migration parity, group edits, legacy mirror and catalog identity passed.');

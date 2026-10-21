@@ -14,7 +14,7 @@ import { ProjectSimulation, DocumentCustomization, AttachedPDFDocument } from '.
 import { PDFMergeService } from '../../../services/pdfMergeService';
 import { PDFAttachmentStorage } from '../../../services/pdfAttachmentStorage';
 import { PDFThumbnailService } from '../../../services/pdfThumbnailService';
-import { proposalDatasheets } from '../../../utils/proposalDatasheets';
+import { datasheetFileName, proposalDatasheets } from '../../../utils/proposalDatasheets';
 import { fetchEquipmentAsset } from '../../../services/equipmentAssetService';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 
@@ -285,7 +285,7 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
         setFeedbackMsg('Ficha recuperada en este dispositivo, sin duplicar el anexo.');
         return;
       }
-      await handleProcessFiles([new File([blob], source.item.datasheetName || 'Ficha técnica.pdf', { type: 'application/pdf' })], [source.key]);
+      await handleProcessFiles([new File([blob], datasheetFileName(source.item.displayName), { type: 'application/pdf' })], [source.key]);
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : 'No se pudo adjuntar la ficha del catálogo.');
     } finally {
@@ -374,7 +374,7 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
           {detected.map(source => <button key={source.key} type="button" disabled={isUploading || currentProject.isDeleted}
             onClick={() => void handleAddCatalogDatasheet(source)}
             className="block w-full rounded border border-emerald-500/40 px-2 py-2 text-left text-xs disabled:opacity-50">
-            {attachedPdfs.some(att => att.sourceDatasheetKey === source.key) ? '↻ Recuperar' : '+ Adjuntar'} {source.item.datasheetName || source.item.displayName}
+            {attachedPdfs.some(att => att.sourceDatasheetKey === source.key) ? '↻ Recuperar' : '+ Adjuntar'} {datasheetFileName(source.item.displayName)}
           </button>)}
           <p className="text-[11px] opacity-70">Se descargan una vez y quedan disponibles como anexos en este dispositivo.</p>
         </div>

@@ -3,6 +3,7 @@ import { useSimulationStore as store } from '../store/useSimulationStore';
 import { saveDatasheetLocally, attachImportedDatasheet } from '../services/datasheetImportService';
 import { normalizeDatasheetResponse } from '../utils/datasheetImport';
 import { featureScope } from '../../shared/applicationFeatures';
+import { datasheetFileName } from '../utils/proposalDatasheets';
 
 async function main() {
   const originalFetch = globalThis.fetch;
@@ -48,6 +49,28 @@ async function main() {
     assert.equal(store.getState().equipmentCatalog.length, sizeBeforeRetry, 'Retry creates no duplicate models');
     receipt.ids.forEach(id => assert.equal(store.getState().equipmentCatalog.find(item => item.id === id)?.datasheetAssetId, 'shared-qa-file'));
     await assert.rejects(attachImportedDatasheet(receipt, file, signal), /adjunto cambió/, 'A stale receipt cannot overwrite another attachment');
+    receipt.ids.forEach(id => {
+      const item = store.getState().equipmentCatalog.find(item => item.id === id)!;
+      assert.equal(item.datasheetName, datasheetFileName(item.displayName), 'Each model names the shared file after itself, not the server name');
+    });
+
+    // A photo scanned with AI is an equipment image, never a datasheet annex.
+    const photoReceipt = saveDatasheetLocally(normalizeDatasheetResponse({ equipmentType: 'panel', brand: 'QA', modelSeries: 'Foto',
+      variants: [{ modelCode: 'QA-FOTO-600', displayName: 'QA Foto 600 W', powerW: 600 }] }));
+    let uploadedKind: unknown;
+    globalThis.fetch = async (_url, init) => {
+      uploadedKind = (init?.body as FormData).get('kind');
+      return new Response(JSON.stringify({ asset: { id: 'photo-asset', name: 'IMG_0001.jpg' } }));
+    };
+    const photo = new File([new Uint8Array([0xff, 0xd8, 0xff, 0xe0])], 'IMG_0001.jpg', { type: 'image/jpeg' });
+    await attachImportedDatasheet(photoReceipt, photo, signal);
+    assert.equal(uploadedKind, 'image');
+    const photographed = store.getState().equipmentCatalog.find(item => item.id === photoReceipt.ids[0])!;
+    assert.deepEqual(photographed.imageAssetIds, ['photo-asset']);
+    assert.deepEqual(photographed.imageNames, ['QA Foto 600 W']);
+    assert.equal(photographed.datasheetAssetId, undefined, 'No PDF annex is invented from a photo');
+    await attachImportedDatasheet(photoReceipt, photo, signal);
+    assert.deepEqual(store.getState().equipmentCatalog.find(item => item.id === photoReceipt.ids[0])!.imageAssetIds, ['photo-asset'], 'Retrying does not duplicate the image');
 
     const beforeUpdate = store.getState().equipmentCatalog.find(item => item.id === receipt.ids[0])!;
     const offers = [{ id: 'offer', supplierName: 'QA', priceUSD: 120, updatedAt: '2026-10-13' }];

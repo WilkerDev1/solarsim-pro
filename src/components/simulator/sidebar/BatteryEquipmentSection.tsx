@@ -1,5 +1,5 @@
 import React from 'react';
-import { editEquipmentGroup } from '../../../utils/equipmentGroups';
+import { editEquipmentGroup, selectCatalogEquipment } from '../../../utils/equipmentGroups';
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs, BatteryItemSpec } from '../../../types';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { SearchableEquipmentSelect } from './SearchableEquipmentSelect';
@@ -30,6 +30,7 @@ export const BatteryEquipmentSection: React.FC<BatteryEquipmentSectionProps> = (
 
     const newBattery: BatteryItemSpec = {
       id: `battery-${Date.now()}`,
+      catalogItemId: candidate?.id,
       brandModel: candidate?.displayName || 'Batería Dyness A48100 (5.12 kWh)',
       capacityKWh: candidate?.capacityKWh || 5.12,
       count: 1,
@@ -80,20 +81,17 @@ export const BatteryEquipmentSection: React.FC<BatteryEquipmentSectionProps> = (
       }
     }
 
-    if (project.specs.batteries && project.specs.batteries.length > 0) {
-      const updatedBatteries = [...project.specs.batteries];
-      updatedBatteries[0] = {
-        ...updatedBatteries[0],
-        brandModel: item.displayName,
+    specsUpdate.selectedSupplierInfo = newSupplierInfo;
+    // The primary group takes the catalog identity (catalogItemId for datasheets); the mirror follows it.
+    updateSpecs({
+      ...specsUpdate,
+      ...selectCatalogEquipment(project.specs, 'battery', 0, item, {
         capacityKWh: item.capacityKWh || 16.08,
         dodPct: item.dodPct || 90,
-        unitPriceUSD: specsUpdate.batteryUnitPriceUSD ?? updatedBatteries[0].unitPriceUSD,
-      };
-      specsUpdate.batteries = updatedBatteries;
-    }
-
-    specsUpdate.selectedSupplierInfo = newSupplierInfo;
-    updateSpecs(specsUpdate);
+        selectedSupplierInfo: newSupplierInfo.battery,
+        ...(specsUpdate.batteryUnitPriceUSD !== undefined ? { unitPriceUSD: specsUpdate.batteryUnitPriceUSD } : {}),
+      }),
+    });
   };
 
   return (
@@ -183,11 +181,10 @@ export const BatteryEquipmentSection: React.FC<BatteryEquipmentSectionProps> = (
                     selectedValue={bat.brandModel}
                     selectedPower={bat.capacityKWh}
                     onSelect={(item) => {
-                      handleUpdateBatteryItem(actualIdx, {
-                        brandModel: item.displayName,
+                      updateSpecs(selectCatalogEquipment(project.specs, 'battery', actualIdx, item, {
                         capacityKWh: item.capacityKWh || 5.12,
                         unitPriceUSD: item.supplierPrices?.[0]?.priceUSD || bat.unitPriceUSD,
-                      });
+                      }));
                     }}
                     onOpenScanner={openAIDatasheetModal}
                     label={`Modelo Batería #${actualIdx + 1}`}
