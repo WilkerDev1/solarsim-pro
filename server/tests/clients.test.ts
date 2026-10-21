@@ -109,6 +109,8 @@ test("shared validation normalizes optional fields and the tax id", () => {
     { name: "   " },
     { name: "x".repeat(256) },
     { name: "Ana", kind: "gobierno" },
+    { name: "Ana", kind: "constructor" },
+    { name: "Ana", kind: "toString" },
     { name: "Ana", email: "sin-arroba" },
     { name: "Ana", taxId: "RNC#1" },
     { name: "Ana", phone: 809 },
@@ -360,5 +362,42 @@ test("client deletion is logical, unlinks proposals with a version bump and cann
     (await request("DELETE", "/api/clients/missing?baseVersion=1", editor))
       .status,
     404,
+  );
+});
+
+test("history restore keeps the current client link and never revives a deleted client", async () => {
+  await request("PUT", "/api/clients/client-history", admin, {
+    name: "Cliente con historial",
+    baseVersion: 0,
+  });
+  await push(editor, project("client-history-project", "client-history"));
+  await push(editor, project("client-history-project", "client-history", 1));
+  assert.equal(
+    (
+      await request(
+        "DELETE",
+        "/api/clients/client-history?baseVersion=1",
+        editor,
+      )
+    ).status,
+    200,
+  );
+  const history = (
+    await request("GET", "/api/projects/client-history-project/history", admin)
+  ).body.history;
+  const linkedSnapshot = history.find((h: any) => h.version_number === 1);
+  assert.ok(linkedSnapshot);
+  const restored = await request(
+    "POST",
+    `/api/projects/client-history-project/history/${linkedSnapshot.id}/restore`,
+    editor,
+    { baseVersion: 3 },
+  );
+  assert.equal(restored.status, 200);
+  assert.equal(restored.body.project.clientId, undefined);
+  assert.equal(
+    (await push(editor, project("client-history-project", undefined, 4))).body
+      .results[0].status,
+    "updated",
   );
 });

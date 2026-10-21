@@ -49,7 +49,7 @@ export function validateClientInput(input: unknown): ClientValidation {
     return { ok: false, error: "Cliente inválido" };
   const data = input as Record<string, unknown>;
   const kind = data.kind ?? "persona";
-  if (typeof kind !== "string" || !(kind in CLIENT_KINDS))
+  if (kind !== "persona" && kind !== "empresa")
     return { ok: false, error: "Tipo de cliente inválido" };
   if (typeof data.name !== "string" || !data.name.trim())
     return { ok: false, error: "El nombre del cliente es obligatorio" };

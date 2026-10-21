@@ -579,6 +579,8 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
           ...snapshot.data_json,
           commercial: row.data_json.commercial,
           proposalLink: row.data_json.proposalLink,
+          // The client link is directory metadata, like the commercial state: history never revives a removed or deleted link.
+          clientId: row.data_json.clientId,
           id: row.id,
           isDeleted: row.is_deleted,
         },
