@@ -238,7 +238,8 @@ export function renderProposalPage(stored: StoredProposal): string {
   const textContext = createDocumentTextContext({
     clientName, quoteValidityDays, distributor, tariffCode: rawTariffCode, isZeroExport, gridExportFeePct: exportFee, hasBattery,
     hasBatteryStorage: hasBattery, companyName,
-    clientContactPerson: contactName, clientPhone, clientEmail: custom.clientEmail || client.contactEmail || '',
+    // Misma cadena que la app (documentTextContext): persona de contacto → empresa → nombre del cliente.
+    clientContactPerson: client.contactPerson || client.company || clientName || '', clientPhone, clientEmail: custom.clientEmail || client.contactEmail || '',
   });
   const customRecord = custom as Record<string, unknown>;
   const docText = (key: string) => viewerText(key, customRecord, client, textContext);
