@@ -3,7 +3,7 @@ import { useSimulationStore } from '../store/useSimulationStore';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../data/defaultEquipmentCatalog';
 import { DEFAULT_AGENT_POLICY } from '../store/slices/agentSlice';
-import { executeAgentTool } from '../features/agentTools/registry';
+import { executeAgentTool, executeForAssistant } from '../features/agentTools/registry';
 import { assistantOwner } from '../features/assistant/tools';
 import { findAgentTool } from '../../shared/agentTools/definitions';
 
@@ -111,7 +111,24 @@ assert.equal(updatedOffer?.stockStatus, 'on_order');
 const badOffer = await executeAgentTool({ name: 'update_supplier_price', args: { equipmentId: panel.id, offerId: 'missing', priceUSD: 1 } }, ctx());
 assert.equal(badOffer.status, 'error');
 
-// 8. Readers cannot create proposals.
+// 8. In-app assistant: guarded native plans render as confirmation cards and confirm through the queue.
+store.setState({ activeView: 'simulator' });
+const uiResult = await executeForAssistant({ name: 'set_proposal_status', args: { id: existing.id, status: 'Archived' } }, { source: 'app-assistant', owner: assistantOwner() });
+assert(uiResult.action && Array.isArray(uiResult.action.edits) && uiResult.action.edits.length > 0, 'card has displayable changes');
+assert.equal(store.getState().confirmAgentAction(uiResult.action.id).success, true);
+assert.equal(store.getState().projects.find((p) => p.id === existing.id)?.status, 'Archived');
+
+// 9. A queued duplicate is refused if the member became a reader before confirming.
+store.getState().setAgentPolicy({ external: { read: 'allow', draft: 'confirm', guarded: 'confirm' } });
+const queuedDup = await executeAgentTool({ name: 'duplicate_proposal', args: { id: existing.id } }, ctx());
+assert(queuedDup.status === 'pending_confirmation');
+const countBeforeReader = store.getState().projects.length;
+store.setState({ syncSettings: { ...store.getState().syncSettings, currentUser: { id: 'w', name: 'Ex editor', email: 'w@example.invalid', role: 'LECTOR', organizationId: 'org' } as never, authToken: 'synthetic' } });
+assert.equal(store.getState().confirmAgentAction(queuedDup.actionId).success, false);
+assert.equal(store.getState().projects.length, countBeforeReader);
+store.getState().setAgentPolicy({ external: { read: 'allow', draft: 'allow', guarded: 'confirm' } });
+
+// 10. Readers cannot create proposals.
 store.setState({ workspaceScope: 'https://qa.invalid|org', syncSettings: { ...store.getState().syncSettings, serverUrl: 'https://qa.invalid', authToken: 'synthetic',
   currentUser: { id: 'r', name: 'Lector', email: 'r@example.invalid', role: 'LECTOR', organizationId: 'org' } as never } });
 const reader = await executeAgentTool({ name: 'create_proposal', args: { clientName: 'X', distributor: 'EDESUR', tariffCode: 'BTS1', averageMonthlyKWh: 300,

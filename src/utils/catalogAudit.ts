@@ -1,4 +1,5 @@
 import type { ProjectSimulation } from '../types';
+import { getProjectBatteries, getProjectInverters, getProjectPanels } from './equipmentSpecsUtils';
 import type { SolarEquipmentItem } from '../types/equipment';
 
 export type CatalogAuditCode =
@@ -86,10 +87,11 @@ export function auditCatalog(
 
   for (const project of projects) {
     if (project.isDeleted) continue;
+    // Compatibility readers cover 2.6.0 proposals that only have the scalar mirror; nothing is migrated here.
     const groups = [
-      ...(project.specs.panels || []).map((g) => ({ ...g, type: 'panel' as const })),
-      ...(project.specs.inverters || []).map((g) => ({ ...g, type: 'inverter' as const })),
-      ...(project.specs.batteries || []).map((g) => ({ ...g, type: 'battery' as const })),
+      ...getProjectPanels(project.specs).map((g) => ({ ...g, type: 'panel' as const })),
+      ...getProjectInverters(project.specs).map((g) => ({ ...g, type: 'inverter' as const })),
+      ...(project.specs.hasBattery ? getProjectBatteries(project.specs) : []).map((g) => ({ ...g, type: 'battery' as const })),
     ].filter((g) => g.count > 0 && (!options.type || g.type === options.type));
     for (const group of groups) {
       const resolved = catalog.some((item) => item.type === group.type &&

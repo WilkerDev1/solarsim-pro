@@ -34,11 +34,19 @@ assert.deepEqual(codes('nopower'), ['missing_nominal']);
 assert(codes('dup').includes('duplicate_model'));
 assert.deepEqual(codes('nostock'), ['no_stock']);
 assert.deepEqual(codes('outlier'), ['price_outlier']);
-const unmatched = report.findings.filter((f) => f.code === 'unmatched_proposal_equipment');
+// The benchmark's inverter (scalar mirror) is not in this synthetic catalog either, so only panels are asserted.
+const unmatched = report.findings.filter((f) => f.code === 'unmatched_proposal_equipment' && f.message.includes('Panel'));
 assert.equal(unmatched.length, 1, 'catalogItemId and exact names resolve; unknown models are reported');
 assert.equal(unmatched[0].projectId, 'audit-p');
+assert(unmatched[0].message.includes('Panel fantasma'));
 assert.equal(report.summary.total, report.findings.length);
 assert.equal(report.summary.byCode.missing_price, 1);
 assert(report.findings.every((f) => f.message.length > 0));
 assert.equal(auditCatalog([], [], { now }).findings.length, 0);
+// 2.6.0 proposals without group arrays are audited through the compatibility readers (and not migrated).
+const legacy = { ...structuredClone(BENCHMARK_PROJECT), id: 'legacy-p',
+  specs: { ...structuredClone(BENCHMARK_PROJECT.specs), panels: undefined, inverters: undefined, batteries: undefined, panelBrandModel: 'Panel legado', panelCount: 8 } };
+const legacyReport = auditCatalog(catalog, [legacy], { now });
+assert(legacyReport.findings.some((f) => f.projectId === 'legacy-p' && f.message.includes('Panel legado')));
+assert.equal(legacy.specs.panels, undefined, 'audit never migrates stored proposals');
 console.log('PASS: catalog audit flags prices, staleness, documents, specs, duplicates, stock, outliers and unmatched proposal equipment.');

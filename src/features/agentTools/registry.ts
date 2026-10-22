@@ -244,8 +244,13 @@ export async function executeForAssistant(call: AgentToolCall, ctx: AgentToolCon
   if (outcome.status === 'error') throw new Error(outcome.message);
   const cards = outcome.cards?.map(toAssistantCard).filter((c): c is AssistantCard => !!c);
   if (outcome.status === 'pending_confirmation') {
-    const action = getPendingAgentAction(outcome.actionId)!;
-    return { data: { status: 'pending_confirmation', edits: action.edits }, cards, action };
+    const pending = store().pendingAgentActions.find((a) => a.id === outcome.actionId)!;
+    const action: AssistantAction = isNativePlan(pending.plan)
+      // Native plans are shown with their human-readable changes; confirmation always goes through the queue by id.
+      ? { id: pending.id, kind: pending.plan.targetType, targetId: '', title: pending.title, fingerprint: '', owner: ctx.owner,
+          edits: pending.changes.map((c) => ({ section: 'client' as const, field: c.label, value: c.value })) }
+      : (pending.plan as AssistantAction);
+    return { data: { status: 'pending_confirmation', changes: pending.changes }, cards, action };
   }
   if (outcome.status === 'applied') return { data: outcome.data, cards, activityId: outcome.activityId };
   return { data: outcome.data, cards };

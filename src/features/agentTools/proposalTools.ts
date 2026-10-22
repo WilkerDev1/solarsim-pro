@@ -48,6 +48,7 @@ const createProposal: NativeHandler = (args) => {
       targetType: 'project',
       changes: [{ label: 'Cliente', value: args.clientName }, { label: 'Modalidad', value: 'Simple (Catálogo IA) · matriz de costos' }],
       execute() {
+        if (!canWriteWorkspace()) throw new Error('Tu cuenta solo puede consultar.');
         const built = buildProjectFromDraft(store(), createDraft(args), true);
         if ('error' in built) throw new Error(built.error);
         const project = built.project;
@@ -74,6 +75,8 @@ const duplicateProposal: NativeHandler = (args) => {
     plan: {
       title: `Duplicar ${source.client.name}`, targetType: 'project', changes: [{ label: 'Original', value: source.client.projectId || source.id }],
       execute() {
+        // Permissions may have changed while the plan waited for confirmation.
+        if (!canWriteWorkspace()) throw new Error('Tu cuenta solo puede consultar.');
         findVisibleProject(args.id);
         const id = store().duplicateProject(args.id, { activate: false });
         const copy = id && store().projects.find((p) => p.id === id);
