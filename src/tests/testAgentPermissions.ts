@@ -3,7 +3,9 @@ import { useSimulationStore } from '../store/useSimulationStore';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../data/defaultEquipmentCatalog';
 import { DEFAULT_AGENT_POLICY, normalizeAgentPolicy } from '../store/slices/agentSlice';
-import { executeAgentTool } from '../features/agentTools/registry';
+import { executeAgentTool, executeForAssistant } from '../features/agentTools/registry';
+import { AssistantRunError, runAssistant } from '../features/assistant/service';
+import type { GeminiTransport } from '../../shared/geminiTransport';
 import { assistantOwner } from '../features/assistant/tools';
 import { serializeSimulationStore } from '../store/persistence/serializeSimulationStore';
 import { captureWorkspace, emptyWorkspace } from '../store/sync/organizationWorkspace';
@@ -109,5 +111,57 @@ assert.equal(persisted.agentActivity.length, 300);
 assert.equal(captureWorkspace(store.getState()).agentActivity?.length, 300);
 assert.deepEqual(emptyWorkspace().agentActivity, []);
 assert.equal((persisted as Record<string, unknown>).pendingAgentActions, undefined, 'pending plans are never persisted');
+
+// 11. Undo revalidates today's permissions: a reader keeps "Deshacer" visible but cannot use it.
+reset();
+const readerUndo = await executeAgentTool(coverage(77), internal());
+assert(readerUndo.status === 'applied');
+store.setState({ workspaceScope: 'https://qa.invalid|org', syncSettings: { ...store.getState().syncSettings, serverUrl: 'https://qa.invalid', authToken: 'synthetic',
+  currentUser: { id: 'r', name: 'Lector', email: 'r@example.invalid', role: 'LECTOR', organizationId: 'org' } as any } });
+assert.equal(store.getState().undoAgentActivity(readerUndo.activityId).success, false);
+assert.equal(store.getState().agentActivity[0].status, 'applied', 'activity unchanged when permission is denied');
+assert.equal(store.getState().getActiveProject().rates.targetCoveragePct, 77);
+
+// 12. Undo survives JSON persistence when the agent filled a previously absent field.
+reset();
+const bare = store.getState().equipmentCatalog.find((e) => e.type === 'panel')!;
+store.getState().updateEquipmentItem(bare.id, { cellType: undefined });
+const filled = await executeAgentTool({ name: 'propose_equipment_update', args: { id: bare.id, edits: [{ section: 'equipment', field: 'cellType', valueJson: '"N-Type"' }] } }, internal());
+assert(filled.status === 'pending_confirmation');
+assert.equal(store.getState().confirmAgentAction(filled.actionId).success, true);
+store.setState({ agentActivity: JSON.parse(JSON.stringify(store.getState().agentActivity)) });
+assert.equal(store.getState().undoAgentActivity(store.getState().agentActivity[0].id).success, true);
+assert.equal(store.getState().equipmentCatalog.find((e) => e.id === bare.id)?.cellType, undefined);
+
+// 13. Evicted or unknown plans cannot be confirmed (no direct-apply fallback).
+assert.equal(store.getState().confirmAgentAction('evicted-plan').success, false);
+
+// 14. External agents work with the general assistant switched off, including confirmation.
+reset();
+store.setState({ appAssistantEnabled: false });
+const offRead = await executeAgentTool({ name: 'search_projects', args: {} }, external());
+assert.equal(offRead.status, 'ok');
+const offEdit = await executeAgentTool(coverage(66), external());
+assert(offEdit.status === 'applied', JSON.stringify(offEdit));
+store.getState().setAgentPolicy({ external: { read: 'allow', draft: 'confirm', guarded: 'confirm' } });
+const offPending = await executeAgentTool(coverage(64), external());
+assert(offPending.status === 'pending_confirmation');
+assert.equal(store.getState().confirmAgentAction(offPending.actionId).success, true);
+assert.equal(store.getState().getActiveProject().rates.targetCoveragePct, 64);
+assert.equal((await executeAgentTool({ name: 'search_projects', args: {} }, internal())).status, 'error', 'the in-app assistant still honours its switch');
+
+// 15. A model failure after an applied change still reports it with its undo card.
+reset();
+let round = 0;
+const failingAfterApply: GeminiTransport = async () => (round++ === 0
+  ? { candidates: [{ finishReason: 'STOP', content: { role: 'model', parts: [{ functionCall: { name: 'propose_project_update', args: { id: project.id, title: 'Cobertura 81', edits: [{ section: 'rates', field: 'targetCoveragePct', valueJson: '81' }] } } }] } }] }
+  : { candidates: [{ finishReason: 'MAX_TOKENS', content: { parts: [{ text: '...' }] } }] });
+const runOwner = assistantOwner();
+await assert.rejects(
+  () => runAssistant({ apiKey: 'synthetic', model: 'synthetic', prompt: 'Cobertura 81', history: [], signal: new AbortController().signal, transport: failingAfterApply,
+    execute: (call) => executeForAssistant(call, { source: 'app-assistant', owner: runOwner }) }),
+  (error: unknown) => error instanceof AssistantRunError && error.applied.length === 1 && /ya se aplicaron/.test(error.message)
+);
+assert.equal(store.getState().getActiveProject().rates.targetCoveragePct, 81);
 
 console.log('PASS: agent policy (read/draft/guarded × source), immediate drafts with undo, confirmations, status tool, readers and persistence.');

@@ -24,12 +24,33 @@ export interface AssistantRunOptions {
   transport?: GeminiTransport;
 }
 /** Small bounded tool loop. Tool results are data, never instructions or executable HTML. */
+/** Raised when the conversation fails after some changes were already applied, so the UI can still show them. */
+export class AssistantRunError extends Error {
+  constructor(message: string, readonly applied: { activityId: string; title: string }[]) {
+    super(message);
+  }
+}
 export async function runAssistant(
   options: AssistantRunOptions
 ): Promise<AssistantMessage> {
+  const applied: { activityId: string; title: string }[] = [];
+  try {
+    return await runAssistantLoop(options, applied);
+  } catch (error) {
+    if (!applied.length) throw error;
+    // Mutations already happened: never report "nothing was applied" and keep their undo cards visible.
+    throw new AssistantRunError(
+      'La conversación se interrumpió, pero algunos cambios ya se aplicaron. Puedes revisarlos o deshacerlos abajo.',
+      applied
+    );
+  }
+}
+async function runAssistantLoop(
+  options: AssistantRunOptions,
+  applied: { activityId: string; title: string }[]
+): Promise<AssistantMessage> {
   const cards: AssistantCard[] = [];
   const actions: AssistantAction[] = [];
-  const applied: { activityId: string; title: string }[] = [];
   const contents: any[] = options.history
     .slice(-12)
     .map((m) => ({

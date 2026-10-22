@@ -4,6 +4,7 @@ import { validateJsonSchema } from '../../../shared/agentTools/jsonSchema';
 import type { AgentSource, AgentToolCall, AgentToolDefinition, AgentToolOutcome } from '../../../shared/agentTools/types';
 import type { AgentCard } from '../../../shared/agentCards';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { isWriterRole } from '../../../shared/permissions';
 import { agentPolicyKey, installAgentRuntime, type AgentActivityEntry, type AgentChange, type PendingAgentAction } from '../../store/slices/agentSlice';
 import { editableAssistantFields } from '../assistant/validation';
 import { applyAssistantAction, executeAssistantTool } from '../assistant/tools';
@@ -71,36 +72,57 @@ const describeChanges = (action: AssistantAction): AgentChange[] =>
 
 /** Applies a revalidated plan and records it with the sections needed to undo it. */
 function applyPlan(action: AssistantAction, meta: { source: AgentSource; clientLabel?: string; tool: string; kind: 'draft' | 'guarded' }) {
+  // Only the general assistant depends on its own on/off switch; other agent surfaces keep working without it.
+  const requireAssistantEnabled = meta.source === 'app-assistant';
   const s = store();
   const fields = action.kind === 'equipment' ? [...new Set(action.edits.map((e) => e.field))] : [...PROJECT_SECTIONS];
   const target = action.kind === 'equipment' ? s.equipmentCatalog.find((e) => e.id === action.targetId) : s.projects.find((p) => p.id === action.targetId);
   if (!target) throw new Error('Destino no disponible.');
   const before = pick(target, fields);
-  applyAssistantAction(action);
+  applyAssistantAction(action, { requireAssistantEnabled });
   const after = action.kind === 'equipment'
     ? store().equipmentCatalog.find((e) => e.id === action.targetId)
     : store().projects.find((p) => p.id === action.targetId);
   return store().recordAgentActivity({
     source: meta.source, clientLabel: meta.clientLabel, tool: meta.tool, kind: meta.kind,
     targetType: action.kind, targetId: action.targetId, title: action.title, changes: describeChanges(action),
-    undo: after ? { before, afterFingerprint: fingerprint(pick(after, fields)) } : undefined,
+    // `fields` survives JSON persistence even when a field was absent (undefined) before the change.
+    undo: after ? { before, fields, afterFingerprint: fingerprint(pick(after, fields)) } : undefined,
   });
+}
+
+/** Undo is a new write: revalidate today's permissions and target state, never the ones from when the agent acted. */
+function canWriteNow(): boolean {
+  const s = store();
+  const user = s.syncSettings.currentUser;
+  return user ? !!s.syncSettings.authToken && isWriterRole(user.role) : s.workspaceScope === 'local';
 }
 
 function undoEntry(entry: AgentActivityEntry) {
   const s = store();
-  const fields = Object.keys(entry.undo!.before);
-  const current = entry.targetType === 'equipment' ? s.equipmentCatalog.find((e) => e.id === entry.targetId) : s.projects.find((p) => p.id === entry.targetId);
-  if (!current) return { success: false, error: 'El destino ya no existe.' };
-  if (fingerprint(pick(current, fields)) !== entry.undo!.afterFingerprint)
-    return { success: false, error: 'El destino cambió después; usa el historial de versiones de la propuesta para revertir.' };
+  if (!canWriteNow()) return { success: false, error: 'Tu cuenta solo puede consultar.' };
+  const fields = entry.undo!.fields || Object.keys(entry.undo!.before);
+  const restored = Object.fromEntries(fields.map((f) => [f, structuredClone(entry.undo!.before[f])]));
   if (entry.targetType === 'equipment') {
-    s.updateEquipmentItem(entry.targetId, entry.undo!.before);
-    return { success: true };
+    const current = s.equipmentCatalog.find((e) => e.id === entry.targetId);
+    if (!current) return { success: false, error: 'El equipo ya no existe.' };
+    if (s.equipmentConflicts[entry.targetId]) return { success: false, error: 'Resuelve primero el conflicto del equipo.' };
+    if (fingerprint(pick(current, fields)) !== entry.undo!.afterFingerprint)
+      return { success: false, error: 'El equipo cambió después; revísalo en el catálogo.' };
+    s.updateEquipmentItem(entry.targetId, restored);
+    const after = store().equipmentCatalog.find((e) => e.id === entry.targetId);
+    return after && fingerprint(pick(after, fields)) === fingerprint(restored)
+      ? { success: true }
+      : { success: false, error: 'El catálogo rechazó el cambio.' };
   }
-  return s.updateProjectById(entry.targetId, () => structuredClone(entry.undo!.before))
+  const current = s.projects.find((p) => p.id === entry.targetId);
+  if (!current) return { success: false, error: 'La propuesta ya no existe.' };
+  if (current.isDeleted || current.syncStatus === 'conflict') return { success: false, error: 'La propuesta no admite cambios (papelera o conflicto).' };
+  if (fingerprint(pick(current, fields)) !== entry.undo!.afterFingerprint)
+    return { success: false, error: 'La propuesta cambió después; usa el historial de versiones para revertir.' };
+  return s.updateProjectById(entry.targetId, () => restored)
     ? { success: true }
-    : { success: false, error: 'La propuesta no admite cambios (papelera).' };
+    : { success: false, error: 'La propuesta no admite cambios.' };
 }
 
 installAgentRuntime({
@@ -141,7 +163,7 @@ export async function executeAgentTool(call: AgentToolCall, ctx: AgentToolContex
   if (definition.name === 'get_agent_action_status') return actionStatus(args, ctx);
   let result: AssistantToolResult;
   try {
-    result = executeAssistantTool({ name: call.name, args: decodeArgs(args) }, ctx.owner);
+    result = executeAssistantTool({ name: call.name, args: decodeArgs(args) }, ctx.owner, { requireAssistantEnabled: ctx.source === 'app-assistant' });
   } catch (error) {
     return { status: 'error', code: 'tool_failed', message: error instanceof Error ? error.message : 'Herramienta no disponible.' };
   }

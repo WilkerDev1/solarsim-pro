@@ -66,13 +66,14 @@ function canWrite() {
 }
 export function executeAssistantTool(
   call: AssistantToolCall,
-  owner: string
+  owner: string,
+  options: { requireAssistantEnabled?: boolean } = {}
 ): AssistantToolResult {
   if (owner !== assistantOwner())
     throw new Error('El espacio o la sesión cambió.');
   const { name, args } = call;
   const s = useSimulationStore.getState();
-  if (!s.appAssistantEnabled)
+  if (options.requireAssistantEnabled !== false && !s.appAssistantEnabled)
     throw new Error(
       'Activa el asistente experimental en Funciones de la aplicación.'
     );
@@ -309,7 +310,7 @@ export function executeAssistantTool(
   throw new Error('Herramienta no permitida.');
 }
 /** Revalidate live owner, permission and target before every confirmed mutation. */
-export function applyAssistantAction(action: AssistantAction) {
+export function applyAssistantAction(action: AssistantAction, options: { requireAssistantEnabled?: boolean } = {}) {
   const fresh = executeAssistantTool(
     {
       name:
@@ -319,7 +320,8 @@ export function applyAssistantAction(action: AssistantAction) {
       // Policy edits are re-derived by the planner; agents cannot submit them directly.
       args: { id: action.targetId, title: action.title, edits: action.edits.filter((e) => !(e.section === 'specs' && e.field in AUTOMATED_PRICING)) },
     },
-    action.owner
+    action.owner,
+    options
   ).action!;
   if (fresh.fingerprint !== action.fingerprint)
     throw new Error(

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { assistantOwner } from './tools';
 import { executeForAssistant } from '../agentTools/registry';
-import { runAssistant } from './service';
+import { AssistantRunError, runAssistant } from './service';
 import type { GeminiTransport } from '../../../shared/geminiTransport';
 import type { AssistantMessage } from './types';
 export function useAppAssistant(
@@ -59,7 +59,9 @@ export function useAppAssistant(
       });
       if (valid()) setMessages((previous) => [...previous, reply]);
     } catch (e) {
-      if (valid())
+      if (valid() && e instanceof AssistantRunError)
+        setMessages((previous) => [...previous, { role: 'assistant', text: e.message, applied: e.applied }]);
+      else if (valid())
         setError(
           e instanceof Error ? e.message : 'No se pudo completar la consulta.'
         );

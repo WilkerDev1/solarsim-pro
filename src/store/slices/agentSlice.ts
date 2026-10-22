@@ -48,7 +48,7 @@ export interface AgentActivityEntry {
   changes: AgentChange[];
   status: 'applied' | 'undone';
   /** Only the sections the change touched, plus a fingerprint of their state right after it. */
-  undo?: { before: Record<string, unknown>; afterFingerprint: string };
+  undo?: { before: Record<string, unknown>; fields?: string[]; afterFingerprint: string };
 }
 
 export type PendingAgentActionStatus = 'pending' | 'applied' | 'rejected' | 'expired' | 'failed';
@@ -125,7 +125,7 @@ export const createAgentSlice: SimulationSlice<AgentSlice> = (set, get) => {
     },
     confirmAgentAction: (id) => {
       const action = get().pendingAgentActions.find((a) => a.id === id);
-      if (!action || action.status !== 'pending') return { success: false, error: 'La acción ya no está pendiente.' };
+      if (!action || action.status !== 'pending') return { success: false, error: 'La acción ya no está disponible; pide al agente que la prepare de nuevo.' };
       if (Date.parse(action.expiresAt) < Date.now()) {
         patchPending(id, { status: 'expired' });
         return { success: false, error: 'La acción caducó. Pide al agente que la prepare de nuevo.' };

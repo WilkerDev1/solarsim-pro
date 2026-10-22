@@ -5,7 +5,6 @@ import { fetchEquipmentAsset } from '../../../services/equipmentAssetService';
 import { assistantFieldLabel, assistantValueLabel } from '../labels';
 import type { AssistantAction, AssistantCard } from '../types';
 import {
-  applyAssistantAction,
   assistantOwner,
   visibleAssistantProjects,
   visibleAssistantEquipment,
@@ -192,11 +191,9 @@ export function AssistantActionCard({
               disabled={disabled}
               onClick={() => {
                 try {
-                  const queued = useSimulationStore.getState().pendingAgentActions.some((a) => a.id === action.id);
-                  if (queued) {
-                    const result = useSimulationStore.getState().confirmAgentAction(action.id);
-                    if (!result.success) throw new Error(result.error);
-                  } else applyAssistantAction(action);
+                  // Only queued plans can be confirmed: an evicted or expired plan must be prepared again.
+                  const result = useSimulationStore.getState().confirmAgentAction(action.id);
+                  if (!result.success) throw new Error(result.error || 'La acción ya no está disponible; pide al asistente que la prepare de nuevo.');
                   setStatus('applied');
                   setError('');
                   onApplied(
