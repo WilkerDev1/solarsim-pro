@@ -1,3 +1,4 @@
+import { createProjectId } from '../../utils/projectId';
 import { commercialCopy } from '../../../shared/proposalCommercial';
 import { projectMutationMetadata } from '../sync/projectMutation';
 import { SimulationSlice, ImportExportSlice } from '../types';
@@ -104,7 +105,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
       importedList = importedList.map((raw) => ({
         ...BENCHMARK_PROJECT,
         ...raw,
-        id: typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : `proj-${Date.now()}`,
+        id: typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : createProjectId(),
         createdAt: raw.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         status: raw.status || 'Draft',
@@ -197,7 +198,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
       for (const proj of importedList) {
         let finalId = proj.id;
         if (!finalId || existingIds.has(finalId)) {
-          finalId = `proj-imported-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+          finalId = createProjectId("proj-imported");
         }
         existingIds.add(finalId);
 
@@ -262,7 +263,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
 
     if (strategy === 'next_sequence') {
       const nextSeq = generateNextProjectSequence(currentProjects);
-      const newId = `proj-imported-${Date.now()}`;
+      const newId = createProjectId("proj-imported");
       const newProj: ProjectSimulation = {
         ...incomingProject,
         commercial: commercialCopy(incomingProject, currentUser || undefined),
@@ -300,7 +301,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
       targetActiveId = conflictingProject.id;
       toastMsg = `¡Proyecto "${incomingProject.client.name}" sobrescrito con éxito!`;
     } else if (strategy === 'copy_version') {
-      const newId = `proj-imported-${Date.now()}`;
+      const newId = createProjectId("proj-imported");
       const dupIdentifiers = generateDuplicateProjectIdentifiers(incomingProject, currentProjects);
       const newProj: ProjectSimulation = {
         ...incomingProject,
