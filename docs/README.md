@@ -12,6 +12,7 @@ Documentos canónicos y vigentes. No se mantienen documentos fechados: el histor
 - [Recursos compartidos](SHARED_RESOURCES.md): carpetas, registro de propuestas web, ofertas y adjuntos.
 - [Catálogo de equipos](EQUIPMENT_CATALOG.md): modelos, ofertas de proveedores y fichas.
 - [Centro empresarial](COMPANY_CENTER.md): organizaciones, equipos, membretes y aislamiento.
+- [Editor del documento de propuesta](PROPOSAL_DOCUMENT_EDITOR.md): textos editables en la hoja, registro de textos, plantillas, diseño y propuesta web.
 - [Seguimiento comercial](PROPOSAL_COMMERCIAL_TRACKING.md): decisiones del cliente, responsables y reportes.
 - [Subsistema IA](AI_SCANNERS_SPECIFICATION.md) y [tarifas en el flujo IA](AI_TARIFF_CONTEXT.md).
 - [Asistente general experimental](APP_ASSISTANT.md).

@@ -54,3 +54,11 @@ Esta guía establece los estándares obligatorios de diseño, maquetación y exp
   ```
 - Asignar al clon `clone.style.flexDirection = 'column'` y `clone.style.justifyContent = 'space-between'`.
 - Añadir retardo de estabilización de ~100ms antes de llamar a `html2canvas` para garantizar carga completa de fuentes y gráficos base64.
+
+---
+
+## 5. Cromo del editor y listas
+- **Todo elemento que existe solo para editar** (barras, insignias de edición, editores en el sitio, filas auxiliares) lleva el atributo `data-pdf-chrome`. El PDF nunca lo muestra: el editor pasa a modo `export` antes de capturar, `exportProposalPdf` quita `[data-pdf-chrome]` y los atributos de edición del clon y pasa `ignoreElements` a `html2canvas`, y `@media print` lo oculta.
+- Los textos editables se dibujan con `<EditableText>` (sin contenedores con `overflow: hidden`, que recortan descendentes).
+- **No usar `::marker` ni `<ul>/<ol>` con viñetas nativas** en texto del documento: `html2canvas` no dibuja los marcadores. Las viñetas son spans con `•` (componente `RichText`).
+- El texto enriquecido es el subconjunto de `shared/documentTexts/richText.ts` (negrita, cursiva, viñetas y párrafos); nunca se guarda HTML.
