@@ -2,6 +2,7 @@ import React from 'react';
 import { editEquipmentGroup, selectCatalogEquipment } from '../../../utils/equipmentGroups';
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs, BatteryItemSpec } from '../../../types';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { SearchableEquipmentSelect } from './SearchableEquipmentSelect';
 import { SolarEquipmentItem } from '../../../types/equipment';
 import { BatteryCharging, Plus, Trash2 } from 'lucide-react';
@@ -17,7 +18,7 @@ interface BatteryEquipmentSectionProps {
 
 /** Storage (BESS) block of the equipment sidebar: battery groups in simple and detailed mode. */
 export const BatteryEquipmentSection: React.FC<BatteryEquipmentSectionProps> = ({ project, summary, isDark, isDetailed, updateSpecs }) => {
-  const { equipmentCatalog, openAIDatasheetModal } = useSimulationStore();
+  const { equipmentCatalog, openAIDatasheetModal } = useSimulationStore(useShallow((s) => ({ equipmentCatalog: s.equipmentCatalog, openAIDatasheetModal: s.openAIDatasheetModal })));
   const projectBatteries = getProjectBatteries(project.specs);
   const extraBatteries = projectBatteries.slice(1);
   const totalBatteryKWh = calculateTotalBatteryCapacityKWh(project.specs);

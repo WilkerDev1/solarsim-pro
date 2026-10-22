@@ -4,6 +4,7 @@ import { ProjectFolder } from "../../types";
 import { fetchWithSessionRetry } from "../../services/syncService";
 import { ownsProject } from "../sync/projectReconciliation";
 import { contentEqual } from "../sync/projectDifferences";
+import { reuseArray, reuseIfEqual, reuseRecord } from "../sync/structuralSharing";
 
 // Compare the editable definition, excluding server attribution and receipt metadata.
 const folderContent = (folder: ProjectFolder) => ({
@@ -418,17 +419,22 @@ export const createFolderSlice: SimulationSlice<FolderSlice> = (set, get) => {
             const hiddenDeletes = new Set(
               s.folderDeletionQueue.map((c) => c.id),
             );
-            const folders = [
+            const folders = reuseArray(s.folders, [
               ...pending,
-              ...[...remote.values()].filter(
-                (f) =>
-                  !pending.some((p) => p.id === f.id) &&
-                  !hiddenDeletes.has(f.id),
-              ),
-            ];
-            const changes = Object.fromEntries(
-              Object.entries(s.folderChanges).filter(
-                ([id]) => !deleted.has(id),
+              ...[...remote.values()]
+                .filter(
+                  (f) =>
+                    !pending.some((p) => p.id === f.id) &&
+                    !hiddenDeletes.has(f.id),
+                )
+                .map((f) => reuseIfEqual(s.folders.find((v) => v.id === f.id), f)),
+            ]);
+            const changes = reuseRecord(
+              s.folderChanges,
+              Object.fromEntries(
+                Object.entries(s.folderChanges).filter(
+                  ([id]) => !deleted.has(id),
+                ),
               ),
             );
             return {

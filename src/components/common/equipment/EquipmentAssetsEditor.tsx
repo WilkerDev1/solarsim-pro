@@ -3,6 +3,7 @@ import { EquipmentImagePreview } from './EquipmentImagePreview';
 import React, { useEffect, useRef, useState } from 'react';
 import type { SolarEquipmentItem } from '../../../types/equipment';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { fetchEquipmentAsset, uploadEquipmentAsset } from '../../../services/equipmentAssetService';
 import { seedEquipmentAssetBlob } from '../../../features/equipmentPreview/equipmentPreviewLoader';
 import { datasheetDisplayName, datasheetFileName } from '../../../utils/proposalDatasheets';
@@ -13,7 +14,7 @@ export function EquipmentAssetsEditor({ item, onChange, disabled, dark, onBusy }
   const controller = useRef<AbortController | null>(null);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; controller.current?.abort(); onBusy(false); }; }, [onBusy]);
-  const current = useSimulationStore();
+  const current = useSimulationStore(useShallow((s) => ({ syncSettings: s.syncSettings })));
   const run = async (operation: (server: string, token: string, signal: AbortSignal, valid: () => boolean) => Promise<void>) => {
     const initial = useSimulationStore.getState();
     const { authToken, currentUser, serverUrl } = initial.syncSettings;

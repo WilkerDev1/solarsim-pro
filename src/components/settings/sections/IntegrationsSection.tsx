@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { SyncService, PingResult } from '../../../services/syncService';
 import { ShareProposalService } from '../../../services/shareProposalService';
 import {
@@ -32,7 +33,7 @@ export const IntegrationsSection: React.FC = () => {
     setSyncSettings,
     syncProjectsWithServer,
     isSyncing,
-  } = useSimulationStore();
+  } = useSimulationStore(useShallow((s) => ({ geminiApiKey: s.geminiApiKey, setGeminiApiKey: s.setGeminiApiKey, geminiModel: s.geminiModel, setGeminiModel: s.setGeminiModel, syncSettings: s.syncSettings, setSyncSettings: s.setSyncSettings, syncProjectsWithServer: s.syncProjectsWithServer, isSyncing: s.isSyncing })));
 
   // AI Local State
   const [aiKeyInput, setAiKeyInput] = useState(geminiApiKey || '');

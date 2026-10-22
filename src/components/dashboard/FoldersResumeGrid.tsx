@@ -2,12 +2,13 @@ import { canAdminister } from '../../../shared/permissions';
 import React, { useState } from 'react';
 import { Folder, FolderPlus, Edit3, Trash2, EyeOff } from 'lucide-react';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { ProjectFolder } from '../../types';
 import { CreateFolderModal } from './sidebar/CreateFolderModal';
 import { confirmAction } from '../common/confirmAction';
 
 export const FoldersResumeGrid: React.FC = () => {
-  const { folders, projects, activeFolderId, setActiveFolderId, syncSettings, deleteFolder, moveProjectToFolder } = useSimulationStore();
+  const { folders, projects, activeFolderId, setActiveFolderId, syncSettings, deleteFolder, moveProjectToFolder } = useSimulationStore(useShallow((s) => ({ folders: s.folders, projects: s.projects, activeFolderId: s.activeFolderId, setActiveFolderId: s.setActiveFolderId, syncSettings: s.syncSettings, deleteFolder: s.deleteFolder, moveProjectToFolder: s.moveProjectToFolder })));
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [folderToEdit, setFolderToEdit] = useState<ProjectFolder | null>(null);
   const isAdmin = canAdminister(syncSettings.currentUser);

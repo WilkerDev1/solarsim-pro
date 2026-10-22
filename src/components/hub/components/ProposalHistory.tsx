@@ -1,13 +1,14 @@
 import { useState } from "react";
 import type { ProjectSimulation, ProjectSnapshot } from "../../../types";
 import { useSimulationStore } from "../../../store/useSimulationStore";
+import { useShallow } from 'zustand/react/shallow';
 import { canEditCommercial } from "../../../features/proposals/commercial";
 import { projectDifferences } from "../../../store/sync/projectDifferences";
 import { CreateSnapshotModal } from "./CreateSnapshotModal";
 import { confirmAction } from "../../common/confirmAction";
 export function ProposalHistory({ project }: { project: ProjectSimulation }) {
   const { snapshotsByProject, restoreSnapshot, syncSettings } =
-    useSimulationStore();
+    useSimulationStore(useShallow((s) => ({ snapshotsByProject: s.snapshotsByProject, restoreSnapshot: s.restoreSnapshot, syncSettings: s.syncSettings })));
   const [creating, setCreating] = useState(false);
   const [comparing, setComparing] = useState<ProjectSnapshot | null>(null);
   const [feedback, setFeedback] = useState("");

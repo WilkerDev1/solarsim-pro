@@ -1,6 +1,9 @@
 import { isReaderRole } from '../../../shared/permissions';
 import React, { useState, useCallback, useEffect } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
+import { energyCalculationMode } from '../../../shared/applicationFeatures';
+import { effectiveFeatureSettings } from '../../features/application/featurePolicy';
 import { fetchSolarRadiationByCoordinates } from '../../services/solarRadiationApi';
 import { Shield, Trash2, RotateCcw, ArrowLeft, Undo2, Redo2 } from 'lucide-react';
 import { ParameterSidebar } from './sidebar/ParameterSidebar';
@@ -36,7 +39,7 @@ export const SimulatorView: React.FC = () => {
     canRedo,
     undo,
     redo,
-  } = useSimulationStore();
+  } = useSimulationStore(useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId, getActiveProject: s.getActiveProject, getFinancialSummary: s.getFinancialSummary, updateClient: s.updateClient, updateSpecs: s.updateSpecs, updateRates: s.updateRates, updateFinancials: s.updateFinancials, updateMonthlyConsumption: s.updateMonthlyConsumption, updateAllMonthlyConsumption: s.updateAllMonthlyConsumption, setMonthlyConsumption: s.setMonthlyConsumption, saveActiveProject: s.saveActiveProject, openAIInvoiceModal: s.openAIInvoiceModal, syncSettings: s.syncSettings, sidebarWidth: s.sidebarWidth, setSidebarWidth: s.setSidebarWidth, sidebarTheme: s.sidebarTheme, restoreProject: s.restoreProject, hardDeleteProject: s.hardDeleteProject, setActiveView: s.setActiveView, setIsTrashActive: s.setIsTrashActive, canUndo: s.canUndo, canRedo: s.canRedo, undo: s.undo, redo: s.redo, energyMode: energyCalculationMode(effectiveFeatureSettings(s)) })));
 
   const project = getActiveProject();
   const summary = getFinancialSummary();

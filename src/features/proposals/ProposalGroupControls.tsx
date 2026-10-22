@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { GitBranch, X } from "lucide-react";
 import type { ProjectSimulation } from "../../types";
 import { useSimulationStore } from "../../store/useSimulationStore";
+import { useShallow } from 'zustand/react/shallow';
 import { canEditCommercial } from "./commercial";
 import { proposalFamily, currentProposalDrag } from "./proposalGroups";
 import { PROPOSAL_GROUP_COLORS } from "../../../shared/proposalLinks";
@@ -11,7 +12,7 @@ export function requestProposalGroupMenu(id:string,x:number,y:number) {
   window.dispatchEvent(new CustomEvent('solarsim-proposal-group-menu',{detail:{id,x,y}}));
 }
 export function useProposalLinkDrop(project: ProjectSimulation) {
-  const { syncSettings, linkProposals } = useSimulationStore();
+  const { syncSettings, linkProposals } = useSimulationStore(useShallow((s) => ({ syncSettings: s.syncSettings, linkProposals: s.linkProposals })));
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null),
     ready = useRef(false);
   const [hover, setHover] = useState<"waiting" | "ready" | null>(null);
@@ -90,7 +91,7 @@ export function ProposalGroupControls({
 }: {
   project: ProjectSimulation;
 }) {
-  const state = useSimulationStore(),
+  const state = useSimulationStore(useShallow((s) => ({ projects: s.projects, syncSettings: s.syncSettings, sidebarTheme: s.sidebarTheme, linkProposals: s.linkProposals, setProposalGroupColor: s.setProposalGroupColor }))),
     family = proposalFamily(project, state.projects);
   const dialog = useRef<HTMLDialogElement>(null);
   const menu=useRef<HTMLDivElement>(null);

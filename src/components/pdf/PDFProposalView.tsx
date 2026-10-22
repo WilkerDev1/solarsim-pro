@@ -1,6 +1,9 @@
 import React, { useRef, useState, useMemo } from 'react';
 import { flushSync } from 'react-dom';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
+import { energyCalculationMode } from '../../../shared/applicationFeatures';
+import { effectiveFeatureSettings } from '../../features/application/featurePolicy';
 import { resolveProposalAttachmentBytes } from '../../services/proposalAttachmentResolver';
 import { exportProposalPdf } from './export/exportProposalPdf';
 import { ProposalAnnexSync } from './annexes/ProposalAnnexSync';
@@ -44,7 +47,7 @@ export const PDFProposalView: React.FC = () => {
     restoreProject,
     setDocumentTexts,
     saveDocumentTextsToCompanyTemplate,
-  } = useSimulationStore();
+  } = useSimulationStore(useShallow((s) => ({ getActiveProject: s.getActiveProject, getFinancialSummary: s.getFinancialSummary, updateSpecs: s.updateSpecs, updateDocumentCustomization: s.updateDocumentCustomization, saveCurrentProjectAsDefaultDocumentTemplate: s.saveCurrentProjectAsDefaultDocumentTemplate, resetDefaultDocumentCustomization: s.resetDefaultDocumentCustomization, sidebarTheme: s.sidebarTheme, openShareModal: s.openShareModal, restoreProject: s.restoreProject, setDocumentTexts: s.setDocumentTexts, saveDocumentTextsToCompanyTemplate: s.saveDocumentTextsToCompanyTemplate, projects: s.projects, activeProjectId: s.activeProjectId, energyMode: energyCalculationMode(effectiveFeatureSettings(s)) })));
   const currentUser = useSimulationStore((s) => s.syncSettings.currentUser);
   const companies = useSimulationStore((s) => s.companies);
 

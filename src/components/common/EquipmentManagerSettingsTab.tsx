@@ -1,6 +1,7 @@
 import { isWriterRole } from '../../../shared/permissions';
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
+import { useShallow } from 'zustand/react/shallow';
 import { SolarEquipmentItem, EquipmentType } from "../../types/equipment";
 import { SupplierManagerSection } from "./SupplierManagerSection";
 import {
@@ -53,7 +54,7 @@ export const EquipmentManagerSettingsTab: React.FC<
     syncSettings,
     equipmentConflicts,
     resolveEquipmentConflict,
-  } = useSimulationStore();
+  } = useSimulationStore(useShallow((s) => ({ equipmentCatalog: s.equipmentCatalog, addEquipmentItem: s.addEquipmentItem, updateEquipmentItem: s.updateEquipmentItem, removeEquipmentItem: s.removeEquipmentItem, resetEquipmentCatalogToDefaults: s.resetEquipmentCatalogToDefaults, openAIDatasheetModal: s.openAIDatasheetModal, openAIPriceCatalogModal: s.openAIPriceCatalogModal, openSupplierPriceModal: s.openSupplierPriceModal, syncEquipmentWithServer: s.syncEquipmentWithServer, syncSettings: s.syncSettings, equipmentConflicts: s.equipmentConflicts, resolveEquipmentConflict: s.resolveEquipmentConflict })));
 
   const canEdit =
     !syncSettings.currentUser ||

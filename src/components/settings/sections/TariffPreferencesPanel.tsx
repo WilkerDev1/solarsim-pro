@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Receipt, ChevronDown, ChevronUp, Check, Sparkles, Cloud, RefreshCw, Zap, Coins, DollarSign } from 'lucide-react';
 import { UtilityDistributor, getDistributorTariffOptions } from '../../../types/tariffs';
 import { confirmAction } from '../../common/confirmAction';
@@ -20,7 +21,7 @@ export const TariffPreferencesPanel: React.FC<TariffPreferencesPanelProps> = ({ 
     resetToDefaultTariffs,
     syncTariffsWithServer,
     fetchTariffsFromServer,
-  } = useSimulationStore();
+  } = useSimulationStore(useShallow((s) => ({ defaultSimulationSettings: s.defaultSimulationSettings, updateDefaultSimulationSettings: s.updateDefaultSimulationSettings, tariffMatrix: s.tariffMatrix, updateDistributorTariff: s.updateDistributorTariff, resetToDefaultTariffs: s.resetToDefaultTariffs, syncTariffsWithServer: s.syncTariffsWithServer, fetchTariffsFromServer: s.fetchTariffsFromServer })));
   const [prefDistributorTab, setPrefDistributorTab] = useState<UtilityDistributor>('EDEESTE');
   const [isSyncingTariffs, setIsSyncingTariffs] = useState(false);
   const [tariffCurrencyMode, setTariffCurrencyMode] = useState<'USD' | 'DOP'>('USD');

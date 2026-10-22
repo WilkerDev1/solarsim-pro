@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { GitCommit, X, Check, Tag } from 'lucide-react';
 
 interface CreateSnapshotModalProps {
@@ -9,7 +10,7 @@ interface CreateSnapshotModalProps {
 }
 
 export const CreateSnapshotModal: React.FC<CreateSnapshotModalProps> = ({ isOpen, onClose, projectId }) => {
-  const { createSnapshot } = useSimulationStore();
+  const { createSnapshot } = useSimulationStore(useShallow((s) => ({ createSnapshot: s.createSnapshot })));
   const [label, setLabel] = useState('');
   const [notes, setNotes] = useState('');
 

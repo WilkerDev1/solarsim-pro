@@ -1,5 +1,6 @@
 import React from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { AlertTriangle, Hash, Copy, Replace, X, ShieldAlert } from 'lucide-react';
 
 export const ImportConflictModal: React.FC = () => {
@@ -8,7 +9,7 @@ export const ImportConflictModal: React.FC = () => {
     resolveImportConflict,
     cancelImportConflict,
     sidebarTheme,
-  } = useSimulationStore();
+  } = useSimulationStore(useShallow((s) => ({ pendingImportConflict: s.pendingImportConflict, resolveImportConflict: s.resolveImportConflict, cancelImportConflict: s.cancelImportConflict, sidebarTheme: s.sidebarTheme })));
 
   if (!pendingImportConflict) return null;
 

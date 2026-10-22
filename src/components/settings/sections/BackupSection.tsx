@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import {
   Database,
   Download,
@@ -11,7 +12,7 @@ import {
 } from 'lucide-react';
 
 export const BackupSection: React.FC = () => {
-  const { projects, exportAllProjectsAsJSON, importProjectsFromJSON } = useSimulationStore();
+  const { projects, exportAllProjectsAsJSON, importProjectsFromJSON } = useSimulationStore(useShallow((s) => ({ projects: s.projects, exportAllProjectsAsJSON: s.exportAllProjectsAsJSON, importProjectsFromJSON: s.importProjectsFromJSON })));
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [backupMsg, setBackupMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 

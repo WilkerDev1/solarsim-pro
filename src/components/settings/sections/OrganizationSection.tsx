@@ -1,6 +1,7 @@
 import { isAdminRole, normalizeRole } from '../../../../shared/permissions';
 import { useEffect, useRef, useState } from "react";
 import { useSimulationStore } from "../../../store/useSimulationStore";
+import { useShallow } from 'zustand/react/shallow';
 import { SyncService } from "../../../services/syncService";
 import {
   CompanyService,
@@ -13,7 +14,7 @@ import { confirmAction } from "../../common/confirmAction";
 
 export function OrganizationSection() {
   const { syncSettings, workspaceScope, sessionGeneration, sidebarTheme } =
-    useSimulationStore();
+    useSimulationStore(useShallow((s) => ({ syncSettings: s.syncSettings, workspaceScope: s.workspaceScope, sessionGeneration: s.sessionGeneration, sidebarTheme: s.sidebarTheme })));
   const ownerKey = draftOwnerKey(workspaceScope, syncSettings, true);
   const mounted = useRef(true);
   const loadRequest = useRef(0);

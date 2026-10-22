@@ -10,6 +10,7 @@ import {
   Building2,
 } from "lucide-react";
 import { useSimulationStore } from "../../store/useSimulationStore";
+import { useShallow } from 'zustand/react/shallow';
 import type {
   EquipmentSupplierPrice,
   SolarEquipmentItem,
@@ -23,7 +24,7 @@ import { confirmAction } from "./confirmAction";
 
 export function SupplierPricesDetailModal() {
   const { supplierPriceModalEquipment, workspaceScope, sessionGeneration } =
-    useSimulationStore();
+    useSimulationStore(useShallow((s) => ({ supplierPriceModalEquipment: s.supplierPriceModalEquipment, workspaceScope: s.workspaceScope, sessionGeneration: s.sessionGeneration })));
   if (!supplierPriceModalEquipment) return null;
   return (
     <EquipmentOffers
@@ -33,7 +34,7 @@ export function SupplierPricesDetailModal() {
   );
 }
 function EquipmentOffers({ equipmentId }: { equipmentId: string }) {
-  const state = useSimulationStore();
+  const state = useSimulationStore(useShallow((s) => ({ equipmentCatalog: s.equipmentCatalog, syncSettings: s.syncSettings, equipmentConflicts: s.equipmentConflicts, closeSupplierPriceModal: s.closeSupplierPriceModal, projects: s.projects, activeProjectId: s.activeProjectId, activeView: s.activeView, isSettingsModalOpen: s.isSettingsModalOpen, sidebarTheme: s.sidebarTheme, addOrUpdateSupplierPrice: s.addOrUpdateSupplierPrice, openAIPriceCatalogModal: s.openAIPriceCatalogModal, applySupplierPriceToProject: s.applySupplierPriceToProject, removeSupplierPrice: s.removeSupplierPrice })));
   const item = state.equipmentCatalog.find((item) => item.id === equipmentId);
   const dialog = useRef<HTMLDialogElement>(null);
   const [editor, setEditor] = useState<{

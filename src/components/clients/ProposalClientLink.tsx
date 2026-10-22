@@ -4,6 +4,7 @@ import { ArrowUpRight, Link2, UserRound, X } from 'lucide-react';
 import { CLIENT_KINDS } from '../../../shared/clients';
 import { canEditCommercial } from '../../features/proposals/commercial';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import type { ProjectSimulation } from '../../types';
 import type { ClientRecord } from '../../types/client';
 import { confirmAction } from '../common/confirmAction';
@@ -44,7 +45,7 @@ export function ProposalClientBadge({ project }: { project: ProjectSimulation })
 
 /** Dialog to link, change or remove the directory client of a proposal. */
 export function ClientLinkDialog({ project, onClose }: { project: ProjectSimulation; onClose: () => void }) {
-  const { clients, sidebarTheme, linkProposalToClient, createClientRecord } = useSimulationStore();
+  const { clients, sidebarTheme, linkProposalToClient, createClientRecord } = useSimulationStore(useShallow((s) => ({ clients: s.clients, sidebarTheme: s.sidebarTheme, linkProposalToClient: s.linkProposalToClient, createClientRecord: s.createClientRecord })));
   const [error, setError] = useState('');
   const dialogRef = useRef<HTMLDivElement>(null);
   useEffect(() => {

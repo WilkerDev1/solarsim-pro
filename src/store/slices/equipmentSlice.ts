@@ -4,6 +4,7 @@ import { SimulationSlice, EquipmentSlice } from '../types';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../../data/defaultEquipmentCatalog';
 import { SolarEquipmentItem } from '../../types/equipment';
 import { SyncService } from '../../services/syncService';
+import { reuseArray, reuseIfEqual, reuseRecord } from '../sync/structuralSharing';
 
 export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (baseSet, get) => {
   let inFlight: { generation: number; promise: Promise<{ success: boolean; message: string }> } | null = null;
@@ -202,9 +203,13 @@ export const createEquipmentSlice: SimulationSlice<EquipmentSlice> = (baseSet, g
             }
             return false;
           }).map((item) => [item.id, item]));
-          for (const item of pulled.items!) if (!deleted.has(item.id) && !state.equipmentChanges[item.id]) local.set(item.id, { ...item, syncServerUrl: serverUrl, baseVersion: item.version ?? 1 });
+          for (const item of pulled.items!) if (!deleted.has(item.id) && !state.equipmentChanges[item.id]) local.set(item.id, reuseIfEqual(local.get(item.id), { ...item, syncServerUrl: serverUrl, baseVersion: item.version ?? 1 }));
           const recoverable = new Set([...local.values()].filter((item) => conflicts[item.id]?.reason === 'deleted' && state.equipmentChanges[item.id]?.scope === scope).map((item) => item.id));
-          return { equipmentCatalog: Array.from(local.values()), equipmentConflicts: conflicts, deletedEquipmentIds: [...deleted].filter((id) => !recoverable.has(id)) };
+          return {
+            equipmentCatalog: reuseArray(state.equipmentCatalog, Array.from(local.values())),
+            equipmentConflicts: reuseRecord(state.equipmentConflicts, conflicts),
+            deletedEquipmentIds: reuseArray(state.deletedEquipmentIds || [], [...deleted].filter((id) => !recoverable.has(id))),
+          };
         });
         if (canWrite) for (const captured of get().equipmentDeletionQueue.filter((item) => item.scope === scope)) {
           let deletion = captured;

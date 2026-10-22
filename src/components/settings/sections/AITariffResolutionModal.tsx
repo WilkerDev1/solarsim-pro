@@ -1,6 +1,7 @@
 import { isReaderRole } from '../../../../shared/permissions';
 import React, { useState, useRef, useEffect } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { GlobalTariffMatrix, UtilityDistributor } from '../../../types/tariffs';
 import { getTariffSource, tariffSourceFieldLabel } from '../../../utils/aiTariffContext';
 import { GeminiTariffService } from '../../../services/geminiTariffService';
@@ -30,7 +31,7 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
     syncSettings,
     tariffMatrix,
     sessionGeneration,
-  } = useSimulationStore();
+  } = useSimulationStore(useShallow((s) => ({ geminiApiKey: s.geminiApiKey, geminiModel: s.geminiModel, setTariffMatrix: s.setTariffMatrix, syncTariffsWithServer: s.syncTariffsWithServer, syncSettings: s.syncSettings, tariffMatrix: s.tariffMatrix, sessionGeneration: s.sessionGeneration })));
 
   const [file, setFile] = useState<File | null>(null);
   const [fileBase64, setFileBase64] = useState<string | null>(null);

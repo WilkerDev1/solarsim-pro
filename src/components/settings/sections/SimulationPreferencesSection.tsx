@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import {
   Coins,
   Zap,
@@ -26,7 +27,7 @@ export const SimulationPreferencesSection: React.FC = () => {
     defaultSimulationSettings,
     updateDefaultSimulationSettings,
     equipmentCatalog,
-  } = useSimulationStore();
+  } = useSimulationStore(useShallow((s) => ({ defaultSimulationSettings: s.defaultSimulationSettings, updateDefaultSimulationSettings: s.updateDefaultSimulationSettings, equipmentCatalog: s.equipmentCatalog })));
   const defs = defaultSimulationSettings;
 
   const [isAITariffModalOpen, setIsAITariffModalOpen] = useState(false);

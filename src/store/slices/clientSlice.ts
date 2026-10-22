@@ -5,6 +5,7 @@ import type { ClientChange, ClientDeletionCommand, ClientMutationResult, ClientR
 import { ClientSyncService } from '../../services/clientSyncService';
 import { ownsProject } from '../sync/projectReconciliation';
 import { contentEqual } from '../sync/projectDifferences';
+import { reuseArray, reuseIfEqual, reuseRecord } from '../sync/structuralSharing';
 
 export interface ClientSlice {
   clients: ClientRecord[];
@@ -276,15 +277,17 @@ export const createClientSlice: SimulationSlice<ClientSlice> = (set, get) => {
           if (!current()) return SESSION_CHANGED;
           set((s) => {
             // Unsynced edits to a tombstoned client stay as a deletion conflict; everything else about it is dropped.
-            const changes = Object.fromEntries(
+            const changes = reuseRecord(s.clientChanges, Object.fromEntries(
               Object.entries(s.clientChanges).filter(([id, c]) => !deleted.has(id) || (c.serverDeleted && s.clients.some((x) => x.id === id))),
-            );
+            ));
             const pending = s.clients.filter((c) => changes[c.id]);
             const hidden = new Set(s.clientDeletionQueue.map((c) => c.id));
-            const clients = [
+            const clients = reuseArray(s.clients, [
               ...pending,
-              ...[...remote.values()].filter((c) => !changes[c.id] && !hidden.has(c.id)),
-            ];
+              ...[...remote.values()]
+                .filter((c) => !changes[c.id] && !hidden.has(c.id))
+                .map((c) => reuseIfEqual(s.clients.find((x) => x.id === c.id), c)),
+            ]);
             return {
               clients,
               clientChanges: changes,

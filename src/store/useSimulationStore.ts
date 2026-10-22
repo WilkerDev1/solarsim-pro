@@ -2,7 +2,8 @@ import { createAgentSlice } from './slices/agentSlice';
 import { hydrateSimulationStore } from './persistence/hydrateSimulationStore';
 import { serializeSimulationStore } from './persistence/serializeSimulationStore';
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist } from 'zustand/middleware';
+import { createDeferredJSONStorage } from './persistence/deferredStorage';
 import { SimulationStore, SimulationState, NewProjectPayload } from './types';
 import { createProjectSlice } from './slices/projectSlice';
 import { createEquipmentSlice } from './slices/equipmentSlice';
@@ -27,6 +28,32 @@ export {
   findDuplicateProjectInfo,
 } from './initialData';
 
+const memoryStorage = (() => {
+  const memStore: Record<string, string> = {};
+  return {
+    getItem: (key: string) => memStore[key] ?? null,
+    setItem: (key: string, value: string) => {
+      memStore[key] = value;
+    },
+    removeItem: (key: string) => {
+      delete memStore[key];
+    },
+  };
+})();
+const persistStorage = createDeferredJSONStorage<ReturnType<typeof serializeSimulationStore>>(() =>
+  typeof window !== 'undefined' && window.localStorage ? window.localStorage : memoryStorage
+);
+
+/** Writes the pending persisted state now; the window flushes it on its own before closing. */
+export const flushSimulationStorePersistence = () => persistStorage.flush();
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', flushSimulationStorePersistence);
+  window.addEventListener('beforeunload', flushSimulationStorePersistence);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushSimulationStorePersistence();
+  });
+}
+
 export const useSimulationStore = create<SimulationStore>()(
   persist(
     (...a) => ({
@@ -48,21 +75,7 @@ export const useSimulationStore = create<SimulationStore>()(
 
     {
       name: typeof window !== 'undefined' && window.location?.pathname.startsWith('/scripts/qa/fixtures/') ? 'solarsim-qa-fixture-storage' : 'solarsim-pro-storage',
-      storage: createJSONStorage(() => {
-        if (typeof window !== 'undefined' && window.localStorage) {
-          return window.localStorage;
-        }
-        const memStore: Record<string, string> = {};
-        return {
-          getItem: (key: string) => memStore[key] ?? null,
-          setItem: (key: string, value: string) => {
-            memStore[key] = value;
-          },
-          removeItem: (key: string) => {
-            delete memStore[key];
-          },
-        };
-      }),
+      storage: persistStorage,
       onRehydrateStorage: () => hydrateSimulationStore,
 
       partialize: serializeSimulationStore,

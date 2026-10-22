@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import {
   Bell,
   CheckCheck,
@@ -22,7 +23,7 @@ export const NotificationDropdown: React.FC = () => {
     clearNotifications,
     setActiveProject,
     sidebarTheme,
-  } = useSimulationStore();
+  } = useSimulationStore(useShallow((s) => ({ notifications: s.notifications, unreadNotificationsCount: s.unreadNotificationsCount, markAsRead: s.markAsRead, markAllAsRead: s.markAllAsRead, clearNotifications: s.clearNotifications, setActiveProject: s.setActiveProject, sidebarTheme: s.sidebarTheme })));
 
   const isDark = sidebarTheme === 'dark';
   const [isOpen, setIsOpen] = useState(false);
