@@ -548,7 +548,8 @@ export const EquipmentEditorModal: React.FC<EquipmentEditorModalProps> = ({
                   <input
                     type="number"
                     step="1"
-                    value={editingItem.batteryEfficiencyPct || DEFAULT_BATTERY_EFFICIENCY_PCT}
+                    value={editingItem.batteryEfficiencyPct || ""}
+                    placeholder={String(DEFAULT_BATTERY_EFFICIENCY_PCT)}
                     onChange={(e) =>
                       setEditingItem({
                         ...editingItem,

@@ -60,8 +60,10 @@ const projectOf = (specs: Partial<SystemSpecs> = {}): ProjectSimulation => ({ ..
   assert.equal(usable({ batteryDOD: undefined, batteryEfficiencyPct: 90 }), reference, 'DOD ausente: 90, no 80');
   assert.equal(usable({ batteryDOD: 0, batteryEfficiencyPct: 0 }), reference);
   const unset = getProjectBatteries(withBattery({ batteryEfficiencyPct: undefined, batteryDOD: undefined }))[0];
-  assert.equal(unset.efficiencyPct, 90);
-  assert.equal(unset.dodPct, 90);
+  assert.equal(unset.efficiencyPct, undefined, 'el grupo puede guardar el dato vacío');
+  assert.equal(unset.dodPct, undefined);
+  assert.equal(shared.resolveBatteryBankEfficiencyPct(withBattery({ batteryEfficiencyPct: undefined, batteryDOD: undefined })), 90, 'el motor aplica el 90');
+  assert.equal(shared.resolveBatteryBankDodPct(withBattery({ batteryEfficiencyPct: undefined, batteryDOD: undefined })), 90);
   const preview = (specs: Partial<SystemSpecs>) => computeLoadProfilePreview(projectOf(withBattery(specs)), 'BTS2', 900);
   assert.deepEqual(preview({ batteryEfficiencyPct: undefined, batteryDOD: undefined }), preview({ batteryEfficiencyPct: 90, batteryDOD: 90 }));
 }
@@ -117,7 +119,7 @@ const projectOf = (specs: Partial<SystemSpecs> = {}): ProjectSimulation => ({ ..
   const finance = readFileSync('src/engine/financeEngine.ts', 'utf8');
   assert(finance.includes('resolvePricePerWattUSD('), 'financeEngine usa el helper compartido');
   assert.equal(valueOf(direct({ pricePerWattUSD: 0.5, pricePerKWpUSD: 0 }), 'pd-price-kwp'), '500', '$/kWp 0 también cae al valor derivado');
-  assert.equal(valueOf(direct({ pricePerWattUSD: 0.5, pricePerKWpUSD: 520 }), 'pd-price-kwp'), '520');
+  assert.equal(valueOf(direct({ pricePerWattUSD: 0.52, pricePerKWpUSD: 520 }), 'pd-price-kwp'), '520');
 }
 
 // ── Bugs 4 y 5: tasa y multiplicador con una sola regla ────────────────────────────────────

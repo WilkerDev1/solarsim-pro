@@ -24,7 +24,7 @@ const TIP =
 export const DirectPrice: React.FC<DirectPriceProps> = ({ specs, summary, financialsPricePerWattUSD, updateSpecs }) => {
   // Ambos campos salen del mismo valor. El motor ignora un $/Wp ≤ 0 (usa financials y luego el default): la vista sigue la misma cadena.
   const wattPrice = resolvePricePerWattUSD(specs, { pricePerWattUSD: financialsPricePerWattUSD });
-  const kwpPrice = isValidDirectPrice(specs.pricePerKWpUSD) ? specs.pricePerKWpUSD : pricePerKWpFromWatt(wattPrice);
+  const kwpPrice = isValidDirectPrice(specs.pricePerKWpUSD) && Math.abs(specs.pricePerKWpUSD / 1000 - wattPrice) <= 0.00051 ? specs.pricePerKWpUSD : pricePerKWpFromWatt(wattPrice);
   const matrix = summary?.costMatrix;
 
   return (

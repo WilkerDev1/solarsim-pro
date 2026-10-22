@@ -8,8 +8,9 @@ import { calculateMonthlySolarProduction } from '../engine/solarEngine';
 import { calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { getProjectBatteries } from '../utils/equipmentSpecsUtils';
 import { buildCatalogSelectionUpdate } from '../components/simulator/params/logic/catalogSelection';
-import { selectCatalogEquipment } from '../utils/equipmentGroups';
-import { resolveBatteryBankDodPct, resolveBatteryBankEfficiencyPct } from '../../shared/projectDefaults';
+import { readFileSync } from 'node:fs';
+import { editEquipmentGroup, selectCatalogEquipment } from '../utils/equipmentGroups';
+import { resolveBatteryBankDodPct, resolveBatteryBankEfficiencyPct, resolvePrimaryBatteryEfficiencyPct } from '../../shared/projectDefaults';
 import type { ProjectSimulation, SystemSpecs } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
 
@@ -44,7 +45,7 @@ close(resolveBatteryBankEfficiencyPct(bank({}, {}, { batteryEfficiencyPct: 80 })
 // ── Motor: financeEngine, solarEngine y equipmentSpecsUtils ────────────────────────────────
 const project = (specs: SystemSpecs): ProjectSimulation => ({ ...base, specs });
 const usable = (specs: SystemSpecs) => calculateProjectFinancialSummary(project(specs)).batteryUsableKWh;
-const dispatch = (specs: SystemSpecs) => JSON.stringify(calculateMonthlySolarProduction('Distrito Nacional', specs, base.monthlyConsumption, 0.2, 25, undefined, 'BTS2', false));
+const dispatch = (specs: SystemSpecs) => JSON.stringify(calculateMonthlySolarProduction('Distrito Nacional', specs, base.monthlyConsumption, 0.2, 25, undefined, 'BTS2', false, 'self_consumption'));
 const referenceBank = bank({ dodPct: 90, efficiencyPct: 90 });
 for (const missing of [undefined, 0, '', NaN]) {
   const candidate = bank({ dodPct: 90, efficiencyPct: missing });
@@ -68,7 +69,7 @@ assert.equal(usable(bank({ dodPct: 60, efficiencyPct: 95 })), Math.round(47 * ((
 assert.equal(usable({ ...base.specs, hasBattery: true, batteries: undefined, batteryCapacityKWh: 10, batteryCount: 1, batteryDOD: 80, batteryEfficiencyPct: 92 } as SystemSpecs), 7.4);
 
 // ── Catálogo: batería sin eficiencia ───────────────────────────────────────────────────────
-const item = (extra: object = {}) => ({ id: 'n', type: 'battery', displayName: 'Nueva', brand: 'B', capacityKWh: 10, ...extra }) as SolarEquipmentItem;
+const item = (extra: object = {}) => ({ id: 'n', type: 'battery', displayName: 'Nueva', brand: 'B', capacityKWh: 15, ...extra }) as SolarEquipmentItem;
 for (const missing of [undefined, 0, '', NaN]) {
   const catalogItem = item({ batteryEfficiencyPct: missing, dodPct: missing });
   const primary = buildCatalogSelectionUpdate({ ...base.specs } as SystemSpecs, 'battery', catalogItem);
@@ -78,6 +79,20 @@ for (const missing of [undefined, 0, '', NaN]) {
   const edit = selectCatalogEquipment(specs, 'battery', 1, catalogItem, { efficiencyPct: undefined, dodPct: undefined });
   const next = { ...specs, ...edit } as SystemSpecs;
   assert.equal(resolveBatteryBankEfficiencyPct(next), resolveBatteryBankEfficiencyPct(bank({ efficiencyPct: 90 })), 'modelo #2 sin eficiencia en el banco: 90 en el motor');
+}
+
+// ── Dock: el campo de la batería principal edita el grupo 1 y el espejo ────────────────────
+{
+  const specs = bank({ dodPct: 90, efficiencyPct: 90 });
+  const patch = editEquipmentGroup(specs, 'battery', { type: 'update', index: 0, patch: { efficiencyPct: 80 } });
+  assert.equal(patch.batteryEfficiencyPct, 80, 'el espejo escalar sigue al primer grupo');
+  const next = { ...specs, ...patch } as SystemSpecs;
+  close(resolveBatteryBankEfficiencyPct(next), (32 * 80 + 15 * 90) / 47, 'el motor ve el cambio del dock con varios modelos');
+  assert.equal(resolvePrimaryBatteryEfficiencyPct(next), 80);
+}
+for (const file of ['src/components/common/AIDatasheetScannerModal.tsx', 'src/components/common/EquipmentEditorModal.tsx', 'src/components/common/EquipmentManagerSettingsTab.tsx']) {
+  const text = readFileSync(file, 'utf8');
+  assert(!/batteryEfficiencyPct[^\n]{0,40}\b95\b/.test(text) && !text.includes('"battery" ? 95'), `${file} no fuerza 95`);
 }
 
 console.log('testBatteryBankDefaults: ok');

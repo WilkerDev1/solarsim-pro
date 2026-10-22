@@ -1,6 +1,6 @@
 import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
 import { DEFAULT_UNIT_PRICE_USD } from '../utils/equipmentGroups';
-import { DEFAULT_INSTALLATION_USD_PER_KWP, DEFAULT_PRICE_PER_WATT_USD, resolveBatteryDodPct, resolveBatteryEfficiencyPct, resolveDopRate, resolvePricePerWattUSD, resolveSaleMarginMultiplier } from '../../shared/projectDefaults';
+import { DEFAULT_INSTALLATION_USD_PER_KWP, DEFAULT_PRICE_PER_WATT_USD, resolveBatteryBankDodPct, resolveBatteryBankEfficiencyPct, resolveDopRate, resolvePricePerWattUSD, resolveSaleMarginMultiplier } from '../../shared/projectDefaults';
 import { ITBIS_RATE, LEY5707_CREDIT_RATE, appliesItemMargin, customItemsTaxBreakdown, isItemItbisExonerated } from '../../shared/financialRules';
 import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem, CustomQuotationItem, CustomQuotationDiscount, ProjectSimulation } from '../types';
 import { calculateDCCapacityKWp, calculateMonthlySolarProduction } from './solarEngine';
@@ -581,8 +581,8 @@ export function calculateFinancialSummary(
     : 0;
 
   // Battery Usable Capacity & Backup Autonomy calculation
-  const batteryDodPct = resolveBatteryDodPct(specs.batteryDOD);
-  const batteryEffPct = resolveBatteryEfficiencyPct(specs.batteryEfficiencyPct);
+  const batteryDodPct = resolveBatteryBankDodPct(specs);
+  const batteryEffPct = resolveBatteryBankEfficiencyPct(specs);
   const totalBatteryKWh = calculateTotalBatteryCapacityKWh(specs);
   const batteryUsableKWh = specs.hasBattery
     ? Math.round(((totalBatteryKWh || specs.batteryCapacityKWh) * (batteryDodPct / 100) * (batteryEffPct / 100)) * 10) / 10

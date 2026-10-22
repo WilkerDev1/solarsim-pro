@@ -4,7 +4,7 @@ import { catalogPanelGroupPatch } from '../../../../../utils/catalogGroupPatch';
 import { editEquipmentGroup, selectCatalogEquipment, type EquipmentKind } from '../../../../../utils/equipmentGroups';
 import { getProjectBatteries, getProjectInverters, getProjectPanels } from '../../../../../utils/equipmentSpecsUtils';
 import { buildCatalogSelectionUpdate } from '../../logic/catalogSelection';
-import { MANUAL_BRAND_PLACEHOLDER } from '../../logic/dockDefaults';
+import { MANUAL_BRAND_PLACEHOLDER, resolveBatteryDodPct, resolveBatteryEfficiencyPct } from '../../logic/dockDefaults';
 
 export type EquipmentMode = 'catalog' | 'manual';
 type GroupItem = { panel: PanelItemSpec; inverter: InverterItemSpec; battery: BatteryItemSpec };
@@ -135,7 +135,7 @@ function secondaryCatalogExtras(kind: EquipmentKind, item: SolarEquipmentItem, c
   const unitPriceUSD = item.supplierPrices?.[0]?.priceUSD || currentPrice;
   if (kind === 'panel') return { ...catalogPanelGroupPatch(item), unitPriceUSD };
   if (kind === 'inverter') return { powerKW: item.powerKW || 5.0, unitPriceUSD };
-  return { capacityKWh: item.capacityKWh || 5.12, unitPriceUSD };
+  return { capacityKWh: item.capacityKWh || 5.12, unitPriceUSD, dodPct: resolveBatteryDodPct(item.dodPct), efficiencyPct: resolveBatteryEfficiencyPct(item.batteryEfficiencyPct) };
 }
 
 /** Cantidad en unidades enteras, mínimo 1: el Stepper acepta fracciones y los equipos no se cuentan en fracciones. */

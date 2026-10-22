@@ -1,4 +1,3 @@
-import { resolveBatteryDodPct, resolveBatteryEfficiencyPct } from '../../shared/projectDefaults';
 import { SystemSpecs, PanelItemSpec, InverterItemSpec, BatteryItemSpec } from '../types';
 
 /**
@@ -82,8 +81,8 @@ export function getProjectBatteries(specs: SystemSpecs): BatteryItemSpec[] {
       count: specs.batteryCount !== undefined ? specs.batteryCount : 1,
       unitPriceUSD: specs.batteryUnitPriceUSD,
       weightKilos: specs.batteryWeightKilos,
-      dodPct: resolveBatteryDodPct(specs.batteryDOD),
-      efficiencyPct: resolveBatteryEfficiencyPct(specs.batteryEfficiencyPct),
+      dodPct: specs.batteryDOD, // vacío permitido: el motor aplica el default (shared/projectDefaults)
+      efficiencyPct: specs.batteryEfficiencyPct,
       lifespanYears: specs.batteryLifespanYears || 10,
       replacementCostUSD: specs.batteryReplacementCostUSD,
       selectedSupplierInfo: specs.selectedSupplierInfo?.battery

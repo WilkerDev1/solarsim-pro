@@ -19,7 +19,7 @@ const LIST_KEY: Record<EquipmentKind, ListKey> = { panel: 'panels', inverter: 'i
 const MIRROR: { [K in EquipmentKind]: Partial<Record<keyof GroupItem[K], keyof SystemSpecs>> } = {
   panel: { brandModel: 'panelBrandModel', powerW: 'panelPowerW', count: 'panelCount', unitPriceUSD: 'panelUnitPriceUSD', weightKilos: 'panelWeightKilos' },
   inverter: { brandModel: 'inverterBrandModel', powerKW: 'inverterPowerKW', count: 'inverterCount', unitPriceUSD: 'inverterUnitPriceUSD', weightKilos: 'inverterWeightKilos' },
-  battery: { brandModel: 'batteryBrandModel', capacityKWh: 'batteryCapacityKWh', count: 'batteryCount', unitPriceUSD: 'batteryUnitPriceUSD', weightKilos: 'batteryWeightKilos' },
+  battery: { brandModel: 'batteryBrandModel', capacityKWh: 'batteryCapacityKWh', dodPct: 'batteryDOD', efficiencyPct: 'batteryEfficiencyPct', count: 'batteryCount', unitPriceUSD: 'batteryUnitPriceUSD', weightKilos: 'batteryWeightKilos' },
 };
 const KINDS: EquipmentKind[] = ['panel', 'inverter', 'battery'];
 

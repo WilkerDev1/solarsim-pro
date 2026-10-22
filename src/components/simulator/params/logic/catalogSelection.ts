@@ -3,7 +3,7 @@ import type { SolarEquipmentItem } from '../../../../types/equipment';
 import { catalogPanelGroupPatch } from '../../../../utils/catalogGroupPatch';
 import { selectCatalogEquipment, type EquipmentKind } from '../../../../utils/equipmentGroups';
 import {
-  DEFAULT_BATTERY_CAPACITY_KWH, DEFAULT_BATTERY_DOD_PCT, DEFAULT_BATTERY_EFFICIENCY_PCT, DEFAULT_CATALOG_INVERTER_KW, DEFAULT_CATALOG_PANEL,
+  DEFAULT_BATTERY_CAPACITY_KWH, DEFAULT_CATALOG_INVERTER_KW, DEFAULT_CATALOG_PANEL, resolveBatteryDodPct, resolveBatteryEfficiencyPct,
 } from './dockDefaults';
 
 type SupplierInfo = NonNullable<SystemSpecs['selectedSupplierInfo']>;
@@ -38,11 +38,15 @@ const SELECTION: Record<
     mirror: (item) => ({
       batteryBrandModel: item.displayName,
       batteryCapacityKWh: item.capacityKWh || DEFAULT_BATTERY_CAPACITY_KWH,
-      batteryDOD: item.dodPct || DEFAULT_BATTERY_DOD_PCT,
-      batteryEfficiencyPct: item.batteryEfficiencyPct || DEFAULT_BATTERY_EFFICIENCY_PCT,
+      batteryDOD: resolveBatteryDodPct(item.dodPct),
+      batteryEfficiencyPct: resolveBatteryEfficiencyPct(item.batteryEfficiencyPct),
     }),
     priceField: 'batteryUnitPriceUSD',
-    group: (item) => ({ capacityKWh: item.capacityKWh || DEFAULT_BATTERY_CAPACITY_KWH, dodPct: item.dodPct || DEFAULT_BATTERY_DOD_PCT }),
+    group: (item) => ({
+      capacityKWh: item.capacityKWh || DEFAULT_BATTERY_CAPACITY_KWH,
+      dodPct: resolveBatteryDodPct(item.dodPct),
+      efficiencyPct: resolveBatteryEfficiencyPct(item.batteryEfficiencyPct),
+    }),
   },
 };
 
