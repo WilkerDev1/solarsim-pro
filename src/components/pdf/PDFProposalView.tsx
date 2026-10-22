@@ -8,6 +8,8 @@ import { confirmMissingAnnexes } from './annexes/confirmMissingAnnexes';
 import { PDFSectionId } from '../../constants/pdfSections';
 import { buildPdfLayout, normalizeSectionOrder } from '../../utils/pdfLayout';
 import { formatProposalDate } from '../../utils/formatDateUtils';
+import { DocumentEditorProvider } from './editor/DocumentEditorContext';
+import { canEditDocument, type DocumentEditorMode } from './editor/documentEditorState';
 
 // Modular Page Components
 import { PDFSidebarControls } from './controls/PDFSidebarControls';
@@ -39,7 +41,11 @@ export const PDFProposalView: React.FC = () => {
     sidebarTheme,
     openShareModal,
     restoreProject,
+    setDocumentTexts,
+    saveDocumentTextsToCompanyTemplate,
   } = useSimulationStore();
+  const currentUser = useSimulationStore((s) => s.syncSettings.currentUser);
+  const companies = useSimulationStore((s) => s.companies);
 
   const isDark = sidebarTheme === 'dark';
   const activeProjectId = useSimulationStore((s) => s.activeProjectId);
@@ -136,28 +142,37 @@ export const PDFProposalView: React.FC = () => {
     project.customization?.attachedPdfs || [],
   );
 
+  // Una propuesta en papelera, con conflicto o de un lector se ve pero no se edita.
+  const writable = canEditDocument({ project, user: currentUser });
+  const editing = isEditMode && writable;
+  const editorMode: DocumentEditorMode = isExporting ? 'export' : editing ? 'edit' : 'view';
+  const editorActions = useMemo(() => ({
+    setText: (key: string, value: string) => setDocumentTexts({ [key]: value }),
+    resetText: (key: string) => setDocumentTexts({ [key]: null }),
+    saveToTemplate: (key: string) => saveDocumentTextsToCompanyTemplate([key]).saved.length > 0,
+  }), [setDocumentTexts, saveDocumentTextsToCompanyTemplate]);
+
   const renderSection = (id: PDFSectionId) => {
     const page = { project, summary, activeTheme, showHeadersFooters, currentDateStr, pageNum: pageNumbers[id], totalPages: footerTotalPages };
-    const editable = { isEditMode, updateDocumentCustomization, updateDefaultDocumentCustomization };
     switch (id) {
       case 'cover':
-        return <PDFCoverPage key={id} project={project} summary={summary} activeTheme={activeTheme} currentDateStr={currentDateStr} isEditMode={isEditMode} updateClient={updateClient} />;
+        return <PDFCoverPage key={id} project={project} summary={summary} activeTheme={activeTheme} currentDateStr={currentDateStr} />;
       case 'tableOfContents':
         return <PDFTableOfContents key={id} {...page} tocItems={tocItems} />;
       case 'executiveSummary':
         return <PDFExecutiveSummaryPage key={id} {...page} />;
       case 'aboutUs':
-        return <PDFAboutUsPage key={id} {...page} {...editable} />;
+        return <PDFAboutUsPage key={id} {...page} />;
       case 'benefits':
-        return <PDFSolarBenefitsPage key={id} {...page} {...editable} />;
+        return <PDFSolarBenefitsPage key={id} {...page} />;
       case 'techIntro':
-        return <PDFTechnicalIntroPage key={id} {...page} {...editable} />;
+        return <PDFTechnicalIntroPage key={id} {...page} />;
       case 'projectDescription':
-        return <PDFProjectDescriptionPage key={id} {...page} {...editable} />;
+        return <PDFProjectDescriptionPage key={id} {...page} />;
       case 'energy':
-        return <PDFPage1Energy key={id} {...page} isEditMode={isEditMode} updateDocumentCustomization={updateDocumentCustomization} updateSpecs={updateSpecs} />;
+        return <PDFPage1Energy key={id} {...page} isEditMode={editing} updateDocumentCustomization={updateDocumentCustomization} updateSpecs={updateSpecs} />;
       case 'quotation':
-        return <PDFPage2Quotation key={id} {...page} {...editable} updateClient={updateClient} />;
+        return <PDFPage2Quotation key={id} {...page} />;
       case 'roi':
         return <PDFPage3ROI key={id} {...page} />;
       case 'cashFlow':
@@ -219,7 +234,7 @@ export const PDFProposalView: React.FC = () => {
         updateDefaultDocumentCustomization={updateDefaultDocumentCustomization}
         saveCurrentProjectAsDefaultDocumentTemplate={saveCurrentProjectAsDefaultDocumentTemplate}
         resetDefaultDocumentCustomization={resetDefaultDocumentCustomization}
-        isEditMode={isEditMode}
+        isEditMode={editing}
         setIsEditMode={setIsEditMode}
       />
 
@@ -257,7 +272,7 @@ export const PDFProposalView: React.FC = () => {
         )}
 
         {/* Live Edit Mode Floating Banner */}
-        {isEditMode && !project.isDeleted && (
+        {editing && (
           <div className="w-[850px] bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center justify-between gap-4 border border-blue-400/40 animate-in fade-in slide-in-from-top-2 sticky top-0 z-40">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-white shrink-0 shadow-xs">
@@ -271,7 +286,7 @@ export const PDFProposalView: React.FC = () => {
                   </span>
                 </h4>
                 <p className="text-[11px] text-blue-100 font-medium">
-                  Haz clic sobre cualquier párrafo o subtítulo para modificarlo. Usa <code className="bg-blue-900/60 px-1 py-0.5 rounded text-[10px] text-amber-200">**texto**</code> o <kbd className="bg-blue-900/60 px-1 py-0.5 rounded text-[10px] text-amber-200">Ctrl+B</kbd> para negritas, o <strong>Hacer Permanente</strong> para fijar plantillas futuras.
+                  Haz clic sobre cualquier texto para modificarlo. <kbd className="bg-blue-900/60 px-1 py-0.5 rounded text-[10px] text-amber-200">Ctrl+B</kbd> pone negrita, <kbd className="bg-blue-900/60 px-1 py-0.5 rounded text-[10px] text-amber-200">Esc</kbd> cancela y <strong>Guardar en plantilla</strong> lo usa en las próximas propuestas de la empresa.
                 </p>
               </div>
             </div>
@@ -287,9 +302,19 @@ export const PDFProposalView: React.FC = () => {
 
         <ProposalAnnexSync project={project} />
 
-        <div ref={pdfRef} className="flex flex-col gap-8 print:gap-0">
-          {effectiveSectionOrder.map((sectionId) => (sectionVisibility[sectionId] ? renderSection(sectionId) : null))}
-        </div>
+        <DocumentEditorProvider
+          project={project}
+          summary={summary}
+          currentDateStr={currentDateStr}
+          company={companies.find((company) => company.id === project.companyProfileId)}
+          mode={editorMode}
+          writable={writable}
+          actions={editorActions}
+        >
+          <div ref={pdfRef} className="flex flex-col gap-8 print:gap-0">
+            {effectiveSectionOrder.map((sectionId) => (sectionVisibility[sectionId] ? renderSection(sectionId) : null))}
+          </div>
+        </DocumentEditorProvider>
       </main>
     </div>
   );

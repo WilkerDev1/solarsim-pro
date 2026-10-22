@@ -9,7 +9,7 @@ import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocume
 import { Wrench, Activity, LineChart, Sparkles, Award, Shield, Users } from 'lucide-react';
 import { renderFormattedMarkdown } from '../../../utils/textFormatter';
 
-import { InlineEditableText } from '../common/InlineEditableText';
+import { EditableText } from '../editor/EditableText';
 
 interface PDFAboutUsPageProps {
   project: ProjectSimulation;
@@ -19,9 +19,6 @@ interface PDFAboutUsPageProps {
   currentDateStr: string;
   pageNum: number;
   totalPages: number;
-  isEditMode?: boolean;
-  updateDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
-  updateDefaultDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
 }
 
 export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
@@ -32,27 +29,7 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
   currentDateStr,
   pageNum,
   totalPages,
-  isEditMode = false,
-  updateDocumentCustomization,
-  updateDefaultDocumentCustomization,
 }) => {
-  const cust = project.customization || {};
-  const companyName = cust.companyName || DEFAULT_DOCUMENT_CUSTOMIZATION.companyName || 'ELECTSUN';
-  
-  // Clean intro text if it previously contained the transition paragraph
-  const transitionPhrase = 'Descubre cómo nuestros productos y servicios pueden ayudarte a aprovechar al máximo la energía del sol.';
-  let rawIntroText = cust.aboutUsIntroText !== undefined ? cust.aboutUsIntroText : (DEFAULT_DOCUMENT_CUSTOMIZATION.aboutUsIntroText || '');
-  if (rawIntroText.includes(transitionPhrase)) {
-    rawIntroText = rawIntroText.replace(transitionPhrase, '').trim();
-  }
-  const aboutUsIntroText = rawIntroText || `En ${companyName.toUpperCase()}, transformamos la energía solar en una solución inteligente, sostenible y accesible para todos. Creemos en un futuro más limpio y eficiente, y estamos aquí para hacerlo posible.`;
-
-  const aboutUsTransitionText = cust.aboutUsTransitionText !== undefined 
-    ? cust.aboutUsTransitionText 
-    : (DEFAULT_DOCUMENT_CUSTOMIZATION.aboutUsTransitionText || transitionPhrase);
-
-  const whyChooseUsText = cust.whyChooseUsText || DEFAULT_DOCUMENT_CUSTOMIZATION.whyChooseUsText || '';
-
   return (
     <PDFPageShell
       project={project}
@@ -80,19 +57,7 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
             1. ¿QUIÉNES SOMOS?
           </div>
           <div className="pt-0.5">
-            <InlineEditableText
-              value={cust.aboutUsIntroText}
-              defaultValue={aboutUsIntroText}
-              onSave={(val) => updateDocumentCustomization?.({ aboutUsIntroText: val })}
-              onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ aboutUsIntroText: val })}
-              isEditMode={isEditMode}
-              multiline={true}
-              label="Texto ¿Quiénes Somos?"
-              className="text-slate-700 text-[11.5px] leading-relaxed text-justify font-medium block whitespace-pre-line"
-              boldClassName="text-slate-950 font-bold"
-              isCustomized={!!cust.aboutUsIntroText}
-              onReset={() => updateDocumentCustomization?.({ aboutUsIntroText: '' })}
-            />
+            <EditableText k="aboutUs.intro" className="text-slate-700 text-[11.5px] leading-relaxed text-justify font-medium block whitespace-pre-line" boldClassName="text-slate-950 font-bold" />
           </div>
         </div>
 
@@ -209,19 +174,7 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
 
         {/* Bloque Inferior: Transición + 1.1 ¿Por Qué Elegirnos? */}
         <div className="space-y-2.5">
-          <InlineEditableText
-            value={cust.aboutUsTransitionText}
-            defaultValue={aboutUsTransitionText}
-            onSave={(val) => updateDocumentCustomization?.({ aboutUsTransitionText: val })}
-            onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ aboutUsTransitionText: val })}
-            isEditMode={isEditMode}
-            multiline={true}
-            label="Texto de Transición"
-            className="text-slate-700 text-[11.5px] leading-relaxed text-left font-medium block whitespace-pre-line"
-            boldClassName="text-slate-950 font-bold"
-            isCustomized={!!cust.aboutUsTransitionText}
-            onReset={() => updateDocumentCustomization?.({ aboutUsTransitionText: '' })}
-          />
+          <EditableText k="aboutUs.transition" className="text-slate-700 text-[11.5px] leading-relaxed text-left font-medium block whitespace-pre-line" boldClassName="text-slate-950 font-bold" />
 
           <div className="space-y-2">
             <div
@@ -234,19 +187,7 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
             >
               1.1 ¿POR QUÉ ELEGIRNOS?
             </div>
-            <InlineEditableText
-              value={cust.whyChooseUsText}
-              defaultValue={whyChooseUsText}
-              onSave={(val) => updateDocumentCustomization?.({ whyChooseUsText: val })}
-              onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ whyChooseUsText: val })}
-              isEditMode={isEditMode}
-              multiline={true}
-              label="Texto ¿Por Qué Elegirnos?"
-              className="text-slate-700 text-[11.5px] leading-relaxed font-medium block whitespace-pre-line pt-0.5"
-              boldClassName="text-slate-950 font-bold"
-              isCustomized={!!cust.whyChooseUsText}
-              onReset={() => updateDocumentCustomization?.({ whyChooseUsText: '' })}
-            />
+            <EditableText k="aboutUs.whyChooseUs" className="text-slate-700 text-[11.5px] leading-relaxed font-medium block whitespace-pre-line pt-0.5" boldClassName="text-slate-950 font-bold" />
 
             <div className="grid grid-cols-3 gap-3 pt-1">
               <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/90 space-y-1.5 shadow-xs">

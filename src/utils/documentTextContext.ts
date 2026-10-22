@@ -1,6 +1,9 @@
 import { cleanClientName } from '../../shared/proposalPresentation';
 import { createDocumentTextContext, type DocumentTextContext } from '../../shared/documentTexts';
 import type { CompanyProfile, FinancialSummaryResult, ProjectSimulation } from '../types';
+import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
+import { calculateProjectFinancialSummary } from '../engine/financeEngine';
+import { formatProposalDate } from './formatDateUtils';
 import {
   calculateTotalBatteryCapacityKWh,
   formatBatteriesSummary,
@@ -79,5 +82,18 @@ export function buildDocumentTextContext(
     batteryCapacityKWh: specs.batteryCapacityKWh || 0,
     batteriesSummaryText,
     batteryModelText: multiBatteries ? batteriesSummaryText : batteryModel,
+  });
+}
+
+/** Contexto para un proyecto del store (resumen financiero con el modo de cálculo efectivo). */
+export function documentTextContextFor(
+  state: { companies: CompanyProfile[]; activeProjectId: string; getFinancialSummary: () => FinancialSummaryResult },
+  project: ProjectSimulation,
+  calculationMode?: EnergyCalculationMode,
+): DocumentTextContext {
+  const summary = project.id === state.activeProjectId ? state.getFinancialSummary() : calculateProjectFinancialSummary(project, calculationMode);
+  return buildDocumentTextContext(project, summary, {
+    currentDateStr: formatProposalDate(project.client?.quoteDate || project.customization?.quoteDate),
+    company: state.companies.find((company) => company.id === project.companyProfileId),
   });
 }

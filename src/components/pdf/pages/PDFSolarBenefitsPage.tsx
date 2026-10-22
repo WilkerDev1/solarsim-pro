@@ -8,7 +8,7 @@ import { PDFWatermark } from '../PDFWatermark';
 import { PDF_BENEFITS_HOUSE_BASE64 } from '../../../assets/pdfGraphicAssets';
 import { Sun, DollarSign, Leaf, Globe2, ShieldCheck, CheckCircle2, TrendingUp, Zap } from 'lucide-react';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
-import { InlineEditableText } from '../common/InlineEditableText';
+import { EditableText } from '../editor/EditableText';
 
 interface PDFSolarBenefitsPageProps {
   project: ProjectSimulation;
@@ -18,9 +18,6 @@ interface PDFSolarBenefitsPageProps {
   currentDateStr: string;
   pageNum: number;
   totalPages: number;
-  isEditMode?: boolean;
-  updateDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
-  updateDefaultDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
 }
 
 export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
@@ -31,11 +28,7 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
   currentDateStr,
   pageNum,
   totalPages,
-  isEditMode = false,
-  updateDocumentCustomization,
-  updateDefaultDocumentCustomization,
 }) => {
-  const cust = project.customization || {};
   return (
     <PDFPageShell
       project={project}
@@ -136,19 +129,7 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
             2.1. OBJETIVOS E INCENTIVOS DE LA LEY 57-07 DE ENERGÍAS RENOVABLES
           </div>
 
-          <InlineEditableText
-            value={cust.ley5707ObjectivesIntroText}
-            defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.ley5707ObjectivesIntroText}
-            onSave={(val) => updateDocumentCustomization?.({ ley5707ObjectivesIntroText: val })}
-            onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ ley5707ObjectivesIntroText: val })}
-            isEditMode={isEditMode}
-            multiline={true}
-            label="Objetivos Ley 57-07 (Intro)"
-            className="text-slate-700 text-[11.5px] leading-relaxed font-medium block whitespace-pre-line"
-            boldClassName="text-slate-950 font-bold"
-            isCustomized={!!cust.ley5707ObjectivesIntroText}
-            onReset={() => updateDocumentCustomization?.({ ley5707ObjectivesIntroText: '' })}
-          />
+          <EditableText k="benefits.ley5707Intro" className="text-slate-700 text-[11.5px] leading-relaxed font-medium block whitespace-pre-line" boldClassName="text-slate-950 font-bold" />
 
           <div className="grid grid-cols-2 gap-3.5">
             <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/90 flex items-start gap-3 shadow-xs">

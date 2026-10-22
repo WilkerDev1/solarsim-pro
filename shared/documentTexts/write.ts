@@ -57,8 +57,11 @@ export function documentTextResetPatch(key: string, source: DocumentTextSource):
     return { client: { [definition.clientField]: definition.clientField === 'quoteValidityDays' ? 7 : '' } };
   }
   if (definition.legacyField) {
-    // Los datos de empresa/contacto distinguen «vacío» de «sin definir»: restablecer quita el campo.
-    return { customization: { [definition.legacyField]: definition.emptyIsValue ? undefined : '' } };
+    // Los datos de empresa/contacto distinguen «vacío» de «sin definir»: restablecer quita el campo
+    // (y vacía su espejo en `client`, que es el valor por defecto del texto).
+    const patch: DocumentTextPatch = { customization: { [definition.legacyField]: definition.emptyIsValue ? undefined : '' } };
+    if (definition.mirrorsClientField) patch.client = { [definition.mirrorsClientField]: '' };
+    return patch;
   }
   const { [key]: _removed, ...texts } = source.customization?.texts || {};
   return { customization: { texts } };

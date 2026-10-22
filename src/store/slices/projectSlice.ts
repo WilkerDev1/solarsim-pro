@@ -15,6 +15,8 @@ import { calculateFinancialSummary, calculateCostMatrixSummary } from '../../eng
 import { calculateRecommendedPanelCount } from '../../engine/solarEngine';
 import { projectMutationMetadata } from '../sync/projectMutation';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
+import { applyDocumentTextPatch, companyTemplateTextPatch, documentTextsPatch } from '../../../shared/documentTexts';
+import { documentTextContextFor } from '../../utils/documentTextContext';
 
 /** Specs with the panel count the engine recommends for this consumption, province and coverage target. */
 function withRecommendedPanels(specs: SystemSpecs, client: ClientInfo, monthlyConsumption: number[], targetCoveragePct: number): SystemSpecs {
@@ -551,6 +553,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     const customization = { ...(p.customization || {}) };
     if (clientPartial.contactPhone !== undefined) customization.clientPhone = clientPartial.contactPhone;
     if (clientPartial.contactPerson !== undefined) customization.contactName = clientPartial.contactPerson;
+    if (clientPartial.contactEmail !== undefined) customization.clientEmail = clientPartial.contactEmail;
     const specs = p.specs.autoCalculatePanels && clientPartial.province
       ? withRecommendedPanels(p.specs, client, p.monthlyConsumption, p.rates.targetCoveragePct ?? 95)
       : { ...p.specs };
@@ -615,34 +618,42 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
   setMonthlyConsumption: (monthlyConsumption, lockAutoPanels = false) =>
     updateActiveConsumption(() => monthlyConsumption.map((v) => Math.max(0, v)), lockAutoPanels),
 
-  updateDocumentCustomization: (customizationPartial) => {
-    if (isActiveProjectTrashed()) return;
-    set((state) => {
-      const targetId = state.activeProjectId || state.getActiveProject()?.id;
-      return {
-        projects: state.projects.map((p) => {
-          if (p.id === targetId) {
-            const updatedClient = { ...p.client };
-            if (customizationPartial.clientPhone !== undefined) {
-              updatedClient.contactPhone = customizationPartial.clientPhone;
-            }
-            if (customizationPartial.contactName !== undefined) {
-              updatedClient.contactPerson = customizationPartial.contactName;
-            }
-            return {
-              ...p,
-              ...projectMutationMetadata(p, get().syncSettings),
-              updatedAt: new Date().toISOString(),
-              client: updatedClient,
-              customization: { ...(p.customization || {}), ...customizationPartial },
-            };
-          }
-          return p;
-        }),
-      };
-    });
+  updateDocumentCustomization: (customizationPartial) => updateActiveProject((p) => {
+    // Contacto, teléfono y correo del documento son espejo de los datos del cliente.
+    const client = { ...p.client };
+    if (customizationPartial.clientPhone !== undefined) client.contactPhone = customizationPartial.clientPhone;
+    if (customizationPartial.contactName !== undefined) client.contactPerson = customizationPartial.contactName;
+    if (customizationPartial.clientEmail !== undefined) client.contactEmail = customizationPartial.clientEmail;
+    return { client, customization: { ...(p.customization || {}), ...customizationPartial } };
+  }),
 
-    get().triggerAutoSync(false);
+  setDocumentTexts: (values) => updateActiveProject((p, state) => {
+    const ctx = documentTextContextFor(state, p, energyCalculationMode(effectiveFeatureSettings(state)));
+    const patch = documentTextsPatch(values, p, ctx);
+    const next = applyDocumentTextPatch({ customization: p.customization || {}, client: p.client }, patch);
+    return { customization: next.customization, client: next.client };
+  }),
+
+  saveDocumentTextsToCompanyTemplate: (keys) => {
+    const state = get();
+    const active = state.getActiveProject();
+    const companyId = active?.companyProfileId || (state.companies.length === 1 ? state.companies[0].id : undefined);
+    const company = state.companies.find((item) => item.id === companyId);
+    if (!active || !company) {
+      set({ saveFeedbackMessage: 'Selecciona la empresa emisora de esta propuesta antes de guardar su plantilla.' });
+      return { saved: [], skipped: keys === 'all' ? [] : [...keys] };
+    }
+    const template = state.documentTemplatesByCompany[company.id] || reusableDocumentTemplate(companyDocumentCustomization(company, state.defaultDocumentCustomization, state.documentTemplatesByCompany));
+    const ctx = documentTextContextFor(state, active, energyCalculationMode(effectiveFeatureSettings(state)));
+    const { patch, saved, skipped } = companyTemplateTextPatch(keys, active, ctx, template);
+    if (!saved.length) return { saved, skipped };
+    set((current) => ({
+      defaultDocumentCustomization: { ...(current.defaultDocumentCustomization || DEFAULT_DOCUMENT_CUSTOMIZATION), ...patch },
+      documentTemplatesByCompany: { ...current.documentTemplatesByCompany, [company.id]: { ...template, ...patch } },
+      saveFeedbackMessage: saved.length === 1 ? 'Texto guardado en la plantilla de la empresa 📑' : `${saved.length} textos guardados en la plantilla de la empresa 📑`,
+    }));
+    setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
+    return { saved, skipped };
   },
 
   applySupplierPriceToProject: (equipmentType, supplierPrice, equipmentItem) => {

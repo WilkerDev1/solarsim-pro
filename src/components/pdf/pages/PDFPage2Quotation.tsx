@@ -1,14 +1,13 @@
 import { PDFPageShell } from '../PDFPageShell';
-import { cleanClientName, getTariffDisplayName } from '../../../../shared/proposalPresentation';
+import { getTariffDisplayName } from '../../../../shared/proposalPresentation';
 import React from 'react';
 import { ShieldCheck, CheckCircle2, Check } from 'lucide-react';
-import { ProjectSimulation, FinancialSummaryResult, DocumentCustomization, ClientInfo } from '../../../types';
+import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
 import { PDFHeaderBanner } from '../PDFHeaderBanner';
 import { PDFFooter } from '../PDFFooter';
 import { PDFWatermark } from '../PDFWatermark';
-import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
-import { InlineEditableText } from '../common/InlineEditableText';
+import { EditableText } from '../editor/EditableText';
 import { getProjectPanels, getProjectInverters, getProjectBatteries } from '../../../utils/equipmentSpecsUtils';
 
 interface PDFPage2QuotationProps {
@@ -19,10 +18,6 @@ interface PDFPage2QuotationProps {
   currentDateStr: string;
   pageNum: number;
   totalPages: number;
-  isEditMode?: boolean;
-  updateDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
-  updateDefaultDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
-  updateClient?: (client: Partial<ClientInfo>) => void;
 }
 
 const cleanInstallationDesc = (desc?: string): string => {
@@ -43,35 +38,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
   currentDateStr,
   pageNum,
   totalPages,
-  isEditMode = false,
-  updateDocumentCustomization,
-  updateDefaultDocumentCustomization,
-  updateClient,
 }) => {
-  const cust = project.customization || {};
-
-  const clientDisplayName = cleanClientName(project.client.name || 'Cliente');
-  const contactName = cust.contactName !== undefined 
-    ? cust.contactName 
-    : (project.client.contactPerson || project.client.company || clientDisplayName || '');
-  const rawClientPhone = cust.clientPhone !== undefined 
-    ? cust.clientPhone 
-    : (project.client.contactPhone || '');
-  const clientPhone = (rawClientPhone.includes('555-0199') || rawClientPhone.includes('5550199') || rawClientPhone === '+1 (809) 000-0000') 
-    ? '' 
-    : rawClientPhone;
-  const defaultValidityNote = `* Equipos según disponibilidad de inventario | * Propuesta válida por ${project.client.quoteValidityDays || 7} días | * Precios en USD *`;
-
-  // Dynamic services included
-  const servicesText = cust.servicesIncludedText !== undefined && cust.servicesIncludedText !== ''
-    ? cust.servicesIncludedText
-    : DEFAULT_DOCUMENT_CUSTOMIZATION.servicesIncludedText || 'Permisos y Tramitación ante CNE y Distribuidora, Medición Neta, Planos Eléctricos, Instalación Certificada y Puesta en Marcha.';
-
-  const serviceItems = servicesText
-    .split(/[,;\n]/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-
   const customItems = project.financials.customItems || [];
 
   return (
@@ -103,123 +70,33 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
             <div className="space-y-0.5">
               <div className="flex items-center gap-1.5 leading-snug">
                 <span className="font-bold text-slate-600 shrink-0">Cliente:</span>{' '}
-                <InlineEditableText
-                  value={project.client.name}
-                  defaultValue="Cliente"
-                  onSave={(val) => updateClient?.({ name: val })}
-                  isEditMode={isEditMode}
-                  multiline={false}
-                  label="Nombre del Cliente"
-                  placeholder="Nombre del cliente"
-                  className="font-bold text-slate-900 inline-block"
-                  boldClassName="font-bold text-slate-950"
-                />
+                <EditableText k="client.name" className="font-bold text-slate-900 inline-block" boldClassName="font-bold text-slate-950" placeholder="Nombre del cliente" />
               </div>
               <div className="flex items-center gap-1.5 leading-snug">
                 <span className="font-bold text-slate-600 shrink-0">Contacto:</span>{' '}
-                <InlineEditableText
-                  value={contactName}
-                  defaultValue=""
-                  onSave={(val) => {
-                    updateDocumentCustomization?.({ contactName: val });
-                    updateClient?.({ contactPerson: val });
-                  }}
-                  onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ contactName: val })}
-                  isEditMode={isEditMode}
-                  multiline={false}
-                  label="Contacto (Atención a)"
-                  placeholder="(Agregar contacto)"
-                  className="font-medium inline-block text-slate-800"
-                  boldClassName="font-bold text-slate-950"
-                  isCustomized={!!cust.contactName}
-                  onReset={() => {
-                    updateDocumentCustomization?.({ contactName: '' });
-                    updateClient?.({ contactPerson: '' });
-                  }}
-                />
+                <EditableText k="client.contact" className="font-medium inline-block text-slate-800" boldClassName="font-bold text-slate-950" placeholder="(Agregar contacto)" />
               </div>
               <div className="flex items-center gap-1.5 leading-snug">
                 <span className="font-bold text-slate-600 shrink-0">Teléfono:</span>{' '}
-                <InlineEditableText
-                  value={clientPhone}
-                  defaultValue=""
-                  onSave={(val) => {
-                    updateDocumentCustomization?.({ clientPhone: val });
-                    updateClient?.({ contactPhone: val });
-                  }}
-                  isEditMode={isEditMode}
-                  multiline={false}
-                  label="Teléfono del Cliente"
-                  placeholder="(Agregar teléfono)"
-                  className="font-medium inline-block text-slate-800"
-                  boldClassName="font-bold text-slate-950"
-                  isCustomized={!!cust.clientPhone}
-                  onReset={() => {
-                    updateDocumentCustomization?.({ clientPhone: '' });
-                    updateClient?.({ contactPhone: '' });
-                  }}
-                />
+                <EditableText k="client.phone" className="font-medium inline-block text-slate-800" boldClassName="font-bold text-slate-950" placeholder="(Agregar teléfono)" />
               </div>
               <div className="flex items-center gap-1.5 leading-snug">
                 <span className="font-bold text-slate-600 shrink-0">Dirección:</span>{' '}
-                <InlineEditableText
-                  value={project.client.address || ''}
-                  defaultValue={`${project.client.province || project.client.location || 'Santo Domingo'}, República Dominicana`}
-                  onSave={(val) => updateClient?.({ address: val })}
-                  isEditMode={isEditMode}
-                  multiline={false}
-                  label="Dirección del Cliente"
-                  placeholder="Dirección del cliente"
-                  className="font-medium inline-block text-slate-800"
-                  boldClassName="font-bold text-slate-950"
-                />
+                <EditableText k="client.address" className="font-medium inline-block text-slate-800" boldClassName="font-bold text-slate-950" />
               </div>
             </div>
             <div className="space-y-0.5 text-right">
               <div className="flex items-center justify-end gap-1.5 leading-snug">
                 <span className="font-bold text-slate-600 shrink-0">N° Cotización:</span>{' '}
-                <InlineEditableText
-                  value={project.client.quoteNumber || 'C-0001'}
-                  defaultValue="C-0001"
-                  onSave={(val) => updateClient?.({ quoteNumber: val })}
-                  isEditMode={isEditMode}
-                  multiline={false}
-                  label="N° Cotización"
-                  placeholder="C-0001"
-                  className="font-bold font-mono text-slate-900 inline-block"
-                  boldClassName="font-bold font-mono text-slate-950"
-                />
+                <EditableText k="quote.number" className="font-bold font-mono text-slate-900 inline-block" boldClassName="font-bold font-mono text-slate-950" />
               </div>
               <div className="flex items-center justify-end gap-1.5 leading-snug">
                 <span className="font-bold text-slate-600 shrink-0">Fecha:</span>{' '}
-                <InlineEditableText
-                  value={project.client.quoteDate || currentDateStr}
-                  defaultValue={currentDateStr}
-                  onSave={(val) => updateClient?.({ quoteDate: val })}
-                  isEditMode={isEditMode}
-                  multiline={false}
-                  label="Fecha de Cotización"
-                  placeholder="DD/MM/AAAA o YYYY-MM-DD"
-                  className="font-semibold text-slate-800 inline-block"
-                  boldClassName="font-semibold text-slate-900"
-                />
+                <EditableText k="quote.date" className="font-semibold text-slate-800 inline-block" boldClassName="font-semibold text-slate-900" />
               </div>
               <div className="flex items-center justify-end gap-1.5 leading-snug">
                 <span className="font-bold text-slate-600 shrink-0">Válido por:</span>{' '}
-                <InlineEditableText
-                  value={project.client.quoteValidityDays ? `${project.client.quoteValidityDays} Días` : '7 Días'}
-                  defaultValue="7 Días"
-                  onSave={(val) => {
-                    const num = parseInt(val.replace(/\D/g, ''), 10);
-                    updateClient?.({ quoteValidityDays: isNaN(num) ? 7 : num });
-                  }}
-                  isEditMode={isEditMode}
-                  multiline={false}
-                  label="Días de Validez"
-                  placeholder="7 Días"
-                  className="font-bold text-slate-900 inline-block"
-                  boldClassName="font-bold text-slate-950"
-                />
+                <EditableText k="quote.validityDays" className="font-bold text-slate-900 inline-block">{(days) => `${days} Días`}</EditableText>
               </div>
             </div>
           </div>
@@ -459,69 +336,21 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
             </h4>
             <div className="flex items-center gap-1 leading-snug">
               <span className="font-bold text-slate-800 shrink-0">• Paneles Solares:</span>
-              <InlineEditableText
-                value={cust.panelWarrantyText}
-                defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.panelWarrantyText || '25 Años de Producción Lineal'}
-                onSave={(val) => updateDocumentCustomization?.({ panelWarrantyText: val })}
-                onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ panelWarrantyText: val })}
-                isEditMode={isEditMode}
-                multiline={false}
-                label="Garantía Paneles"
-                className="font-medium inline-block"
-                boldClassName="font-bold text-slate-950"
-                isCustomized={!!cust.panelWarrantyText}
-                onReset={() => updateDocumentCustomization?.({ panelWarrantyText: '' })}
-              />
+              <EditableText k="quotation.warranty.panel" className="font-medium inline-block" boldClassName="font-bold text-slate-950" />
             </div>
             <div className="flex items-center gap-1 leading-snug">
               <span className="font-bold text-slate-800 shrink-0">• Inversor:</span>
-              <InlineEditableText
-                value={cust.inverterWarrantyText}
-                defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.inverterWarrantyText || '5 a 10 Años de Fábrica'}
-                onSave={(val) => updateDocumentCustomization?.({ inverterWarrantyText: val })}
-                onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ inverterWarrantyText: val })}
-                isEditMode={isEditMode}
-                multiline={false}
-                label="Garantía Inversor"
-                className="font-medium inline-block"
-                boldClassName="font-bold text-slate-950"
-                isCustomized={!!cust.inverterWarrantyText}
-                onReset={() => updateDocumentCustomization?.({ inverterWarrantyText: '' })}
-              />
+              <EditableText k="quotation.warranty.inverter" className="font-medium inline-block" boldClassName="font-bold text-slate-950" />
             </div>
             {project.specs.hasBattery && (
               <div className="flex items-center gap-1 leading-snug">
                 <span className="font-bold text-slate-800 shrink-0">• Batería:</span>
-                <InlineEditableText
-                  value={cust.batteryWarrantyText}
-                  defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.batteryWarrantyText || '5 a 10 Años (según fabricante)'}
-                  onSave={(val) => updateDocumentCustomization?.({ batteryWarrantyText: val })}
-                  onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ batteryWarrantyText: val })}
-                  isEditMode={isEditMode}
-                  multiline={false}
-                  label="Garantía Batería"
-                  className="font-medium inline-block"
-                  boldClassName="font-bold text-slate-950"
-                  isCustomized={!!cust.batteryWarrantyText}
-                  onReset={() => updateDocumentCustomization?.({ batteryWarrantyText: '' })}
-                />
+                <EditableText k="quotation.warranty.battery" className="font-medium inline-block" boldClassName="font-bold text-slate-950" />
               </div>
             )}
             <div className="flex items-center gap-1 leading-snug">
               <span className="font-bold text-slate-800 shrink-0">• Mano de Obra y Soporte:</span>
-              <InlineEditableText
-                value={cust.workmanshipWarrantyText}
-                defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.workmanshipWarrantyText || '1 Año en Instalación y Soporte Técnico'}
-                onSave={(val) => updateDocumentCustomization?.({ workmanshipWarrantyText: val })}
-                onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ workmanshipWarrantyText: val })}
-                isEditMode={isEditMode}
-                multiline={false}
-                label="Garantía Mano de Obra"
-                className="font-medium inline-block"
-                boldClassName="font-bold text-slate-950"
-                isCustomized={!!cust.workmanshipWarrantyText}
-                onReset={() => updateDocumentCustomization?.({ workmanshipWarrantyText: '' })}
-              />
+              <EditableText k="quotation.warranty.workmanship" className="font-medium inline-block" boldClassName="font-bold text-slate-950" />
             </div>
           </div>
 
@@ -533,48 +362,24 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
             >
               <CheckCircle2 className="w-3.5 h-3.5" style={{ color: activeTheme.primary }} /> NOS ENCARGAMOS DE GESTIONAR
             </h4>
-            {serviceItems.length > 0 ? (
-              <div className="space-y-0.5">
-                {serviceItems.map((item, idx) => (
+            <EditableText k="quotation.servicesIncluded" as="div" className="space-y-0.5 block">
+              {(text) => text
+                .split(/[,;\n]/)
+                .map((item) => item.replace(/^\s*[-•]\s*/, '').replace(/\*/g, '').trim())
+                .filter(Boolean)
+                .map((item, idx) => (
                   <div key={idx} className="flex items-start gap-1.5 leading-snug">
                     <Check className="w-3 h-3 text-emerald-600 shrink-0 mt-0.5" />
                     <span className="font-medium text-slate-700">{item}</span>
                   </div>
                 ))}
-              </div>
-            ) : (
-              <InlineEditableText
-                value={cust.servicesIncludedText}
-                defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.servicesIncludedText}
-                onSave={(val) => updateDocumentCustomization?.({ servicesIncludedText: val })}
-                onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ servicesIncludedText: val })}
-                isEditMode={isEditMode}
-                multiline={true}
-                label="Servicios Gestionados"
-                className="text-[10px] leading-snug block"
-                boldClassName="font-bold text-slate-950"
-                isCustomized={!!cust.servicesIncludedText}
-                onReset={() => updateDocumentCustomization?.({ servicesIncludedText: '' })}
-              />
-            )}
+            </EditableText>
           </div>
         </div>
 
         {/* 7. NOTA LEGAL */}
         <div className="text-center text-[9px] text-slate-500 font-semibold italic pt-0.5">
-          <InlineEditableText
-            value={cust.validityNote}
-            defaultValue={defaultValidityNote}
-            onSave={(val) => updateDocumentCustomization?.({ validityNote: val })}
-            onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ validityNote: val })}
-            isEditMode={isEditMode}
-            multiline={false}
-            label="Nota Legal y Términos"
-            className="text-center text-[9px] text-slate-500 font-semibold italic block"
-            boldClassName="font-bold text-slate-700"
-            isCustomized={!!cust.validityNote}
-            onReset={() => updateDocumentCustomization?.({ validityNote: '' })}
-          />
+          <EditableText k="quotation.validityNote" className="text-center text-[9px] text-slate-500 font-semibold italic block" boldClassName="font-bold text-slate-700" />
         </div>
       </div>
     </PDFPageShell>
