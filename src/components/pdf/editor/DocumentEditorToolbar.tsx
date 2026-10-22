@@ -71,7 +71,8 @@ export const DocumentEditorToolbar: React.FC<DocumentEditorToolbarProps> = ({ is
         type="button"
         onMouseDown={keep}
         onClick={() => {
-          if (isEditMode) closeEditor();
+          // Al terminar de editar se guarda lo escrito; descartar es solo para cancelar, restablecer y el historial.
+          if (isEditMode) editor.editorRef.current?.commit();
           setIsEditMode(!isEditMode);
         }}
         className={`h-7 px-2.5 rounded-lg flex items-center gap-1.5 text-[11px] font-black cursor-pointer transition-colors ${isEditMode ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-200 hover:bg-slate-200'}`}

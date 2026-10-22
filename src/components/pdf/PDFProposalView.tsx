@@ -148,7 +148,9 @@ export const PDFProposalView: React.FC = () => {
   const writable = canEditDocument({ project, user: currentUser });
   const readOnlyReason = writable
     ? null
-    : project.syncStatus === 'conflict'
+    : project.isDeleted
+      ? 'Propuesta en papelera: solo lectura. Restáurala para editar el documento.'
+      : project.syncStatus === 'conflict'
       ? 'Esta propuesta tiene un conflicto de sincronización: resuélvelo antes de editar el documento.'
       : 'Tu cuenta solo puede consultar esta propuesta.';
   const editing = isEditMode && writable;
@@ -289,7 +291,7 @@ export const PDFProposalView: React.FC = () => {
           writable={writable}
           actions={editorActions}
         >
-          <DocumentEditorToolbar isEditMode={editing} setIsEditMode={setIsEditMode} readOnlyReason={project.isDeleted ? null : readOnlyReason} />
+          <DocumentEditorToolbar isEditMode={editing} setIsEditMode={setIsEditMode} readOnlyReason={readOnlyReason} />
           <div ref={pdfRef} className="flex flex-col gap-8 print:gap-0">
             {effectiveSectionOrder.map((sectionId) => (sectionVisibility[sectionId] ? renderSection(sectionId) : null))}
           </div>
