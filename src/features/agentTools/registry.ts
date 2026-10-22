@@ -12,11 +12,12 @@ import type { AgentToolContext, NativeHandler, NativePlan } from './nativeTools'
 import { PROPOSAL_TOOL_HANDLERS } from './proposalTools';
 import { CATALOG_TOOL_HANDLERS } from './catalogTools';
 import { DOCUMENT_TOOL_HANDLERS } from './documentTools';
+import { ATTACHMENT_TOOL_HANDLERS } from './attachmentTools';
 import { assistantFieldLabel, assistantValueLabel } from '../assistant/labels';
 import type { AssistantAction, AssistantCard, AssistantToolResult } from '../assistant/types';
 
 export type { AgentToolContext } from './nativeTools';
-const NATIVE_HANDLERS: Record<string, NativeHandler> = { ...PROPOSAL_TOOL_HANDLERS, ...CATALOG_TOOL_HANDLERS, ...DOCUMENT_TOOL_HANDLERS };
+const NATIVE_HANDLERS: Record<string, NativeHandler> = { ...PROPOSAL_TOOL_HANDLERS, ...CATALOG_TOOL_HANDLERS, ...DOCUMENT_TOOL_HANDLERS, ...ATTACHMENT_TOOL_HANDLERS };
 
 const MAX_RESULT_BYTES = 64000;
 const PROJECT_SECTIONS = ['client', 'specs', 'rates', 'financials', 'monthlyConsumption', 'customization'] as const;
@@ -218,10 +219,13 @@ async function executeNative(handler: NativeHandler, definition: AgentToolDefini
   if (ctx.owner !== assistantOwner()) return { status: 'error', code: 'stale_owner', message: 'El espacio o la sesión cambió.' };
   let result;
   try {
-    result = handler(args, ctx);
+    result = await handler(args, ctx);
   } catch (error) {
     return { status: 'error', code: 'tool_failed', message: error instanceof Error ? error.message : 'Herramienta no disponible.' };
   }
+  // Preparation may have awaited (e.g. counting PDF pages): the request could be cancelled or the session changed meanwhile.
+  if (ctx.signal?.aborted) return { status: 'error', code: 'cancelled', message: 'Solicitud cancelada.' };
+  if (ctx.owner !== assistantOwner()) return { status: 'error', code: 'stale_owner', message: 'El espacio o la sesión cambió.' };
   if (JSON.stringify(result.data ?? null).length > MAX_RESULT_BYTES)
     return { status: 'error', code: 'result_too_large', message: 'Resultado demasiado grande. Usa filtros más concretos.' };
   if (!result.plan) return { status: 'ok', data: result.data, cards: result.cards };
