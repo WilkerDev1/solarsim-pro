@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { DocumentEditorProvider } from '../components/pdf/editor/DocumentEditorContext';
@@ -103,6 +104,9 @@ assert.equal(canEditDocument({ project: { ...writable, syncStatus: 'conflict' },
   for (const key of ['client.name', 'client.contact', 'client.phone', 'client.address', 'quote.number', 'quote.date', 'quote.validityDays', 'quotation.warranty.panel', 'quotation.servicesIncluded', 'quotation.validityNote']) {
     assert.ok(quotation.includes(`data-doc-text="${key}"`), key);
   }
+  // A key rendered twice (cover + quotation date) keeps one editor: the active instance is tracked apart from the key.
+  assert.equal((quotation.match(/data-doc-text="quote.date"/g) || []).length, 1);
+  assert.ok(readFileSync('src/components/pdf/editor/EditableText.tsx', 'utf8').includes('editor.activeInstance === instance'));
   // Without a provider (tests, standalone renders) the pages fall back to read-only texts.
   assert.ok(!renderToStaticMarkup(description).includes('data-pdf-chrome'));
 }

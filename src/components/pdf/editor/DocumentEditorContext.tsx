@@ -19,7 +19,9 @@ export interface DocumentEditorValue extends DocumentEditorActions {
   canEdit: boolean;
   resolve: (key: string) => ResolvedDocumentText;
   activeKey: string | null;
-  setActiveKey: (key: string | null) => void;
+  /** Instancia concreta en edición (un mismo texto puede aparecer en varias páginas). */
+  activeInstance: string | null;
+  setActiveKey: (key: string | null, instance?: string) => void;
 }
 
 const DocumentEditorReactContext = createContext<DocumentEditorValue | null>(null);
@@ -40,7 +42,8 @@ interface ProviderProps {
 
 /** Fuente única de los textos del documento para todas las páginas de la propuesta. */
 export const DocumentEditorProvider: React.FC<ProviderProps> = ({ project, summary, currentDateStr, company, mode = 'view', writable = false, actions = NO_ACTIONS, children }) => {
-  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const [active, setActive] = useState<{ key: string; instance: string | null } | null>(null);
+  const setActiveKey = useCallback((key: string | null, instance?: string) => setActive(key ? { key, instance: instance ?? null } : null), []);
   const ctx = useMemo(
     () => buildDocumentTextContext(project, summary, { currentDateStr, company }),
     [project, summary, currentDateStr, company],
@@ -48,8 +51,8 @@ export const DocumentEditorProvider: React.FC<ProviderProps> = ({ project, summa
   const resolve = useCallback((key: string) => resolveDocumentText(key, project, ctx), [project, ctx]);
   const canEdit = mode === 'edit' && writable;
   const value = useMemo<DocumentEditorValue>(
-    () => ({ project, ctx, mode, canEdit, resolve, activeKey: canEdit ? activeKey : null, setActiveKey, ...actions }),
-    [project, ctx, mode, canEdit, resolve, activeKey, actions],
+    () => ({ project, ctx, mode, canEdit, resolve, activeKey: canEdit ? active?.key ?? null : null, activeInstance: canEdit ? active?.instance ?? null : null, setActiveKey, ...actions }),
+    [project, ctx, mode, canEdit, resolve, active, setActiveKey, actions],
   );
   return <DocumentEditorReactContext.Provider value={value}>{children}</DocumentEditorReactContext.Provider>;
 };

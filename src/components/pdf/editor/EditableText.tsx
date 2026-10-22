@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { Pencil } from 'lucide-react';
 import { getDocumentTextDefinition } from '../../../../shared/documentTexts';
 import { useDocumentEditor } from './DocumentEditorContext';
@@ -23,6 +23,7 @@ interface EditableTextProps {
 /** Un texto del documento: se muestra resuelto y, en modo edición, se edita en su sitio. */
 export const EditableText: React.FC<EditableTextProps> = ({ k, as = 'span', className = '', style, boldClassName, boldStyle, placeholder = 'Escribe aquí...', children }) => {
   const editor = useDocumentEditor();
+  const instance = useId();
   const definition = getDocumentTextDefinition(k);
   if (!definition) throw new Error(`Texto del documento desconocido: ${k}`);
   const resolved = editor.resolve(k);
@@ -33,7 +34,7 @@ export const EditableText: React.FC<EditableTextProps> = ({ k, as = 'span', clas
     return <Tag className={className} style={style} data-doc-text={k}>{content}</Tag>;
   }
 
-  if (editor.activeKey === k) {
+  if (editor.activeKey === k && editor.activeInstance === instance) {
     return (
       <InlineTextEditor
         definition={definition}
@@ -66,11 +67,11 @@ export const EditableText: React.FC<EditableTextProps> = ({ k, as = 'span', clas
       role="button"
       tabIndex={0}
       title={`Editar: ${definition.label}`}
-      onClick={() => editor.setActiveKey(k)}
+      onClick={() => editor.setActiveKey(k, instance)}
       onKeyDown={(event: React.KeyboardEvent) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
-          editor.setActiveKey(k);
+          editor.setActiveKey(k, instance);
         }
       }}
     >
