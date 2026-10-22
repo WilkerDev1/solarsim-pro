@@ -1,6 +1,6 @@
 import React, { useRef, useState, useMemo } from 'react';
+import { flushSync } from 'react-dom';
 import { useSimulationStore } from '../../store/useSimulationStore';
-import { PDFColorTheme, PDF_COLOR_THEMES } from '../../constants/pdfThemes';
 import { resolveProposalAttachmentBytes } from '../../services/proposalAttachmentResolver';
 import { exportProposalPdf } from './export/exportProposalPdf';
 import { ProposalAnnexSync } from './annexes/ProposalAnnexSync';
@@ -8,6 +8,10 @@ import { confirmMissingAnnexes } from './annexes/confirmMissingAnnexes';
 import { PDFSectionId } from '../../constants/pdfSections';
 import { buildPdfLayout, normalizeSectionOrder } from '../../utils/pdfLayout';
 import { formatProposalDate } from '../../utils/formatDateUtils';
+import { DocumentEditorProvider } from './editor/DocumentEditorContext';
+import { DocumentEditorToolbar } from './editor/DocumentEditorToolbar';
+import { useDocumentLayout } from './useDocumentLayout';
+import { canEditDocument, type DocumentEditorMode } from './editor/documentEditorState';
 
 // Modular Page Components
 import { PDFSidebarControls } from './controls/PDFSidebarControls';
@@ -30,16 +34,18 @@ export const PDFProposalView: React.FC = () => {
   const {
     getActiveProject,
     getFinancialSummary,
-    updateClient,
     updateSpecs,
     updateDocumentCustomization,
-    updateDefaultDocumentCustomization,
     saveCurrentProjectAsDefaultDocumentTemplate,
     resetDefaultDocumentCustomization,
     sidebarTheme,
     openShareModal,
     restoreProject,
+    setDocumentTexts,
+    saveDocumentTextsToCompanyTemplate,
   } = useSimulationStore();
+  const currentUser = useSimulationStore((s) => s.syncSettings.currentUser);
+  const companies = useSimulationStore((s) => s.companies);
 
   const isDark = sidebarTheme === 'dark';
   const activeProjectId = useSimulationStore((s) => s.activeProjectId);
@@ -50,29 +56,14 @@ export const PDFProposalView: React.FC = () => {
   const summary = getFinancialSummary();
   const pdfRef = useRef<HTMLDivElement>(null);
 
-  // Document Toggles (Intro & Presentation)
-  const [showCover, setShowCover] = useState(true); // Portada Ejecutiva
-  const [showTableOfContents, setShowTableOfContents] = useState(true); // Índice de Contenido
-  const [showExecutiveSummary, setShowExecutiveSummary] = useState(true); // Cuadro Resumen Ejecutivo
-  const [showAboutUs, setShowAboutUs] = useState(true); // 1. ¿Quiénes Somos? & Servicios
-  const [showBenefits, setShowBenefits] = useState(true); // 2. Beneficios Solares & Ley 57-07
-  const [showTechIntro, setShowTechIntro] = useState(true); // 3. ¿Qué es FV? & Flujo Técnico
-  const [showProjectDescription, setShowProjectDescription] = useState(true); // 4. Resumen & Normativa SIE
-
-  // Document Toggles (Core Technical & Financial)
-  const [showPage1, setShowPage1] = useState(true); // 5. Análisis de Energía y Balance
-  const [showPageQuotation, setShowPageQuotation] = useState(true); // 6. Cotización de Sistema Fotovoltaico
-  const [showPage2, setShowPage2] = useState(true); // 7. Retorno de Inversión y Métricas
-  const [showPage3, setShowPage3] = useState(true); // 8. Flujo de Caja 25 Años
-  const [showPageCostMatrix, setShowPageCostMatrix] = useState(false); // 9. Costos Internos (Confidencial)
-  const [showHeadersFooters, setShowHeadersFooters] = useState(true);
+  // Secciones visibles, tema y cabecera/pie viven en la propuesta (customization.layout).
+  const layout = useDocumentLayout(project);
+  const { visibility: sectionVisibility, theme: activeTheme, showHeadersFooters } = layout;
   const [isExporting, setIsExporting] = useState(false);
 
-  // Active Color Theme
-  const [activeTheme, setActiveTheme] = useState<PDFColorTheme>(PDF_COLOR_THEMES[0]);
 
   // Active Tab in Sidebar ("Secciones" vs "Modo Edición")
-  const [sidebarTab, setSidebarTab] = useState<'sections' | 'edit'>('sections');
+  const [sidebarTab, setSidebarTab] = useState<'sections' | 'design'>('sections');
 
   // Live Inline Editing Mode
   const [isEditMode, setIsEditMode] = useState(false);
@@ -83,7 +74,9 @@ export const PDFProposalView: React.FC = () => {
 
   const handleExportPDF = async () => {
     if (!pdfRef.current) return;
-    setIsExporting(true);
+    // Modo 'export': el editor se desmonta y la hoja queda sin cromo antes de la captura.
+    flushSync(() => setIsExporting(true));
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
 
     try {
       const pages = Array.from(pdfRef.current.querySelectorAll<HTMLElement>('.pdf-page'));
@@ -114,21 +107,6 @@ export const PDFProposalView: React.FC = () => {
     [project?.customization?.sectionOrder]
   );
 
-  const sectionVisibility: Record<PDFSectionId, boolean> = {
-    cover: showCover,
-    tableOfContents: showTableOfContents,
-    executiveSummary: showExecutiveSummary,
-    aboutUs: showAboutUs,
-    benefits: showBenefits,
-    techIntro: showTechIntro,
-    projectDescription: showProjectDescription,
-    energy: showPage1,
-    quotation: showPageQuotation,
-    roi: showPage2,
-    cashFlow: showPage3,
-    costMatrix: showPageCostMatrix,
-  };
-
   const { pageNumbers, footerTotalPages, tocItems } = buildPdfLayout(
     effectiveSectionOrder,
     sectionVisibility,
@@ -136,28 +114,44 @@ export const PDFProposalView: React.FC = () => {
     project.customization?.attachedPdfs || [],
   );
 
+  // Una propuesta en papelera, con conflicto o de un lector se ve pero no se edita.
+  const writable = canEditDocument({ project, user: currentUser });
+  const readOnlyReason = writable
+    ? null
+    : project.isDeleted
+      ? 'Propuesta en papelera: solo lectura. Restáurala para editar el documento.'
+      : project.syncStatus === 'conflict'
+      ? 'Esta propuesta tiene un conflicto de sincronización: resuélvelo antes de editar el documento.'
+      : 'Tu cuenta solo puede consultar esta propuesta.';
+  const editing = isEditMode && writable;
+  const editorMode: DocumentEditorMode = isExporting ? 'export' : editing ? 'edit' : 'view';
+  const editorActions = useMemo(() => ({
+    setText: (key: string, value: string) => setDocumentTexts({ [key]: value }),
+    resetText: (key: string) => setDocumentTexts({ [key]: null }),
+    saveToTemplate: (key: string) => saveDocumentTextsToCompanyTemplate([key]).saved.length > 0,
+  }), [setDocumentTexts, saveDocumentTextsToCompanyTemplate]);
+
   const renderSection = (id: PDFSectionId) => {
     const page = { project, summary, activeTheme, showHeadersFooters, currentDateStr, pageNum: pageNumbers[id], totalPages: footerTotalPages };
-    const editable = { isEditMode, updateDocumentCustomization, updateDefaultDocumentCustomization };
     switch (id) {
       case 'cover':
-        return <PDFCoverPage key={id} project={project} summary={summary} activeTheme={activeTheme} currentDateStr={currentDateStr} isEditMode={isEditMode} updateClient={updateClient} />;
+        return <PDFCoverPage key={id} project={project} summary={summary} activeTheme={activeTheme} currentDateStr={currentDateStr} />;
       case 'tableOfContents':
         return <PDFTableOfContents key={id} {...page} tocItems={tocItems} />;
       case 'executiveSummary':
         return <PDFExecutiveSummaryPage key={id} {...page} />;
       case 'aboutUs':
-        return <PDFAboutUsPage key={id} {...page} {...editable} />;
+        return <PDFAboutUsPage key={id} {...page} />;
       case 'benefits':
-        return <PDFSolarBenefitsPage key={id} {...page} {...editable} />;
+        return <PDFSolarBenefitsPage key={id} {...page} />;
       case 'techIntro':
-        return <PDFTechnicalIntroPage key={id} {...page} {...editable} />;
+        return <PDFTechnicalIntroPage key={id} {...page} />;
       case 'projectDescription':
-        return <PDFProjectDescriptionPage key={id} {...page} {...editable} />;
+        return <PDFProjectDescriptionPage key={id} {...page} />;
       case 'energy':
-        return <PDFPage1Energy key={id} {...page} isEditMode={isEditMode} updateDocumentCustomization={updateDocumentCustomization} updateSpecs={updateSpecs} />;
+        return <PDFPage1Energy key={id} {...page} isEditMode={editing} updateDocumentCustomization={updateDocumentCustomization} updateSpecs={updateSpecs} />;
       case 'quotation':
-        return <PDFPage2Quotation key={id} {...page} {...editable} updateClient={updateClient} />;
+        return <PDFPage2Quotation key={id} {...page} />;
       case 'roi':
         return <PDFPage3ROI key={id} {...page} />;
       case 'cashFlow':
@@ -175,8 +169,7 @@ export const PDFProposalView: React.FC = () => {
       <PDFSidebarControls
         isDark={isDark}
         project={project}
-        activeTheme={activeTheme}
-        setActiveTheme={setActiveTheme}
+        layout={layout}
         activePagesCount={footerTotalPages}
         sidebarTab={sidebarTab}
         setSidebarTab={setSidebarTab}
@@ -187,40 +180,10 @@ export const PDFProposalView: React.FC = () => {
         onRefresh={() => {
           useSimulationStore.setState({ activeProjectId: project.id });
         }}
-        showCover={showCover}
-        setShowCover={setShowCover}
-        showTableOfContents={showTableOfContents}
-        setShowTableOfContents={setShowTableOfContents}
-        showExecutiveSummary={showExecutiveSummary}
-        setShowExecutiveSummary={setShowExecutiveSummary}
-        showAboutUs={showAboutUs}
-        setShowAboutUs={setShowAboutUs}
-        showBenefits={showBenefits}
-        setShowBenefits={setShowBenefits}
-        showTechIntro={showTechIntro}
-        setShowTechIntro={setShowTechIntro}
-        showProjectDescription={showProjectDescription}
-        setShowProjectDescription={setShowProjectDescription}
-        showPage1={showPage1}
-        setShowPage1={setShowPage1}
-        showPageQuotation={showPageQuotation}
-        setShowPageQuotation={setShowPageQuotation}
-        showPage2={showPage2}
-        setShowPage2={setShowPage2}
-        showPage3={showPage3}
-        setShowPage3={setShowPage3}
-        showPageCostMatrix={showPageCostMatrix}
-        setShowPageCostMatrix={setShowPageCostMatrix}
-        showHeadersFooters={showHeadersFooters}
-        setShowHeadersFooters={setShowHeadersFooters}
-        updateClient={updateClient}
         updateSpecs={updateSpecs}
         updateDocumentCustomization={updateDocumentCustomization}
-        updateDefaultDocumentCustomization={updateDefaultDocumentCustomization}
         saveCurrentProjectAsDefaultDocumentTemplate={saveCurrentProjectAsDefaultDocumentTemplate}
         resetDefaultDocumentCustomization={resetDefaultDocumentCustomization}
-        isEditMode={isEditMode}
-        setIsEditMode={setIsEditMode}
       />
 
       {/* PDF Page Canvas */}
@@ -256,40 +219,22 @@ export const PDFProposalView: React.FC = () => {
           </div>
         )}
 
-        {/* Live Edit Mode Floating Banner */}
-        {isEditMode && !project.isDeleted && (
-          <div className="w-[850px] bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center justify-between gap-4 border border-blue-400/40 animate-in fade-in slide-in-from-top-2 sticky top-0 z-40">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-white shrink-0 shadow-xs">
-                <span className="text-sm animate-bounce">✏️</span>
-              </div>
-              <div>
-                <h4 className="text-xs font-black tracking-wide flex items-center gap-2">
-                  MODO EDICIÓN EN VIVO ACTIVO
-                  <span className="text-[9.5px] bg-amber-400 text-slate-950 font-extrabold px-2 py-0.5 rounded-full">
-                    Tiempo Real
-                  </span>
-                </h4>
-                <p className="text-[11px] text-blue-100 font-medium">
-                  Haz clic sobre cualquier párrafo o subtítulo para modificarlo. Usa <code className="bg-blue-900/60 px-1 py-0.5 rounded text-[10px] text-amber-200">**texto**</code> o <kbd className="bg-blue-900/60 px-1 py-0.5 rounded text-[10px] text-amber-200">Ctrl+B</kbd> para negritas, o <strong>Hacer Permanente</strong> para fijar plantillas futuras.
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsEditMode(false)}
-              className="px-4 py-2 rounded-xl bg-white hover:bg-blue-50 text-blue-950 font-black text-xs shadow-md transition-all cursor-pointer active:scale-95 shrink-0"
-            >
-              Listo / Finalizar
-            </button>
-          </div>
-        )}
-
         <ProposalAnnexSync project={project} />
 
-        <div ref={pdfRef} className="flex flex-col gap-8 print:gap-0">
-          {effectiveSectionOrder.map((sectionId) => (sectionVisibility[sectionId] ? renderSection(sectionId) : null))}
-        </div>
+        <DocumentEditorProvider
+          project={project}
+          summary={summary}
+          currentDateStr={currentDateStr}
+          company={companies.find((company) => company.id === project.companyProfileId)}
+          mode={editorMode}
+          writable={writable}
+          actions={editorActions}
+        >
+          <DocumentEditorToolbar isEditMode={editing} setIsEditMode={setIsEditMode} readOnlyReason={readOnlyReason} />
+          <div ref={pdfRef} className="flex flex-col gap-8 print:gap-0">
+            {effectiveSectionOrder.map((sectionId) => (sectionVisibility[sectionId] ? renderSection(sectionId) : null))}
+          </div>
+        </DocumentEditorProvider>
       </main>
     </div>
   );

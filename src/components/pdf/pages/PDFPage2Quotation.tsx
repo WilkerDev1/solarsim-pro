@@ -1,14 +1,14 @@
 import { PDFPageShell } from '../PDFPageShell';
-import { cleanClientName, getTariffDisplayName } from '../../../../shared/proposalPresentation';
+import { getTariffDisplayName } from '../../../../shared/proposalPresentation';
 import React from 'react';
 import { ShieldCheck, CheckCircle2, Check } from 'lucide-react';
-import { ProjectSimulation, FinancialSummaryResult, DocumentCustomization, ClientInfo } from '../../../types';
+import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
 import { PDFHeaderBanner } from '../PDFHeaderBanner';
 import { PDFFooter } from '../PDFFooter';
 import { PDFWatermark } from '../PDFWatermark';
-import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
-import { InlineEditableText } from '../common/InlineEditableText';
+import { EditableText } from '../editor/EditableText';
+import { OptionalTextRow } from '../editor/OptionalTextRow';
 import { getProjectPanels, getProjectInverters, getProjectBatteries } from '../../../utils/equipmentSpecsUtils';
 
 interface PDFPage2QuotationProps {
@@ -19,10 +19,6 @@ interface PDFPage2QuotationProps {
   currentDateStr: string;
   pageNum: number;
   totalPages: number;
-  isEditMode?: boolean;
-  updateDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
-  updateDefaultDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
-  updateClient?: (client: Partial<ClientInfo>) => void;
 }
 
 const cleanInstallationDesc = (desc?: string): string => {
@@ -43,35 +39,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
   currentDateStr,
   pageNum,
   totalPages,
-  isEditMode = false,
-  updateDocumentCustomization,
-  updateDefaultDocumentCustomization,
-  updateClient,
 }) => {
-  const cust = project.customization || {};
-
-  const clientDisplayName = cleanClientName(project.client.name || 'Cliente');
-  const contactName = cust.contactName !== undefined 
-    ? cust.contactName 
-    : (project.client.contactPerson || project.client.company || clientDisplayName || '');
-  const rawClientPhone = cust.clientPhone !== undefined 
-    ? cust.clientPhone 
-    : (project.client.contactPhone || '');
-  const clientPhone = (rawClientPhone.includes('555-0199') || rawClientPhone.includes('5550199') || rawClientPhone === '+1 (809) 000-0000') 
-    ? '' 
-    : rawClientPhone;
-  const defaultValidityNote = `* Equipos según disponibilidad de inventario | * Propuesta válida por ${project.client.quoteValidityDays || 7} días | * Precios en USD *`;
-
-  // Dynamic services included
-  const servicesText = cust.servicesIncludedText !== undefined && cust.servicesIncludedText !== ''
-    ? cust.servicesIncludedText
-    : DEFAULT_DOCUMENT_CUSTOMIZATION.servicesIncludedText || 'Permisos y Tramitación ante CNE y Distribuidora, Medición Neta, Planos Eléctricos, Instalación Certificada y Puesta en Marcha.';
-
-  const serviceItems = servicesText
-    .split(/[,;\n]/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-
   const customItems = project.financials.customItems || [];
 
   return (
@@ -83,7 +51,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
       currentDateStr={currentDateStr}
       pageNum={pageNum}
       totalPages={totalPages}
-      pageTitle="COTIZACIÓN DE SISTEMA FOTOVOLTAICO"
+      sectionId="quotation"
     >
 
       {/* Body */}
@@ -97,129 +65,45 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
               borderLeftColor: activeTheme.primary,
             }}
           >
-            DATOS DEL CLIENTE :
+            <EditableText k="quotation.clientHeading" />
           </h3>
           <div className="grid grid-cols-2 gap-4 px-2 text-[10px]">
             <div className="space-y-0.5">
               <div className="flex items-center gap-1.5 leading-snug">
-                <span className="font-bold text-slate-600 shrink-0">Cliente:</span>{' '}
-                <InlineEditableText
-                  value={project.client.name}
-                  defaultValue="Cliente"
-                  onSave={(val) => updateClient?.({ name: val })}
-                  isEditMode={isEditMode}
-                  multiline={false}
-                  label="Nombre del Cliente"
-                  placeholder="Nombre del cliente"
-                  className="font-bold text-slate-900 inline-block"
-                  boldClassName="font-bold text-slate-950"
-                />
+                <span className="font-bold text-slate-600 shrink-0"><EditableText k="quotation.label.client" /></span>{' '}
+                <EditableText k="client.name" className="font-bold text-slate-900 inline-block" boldClassName="font-bold text-slate-950" placeholder="Nombre del cliente" />
               </div>
               <div className="flex items-center gap-1.5 leading-snug">
-                <span className="font-bold text-slate-600 shrink-0">Contacto:</span>{' '}
-                <InlineEditableText
-                  value={contactName}
-                  defaultValue=""
-                  onSave={(val) => {
-                    updateDocumentCustomization?.({ contactName: val });
-                    updateClient?.({ contactPerson: val });
-                  }}
-                  onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ contactName: val })}
-                  isEditMode={isEditMode}
-                  multiline={false}
-                  label="Contacto (Atención a)"
-                  placeholder="(Agregar contacto)"
-                  className="font-medium inline-block text-slate-800"
-                  boldClassName="font-bold text-slate-950"
-                  isCustomized={!!cust.contactName}
-                  onReset={() => {
-                    updateDocumentCustomization?.({ contactName: '' });
-                    updateClient?.({ contactPerson: '' });
-                  }}
-                />
+                <span className="font-bold text-slate-600 shrink-0"><EditableText k="quotation.label.contact" /></span>{' '}
+                <EditableText k="client.contact" className="font-medium inline-block text-slate-800" boldClassName="font-bold text-slate-950" placeholder="(Agregar contacto)" />
               </div>
               <div className="flex items-center gap-1.5 leading-snug">
-                <span className="font-bold text-slate-600 shrink-0">Teléfono:</span>{' '}
-                <InlineEditableText
-                  value={clientPhone}
-                  defaultValue=""
-                  onSave={(val) => {
-                    updateDocumentCustomization?.({ clientPhone: val });
-                    updateClient?.({ contactPhone: val });
-                  }}
-                  isEditMode={isEditMode}
-                  multiline={false}
-                  label="Teléfono del Cliente"
-                  placeholder="(Agregar teléfono)"
-                  className="font-medium inline-block text-slate-800"
-                  boldClassName="font-bold text-slate-950"
-                  isCustomized={!!cust.clientPhone}
-                  onReset={() => {
-                    updateDocumentCustomization?.({ clientPhone: '' });
-                    updateClient?.({ contactPhone: '' });
-                  }}
-                />
+                <span className="font-bold text-slate-600 shrink-0"><EditableText k="quotation.label.phone" /></span>{' '}
+                <EditableText k="client.phone" className="font-medium inline-block text-slate-800" boldClassName="font-bold text-slate-950" placeholder="(Agregar teléfono)" />
               </div>
+              <OptionalTextRow k="client.email">
+                <div className="flex items-center gap-1.5 leading-snug">
+                <span className="font-bold text-slate-600 shrink-0"><EditableText k="quotation.label.email" /></span>{' '}
+                <EditableText k="client.email" className="font-medium inline-block text-slate-800" boldClassName="font-bold text-slate-950" placeholder="(Agregar correo)" />
+              </div>
+              </OptionalTextRow>
               <div className="flex items-center gap-1.5 leading-snug">
-                <span className="font-bold text-slate-600 shrink-0">Dirección:</span>{' '}
-                <InlineEditableText
-                  value={project.client.address || ''}
-                  defaultValue={`${project.client.province || project.client.location || 'Santo Domingo'}, República Dominicana`}
-                  onSave={(val) => updateClient?.({ address: val })}
-                  isEditMode={isEditMode}
-                  multiline={false}
-                  label="Dirección del Cliente"
-                  placeholder="Dirección del cliente"
-                  className="font-medium inline-block text-slate-800"
-                  boldClassName="font-bold text-slate-950"
-                />
+                <span className="font-bold text-slate-600 shrink-0"><EditableText k="quotation.label.address" /></span>{' '}
+                <EditableText k="client.address" className="font-medium inline-block text-slate-800" boldClassName="font-bold text-slate-950" />
               </div>
             </div>
             <div className="space-y-0.5 text-right">
               <div className="flex items-center justify-end gap-1.5 leading-snug">
-                <span className="font-bold text-slate-600 shrink-0">N° Cotización:</span>{' '}
-                <InlineEditableText
-                  value={project.client.quoteNumber || 'C-0001'}
-                  defaultValue="C-0001"
-                  onSave={(val) => updateClient?.({ quoteNumber: val })}
-                  isEditMode={isEditMode}
-                  multiline={false}
-                  label="N° Cotización"
-                  placeholder="C-0001"
-                  className="font-bold font-mono text-slate-900 inline-block"
-                  boldClassName="font-bold font-mono text-slate-950"
-                />
+                <span className="font-bold text-slate-600 shrink-0"><EditableText k="quotation.label.number" /></span>{' '}
+                <EditableText k="quote.number" className="font-bold font-mono text-slate-900 inline-block" boldClassName="font-bold font-mono text-slate-950" />
               </div>
               <div className="flex items-center justify-end gap-1.5 leading-snug">
-                <span className="font-bold text-slate-600 shrink-0">Fecha:</span>{' '}
-                <InlineEditableText
-                  value={project.client.quoteDate || currentDateStr}
-                  defaultValue={currentDateStr}
-                  onSave={(val) => updateClient?.({ quoteDate: val })}
-                  isEditMode={isEditMode}
-                  multiline={false}
-                  label="Fecha de Cotización"
-                  placeholder="DD/MM/AAAA o YYYY-MM-DD"
-                  className="font-semibold text-slate-800 inline-block"
-                  boldClassName="font-semibold text-slate-900"
-                />
+                <span className="font-bold text-slate-600 shrink-0"><EditableText k="quotation.label.date" /></span>{' '}
+                <EditableText k="quote.date" className="font-semibold text-slate-800 inline-block" boldClassName="font-semibold text-slate-900" />
               </div>
               <div className="flex items-center justify-end gap-1.5 leading-snug">
-                <span className="font-bold text-slate-600 shrink-0">Válido por:</span>{' '}
-                <InlineEditableText
-                  value={project.client.quoteValidityDays ? `${project.client.quoteValidityDays} Días` : '7 Días'}
-                  defaultValue="7 Días"
-                  onSave={(val) => {
-                    const num = parseInt(val.replace(/\D/g, ''), 10);
-                    updateClient?.({ quoteValidityDays: isNaN(num) ? 7 : num });
-                  }}
-                  isEditMode={isEditMode}
-                  multiline={false}
-                  label="Días de Validez"
-                  placeholder="7 Días"
-                  className="font-bold text-slate-900 inline-block"
-                  boldClassName="font-bold text-slate-950"
-                />
+                <span className="font-bold text-slate-600 shrink-0"><EditableText k="quotation.label.validity" /></span>{' '}
+                <EditableText k="quote.validityDays" className="font-bold text-slate-900 inline-block">{(days) => `${days} Días`}</EditableText>
               </div>
             </div>
           </div>
@@ -234,25 +118,25 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
               borderLeftColor: activeTheme.primary,
             }}
           >
-            ESPECIFICACIONES DEL SISTEMA
+            <EditableText k="quotation.specsHeading" />
           </h3>
           <div className="grid grid-cols-2 gap-4 bg-slate-50/60 p-2 rounded-lg border border-slate-200 text-[10px]">
             <div className="space-y-0.5">
               <div>
-                <span className="font-bold text-slate-700">Potencia (kW-dc):</span>{' '}
+                <span className="font-bold text-slate-700"><EditableText k="quotation.label.power" /></span>{' '}
                 <span className="font-bold text-slate-900">{summary.systemCapacityKWp.toFixed(2)} kWp</span>
               </div>
               <div>
-                <span className="font-bold text-slate-700">Tipo de instalación:</span> Fotovoltaica
+                <EditableText k="quotation.label.installType" className="font-bold text-slate-700" /> <EditableText k="quotation.installTypeValue" />
               </div>
             </div>
             <div className="space-y-0.5 text-right">
               <div>
-                <span className="font-bold text-slate-700">Consumo mensual estimado:</span>{' '}
+                <span className="font-bold text-slate-700"><EditableText k="quotation.label.monthlyConsumption" /></span>{' '}
                 <span className="font-bold text-slate-900">{Math.round(summary.annualConsumptionKWh / 12).toLocaleString()} kWh</span>
               </div>
               <div>
-                <span className="font-bold text-slate-700">Distribuidor / Tarifa:</span>{' '}
+                <span className="font-bold text-slate-700"><EditableText k="quotation.label.tariff" /></span>{' '}
                 <span className="font-bold" style={{ color: activeTheme.primary }}>
                   {project.client.distributor || project.rates.distributor || 'EDES'} • {getTariffDisplayName(project.client.distributor || project.rates.distributor, project.rates.tariffCode)}
                 </span>
@@ -270,15 +154,15 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
               borderLeftColor: activeTheme.primary,
             }}
           >
-            EQUIPOS Y MATERIALES
+            <EditableText k="quotation.equipmentHeading" />
           </h3>
           <div className="border border-slate-200 rounded-lg overflow-hidden">
             <table className="w-full text-left border-collapse">
               <thead className="text-white font-bold text-[9.5px] uppercase" style={{ backgroundColor: activeTheme.primary }}>
                 <tr>
-                  <th className="px-3 py-1">DESCRIPCIÓN</th>
-                  <th className="px-3 py-1 text-center w-20">CANT.</th>
-                  <th className="px-3 py-1 text-center w-20">UNIDAD</th>
+                  <th className="px-3 py-1"><EditableText k="quotation.table.description" /></th>
+                  <th className="px-3 py-1 text-center w-20"><EditableText k="quotation.table.quantity" /></th>
+                  <th className="px-3 py-1 text-center w-20"><EditableText k="quotation.table.unit" /></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 text-[10px] text-slate-800 font-semibold">
@@ -288,7 +172,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                       {p.brandModel || `Módulos Monocristalinos Tier-1 (${p.powerW}W)`}
                     </td>
                     <td className="px-3 py-1 text-center font-bold font-mono">{p.count}</td>
-                    <td className="px-3 py-1 text-center text-slate-500 font-normal">UD</td>
+                    <td className="px-3 py-1 text-center text-slate-500 font-normal"><EditableText k="quotation.table.unitValue" /></td>
                   </tr>
                 ))}
                 {getProjectInverters(project.specs).map((inv, idx) => (
@@ -297,7 +181,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                       {inv.brandModel || 'Inversor Solar On-Grid / Híbrido'}
                     </td>
                     <td className="px-3 py-1 text-center font-bold font-mono">{inv.count || 1}</td>
-                    <td className="px-3 py-1 text-center text-slate-500 font-normal">UD</td>
+                    <td className="px-3 py-1 text-center text-slate-500 font-normal"><EditableText k="quotation.table.unitValue" /></td>
                   </tr>
                 ))}
                 {project.specs.hasBattery && getProjectBatteries(project.specs).map((bat, idx) => (
@@ -306,7 +190,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                       {bat.brandModel || 'Banco de Baterías de Litio'}
                     </td>
                     <td className="px-3 py-1 text-center font-bold font-mono">{bat.count || 1}</td>
-                    <td className="px-3 py-1 text-center text-slate-500 font-normal">UD</td>
+                    <td className="px-3 py-1 text-center text-slate-500 font-normal"><EditableText k="quotation.table.unitValue" /></td>
                   </tr>
                 ))}
                 <tr className={project.specs.hasBattery ? 'bg-slate-50/60' : 'bg-white'}>
@@ -314,7 +198,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                     {cleanInstallationDesc(project.specs.installationServicesDesc)}
                   </td>
                   <td className="px-3 py-1 text-center font-bold font-mono">1</td>
-                  <td className="px-3 py-1 text-center text-slate-500 font-normal">UD</td>
+                  <td className="px-3 py-1 text-center text-slate-500 font-normal"><EditableText k="quotation.table.unitValue" /></td>
                 </tr>
                 {customItems.map((cItem, cIdx) => (
                   <tr
@@ -337,19 +221,19 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
         <div className="flex justify-end">
           <div className="w-[380px] bg-slate-50/90 border border-slate-200 rounded-lg p-2 space-y-1 text-[10px]">
             <div className="flex justify-between text-slate-700">
-              <span className="font-bold">SUB-TOTAL (USD) SIN ITBIS :</span>
+              <span className="font-bold"><EditableText k="quotation.totals.subtotal" /></span>
               <span className="font-bold font-mono">
                 ${summary.commercialPreTaxSubtotalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="flex justify-between text-slate-900 bg-slate-200/80 px-2 py-0.5 rounded font-bold">
-              <span>TOTAL GENERAL (USD) :</span>
+              <span><EditableText k="quotation.totals.total" /></span>
               <span className="font-mono">
                 ${(summary.listGrossInvestmentUSD + (project.financials.applyITBISExemption ? summary.itbisSavedUSD : 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="flex justify-between font-bold" style={{ color: activeTheme.secondary }}>
-              <span>ITBIS A DESCONTAR POR LEY 57-07 US$ :</span>
+              <span><EditableText k="quotation.totals.itbis" /></span>
               <span className="font-mono">
                 ${summary.itbisSavedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
@@ -371,13 +255,13 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
               className="flex justify-between text-white px-2 py-0.5 rounded font-bold"
               style={{ backgroundColor: activeTheme.primary }}
             >
-              <span>TOTAL GENERAL (USD) SI CALIFICA LEY 57-07 :</span>
+              <span><EditableText k="quotation.totals.totalLey" /></span>
               <span className="font-mono">
                 ${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="flex justify-between text-slate-800 pt-0.5 border-t border-slate-300">
-              <span className="font-bold">PRECIO POR WATT (USD/W):</span>
+              <span className="font-bold"><EditableText k="quotation.totals.pricePerWatt" /></span>
               <span className="font-bold font-mono" style={{ color: activeTheme.primary }}>
                 ${(summary.salePricePerWattUSD ?? (summary.systemCapacityKWp > 0 ? summary.grossInvestmentUSD / (summary.systemCapacityKWp * 1000) : 0)).toFixed(2)}
               </span>
@@ -394,49 +278,49 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
               borderLeftColor: activeTheme.primary,
             }}
           >
-            INCENTIVOS DE LEY 57-07
+            <EditableText k="quotation.incentivesHeading" />
           </h3>
           <p className="text-[9px] font-bold bg-amber-50 border border-amber-200 text-amber-900 px-2.5 py-0.5 rounded mb-1">
-            (Descuento de 40% para equipos energía renovables: Paneles solares, inversores y baterías)
+            <EditableText k="quotation.incentivesNote" />
           </p>
           <div className="border border-slate-200 rounded-lg overflow-hidden">
             <table className="w-full text-left border-collapse">
               <thead className="text-white font-bold text-[9.5px] uppercase" style={{ backgroundColor: activeTheme.primary }}>
                 <tr>
-                  <th className="px-3 py-1">CONCEPTO</th>
-                  <th className="px-3 py-1 text-right">VALOR US $</th>
+                  <th className="px-3 py-1"><EditableText k="quotation.incentives.concept" /></th>
+                  <th className="px-3 py-1 text-right"><EditableText k="quotation.incentives.value" /></th>
                   <th className="px-3 py-1 text-right w-20">%</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 text-[10px] text-slate-800 font-semibold">
                 <tr className="bg-white font-bold">
-                  <td className="px-3 py-1">TOTAL EQUIPOS ENERGÍAS RENOVABLES (PANELES-INVERSORES-BATERÍAS)</td>
+                  <td className="px-3 py-1"><EditableText k="quotation.incentives.equipment" /></td>
                   <td className="px-3 py-1 text-right font-mono">${(summary.equipmentPortionUSD || summary.grossInvestmentUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td className="px-3 py-1 text-right font-mono">100%</td>
                 </tr>
                 <tr className="bg-slate-50/60">
-                  <td className="px-3 py-1">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 1ER AÑO</td>
+                  <td className="px-3 py-1"><EditableText k="quotation.incentives.year1" /></td>
                   <td className="px-3 py-1 text-right font-mono font-bold" style={{ color: activeTheme.secondary }}>
                     ${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className="px-3 py-1 text-right font-mono" style={{ color: activeTheme.secondary }}>13.33%</td>
                 </tr>
                 <tr className="bg-white">
-                  <td className="px-3 py-1">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 2DO AÑO</td>
+                  <td className="px-3 py-1"><EditableText k="quotation.incentives.year2" /></td>
                   <td className="px-3 py-1 text-right font-mono font-bold" style={{ color: activeTheme.secondary }}>
                     ${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className="px-3 py-1 text-right font-mono" style={{ color: activeTheme.secondary }}>13.33%</td>
                 </tr>
                 <tr className="bg-slate-50/60">
-                  <td className="px-3 py-1">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 3ER AÑO</td>
+                  <td className="px-3 py-1"><EditableText k="quotation.incentives.year3" /></td>
                   <td className="px-3 py-1 text-right font-mono font-bold" style={{ color: activeTheme.secondary }}>
                     ${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className="px-3 py-1 text-right font-mono" style={{ color: activeTheme.secondary }}>13.33%</td>
                 </tr>
                 <tr className={`font-bold ${activeTheme.accentLightBg}`} style={{ color: activeTheme.primary }}>
-                  <td className="px-3 py-1">TOTAL A DESCONTAR POR LA LEY 57-07 (40% DEL TOTAL)</td>
+                  <td className="px-3 py-1"><EditableText k="quotation.incentives.total" /></td>
                   <td className="px-3 py-1 text-right font-mono" style={{ color: activeTheme.primary }}>
                     ${summary.ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
@@ -455,73 +339,25 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
               className="font-bold border-b border-slate-200 pb-0.5 mb-0.5 uppercase tracking-wider flex items-center gap-1.5"
               style={{ color: activeTheme.primary }}
             >
-              <ShieldCheck className="w-3.5 h-3.5" /> GARANTÍAS
+              <ShieldCheck className="w-3.5 h-3.5" /> <EditableText k="quotation.warrantiesHeading" />
             </h4>
             <div className="flex items-center gap-1 leading-snug">
-              <span className="font-bold text-slate-800 shrink-0">• Paneles Solares:</span>
-              <InlineEditableText
-                value={cust.panelWarrantyText}
-                defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.panelWarrantyText || '25 Años de Producción Lineal'}
-                onSave={(val) => updateDocumentCustomization?.({ panelWarrantyText: val })}
-                onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ panelWarrantyText: val })}
-                isEditMode={isEditMode}
-                multiline={false}
-                label="Garantía Paneles"
-                className="font-medium inline-block"
-                boldClassName="font-bold text-slate-950"
-                isCustomized={!!cust.panelWarrantyText}
-                onReset={() => updateDocumentCustomization?.({ panelWarrantyText: '' })}
-              />
+              <EditableText k="quotation.warranty.panelLabel" className="font-bold text-slate-800 shrink-0" />
+              <EditableText k="quotation.warranty.panel" className="font-medium inline-block" boldClassName="font-bold text-slate-950" />
             </div>
             <div className="flex items-center gap-1 leading-snug">
-              <span className="font-bold text-slate-800 shrink-0">• Inversor:</span>
-              <InlineEditableText
-                value={cust.inverterWarrantyText}
-                defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.inverterWarrantyText || '5 a 10 Años de Fábrica'}
-                onSave={(val) => updateDocumentCustomization?.({ inverterWarrantyText: val })}
-                onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ inverterWarrantyText: val })}
-                isEditMode={isEditMode}
-                multiline={false}
-                label="Garantía Inversor"
-                className="font-medium inline-block"
-                boldClassName="font-bold text-slate-950"
-                isCustomized={!!cust.inverterWarrantyText}
-                onReset={() => updateDocumentCustomization?.({ inverterWarrantyText: '' })}
-              />
+              <EditableText k="quotation.warranty.inverterLabel" className="font-bold text-slate-800 shrink-0" />
+              <EditableText k="quotation.warranty.inverter" className="font-medium inline-block" boldClassName="font-bold text-slate-950" />
             </div>
             {project.specs.hasBattery && (
               <div className="flex items-center gap-1 leading-snug">
-                <span className="font-bold text-slate-800 shrink-0">• Batería:</span>
-                <InlineEditableText
-                  value={cust.batteryWarrantyText}
-                  defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.batteryWarrantyText || '5 a 10 Años (según fabricante)'}
-                  onSave={(val) => updateDocumentCustomization?.({ batteryWarrantyText: val })}
-                  onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ batteryWarrantyText: val })}
-                  isEditMode={isEditMode}
-                  multiline={false}
-                  label="Garantía Batería"
-                  className="font-medium inline-block"
-                  boldClassName="font-bold text-slate-950"
-                  isCustomized={!!cust.batteryWarrantyText}
-                  onReset={() => updateDocumentCustomization?.({ batteryWarrantyText: '' })}
-                />
+                <EditableText k="quotation.warranty.batteryLabel" className="font-bold text-slate-800 shrink-0" />
+                <EditableText k="quotation.warranty.battery" className="font-medium inline-block" boldClassName="font-bold text-slate-950" />
               </div>
             )}
             <div className="flex items-center gap-1 leading-snug">
-              <span className="font-bold text-slate-800 shrink-0">• Mano de Obra y Soporte:</span>
-              <InlineEditableText
-                value={cust.workmanshipWarrantyText}
-                defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.workmanshipWarrantyText || '1 Año en Instalación y Soporte Técnico'}
-                onSave={(val) => updateDocumentCustomization?.({ workmanshipWarrantyText: val })}
-                onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ workmanshipWarrantyText: val })}
-                isEditMode={isEditMode}
-                multiline={false}
-                label="Garantía Mano de Obra"
-                className="font-medium inline-block"
-                boldClassName="font-bold text-slate-950"
-                isCustomized={!!cust.workmanshipWarrantyText}
-                onReset={() => updateDocumentCustomization?.({ workmanshipWarrantyText: '' })}
-              />
+              <EditableText k="quotation.warranty.workmanshipLabel" className="font-bold text-slate-800 shrink-0" />
+              <EditableText k="quotation.warranty.workmanship" className="font-medium inline-block" boldClassName="font-bold text-slate-950" />
             </div>
           </div>
 
@@ -531,50 +367,31 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
               className="font-bold border-b border-slate-200 pb-0.5 mb-0.5 uppercase tracking-wider flex items-center gap-1.5"
               style={{ color: activeTheme.primary }}
             >
-              <CheckCircle2 className="w-3.5 h-3.5" style={{ color: activeTheme.primary }} /> NOS ENCARGAMOS DE GESTIONAR
+              <CheckCircle2 className="w-3.5 h-3.5" style={{ color: activeTheme.primary }} /> <EditableText k="quotation.servicesHeading" />
             </h4>
-            {serviceItems.length > 0 ? (
-              <div className="space-y-0.5">
-                {serviceItems.map((item, idx) => (
+            <EditableText k="quotation.servicesIncluded" as="div" className="space-y-0.5 block">
+              {(text) => text
+                .split(/[,;\n]/)
+                .map((item) => item.replace(/^\s*[-•]\s*/, '').replace(/\*/g, '').trim())
+                .filter(Boolean)
+                .map((item, idx) => (
                   <div key={idx} className="flex items-start gap-1.5 leading-snug">
                     <Check className="w-3 h-3 text-emerald-600 shrink-0 mt-0.5" />
                     <span className="font-medium text-slate-700">{item}</span>
                   </div>
                 ))}
-              </div>
-            ) : (
-              <InlineEditableText
-                value={cust.servicesIncludedText}
-                defaultValue={DEFAULT_DOCUMENT_CUSTOMIZATION.servicesIncludedText}
-                onSave={(val) => updateDocumentCustomization?.({ servicesIncludedText: val })}
-                onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ servicesIncludedText: val })}
-                isEditMode={isEditMode}
-                multiline={true}
-                label="Servicios Gestionados"
-                className="text-[10px] leading-snug block"
-                boldClassName="font-bold text-slate-950"
-                isCustomized={!!cust.servicesIncludedText}
-                onReset={() => updateDocumentCustomization?.({ servicesIncludedText: '' })}
-              />
-            )}
+            </EditableText>
           </div>
         </div>
 
         {/* 7. NOTA LEGAL */}
         <div className="text-center text-[9px] text-slate-500 font-semibold italic pt-0.5">
-          <InlineEditableText
-            value={cust.validityNote}
-            defaultValue={defaultValidityNote}
-            onSave={(val) => updateDocumentCustomization?.({ validityNote: val })}
-            onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ validityNote: val })}
-            isEditMode={isEditMode}
-            multiline={false}
-            label="Nota Legal y Términos"
-            className="text-center text-[9px] text-slate-500 font-semibold italic block"
-            boldClassName="font-bold text-slate-700"
-            isCustomized={!!cust.validityNote}
-            onReset={() => updateDocumentCustomization?.({ validityNote: '' })}
-          />
+          <EditableText k="quotation.validityNote" className="text-center text-[9px] text-slate-500 font-semibold italic block" boldClassName="font-bold text-slate-700" />
+          <div className="mt-0.5 flex items-center justify-center gap-3 not-italic">
+            <EditableText k="company.name" className="font-bold" />
+            <OptionalTextRow k="company.rnc"><span><EditableText k="quotation.issuerRncLabel" /> <EditableText k="company.rnc" /></span></OptionalTextRow>
+            <OptionalTextRow k="company.email"><EditableText k="company.email" /></OptionalTextRow>
+          </div>
         </div>
       </div>
     </PDFPageShell>

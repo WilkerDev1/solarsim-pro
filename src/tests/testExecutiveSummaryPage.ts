@@ -12,7 +12,7 @@ for (const applyLey5707 of [true, false]) {
   const project = { ...structuredClone(BENCHMARK_PROJECT), financials: { ...BENCHMARK_PROJECT.financials, applyLey5707 } };
   const summary = calculateProjectFinancialSummary(project);
   const html = renderToStaticMarkup(React.createElement(PDFExecutiveSummaryPage, { project, summary, activeTheme: theme, showHeadersFooters: true, currentDateStr: 'hoy', pageNum: 3, totalPages: 11 }));
-  const shown = Number(html.match(/(\d+)%<\/span><span[^>]*>Base computable deducible/)?.[1]);
+  const shown = Number(html.match(/(\d+)%<\/span><span[^>]*>(?:<span[^>]*>)?Base computable deducible/)?.[1]); // la etiqueta es un texto editable
   const expected = Math.round((summary.equipmentPortionUSD / summary.grossInvestmentUSD) * 100);
   assert.equal(shown, expected, `Ley 57-07 ${applyLey5707 ? 'activa' : 'inactiva'}: base computable ${expected}% (mostrado ${shown}%)`);
 }

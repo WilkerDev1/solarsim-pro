@@ -1,6 +1,6 @@
 import React from 'react';
 import { DocumentCustomization } from '../../types';
-import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
+import { EditableText } from './editor/EditableText';
 
 interface PDFFooterProps {
   pageNum: number;
@@ -13,11 +13,6 @@ export const PDFFooter: React.FC<PDFFooterProps> = ({
   totalPages,
   customization,
 }) => {
-  const footerText =
-    customization?.companyFooterText ??
-    DEFAULT_DOCUMENT_CUSTOMIZATION.companyFooterText ??
-    '';
-
   return (
     <footer
       className="w-full px-10 border-t border-slate-200 flex justify-between items-center bg-slate-50 z-30 box-border shrink-0 mt-auto"
@@ -27,13 +22,15 @@ export const PDFFooter: React.FC<PDFFooterProps> = ({
         className="font-bold text-[10px] whitespace-nowrap"
         style={{ color: '#64748b' }}
       >
-        {footerText}
+        <EditableText k="company.footer" />
       </div>
       <div
         className="font-bold text-[10px] shrink-0 ml-4 whitespace-nowrap"
         style={{ color: '#0f172a' }}
       >
-        Página {pageNum} de {totalPages}
+        <EditableText k="footer.pageCounter">
+          {(text) => text.replace('{page}', String(pageNum)).replace('{total}', String(totalPages))}
+        </EditableText>
       </div>
     </footer>
   );

@@ -1,22 +1,15 @@
 import { PDFPageShell } from '../PDFPageShell';
-import { cleanClientName, getTariffDisplayName } from '../../../../shared/proposalPresentation';
 import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult, DocumentCustomization } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
 import { PDFHeaderBanner } from '../PDFHeaderBanner';
 import { PDFFooter } from '../PDFFooter';
 import { PDFWatermark } from '../PDFWatermark';
-import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../../constants/defaultDocumentCustomization';
 import { FileText, ShieldAlert, Sparkles, Zap, BatteryCharging, Sun } from 'lucide-react';
-import { renderFormattedMarkdown, resolveDynamicProjectSummaryParagraph1, resolveDynamicProjectSummaryParagraph2 } from '../../../utils/textFormatter';
 
-import { InlineEditableText } from '../common/InlineEditableText';
-import {
-  formatPanelsSummary,
-  formatInvertersSummary,
-  formatBatteriesSummary,
-  calculateTotalBatteryCapacityKWh,
-} from '../../../utils/equipmentSpecsUtils';
+import { EditableText } from '../editor/EditableText';
+import { OptionalTextRow } from '../editor/OptionalTextRow';
+import { calculateTotalBatteryCapacityKWh } from '../../../utils/equipmentSpecsUtils';
 
 interface PDFProjectDescriptionPageProps {
   project: ProjectSimulation;
@@ -26,9 +19,6 @@ interface PDFProjectDescriptionPageProps {
   currentDateStr: string;
   pageNum: number;
   totalPages: number;
-  isEditMode?: boolean;
-  updateDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
-  updateDefaultDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
 }
 
 export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps> = ({
@@ -39,104 +29,8 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
   currentDateStr,
   pageNum,
   totalPages,
-  isEditMode = false,
-  updateDocumentCustomization,
-  updateDefaultDocumentCustomization,
 }) => {
-  const cust = project.customization || {};
-
-  // Compute regulatory note paragraphs dynamically based on project conditions (tariff, export fee, zero-export)
-  const getRegulatoryParagraphs = (): string[] => {
-    if (cust.regulatoryNote && cust.regulatoryNote !== DEFAULT_DOCUMENT_CUSTOMIZATION.regulatoryNote) {
-      return cust.regulatoryNote.split('\n\n').filter(Boolean);
-    }
-
-    const isZeroExport = !!project.rates.isZeroExport;
-    const distributor = project.client.distributor || project.rates.distributor || 'EDES';
-    const isCEPM = distributor === 'CEPM';
-    const tariff = project.rates.tariffCode || (isCEPM ? 'RBT-1' : 'BTS2');
-    const tariffDisplayName = getTariffDisplayName(distributor, tariff);
-    const exportFee = project.rates.gridExportFeePct ?? 25;
-
-    const p1 = isZeroExport
-      ? 'El sistema fotovoltaico operará bajo la modalidad de Inyección Cero (Zero-Export con limitador antivertido), suministrando energía prioritariamente a los consumos internos del inmueble y evitando cualquier inyección de excedentes hacia la red eléctrica de distribución.'
-      : `La energía generada mensualmente se descontará del consumo tomado de la red de ${isCEPM ? 'CEPM' : 'la distribuidora eléctrica (EDES)'}. Cuando la producción supere el consumo, el excedente se acreditará como descuento en su factura eléctrica bajo el régimen de Medición Neta.`;
-
-    const p2 = 'La presente propuesta ha sido elaborada conforme a la Resolución SIE-007-2026-REG y se basa en criterios técnicos y el historial de consumo del cliente.';
-
-    const p3 = 'Los ahorros indicados son estimados y pueden variar según los hábitos de consumo, el perfil de carga y las condiciones reales de operación del sistema.';
-
-    let p4 = '';
-    if (isZeroExport) {
-      p4 = `Al operar con limitador antivertido (inyección cero)${project.specs.hasBattery ? ' y almacenamiento en baterías de litio' : ''}, la totalidad de la energía solar se aprovecha internamente, por lo que el proyecto no genera cargos por derecho de uso de la red bajo la normativa vigente.`;
-    } else {
-      p4 = `Para la tarifa ${tariffDisplayName}, el análisis económico considera el cargo por derecho de uso de la red, equivalente al ${exportFee}% del valor de la energía excedente exportada, conforme al régimen de Medición Neta y la normativa vigente (Resolución SIE-007-2026-REG). Por esta razón, el sistema se diseña para maximizar el autoconsumo y optimizar la inyección de energía, obteniendo así el mayor retorno de inversión posible.${project.specs.hasBattery ? '' : ' Cuando resulte conveniente, se recomendará la incorporación de baterías de litio para incrementar el aprovechamiento directo de la energía generada.'}`;
-    }
-
-    return [p1, p2, p3, p4];
-  };
-
-  const paragraphs = getRegulatoryParagraphs();
-
-  const rawClientName = project.client.name || 'Cliente';
-  const clientName = cleanClientName(rawClientName);
-  const rawPanelModel = project.specs.panelBrandModel || 'Módulos Monocristalinos TOPCon';
-  const panelModel = (rawPanelModel.toLowerCase().includes('w') || (project.specs.panelPowerW || 0) <= 0)
-    ? rawPanelModel
-    : `${rawPanelModel} (${project.specs.panelPowerW}W)`;
-
-  const rawInverterModel = project.specs.inverterBrandModel || 'Inversor Solar Inteligente';
-  const inverterModel = (rawInverterModel.toLowerCase().includes('kw') || (project.specs.inverterPowerKW || 0) <= 0)
-    ? rawInverterModel
-    : `${rawInverterModel} (${project.specs.inverterPowerKW || (summary.systemCapacityKWp * 0.9).toFixed(1)} kW)`;
-
-  const rawBatteryModel = project.specs.batteryBrandModel || 'Batería de Litio LiFePO4';
-  const batteryModel = (rawBatteryModel.toLowerCase().includes('kwh') || (project.specs.batteryCapacityKWh || 0) <= 0)
-    ? rawBatteryModel
-    : `${rawBatteryModel} (${project.specs.batteryCapacityKWh} kWh)`;
-
-  const hasMultiPanels = !!(project.specs.panels && project.specs.panels.length > 1);
-  const panelsSummaryText = hasMultiPanels
-    ? formatPanelsSummary(project.specs)
-    : `${project.specs.panelCount} ${panelModel}`;
-
-  const hasMultiInverters = !!(project.specs.inverters && project.specs.inverters.length > 1);
-  const invertersSummaryText = hasMultiInverters
-    ? formatInvertersSummary(project.specs)
-    : `${project.specs.inverterCount || 1} ${inverterModel}`;
-
-  const hasMultiBatteries = !!(project.specs.batteries && project.specs.batteries.length > 1);
-  const batteriesSummaryText = hasMultiBatteries
-    ? formatBatteriesSummary(project.specs)
-    : `${project.specs.batteryCount || 1} ${batteryModel}`;
-
   const totalBESSKWh = calculateTotalBatteryCapacityKWh(project.specs);
-
-  const defaultParagraph1 = `El consumo promedio anual de **${clientName}** es de **${summary.annualConsumptionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh**, por lo que se le propone la instalación de **${panelsSummaryText}**, alcanzando una potencia DC instalada de **${summary.systemCapacityKWp.toFixed(2)} kWp**. La producción energética estimada para este sistema es de **${summary.annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh anuales**, representando el **${summary.energyCoveragePct.toFixed(1)}%** del consumo total del cliente.`;
-
-  const defaultParagraph2 = `Adicionalmente, se contempla la instalación de **${invertersSummaryText}**${project.specs.hasBattery && totalBESSKWh > 0 ? ` y **${batteriesSummaryText}**` : ''} ${cust.projectEngineeringScopeText !== undefined && cust.projectEngineeringScopeText.trim() !== '' ? cust.projectEngineeringScopeText.trim() : DEFAULT_DOCUMENT_CUSTOMIZATION.projectEngineeringScopeText}`;
-
-  const resolvedParagraph1 = resolveDynamicProjectSummaryParagraph1(
-    cust.customProjectSummaryParagraph1,
-    defaultParagraph1,
-    project,
-    summary,
-    clientName,
-    hasMultiPanels ? panelsSummaryText : panelModel
-  );
-
-  const resolvedParagraph2 = resolveDynamicProjectSummaryParagraph2(
-    cust.customProjectSummaryParagraph2,
-    defaultParagraph2,
-    project,
-    hasMultiInverters ? invertersSummaryText : inverterModel,
-    hasMultiBatteries ? batteriesSummaryText : batteryModel,
-    cust.projectEngineeringScopeText !== undefined && cust.projectEngineeringScopeText.trim() !== ''
-      ? cust.projectEngineeringScopeText.trim()
-      : DEFAULT_DOCUMENT_CUSTOMIZATION.projectEngineeringScopeText || ''
-  );
-
-  const defaultRegulatoryText = paragraphs.join('\n\n');
 
   return (
     <PDFPageShell
@@ -147,7 +41,7 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
       currentDateStr={currentDateStr}
       pageNum={pageNum}
       totalPages={totalPages}
-      pageTitle="4. DESCRIPCIÓN DEL PROYECTO & NORMATIVA SIE"
+      sectionId="projectDescription"
     >
 
       {/* Body */}
@@ -163,52 +57,20 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
             </div>
             <div className="flex-1">
               <h2 className="text-xs font-black uppercase tracking-tight text-slate-900">
-                Resumen Ejecutivo de la Solución Propuesta
+                <EditableText k="projectDescription.heading" />
               </h2>
-              <InlineEditableText
-                value={cust.projectSummarySubtitle}
-                defaultValue={`Criterios de dimensionamiento técnico para ${clientName}`}
-                onSave={(val) => updateDocumentCustomization?.({ projectSummarySubtitle: val })}
-                onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ projectSummarySubtitle: val })}
-                isEditMode={isEditMode}
-                multiline={false}
-                label="Subtítulo del Resumen Técnico"
-                className="text-[10px] text-slate-500 font-semibold block"
-                boldClassName="text-slate-800 font-bold"
-                isCustomized={!!cust.projectSummarySubtitle}
-                onReset={() => updateDocumentCustomization?.({ projectSummarySubtitle: '' })}
-              />
+              <EditableText k="projectDescription.subtitle" className="text-[10px] text-slate-500 font-semibold block" boldClassName="text-slate-800 font-bold" />
             </div>
           </div>
 
           <div className="p-4 rounded-2xl border border-slate-200 bg-white shadow-xs space-y-3 leading-relaxed text-justify">
-            <InlineEditableText
-              value={resolvedParagraph1}
-              defaultValue={defaultParagraph1}
-              onSave={(val) => updateDocumentCustomization?.({ customProjectSummaryParagraph1: val })}
-              onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ customProjectSummaryParagraph1: val })}
-              isEditMode={isEditMode}
-              multiline={true}
-              label="Párrafo 1 (Consumo y Producción)"
-              className="text-slate-700 text-[11.5px] font-medium block whitespace-pre-line leading-relaxed text-justify"
-              boldClassName="text-slate-950 font-bold"
-              isCustomized={!!cust.customProjectSummaryParagraph1}
-              onReset={() => updateDocumentCustomization?.({ customProjectSummaryParagraph1: '' })}
-            />
+            <EditableText k="projectDescription.paragraph1" className="text-slate-700 text-[11.5px] font-medium block whitespace-pre-line leading-relaxed text-justify" boldClassName="text-slate-950 font-bold" />
 
-            <InlineEditableText
-              value={resolvedParagraph2}
-              defaultValue={defaultParagraph2}
-              onSave={(val) => updateDocumentCustomization?.({ customProjectSummaryParagraph2: val })}
-              onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ customProjectSummaryParagraph2: val })}
-              isEditMode={isEditMode}
-              multiline={true}
-              label="Párrafo 2 (Equipos y Alcance de Instalación)"
-              className="text-slate-700 text-[11.5px] font-medium block whitespace-pre-line leading-relaxed text-justify"
-              boldClassName="text-slate-950 font-bold"
-              isCustomized={!!cust.customProjectSummaryParagraph2}
-              onReset={() => updateDocumentCustomization?.({ customProjectSummaryParagraph2: '' })}
-            />
+            <EditableText k="projectDescription.paragraph2" className="text-slate-700 text-[11.5px] font-medium block whitespace-pre-line leading-relaxed text-justify" boldClassName="text-slate-950 font-bold" />
+            <OptionalTextRow k="projectDescription.engineeringScope" editOnly>
+              <p className="text-[10px] text-slate-500 font-semibold">Alcance de ingeniería (se inserta en el párrafo 2):</p>
+              <EditableText k="projectDescription.engineeringScope" className="text-slate-600 text-[10.5px] block" boldClassName="font-bold" />
+            </OptionalTextRow>
           </div>
 
           {/* Quick Metrics Cards (4 indicators when system has battery, 3 otherwise) */}
@@ -221,7 +83,7 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
                 <Zap className="w-4 h-4" />
               </div>
               <div>
-                <span className="text-[9.5px] uppercase font-black text-slate-400 block">Potencia DC</span>
+                <span className="text-[9.5px] uppercase font-black text-slate-400 block"><EditableText k="projectDescription.metric.power" /></span>
                 <span className="text-sm font-black font-mono text-slate-900 block">
                   {summary.systemCapacityKWp.toFixed(2)} kWp
                 </span>
@@ -233,7 +95,7 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
                 <Sparkles className="w-4 h-4" />
               </div>
               <div>
-                <span className="text-[9.5px] uppercase font-black text-slate-400 block">Cobertura Solar</span>
+                <span className="text-[9.5px] uppercase font-black text-slate-400 block"><EditableText k="projectDescription.metric.coverage" /></span>
                 <span className="text-sm font-black font-mono text-sky-700 block">
                   {summary.energyCoveragePct.toFixed(1)}% Anual
                 </span>
@@ -245,7 +107,7 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
                 <Sun className="w-4 h-4 text-amber-400" />
               </div>
               <div>
-                <span className="text-[9.5px] uppercase font-black text-slate-400 block">Generación Anual</span>
+                <span className="text-[9.5px] uppercase font-black text-slate-400 block"><EditableText k="projectDescription.metric.production" /></span>
                 <span className="text-sm font-black font-mono text-slate-900 block">
                   {Math.round(summary.annualProductionKWh).toLocaleString()} kWh
                 </span>
@@ -258,7 +120,7 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
                   <BatteryCharging className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-[9.5px] uppercase font-black text-emerald-800 block">Almacenamiento BESS</span>
+                  <span className="text-[9.5px] uppercase font-black text-emerald-800 block"><EditableText k="projectDescription.metric.storage" /></span>
                   <span className="text-sm font-black font-mono text-emerald-950 block">
                     {totalBESSKWh.toFixed(1)} kWh
                   </span>
@@ -272,23 +134,11 @@ export const PDFProjectDescriptionPage: React.FC<PDFProjectDescriptionPageProps>
         <div className="rounded-2xl border-2 border-amber-300/80 bg-amber-50/80 p-4 shadow-xs space-y-2.5 relative overflow-hidden">
           <div className="flex items-center gap-2 text-amber-950 font-black text-xs uppercase tracking-wider">
             <ShieldAlert className="w-4.5 h-4.5 text-amber-600" />
-            <span>Marco Regulatorio y Condiciones de Operación (SIE / EDES)</span>
+            <span><EditableText k="projectDescription.regulatoryHeading" /></span>
           </div>
 
           <div className="space-y-2 text-amber-950/90 text-[11.5px] leading-relaxed text-justify font-medium">
-            <InlineEditableText
-              value={cust.regulatoryNote}
-              defaultValue={defaultRegulatoryText}
-              onSave={(val) => updateDocumentCustomization?.({ regulatoryNote: val })}
-              onSavePermanent={(val) => updateDefaultDocumentCustomization?.({ regulatoryNote: val })}
-              isEditMode={isEditMode}
-              multiline={true}
-              label="Marco Regulatorio SIE (Párrafos)"
-              className="text-amber-950/90 text-[11.5px] leading-relaxed text-justify font-medium block whitespace-pre-line"
-              boldClassName="font-bold text-amber-950"
-              isCustomized={!!(cust.regulatoryNote && cust.regulatoryNote !== DEFAULT_DOCUMENT_CUSTOMIZATION.regulatoryNote)}
-              onReset={() => updateDocumentCustomization?.({ regulatoryNote: DEFAULT_DOCUMENT_CUSTOMIZATION.regulatoryNote })}
-            />
+            <EditableText k="projectDescription.regulatoryNote" className="text-amber-950/90 text-[11.5px] leading-relaxed text-justify font-medium block whitespace-pre-line" boldClassName="font-bold text-amber-950" />
           </div>
         </div>
       </div>

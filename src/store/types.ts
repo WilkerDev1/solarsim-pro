@@ -8,6 +8,7 @@ import {
   FinancialSummaryResult,
   UpdateInfo,
   DocumentCustomization,
+  DocumentLayoutSettings,
   ExtractedInvoiceData,
   SyncSettings,
   UserProfile,
@@ -128,6 +129,12 @@ export interface ProjectSlice {
   updateAllMonthlyConsumption: (value: number) => void;
   setMonthlyConsumption: (monthlyConsumption: number[], lockAutoPanels?: boolean) => void;
   updateDocumentCustomization: (customization: Partial<DocumentCustomization>) => void;
+  /** Diseño persistente del documento (secciones visibles, tema, cabecera/pie). Registra deshacer. */
+  setDocumentLayout: (patch: Partial<DocumentLayoutSettings>) => void;
+  /** Textos del documento por clave estable (`null` restablece). Registra deshacer. */
+  setDocumentTexts: (values: Record<string, string | null>) => void;
+  /** Guarda textos en la plantilla de la empresa emisora (con placeholders; nunca datos del cliente). */
+  saveDocumentTextsToCompanyTemplate: (keys: readonly string[] | 'all') => { saved: string[]; skipped: string[] };
   applySupplierPriceToProject: (
     equipmentType: 'panel' | 'inverter' | 'battery',
     supplierPrice: import('../types/equipment').EquipmentSupplierPrice,
