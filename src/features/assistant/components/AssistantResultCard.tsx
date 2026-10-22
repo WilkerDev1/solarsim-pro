@@ -5,7 +5,6 @@ import { fetchEquipmentAsset } from '../../../services/equipmentAssetService';
 import { assistantFieldLabel, assistantValueLabel } from '../labels';
 import type { AssistantAction, AssistantCard } from '../types';
 import {
-  applyAssistantAction,
   assistantOwner,
   visibleAssistantProjects,
   visibleAssistantEquipment,
@@ -192,7 +191,9 @@ export function AssistantActionCard({
               disabled={disabled}
               onClick={() => {
                 try {
-                  applyAssistantAction(action);
+                  // Only queued plans can be confirmed: an evicted or expired plan must be prepared again.
+                  const result = useSimulationStore.getState().confirmAgentAction(action.id);
+                  if (!result.success) throw new Error(result.error || 'La acción ya no está disponible; pide al asistente que la prepare de nuevo.');
                   setStatus('applied');
                   setError('');
                   onApplied(
@@ -207,12 +208,54 @@ export function AssistantActionCard({
             >
               Confirmar cambio
             </button>
-            <button disabled={disabled} onClick={() => setStatus('discarded')}>
+            <button disabled={disabled} onClick={() => { useSimulationStore.getState().rejectAgentAction(action.id); setStatus('discarded'); }}>
               Descartar
             </button>
           </>
         ) : (
           <p>{status === 'applied' ? 'Aplicado' : 'Descartado'}</p>
+        )}
+        {error && (
+          <p role="alert" className="assistant-widget-error">
+            {error}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** A change the assistant already applied (drafts-free policy), with a one-click undo. */
+export function AssistantAppliedCard({ activityId, title }: { activityId: string; title: string }) {
+  const entry = useSimulationStore((s) => s.agentActivity.find((a) => a.id === activityId));
+  const [error, setError] = useState('');
+  if (!entry) return null;
+  return (
+    <div className="assistant-result">
+      <div className="assistant-result-content">
+        <h3>{title}</h3>
+        <dl className="assistant-changes">
+          {entry.changes.map((c, i) => (
+            <div key={`${c.label}-${i}`}>
+              <dt>{c.label}</dt>
+              <dd>{c.value}</dd>
+            </div>
+          ))}
+        </dl>
+        {entry.status === 'applied' ? (
+          <>
+            <p>Aplicado. Queda en Ajustes → Agentes e IA.</p>
+            <button
+              onClick={() => {
+                const result = useSimulationStore.getState().undoAgentActivity(activityId);
+                setError(result.success ? '' : result.error || 'No se pudo deshacer.');
+              }}
+            >
+              Deshacer
+            </button>
+          </>
+        ) : (
+          <p>Deshecho</p>
         )}
         {error && (
           <p role="alert" className="assistant-widget-error">

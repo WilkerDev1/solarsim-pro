@@ -10,10 +10,11 @@ import { CloudflareProposalsSection } from './sections/CloudflareProposalsSectio
 import { OrganizationSection } from './sections/OrganizationSection';
 import { ApplicationFeaturesSection } from './sections/ApplicationFeaturesSection';
 import { BackupSection } from './sections/BackupSection';
+import { AgentsSection } from './sections/AgentsSection';
 
 const sectionComponents: Record<SettingsSectionId, React.ComponentType> = {
   funciones: ApplicationFeaturesSection, cuenta: ProfileSection, preferencias: SimulationPreferencesSection, integraciones: IntegrationsSection,
-  catalogo: EquipmentSection, cloudflare: CloudflareProposalsSection, organizacion: OrganizationSection, respaldo: BackupSection,
+  catalogo: EquipmentSection, cloudflare: CloudflareProposalsSection, organizacion: OrganizationSection, respaldo: BackupSection, agentes: AgentsSection,
 };
 
 export const SettingsModal: React.FC = () => {

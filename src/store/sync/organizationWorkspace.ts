@@ -32,11 +32,15 @@ const keys = [
   "companies",
   "activeCompanyId",
   "localUserProfile",
+  "agentActivity",
 ] as const;
+// Keys added after 2.6 are optional: archives written by older versions lack them and fall back to emptyWorkspace().
+type OptionalWorkspaceKey = "agentActivity";
 export type OrganizationWorkspace = Pick<
   SimulationStore,
-  (typeof keys)[number]
->;
+  Exclude<(typeof keys)[number], OptionalWorkspaceKey>
+> &
+  Partial<Pick<SimulationStore, OptionalWorkspaceKey>>;
 // Cached identity keeps the offline workspace selected even when its token expires.
 // Only explicit logout (no currentUser) returns to the personal local workspace.
 export const workspaceScope = (session: SyncSettings): string =>
@@ -72,6 +76,7 @@ export function emptyWorkspace(): OrganizationWorkspace {
     companies: [DEFAULT_LOCAL_COMPANY],
     activeCompanyId: DEFAULT_LOCAL_COMPANY.id,
     localUserProfile: DEFAULT_LOCAL_USER,
+    agentActivity: [],
   });
 }
 /** One-time partition of legacy mixed project caches. No document is reassigned. */
@@ -333,6 +338,7 @@ export function changeWorkspace(
     activeFolderId: null,
     activeConflict: null,
     pendingImportConflict: null,
+    pendingAgentActions: [],
     undoStack: [],
     redoStack: [],
     canUndo: false,

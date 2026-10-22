@@ -8,6 +8,7 @@ import { normalizeBrandName, inferBrandFromText } from '../../utils/equipmentBra
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
 import { normalizeFeatureSettings, featureScope, isFeatureSettings } from '../../../shared/applicationFeatures';
 import { migrateDefaultSimulationSettings } from '../defaultSimulationSettings';
+import { normalizeAgentPolicy } from '../slices/agentSlice';
 
 export function hydrateSimulationStore(state: SimulationStore | undefined): void {
   if (state && state.projects && Array.isArray(state.projects)) {
@@ -182,6 +183,9 @@ export function hydrateSimulationStore(state: SimulationStore | undefined): void
     }
 
     state.documentTemplatesByCompany ||= {};
+    state.agentPolicy = normalizeAgentPolicy(state.agentPolicy);
+    if (!Array.isArray(state.agentActivity)) state.agentActivity = [];
+    state.pendingAgentActions = [];
     if (state.defaultSimulationSettings) state.defaultSimulationSettings = migrateDefaultSimulationSettings(state.defaultSimulationSettings);
     for (const workspace of Object.values(state.organizationWorkspaces || {})) {
       if (workspace?.defaultSimulationSettings) workspace.defaultSimulationSettings = migrateDefaultSimulationSettings(workspace.defaultSimulationSettings);

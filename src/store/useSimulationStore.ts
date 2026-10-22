@@ -1,3 +1,4 @@
+import { createAgentSlice } from './slices/agentSlice';
 import { hydrateSimulationStore } from './persistence/hydrateSimulationStore';
 import { serializeSimulationStore } from './persistence/serializeSimulationStore';
 import { create } from 'zustand';
@@ -40,6 +41,7 @@ export const useSimulationStore = create<SimulationStore>()(
       ...createVersionHistorySlice(...a),
       ...createNotificationSlice(...a),
       ...createFeatureSettingsSlice(...a),
+      ...createAgentSlice(...a),
     }),
 
     {

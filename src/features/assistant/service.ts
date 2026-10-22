@@ -24,8 +24,30 @@ export interface AssistantRunOptions {
   transport?: GeminiTransport;
 }
 /** Small bounded tool loop. Tool results are data, never instructions or executable HTML. */
+/** Raised when the conversation fails after some changes were already applied, so the UI can still show them. */
+export class AssistantRunError extends Error {
+  constructor(message: string, readonly applied: { activityId: string; title: string }[]) {
+    super(message);
+  }
+}
 export async function runAssistant(
   options: AssistantRunOptions
+): Promise<AssistantMessage> {
+  const applied: { activityId: string; title: string }[] = [];
+  try {
+    return await runAssistantLoop(options, applied);
+  } catch (error) {
+    if (!applied.length) throw error;
+    // Mutations already happened: never report "nothing was applied" and keep their undo cards visible.
+    throw new AssistantRunError(
+      'La conversación se interrumpió, pero algunos cambios ya se aplicaron. Puedes revisarlos o deshacerlos abajo.',
+      applied
+    );
+  }
+}
+async function runAssistantLoop(
+  options: AssistantRunOptions,
+  applied: { activityId: string; title: string }[]
 ): Promise<AssistantMessage> {
   const cards: AssistantCard[] = [];
   const actions: AssistantAction[] = [];
@@ -85,6 +107,7 @@ export async function runAssistant(
           ...new Map(cards.map((c) => [`${c.kind}:${c.id}`, c])).values(),
         ].slice(0, 12),
         actions,
+        ...(applied.length ? { applied } : {}),
       };
     if (calls.length > 4)
       throw new Error(
@@ -99,6 +122,8 @@ export async function runAssistant(
             'Resultado demasiado grande. Consulta un equipo o una propuesta específica.'
           );
         if (result.cards) cards.push(...result.cards);
+        if (result.activityId)
+          applied.push({ activityId: result.activityId, title: String(call.args?.title || 'Cambio aplicado').slice(0, 150) });
         if (result.action) {
           if (actions.length >= 3)
             throw new Error('Máximo tres cambios por mensaje.');

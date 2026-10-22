@@ -3,8 +3,12 @@ import { AGENT_TOOL_DEFINITIONS, findAgentTool } from '../../../shared/agentTool
 import { validateJsonSchema } from '../../../shared/agentTools/jsonSchema';
 import type { AgentSource, AgentToolCall, AgentToolDefinition, AgentToolOutcome } from '../../../shared/agentTools/types';
 import type { AgentCard } from '../../../shared/agentCards';
+import { useSimulationStore } from '../../store/useSimulationStore';
+import { isWriterRole } from '../../../shared/permissions';
+import { agentPolicyKey, installAgentRuntime, type AgentActivityEntry, type AgentChange, type PendingAgentAction } from '../../store/slices/agentSlice';
 import { editableAssistantFields } from '../assistant/validation';
-import { executeAssistantTool } from '../assistant/tools';
+import { applyAssistantAction, executeAssistantTool } from '../assistant/tools';
+import { assistantFieldLabel, assistantValueLabel } from '../assistant/labels';
 import type { AssistantAction, AssistantCard, AssistantToolResult } from '../assistant/types';
 
 export interface AgentToolContext {
@@ -16,10 +20,15 @@ export interface AgentToolContext {
 }
 
 const MAX_RESULT_BYTES = 64000;
-const pendingActions = new Map<string, AssistantAction>();
+const PROJECT_SECTIONS = ['client', 'specs', 'rates', 'financials', 'monthlyConsumption', 'customization'] as const;
+const store = () => useSimulationStore.getState();
+const fingerprint = (value: unknown) => JSON.stringify(value ?? null);
+const pick = (source: object, keys: readonly string[]) =>
+  Object.fromEntries(keys.map((k) => [k, structuredClone((source as Record<string, unknown>)[k])]));
 
 export function listAgentTools(source: AgentSource): AgentToolDefinition[] {
-  return AGENT_TOOL_DEFINITIONS.filter((d) => d.surfaces.includes(source)).map(describeAgentTool);
+  const policy = store().agentPolicy[agentPolicyKey(source)];
+  return AGENT_TOOL_DEFINITIONS.filter((d) => d.surfaces.includes(source) && policy[d.kind] !== 'deny').map(describeAgentTool);
 }
 
 /** Appends the live editable-field whitelist so models see exactly which fields are accepted. */
@@ -58,37 +67,130 @@ function decodeArgs(args: Record<string, unknown>): Record<string, unknown> {
   };
 }
 
+const describeChanges = (action: AssistantAction): AgentChange[] =>
+  action.edits.map((e) => ({ label: assistantFieldLabel(e.field), value: assistantValueLabel(e.value) }));
+
+/** Applies a revalidated plan and records it with the sections needed to undo it. */
+function applyPlan(action: AssistantAction, meta: { source: AgentSource; clientLabel?: string; tool: string; kind: 'draft' | 'guarded' }) {
+  // Only the general assistant depends on its own on/off switch; other agent surfaces keep working without it.
+  const requireAssistantEnabled = meta.source === 'app-assistant';
+  const s = store();
+  const fields = action.kind === 'equipment' ? [...new Set(action.edits.map((e) => e.field))] : [...PROJECT_SECTIONS];
+  const target = action.kind === 'equipment' ? s.equipmentCatalog.find((e) => e.id === action.targetId) : s.projects.find((p) => p.id === action.targetId);
+  if (!target) throw new Error('Destino no disponible.');
+  const before = pick(target, fields);
+  applyAssistantAction(action, { requireAssistantEnabled });
+  const after = action.kind === 'equipment'
+    ? store().equipmentCatalog.find((e) => e.id === action.targetId)
+    : store().projects.find((p) => p.id === action.targetId);
+  return store().recordAgentActivity({
+    source: meta.source, clientLabel: meta.clientLabel, tool: meta.tool, kind: meta.kind,
+    targetType: action.kind, targetId: action.targetId, title: action.title, changes: describeChanges(action),
+    // `fields` survives JSON persistence even when a field was absent (undefined) before the change.
+    undo: after ? { before, fields, afterFingerprint: fingerprint(pick(after, fields)) } : undefined,
+  });
+}
+
+/** Undo is a new write: revalidate today's permissions and target state, never the ones from when the agent acted. */
+function canWriteNow(): boolean {
+  const s = store();
+  const user = s.syncSettings.currentUser;
+  return user ? !!s.syncSettings.authToken && isWriterRole(user.role) : s.workspaceScope === 'local';
+}
+
+function undoEntry(entry: AgentActivityEntry) {
+  const s = store();
+  if (!canWriteNow()) return { success: false, error: 'Tu cuenta solo puede consultar.' };
+  const fields = entry.undo!.fields || Object.keys(entry.undo!.before);
+  const restored = Object.fromEntries(fields.map((f) => [f, structuredClone(entry.undo!.before[f])]));
+  if (entry.targetType === 'equipment') {
+    const current = s.equipmentCatalog.find((e) => e.id === entry.targetId);
+    if (!current) return { success: false, error: 'El equipo ya no existe.' };
+    if (s.equipmentConflicts[entry.targetId]) return { success: false, error: 'Resuelve primero el conflicto del equipo.' };
+    if (fingerprint(pick(current, fields)) !== entry.undo!.afterFingerprint)
+      return { success: false, error: 'El equipo cambió después; revísalo en el catálogo.' };
+    s.updateEquipmentItem(entry.targetId, restored);
+    const after = store().equipmentCatalog.find((e) => e.id === entry.targetId);
+    return after && fingerprint(pick(after, fields)) === fingerprint(restored)
+      ? { success: true }
+      : { success: false, error: 'El catálogo rechazó el cambio.' };
+  }
+  const current = s.projects.find((p) => p.id === entry.targetId);
+  if (!current) return { success: false, error: 'La propuesta ya no existe.' };
+  if (current.isDeleted || current.syncStatus === 'conflict') return { success: false, error: 'La propuesta no admite cambios (papelera o conflicto).' };
+  if (fingerprint(pick(current, fields)) !== entry.undo!.afterFingerprint)
+    return { success: false, error: 'La propuesta cambió después; usa el historial de versiones para revertir.' };
+  return s.updateProjectById(entry.targetId, () => restored)
+    ? { success: true }
+    : { success: false, error: 'La propuesta no admite cambios.' };
+}
+
+installAgentRuntime({
+  apply(pending: PendingAgentAction) {
+    try {
+      const activityId = applyPlan(pending.plan as AssistantAction, { source: pending.source, clientLabel: pending.clientLabel, tool: pending.tool, kind: pending.kind === 'guarded' ? 'guarded' : 'draft' });
+      return { success: true, activityId };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'No se pudo aplicar.' };
+    }
+  },
+  undo: undoEntry,
+});
+
+async function actionStatus(args: Record<string, unknown>, ctx: AgentToolContext): Promise<AgentToolOutcome> {
+  const deadline = Date.now() + Math.min(20, Number(args.waitSeconds) || 0) * 1000;
+  for (;;) {
+    const action = store().pendingAgentActions.find((a) => a.id === args.actionId);
+    if (!action) return { status: 'error', code: 'not_found', message: 'Acción desconocida o ya descartada.' };
+    const expired = action.status === 'pending' && Date.parse(action.expiresAt) < Date.now();
+    if (action.status !== 'pending' || expired || Date.now() >= deadline || ctx.signal?.aborted)
+      return { status: 'ok', data: { actionId: action.id, status: expired ? 'expired' : action.status, error: action.error, activityId: action.activityId } };
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+}
+
 export async function executeAgentTool(call: AgentToolCall, ctx: AgentToolContext): Promise<AgentToolOutcome> {
   const definition = findAgentTool(call.name);
   if (!definition || !definition.surfaces.includes(ctx.source))
     return { status: 'error', code: 'unknown_tool', message: 'Herramienta no permitida.' };
+  const policy = store().agentPolicy[agentPolicyKey(ctx.source)];
+  if (policy[definition.kind] === 'deny')
+    return { status: 'error', code: 'denied', message: 'Los permisos de agentes de este dispositivo no permiten esta acción.' };
   const args = call.args && typeof call.args === 'object' && !Array.isArray(call.args) ? call.args : {};
   const errors = validateJsonSchema(definition.inputSchema, args);
   if (errors.length) return { status: 'error', code: 'invalid_arguments', message: errors.slice(0, 5).join(' ') };
   if (ctx.signal?.aborted) return { status: 'error', code: 'cancelled', message: 'Solicitud cancelada.' };
+  if (definition.name === 'get_agent_action_status') return actionStatus(args, ctx);
   let result: AssistantToolResult;
   try {
-    result = executeAssistantTool({ name: call.name, args: decodeArgs(args) }, ctx.owner);
+    result = executeAssistantTool({ name: call.name, args: decodeArgs(args) }, ctx.owner, { requireAssistantEnabled: ctx.source === 'app-assistant' });
   } catch (error) {
     return { status: 'error', code: 'tool_failed', message: error instanceof Error ? error.message : 'Herramienta no disponible.' };
   }
   if (JSON.stringify(result.data ?? null).length > MAX_RESULT_BYTES)
     return { status: 'error', code: 'result_too_large', message: 'Resultado demasiado grande. Consulta un equipo o una propuesta específica.' };
   const cards = result.cards?.map(toAgentCard);
-  if (result.action) {
-    pendingActions.set(result.action.id, result.action);
-    // Bounded: only recent plans can be confirmed; older ones must be prepared again.
-    while (pendingActions.size > 50) pendingActions.delete(pendingActions.keys().next().value!);
-    return { status: 'pending_confirmation', actionId: result.action.id, summary: result.action.title, cards };
+  const action = result.action;
+  if (!action) return { status: 'ok', data: result.data, cards };
+  const kind = definition.kind === 'guarded' ? 'guarded' : 'draft';
+  const meta = { source: ctx.source, clientLabel: ctx.clientLabel, tool: definition.name, kind } as const;
+  if (kind === 'draft' && policy.draft === 'allow') {
+    try {
+      const activityId = applyPlan(action, meta);
+      return { status: 'applied', data: { status: 'applied', edits: action.edits }, activityId, cards };
+    } catch (error) {
+      return { status: 'error', code: 'apply_failed', message: error instanceof Error ? error.message : 'No se pudo aplicar.' };
+    }
   }
-  return { status: 'ok', data: result.data, cards };
+  store().queueAgentAction({ id: action.id, ...meta, title: action.title, changes: describeChanges(action), plan: action });
+  return { status: 'pending_confirmation', actionId: action.id, summary: action.title, cards };
 }
 
 export function getPendingAgentAction(actionId: string): AssistantAction | undefined {
-  return pendingActions.get(actionId);
+  return store().pendingAgentActions.find((a) => a.id === actionId)?.plan as AssistantAction | undefined;
 }
 
-/** Legacy shape consumed by the general assistant UI (cards + confirmable action). */
+/** Legacy shape consumed by the general assistant UI (cards, confirmable plan or applied activity). */
 export async function executeForAssistant(call: AgentToolCall, ctx: AgentToolContext): Promise<AssistantToolResult> {
   const outcome = await executeAgentTool(call, ctx);
   if (outcome.status === 'error') throw new Error(outcome.message);
@@ -97,5 +199,6 @@ export async function executeForAssistant(call: AgentToolCall, ctx: AgentToolCon
     const action = getPendingAgentAction(outcome.actionId)!;
     return { data: { status: 'pending_confirmation', edits: action.edits }, cards, action };
   }
+  if (outcome.status === 'applied') return { data: outcome.data, cards, activityId: outcome.activityId };
   return { data: outcome.data, cards };
 }
