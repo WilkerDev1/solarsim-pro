@@ -1,8 +1,9 @@
 import { escapeHtml } from './escaping';
+import type { EnergyCalculationMode } from '../../../shared/applicationFeatures';
 
 export type FlowBranchKey = 'home' | 'battery' | 'grid';
 export interface FlowBranch { key: FlowBranchKey; pct: number; kWh: number }
-interface FlowInput { hybrid: boolean; isZeroExport: boolean; annualProductionKWh: number; monthly: any[] }
+interface FlowInput { hybrid: boolean; isZeroExport: boolean; annualProductionKWh: number; monthly: any[]; calculationMode?: EnergyCalculationMode }
 
 // The diagram is a visual guide, not a measurement: shares are rounded to 5 %
 // and fall back to a typical split when the publication lacks usable data.
@@ -34,7 +35,12 @@ function roundToFive(raw: Partial<Record<FlowBranchKey, number>>): Partial<Recor
   return Object.fromEntries(keys.map((k) => [k, units[k] * 5]));
 }
 
-export function energyFlowBranches({ hybrid, isZeroExport, annualProductionKWh, monthly }: FlowInput): FlowBranch[] {
+export function energyFlowBranches({ hybrid, isZeroExport, annualProductionKWh, monthly, calculationMode }: FlowInput): FlowBranch[] {
+  return energyFlow({ hybrid, isZeroExport, annualProductionKWh, monthly, calculationMode }).branches;
+}
+
+/** Branches plus the energy they share: what was actually used, never curtailed zero-export surplus. */
+function energyFlow({ hybrid, isZeroExport, annualProductionKWh, monthly, calculationMode }: FlowInput): { branches: FlowBranch[]; totalKWh: number } {
   const rows = Array.isArray(monthly) ? monthly : [];
   const sum = (pick: (m: any) => number) => rows.reduce((total, m) => total + (Number(pick(m)) || 0), 0);
   const production = sum((m) => m.productionKWh);
@@ -44,14 +50,19 @@ export function energyFlowBranches({ hybrid, isZeroExport, annualProductionKWh, 
   const exported = isZeroExport ? 0 : sum((m) => typeof m.gridExportedKWh === 'number'
     ? m.gridExportedKWh
     : Math.max(0, (Number(m.productionKWh) || 0) - (Number(m.solarSelfConsumedKWh) || 0)));
+  const home = Math.max(0, selfConsumed - battery);
 
-  const usable = production > 0 && selfConsumed > 0 && (!hybrid || battery > 0);
+  // Legacy snapshots never record the battery cycle; the physical model may report a real zero.
+  const batteryKnown = !hybrid || battery > 0 || calculationMode === 'self_consumption';
+  const usable = production > 0 && selfConsumed > 0 && batteryKnown;
   const pct = usable
-    ? roundToFive({ home: Math.max(0, selfConsumed - battery), battery, grid: exported })
+    ? roundToFive({ home, battery, grid: exported })
     : TYPICAL[hybrid ? (isZeroExport ? 'hybridZeroExport' : 'hybrid') : (isZeroExport ? 'zeroExport' : 'onGrid')];
-  const total = annualProductionKWh > 0 ? annualProductionKWh : production;
-  return ORDER.filter((k) => (pct[k] ?? 0) > 0)
-    .map((key) => ({ key, pct: pct[key]!, kWh: Math.round((total * pct[key]!) / 100 / 100) * 100 }));
+  // Without data, a zero-export production figure would include curtailed energy: show shares only.
+  const totalKWh = usable ? home + battery + exported : (isZeroExport ? 0 : (annualProductionKWh > 0 ? annualProductionKWh : production));
+  const branches = ORDER.filter((k) => (pct[k] ?? 0) > 0)
+    .map((key) => ({ key, pct: pct[key]!, kWh: Math.round((totalKWh * pct[key]!) / 100 / 100) * 100 }));
+  return { branches, totalKWh };
 }
 
 const ICONS = {
@@ -122,10 +133,7 @@ function flowSvg(branches: FlowBranch[], hybrid: boolean, productionKWh: number,
 /** Variant C of the energy flow diagram: one diagram, hybrid or grid-tied, above section 1. */
 export function renderEnergyFlowSection(input: FlowInput): string {
   const { hybrid, isZeroExport } = input;
-  const branches = energyFlowBranches(input);
-  const productionKWh = input.annualProductionKWh > 0
-    ? input.annualProductionKWh
-    : (Array.isArray(input.monthly) ? input.monthly.reduce((t, m) => t + (Number(m?.productionKWh) || 0), 0) : 0);
+  const { branches, totalKWh: productionKWh } = energyFlow(input);
   const title = hybrid ? 'Sistema híbrido' : (isZeroExport ? 'Sistema de autoconsumo' : 'Sistema de inyección');
   const subtitle = hybrid ? 'con batería' : (isZeroExport ? 'inyección cero' : 'on-grid');
   const ariaLabel = `Flujo anual aproximado de un ${title.toLowerCase()}: ${branches.map((b) => `${b.pct} % ${labelFor(b.key, hybrid).toLowerCase()}`).join(', ')}`;

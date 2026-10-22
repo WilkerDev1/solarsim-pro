@@ -5,6 +5,7 @@ import { ELECTSUN_LOGO_COLOR_BASE64 } from '../../../shared/electsunLogoColor';
 import { escapeHtml, formatInlineMarkdown, formatMarkdown, safeLogoUrl, scriptJson } from './escaping';
 import { createDocumentTextContext, docTextKey, interpolate, viewerText } from '../../../shared/documentTexts';
 import { ENERGY_FLOW_CSS, renderEnergyFlowSection } from './energyFlow';
+import { isBuiltInFeatureAvailable } from '../../../shared/applicationFeatures';
 
 export function renderExpiredPage(companyName = 'electsun', companyPhone = '+1 (809) 378-6590'): string {
   return `<!DOCTYPE html>
@@ -494,7 +495,7 @@ ${ENERGY_FLOW_CSS}
     </header>
 
     <!-- FLUJO ENERGÉTICO ANIMADO (guía visual aproximada) -->
-    ${renderEnergyFlowSection({ hybrid: hasBattery && totalBESSKWh > 0, isZeroExport, annualProductionKWh, monthly: monthlyData })}
+    ${isBuiltInFeatureAvailable('proposalEnergyFlowDiagram') ? renderEnergyFlowSection({ hybrid: hasBattery && totalBESSKWh > 0, isZeroExport, annualProductionKWh, monthly: monthlyData, calculationMode: stored.calculationSnapshot?.mode }) : ''}
 
     <!-- 2. RESUMEN EJECUTIVO DE LA SOLUCIÓN PROPUESTA -->
     <section class="bg-white border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">

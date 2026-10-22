@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { renderProposalPage } from '../src/template';
 import { energyFlowBranches } from '../src/energyFlow';
+import { BUILT_IN_APPLICATION_FEATURES, isBuiltInFeatureAvailable } from '../../../shared/applicationFeatures';
 
 const month = (productionKWh: number, solarSelfConsumedKWh: number, gridExportedKWh?: number, batteryContributionKWh?: number) =>
   ({ month: 'Ene', productionKWh, solarSelfConsumedKWh, gridExportedKWh, batteryContributionKWh, consumptionKWh: 400 });
@@ -48,10 +49,24 @@ assert.ok(!energyFlowBranches({ hybrid: true, isZeroExport: true, annualProducti
 // A tiny export still shows a visible branch instead of disappearing.
 assert.deepEqual(shares(energyFlowBranches({ hybrid: false, isZeroExport: false, annualProductionKWh: 1000, monthly: [month(1000, 990, 10)] })), { home: 95, grid: 5 });
 
+// Zero export curtails the surplus: branch energy is what was used, never the potential production.
+const curtailed = energyFlowBranches({ hybrid: false, isZeroExport: true, annualProductionKWh: 10000, monthly: [month(10000, 3000, 0)] });
+assert.deepEqual(curtailed.map((b) => [b.key, b.pct, b.kWh]), [['home', 100, 3000]]);
+// Without data, a zero-export guide shows shares only.
+assert.ok(energyFlowBranches({ hybrid: false, isZeroExport: true, annualProductionKWh: 10000, monthly: [] }).every((b) => b.kWh === 0));
+
+// In the physical model a battery may legitimately stay idle: a measured zero is kept, not replaced by a typical split.
+const idleBattery = energyFlowBranches({ hybrid: true, isZeroExport: false, annualProductionKWh: 12000, calculationMode: 'self_consumption', monthly: [month(12000, 12000, 0, 0)] });
+assert.deepEqual(shares(idleBattery), { home: 100 });
+
 for (const branches of [onGrid, hybrid, legacyHybrid]) {
   assert.equal(branches.reduce((sum, b) => sum + b.pct, 0), 100);
   assert.ok(branches.every((b) => b.pct % 5 === 0 && b.pct > 0));
 }
+
+// The diagram is a registered, always-available built-in capability.
+assert.ok(BUILT_IN_APPLICATION_FEATURES.some((f) => f.id === 'proposalEnergyFlowDiagram' && f.defaultEnabled));
+assert.equal(isBuiltInFeatureAvailable('proposalEnergyFlowDiagram'), true);
 
 // Exactly one diagram, placed between the quote details and the executive summary.
 const onGridHtml = renderProposalPage(proposal({ summary: { monthlyBreakdown: [month(8900, 4090, 4810)] } }));
