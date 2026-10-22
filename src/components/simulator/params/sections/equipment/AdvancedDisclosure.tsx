@@ -24,7 +24,7 @@ export const AdvancedDisclosure: React.FC<AdvancedDisclosureProps> = ({ label = 
         <ChevronDown size={14} strokeWidth={2} aria-hidden="true" className={open ? '' : '-rotate-90'} />
         {label}
       </button>
-      <div id={id} hidden={!open} className="flex flex-col gap-2.5">
+      <div id={id} hidden={!open} className={open ? 'flex flex-col gap-2.5' : undefined}>
         {children}
       </div>
     </div>

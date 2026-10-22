@@ -137,6 +137,11 @@ function secondaryCatalogExtras(kind: EquipmentKind, item: SolarEquipmentItem, c
   return { capacityKWh: item.capacityKWh || 5.12, unitPriceUSD };
 }
 
+/** Cantidad en unidades enteras, mínimo 1: el Stepper acepta fracciones y los equipos no se cuentan en fracciones. */
+export function wholeCount(count: number): number {
+  return Number.isFinite(count) ? Math.max(1, Math.trunc(count)) : 1;
+}
+
 export interface GroupActions<K extends EquipmentKind> {
   add: () => void;
   remove: (index: number) => void;
@@ -175,7 +180,7 @@ export function createGroupActions<K extends EquipmentKind>(
       const current = itemsOf(specs, kind)[index];
       commit(selectCatalogEquipment(specs, kind, index, item, secondaryCatalogExtras(kind, item, current?.unitPriceUSD) as Partial<GroupItem[K]>));
     },
-    setCount: (index, count) => update(index, { count } as Partial<GroupItem[K]>),
+    setCount: (index, count) => update(index, { count: wholeCount(count) } as Partial<GroupItem[K]>),
     setBrand: (index, brandModel) => update(index, { brandModel } as Partial<GroupItem[K]>),
     setMagnitude: (index, value) => update(index, { [field]: value } as Partial<GroupItem[K]>),
   };

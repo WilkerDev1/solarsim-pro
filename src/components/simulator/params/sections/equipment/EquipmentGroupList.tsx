@@ -63,7 +63,7 @@ export const EquipmentGroupList: React.FC<EquipmentGroupListProps> = ({ kind, mo
   );
 
   const renderCatalog = (view: GroupModelView, index: number) => {
-    const picker = (
+    const makePicker = (trailing?: React.ReactNode) => (
       <SearchableEquipmentSelect
         type={kind}
         items={catalog}
@@ -73,12 +73,13 @@ export const EquipmentGroupList: React.FC<EquipmentGroupListProps> = ({ kind, mo
         onOpenScanner={onOpenScanner}
         label={`Modelo de ${config.noun} #${index + 1}`}
         placeholder={config.searchPlaceholder}
+        trailing={trailing}
       />
     );
     if (index === 0 && autoCalculate) {
       return (
         <>
-          {picker}
+          {makePicker()}
           <div className="flex items-center justify-between gap-2">
             <AutoCalculateRow kindNoun={config.plural} auto={autoCalculate} />
             {stepper(view, index, autoCalculate.checked)}
@@ -86,12 +87,7 @@ export const EquipmentGroupList: React.FC<EquipmentGroupListProps> = ({ kind, mo
         </>
       );
     }
-    return (
-      <div className="flex items-center gap-2">
-        <div className="min-w-0 flex-1">{picker}</div>
-        {stepper(view, index, false, true)}
-      </div>
-    );
+    return makePicker(stepper(view, index, false, true));
   };
 
   const renderManual = (view: GroupModelView, index: number) => {

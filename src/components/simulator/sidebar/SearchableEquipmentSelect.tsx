@@ -17,6 +17,10 @@ interface SearchableEquipmentSelectProps {
   isDark?: boolean;
   /** Nombre accesible del selector; no se dibuja. */
   label: string;
+  /** Contenido junto al disparador (contador); el menú abierto sigue ocupando todo el ancho. */
+  trailing?: React.ReactNode;
+  /** Solo para pruebas de marcado. */
+  defaultOpen?: boolean;
 }
 
 export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps> = ({
@@ -28,8 +32,10 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
   onOpenScanner,
   placeholder,
   label,
+  trailing,
+  defaultOpen = false,
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(defaultOpen);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBrandFilter, setSelectedBrandFilter] = useState<string>('all');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -182,6 +188,7 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
   return (
     <div className="relative min-w-0" ref={containerRef}>
       {/* Selector: lupa, nombre del modelo y potencia en mono */}
+      <div className="flex items-center gap-2">
       <button
         type="button"
         aria-label={`${label}: ${selectedValue || 'sin seleccionar'}`}
@@ -194,7 +201,7 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
             setTimeout(() => inputRef.current?.focus(), 50);
           }
         }}
-        className={`flex h-[34px] w-full cursor-pointer items-center gap-2 rounded-md border bg-pd-field px-2.5 text-left ${
+        className={`flex h-[34px] min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-md border bg-pd-field px-2.5 text-left ${
           isOpen ? 'border-pd-accent' : 'border-pd-field-border hover:border-pd-outline'
         }`}
       >
@@ -205,6 +212,8 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
         {effectivePower ? <span className="flex-none font-mono text-xs text-pd-muted">{`${effectivePower} ${unitText}`}</span> : null}
         <ChevronDown size={14} strokeWidth={2} aria-hidden="true" className={`flex-none text-pd-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
+      {trailing}
+      </div>
 
       {/* Menú con buscador en tiempo real, en flujo normal para expandir la sección */}
       {isOpen && (

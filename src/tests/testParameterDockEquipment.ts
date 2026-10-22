@@ -11,6 +11,8 @@ import {
   buildNewItem, createGroupActions, formatDcAcRatio, formatKW, groupViews,
 } from '../components/simulator/params/sections/equipment/equipmentGroupModel';
 import { EquipmentParamsSection } from '../components/simulator/sidebar/EquipmentParamsSection';
+import { SearchableEquipmentSelect } from '../components/simulator/sidebar/SearchableEquipmentSelect';
+import { AdvancedDisclosure } from '../components/simulator/params/sections/equipment/AdvancedDisclosure';
 import { EquipmentGroupList } from '../components/simulator/params/sections/equipment/EquipmentGroupList';
 
 const h = React.createElement;
@@ -225,6 +227,43 @@ const listProps = (kind: EquipmentKind, mode: 'catalog' | 'manual', specs: Parti
   const noBattery = section({ ...(project as object), specs: { ...(project as { specs: object }).specs, hasBattery: false } });
   assert.ok(!/Energía útil/.test(noBattery), 'sin batería no hay energía útil ni autonomía');
   assert.ok(!/Agregar modelo de batería/.test(noBattery));
+}
+
+// --- Avanzado plegado: `hidden` no puede convivir con `flex` (Tailwind le gana a [hidden]) ---
+{
+  const closed = render(h(AdvancedDisclosure, null, h('p', null, 'cuerpo')));
+  const body = closed.match(/<div[^>]*id="[^"]*"[^>]*>/)?.[0] ?? '';
+  assert.match(body, /hidden=""/);
+  assert.ok(!/\bflex\b/.test(body), 'plegado no lleva flex');
+  const open = render(h(AdvancedDisclosure, { defaultOpen: true }, h('p', null, 'cuerpo')));
+  const openBody = open.match(/<div[^>]*id="[^"]*"[^>]*>/)?.[0] ?? '';
+  assert.ok(!/hidden=""/.test(openBody) && /\bflex\b/.test(openBody), 'abierto es flex y visible');
+}
+
+// --- Cantidades enteras: 1.5 o 0 nunca llegan a la lista ---
+for (const kind of ['panel', 'inverter', 'battery'] as const) {
+  const { state, actions } = harness(multi());
+  actions(kind).setCount(0, 1.5);
+  const list = state.specs[kind === 'panel' ? 'panels' : kind === 'inverter' ? 'inverters' : 'batteries']!;
+  assert.equal(list[0].count, 1, `${kind}: 1.5 se guarda como entero`);
+  actions(kind).setCount(0, 4.9);
+  assert.equal((state.specs[kind === 'panel' ? 'panels' : kind === 'inverter' ? 'inverters' : 'batteries']!)[0].count, 4);
+  actions(kind).setCount(0, 0);
+  assert.equal((state.specs[kind === 'panel' ? 'panels' : kind === 'inverter' ? 'inverters' : 'batteries']!)[0].count, 1, 'mínimo 1');
+}
+
+// --- Menú abierto del selector: ocupa todo el ancho de la tarjeta, no el del disparador junto al contador ---
+{
+  const open = render(h(EquipmentGroupList, listProps('inverter', 'catalog', multi()))) ;
+  assert.match(open, /aria-label="Cantidad de inversores"/);
+  const markup = render(h(SearchableEquipmentSelect, {
+    type: 'inverter', items: catalog, selectedValue: 'Inversor 8', selectedPower: 8, onSelect: noop, onOpenScanner: noop, label: 'Modelo', defaultOpen: true,
+    trailing: h('span', { 'data-trailing': '' }, '+'),
+  } as never));
+  const trailingAt = markup.indexOf('data-trailing');
+  const menuAt = markup.indexOf('role="listbox"');
+  assert.ok(trailingAt > 0 && menuAt > trailingAt, 'el contador va junto al disparador y el menú después');
+  assert.ok(/data-trailing[^>]*>\+<\/span><\/div><div class="mt-1\.5 w-full/.test(markup), 'el menú queda fuera de la fila del disparador');
 }
 
 // --- Las secciones usan solo tokens pd-*, sin isDark ni colores sueltos, y la cantidad de batería no salta editEquipmentGroup ---
