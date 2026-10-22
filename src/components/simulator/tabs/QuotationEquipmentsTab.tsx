@@ -2,7 +2,7 @@ import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import { ShieldCheck, CheckCircle2, Check } from 'lucide-react';
 import { getProjectPanels, getProjectInverters, getProjectBatteries } from '../../../utils/equipmentSpecsUtils';
-import { MANUAL_BRAND_PLACEHOLDER, SAMPLE_PHONE_MARKER, SAMPLE_QUOTE_NUMBER, resolveSaleMarginMultiplier } from '../../../../shared/projectDefaults';
+import { MANUAL_BRAND_PLACEHOLDER, QUOTATION_PANEL_BRAND_FALLBACK, SAMPLE_PHONE_MARKER, SAMPLE_QUOTE_NUMBER, resolveSaleMarginMultiplier } from '../../../../shared/projectDefaults';
 import { formatProposalDate } from '../../../utils/formatDateUtils';
 
 interface QuotationEquipmentsTabProps {
@@ -139,7 +139,7 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
                 <tbody className="divide-y divide-slate-200 text-[11px] text-slate-800 font-semibold">
                   {getProjectPanels(project.specs).map((panel, idx) => (
                     <tr key={panel.id || `panel-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
-                      <td className="px-3 py-2">{panel.brandModel || MANUAL_BRAND_PLACEHOLDER.panel}</td>
+                      <td className="px-3 py-2">{panel.brandModel || QUOTATION_PANEL_BRAND_FALLBACK}</td>
                       <td className="px-3 py-2 text-center font-bold">{panel.count}</td>
                       <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
                     </tr>

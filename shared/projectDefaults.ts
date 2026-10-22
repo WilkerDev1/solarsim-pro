@@ -32,6 +32,9 @@ export const MANUAL_BRAND_PLACEHOLDER = {
   battery: 'Batería Hinaess 16 KwH-48 vdc.',
 } as const;
 
+/** Marca que imprime la cotización para un grupo de paneles sin nombre (distinta del marcador del modo Manual del dock). */
+export const QUOTATION_PANEL_BRAND_FALLBACK = 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)';
+
 /** Número finito y > 0: la regla común de «dato válido» para tasa, multiplicador, DOD y eficiencia. */
 const isPositive = (value: number | undefined | null): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0;
 

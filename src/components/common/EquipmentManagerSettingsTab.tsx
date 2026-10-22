@@ -31,6 +31,7 @@ import { EquipmentOffersEditor } from "./equipment/EquipmentOffersEditor";
 import { EquipmentAssetsEditor } from "./equipment/EquipmentAssetsEditor";
 import { CatalogEquipmentRow } from "./equipment/CatalogEquipmentRow";
 import { EquipmentEditorModal } from "./EquipmentEditorModal";
+import { DEFAULT_BATTERY_EFFICIENCY_PCT } from "../../../shared/projectDefaults";
 import { normalizeBrandName } from "../../utils/equipmentBrandUtils";
 import { confirmAction } from "./confirmAction";
 
@@ -234,7 +235,7 @@ export const EquipmentManagerSettingsTab: React.FC<
       capacityAh: type === "battery" ? 314 : undefined,
       voltageV: type === "battery" ? 51.2 : undefined,
       dodPct: type === "battery" ? 90 : undefined,
-      batteryEfficiencyPct: type === "battery" ? 95 : undefined,
+      batteryEfficiencyPct: type === "battery" ? DEFAULT_BATTERY_EFFICIENCY_PCT : undefined,
       efficiencyPct:
         type === "panel" ? 22.2 : type === "inverter" ? 97.5 : undefined,
       tempCoeff: type === "panel" ? -0.29 : undefined,

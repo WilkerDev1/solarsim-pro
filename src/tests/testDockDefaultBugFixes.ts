@@ -127,6 +127,12 @@ const projectOf = (specs: Partial<SystemSpecs> = {}): ProjectSimulation => ({ ..
   for (const literal of ['60.0', '170.0', '|| 1.25', '|| 80', '|| 92']) assert(!finance.includes(literal), `financeEngine repite «${literal}»`);
   const utils = readFileSync('src/utils/equipmentSpecsUtils.ts', 'utf8');
   for (const literal of ['|| 90', '|| 95']) assert(!utils.includes(literal), `equipmentSpecsUtils repite «${literal}»`);
+  for (const file of ['src/components/common/EquipmentEditorModal.tsx', 'src/components/common/EquipmentManagerSettingsTab.tsx']) {
+    const text = readFileSync(file, 'utf8');
+    assert(!/batteryEfficiencyPct(\s*\|\|\s*|\s*\?\s*)95|"battery" \? 95/.test(text) && !text.includes('batteryEfficiencyPct || 95') && !text.includes('"battery" ? 95'), `${file} repite la eficiencia 95`);
+  }
+  assert.match(quotation, /QUOTATION_PANEL_BRAND_FALLBACK/, 'la cotización conserva su marca de panel sin nombre (620 W), ahora con nombre');
+  assert.equal(shared.QUOTATION_PANEL_BRAND_FALLBACK, 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)');
   assert.equal(dockDefaults.MANUAL_BRAND_PLACEHOLDER, shared.MANUAL_BRAND_PLACEHOLDER);
   assert.equal(dockDefaults.SAMPLE_QUOTE_NUMBER, shared.SAMPLE_QUOTE_NUMBER);
   assert.equal(dockDefaults.DEFAULT_DOP_RATE, shared.DEFAULT_DOP_RATE);
