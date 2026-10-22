@@ -23,6 +23,9 @@ const MIRROR: { [K in EquipmentKind]: Partial<Record<keyof GroupItem[K], keyof S
 };
 const KINDS: EquipmentKind[] = ['panel', 'inverter', 'battery'];
 
+/** Group fields whose legacy scalar edit applies to the first group even when the project has several. */
+const PRIMARY_SCALAR_FIELDS: Record<EquipmentKind, string[]> = { panel: [], inverter: [], battery: ['dodPct', 'efficiencyPct'] };
+
 /** Unit price the cost matrix assumes for a legacy single-model project without one. */
 export const DEFAULT_UNIT_PRICE_USD: Record<EquipmentKind, number> = { panel: 103.32, inverter: 2300.0, battery: 1990.0 };
 
@@ -110,7 +113,16 @@ export function normalizeEquipmentEdit(current: SystemSpecs, patch: Partial<Syst
       }
       const single = groups[0] ?? groupsOf(merged, kind)[0];
       groups = single ? [{ ...single, ...fromPatch }] : groupsOf(merged, kind);
-    } else if (!supplierChanged(kind)) continue;
+    } else {
+      // Con varios grupos los motores leen los grupos; un valor escalar de DOD/eficiencia (asistente, importaciones) es del primero.
+      const primary: Record<string, unknown> = {};
+      for (const field of PRIMARY_SCALAR_FIELDS[kind]) {
+        const legacy = (MIRROR[kind] as Record<string, keyof SystemSpecs>)[field];
+        if (legacy && patch[legacy] !== undefined) primary[field] = patch[legacy];
+      }
+      if (Object.keys(primary).length) groups[0] = { ...groups[0], ...primary };
+      else if (!supplierChanged(kind)) continue;
+    }
     // The selected supplier belongs to the primary group, like supplier pricing does.
     if (supplierChanged(kind) && groups[0]) groups[0] = { ...groups[0], selectedSupplierInfo: patch.selectedSupplierInfo?.[kind] };
     lists[kind] = groups;

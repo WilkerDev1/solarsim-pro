@@ -11,7 +11,7 @@ import { DEFAULT_RD_TARIFF_MATRIX } from '../data/rdTariffs';
 import { getProjectBatteries } from '../utils/equipmentSpecsUtils';
 import { buildCatalogSelectionUpdate } from '../components/simulator/params/logic/catalogSelection';
 import { readFileSync } from 'node:fs';
-import { editEquipmentGroup, selectCatalogEquipment } from '../utils/equipmentGroups';
+import { editEquipmentGroup, normalizeEquipmentEdit, selectCatalogEquipment } from '../utils/equipmentGroups';
 import { resolveBatteryBankDodPct, resolveBatteryBankEfficiencyPct, resolvePrimaryBatteryEfficiencyPct } from '../../shared/projectDefaults';
 import type { ProjectSimulation, SystemSpecs } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
@@ -124,6 +124,17 @@ for (const file of ['src/components/common/AIDatasheetScannerModal.tsx', 'src/co
   assert.equal(specs.batteries![0].efficiencyPct, 85, 'el grupo principal toma la eficiencia del catálogo');
   assert.equal(specs.batteryEfficiencyPct, 85);
   close(resolveBatteryBankEfficiencyPct(specs), 87.5, 'el motor ve el cambio');
+}
+
+// ── Edición escalar (asistente, importaciones) con varios modelos: va al grupo principal ────
+{
+  const specs = bank({ dodPct: 90, efficiencyPct: 90 }, { dodPct: 90, efficiencyPct: 95 });
+  const next = normalizeEquipmentEdit(specs, { batteryEfficiencyPct: 80, batteryDOD: 70 });
+  assert.equal(next.batteries![0].efficiencyPct, 80, 'la eficiencia escalar llega al primer grupo');
+  assert.equal(next.batteries![0].dodPct, 70);
+  assert.equal(next.batteries![1].efficiencyPct, 90, 'los demás grupos no cambian');
+  assert.equal(next.batteryEfficiencyPct, 80);
+  close(resolveBatteryBankEfficiencyPct(next), (32 * 0.7 * 80 + 15 * 0.9 * 90) / (32 * 0.7 + 15 * 0.9), 'el motor usa el valor editado');
 }
 
 console.log('testBatteryBankDefaults: ok');
