@@ -7,6 +7,7 @@ import { documentLogo, webHeaderLogo } from '../../../utils/documentLogo';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import type { DocumentCustomization, ProjectSimulation } from '../../../types';
 import type { DocumentLayoutState } from '../useDocumentLayout';
+import { registerPendingDesignEdit } from './pendingDesignEdits';
 import { confirmAction } from '../../common/confirmAction';
 
 type LogoField = 'coverLogoBase64' | 'headerLogoBase64' | 'webHeaderLogoBase64' | 'watermarkLogoBase64';
@@ -88,13 +89,36 @@ export const PDFDesignControls: React.FC<PDFDesignControlsProps> = ({
   const [opacity, setOpacity] = useState(storedOpacity);
   const [templateSaved, setTemplateSaved] = useState(false);
 
-  // El control deslizante guarda tras 400 ms sin moverse, no en cada paso.
+  // El control deslizante guarda tras 400 ms sin moverse. Lo pendiente se guarda al salir de la pestaña
+  // y antes de exportar o imprimir, siempre en la propuesta y la sesión donde se cambió.
+  const pending = useRef<{ value: number; projectId: string; generation: number } | null>(null);
+  const commit = useRef(updateDocumentCustomization);
+  commit.current = updateDocumentCustomization;
+  const flush = useRef(() => {});
+  flush.current = () => {
+    const edit = pending.current;
+    pending.current = null;
+    if (!edit) return;
+    const state = useSimulationStore.getState();
+    if (state.activeProjectId === edit.projectId && state.sessionGeneration === edit.generation) commit.current({ watermarkOpacity: edit.value });
+  };
   useEffect(() => setOpacity(storedOpacity), [storedOpacity, project.id]);
   useEffect(() => {
-    if (opacity === storedOpacity) return;
-    const timer = setTimeout(() => updateDocumentCustomization({ watermarkOpacity: opacity }), 400);
+    if (opacity === storedOpacity) {
+      pending.current = null;
+      return;
+    }
+    pending.current = { value: opacity, projectId: project.id, generation: useSimulationStore.getState().sessionGeneration };
+    const timer = setTimeout(() => flush.current(), 400);
     return () => clearTimeout(timer);
-  }, [opacity, storedOpacity, updateDocumentCustomization]);
+  }, [opacity, storedOpacity, project.id]);
+  useEffect(() => {
+    const unregister = registerPendingDesignEdit(() => flush.current());
+    return () => {
+      flush.current();
+      unregister();
+    };
+  }, []);
 
   return (
     <div className="space-y-4">

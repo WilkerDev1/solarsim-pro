@@ -34,6 +34,16 @@ export function withSectionVisible(layout: DocumentLayout | null | undefined, id
   return next;
 }
 
+/**
+ * Parche para `setDocumentLayout` al cambiar una sección. Lleva siempre las dos listas (vacías si
+ * no quedan diferencias) para que volver al valor por defecto reemplace la lista guardada en lugar
+ * de heredarla al combinar parches.
+ */
+export function sectionVisibilityPatch(layout: DocumentLayout | null | undefined, id: DocumentSectionId, visible: boolean): Required<Pick<DocumentLayout, 'hiddenSections' | 'visibleSections'>> {
+  const next = withSectionVisible(layout, id, visible);
+  return { hiddenSections: next.hiddenSections ?? [], visibleSections: next.visibleSections ?? [] };
+}
+
 /** Quita ids desconocidos y valores inválidos de un diseño guardado (datos antiguos o editados a mano). */
 export function normalizeDocumentLayout(layout: unknown): DocumentLayout {
   if (!layout || typeof layout !== 'object') return {};

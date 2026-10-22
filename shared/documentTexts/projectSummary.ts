@@ -119,6 +119,21 @@ export function resolveDynamicProjectSummaryParagraph2(
     .replace(/{batteryModel}/gi, formattedBatteryDesc)
     .replace(/{scopeText}/gi, scopeText);
 
+  const hasStorage = !!project.specs.hasBattery && (project.specs.batteryCapacityKWh || 0) > 0;
+  const inverterBlock = isPreformattedInverters ? formattedInverterDesc : `${invCount} ${formattedInverterDesc}`;
+  const batteryBlock = isPreformattedBatteries ? formattedBatteryDesc : `${batCount} ${formattedBatteryDesc}`;
+
+  // 2a. Inversores y baterías dentro de un mismo bloque en negrita: se actualiza el bloque completo.
+  const combined = /instalación\s+de\s+\*\*[^*]*?bater[íi]a[^*]*\*\*/i;
+  if (hasStorage && combined.test(text)) {
+    text = text.replace(combined, `instalación de **${inverterBlock} y ${batteryBlock}**`);
+    text = text.replace(/Inversor(?:es)?\s+Inversor(?:es)?/gi, invLabel);
+    text = text.replace(/Bater[íi]as?\s+Bater[íi]as?/gi, batLabel);
+    text = text.replace(/(\(\d+(?:\.\d+)?\s*k?W\))\s+\1/gi, '$1');
+    text = text.replace(/(\(\d+(?:\.\d+)?\s*kWh\))\s+\1/gi, '$1');
+    return text;
+  }
+
   // 2. Keep inverter count and model synchronized:
   text = text.replace(
     /instalación\s+de\s+\*\*\s*(?:\d+\s+)?(?:Inversor(?:es)?\s+)?[^*]+\*\*/i,

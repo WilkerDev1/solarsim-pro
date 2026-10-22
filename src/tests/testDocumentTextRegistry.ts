@@ -255,7 +255,7 @@ assert.equal(compared, 26 * Object.keys(FIXTURES).length);
   // Writing the dynamic default keeps it dynamic.
   const regulatoryDefault = resolveDocumentText('projectDescription.regulatoryNote', project, ctx).text;
   assert.deepEqual(documentTextPatch('projectDescription.regulatoryNote', regulatoryDefault, project, ctx), { customization: { regulatoryNote: '' } });
-  assert.deepEqual(documentTextResetPatch('client.contact', project), { customization: { contactName: undefined } });
+  assert.deepEqual(documentTextResetPatch('client.contact', project), { customization: { contactName: undefined }, client: { contactPerson: '' } }, 'Restablecer también vacía el espejo del cliente');
   assert.deepEqual(documentTextResetPatch('client.name', project), {}, 'El nombre del cliente no se restablece');
   // Single-line plain fields drop formatting and line breaks.
   assert.deepEqual(documentTextPatch('company.phone', '**809**\n111', project, ctx), { customization: { companyPhone: '809 111' } });

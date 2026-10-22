@@ -12,3 +12,4 @@ export * from './write';
 export * from './templates';
 export * from './richText';
 export { regulatoryNoteDefault, validityNoteDefault, isPlaceholderPhone } from './dynamicTexts';
+export * from './share';

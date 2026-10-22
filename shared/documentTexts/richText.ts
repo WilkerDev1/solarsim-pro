@@ -187,6 +187,8 @@ export interface RichHtmlOptions {
   boldClass?: string;
   /** Separación entre párrafos (CSS). */
   paragraphGap?: string;
+  /** Un solo párrafo se devuelve sin contenedor de bloque (texto dentro de un `<span>` o una celda). */
+  inline?: boolean;
 }
 
 /**
@@ -194,14 +196,16 @@ export interface RichHtmlOptions {
  * que html2canvas no dibuja de forma fiable).
  */
 export function renderRichTextHtml(source: string | null | undefined, options: RichHtmlOptions = {}): string {
-  const { boldClass, paragraphGap = '0.5em' } = options;
+  const { boldClass, paragraphGap = '0.5em', inline: inlineOnly = false } = options;
   const inline = (line: RichLine) => line.map((segment) => {
     let html = escapeRichHtml(segment.text);
     if (segment.italic) html = `<em>${html}</em>`;
     if (segment.bold) html = `<strong${boldClass ? ` class="${escapeRichHtml(boldClass)}"` : ''}>${html}</strong>`;
     return html;
   }).join('');
-  return parseRichText(source)
+  const blocks = parseRichText(source);
+  if (inlineOnly && blocks.length === 1 && blocks[0].type === 'paragraph') return blocks[0].lines.map(inline).join('<br>');
+  return blocks
     .map((block, index) => {
       const gap = index > 0 && !block.tight ? ` style="display:block;margin-top:${paragraphGap}"` : ' style="display:block"';
       if (block.type === 'paragraph') return `<span${gap}>${block.lines.map(inline).join('<br>')}</span>`;

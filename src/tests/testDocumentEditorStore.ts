@@ -42,6 +42,14 @@ assert.notEqual(store().getActiveProject().customization?.panelWarrantyText, '**
 store().redo();
 assert.equal(store().getActiveProject().customization?.panelWarrantyText, '**30** años');
 
+// 2b. Resetting contact/phone clears the client mirror too, so the edited value really disappears.
+store().setDocumentTexts({ 'client.contact': 'Ing. Mario', 'client.phone': '809-111-0000' });
+assert.equal(store().getActiveProject().client.contactPerson, 'Ing. Mario');
+store().setDocumentTexts({ 'client.contact': null, 'client.phone': null });
+assert.notEqual(resolveDocumentText('client.contact', store().getActiveProject(), ctx()).text, 'Ing. Mario');
+assert.equal(resolveDocumentText('client.phone', store().getActiveProject(), ctx()).text, '');
+assert.equal(store().getActiveProject().client.contactPhone, '');
+
 // 3. Reset (null) restores the default.
 store().setDocumentTexts({ 'quotation.warranty.panel': null });
 assert.equal(resolveDocumentText('quotation.warranty.panel', store().getActiveProject(), ctx()).isCustomized, false);

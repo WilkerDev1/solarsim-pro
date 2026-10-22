@@ -4,13 +4,13 @@ import { useSimulationStore } from '../../store/useSimulationStore';
 import { resolveProposalAttachmentBytes } from '../../services/proposalAttachmentResolver';
 import { exportProposalPdf } from './export/exportProposalPdf';
 import { ProposalAnnexSync } from './annexes/ProposalAnnexSync';
-import { confirmMissingAnnexes } from './annexes/confirmMissingAnnexes';
 import { PDFSectionId } from '../../constants/pdfSections';
 import { buildPdfLayout, normalizeSectionOrder } from '../../utils/pdfLayout';
 import { formatProposalDate } from '../../utils/formatDateUtils';
 import { DocumentEditorProvider } from './editor/DocumentEditorContext';
 import { DocumentEditorToolbar } from './editor/DocumentEditorToolbar';
 import { useDocumentLayout } from './useDocumentLayout';
+import { flushPendingDesignEdits } from './controls/pendingDesignEdits';
 import { canEditDocument, type DocumentEditorMode } from './editor/documentEditorState';
 
 // Modular Page Components
@@ -69,11 +69,14 @@ export const PDFProposalView: React.FC = () => {
   const [isEditMode, setIsEditMode] = useState(false);
 
   const handlePrint = () => {
-    window.print();
+    // Lo pendiente del dock (p. ej. la opacidad de la marca de agua) se guarda antes de imprimir.
+    flushPendingDesignEdits();
+    requestAnimationFrame(() => window.print());
   };
 
   const handleExportPDF = async () => {
     if (!pdfRef.current) return;
+    flushPendingDesignEdits();
     // Modo 'export': el editor se desmonta y la hoja queda sin cromo antes de la captura.
     flushSync(() => setIsExporting(true));
     await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
@@ -88,7 +91,6 @@ export const PDFProposalView: React.FC = () => {
         fileName: `Propuesta_SolarSim_${sanitizedClientName}.pdf`,
         attachments: currentProj.customization?.attachedPdfs || [],
         resolveAttachmentBytes: resolveProposalAttachmentBytes,
-        onMissingAttachments: confirmMissingAnnexes,
       });
     } catch (err) {
       console.error('Error generating multi-page PDF:', err);

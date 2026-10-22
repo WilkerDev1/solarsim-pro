@@ -30,7 +30,7 @@ function withBreaks(lines: React.ReactNode[]) {
  * Texto del documento listo para html2canvas: párrafos como bloques, viñetas como spans `•`
  * (nunca `<ul>`/`::marker`) y un texto de una sola línea se queda en línea.
  */
-export const RichText: React.FC<RichTextProps> = ({ text, format = 'rich', boldClassName = 'text-slate-950 font-bold', boldStyle }) => {
+export const RichText: React.FC<RichTextProps> = ({ text, format = 'rich', boldClassName = 'font-bold', boldStyle }) => {
   if (format === 'plain') return <>{withBreaks(text.split('\n'))}</>;
   const blocks = parseRichText(text);
   if (blocks.length === 1 && blocks[0].type === 'paragraph') {

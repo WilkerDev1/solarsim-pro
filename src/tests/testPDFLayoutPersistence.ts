@@ -3,10 +3,12 @@ import { useSimulationStore } from '../store/useSimulationStore';
 import { DEFAULT_LOCAL_COMPANY } from '../types/companyProfile';
 import { serializeSimulationStore } from '../store/persistence/serializeSimulationStore';
 import { hydrateSimulationStore } from '../store/persistence/hydrateSimulationStore';
+import { flushPendingDesignEdits, registerPendingDesignEdit } from '../components/pdf/controls/pendingDesignEdits';
 import { PDF_COLOR_THEMES } from '../constants/pdfThemes';
 import {
   normalizeDocumentLayout,
   resolveSectionVisibility,
+  sectionVisibilityPatch,
   showHeadersFooters,
   withSectionVisible,
 } from '../../shared/documentLayout';
@@ -48,6 +50,24 @@ assert.equal(store().getActiveProject().customization?.layout, undefined, 'Desha
 store().redo();
 assert.deepEqual(store().getActiveProject().customization?.layout?.hiddenSections, ['techIntro']);
 
+// Restoring the last override really clears it (the patch carries explicit lists).
+store().setDocumentLayout(sectionVisibilityPatch(store().getActiveProject().customization?.layout, 'techIntro', true));
+assert.equal(store().getActiveProject().customization?.layout?.hiddenSections, undefined, 'Volver a mostrar la última sección oculta limpia la lista');
+store().setDocumentLayout(sectionVisibilityPatch(store().getActiveProject().customization?.layout, 'costMatrix', true));
+assert.deepEqual(store().getActiveProject().customization?.layout?.visibleSections, ['costMatrix']);
+store().setDocumentLayout(sectionVisibilityPatch(store().getActiveProject().customization?.layout, 'costMatrix', false));
+assert.equal(store().getActiveProject().customization?.layout?.visibleSections, undefined, 'Ocultar de nuevo la matriz confidencial la quita del PDF');
+store().setDocumentLayout(sectionVisibilityPatch(store().getActiveProject().customization?.layout, 'techIntro', false));
+
+// Readers cannot change the saved layout or texts.
+const syncSettings = store().syncSettings;
+useSimulationStore.setState({ syncSettings: { ...syncSettings, currentUser: { id: 'r', name: 'Lector', email: 'r@test.invalid', role: 'LECTOR', organizationId: 'o' } } });
+const beforeReader = structuredClone(store().getActiveProject().customization);
+store().setDocumentLayout({ themeId: 'lector', showHeadersFooters: true });
+store().setDocumentTexts({ 'quotation.warranty.panel': 'No debe guardarse' });
+assert.deepEqual(store().getActiveProject().customization, beforeReader, 'Un lector no modifica diseño ni textos');
+useSimulationStore.setState({ syncSettings });
+
 // Survives serialization / hydration (a reopened proposal keeps its sections, theme and header/footer).
 const restored = { ...store(), ...JSON.parse(JSON.stringify(serializeSimulationStore(store()))) };
 hydrateSimulationStore(restored);
@@ -61,5 +81,16 @@ store().moveToTrash(id);
 useSimulationStore.setState({ activeProjectId: id });
 store().setDocumentLayout({ themeId: 'otro', showHeadersFooters: true });
 assert.deepEqual(store().projects.find((project) => project.id === id)!.customization?.layout, before);
+
+// Pending dock edits are flushed before exporting or printing, and unregistered ones are not.
+{
+  let flushed = 0;
+  const unregister = registerPendingDesignEdit(() => { flushed++; });
+  flushPendingDesignEdits();
+  assert.equal(flushed, 1);
+  unregister();
+  flushPendingDesignEdits();
+  assert.equal(flushed, 1);
+}
 
 console.log('PASS: document layout rules, persistence, undo and trash guard.');
