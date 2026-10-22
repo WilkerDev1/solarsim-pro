@@ -13,6 +13,8 @@ export interface McpControllerOptions {
   copyText: (text: string) => void;
   /** Effective availability of the `localMcpServer` device feature (defaults to the shared registry). */
   featureAvailable?: () => boolean;
+  /** Packaged executable, so the panel can show the Claude Desktop (`--mcp-stdio`) configuration. */
+  executablePath?: string;
 }
 
 export class McpController {
@@ -41,6 +43,7 @@ export class McpController {
       url: `http://127.0.0.1:${this.config.port}${MCP_PATH}`,
       error: this.error,
       clients: this.server.clients(),
+      executablePath: this.options.executablePath,
     };
   }
 

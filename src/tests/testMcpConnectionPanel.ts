@@ -15,6 +15,13 @@ assert.equal(
 );
 assert.equal(snippets.codex, `[mcp_servers.solarsim]\nurl = "${url}"\nbearer_token_env_var = "SOLARSIM_MCP_TOKEN"`);
 assert.match(snippets.codexEnv, /SOLARSIM_MCP_TOKEN/);
+
+// Claude Desktop only speaks stdio: the config launches the app itself with --mcp-stdio (valid JSON, path escaped).
+assert.deepEqual(JSON.parse(buildMcpSnippets(url, 'C:\\Program Files\\SolarSim Pro\\SolarSim Pro.exe').claudeDesktop), {
+  mcpServers: { solarsim: { command: 'C:\\Program Files\\SolarSim Pro\\SolarSim Pro.exe', args: ['--mcp-stdio'] } },
+});
+assert.deepEqual(JSON.parse(snippets.claudeDesktop).mcpServers.solarsim.args, ['--mcp-stdio']);
+assert.match(snippets.claudeDesktop, /<ruta de SolarSim Pro>/, 'development builds have no packaged executable to point at');
 assert.equal(buildMcpSnippets('http://127.0.0.1:50000/mcp').claudeCode.includes(':50000/mcp'), true);
 
 const base: McpServerStatus = { enabled: true, running: true, port: 47321, url, clients: [{ name: 'claude-code', lastSeenAt: '2026-10-21T12:00:00.000Z' }] };
@@ -29,6 +36,9 @@ assert(running.includes('claude-code'));
 assert(running.includes('Escuchando'));
 assert(running.includes('claude mcp add --transport http solarsim'));
 assert(running.includes('bearer_token_env_var'));
+assert(running.includes('Claude Desktop'));
+assert(running.includes('--mcp-stdio'));
+assert(html({ ...base, executablePath: '/opt/SolarSim Pro/solarsim-pro' }).includes('/opt/SolarSim Pro/solarsim-pro'));
 assert(running.includes('Copiar token'));
 assert(running.includes('Regenerar token'));
 assert(running.includes('aria-checked="true"'));

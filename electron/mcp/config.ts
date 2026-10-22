@@ -54,3 +54,14 @@ export function loadMcpConfig(file: string): McpConfig {
   if (JSON.stringify(raw) !== JSON.stringify(config)) saveMcpConfig(file, config);
   return config;
 }
+
+/** Read-only variant for the stdio proxy: never creates or repairs the file. Null when missing or unusable. */
+export function readMcpConfig(file: string): McpConfig | null {
+  try {
+    const parsed = JSON.parse(readFileSync(file, 'utf8'));
+    if (!parsed || typeof parsed !== 'object' || !validPort(parsed.port) || !validToken(parsed.token)) return null;
+    return { enabled: parsed.enabled === true, port: parsed.port, token: parsed.token };
+  } catch {
+    return null;
+  }
+}
