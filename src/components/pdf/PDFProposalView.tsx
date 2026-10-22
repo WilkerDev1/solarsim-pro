@@ -4,6 +4,7 @@ import { useSimulationStore } from '../../store/useSimulationStore';
 import { resolveProposalAttachmentBytes } from '../../services/proposalAttachmentResolver';
 import { exportProposalPdf } from './export/exportProposalPdf';
 import { ProposalAnnexSync } from './annexes/ProposalAnnexSync';
+import { confirmMissingAnnexes } from './annexes/confirmMissingAnnexes';
 import { PDFSectionId } from '../../constants/pdfSections';
 import { buildPdfLayout, normalizeSectionOrder } from '../../utils/pdfLayout';
 import { formatProposalDate } from '../../utils/formatDateUtils';
@@ -91,6 +92,7 @@ export const PDFProposalView: React.FC = () => {
         fileName: `Propuesta_SolarSim_${sanitizedClientName}.pdf`,
         attachments: currentProj.customization?.attachedPdfs || [],
         resolveAttachmentBytes: resolveProposalAttachmentBytes,
+        onMissingAttachments: confirmMissingAnnexes,
       });
     } catch (err) {
       console.error('Error generating multi-page PDF:', err);

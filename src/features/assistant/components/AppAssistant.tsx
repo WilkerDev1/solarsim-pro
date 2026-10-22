@@ -8,13 +8,16 @@ import {
   Minimize2,
   RotateCcw,
   Settings,
+  Paperclip,
 } from 'lucide-react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useAppAssistant } from '../useAppAssistant';
 import { assistantOwner } from '../tools';
 import { ChatMessage } from './ChatMessage';
+import { AgentCardView } from '../cards/registry';
 import {
   AssistantActionCard,
+  AssistantAppliedCard,
   AssistantResultCard,
 } from './AssistantResultCard';
 import '../chat.css';
@@ -145,6 +148,12 @@ function AssistantPanel({
                     onApplied={ai.append}
                   />
                 ))}
+                {m.agentCards?.map((card) => (
+                  <AgentCardView key={`${card.type}:${card.id}`} card={card} />
+                ))}
+                {m.applied?.map((a) => (
+                  <AssistantAppliedCard key={a.activityId} activityId={a.activityId} title={a.title} />
+                ))}
               </ChatMessage>
             ))}
             {ai.busy && (
@@ -165,6 +174,16 @@ function AssistantPanel({
                 {ai.error}
               </p>
             )}
+            {ai.files.length > 0 && (
+              <ul className="assistant-file-chips" aria-label="Archivos adjuntos">
+                {ai.files.map((f) => (
+                  <li key={f.id}>
+                    <span>{f.name}</span>
+                    <button type="button" aria-label={`Quitar ${f.name}`} onClick={() => ai.removeFile(f.id)}><X size={12} /></button>
+                  </li>
+                ))}
+              </ul>
+            )}
             <label className="sr-only" htmlFor="app-assistant-input">
               Mensaje al asistente
             </label>
@@ -184,6 +203,20 @@ function AssistantPanel({
               }}
             />
             <div className="assistant-widget-actions">
+              <label className="assistant-icon" title="Adjuntar PDF o imagen" aria-label="Adjuntar PDF o imagen">
+                <Paperclip size={16} />
+                <input
+                  type="file"
+                  className="sr-only"
+                  accept="application/pdf,image/png,image/jpeg,image/webp"
+                  multiple
+                  disabled={ai.busy}
+                  onChange={(e) => {
+                    if (e.target.files) void ai.addFiles(e.target.files);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
               <button
                 type="button"
                 className="assistant-icon"
@@ -223,8 +256,10 @@ function AssistantPanel({
             )}
             <details className="proposal-note-details">
               <summary>Contexto y privacidad</summary>Solo se consulta el
-              espacio actual. Texto y resultados de las herramientas se envían a
-              Google Gemini. Los cambios requieren confirmar.
+              espacio actual. Texto, archivos adjuntos y resultados de las
+              herramientas se envían a Google Gemini. Los borradores se aplican
+              con opción de deshacer; catálogo, precios y estados piden confirmación
+              (Ajustes → Agentes e IA).
             </details>
           </form>
         </section>

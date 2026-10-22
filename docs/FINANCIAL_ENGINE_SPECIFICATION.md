@@ -119,7 +119,7 @@ $$\text{Venta mano de obra} = (\text{Instalación} + \text{ITBIS instalación}) 
 ### 4.1 Modo de precio e inversión bruta
 
 - **Matriz de costos** (predeterminado en modo detallado): $I_{bruta} = I_{final}$ de la matriz.
-- **Precio directo por W** (`pricingMode: 'direct_watt'`, o modo simple sin `pricingMode: 'cost_matrix'`): base $= P_{dc} \times 1000 \times P_{W}$, con $P_W$ = `specs.pricePerWattUSD`, si no `financials.pricePerWattUSD`, si no 1.13. El precio de lista suma los ítems adicionales y su ITBIS no exonerado, y los descuentos se recalculan sobre ese precio. `directPriceSurplusTarget` (`margin` o `labor`) decide cómo se reparte la diferencia respecto al costo en la matriz mostrada.
+- **Precio directo por W** (`pricingMode: 'direct_watt'`, o modo simple sin `pricingMode: 'cost_matrix'`). Solo se usa por elección manual: las propuestas automáticas fijan `AUTOMATED_PRICING` (`shared/automatedProposalPolicy.ts`: `isDetailed: false`, `pricingMode: 'cost_matrix'`) y el predeterminado de fábrica es la matriz. base $= P_{dc} \times 1000 \times P_{W}$, con $P_W$ = `specs.pricePerWattUSD`, si no `financials.pricePerWattUSD`, si no 1.13. El precio de lista suma los ítems adicionales y su ITBIS no exonerado, y los descuentos se recalculan sobre ese precio. `directPriceSurplusTarget` (`margin` o `labor`) decide cómo se reparte la diferencia respecto al costo en la matriz mostrada.
 - `financials.customCostUSD > 0` sustituye la inversión en ambos modos.
 
 **Ítems adicionales:** llevan $M_{venta}$ salvo `applyMargin === false`, tanto en la matriz de costos como en el total de precio directo y en el desglose de ITBIS (`appliesItemMargin` en `shared/financialRules.ts`). El ITBIS de un ítem se calcula sobre su precio de venta (`customItemsTaxBreakdown`); la exoneración la decide `isItemItbisExonerated` (`exonerateITBIS`, o el campo heredado `applyITBIS`, exonerado por defecto). El visor web usa las mismas funciones para enlaces antiguos sin `customItemsNonExoneratedITBISUSD`.
@@ -156,7 +156,7 @@ Para $t = 1 \dots N$ (`projectLifespanYears`):
 
 $$CF_t = S_{yr1} \times (1 - d)^{t-1} \times (1 + i)^{t-1} + \text{Crédito}_t - \text{Reemplazo}_t$$
 
-- $d$: `annualDegradation` en modo detallado; 0.5% en modo simple.
+- $d$ (`resolveAnnualDegradationPct`): en modo detallado, `annualDegradation`. En modo simple, la degradación de los grupos de paneles del catálogo ponderada por potencia DC; si ningún grupo la trae, `annualDegradation`; si falta, 0.5%. Hasta 2.6.x el modo simple usaba siempre 0.5%, así que las propuestas simples existentes pueden ver un flujo de caja ligeramente distinto al recalcular (los enlaces publicados conservan su `calculationSnapshot`).
 - $i$: `annualEnergyInflationPct` (3.5% si falta).
 - $\text{Crédito}_t = \text{Crédito Ley 57-07}/3$ para $t \le 3$, si no 0.
 - $\text{Reemplazo}_t$ = `batteryReplacementCostUSD` en el año `batteryLifespanYears` (10 si falta), solo con batería y costo positivo.

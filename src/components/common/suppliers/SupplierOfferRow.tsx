@@ -9,6 +9,7 @@ import {
   STOCK_LABELS,
   type StockStatus,
 } from "../../../utils/supplierOfferUpdates";
+import { EquipmentPreviewThumb } from "../equipment/EquipmentPreviewThumb";
 
 export function SupplierOfferRow({
   equipment,
@@ -66,19 +67,28 @@ export function SupplierOfferRow({
           />
         </td>
         <td className="supplier-model">
-          <strong>{equipment.displayName}</strong>
-          <span>
-            {equipment.brand || "Sin marca"} ·{" "}
-            {equipment.type === "panel"
-              ? "Panel"
-              : equipment.type === "inverter"
-                ? "Inversor"
-                : "Batería"}
-            {offer.sku ? ` · ${offer.sku}` : ""}
-          </span>
-          {offer.notes && !details && (
-            <span className="supplier-note">{offer.notes}</span>
-          )}
+          <div className="supplier-model-layout">
+            <EquipmentPreviewThumb
+              item={equipment}
+              size={36}
+              className="equipment-preview-thumb"
+            />
+            <div>
+              <strong>{equipment.displayName}</strong>
+              <span>
+                {equipment.brand || "Sin marca"} ·{" "}
+                {equipment.type === "panel"
+                  ? "Panel"
+                  : equipment.type === "inverter"
+                    ? "Inversor"
+                    : "Batería"}
+                {offer.sku ? ` · ${offer.sku}` : ""}
+              </span>
+              {offer.notes && !details && (
+                <span className="supplier-note">{offer.notes}</span>
+              )}
+            </div>
+          </div>
         </td>
         <td>
           <select

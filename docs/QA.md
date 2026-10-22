@@ -14,7 +14,7 @@ La lista completa de gates está en [MAINTENANCE_AND_UPDATES.md](MAINTENANCE_AND
 
 - **Staging con runtime real**: `QA_CLOUDFLARED=/ruta/al/cloudflared npx tsx scripts/qa/runRuntimeStaging.ts`. Levanta PostgreSQL desechable, API HTTP real, Wrangler local (workerd y KV privados) y túneles HTTPS temporales; rechaza destinos de producción, aprovisiona usuarios sintéticos `@staging.example.invalid` (Ana ADMIN, Bruno EDITOR, Vera lector y una cuenta de otra organización) y ejecuta `scripts/qa/stagingRehearsal.ts` (CAS entre editores, rechazo del lector y de clientes sin `baseVersion`, snapshots de publicación, papelera). `Ctrl+C` limpia procesos, contenedor, KV y túneles.
 - **Aplicación completa contra ese staging**: en otra terminal `npm run dev` y abrir `/scripts/qa/fixtures/runtimeFlow.html` sobre el origen de Vite.
-- **Fixtures de componentes**: `scripts/qa/fixtures/*.html` montan vistas reales con transporte simulado (catálogo, asistente, centro empresarial, conflictos, borradores, simulador, fichas y editor del documento: `documentEditor.html`). Acreditan el comportamiento de UI, no la API.
+- **Fixtures de componentes**: `scripts/qa/fixtures/*.html` montan vistas reales con transporte simulado (catálogo, asistente, centro empresarial, clientes, conflictos, borradores, simulador, fichas y editor del documento: `documentEditor.html`). Acreditan el comportamiento de UI, no la API.
 - **Electron empaquetado**: `node scripts/qa/runElectronRuntime.mjs [ruta/app.asar]` arranca el ASAR con perfil privado y comprueba aislamiento del renderer e IPC. `release.yml` lo usa tras instalar los paquetes.
 - **Respaldo**: `scripts/qa/restoreBackupRehearsal.py` (ver [infraestructura](INFRASTRUCTURE_ARCHITECTURE.md#despliegue-de-la-api)).
 
@@ -22,6 +22,8 @@ Las capturas de QA se guardan localmente en `docs/qa/` (ignorado por Git) y cont
 
 ## Matriz de revisión manual
 
+- Catálogo con vistas previas (`/scripts/qa/fixtures/equipmentCatalog.html?assets=1`, también `&suppliers=1` y `&theme=dark`): miniaturas en la tabla, en las ofertas por proveedor y en el selector del simulador (imagen, primera página de la ficha o icono); el diálogo muestra galería, páginas y descarga, y cerrarlo con el fondo no selecciona la opción ni cierra el selector.
+- Fichas automáticas (`/scripts/qa/fixtures/simulatorDatasheets.html?assets=1`, `&reader=1` para un lector): el anexo aparece con insignia «Automática» y su número de páginas; quitarlo muestra «Restaurar fichas»; añadir o quitar equipos añade o retira anexos; un lector no modifica nada. Exportar con un anexo sin archivo pide confirmación.
 - Menú con tarjetas y lista: búsqueda/filtros, nombres largos, acciones por teclado y arrastre a carpeta; la preferencia persiste al recargar. Claro/oscuro a tamaño normal y mínimo Electron 1024×700.
 - Ajustes: navegación por categorías, título/foco, Escape, borradores al cambiar de categoría y fondo inerte para accesibilidad.
 - Sin cuenta, proyección desactivada: tabla de 5 columnas, gráfica de 2 series, sin perfil diurno. Al activarla aparecen controles y desglose y cambian ahorro/VAN; al desactivarla vuelve el cálculo clásico y se conservan los datos introducidos. Revisar PDF y hub.

@@ -25,6 +25,9 @@ export function serializeSimulationStore(state: SimulationStore) {
     folders: state.folders,
     folderChanges: state.folderChanges,
     folderDeletionQueue: state.folderDeletionQueue,
+    clients: state.clients,
+    clientChanges: state.clientChanges,
+    clientDeletionQueue: state.clientDeletionQueue,
     tariffMatrix: state.tariffMatrix,
     defaultSimulationSettings: state.defaultSimulationSettings,
     defaultDocumentCustomization: state.defaultDocumentCustomization,
@@ -35,5 +38,7 @@ export function serializeSimulationStore(state: SimulationStore) {
     snapshotsByProject: state.snapshotsByProject,
     projectDeletionQueue: state.projectDeletionQueue,
     projectConflicts: state.projectConflicts,
+    agentPolicy: state.agentPolicy,
+    agentActivity: state.agentActivity,
   };
 }

@@ -1,6 +1,6 @@
 import { canEditCommercial } from '../../features/proposals/commercial';
 import { isProposalLink } from '../../../shared/proposalLinks';
-import { normalizeEquipmentEdit, normalizeSpecsChange } from '../../utils/equipmentGroups';
+import { normalizeEquipmentEdit, normalizeSpecsChange, selectCatalogEquipment } from '../../utils/equipmentGroups';
 import { commercialCopy, commercialState, isProposalCommercial } from '../../../shared/proposalCommercial';
 import { companyDocumentCustomization, reusableDocumentTemplate } from '../../utils/companyDocumentTemplate';
 import { DEFAULT_SIMULATION_SETTINGS } from '../defaultSimulationSettings';
@@ -176,6 +176,19 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
   },
 
+  updateProjectById: (id, edit) => {
+    const target = get().projects.find((p) => p.id === id);
+    if (!target || target.isDeleted || target.deletedAt) return false;
+    set((state) => ({
+      projects: state.projects.map((p) => p.id === id
+        ? withNormalizedEquipment(p, { ...p, ...projectMutationMetadata(p, get().syncSettings), updatedAt: new Date().toISOString(), ...edit(p) })
+        : p),
+    }));
+    get().triggerAutoSync(false);
+    if (id === get().activeProjectId) get().recordUndoState(get().getActiveProject());
+    return true;
+  },
+
   createNewProject: (payload) => {
     const defs = get().defaultSimulationSettings;
     const id = `proj-${Date.now()}`;
@@ -222,6 +235,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
       },
       specs: {
         ...BENCHMARK_PROJECT.specs,
+        isDetailed: false, // Simple (Catálogo IA): equipos del catálogo con precios de proveedor
         pricingMode: defs?.defaultPricingMode === 'direct' ? 'direct_watt' : 'cost_matrix',
         panelPowerW: defs?.defaultPanelPowerW || 620,
         panelBrandModel: defs?.defaultPanelModel || BENCHMARK_PROJECT.specs.panelBrandModel,
@@ -278,9 +292,9 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     }
   },
 
-  duplicateProject: (id) => {
+  duplicateProject: (id, options) => {
     const original = get().projects.find((p) => p.id === id);
-    if (!original) return;
+    if (!original) return undefined;
 
     const dupIdentifiers = generateDuplicateProjectIdentifiers(original, get().projects);
     const newId = `proj-${Date.now()}`;
@@ -319,7 +333,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
 
     set((state) => ({
       projects: [cloned, ...state.projects],
-      activeProjectId: newId,
+      ...(options?.activate === false ? {} : { activeProjectId: newId }),
       saveFeedbackMessage: `¡Proyecto duplicado como versión ${dupIdentifiers.versionSuffix}! ✨`,
     }));
 
@@ -328,6 +342,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
       get().triggerAutoSync(true);
     }
+    return newId;
   },
 
   moveToTrash: (id) => {
@@ -726,6 +741,10 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
             });
           }
           updatedSpecs.selectedSupplierInfo = selectedSupplierInfo;
+          // The primary group remembers its catalog item (datasheet annexes); unmigrated projects migrate here.
+          if (targetItem) Object.assign(updatedSpecs, selectCatalogEquipment(updatedSpecs, equipmentType, 0, targetItem, {
+            unitPriceUSD: supplierPrice.priceUSD, selectedSupplierInfo: selectedSupplierInfo[equipmentType],
+          }));
           const nextFinancials = withoutStaleFinancialOverrides(p, p.financials);
 
           return {

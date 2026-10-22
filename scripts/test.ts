@@ -6,6 +6,8 @@ const root = process.cwd();
 const filters = process.argv.slice(2).map(f => f.toLowerCase());
 const suites = readdirSync(path.join(root, 'src/tests')).filter(file => /^test.*\.ts$/.test(file)).sort().map(file => `src/tests/${file}`);
 suites.push('electron/updater/tests/updaterIntegrity.test.ts');
+// Electron main-process suites run on node:http: `fetch` is disabled in the test environment.
+suites.push(...readdirSync(path.join(root, 'electron/mcp/tests')).filter(file => /\.test\.ts$/.test(file)).sort().map(file => `electron/mcp/tests/${file}`));
 const selected = filters.length ? suites.filter(suite => filters.some(f => suite.toLowerCase().includes(f))) : suites;
 if (!selected.length) { console.error(`No suite matches: ${filters.join(', ')}`); process.exit(1); }
 for (const suite of selected) {

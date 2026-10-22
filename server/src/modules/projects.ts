@@ -281,6 +281,31 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
             continue;
           }
         }
+        // Clients created offline stay linkable until they are published.
+        // Known clients must belong to this tenant and must not be deleted.
+        if (input.clientId != null) {
+          if (
+            typeof input.clientId !== "string" ||
+            !input.clientId ||
+            input.clientId.length > 64
+          ) {
+            conflict("invalid_client", existing);
+            continue;
+          }
+          const linked = (
+            await client.query(
+              "SELECT organization_id,deleted_at FROM clients WHERE id=$1",
+              [input.clientId],
+            )
+          ).rows;
+          const ownClient = linked.find(
+            (row) => row.organization_id === user.organizationId,
+          );
+          if ((linked.length > 0 && !ownClient) || ownClient?.deleted_at) {
+            conflict("invalid_client", existing);
+            continue;
+          }
+        }
         if (existing && input.forceNewVersion) {
           const id = `${input.id.slice(0, 80)}-fork-${crypto.randomUUID()}`;
           const project = await saveProject(client, user, {
@@ -554,6 +579,8 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
           ...snapshot.data_json,
           commercial: row.data_json.commercial,
           proposalLink: row.data_json.proposalLink,
+          // The client link is directory metadata, like the commercial state: history never revives a removed or deleted link.
+          clientId: row.data_json.clientId,
           id: row.id,
           isDeleted: row.is_deleted,
         },
