@@ -15,7 +15,7 @@ import { calculateFinancialSummary, calculateCostMatrixSummary } from '../../eng
 import { calculateRecommendedPanelCount } from '../../engine/solarEngine';
 import { projectMutationMetadata } from '../sync/projectMutation';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
-import { canWrite } from '../../../shared/permissions';
+import { canEditDocument } from '../../components/pdf/editor/documentEditorState';
 import { normalizeDocumentLayout } from '../../../shared/documentLayout';
 import { applyDocumentTextPatch, companyTemplateTextPatch, documentTextsPatch } from '../../../shared/documentTexts';
 import { documentTextContextFor } from '../../utils/documentTextContext';
@@ -55,6 +55,13 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
   const isActiveProjectTrashed = () => {
     const state = get();
     return !!state.projects.find((p) => p.id === (state.activeProjectId || state.getActiveProject()?.id))?.isDeleted;
+  };
+
+  /** Same rule as the editor UI: writers only, never trashed or conflicted proposals. */
+  const canEditActiveDocument = () => {
+    const state = get();
+    const active = state.projects.find((p) => p.id === (state.activeProjectId || state.getActiveProject()?.id));
+    return !!active && canEditDocument({ project: active, user: state.syncSettings.currentUser });
   };
 
   /** Applies an edit to the active project, stamps mutation metadata, then auto-syncs and records undo. */
@@ -629,11 +636,11 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     return { client, customization: { ...(p.customization || {}), ...customizationPartial } };
   }),
 
-  setDocumentLayout: (patch) => !canWrite(get().syncSettings.currentUser) ? undefined : updateActiveProject((p) => ({
+  setDocumentLayout: (patch) => !canEditActiveDocument() ? undefined : updateActiveProject((p) => ({
     customization: { ...(p.customization || {}), layout: normalizeDocumentLayout({ ...(p.customization?.layout || {}), ...patch }) },
   })),
 
-  setDocumentTexts: (values) => !canWrite(get().syncSettings.currentUser) ? undefined : updateActiveProject((p, state) => {
+  setDocumentTexts: (values) => !canEditActiveDocument() ? undefined : updateActiveProject((p, state) => {
     const ctx = documentTextContextFor(state, p, energyCalculationMode(effectiveFeatureSettings(state)));
     const patch = documentTextsPatch(values, p, ctx);
     const next = applyDocumentTextPatch({ customization: p.customization || {}, client: p.client }, patch);

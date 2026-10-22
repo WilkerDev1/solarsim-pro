@@ -13,6 +13,10 @@ interface OptionalTextRowProps {
 export const OptionalTextRow: React.FC<OptionalTextRowProps> = ({ k, editOnly = false, children }) => {
   const editor = useDocumentEditor();
   if (editor.mode === 'export') return editOnly || !editor.resolve(k).text ? null : <>{children}</>;
-  if (editor.canEdit) return editOnly ? <div data-pdf-chrome>{children}</div> : <>{children}</>;
+  if (editor.canEdit) {
+    // Fila vacía = marcador de posición del editor: no se imprime. Con valor sigue imprimiéndose.
+    if (editOnly || !editor.resolve(k).text) return <div data-pdf-chrome>{children}</div>;
+    return <>{children}</>;
+  }
   return editOnly || !editor.resolve(k).text ? null : <>{children}</>;
 };
