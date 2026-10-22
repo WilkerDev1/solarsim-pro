@@ -14,7 +14,6 @@ interface SearchableEquipmentSelectProps {
   onOpenScanner: () => void;
   placeholder?: string;
   /** Ya no se usa: los colores salen de los tokens pd-* y cambian con la clase dark. */
-  isDark?: boolean;
   /** Nombre accesible del selector; no se dibuja. */
   label: string;
   /** Contenido junto al disparador (contador); el menú abierto sigue ocupando todo el ancho. */
@@ -114,7 +113,6 @@ export const SearchableEquipmentSelect: React.FC<SearchableEquipmentSelectProps>
 
   const isPanel = type === 'panel';
   const isBattery = type === 'battery';
-  const isInverter = type === 'inverter';
 
   const getPlaceholderText = () => {
     if (placeholder) return placeholder;

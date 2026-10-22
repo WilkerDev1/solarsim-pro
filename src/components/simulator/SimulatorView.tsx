@@ -25,12 +25,10 @@ export const SimulatorView: React.FC = () => {
     updateMonthlyConsumption,
     updateAllMonthlyConsumption,
     setMonthlyConsumption,
-    saveActiveProject,
     openAIInvoiceModal,
     syncSettings,
     sidebarWidth,
     setSidebarWidth,
-    sidebarTheme,
     restoreProject,
     hardDeleteProject,
     setActiveView,
@@ -39,11 +37,10 @@ export const SimulatorView: React.FC = () => {
     canRedo,
     undo,
     redo,
-  } = useSimulationStore(useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId, getActiveProject: s.getActiveProject, getFinancialSummary: s.getFinancialSummary, updateClient: s.updateClient, updateSpecs: s.updateSpecs, updateRates: s.updateRates, updateFinancials: s.updateFinancials, updateMonthlyConsumption: s.updateMonthlyConsumption, updateAllMonthlyConsumption: s.updateAllMonthlyConsumption, setMonthlyConsumption: s.setMonthlyConsumption, saveActiveProject: s.saveActiveProject, openAIInvoiceModal: s.openAIInvoiceModal, syncSettings: s.syncSettings, sidebarWidth: s.sidebarWidth, setSidebarWidth: s.setSidebarWidth, sidebarTheme: s.sidebarTheme, restoreProject: s.restoreProject, hardDeleteProject: s.hardDeleteProject, setActiveView: s.setActiveView, setIsTrashActive: s.setIsTrashActive, canUndo: s.canUndo, canRedo: s.canRedo, undo: s.undo, redo: s.redo, energyMode: energyCalculationMode(effectiveFeatureSettings(s)) })));
+  } = useSimulationStore(useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId, getActiveProject: s.getActiveProject, getFinancialSummary: s.getFinancialSummary, updateClient: s.updateClient, updateSpecs: s.updateSpecs, updateRates: s.updateRates, updateFinancials: s.updateFinancials, updateMonthlyConsumption: s.updateMonthlyConsumption, updateAllMonthlyConsumption: s.updateAllMonthlyConsumption, setMonthlyConsumption: s.setMonthlyConsumption, openAIInvoiceModal: s.openAIInvoiceModal, syncSettings: s.syncSettings, sidebarWidth: s.sidebarWidth, setSidebarWidth: s.setSidebarWidth, restoreProject: s.restoreProject, hardDeleteProject: s.hardDeleteProject, setActiveView: s.setActiveView, setIsTrashActive: s.setIsTrashActive, canUndo: s.canUndo, canRedo: s.canRedo, undo: s.undo, redo: s.redo, energyMode: energyCalculationMode(effectiveFeatureSettings(s)) })));
 
   const project = getActiveProject();
   const summary = getFinancialSummary();
-  const isDark = sidebarTheme === 'dark';
 
   // Navigation tab for the right content area
   const [activeMainTab, setActiveMainTab] = useState<'energia' | 'cotizacion' | 'retorno'>('energia');
@@ -148,7 +145,6 @@ export const SimulatorView: React.FC = () => {
         project={project}
         projects={projects}
         summary={summary}
-        isDark={isDark}
         sidebarWidth={sidebarWidth}
         isDragging={isDragging}
         onMouseDown={handleMouseDown}
@@ -159,7 +155,6 @@ export const SimulatorView: React.FC = () => {
         updateSpecs={project.isDeleted ? () => {} : updateSpecs}
         updateRates={project.isDeleted ? () => {} : updateRates}
         updateFinancials={project.isDeleted ? () => {} : updateFinancials}
-        saveActiveProject={project.isDeleted ? () => {} : saveActiveProject}
       />
 
       {/* Main Content Area */}

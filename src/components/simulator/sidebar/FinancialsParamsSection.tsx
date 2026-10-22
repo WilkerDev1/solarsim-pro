@@ -12,7 +12,6 @@ import { newCustomDiscount, newCustomItem, patchById, removeById } from '../para
 interface FinancialsParamsSectionProps {
   project: ProjectSimulation;
   /** Ya no se usa: el estilo sale de los tokens `pd-*`. Se elimina en la limpieza final. */
-  isDark?: boolean;
   updateFinancials: (financials: Partial<FinancialParams>) => void;
 }
 

@@ -10,7 +10,6 @@ interface ClientParamsSectionProps {
   project: ProjectSimulation;
   projects: ProjectSimulation[];
   /** El dock ya no pinta según el tema: los tokens pd-* cambian solos. Se acepta para no romper al contenedor. */
-  isDark?: boolean;
   isIdUnlocked: boolean;
   setIsIdUnlocked: (val: boolean) => void;
   isFetchingSolar: boolean;

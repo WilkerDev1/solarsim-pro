@@ -13,7 +13,6 @@ interface BatteryEquipmentSectionProps {
   isDetailed: boolean;
   updateSpecs: (specs: Partial<SystemSpecs>) => void;
   /** Ya no se usa: los colores salen de los tokens pd-* y cambian con la clase dark. */
-  isDark?: boolean;
 }
 
 const YES_NO = [

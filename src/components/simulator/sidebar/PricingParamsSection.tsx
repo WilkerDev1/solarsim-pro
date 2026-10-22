@@ -23,7 +23,6 @@ interface PricingParamsSectionProps {
   project: ProjectSimulation;
   summary: FinancialSummaryResult;
   /** Ya no se usa: el estilo sale de los tokens `pd-*`. Se elimina en la limpieza final. */
-  isDark?: boolean;
   updateSpecs: (specs: Partial<SystemSpecs>) => void;
 }
 
