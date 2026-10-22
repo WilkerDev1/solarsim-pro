@@ -52,12 +52,13 @@ const proposal = (id: string, clientId?: string): ProjectSimulation => ({
 
 try {
   store.getState().setSyncSettings({ serverUrl, currentUser: user, authToken: 'synthetic', autoSyncEnabled: false, lastSyncTimestamp: null });
-  store.setState({ clients: [], clientChanges: {}, clientDeletionQueue: [], projects: [proposal('p-gone', 'client-gone'), proposal('p-kept', 'client-a')] });
+  store.setState({ clients: [], clientChanges: {}, clientDeletionQueue: [], projects: [{ ...proposal('p-gone', 'client-gone'), syncStatus: 'synced' as const }, proposal('p-kept', 'client-a')] });
 
   // Pull: server records replace the list and links to deleted clients are dropped locally.
   assert.equal((await store.getState().syncClientsWithServer()).success, true);
   assert.deepEqual(store.getState().clients.map((c) => c.id), ['client-a']);
   assert.equal(store.getState().projects.find((p) => p.id === 'p-gone')!.clientId, undefined);
+  assert.equal(store.getState().projects.find((p) => p.id === 'p-gone')!.baseVersion, 2, 'Synced copies follow the server version bump');
   assert.equal(store.getState().projects.find((p) => p.id === 'p-kept')!.clientId, 'client-a');
 
   // Offline creation is durable and published once the connection returns.

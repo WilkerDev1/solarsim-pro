@@ -38,7 +38,14 @@ export const createClientSlice: SimulationSlice<ClientSlice> = (set, get) => {
   // Server deletions unlink proposals locally too; the push would otherwise be rejected as invalid_client.
   const unlinkDeleted = (deleted: Set<string>) =>
     set((s) => s.projects.some((p) => p.clientId && deleted.has(p.clientId))
-      ? { projects: s.projects.map((p) => (p.clientId && deleted.has(p.clientId) ? { ...p, clientId: undefined } : p)) }
+      ? {
+          projects: s.projects.map((p) => {
+            if (!p.clientId || !deleted.has(p.clientId)) return p;
+            // The server unlinked its copy and bumped its version once; a synced local copy must follow to keep its CAS base.
+            const follow = p.syncStatus === 'synced' && Number.isSafeInteger(p.baseVersion);
+            return { ...p, clientId: undefined, ...(follow ? { version: (p.version ?? p.baseVersion!) + 1, baseVersion: p.baseVersion! + 1 } : {}) };
+          }),
+        }
       : {});
 
   return {
