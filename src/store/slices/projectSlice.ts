@@ -747,7 +747,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
             updatedSpecs.batteries = updatedSpecs.batteries.map((item, index) => index ? item : {
               ...item, brandModel: updatedSpecs.batteryBrandModel || item.brandModel,
               capacityKWh: updatedSpecs.batteryCapacityKWh || item.capacityKWh,
-              dodPct: updatedSpecs.batteryDOD, unitPriceUSD: supplierPrice.priceUSD,
+              dodPct: updatedSpecs.batteryDOD, efficiencyPct: updatedSpecs.batteryEfficiencyPct, unitPriceUSD: supplierPrice.priceUSD,
               selectedSupplierInfo: selectedSupplierInfo.battery,
             });
           }

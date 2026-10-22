@@ -111,4 +111,19 @@ for (const file of ['src/components/common/AIDatasheetScannerModal.tsx', 'src/co
   assert.equal(prepared.specs.batteryDOD, 90, 'el escalar es el del primer grupo');
 }
 
+// ── Catálogo → proyecto con grupos: el precio de proveedor sincroniza la eficiencia del grupo principal ──
+{
+  const { useSimulationStore } = await import('../store/useSimulationStore');
+  const store = () => useSimulationStore.getState();
+  store().createNewProject({ name: 'Banco', province: 'Santiago', distributor: 'EDENORTE', tariffCode: 'BTS2' });
+  store().updateSpecs({ hasBattery: true, batteries: [group('A', 10, 1, { dodPct: 90, efficiencyPct: 95 }), group('B', 10, 1, { dodPct: 90, efficiencyPct: 90 })] } as Partial<SystemSpecs>);
+  const offer = { id: 'sp', supplierName: 'Dist', priceUSD: 1500, updatedAt: '2026-10-21' };
+  const entry = { id: 'cat-x', displayName: 'Nueva 10', type: 'battery', brand: 'QA', modelSeries: 'QA', createdAt: 'x', updatedAt: 'x', capacityKWh: 10, dodPct: 90, batteryEfficiencyPct: 85, supplierPrices: [offer] } as unknown as SolarEquipmentItem;
+  store().applySupplierPriceToProject('battery', offer, entry);
+  const specs = store().getActiveProject().specs;
+  assert.equal(specs.batteries![0].efficiencyPct, 85, 'el grupo principal toma la eficiencia del catálogo');
+  assert.equal(specs.batteryEfficiencyPct, 85);
+  close(resolveBatteryBankEfficiencyPct(specs), 87.5, 'el motor ve el cambio');
+}
+
 console.log('testBatteryBankDefaults: ok');
