@@ -21,44 +21,34 @@ import {
   RotateCcw,
   LayoutDashboard,
 } from 'lucide-react';
-import { PDFColorTheme, PDF_COLOR_THEMES } from '../../../constants/pdfThemes';
+import { DOCUMENT_SECTION_IDS, DOCUMENT_SECTIONS, sectionLabel } from '../../../../shared/documentTexts/sections';
+import type { SectionVisibility } from '../../../../shared/documentLayout';
+import { PDFExtraTocEditor } from './PDFExtraTocEditor';
 import { ProjectSimulation, DocumentCustomization, ExtraTOCItem } from '../../../types';
+
+const SECTION_ICONS: Record<PDFSectionId, React.ComponentType<{ className?: string }>> = {
+  cover: Layout,
+  tableOfContents: ListOrdered,
+  executiveSummary: LayoutDashboard,
+  aboutUs: Building2,
+  benefits: Sun,
+  techIntro: Cpu,
+  projectDescription: FileText,
+  energy: Zap,
+  quotation: FileText,
+  roi: TrendingUp,
+  cashFlow: BarChart3,
+  costMatrix: Lock,
+};
 import { PDFAttachmentsSection } from './PDFAttachmentsSection';
 import { PDFSectionId, DEFAULT_PDF_SECTION_ORDER } from '../../../constants/pdfSections';
 import { normalizeSectionOrder } from '../../../utils/pdfLayout';
 
 interface PDFSectionTogglesProps {
   isDark: boolean;
-  activeTheme: PDFColorTheme;
-  setActiveTheme: (theme: PDFColorTheme) => void;
-  // New Intro Pages
-  showCover: boolean;
-  setShowCover: (val: boolean) => void;
-  showTableOfContents: boolean;
-  setShowTableOfContents: (val: boolean) => void;
-  showExecutiveSummary: boolean;
-  setShowExecutiveSummary: (val: boolean) => void;
-  showAboutUs: boolean;
-  setShowAboutUs: (val: boolean) => void;
-  showBenefits: boolean;
-  setShowBenefits: (val: boolean) => void;
-  showTechIntro: boolean;
-  setShowTechIntro: (val: boolean) => void;
-  showProjectDescription: boolean;
-  setShowProjectDescription: (val: boolean) => void;
-  // Core Technical & Financial Pages
-  showPage1: boolean;
-  setShowPage1: (val: boolean) => void;
-  showPageQuotation: boolean;
-  setShowPageQuotation: (val: boolean) => void;
-  showPage2: boolean;
-  setShowPage2: (val: boolean) => void;
-  showPage3: boolean;
-  setShowPage3: (val: boolean) => void;
-  showPageCostMatrix: boolean;
-  setShowPageCostMatrix: (val: boolean) => void;
-  showHeadersFooters: boolean;
-  setShowHeadersFooters: (val: boolean) => void;
+  /** Visibilidad efectiva de cada sección y su cambio (persistido en `customization.layout`). */
+  visibility: SectionVisibility;
+  setSectionVisible: (id: PDFSectionId, visible: boolean) => void;
   project?: ProjectSimulation;
   updateDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
   updateSpecs?: (specs: Partial<ProjectSimulation['specs']>) => void;
@@ -66,44 +56,13 @@ interface PDFSectionTogglesProps {
 
 export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
   isDark,
-  activeTheme,
-  setActiveTheme,
-  showCover,
-  setShowCover,
-  showTableOfContents,
-  setShowTableOfContents,
-  showExecutiveSummary,
-  setShowExecutiveSummary,
-  showAboutUs,
-  setShowAboutUs,
-  showBenefits,
-  setShowBenefits,
-  showTechIntro,
-  setShowTechIntro,
-  showProjectDescription,
-  setShowProjectDescription,
-  showPage1,
-  setShowPage1,
-  showPageQuotation,
-  setShowPageQuotation,
-  showPage2,
-  setShowPage2,
-  showPage3,
-  setShowPage3,
-  showPageCostMatrix,
-  setShowPageCostMatrix,
-  showHeadersFooters,
-  setShowHeadersFooters,
+  visibility,
+  setSectionVisible,
   project,
   updateDocumentCustomization,
   updateSpecs,
 }) => {
   const projectionEnabled = useSelfConsumptionProjection();
-  const [newExtraTitle, setNewExtraTitle] = useState('');
-  const [newExtraSubtitle, setNewExtraSubtitle] = useState('');
-  const [newExtraPageCount, setNewExtraPageCount] = useState<number>(1);
-  const [isAddingOpen, setIsAddingOpen] = useState(false);
-
   const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
@@ -136,188 +95,19 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
     });
   };
 
-  const sectionConfigs: Record<
-    PDFSectionId,
-    {
-      visible: boolean;
-      toggle: (val: boolean) => void;
-      icon: React.ComponentType<{ className?: string }>;
-      title: string;
-      subtitle: string;
-      isConfidential?: boolean;
-    }
-  > = {
-    cover: {
-      visible: showCover,
-      toggle: setShowCover,
-      icon: Layout,
-      title: 'Portada Ejecutiva',
-      subtitle: 'Imagen hero, cliente y datos',
-    },
-    tableOfContents: {
-      visible: showTableOfContents,
-      toggle: setShowTableOfContents,
-      icon: ListOrdered,
-      title: 'Índice del Dossier',
-      subtitle: 'Estructura y números dinámicos',
-    },
-    executiveSummary: {
-      visible: showExecutiveSummary,
-      toggle: setShowExecutiveSummary,
-      icon: LayoutDashboard,
-      title: 'Cuadro Resumen Ejecutivo',
-      subtitle: 'Inversión bruta, Ley 57-07 y retorno',
-    },
-    aboutUs: {
-      visible: showAboutUs,
-      toggle: setShowAboutUs,
-      icon: Building2,
-      title: '1. ¿Quiénes Somos? & Servicios',
-      subtitle: 'Visión y 4 tarjetas de servicio',
-    },
-    benefits: {
-      visible: showBenefits,
-      toggle: setShowBenefits,
-      icon: Sun,
-      title: '2. Beneficios Solares & Ley 57-07',
-      subtitle: 'Pilares y marco fiscal dominicano',
-    },
-    techIntro: {
-      visible: showTechIntro,
-      toggle: setShowTechIntro,
-      icon: Cpu,
-      title: '3. ¿Qué es FV? & Flujo Técnico',
-      subtitle: 'Render 3D y diagrama de flujo',
-    },
-    projectDescription: {
-      visible: showProjectDescription,
-      toggle: setShowProjectDescription,
-      icon: FileText,
-      title: '4. Resumen & Normativa SIE',
-      subtitle: 'Narrativa técnica y Res. SIE-007',
-    },
-    energy: {
-      visible: showPage1,
-      toggle: setShowPage1,
-      icon: Zap,
-      title: 'Análisis de Energía y Balance',
-      subtitle: 'Generación vs Demanda mensual',
-    },
-    quotation: {
-      visible: showPageQuotation,
-      toggle: setShowPageQuotation,
-      icon: FileText,
-      title: 'Cotización de Sistema',
-      subtitle: 'Equipos, inversión y garantías',
-    },
-    roi: {
-      visible: showPage2,
-      toggle: setShowPage2,
-      icon: TrendingUp,
-      title: 'Retorno de Inversión',
-      subtitle: 'Payback, VAN, TIR y Ley 57-07',
-    },
-    cashFlow: {
-      visible: showPage3,
-      toggle: setShowPage3,
-      icon: BarChart3,
-      title: 'Flujo de Caja 25 Años',
-      subtitle: 'Proyección financiera detallada',
-    },
-    costMatrix: {
-      visible: showPageCostMatrix,
-      toggle: setShowPageCostMatrix,
-      icon: Lock,
-      title: 'Costos Internos',
-      subtitle: 'Matriz de márgenes y desglose',
-      isConfidential: true,
-    },
-  };
-
-  const handleAddExtraItem = () => {
-    if (!newExtraTitle.trim() || !updateDocumentCustomization) return;
-    const newItem: ExtraTOCItem = {
-      id: `extra-toc-${Date.now()}`,
-      title: newExtraTitle.trim(),
-      subtitle: newExtraSubtitle.trim() || undefined,
-      pageCount: newExtraPageCount > 0 ? newExtraPageCount : 1,
-    };
-    updateDocumentCustomization({
-      extraTocItems: [...extraTocItems, newItem],
-    });
-    setNewExtraTitle('');
-    setNewExtraSubtitle('');
-    setNewExtraPageCount(1);
-    setIsAddingOpen(false);
-  };
-
-  const handleAddPreset = (preset: { title: string; subtitle: string; pageCount: number }) => {
-    if (!updateDocumentCustomization) return;
-    const newItem: ExtraTOCItem = {
-      id: `extra-toc-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      title: preset.title,
-      subtitle: preset.subtitle,
-      pageCount: preset.pageCount,
-    };
-    updateDocumentCustomization({
-      extraTocItems: [...extraTocItems, newItem],
-    });
-  };
-
-  const handleUpdatePageCount = (id: string, newCount: number) => {
-    if (!updateDocumentCustomization) return;
-    const clamped = Math.max(1, Math.min(99, newCount));
-    updateDocumentCustomization({
-      extraTocItems: extraTocItems.map((it) => (it.id === id ? { ...it, pageCount: clamped } : it)),
-    });
-  };
-
-  const handleRemoveExtraItem = (id: string) => {
-    if (!updateDocumentCustomization) return;
-    updateDocumentCustomization({
-      extraTocItems: extraTocItems.filter((it) => it.id !== id),
-    });
-  };
+  const sectionConfigs = Object.fromEntries(
+    DOCUMENT_SECTION_IDS.map((id) => [id, {
+      visible: visibility[id],
+      toggle: (value: boolean) => setSectionVisible(id, value),
+      icon: SECTION_ICONS[id],
+      title: sectionLabel(id),
+      subtitle: DOCUMENT_SECTIONS[id].description,
+      isConfidential: DOCUMENT_SECTIONS[id].confidential,
+    }]),
+  ) as Record<PDFSectionId, { visible: boolean; toggle: (value: boolean) => void; icon: React.ComponentType<{ className?: string }>; title: string; subtitle: string; isConfidential?: boolean }>;
 
   return (
     <div className="space-y-4">
-      {/* Selector de Color */}
-      <div className="space-y-2">
-        <h3 className={`text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400`}>
-          Paleta de Color Corporativa
-        </h3>
-        <div className="grid grid-cols-6 gap-1.5">
-          {PDF_COLOR_THEMES.map((theme) => {
-            const isActive = activeTheme.id === theme.id;
-            return (
-              <button
-                key={theme.id}
-                onClick={() => setActiveTheme(theme)}
-                title={theme.name}
-                className={`h-11 rounded-xl flex flex-col overflow-hidden border-2 transition-all cursor-pointer relative ${
-                  isActive
-                    ? 'border-emerald-500 ring-2 ring-emerald-500/40 scale-105 shadow-md'
-                    : isDark
-                    ? 'border-[#2e2e3a] opacity-70 hover:opacity-100 hover:border-zinc-500'
-                    : 'border-slate-200 opacity-80 hover:opacity-100 hover:border-slate-400'
-                }`}
-              >
-                <span className="flex-1 w-full" style={{ backgroundColor: theme.primary }}></span>
-                <span className="flex-1 w-full" style={{ backgroundColor: theme.secondary }}></span>
-                <span className="flex-1 w-full" style={{ backgroundColor: theme.tertiary || theme.barColor }}></span>
-                {isActive && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-[1px]">
-                    <Check className="w-3.5 h-3.5 text-white drop-shadow" />
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className={`h-px w-full bg-slate-200 dark:bg-[#2a2a36]`}></div>
-
       {/* 1. SECCIÓN: ESTRUCTURA Y ORDEN DE PÁGINAS */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -530,182 +320,7 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
 
       <div className={`h-px w-full bg-slate-200 dark:bg-[#2a2a36]`}></div>
 
-      {/* 3. PÁGINAS EXTRA / ANEXOS DEL ÍNDICE */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <ListPlus className="w-4 h-4 text-amber-500 shrink-0" />
-            <h3 className={`text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300`}>
-              3. Páginas Extra / Anexos del Índice
-            </h3>
-          </div>
-          <span
-            className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
-              extraTocItems.length > 0
-                ? isDark
-                  ? 'bg-amber-950/80 text-amber-300 border-amber-800/60'
-                  : 'bg-amber-100 text-amber-800 border-amber-300'
-                : isDark
-                ? 'bg-zinc-800 text-zinc-500 border-zinc-700'
-                : 'bg-slate-100 text-slate-500 border-slate-200'
-            }`}
-          >
-            {extraTocItems.length} {extraTocItems.length === 1 ? 'Anexo' : 'Anexos'}
-          </span>
-        </div>
-
-        <p className={`text-[11px] leading-relaxed text-slate-500 dark:text-zinc-400`}>
-          Añade puntos adicionales al índice para documentos que insertarás externamente (ej. Fichas técnicas, Planos, Certificaciones). El sistema les asignará automáticamente los números de página finales correlativos.
-        </p>
-
-        {/* Lista de Anexos Existentes */}
-        {extraTocItems.length > 0 && (
-          <div className="space-y-2">
-            {extraTocItems.map((item, idx) => (
-              <div
-                key={item.id}
-                className={`p-2.5 rounded-xl border flex items-center justify-between gap-2.5 transition-all ${
-                  isDark ? 'bg-[#1a1a24] border-[#2e2e3e]' : 'bg-white border-slate-200 shadow-2xs'
-                }`}
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-500 font-black text-[10px] flex items-center justify-center shrink-0">
-                      +{idx + 1}
-                    </span>
-                    <span className={`text-xs font-bold truncate block text-slate-900 dark:text-zinc-100`}>
-                      {item.title}
-                    </span>
-                  </div>
-                  {item.subtitle && (
-                    <span className={`text-[10.5px] truncate block pl-5.5 text-slate-500 dark:text-zinc-400`}>
-                      {item.subtitle}
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <div
-                    className={`flex items-center rounded-lg border px-1.5 py-0.5 transition-all ${
-                      isDark
-                        ? 'bg-[#242432] border-[#38384a] focus-within:border-amber-500'
-                        : 'bg-slate-100 border-slate-300 focus-within:border-amber-600 focus-within:bg-white'
-                    }`}
-                    title="Haz clic para modificar la cantidad de páginas de este anexo"
-                  >
-                    <input
-                      type="number"
-                      min="1"
-                      max="99"
-                      value={item.pageCount || 1}
-                      onChange={(e) => handleUpdatePageCount(item.id, parseInt(e.target.value) || 1)}
-                      className={`w-6 text-center font-mono font-black text-xs bg-transparent outline-none p-0 cursor-text text-amber-900 dark:text-amber-400`}
-                    />
-                    <span className={`text-[10px] font-bold select-none pl-0.5 text-slate-500 dark:text-zinc-400`}>
-                      {(item.pageCount || 1) === 1 ? 'pág' : 'págs'}
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveExtraItem(item.id)}
-                    className="p-1 rounded-md text-red-400 hover:text-red-300 hover:bg-red-500/20 transition-colors cursor-pointer"
-                    title="Eliminar punto del índice"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Formulario para Agregar Nuevo Punto */}
-        <div
-          className={`p-3 rounded-xl border space-y-2.5 bg-slate-50 border-slate-200 dark:bg-[#181822] dark:border-[#2c2c3c]`}
-        >
-          <div className="flex items-center justify-between">
-            <span className={`text-[10px] font-extrabold uppercase tracking-wider text-amber-800 dark:text-amber-400`}>
-              + Agregar Nuevo Punto al Índice
-            </span>
-          </div>
-
-          <div>
-            <label className={`block text-[10px] font-bold uppercase mb-1 text-slate-600 dark:text-zinc-400`}>
-              Título del Punto Extra / Anexo
-            </label>
-            <input
-              type="text"
-              placeholder="ej: Fichas Técnicas de Equipos"
-              value={newExtraTitle}
-              onChange={(e) => setNewExtraTitle(e.target.value)}
-              className={`w-full text-xs px-2.5 py-1.5 rounded-lg border font-medium outline-none transition-colors bg-white border-slate-300 text-slate-800 focus:border-amber-600 dark:bg-[#242432] dark:border-[#38384a] dark:text-zinc-100 dark:focus:border-amber-500`}
-            />
-          </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            <div className="col-span-2">
-              <label className={`block text-[10px] font-bold uppercase mb-1 text-slate-600 dark:text-zinc-400`}>
-                Subtema / Descripción (Opcional)
-              </label>
-              <input
-                type="text"
-                placeholder="ej: Datasheets de Módulos e Inversores"
-                value={newExtraSubtitle}
-                onChange={(e) => setNewExtraSubtitle(e.target.value)}
-                className={`w-full text-xs px-2.5 py-1.5 rounded-lg border font-medium outline-none transition-colors bg-white border-slate-300 text-slate-800 focus:border-amber-600 dark:bg-[#242432] dark:border-[#38384a] dark:text-zinc-100 dark:focus:border-amber-500`}
-              />
-            </div>
-            <div>
-              <label className={`block text-[10px] font-bold uppercase mb-1 text-slate-600 dark:text-zinc-400`}>
-                Páginas
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="50"
-                value={newExtraPageCount}
-                onChange={(e) => setNewExtraPageCount(parseInt(e.target.value) || 1)}
-                className={`w-full text-xs px-2.5 py-1.5 rounded-lg border font-medium outline-none transition-colors bg-white border-slate-300 text-slate-800 focus:border-amber-600 dark:bg-[#242432] dark:border-[#38384a] dark:text-zinc-100 dark:focus:border-amber-500`}
-              />
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleAddExtraItem}
-            disabled={!newExtraTitle.trim()}
-            className="w-full py-2 px-3 rounded-lg text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer bg-amber-500 hover:bg-amber-400 text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xs"
-          >
-            <PlusCircle className="w-3.5 h-3.5" />
-            <span>Añadir Punto al Índice</span>
-          </button>
-
-          {/* Plantillas / Presets Rápidos */}
-          <div className="pt-2 border-t border-dashed border-zinc-700/50">
-            <span className={`text-[9.5px] uppercase font-bold tracking-wider block mb-1.5 text-slate-400 dark:text-zinc-500`}>
-              Sugerencias Rápidas:
-            </span>
-            <div className="flex flex-wrap gap-1">
-              {[
-                { title: 'Fichas Técnicas de Equipos', subtitle: 'Datasheets de Módulos e Inversores Tier-1', pageCount: 2 },
-                { title: 'Diagramas Unifilares y Planos', subtitle: 'Esquema Eléctrico y Distribución de Strings', pageCount: 1 },
-                { title: 'Certificaciones y Garantías', subtitle: 'Certificados UL, IEC y Respaldo de Fábrica', pageCount: 1 },
-                { title: 'Anexo Fotográfico de Sitio', subtitle: 'Levantamiento de Techo y Puntos de Conexión', pageCount: 1 },
-              ].map((preset, pIdx) => (
-                <button
-                  key={pIdx}
-                  type="button"
-                  onClick={() => handleAddPreset(preset)}
-                  className={`text-[10px] font-semibold px-2 py-1 rounded-md border transition-colors cursor-pointer bg-white border-slate-300 text-slate-700 hover:bg-amber-50 hover:text-amber-900 hover:border-amber-300 dark:bg-[#242432] dark:border-[#38384a] dark:text-zinc-300 dark:hover:bg-amber-950/40 dark:hover:text-amber-300 dark:hover:border-amber-700/50`}
-                >
-                  + {preset.title}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
+      <PDFExtraTocEditor isDark={isDark} extraTocItems={extraTocItems} updateDocumentCustomization={updateDocumentCustomization} />
 
       <div className={`h-px w-full bg-slate-200 dark:bg-[#2a2a36]`}></div>
 
@@ -716,33 +331,6 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
         updateDocumentCustomization={updateDocumentCustomization}
       />
 
-      <div className={`h-px w-full bg-slate-200 dark:bg-[#2a2a36]`}></div>
-
-      {/* Opciones de Formato */}
-      <div className="space-y-2">
-        <h3 className={`text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400`}>
-          Opciones de Formato
-        </h3>
-        <label
-          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
-            showHeadersFooters
-              ? isDark
-                ? 'bg-[#22222d] border-[#38384a] text-zinc-100'
-                : 'bg-white border-slate-300 text-slate-800'
-              : isDark
-              ? 'bg-[#1b1b22] border-[#2a2a36] text-zinc-400'
-              : 'bg-slate-50 border-slate-200 text-slate-600'
-          }`}
-        >
-          <span className="text-xs font-semibold">Mostrar Encabezados y Pies</span>
-          <input
-            type="checkbox"
-            checked={showHeadersFooters}
-            onChange={(e) => setShowHeadersFooters(e.target.checked)}
-            className="w-4 h-4 rounded text-emerald-600 focus:ring-0 cursor-pointer shrink-0"
-          />
-        </label>
-      </div>
     </div>
   );
 };
