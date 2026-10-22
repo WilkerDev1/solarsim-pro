@@ -9,6 +9,7 @@ import { PDFFooter } from '../PDFFooter';
 import { PDFWatermark } from '../PDFWatermark';
 import { EditableText } from '../editor/EditableText';
 import { OptionalTextRow } from '../editor/OptionalTextRow';
+import { RichText } from '../editor/RichText';
 import { getProjectPanels, getProjectInverters, getProjectBatteries } from '../../../utils/equipmentSpecsUtils';
 
 interface PDFPage2QuotationProps {
@@ -372,12 +373,12 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
             <EditableText k="quotation.servicesIncluded" as="div" className="space-y-0.5 block">
               {(text) => text
                 .split(/[,;\n]/)
-                .map((item) => item.replace(/^\s*[-•]\s*/, '').replace(/\*/g, '').trim())
+                .map((item) => item.replace(/^\s*[-•]\s*/, '').trim())
                 .filter(Boolean)
                 .map((item, idx) => (
                   <div key={idx} className="flex items-start gap-1.5 leading-snug">
                     <Check className="w-3 h-3 text-emerald-600 shrink-0 mt-0.5" />
-                    <span className="font-medium text-slate-700">{item}</span>
+                    <span className="font-medium text-slate-700"><RichText text={item} /></span>
                   </div>
                 ))}
             </EditableText>

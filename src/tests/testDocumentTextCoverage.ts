@@ -14,6 +14,7 @@ import { PDFPage2Quotation } from '../components/pdf/pages/PDFPage2Quotation';
 import { PDFPage3ROI } from '../components/pdf/pages/PDFPage3ROI';
 import { PDFPage4CashFlow } from '../components/pdf/pages/PDFPage4CashFlow';
 import { PDFPage5CostMatrix } from '../components/pdf/pages/PDFPage5CostMatrix';
+import { RichText } from '../components/pdf/editor/RichText';
 import { PDF_COLOR_THEMES } from '../constants/pdfThemes';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateProjectFinancialSummary } from '../engine/financeEngine';
@@ -67,4 +68,13 @@ const CONDITIONAL = new Set([
 const missing = DOCUMENT_TEXT_DEFINITIONS.map((d) => d.key).filter((key) => !rendered.has(key) && !CONDITIONAL.has(key));
 assert.deepEqual(missing, [], `Textos del registro sin lugar en la hoja:\n${missing.join('\n')}`);
 assert.ok(rendered.size >= 180, `Se esperaban muchos textos editables en la hoja (hay ${rendered.size})`);
+// Formatting survives: bold in a service list renders as <strong>, and bold inherits the colour of dark headers.
+{
+  const formatted: ProjectSimulation = { ...project, customization: { ...project.customization, texts: { 'aboutUs.service1.items': '- **Levantamiento** técnico\n- Planos' } } };
+  const html = renderToStaticMarkup(React.createElement(DocumentEditorProvider, { project: formatted, summary, currentDateStr: base.currentDateStr, mode: 'view', children: React.createElement(PDFAboutUsPage, { ...base, project: formatted }) }));
+  assert.ok(html.includes('<strong class="font-bold">Levantamiento</strong> técnico'), 'La negrita de una lista de servicios se conserva');
+  assert.ok(!html.includes('**'));
+  assert.ok(!renderToStaticMarkup(React.createElement(RichText, { text: 'a **b**' })).includes('text-slate-950'), 'La negrita hereda el color (cabeceras oscuras)');
+}
+
 console.log(`PASS: ${rendered.size} textos del registro se dibujan en las 12 páginas (${DOCUMENT_TEXT_DEFINITIONS.length} definidos).`);

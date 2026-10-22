@@ -11,6 +11,7 @@ import { renderFormattedMarkdown } from '../../../utils/textFormatter';
 
 import { EditableText } from '../editor/EditableText';
 import { listItems } from '../editor/listItems';
+import { RichText } from '../editor/RichText';
 
 interface PDFAboutUsPageProps {
   project: ProjectSimulation;
@@ -92,7 +93,7 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
                 </p>
               </div>
               <EditableText k="aboutUs.service1.items" as="ul" className="text-[9px] text-slate-600 space-y-1 border-t border-slate-100 pt-2 font-medium">
-                {(text) => listItems(text).map((item, idx) => <li key={idx}>• {item}</li>)}
+                {(text) => listItems(text).map((item, idx) => <li key={idx}>• <RichText text={item} /></li>)}
               </EditableText>
             </div>
 
@@ -113,7 +114,7 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
                 </p>
               </div>
               <EditableText k="aboutUs.service2.items" as="ul" className="text-[9px] text-slate-600 space-y-1 border-t border-slate-100 pt-2 font-medium">
-                {(text) => listItems(text).map((item, idx) => <li key={idx}>• {item}</li>)}
+                {(text) => listItems(text).map((item, idx) => <li key={idx}>• <RichText text={item} /></li>)}
               </EditableText>
             </div>
 
@@ -134,7 +135,7 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
                 </p>
               </div>
               <EditableText k="aboutUs.service3.items" as="ul" className="text-[9px] text-slate-600 space-y-1 border-t border-slate-100 pt-2 font-medium">
-                {(text) => listItems(text).map((item, idx) => <li key={idx}>• {item}</li>)}
+                {(text) => listItems(text).map((item, idx) => <li key={idx}>• <RichText text={item} /></li>)}
               </EditableText>
             </div>
 
@@ -155,7 +156,7 @@ export const PDFAboutUsPage: React.FC<PDFAboutUsPageProps> = ({
                 </p>
               </div>
               <EditableText k="aboutUs.service4.items" as="ul" className="text-[9px] text-slate-600 space-y-1 border-t border-slate-100 pt-2 font-medium">
-                {(text) => listItems(text).map((item, idx) => <li key={idx}>• {item}</li>)}
+                {(text) => listItems(text).map((item, idx) => <li key={idx}>• <RichText text={item} /></li>)}
               </EditableText>
             </div>
           </div>
