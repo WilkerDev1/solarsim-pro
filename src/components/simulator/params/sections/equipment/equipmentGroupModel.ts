@@ -4,6 +4,7 @@ import { catalogPanelGroupPatch } from '../../../../../utils/catalogGroupPatch';
 import { editEquipmentGroup, selectCatalogEquipment, type EquipmentKind } from '../../../../../utils/equipmentGroups';
 import { getProjectBatteries, getProjectInverters, getProjectPanels } from '../../../../../utils/equipmentSpecsUtils';
 import { buildCatalogSelectionUpdate } from '../../logic/catalogSelection';
+import { MANUAL_BRAND_PLACEHOLDER } from '../../logic/dockDefaults';
 
 export type EquipmentMode = 'catalog' | 'manual';
 type GroupItem = { panel: PanelItemSpec; inverter: InverterItemSpec; battery: BatteryItemSpec };
@@ -35,7 +36,7 @@ export const KIND_CONFIG: Record<EquipmentKind, KindConfig> = {
     magnitudeStep: 5,
     magnitudeMin: 50,
     searchPlaceholder: 'Buscar o seleccionar panel…',
-    manualBrandFallback: 'Módulos Canadian Solar CS6.1-72TB-600 (600W)',
+    manualBrandFallback: MANUAL_BRAND_PLACEHOLDER.panel,
   },
   inverter: {
     title: 'Inversores',
@@ -47,7 +48,7 @@ export const KIND_CONFIG: Record<EquipmentKind, KindConfig> = {
     magnitudeStep: 0.5,
     magnitudeMin: 0.5,
     searchPlaceholder: 'Buscar o seleccionar inversor…',
-    manualBrandFallback: 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)',
+    manualBrandFallback: MANUAL_BRAND_PLACEHOLDER.inverter,
   },
   battery: {
     title: 'Baterías',
@@ -59,7 +60,7 @@ export const KIND_CONFIG: Record<EquipmentKind, KindConfig> = {
     magnitudeStep: 0.5,
     magnitudeMin: 0.5,
     searchPlaceholder: 'Buscar o seleccionar batería…',
-    manualBrandFallback: 'Batería Hinaess 16 KwH-48 vdc.',
+    manualBrandFallback: MANUAL_BRAND_PLACEHOLDER.battery,
   },
 };
 

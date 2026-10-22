@@ -2,6 +2,9 @@ import type { SystemSpecs } from '../../../../types';
 import type { SolarEquipmentItem } from '../../../../types/equipment';
 import { catalogPanelGroupPatch } from '../../../../utils/catalogGroupPatch';
 import { selectCatalogEquipment, type EquipmentKind } from '../../../../utils/equipmentGroups';
+import {
+  DEFAULT_BATTERY_CAPACITY_KWH, DEFAULT_BATTERY_DOD_PCT, DEFAULT_BATTERY_EFFICIENCY_PCT, DEFAULT_CATALOG_INVERTER_KW, DEFAULT_CATALOG_PANEL,
+} from './dockDefaults';
 
 type SupplierInfo = NonNullable<SystemSpecs['selectedSupplierInfo']>;
 
@@ -17,29 +20,29 @@ const SELECTION: Record<
   panel: {
     mirror: (item) => ({
       panelBrandModel: item.displayName,
-      panelPowerW: item.powerW || 550,
-      panelEfficiency: item.efficiencyPct || 22.0,
-      tempCoeff: item.tempCoeff || -0.29,
-      annualDegradation: item.annualDegradation || 0.4,
+      panelPowerW: item.powerW || DEFAULT_CATALOG_PANEL.powerW,
+      panelEfficiency: item.efficiencyPct || DEFAULT_CATALOG_PANEL.efficiencyPct,
+      tempCoeff: item.tempCoeff || DEFAULT_CATALOG_PANEL.tempCoeff,
+      annualDegradation: item.annualDegradation || DEFAULT_CATALOG_PANEL.annualDegradation,
     }),
     priceField: 'panelUnitPriceUSD',
     // Model-specific values (degradation, efficiency…) are replaced, never inherited from the previous model.
     group: (item) => ({ ...catalogPanelGroupPatch(item) }),
   },
   inverter: {
-    mirror: (item) => ({ inverterBrandModel: item.displayName, inverterPowerKW: item.powerKW || 8.0 }),
+    mirror: (item) => ({ inverterBrandModel: item.displayName, inverterPowerKW: item.powerKW || DEFAULT_CATALOG_INVERTER_KW }),
     priceField: 'inverterUnitPriceUSD',
-    group: (item) => ({ powerKW: item.powerKW || 8.0 }),
+    group: (item) => ({ powerKW: item.powerKW || DEFAULT_CATALOG_INVERTER_KW }),
   },
   battery: {
     mirror: (item) => ({
       batteryBrandModel: item.displayName,
-      batteryCapacityKWh: item.capacityKWh || 16.08,
-      batteryDOD: item.dodPct || 90,
-      batteryEfficiencyPct: item.batteryEfficiencyPct || 95,
+      batteryCapacityKWh: item.capacityKWh || DEFAULT_BATTERY_CAPACITY_KWH,
+      batteryDOD: item.dodPct || DEFAULT_BATTERY_DOD_PCT,
+      batteryEfficiencyPct: item.batteryEfficiencyPct || DEFAULT_BATTERY_EFFICIENCY_PCT,
     }),
     priceField: 'batteryUnitPriceUSD',
-    group: (item) => ({ capacityKWh: item.capacityKWh || 16.08, dodPct: item.dodPct || 90 }),
+    group: (item) => ({ capacityKWh: item.capacityKWh || DEFAULT_BATTERY_CAPACITY_KWH, dodPct: item.dodPct || DEFAULT_BATTERY_DOD_PCT }),
   },
 };
 

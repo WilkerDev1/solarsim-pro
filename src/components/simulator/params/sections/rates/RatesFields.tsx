@@ -3,6 +3,7 @@ import { getTariffDisplayName } from '../../../../../../shared/proposalPresentat
 import type { ProjectSimulation, SystemSpecs, UtilityRates } from '../../../../../types';
 import { getDistributorTariffOptions, type UtilityDistributor } from '../../../../../types/tariffs';
 import { Field, FieldAction, InfoTip, ParamRow, SelectField, ToggleGroup, WarnChip } from '../../ui';
+import { DEFAULT_GRID_EXPORT_FEE_PCT, DEFAULT_TARGET_COVERAGE_PCT } from '../../logic/dockDefaults';
 import { SelfConsumptionPanel } from './SelfConsumptionPanel';
 import {
   averageMonthlyConsumption,
@@ -65,7 +66,7 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
   const referenceText = `Oficial $${reference.toFixed(3)}`;
   const exportTip = zeroExport
     ? 'Inyección cero activa: el sistema no vuelca excedentes a la red pública, por lo que no aplica retención ni cargo por uso de red.'
-    : `Medición neta (${getTariffDisplayName(distributor, rates.tariffCode || '')}): retención del ${rates.gridExportFeePct ?? 25}% por derecho de uso de red bajo la Res. SIE-007-2026-REG sobre los kWh excedentes exportados a la red de ${distributor}.`;
+    : `Medición neta (${getTariffDisplayName(distributor, rates.tariffCode || '')}): retención del ${rates.gridExportFeePct ?? DEFAULT_GRID_EXPORT_FEE_PCT}% por derecho de uso de red bajo la Res. SIE-007-2026-REG sobre los kWh excedentes exportados a la red de ${distributor}.`;
 
   return (
     <div className="space-y-2.5">
@@ -112,7 +113,7 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
           step="1"
           mono
           suffix="%"
-          value={rates.targetCoveragePct ?? 95}
+          value={rates.targetCoveragePct ?? DEFAULT_TARGET_COVERAGE_PCT}
           onChange={value => updateRates({ targetCoveragePct: parseNumber(value) })}
         />
       </ParamRow>

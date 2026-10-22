@@ -5,9 +5,8 @@ import { resolveProjectEquipment } from '../../../../../utils/equipmentMatchingU
 import { getProjectBatteries, getProjectInverters, getProjectPanels } from '../../../../../utils/equipmentSpecsUtils';
 import type { SystemSpecs } from '../../../../../types';
 import type { SolarEquipmentItem } from '../../../../../types/equipment';
-import {
-  DEFAULT_INSTALLATION_USD_PER_KWP, bestSupplierPricingPatch, displayedUnitPrice, manualUnitPricePatch, type PricedKind,
-} from './supplierPricing';
+import { DEFAULT_INSTALLATION_USD_PER_KWP } from '../../logic/dockDefaults';
+import { bestSupplierPricingPatch, displayedUnitPrice, manualUnitPricePatch, type PricedKind } from './supplierPricing';
 import { UnitCostRow } from './UnitCostRow';
 
 interface UnitCostsProps {

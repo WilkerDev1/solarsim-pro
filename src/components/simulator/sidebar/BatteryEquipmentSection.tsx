@@ -3,6 +3,7 @@ import { ProjectSimulation, FinancialSummaryResult, SystemSpecs } from '../../..
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
 import { calculateTotalBatteryCapacityKWh, calculateTotalBatteryCount, getProjectBatteries } from '../../../utils/equipmentSpecsUtils';
+import { DEFAULT_BATTERY_DOD_PCT, DEFAULT_BATTERY_EFFICIENCY_PCT } from '../params/logic/dockDefaults';
 import { Field, ParamRow, StatStrip, ToggleGroup } from '../params/ui';
 import { AdvancedDisclosure } from '../params/sections/equipment/AdvancedDisclosure';
 import { EquipmentGroupList } from '../params/sections/equipment/EquipmentGroupList';
@@ -60,8 +61,8 @@ export const BatteryEquipmentSection: React.FC<BatteryEquipmentSectionProps> = (
                 mono
                 step={5}
                 suffix="%"
-                value={specs.batteryDOD || 90}
-                onChange={(value) => updateSpecs({ batteryDOD: parseFloat(value) || 90 })}
+                value={specs.batteryDOD || DEFAULT_BATTERY_DOD_PCT}
+                onChange={(value) => updateSpecs({ batteryDOD: parseFloat(value) || DEFAULT_BATTERY_DOD_PCT })}
               />
             </ParamRow>
             <ParamRow label="Eficiencia de carga" htmlFor="dock-battery-efficiency">
@@ -71,8 +72,8 @@ export const BatteryEquipmentSection: React.FC<BatteryEquipmentSectionProps> = (
                 mono
                 step={1}
                 suffix="%"
-                value={specs.batteryEfficiencyPct || 95}
-                onChange={(value) => updateSpecs({ batteryEfficiencyPct: parseFloat(value) || 95 })}
+                value={specs.batteryEfficiencyPct || DEFAULT_BATTERY_EFFICIENCY_PCT}
+                onChange={(value) => updateSpecs({ batteryEfficiencyPct: parseFloat(value) || DEFAULT_BATTERY_EFFICIENCY_PCT })}
               />
             </ParamRow>
             <ParamRow label="Reemplazo año 10" htmlFor="dock-battery-replacement">

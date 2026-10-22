@@ -1,14 +1,11 @@
 import type { SystemSpecs } from '../../../../../types';
 import type { EquipmentSupplierPrice, SolarEquipmentItem } from '../../../../../types/equipment';
 import { getProjectBatteries, getProjectInverters, getProjectPanels } from '../../../../../utils/equipmentSpecsUtils';
+import { DEFAULT_UNIT_PRICE_USD } from '../../../../../utils/equipmentGroups';
 
 export type PricedKind = 'panel' | 'inverter' | 'battery';
 
 type SupplierInfo = NonNullable<SystemSpecs['selectedSupplierInfo']>;
-
-/** Valores por defecto que la vista mostraba cuando el modelo no trae precio propio. */
-export const DEFAULT_UNIT_PRICE_USD: Record<PricedKind, number> = { panel: 103.32, inverter: 2300, battery: 1990 };
-export const DEFAULT_INSTALLATION_USD_PER_KWP = 170;
 
 /** Proveedor más barato de un equipo; ante empate gana el primero de la lista. */
 export function bestSupplierPrice(item: SolarEquipmentItem | null | undefined): EquipmentSupplierPrice | null {

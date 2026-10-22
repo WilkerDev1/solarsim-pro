@@ -7,6 +7,7 @@ import { effectiveFeatureSettings } from '../../features/application/featurePoli
 import { fetchSolarRadiationByCoordinates } from '../../services/solarRadiationApi';
 import { Shield, Trash2, RotateCcw, ArrowLeft, Undo2, Redo2 } from 'lucide-react';
 import { ParameterSidebar } from './sidebar/ParameterSidebar';
+import { SAMPLE_GPS_COORDINATES } from './params/logic/dockDefaults';
 import { EnergyAnalysisTab } from './tabs/EnergyAnalysisTab';
 import { QuotationEquipmentsTab } from './tabs/QuotationEquipmentsTab';
 import { FinancialReturnTab } from './tabs/FinancialReturnTab';
@@ -114,10 +115,10 @@ export const SimulatorView: React.FC = () => {
 
   // Handler for GPS satellite solar radiation fetching
   const handleFetchSolarApi = async () => {
-    const coords = project.client.coordinates || '18.4861, -69.9312';
+    const coords = project.client.coordinates || SAMPLE_GPS_COORDINATES;
     const parts = coords.split(',').map((p) => parseFloat(p.trim()));
     if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) {
-      setSolarApiStatus('⚠️ Formato inválido. Usa: Latitud, Longitud (ej: 18.4861, -69.9312)');
+      setSolarApiStatus(`⚠️ Formato inválido. Usa: Latitud, Longitud (ej: ${SAMPLE_GPS_COORDINATES})`);
       return;
     }
 

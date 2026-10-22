@@ -3,7 +3,8 @@ import { Loader2 } from 'lucide-react';
 import { RD_PROVINCES } from '../../../../../data/rdProvinces';
 import type { ClientInfo } from '../../../../../types';
 import { Field, ParamRow, SelectField, StackedField, ToggleGroup } from '../../ui';
-import { DEFAULT_GPS_COORDINATES, solarSourceMode, type SolarSourceMode } from './clientLogic';
+import { solarSourceMode, type SolarSourceMode } from './clientLogic';
+import { SAMPLE_GPS_COORDINATES } from '../../logic/dockDefaults';
 
 export interface RadiationSourceProps {
   client: ClientInfo;
@@ -45,8 +46,8 @@ export const RadiationSource: React.FC<RadiationSourceProps> = ({ client, isFetc
             <Field
               id="pd-cli-coords"
               mono
-              value={client.coordinates || DEFAULT_GPS_COORDINATES}
-              placeholder={DEFAULT_GPS_COORDINATES}
+              value={client.coordinates || SAMPLE_GPS_COORDINATES}
+              placeholder={SAMPLE_GPS_COORDINATES}
               onChange={value => updateClient({ coordinates: value })}
             />
           </StackedField>

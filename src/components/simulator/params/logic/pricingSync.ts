@@ -1,7 +1,6 @@
 /** Price per Wp ↔ price per kWp, and sale margin % ↔ multiplier, as the pricing section keeps them in sync. */
+import { DEFAULT_SALE_MARGIN_MULTIPLIER } from './dockDefaults';
 
-export const DEFAULT_SALE_MARGIN_MULTIPLIER = 1.25;
-export const DEFAULT_PRICE_PER_WATT_USD = 1.15;
 
 /** $/Wp → $/kWp (2 decimals). */
 export function pricePerKWpFromWatt(pricePerWattUSD: number): number {

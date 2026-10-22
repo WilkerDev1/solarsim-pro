@@ -1,5 +1,6 @@
 import React from 'react';
 import { ProjectSimulation, FinancialParams, CustomQuotationItem, CustomQuotationDiscount } from '../../../types';
+import { DEFAULT_SALE_MARGIN_MULTIPLIER } from '../params/logic/dockDefaults';
 import { computeQuotationAdjustments } from '../params/logic/quotationAdjustments';
 import { calculateCostMatrixSummary } from '../../../engine/financeEngine';
 import { calculateTotalDCCapacityKWp } from '../../../utils/equipmentSpecsUtils';
@@ -62,7 +63,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
 
       <ItemsList
         items={customItems}
-        marginMultiplier={project.specs?.saleMarginMultiplier || 1.25}
+        marginMultiplier={project.specs?.saleMarginMultiplier || DEFAULT_SALE_MARGIN_MULTIPLIER}
         totals={totals}
         onAdd={() => updateFinancials({ customItems: [...customItems, newCustomItem()] })}
         onUpdate={(id: string, partial: Partial<CustomQuotationItem>) => updateFinancials({ customItems: patchById(customItems, id, partial) })}

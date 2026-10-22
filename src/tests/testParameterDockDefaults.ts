@@ -4,6 +4,8 @@
  * literales a `params/logic/dockDefaults.ts` o a su fuente única.
  */
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
@@ -12,6 +14,7 @@ import type { ProjectSimulation, SystemSpecs } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
 import { DEFAULT_UNIT_PRICE_USD } from '../utils/equipmentGroups';
 import { getProjectBatteries } from '../utils/equipmentSpecsUtils';
+import * as dockDefaults from '../components/simulator/params/logic/dockDefaults';
 import { buildCatalogSelectionUpdate } from '../components/simulator/params/logic/catalogSelection';
 import { marginPctFromMultiplier, wholeMarginPctFromMultiplier } from '../components/simulator/params/logic/pricingSync';
 import { displayPhone, displayQuoteNumber } from '../components/simulator/params/sections/client/clientLogic';
@@ -212,6 +215,33 @@ assert.deepEqual(DEFAULT_UNIT_PRICE_USD, { panel: 103.32, inverter: 2300, batter
   assert.equal(fin(undefined), fin(1.25));
   assert.equal(fin(0), fin(1.25));
   assert.notEqual(fin(1.5), fin(1.25));
+}
+
+// ── Fuente única: las constantes coinciden con el caso de referencia y los literales viven solo en dockDefaults ──
+{
+  assert.equal(dockDefaults.SAMPLE_QUOTE_NUMBER, base.client.quoteNumber);
+  assert(base.client.contactPhone?.includes(dockDefaults.SAMPLE_PHONE_MARKER));
+  assert.equal(dockDefaults.SAMPLE_GPS_COORDINATES, base.client.coordinates);
+  assert.equal(dockDefaults.DEFAULT_DOP_RATE, base.specs.dopExchangeRate);
+  assert.equal(dockDefaults.DEFAULT_SALE_MARGIN_MULTIPLIER, base.specs.saleMarginMultiplier);
+  assert.equal(dockDefaults.DEFAULT_INSTALLATION_USD_PER_KWP, base.specs.installationUnitPriceUSD);
+  assert.equal(dockDefaults.DEFAULT_TARGET_COVERAGE_PCT, base.rates.targetCoveragePct);
+  assert.equal(dockDefaults.DEFAULT_GRID_EXPORT_FEE_PCT, base.rates.gridExportFeePct);
+  assert.equal(DEFAULT_UNIT_PRICE_USD.panel, base.specs.panelUnitPriceUSD);
+  assert.equal(DEFAULT_UNIT_PRICE_USD.inverter, base.specs.inverterUnitPriceUSD);
+  assert.equal(DEFAULT_UNIT_PRICE_USD.battery, base.specs.batteryUnitPriceUSD);
+
+  const files = (dir: string): string[] => readdirSync(dir).flatMap((name) => {
+    const full = path.join(dir, name);
+    return statSync(full).isDirectory() ? files(full) : /\.tsx?$/.test(name) ? [full] : [];
+  });
+  const roots = ['src/components/simulator/sidebar', 'src/components/simulator/params', 'src/components/simulator/SimulatorView.tsx'];
+  const sources = roots.flatMap((r) => (statSync(r).isDirectory() ? files(r) : [r])).filter((f) => !f.endsWith('dockDefaults.ts'));
+  const literals = ['C-0030', '555-0199', '18.4861', 'Canadian Solar CS6', 'Lux Power LXP', 'Hinaess', '16.08', '103.32'];
+  for (const file of sources) {
+    const text = readFileSync(file, 'utf8');
+    for (const literal of literals) assert(!text.includes(literal), `${file} repite el literal «${literal}»: usa dockDefaults`);
+  }
 }
 
 console.log('testParameterDockDefaults: ok');

@@ -2,9 +2,8 @@ import React from 'react';
 import { Sparkles } from 'lucide-react';
 import { InfoTip, ParamRow, StatStrip, SubHeader, SubHeaderTextButton, ToggleGroup } from '../../ui';
 import type { FinancialSummaryResult, SystemSpecs } from '../../../../../types';
-import {
-  DEFAULT_PRICE_PER_WATT_USD, kwpPricePatch, pricePerKWpFromWatt, roundedWattPrice, wattPricePatch,
-} from '../../logic/pricingSync';
+import { DEFAULT_PRICE_PER_WATT_USD, DEFAULT_SALE_MARGIN_MULTIPLIER } from '../../logic/dockDefaults';
+import { kwpPricePatch, pricePerKWpFromWatt, roundedWattPrice, wattPricePatch } from '../../logic/pricingSync';
 import { usd } from './format';
 import { NumberField } from './NumberField';
 
@@ -19,7 +18,7 @@ const TIP =
 
 /** Modo Directo: $/W y $/kWp sincronizados, destino del excedente y resumen de margen. */
 export const DirectPrice: React.FC<DirectPriceProps> = ({ specs, summary, updateSpecs }) => {
-  const wattPrice = specs.pricePerWattUSD !== undefined ? specs.pricePerWattUSD : 1.15;
+  const wattPrice = specs.pricePerWattUSD !== undefined ? specs.pricePerWattUSD : DEFAULT_PRICE_PER_WATT_USD;
   const kwpPrice = specs.pricePerKWpUSD !== undefined ? specs.pricePerKWpUSD : pricePerKWpFromWatt(specs.pricePerWattUSD || DEFAULT_PRICE_PER_WATT_USD);
   const matrix = summary?.costMatrix;
 
@@ -59,7 +58,7 @@ export const DirectPrice: React.FC<DirectPriceProps> = ({ specs, summary, update
       <StatStrip
         items={[
           { label: 'Potencia', value: `${(summary?.systemCapacityKWp ?? 0).toFixed(2)} kWp` },
-          { label: 'Margen', value: `${(matrix?.saleMarginMultiplier || 1.25).toFixed(2)}× · +${(matrix?.markupOnCostPct || 0).toFixed(1)}%` },
+          { label: 'Margen', value: `${(matrix?.saleMarginMultiplier || DEFAULT_SALE_MARGIN_MULTIPLIER).toFixed(2)}× · +${(matrix?.markupOnCostPct || 0).toFixed(1)}%` },
           { label: 'Ganancia neta', value: `+$${usd(matrix?.gananciaUSD || 0)}` },
         ]}
       />
