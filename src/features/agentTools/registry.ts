@@ -11,11 +11,12 @@ import { applyAssistantAction, assistantOwner, executeAssistantTool } from '../a
 import type { AgentToolContext, NativeHandler, NativePlan } from './nativeTools';
 import { PROPOSAL_TOOL_HANDLERS } from './proposalTools';
 import { CATALOG_TOOL_HANDLERS } from './catalogTools';
+import { DOCUMENT_TOOL_HANDLERS } from './documentTools';
 import { assistantFieldLabel, assistantValueLabel } from '../assistant/labels';
 import type { AssistantAction, AssistantCard, AssistantToolResult } from '../assistant/types';
 
 export type { AgentToolContext } from './nativeTools';
-const NATIVE_HANDLERS: Record<string, NativeHandler> = { ...PROPOSAL_TOOL_HANDLERS, ...CATALOG_TOOL_HANDLERS };
+const NATIVE_HANDLERS: Record<string, NativeHandler> = { ...PROPOSAL_TOOL_HANDLERS, ...CATALOG_TOOL_HANDLERS, ...DOCUMENT_TOOL_HANDLERS };
 
 const MAX_RESULT_BYTES = 64000;
 const PROJECT_SECTIONS = ['client', 'specs', 'rates', 'financials', 'monthlyConsumption', 'customization'] as const;
