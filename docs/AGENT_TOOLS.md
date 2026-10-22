@@ -18,7 +18,7 @@ Las dos interfaces internas se mantienen separadas, pero comparten herramientas,
 | Registro | `src/features/agentTools/registry.ts` | `executeAgentTool(call, {source, owner})`: superficie, permisos, validación, propietario (sesión y espacio), límite de 64 KB, aplicación o cola |
 | Herramientas | `proposalTools.ts`, `catalogTools.ts` y planificadores de `src/features/assistant/tools.ts` | Planes que se revalidan al ejecutarse |
 | Estado | `src/store/slices/agentSlice.ts` | Política por dispositivo, actividad por espacio (máx. 300) y acciones pendientes en memoria (10 min) |
-| Tarjetas | `shared/agentCards.ts`, `src/features/assistant/cards/` | Datos puros por tipo; React en la app y MCP Apps para hosts externos |
+| Tarjetas | `shared/agentCards.ts`, `src/features/assistant/cards/` | Datos puros por tipo; React en la app y MCP Apps para hosts externos ([MCP_LOCAL.md](MCP_LOCAL.md#tarjetas-mcp-apps)) |
 
 El asistente general usa function calling de Gemini con las declaraciones generadas desde las definiciones. Admite 4 rondas, 4 herramientas por ronda y 12 mensajes de historial. El chat interpreta un subconjunto seguro de markdown (`chatMarkdown.ts`), nunca HTML ni enlaces. Acepta hasta tres PDF o imágenes de 8 MB, validados por firma, que solo se envían con el mensaje actual.
 
