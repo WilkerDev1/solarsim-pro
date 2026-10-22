@@ -3,6 +3,7 @@ import { useSimulationStore } from '../store/useSimulationStore';
 import { DEFAULT_LOCAL_COMPANY } from '../types/companyProfile';
 import { serializeSimulationStore } from '../store/persistence/serializeSimulationStore';
 import { hydrateSimulationStore } from '../store/persistence/hydrateSimulationStore';
+import { flushPendingDesignEdits, registerPendingDesignEdit } from '../components/pdf/controls/pendingDesignEdits';
 import { PDF_COLOR_THEMES } from '../constants/pdfThemes';
 import {
   normalizeDocumentLayout,
@@ -80,5 +81,16 @@ store().moveToTrash(id);
 useSimulationStore.setState({ activeProjectId: id });
 store().setDocumentLayout({ themeId: 'otro', showHeadersFooters: true });
 assert.deepEqual(store().projects.find((project) => project.id === id)!.customization?.layout, before);
+
+// Pending dock edits are flushed before exporting or printing, and unregistered ones are not.
+{
+  let flushed = 0;
+  const unregister = registerPendingDesignEdit(() => { flushed++; });
+  flushPendingDesignEdits();
+  assert.equal(flushed, 1);
+  unregister();
+  flushPendingDesignEdits();
+  assert.equal(flushed, 1);
+}
 
 console.log('PASS: document layout rules, persistence, undo and trash guard.');
