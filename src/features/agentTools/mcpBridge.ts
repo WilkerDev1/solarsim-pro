@@ -1,25 +1,13 @@
 // Renderer side of the local MCP bridge: executes forwarded tool calls and keeps main's tool snapshot in sync.
 import type { ElectronMcpApi } from '../../../shared/agentTools/bridge';
-import type { PendingActionCard } from '../../../shared/agentCards';
 import type { AgentToolOutcome } from '../../../shared/agentTools/types';
 import { isDeviceFeatureAvailable } from '../../../shared/applicationFeatures';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { assistantOwner } from '../assistant/tools';
 import { executeAgentTool, listAgentTools } from './registry';
 
-/** Guarded tools queue a plan and return no card: build the `pending-action` card that MCP Apps hosts render from the queued action. */
-function withPendingCard(outcome: AgentToolOutcome): AgentToolOutcome {
-  if (outcome.status !== 'pending_confirmation' || outcome.cards?.some((c) => c.type === 'pending-action')) return outcome;
-  const queued = useSimulationStore.getState().pendingAgentActions.find((a) => a.id === outcome.actionId);
-  const card: PendingActionCard = {
-    type: 'pending-action', id: outcome.actionId, title: outcome.summary, actionId: outcome.actionId,
-    changes: (queued?.changes ?? []).slice(0, 20).map((c) => ({ label: c.label, after: c.value })),
-  };
-  return { ...outcome, cards: [...(outcome.cards ?? []), card] };
-}
-
 /** Plain JSON only: the outcome crosses IPC and goes out over HTTP. */
-const plain = (outcome: AgentToolOutcome): AgentToolOutcome => JSON.parse(JSON.stringify(withPendingCard(outcome)));
+const plain = (outcome: AgentToolOutcome): AgentToolOutcome => JSON.parse(JSON.stringify(outcome));
 
 export interface McpBridgeOptions {
   /** Effective availability of the `localMcpServer` device feature. */

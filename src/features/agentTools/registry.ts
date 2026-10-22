@@ -20,6 +20,10 @@ const NATIVE_HANDLERS: Record<string, NativeHandler> = { ...PROPOSAL_TOOL_HANDLE
 const MAX_RESULT_BYTES = 64000;
 const PROJECT_SECTIONS = ['client', 'specs', 'rates', 'financials', 'monthlyConsumption', 'customization'] as const;
 const store = () => useSimulationStore.getState();
+/** Queued plans carry no card of their own: expose the pending changes so MCP Apps hosts (and the app) can render them. */
+const pendingCard = (actionId: string, title: string, changes: AgentChange[]): AgentCard => ({
+  type: 'pending-action', id: actionId, title, actionId, changes: changes.slice(0, 20).map((c) => ({ label: c.label, after: c.value })),
+});
 const fingerprint = (value: unknown) => JSON.stringify(value ?? null);
 const pick = (source: object, keys: readonly string[]) =>
   Object.fromEntries(keys.map((k) => [k, structuredClone((source as Record<string, unknown>)[k])]));
@@ -204,8 +208,9 @@ export async function executeAgentTool(call: AgentToolCall, ctx: AgentToolContex
       return { status: 'error', code: 'apply_failed', message: error instanceof Error ? error.message : 'No se pudo aplicar.' };
     }
   }
-  store().queueAgentAction({ id: action.id, ...meta, title: action.title, changes: describeChanges(action), plan: action });
-  return { status: 'pending_confirmation', actionId: action.id, summary: action.title, cards };
+  const changes = describeChanges(action);
+  store().queueAgentAction({ id: action.id, ...meta, title: action.title, changes, plan: action });
+  return { status: 'pending_confirmation', actionId: action.id, summary: action.title, cards: [...(cards ?? []), pendingCard(action.id, action.title, changes)] };
 }
 
 async function executeNative(handler: NativeHandler, definition: AgentToolDefinition, args: Record<string, unknown>, ctx: AgentToolContext, draftPolicy: string): Promise<AgentToolOutcome> {
@@ -233,7 +238,7 @@ async function executeNative(handler: NativeHandler, definition: AgentToolDefini
   }
   const actionId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   store().queueAgentAction({ id: actionId, ...meta, title: result.plan.title, changes: result.plan.changes, plan: result.plan });
-  return { status: 'pending_confirmation', actionId, summary: result.plan.title, cards: result.cards };
+  return { status: 'pending_confirmation', actionId, summary: result.plan.title, cards: [...(result.cards ?? []), pendingCard(actionId, result.plan.title, result.plan.changes)] };
 }
 
 export function getPendingAgentAction(actionId: string): AssistantAction | undefined {

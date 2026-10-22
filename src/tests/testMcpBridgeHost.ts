@@ -63,6 +63,15 @@ assert.equal(pendingCard.actionId, pendingOutcome.actionId);
 assert.equal(pendingCard.title, pendingOutcome.summary);
 assert(pendingCard.changes.length > 0 && pendingCard.changes.every((c) => c.label && typeof c.after === 'string'));
 assert.deepEqual(pendingCard.changes.map((c) => c.label), store.getState().pendingAgentActions.find((a) => a.id === pendingOutcome.actionId)!.changes.map((c) => c.label));
+// Same for planners of the general assistant when the draft policy asks for confirmation.
+store.getState().setAgentPolicy({ external: { read: 'allow', draft: 'confirm', guarded: 'confirm' } });
+invoke({ requestId: 'r3b', call: { ...coverage, args: { ...coverage.args, edits: [{ section: 'rates', field: 'targetCoveragePct', valueJson: '70' }] } } });
+await settle();
+const planned = responses[responses.length - 1].outcome as Extract<AgentToolOutcome, { status: 'pending_confirmation' }>;
+assert.equal(planned.status, 'pending_confirmation');
+assert(planned.cards?.some((c) => c.type === 'pending-action' && c.actionId === planned.actionId && c.changes.length > 0));
+store.getState().setAgentPolicy({ external: { read: 'allow', draft: 'allow', guarded: 'confirm' } });
+responses.pop();
 invoke({ requestId: 'r4', call: { name: 'search_projects', args: { limit: 'many' } } });
 await settle();
 assert(responses[3].outcome.status === 'error' && responses[3].outcome.code === 'invalid_arguments');
