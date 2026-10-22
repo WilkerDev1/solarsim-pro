@@ -52,4 +52,18 @@ assert.equal(status.running, false);
 assert.match(status.error ?? '', /47|puerto|uso/i);
 blocker.close();
 await controller.setEnabled(false);
+// Overlapping toggles are serialized: the last request wins, in both orders, and the server matches the persisted choice.
+const isUp = () => new Promise<boolean>((resolve) => net.connect(port, '127.0.0.1').on('connect', function (this: net.Socket) { this.destroy(); resolve(true); }).on('error', () => resolve(false)));
+const [, off1] = await Promise.all([controller.setEnabled(true), controller.setEnabled(false)]);
+assert.equal(off1.running, false);
+assert.equal(off1.enabled, false);
+assert.equal(await isUp(), false, 'disable issued while enabling must leave the endpoint closed');
+assert.equal(loadMcpConfig(file).enabled, false);
+const [, on2] = await Promise.all([controller.setEnabled(false), controller.setEnabled(true)]);
+assert.equal(on2.running, true);
+assert.equal(on2.enabled, true);
+assert.equal(await isUp(), true, 'enable issued while disabling must leave the endpoint open');
+assert.equal(loadMcpConfig(file).enabled, true);
+await controller.setEnabled(false);
+assert.equal(await isUp(), false);
 console.log('MCP controller: enable, disable, token rotation and port conflicts verified.');

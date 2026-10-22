@@ -130,4 +130,13 @@ await rotating.stop();
 
 await server.stop();
 assert.equal(server.running, false);
+
+// stop() issued while a start is still binding waits for it and closes the endpoint (no late listener).
+const racing = new LocalMcpServer({ bridge, getToken: () => token, version: '0.0.0-test' });
+const pendingStart = racing.start(0);
+await racing.stop();
+await pendingStart;
+assert.equal(racing.running, false, 'a start that was stopped before it finished must not stay listening');
+assert.equal(await racing.start(0) > 0, true, 'the server can be started again afterwards');
+await racing.stop();
 console.log('MCP server: JSON-RPC, tool mapping and transport guards verified.');

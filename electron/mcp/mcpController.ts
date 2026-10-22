@@ -17,6 +17,8 @@ export class McpController {
   private readonly server: LocalMcpServer;
   private config: McpConfig;
   private error: string | undefined;
+  /** Lifecycle changes run one at a time, so overlapping toggles always end in the last requested state. */
+  private queue: Promise<unknown> = Promise.resolve();
 
   constructor(private readonly options: McpControllerOptions) {
     this.config = loadMcpConfig(options.configFile);
@@ -39,12 +41,14 @@ export class McpController {
     };
   }
 
-  async setEnabled(enabled: boolean): Promise<McpServerStatus> {
-    this.config = { ...this.config, enabled };
-    saveMcpConfig(this.options.configFile, this.config);
-    if (enabled) await this.startServer();
-    else await this.stopServer();
-    return this.status();
+  setEnabled(enabled: boolean): Promise<McpServerStatus> {
+    return this.serial(async () => {
+      this.config = { ...this.config, enabled };
+      saveMcpConfig(this.options.configFile, this.config);
+      if (enabled) await this.startServer();
+      else await this.stopServer();
+      return this.status();
+    });
   }
 
   async regenerateToken(): Promise<McpServerStatus> {
@@ -61,7 +65,13 @@ export class McpController {
 
   async shutdown(): Promise<void> {
     this.bridge.rendererGone();
-    await this.stopServer();
+    await this.serial(() => this.stopServer());
+  }
+
+  private serial<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.queue.then(task, task);
+    this.queue = run.catch(() => undefined);
+    return run;
   }
 
   private async startServer(): Promise<void> {

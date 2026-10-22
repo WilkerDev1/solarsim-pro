@@ -35,6 +35,7 @@ const safeLabel = (value: unknown): string | undefined => {
 export class LocalMcpServer {
   private http: http.Server | null = null;
   private boundPort = 0;
+  private starting: Promise<number> | null = null;
   /** session id → client. Sessions are only a labeling aid: the transport itself stays stateless. */
   private sessions = new Map<string, { name: string; lastSeenAt: number }>();
 
@@ -61,7 +62,8 @@ export class LocalMcpServer {
 
   start(port: number): Promise<number> {
     if (this.http) return Promise.resolve(this.boundPort);
-    return new Promise((resolve, reject) => {
+    if (this.starting) return this.starting;
+    const pending = new Promise<number>((resolve, reject) => {
       const server = http.createServer((req, res) => {
         this.handle(req, res).catch(() => {
           if (!res.headersSent) this.reply(res, 500, { jsonrpc: '2.0', error: { code: -32603, message: 'Error interno.' }, id: null });
@@ -77,15 +79,23 @@ export class LocalMcpServer {
         resolve(this.boundPort);
       });
     });
+    this.starting = pending;
+    const settled = () => {
+      if (this.starting === pending) this.starting = null;
+    };
+    pending.then(settled, settled);
+    return pending;
   }
 
-  stop(): Promise<void> {
+  /** Waits for a start that is still binding, so a stop requested meanwhile cannot be undone by it. */
+  async stop(): Promise<void> {
+    if (this.starting) await this.starting.catch(() => undefined);
     const server = this.http;
     this.http = null;
     this.boundPort = 0;
     this.sessions.clear();
-    if (!server) return Promise.resolve();
-    return new Promise((resolve) => {
+    if (!server) return;
+    await new Promise<void>((resolve) => {
       server.close(() => resolve());
       server.closeAllConnections();
     });
