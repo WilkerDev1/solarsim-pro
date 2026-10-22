@@ -26,7 +26,7 @@ export interface NativeExecution {
 export interface NativePlan {
   title: string;
   changes: AgentChange[];
-  targetType: 'project' | 'equipment';
+  targetType: 'project' | 'equipment' | 'client';
   execute(): NativeExecution;
 }
 

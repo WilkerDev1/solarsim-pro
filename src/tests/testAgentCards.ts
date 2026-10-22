@@ -14,7 +14,8 @@ const html = renderToStaticMarkup(React.createElement(AgentCardView, { card: aud
 assert(html.includes('Auditoría del inventario'));
 assert(html.includes('&lt;b&gt;Panel&lt;/b&gt; sin precio'), 'finding text is escaped');
 assert(html.includes('data-severity="error"'));
-assert.equal(renderToStaticMarkup(React.createElement(AgentCardView, { card: { type: 'client', id: 'c', title: 'Cliente' } })), '', 'unknown card types render nothing yet');
+assert.equal(renderToStaticMarkup(React.createElement(AgentCardView, { card: { type: 'attachment', id: 'a', title: 'Anexo', proposalId: 'p', enabled: true } })), '', 'types without a view render nothing');
+assert(renderToStaticMarkup(React.createElement(AgentCardView, { card: { type: 'client', id: 'c', title: 'Hotel <QA>' } })).includes('Hotel &lt;QA&gt;'));
 
 useSimulationStore.setState({ appAssistantEnabled: true, workspaceScope: 'local', projects: [], equipmentCatalog: structuredClone(DEFAULT_EQUIPMENT_CATALOG), deletedEquipmentIds: [], sessionGeneration: 0,
   syncSettings: { ...useSimulationStore.getState().syncSettings, currentUser: null, authToken: null } });
