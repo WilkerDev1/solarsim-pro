@@ -4,6 +4,18 @@ import { ProjectSimulation, FinancialSummaryResult, SystemSpecs } from '../../..
 import { SolarEquipmentItem, EquipmentSupplierPrice } from '../../../types/equipment';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
+import { useSupplierCleanup } from '../params/hooks/useSupplierCleanup';
+import {
+  DEFAULT_PRICE_PER_WATT_USD,
+  kwpPricePatch,
+  marginPctFromMultiplier,
+  multiplierFromMarginInput,
+  multiplierFromQuickMargin,
+  pricePerKWpFromWatt,
+  roundedWattPrice,
+  wattPricePatch,
+  wholeMarginPctFromMultiplier,
+} from '../params/logic/pricingSync';
 import { DollarSign, ChevronDown, Sliders, Tag, Sparkles, Building2, Check, RefreshCw } from 'lucide-react';
 import { getProjectPanels, getProjectInverters, getProjectBatteries } from '../../../utils/equipmentSpecsUtils';
 
@@ -67,49 +79,14 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
 
   const batterySupplierMatches = supplierQuotesItem(selectedBattery, project.specs.selectedSupplierInfo?.battery);
 
-  // Limpieza protectora de proveedores huérfanos solo si el proveedor no existe en ningún equipo del catálogo
-  React.useEffect(() => {
-    const info = project.specs.selectedSupplierInfo;
-    if (!info) return;
-
-    let needsCleanup = false;
-    const cleanedInfo = { ...info };
-
-    if (info.panel && !panelSupplierMatches) {
-      const existsInCatalog = equipmentCatalog.some((e) => e.type === 'panel' && supplierQuotesItem(e, info.panel));
-      if (!existsInCatalog) {
-        delete cleanedInfo.panel;
-        needsCleanup = true;
-      }
-    }
-    if (info.inverter && !inverterSupplierMatches) {
-      const existsInCatalog = equipmentCatalog.some((e) => e.type === 'inverter' && supplierQuotesItem(e, info.inverter));
-      if (!existsInCatalog) {
-        delete cleanedInfo.inverter;
-        needsCleanup = true;
-      }
-    }
-    if (info.battery && !batterySupplierMatches) {
-      const existsInCatalog = equipmentCatalog.some((e) => e.type === 'battery' && supplierQuotesItem(e, info.battery));
-      if (!existsInCatalog) {
-        delete cleanedInfo.battery;
-        needsCleanup = true;
-      }
-    }
-
-    if (needsCleanup) {
-      updateSpecs({ selectedSupplierInfo: cleanedInfo });
-    }
-  }, [
-    project.specs.selectedSupplierInfo,
-    project.specs.panelBrandModel,
-    project.specs.inverterBrandModel,
-    project.specs.batteryBrandModel,
+  useSupplierCleanup({
+    specs: project.specs,
+    equipmentCatalog,
     panelSupplierMatches,
     inverterSupplierMatches,
     batterySupplierMatches,
-    equipmentCatalog,
-  ]);
+    updateSpecs,
+  });
 
   const handleSyncAllWithBestSupplierPrices = () => {
     const newSpecs: Partial<SystemSpecs> = {
@@ -208,11 +185,10 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
             <button
               type="button"
               onClick={() => {
-                const autoWp = Math.round(((summary?.costMatrix?.salePricePerWattUSD) || project.specs.pricePerWattUSD || 1.15) * 100) / 100;
+                const autoWp = roundedWattPrice(summary?.costMatrix?.salePricePerWattUSD, project.specs.pricePerWattUSD, DEFAULT_PRICE_PER_WATT_USD);
                 updateSpecs({
                   pricingMode: 'direct_watt',
-                  pricePerWattUSD: autoWp,
-                  pricePerKWpUSD: Math.round(autoWp * 1000 * 100) / 100,
+                  ...wattPricePatch(autoWp),
                 });
               }}
               className={`flex-1 rounded-lg py-1.5 px-2 text-[11px] font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
@@ -261,10 +237,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                       value={project.specs.pricePerWattUSD !== undefined ? project.specs.pricePerWattUSD : 1.15}
                       onChange={(e) => {
                         const val = parseFloat(e.target.value) || 0;
-                        updateSpecs({
-                          pricePerWattUSD: val,
-                          pricePerKWpUSD: Math.round(val * 1000 * 100) / 100,
-                        });
+                        updateSpecs(wattPricePatch(val));
                       }}
                       className={`w-full border rounded-lg pl-7 pr-10 py-1.5 text-xs font-mono font-bold transition-all bg-emerald-50/40 border-emerald-300 text-emerald-950 focus:border-emerald-600 dark:bg-[#121216] dark:border-[#383848] dark:text-emerald-300 dark:focus:border-emerald-500`}
                     />
@@ -285,14 +258,11 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                       value={
                         project.specs.pricePerKWpUSD !== undefined
                           ? project.specs.pricePerKWpUSD
-                          : Math.round((project.specs.pricePerWattUSD || 1.15) * 1000 * 100) / 100
+                          : pricePerKWpFromWatt(project.specs.pricePerWattUSD || DEFAULT_PRICE_PER_WATT_USD)
                       }
                       onChange={(e) => {
                         const val = parseFloat(e.target.value) || 0;
-                        updateSpecs({
-                          pricePerKWpUSD: val,
-                          pricePerWattUSD: Math.round((val / 1000) * 1000) / 1000,
-                        });
+                        updateSpecs(kwpPricePatch(val));
                       }}
                       className={`w-full border rounded-lg pl-7 pr-12 py-1.5 text-xs font-mono font-bold transition-all bg-emerald-50/40 border-emerald-300 text-emerald-950 focus:border-emerald-600 dark:bg-[#121216] dark:border-[#383848] dark:text-emerald-300 dark:focus:border-emerald-500`}
                     />
@@ -385,11 +355,8 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    const autoWp = Math.round(((summary?.costMatrix?.salePricePerWattUSD) || 1.15) * 100) / 100;
-                    updateSpecs({
-                      pricePerWattUSD: autoWp,
-                      pricePerKWpUSD: Math.round(autoWp * 1000 * 100) / 100,
-                    });
+                    const autoWp = roundedWattPrice(summary?.costMatrix?.salePricePerWattUSD, DEFAULT_PRICE_PER_WATT_USD);
+                    updateSpecs(wattPricePatch(autoWp));
                   }}
                   className={`px-2 py-1 text-[10px] rounded-md font-bold flex items-center gap-1 border transition-all cursor-pointer shrink-0 ml-2 bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:border-zinc-700 dark:text-zinc-200`}
                   title="Importar el precio sugerido calculado por la matriz de costos y equipos"
@@ -444,12 +411,9 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                         min="0"
                         max="500"
                         placeholder="25"
-                        value={Math.round(((project.specs.saleMarginMultiplier || 1.25) - 1) * 100 * 10) / 10}
+                        value={marginPctFromMultiplier(project.specs.saleMarginMultiplier)}
                         onChange={(e) => {
-                          const pct = parseFloat(e.target.value);
-                          const validPct = isNaN(pct) ? 0 : Math.max(0, pct);
-                          const multiplier = Math.round((1 + validPct / 100) * 1000) / 1000;
-                          updateSpecs({ saleMarginMultiplier: multiplier });
+                          updateSpecs({ saleMarginMultiplier: multiplierFromMarginInput(parseFloat(e.target.value)) });
                         }}
                         className={`w-full border rounded-lg pl-3 pr-7 py-1.5 text-xs font-extrabold transition-all bg-slate-50 border-slate-300 text-amber-700 focus:border-amber-600 dark:bg-[#18181b] dark:border-[#3f3f46] dark:text-amber-300 dark:focus:border-amber-500`}
                       />
@@ -465,20 +429,19 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
                       Márgenes comerciales sugeridos:
                     </span>
                     <span className="text-[10px] text-amber-500 font-mono font-bold">
-                      {Math.round(((project.specs.saleMarginMultiplier || 1.25) - 1) * 100 * 10) / 10}% actual
+                      {marginPctFromMultiplier(project.specs.saleMarginMultiplier)}% actual
                     </span>
                   </div>
                   <div className="grid grid-cols-6 gap-1">
                     {[10, 15, 20, 25, 30, 35].map((pct) => {
-                      const currentPct = Math.round(((project.specs.saleMarginMultiplier || 1.25) - 1) * 100);
+                      const currentPct = wholeMarginPctFromMultiplier(project.specs.saleMarginMultiplier);
                       const isSelected = currentPct === pct;
                       return (
                         <button
                           key={pct}
                           type="button"
                           onClick={() => {
-                            const multiplier = 1 + pct / 100;
-                            updateSpecs({ saleMarginMultiplier: multiplier });
+                            updateSpecs({ saleMarginMultiplier: multiplierFromQuickMargin(pct) });
                           }}
                           className={`py-1 rounded-lg text-xs font-extrabold border transition-all cursor-pointer ${
                             isSelected
@@ -691,10 +654,10 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
 
               {/* 3. GRUPO: Desglose Comercial en Vivo (Costo vs Ganancia vs Precio Venta) */}
               {(() => {
-                const autoSaleWp = Math.round(((summary?.costMatrix?.salePricePerWattUSD) || 1.08) * 100) / 100;
+                const autoSaleWp = roundedWattPrice(summary?.costMatrix?.salePricePerWattUSD, 1.08);
                 const costWp = Math.round(((summary?.costMatrix?.costPerWattUSD) || 0.86) * 100) / 100;
                 const profitWp = Math.max(0, Math.round((autoSaleWp - costWp) * 100) / 100);
-                const marginPct = Math.round(((project.specs.saleMarginMultiplier || 1.25) - 1) * 100 * 10) / 10;
+                const marginPct = marginPctFromMultiplier(project.specs.saleMarginMultiplier);
 
                 return (
                   <div

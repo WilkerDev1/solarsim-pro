@@ -3,6 +3,7 @@ import { editEquipmentGroup, selectCatalogEquipment } from '../../../utils/equip
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs, BatteryItemSpec } from '../../../types';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
+import { buildCatalogSelectionUpdate, manualBatteryCountPatch } from '../params/logic/catalogSelection';
 import { SearchableEquipmentSelect } from './SearchableEquipmentSelect';
 import { SolarEquipmentItem } from '../../../types/equipment';
 import { BatteryCharging, Plus, Trash2 } from 'lucide-react';
@@ -45,55 +46,7 @@ export const BatteryEquipmentSection: React.FC<BatteryEquipmentSectionProps> = (
   const handleRemoveBatteryItem = (index: number) =>
     updateSpecs(editEquipmentGroup(project.specs, 'battery', { type: 'remove', index }));
 
-  const handleSelectBattery = (item: SolarEquipmentItem) => {
-    const suppliers = item.supplierPrices || [];
-    const newSupplierInfo = { ...(project.specs.selectedSupplierInfo || {}) };
-    const specsUpdate: Partial<SystemSpecs> = {
-      batteryBrandModel: item.displayName,
-      batteryCapacityKWh: item.capacityKWh || 16.08,
-      batteryDOD: item.dodPct || 90,
-      batteryEfficiencyPct: item.batteryEfficiencyPct || 95,
-    };
-
-    if (project.specs.autoSupplierPricing && suppliers.length > 0) {
-      const bestSp = [...suppliers].sort((a, b) => a.priceUSD - b.priceUSD)[0];
-      specsUpdate.batteryUnitPriceUSD = bestSp.priceUSD;
-      newSupplierInfo.battery = {
-        supplierName: bestSp.supplierName,
-        priceUSD: bestSp.priceUSD,
-        updatedAt: bestSp.updatedAt,
-        supplierPriceId: bestSp.id,
-      };
-    } else {
-      const match = suppliers.find(
-        (sp) =>
-          sp.id === newSupplierInfo.battery?.supplierPriceId ||
-          sp.supplierName.toLowerCase().trim() === newSupplierInfo.battery?.supplierName?.toLowerCase().trim()
-      );
-      if (match) {
-        newSupplierInfo.battery = {
-          supplierName: match.supplierName,
-          priceUSD: match.priceUSD,
-          updatedAt: match.updatedAt,
-          supplierPriceId: match.id,
-        };
-      } else {
-        delete newSupplierInfo.battery;
-      }
-    }
-
-    specsUpdate.selectedSupplierInfo = newSupplierInfo;
-    // The primary group takes the catalog identity (catalogItemId for datasheets); the mirror follows it.
-    updateSpecs({
-      ...specsUpdate,
-      ...selectCatalogEquipment(project.specs, 'battery', 0, item, {
-        capacityKWh: item.capacityKWh || 16.08,
-        dodPct: item.dodPct || 90,
-        selectedSupplierInfo: newSupplierInfo.battery,
-        ...(specsUpdate.batteryUnitPriceUSD !== undefined ? { unitPriceUSD: specsUpdate.batteryUnitPriceUSD } : {}),
-      }),
-    });
-  };
+  const handleSelectBattery = (item: SolarEquipmentItem) => updateSpecs(buildCatalogSelectionUpdate(project.specs, 'battery', item));
 
   return (
   <div className={`pt-2 border-t space-y-3 border-slate-200 dark:border-[#27272a]`}>
@@ -146,7 +99,7 @@ export const BatteryEquipmentSection: React.FC<BatteryEquipmentSectionProps> = (
                   if (project.specs.batteries && project.specs.batteries.length > 0) {
                     handleUpdateBatteryItem(0, { count });
                   } else {
-                    updateSpecs({ batteryCount: count });
+                    updateSpecs(manualBatteryCountPatch(count));
                   }
                 }}
                 className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all bg-white border-slate-300 text-slate-800 dark:bg-[#18181b] dark:border-[#3f3f46] dark:text-zinc-100`}
@@ -245,7 +198,7 @@ export const BatteryEquipmentSection: React.FC<BatteryEquipmentSectionProps> = (
                   step="1"
                   min="1"
                   value={project.specs.batteryCount ?? 0}
-                  onChange={(e) => updateSpecs({ batteryCount: parseInt(e.target.value) || 1 })}
+                  onChange={(e) => updateSpecs(manualBatteryCountPatch(parseInt(e.target.value) || 1))}
                   className={`w-full border rounded-lg px-3 py-1.5 text-xs font-bold transition-all bg-white border-slate-300 text-slate-800 dark:bg-[#18181b] dark:border-[#3f3f46] dark:text-zinc-100`}
                 />
               </div>

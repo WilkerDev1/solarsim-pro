@@ -2,6 +2,7 @@ import React from 'react';
 import { ITBIS_RATE, isItemItbisExonerated } from '../../../../shared/financialRules';
 import { ProjectSimulation, FinancialParams, CustomQuotationItem, CustomQuotationDiscount } from '../../../types';
 import { Landmark, ChevronDown, Plus, Trash2, PackagePlus, Tag, Percent, DollarSign } from 'lucide-react';
+import { computeQuotationAdjustments, discountAmountUSD } from '../params/logic/quotationAdjustments';
 import { calculateCostMatrixSummary } from '../../../engine/financeEngine';
 import { calculateTotalDCCapacityKWp } from '../../../utils/equipmentSpecsUtils';
 
@@ -85,33 +86,16 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
 
   const estimatedListPriceUSD = matrixSummary.listPorcentajeVentaUSD || matrixSummary.porcentajeVentaUSD || 0;
 
-  const getDiscountAmountUSD = (disc: CustomQuotationDiscount) => {
-    if (disc.type === 'percentage') {
-      const pct = Math.max(0, Math.min(100, disc.value || 0));
-      return Math.round((estimatedListPriceUSD * (pct / 100)) * 100) / 100;
-    }
-    return Math.max(0, disc.value || 0);
-  };
+  const getDiscountAmountUSD = (disc: CustomQuotationDiscount) => discountAmountUSD(disc, estimatedListPriceUSD);
 
-  const totalDiscountUSD = customDiscounts.reduce((sum, disc) => sum + getDiscountAmountUSD(disc), 0);
-  const equipmentDiscountUSD = customDiscounts
-    .filter((disc) => disc.target === 'equipment')
-    .reduce((sum, disc) => sum + getDiscountAmountUSD(disc), 0);
-
-  const customItemsSubtotalUSD = customItems.reduce(
-    (sum, it) => sum + (it.quantity || 0) * (it.unitPriceUSD || 0),
-    0
-  );
-
-  const customItemsExoneratedITBISUSD = customItems.reduce((sum, it) => {
-    const isExonerated = isItemItbisExonerated(it);
-    return isExonerated ? sum + ((it.quantity || 0) * (it.unitPriceUSD || 0) * ITBIS_RATE) : sum;
-  }, 0);
-
-  const customItemsNonExoneratedITBISUSD = customItems.reduce((sum, it) => {
-    const isExonerated = isItemItbisExonerated(it);
-    return !isExonerated ? sum + ((it.quantity || 0) * (it.unitPriceUSD || 0) * ITBIS_RATE) : sum;
-  }, 0);
+  const {
+    totalDiscountUSD,
+    equipmentDiscountUSD,
+    exoneratedITBISUSD: customItemsExoneratedITBISUSD,
+    chargedITBISUSD: customItemsNonExoneratedITBISUSD,
+    itemsSubtotalUSD: customItemsSubtotalUSD,
+    finalPriceUSD,
+  } = computeQuotationAdjustments(customItems, customDiscounts, estimatedListPriceUSD);
 
   return (
     <div
@@ -565,7 +549,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
                   <div>
                     <span className="block">Total Descuentos:</span>
                     <span className="text-[10px] font-normal text-slate-500 dark:text-zinc-400">
-                      Lista: ${estimatedListPriceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} → Final: ${(Math.max(0, estimatedListPriceUSD - totalDiscountUSD)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                      Lista: ${estimatedListPriceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} → Final: ${finalPriceUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
                     </span>
                   </div>
                   <div className="text-right">
