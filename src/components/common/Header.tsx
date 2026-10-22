@@ -24,7 +24,7 @@ export const Header: React.FC = () => {
     exportProjectAsJSON,
     saveFeedbackMessage,
     sidebarTheme,
-  } = useSimulationStore(useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, getActiveProject: s.getActiveProject, openShareModal: s.openShareModal, saveActiveProject: s.saveActiveProject, exportProjectAsJSON: s.exportProjectAsJSON, saveFeedbackMessage: s.saveFeedbackMessage, sidebarTheme: s.sidebarTheme })));
+  } = useSimulationStore(useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, getActiveProject: s.getActiveProject, openShareModal: s.openShareModal, saveActiveProject: s.saveActiveProject, exportProjectAsJSON: s.exportProjectAsJSON, saveFeedbackMessage: s.saveFeedbackMessage, sidebarTheme: s.sidebarTheme, projects: s.projects, activeProjectId: s.activeProjectId })));
 
   const isDark = sidebarTheme === 'dark';
   const activeProject = getActiveProject();

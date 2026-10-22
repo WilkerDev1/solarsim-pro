@@ -52,7 +52,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
     getActiveProject,
     sessionGeneration,
     syncSettings,
-  } = useSimulationStore(useShallow((s) => ({ isAIPriceCatalogModalOpen: s.isAIPriceCatalogModalOpen, closeAIPriceCatalogModal: s.closeAIPriceCatalogModal, openSettingsModal: s.openSettingsModal, equipmentCatalog: s.equipmentCatalog, batchUpdateSupplierPrices: s.batchUpdateSupplierPrices, addEquipmentItem: s.addEquipmentItem, geminiApiKey: s.geminiApiKey, geminiModel: s.geminiModel, sidebarTheme: s.sidebarTheme, getActiveProject: s.getActiveProject, sessionGeneration: s.sessionGeneration, syncSettings: s.syncSettings })));
+  } = useSimulationStore(useShallow((s) => ({ isAIPriceCatalogModalOpen: s.isAIPriceCatalogModalOpen, closeAIPriceCatalogModal: s.closeAIPriceCatalogModal, openSettingsModal: s.openSettingsModal, equipmentCatalog: s.equipmentCatalog, batchUpdateSupplierPrices: s.batchUpdateSupplierPrices, addEquipmentItem: s.addEquipmentItem, geminiApiKey: s.geminiApiKey, geminiModel: s.geminiModel, sidebarTheme: s.sidebarTheme, getActiveProject: s.getActiveProject, sessionGeneration: s.sessionGeneration, syncSettings: s.syncSettings, projects: s.projects, activeProjectId: s.activeProjectId })));
 
   const isDark = sidebarTheme === "dark";
   const canEdit =

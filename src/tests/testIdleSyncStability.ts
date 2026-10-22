@@ -103,13 +103,30 @@ try {
 
 // Subscribing to the whole store re-renders a component on every set(), including sync bookkeeping.
 const unscoped: string[] = [];
+// Getters are stable functions: selecting one alone never re-renders when the data it reads changes.
+const getterDependencies: Record<string, string[]> = {
+  getActiveProject: ['projects', 'activeProjectId'],
+  getFinancialSummary: ['projects', 'activeProjectId', 'energyMode'],
+  getActiveCompany: ['companies', 'activeCompanyId'],
+};
+const staleGetters: string[] = [];
 const walk = (dir: string) => {
   for (const name of readdirSync(dir)) {
     const file = path.join(dir, name);
     if (statSync(file).isDirectory()) { if (file !== path.join('src', 'tests')) walk(file); continue; }
-    if (/\.(ts|tsx)$/.test(name) && /useSimulationStore\(\s*\)/.test(readFileSync(file, 'utf8'))) unscoped.push(file);
+    if (!/\.(ts|tsx)$/.test(name)) continue;
+    const source = readFileSync(file, 'utf8');
+    if (/useSimulationStore\(\s*\)/.test(source)) unscoped.push(file);
+    for (const selector of source.match(/useShallow\(\(s\) => \(\{.*?\}\)\)/g) ?? []) {
+      for (const [getter, dependencies] of Object.entries(getterDependencies)) {
+        if (!selector.includes(`${getter}: s.${getter}`)) continue;
+        const missing = dependencies.filter(key => !selector.includes(`${key}: `));
+        if (missing.length) staleGetters.push(`${file}: ${getter} without ${missing.join(', ')}`);
+      }
+    }
   }
 };
 walk('src');
+assert.deepEqual(staleGetters, [], `Select the state a getter reads:\n${staleGetters.join('\n')}`);
 assert.deepEqual(unscoped, [], `Components must select the slices they render:\n${unscoped.join('\n')}`);
 console.log('Idle sync keeps references, persistence is coalesced and components subscribe to selected state.');
