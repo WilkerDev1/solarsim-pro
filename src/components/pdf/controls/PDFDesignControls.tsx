@@ -88,13 +88,23 @@ export const PDFDesignControls: React.FC<PDFDesignControlsProps> = ({
   const [opacity, setOpacity] = useState(storedOpacity);
   const [templateSaved, setTemplateSaved] = useState(false);
 
-  // El control deslizante guarda tras 400 ms sin moverse, no en cada paso.
+  // El control deslizante guarda tras 400 ms sin moverse; al salir de la pestaña se guarda lo pendiente.
+  const pending = useRef<number | null>(null);
+  const commit = useRef(updateDocumentCustomization);
+  commit.current = updateDocumentCustomization;
   useEffect(() => setOpacity(storedOpacity), [storedOpacity, project.id]);
   useEffect(() => {
-    if (opacity === storedOpacity) return;
-    const timer = setTimeout(() => updateDocumentCustomization({ watermarkOpacity: opacity }), 400);
+    pending.current = opacity === storedOpacity ? null : opacity;
+    if (pending.current === null) return;
+    const timer = setTimeout(() => {
+      commit.current({ watermarkOpacity: opacity });
+      pending.current = null;
+    }, 400);
     return () => clearTimeout(timer);
-  }, [opacity, storedOpacity, updateDocumentCustomization]);
+  }, [opacity, storedOpacity]);
+  useEffect(() => () => {
+    if (pending.current !== null) commit.current({ watermarkOpacity: pending.current });
+  }, []);
 
   return (
     <div className="space-y-4">

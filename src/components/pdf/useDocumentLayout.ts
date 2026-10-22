@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { PDF_COLOR_THEMES, type PDFColorTheme } from '../../constants/pdfThemes';
 import type { PDFSectionId } from '../../constants/pdfSections';
-import { resolveSectionVisibility, showHeadersFooters, withSectionVisible, type SectionVisibility } from '../../../shared/documentLayout';
+import { resolveSectionVisibility, sectionVisibilityPatch, showHeadersFooters, type SectionVisibility } from '../../../shared/documentLayout';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import type { ProjectSimulation } from '../../types';
 
@@ -21,7 +21,7 @@ export function useDocumentLayout(project: ProjectSimulation): DocumentLayoutSta
   const visibility = useMemo(() => resolveSectionVisibility(layout), [layout]);
   const theme = useMemo(() => PDF_COLOR_THEMES.find((item) => item.id === layout?.themeId) ?? PDF_COLOR_THEMES[0], [layout?.themeId]);
   const setSectionVisible = useCallback(
-    (id: PDFSectionId, visible: boolean) => setDocumentLayout(withSectionVisible(layout, id, visible)),
+    (id: PDFSectionId, visible: boolean) => setDocumentLayout(sectionVisibilityPatch(layout, id, visible)),
     [layout, setDocumentLayout],
   );
   const setTheme = useCallback((next: PDFColorTheme) => setDocumentLayout({ themeId: next.id }), [setDocumentLayout]);
