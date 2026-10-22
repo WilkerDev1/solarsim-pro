@@ -50,3 +50,10 @@ assert.equal(clientNameKey('Hotel Las Palmas, S.R.L.'), clientNameKey('hotel las
 assert.equal(clientNameKey('Inversiones SAS'), 'inversiones');
 assert.equal(clientNameKey('Sasha'), 'sasha');
 console.log('✅ Client summary: linked proposals, document and commercial counts, amounts and filters passed.');
+
+// Phone search compares digits apart from the text: formatted phones match raw digit queries.
+const withPhone = [{ ...record('p1', 'Tel Uno', 'persona'), phone: '809-555-1234' }, { ...record('p2', 'Tel Dos', 'persona'), phone: '(829) 777-0000' }];
+assert.deepEqual(filterClients(withPhone, '8095551234', 'all').map((c) => c.id), ['p1'], 'Full digits match a formatted phone');
+assert.deepEqual(filterClients(withPhone, '5551234', 'all').map((c) => c.id), ['p1'], 'Partial digits match across separators');
+assert.deepEqual(filterClients(withPhone, '829 777', 'all').map((c) => c.id), ['p2']);
+assert.deepEqual(filterClients(withPhone, 'tel', 'all').map((c) => c.id), ['p2', 'p1'], 'Text queries are unaffected');

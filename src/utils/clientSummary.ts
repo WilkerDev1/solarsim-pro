@@ -62,12 +62,15 @@ export function filterClients(
 ): ClientRecord[] {
   const text = clientNameKey(query);
   const taxId = normalizeTaxId(query);
+  const digits = query.replace(/\D/g, '');
   return clients
     .filter((client) => kind === 'all' || client.kind === kind)
     .filter((client) =>
       !query.trim() ||
       (text && clientNameKey(`${client.name} ${client.email} ${client.phone}`).includes(text)) ||
-      (taxId && normalizeTaxId(client.taxId).includes(taxId)),
+      (taxId && normalizeTaxId(client.taxId).includes(taxId)) ||
+      // Phones are stored formatted (809-555-1234): compare digits only, so 8095551234 and 5551234 match.
+      (digits && client.phone.replace(/\D/g, '').includes(digits)),
     )
     .sort((a, b) => clientNameKey(a.name).localeCompare(clientNameKey(b.name)) || a.id.localeCompare(b.id));
 }
