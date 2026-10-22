@@ -3,7 +3,7 @@ import { ProjectSimulation, FinancialSummaryResult, ClientInfo, SystemSpecs, Uti
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { ParameterDockPanel } from './ParameterDockPanel';
 import {
-  allSections, anySectionOpen, financialsBadge, loadOpenSections, saveOpenSections, toggleSection as toggleSectionState,
+  toggleAll, financialsBadge, loadOpenSections, saveOpenSections, toggleSection as toggleSectionState,
   type DockSectionKey, type OpenSections,
 } from '../params/logic/dockSections';
 import { ClientParamsSection } from './ClientParamsSection';
@@ -65,7 +65,7 @@ export const ParameterSidebar: React.FC<ParameterSidebarProps> = ({
     saveOpenSections(next, userId);
   };
   const toggleSection = (key: DockSectionKey) => updateOpen(toggleSectionState(openSections, key));
-  const toggleAllSections = () => updateOpen(allSections(!anySectionOpen(openSections)));
+  const toggleAllSections = () => updateOpen(toggleAll(openSections));
   const badge = financialsBadge(project.financials);
 
   const renderBody = (key: DockSectionKey): React.ReactNode => {

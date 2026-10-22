@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
-  DOCK_SECTION_KEYS, allSections, anySectionOpen, dockStorageKey, financialsBadge, loadOpenSections, saveOpenSections, toggleSection,
+  DOCK_SECTION_KEYS, allSections, allSectionsOpen, toggleAll, dockStorageKey, financialsBadge, loadOpenSections, saveOpenSections, toggleSection,
 } from '../components/simulator/params/logic/dockSections';
 import { ParameterDockPanel } from '../components/simulator/sidebar/ParameterDockPanel';
 
@@ -21,11 +21,14 @@ const broken = {
 // Abrir y cerrar
 {
   let s = allSections(false);
-  assert.equal(anySectionOpen(s), false);
+  assert.equal(allSectionsOpen(s), false);
   s = toggleSection(s, 'rates');
   assert.equal(s.rates, true);
   assert.equal(s.client, false);
-  assert.equal(anySectionOpen(s), true);
+  assert.equal(allSectionsOpen(s), false, 'parcial no cuenta como todo abierto');
+  assert.deepEqual(toggleAll(s), allSections(true), 'parcial: «todo» expande');
+  assert.deepEqual(toggleAll(allSections(true)), allSections(false), 'todo abierto: colapsa');
+  assert.deepEqual(toggleAll(allSections(false)), allSections(true));
   s = toggleSection(s, 'rates');
   assert.equal(s.rates, false);
   assert.deepEqual([...DOCK_SECTION_KEYS], ['client', 'rates', 'equipment', 'costs', 'financials']);
@@ -84,7 +87,9 @@ const broken = {
   assert.match(closed, /Expandir todo/);
   const opened = panel({ ...allSections(false), rates: true });
   assert.equal((opened.match(/aria-expanded="true"/g) ?? []).length, 1);
-  assert.match(opened, /Colapsar todo/);
+  assert.match(opened, /Expandir todo/, 'parcialmente abierto sigue ofreciendo expandir');
+  assert.doesNotMatch(opened, /Colapsar todo/);
+  assert.match(panel(allSections(true)), /Colapsar todo/);
   assert.doesNotMatch(panel(allSections(true), financialsBadge({})), /personalizado/);
 }
 

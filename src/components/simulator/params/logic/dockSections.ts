@@ -14,7 +14,10 @@ export const dockStorageKey = (userId?: string | null): string => `solarsim.para
 
 export const toggleSection = (state: OpenSections, key: DockSectionKey): OpenSections => ({ ...state, [key]: !state[key] });
 
-export const anySectionOpen = (state: OpenSections): boolean => DOCK_SECTION_KEYS.some((k) => state[k]);
+export const allSectionsOpen = (state: OpenSections): boolean => DOCK_SECTION_KEYS.every((k) => state[k]);
+
+/** «Colapsar todo» solo si todas están abiertas; en cualquier otro caso expande todas. */
+export const toggleAll = (state: OpenSections): OpenSections => allSections(!allSectionsOpen(state));
 
 const defaultStorage = (): DockStorage | null => {
   try {

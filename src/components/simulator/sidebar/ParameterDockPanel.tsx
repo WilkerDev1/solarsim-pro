@@ -1,7 +1,7 @@
 import React from 'react';
 import { ChevronsDownUp, ChevronsUpDown, DollarSign, Landmark, Receipt, Sun, User } from 'lucide-react';
 import { ParamSection } from '../params/ui';
-import { DOCK_SECTION_KEYS, anySectionOpen, type DockSectionKey, type FinancialsBadge, type OpenSections } from '../params/logic/dockSections';
+import { DOCK_SECTION_KEYS, allSectionsOpen, type DockSectionKey, type FinancialsBadge, type OpenSections } from '../params/logic/dockSections';
 
 const ICON_PROPS = { size: 16, strokeWidth: 1.75, 'aria-hidden': true } as const;
 
@@ -24,9 +24,9 @@ export interface ParameterDockPanelProps {
 
 /** Panel plano del dock: encabezado, las 5 secciones y el pie con «Colapsar todo». */
 export const ParameterDockPanel: React.FC<ParameterDockPanelProps> = ({ open, onToggle, onToggleAll, financialsBadge, renderBody }) => {
-  const anyOpen = anySectionOpen(open);
-  const allLabel = anyOpen ? 'Colapsar todo' : 'Expandir todo';
-  const Icon = anyOpen ? ChevronsDownUp : ChevronsUpDown;
+  const allOpen = allSectionsOpen(open);
+  const allLabel = allOpen ? 'Colapsar todo' : 'Expandir todo';
+  const Icon = allOpen ? ChevronsDownUp : ChevronsUpDown;
   const badge =
     financialsBadge.label === '' ? undefined : (
       <>
