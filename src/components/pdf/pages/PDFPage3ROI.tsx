@@ -1,4 +1,5 @@
 import { PDFPageShell } from '../PDFPageShell';
+import { EditableText } from '../editor/EditableText';
 import { cleanClientName } from '../../../../shared/proposalPresentation';
 import React from 'react';
 import {
@@ -61,7 +62,7 @@ export const PDFPage3ROI: React.FC<PDFPage3ROIProps> = ({
       currentDateStr={currentDateStr}
       pageNum={pageNum}
       totalPages={totalPages}
-      pageTitle="RETORNO DE INVERSIÓN - RESUMEN"
+      sectionId="roi"
     >
 
       {/* Body */}
@@ -69,37 +70,37 @@ export const PDFPage3ROI: React.FC<PDFPage3ROIProps> = ({
         {/* Financial Indicators Grid */}
         <div className="space-y-2">
           <h2 className="text-sm font-bold text-gray-800 border-b border-gray-100 pb-1 uppercase tracking-wider">
-            Indicadores Financieros
+            <EditableText k="roi.indicatorsHeading" />
           </h2>
           <div className="grid grid-cols-5 gap-2.5">
             <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-2.5 text-center">
-              <p className="text-[9.5px] text-gray-500 uppercase font-bold tracking-wider mb-0.5">Payback</p>
+              <p className="text-[9.5px] text-gray-500 uppercase font-bold tracking-wider mb-0.5"><EditableText k="roi.indicator.payback" /></p>
               <p className="text-lg font-bold text-gray-900">
-                {summary.paybackYears} <span className="text-[10px] font-medium text-gray-500">Años</span>
+                {summary.paybackYears} <span className="text-[10px] font-medium text-gray-500"><EditableText k="roi.indicator.paybackUnit" /></span>
               </p>
             </div>
 
             <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-2.5 text-center">
-              <p className="text-[9.5px] text-gray-500 uppercase font-bold tracking-wider mb-0.5">TIR</p>
+              <p className="text-[9.5px] text-gray-500 uppercase font-bold tracking-wider mb-0.5"><EditableText k="roi.indicator.irr" /></p>
               <p className="text-lg font-bold" style={{ color: activeTheme.primary }}>{summary.irrPct}%</p>
             </div>
 
             <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-2.5 text-center">
-              <p className="text-[9.5px] text-gray-500 uppercase font-bold tracking-wider mb-0.5">VAN (10%)</p>
+              <p className="text-[9.5px] text-gray-500 uppercase font-bold tracking-wider mb-0.5"><EditableText k="roi.indicator.npv" /></p>
               <p className="text-sm font-bold text-gray-900">
                 ${summary.npvUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </p>
             </div>
 
             <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-2.5 text-center">
-              <p className="text-[9.5px] text-gray-500 uppercase font-bold tracking-wider mb-0.5">Ahorro 25 Años</p>
+              <p className="text-[9.5px] text-gray-500 uppercase font-bold tracking-wider mb-0.5"><EditableText k="roi.indicator.savings25" /></p>
               <p className="text-sm font-bold text-green-700">
                 ${summary.total25YearSavingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </p>
             </div>
 
             <div className="bg-gray-50/80 border border-gray-200 rounded-xl p-2.5 text-center">
-              <p className="text-[9.5px] text-gray-500 uppercase font-bold tracking-wider mb-0.5">ROI</p>
+              <p className="text-[9.5px] text-gray-500 uppercase font-bold tracking-wider mb-0.5"><EditableText k="roi.indicator.roi" /></p>
               <p className="text-lg font-bold text-gray-900">{summary.roi25YrPct}%</p>
             </div>
           </div>
@@ -108,29 +109,29 @@ export const PDFPage3ROI: React.FC<PDFPage3ROIProps> = ({
         {/* Parameters Table */}
         <div className="space-y-2">
           <h2 className="text-sm font-bold text-gray-800 border-b border-gray-100 pb-1 uppercase tracking-wider">
-            Cálculo de Ahorro y Retorno de Inversión
+            <EditableText k="roi.calcHeading" />
           </h2>
           <div className="border border-gray-200 rounded-lg overflow-hidden text-[11px]">
             <table className="w-full text-left">
               <tbody className="divide-y divide-gray-200 text-gray-700 font-semibold">
                 <tr className="bg-gray-50/60">
-                  <td className="px-4 py-1.5 text-gray-800 w-1/2">Cliente</td>
+                  <td className="px-4 py-1.5 text-gray-800 w-1/2"><EditableText k="roi.calc.client" /></td>
                   <td className="px-4 py-1.5 text-right font-bold uppercase text-gray-900">{cleanClientName(project.client.name || 'Cliente')}</td>
                 </tr>
                 <tr>
-                  <td className="px-4 py-1.5 text-gray-800">Potencia Instalada (kWp)</td>
+                  <td className="px-4 py-1.5 text-gray-800"><EditableText k="roi.calc.capacity" /></td>
                   <td className="px-4 py-1.5 text-right font-bold">{summary.systemCapacityKWp.toFixed(2)} kWp</td>
                 </tr>
                 {summary.itbisSavedUSD > 0 && (
                   <>
                     <tr className="bg-gray-50/60">
-                      <td className="px-4 py-1.5 text-gray-800">Precio de Lista con ITBIS</td>
+                      <td className="px-4 py-1.5 text-gray-800"><EditableText k="roi.calc.listPrice" /></td>
                       <td className="px-4 py-1.5 text-right font-bold text-gray-500 font-mono">
                         ${(summary.grossInvestmentUSD + summary.itbisSavedUSD).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                       </td>
                     </tr>
                     <tr>
-                      <td className="px-4 py-1.5 text-gray-800">Exoneración 18% ITBIS (Ley 57-07)</td>
+                      <td className="px-4 py-1.5 text-gray-800"><EditableText k="roi.calc.itbis" /></td>
                       <td className="px-4 py-1.5 text-right font-bold text-green-700 font-mono">
                         -${summary.itbisSavedUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                       </td>
@@ -138,19 +139,19 @@ export const PDFPage3ROI: React.FC<PDFPage3ROIProps> = ({
                   </>
                 )}
                 <tr className="bg-gray-50/60 font-bold">
-                  <td className="px-4 py-1.5 text-gray-900">Total a Pagar en Contrato (Año 0)</td>
+                  <td className="px-4 py-1.5 text-gray-900"><EditableText k="roi.calc.contract" /></td>
                   <td className="px-4 py-1.5 text-right font-bold text-gray-900 font-mono">
                     ${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </td>
                 </tr>
                 <tr>
-                  <td className="px-4 py-1.5 text-gray-800">Crédito Fiscal 40% DGII (Ley 57-07)</td>
+                  <td className="px-4 py-1.5 text-gray-800"><EditableText k="roi.calc.credit" /></td>
                   <td className="px-4 py-1.5 text-right font-bold text-green-700 font-mono">
                     -${summary.ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </td>
                 </tr>
                 <tr className="bg-emerald-50/80 font-bold text-emerald-950 border-t border-emerald-200">
-                  <td className="px-4 py-1.5 text-emerald-950">Inversión Neta Final tras Crédito Fiscal</td>
+                  <td className="px-4 py-1.5 text-emerald-950"><EditableText k="roi.calc.net" /></td>
                   <td className="px-4 py-1.5 text-right font-black text-emerald-800 font-mono">
                     ${summary.netInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </td>
@@ -163,20 +164,20 @@ export const PDFPage3ROI: React.FC<PDFPage3ROIProps> = ({
         {/* Milestones Table */}
         <div className="space-y-2">
           <h2 className="text-sm font-bold text-gray-800 border-b border-gray-100 pb-1 uppercase tracking-wider">
-            Resumen de Ahorro Anual y Retorno de Inversión
+            <EditableText k="roi.tableHeading" />
           </h2>
           <div className="border border-gray-200 rounded-lg overflow-hidden text-[11px]">
             <table className="w-full text-left">
               <thead className="text-white uppercase font-bold text-[10px]" style={{ backgroundColor: activeTheme.primary }}>
                 <tr>
-                  <th className="px-4 py-1.5">Año</th>
-                  <th className="px-4 py-1.5 text-right">Ahorro Energético (USD)</th>
-                  <th className="px-4 py-1.5 text-right">Beneficio Acumulado (USD)</th>
+                  <th className="px-4 py-1.5"><EditableText k="roi.table.year" /></th>
+                  <th className="px-4 py-1.5 text-right"><EditableText k="roi.table.savings" /></th>
+                  <th className="px-4 py-1.5 text-right"><EditableText k="roi.table.cumulative" /></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 text-gray-700 font-semibold">
                 <tr className="bg-gray-50/60">
-                  <td className="px-4 py-1.5 font-bold">Año 1</td>
+                  <td className="px-4 py-1.5 font-bold"><EditableText k="roi.table.year1" /></td>
                   <td className="px-4 py-1.5 text-right">${year1Obj.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                   <td className="px-4 py-1.5 text-right text-red-600 font-bold">
                     ${year1Obj.cumulativeCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
@@ -190,14 +191,14 @@ export const PDFPage3ROI: React.FC<PDFPage3ROIProps> = ({
                   </td>
                 </tr>
                 <tr className="bg-gray-50/60">
-                  <td className="px-4 py-1.5 font-bold">Año 10</td>
+                  <td className="px-4 py-1.5 font-bold"><EditableText k="roi.table.year10" /></td>
                   <td className="px-4 py-1.5 text-right">${year10Obj.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                   <td className="px-4 py-1.5 text-right text-green-700 font-bold">
                     ${year10Obj.cumulativeCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </td>
                 </tr>
                 <tr className="font-bold">
-                  <td className="px-4 py-1.5 font-bold">Año 25</td>
+                  <td className="px-4 py-1.5 font-bold"><EditableText k="roi.table.year25" /></td>
                   <td className="px-4 py-1.5 text-right">${year25Obj.savingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                   <td className="px-4 py-1.5 text-right font-bold" style={{ color: activeTheme.primary }}>
                     ${year25Obj.cumulativeCashFlowUSD.toLocaleString('en-US', { minimumFractionDigits: 2 })}
@@ -211,7 +212,7 @@ export const PDFPage3ROI: React.FC<PDFPage3ROIProps> = ({
         {/* Accumulated Benefit Chart */}
         <div className="space-y-2 mt-auto">
           <h2 className="text-sm font-bold text-gray-800 border-b border-gray-100 pb-1 uppercase tracking-wider">
-            Beneficio Acumulado (25 Años)
+            <EditableText k="roi.table.total25" />
           </h2>
           <div className="h-[180px] w-full bg-gray-50/70 border border-gray-200 rounded-xl p-2.5">
             <ResponsiveContainer width="100%" height="100%">
