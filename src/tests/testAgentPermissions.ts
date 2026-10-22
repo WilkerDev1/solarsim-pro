@@ -164,4 +164,34 @@ await assert.rejects(
 );
 assert.equal(store.getState().getActiveProject().rates.targetCoveragePct, 81);
 
+// 16. Pricing edits of a proposal are "guarded": they wait for confirmation even when drafts apply freely.
+reset();
+const margin = await executeAgentTool({ name: 'propose_project_update', args: { id: project.id, title: 'Margen 35%', edits: [{ section: 'specs', field: 'saleMarginMultiplier', valueJson: '1.35' }] } }, external());
+assert(margin.status === 'pending_confirmation', JSON.stringify(margin));
+assert.notEqual(store.getState().getActiveProject().specs.saleMarginMultiplier, 1.35);
+const mixed = await executeAgentTool({ name: 'propose_project_update', args: { id: project.id, edits: [
+  { section: 'rates', field: 'targetCoveragePct', valueJson: '88' }, { section: 'financials', field: 'customDiscounts', valueJson: '[{"id":"d1","description":"Cortesía","type":"percentage","value":5,"target":"general"}]' }] } }, external());
+assert(mixed.status === 'pending_confirmation', 'a mixed plan with pricing waits as a whole');
+const coverageOnly = await executeAgentTool(coverage(87), external());
+assert.equal(coverageOnly.status, 'applied', 'non-pricing edits keep the drafts-free policy');
+store.getState().setAgentPolicy({ external: { read: 'allow', draft: 'allow', guarded: 'deny' } });
+assert.equal((await executeAgentTool({ name: 'propose_project_update', args: { id: project.id, edits: [{ section: 'specs', field: 'saleMarginMultiplier', valueJson: '1.4' }] } }, external())).status, 'error', 'blocked sensitive changes stay blocked');
+
+// 17. Undo on a 2.6.0 proposal (no group arrays) restores the original equipment without keeping new group data.
+reset();
+const legacyProject = store.getState().getActiveProject();
+store.getState().updateProjectById(legacyProject.id, () => ({ specs: { ...legacyProject.specs, panels: undefined, inverters: undefined, batteries: undefined } }));
+const legacyBefore = store.getState().getActiveProject().specs;
+assert.equal(legacyBefore.panels, undefined);
+const altPanel = store.getState().equipmentCatalog.filter((e) => e.type === 'panel').at(-1)!;
+const replace = await executeAgentTool({ name: 'propose_project_update', args: { id: legacyProject.id, edits: [{ section: 'specs', field: 'panels', valueJson: JSON.stringify([{ id: altPanel.id, count: 20, unitPriceUSD: 100 }]) }] } }, internal());
+assert(replace.status === 'pending_confirmation', 'equipment groups carry prices: confirmation required');
+assert.equal(store.getState().confirmAgentAction(replace.actionId).success, true);
+const replacedEntry = store.getState().agentActivity[0];
+assert.equal(store.getState().undoAgentActivity(replacedEntry.id).success, true);
+const restoredSpecs = store.getState().getActiveProject().specs;
+assert.equal(restoredSpecs.panelBrandModel, legacyBefore.panelBrandModel);
+assert.equal(restoredSpecs.panelCount, legacyBefore.panelCount);
+assert(!restoredSpecs.panels?.some((g) => g.id === altPanel.id), 'no replacement group survives the undo');
+
 console.log('PASS: agent policy (read/draft/guarded × source), immediate drafts with undo, confirmations, status tool, readers and persistence.');

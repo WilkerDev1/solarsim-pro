@@ -174,6 +174,7 @@ function AssistantPanel({
                 {ai.error}
               </p>
             )}
+            {ai.loadingFiles && <p role="status" className="assistant-widget-status">Leyendo archivos adjuntos…</p>}
             {ai.files.length > 0 && (
               <ul className="assistant-file-chips" aria-label="Archivos adjuntos">
                 {ai.files.map((f) => (
@@ -242,7 +243,7 @@ function AssistantPanel({
                 <button
                   type="submit"
                   className="assistant-send"
-                  disabled={!ai.prompt.trim() || !state.geminiApiKey}
+                  disabled={!ai.prompt.trim() || !state.geminiApiKey || ai.loadingFiles}
                 >
                   <Send size={14} />
                   Enviar

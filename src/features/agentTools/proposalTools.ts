@@ -53,7 +53,13 @@ const createProposal: NativeHandler = (args) => {
         if ('error' in built) throw new Error(built.error);
         const project = built.project;
         insertProject(project);
-        return { targetId: project.id, data: { proposalId: project.id, code: project.client.projectId }, cards: [proposalCard(project)],
+        // Equipment without a supplier offer quotes at 0: say so in the result instead of leaving it to the simulation.
+        const unpriced = [...(project.specs.panels ?? []), ...(project.specs.inverters ?? []), ...(project.specs.batteries ?? [])]
+          .filter((g) => g.count > 0 && !(typeof g.unitPriceUSD === 'number' && g.unitPriceUSD > 0)).map((g) => g.brandModel);
+        const warnings = unpriced.length
+          ? [`Sin oferta de proveedor con precio: ${unpriced.join(', ')}. El precio de contrato no es válido hasta cargar precios en el catálogo (update_supplier_price o el editor de ofertas).`]
+          : [];
+        return { targetId: project.id, data: { proposalId: project.id, code: project.client.projectId, warnings }, cards: [proposalCard(project)],
           undo: { op: 'trash', before: {}, afterFingerprint: '' } };
       },
     },
@@ -107,7 +113,7 @@ const setProposalStatus: NativeHandler = (args) => {
         const current = requireEditableProject(args.id);
         const before = { status: current.status };
         store().setProjectStatus(current.id, status);
-        return { targetId: current.id, data: { status }, undo: { before, afterFingerprint: fingerprint({ status }) } };
+        return { targetId: current.id, data: { status }, undo: { before, fields: ['status'], afterFingerprint: fingerprint({ status }) } };
       },
     },
   };
@@ -127,7 +133,8 @@ const setCommercialStatus: NativeHandler = (args) => {
         const result = store().setProposalCommercialState(current.id, { status });
         if (!result.success) throw new Error(result.error);
         const after = store().projects.find((p) => p.id === current.id)!;
-        return { targetId: current.id, data: { status }, undo: { before, afterFingerprint: fingerprint({ commercial: after.commercial }) } };
+        // `fields` keeps the key even when commercial was undefined (lost in JSON persistence otherwise).
+        return { targetId: current.id, data: { status }, undo: { before, fields: ['commercial'], afterFingerprint: fingerprint({ commercial: after.commercial }) } };
       },
     },
   };

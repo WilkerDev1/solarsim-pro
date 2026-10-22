@@ -78,7 +78,8 @@ export const McpConnectionPanelView: React.FC<ViewProps> = ({ status, busy, unav
             <div className="space-y-3">
               <p className="text-xs text-slate-500 dark:text-zinc-400">Sustituye <code>&lt;TOKEN&gt;</code> por el token copiado con el botón de arriba; no se muestra en pantalla.</p>
               <Snippet title="Claude Code" hint="Ejecuta en una terminal." code={snippets.claudeCode} onCopy={onCopy} />
-              <Snippet title="Codex" hint="Añade a ~/.codex/config.toml y exporta el token en tu shell." code={`${snippets.codex}\n\n# shell\n${snippets.codexEnv}`} onCopy={onCopy} />
+              <Snippet title="Codex · config.toml" hint="Añade este bloque a ~/.codex/config.toml." code={snippets.codex} onCopy={onCopy} />
+              <Snippet title="Codex · token en tu shell" hint="Ejecútalo en la terminal (o en tu perfil del shell) antes de abrir Codex." code={snippets.codexEnv} onCopy={onCopy} />
               <Snippet title="Claude Desktop" hint="Añade a claude_desktop_config.json (Ajustes → Desarrollador → Editar configuración) y reinicia Claude Desktop. SolarSim debe estar abierto; no requiere pegar el token." code={snippets.claudeDesktop} onCopy={onCopy} />
             </div>
           )}

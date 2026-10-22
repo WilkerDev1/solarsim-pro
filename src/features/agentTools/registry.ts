@@ -72,6 +72,15 @@ function decodeArgs(args: Record<string, unknown>): Record<string, unknown> {
   };
 }
 
+/** Fields that change what the customer pays (costs, margins, labor, extras, discounts, equipment groups with unit prices). */
+const PRICING_FIELDS: Record<string, readonly string[]> = {
+  specs: ['saleMarginMultiplier', 'installationUnitPriceUSD', 'panelUnitPriceUSD', 'inverterUnitPriceUSD', 'batteryUnitPriceUSD', 'batteryCostUSD',
+    'autoSupplierPricing', 'panels', 'inverters', 'batteries'],
+  financials: ['customItems', 'customDiscounts'],
+};
+export const touchesPricing = (action: AssistantAction): boolean =>
+  action.kind === 'project' && action.edits.some((e) => PRICING_FIELDS[e.section]?.includes(e.field));
+
 const describeChanges = (action: AssistantAction): AgentChange[] =>
   action.edits.map((e) => ({ label: assistantFieldLabel(e.field), value: assistantValueLabel(e.value) }));
 
@@ -147,9 +156,11 @@ function undoEntry(entry: AgentActivityEntry) {
   if (current.isDeleted || current.syncStatus === 'conflict') return { success: false, error: 'La propuesta no admite cambios (papelera o conflicto).' };
   if (fingerprint(pick(current, fields)) !== entry.undo!.afterFingerprint)
     return { success: false, error: 'La propuesta cambió después; usa el historial de versiones para revertir.' };
-  return s.updateProjectById(entry.targetId, () => restored)
+  if (!s.updateProjectById(entry.targetId, () => restored, { restore: true })) return { success: false, error: 'La propuesta no admite cambios.' };
+  const after = store().projects.find((p) => p.id === entry.targetId);
+  return after && fingerprint(pick(after, fields)) === fingerprint(restored)
     ? { success: true }
-    : { success: false, error: 'La propuesta no admite cambios.' };
+    : { success: false, error: 'No se pudo restaurar el estado anterior; usa el historial de versiones.' };
 }
 
 installAgentRuntime({
@@ -205,7 +216,10 @@ export async function executeAgentTool(call: AgentToolCall, ctx: AgentToolContex
   const cards = result.cards?.map(toAgentCard);
   const action = result.action;
   if (!action) return { status: 'ok', data: result.data, cards };
-  const kind = definition.kind === 'guarded' ? 'guarded' : 'draft';
+  // Prices are sensitive whatever tool carries them: a plan that touches any pricing field is guarded as a whole.
+  const kind = definition.kind === 'guarded' || touchesPricing(action) ? 'guarded' : 'draft';
+  if (kind === 'guarded' && policy.guarded === 'deny')
+    return { status: 'error', code: 'denied', message: 'Los permisos de agentes de este dispositivo no permiten cambiar precios.' };
   const meta = { source: ctx.source, clientLabel: ctx.clientLabel, tool: definition.name, kind } as const;
   if (kind === 'draft' && policy.draft === 'allow') {
     try {

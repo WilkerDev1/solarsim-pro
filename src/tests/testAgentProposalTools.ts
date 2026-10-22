@@ -49,8 +49,16 @@ assert.equal(proposal.specs.panels?.[0].unitPriceUSD, 95, 'cheapest in-stock off
 assert.equal(proposal.monthlyConsumption.length, 12);
 assert.equal(store.getState().activeView, 'dashboard', 'agents do not navigate the user away');
 assert.equal(created.cards?.[0].type, 'proposal');
+assert.deepEqual((created.data as { warnings: string[] }).warnings, [], 'priced equipment: no warnings');
 assert.equal(store.getState().undoAgentActivity(created.activityId).success, true);
 assert.equal(store.getState().projects.find((p) => p.id === proposalId)?.isDeleted, true, 'undoing a creation moves it to the trash');
+
+// 2b. Equipment without supplier prices is reported in the result (seen in the Claude Code end-to-end test).
+const unpricedPanel = catalog.find((e) => e.type === 'panel' && e.id !== panel.id && !e.supplierPrices?.length)!;
+const unpriced = await executeAgentTool({ name: 'create_proposal', args: { clientName: 'Sin precios', distributor: 'EDESUR', tariffCode: 'BTS1', averageMonthlyKWh: 400,
+  panels: [{ catalogItemId: unpricedPanel.id, count: 6 }], inverters: [{ catalogItemId: inverter.id, count: 1 }] } }, ctx());
+assert(unpriced.status === 'applied');
+assert.match((unpriced.data as { warnings: string[] }).warnings[0], /Sin oferta de proveedor/);
 
 // 3. Invalid creations are rejected without side effects.
 const before = store.getState().projects.length;
@@ -127,6 +135,16 @@ store.setState({ syncSettings: { ...store.getState().syncSettings, currentUser: 
 assert.equal(store.getState().confirmAgentAction(queuedDup.actionId).success, false);
 assert.equal(store.getState().projects.length, countBeforeReader);
 store.getState().setAgentPolicy({ external: { read: 'allow', draft: 'allow', guarded: 'confirm' } });
+
+// 9b. Undo of a commercial decision survives persistence when the proposal had no commercial object.
+store.setState({ projects: [...store.getState().projects, { ...structuredClone(existing), id: 'no-commercial', commercial: undefined, status: 'Draft' as const }] });
+store.setState({ syncSettings: { ...store.getState().syncSettings, currentUser: null, authToken: null } });
+const firstDecision = await executeAgentTool({ name: 'set_commercial_status', args: { id: 'no-commercial', status: 'rejected' } }, ctx());
+assert(firstDecision.status === 'pending_confirmation');
+assert.equal(store.getState().confirmAgentAction(firstDecision.actionId).success, true);
+store.setState({ agentActivity: JSON.parse(JSON.stringify(store.getState().agentActivity)) });
+assert.equal(store.getState().undoAgentActivity(store.getState().agentActivity[0].id).success, true);
+assert.equal(store.getState().projects.find((p) => p.id === 'no-commercial')?.commercial, undefined);
 
 // 10. Readers cannot create proposals.
 store.setState({ workspaceScope: 'https://qa.invalid|org', syncSettings: { ...store.getState().syncSettings, serverUrl: 'https://qa.invalid', authToken: 'synthetic',
