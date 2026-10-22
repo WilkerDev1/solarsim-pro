@@ -37,11 +37,11 @@ const SEVERITY = { error: 'error', warning: 'warning', info: 'info' } as const;
 
 function audit(card: CardOf<'catalog-audit'>): string {
   const count = (severity: keyof typeof SEVERITY) => card.findings.filter((f) => f.severity === severity).length;
-  const summary = [plural(count('error'), 'error', 'errores'), plural(count('warning'), 'aviso', 'avisos'), plural(count('info'), 'nota', 'notas')].join(' · ');
-  const rows = card.findings.slice(0, 50).map((f) =>
+  // The card carries a capped subset (the real total travels in `detail`), so the counts say they cover only what is listed.
+  const shown = [plural(count('error'), 'error', 'errores'), plural(count('warning'), 'aviso', 'avisos'), plural(count('info'), 'nota', 'notas')].join(' · ');
+  const rows = card.findings.map((f) =>
     `<li class="finding ${SEVERITY[f.severity] ?? 'info'}"><span class="dot"></span><span>${escapeHtml(f.message)}${f.equipmentId ? ` <span class="muted">(${escapeHtml(f.equipmentId)})</span>` : ''}</span></li>`).join('');
-  const more = card.findings.length > 50 ? `<p class="muted">Y ${card.findings.length - 50} más.</p>` : '';
-  return `<article class="card"><h2>${escapeHtml(card.title)}</h2><p class="muted">${escapeHtml(summary)}</p>${rows ? `<ul>${rows}</ul>` : '<p class="muted">Sin hallazgos.</p>'}${more}</article>`;
+  return `<article class="card"><h2>${escapeHtml(card.title)}</h2>${card.detail ? `<p class="muted">${escapeHtml(card.detail)}</p>` : ''}<p class="muted">Mostrados: ${escapeHtml(shown)}</p>${rows ? `<ul>${rows}</ul>` : '<p class="muted">Sin hallazgos.</p>'}</article>`;
 }
 
 function pending(card: CardOf<'pending-action'>): string {

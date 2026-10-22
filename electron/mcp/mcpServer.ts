@@ -134,7 +134,9 @@ export class LocalMcpServer {
       { name: 'solarsim', version: this.options.version },
       { capabilities: { tools: { listChanged: false }, resources: { listChanged: false } }, instructions: AGENT_RULES_ES },
     );
-    server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: this.options.bridge.tools.map(toMcpTool) }));
+    server.setRequestHandler(ListToolsRequestSchema, async () => ({
+      tools: this.options.bridge.tools.map((tool) => toMcpTool(tool, (type) => this.options.cardHtml?.(type) !== undefined)),
+    }));
     // MCP Apps: card views served as static, self-contained documents with a strict CSP (no origins requested from the host).
     const cardTypes = () => MCP_APP_CARD_TYPES.filter((type) => this.options.cardHtml?.(type) !== undefined);
     server.setRequestHandler(ListResourcesRequestSchema, async () => ({

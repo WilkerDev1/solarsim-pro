@@ -73,6 +73,8 @@ Si el puerto 47321 está ocupado, el panel lo indica; el puerto se cambia en `mc
 | Cuerpos enormes o ráfagas | Límite de 12 MB, tiempos de espera por herramienta y sin estado persistente en el servidor |
 | IPC falsificado | Cada canal `mcp:*` comprueba que el emisor es el `webContents` de la ventana principal y valida la forma de los mensajes |
 
+**Activación por dispositivo.** El interruptor vive en `mcp.json`, no en `shared/applicationFeatures.ts`: ese registro es la política de cálculo sincronizada con la organización (`ApplicationFeatureSettings`, validada en la API), mientras que el servidor MCP es una decisión de seguridad de cada equipo, igual que los permisos de agentes (`agentPolicy`). Una organización no puede abrir un puerto en un equipo ajeno. Los permisos por tipo (`read`/`draft`/`guarded`) de «Agentes externos» sí se aplican en cada llamada y pueden bloquearlo todo.
+
 Fuera de alcance: acceso desde otros equipos (el servidor no escucha en la red) y protección frente a malware con el mismo usuario del sistema operativo.
 
 ## MCP remoto (esbozo, no implementado)

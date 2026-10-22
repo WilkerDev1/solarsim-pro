@@ -25,7 +25,10 @@ const audit = renderCards('catalog-audit', [{ type: 'catalog-audit', id: 'a', ti
   { code: 'no_price', severity: 'error', equipmentId: 'eq-1', message: 'Sin precio' },
   { code: 'no_stock', severity: 'info', message: 'Sin stock' },
   { code: 'dup', severity: 'warning', message: 'Duplicado <b>' },
-] }]);
+], detail: '45 hallazgos en 12 equipos' }]);
+// The card lists a capped subset: the real total must show, and the counts must say they cover only what is listed.
+assert.match(audit, /45 hallazgos en 12 equipos/);
+assert.match(audit, /mostrados/i);
 assert.match(audit, /Sin precio/);
 assert(audit.includes('Duplicado &lt;b&gt;'));
 assert.match(audit, /1 error/);
@@ -117,5 +120,16 @@ const bareList = await new Promise<any>((resolve) => {
   req.end(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'resources/list' }));
 });
 assert.deepEqual(bareList.result.resources, []);
+// Tools do not advertise a view whose document is unavailable (hosts would hit a resource error instead of the text fallback).
+const bareTools = await new Promise<any>((resolve) => {
+  const req = http.request({ host: '127.0.0.1', port: barePort, method: 'POST', path: '/mcp', setHost: false, headers: { host: `127.0.0.1:${barePort}`, authorization: `Bearer ${token}`, 'content-type': 'application/json', accept: 'application/json, text/event-stream' } }, (res) => {
+    let text = '';
+    res.on('data', (c) => (text += c));
+    res.on('end', () => resolve(JSON.parse(text)));
+  });
+  req.end(JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' }));
+});
+assert(bareTools.result.tools.length > 0);
+assert(bareTools.result.tools.every((t: any) => t._meta === undefined), 'no UI metadata without built documents');
 await bare.stop();
 console.log('MCP Apps: rendering, strict CSP, resources and tool metadata verified.');
