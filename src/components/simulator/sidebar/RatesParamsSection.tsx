@@ -8,7 +8,6 @@ import { RatesFields } from '../params/sections/rates/RatesFields';
 interface RatesParamsSectionProps {
   project: ProjectSimulation;
   /** El dock ya no pinta según el tema: los tokens pd-* cambian solos. Se acepta para no romper al contenedor. */
-  isDark?: boolean;
   updateRates: (rates: Partial<UtilityRates>) => void;
   updateSpecs?: (specs: Partial<SystemSpecs>) => void;
 }

@@ -16,7 +16,6 @@ interface ParameterSidebarProps {
   project: ProjectSimulation;
   projects: ProjectSimulation[];
   summary: FinancialSummaryResult;
-  isDark: boolean;
   sidebarWidth: number;
   isDragging: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
@@ -27,14 +26,12 @@ interface ParameterSidebarProps {
   updateSpecs: (specs: Partial<SystemSpecs>) => void;
   updateRates: (rates: Partial<UtilityRates>) => void;
   updateFinancials: (financials: Partial<FinancialParams>) => void;
-  saveActiveProject: () => void;
 }
 
 export const ParameterSidebar: React.FC<ParameterSidebarProps> = ({
   project,
   projects,
   summary,
-  isDark,
   sidebarWidth,
   isDragging,
   onMouseDown,
@@ -45,7 +42,6 @@ export const ParameterSidebar: React.FC<ParameterSidebarProps> = ({
   updateSpecs,
   updateRates,
   updateFinancials,
-  saveActiveProject,
 }) => {
   const [isIdUnlocked, setIsIdUnlocked] = useState(false);
 
@@ -75,7 +71,6 @@ export const ParameterSidebar: React.FC<ParameterSidebarProps> = ({
           <ClientParamsSection
             project={project}
             projects={projects}
-            isDark={isDark}
             isIdUnlocked={isIdUnlocked}
             setIsIdUnlocked={setIsIdUnlocked}
             isFetchingSolar={isFetchingSolar}
@@ -85,13 +80,13 @@ export const ParameterSidebar: React.FC<ParameterSidebarProps> = ({
           />
         );
       case 'rates':
-        return <RatesParamsSection project={project} isDark={isDark} updateRates={updateRates} updateSpecs={updateSpecs} />;
+        return <RatesParamsSection project={project} updateRates={updateRates} updateSpecs={updateSpecs} />;
       case 'equipment':
-        return <EquipmentParamsSection project={project} summary={summary} isDark={isDark} updateSpecs={updateSpecs} />;
+        return <EquipmentParamsSection project={project} summary={summary} updateSpecs={updateSpecs} />;
       case 'costs':
-        return <PricingParamsSection project={project} summary={summary} isDark={isDark} updateSpecs={updateSpecs} />;
+        return <PricingParamsSection project={project} summary={summary} updateSpecs={updateSpecs} />;
       case 'financials':
-        return <FinancialsParamsSection project={project} isDark={isDark} updateFinancials={updateFinancials} />;
+        return <FinancialsParamsSection project={project} updateFinancials={updateFinancials} />;
     }
   };
 
@@ -100,9 +95,7 @@ export const ParameterSidebar: React.FC<ParameterSidebarProps> = ({
       {/* Left Sidebar: Parameters */}
       <aside
         style={{ width: `${Math.max(sidebarWidth || 380, 380)}px` }}
-        className={`flex flex-col shrink-0 h-full overflow-y-auto z-10 transition-[background-color,border-color,color] duration-200 ${
-          isDark ? 'bg-[#18181b] border-r border-[#27272a] shadow-xl' : 'bg-white border-r border-slate-200 shadow-sm'
-        }`}
+        className="flex flex-col shrink-0 h-full overflow-y-auto z-10 bg-pd-panel border-r border-pd-border shadow-sm transition-[background-color,border-color,color] duration-200"
       >
         <ParameterDockPanel
           open={openSections}
@@ -116,8 +109,8 @@ export const ParameterSidebar: React.FC<ParameterSidebarProps> = ({
       {/* Vertical Drag Handle for Sidebar Resizing */}
       <div
         onMouseDown={onMouseDown}
-        className={`w-1.5 hover:w-2 hover:bg-emerald-500 cursor-col-resize shrink-0 transition-all z-20 relative group select-none ${
-          isDragging ? 'bg-emerald-500 w-2' : isDark ? 'bg-[#27272a]' : 'bg-slate-200'
+        className={`w-1.5 hover:w-2 hover:bg-pd-accent cursor-col-resize shrink-0 transition-all z-20 relative group select-none ${
+          isDragging ? 'bg-pd-accent w-2' : 'bg-pd-border'
         }`}
         title="Arrastra para cambiar el ancho de la barra de parámetros"
       >
