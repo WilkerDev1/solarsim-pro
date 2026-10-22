@@ -2,14 +2,12 @@ import React from 'react';
 import { ProjectSimulation, ClientInfo } from '../../../types';
 import { RD_PROVINCES } from '../../../data/rdProvinces';
 import { generateNextProjectSequence, findDuplicateProjectInfo } from '../../../store/useSimulationStore';
-import { User, ChevronDown, Globe, Loader2, CheckCircle2, Lock, Unlock, AlertTriangle, Calendar } from 'lucide-react';
+import { Globe, Loader2, CheckCircle2, Lock, Unlock, AlertTriangle, Calendar } from 'lucide-react';
 import { getProposalDateInputValue, formatProposalDate } from '../../../utils/formatDateUtils';
 
 interface ClientParamsSectionProps {
   project: ProjectSimulation;
   projects: ProjectSimulation[];
-  isOpen: boolean;
-  onToggle: () => void;
   isDark: boolean;
   isIdUnlocked: boolean;
   setIsIdUnlocked: (val: boolean) => void;
@@ -22,8 +20,6 @@ interface ClientParamsSectionProps {
 export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
   project,
   projects,
-  isOpen,
-  onToggle,
   isDark,
   isIdUnlocked,
   setIsIdUnlocked,
@@ -33,31 +29,7 @@ export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
   updateClient,
 }) => {
   return (
-    <div
-      className={`rounded-xl border overflow-hidden transition-all ${
-        isDark ? 'border-[#27272a] bg-[#1a1a24]' : 'border-slate-200 bg-white shadow-xs'
-      }`}
-    >
-      <button
-        type="button"
-        onClick={onToggle}
-        className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors text-slate-800 hover:bg-slate-50 dark:text-zinc-200 dark:hover:bg-[#222230]`}
-      >
-        <div className="flex items-center gap-2">
-          <User className="w-4 h-4 text-emerald-500 shrink-0" />
-          <span>1. Proyecto y Cliente</span>
-        </div>
-        <ChevronDown
-          className={`w-4 h-4 text-zinc-400 transition-transform duration-200 ${
-            isOpen ? 'rotate-180 text-emerald-500' : ''
-          }`}
-        />
-      </button>
-
-      {isOpen && (
-        <div
-          className={`p-3.5 pt-2 space-y-3 border-t border-slate-100 bg-slate-50/50 dark:border-[#27272a] dark:bg-[#14141c]/50`}
-        >
+    <div className="space-y-3">
           <div>
             <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
               Nombre del Cliente
@@ -398,8 +370,6 @@ export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
               </div>
             );
           })()}
-        </div>
-      )}
     </div>
   );
 };

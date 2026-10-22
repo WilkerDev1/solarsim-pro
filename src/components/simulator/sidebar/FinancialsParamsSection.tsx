@@ -1,23 +1,19 @@
 import React from 'react';
 import { ITBIS_RATE, isItemItbisExonerated } from '../../../../shared/financialRules';
 import { ProjectSimulation, FinancialParams, CustomQuotationItem, CustomQuotationDiscount } from '../../../types';
-import { Landmark, ChevronDown, Plus, Trash2, PackagePlus, Tag, Percent, DollarSign } from 'lucide-react';
+import { Plus, Trash2, PackagePlus, Tag, Percent, DollarSign } from 'lucide-react';
 import { computeQuotationAdjustments, discountAmountUSD } from '../params/logic/quotationAdjustments';
 import { calculateCostMatrixSummary } from '../../../engine/financeEngine';
 import { calculateTotalDCCapacityKWp } from '../../../utils/equipmentSpecsUtils';
 
 interface FinancialsParamsSectionProps {
   project: ProjectSimulation;
-  isOpen: boolean;
-  onToggle: () => void;
   isDark: boolean;
   updateFinancials: (financials: Partial<FinancialParams>) => void;
 }
 
 export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = ({
   project,
-  isOpen,
-  onToggle,
   isDark,
   updateFinancials,
 }) => {
@@ -98,41 +94,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
   } = computeQuotationAdjustments(customItems, customDiscounts, estimatedListPriceUSD);
 
   return (
-    <div
-      className={`rounded-xl border overflow-hidden transition-all ${
-        isDark ? 'border-[#27272a] bg-[#1a1a24]' : 'border-slate-200 bg-white shadow-xs'
-      }`}
-    >
-      <button
-        type="button"
-        onClick={onToggle}
-        className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors text-slate-800 hover:bg-slate-50 dark:text-zinc-200 dark:hover:bg-[#222230]`}
-      >
-        <div className="flex items-center gap-2">
-          <Landmark className="w-4 h-4 text-emerald-500 shrink-0" />
-          <span>5. Finanzas e Incentivos (Ley 57-07)</span>
-          {customItems.length > 0 && (
-            <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-extrabold rounded-full">
-              +{customItems.length}
-            </span>
-          )}
-          {customDiscounts.length > 0 && (
-            <span className="px-1.5 py-0.5 bg-rose-500/20 text-rose-600 dark:text-rose-400 text-[10px] font-extrabold rounded-full">
-              -{customDiscounts.length} desc
-            </span>
-          )}
-        </div>
-        <ChevronDown
-          className={`w-4 h-4 text-zinc-400 transition-transform duration-200 ${
-            isOpen ? 'rotate-180 text-emerald-500' : ''
-          }`}
-        />
-      </button>
-
-      {isOpen && (
-        <div
-          className={`p-3.5 pt-2 space-y-3.5 border-t border-slate-100 bg-slate-50/50 dark:border-[#27272a] dark:bg-[#14141c]/50`}
-        >
+    <div className="space-y-3.5">
           {/* Toggles Principales */}
           <label className="flex items-center justify-between cursor-pointer group">
             <span
@@ -566,8 +528,6 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
               </div>
             )}
           </div>
-        </div>
-      )}
     </div>
   );
 };
