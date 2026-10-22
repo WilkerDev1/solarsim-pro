@@ -18,7 +18,7 @@ export interface ParameterDockPanelProps {
   onToggle: (key: DockSectionKey) => void;
   onToggleAll: () => void;
   financialsBadge: FinancialsBadge;
-  /** Cuerpo de cada sección; solo se monta cuando la sección está abierta. */
+  /** Cuerpo de cada sección; siempre montado (oculto con hidden al colapsar) para no reiniciar efectos como useCatalogPowerSync. */
   renderBody: (key: DockSectionKey) => React.ReactNode;
 }
 
@@ -62,7 +62,7 @@ export const ParameterDockPanel: React.FC<ParameterDockPanelProps> = ({ open, on
             badge={key === 'financials' ? badge : undefined}
             badgeLabel={key === 'financials' ? financialsBadge.label : undefined}
           >
-            {open[key] ? renderBody(key) : null}
+            {renderBody(key)}
           </ParamSection>
         ))}
       </div>

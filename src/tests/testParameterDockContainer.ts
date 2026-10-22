@@ -79,6 +79,9 @@ const broken = {
     }));
   const closed = panel(allSections(false));
   assert.match(closed, /PARÁMETROS/);
+  for (const k of DOCK_SECTION_KEYS) {
+    assert.match(closed, new RegExp(`id="dock-${k}-body"[^>]*hidden[^>]*><p data-body="${k}"`), `${k}: cuerpo montado pero oculto al colapsar`);
+  }
   assert.equal((closed.match(/aria-expanded="false"/g) ?? []).length, 5);
   assert.doesNotMatch(closed, /aria-expanded="true"/);
   for (const t of ['Proyecto y cliente', 'Tarifas', 'Equipamiento', 'Costos y margen', 'Finanzas']) assert.ok(closed.includes(t), t);
