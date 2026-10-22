@@ -137,6 +137,10 @@ export function ProposalClientSection({ project }: { project: ProjectSimulation 
             onClick={async () => {
               if (!(await confirmAction({ title: 'Usar datos del cliente', message: `¿Reemplazar los datos impresos de la propuesta con los de «${client.name}»? Los campos vacíos del cliente no se copian.`, confirmLabel: 'Usar datos' })))
                 return;
+              // Background sync may have changed the proposal while the dialog was open.
+              const state = useSimulationStore.getState();
+              const current = state.projects.find((p) => p.id === project.id);
+              if (!current || state.activeProjectId !== project.id || !canEditCommercial(current, state.syncSettings)) return;
               updateClient({
                 name: client.name,
                 ...(client.kind === 'empresa' ? { company: client.name } : {}),
