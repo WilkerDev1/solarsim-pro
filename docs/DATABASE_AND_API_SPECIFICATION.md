@@ -33,8 +33,11 @@ JWT_SECRET y DB_PASSWORD son obligatorios, privados y sin fallback conocido. PAT
 | GET /api/equipment | Catálogo accesible y deletedIds de ese ámbito. VIEWER puede descargar. |
 | POST /api/equipment/batch | Solo escritores; baseVersion por equipo, no transferencia de propietario. |
 | DELETE /api/equipment/:id | Equipo propio exige baseVersion; catálogo compartido se oculta para la organización, sin borrar su origen. |
+| GET /api/clients | Clientes activos de la organización y `deletedIds`; también lectores. |
+| PUT /api/clients/:id | Escritores; `{...cliente, baseVersion}` CAS (0 = crear). 409 con `client` actual o `null` si está borrado. |
+| DELETE /api/clients/:id | `?baseVersion=N`; borrado lógico que quita `clientId` de las propuestas y sube su versión. |
 
-Push devuelve una confirmación por entrada. Proyectos: `{id,originalId?,status:'created'|'updated'|'forked',version,project}` o `{id,status:'conflict',reason,serverVersion,serverProject?}`. Equipos: `{id,status:'created'|'updated',version,item}` o `{id,status:'conflict',reason,serverVersion?,serverItem?}`. Un HTTP200 con conflicto no marca datos como sincronizados. Cliente rechaza confirmaciones incompletas, repetidas o sin documento/versiones.
+Push devuelve una confirmación por entrada. Proyectos: `{id,originalId?,status:'created'|'updated'|'forked',version,project}` o `{id,status:'conflict',reason,serverVersion,serverProject?}`; `reason:'invalid_client'` indica un `clientId` malformado, ajeno o borrado (los ids desconocidos se aceptan). Equipos: `{id,status:'created'|'updated',version,item}` o `{id,status:'conflict',reason,serverVersion?,serverItem?}`. Un HTTP200 con conflicto no marca datos como sincronizados. Cliente rechaza confirmaciones incompletas, repetidas o sin documento/versiones.
 
 ## Integridad
 
@@ -50,3 +53,7 @@ Las migraciones aditivas 1/2 registran progreso y añaden tablas/columnas/índic
 ## Recursos compartidos de esta rama
 
 La migración aditiva 004 incorpora `project_folders` y `equipment_assets`. Las carpetas distinguen visibilidad pública de la organización y privada del creador, con CAS y tombstones. Los adjuntos guardan bytes y se deduplican por organización/tipo/SHA-256; la API valida pertenencia y referencias al guardar el equipo. El Worker consulta la API para autorizar lectura del registro organizacional; conserva su índice de metadatos separado del contenido temporal. Véase [contrato de recursos compartidos](SHARED_RESOURCES.md) para endpoints, permisos, paginación y límites de recuperación. Esta descripción del código no certifica su despliegue en producción.
+
+## Clientes
+
+La migración aditiva 005 incorpora `clients` (PK `(organization_id, id)`, versión, autoría y `deleted_at`) y los índices `clients(id)`, `clients(organization_id, tax_id)` y `projects(organization_id, data_json->>'clientId')`. El enlace vive en `data_json.clientId` de la propuesta. Es independiente de los datos impresos y la restauración de historial lo conserva. Contrato completo: [directorio de clientes](CLIENTS.md).
