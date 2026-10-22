@@ -14,11 +14,25 @@ La deduplicación usa organización, tipo de activo y SHA-256. Varios modelos pu
 
 Al confirmar un escaneo IA autenticado se sube una sola copia del original antes de modificar el inventario y todas las variantes seleccionadas reciben la misma referencia. Si la subida falla, el borrador queda abierto y no se indica éxito. Cambiar sesión o espacio descarta las respuestas pendientes. Sin sesión puede guardarse el catálogo local, con aviso explícito de que la ficha no se adjuntó al servidor.
 
-Las imágenes muestran una miniatura obtenida con autenticación y un enlace de descarga. Los adjuntos necesitan conexión y sesión; no existe caché durable offline de sus bytes. El catálogo conserva nombres y referencias para volver a obtenerlos al reconectar.
+Los archivos se descargan con autenticación y quedan en la caché de vistas previas (siguiente sección); el catálogo conserva nombres y referencias para volver a obtenerlos al reconectar. Una ficha se nombra siempre `Ficha técnica - {modelo}.pdf` (`datasheetFileName` en `src/utils/proposalDatasheets.ts`): el servidor deduplica archivos idénticos y conserva el nombre de la primera subida (p. ej. `5f3b762bf4e99b1.pdf`), que no se muestra. Un escaneo IA de una foto (JPEG, PNG o WebP) se sube como `image` y se añade a las imágenes del equipo (máximo seis; con la galería llena se informa y la foto sigue pendiente); nunca se convierte en ficha.
+
+## Vistas previas
+
+- **Qué se muestra.** `EquipmentPreviewThumb` (40 px) aparece en la celda «Equipo / modelo» del catálogo, en las filas de ofertas por proveedor y en las opciones del selector de equipos del simulador: la primera imagen del equipo, si no la primera página de su ficha PDF y, si no hay archivos, el icono del tipo. Con archivos, un clic abre `EquipmentPreviewDialog`: galería de imágenes, hasta ocho páginas de la ficha y descarga. Solo se leen activos del servidor; un `datasheetUrl` externo nunca se descarga para una miniatura.
+- **Caché.** `src/services/equipmentPreviewCache.ts` guarda los bytes en IndexedDB `solarsim_equipment_previews` con clave `espacio|activo|variante`, donde el espacio es servidor + organización, así que nada cruza cuentas. Los ids de activos son por contenido: no caducan y solo se podan por uso (LRU en memoria y por bytes en disco, con hora de acceso actualizada también en aciertos de memoria). Hay una sola petición en vuelo por clave, descargas con límite de 15 s y una caché negativa de 30 s para fallos reales; la falta de sesión y las cancelaciones no se recuerdan como fallo. Sin conexión siguen viéndose las vistas previas ya descargadas.
+- **Seguridad.** El tipo se decide por los bytes (PDF, PNG, JPEG, WebP), no por `Content-Type`; SVG, HTML y cualquier otro formato se rechazan.
+
+## Fichas anexadas automáticamente
+
+Cada equipo de la propuesta con cantidad mayor que cero cuyo modelo del catálogo tiene una ficha PDF del servidor genera un anexo `origin: 'catalog'`: activado, fuera del índice y titulado «Ficha técnica — {modelo}». El modelo se resuelve con `resolveGroupCatalogItem` (`catalogItemId` del grupo → id de catálogo en `group.id` → nombre exacto único; un nombre ambiguo no se adivina). Las variantes que comparten un archivo dan un solo anexo. Elegir un equipo en el simulador, aplicar un precio de proveedor o importarlo con IA guarda `catalogItemId` en el grupo (`selectCatalogEquipment`).
+
+`ProposalAnnexSync` aplica la política (`src/utils/proposalAnnexes.ts`) al abrir la vista PDF y al cambiar equipos o catálogo; no actúa con lectores, propuestas en papelera ni conflictos. Retirar un anexo automático lo descarta (`dismissedDatasheetKeys`) y «Restaurar fichas» lo recupera; los anexos de equipos que ya no están se retiran y los manuales no se tocan. Los anexos de un modelo cuyo archivo es una imagen o un enlace externo siguen siendo manuales.
+
+Al exportar, los bytes de cada anexo se buscan en el almacén local de anexos, luego en la caché de vistas previas y por último en el servidor (`src/services/proposalAttachmentResolver.ts`); lo recuperado se guarda para la siguiente exportación. Si falta algún anexo activado, la exportación pide confirmación («Exportar sin N anexos») en lugar de omitirlo en silencio. La propuesta ya no guarda `thumbnailDataUrl`; la miniatura de cada anexo sale de la caché.
 
 ## Verificación
 
-`src/tests/testEquipmentAssets.ts` verifica formatos/tamaño, multipart, propagación de fallos y descarga autenticada con fetch simulado. Las pruebas de backend cubren autorización y deduplicación; ninguna prueba usa producción. El recorrido visual debe revisar alta/edición de ofertas, ficha compartida por variantes, imágenes, cambio de sesión durante subida y lector sin controles de mutación.
+`src/tests/testEquipmentAssets.ts` verifica formatos/tamaño, multipart, propagación de fallos y descarga autenticada con fetch simulado. `testEquipmentPreviewCache`, `testCatalogEquipmentTable`, `testEquipmentGroups`, `testProposalDatasheets`, `testAIProposalCatalogIdentity`, `testDatasheetOfflineSave` y `testProposalAnnexes` cubren la caché, la tabla, la identidad de catálogo, los nombres de ficha y la política de anexos. Las pruebas de backend cubren autorización y deduplicación; ninguna prueba usa producción. El recorrido visual debe revisar alta/edición de ofertas, ficha compartida por variantes, imágenes, cambio de sesión durante subida y lector sin controles de mutación.
 
 ## Administración por proveedor
 
