@@ -1,3 +1,4 @@
+import { createProjectId } from '../../utils/projectId';
 import { isReaderRole } from '../../../shared/permissions';
 import { prepareProposalDraftProject, createAIProposalBase } from '../../utils/proposalDraftProject';
 import { companyDocumentCustomization } from '../../utils/companyDocumentTemplate';
@@ -43,7 +44,7 @@ export function buildProjectFromDraft(state:SimulationStore,input:ExtractedInvoi
     const seq=createNewProject?generateNextProjectSequence(state.projects):undefined;
     const user=state.syncSettings.currentUser;
     const project:ProjectSimulation={...base,
-      ...(createNewProject?{id:`proj-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`,createdAt:now,status:'Draft',
+      ...(createNewProject?{id:createProjectId(),createdAt:now,status:'Draft',
         authorId:user?.id || 'local-user',authorName:user?.name || 'Ing. Solar',authorEmail:user?.email || '',version:1,baseVersion:0,
         organizationId:user?.organizationId,syncServerUrl:user?state.syncSettings.serverUrl.trim().replace(/\/+$/,''):undefined,syncStatus:user?'pending':'local_only',companyProfileId:state.activeCompanyId}
         :projectMutationMetadata(base,state.syncSettings)),

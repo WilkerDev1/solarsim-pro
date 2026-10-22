@@ -1,3 +1,4 @@
+import { createProjectId } from '../../utils/projectId';
 import { canEditCommercial } from '../../features/proposals/commercial';
 import { isProposalLink } from '../../../shared/proposalLinks';
 import { normalizeEquipmentEdit, normalizeSpecsChange, selectCatalogEquipment } from '../../utils/equipmentGroups';
@@ -201,7 +202,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
 
   createNewProject: (payload) => {
     const defs = get().defaultSimulationSettings;
-    const id = `proj-${Date.now()}`;
+    const id = createProjectId();
     const name = typeof payload === 'string' ? payload : (payload?.name || 'Nuevo Proyecto Solar');
     const company = typeof payload === 'object' && payload?.company ? payload.company : 'Cliente Comercial';
     const province = typeof payload === 'object' && payload?.province ? payload.province : (defs?.defaultProvince || 'Santo Domingo / Distrito Nacional');
@@ -307,7 +308,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     if (!original) return undefined;
 
     const dupIdentifiers = generateDuplicateProjectIdentifiers(original, get().projects);
-    const newId = `proj-${Date.now()}`;
+    const newId = createProjectId();
     const currentUser = get().syncSettings?.currentUser;
     const clonedFinancials = { ...original.financials };
     delete clonedFinancials.customITBISSavedUSD;
