@@ -39,6 +39,10 @@ export const BUILT_IN_APPLICATION_FEATURES = [{
   id: 'proposalCommercialTracking', title: 'Seguimiento comercial de propuestas',
   description: 'Estados de aprobación, notas, responsables y resultados comerciales; disponible sin alterar el cálculo energético.',
   stage: 'stable' as FeatureStage, available: true, visibilityWhenDisabled: 'labelled' as const, defaultEnabled: true, configurable: false,
+}, {
+  id: 'clientsDirectory', title: 'Directorio de clientes',
+  description: 'Clientes de la organización enlazados a propuestas, con resumen de estados; no cambia los datos impresos ni el cálculo.',
+  stage: 'stable' as FeatureStage, available: true, visibilityWhenDisabled: 'labelled' as const, defaultEnabled: true, configurable: false,
 }] as const;
 
 /**

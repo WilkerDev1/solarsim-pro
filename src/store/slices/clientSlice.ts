@@ -116,6 +116,7 @@ export const createClientSlice: SimulationSlice<ClientSlice> = (set, get) => {
       if (!writable()) return { ok: false, error: 'Tu rol no permite enlazar propuestas.' };
       if (!project) return { ok: false, error: 'Propuesta no encontrada.' };
       if (project.isDeleted) return { ok: false, error: 'Las propuestas en papelera son de solo lectura.' };
+      if (project.syncStatus === 'conflict') return { ok: false, error: 'Resuelve primero el conflicto de la propuesta.' };
       if (user && project.organizationId && !ownsProject(project, state.syncSettings.serverUrl, user.organizationId))
         return { ok: false, error: 'La propuesta pertenece a otro espacio de trabajo.' };
       if (clientId && !state.clients.some((c) => c.id === clientId)) return { ok: false, error: 'Cliente no encontrado.' };
