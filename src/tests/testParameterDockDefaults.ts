@@ -196,12 +196,12 @@ assert.deepEqual(DEFAULT_UNIT_PRICE_USD, { panel: 103.32, inverter: 2300, batter
     summary: { systemCapacityKWp: 10, costMatrix: matrix } as never, updateSpecs: noop,
   }));
   const html = direct({ pricePerWattUSD: undefined, pricePerKWpUSD: undefined });
-  assert.equal(valueOf(html, 'pd-price-w'), '1.15');
-  assert.equal(valueOf(html, 'pd-price-kwp'), '1150');
+  assert.equal(valueOf(html, 'pd-price-w'), '1.13', 'default único con el motor (antes 1.15)');
+  assert.equal(valueOf(html, 'pd-price-kwp'), '1130');
   assert.match(html, /1\.25× · \+0\.0%/);
   const zero = direct({ pricePerWattUSD: 0, pricePerKWpUSD: undefined });
-  assert.equal(valueOf(zero, 'pd-price-w'), '1.15', '$/W 0 no es válido (el motor lo ignora): default en ambos campos (antes 0)');
-  assert.equal(valueOf(zero, 'pd-price-kwp'), '1150', '$/kWp sale del mismo valor que $/W');
+  assert.equal(valueOf(zero, 'pd-price-w'), '1.13', '$/W 0 no es válido (el motor lo ignora): default en ambos campos (antes 0)');
+  assert.equal(valueOf(zero, 'pd-price-kwp'), '1130', '$/kWp sale del mismo valor que $/W');
   assert.match(direct({}, { saleMarginMultiplier: 0, markupOnCostPct: 0, gananciaUSD: 0 }), /1\.25× · \+0\.0%/);
   assert.match(direct({}, { saleMarginMultiplier: 1.3, markupOnCostPct: 30, gananciaUSD: 100 }), /1\.30× · \+30\.0%/);
 }

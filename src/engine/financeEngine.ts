@@ -1,6 +1,6 @@
 import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
 import { DEFAULT_UNIT_PRICE_USD } from '../utils/equipmentGroups';
-import { DEFAULT_INSTALLATION_USD_PER_KWP, resolveBatteryDodPct, resolveBatteryEfficiencyPct, resolveDopRate, resolveSaleMarginMultiplier } from '../../shared/projectDefaults';
+import { DEFAULT_INSTALLATION_USD_PER_KWP, DEFAULT_PRICE_PER_WATT_USD, resolveBatteryDodPct, resolveBatteryEfficiencyPct, resolveDopRate, resolveSaleMarginMultiplier } from '../../shared/projectDefaults';
 import { ITBIS_RATE, LEY5707_CREDIT_RATE, appliesItemMargin, customItemsTaxBreakdown, isItemItbisExonerated } from '../../shared/financialRules';
 import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem, CustomQuotationItem, CustomQuotationDiscount, ProjectSimulation } from '../types';
 import { calculateDCCapacityKWp, calculateMonthlySolarProduction } from './solarEngine';
@@ -272,7 +272,7 @@ export function calculateCostMatrixSummary(
 
   const costPerWattUSD = totalNetoUSD / (capacityKW * 1000);
   const salePricePerWattUSD = porcentajeVentaUSD / (capacityKW * 1000);
-  const solarSalePricePerWattUSD = capacityKW > 0 ? Math.round((solarOnlyVentaUSD / (capacityKW * 1000)) * 100) / 100 : 1.13;
+  const solarSalePricePerWattUSD = capacityKW > 0 ? Math.round((solarOnlyVentaUSD / (capacityKW * 1000)) * 100) / 100 : DEFAULT_PRICE_PER_WATT_USD;
 
   const marginOnSalePct = porcentajeVentaUSD > 0 ? Math.round((gananciaUSD / porcentajeVentaUSD) * 10000) / 100 : 0;
   const markupOnCostPct = totalNetoUSD > 0 ? Math.round((gananciaUSD / totalNetoUSD) * 10000) / 100 : 0;
@@ -416,7 +416,7 @@ export function calculateFinancialSummary(
   const isDirectWatt = specs.pricingMode === 'direct_watt' || (!specs.isDetailed && specs.pricingMode !== 'cost_matrix');
   const effectivePricePerWatt = specs.pricePerWattUSD !== undefined && specs.pricePerWattUSD > 0
     ? specs.pricePerWattUSD
-    : (financials.pricePerWattUSD !== undefined && financials.pricePerWattUSD > 0 ? financials.pricePerWattUSD : 1.13);
+    : (financials.pricePerWattUSD !== undefined && financials.pricePerWattUSD > 0 ? financials.pricePerWattUSD : DEFAULT_PRICE_PER_WATT_USD);
 
   const customItemsTotalUSD = Math.round(customItems.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPriceUSD || 0)), 0) * 100) / 100;
   
@@ -674,7 +674,7 @@ export function calculateFinancialSummary(
   // Effective sale price per Watt and per kWp (dynamic across both cost matrix and direct watt modes):
   const salePricePerWattUSD = dcCapacityKWp > 0
     ? Math.round((grossInvestmentUSD / (dcCapacityKWp * 1000)) * 10000) / 10000
-    : (costMatrix.salePricePerWattUSD || effectivePricePerWatt || 1.13);
+    : (costMatrix.salePricePerWattUSD || effectivePricePerWatt || DEFAULT_PRICE_PER_WATT_USD);
 
   const salePricePerKWpUSD = dcCapacityKWp > 0
     ? Math.round((grossInvestmentUSD / dcCapacityKWp) * 100) / 100

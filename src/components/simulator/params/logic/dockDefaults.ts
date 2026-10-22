@@ -11,6 +11,7 @@ export {
   DEFAULT_BATTERY_EFFICIENCY_PCT,
   DEFAULT_DOP_RATE,
   DEFAULT_INSTALLATION_USD_PER_KWP,
+  DEFAULT_PRICE_PER_WATT_USD,
   DEFAULT_SALE_MARGIN_MULTIPLIER,
   MANUAL_BRAND_PLACEHOLDER,
   SAMPLE_PHONE_MARKER,
@@ -44,6 +45,3 @@ export const DEFAULT_CATALOG_PANEL = { powerW: 550, efficiencyPct: 22, tempCoeff
 /** Potencia (kW) de un inversor del catálogo sin potencia (`||`). */
 export const DEFAULT_CATALOG_INVERTER_KW = 8;
 
-// ── Costos y margen ──
-/** Precio directo por Wp (US$) cuando el proyecto no trae uno válido (> 0; el motor ignora ≤ 0). */
-export const DEFAULT_PRICE_PER_WATT_USD = 1.15;

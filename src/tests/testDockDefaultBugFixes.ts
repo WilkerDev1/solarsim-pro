@@ -91,8 +91,8 @@ const projectOf = (specs: Partial<SystemSpecs> = {}): ProjectSimulation => ({ ..
   }));
   for (const zero of [0, -1]) {
     const html = direct({ pricePerWattUSD: zero });
-    assert.equal(valueOf(html, 'pd-price-w'), '1.15', '$/W ≤ 0 no es válido (el motor lo ignora): default');
-    assert.equal(valueOf(html, 'pd-price-kwp'), '1150', '$/kWp sale del mismo valor');
+    assert.equal(valueOf(html, 'pd-price-w'), '1.13', '$/W ≤ 0 no es válido (el motor lo ignora): default del motor (1.13, antes 1.15 en la vista)');
+    assert.equal(valueOf(html, 'pd-price-kwp'), '1130', '$/kWp sale del mismo valor');
   }
   assert.equal(valueOf(direct({ pricePerWattUSD: 0.5 }), 'pd-price-kwp'), '500');
   assert.equal(valueOf(direct({ pricePerWattUSD: 0.5, pricePerKWpUSD: 0 }), 'pd-price-kwp'), '500', '$/kWp 0 también cae al valor derivado');
@@ -124,7 +124,7 @@ const projectOf = (specs: Partial<SystemSpecs> = {}): ProjectSimulation => ({ ..
   const quotation = readFileSync('src/components/simulator/tabs/QuotationEquipmentsTab.tsx', 'utf8');
   for (const literal of ['C-0030', '555-0199', 'Lux Power LXP', 'Hinaess', 'TOPHIKU6', '|| 1.25']) assert(!quotation.includes(literal), `QuotationEquipmentsTab repite «${literal}»`);
   const finance = readFileSync('src/engine/financeEngine.ts', 'utf8');
-  for (const literal of ['60.0', '170.0', '|| 1.25', '|| 80', '|| 92']) assert(!finance.includes(literal), `financeEngine repite «${literal}»`);
+  for (const literal of ['1.13', '60.0', '170.0', '|| 1.25', '|| 80', '|| 92']) assert(!finance.includes(literal), `financeEngine repite «${literal}»`);
   const utils = readFileSync('src/utils/equipmentSpecsUtils.ts', 'utf8');
   for (const literal of ['|| 90', '|| 95']) assert(!utils.includes(literal), `equipmentSpecsUtils repite «${literal}»`);
   for (const file of ['src/components/common/EquipmentEditorModal.tsx', 'src/components/common/EquipmentManagerSettingsTab.tsx']) {
@@ -135,6 +135,8 @@ const projectOf = (specs: Partial<SystemSpecs> = {}): ProjectSimulation => ({ ..
   assert.equal(shared.QUOTATION_PANEL_BRAND_FALLBACK, 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)');
   assert.equal(dockDefaults.MANUAL_BRAND_PLACEHOLDER, shared.MANUAL_BRAND_PLACEHOLDER);
   assert.equal(dockDefaults.SAMPLE_QUOTE_NUMBER, shared.SAMPLE_QUOTE_NUMBER);
+  assert.equal(shared.DEFAULT_PRICE_PER_WATT_USD, 1.13, 'valor del motor: el que determina los totales');
+  assert.equal(dockDefaults.DEFAULT_PRICE_PER_WATT_USD, shared.DEFAULT_PRICE_PER_WATT_USD);
   assert.equal(dockDefaults.DEFAULT_DOP_RATE, shared.DEFAULT_DOP_RATE);
   assert.equal(dockDefaults.DEFAULT_INSTALLATION_USD_PER_KWP, shared.DEFAULT_INSTALLATION_USD_PER_KWP);
 }

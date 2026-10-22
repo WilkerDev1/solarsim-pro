@@ -20,6 +20,9 @@ export const DEFAULT_SALE_MARGIN_MULTIPLIER = 1.25;
 /** Mano de obra (US$ por kWp) cuando el proyecto no la define (`!== undefined`: un 0 explícito se conserva). */
 export const DEFAULT_INSTALLATION_USD_PER_KWP = 170;
 
+/** Precio directo por Wp (US$) cuando el proyecto no trae uno válido (> 0). Es el del motor (`financeEngine`), que determina los totales. */
+export const DEFAULT_PRICE_PER_WATT_USD = 1.13;
+
 // ── Marcadores de ejemplo (vienen de `BENCHMARK_PROJECT`, `src/engine/referenceCase.ts`) ──
 /** Número de cotización de ejemplo que se muestra si el proyecto no tiene uno. */
 export const SAMPLE_QUOTE_NUMBER = 'C-0030';
