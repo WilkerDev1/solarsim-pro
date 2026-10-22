@@ -34,7 +34,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({ 
 
   const totalDCKWp = calculateTotalDCCapacityKWp(specs);
   const totalInverterKW = calculateTotalInverterPowerKW(specs);
-  const losses = specs.systemLosses !== undefined ? specs.systemLosses : 25;
+  const losses = specs.systemLosses !== undefined ? specs.systemLosses : DEFAULT_SYSTEM_LOSSES_PCT;
   const autoInfo = `Calcula los paneles para cubrir el ${project.rates.targetCoveragePct ?? DEFAULT_TARGET_COVERAGE_PCT}% del consumo, con ${specs.systemLosses ?? DEFAULT_SYSTEM_LOSSES_PCT}% de pérdidas.`;
   const common = { mode, specs, catalog: equipmentCatalog, updateSpecs, onOpenScanner: openAIDatasheetModal } as const;
 

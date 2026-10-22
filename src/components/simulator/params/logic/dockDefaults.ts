@@ -30,6 +30,8 @@ export const DEFAULT_SYSTEM_LOSSES_PCT = 25;
 export const DEFAULT_BATTERY_DOD_PCT = 90;
 /** Eficiencia de la batería (%) cuando falta o es 0 (`||`). */
 export const DEFAULT_BATTERY_EFFICIENCY_PCT = 95;
+/** Eficiencia (%) que la vista previa de autoconsumo asume si falta (`!== undefined`); es 90, no 95 como en el campo de la batería. Refleja el motor (`solarEngine`). */
+export const PREVIEW_BATTERY_EFFICIENCY_PCT = 90;
 /** Capacidad (kWh) de una batería del catálogo sin capacidad (`||`). */
 export const DEFAULT_BATTERY_CAPACITY_KWH = 16.08;
 /** Valores que toma un panel del catálogo al que le faltan datos (`||`). */

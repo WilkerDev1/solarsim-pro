@@ -15,6 +15,7 @@ import type { SolarEquipmentItem } from '../types/equipment';
 import { DEFAULT_UNIT_PRICE_USD } from '../utils/equipmentGroups';
 import { getProjectBatteries } from '../utils/equipmentSpecsUtils';
 import * as dockDefaults from '../components/simulator/params/logic/dockDefaults';
+import { computeLoadProfilePreview } from '../components/simulator/params/logic/loadProfilePreview';
 import { buildCatalogSelectionUpdate } from '../components/simulator/params/logic/catalogSelection';
 import { marginPctFromMultiplier, wholeMarginPctFromMultiplier } from '../components/simulator/params/logic/pricingSync';
 import { displayPhone, displayQuoteNumber } from '../components/simulator/params/sections/client/clientLogic';
@@ -215,6 +216,15 @@ assert.deepEqual(DEFAULT_UNIT_PRICE_USD, { panel: 103.32, inverter: 2300, batter
   assert.equal(fin(undefined), fin(1.25));
   assert.equal(fin(0), fin(1.25));
   assert.notEqual(fin(1.5), fin(1.25));
+}
+
+// ── Vista previa de autoconsumo: DOD 90, eficiencia 90 y pérdidas 25 cuando son undefined ──
+{
+  const preview = (specs: Partial<SystemSpecs>) => computeLoadProfilePreview(projectOf({ hasBattery: true, batteryCapacityKWh: 16, batteryCount: 1, batteries: undefined, ...specs }), 'BTS2', 900);
+  const unset = { batteryDOD: undefined, batteryEfficiencyPct: undefined, systemLosses: undefined } as Partial<SystemSpecs>;
+  assert.deepEqual(preview(unset), preview({ batteryDOD: 90, batteryEfficiencyPct: 90, systemLosses: 25 }));
+  assert.notDeepEqual(preview(unset), preview({ batteryDOD: 50, batteryEfficiencyPct: 90, systemLosses: 25 }));
+  assert.notDeepEqual(preview(unset), preview({ batteryDOD: 90, batteryEfficiencyPct: 95, systemLosses: 25 }), 'la eficiencia de la vista previa es 90, no 95');
 }
 
 // ── Fuente única: las constantes coinciden con el caso de referencia y los literales viven solo en dockDefaults ──
