@@ -1,6 +1,6 @@
 import { catalogPanelGroupPatch } from '../../../utils/catalogGroupPatch';
 import React from 'react';
-import { editEquipmentGroup } from '../../../utils/equipmentGroups';
+import { editEquipmentGroup, selectCatalogEquipment } from '../../../utils/equipmentGroups';
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs, PanelItemSpec, InverterItemSpec, BatteryItemSpec } from '../../../types';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { SearchableEquipmentSelect } from './SearchableEquipmentSelect';
@@ -77,6 +77,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
 
     const newPanel: PanelItemSpec = {
       id: `panel-${Date.now()}`,
+      catalogItemId: candidate?.id,
       brandModel: candidate?.displayName || 'Módulos JA Solar JAM66D45-630/LB (630W)',
       powerW: candidate?.powerW || 630,
       count: 10,
@@ -92,6 +93,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
 
     const newInv: InverterItemSpec = {
       id: `inv-${Date.now()}`,
+      catalogItemId: candidate?.id,
       brandModel: candidate?.displayName || 'Inversor Huawei SUN2000-5KTL-M1 (5.0kW)',
       powerKW: candidate?.powerKW || 5.0,
       count: 1,
@@ -147,18 +149,17 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
       }
     }
 
-    if (project.specs.panels && project.specs.panels.length > 0) {
-      const updatedPanels = [...project.specs.panels];
-      updatedPanels[0] = {
-        ...updatedPanels[0],
-        ...catalogPanelGroupPatch(item),
-        unitPriceUSD: specsUpdate.panelUnitPriceUSD ?? updatedPanels[0].unitPriceUSD,
-      };
-      specsUpdate.panels = updatedPanels;
-    }
-
     specsUpdate.selectedSupplierInfo = newSupplierInfo;
-    updateSpecs(specsUpdate);
+    // The primary group takes the catalog identity (catalogItemId for datasheets); the mirror follows it.
+    updateSpecs({
+      ...specsUpdate,
+      ...selectCatalogEquipment(project.specs, 'panel', 0, item, {
+        // Model-specific values (degradation, efficiency…) are replaced, never inherited from the previous model.
+        ...catalogPanelGroupPatch(item),
+        selectedSupplierInfo: newSupplierInfo.panel,
+        ...(specsUpdate.panelUnitPriceUSD !== undefined ? { unitPriceUSD: specsUpdate.panelUnitPriceUSD } : {}),
+      }),
+    });
   };
 
   const handleSelectInverter = (item: SolarEquipmentItem) => {
@@ -196,19 +197,15 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
       }
     }
 
-    if (project.specs.inverters && project.specs.inverters.length > 0) {
-      const updatedInverters = [...project.specs.inverters];
-      updatedInverters[0] = {
-        ...updatedInverters[0],
-        brandModel: item.displayName,
-        powerKW: item.powerKW || 8.0,
-        unitPriceUSD: specsUpdate.inverterUnitPriceUSD ?? updatedInverters[0].unitPriceUSD,
-      };
-      specsUpdate.inverters = updatedInverters;
-    }
-
     specsUpdate.selectedSupplierInfo = newSupplierInfo;
-    updateSpecs(specsUpdate);
+    updateSpecs({
+      ...specsUpdate,
+      ...selectCatalogEquipment(project.specs, 'inverter', 0, item, {
+        powerKW: item.powerKW || 8.0,
+        selectedSupplierInfo: newSupplierInfo.inverter,
+        ...(specsUpdate.inverterUnitPriceUSD !== undefined ? { unitPriceUSD: specsUpdate.inverterUnitPriceUSD } : {}),
+      }),
+    });
   };
 
 
@@ -396,10 +393,10 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                         selectedValue={p.brandModel}
                         selectedPower={p.powerW}
                         onSelect={(item) => {
-                          handleUpdatePanelItem(actualIdx, {
+                          updateSpecs(selectCatalogEquipment(project.specs, 'panel', actualIdx, item, {
                             ...catalogPanelGroupPatch(item),
                             unitPriceUSD: item.supplierPrices?.[0]?.priceUSD || p.unitPriceUSD,
-                          });
+                          }));
                         }}
                         onOpenScanner={openAIDatasheetModal}
                         label={`Modelo Panel #${actualIdx + 1}`}
@@ -513,11 +510,10 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                         selectedValue={inv.brandModel}
                         selectedPower={inv.powerKW}
                         onSelect={(item) => {
-                          handleUpdateInverterItem(actualIdx, {
-                            brandModel: item.displayName,
+                          updateSpecs(selectCatalogEquipment(project.specs, 'inverter', actualIdx, item, {
                             powerKW: item.powerKW || 5.0,
                             unitPriceUSD: item.supplierPrices?.[0]?.priceUSD || inv.unitPriceUSD,
-                          });
+                          }));
                         }}
                         onOpenScanner={openAIDatasheetModal}
                         label={`Modelo Inversor #${actualIdx + 1}`}

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
-import { proposalDatasheets } from '../utils/proposalDatasheets';
+import { datasheetDisplayName, datasheetFileName, proposalDatasheets } from '../utils/proposalDatasheets';
 import type { SolarEquipmentItem } from '../types/equipment';
 const p = structuredClone(BENCHMARK_PROJECT);
 p.specs.panels = [{ id: 'a', brandModel: 'QA A', powerW: 600, count: 10 }, { id: 'b', brandModel: 'QA B', powerW: 620, count: 5 }];
@@ -15,4 +15,17 @@ assert.deepEqual(proposalDatasheets(p, catalog).map(s => s.key), ['shared', 'bat
 assert.equal(proposalDatasheets(p, [...catalog, item('duplicate', 'QA Battery', 'wrong', 'battery')]).length, 1, 'Ambiguous catalog model is never guessed');
 catalog[0].datasheetName = 'photo.png'; catalog[1].datasheetName = 'photo.png';
 assert.deepEqual(proposalDatasheets(p, catalog).map(s => s.key), ['battery'], 'Images are not PDF annexes');
-console.log('Proposal datasheet detection, shared-document deduplication and inactive equipment passed.');
+catalog[0].datasheetName = 'QA.pdf'; catalog[1].datasheetName = 'QA.pdf';
+// Catalog identity: a renamed group still finds its datasheet; AI groups carry the catalog id as group id.
+p.specs.panels = [{ id: 'g1', catalogItemId: 'a', brandModel: 'Nombre editado a mano', powerW: 600, count: 10 }];
+p.specs.inverters = [{ id: 'c', brandModel: 'Inversor renombrado', powerKW: 8, count: 1 }];
+assert.deepEqual(proposalDatasheets(p, catalog).map(s => [s.key, s.item.id]), [['shared', 'a'], ['unused', 'c'], ['battery', 'd']]);
+// Friendly names: never the deduplicated server name (e.g. 5f3b762bf4e99b1.pdf).
+assert.equal(datasheetFileName('Módulos JA Solar JAM66D45-630/LB (630W)'), 'Ficha técnica - Módulos JA Solar JAM66D45-630-LB (630W).pdf');
+assert.equal(datasheetFileName('  Inversor: 8K?  '), 'Ficha técnica - Inversor 8K.pdf');
+assert.equal(datasheetFileName(''), 'Ficha técnica.pdf');
+assert.equal(datasheetFileName('QA 600', 'image/png'), 'Ficha técnica - QA 600.png');
+assert.equal(datasheetDisplayName({ displayName: 'QA 600', datasheetName: '5f3b762bf4e99b1.pdf' }), 'Ficha técnica - QA 600.pdf');
+assert.equal(datasheetDisplayName({ displayName: 'QA 600', datasheetName: 'scan.JPG' }), 'Ficha técnica - QA 600.jpg');
+assert.equal(datasheetDisplayName({ displayName: 'QA 600' }), 'Ficha técnica - QA 600.pdf');
+console.log('Proposal datasheet detection, catalog identity, shared-document deduplication, inactive equipment and friendly names passed.');

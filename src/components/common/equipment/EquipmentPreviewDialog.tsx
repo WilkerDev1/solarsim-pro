@@ -4,6 +4,7 @@ import { Download, FileText, X } from 'lucide-react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useEquipmentAssetBlob } from '../../../features/equipmentPreview/useEquipmentAssetPreview';
 import type { EquipmentPreviewItem } from './EquipmentPreviewThumb';
+import { datasheetDisplayName } from '../../../utils/proposalDatasheets';
 
 const MAX_DATASHEET_PAGES = 8;
 
@@ -112,7 +113,7 @@ export function EquipmentPreviewDialog({ item, onClose }: { item: EquipmentPrevi
                 {images.map((id, index) => <GalleryImage key={id} assetId={id} name={item.imageNames?.[index] || `Imagen ${index + 1}`} />)}
               </div>
             </section>}
-            {item.datasheetAssetId && <DatasheetPages assetId={item.datasheetAssetId} name={item.datasheetName || `Ficha técnica - ${item.displayName}.pdf`} />}
+            {item.datasheetAssetId && <DatasheetPages assetId={item.datasheetAssetId} name={datasheetDisplayName(item)} />}
             {!images.length && !item.datasheetAssetId && <p className="text-sm text-slate-500 dark:text-zinc-400">Este equipo no tiene imágenes ni ficha técnica.</p>}
           </div>
         </div>
