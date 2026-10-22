@@ -103,6 +103,18 @@ s.send({ jsonrpc: '2.0', id: 9, method: 'tools/list' });
 const closed = await s.next();
 assert.equal(closed.id, 9);
 assert.match(closed.error.message, /abre SolarSim/i);
+
+// HTTP-level rejections (here: body over the server's cap) keep the request id so the host can correlate the failure.
+const small = new LocalMcpServer({ bridge, getToken: () => token, version: '0.0.0-test', maxBodyBytes: 512 });
+const smallPort = await small.start(0);
+config = { enabled: true, port: smallPort, token };
+s.send({ jsonrpc: '2.0', id: 'big-1', method: 'tools/call', params: { name: 'search_projects', arguments: { q: 'x'.repeat(2000) } } });
+const tooBig = await s.next();
+assert.equal(tooBig.id, 'big-1');
+assert.equal(tooBig.error.code, -32000);
+assert.match(tooBig.error.message, /demasiado grande/);
+await small.stop();
+config = { enabled: true, port, token };
 const countBefore = s.lines.length;
 s.send({ jsonrpc: '2.0', method: 'notifications/cancelled' });
 s.end();

@@ -118,8 +118,18 @@ export async function runStdioProxy(options: StdioProxyOptions): Promise<void> {
       const reply = await post(config, line, sessionId);
       if (reply.sessionId) sessionId = reply.sessionId;
       if (reply.status === 401) return fail('SolarSim rechazó el token: copia el token vigente en Ajustes → Agentes e IA y actualiza el cliente.');
+      if (reply.status >= 400) {
+        // The HTTP layer rejects before parsing JSON-RPC, so its errors carry `id: null`: re-attach the request's id.
+        let message = `SolarSim respondió con el estado ${reply.status}.`;
+        try {
+          const detail = JSON.parse(reply.body)?.error?.message;
+          if (typeof detail === 'string' && detail) message = detail;
+        } catch {
+          // Keep the generic message for non-JSON bodies.
+        }
+        return fail(message);
+      }
       for (const out of replyLines(reply.body)) write(out);
-      if (reply.status >= 400 && !reply.body.trim()) fail(`SolarSim respondió con el estado ${reply.status}.`);
     } catch {
       fail(NOT_RUNNING);
     }
