@@ -57,7 +57,7 @@ export const TariffPreferencesPanel: React.FC<TariffPreferencesPanelProps> = ({ 
             <Receipt className="w-4 h-4" />
           </div>
           <div>
-            <span className="text-sm font-bold text-slate-900 dark:text-white">2. Tarifas Eléctricas & Pliegos Regulados (SIE / CEPM)</span>
+            <span className="text-sm font-bold text-slate-900 dark:text-white">Tarifas</span>
             <span className="block text-[11px] text-slate-400 dark:text-zinc-500">
               Matriz tarifaria oficial para EDEESTE, EDESUR, EDENORTE y CEPM con sincronización en la nube
             </span>
