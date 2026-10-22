@@ -68,31 +68,39 @@ interface BankSpecs {
   batteryEfficiencyPct?: number | null;
 }
 
+/** Valor de un grupo: el propio si es válido; el primero hereda antes el escalar del proyecto (espejo del primer grupo); el resto, el default. */
+function groupPct(specs: BankSpecs, index: number, field: 'dodPct' | 'efficiencyPct'): number {
+  const own = specs.batteries?.[index]?.[field];
+  if (isPositive(own)) return own;
+  if (field === 'dodPct') return index === 0 ? resolveBatteryDodPct(specs.batteryDOD) : DEFAULT_BATTERY_DOD_PCT;
+  return index === 0 ? resolveBatteryEfficiencyPct(specs.batteryEfficiencyPct) : DEFAULT_BATTERY_EFFICIENCY_PCT;
+}
+
 /**
- * Promedio de `field` de cada grupo, ponderado por su capacidad total (`capacityKWh × count`).
- * Un grupo sin dato válido (no finito o ≤ 0) usa el default; el primero hereda antes el escalar del proyecto
- * (`batteryDOD`/`batteryEfficiencyPct`, espejo del primer grupo). Sin grupos o con capacidad total 0 se usa el escalar.
+ * Promedio ponderado del banco. El DOD pesa por capacidad total del grupo (`capacityKWh × count`); la eficiencia pesa por
+ * esa capacidad × el DOD del grupo, de modo que `total × DOD × η` conserva la energía útil Σ(Cᵢ·DOD ᵢ·ηᵢ) (con el mismo DOD
+ * en todos los grupos es el promedio ponderado por capacidad). Sin grupos o con capacidad total 0 se usa el escalar del proyecto.
  */
-function weightedBankPct(specs: BankSpecs, field: 'dodPct' | 'efficiencyPct', scalar: number | null | undefined, resolveScalar: (v: number | null | undefined) => number, fallback: number): number {
+function weightedBankPct(specs: BankSpecs, field: 'dodPct' | 'efficiencyPct', scalar: number): number {
   const groups = Array.isArray(specs.batteries) ? specs.batteries : [];
   let weighted = 0;
   let total = 0;
   groups.forEach((group, index) => {
-    const weight = (Number(group?.capacityKWh) || 0) * (Number(group?.count) || 0);
-    if (!(weight > 0)) return;
-    const own = group[field];
-    weighted += weight * (isPositive(own) ? own : index === 0 ? resolveScalar(scalar) : fallback);
+    const capacity = (Number(group?.capacityKWh) || 0) * (Number(group?.count) || 0);
+    if (!(capacity > 0)) return;
+    const weight = field === 'efficiencyPct' ? capacity * groupPct(specs, index, 'dodPct') : capacity;
+    weighted += weight * groupPct(specs, index, field);
     total += weight;
   });
-  return total > 0 ? weighted / total : resolveScalar(scalar);
+  return total > 0 ? weighted / total : scalar;
 }
 
-/** Eficiencia (%) del banco: promedio ponderado por capacidad de la de cada grupo. Un solo modelo: la suya. */
+/** Eficiencia (%) del banco: promedio ponderado de la de cada grupo. Un solo modelo: la suya. */
 export const resolveBatteryBankEfficiencyPct = (specs: BankSpecs): number =>
-  weightedBankPct(specs, 'efficiencyPct', specs.batteryEfficiencyPct, resolveBatteryEfficiencyPct, DEFAULT_BATTERY_EFFICIENCY_PCT);
+  weightedBankPct(specs, 'efficiencyPct', resolveBatteryEfficiencyPct(specs.batteryEfficiencyPct));
 /** DOD (%) del banco: promedio ponderado por capacidad del de cada grupo. */
 export const resolveBatteryBankDodPct = (specs: BankSpecs): number =>
-  weightedBankPct(specs, 'dodPct', specs.batteryDOD, resolveBatteryDodPct, DEFAULT_BATTERY_DOD_PCT);
+  weightedBankPct(specs, 'dodPct', resolveBatteryDodPct(specs.batteryDOD));
 
 /** Eficiencia (%) que ve el dock para la batería principal: la del primer grupo si es válida; si no, la del proyecto. */
 export const resolvePrimaryBatteryEfficiencyPct = (specs: BankSpecs): number =>

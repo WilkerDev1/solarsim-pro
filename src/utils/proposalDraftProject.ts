@@ -51,14 +51,13 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
       specs.batteryUnitPriceUSD=data.batteries?.[0]?.unitPriceUSD ?? 0;
       specs.hasBattery=Boolean(data.batteries?.length);
       if (data.batteries?.length) {
-        // Adapter only: preserve E_util=sum(C_i*DoD_i*eta_i) with the engines' existing scalar contract.
-        const totalCapacity=data.batteries.reduce((sum,b)=>sum+b.capacityKWh*b.count,0);
+        // El motor pondera DOD y eficiencia por grupo: cada grupo lleva los suyos (o el default) y los escalares
+        // son el espejo del primer grupo, no un promedio del banco (se promediaría dos veces).
         const defaultDod=createNewProject?(defaults.defaultBatteryDOD ?? DEFAULT_BATTERY_DOD_PCT):(base.specs.batteryDOD ?? DEFAULT_BATTERY_DOD_PCT);
         const defaultEfficiency=base.specs.batteryEfficiencyPct ?? DEFAULT_BATTERY_EFFICIENCY_PCT;
-        const afterDod=data.batteries.reduce((sum,b)=>sum+b.capacityKWh*b.count*(b.dodPct ?? defaultDod)/100,0);
-        const usable=data.batteries.reduce((sum,b)=>sum+b.capacityKWh*b.count*(b.dodPct ?? defaultDod)/100*(b.efficiencyPct ?? defaultEfficiency)/100,0);
-        specs.batteryDOD=totalCapacity>0?afterDod/totalCapacity*100:defaultDod;
-        specs.batteryEfficiencyPct=afterDod>0?usable/afterDod*100:defaultEfficiency;
+        specs.batteries=data.batteries.map(group=>({...group,dodPct:group.dodPct ?? defaultDod,efficiencyPct:group.efficiencyPct ?? defaultEfficiency}));
+        specs.batteryDOD=specs.batteries[0].dodPct ?? defaultDod;
+        specs.batteryEfficiencyPct=specs.batteries[0].efficiencyPct;
       }
     }
     const fx=data.dopExchangeRate || base.rates.usdExchangeRate || 60;

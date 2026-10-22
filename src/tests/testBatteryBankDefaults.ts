@@ -6,6 +6,8 @@ import assert from 'node:assert/strict';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateMonthlySolarProduction } from '../engine/solarEngine';
 import { calculateProjectFinancialSummary } from '../engine/financeEngine';
+import { createAIProposalBase, prepareProposalDraftProject } from '../utils/proposalDraftProject';
+import { DEFAULT_RD_TARIFF_MATRIX } from '../data/rdTariffs';
 import { getProjectBatteries } from '../utils/equipmentSpecsUtils';
 import { buildCatalogSelectionUpdate } from '../components/simulator/params/logic/catalogSelection';
 import { readFileSync } from 'node:fs';
@@ -93,6 +95,20 @@ for (const missing of [undefined, 0, '', NaN]) {
 for (const file of ['src/components/common/AIDatasheetScannerModal.tsx', 'src/components/common/EquipmentEditorModal.tsx', 'src/components/common/EquipmentManagerSettingsTab.tsx']) {
   const text = readFileSync(file, 'utf8');
   assert(!/batteryEfficiencyPct[^\n]{0,40}\b95\b/.test(text) && !text.includes('"battery" ? 95'), `${file} no fuerza 95`);
+}
+
+// ── Borrador de IA: los escalares reflejan el primer grupo, no un promedio del banco ───────
+{
+  const draftBase = createAIProposalBase(BENCHMARK_PROJECT, { defaultBatteryDOD: 90 } as never, 'Santiago');
+  const data = {
+    monthlyConsumptionKWh: Array(12).fill(1000), averageMonthlyKWh: 1000, province: 'Santiago', distributor: 'EDENORTE', tariffCode: 'BTS1',
+    panels: [{ id: 'p', brandModel: 'P', powerW: 600, count: 10 }], inverters: [{ id: 'i', brandModel: 'I', powerKW: 5, count: 1 }],
+    batteries: [group('G1', 10, 1), group('G2', 10, 1, { dodPct: 80, efficiencyPct: 80 })],
+  };
+  const prepared = prepareProposalDraftProject(draftBase, data as never, DEFAULT_RD_TARIFF_MATRIX as never, { isNew: true });
+  close(resolveBatteryBankDodPct(prepared.specs), 85, 'DOD del banco = (90 + 80) / 2, sin promediar dos veces');
+  close(20 * (resolveBatteryBankDodPct(prepared.specs) / 100) * (resolveBatteryBankEfficiencyPct(prepared.specs) / 100), 10 * 0.9 * 0.9 + 10 * 0.8 * 0.8, 'energía útil del banco = Σ(C·DOD·η) = 14.5 kWh');
+  assert.equal(prepared.specs.batteryDOD, 90, 'el escalar es el del primer grupo');
 }
 
 console.log('testBatteryBankDefaults: ok');
