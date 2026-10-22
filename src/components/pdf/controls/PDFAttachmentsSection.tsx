@@ -8,6 +8,7 @@ import { fetchEquipmentAsset } from '../../../services/equipmentAssetService';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { dismissAnnex, restoreDismissedAnnexes, workspaceCatalog } from '../../../utils/proposalAnnexes';
 import { AnnexCard } from '../annexes/AnnexCard';
+import { resolveProposalAttachmentBytes } from '../../../services/proposalAttachmentResolver';
 
 interface PDFAttachmentsSectionProps {
   isDark: boolean;
@@ -259,7 +260,10 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
   const handleRestoreDatasheets = () => doUpdateDoc(restoreDismissedAnnexes());
 
   const handlePreviewAttachment = async (id: string, fileName: string) => {
-    const buffer = await PDFAttachmentStorage.getAttachment(id);
+    // Same lookup as the export: local bytes, then the preview cache, then the server (automatic annexes
+    // synced from another device have no local copy yet).
+    const annex = getLatestAttachments().find((att) => att.id === id);
+    const buffer = annex ? await resolveProposalAttachmentBytes(annex) : await PDFAttachmentStorage.getAttachment(id);
     if (!buffer) {
       alert(`No se encontró el archivo binario de "${fileName}" en memoria local.`);
       return;

@@ -47,16 +47,18 @@ export const ProposalAnnexSync: React.FC<ProposalAnnexSyncProps> = ({ project })
     const pending = (attachedPdfs ?? []).filter((att) => att.origin === 'catalog' && att.pageCountPending && !counted.current.has(attempt(att)));
     if (!pending.length) return;
     let cancelled = false;
+    const started = new Set<string>();
     void (async () => {
       for (const annex of pending) {
         if (cancelled) return;
+        started.add(attempt(annex));
         counted.current.add(attempt(annex));
         const bytes = await resolveProposalAttachmentBytes(annex);
-        // A newer run takes over; this annex is still pending for it. A failure is not retried until remount.
-        if (cancelled) { counted.current.delete(attempt(annex)); return; }
-        if (!bytes) continue;
+        if (cancelled) return;
+        if (!bytes) { started.delete(attempt(annex)); continue; } // not retried until remount
         const pageCount = await PDFMergeService.getPdfPageCount(bytes.slice(0)).catch(() => 1);
-        if (cancelled) { counted.current.delete(attempt(annex)); return; }
+        if (cancelled) return;
+        started.delete(attempt(annex));
         if (!isTarget()) return;
         const latest = useSimulationStore.getState().projects.find((p) => p.id === live.id)?.customization?.attachedPdfs ?? [];
         if (!latest.some((att) => att.id === annex.id && att.pageCountPending)) continue;
@@ -65,7 +67,8 @@ export const ProposalAnnexSync: React.FC<ProposalAnnexSyncProps> = ({ project })
         });
       }
     })();
-    return () => { cancelled = true; };
+    // A cancelled run hands its unfinished annexes to the next run, which starts right after this cleanup.
+    return () => { cancelled = true; started.forEach((key) => counted.current.delete(key)); };
   }, [allowed, live.id, attachedPdfs]);
 
   return null;
