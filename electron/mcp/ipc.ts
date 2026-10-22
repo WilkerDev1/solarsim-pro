@@ -1,4 +1,6 @@
 // IPC surface of the local MCP server. Every handler accepts only the main window's own webContents.
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { app, clipboard, ipcMain, type BrowserWindow, type IpcMainEvent, type IpcMainInvokeEvent } from 'electron';
 import type { McpRendererSnapshot } from '../../shared/agentTools/bridge';
 import type { AgentToolOutcome } from '../../shared/agentTools/types';
@@ -19,6 +21,15 @@ const isSnapshot = (value: unknown): value is McpRendererSnapshot => {
 const isOutcome = (value: unknown): value is AgentToolOutcome =>
   !!value && typeof value === 'object' && ['ok', 'applied', 'pending_confirmation', 'error'].includes((value as { status?: string }).status ?? '');
 
+/** Documents written next to the bundle by `scripts/buildMcpApps.mjs`; missing in a partial build, in which case no view is advertised. */
+const readCardHtml = (type: string): string | undefined => {
+  try {
+    return readFileSync(path.join(__dirname, 'mcp-apps', `${type}.html`), 'utf8');
+  } catch {
+    return undefined;
+  }
+};
+
 export function createMcpController(getWindow: () => BrowserWindow | null): McpController {
   return new McpController({
     configFile: mcpConfigPath(app.getPath('userData')),
@@ -30,6 +41,7 @@ export function createMcpController(getWindow: () => BrowserWindow | null): McpC
       return true;
     },
     copyText: (text) => clipboard.writeText(text),
+    cardHtml: readCardHtml,
     executablePath: app.isPackaged ? process.env.APPIMAGE || process.env.PORTABLE_EXECUTABLE_FILE || app.getPath('exe') : undefined,
   });
 }

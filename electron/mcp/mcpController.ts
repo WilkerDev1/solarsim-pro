@@ -1,4 +1,5 @@
 // Owns the local MCP server lifecycle: config, bridge, HTTP endpoint. No Electron imports; IPC lives in ipc.ts.
+import type { McpAppCardType } from '../../shared/agentCards';
 import type { McpInvokeMessage, McpServerStatus } from '../../shared/agentTools/bridge';
 import { isDeviceFeatureAvailable } from '../../shared/applicationFeatures';
 import { generateMcpToken, loadMcpConfig, saveMcpConfig, type McpConfig } from './config';
@@ -15,6 +16,7 @@ export interface McpControllerOptions {
   featureAvailable?: () => boolean;
   /** Packaged executable, so the panel can show the Claude Desktop (`--mcp-stdio`) configuration. */
   executablePath?: string;
+  cardHtml?: (type: McpAppCardType) => string | undefined;
 }
 
 export class McpController {
@@ -28,7 +30,7 @@ export class McpController {
   constructor(private readonly options: McpControllerOptions) {
     this.config = loadMcpConfig(options.configFile);
     this.bridge = new RendererBridge({ send: options.send });
-    this.server = new LocalMcpServer({ bridge: this.bridge, getToken: () => this.config.token, version: options.version });
+    this.server = new LocalMcpServer({ bridge: this.bridge, getToken: () => this.config.token, version: options.version, cardHtml: options.cardHtml });
   }
 
   async init(): Promise<void> {

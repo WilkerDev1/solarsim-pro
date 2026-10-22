@@ -1,4 +1,5 @@
 // Maps renderer outcomes to MCP CallToolResult content. Text is always present for hosts that ignore structuredContent.
+import { isMcpAppCardType, mcpAppUri, type McpAppCardType } from '../../shared/agentCards';
 import type { AgentToolDefinition, AgentToolOutcome } from '../../shared/agentTools/types';
 
 export interface McpToolResult {
@@ -36,7 +37,9 @@ export function failureResult(code: string, message: string): McpToolResult {
 }
 
 /** MCP tool listing entry. Output schemas are omitted: structuredContent carries the outcome envelope, not raw tool data. */
-export function toMcpTool(definition: AgentToolDefinition) {
+/** `hasView` says whether a card's document is available: tools never advertise a view that resources/read could not serve. */
+export function toMcpTool(definition: AgentToolDefinition, hasView: (type: McpAppCardType) => boolean = () => true) {
+  const uri = isMcpAppCardType(definition.card) && hasView(definition.card) ? mcpAppUri(definition.card) : undefined;
   return {
     name: definition.name,
     title: definition.title,
@@ -48,5 +51,7 @@ export function toMcpTool(definition: AgentToolDefinition) {
       destructiveHint: definition.kind === 'guarded',
       openWorldHint: false,
     },
+    // MCP Apps: hosts that render views fetch the card; others ignore it and show the text. `ui/resourceUri` is the legacy key.
+    ...(uri ? { _meta: { ui: { resourceUri: uri }, 'ui/resourceUri': uri } } : {}),
   };
 }

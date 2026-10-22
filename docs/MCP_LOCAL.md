@@ -26,6 +26,14 @@ Cliente MCP ──HTTP POST /mcp (Bearer)──▶ electron/mcp (main) ──IPC
 - Con la ventana cerrada, recargándose o sin sesión lista, `tools/call` responde `isError` y `tools/list` queda vacío.
 - La aplicación usa `requestSingleInstanceLock`: una segunda instancia enfoca la primera, de modo que el puerto y el perfil nunca se comparten.
 
+## Tarjetas (MCP Apps)
+
+Las herramientas con tarjeta de **propuesta**, **auditoría de catálogo** o **acción pendiente** anuncian una vista con `_meta.ui.resourceUri = ui://solarsim/cards/<tipo>` (y la clave heredada `ui/resourceUri`). Los anfitriones compatibles con MCP Apps la piden con `resources/read` y la muestran junto al resultado; los demás ignoran el metadato y usan siempre el texto de la respuesta, que nunca se omite.
+
+- Los datos son los mismos `AgentCard` de `shared/agentCards.ts` que usan las tarjetas React de la app, tomados de `structuredContent.cards`.
+- `scripts/buildMcpApps.mjs` (parte de `npm run build:electron`) compila `electron/mcp/apps/view.ts` con `@modelcontextprotocol/ext-apps` (versión fija) a un HTML autocontenido por tipo en `dist-electron/mcp-apps/`. Sin ese build no se anuncia ninguna vista.
+- Seguridad: `text/html;profile=mcp-app`; CSP `default-src 'none'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'` con solo script y estilo en línea; `_meta.ui.csp` vacío (no se piden orígenes al anfitrión), sin `domain` ni permisos; ninguna URL externa. Todo texto dinámico pasa por `escapeHtml`; nunca llega HTML desde los datos.
+
 ## Conectar clientes
 
 Activa el servidor, pulsa **Copiar token** y sustituye `<TOKEN>`:
@@ -65,6 +73,8 @@ Si el puerto 47321 está ocupado, el panel lo indica; el puerto se cambia en `mc
 | Cuerpos enormes o ráfagas | Límite de 12 MB, tiempos de espera por herramienta y sin estado persistente en el servidor |
 | IPC falsificado | Cada canal `mcp:*` comprueba que el emisor es el `webContents` de la ventana principal y valida la forma de los mensajes |
 
+**Activación por dispositivo.** La función está registrada como `localMcpServer` en `DEVICE_APPLICATION_FEATURES` (`shared/applicationFeatures.ts`): por dispositivo, apagada por defecto y fuera de `ApplicationFeatureSettings`, que los clientes 2.6.x y la API validan con exactamente una clave. Una organización no puede abrir un puerto en el equipo de un miembro, así que no hay política de organización sobre ella; la disponibilidad efectiva (`isDeviceFeatureAvailable`) se comprueba antes de abrir el endpoint (`McpController`) y antes de publicar o ejecutar herramientas (`connectMcpBridge`). Los permisos por tipo (`read`/`draft`/`guarded`) de «Agentes externos» se aplican en cada llamada y pueden bloquearlo todo.
+
 Fuera de alcance: acceso desde otros equipos (el servidor no escucha en la red) y protección frente a malware con el mismo usuario del sistema operativo.
 
 ## MCP remoto (esbozo, no implementado)
@@ -74,6 +84,7 @@ Un `/mcp` en la API Hono con OAuth 2.1 + PKCE y metadatos RFC 9728/8414 permitir
 ## Verificación
 
 - `electron/mcp/tests/*.test.ts`: configuración, guarda, puente, controlador y JSON-RPC real sobre `node:http` (initialize, tools/list, tools/call, 401/403/413, renderer no listo).
+- `electron/mcp/tests/mcpApps.test.ts`: escape de texto, CSP y ausencia de cargas externas en los documentos compilados, `resources/list|read` y metadatos de herramientas.
 - `electron/mcp/tests/stdioProxy.test.ts`: encuadre por líneas (trozos, CRLF, UTF-8 partido) y proxy contra el servidor real.
 - `src/tests/testMcpBridgeHost.ts` y `testMcpConnectionPanel.ts`.
 - Manual (sin producción): `npm run electron:dev` con `--user-data-dir` temporal, activar el servidor y conectar `claude mcp add …`.

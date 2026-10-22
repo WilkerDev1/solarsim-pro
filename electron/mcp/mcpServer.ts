@@ -4,7 +4,9 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolRequestSchema, ErrorCode, ListResourcesRequestSchema, ListToolsRequestSchema, McpError, ReadResourceRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { RESOURCE_MIME_TYPE } from '@modelcontextprotocol/ext-apps/server';
+import { isMcpAppCardType, MCP_APP_CARD_TYPES, mcpAppUri, type McpAppCardType } from '../../shared/agentCards';
 import { AGENT_RULES_ES } from '../../shared/agentTools/rules';
 import { authorizeRequest, BodyTooLargeError, MAX_BODY_BYTES, readLimitedBody } from './httpGuard';
 import { BridgeError, type RendererBridge } from './rendererBridge';
@@ -19,6 +21,8 @@ export interface LocalMcpServerOptions {
   getToken: () => string;
   version: string;
   maxBodyBytes?: number;
+  /** Built MCP Apps document for a card type (see scripts/buildMcpApps.mjs); undefined when not built. */
+  cardHtml?: (type: McpAppCardType) => string | undefined;
 }
 
 export interface McpClientInfo {
@@ -128,9 +132,22 @@ export class LocalMcpServer {
     const clientLabel = this.identify(req, res, body);
     const server = new Server(
       { name: 'solarsim', version: this.options.version },
-      { capabilities: { tools: { listChanged: false } }, instructions: AGENT_RULES_ES },
+      { capabilities: { tools: { listChanged: false }, resources: { listChanged: false } }, instructions: AGENT_RULES_ES },
     );
-    server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: this.options.bridge.tools.map(toMcpTool) }));
+    server.setRequestHandler(ListToolsRequestSchema, async () => ({
+      tools: this.options.bridge.tools.map((tool) => toMcpTool(tool, (type) => this.options.cardHtml?.(type) !== undefined)),
+    }));
+    // MCP Apps: card views served as static, self-contained documents with a strict CSP (no origins requested from the host).
+    const cardTypes = () => MCP_APP_CARD_TYPES.filter((type) => this.options.cardHtml?.(type) !== undefined);
+    server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+      resources: cardTypes().map((type) => ({ uri: mcpAppUri(type), name: `solarsim-${type}`, title: `Tarjeta SolarSim: ${type}`, mimeType: RESOURCE_MIME_TYPE })),
+    }));
+    server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+      const type = MCP_APP_CARD_TYPES.find((t) => mcpAppUri(t) === request.params.uri);
+      const text = type && isMcpAppCardType(type) ? this.options.cardHtml?.(type) : undefined;
+      if (!type || text === undefined) throw new McpError(ErrorCode.InvalidParams, 'Recurso no encontrado.');
+      return { contents: [{ uri: mcpAppUri(type), mimeType: RESOURCE_MIME_TYPE, text, _meta: { ui: { csp: {}, prefersBorder: true } } }] };
+    });
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
       try {
