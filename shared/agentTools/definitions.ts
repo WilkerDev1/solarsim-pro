@@ -140,6 +140,46 @@ const PROPOSAL_AND_CATALOG_TOOLS: AgentToolDefinition[] = [
     inputSchema: object({ proposalId: id('ID de la propuesta.'), attachmentId: id('ID del anexo.') }, ['proposalId', 'attachmentId']),
   },
   {
+    name: 'search_clients', title: 'Buscar clientes', kind: 'read', category: 'clients', card: 'client', surfaces: [...ALL],
+    description: 'Busca en el directorio de clientes por nombre, RNC/cédula, teléfono o correo. Incluye cuántas propuestas tiene enlazadas cada uno.',
+    inputSchema: object({ query: { type: 'string', maxLength: 200 }, kind: { type: 'string', enum: ['persona', 'empresa', 'all'] } }),
+  },
+  {
+    name: 'get_client', title: 'Consultar cliente', kind: 'read', category: 'clients', card: 'client', surfaces: [...ALL],
+    description: 'Datos del cliente, propuestas enlazadas y resumen de sus estados (borrador/final/archivada y decisión comercial).',
+    inputSchema: object({ id: id('ID del cliente.') }, ['id']),
+  },
+  {
+    name: 'create_client', title: 'Crear cliente', kind: 'draft', category: 'clients', card: 'client', surfaces: [...ALL],
+    description: 'Crea un cliente en el directorio. Solo el nombre es obligatorio. Es independiente del nombre impreso en las propuestas.',
+    inputSchema: object({
+      name: { type: 'string', minLength: 1, maxLength: 255 },
+      kind: { type: 'string', enum: ['persona', 'empresa'] },
+      taxId: { type: 'string', maxLength: 32, description: 'RNC o cédula.' }, phone: { type: 'string', maxLength: 64 }, email: { type: 'string', maxLength: 255 },
+      address: { type: 'string', maxLength: 500 }, province: { type: 'string', maxLength: 100 }, notes: { type: 'string', maxLength: 4000 },
+    }, ['name']),
+  },
+  {
+    name: 'update_client', title: 'Editar cliente', kind: 'draft', category: 'clients', card: 'client', surfaces: [...ALL],
+    description: 'Actualiza datos opcionales de un cliente del directorio.',
+    inputSchema: object({
+      id: id('ID del cliente.'), name: { type: 'string', minLength: 1, maxLength: 255 },
+      kind: { type: 'string', enum: ['persona', 'empresa'] },
+      taxId: { type: 'string', maxLength: 32, description: 'RNC o cédula.' }, phone: { type: 'string', maxLength: 64 }, email: { type: 'string', maxLength: 255 },
+      address: { type: 'string', maxLength: 500 }, province: { type: 'string', maxLength: 100 }, notes: { type: 'string', maxLength: 4000 },
+    }, ['id']),
+  },
+  {
+    name: 'link_proposal_to_client', title: 'Enlazar propuesta con cliente', kind: 'draft', category: 'clients', surfaces: [...ALL],
+    description: 'Enlaza una propuesta con un cliente del directorio (clientId null la desenlaza). No cambia el nombre ni los datos impresos en la propuesta.',
+    inputSchema: object({ proposalId: id('ID de la propuesta.'), clientId: { type: 'string', maxLength: 64, nullable: true } }, ['proposalId']),
+  },
+  {
+    name: 'delete_client', title: 'Eliminar cliente', kind: 'guarded', category: 'clients', surfaces: [...ALL],
+    description: 'Elimina un cliente del directorio y desenlaza sus propuestas (sus datos impresos no cambian). Requiere confirmación.',
+    inputSchema: object({ id: id('ID del cliente.') }, ['id']),
+  },
+  {
     name: 'apply_proposal_draft', title: 'Aplicar borrador del asistente de propuestas', kind: 'draft', category: 'proposals', card: 'proposal',
     surfaces: ['proposal-assistant'],
     description: 'Aplica el borrador revisado del asistente de propuestas (crear o actualizar la propuesta abierta). Uso interno de la interfaz de revisión.',

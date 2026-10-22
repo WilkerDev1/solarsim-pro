@@ -42,7 +42,7 @@ export interface AgentActivityEntry {
   clientLabel?: string;
   tool: string;
   kind: AgentToolKind;
-  targetType: 'project' | 'equipment';
+  targetType: 'project' | 'equipment' | 'client';
   targetId: string;
   title: string;
   changes: AgentChange[];

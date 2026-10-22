@@ -13,11 +13,12 @@ import { PROPOSAL_TOOL_HANDLERS } from './proposalTools';
 import { CATALOG_TOOL_HANDLERS } from './catalogTools';
 import { DOCUMENT_TOOL_HANDLERS } from './documentTools';
 import { ATTACHMENT_TOOL_HANDLERS } from './attachmentTools';
+import { CLIENT_TOOL_HANDLERS } from './clientTools';
 import { assistantFieldLabel, assistantValueLabel } from '../assistant/labels';
 import type { AssistantAction, AssistantCard, AssistantToolResult } from '../assistant/types';
 
 export type { AgentToolContext } from './nativeTools';
-const NATIVE_HANDLERS: Record<string, NativeHandler> = { ...PROPOSAL_TOOL_HANDLERS, ...CATALOG_TOOL_HANDLERS, ...DOCUMENT_TOOL_HANDLERS, ...ATTACHMENT_TOOL_HANDLERS };
+const NATIVE_HANDLERS: Record<string, NativeHandler> = { ...PROPOSAL_TOOL_HANDLERS, ...CATALOG_TOOL_HANDLERS, ...DOCUMENT_TOOL_HANDLERS, ...ATTACHMENT_TOOL_HANDLERS, ...CLIENT_TOOL_HANDLERS };
 
 const MAX_RESULT_BYTES = 64000;
 const PROJECT_SECTIONS = ['client', 'specs', 'rates', 'financials', 'monthlyConsumption', 'customization'] as const;
@@ -260,7 +261,7 @@ export async function executeForAssistant(call: AgentToolCall, ctx: AgentToolCon
     const pending = store().pendingAgentActions.find((a) => a.id === outcome.actionId)!;
     const action: AssistantAction = isNativePlan(pending.plan)
       // Native plans are shown with their human-readable changes; confirmation always goes through the queue by id.
-      ? { id: pending.id, kind: pending.plan.targetType, targetId: '', title: pending.title, fingerprint: '', owner: ctx.owner,
+      ? { id: pending.id, kind: pending.plan.targetType === 'equipment' ? 'equipment' : 'project', targetId: '', title: pending.title, fingerprint: '', owner: ctx.owner,
           edits: pending.changes.map((c) => ({ section: 'client' as const, field: c.label, value: c.value })) }
       : (pending.plan as AssistantAction);
     return { data: { status: 'pending_confirmation', changes: pending.changes }, cards, action };

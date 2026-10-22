@@ -18,7 +18,7 @@ Las dos interfaces internas se mantienen separadas, pero comparten herramientas,
 | Registro | `src/features/agentTools/registry.ts` | `executeAgentTool(call, {source, owner})`: superficie, permisos, validación, propietario (sesión y espacio), límite de 64 KB, aplicación o cola |
 | Herramientas | `proposalTools.ts`, `catalogTools.ts` y planificadores de `src/features/assistant/tools.ts` | Planes que se revalidan al ejecutarse |
 | Estado | `src/store/slices/agentSlice.ts` | Política por dispositivo, actividad por espacio (máx. 300) y acciones pendientes en memoria (10 min) |
-| Tarjetas | `shared/agentCards.ts`, `src/features/assistant/cards/` | Datos puros por tipo; React en la app y MCP Apps para hosts externos ([MCP_LOCAL.md](MCP_LOCAL.md#tarjetas-mcp-apps)) |
+| Tarjetas | `shared/agentCards.ts`, `src/features/assistant/cards/` | Datos puros por tipo (auditoría y cliente con vista interactiva); React en la app y MCP Apps para hosts externos ([MCP_LOCAL.md](MCP_LOCAL.md#tarjetas-mcp-apps)) |
 
 El asistente general usa function calling de Gemini con las declaraciones generadas desde las definiciones. Admite 4 rondas, 4 herramientas por ronda y 12 mensajes de historial. El chat interpreta un subconjunto seguro de markdown (`chatMarkdown.ts`), nunca HTML ni enlaces. Acepta hasta tres PDF o imágenes de 8 MB, validados por firma, que solo se envían con el mensaje actual.
 
@@ -58,8 +58,17 @@ Toda propuesta creada o editada por agentes cotiza en modo **Simple (Catálogo I
 | `update_supplier_price` | guarded | Precio USD y/o disponibilidad de una oferta existente |
 | `apply_proposal_draft` | draft | Solo el asistente de propuestas |
 | `get_agent_action_status` | read | Espera hasta 20 s la decisión de una acción pendiente |
-
-Los textos del documento, los anexos y los clientes llegan como herramientas cuando se integran el editor del documento, los anexos automáticos y el directorio de clientes.
+| `list_document_texts` | read | Textos editables del PDF por clave (p. ej. `quotation.warranty.panel`, `client.phone`), con sección, personalización y plantilla |
+| `set_document_text`, `reset_document_text` | draft | Cualquier propuesta por id. Mismas reglas que el editor en línea (saneo, formato, placeholders, espejo en los datos del cliente) |
+| `set_document_layout` | draft | Secciones ocultas, tema y cabecera/pie |
+| `save_document_text_to_company_template` | guarded | Solo textos de plantilla y con la propuesta abierta |
+| `list_proposal_attachments`, `sync_catalog_datasheets`, `set_attachment_enabled` | read / draft | Fichas del catálogo con la misma política que la vista PDF |
+| `attach_file_to_proposal` | draft | PDF del chat (`fileId`) o en base64 desde un agente externo. Firma y 8 MB verificados, páginas contadas; nunca rutas del disco |
+| `remove_proposal_attachment` | guarded | Una ficha del catálogo quitada queda descartada |
+| `search_clients`, `get_client` | read | Directorio por nombre, RNC/cédula, teléfono o correo. Resumen de estados de las propuestas enlazadas |
+| `create_client`, `update_client` | draft | Solo el nombre es obligatorio. El directorio se sincroniza con CAS; desde la actividad no se deshace |
+| `link_proposal_to_client` | draft | `clientId: null` desenlaza; no cambia los datos impresos. Con deshacer |
+| `delete_client` | guarded | Desenlaza sus propuestas |
 
 ## Privacidad
 
@@ -67,6 +76,6 @@ Texto, archivos adjuntos y resultados de herramientas se envían a Google Gemini
 
 ## Verificación
 
-- Suites: `testMcpBridgeHost`, `testMcpConnectionPanel`, `electron/mcp/tests/*`, `testAgentToolSchemas`, `testAgentPermissions`, `testAgentProposalTools`, `testCatalogAudit`, `testAgentCards`, `testChatMarkdown`, `testChatFiles`, `testProposalAssistantApply`, `testAutomatedPricingPolicy` y `testAppAssistant`.
+- Suites: `testAgentDocumentTools`, `testAgentAttachmentTools`, `testAgentClientTools`, `testMcpBridgeHost`, `testMcpConnectionPanel`, `electron/mcp/tests/*`, `testAgentToolSchemas`, `testAgentPermissions`, `testAgentProposalTools`, `testCatalogAudit`, `testAgentCards`, `testChatMarkdown`, `testChatFiles`, `testProposalAssistantApply`, `testAutomatedPricingPolicy` y `testAppAssistant`.
 - Todas usan transporte sintético; ninguna escribe en producción ni llama a Gemini real.
 - La fixture `scripts/qa/fixtures/appAssistant.html` cubre consultas, auditoría, cambio aplicado con deshacer y confirmación.
