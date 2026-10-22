@@ -4,6 +4,8 @@ import { editEquipmentGroup, selectCatalogEquipment } from '../../../utils/equip
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs, PanelItemSpec, InverterItemSpec, BatteryItemSpec } from '../../../types';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
+import { buildCatalogSelectionUpdate } from '../params/logic/catalogSelection';
+import { useCatalogPowerSync } from '../params/hooks/useCatalogPowerSync';
 import { SearchableEquipmentSelect } from './SearchableEquipmentSelect';
 import { BatteryEquipmentSection } from './BatteryEquipmentSection';
 import { SolarEquipmentItem } from '../../../types/equipment';
@@ -50,25 +52,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
   const totalInverterCount = calculateTotalInverterCount(project.specs);
 
 
-  // Auto-sanear inconsistencias de potencia unitaria si el modelo seleccionado está en el catálogo verificado
-  React.useEffect(() => {
-    if (project.specs.inverterBrandModel && project.specs.inverterPowerKW) {
-      const match = equipmentCatalog.find(
-        (it) => it.type === 'inverter' && it.displayName === project.specs.inverterBrandModel
-      );
-      if (match && match.powerKW && match.powerKW !== project.specs.inverterPowerKW) {
-        updateSpecs({ inverterPowerKW: match.powerKW });
-      }
-    }
-    if (project.specs.panelBrandModel && project.specs.panelPowerW) {
-      const match = equipmentCatalog.find(
-        (it) => it.type === 'panel' && it.displayName === project.specs.panelBrandModel
-      );
-      if (match && match.powerW && match.powerW !== project.specs.panelPowerW) {
-        updateSpecs({ panelPowerW: match.powerW });
-      }
-    }
-  }, [project.specs.inverterBrandModel, project.specs.panelBrandModel, equipmentCatalog]);
+  useCatalogPowerSync(project.specs, equipmentCatalog, updateSpecs);
 
   // --- EQUIPMENT GROUP HANDLERS (lists are the source; editEquipmentGroup keeps the legacy mirror) ---
   const handleAddPanelModel = () => {
@@ -112,102 +96,9 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
   const handleRemoveInverterItem = (index: number) =>
     updateSpecs(editEquipmentGroup(project.specs, 'inverter', { type: 'remove', index }));
 
-  const handleSelectPanel = (item: SolarEquipmentItem) => {
-    const suppliers = item.supplierPrices || [];
-    const newSupplierInfo = { ...(project.specs.selectedSupplierInfo || {}) };
-    const specsUpdate: Partial<SystemSpecs> = {
-      panelBrandModel: item.displayName,
-      panelPowerW: item.powerW || 550,
-      panelEfficiency: item.efficiencyPct || 22.0,
-      tempCoeff: item.tempCoeff || -0.29,
-      annualDegradation: item.annualDegradation || 0.4,
-    };
+  const handleSelectPanel = (item: SolarEquipmentItem) => updateSpecs(buildCatalogSelectionUpdate(project.specs, 'panel', item));
 
-    if (project.specs.autoSupplierPricing && suppliers.length > 0) {
-      const bestSp = [...suppliers].sort((a, b) => a.priceUSD - b.priceUSD)[0];
-      specsUpdate.panelUnitPriceUSD = bestSp.priceUSD;
-      newSupplierInfo.panel = {
-        supplierName: bestSp.supplierName,
-        priceUSD: bestSp.priceUSD,
-        updatedAt: bestSp.updatedAt,
-        supplierPriceId: bestSp.id,
-      };
-    } else {
-      const match = suppliers.find(
-        (sp) =>
-          sp.id === newSupplierInfo.panel?.supplierPriceId ||
-          sp.supplierName.toLowerCase().trim() === newSupplierInfo.panel?.supplierName?.toLowerCase().trim()
-      );
-      if (match) {
-        newSupplierInfo.panel = {
-          supplierName: match.supplierName,
-          priceUSD: match.priceUSD,
-          updatedAt: match.updatedAt,
-          supplierPriceId: match.id,
-        };
-      } else {
-        delete newSupplierInfo.panel;
-      }
-    }
-
-    specsUpdate.selectedSupplierInfo = newSupplierInfo;
-    // The primary group takes the catalog identity (catalogItemId for datasheets); the mirror follows it.
-    updateSpecs({
-      ...specsUpdate,
-      ...selectCatalogEquipment(project.specs, 'panel', 0, item, {
-        // Model-specific values (degradation, efficiency…) are replaced, never inherited from the previous model.
-        ...catalogPanelGroupPatch(item),
-        selectedSupplierInfo: newSupplierInfo.panel,
-        ...(specsUpdate.panelUnitPriceUSD !== undefined ? { unitPriceUSD: specsUpdate.panelUnitPriceUSD } : {}),
-      }),
-    });
-  };
-
-  const handleSelectInverter = (item: SolarEquipmentItem) => {
-    const suppliers = item.supplierPrices || [];
-    const newSupplierInfo = { ...(project.specs.selectedSupplierInfo || {}) };
-    const specsUpdate: Partial<SystemSpecs> = {
-      inverterBrandModel: item.displayName,
-      inverterPowerKW: item.powerKW || 8.0,
-    };
-
-    if (project.specs.autoSupplierPricing && suppliers.length > 0) {
-      const bestSp = [...suppliers].sort((a, b) => a.priceUSD - b.priceUSD)[0];
-      specsUpdate.inverterUnitPriceUSD = bestSp.priceUSD;
-      newSupplierInfo.inverter = {
-        supplierName: bestSp.supplierName,
-        priceUSD: bestSp.priceUSD,
-        updatedAt: bestSp.updatedAt,
-        supplierPriceId: bestSp.id,
-      };
-    } else {
-      const match = suppliers.find(
-        (sp) =>
-          sp.id === newSupplierInfo.inverter?.supplierPriceId ||
-          sp.supplierName.toLowerCase().trim() === newSupplierInfo.inverter?.supplierName?.toLowerCase().trim()
-      );
-      if (match) {
-        newSupplierInfo.inverter = {
-          supplierName: match.supplierName,
-          priceUSD: match.priceUSD,
-          updatedAt: match.updatedAt,
-          supplierPriceId: match.id,
-        };
-      } else {
-        delete newSupplierInfo.inverter;
-      }
-    }
-
-    specsUpdate.selectedSupplierInfo = newSupplierInfo;
-    updateSpecs({
-      ...specsUpdate,
-      ...selectCatalogEquipment(project.specs, 'inverter', 0, item, {
-        powerKW: item.powerKW || 8.0,
-        selectedSupplierInfo: newSupplierInfo.inverter,
-        ...(specsUpdate.inverterUnitPriceUSD !== undefined ? { unitPriceUSD: specsUpdate.inverterUnitPriceUSD } : {}),
-      }),
-    });
-  };
+  const handleSelectInverter = (item: SolarEquipmentItem) => updateSpecs(buildCatalogSelectionUpdate(project.specs, 'inverter', item));
 
 
   const isDetailed = !!project.specs.isDetailed;
