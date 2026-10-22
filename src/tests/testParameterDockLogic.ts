@@ -97,7 +97,7 @@ const baseSpecs = { panelBrandModel: 'Old', panelPowerW: 400, panelCount: 10, ha
   const bareBat = buildCatalogSelectionUpdate(baseSpecs, 'battery', catalogItem({ id: 'b2', type: 'battery', displayName: 'Bare' }));
   assert.equal(bareBat.batteryCapacityKWh, 16.08);
   assert.equal(bareBat.batteryDOD, 90);
-  assert.equal(bareBat.batteryEfficiencyPct, 95);
+  assert.equal(bareBat.batteryEfficiencyPct, 90, 'eficiencia por defecto única (antes 95 en el dock)');
 }
 { // The battery count in Manual mode goes through editEquipmentGroup like every other group edit, so
   // batteries[] and the legacy `batteryCount` mirror never drift apart (fixed in T3b; it used to write batteryCount alone).

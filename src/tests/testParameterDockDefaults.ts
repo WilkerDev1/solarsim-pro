@@ -117,18 +117,18 @@ assert.equal(averageMonthlyConsumption({ monthlyConsumption: [100, 300] }), 200)
   assert.doesNotMatch(list('panel', { panelBrandModel: 'Mi panel' }), /Canadian Solar CS6\.1-72TB-600/);
 }
 
-// ── Batería: DOD y eficiencia (|| trata 0 como vacío) y selección de catálogo vacía ─────────
+// ── Batería: DOD y eficiencia (0 guardado = default) y selección de catálogo vacía ─────────
 {
   const battery = (specs: object) => render(h(BatteryEquipmentSection, {
     project: projectOf({ hasBattery: true, ...specs }), summary: emptySummary, isDetailed: true, updateSpecs: noop,
   }));
   const defaults = battery({ batteryDOD: undefined, batteryEfficiencyPct: undefined, batteryReplacementCostUSD: undefined });
   assert.equal(valueOf(defaults, 'dock-battery-dod'), '90');
-  assert.equal(valueOf(defaults, 'dock-battery-efficiency'), '95');
+  assert.equal(valueOf(defaults, 'dock-battery-efficiency'), '90', 'la eficiencia por defecto es la del motor (90), no 95');
   assert.equal(valueOf(defaults, 'dock-battery-replacement'), '0');
   const zeros = battery({ batteryDOD: 0, batteryEfficiencyPct: 0, batteryReplacementCostUSD: 0 });
-  assert.equal(valueOf(zeros, 'dock-battery-dod'), '90', '0 se muestra como 90');
-  assert.equal(valueOf(zeros, 'dock-battery-efficiency'), '95', '0 se muestra como 95');
+  assert.equal(valueOf(zeros, 'dock-battery-dod'), '90', 'un 0 guardado no es válido: se muestra el default, igual que el motor');
+  assert.equal(valueOf(zeros, 'dock-battery-efficiency'), '90', 'un 0 guardado se muestra como 90 (antes 95)');
   const set = battery({ batteryDOD: 80, batteryEfficiencyPct: 92, batteryReplacementCostUSD: 3000 });
   assert.equal(valueOf(set, 'dock-battery-dod'), '80');
   assert.equal(valueOf(set, 'dock-battery-efficiency'), '92');
@@ -140,12 +140,12 @@ assert.equal(averageMonthlyConsumption({ monthlyConsumption: [100, 300] }), 200)
   const bat = buildCatalogSelectionUpdate(specs, 'battery', empty('battery'));
   assert.equal(bat.batteryCapacityKWh, 16.08);
   assert.equal(bat.batteryDOD, 90);
-  assert.equal(bat.batteryEfficiencyPct, 95);
+  assert.equal(bat.batteryEfficiencyPct, 90);
   const group = getProjectBatteries({ ...specs, hasBattery: true, ...bat } as SystemSpecs)[0];
   assert.equal(group.capacityKWh, 16.08);
   assert.equal(group.dodPct, 90);
   const zero = buildCatalogSelectionUpdate(specs, 'battery', { ...empty('battery'), capacityKWh: 0, dodPct: 0, batteryEfficiencyPct: 0 });
-  assert.deepEqual([zero.batteryCapacityKWh, zero.batteryDOD, zero.batteryEfficiencyPct], [16.08, 90, 95], 'ceros del catálogo: valores por defecto');
+  assert.deepEqual([zero.batteryCapacityKWh, zero.batteryDOD, zero.batteryEfficiencyPct], [16.08, 90, 90], 'ceros del catálogo: valores por defecto');
   const real = buildCatalogSelectionUpdate(specs, 'battery', { ...empty('battery'), capacityKWh: 10, dodPct: 80, batteryEfficiencyPct: 92 });
   assert.deepEqual([real.batteryCapacityKWh, real.batteryDOD, real.batteryEfficiencyPct], [10, 80, 92]);
   const panel = buildCatalogSelectionUpdate(specs, 'panel', empty('panel'));
@@ -181,15 +181,14 @@ assert.deepEqual(DEFAULT_UNIT_PRICE_USD, { panel: 103.32, inverter: 2300, batter
   assert.equal(valueOf(html, 'pd-dop-rate'), '60');
   assert.equal(valueOf(html, 'pd-margin'), '25');
   assert.match(html, /1\.25×/);
-  assert.match(html, /Costo \/Wp[\s\S]*?\$0\.86/);
-  assert.match(html, /Venta \/Wp[\s\S]*?\$1\.08/);
-  assert.match(html, /Ganancia \/Wp[\s\S]*?\+\$0\.22/);
-  assert.match(html, /Venta \/kWp[\s\S]*?\$1,080\.00/, 'Venta /kWp = 1.08 × 1000');
-  assert.equal(valueOf(pricing({ dopExchangeRate: 0 }), 'pd-dop-rate'), '0', 'la tasa 0 explícita se muestra (!== undefined)');
+  for (const label of ['Costo /Wp', 'Ganancia /Wp', 'Venta /Wp', 'Venta /kWp']) {
+    assert.match(html, new RegExp(`${label}[\\s\\S]*?—`), `${label} sin matriz: «—», no una cifra inventada (antes 0.86 / 1.08)`);
+  }
+  assert.equal(valueOf(pricing({ dopExchangeRate: 0 }), 'pd-dop-rate'), '60', 'una tasa 0 no es válida: la vista usa la misma regla que el cálculo (antes mostraba 0)');
   assert.equal(valueOf(pricing({ saleMarginMultiplier: 0 }), 'pd-margin'), '25');
   const withZeros = pricing({}, { costMatrix: { costPerWattUSD: 0, salePricePerWattUSD: 0 } });
-  assert.match(withZeros, /Costo \/Wp[\s\S]*?\$0\.86/, 'costo/Wp 0 se muestra como 0.86');
-  assert.match(withZeros, /Venta \/Wp[\s\S]*?\$1\.08/);
+  assert.match(withZeros, /Costo \/Wp[\s\S]*?\$0\.00/, 'costo/Wp real 0 se muestra como 0.00 (antes 0.86)');
+  assert.match(withZeros, /Venta \/Wp[\s\S]*?\$0\.00/, 'venta/Wp real 0 se muestra como 0.00 (antes 1.08)');
 }
 {
   const direct = (specs: object, matrix?: object) => render(h(DirectPrice, {
@@ -201,8 +200,8 @@ assert.deepEqual(DEFAULT_UNIT_PRICE_USD, { panel: 103.32, inverter: 2300, batter
   assert.equal(valueOf(html, 'pd-price-kwp'), '1150');
   assert.match(html, /1\.25× · \+0\.0%/);
   const zero = direct({ pricePerWattUSD: 0, pricePerKWpUSD: undefined });
-  assert.equal(valueOf(zero, 'pd-price-w'), '0', '$/W 0 se respeta');
-  assert.equal(valueOf(zero, 'pd-price-kwp'), '1150', '$/kWp con $/W = 0 cae en 1.15 × 1000');
+  assert.equal(valueOf(zero, 'pd-price-w'), '1.15', '$/W 0 no es válido (el motor lo ignora): default en ambos campos (antes 0)');
+  assert.equal(valueOf(zero, 'pd-price-kwp'), '1150', '$/kWp sale del mismo valor que $/W');
   assert.match(direct({}, { saleMarginMultiplier: 0, markupOnCostPct: 0, gananciaUSD: 0 }), /1\.25× · \+0\.0%/);
   assert.match(direct({}, { saleMarginMultiplier: 1.3, markupOnCostPct: 30, gananciaUSD: 100 }), /1\.30× · \+30\.0%/);
 }

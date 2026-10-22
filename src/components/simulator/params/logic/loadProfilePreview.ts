@@ -1,7 +1,7 @@
 import { getProvinceHSP } from '../../../../data/rdProvinces';
 import { getRecommendedLoadProfile } from '../../../../engine/solarEngine';
 import type { ProjectSimulation } from '../../../../types';
-import { DEFAULT_BATTERY_DOD_PCT, DEFAULT_SYSTEM_LOSSES_PCT, PREVIEW_BATTERY_EFFICIENCY_PCT } from './dockDefaults';
+import { DEFAULT_SYSTEM_LOSSES_PCT, resolveBatteryDodPct, resolveBatteryEfficiencyPct } from './dockDefaults';
 import { calculateTotalBatteryCapacityKWh, calculateTotalDCCapacityKWp } from '../../../../utils/equipmentSpecsUtils';
 
 export type LoadProfilePreset = 'residential' | 'commercial' | 'industrial' | 'custom';
@@ -40,8 +40,8 @@ export function computeLoadProfilePreview(
 ): LoadProfilePreview {
   const totalBatteryKWh = calculateTotalBatteryCapacityKWh(project.specs);
   const hasBattery = !!(project.specs.hasBattery && totalBatteryKWh > 0);
-  const batteryDodPct = project.specs.batteryDOD !== undefined ? project.specs.batteryDOD : DEFAULT_BATTERY_DOD_PCT;
-  const batteryEffPct = project.specs.batteryEfficiencyPct !== undefined ? project.specs.batteryEfficiencyPct : PREVIEW_BATTERY_EFFICIENCY_PCT;
+  const batteryDodPct = resolveBatteryDodPct(project.specs.batteryDOD);
+  const batteryEffPct = resolveBatteryEfficiencyPct(project.specs.batteryEfficiencyPct);
   const dailyUsableBatteryKWh = hasBattery ? totalBatteryKWh * (batteryDodPct / 100) * (batteryEffPct / 100) : 0;
 
   const recommendedProfile = getRecommendedLoadProfile(currentTariffCode, avgMonthlyConsumption);

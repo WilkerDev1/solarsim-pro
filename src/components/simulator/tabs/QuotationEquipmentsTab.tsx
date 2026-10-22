@@ -2,6 +2,7 @@ import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import { ShieldCheck, CheckCircle2, Check } from 'lucide-react';
 import { getProjectPanels, getProjectInverters, getProjectBatteries } from '../../../utils/equipmentSpecsUtils';
+import { MANUAL_BRAND_PLACEHOLDER, SAMPLE_PHONE_MARKER, SAMPLE_QUOTE_NUMBER, resolveSaleMarginMultiplier } from '../../../../shared/projectDefaults';
 import { formatProposalDate } from '../../../utils/formatDateUtils';
 
 interface QuotationEquipmentsTabProps {
@@ -38,7 +39,7 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
         <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">N° COTIZACIÓN</span>
-          <span className="text-lg font-bold text-slate-900">{project.client.quoteNumber || 'C-0030'}</span>
+          <span className="text-lg font-bold text-slate-900">{project.client.quoteNumber || SAMPLE_QUOTE_NUMBER}</span>
         </div>
         <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">POTENCIA FOTOVOLTAICA</span>
@@ -93,11 +94,11 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
               <div className="space-y-1">
                 <div><span className="font-bold text-slate-600">Cliente:</span> <span className="font-bold text-slate-900">{project.client.name}</span></div>
                 <div><span className="font-bold text-slate-600">Contacto:</span> {project.customization?.contactName || project.client.contactPerson || project.client.company || project.client.name}</div>
-                <div><span className="font-bold text-slate-600">Teléfono:</span> {project.customization?.clientPhone || (project.client.contactPhone && !project.client.contactPhone.includes('555-0199') ? project.client.contactPhone : '') || '—'}</div>
+                <div><span className="font-bold text-slate-600">Teléfono:</span> {project.customization?.clientPhone || (project.client.contactPhone && !project.client.contactPhone.includes(SAMPLE_PHONE_MARKER) ? project.client.contactPhone : '') || '—'}</div>
                 <div><span className="font-bold text-slate-600">Dirección:</span> {project.client.address || `${project.client.province || project.client.location || 'Santo Domingo'}, RD`}</div>
               </div>
               <div className="space-y-1 text-right">
-                <div><span className="font-bold text-slate-600">N° Cotización:</span> <span className="font-bold text-slate-900">{project.client.quoteNumber || 'C-0030'}</span></div>
+                <div><span className="font-bold text-slate-600">N° Cotización:</span> <span className="font-bold text-slate-900">{project.client.quoteNumber || SAMPLE_QUOTE_NUMBER}</span></div>
                 <div><span className="font-bold text-slate-600">Fecha:</span> <span className="font-semibold text-slate-800">{currentDateStr}</span></div>
                 <div><span className="font-bold text-slate-600">Válido por:</span> <span className="font-bold text-emerald-700">{project.client.quoteValidityDays || 7} Días</span></div>
               </div>
@@ -138,21 +139,21 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
                 <tbody className="divide-y divide-slate-200 text-[11px] text-slate-800 font-semibold">
                   {getProjectPanels(project.specs).map((panel, idx) => (
                     <tr key={panel.id || `panel-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
-                      <td className="px-3 py-2">{panel.brandModel || 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)'}</td>
+                      <td className="px-3 py-2">{panel.brandModel || MANUAL_BRAND_PLACEHOLDER.panel}</td>
                       <td className="px-3 py-2 text-center font-bold">{panel.count}</td>
                       <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
                     </tr>
                   ))}
                   {getProjectInverters(project.specs).map((inv, idx) => (
                     <tr key={inv.id || `inv-${idx}`} className={idx % 2 === 0 ? 'bg-slate-50/60' : 'bg-white'}>
-                      <td className="px-3 py-2">{inv.brandModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)'}</td>
+                      <td className="px-3 py-2">{inv.brandModel || MANUAL_BRAND_PLACEHOLDER.inverter}</td>
                       <td className="px-3 py-2 text-center font-bold">{inv.count || 1}</td>
                       <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
                     </tr>
                   ))}
                   {project.specs.hasBattery && getProjectBatteries(project.specs).map((bat, idx) => (
                     <tr key={bat.id || `bat-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
-                      <td className="px-3 py-2">{bat.brandModel || 'Batería Hinaess 16 KwH-48 vdc.'}</td>
+                      <td className="px-3 py-2">{bat.brandModel || MANUAL_BRAND_PLACEHOLDER.battery}</td>
                       <td className="px-3 py-2 text-center font-bold">{bat.count || 1}</td>
                       <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
                     </tr>
@@ -366,7 +367,7 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
                 Tasa USD: <span className="text-white font-extrabold">{summary.costMatrix.dopExchangeRate} DOP</span>
               </div>
               <div>
-                Factor Venta: <span className="text-white font-extrabold">{(summary.costMatrix.saleMarginMultiplier || 1.25).toFixed(2)}x</span>
+                Factor Venta: <span className="text-white font-extrabold">{resolveSaleMarginMultiplier(summary.costMatrix.saleMarginMultiplier).toFixed(2)}x</span>
               </div>
             </div>
           </div>
@@ -532,7 +533,7 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
                 </>
               ) : (
                 <div className="flex justify-between text-red-600 font-extrabold bg-red-50 border border-red-200 px-2.5 py-1 rounded">
-                  <span>Porcentaje venta ({(summary.costMatrix.saleMarginMultiplier || 1.25).toFixed(2)}) :</span>
+                  <span>Porcentaje venta ({resolveSaleMarginMultiplier(summary.costMatrix.saleMarginMultiplier).toFixed(2)}) :</span>
                   <span>
                     {costTableCurrency === 'USD' ? (
                       <strong>${summary.costMatrix.porcentajeVentaUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</strong>

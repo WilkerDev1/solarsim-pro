@@ -86,7 +86,7 @@ const projectOf = (specs: Partial<SystemSpecs> = {}): ProjectSimulation => ({ ..
 // ── Bug 3: precio directo coherente ─────────────────────────────────────────────────────────
 {
   const direct = (specs: object) => render(h(DirectPrice, {
-    specs: { ...base.specs, pricingMode: 'direct_watt', pricePerWattUSD: undefined, pricePerKWpUSD: undefined, ...specs } as SystemSpecs,
+    specs: { ...base.specs, pricingMode: 'direct_watt', pricePerWattUSD: undefined, pricePerKWpUSD: undefined, ...specs } as unknown as SystemSpecs,
     summary: { systemCapacityKWp: 10 } as never, updateSpecs: noop,
   }));
   for (const zero of [0, -1]) {
@@ -122,7 +122,7 @@ const projectOf = (specs: Partial<SystemSpecs> = {}): ProjectSimulation => ({ ..
 // ── Bug 7: sin duplicados fuera del dock ───────────────────────────────────────────────────
 {
   const quotation = readFileSync('src/components/simulator/tabs/QuotationEquipmentsTab.tsx', 'utf8');
-  for (const literal of ['C-0030', '555-0199', 'Lux Power LXP', 'Hinaess', '|| 1.25']) assert(!quotation.includes(literal), `QuotationEquipmentsTab repite «${literal}»`);
+  for (const literal of ['C-0030', '555-0199', 'Lux Power LXP', 'Hinaess', 'TOPHIKU6', '|| 1.25']) assert(!quotation.includes(literal), `QuotationEquipmentsTab repite «${literal}»`);
   const finance = readFileSync('src/engine/financeEngine.ts', 'utf8');
   for (const literal of ['60.0', '170.0', '|| 1.25', '|| 80', '|| 92']) assert(!finance.includes(literal), `financeEngine repite «${literal}»`);
   const utils = readFileSync('src/utils/equipmentSpecsUtils.ts', 'utf8');

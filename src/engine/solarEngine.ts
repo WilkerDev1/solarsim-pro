@@ -1,4 +1,5 @@
 import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
+import { resolveBatteryDodPct, resolveBatteryEfficiencyPct } from '../../shared/projectDefaults';
 import { SystemSpecs, MonthlyEnergyResult } from '../types';
 import { getProvinceHSP } from '../data/rdProvinces';
 import { calculateTotalDCCapacityKWp, calculateTotalBatteryCapacityKWh } from '../utils/equipmentSpecsUtils';
@@ -150,8 +151,8 @@ export function calculateMonthlySolarProduction(
   // BESS battery specifications
   const totalBatteryKWh = calculateTotalBatteryCapacityKWh(specs);
   const hasBatteryStorage = !!(specs.hasBattery && totalBatteryKWh > 0);
-  const batteryDodPct = specs.batteryDOD !== undefined ? specs.batteryDOD : 90;
-  const batteryEffPct = specs.batteryEfficiencyPct !== undefined ? specs.batteryEfficiencyPct : 90;
+  const batteryDodPct = resolveBatteryDodPct(specs.batteryDOD);
+  const batteryEffPct = resolveBatteryEfficiencyPct(specs.batteryEfficiencyPct);
   const dailyUsableBatteryKWh = hasBatteryStorage
     ? totalBatteryKWh * (batteryDodPct / 100) * (batteryEffPct / 100)
     : 0;

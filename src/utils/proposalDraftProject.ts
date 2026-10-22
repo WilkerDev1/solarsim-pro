@@ -5,6 +5,7 @@ import type { GlobalTariffMatrix } from '../types/tariffs';
 import { calculateRecommendedPanelCount } from '../engine/solarEngine';
 import { resolveAITariffSelection } from './aiTariffContext';
 import { getReferenceEnergyRateUSD } from '../data/rdTariffs';
+import { DEFAULT_BATTERY_DOD_PCT, DEFAULT_BATTERY_EFFICIENCY_PCT } from '../../shared/projectDefaults';
 import { enforceAutomatedPricing } from '../../shared/automatedProposalPolicy';
 /** Pure adapter shared by preview and application. No store mutation, metadata or network. */
 export function prepareProposalDraftProject(base:ProjectSimulation,data:ExtractedInvoiceData,tariffMatrix:GlobalTariffMatrix,options:{isNew?:boolean;defaultBatteryDOD?:number}={}):ProjectSimulation {
@@ -52,8 +53,8 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
       if (data.batteries?.length) {
         // Adapter only: preserve E_util=sum(C_i*DoD_i*eta_i) with the engines' existing scalar contract.
         const totalCapacity=data.batteries.reduce((sum,b)=>sum+b.capacityKWh*b.count,0);
-        const defaultDod=createNewProject?(defaults.defaultBatteryDOD ?? 90):(base.specs.batteryDOD ?? 90);
-        const defaultEfficiency=base.specs.batteryEfficiencyPct ?? 90;
+        const defaultDod=createNewProject?(defaults.defaultBatteryDOD ?? DEFAULT_BATTERY_DOD_PCT):(base.specs.batteryDOD ?? DEFAULT_BATTERY_DOD_PCT);
+        const defaultEfficiency=base.specs.batteryEfficiencyPct ?? DEFAULT_BATTERY_EFFICIENCY_PCT;
         const afterDod=data.batteries.reduce((sum,b)=>sum+b.capacityKWh*b.count*(b.dodPct ?? defaultDod)/100,0);
         const usable=data.batteries.reduce((sum,b)=>sum+b.capacityKWh*b.count*(b.dodPct ?? defaultDod)/100*(b.efficiencyPct ?? defaultEfficiency)/100,0);
         specs.batteryDOD=totalCapacity>0?afterDod/totalCapacity*100:defaultDod;

@@ -3,7 +3,7 @@ import { getRecommendedLoadProfile } from '../../../../../engine/solarEngine';
 import type { ProjectSimulation, SystemSpecs, UtilityRates } from '../../../../../types';
 import { mapTariffCodeOnDistributorChange, type UtilityDistributor } from '../../../../../types/tariffs';
 import { detectLoadProfilePreset, type LoadProfilePreset } from '../../logic/loadProfilePreview';
-import { DEFAULT_DOP_RATE, DEFAULT_GRID_EXPORT_FEE_PCT, DEFAULT_MONTHLY_CONSUMPTION_KWH } from '../../logic/dockDefaults';
+import { DEFAULT_GRID_EXPORT_FEE_PCT, DEFAULT_MONTHLY_CONSUMPTION_KWH, resolveDopRate } from '../../logic/dockDefaults';
 
 type TariffMatrix = Parameters<typeof getReferenceEnergyRateUSD>[0];
 
@@ -34,7 +34,7 @@ export function referenceRate(input: ReferenceInput, distributor: UtilityDistrib
     distributor,
     tariffCode,
     input.avgMonthlyConsumption,
-    input.dopExchangeRate || DEFAULT_DOP_RATE
+    resolveDopRate(input.dopExchangeRate)
   );
 }
 

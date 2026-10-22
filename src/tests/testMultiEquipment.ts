@@ -255,8 +255,10 @@ if (financialSummary.systemCapacityKWp !== 17.9) {
   throw new Error(`❌ Financial summary systemCapacityKWp expected 17.9, got ${financialSummary.systemCapacityKWp}`);
 }
 
-if (financialSummary.batteryUsableKWh !== 19.4) {
-  throw new Error(`❌ Financial summary batteryUsableKWh expected 19.4, got ${financialSummary.batteryUsableKWh}`);
+// Sin `batteryEfficiencyPct` el resumen financiero usa la eficiencia única del proyecto (90 %, como el motor
+// de energía); antes usaba 92 % y daba 19.4 kWh (26.4 kWh × DOD 80 % × 0.92).
+if (financialSummary.batteryUsableKWh !== 19) {
+  throw new Error(`❌ Financial summary batteryUsableKWh expected 19, got ${financialSummary.batteryUsableKWh}`);
 }
 
 if (financialSummary.batteryBackupAutonomyHours <= 0) {

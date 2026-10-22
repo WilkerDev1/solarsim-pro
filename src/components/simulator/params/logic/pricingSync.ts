@@ -1,5 +1,5 @@
 /** Price per Wp ↔ price per kWp, and sale margin % ↔ multiplier, as the pricing section keeps them in sync. */
-import { DEFAULT_SALE_MARGIN_MULTIPLIER } from './dockDefaults';
+import { resolveSaleMarginMultiplier } from './dockDefaults';
 
 
 /** $/Wp → $/kWp (2 decimals). */
@@ -30,12 +30,12 @@ export function kwpPricePatch(pricePerKWpUSD: number): { pricePerKWpUSD: number;
 
 /** Margin % (one decimal) shown for a multiplier. */
 export function marginPctFromMultiplier(multiplier: number | undefined): number {
-  return Math.round(((multiplier || DEFAULT_SALE_MARGIN_MULTIPLIER) - 1) * 100 * 10) / 10;
+  return Math.round((resolveSaleMarginMultiplier(multiplier) - 1) * 100 * 10) / 10;
 }
 
 /** Whole-percent margin used to highlight the quick-margin buttons. */
 export function wholeMarginPctFromMultiplier(multiplier: number | undefined): number {
-  return Math.round(((multiplier || DEFAULT_SALE_MARGIN_MULTIPLIER) - 1) * 100);
+  return Math.round((resolveSaleMarginMultiplier(multiplier) - 1) * 100);
 }
 
 /** Multiplier for the typed margin %: NaN counts as 0, negatives clamp to 0, rounded to 3 decimals. */
