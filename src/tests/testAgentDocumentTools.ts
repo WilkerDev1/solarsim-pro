@@ -6,6 +6,7 @@ import { executeAgentTool } from '../features/agentTools/registry';
 import { assistantOwner } from '../features/assistant/tools';
 import { findAgentTool } from '../../shared/agentTools/definitions';
 import { renderRichTextHtml } from '../../shared/documentTexts';
+import { resolveSectionVisibility } from '../../shared/documentLayout';
 
 const store = useSimulationStore;
 const other = { ...structuredClone(BENCHMARK_PROJECT), id: 'doc-other', status: 'Draft' as const, syncStatus: 'local_only' as const };
@@ -26,6 +27,11 @@ assert(listed.status === 'ok');
 const texts = (listed.data as { texts: { key: string; section: string; text: string; templatable: boolean }[] }).texts;
 assert(texts.some((t) => t.key === 'quotation.warranty.panel' && t.text.length > 0));
 assert(texts.every((t) => t.section === 'quotation'), 'section filter');
+// Long paragraphs are returned complete (no silent truncation before a replace).
+const long = 'Párrafo largo. '.repeat(180).trim();
+await executeAgentTool({ name: 'set_document_text', args: { proposalId: other.id, key: 'aboutUs.intro', text: long } }, ctx());
+const fullIntro = (await executeAgentTool({ name: 'list_document_texts', args: { proposalId: other.id, section: 'aboutUs' } }, ctx()) as any).data.texts.find((t: any) => t.key === 'aboutUs.intro').text;
+assert.equal(fullIntro.length, long.length);
 
 // 2. The user's example: change the panel warranty text of a proposal that is not open.
 const warranty = await executeAgentTool({ name: 'set_document_text', args: { proposalId: other.id, key: 'quotation.warranty.panel', text: '30 años de **producción lineal**' } }, ctx());
@@ -56,7 +62,13 @@ assert(!renderRichTextHtml(intro).includes('<script'), 'markup is stored as text
 // 6. Layout: hide sections and change theme; invalid ids are rejected.
 const layout = await executeAgentTool({ name: 'set_document_layout', args: { proposalId: other.id, hiddenSections: ['costMatrix', 'roi'], themeId: 'navy', showHeadersFooters: false } }, ctx());
 assert(layout.status === 'applied', JSON.stringify(layout));
-assert.deepEqual(project(other.id).customization?.layout?.hiddenSections, ['costMatrix', 'roi']);
+assert.equal(resolveSectionVisibility(project(other.id).customization?.layout).roi, false);
+assert.equal(resolveSectionVisibility(project(other.id).customization?.layout).costMatrix, false);
+// An explicit "visible" override (cost matrix shown in the editor) is cleared when an agent hides it.
+await executeAgentTool({ name: 'set_document_layout', args: { proposalId: other.id, visibleSections: ['costMatrix'] } }, ctx());
+assert.equal(resolveSectionVisibility(project(other.id).customization?.layout).costMatrix, true);
+await executeAgentTool({ name: 'set_document_layout', args: { proposalId: other.id, hiddenSections: ['costMatrix'] } }, ctx());
+assert.equal(resolveSectionVisibility(project(other.id).customization?.layout).costMatrix, false, 'confidential costs stay hidden');
 assert.equal(project(other.id).customization?.layout?.themeId, 'navy');
 assert.equal((await executeAgentTool({ name: 'set_document_layout', args: { proposalId: other.id, hiddenSections: ['bogus'] } }, ctx())).status, 'error');
 assert.equal((await executeAgentTool({ name: 'set_document_layout', args: { proposalId: other.id, themeId: 'bogus' } }, ctx())).status, 'error');

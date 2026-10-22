@@ -6,6 +6,8 @@ import { PDF_COLOR_THEMES } from '../../constants/pdfThemes';
 import { documentTextContextFor } from '../../utils/documentTextContext';
 import { effectiveFeatureSettings } from '../application/featurePolicy';
 import type { ProjectSimulation } from '../../types';
+import { withSectionVisible, type DocumentLayout } from '../../../shared/documentLayout';
+import type { DocumentSectionId } from '../../../shared/documentTexts';
 import { findVisibleProject, fingerprint, pickFields, requireEditableProject, store, type NativeHandler } from './nativeTools';
 
 const TEXT_FIELDS = ['customization', 'client'] as const;
@@ -42,7 +44,8 @@ function textsPlan(proposalId: string, values: Record<string, string | null>, ti
 const listTexts: NativeHandler = (args) => {
   const project = findVisibleProject(args.proposalId);
   const texts = listDocumentTexts(project, contextFor(project), args.section ? { section: args.section } : {}).map((t) => ({
-    key: t.key, label: t.label, section: t.section, text: t.text.slice(0, 2000), isCustomized: t.isCustomized, templatable: t.templatable, format: t.format,
+    // Full text: agents edit by replacing the whole value, so a truncated read would silently drop content.
+    key: t.key, label: t.label, section: t.section, text: t.text, isCustomized: t.isCustomized, templatable: t.templatable, format: t.format,
   }));
   return { data: { proposalId: project.id, texts } };
 };
@@ -56,9 +59,14 @@ const resetText: NativeHandler = (args) =>
 const setLayout: NativeHandler = (args) => {
   const project = requireEditableProject(args.proposalId);
   if (args.hiddenSections && !args.hiddenSections.every(isDocumentSectionId)) throw new Error('Sección desconocida en hiddenSections.');
+  if (args.visibleSections && !args.visibleSections.every(isDocumentSectionId)) throw new Error('Sección desconocida en visibleSections.');
   if (args.themeId && !PDF_COLOR_THEMES.some((t) => t.id === args.themeId)) throw new Error(`Tema desconocido. Usa: ${PDF_COLOR_THEMES.map((t) => t.id).join(', ')}.`);
+  const visibility: [DocumentSectionId, boolean][] = [
+    ...((args.hiddenSections ?? []) as DocumentSectionId[]).map((id): [DocumentSectionId, boolean] => [id, false]),
+    ...((args.visibleSections ?? []) as DocumentSectionId[]).map((id): [DocumentSectionId, boolean] => [id, true]),
+  ];
   const patch = {
-    ...(args.hiddenSections ? { hiddenSections: [...args.hiddenSections] } : {}),
+    ...(visibility.length ? { visibility: visibility.map(([id, v]) => `${id}:${v ? 'visible' : 'oculta'}`) } : {}),
     ...(args.themeId ? { themeId: args.themeId } : {}),
     ...(typeof args.showHeadersFooters === 'boolean' ? { showHeadersFooters: args.showHeadersFooters } : {}),
   };
@@ -71,7 +79,14 @@ const setLayout: NativeHandler = (args) => {
       execute() {
         const current = requireEditableProject(args.proposalId);
         const before = pickFields(current, ['customization']);
-        store().updateProjectById(current.id, (p) => ({ customization: { ...p.customization, layout: { ...p.customization?.layout, ...patch } } }));
+        store().updateProjectById(current.id, (p) => {
+          // withSectionVisible clears conflicting overrides (an explicit "visible" would otherwise win over "hidden").
+          let layout = { ...p.customization?.layout } as DocumentLayout;
+          for (const [id, visible] of visibility) layout = withSectionVisible(layout, id, visible);
+          if (args.themeId) layout.themeId = args.themeId;
+          if (typeof args.showHeadersFooters === 'boolean') layout.showHeadersFooters = args.showHeadersFooters;
+          return { customization: { ...p.customization, layout } };
+        });
         const after = store().projects.find((p) => p.id === current.id)!;
         return { targetId: current.id, undo: { before, fields: ['customization'], afterFingerprint: fingerprint(pickFields(after, ['customization'])) } };
       },

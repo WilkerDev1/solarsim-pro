@@ -100,7 +100,8 @@ const PROPOSAL_AND_CATALOG_TOOLS: AgentToolDefinition[] = [
     description: 'Oculta secciones del PDF, cambia el tema de color o la cabecera/pie. Secciones: cover, tableOfContents, executiveSummary, aboutUs, benefits, techIntro, projectDescription, energy, quotation, roi, cashFlow, costMatrix.',
     inputSchema: object({
       proposalId: id('ID de la propuesta.'),
-      hiddenSections: { type: 'array', maxItems: 12, items: { type: 'string', maxLength: 40 } },
+      hiddenSections: { type: 'array', maxItems: 12, items: { type: 'string', maxLength: 40 }, description: 'Secciones a ocultar.' },
+      visibleSections: { type: 'array', maxItems: 12, items: { type: 'string', maxLength: 40 }, description: 'Secciones a mostrar (p. ej. costMatrix, oculta por defecto).' },
       themeId: { type: 'string', maxLength: 40 },
       showHeadersFooters: { type: 'boolean' },
     }, ['proposalId']),
