@@ -218,6 +218,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
       },
       specs: {
         ...BENCHMARK_PROJECT.specs,
+        isDetailed: false, // Simple (Catálogo IA): equipos del catálogo con precios de proveedor
         pricingMode: defs?.defaultPricingMode === 'direct' ? 'direct_watt' : 'cost_matrix',
         panelPowerW: defs?.defaultPanelPowerW || 620,
         panelBrandModel: defs?.defaultPanelModel || BENCHMARK_PROJECT.specs.panelBrandModel,

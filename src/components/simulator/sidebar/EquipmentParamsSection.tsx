@@ -1,3 +1,4 @@
+import { catalogPanelGroupPatch } from '../../../utils/catalogGroupPatch';
 import React from 'react';
 import { editEquipmentGroup } from '../../../utils/equipmentGroups';
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs, PanelItemSpec, InverterItemSpec, BatteryItemSpec } from '../../../types';
@@ -150,8 +151,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
       const updatedPanels = [...project.specs.panels];
       updatedPanels[0] = {
         ...updatedPanels[0],
-        brandModel: item.displayName,
-        powerW: item.powerW || 550,
+        ...catalogPanelGroupPatch(item),
         unitPriceUSD: specsUpdate.panelUnitPriceUSD ?? updatedPanels[0].unitPriceUSD,
       };
       specsUpdate.panels = updatedPanels;
@@ -397,8 +397,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                         selectedPower={p.powerW}
                         onSelect={(item) => {
                           handleUpdatePanelItem(actualIdx, {
-                            brandModel: item.displayName,
-                            powerW: item.powerW || 550,
+                            ...catalogPanelGroupPatch(item),
                             unitPriceUSD: item.supplierPrices?.[0]?.priceUSD || p.unitPriceUSD,
                           });
                         }}

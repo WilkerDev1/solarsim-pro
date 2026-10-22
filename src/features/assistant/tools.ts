@@ -10,6 +10,7 @@ import {
 } from '../../../shared/applicationFeatures';
 import { buildAITariffContext } from '../../utils/aiTariffContext';
 import { editableAssistantFields, validateAssistantEdits } from './validation';
+import { AUTOMATED_PRICING } from '../../../shared/automatedProposalPolicy';
 import type {
   AssistantAction,
   AssistantToolCall,
@@ -221,6 +222,12 @@ export function executeAssistantTool(
     if (kind === 'project' && (target as any).syncStatus === 'conflict')
       throw new Error('Resuelve primero el conflicto de esta propuesta.');
     const edits = validateAssistantEdits(args.edits, kind);
+    // Agent edits that affect pricing always leave the proposal in catalog mode with the cost matrix.
+    if (kind === 'project' && edits.some((e) => e.section === 'specs' || e.section === 'financials')) {
+      const specs = (target as unknown as { specs: Record<string, unknown> }).specs;
+      for (const [field, value] of Object.entries(AUTOMATED_PRICING))
+        if (specs[field] !== value) edits.push({ section: 'specs', field, value });
+    }
     const groups = edits.filter(
       (e) =>
         e.section === 'specs' &&
@@ -309,7 +316,8 @@ export function applyAssistantAction(action: AssistantAction) {
         action.kind === 'project'
           ? 'propose_project_update'
           : 'propose_equipment_update',
-      args: { id: action.targetId, title: action.title, edits: action.edits },
+      // Policy edits are re-derived by the planner; agents cannot submit them directly.
+      args: { id: action.targetId, title: action.title, edits: action.edits.filter((e) => !(e.section === 'specs' && e.field in AUTOMATED_PRICING)) },
     },
     action.owner
   ).action!;

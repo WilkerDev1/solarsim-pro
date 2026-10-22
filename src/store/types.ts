@@ -59,6 +59,8 @@ export interface DefaultSimulationSettings {
 
   // 4. Costos y Margen de Venta
   defaultPricingMode: 'direct' | 'matrix';
+  /** Set when the user picks the pricing mode in Ajustes; otherwise a stored "direct" migrates to "matrix". */
+  pricingModeChosenByUser?: boolean;
   defaultDirectPriceUSDPerWp: number;
   defaultTargetMarginPct: number;
   defaultExcessEnergyDestiny: 'net_metering' | 'direct_sale';

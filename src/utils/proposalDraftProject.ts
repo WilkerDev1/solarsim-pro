@@ -5,6 +5,7 @@ import type { GlobalTariffMatrix } from '../types/tariffs';
 import { calculateRecommendedPanelCount } from '../engine/solarEngine';
 import { resolveAITariffSelection } from './aiTariffContext';
 import { getReferenceEnergyRateUSD } from '../data/rdTariffs';
+import { enforceAutomatedPricing } from '../../shared/automatedProposalPolicy';
 /** Pure adapter shared by preview and application. No store mutation, metadata or network. */
 export function prepareProposalDraftProject(base:ProjectSimulation,data:ExtractedInvoiceData,tariffMatrix:GlobalTariffMatrix,options:{isNew?:boolean;defaultBatteryDOD?:number}={}):ProjectSimulation {
   const province=data.province || base.client.province;
@@ -29,7 +30,6 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
       ...(data.selectedBatteryUnitPriceUSD!==undefined?{batteryUnitPriceUSD:data.selectedBatteryUnitPriceUSD}:{}),
       ...(data.hasBattery!==undefined?{hasBattery:data.hasBattery}:{}),
       ...(data.targetMarginPct!==undefined?{saleMarginMultiplier:1+data.targetMarginPct/100}:{}),
-      ...(data.pricingMode?{pricingMode:data.pricingMode}:{}),
       ...(data.commercial?.installationTotalUSD!==undefined&&dcKWp>0?{installationUnitPriceUSD:data.commercial.installationTotalUSD/dcKWp}:data.commercial?.installationUnitPriceUSD!==undefined?{installationUnitPriceUSD:data.commercial.installationUnitPriceUSD}:{}),
       ...(data.commercial?.directPriceSurplusTarget?{directPriceSurplusTarget:data.commercial.directPriceSurplusTarget}:{}),
       ...(data.commercial?.pricePerWattUSD!==undefined?{pricePerWattUSD:data.commercial.pricePerWattUSD}:{}),
@@ -68,13 +68,13 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
       ...(energy!==undefined?{energyCostPerKWh:energy}:createNewProject?{energyCostPerKWh:0}:{}),
       ...(tariff?{gridExportFeePct:tariff.netMeteringRetentionPct}:{}),
     };
-  return {...base,specs,rates,client:{...base.client,province},monthlyConsumption:[...data.monthlyConsumptionKWh],financials:{...base.financials,...(data.commercial?.pricePerWattUSD!==undefined?{pricePerWattUSD:data.commercial.pricePerWattUSD}:{}),...(data.commercial?.customItems!==undefined?{customItems:structuredClone(data.commercial.customItems)}:{}),...(data.commercial?.customDiscounts!==undefined?{customDiscounts:structuredClone(data.commercial.customDiscounts)}:{})}};
+  return {...base,specs:enforceAutomatedPricing(specs),rates,client:{...base.client,province},monthlyConsumption:[...data.monthlyConsumptionKWh],financials:{...base.financials,...(data.commercial?.pricePerWattUSD!==undefined?{pricePerWattUSD:data.commercial.pricePerWattUSD}:{}),...(data.commercial?.customItems!==undefined?{customItems:structuredClone(data.commercial.customItems)}:{}),...(data.commercial?.customDiscounts!==undefined?{customDiscounts:structuredClone(data.commercial.customDiscounts)}:{})}};
 }
 
 export function createAIProposalBase(template:ProjectSimulation,defaults:DefaultSimulationSettings,province:string):ProjectSimulation {
  const base=structuredClone(template);
 
-      base.specs={...base.specs,pricePerWattUSD:defaults.defaultDirectPriceUSDPerWp,systemLosses:defaults.defaultSystemLosses ?? 25,annualDegradation:defaults.defaultAnnualDegradation ?? 0.4,pricingMode:defaults.defaultPricingMode==='direct'?'direct_watt':'cost_matrix',saleMarginMultiplier:1+(defaults.defaultTargetMarginPct ?? 28)/100,panels:undefined,inverters:undefined,batteries:undefined,installationUnitPriceUSD:0};
+      base.specs={...base.specs,pricePerWattUSD:defaults.defaultDirectPriceUSDPerWp,systemLosses:defaults.defaultSystemLosses ?? 25,annualDegradation:defaults.defaultAnnualDegradation ?? 0.4,isDetailed:false,pricingMode:'cost_matrix',saleMarginMultiplier:1+(defaults.defaultTargetMarginPct ?? 28)/100,panels:undefined,inverters:undefined,batteries:undefined,installationUnitPriceUSD:0};
       base.rates={...base.rates,targetCoveragePct:defaults.defaultTargetCoveragePct ?? 95,isZeroExport:defaults.defaultZeroExport,currency:defaults.currency || 'USD',annualEnergyInflationPct:defaults.annualEnergyTariffEscalationPct ?? 3.5};
       base.financials={...base.financials,applyLey5707:defaults.applyLey5707,applyITBISExemption:defaults.applyITBISExemption,discountRatePct:defaults.discountRatePct,projectLifespanYears:defaults.lifespanYears,pricePerWattUSD:defaults.defaultDirectPriceUSDPerWp,customItems:[],customDiscounts:[],customCostUSD:undefined,customLey5707CreditUSD:undefined,customITBISSavedUSD:undefined};
       base.client={...base.client,company:'',address:'',contactPhone:'',contactEmail:'',contactPerson:'',location:province,customMonthlyHSP:undefined,coordinates:undefined};

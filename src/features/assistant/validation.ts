@@ -26,12 +26,8 @@ const fields: Record<AssistantSection, string[]> = {
     'panels',
     'inverters',
     'batteries',
-    'isDetailed',
-    'pricingMode',
     'panelPowerW',
     'panelCount',
-    'pricePerWattUSD',
-    'pricePerKWpUSD',
     'inverterPowerKW',
     'inverterCount',
     'hasBattery',
@@ -45,7 +41,6 @@ const fields: Record<AssistantSection, string[]> = {
     'inverterUnitPriceUSD',
     'batteryUnitPriceUSD',
     'installationUnitPriceUSD',
-    'directPriceSurplusTarget',
     'autoSupplierPricing',
     'panelEfficiency',
     'tempCoeff',
@@ -78,7 +73,6 @@ const fields: Record<AssistantSection, string[]> = {
     'customDiscounts',
     'applyLey5707',
     'applyITBISExemption',
-    'pricePerWattUSD',
     'discountRatePct',
     'projectLifespanYears',
     'co2FactorKgPerKWh',
@@ -121,6 +115,7 @@ const fields: Record<AssistantSection, string[]> = {
     'weightKg',
   ],
 };
+export const ASSISTANT_EDITABLE_FIELDS: Readonly<Record<AssistantSection, readonly string[]>> = fields;
 const booleanFields = new Set([
   'isDetailed',
   'hasBattery',

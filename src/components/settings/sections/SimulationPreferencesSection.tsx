@@ -496,11 +496,11 @@ export const SimulationPreferencesSection: React.FC = () => {
                 </label>
                 <select
                   value={defs.defaultPricingMode}
-                  onChange={(e) => updateDefaultSimulationSettings({ defaultPricingMode: e.target.value as 'direct' | 'matrix' })}
+                  onChange={(e) => updateDefaultSimulationSettings({ defaultPricingMode: e.target.value as 'direct' | 'matrix', pricingModeChosenByUser: true })}
                   className="w-full px-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-800 dark:text-zinc-200"
                 >
-                  <option value="direct">Precio Directo ($/Wp Llave en Mano)</option>
-                  <option value="matrix">Matriz de Costos Detallada (Equipos + Estructura + Mano de Obra)</option>
+                  <option value="matrix">Matriz de costos con precios del catálogo (recomendado)</option>
+                  <option value="direct">Precio directo ($/Wp llave en mano)</option>
                 </select>
               </div>
 
