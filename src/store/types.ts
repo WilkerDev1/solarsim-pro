@@ -59,6 +59,8 @@ export interface DefaultSimulationSettings {
 
   // 4. Costos y Margen de Venta
   defaultPricingMode: 'direct' | 'matrix';
+  /** Set when the user picks the pricing mode in Ajustes; otherwise a stored "direct" migrates to "matrix". */
+  pricingModeChosenByUser?: boolean;
   defaultDirectPriceUSDPerWp: number;
   defaultTargetMarginPct: number;
   defaultExcessEnergyDestiny: 'net_metering' | 'direct_sale';
@@ -102,7 +104,10 @@ export interface ProjectSlice {
   resetDefaultDocumentCustomization: () => void;
 
   createNewProject: (payload?: string | NewProjectPayload) => void;
-  duplicateProject: (id: string) => void;
+  /** Edits any proposal by id (agents); refuses trashed proposals. Returns false when nothing changed. */
+  updateProjectById: (id: string, edit: (project: ProjectSimulation) => Partial<ProjectSimulation>) => boolean;
+  /** Returns the new proposal id. `activate: false` keeps the user on the current proposal (agents). */
+  duplicateProject: (id: string, options?: { activate?: boolean }) => string | undefined;
   moveToTrash: (id: string) => void;
   deleteProject: (id: string) => void; // Compatibilidad: delega en moveToTrash
   restoreProject: (id: string) => void;
@@ -323,6 +328,7 @@ export interface NotificationSlice {
 
 import { TariffSlice } from './slices/tariffSlice';
 import { FeatureSettingsSlice } from './slices/featureSettingsSlice';
+import { AgentSlice } from './slices/agentSlice';
 
 export type SimulationStore = ProjectSlice &
   EquipmentSlice &
@@ -335,7 +341,8 @@ export type SimulationStore = ProjectSlice &
   CompanyProfileSlice &
   VersionHistorySlice &
   NotificationSlice &
-  FeatureSettingsSlice;
+  FeatureSettingsSlice &
+  AgentSlice;
 
 export type SimulationState = SimulationStore;
 export type SimulationSlice<T> = StateCreator<SimulationStore, [], [], T>;

@@ -25,7 +25,7 @@ export const DEFAULT_SIMULATION_SETTINGS: DefaultSimulationSettings = {
   defaultBatteryDOD: 90,
 
   // 4. Costos y Margen de Venta
-  defaultPricingMode: "direct",
+  defaultPricingMode: "matrix",
   defaultDirectPriceUSDPerWp: 1.05,
   defaultTargetMarginPct: 28,
   defaultExcessEnergyDestiny: "net_metering",
@@ -40,3 +40,12 @@ export const DEFAULT_SIMULATION_SETTINGS: DefaultSimulationSettings = {
   lifespanYears: 25,
   annualEnergyTariffEscalationPct: 3.5,
 };
+
+/**
+ * Before 2.7 the factory default was price-per-W ("direct") and it was persisted with every install, so a saved
+ * "direct" cannot be told apart from an inherited default. Only an explicit choice (pricingModeChosenByUser) keeps it.
+ */
+export function migrateDefaultSimulationSettings(settings: DefaultSimulationSettings): DefaultSimulationSettings {
+  if (!settings || settings.pricingModeChosenByUser || settings.defaultPricingMode !== "direct") return settings;
+  return { ...settings, defaultPricingMode: "matrix" };
+}

@@ -66,7 +66,7 @@ Se registraron dos llamadas reales de prueba de propuestas en esta tarea. Son ev
 
 La ficha de fabricante `LXP-LB-US-8-10K-datasheet.pdf` de Descargas se analizó con Gemini: la comprobación de las potencias nominales de ambas variantes (8 y 10 kW) pasó. No se enviaron facturas privadas en esta prueba. La primera comprobación falló en el script de QA por acceder a un campo inexistente; se corrigió el script y se repitió una vez. Esta evidencia puntual no garantiza otras fichas.
 
-Al aplicar se preservan provincia del contexto, precio directo configurado, referencias NIC/NIS/contrato y notas en `project.aiSource`. Los grupos BESS se adaptan a los escalares existentes conservando la suma de energía útil por grupo; no se cambia el motor. La revisión invalida su confirmación si cambia el borrador normalizado. Las notas revisadas quedan visibles en la cotización del simulador.
+Al aplicar se preservan provincia del contexto, referencias NIC/NIS/contrato y notas en `project.aiSource`. Los grupos BESS se adaptan a los escalares existentes conservando la suma de energía útil por grupo; no se cambia el motor. La revisión invalida su confirmación si cambia el borrador normalizado. Las notas revisadas quedan visibles en la cotización del simulador.
 
 ## Cotización editable antes de aplicar
 
@@ -91,3 +91,9 @@ Los nombres genéricos de equipo se cotejan por marca, tipo, magnitud y unidades
 Cantidades/modelos/pérdidas/ubicación recalculan esa referencia durante el borrador. Se desactiva dimensionar desde esa demanda derivada, evitando circularidad. Un historial observado conserva su procedencia; editar manualmente los meses termina el modo teórico. Tras aplicar, los meses son una referencia guardada: cambios posteriores del diseño requieren revisarlos; el simulador avisa de ese origen y reemplazar consumos termina la etiqueta teórica. No se cambia el contrato financiero ni las gráficas de publicaciones ya existentes.
 
 Sin precio de energía explícito se consulta sólo una distribuidora/código válido del catálogo, usando consumo mensual para tarifas escalonadas y marcándolo aproximado. Cambiar consumo o código recalcula referencias; tasas manuales/de factura se conservan. Se informa la necesidad de verificar vigencia. No se selecciona silenciosamente BTS2 ante código desconocido.
+
+## Modalidad de precio de las propuestas automáticas
+
+Toda propuesta creada o actualizada por IA (asistente de propuestas, asistente general y agentes externos) cotiza en modo **Simple (Catálogo IA)**: grupos con ID real del catálogo, costos de las ofertas de proveedor y matriz de costos (`AUTOMATED_PRICING` en `shared/automatedProposalPolicy.ts`). El esquema solo admite `cost_matrix`; si el modelo o el usuario piden precio por Wp, `normalizeCommercial` lo convierte a la matriz y emite el aviso `automated_pricing_forced`. La revisión muestra la modalidad como etiqueta fija y los agentes no pueden editar `isDetailed`, `pricingMode` ni los campos por Wp. El precio por Wp sigue disponible a mano en el simulador.
+
+El predeterminado de fábrica de Ajustes → Simulación es la matriz. Antes era precio por Wp y se guardaba en cada instalación, por lo que al hidratar se migra a matriz salvo que el usuario lo haya elegido explícitamente (`pricingModeChosenByUser`). Las propuestas manuales nuevas empiezan en modo Simple.

@@ -1,3 +1,4 @@
+import { catalogPanelGroupPatch } from '../../../utils/catalogGroupPatch';
 import React from 'react';
 import { editEquipmentGroup, selectCatalogEquipment } from '../../../utils/equipmentGroups';
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs, PanelItemSpec, InverterItemSpec, BatteryItemSpec } from '../../../types';
@@ -153,7 +154,8 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
     updateSpecs({
       ...specsUpdate,
       ...selectCatalogEquipment(project.specs, 'panel', 0, item, {
-        powerW: item.powerW || 550,
+        // Model-specific values (degradation, efficiency…) are replaced, never inherited from the previous model.
+        ...catalogPanelGroupPatch(item),
         selectedSupplierInfo: newSupplierInfo.panel,
         ...(specsUpdate.panelUnitPriceUSD !== undefined ? { unitPriceUSD: specsUpdate.panelUnitPriceUSD } : {}),
       }),
@@ -392,7 +394,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
                         selectedPower={p.powerW}
                         onSelect={(item) => {
                           updateSpecs(selectCatalogEquipment(project.specs, 'panel', actualIdx, item, {
-                            powerW: item.powerW || 550,
+                            ...catalogPanelGroupPatch(item),
                             unitPriceUSD: item.supplierPrices?.[0]?.priceUSD || p.unitPriceUSD,
                           }));
                         }}

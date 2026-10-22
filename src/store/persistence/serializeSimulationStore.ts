@@ -35,5 +35,7 @@ export function serializeSimulationStore(state: SimulationStore) {
     snapshotsByProject: state.snapshotsByProject,
     projectDeletionQueue: state.projectDeletionQueue,
     projectConflicts: state.projectConflicts,
+    agentPolicy: state.agentPolicy,
+    agentActivity: state.agentActivity,
   };
 }

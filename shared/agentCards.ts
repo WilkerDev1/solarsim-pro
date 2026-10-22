@@ -46,3 +46,9 @@ export interface DocumentTextCard extends AgentCardBase<'document-text'> {
 
 export type AgentCard =
   | ProposalCard | EquipmentCard | CatalogAuditCard | PendingActionCard | ClientCard | AttachmentCard | DocumentTextCard;
+
+/** Card types that external MCP hosts can render as MCP Apps views (`ui://solarsim/cards/<type>`). */
+export const MCP_APP_CARD_TYPES = ['proposal', 'catalog-audit', 'pending-action'] as const satisfies readonly AgentCardType[];
+export type McpAppCardType = (typeof MCP_APP_CARD_TYPES)[number];
+export const mcpAppUri = (type: McpAppCardType): string => `ui://solarsim/cards/${type}`;
+export const isMcpAppCardType = (type: string | undefined): type is McpAppCardType => (MCP_APP_CARD_TYPES as readonly string[]).includes(type ?? '');

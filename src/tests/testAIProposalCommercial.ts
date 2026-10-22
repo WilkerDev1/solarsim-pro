@@ -72,7 +72,11 @@ assert.equal(followup.panels?.[0].unitPriceUSD,0);
 const conflicting=normalizeProposalDraft({...input,panels:[{equipmentId:panel.id,quantity:5,unitPriceUSD:100},{equipmentId:panel.id,quantity:5,unitPriceUSD:200}]},catalog,context);
 assert.equal(conflicting.panels?.length,2,'conflicting commercial rows cannot collapse');
 assert.equal(normalizeProposalDraft(conflicting,catalog,context).requiresReview,true);
-assert.equal(normalizeProposalDraft({...input,commercial:{pricingMode:'direct_watt',pricePerWattUSD:0}},catalog,context).requiresReview,true);
+// Automated proposals never quote per-W: the request is forced to the cost matrix with a warning (automatedProposalPolicy).
+const perW=normalizeProposalDraft({...input,commercial:{pricingMode:'direct_watt',pricePerWattUSD:0}},catalog,context);
+assert.equal(perW.commercial?.pricingMode,'cost_matrix');
+assert.equal(perW.requiresReview,false);
+assert(perW.validationIssues?.some(i=>i.code==='automated_pricing_forced'&&i.severity==='warning'));
 const corrected=normalizeProposalDraft({...input,commercial:{markupPct:30}},catalog,{...context,currentDraft:{commercial:{markupPct:-5}}});
 assert.equal(corrected.requiresReview,false,'a valid correction removes the old error in the first pass');
 
