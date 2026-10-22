@@ -2,13 +2,15 @@ import React from 'react';
 import { Sparkles } from 'lucide-react';
 import { CommitNumberField, InfoTip, ParamRow, StatStrip, SubHeader, SubHeaderTextButton, ToggleGroup } from '../../ui';
 import type { FinancialSummaryResult, SystemSpecs } from '../../../../../types';
-import { DEFAULT_PRICE_PER_WATT_USD, isValidDirectPrice, resolveSaleMarginMultiplier } from '../../logic/dockDefaults';
+import { isValidDirectPrice, resolvePricePerWattUSD, resolveSaleMarginMultiplier } from '../../logic/dockDefaults';
 import { kwpPricePatch, pricePerKWpFromWatt, roundedWattPrice, wattPricePatch } from '../../logic/pricingSync';
 import { usd } from './format';
 
 interface DirectPriceProps {
   specs: SystemSpecs;
   summary: FinancialSummaryResult;
+  /** `financials.pricePerWattUSD` del proyecto: segundo eslabón de la cadena de fallback del motor. */
+  financialsPricePerWattUSD?: number;
   updateSpecs: (specs: Partial<SystemSpecs>) => void;
 }
 
@@ -19,9 +21,9 @@ const TIP =
   'Fija el costo llave en mano por Wp o kWp sin desglosar mano de obra. El excedente comercial se asigna a la ganancia o a mano de obra, ingeniería e instalación.';
 
 /** Modo Directo: $/W y $/kWp sincronizados, destino del excedente y resumen de margen. */
-export const DirectPrice: React.FC<DirectPriceProps> = ({ specs, summary, updateSpecs }) => {
-  // Ambos campos salen del mismo valor. El motor ignora un $/Wp ≤ 0, así que 0 no es válido: se muestra el default.
-  const wattPrice = isValidDirectPrice(specs.pricePerWattUSD) ? specs.pricePerWattUSD : DEFAULT_PRICE_PER_WATT_USD;
+export const DirectPrice: React.FC<DirectPriceProps> = ({ specs, summary, financialsPricePerWattUSD, updateSpecs }) => {
+  // Ambos campos salen del mismo valor. El motor ignora un $/Wp ≤ 0 (usa financials y luego el default): la vista sigue la misma cadena.
+  const wattPrice = resolvePricePerWattUSD(specs, { pricePerWattUSD: financialsPricePerWattUSD });
   const kwpPrice = isValidDirectPrice(specs.pricePerKWpUSD) ? specs.pricePerKWpUSD : pricePerKWpFromWatt(wattPrice);
   const matrix = summary?.costMatrix;
 
@@ -34,7 +36,7 @@ export const DirectPrice: React.FC<DirectPriceProps> = ({ specs, summary, update
             <InfoTip text={TIP} />
             <SubHeaderTextButton
               icon={<Sparkles size={13} strokeWidth={2} aria-hidden="true" />}
-              onClick={() => updateSpecs(wattPricePatch(roundedWattPrice(matrix?.salePricePerWattUSD, DEFAULT_PRICE_PER_WATT_USD)))}
+              onClick={() => updateSpecs(wattPricePatch(roundedWattPrice(matrix?.salePricePerWattUSD, wattPrice)))}
             >
               Sugerir de costos
             </SubHeaderTextButton>

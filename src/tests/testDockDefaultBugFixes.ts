@@ -95,6 +95,19 @@ const projectOf = (specs: Partial<SystemSpecs> = {}): ProjectSimulation => ({ ..
     assert.equal(valueOf(html, 'pd-price-kwp'), '1130', '$/kWp sale del mismo valor');
   }
   assert.equal(valueOf(direct({ pricePerWattUSD: 0.5 }), 'pd-price-kwp'), '500');
+  // Cadena única con el motor: specs > 0, luego financials > 0, luego el default.
+  assert.equal(shared.resolvePricePerWattUSD({ pricePerWattUSD: 0 }, { pricePerWattUSD: 1.2 }), 1.2);
+  assert.equal(shared.resolvePricePerWattUSD({ pricePerWattUSD: 0.9 }, { pricePerWattUSD: 1.2 }), 0.9);
+  assert.equal(shared.resolvePricePerWattUSD({}, { pricePerWattUSD: -1 }), 1.13);
+  assert.equal(shared.resolvePricePerWattUSD({ pricePerWattUSD: NaN }, undefined), 1.13);
+  for (const specsPrice of [0, -1, undefined]) {
+    const project = projectOf({ pricingMode: 'direct_watt', pricePerWattUSD: specsPrice, pricePerKWpUSD: undefined } as unknown as Partial<SystemSpecs>);
+    const html = render(h(PricingParamsSection, { project: { ...project, financials: { ...project.financials, pricePerWattUSD: 1.2 } }, summary: {} as never, updateSpecs: noop }));
+    assert.equal(valueOf(html, 'pd-price-w'), '1.2', 'la vista sigue la cadena del motor: financials.pricePerWattUSD');
+    assert.equal(valueOf(html, 'pd-price-kwp'), '1200');
+  }
+  const finance = readFileSync('src/engine/financeEngine.ts', 'utf8');
+  assert(finance.includes('resolvePricePerWattUSD('), 'financeEngine usa el helper compartido');
   assert.equal(valueOf(direct({ pricePerWattUSD: 0.5, pricePerKWpUSD: 0 }), 'pd-price-kwp'), '500', '$/kWp 0 también cae al valor derivado');
   assert.equal(valueOf(direct({ pricePerWattUSD: 0.5, pricePerKWpUSD: 520 }), 'pd-price-kwp'), '520');
 }

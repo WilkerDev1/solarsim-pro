@@ -51,3 +51,11 @@ export const resolveBatteryDodPct = (dod: number | undefined | null): number => 
 export const resolveBatteryEfficiencyPct = (efficiency: number | undefined | null): number => (isPositive(efficiency) ? efficiency : DEFAULT_BATTERY_EFFICIENCY_PCT);
 /** `true` si el precio directo ($/Wp o $/kWp) es utilizable: finito y > 0, como exige el motor. */
 export const isValidDirectPrice = (price: number | undefined | null): price is number => isPositive(price);
+/**
+ * Precio directo por Wp (US$) efectivo: el del proyecto si es > 0; si no, el de `financials` si es > 0;
+ * si no, el default. Es la cadena del motor y la de la vista del dock, para que nunca diverjan.
+ */
+export const resolvePricePerWattUSD = (
+  specs: { pricePerWattUSD?: number | null } | undefined,
+  financials?: { pricePerWattUSD?: number | null } | undefined,
+): number => (isPositive(specs?.pricePerWattUSD) ? specs.pricePerWattUSD : isPositive(financials?.pricePerWattUSD) ? financials.pricePerWattUSD : DEFAULT_PRICE_PER_WATT_USD);

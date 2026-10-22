@@ -1,6 +1,6 @@
 import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
 import { DEFAULT_UNIT_PRICE_USD } from '../utils/equipmentGroups';
-import { DEFAULT_INSTALLATION_USD_PER_KWP, DEFAULT_PRICE_PER_WATT_USD, resolveBatteryDodPct, resolveBatteryEfficiencyPct, resolveDopRate, resolveSaleMarginMultiplier } from '../../shared/projectDefaults';
+import { DEFAULT_INSTALLATION_USD_PER_KWP, DEFAULT_PRICE_PER_WATT_USD, resolveBatteryDodPct, resolveBatteryEfficiencyPct, resolveDopRate, resolvePricePerWattUSD, resolveSaleMarginMultiplier } from '../../shared/projectDefaults';
 import { ITBIS_RATE, LEY5707_CREDIT_RATE, appliesItemMargin, customItemsTaxBreakdown, isItemItbisExonerated } from '../../shared/financialRules';
 import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem, CustomQuotationItem, CustomQuotationDiscount, ProjectSimulation } from '../types';
 import { calculateDCCapacityKWp, calculateMonthlySolarProduction } from './solarEngine';
@@ -414,9 +414,7 @@ export function calculateFinancialSummary(
 
   // Pricing Mode: 'cost_matrix' (default) vs 'direct_watt' (manual $/W or $/kW base price)
   const isDirectWatt = specs.pricingMode === 'direct_watt' || (!specs.isDetailed && specs.pricingMode !== 'cost_matrix');
-  const effectivePricePerWatt = specs.pricePerWattUSD !== undefined && specs.pricePerWattUSD > 0
-    ? specs.pricePerWattUSD
-    : (financials.pricePerWattUSD !== undefined && financials.pricePerWattUSD > 0 ? financials.pricePerWattUSD : DEFAULT_PRICE_PER_WATT_USD);
+  const effectivePricePerWatt = resolvePricePerWattUSD(specs, financials);
 
   const customItemsTotalUSD = Math.round(customItems.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPriceUSD || 0)), 0) * 100) / 100;
   

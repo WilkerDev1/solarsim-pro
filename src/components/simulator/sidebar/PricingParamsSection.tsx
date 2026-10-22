@@ -12,7 +12,7 @@ import {
   wattPricePatch,
   wholeMarginPctFromMultiplier,
 } from '../params/logic/pricingSync';
-import { DEFAULT_PRICE_PER_WATT_USD, resolveDopRate, resolveSaleMarginMultiplier } from '../params/logic/dockDefaults';
+import { resolveDopRate, resolvePricePerWattUSD, resolveSaleMarginMultiplier } from '../params/logic/dockDefaults';
 import { ChipGroup, CommitNumberField, ParamRow, StatStrip, ToggleGroup } from '../params/ui';
 import { DirectPrice } from '../params/sections/pricing/DirectPrice';
 import { NumberField } from '../params/sections/pricing/NumberField';
@@ -64,7 +64,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
       updateSpecs({ pricingMode: 'cost_matrix' });
       return;
     }
-    const autoWp = roundedWattPrice(matrix?.salePricePerWattUSD, specs.pricePerWattUSD, DEFAULT_PRICE_PER_WATT_USD);
+    const autoWp = roundedWattPrice(matrix?.salePricePerWattUSD, resolvePricePerWattUSD(specs, project.financials));
     updateSpecs({ pricingMode: 'direct_watt', ...wattPricePatch(autoWp) });
   };
 
@@ -84,7 +84,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
       </ParamRow>
 
       {isDirect ? (
-        <DirectPrice specs={specs} summary={summary} updateSpecs={updateSpecs} />
+        <DirectPrice specs={specs} summary={summary} financialsPricePerWattUSD={project.financials?.pricePerWattUSD} updateSpecs={updateSpecs} />
       ) : (
         <>
           <ParamRow label="Tasa DOP/USD" htmlFor="pd-dop-rate">

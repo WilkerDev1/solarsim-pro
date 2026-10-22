@@ -20,6 +20,7 @@ export {
   resolveBatteryDodPct,
   resolveBatteryEfficiencyPct,
   resolveDopRate,
+  resolvePricePerWattUSD,
   resolveSaleMarginMultiplier,
 } from '../../../../../shared/projectDefaults';
 
