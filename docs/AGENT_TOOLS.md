@@ -4,7 +4,7 @@ SolarSim expone un único registro de herramientas para tres superficies:
 
 - el **Asistente de propuestas** (menú Sparkles), que crea o actualiza propuestas a partir de facturas;
 - el **Asistente general** (chat flotante en Inicio, Hub y Simulador), experimental y apagado por defecto en Funciones de la aplicación;
-- los **agentes externos** conectados por MCP local (fase posterior).
+- los **agentes externos** conectados por el [servidor MCP local](MCP_LOCAL.md).
 
 Las dos interfaces internas se mantienen separadas, pero comparten herramientas, reglas, permisos, registro de actividad y política de precios.
 
@@ -67,6 +67,6 @@ Texto, archivos adjuntos y resultados de herramientas se envían a Google Gemini
 
 ## Verificación
 
-- Suites: `testAgentToolSchemas`, `testAgentPermissions`, `testAgentProposalTools`, `testCatalogAudit`, `testAgentCards`, `testChatMarkdown`, `testChatFiles`, `testProposalAssistantApply`, `testAutomatedPricingPolicy` y `testAppAssistant`.
+- Suites: `testMcpBridgeHost`, `testMcpConnectionPanel`, `electron/mcp/tests/*`, `testAgentToolSchemas`, `testAgentPermissions`, `testAgentProposalTools`, `testCatalogAudit`, `testAgentCards`, `testChatMarkdown`, `testChatFiles`, `testProposalAssistantApply`, `testAutomatedPricingPolicy` y `testAppAssistant`.
 - Todas usan transporte sintético; ninguna escribe en producción ni llama a Gemini real.
 - La fixture `scripts/qa/fixtures/appAssistant.html` cubre consultas, auditoría, cambio aplicado con deshacer y confirmación.
