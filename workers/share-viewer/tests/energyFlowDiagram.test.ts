@@ -59,6 +59,9 @@ assert.ok(energyFlowBranches({ hybrid: false, isZeroExport: true, annualProducti
 const idleBattery = energyFlowBranches({ hybrid: true, isZeroExport: false, annualProductionKWh: 12000, calculationMode: 'self_consumption', monthly: [month(12000, 12000, 0, 0)] });
 assert.deepEqual(shares(idleBattery), { home: 100 });
 
+// A measured zero self-consumption (no load) keeps the all-export result.
+assert.deepEqual(shares(energyFlowBranches({ hybrid: false, isZeroExport: false, annualProductionKWh: 10000, monthly: [month(10000, 0, 10000)] })), { grid: 100 });
+
 for (const branches of [onGrid, hybrid, legacyHybrid]) {
   assert.equal(branches.reduce((sum, b) => sum + b.pct, 0), 100);
   assert.ok(branches.every((b) => b.pct % 5 === 0 && b.pct > 0));

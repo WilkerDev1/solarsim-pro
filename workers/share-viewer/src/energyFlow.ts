@@ -54,7 +54,7 @@ function energyFlow({ hybrid, isZeroExport, annualProductionKWh, monthly, calcul
 
   // Legacy snapshots never record the battery cycle; the physical model may report a real zero.
   const batteryKnown = !hybrid || battery > 0 || calculationMode === 'self_consumption';
-  const usable = production > 0 && selfConsumed > 0 && batteryKnown;
+  const usable = production > 0 && selfConsumed + exported > 0 && batteryKnown;
   const pct = usable
     ? roundToFive({ home, battery, grid: exported })
     : TYPICAL[hybrid ? (isZeroExport ? 'hybridZeroExport' : 'hybrid') : (isZeroExport ? 'zeroExport' : 'onGrid')];
