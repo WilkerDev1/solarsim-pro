@@ -7,17 +7,15 @@ import { useSimulationStore } from '../../store/useSimulationStore';
 import { isWriterRole } from '../../../shared/permissions';
 import { agentPolicyKey, installAgentRuntime, type AgentActivityEntry, type AgentChange, type PendingAgentAction } from '../../store/slices/agentSlice';
 import { editableAssistantFields } from '../assistant/validation';
-import { applyAssistantAction, executeAssistantTool } from '../assistant/tools';
+import { applyAssistantAction, assistantOwner, executeAssistantTool } from '../assistant/tools';
+import type { AgentToolContext, NativeHandler, NativePlan } from './nativeTools';
+import { PROPOSAL_TOOL_HANDLERS } from './proposalTools';
+import { CATALOG_TOOL_HANDLERS } from './catalogTools';
 import { assistantFieldLabel, assistantValueLabel } from '../assistant/labels';
 import type { AssistantAction, AssistantCard, AssistantToolResult } from '../assistant/types';
 
-export interface AgentToolContext {
-  source: AgentSource;
-  /** Workspace/session owner captured when the request started; a change invalidates the call. */
-  owner: string;
-  clientLabel?: string;
-  signal?: AbortSignal;
-}
+export type { AgentToolContext } from './nativeTools';
+const NATIVE_HANDLERS: Record<string, NativeHandler> = { ...PROPOSAL_TOOL_HANDLERS, ...CATALOG_TOOL_HANDLERS };
 
 const MAX_RESULT_BYTES = 64000;
 const PROJECT_SECTIONS = ['client', 'specs', 'rates', 'financials', 'monthlyConsumption', 'customization'] as const;
@@ -98,9 +96,27 @@ function canWriteNow(): boolean {
   return user ? !!s.syncSettings.authToken && isWriterRole(user.role) : s.workspaceScope === 'local';
 }
 
+type PlanMeta = { source: AgentSource; clientLabel?: string; tool: string; kind: 'draft' | 'guarded' };
+const isNativePlan = (plan: unknown): plan is NativePlan => !!plan && typeof (plan as NativePlan).execute === 'function';
+
+function runNativePlan(plan: NativePlan, meta: PlanMeta) {
+  const execution = plan.execute();
+  const activityId = store().recordAgentActivity({
+    ...meta, targetType: plan.targetType, targetId: execution.targetId, title: plan.title, changes: plan.changes, undo: execution.undo,
+  });
+  return { activityId, execution };
+}
+
 function undoEntry(entry: AgentActivityEntry) {
   const s = store();
   if (!canWriteNow()) return { success: false, error: 'Tu cuenta solo puede consultar.' };
+  if (entry.undo?.op === 'trash' || entry.undo?.op === 'restore') {
+    const project = s.projects.find((p) => p.id === entry.targetId);
+    if (!project) return { success: false, error: 'La propuesta ya no existe.' };
+    if (entry.undo.op === 'trash') s.moveToTrash(project.id);
+    else s.restoreProject(project.id);
+    return { success: true };
+  }
   const fields = entry.undo!.fields || Object.keys(entry.undo!.before);
   const restored = Object.fromEntries(fields.map((f) => [f, structuredClone(entry.undo!.before[f])]));
   if (entry.targetType === 'equipment') {
@@ -128,6 +144,10 @@ function undoEntry(entry: AgentActivityEntry) {
 installAgentRuntime({
   apply(pending: PendingAgentAction) {
     try {
+      if (isNativePlan(pending.plan)) {
+        const meta = { source: pending.source, clientLabel: pending.clientLabel, tool: pending.tool, kind: pending.kind === 'guarded' ? 'guarded' : 'draft' } as const;
+        return { success: true, activityId: runNativePlan(pending.plan, meta).activityId };
+      }
       const activityId = applyPlan(pending.plan as AssistantAction, { source: pending.source, clientLabel: pending.clientLabel, tool: pending.tool, kind: pending.kind === 'guarded' ? 'guarded' : 'draft' });
       return { success: true, activityId };
     } catch (error) {
@@ -161,6 +181,8 @@ export async function executeAgentTool(call: AgentToolCall, ctx: AgentToolContex
   if (errors.length) return { status: 'error', code: 'invalid_arguments', message: errors.slice(0, 5).join(' ') };
   if (ctx.signal?.aborted) return { status: 'error', code: 'cancelled', message: 'Solicitud cancelada.' };
   if (definition.name === 'get_agent_action_status') return actionStatus(args, ctx);
+  const native = NATIVE_HANDLERS[definition.name];
+  if (native) return executeNative(native, definition, args, ctx, policy.draft);
   let result: AssistantToolResult;
   try {
     result = executeAssistantTool({ name: call.name, args: decodeArgs(args) }, ctx.owner, { requireAssistantEnabled: ctx.source === 'app-assistant' });
@@ -186,6 +208,32 @@ export async function executeAgentTool(call: AgentToolCall, ctx: AgentToolContex
   return { status: 'pending_confirmation', actionId: action.id, summary: action.title, cards };
 }
 
+async function executeNative(handler: NativeHandler, definition: AgentToolDefinition, args: Record<string, unknown>, ctx: AgentToolContext, draftPolicy: string): Promise<AgentToolOutcome> {
+  if (ctx.owner !== assistantOwner()) return { status: 'error', code: 'stale_owner', message: 'El espacio o la sesión cambió.' };
+  let result;
+  try {
+    result = handler(args, ctx);
+  } catch (error) {
+    return { status: 'error', code: 'tool_failed', message: error instanceof Error ? error.message : 'Herramienta no disponible.' };
+  }
+  if (JSON.stringify(result.data ?? null).length > MAX_RESULT_BYTES)
+    return { status: 'error', code: 'result_too_large', message: 'Resultado demasiado grande. Usa filtros más concretos.' };
+  if (!result.plan) return { status: 'ok', data: result.data, cards: result.cards };
+  const kind = definition.kind === 'guarded' ? 'guarded' : 'draft';
+  const meta = { source: ctx.source, clientLabel: ctx.clientLabel, tool: definition.name, kind } as const;
+  if (kind === 'draft' && draftPolicy === 'allow') {
+    try {
+      const { activityId, execution } = runNativePlan(result.plan, meta);
+      return { status: 'applied', data: { status: 'applied', ...(execution.data as object) }, activityId, cards: execution.cards ?? result.cards };
+    } catch (error) {
+      return { status: 'error', code: 'apply_failed', message: error instanceof Error ? error.message : 'No se pudo aplicar.' };
+    }
+  }
+  const actionId = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  store().queueAgentAction({ id: actionId, ...meta, title: result.plan.title, changes: result.plan.changes, plan: result.plan });
+  return { status: 'pending_confirmation', actionId, summary: result.plan.title, cards: result.cards };
+}
+
 export function getPendingAgentAction(actionId: string): AssistantAction | undefined {
   return store().pendingAgentActions.find((a) => a.id === actionId)?.plan as AssistantAction | undefined;
 }
@@ -196,8 +244,13 @@ export async function executeForAssistant(call: AgentToolCall, ctx: AgentToolCon
   if (outcome.status === 'error') throw new Error(outcome.message);
   const cards = outcome.cards?.map(toAssistantCard).filter((c): c is AssistantCard => !!c);
   if (outcome.status === 'pending_confirmation') {
-    const action = getPendingAgentAction(outcome.actionId)!;
-    return { data: { status: 'pending_confirmation', edits: action.edits }, cards, action };
+    const pending = store().pendingAgentActions.find((a) => a.id === outcome.actionId)!;
+    const action: AssistantAction = isNativePlan(pending.plan)
+      // Native plans are shown with their human-readable changes; confirmation always goes through the queue by id.
+      ? { id: pending.id, kind: pending.plan.targetType, targetId: '', title: pending.title, fingerprint: '', owner: ctx.owner,
+          edits: pending.changes.map((c) => ({ section: 'client' as const, field: c.label, value: c.value })) }
+      : (pending.plan as AssistantAction);
+    return { data: { status: 'pending_confirmation', changes: pending.changes }, cards, action };
   }
   if (outcome.status === 'applied') return { data: outcome.data, cards, activityId: outcome.activityId };
   return { data: outcome.data, cards };
