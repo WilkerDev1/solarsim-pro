@@ -36,7 +36,8 @@ export interface NativeResult {
   plan?: NativePlan;
 }
 
-export type NativeHandler = (args: Record<string, any>, ctx: AgentToolContext) => NativeResult;
+/** Preparation may be async (e.g. reading a PDF); `execute` stays synchronous so confirmation can apply it immediately. */
+export type NativeHandler = (args: Record<string, any>, ctx: AgentToolContext) => NativeResult | Promise<NativeResult>;
 
 export const store = () => useSimulationStore.getState();
 export const fingerprint = (value: unknown) => JSON.stringify(value ?? null);

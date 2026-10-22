@@ -112,6 +112,34 @@ const PROPOSAL_AND_CATALOG_TOOLS: AgentToolDefinition[] = [
     inputSchema: object({ proposalId: id('ID de la propuesta abierta.'), keys: { type: 'array', maxItems: 40, items: { type: 'string', maxLength: 80 } } }, ['proposalId', 'keys']),
   },
   {
+    name: 'list_proposal_attachments', title: 'Consultar anexos', kind: 'read', category: 'attachments', surfaces: [...ALL],
+    description: 'Lista los PDF anexados a una propuesta (fichas del catálogo y anexos manuales) con su estado de fusión e índice.',
+    inputSchema: object({ proposalId: id('ID de la propuesta.') }, ['proposalId']),
+  },
+  {
+    name: 'sync_catalog_datasheets', title: 'Anexar fichas del catálogo', kind: 'draft', category: 'attachments', surfaces: [...ALL],
+    description: 'Anexa las fichas técnicas del catálogo de los equipos usados en la propuesta (y retira las de equipos que ya no están).',
+    inputSchema: object({ proposalId: id('ID de la propuesta.') }, ['proposalId']),
+  },
+  {
+    name: 'set_attachment_enabled', title: 'Configurar anexo', kind: 'draft', category: 'attachments', surfaces: [...ALL],
+    description: 'Activa o desactiva la fusión de un anexo al exportar, su presencia en el índice o su título.',
+    inputSchema: object({ proposalId: id('ID de la propuesta.'), attachmentId: id('ID del anexo.'), enabled: { type: 'boolean' }, inTableOfContents: { type: 'boolean' }, title: { type: 'string', maxLength: 200 } }, ['proposalId', 'attachmentId']),
+  },
+  {
+    name: 'attach_file_to_proposal', title: 'Anexar PDF', kind: 'draft', category: 'attachments', surfaces: [...ALL],
+    description: 'Anexa un PDF a la propuesta: un archivo adjuntado en el chat (fileId) o, para agentes externos, el contenido en base64 (máx. 8 MB). Nunca rutas del disco.',
+    inputSchema: object({
+      proposalId: id('ID de la propuesta.'), fileId: { type: 'string', maxLength: 128 }, fileName: { type: 'string', maxLength: 200 },
+      contentBase64: { type: 'string', maxLength: 11200000 }, title: { type: 'string', maxLength: 200 },
+    }, ['proposalId']),
+  },
+  {
+    name: 'remove_proposal_attachment', title: 'Quitar anexo', kind: 'guarded', category: 'attachments', surfaces: [...ALL],
+    description: 'Quita un anexo de la propuesta; una ficha del catálogo queda descartada para no volver a añadirse. Requiere confirmación.',
+    inputSchema: object({ proposalId: id('ID de la propuesta.'), attachmentId: id('ID del anexo.') }, ['proposalId', 'attachmentId']),
+  },
+  {
     name: 'apply_proposal_draft', title: 'Aplicar borrador del asistente de propuestas', kind: 'draft', category: 'proposals', card: 'proposal',
     surfaces: ['proposal-assistant'],
     description: 'Aplica el borrador revisado del asistente de propuestas (crear o actualizar la propuesta abierta). Uso interno de la interfaz de revisión.',
