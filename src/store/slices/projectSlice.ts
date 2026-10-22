@@ -15,6 +15,8 @@ import { calculateFinancialSummary, calculateCostMatrixSummary } from '../../eng
 import { calculateRecommendedPanelCount } from '../../engine/solarEngine';
 import { projectMutationMetadata } from '../sync/projectMutation';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
+import { canWrite } from '../../../shared/permissions';
+import { normalizeDocumentLayout } from '../../../shared/documentLayout';
 import { applyDocumentTextPatch, companyTemplateTextPatch, documentTextsPatch } from '../../../shared/documentTexts';
 import { documentTextContextFor } from '../../utils/documentTextContext';
 
@@ -627,7 +629,11 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     return { client, customization: { ...(p.customization || {}), ...customizationPartial } };
   }),
 
-  setDocumentTexts: (values) => updateActiveProject((p, state) => {
+  setDocumentLayout: (patch) => !canWrite(get().syncSettings.currentUser) ? undefined : updateActiveProject((p) => ({
+    customization: { ...(p.customization || {}), layout: normalizeDocumentLayout({ ...(p.customization?.layout || {}), ...patch }) },
+  })),
+
+  setDocumentTexts: (values) => !canWrite(get().syncSettings.currentUser) ? undefined : updateActiveProject((p, state) => {
     const ctx = documentTextContextFor(state, p, energyCalculationMode(effectiveFeatureSettings(state)));
     const patch = documentTextsPatch(values, p, ctx);
     const next = applyDocumentTextPatch({ customization: p.customization || {}, client: p.client }, patch);
