@@ -1,33 +1,19 @@
 import React, { useState, useRef } from 'react';
-import {
-  Paperclip,
-  UploadCloud,
-  FileText,
-  Trash2,
-  ExternalLink,
-  CheckCircle2,
-  AlertCircle,
-  Sparkles,
-  GripVertical,
-} from 'lucide-react';
+import { Paperclip, UploadCloud, CheckCircle2, AlertCircle, Sparkles, RotateCcw } from 'lucide-react';
 import { ProjectSimulation, DocumentCustomization, AttachedPDFDocument } from '../../../types';
 import { PDFMergeService } from '../../../services/pdfMergeService';
 import { PDFAttachmentStorage } from '../../../services/pdfAttachmentStorage';
-import { PDFThumbnailService } from '../../../services/pdfThumbnailService';
-import { proposalDatasheets } from '../../../utils/proposalDatasheets';
+import { datasheetFileName, proposalDatasheets } from '../../../utils/proposalDatasheets';
 import { fetchEquipmentAsset } from '../../../services/equipmentAssetService';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { dismissAnnex, restoreDismissedAnnexes, workspaceCatalog } from '../../../utils/proposalAnnexes';
+import { AnnexCard } from '../annexes/AnnexCard';
+import { resolveProposalAttachmentBytes } from '../../../services/proposalAttachmentResolver';
 
 interface PDFAttachmentsSectionProps {
   isDark: boolean;
   project?: ProjectSimulation;
   updateDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
 export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
@@ -52,9 +38,6 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
     s.projects.find((p) => p.id === s.activeProjectId) || s.getActiveProject()
   );
   const currentProject = storeProject || project;
-
-  // Registro de documentos para los cuales ya se intentó generar miniatura (evita bucles infinitos)
-  const attemptedThumbnailsRef = useRef<Set<string>>(new Set());
 
   const doUpdateDoc = (partial: Partial<DocumentCustomization>) => {
     const live = useSimulationStore.getState();
@@ -81,51 +64,6 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
     doUpdateDoc({ attachedPdfs: list });
   };
 
-  // Auto-generar miniaturas de la primera página para anexos existentes que aún no tengan miniatura
-  React.useEffect(() => {
-    if (!currentProject) return;
-    let isMounted = true;
-    const currentList = getLatestAttachments();
-    const missing = currentList.filter(
-      (att) => !att.thumbnailDataUrl && !attemptedThumbnailsRef.current.has(att.id)
-    );
-    if (missing.length === 0) return;
-
-    const generateMissing = async () => {
-      let updated = false;
-      const newList = [...getLatestAttachments()];
-
-      for (let i = 0; i < newList.length; i++) {
-        const item = newList[i];
-        if (!item.thumbnailDataUrl && !attemptedThumbnailsRef.current.has(item.id)) {
-          attemptedThumbnailsRef.current.add(item.id);
-          try {
-            const buf = await PDFAttachmentStorage.getAttachment(item.id);
-            if (buf && isMounted) {
-              const thumb = await PDFThumbnailService.generateThumbnail(buf);
-              if (thumb && thumb.startsWith('data:image') && isMounted) {
-                newList[i] = { ...newList[i], thumbnailDataUrl: thumb };
-                updated = true;
-              }
-            }
-          } catch (e) {
-            console.warn('Error generando miniatura para anexo existente:', e);
-          }
-        }
-      }
-
-      if (updated && isMounted) {
-        const thumbnails = new Map(newList.map(item => [item.id, item.thumbnailDataUrl]));
-        doUpdateDoc({ attachedPdfs: getLatestAttachments().map(item => ({ ...item, thumbnailDataUrl: item.thumbnailDataUrl || thumbnails.get(item.id) })) });
-      }
-    };
-
-    generateMissing();
-    return () => {
-      isMounted = false;
-    };
-  }, [currentProject?.id, currentProject?.customization?.attachedPdfs?.length]);
-
   React.useEffect(() => {
     let cancelled = false;
     setCachedDatasheets([]);
@@ -145,10 +83,10 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
   const enabledAttachments = attachedPdfs.filter((att) => att.enabled);
   const totalAttachedPages = enabledAttachments.reduce((sum, att) => sum + (att.pageCount || 1), 0);
 
-  const detected = proposalDatasheets(currentProject, catalog.filter(item =>
-    (!item.organizationId || item.organizationId === sync.currentUser?.organizationId) &&
-    (!item.syncServerUrl || item.syncServerUrl.replace(/\/+$/, '') === sync.serverUrl.replace(/\/+$/, ''))
-  )).filter(source => !cachedDatasheets.includes(source.key));
+  // Server-stored datasheets are annexed automatically (ProposalAnnexSync); only external links stay manual.
+  const detected = proposalDatasheets(currentProject, workspaceCatalog(catalog, sync.serverUrl, sync.currentUser?.organizationId))
+    .filter(source => !source.item.datasheetAssetId && !cachedDatasheets.includes(source.key));
+  const dismissedCount = currentProject.customization?.dismissedDatasheetKeys?.length || 0;
 
   const handleProcessFiles = async (files: FileList | File[], sourceKeys: string[] = []) => {
     const session = useSimulationStore.getState().sessionGeneration;
@@ -187,16 +125,6 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
           console.warn('Advertencia leyendo páginas de PDF (usando 1 por defecto):', pageErr);
         }
 
-        let thumbnailDataUrl: string | undefined = undefined;
-        try {
-          const rawThumb = await PDFThumbnailService.generateThumbnail(bufferCopy);
-          if (rawThumb && typeof rawThumb === 'string' && rawThumb.startsWith('data:image')) {
-            thumbnailDataUrl = rawThumb;
-          }
-        } catch (thumbErr) {
-          console.warn('Advertencia generando miniatura al subir PDF:', thumbErr);
-        }
-
         const cleanName = file.name
           .replace(/\.pdf$/i, '')
           .replace(/[_-]+/g, ' ')
@@ -220,7 +148,7 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
           uploadedAt: new Date().toISOString(),
           enabled: true,
           addToTableOfContents: false, // Por defecto no altera el índice visual del lienzo
-          thumbnailDataUrl,
+          origin: 'manual',
         });
       }
 
@@ -285,7 +213,7 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
         setFeedbackMsg('Ficha recuperada en este dispositivo, sin duplicar el anexo.');
         return;
       }
-      await handleProcessFiles([new File([blob], source.item.datasheetName || 'Ficha técnica.pdf', { type: 'application/pdf' })], [source.key]);
+      await handleProcessFiles([new File([blob], datasheetFileName(source.item.displayName), { type: 'application/pdf' })], [source.key]);
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : 'No se pudo adjuntar la ficha del catálogo.');
     } finally {
@@ -322,16 +250,20 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
     });
   };
 
+  // Removing an automatic datasheet dismisses it, so the sync does not attach it again.
   const handleRemoveAttachment = async (id: string) => {
     await PDFAttachmentStorage.deleteAttachment(id);
-    const list = getLatestAttachments();
-    doUpdateDoc({
-      attachedPdfs: list.filter((att) => att.id !== id),
-    });
+    const latest = useSimulationStore.getState().projects.find((p) => p.id === currentProject.id) || currentProject;
+    doUpdateDoc(dismissAnnex(latest.customization || {}, id));
   };
 
+  const handleRestoreDatasheets = () => doUpdateDoc(restoreDismissedAnnexes());
+
   const handlePreviewAttachment = async (id: string, fileName: string) => {
-    const buffer = await PDFAttachmentStorage.getAttachment(id);
+    // Same lookup as the export: local bytes, then the preview cache, then the server (automatic annexes
+    // synced from another device have no local copy yet).
+    const annex = getLatestAttachments().find((att) => att.id === id);
+    const buffer = annex ? await resolveProposalAttachmentBytes(annex) : await PDFAttachmentStorage.getAttachment(id);
     if (!buffer) {
       alert(`No se encontró el archivo binario de "${fileName}" en memoria local.`);
       return;
@@ -365,7 +297,7 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
       </div>
 
       <p className={`text-[11px] leading-relaxed text-slate-500 dark:text-zinc-400`}>
-        Adjunta fichas técnicas de paneles/inversores, planos o certificados. Se conservarán en el dock y se fusionarán vectorialmente en alta resolución al final de tu propuesta al exportar el PDF.
+        Las fichas técnicas del catálogo de los equipos de esta propuesta se anexan solas (insignia «Automática»). Adjunta aquí planos, certificados u otros PDF: se fusionan al final de la propuesta al exportar.
       </p>
 
       {detected.length > 0 && (
@@ -374,9 +306,18 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
           {detected.map(source => <button key={source.key} type="button" disabled={isUploading || currentProject.isDeleted}
             onClick={() => void handleAddCatalogDatasheet(source)}
             className="block w-full rounded border border-emerald-500/40 px-2 py-2 text-left text-xs disabled:opacity-50">
-            {attachedPdfs.some(att => att.sourceDatasheetKey === source.key) ? '↻ Recuperar' : '+ Adjuntar'} {source.item.datasheetName || source.item.displayName}
+            {attachedPdfs.some(att => att.sourceDatasheetKey === source.key) ? '↻ Recuperar' : '+ Adjuntar'} {datasheetFileName(source.item.displayName)}
           </button>)}
           <p className="text-[11px] opacity-70">Se descargan una vez y quedan disponibles como anexos en este dispositivo.</p>
+        </div>
+      )}
+      {dismissedCount > 0 && (
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 px-3 py-2 text-[11px] text-slate-600 dark:border-zinc-700 dark:text-zinc-300">
+          <span>{dismissedCount === 1 ? '1 ficha automática retirada' : `${dismissedCount} fichas automáticas retiradas`} de esta propuesta.</span>
+          <button type="button" disabled={currentProject.isDeleted} onClick={handleRestoreDatasheets}
+            className="inline-flex shrink-0 items-center gap-1 font-semibold text-emerald-700 hover:underline disabled:opacity-50 dark:text-emerald-300">
+            <RotateCcw className="h-3 w-3" />Restaurar fichas
+          </button>
         </div>
       )}
       {/* Feedback de Éxito Instantáneo */}
@@ -483,158 +424,22 @@ export const PDFAttachmentsSection: React.FC<PDFAttachmentsSectionProps> = ({
       {attachedPdfs.length > 0 && (
         <div className="space-y-2.5 pt-1">
           {attachedPdfs.map((doc, idx) => (
-            <div
+            <AnnexCard
               key={doc.id}
-              draggable
-              onDragStart={(e) => {
-                setDraggedAttIndex(idx);
-                e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', String(idx));
-              }}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-                if (dragOverAttIndex !== idx) {
-                  setDragOverAttIndex(idx);
-                }
-              }}
-              onDragLeave={() => {
-                if (dragOverAttIndex === idx) {
-                  setDragOverAttIndex(null);
-                }
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                if (draggedAttIndex !== null && draggedAttIndex !== idx) {
-                  handleReorderAttachments(draggedAttIndex, idx);
-                }
-                setDraggedAttIndex(null);
-                setDragOverAttIndex(null);
-              }}
-              onDragEnd={() => {
-                setDraggedAttIndex(null);
-                setDragOverAttIndex(null);
-              }}
-              className={`p-3 rounded-xl border transition-all space-y-2 relative group ${
-                dragOverAttIndex === idx
-                  ? isDark
-                    ? 'border-emerald-400 bg-emerald-950/40 ring-2 ring-emerald-500/40 scale-[1.01]'
-                    : 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-400/50 scale-[1.01]'
-                  : doc.enabled
-                  ? isDark
-                    ? 'bg-[#1a1a24] border-[#2e2e3e] hover:border-zinc-500'
-                    : 'bg-white border-slate-200 shadow-2xs hover:border-slate-400'
-                  : isDark
-                  ? 'bg-[#14141c]/50 border-zinc-800 opacity-60'
-                  : 'bg-slate-100 border-slate-200 opacity-60'
-              } ${draggedAttIndex === idx ? 'opacity-40 border-dashed border-emerald-500' : ''}`}
-            >
-              {/* Fila Principal: Manecilla 3 Rayas, Thumbnail Real Pág 1, Nombre, Badges y Acciones */}
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-start gap-2 min-w-0 flex-1">
-                  {/* Manecilla de 3 rayas para arrastrar y reordenar */}
-                  <div
-                    className="p-1 cursor-grab active:cursor-grabbing text-zinc-500 hover:text-emerald-400 transition-colors shrink-0 self-center"
-                    title="Arrastra con el cursor para cambiar el orden de fusión"
-                  >
-                    <GripVertical className="w-4 h-4" />
-                  </div>
-
-                  {/* Thumbnail Real de la Primera Página */}
-                  <div className="relative w-11 h-15 rounded-lg overflow-hidden border border-emerald-500/30 bg-black/40 shrink-0 shadow-xs group-hover:border-emerald-400 transition-all flex items-center justify-center">
-                    {doc.thumbnailDataUrl ? (
-                      <img
-                        src={doc.thumbnailDataUrl}
-                        alt={doc.title}
-                        className="w-full h-full object-cover object-top"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center bg-emerald-950/20 text-emerald-400">
-                        <FileText className="w-5 h-5" />
-                        <span className="text-[7.5px] font-mono font-bold mt-0.5">PDF</span>
-                      </div>
-                    )}
-                    <div className="absolute bottom-0 inset-x-0 bg-black/75 backdrop-blur-[2px] text-[7.5px] font-mono text-center text-zinc-300 py-0.5 leading-none">
-                      Pág 1
-                    </div>
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <input
-                      type="text"
-                      value={doc.title}
-                      onChange={(e) => handleUpdateTitle(doc.id, e.target.value)}
-                      placeholder="Título descriptivo del archivo..."
-                      className={`text-xs font-bold w-full bg-transparent border-b border-transparent hover:border-zinc-500 focus:border-emerald-500 outline-none transition-colors text-slate-900 dark:text-zinc-100`}
-                    />
-                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                      <span className={`text-[10px] truncate max-w-[130px] text-slate-500 dark:text-zinc-400`}>
-                        {doc.fileName}
-                      </span>
-                      <span className="text-[9.5px] font-mono text-zinc-500">•</span>
-                      <span className="text-[9.5px] font-mono text-zinc-400 font-semibold">
-                        {formatFileSize(doc.fileSize)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Badge de Páginas y Botones de Acción */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span
-                    className={`text-[10px] font-black font-mono px-2 py-0.5 rounded-md border bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-[#242432] dark:border-[#38384a] dark:text-emerald-400`}
-                  >
-                    {doc.pageCount} {doc.pageCount === 1 ? 'pág' : 'págs'}
-                  </span>
-
-                  <button
-                    type="button"
-                    onClick={() => handlePreviewAttachment(doc.id, doc.fileName)}
-                    className="p-1 rounded-md text-zinc-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors cursor-pointer"
-                    title="Ver o descargar PDF original en pestaña nueva"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveAttachment(doc.id)}
-                    className="p-1 rounded-md text-red-400 hover:text-red-300 hover:bg-red-500/20 transition-colors cursor-pointer"
-                    title="Eliminar PDF adjunto"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Fila de Opciones: Checkboxes de Inclusión */}
-              <div className="pt-1.5 border-t border-dashed border-zinc-700/40 flex items-center justify-between text-[10.5px] gap-2">
-                <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={doc.enabled}
-                    onChange={(e) => handleToggleEnabled(doc.id, e.target.checked)}
-                    className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-0 cursor-pointer"
-                  />
-                  <span className={`font-medium text-slate-700 dark:text-zinc-300`}>
-                    ✓ Fusionar al exportar
-                  </span>
-                </label>
-
-                <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={doc.addToTableOfContents}
-                    onChange={(e) => handleToggleAddToToc(doc.id, e.target.checked)}
-                    className="w-3.5 h-3.5 rounded text-emerald-600 focus:ring-0 cursor-pointer"
-                  />
-                  <span className="text-slate-500 dark:text-zinc-400">
-                    Mostrar en el Índice
-                  </span>
-                </label>
-              </div>
-            </div>
+              doc={doc}
+              idx={idx}
+              isDark={isDark}
+              draggedAttIndex={draggedAttIndex}
+              dragOverAttIndex={dragOverAttIndex}
+              setDraggedAttIndex={setDraggedAttIndex}
+              setDragOverAttIndex={setDragOverAttIndex}
+              handleReorderAttachments={handleReorderAttachments}
+              handleUpdateTitle={handleUpdateTitle}
+              handlePreviewAttachment={handlePreviewAttachment}
+              handleRemoveAttachment={handleRemoveAttachment}
+              handleToggleEnabled={handleToggleEnabled}
+              handleToggleAddToToc={handleToggleAddToToc}
+            />
           ))}
         </div>
       )}

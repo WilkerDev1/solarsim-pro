@@ -163,7 +163,7 @@ export function normalizeProposalDraft(rawDraft: unknown, catalog: SolarEquipmen
         if (existing.count>100000) issue(`invalid_${type}_count`,`${item.displayName}: la cantidad total excede 100.000 unidades.`);
         continue;
       }
-      const common={id:item.id,brandModel:item.displayName,count,...(requestedModel?{requestedModel}:{}),...(requestedMagnitude!==undefined?{[type==='panel'?'requestedPowerW':type==='inverter'?'requestedPowerKW':'requestedCapacityKWh']:requestedMagnitude}:{}),unitPriceUSD:effectivePrice,priceSource,weightKilos:item.weightKg,selectedSupplierInfo:supplier};
+      const common={id:item.id,catalogItemId:item.id,brandModel:item.displayName,count,...(requestedModel?{requestedModel}:{}),...(requestedMagnitude!==undefined?{[type==='panel'?'requestedPowerW':type==='inverter'?'requestedPowerKW':'requestedCapacityKWh']:requestedMagnitude}:{}),unitPriceUSD:effectivePrice,priceSource,weightKilos:item.weightKg,selectedSupplierInfo:supplier};
       result.push(type==='panel'?{...common,powerW:item.powerW,efficiencyPct:item.efficiencyPct,tempCoeff:item.tempCoeff,annualDegradation:item.annualDegradation}
         :type==='inverter'?{...common,powerKW:item.powerKW,efficiencyPct:item.maxEfficiencyPct}
         :{...common,capacityKWh:item.capacityKWh,dodPct:item.dodPct,efficiencyPct:item.batteryEfficiencyPct});

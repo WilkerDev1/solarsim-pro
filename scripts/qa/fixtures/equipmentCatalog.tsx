@@ -7,7 +7,38 @@ import { useSimulationStore } from "../../../src/store/useSimulationStore";
 import "../../../src/index.css";
 const params = new URLSearchParams(location.search);
 const dark = params.get("theme") === "dark";
+// Like App.tsx: Tailwind dark variants hang from the root element.
+document.documentElement.classList.toggle("dark", dark);
 const offline = params.has("offline");
+const withAssets = params.has("assets");
+/** `?assets=1`: synthetic images and datasheets so the catalog previews render real thumbnails. */
+async function syntheticAssets() {
+  const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
+  const pdf = await PDFDocument.create();
+  const font = await pdf.embedFont(StandardFonts.HelveticaBold);
+  for (const page of [1, 2, 3]) {
+    const sheet = pdf.addPage([595, 842]);
+    sheet.drawRectangle({ x: 0, y: 742, width: 595, height: 100, color: rgb(0.06, 0.55, 0.38) });
+    sheet.drawText(`Ficha QA · página ${page}`, { x: 40, y: 780, size: 28, font, color: rgb(1, 1, 1) });
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = 320;
+  canvas.height = 320;
+  const context = canvas.getContext("2d")!;
+  context.fillStyle = "#1e3a8a";
+  context.fillRect(0, 0, 320, 320);
+  context.fillStyle = "#93c5fd";
+  for (let row = 0; row < 6; row++) for (let col = 0; col < 4; col++) context.fillRect(20 + col * 72, 20 + row * 48, 64, 40);
+  const png = await new Promise<Blob>((resolve) => canvas.toBlob((blob) => resolve(blob!), "image/png"));
+  return { pdf: await pdf.save(), png: new Uint8Array(await png.arrayBuffer()) };
+}
+const assets = withAssets ? await syntheticAssets() : null;
+const assetPatch = (index: number) =>
+  !withAssets ? {} : index % 3 === 0
+    ? { imageAssetIds: ["qa-image"], imageNames: ["Vista frontal"], datasheetAssetId: "qa-datasheet" }
+    : index % 3 === 1
+      ? { datasheetAssetId: "qa-datasheet", datasheetName: "5f3b762bf4e99b1.pdf" }
+      : { datasheetAssetId: undefined, datasheetName: undefined };
 const item = {
   id: "qa-panel",
   organizationId: "qa-org",
@@ -51,6 +82,7 @@ useSimulationStore.setState({
             "Batería QA LiFePO4 16.08 kWh",
           ][index % 3] + (index > 2 ? ` · Serie ${index + 1}` : ""),
         type: (["panel", "inverter", "battery"] as const)[index % 3],
+        ...assetPatch(index),
         brand: ["QA Solar", "QA Power", "QA Storage"][index % 3],
         supplierPrices: [
           {
@@ -77,7 +109,7 @@ useSimulationStore.setState({
             : []),
         ],
       }))
-    : [{...item,supplierPrices:params.has("emptyOffers")?[]:item.supplierPrices}],
+    : [{...item,supplierPrices:params.has("emptyOffers")?[]:item.supplierPrices,...assetPatch(0)}],
   projects: [],
   sidebarTheme: dark ? "dark" : "light",
   workspaceScope: "https://qa.example.invalid|qa-org",
@@ -139,6 +171,10 @@ window.fetch = async (url, init) => {
       }),
     );
   }
+  if (assets && String(url).endsWith("/api/equipment-assets/qa-image"))
+    return new Response(assets.png, { headers: { "Content-Type": "image/png" } });
+  if (assets && String(url).endsWith("/api/equipment-assets/qa-datasheet"))
+    return new Response(assets.pdf, { headers: { "Content-Type": "application/pdf" } });
   if (String(url).includes("/api/equipment-assets/"))
     return new Response("%PDF-1.7 synthetic", {
       headers: { "Content-Type": "application/pdf" },
