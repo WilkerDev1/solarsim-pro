@@ -43,4 +43,24 @@ assert.equal(isDocTextKey('doc:__proto__'), false);
 assert.equal(isDocTextKey('doc:a.b'), true);
 assert.equal(isDocTextKey('texts'), false);
 
+// Published text uses equipment-group totals, and a combined inverter + battery bold block keeps both.
+{
+  const groups: ProjectSimulation = structuredClone(base);
+  groups.specs.panels = [
+    { id: 'a', brandModel: 'Panel A (600W)', powerW: 600, count: 10 },
+    { id: 'b', brandModel: 'Panel B (620W)', powerW: 620, count: 20 },
+  ] as never;
+  groups.specs.hasBattery = true;
+  groups.specs.batteryCapacityKWh = 10;
+  groups.customization = {
+    customProjectSummaryParagraph1: 'Se instalarán {panelCount} paneles.',
+    customProjectSummaryParagraph2: 'Adicionalmente, se contempla la instalación de **1 Inversor viejo y 1 Batería vieja** con estructura propia.',
+  };
+  const out = publishedDocumentTexts(groups, ctxFor(groups));
+  assert.equal(out['doc:projectDescription.paragraph1'], 'Se instalarán 30 paneles.');
+  const p2 = out['doc:projectDescription.paragraph2'];
+  assert.ok(/Bater[íi]a/i.test(p2) && !p2.includes('vieja'), 'La batería sigue en el bloque combinado: ' + p2);
+  assert.ok(p2.includes(' y ') && p2.includes('estructura propia'));
+}
+
 console.log('PASS: publicación de textos del documento para la propuesta web.');

@@ -6,6 +6,9 @@ import { calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { formatProposalDate } from './formatDateUtils';
 import {
   calculateTotalBatteryCapacityKWh,
+  calculateTotalBatteryCount,
+  calculateTotalInverterCount,
+  calculateTotalPanelCount,
   formatBatteriesSummary,
   formatInvertersSummary,
   formatPanelsSummary,
@@ -72,13 +75,14 @@ export function buildDocumentTextContext(
     annualProductionKWh: summary.annualProductionKWh,
     systemCapacityKWp: summary.systemCapacityKWp,
     energyCoveragePct: summary.energyCoveragePct,
-    panelCount: specs.panelCount,
+    // Totales de todos los grupos de equipos (el campo suelto solo refleja el primero).
+    panelCount: calculateTotalPanelCount(specs),
     panelsSummaryText,
     panelModelText: multiPanels ? panelsSummaryText : panelModel,
-    inverterCount: specs.inverterCount || 1,
+    inverterCount: calculateTotalInverterCount(specs) || 1,
     invertersSummaryText,
     inverterModelText: multiInverters ? invertersSummaryText : inverterModel,
-    batteryCount: specs.batteryCount || 1,
+    batteryCount: calculateTotalBatteryCount(specs) || 1,
     batteryCapacityKWh: specs.batteryCapacityKWh || 0,
     batteriesSummaryText,
     batteryModelText: multiBatteries ? batteriesSummaryText : batteryModel,
