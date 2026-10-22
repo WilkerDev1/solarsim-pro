@@ -3,6 +3,8 @@ import type { AttachedPDFDocument, ExtraTOCItem } from '../types';
 import { DOCUMENT_SECTIONS } from '../../shared/documentTexts/sections';
 
 export interface TOCItem {
+  /** Sección interna: su título y subtítulo son los textos editables `toc.<id>.title/subtitle`. */
+  sectionId?: PDFSectionId;
   number: string;
   title: string;
   subtitle?: string;
@@ -41,7 +43,7 @@ export function buildPdfLayout(
   for (const id of order) {
     const meta = DOCUMENT_SECTIONS[id].toc;
     if (!visibility[id] || !meta) continue;
-    tocItems.push({ number: `${sectionIndex}`, title: meta.title, subtitle: `${sectionIndex}.1 ${meta.subtitle}`, targetPage: pageNumbers[id] });
+    tocItems.push({ sectionId: id, number: `${sectionIndex}`, title: meta.title, subtitle: `${sectionIndex}.1 ${meta.subtitle}`, targetPage: pageNumbers[id] });
     sectionIndex++;
   }
 

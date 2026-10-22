@@ -8,6 +8,7 @@ import { PDFHeaderBanner } from '../PDFHeaderBanner';
 import { PDFFooter } from '../PDFFooter';
 import { PDFWatermark } from '../PDFWatermark';
 import { EditableText } from '../editor/EditableText';
+import { OptionalTextRow } from '../editor/OptionalTextRow';
 import { getProjectPanels, getProjectInverters, getProjectBatteries } from '../../../utils/equipmentSpecsUtils';
 
 interface PDFPage2QuotationProps {
@@ -50,7 +51,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
       currentDateStr={currentDateStr}
       pageNum={pageNum}
       totalPages={totalPages}
-      pageTitle="COTIZACIÓN DE SISTEMA FOTOVOLTAICO"
+      sectionId="quotation"
     >
 
       {/* Body */}
@@ -64,38 +65,44 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
               borderLeftColor: activeTheme.primary,
             }}
           >
-            DATOS DEL CLIENTE :
+            <EditableText k="quotation.clientHeading" />
           </h3>
           <div className="grid grid-cols-2 gap-4 px-2 text-[10px]">
             <div className="space-y-0.5">
               <div className="flex items-center gap-1.5 leading-snug">
-                <span className="font-bold text-slate-600 shrink-0">Cliente:</span>{' '}
+                <span className="font-bold text-slate-600 shrink-0"><EditableText k="quotation.label.client" /></span>{' '}
                 <EditableText k="client.name" className="font-bold text-slate-900 inline-block" boldClassName="font-bold text-slate-950" placeholder="Nombre del cliente" />
               </div>
               <div className="flex items-center gap-1.5 leading-snug">
-                <span className="font-bold text-slate-600 shrink-0">Contacto:</span>{' '}
+                <span className="font-bold text-slate-600 shrink-0"><EditableText k="quotation.label.contact" /></span>{' '}
                 <EditableText k="client.contact" className="font-medium inline-block text-slate-800" boldClassName="font-bold text-slate-950" placeholder="(Agregar contacto)" />
               </div>
               <div className="flex items-center gap-1.5 leading-snug">
-                <span className="font-bold text-slate-600 shrink-0">Teléfono:</span>{' '}
+                <span className="font-bold text-slate-600 shrink-0"><EditableText k="quotation.label.phone" /></span>{' '}
                 <EditableText k="client.phone" className="font-medium inline-block text-slate-800" boldClassName="font-bold text-slate-950" placeholder="(Agregar teléfono)" />
               </div>
+              <OptionalTextRow k="client.email">
+                <div className="flex items-center gap-1.5 leading-snug">
+                <span className="font-bold text-slate-600 shrink-0"><EditableText k="quotation.label.email" /></span>{' '}
+                <EditableText k="client.email" className="font-medium inline-block text-slate-800" boldClassName="font-bold text-slate-950" placeholder="(Agregar correo)" />
+              </div>
+              </OptionalTextRow>
               <div className="flex items-center gap-1.5 leading-snug">
-                <span className="font-bold text-slate-600 shrink-0">Dirección:</span>{' '}
+                <span className="font-bold text-slate-600 shrink-0"><EditableText k="quotation.label.address" /></span>{' '}
                 <EditableText k="client.address" className="font-medium inline-block text-slate-800" boldClassName="font-bold text-slate-950" />
               </div>
             </div>
             <div className="space-y-0.5 text-right">
               <div className="flex items-center justify-end gap-1.5 leading-snug">
-                <span className="font-bold text-slate-600 shrink-0">N° Cotización:</span>{' '}
+                <span className="font-bold text-slate-600 shrink-0"><EditableText k="quotation.label.number" /></span>{' '}
                 <EditableText k="quote.number" className="font-bold font-mono text-slate-900 inline-block" boldClassName="font-bold font-mono text-slate-950" />
               </div>
               <div className="flex items-center justify-end gap-1.5 leading-snug">
-                <span className="font-bold text-slate-600 shrink-0">Fecha:</span>{' '}
+                <span className="font-bold text-slate-600 shrink-0"><EditableText k="quotation.label.date" /></span>{' '}
                 <EditableText k="quote.date" className="font-semibold text-slate-800 inline-block" boldClassName="font-semibold text-slate-900" />
               </div>
               <div className="flex items-center justify-end gap-1.5 leading-snug">
-                <span className="font-bold text-slate-600 shrink-0">Válido por:</span>{' '}
+                <span className="font-bold text-slate-600 shrink-0"><EditableText k="quotation.label.validity" /></span>{' '}
                 <EditableText k="quote.validityDays" className="font-bold text-slate-900 inline-block">{(days) => `${days} Días`}</EditableText>
               </div>
             </div>
@@ -111,25 +118,25 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
               borderLeftColor: activeTheme.primary,
             }}
           >
-            ESPECIFICACIONES DEL SISTEMA
+            <EditableText k="quotation.specsHeading" />
           </h3>
           <div className="grid grid-cols-2 gap-4 bg-slate-50/60 p-2 rounded-lg border border-slate-200 text-[10px]">
             <div className="space-y-0.5">
               <div>
-                <span className="font-bold text-slate-700">Potencia (kW-dc):</span>{' '}
+                <span className="font-bold text-slate-700"><EditableText k="quotation.label.power" /></span>{' '}
                 <span className="font-bold text-slate-900">{summary.systemCapacityKWp.toFixed(2)} kWp</span>
               </div>
               <div>
-                <span className="font-bold text-slate-700">Tipo de instalación:</span> Fotovoltaica
+                <EditableText k="quotation.label.installType" className="font-bold text-slate-700" /> <EditableText k="quotation.installTypeValue" />
               </div>
             </div>
             <div className="space-y-0.5 text-right">
               <div>
-                <span className="font-bold text-slate-700">Consumo mensual estimado:</span>{' '}
+                <span className="font-bold text-slate-700"><EditableText k="quotation.label.monthlyConsumption" /></span>{' '}
                 <span className="font-bold text-slate-900">{Math.round(summary.annualConsumptionKWh / 12).toLocaleString()} kWh</span>
               </div>
               <div>
-                <span className="font-bold text-slate-700">Distribuidor / Tarifa:</span>{' '}
+                <span className="font-bold text-slate-700"><EditableText k="quotation.label.tariff" /></span>{' '}
                 <span className="font-bold" style={{ color: activeTheme.primary }}>
                   {project.client.distributor || project.rates.distributor || 'EDES'} • {getTariffDisplayName(project.client.distributor || project.rates.distributor, project.rates.tariffCode)}
                 </span>
@@ -147,15 +154,15 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
               borderLeftColor: activeTheme.primary,
             }}
           >
-            EQUIPOS Y MATERIALES
+            <EditableText k="quotation.equipmentHeading" />
           </h3>
           <div className="border border-slate-200 rounded-lg overflow-hidden">
             <table className="w-full text-left border-collapse">
               <thead className="text-white font-bold text-[9.5px] uppercase" style={{ backgroundColor: activeTheme.primary }}>
                 <tr>
-                  <th className="px-3 py-1">DESCRIPCIÓN</th>
-                  <th className="px-3 py-1 text-center w-20">CANT.</th>
-                  <th className="px-3 py-1 text-center w-20">UNIDAD</th>
+                  <th className="px-3 py-1"><EditableText k="quotation.table.description" /></th>
+                  <th className="px-3 py-1 text-center w-20"><EditableText k="quotation.table.quantity" /></th>
+                  <th className="px-3 py-1 text-center w-20"><EditableText k="quotation.table.unit" /></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 text-[10px] text-slate-800 font-semibold">
@@ -165,7 +172,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                       {p.brandModel || `Módulos Monocristalinos Tier-1 (${p.powerW}W)`}
                     </td>
                     <td className="px-3 py-1 text-center font-bold font-mono">{p.count}</td>
-                    <td className="px-3 py-1 text-center text-slate-500 font-normal">UD</td>
+                    <td className="px-3 py-1 text-center text-slate-500 font-normal"><EditableText k="quotation.table.unitValue" /></td>
                   </tr>
                 ))}
                 {getProjectInverters(project.specs).map((inv, idx) => (
@@ -174,7 +181,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                       {inv.brandModel || 'Inversor Solar On-Grid / Híbrido'}
                     </td>
                     <td className="px-3 py-1 text-center font-bold font-mono">{inv.count || 1}</td>
-                    <td className="px-3 py-1 text-center text-slate-500 font-normal">UD</td>
+                    <td className="px-3 py-1 text-center text-slate-500 font-normal"><EditableText k="quotation.table.unitValue" /></td>
                   </tr>
                 ))}
                 {project.specs.hasBattery && getProjectBatteries(project.specs).map((bat, idx) => (
@@ -183,7 +190,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                       {bat.brandModel || 'Banco de Baterías de Litio'}
                     </td>
                     <td className="px-3 py-1 text-center font-bold font-mono">{bat.count || 1}</td>
-                    <td className="px-3 py-1 text-center text-slate-500 font-normal">UD</td>
+                    <td className="px-3 py-1 text-center text-slate-500 font-normal"><EditableText k="quotation.table.unitValue" /></td>
                   </tr>
                 ))}
                 <tr className={project.specs.hasBattery ? 'bg-slate-50/60' : 'bg-white'}>
@@ -191,7 +198,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
                     {cleanInstallationDesc(project.specs.installationServicesDesc)}
                   </td>
                   <td className="px-3 py-1 text-center font-bold font-mono">1</td>
-                  <td className="px-3 py-1 text-center text-slate-500 font-normal">UD</td>
+                  <td className="px-3 py-1 text-center text-slate-500 font-normal"><EditableText k="quotation.table.unitValue" /></td>
                 </tr>
                 {customItems.map((cItem, cIdx) => (
                   <tr
@@ -214,19 +221,19 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
         <div className="flex justify-end">
           <div className="w-[380px] bg-slate-50/90 border border-slate-200 rounded-lg p-2 space-y-1 text-[10px]">
             <div className="flex justify-between text-slate-700">
-              <span className="font-bold">SUB-TOTAL (USD) SIN ITBIS :</span>
+              <span className="font-bold"><EditableText k="quotation.totals.subtotal" /></span>
               <span className="font-bold font-mono">
                 ${summary.commercialPreTaxSubtotalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="flex justify-between text-slate-900 bg-slate-200/80 px-2 py-0.5 rounded font-bold">
-              <span>TOTAL GENERAL (USD) :</span>
+              <span><EditableText k="quotation.totals.total" /></span>
               <span className="font-mono">
                 ${(summary.listGrossInvestmentUSD + (project.financials.applyITBISExemption ? summary.itbisSavedUSD : 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="flex justify-between font-bold" style={{ color: activeTheme.secondary }}>
-              <span>ITBIS A DESCONTAR POR LEY 57-07 US$ :</span>
+              <span><EditableText k="quotation.totals.itbis" /></span>
               <span className="font-mono">
                 ${summary.itbisSavedUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
@@ -248,13 +255,13 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
               className="flex justify-between text-white px-2 py-0.5 rounded font-bold"
               style={{ backgroundColor: activeTheme.primary }}
             >
-              <span>TOTAL GENERAL (USD) SI CALIFICA LEY 57-07 :</span>
+              <span><EditableText k="quotation.totals.totalLey" /></span>
               <span className="font-mono">
                 ${summary.grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
             <div className="flex justify-between text-slate-800 pt-0.5 border-t border-slate-300">
-              <span className="font-bold">PRECIO POR WATT (USD/W):</span>
+              <span className="font-bold"><EditableText k="quotation.totals.pricePerWatt" /></span>
               <span className="font-bold font-mono" style={{ color: activeTheme.primary }}>
                 ${(summary.salePricePerWattUSD ?? (summary.systemCapacityKWp > 0 ? summary.grossInvestmentUSD / (summary.systemCapacityKWp * 1000) : 0)).toFixed(2)}
               </span>
@@ -271,49 +278,49 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
               borderLeftColor: activeTheme.primary,
             }}
           >
-            INCENTIVOS DE LEY 57-07
+            <EditableText k="quotation.incentivesHeading" />
           </h3>
           <p className="text-[9px] font-bold bg-amber-50 border border-amber-200 text-amber-900 px-2.5 py-0.5 rounded mb-1">
-            (Descuento de 40% para equipos energía renovables: Paneles solares, inversores y baterías)
+            <EditableText k="quotation.incentivesNote" />
           </p>
           <div className="border border-slate-200 rounded-lg overflow-hidden">
             <table className="w-full text-left border-collapse">
               <thead className="text-white font-bold text-[9.5px] uppercase" style={{ backgroundColor: activeTheme.primary }}>
                 <tr>
-                  <th className="px-3 py-1">CONCEPTO</th>
-                  <th className="px-3 py-1 text-right">VALOR US $</th>
+                  <th className="px-3 py-1"><EditableText k="quotation.incentives.concept" /></th>
+                  <th className="px-3 py-1 text-right"><EditableText k="quotation.incentives.value" /></th>
                   <th className="px-3 py-1 text-right w-20">%</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 text-[10px] text-slate-800 font-semibold">
                 <tr className="bg-white font-bold">
-                  <td className="px-3 py-1">TOTAL EQUIPOS ENERGÍAS RENOVABLES (PANELES-INVERSORES-BATERÍAS)</td>
+                  <td className="px-3 py-1"><EditableText k="quotation.incentives.equipment" /></td>
                   <td className="px-3 py-1 text-right font-mono">${(summary.equipmentPortionUSD || summary.grossInvestmentUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td className="px-3 py-1 text-right font-mono">100%</td>
                 </tr>
                 <tr className="bg-slate-50/60">
-                  <td className="px-3 py-1">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 1ER AÑO</td>
+                  <td className="px-3 py-1"><EditableText k="quotation.incentives.year1" /></td>
                   <td className="px-3 py-1 text-right font-mono font-bold" style={{ color: activeTheme.secondary }}>
                     ${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className="px-3 py-1 text-right font-mono" style={{ color: activeTheme.secondary }}>13.33%</td>
                 </tr>
                 <tr className="bg-white">
-                  <td className="px-3 py-1">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 2DO AÑO</td>
+                  <td className="px-3 py-1"><EditableText k="quotation.incentives.year2" /></td>
                   <td className="px-3 py-1 text-right font-mono font-bold" style={{ color: activeTheme.secondary }}>
                     ${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className="px-3 py-1 text-right font-mono" style={{ color: activeTheme.secondary }}>13.33%</td>
                 </tr>
                 <tr className="bg-slate-50/60">
-                  <td className="px-3 py-1">MONTO A DESCONTAR POR LA LEY 57-07 - DGII 3ER AÑO</td>
+                  <td className="px-3 py-1"><EditableText k="quotation.incentives.year3" /></td>
                   <td className="px-3 py-1 text-right font-mono font-bold" style={{ color: activeTheme.secondary }}>
                     ${(summary.ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
                   <td className="px-3 py-1 text-right font-mono" style={{ color: activeTheme.secondary }}>13.33%</td>
                 </tr>
                 <tr className={`font-bold ${activeTheme.accentLightBg}`} style={{ color: activeTheme.primary }}>
-                  <td className="px-3 py-1">TOTAL A DESCONTAR POR LA LEY 57-07 (40% DEL TOTAL)</td>
+                  <td className="px-3 py-1"><EditableText k="quotation.incentives.total" /></td>
                   <td className="px-3 py-1 text-right font-mono" style={{ color: activeTheme.primary }}>
                     ${summary.ley5707CreditUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </td>
@@ -332,24 +339,24 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
               className="font-bold border-b border-slate-200 pb-0.5 mb-0.5 uppercase tracking-wider flex items-center gap-1.5"
               style={{ color: activeTheme.primary }}
             >
-              <ShieldCheck className="w-3.5 h-3.5" /> GARANTÍAS
+              <ShieldCheck className="w-3.5 h-3.5" /> <EditableText k="quotation.warrantiesHeading" />
             </h4>
             <div className="flex items-center gap-1 leading-snug">
-              <span className="font-bold text-slate-800 shrink-0">• Paneles Solares:</span>
+              <EditableText k="quotation.warranty.panelLabel" className="font-bold text-slate-800 shrink-0" />
               <EditableText k="quotation.warranty.panel" className="font-medium inline-block" boldClassName="font-bold text-slate-950" />
             </div>
             <div className="flex items-center gap-1 leading-snug">
-              <span className="font-bold text-slate-800 shrink-0">• Inversor:</span>
+              <EditableText k="quotation.warranty.inverterLabel" className="font-bold text-slate-800 shrink-0" />
               <EditableText k="quotation.warranty.inverter" className="font-medium inline-block" boldClassName="font-bold text-slate-950" />
             </div>
             {project.specs.hasBattery && (
               <div className="flex items-center gap-1 leading-snug">
-                <span className="font-bold text-slate-800 shrink-0">• Batería:</span>
+                <EditableText k="quotation.warranty.batteryLabel" className="font-bold text-slate-800 shrink-0" />
                 <EditableText k="quotation.warranty.battery" className="font-medium inline-block" boldClassName="font-bold text-slate-950" />
               </div>
             )}
             <div className="flex items-center gap-1 leading-snug">
-              <span className="font-bold text-slate-800 shrink-0">• Mano de Obra y Soporte:</span>
+              <EditableText k="quotation.warranty.workmanshipLabel" className="font-bold text-slate-800 shrink-0" />
               <EditableText k="quotation.warranty.workmanship" className="font-medium inline-block" boldClassName="font-bold text-slate-950" />
             </div>
           </div>
@@ -360,7 +367,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
               className="font-bold border-b border-slate-200 pb-0.5 mb-0.5 uppercase tracking-wider flex items-center gap-1.5"
               style={{ color: activeTheme.primary }}
             >
-              <CheckCircle2 className="w-3.5 h-3.5" style={{ color: activeTheme.primary }} /> NOS ENCARGAMOS DE GESTIONAR
+              <CheckCircle2 className="w-3.5 h-3.5" style={{ color: activeTheme.primary }} /> <EditableText k="quotation.servicesHeading" />
             </h4>
             <EditableText k="quotation.servicesIncluded" as="div" className="space-y-0.5 block">
               {(text) => text
@@ -380,6 +387,11 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
         {/* 7. NOTA LEGAL */}
         <div className="text-center text-[9px] text-slate-500 font-semibold italic pt-0.5">
           <EditableText k="quotation.validityNote" className="text-center text-[9px] text-slate-500 font-semibold italic block" boldClassName="font-bold text-slate-700" />
+          <div className="mt-0.5 flex items-center justify-center gap-3 not-italic">
+            <EditableText k="company.name" className="font-bold" />
+            <OptionalTextRow k="company.rnc"><span><EditableText k="quotation.issuerRncLabel" /> <EditableText k="company.rnc" /></span></OptionalTextRow>
+            <OptionalTextRow k="company.email"><EditableText k="company.email" /></OptionalTextRow>
+          </div>
         </div>
       </div>
     </PDFPageShell>

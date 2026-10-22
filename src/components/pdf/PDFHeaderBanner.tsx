@@ -4,6 +4,7 @@ import { PDFColorTheme } from '../../constants/pdfThemes';
 import { DocumentCustomization } from '../../types';
 import { documentLogo } from '../../utils/documentLogo';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
+import { EditableText } from './editor/EditableText';
 
 interface PDFHeaderBannerProps {
   activeTheme: PDFColorTheme;
@@ -12,7 +13,7 @@ interface PDFHeaderBannerProps {
   systemCapacityKWp: number;
   location: string;
   currentDateStr: string;
-  pageTitle: string;
+  pageTitle: React.ReactNode;
   customization?: DocumentCustomization;
 }
 
@@ -40,13 +41,13 @@ export const PDFHeaderBanner: React.FC<PDFHeaderBannerProps> = ({
       >
         <div>
           <h2 className="text-[11px] font-semibold text-white/80 uppercase tracking-wider">
-            PROPUESTA TÉCNICA Y ECONÓMICA • ID: {projectId || 'SP-2024-089'}
+            <EditableText k="header.kicker" /> • ID: {projectId || 'SP-2024-089'}
           </h2>
           <h1 className="text-xl font-bold uppercase tracking-tight text-white mt-0.5">
             {clientDisplayName} — {systemCapacityKWp.toFixed(2)}kWp
           </h1>
           <p className="text-[11px] text-white/80 mt-0.5">
-            Ubicación: <span className="font-semibold text-white">{location}</span> | Fecha:{' '}
+            <EditableText k="header.locationLabel" /> <span className="font-semibold text-white">{location}</span> | <EditableText k="header.dateLabel" />{' '}
             <span className="font-semibold text-white">{currentDateStr}</span>
           </p>
         </div>
@@ -61,9 +62,9 @@ export const PDFHeaderBanner: React.FC<PDFHeaderBannerProps> = ({
           ) : (
             <div className="text-right">
               <div className="text-2xl font-black tracking-tight text-white flex items-center gap-1.5 justify-end">
-                <span className="w-3.5 h-3.5 bg-white/90 rounded-full inline-block"></span> {companyName}
+                <span className="w-3.5 h-3.5 bg-white/90 rounded-full inline-block"></span> <EditableText k="company.name" />
               </div>
-              <p className="text-[10px] text-white/80 tracking-wider font-semibold uppercase">{companySlogan}</p>
+              <EditableText k="company.slogan" as="p" className="text-[10px] text-white/80 tracking-wider font-semibold uppercase" />
             </div>
           )}
         </div>

@@ -1,4 +1,5 @@
 import { PDFPageShell } from '../PDFPageShell';
+import { EditableText } from '../editor/EditableText';
 import React from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
@@ -37,7 +38,7 @@ export const PDFPage4CashFlow: React.FC<PDFPage4CashFlowProps> = ({
       currentDateStr={currentDateStr}
       pageNum={pageNum}
       totalPages={totalPages}
-      pageTitle="FLUJO DE CAJA Y BENEFICIOS ACUMULADOS (25 AÑOS)"
+      sectionId="cashFlow"
     >
 
       {/* Body */}
@@ -47,13 +48,13 @@ export const PDFPage4CashFlow: React.FC<PDFPage4CashFlowProps> = ({
           <table className="w-full text-left border-collapse flex-1">
             <thead className="text-white font-bold uppercase tracking-wider text-[9px] shrink-0" style={{ backgroundColor: activeTheme.primary }}>
               <tr>
-                <th className="px-2 py-1 w-10 text-center">Año</th>
-                <th className="px-2 py-1 text-right">Energía Generada (kWh)</th>
-                <th className="px-2 py-1 text-right">Ahorro Energía (USD)</th>
-                <th className="px-2 py-1 text-right">Incentivo Fiscal (USD)</th>
-                <th className="px-2 py-1 text-right">Ahorro Anual Total (USD)</th>
-                <th className="px-2 py-1 text-right">Cash Flow (USD)</th>
-                <th className="px-2 py-1 text-right font-bold">CF Beneficio Acumulado (USD)</th>
+                <th className="px-2 py-1 w-10 text-center"><EditableText k="cashFlow.table.year" /></th>
+                <th className="px-2 py-1 text-right"><EditableText k="cashFlow.table.energy" /></th>
+                <th className="px-2 py-1 text-right"><EditableText k="cashFlow.table.energySavings" /></th>
+                <th className="px-2 py-1 text-right"><EditableText k="cashFlow.table.incentive" /></th>
+                <th className="px-2 py-1 text-right"><EditableText k="cashFlow.table.annualSavings" /></th>
+                <th className="px-2 py-1 text-right"><EditableText k="cashFlow.table.cashFlow" /></th>
+                <th className="px-2 py-1 text-right font-bold"><EditableText k="cashFlow.table.cumulative" /></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700 font-semibold text-[9px]">
@@ -124,39 +125,39 @@ export const PDFPage4CashFlow: React.FC<PDFPage4CashFlowProps> = ({
         {/* Full Summary Indicators Box */}
         <div className="bg-slate-50/80 border border-slate-200 rounded-xl p-2 shrink-0">
           <h3 className="text-slate-800 font-bold text-[11px] mb-1 border-b border-slate-200 pb-0.5 flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5" style={{ color: activeTheme.primary }} /> Indicadores Financieros del Proyecto
+            <ShieldCheck className="w-3.5 h-3.5" style={{ color: activeTheme.primary }} /> <EditableText k="cashFlow.indicatorsHeading" />
           </h3>
           <div className="grid grid-cols-4 gap-y-1 gap-x-3 text-[10.5px]">
             <div>
-              <p className="text-slate-400 text-[8.5px] uppercase tracking-wider font-bold mb-0.5">Payback</p>
+              <p className="text-slate-400 text-[8.5px] uppercase tracking-wider font-bold mb-0.5"><EditableText k="cashFlow.indicator.payback" /></p>
               <p className="font-bold text-slate-900">{summary.paybackYears} años</p>
             </div>
             <div>
-              <p className="text-slate-400 text-[8.5px] uppercase tracking-wider font-bold mb-0.5">TIR</p>
+              <p className="text-slate-400 text-[8.5px] uppercase tracking-wider font-bold mb-0.5"><EditableText k="cashFlow.indicator.irr" /></p>
               <p className="font-bold" style={{ color: activeTheme.primary }}>{summary.irrPct}%</p>
             </div>
             <div>
-              <p className="text-slate-400 text-[8.5px] uppercase tracking-wider font-bold mb-0.5">VAN (10%)</p>
+              <p className="text-slate-400 text-[8.5px] uppercase tracking-wider font-bold mb-0.5"><EditableText k="cashFlow.indicator.npv" /></p>
               <p className="font-bold text-slate-900">${summary.npvUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
             </div>
             <div>
-              <p className="text-slate-400 text-[8.5px] uppercase tracking-wider font-bold mb-0.5">Ahorro Total 25 Años</p>
+              <p className="text-slate-400 text-[8.5px] uppercase tracking-wider font-bold mb-0.5"><EditableText k="cashFlow.indicator.savings25" /></p>
               <p className="font-bold" style={{ color: activeTheme.primary }}>${summary.total25YearSavingsUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
             </div>
             <div>
-              <p className="text-slate-400 text-[8.5px] uppercase tracking-wider font-bold mb-0.5">ROI Total</p>
+              <p className="text-slate-400 text-[8.5px] uppercase tracking-wider font-bold mb-0.5"><EditableText k="cashFlow.indicator.roi" /></p>
               <p className="font-bold" style={{ color: activeTheme.primary }}>{summary.roi25YrPct}%</p>
             </div>
             <div>
-              <p className="text-slate-400 text-[8.5px] uppercase tracking-wider font-bold mb-0.5">Reducción CO2</p>
+              <p className="text-slate-400 text-[8.5px] uppercase tracking-wider font-bold mb-0.5"><EditableText k="cashFlow.indicator.co2" /></p>
               <p className="font-bold text-slate-900">{(summary.co2AvoidedTonsPerYear * 25).toFixed(1)} Ton</p>
             </div>
             <div>
-              <p className="text-slate-400 text-[8.5px] uppercase tracking-wider font-bold mb-0.5">Precio por Watt</p>
+              <p className="text-slate-400 text-[8.5px] uppercase tracking-wider font-bold mb-0.5"><EditableText k="cashFlow.indicator.pricePerWatt" /></p>
               <p className="font-bold text-slate-900">${(summary.salePricePerWattUSD ?? (summary.systemCapacityKWp > 0 ? summary.grossInvestmentUSD / (summary.systemCapacityKWp * 1000) : 0)).toFixed(3)} USD/W</p>
             </div>
             <div>
-              <p className="text-slate-400 text-[8.5px] uppercase tracking-wider font-bold mb-0.5">Capacidad DC</p>
+              <p className="text-slate-400 text-[8.5px] uppercase tracking-wider font-bold mb-0.5"><EditableText k="cashFlow.indicator.capacity" /></p>
               <p className="font-bold text-slate-900">{summary.systemCapacityKWp.toFixed(2)} kWp</p>
             </div>
           </div>

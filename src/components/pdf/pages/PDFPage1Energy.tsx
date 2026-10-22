@@ -1,4 +1,6 @@
 import { useSelfConsumptionProjection } from '../../../features/application/useApplicationFeatures';
+import { EditableText } from '../editor/EditableText';
+import { RichText } from '../editor/RichText';
 import { PDFPageShell } from '../PDFPageShell';
 import React from 'react';
 import { Leaf } from 'lucide-react';
@@ -67,7 +69,7 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
       currentDateStr={currentDateStr}
       pageNum={pageNum}
       totalPages={totalPages}
-      pageTitle="ANÁLISIS DE ENERGÍA Y CONSUMO"
+      sectionId="energy"
     >
 
       {/* Main Content */}
@@ -77,7 +79,7 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
           <div className="flex justify-between items-center border-b border-gray-100 pb-1.5">
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-bold text-gray-800 uppercase tracking-wider">
-                Evolución Mensual de Energía
+                <EditableText k="energy.chartHeading" />
               </h2>
               {/* Interactive toggle on preview (hidden in print/export) */}
               {projectionEnabled && <button
@@ -104,17 +106,17 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
             <div className="flex items-center gap-3.5 text-[11px] font-semibold">
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-xs" style={{ backgroundColor: activeTheme.primary }}></span>
-                <span className="text-slate-700">Consumo (kWh)</span>
+                <span className="text-slate-700"><EditableText k="energy.legend.consumption" /></span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-xs" style={{ backgroundColor: activeTheme.barColor }}></span>
-                <span className="text-slate-700">Producción Solar (kWh)</span>
+                <span className="text-slate-700"><EditableText k="energy.legend.production" /></span>
               </div>
               {showSelfConsumption && (
                 <div className="flex items-center gap-1.5">
                   <span className="w-3 h-1 bg-[#2563eb] rounded-full inline-block"></span>
                   <span className="w-2 h-2 rounded-full bg-[#2563eb] inline-block -ml-2.5"></span>
-                  <span className="text-blue-700 font-bold ml-1">Autoconsumo en Sitio</span>
+                  <span className="text-blue-700 font-bold ml-1"><EditableText k="energy.legend.selfConsumption" /></span>
                 </div>
               )}
             </div>
@@ -162,20 +164,20 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
         {/* Table Section */}
         <div className="space-y-2">
           <h2 className="text-sm font-bold text-gray-800 border-b border-gray-100 pb-1.5 uppercase tracking-wider">
-            Resumen Mensual de Energía & Balance de Ahorro
+            <EditableText k="energy.tableHeading" />
           </h2>
           <div className="border border-gray-200 rounded-lg overflow-hidden shadow-xs">
             <table className="w-full text-xs text-left">
               <thead className="text-white uppercase font-bold text-[10px]" style={{ backgroundColor: activeTheme.primary }}>
                 <tr>
-                  <th className="px-3 py-1.5">Mes</th>
-                  <th className="px-3 py-1.5 text-right">Consumo (kWh)</th>
-                  <th className="px-3 py-1.5 text-right">Producción (kWh)</th>
+                  <th className="px-3 py-1.5"><EditableText k="energy.table.month" /></th>
+                  <th className="px-3 py-1.5 text-right"><EditableText k="energy.table.consumption" /></th>
+                  <th className="px-3 py-1.5 text-right"><EditableText k="energy.table.production" /></th>
                   {showSelfConsumption && (
-                    <th className="px-3 py-1.5 text-right">Autoconsumo (kWh)</th>
+                    <th className="px-3 py-1.5 text-right"><EditableText k="energy.table.selfConsumption" /></th>
                   )}
                   <th className="px-3 py-1.5 text-right">
-                    {showSelfConsumption ? 'Ahorro Fact. (kWh)' : 'Ahorro Energ. (kWh)'}
+                    <EditableText k={showSelfConsumption ? 'energy.table.savedBilled' : 'energy.table.savedEnergy'} />
                   </th>
                   <th className="px-3 py-1.5 text-right">%</th>
                 </tr>
@@ -205,7 +207,7 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
               </tbody>
               <tfoot className="font-bold bg-gray-100 text-gray-900 border-t-2 border-gray-300 text-xs">
                 <tr>
-                  <td className="px-3 py-1.5 uppercase font-extrabold">TOTAL</td>
+                  <td className="px-3 py-1.5 uppercase font-extrabold"><EditableText k="energy.table.total" /></td>
                   <td className="px-3 py-1.5 text-right">{totalConsumptionKWh.toLocaleString()}</td>
                   <td className="px-3 py-1.5 text-right">{totalProductionKWh.toFixed(1)}</td>
                   {showSelfConsumption && (
@@ -227,9 +229,11 @@ export const PDFPage1Energy: React.FC<PDFPage1EnergyProps> = ({
             <Leaf className="w-4 h-4" />
           </div>
           <div className="text-xs">
-            <h3 className="font-bold text-xs mb-0.5" style={{ color: activeTheme.primary }}>Impacto Ambiental</h3>
+            <h3 className="font-bold text-xs mb-0.5" style={{ color: activeTheme.primary }}><EditableText k="energy.impactHeading" /></h3>
             <p className="text-slate-800 text-[11px]">
-              Reducción estimada de CO₂: <span className="font-bold">{summary.co2AvoidedTonsPerYear} Toneladas/año</span>. Esto equivale a plantar aproximadamente <span className="font-bold">{treesPlanted} árboles</span> anuales.
+              <EditableText k="energy.impactText" boldClassName="font-bold">
+                {(text) => <RichText text={text.replace('{co2}', String(summary.co2AvoidedTonsPerYear)).replace('{trees}', String(treesPlanted))} boldClassName="font-bold" />}
+              </EditableText>
             </p>
           </div>
         </div>

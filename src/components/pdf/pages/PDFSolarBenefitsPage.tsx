@@ -38,7 +38,7 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
       currentDateStr={currentDateStr}
       pageNum={pageNum}
       totalPages={totalPages}
-      pageTitle="2. BENEFICIOS DE LA ENERGÍA SOLAR Y LEY 57-07"
+      sectionId="benefits"
     >
       {/* Body */}
       <div className="px-10 pt-3 pb-3 flex-1 flex flex-col justify-between text-xs text-slate-800 relative z-10 min-h-0">
@@ -52,7 +52,7 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
               lineHeight: '1.3',
             }}
           >
-            2. BENEFICIOS DE LA ENERGÍA SOLAR
+            <EditableText k="benefits.heading" />
           </div>
 
           {/* Visual House Illustration with Full Width and 4 Feature Pills */}
@@ -66,7 +66,7 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent pointer-events-none" />
               <div className="absolute bottom-3.5 left-4 text-white">
                 <span className="text-[11px] font-black uppercase tracking-wider bg-emerald-600/90 backdrop-blur-xs px-3 py-1.5 rounded-md shadow-xs">
-                  Energía Limpia y Autonomía Residencial
+                  <EditableText k="benefits.imageCaption" />
                 </span>
               </div>
             </div>
@@ -77,9 +77,9 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
                 <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center mx-auto shadow-2xs">
                   <DollarSign className="w-4 h-4" />
                 </div>
-                <h5 className="font-black text-[11px] uppercase tracking-tight text-emerald-950">Ahorro en Factura</h5>
+                <h5 className="font-black text-[11px] uppercase tracking-tight text-emerald-950"><EditableText k="benefits.pillar1.title" /></h5>
                 <p className="text-[10px] text-slate-600 leading-snug font-medium">
-                  Reducción inmediata de hasta un 95% del costo eléctrico mensual.
+                  <EditableText k="benefits.pillar1.text" />
                 </p>
               </div>
 
@@ -87,9 +87,9 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
                 <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center mx-auto shadow-2xs">
                   <TrendingUp className="w-4 h-4" />
                 </div>
-                <h5 className="font-black text-[11px] uppercase tracking-tight text-blue-950">Plusvalía Inmueble</h5>
+                <h5 className="font-black text-[11px] uppercase tracking-tight text-blue-950"><EditableText k="benefits.pillar2.title" /></h5>
                 <p className="text-[10px] text-slate-600 leading-snug font-medium">
-                  Incremento directo del valor comercial del inmueble o negocio.
+                  <EditableText k="benefits.pillar2.text" />
                 </p>
               </div>
 
@@ -97,9 +97,9 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
                 <div className="w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center mx-auto shadow-2xs">
                   <Zap className="w-4 h-4" />
                 </div>
-                <h5 className="font-black text-[11px] uppercase tracking-tight text-amber-950">Independencia</h5>
+                <h5 className="font-black text-[11px] uppercase tracking-tight text-amber-950"><EditableText k="benefits.pillar3.title" /></h5>
                 <p className="text-[10px] text-slate-600 leading-snug font-medium">
-                  Protección ante futuros incrementos tarifarios de las distribuidoras.
+                  <EditableText k="benefits.pillar3.text" />
                 </p>
               </div>
 
@@ -107,9 +107,9 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
                 <div className="w-7 h-7 rounded-full bg-teal-600 text-white flex items-center justify-center mx-auto shadow-2xs">
                   <Leaf className="w-4 h-4" />
                 </div>
-                <h5 className="font-black text-[11px] uppercase tracking-tight text-teal-950">Sostenibilidad</h5>
+                <h5 className="font-black text-[11px] uppercase tracking-tight text-teal-950"><EditableText k="benefits.pillar4.title" /></h5>
                 <p className="text-[10px] text-slate-600 leading-snug font-medium">
-                  Energía 100% limpia sin emisiones contaminantes a la atmósfera.
+                  <EditableText k="benefits.pillar4.text" />
                 </p>
               </div>
             </div>
@@ -126,7 +126,7 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
               lineHeight: '1.3',
             }}
           >
-            2.1. OBJETIVOS E INCENTIVOS DE LA LEY 57-07 DE ENERGÍAS RENOVABLES
+            <EditableText k="benefits.objectivesHeading" />
           </div>
 
           <EditableText k="benefits.ley5707Intro" className="text-slate-700 text-[11.5px] leading-relaxed font-medium block whitespace-pre-line" boldClassName="text-slate-950 font-bold" />
@@ -135,9 +135,9 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
             <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/90 flex items-start gap-3 shadow-xs">
               <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
               <div>
-                <h5 className="font-black text-xs text-slate-900 mb-1">Fortalecer la Diversidad Energética</h5>
+                <h5 className="font-black text-xs text-slate-900 mb-1"><EditableText k="benefits.objective1.title" /></h5>
                 <p className="text-[10.5px] text-slate-600 leading-relaxed font-medium">
-                  Ampliar la capacidad de generación eléctrica distribuida mediante fuentes no convencionales técnica y económicamente viables.
+                  <EditableText k="benefits.objective1.text" />
                 </p>
               </div>
             </div>
@@ -145,9 +145,9 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
             <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/90 flex items-start gap-3 shadow-xs">
               <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
               <div>
-                <h5 className="font-black text-xs text-slate-900 mb-1">Disminuir Dependencia de Fósiles</h5>
+                <h5 className="font-black text-xs text-slate-900 mb-1"><EditableText k="benefits.objective2.title" /></h5>
                 <p className="text-[10.5px] text-slate-600 leading-relaxed font-medium">
-                  Reducir la vulnerabilidad económica del país ante fluctuaciones de precios internacionales de hidrocarburos.
+                  <EditableText k="benefits.objective2.text" />
                 </p>
               </div>
             </div>
@@ -155,19 +155,17 @@ export const PDFSolarBenefitsPage: React.FC<PDFSolarBenefitsPageProps> = ({
             <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/90 flex items-start gap-3 shadow-xs">
               <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
               <div>
-                <h5 className="font-black text-xs text-slate-900 mb-1">Crédito Fiscal al Impuesto Sobre la Renta</h5>
-                <p className="text-[10.5px] text-slate-600 leading-relaxed font-medium">
-                  Permite deducir hasta un <strong>40% de la inversión en equipos</strong> del Impuesto Sobre la Renta (ISR), acelerando el retorno del capital invertido.
-                </p>
+                <h5 className="font-black text-xs text-slate-900 mb-1"><EditableText k="benefits.objective3.title" /></h5>
+                <EditableText k="benefits.objective3.text" as="p" className="text-[10.5px] text-slate-600 leading-relaxed font-medium" boldClassName="font-bold" />
               </div>
             </div>
 
             <div className="p-3.5 rounded-2xl border border-slate-200 bg-slate-50/90 flex items-start gap-3 shadow-xs">
               <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
               <div>
-                <h5 className="font-black text-xs text-slate-900 mb-1">Exención Arancelaria y de ITBIS</h5>
+                <h5 className="font-black text-xs text-slate-900 mb-1"><EditableText k="benefits.objective4.title" /></h5>
                 <p className="text-[10.5px] text-slate-600 leading-relaxed font-medium">
-                  Exención del 100% de impuestos a la importación y aranceles sobre equipos solares certificados para proyectos residenciales e industriales.
+                  <EditableText k="benefits.objective4.text" />
                 </p>
               </div>
             </div>
