@@ -127,6 +127,8 @@ export function buildNewItem<K extends EquipmentKind>(kind: K, specs: SystemSpec
     capacityKWh: candidate?.capacityKWh || 5.12,
     count: 1,
     unitPriceUSD: price || (candidate?.capacityKWh ? candidate.capacityKWh * 160 : 850),
+    dodPct: resolveBatteryDodPct(candidate?.dodPct),
+    efficiencyPct: resolveBatteryEfficiencyPct(candidate?.batteryEfficiencyPct),
   } as GroupItem[K];
 }
 

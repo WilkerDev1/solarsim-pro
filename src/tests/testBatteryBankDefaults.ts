@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateMonthlySolarProduction } from '../engine/solarEngine';
 import { calculateProjectFinancialSummary } from '../engine/financeEngine';
+import { buildNewItem } from '../components/simulator/params/sections/equipment/equipmentGroupModel';
 import { createAIProposalBase, prepareProposalDraftProject } from '../utils/proposalDraftProject';
 import { DEFAULT_RD_TARIFF_MATRIX } from '../data/rdTariffs';
 import { getProjectBatteries } from '../utils/equipmentSpecsUtils';
@@ -135,6 +136,16 @@ for (const file of ['src/components/common/AIDatasheetScannerModal.tsx', 'src/co
   assert.equal(next.batteries![1].efficiencyPct, 90, 'los demás grupos no cambian');
   assert.equal(next.batteryEfficiencyPct, 80);
   close(resolveBatteryBankEfficiencyPct(next), (32 * 0.7 * 80 + 15 * 0.9 * 90) / (32 * 0.7 + 15 * 0.9), 'el motor usa el valor editado');
+}
+
+// ── «+» con un modelo del catálogo: el grupo nuevo lleva sus DOD y eficiencia ───────────────
+{
+  const cat = [item({ id: 'c1', displayName: 'Otra', batteryEfficiencyPct: 95, dodPct: 85 })];
+  const added = buildNewItem('battery', { ...base.specs, hasBattery: true } as SystemSpecs, cat);
+  assert.equal(added.efficiencyPct, 95);
+  assert.equal(added.dodPct, 85);
+  const bare = buildNewItem('battery', { ...base.specs, hasBattery: true } as SystemSpecs, [item({ id: 'c2', displayName: 'Sin dato', batteryEfficiencyPct: 0 })]);
+  assert.equal(bare.efficiencyPct, 90, 'catálogo sin eficiencia: 90');
 }
 
 console.log('testBatteryBankDefaults: ok');
