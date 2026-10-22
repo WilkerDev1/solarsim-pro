@@ -182,7 +182,9 @@ const applyProposalDraft: NativeHandler = (args) => {
       execute() {
         const s = store();
         const previous = createNew ? undefined : s.projects.find((p) => p.id === s.activeProjectId);
-        const before = previous ? pickFields(previous, PROJECT_SECTIONS) : undefined;
+        // applyExtractedInvoice also rewrites aiSource (notes, consumption provenance): undo must restore it too.
+        const fields = [...PROJECT_SECTIONS, 'aiSource'];
+        const before = previous ? pickFields(previous, fields) : undefined;
         const projectsBefore = s.projects;
         s.applyExtractedInvoice(draft, createNew);
         const after = store();
@@ -191,7 +193,7 @@ const applyProposalDraft: NativeHandler = (args) => {
         return {
           targetId: project.id, data: { proposalId: project.id, code: project.client.projectId }, cards: [proposalCard(project)],
           undo: before
-            ? { before, fields: [...PROJECT_SECTIONS], afterFingerprint: fingerprint(pickFields(project, PROJECT_SECTIONS)) }
+            ? { before, fields, afterFingerprint: fingerprint(pickFields(project, fields)) }
             : { op: 'trash', before: {}, afterFingerprint: '' },
         };
       },

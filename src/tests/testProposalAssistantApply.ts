@@ -33,6 +33,14 @@ assert.equal(store.getState().agentActivity[0].source, 'proposal-assistant');
 assert.equal(store.getState().undoAgentActivity(created.activityId).success, true);
 assert.equal(store.getState().projects.find((p) => p.id === project.id)?.isDeleted, true);
 
+// 1b. Updating the open proposal records aiSource (notes, provenance) so undo restores it as well.
+store.setState({ projects: [{ ...project, isDeleted: false, deletedAt: undefined, aiSource: { notes: 'antes' } }], activeProjectId: project.id });
+const updated = await executeAgentTool({ name: 'apply_proposal_draft', args: { draft: { ...draft, aiNotes: 'después' } as unknown as Record<string, unknown>, createNew: false } }, ctx());
+assert(updated.status === 'applied', JSON.stringify(updated));
+assert.match(store.getState().getActiveProject().aiSource?.notes || '', /después/);
+assert.equal(store.getState().undoAgentActivity(updated.activityId).success, true);
+assert.equal(store.getState().getActiveProject().aiSource?.notes, 'antes');
+
 // 2. Under "confirm" the review click still counts as the confirmation; "deny" blocks it.
 store.getState().setAgentPolicy({ internal: { read: 'allow', draft: 'confirm', guarded: 'confirm' } });
 assert.equal((await executeAgentTool({ name: 'apply_proposal_draft', args: { draft: draft as unknown as Record<string, unknown>, createNew: true } }, ctx())).status, 'applied');
