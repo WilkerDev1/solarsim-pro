@@ -327,6 +327,7 @@ export interface NotificationSlice {
 }
 
 import { TariffSlice } from './slices/tariffSlice';
+import { ClientSlice } from './slices/clientSlice';
 import { FeatureSettingsSlice } from './slices/featureSettingsSlice';
 import { AgentSlice } from './slices/agentSlice';
 
@@ -337,6 +338,7 @@ export type SimulationStore = ProjectSlice &
   AISlice &
   UISlice &
   FolderSlice &
+  ClientSlice &
   TariffSlice &
   CompanyProfileSlice &
   VersionHistorySlice &
