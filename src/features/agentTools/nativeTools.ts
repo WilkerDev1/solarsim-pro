@@ -70,3 +70,7 @@ export function findVisibleEquipment(id: string) {
 export const proposalCard = (p: { id: string; status?: string; commercial?: { status?: string }; client: { name: string; projectId?: string } }): AgentCard => ({
   type: 'proposal', id: p.id, title: p.client.name, detail: p.client.projectId, status: p.status, commercialStatus: p.commercial?.status,
 });
+
+export const PROJECT_SECTIONS = ['client', 'specs', 'rates', 'financials', 'monthlyConsumption', 'customization'] as const;
+export const pickFields = (source: object, keys: readonly string[]) =>
+  Object.fromEntries(keys.map((k) => [k, structuredClone((source as Record<string, unknown>)[k])]));

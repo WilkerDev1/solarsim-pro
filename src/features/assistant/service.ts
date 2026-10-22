@@ -6,6 +6,7 @@ import {
 import { toGeminiFunctionDeclarations } from '../../../shared/agentTools/jsonSchema';
 import { assistantSystemPrompt } from '../../../shared/agentTools/rules';
 import { listAgentTools } from '../agentTools/registry';
+import { chatFileParts, type ChatFile } from './chatFiles';
 import type {
   AssistantAction,
   AssistantCard,
@@ -22,6 +23,8 @@ export interface AssistantRunOptions {
   signal: AbortSignal;
   execute: (call: AssistantToolCall) => AssistantToolResult | Promise<AssistantToolResult>;
   transport?: GeminiTransport;
+  /** Files attached to this prompt only; history keeps text. */
+  files?: ChatFile[];
 }
 /** Small bounded tool loop. Tool results are data, never instructions or executable HTML. */
 /** Raised when the conversation fails after some changes were already applied, so the UI can still show them. */
@@ -50,6 +53,7 @@ async function runAssistantLoop(
   applied: { activityId: string; title: string }[]
 ): Promise<AssistantMessage> {
   const cards: AssistantCard[] = [];
+  const agentCards: NonNullable<AssistantMessage['agentCards']> = [];
   const actions: AssistantAction[] = [];
   const contents: any[] = options.history
     .slice(-12)
@@ -59,7 +63,7 @@ async function runAssistantLoop(
     }));
   contents.push({
     role: 'user',
-    parts: [{ text: options.prompt.slice(0, 12000) }],
+    parts: [{ text: options.prompt.slice(0, 12000) }, ...chatFileParts(options.files || [])],
   });
   const tools = [
     { functionDeclarations: toGeminiFunctionDeclarations(listAgentTools('app-assistant')) },
@@ -108,6 +112,7 @@ async function runAssistantLoop(
         ].slice(0, 12),
         actions,
         ...(applied.length ? { applied } : {}),
+        ...(agentCards.length ? { agentCards: agentCards.slice(0, 6) } : {}),
       };
     if (calls.length > 4)
       throw new Error(
@@ -122,6 +127,7 @@ async function runAssistantLoop(
             'Resultado demasiado grande. Consulta un equipo o una propuesta específica.'
           );
         if (result.cards) cards.push(...result.cards);
+        if (result.agentCards) agentCards.push(...result.agentCards);
         if (result.activityId)
           applied.push({ activityId: result.activityId, title: String(call.args?.title || 'Cambio aplicado').slice(0, 150) });
         if (result.action) {

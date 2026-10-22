@@ -342,3 +342,22 @@
   outline: 2px solid #70dbb4;
   outline-offset: 3px;
 }
+
+.assistant-message-text p { margin: 0 0 0.5rem; }
+.assistant-message-text p:last-child { margin-bottom: 0; }
+.assistant-message-text ul, .assistant-message-text ol { margin: 0 0 0.5rem 1.1rem; padding: 0; }
+.assistant-message-text ul { list-style: disc; }
+.assistant-message-text ol { list-style: decimal; }
+.assistant-message-text code { font-family: ui-monospace, monospace; font-size: 0.85em; padding: 0 0.25rem; border-radius: 0.25rem; background: rgb(148 163 184 / 0.18); }
+.assistant-audit-filter { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; margin: 0.25rem 0 0.5rem; color: #bac7d8; }
+.assistant-audit-filter select { background: #243247; color: #f1f5fb; border: 1px solid var(--assistant-border); border-radius: 0.375rem; padding: 0.125rem 0.375rem; font-size: 0.75rem; }
+.assistant-audit-list { list-style: none; margin: 0; padding: 0; max-height: 18rem; overflow-y: auto; display: grid; gap: 0.375rem; }
+.assistant-audit-list li { display: grid; grid-template-columns: auto 1fr auto; gap: 0.5rem; align-items: start; font-size: 0.75rem; line-height: 1.35; }
+.assistant-audit-badge { font-weight: 600; border-radius: 0.375rem; padding: 0 0.375rem; background: #2e3e54; color: #dbe5f1; }
+.assistant-audit-list li[data-severity='error'] .assistant-audit-badge { background: #5b2430; color: #ffc9d0; }
+.assistant-audit-list li[data-severity='warning'] .assistant-audit-badge { background: #5a4419; color: #ffe2a3; }
+.assistant-file-chips { list-style: none; margin: 0 0 0.375rem; padding: 0; display: flex; flex-wrap: wrap; gap: 0.375rem; }
+.assistant-file-chips li { display: inline-flex; align-items: center; gap: 0.25rem; max-width: 100%; font-size: 0.75rem; border-radius: 9999px; padding: 0.125rem 0.25rem 0.125rem 0.625rem; background: rgb(148 163 184 / 0.18); }
+.assistant-file-chips span { overflow-wrap: anywhere; }
+.assistant-file-chips button { display: inline-flex; border-radius: 9999px; padding: 0.125rem; }
+label.assistant-icon { cursor: pointer; }

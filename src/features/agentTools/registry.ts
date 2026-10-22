@@ -221,7 +221,9 @@ async function executeNative(handler: NativeHandler, definition: AgentToolDefini
   if (!result.plan) return { status: 'ok', data: result.data, cards: result.cards };
   const kind = definition.kind === 'guarded' ? 'guarded' : 'draft';
   const meta = { source: ctx.source, clientLabel: ctx.clientLabel, tool: definition.name, kind } as const;
-  if (kind === 'draft' && draftPolicy === 'allow') {
+  // In the proposal assistant the user already reviewed and clicked «Aplicar»: that click is the confirmation.
+  const confirmedInUi = ctx.source === 'proposal-assistant' && draftPolicy === 'confirm';
+  if (kind === 'draft' && (draftPolicy === 'allow' || confirmedInUi)) {
     try {
       const { activityId, execution } = runNativePlan(result.plan, meta);
       return { status: 'applied', data: { status: 'applied', ...(execution.data as object) }, activityId, cards: execution.cards ?? result.cards };
@@ -243,6 +245,7 @@ export async function executeForAssistant(call: AgentToolCall, ctx: AgentToolCon
   const outcome = await executeAgentTool(call, ctx);
   if (outcome.status === 'error') throw new Error(outcome.message);
   const cards = outcome.cards?.map(toAssistantCard).filter((c): c is AssistantCard => !!c);
+  const agentCards = outcome.cards?.filter((c) => !toAssistantCard(c));
   if (outcome.status === 'pending_confirmation') {
     const pending = store().pendingAgentActions.find((a) => a.id === outcome.actionId)!;
     const action: AssistantAction = isNativePlan(pending.plan)
@@ -252,6 +255,6 @@ export async function executeForAssistant(call: AgentToolCall, ctx: AgentToolCon
       : (pending.plan as AssistantAction);
     return { data: { status: 'pending_confirmation', changes: pending.changes }, cards, action };
   }
-  if (outcome.status === 'applied') return { data: outcome.data, cards, activityId: outcome.activityId };
-  return { data: outcome.data, cards };
+  if (outcome.status === 'applied') return { data: outcome.data, cards, agentCards, activityId: outcome.activityId };
+  return { data: outcome.data, cards, agentCards };
 }
