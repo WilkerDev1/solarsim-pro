@@ -1,4 +1,5 @@
 import { PDFPageShell } from '../PDFPageShell';
+import { EditableText } from '../editor/EditableText';
 import { cleanClientName } from '../../../../shared/proposalPresentation';
 import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
@@ -35,7 +36,7 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
       currentDateStr={currentDateStr}
       pageNum={pageNum}
       totalPages={totalPages}
-      pageTitle="ANÁLISIS DE COSTOS Y MARGEN DE GANANCIA (INFORMACIÓN CONFIDENCIAL)"
+      sectionId="costMatrix"
       className="pdf-page bg-white w-[850px] h-[1202px] min-h-[1202px] max-h-[1202px] shadow-2xl relative overflow-hidden flex flex-col font-sans shrink-0 border border-amber-300 print:shadow-none print:w-full print:min-h-screen"
     >
 
@@ -48,15 +49,15 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
                 CLIENTE: {cleanClientName(project.client.name || 'Cliente')} — Desglose de Costos de Proyecto
               </h3>
               <p className="text-[10px] text-amber-100 font-medium">
-                Documento de Control Interno de Precios, ITBIS y Margen de Rentabilidad
+                <EditableText k="costMatrix.subheading" />
               </p>
             </div>
             <div className="text-right text-xs font-bold text-amber-100">
               <div>
-                Tasa Cambio: <span className="text-white font-extrabold">{summary.costMatrix.dopExchangeRate} DOP/USD</span>
+                <EditableText k="costMatrix.exchangeRate" /> <span className="text-white font-extrabold">{summary.costMatrix.dopExchangeRate} DOP/USD</span>
               </div>
               <div>
-                Factor Venta: <span className="text-white font-extrabold">{summary.costMatrix.saleMarginMultiplier}</span>
+                <EditableText k="costMatrix.salesFactor" /> <span className="text-white font-extrabold">{summary.costMatrix.saleMarginMultiplier}</span>
               </div>
             </div>
           </div>
@@ -66,15 +67,15 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
             <table className="w-full text-left text-xs border-collapse">
               <thead className="bg-slate-100 font-bold text-slate-700 border-b border-slate-200 uppercase text-[9px]">
                 <tr>
-                  <th className="py-1 px-2">Productos</th>
-                  <th className="py-1 px-1.5 text-center text-red-600">KW</th>
-                  <th className="py-1 px-1.5 text-center text-red-600">Cantidad</th>
-                  <th className="py-1 px-2 text-right text-red-600">Precio Unit. USD</th>
-                  <th className="py-1 px-2 text-right">Precio Unit. RD</th>
-                  <th className="py-1 px-2 text-right font-bold">Precio Total RD</th>
-                  <th className="py-1 px-2 text-right font-bold">Precio Total USD</th>
-                  <th className="py-1 px-1.5 text-right text-red-600">ITBIS RD</th>
-                  <th className="py-1 px-1.5 text-right text-red-600">ITBIS USD</th>
+                  <th className="py-1 px-2"><EditableText k="costMatrix.table.products" /></th>
+                  <th className="py-1 px-1.5 text-center text-red-600"><EditableText k="costMatrix.table.kw" /></th>
+                  <th className="py-1 px-1.5 text-center text-red-600"><EditableText k="costMatrix.table.quantity" /></th>
+                  <th className="py-1 px-2 text-right text-red-600"><EditableText k="costMatrix.table.unitUsd" /></th>
+                  <th className="py-1 px-2 text-right"><EditableText k="costMatrix.table.unitDop" /></th>
+                  <th className="py-1 px-2 text-right font-bold"><EditableText k="costMatrix.table.totalDop" /></th>
+                  <th className="py-1 px-2 text-right font-bold"><EditableText k="costMatrix.table.totalUsd" /></th>
+                  <th className="py-1 px-1.5 text-right text-red-600"><EditableText k="costMatrix.table.itbisDop" /></th>
+                  <th className="py-1 px-1.5 text-right text-red-600"><EditableText k="costMatrix.table.itbisUsd" /></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 text-slate-800 font-semibold text-[10px]">
@@ -111,21 +112,21 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
           <div className="grid grid-cols-2 gap-3 text-xs font-semibold">
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-2 space-y-0.5">
               <div className="flex justify-between text-slate-700 text-[10.5px]">
-                <span>Precio Neto :</span>
+                <span><EditableText k="costMatrix.summary.net" /></span>
                 <span>
                   RD$ {summary.costMatrix.precioNetoDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp;{' '}
                   <strong className="text-slate-900">${summary.costMatrix.precioNetoUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
                 </span>
               </div>
               <div className="flex justify-between text-slate-700 text-[10.5px]">
-                <span>ITBIS Total :</span>
+                <span><EditableText k="costMatrix.summary.itbis" /></span>
                 <span>
                   RD$ {summary.costMatrix.itbisDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp;{' '}
                   <strong className="text-slate-900">${summary.costMatrix.itbisUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
                 </span>
               </div>
               <div className="flex justify-between text-slate-900 font-bold bg-slate-200/80 px-2 py-0.5 rounded text-[10.5px]">
-                <span>Total Neto (Costo Total) :</span>
+                <span><EditableText k="costMatrix.summary.totalNet" /></span>
                 <span>
                   RD$ {summary.costMatrix.totalNetoDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp;{' '}
                   <strong>${summary.costMatrix.totalNetoUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
@@ -142,7 +143,7 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
 
             <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-2 space-y-0.5">
               <div className="flex justify-between text-slate-700 text-[10.5px]">
-                <span>Precio kilos costo :</span>
+                <span><EditableText k="costMatrix.summary.costPerKilo" /></span>
                 <span>
                   RD$ {summary.costMatrix.precioKilosCostoDOP.toFixed(2)} &nbsp;|&nbsp;{' '}
                   <strong className="text-slate-900">
@@ -151,7 +152,7 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
                 </span>
               </div>
               <div className="flex justify-between text-slate-900 font-bold text-[10.5px]">
-                <span>Precio kilos ventas :</span>
+                <span><EditableText k="costMatrix.summary.salesPerKilo" /></span>
                 <span>
                   RD$ {summary.costMatrix.precioKilosVentasDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp;{' '}
                   <strong className="text-emerald-800">
@@ -160,14 +161,14 @@ export const PDFPage5CostMatrix: React.FC<PDFPage5CostMatrixProps> = ({
                 </span>
               </div>
               <div className="flex justify-between items-center text-amber-950 font-bold bg-amber-100/70 border border-amber-300/80 px-2 py-0.5 rounded text-[10px]">
-                <span>Margen Rentabilidad :</span>
+                <span><EditableText k="costMatrix.summary.margin" /></span>
                 <span>
                   +{summary.costMatrix.markupOnCostPct !== undefined ? summary.costMatrix.markupOnCostPct.toFixed(1) : ((summary.costMatrix.saleMarginMultiplier - 1) * 100).toFixed(1)}% s/costo (Markup) &nbsp;|&nbsp;{' '}
                   {summary.costMatrix.marginOnSalePct !== undefined ? summary.costMatrix.marginOnSalePct.toFixed(1) : ((summary.costMatrix.gananciaUSD / (summary.costMatrix.porcentajeVentaUSD || 1)) * 100).toFixed(1)}% s/venta
                 </span>
               </div>
               <div className="flex justify-between text-emerald-950 font-black bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-lg text-xs mt-0.5">
-                <span>Ganancia Proyectada :</span>
+                <span><EditableText k="costMatrix.summary.profit" /></span>
                 <span>
                   RD$ {summary.costMatrix.gananciaDOP.toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} &nbsp;|&nbsp;{' '}
                   <strong className="text-emerald-800">

@@ -1,4 +1,5 @@
 import { PDFPageShell } from '../PDFPageShell';
+import { EditableText } from '../editor/EditableText';
 import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
@@ -40,7 +41,7 @@ export const PDFTableOfContents: React.FC<PDFTableOfContentsProps> = ({
       currentDateStr={currentDateStr}
       pageNum={pageNum}
       totalPages={totalPages}
-      pageTitle="ÍNDICE DE CONTENIDO"
+      sectionId="tableOfContents"
     >
 
       {/* Body */}
@@ -55,10 +56,10 @@ export const PDFTableOfContents: React.FC<PDFTableOfContentsProps> = ({
             </div>
             <div>
               <h2 className="text-lg font-extrabold uppercase tracking-tight text-slate-900">
-                Estructura de la Propuesta
+                <EditableText k="toc.heading" />
               </h2>
               <p className="text-xs text-slate-500 font-medium">
-                Guía de navegación del dossier técnico y económico
+                <EditableText k="toc.subheading" />
               </p>
             </div>
           </div>
@@ -76,7 +77,7 @@ export const PDFTableOfContents: React.FC<PDFTableOfContentsProps> = ({
                       {item.number}.
                     </span>
                     <span className={`font-black text-slate-900 uppercase tracking-tight ${tocItems.length > 10 ? 'text-xs' : 'text-sm'}`}>
-                      {item.title}
+                      {item.sectionId ? <EditableText k={`toc.${item.sectionId}.title`} /> : item.title}
                     </span>
                   </div>
 
@@ -111,7 +112,7 @@ export const PDFTableOfContents: React.FC<PDFTableOfContentsProps> = ({
                   <div className="flex items-center justify-between text-[11px] text-slate-600 pl-8 pr-12">
                     <span className="font-medium text-slate-600 flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-slate-400 inline-block shrink-0" />
-                      {item.subtitle}
+                      {item.sectionId ? <span>{item.number}.1 <EditableText k={`toc.${item.sectionId}.subtitle`} /></span> : item.subtitle}
                     </span>
                   </div>
                 )}
@@ -122,12 +123,10 @@ export const PDFTableOfContents: React.FC<PDFTableOfContentsProps> = ({
 
         {/* Informative Footer Note */}
         <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/80 text-[11px] text-slate-600 flex items-center justify-between">
-          <span>
-            * Todas las secciones técnicas y proyecciones financieras están calculadas bajo normativa dominicana <strong>(Ley 57-07 y SIE)</strong>.
-          </span>
-          <span className="font-mono font-bold text-slate-800 shrink-0 ml-4">
-            Total: {totalPages} Páginas
-          </span>
+          <EditableText k="toc.footnote" boldClassName="font-bold" />
+          <EditableText k="toc.totalPages" className="font-mono font-bold text-slate-800 shrink-0 ml-4">
+            {(text) => text.replace('{total}', String(totalPages))}
+          </EditableText>
         </div>
       </div>
     </PDFPageShell>

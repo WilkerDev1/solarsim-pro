@@ -57,10 +57,10 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
                 className="text-4xl font-black tracking-tight uppercase"
                 style={{ color: activeTheme.primary }}
               >
-                {companyName}
+                <EditableText k="company.name" />
               </span>
               <span className="text-xs font-bold text-white uppercase tracking-widest">
-                {companySlogan}
+                <EditableText k="company.slogan" />
               </span>
             </div>
           )}
@@ -116,7 +116,7 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
               style={{ backgroundColor: activeTheme.secondary }}
             />
             <span className="text-xs font-black tracking-[0.25em] text-white uppercase drop-shadow-md">
-              SISTEMA SOLAR FOTOVOLTAICO
+              <EditableText k="cover.tag" />
             </span>
           </div>
         </div>
@@ -136,7 +136,7 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
               className="text-[11px] font-black tracking-[0.2em] uppercase"
               style={{ color: activeTheme.primary }}
             >
-              PROPUESTA TÉCNICA Y ECONÓMICA
+              <EditableText k="cover.kicker" />
             </span>
           </div>
 
@@ -164,15 +164,15 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
                 {summary.systemCapacityKWp.toFixed(2)}
               </span>
               <span className="text-xl font-black text-slate-900 tracking-wider">
-                KWP
+                <EditableText k="cover.capacityUnit" />
               </span>
               <div className="h-6 w-[1.5px] bg-slate-300 mx-1" />
               <div className="flex flex-col">
                 <span className="text-[10px] font-extrabold text-slate-600 uppercase tracking-widest">
-                  Capacidad
+                  <EditableText k="cover.capacityLabel1" />
                 </span>
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                  Instalada
+                  <EditableText k="cover.capacityLabel2" />
                 </span>
               </div>
             </div>
@@ -189,7 +189,7 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
                 style={{ backgroundColor: activeTheme.primary }}
               ></div>
               <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-0.5">
-                ID Proyecto
+                <EditableText k="cover.projectIdLabel" />
               </span>
               <span className="text-base font-black text-slate-900 block tracking-tight">
                 {project.client.projectId || 'SP-2024-001'}
@@ -203,7 +203,7 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
                 style={{ backgroundColor: activeTheme.primary }}
               ></div>
               <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-0.5">
-                Fecha Emisión
+                <EditableText k="cover.dateLabel" />
               </span>
               <EditableText k="quote.date" className="text-base font-black block tracking-tight" style={{ color: activeTheme.primary }} boldClassName="text-base font-black" />
             </div>
@@ -215,17 +215,17 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
                 style={{ backgroundColor: activeTheme.secondary }}
               ></div>
               <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-0.5">
-                Validez
+                <EditableText k="cover.validityLabel" />
               </span>
-              <EditableText k="quote.validityDays" className="text-base font-black block" style={{ color: activeTheme.secondary }}>
-                {(days) => `${days} Días Laborables`}
-              </EditableText>
+              <span className="text-base font-black block" style={{ color: activeTheme.secondary }}>
+                <EditableText k="quote.validityDays" /> <EditableText k="cover.validityUnit" />
+              </span>
             </div>
 
             {/* Configuración */}
             <div className="relative pt-2.5 border-t border-slate-200">
               <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest block mb-0.5">
-                Configuración
+                <EditableText k="cover.configurationLabel" />
               </span>
               <span className="text-xs font-bold text-slate-800 block leading-snug">
                 {panelModelText}
@@ -251,7 +251,7 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
               >
                 <Phone className="w-3 h-3" />
               </div>
-              <span className="font-bold text-slate-900 text-[11px] whitespace-nowrap leading-none">{companyPhone}</span>
+              <EditableText k="company.phone" className="font-bold text-slate-900 text-[11px] whitespace-nowrap leading-none" />
             </div>
 
             <div className="flex items-center gap-1.5">
@@ -261,7 +261,7 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
               >
                 <Globe className="w-3 h-3" />
               </div>
-              <span className="font-bold text-slate-900 text-[11px] whitespace-nowrap leading-none">{companyWebsite}</span>
+              <EditableText k="company.website" className="font-bold text-slate-900 text-[11px] whitespace-nowrap leading-none" />
             </div>
 
             <div className="flex items-center gap-1.5">
@@ -271,7 +271,7 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
               >
                 <Instagram className="w-3 h-3" />
               </div>
-              <span className="font-bold text-slate-900 text-[11px] whitespace-nowrap leading-none">@{companyInstagram}</span>
+              <EditableText k="company.instagram" className="font-bold text-slate-900 text-[11px] whitespace-nowrap leading-none">{(handle) => `@${handle}`}</EditableText>
             </div>
           </div>
 
@@ -282,9 +282,9 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
             >
               <MapPin className="w-3 h-3" />
             </div>
-            <span className="font-bold text-slate-800 text-[11px] whitespace-nowrap leading-none">
-              {companyFooterText.split('|')[0] || companyFooterText}
-            </span>
+            <EditableText k="company.footer" className="font-bold text-slate-800 text-[11px] whitespace-nowrap leading-none">
+              {(address) => address.split('|')[0] || address}
+            </EditableText>
           </div>
         </div>
 

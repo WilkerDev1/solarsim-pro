@@ -9,7 +9,8 @@ import {
   syncProjectSummaryParagraph2,
   validityNoteDefault,
 } from './dynamicTexts';
-import type { DocumentSectionId } from './sections';
+import { DOCUMENT_SECTION_IDS, DOCUMENT_SECTIONS, type DocumentSectionId } from './sections';
+import { PAGE_TEXT_DEFINITIONS } from './pageTexts';
 
 export type DocumentTextFormat = 'plain' | 'rich';
 export type DocumentTextSection = DocumentSectionId | 'company' | 'client' | 'header' | 'footer';
@@ -190,6 +191,23 @@ const DEFINITIONS: DocumentTextDefinition[] = [
     defaultText: (ctx) => validityNoteDefault(ctx),
   },
 ];
+
+/** Título de cada página (cinta de cabecera) y entradas del índice: una sola fuente de nombres. */
+const SECTION_TEXT_DEFINITIONS: DocumentTextDefinition[] = DOCUMENT_SECTION_IDS.flatMap((id) => {
+  const meta = DOCUMENT_SECTIONS[id];
+  const base = { section: id, format: 'plain' as const, multiline: false, templatable: true, maxLength: 200 };
+  // La portada no lleva cinta de título.
+  const defs: DocumentTextDefinition[] = id === 'cover' ? [] : [{ ...base, key: `page.${id}.title`, label: `Título de página: ${meta.label}`, defaultText: meta.pageTitle }];
+  if (meta.toc) {
+    defs.push(
+      { ...base, key: `toc.${id}.title`, label: `Índice: ${meta.label}`, defaultText: meta.toc.title },
+      { ...base, key: `toc.${id}.subtitle`, label: `Índice (subtítulo): ${meta.label}`, defaultText: meta.toc.subtitle },
+    );
+  }
+  return defs;
+});
+
+DEFINITIONS.push(...SECTION_TEXT_DEFINITIONS, ...PAGE_TEXT_DEFINITIONS);
 
 export const DOCUMENT_TEXT_DEFINITIONS: readonly DocumentTextDefinition[] = DEFINITIONS;
 

@@ -5,7 +5,7 @@ import { useDocumentEditor } from './DocumentEditorContext';
 import { RichTextEditor } from './RichTextEditor';
 import { RichText } from './RichText';
 
-type Tag = 'span' | 'p' | 'div' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'li' | 'td' | 'th';
+type Tag = 'span' | 'p' | 'div' | 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'ul' | 'li' | 'td' | 'th';
 
 interface EditableTextProps {
   /** Clave del registro `shared/documentTexts`. */
@@ -40,7 +40,7 @@ export const EditableText: React.FC<EditableTextProps> = ({ k, as = 'span', clas
         ref={editor.editorRef}
         definition={definition}
         text={resolved.text}
-        as={definition.multiline && as === 'span' ? 'div' : Tag}
+        as={['ul', 'li', 'td', 'th'].includes(as) || (definition.multiline && as === 'span') ? 'div' : Tag}
         className={className}
         style={style}
         placeholder={placeholder}

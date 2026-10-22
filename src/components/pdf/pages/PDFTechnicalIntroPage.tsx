@@ -37,7 +37,7 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
       currentDateStr={currentDateStr}
       pageNum={pageNum}
       totalPages={totalPages}
-      pageTitle="3. ¿QUÉ ES UN SISTEMA FOTOVOLTAICO? Y DESCRIPCIÓN TÉCNICA"
+      sectionId="techIntro"
     >
 
       {/* Body */}
@@ -52,7 +52,7 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
               lineHeight: '1.3',
             }}
           >
-            3. ¿QUÉ ES UN SISTEMA FOTOVOLTAICO?
+            <EditableText k="techIntro.heading" />
           </div>
           <EditableText k="techIntro.whatIs" className="text-slate-700 text-[11.5px] leading-relaxed text-justify font-medium block whitespace-pre-line" boldClassName="text-slate-950 font-bold" />
 
@@ -76,7 +76,7 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
               lineHeight: '1.3',
             }}
           >
-            3.1 ¿CÓMO FUNCIONA UN SISTEMA FOTOVOLTAICO?
+            <EditableText k="techIntro.howItWorksHeading" />
           </div>
           <EditableText k="techIntro.howItWorks1" className="text-slate-700 text-[11.5px] leading-relaxed text-justify font-medium block whitespace-pre-line" boldClassName="text-slate-950 font-bold" />
           <EditableText k="techIntro.howItWorks2" className="text-slate-700 text-[11.5px] leading-relaxed text-justify font-medium block whitespace-pre-line" boldClassName="text-slate-950 font-bold" />
@@ -92,7 +92,7 @@ export const PDFTechnicalIntroPage: React.FC<PDFTechnicalIntroPageProps> = ({
               lineHeight: '1.3',
             }}
           >
-            4. DESCRIPCIÓN TÉCNICA
+            <EditableText k="techIntro.technicalHeading" />
           </div>
 
           {/* High Quality Flow Diagram - Larger & Prominent */}
