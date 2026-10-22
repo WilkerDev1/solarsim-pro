@@ -7,6 +7,14 @@ import type { EquipmentPreviewItem } from './EquipmentPreviewThumb';
 
 const MAX_DATASHEET_PAGES = 8;
 
+/** Marks the dialog's portal so dropdowns that close on outside clicks can ignore it. */
+export const EQUIPMENT_PREVIEW_ATTRIBUTE = 'data-equipment-preview-dialog';
+
+export function isInsideEquipmentPreview(target: EventTarget | null): boolean {
+  const element = target as { closest?: (selector: string) => unknown } | null;
+  return typeof element?.closest === 'function' && !!element.closest(`[${EQUIPMENT_PREVIEW_ATTRIBUTE}]`);
+}
+
 function saveBlob(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -87,7 +95,9 @@ export function EquipmentPreviewDialog({ item, onClose }: { item: EquipmentPrevi
   }, [onClose]);
   const images = (item.imageAssetIds || []).filter(Boolean);
   return createPortal(
-    <div className={dark ? 'dark' : ''}>
+    // React portal events bubble to the component that opened the dialog (e.g. a selectable option):
+    // no click inside the portal, backdrop included, may reach it.
+    <div className={dark ? 'dark' : ''} {...{ [EQUIPMENT_PREVIEW_ATTRIBUTE]: '' }} onClick={(event) => event.stopPropagation()}>
       <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
         <div ref={dialog} role="dialog" aria-modal="true" aria-label={`Vista previa de ${item.displayName}`} onClick={(event) => event.stopPropagation()}
           className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-2xl dark:border-[#2e2e38] dark:bg-[#181820] dark:text-zinc-100">
