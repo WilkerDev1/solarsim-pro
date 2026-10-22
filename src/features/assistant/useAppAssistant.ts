@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
-import { assistantOwner, executeAssistantTool } from './tools';
+import { assistantOwner } from './tools';
+import { executeForAssistant } from '../agentTools/registry';
 import { runAssistant } from './service';
 import type { GeminiTransport } from '../../../shared/geminiTransport';
 import type { AssistantMessage } from './types';
@@ -53,7 +54,7 @@ export function useAppAssistant(
         signal: abort.signal,
         execute: (call) => {
           if (!valid()) throw new Error('Solicitud cancelada.');
-          return executeAssistantTool(call, owner);
+          return executeForAssistant(call, { source: 'app-assistant', owner, signal: abort.signal });
         },
       });
       if (valid()) setMessages((previous) => [...previous, reply]);
