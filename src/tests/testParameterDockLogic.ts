@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { CustomQuotationDiscount, CustomQuotationItem, ProjectSimulation, SystemSpecs } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
 import { editEquipmentGroup } from '../utils/equipmentGroups';
-import { buildCatalogSelectionUpdate, manualBatteryCountPatch } from '../components/simulator/params/logic/catalogSelection';
+import { buildCatalogSelectionUpdate } from '../components/simulator/params/logic/catalogSelection';
 import { computeLoadProfilePreview, detectLoadProfilePreset } from '../components/simulator/params/logic/loadProfilePreview';
 import { computeQuotationAdjustments, discountAmountUSD } from '../components/simulator/params/logic/quotationAdjustments';
 import {
@@ -99,15 +99,12 @@ const baseSpecs = { panelBrandModel: 'Old', panelPowerW: 400, panelCount: 10, ha
   assert.equal(bareBat.batteryDOD, 90);
   assert.equal(bareBat.batteryEfficiencyPct, 95);
 }
-{ // KNOWN QUIRK, recorded without fixing: Manual mode writes the legacy `batteryCount` directly while
-  // Detallado goes through editEquipmentGroup. With batteries[] present the group count stays stale.
+{ // The battery count in Manual mode goes through editEquipmentGroup like every other group edit, so
+  // batteries[] and the legacy `batteryCount` mirror never drift apart (fixed in T3b; it used to write batteryCount alone).
   const specs = { hasBattery: true, batteryBrandModel: 'Bat', batteryCapacityKWh: 5, batteryCount: 2, batteries: [{ id: 'b', brandModel: 'Bat', capacityKWh: 5, count: 2 }] } as SystemSpecs;
-  const manual = { ...specs, ...manualBatteryCountPatch(7) };
-  assert.equal(manual.batteryCount, 7);
-  assert.equal(manual.batteries?.[0].count, 2, 'Manual mode leaves batteries[0].count stale today');
-  const detailed = { ...specs, ...editEquipmentGroup(specs, 'battery', { type: 'update', index: 0, patch: { count: 7 } }) };
-  assert.equal(detailed.batteries?.[0].count, 7);
-  assert.equal(detailed.batteryCount, 7, 'editEquipmentGroup keeps list and mirror together');
+  const manual = { ...specs, ...editEquipmentGroup(specs, 'battery', { type: 'update', index: 0, patch: { count: 7 } }) };
+  assert.equal(manual.batteries?.[0].count, 7, 'the group count follows the edit');
+  assert.equal(manual.batteryCount, 7, 'the mirror follows the group');
 }
 
 // ── Load profile preview ───────────────────────────────────────────────────────────────────

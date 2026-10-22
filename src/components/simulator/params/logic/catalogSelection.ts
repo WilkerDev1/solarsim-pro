@@ -93,12 +93,3 @@ export function buildCatalogSelectionUpdate(specs: SystemSpecs, kind: EquipmentK
     }),
   };
 }
-
-/**
- * Manual-mode battery count as the dock writes it today: straight to the legacy `batteryCount` field,
- * not through `editEquipmentGroup`. When `batteries[]` exists this leaves `batteries[0].count` stale
- * (the group list is the source). Kept as is until the dock redesign decides to fix it.
- */
-export function manualBatteryCountPatch(count: number): Partial<SystemSpecs> {
-  return { batteryCount: count };
-}
