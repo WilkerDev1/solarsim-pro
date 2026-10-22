@@ -6,72 +6,37 @@ import {
   SlidersHorizontal,
   RefreshCw,
   Globe,
-  Pencil,
+  Palette,
 } from 'lucide-react';
 import { ProjectSimulation, DocumentCustomization } from '../../../types';
-import { PDFColorTheme } from '../../../constants/pdfThemes';
 import { PDFSectionToggles } from './PDFSectionToggles';
-import { PDFDocumentDataEditor } from './PDFDocumentDataEditor';
+import { PDFDesignControls } from './PDFDesignControls';
+import type { DocumentLayoutState } from '../useDocumentLayout';
 
 interface PDFSidebarControlsProps {
   isDark: boolean;
   project: ProjectSimulation;
-  activeTheme: PDFColorTheme;
-  setActiveTheme: (theme: PDFColorTheme) => void;
+  /** Diseño persistente: visibilidad de secciones, tema y cabecera/pie. */
+  layout: DocumentLayoutState;
   activePagesCount: number;
-  sidebarTab: 'sections' | 'edit';
-  setSidebarTab: (tab: 'sections' | 'edit') => void;
+  sidebarTab: 'sections' | 'design';
+  setSidebarTab: (tab: 'sections' | 'design') => void;
   isExporting: boolean;
   handleExportPDF: () => void;
   handlePrint: () => void;
   onOpenShareModal?: () => void;
   onRefresh: () => void;
-
-  // New Intro Pages
-  showCover: boolean;
-  setShowCover: (val: boolean) => void;
-  showTableOfContents: boolean;
-  setShowTableOfContents: (val: boolean) => void;
-  showExecutiveSummary: boolean;
-  setShowExecutiveSummary: (val: boolean) => void;
-  showAboutUs: boolean;
-  setShowAboutUs: (val: boolean) => void;
-  showBenefits: boolean;
-  setShowBenefits: (val: boolean) => void;
-  showTechIntro: boolean;
-  setShowTechIntro: (val: boolean) => void;
-  showProjectDescription: boolean;
-  setShowProjectDescription: (val: boolean) => void;
-
-  // Core Technical & Financial Pages
-  showPage1: boolean;
-  setShowPage1: (val: boolean) => void;
-  showPageQuotation: boolean;
-  setShowPageQuotation: (val: boolean) => void;
-  showPage2: boolean;
-  setShowPage2: (val: boolean) => void;
-  showPage3: boolean;
-  setShowPage3: (val: boolean) => void;
-  showPageCostMatrix: boolean;
-  setShowPageCostMatrix: (val: boolean) => void;
-  showHeadersFooters: boolean;
-  setShowHeadersFooters: (val: boolean) => void;
-
-  updateClient: (client: Partial<ProjectSimulation['client']>) => void;
   updateSpecs: (specs: Partial<ProjectSimulation['specs']>) => void;
   updateDocumentCustomization: (customization: Partial<DocumentCustomization>) => void;
-  updateDefaultDocumentCustomization?: (customization: Partial<DocumentCustomization>) => void;
   saveCurrentProjectAsDefaultDocumentTemplate?: () => void;
   resetDefaultDocumentCustomization?: () => void;
-  isEditMode: boolean;
-  setIsEditMode: (val: boolean) => void;
 }
 
+/** Dock del documento: exportar y compartir, estructura de secciones y diseño. El texto se edita en la hoja. */
 export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
   isDark,
   project,
-  activeTheme,
-  setActiveTheme,
+  layout,
   activePagesCount,
   sidebarTab,
   setSidebarTab,
@@ -80,44 +45,12 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
   handlePrint,
   onOpenShareModal,
   onRefresh,
-
-  showCover,
-  setShowCover,
-  showTableOfContents,
-  setShowTableOfContents,
-  showExecutiveSummary,
-  setShowExecutiveSummary,
-  showAboutUs,
-  setShowAboutUs,
-  showBenefits,
-  setShowBenefits,
-  showTechIntro,
-  setShowTechIntro,
-  showProjectDescription,
-  setShowProjectDescription,
-
-  showPage1,
-  setShowPage1,
-  showPageQuotation,
-  setShowPageQuotation,
-  showPage2,
-  setShowPage2,
-  showPage3,
-  setShowPage3,
-  showPageCostMatrix,
-  setShowPageCostMatrix,
-  showHeadersFooters,
-  setShowHeadersFooters,
-
-  updateClient,
   updateSpecs,
   updateDocumentCustomization,
-  updateDefaultDocumentCustomization,
   saveCurrentProjectAsDefaultDocumentTemplate,
   resetDefaultDocumentCustomization,
-  isEditMode,
-  setIsEditMode,
 }) => {
+  const activeTheme = layout.theme;
   return (
     <aside
       className={`w-[340px] flex flex-col h-full shrink-0 transition-colors z-20 ${
@@ -180,7 +113,7 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
         </button>
       </div>
 
-      {/* Tabs Header: "Secciones" vs "Modo Edición" */}
+      {/* Pestañas del dock: estructura y diseño (los textos se editan en la hoja) */}
       <div className={`grid grid-cols-2 p-1.5 m-3 rounded-xl border bg-slate-100 border-slate-200 dark:bg-[#14141a] dark:border-[#2a2a36]`}>
         <button
           type="button"
@@ -200,12 +133,9 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
         </button>
         <button
           type="button"
-          onClick={() => {
-            setSidebarTab('edit');
-            setIsEditMode(true);
-          }}
-          className={`py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer relative ${
-            sidebarTab === 'edit'
+          onClick={() => setSidebarTab('design')}
+          className={`py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            sidebarTab === 'design'
               ? isDark
                 ? 'bg-[#242432] text-white shadow-xs'
                 : 'bg-white text-slate-900 shadow-xs'
@@ -214,11 +144,8 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <Pencil className="w-3.5 h-3.5 text-blue-500" />
-          <span>Modo Edición</span>
-          {isEditMode && (
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
-          )}
+          <Palette className="w-3.5 h-3.5" />
+          Diseño
         </button>
       </div>
 
@@ -227,50 +154,20 @@ export const PDFSidebarControls: React.FC<PDFSidebarControlsProps> = ({
         {sidebarTab === 'sections' ? (
           <PDFSectionToggles
             isDark={isDark}
-            activeTheme={activeTheme}
-            setActiveTheme={setActiveTheme}
-            showCover={showCover}
-            setShowCover={setShowCover}
-            showTableOfContents={showTableOfContents}
-            setShowTableOfContents={setShowTableOfContents}
-            showExecutiveSummary={showExecutiveSummary}
-            setShowExecutiveSummary={setShowExecutiveSummary}
-            showAboutUs={showAboutUs}
-            setShowAboutUs={setShowAboutUs}
-            showBenefits={showBenefits}
-            setShowBenefits={setShowBenefits}
-            showTechIntro={showTechIntro}
-            setShowTechIntro={setShowTechIntro}
-            showProjectDescription={showProjectDescription}
-            setShowProjectDescription={setShowProjectDescription}
-            showPage1={showPage1}
-            setShowPage1={setShowPage1}
-            showPageQuotation={showPageQuotation}
-            setShowPageQuotation={setShowPageQuotation}
-            showPage2={showPage2}
-            setShowPage2={setShowPage2}
-            showPage3={showPage3}
-            setShowPage3={setShowPage3}
-            showPageCostMatrix={showPageCostMatrix}
-            setShowPageCostMatrix={setShowPageCostMatrix}
-            showHeadersFooters={showHeadersFooters}
-            setShowHeadersFooters={setShowHeadersFooters}
+            visibility={layout.visibility}
+            setSectionVisible={layout.setSectionVisible}
             project={project}
             updateDocumentCustomization={updateDocumentCustomization}
             updateSpecs={updateSpecs}
           />
         ) : (
-          <PDFDocumentDataEditor
+          <PDFDesignControls
             isDark={isDark}
             project={project}
-            updateClient={updateClient}
-            updateSpecs={updateSpecs}
+            layout={layout}
             updateDocumentCustomization={updateDocumentCustomization}
-            updateDefaultDocumentCustomization={updateDefaultDocumentCustomization}
             saveCurrentProjectAsDefaultDocumentTemplate={saveCurrentProjectAsDefaultDocumentTemplate}
             resetDefaultDocumentCustomization={resetDefaultDocumentCustomization}
-            isEditMode={isEditMode}
-            setIsEditMode={setIsEditMode}
           />
         )}
       </div>

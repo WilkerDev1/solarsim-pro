@@ -15,6 +15,7 @@ import { calculateFinancialSummary, calculateCostMatrixSummary } from '../../eng
 import { calculateRecommendedPanelCount } from '../../engine/solarEngine';
 import { projectMutationMetadata } from '../sync/projectMutation';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
+import { normalizeDocumentLayout } from '../../../shared/documentLayout';
 import { applyDocumentTextPatch, companyTemplateTextPatch, documentTextsPatch } from '../../../shared/documentTexts';
 import { documentTextContextFor } from '../../utils/documentTextContext';
 
@@ -611,6 +612,10 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     if (customizationPartial.clientEmail !== undefined) client.contactEmail = customizationPartial.clientEmail;
     return { client, customization: { ...(p.customization || {}), ...customizationPartial } };
   }),
+
+  setDocumentLayout: (patch) => updateActiveProject((p) => ({
+    customization: { ...(p.customization || {}), layout: normalizeDocumentLayout({ ...(p.customization?.layout || {}), ...patch }) },
+  })),
 
   setDocumentTexts: (values) => updateActiveProject((p, state) => {
     const ctx = documentTextContextFor(state, p, energyCalculationMode(effectiveFeatureSettings(state)));

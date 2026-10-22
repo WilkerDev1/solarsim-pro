@@ -1,7 +1,6 @@
 import React, { useRef, useState, useMemo } from 'react';
 import { flushSync } from 'react-dom';
 import { useSimulationStore } from '../../store/useSimulationStore';
-import { PDFColorTheme, PDF_COLOR_THEMES } from '../../constants/pdfThemes';
 import { resolveProposalAttachmentBytes } from '../../services/proposalAttachmentResolver';
 import { exportProposalPdf } from './export/exportProposalPdf';
 import { ProposalAnnexSync } from './annexes/ProposalAnnexSync';
@@ -10,6 +9,7 @@ import { buildPdfLayout, normalizeSectionOrder } from '../../utils/pdfLayout';
 import { formatProposalDate } from '../../utils/formatDateUtils';
 import { DocumentEditorProvider } from './editor/DocumentEditorContext';
 import { DocumentEditorToolbar } from './editor/DocumentEditorToolbar';
+import { useDocumentLayout } from './useDocumentLayout';
 import { canEditDocument, type DocumentEditorMode } from './editor/documentEditorState';
 
 // Modular Page Components
@@ -33,10 +33,8 @@ export const PDFProposalView: React.FC = () => {
   const {
     getActiveProject,
     getFinancialSummary,
-    updateClient,
     updateSpecs,
     updateDocumentCustomization,
-    updateDefaultDocumentCustomization,
     saveCurrentProjectAsDefaultDocumentTemplate,
     resetDefaultDocumentCustomization,
     sidebarTheme,
@@ -57,29 +55,14 @@ export const PDFProposalView: React.FC = () => {
   const summary = getFinancialSummary();
   const pdfRef = useRef<HTMLDivElement>(null);
 
-  // Document Toggles (Intro & Presentation)
-  const [showCover, setShowCover] = useState(true); // Portada Ejecutiva
-  const [showTableOfContents, setShowTableOfContents] = useState(true); // Índice de Contenido
-  const [showExecutiveSummary, setShowExecutiveSummary] = useState(true); // Cuadro Resumen Ejecutivo
-  const [showAboutUs, setShowAboutUs] = useState(true); // 1. ¿Quiénes Somos? & Servicios
-  const [showBenefits, setShowBenefits] = useState(true); // 2. Beneficios Solares & Ley 57-07
-  const [showTechIntro, setShowTechIntro] = useState(true); // 3. ¿Qué es FV? & Flujo Técnico
-  const [showProjectDescription, setShowProjectDescription] = useState(true); // 4. Resumen & Normativa SIE
-
-  // Document Toggles (Core Technical & Financial)
-  const [showPage1, setShowPage1] = useState(true); // 5. Análisis de Energía y Balance
-  const [showPageQuotation, setShowPageQuotation] = useState(true); // 6. Cotización de Sistema Fotovoltaico
-  const [showPage2, setShowPage2] = useState(true); // 7. Retorno de Inversión y Métricas
-  const [showPage3, setShowPage3] = useState(true); // 8. Flujo de Caja 25 Años
-  const [showPageCostMatrix, setShowPageCostMatrix] = useState(false); // 9. Costos Internos (Confidencial)
-  const [showHeadersFooters, setShowHeadersFooters] = useState(true);
+  // Secciones visibles, tema y cabecera/pie viven en la propuesta (customization.layout).
+  const layout = useDocumentLayout(project);
+  const { visibility: sectionVisibility, theme: activeTheme, showHeadersFooters } = layout;
   const [isExporting, setIsExporting] = useState(false);
 
-  // Active Color Theme
-  const [activeTheme, setActiveTheme] = useState<PDFColorTheme>(PDF_COLOR_THEMES[0]);
 
   // Active Tab in Sidebar ("Secciones" vs "Modo Edición")
-  const [sidebarTab, setSidebarTab] = useState<'sections' | 'edit'>('sections');
+  const [sidebarTab, setSidebarTab] = useState<'sections' | 'design'>('sections');
 
   // Live Inline Editing Mode
   const [isEditMode, setIsEditMode] = useState(false);
@@ -121,21 +104,6 @@ export const PDFProposalView: React.FC = () => {
     () => normalizeSectionOrder(project?.customization?.sectionOrder),
     [project?.customization?.sectionOrder]
   );
-
-  const sectionVisibility: Record<PDFSectionId, boolean> = {
-    cover: showCover,
-    tableOfContents: showTableOfContents,
-    executiveSummary: showExecutiveSummary,
-    aboutUs: showAboutUs,
-    benefits: showBenefits,
-    techIntro: showTechIntro,
-    projectDescription: showProjectDescription,
-    energy: showPage1,
-    quotation: showPageQuotation,
-    roi: showPage2,
-    cashFlow: showPage3,
-    costMatrix: showPageCostMatrix,
-  };
 
   const { pageNumbers, footerTotalPages, tocItems } = buildPdfLayout(
     effectiveSectionOrder,
@@ -199,8 +167,7 @@ export const PDFProposalView: React.FC = () => {
       <PDFSidebarControls
         isDark={isDark}
         project={project}
-        activeTheme={activeTheme}
-        setActiveTheme={setActiveTheme}
+        layout={layout}
         activePagesCount={footerTotalPages}
         sidebarTab={sidebarTab}
         setSidebarTab={setSidebarTab}
@@ -211,40 +178,10 @@ export const PDFProposalView: React.FC = () => {
         onRefresh={() => {
           useSimulationStore.setState({ activeProjectId: project.id });
         }}
-        showCover={showCover}
-        setShowCover={setShowCover}
-        showTableOfContents={showTableOfContents}
-        setShowTableOfContents={setShowTableOfContents}
-        showExecutiveSummary={showExecutiveSummary}
-        setShowExecutiveSummary={setShowExecutiveSummary}
-        showAboutUs={showAboutUs}
-        setShowAboutUs={setShowAboutUs}
-        showBenefits={showBenefits}
-        setShowBenefits={setShowBenefits}
-        showTechIntro={showTechIntro}
-        setShowTechIntro={setShowTechIntro}
-        showProjectDescription={showProjectDescription}
-        setShowProjectDescription={setShowProjectDescription}
-        showPage1={showPage1}
-        setShowPage1={setShowPage1}
-        showPageQuotation={showPageQuotation}
-        setShowPageQuotation={setShowPageQuotation}
-        showPage2={showPage2}
-        setShowPage2={setShowPage2}
-        showPage3={showPage3}
-        setShowPage3={setShowPage3}
-        showPageCostMatrix={showPageCostMatrix}
-        setShowPageCostMatrix={setShowPageCostMatrix}
-        showHeadersFooters={showHeadersFooters}
-        setShowHeadersFooters={setShowHeadersFooters}
-        updateClient={updateClient}
         updateSpecs={updateSpecs}
         updateDocumentCustomization={updateDocumentCustomization}
-        updateDefaultDocumentCustomization={updateDefaultDocumentCustomization}
         saveCurrentProjectAsDefaultDocumentTemplate={saveCurrentProjectAsDefaultDocumentTemplate}
         resetDefaultDocumentCustomization={resetDefaultDocumentCustomization}
-        isEditMode={editing}
-        setIsEditMode={setIsEditMode}
       />
 
       {/* PDF Page Canvas */}
