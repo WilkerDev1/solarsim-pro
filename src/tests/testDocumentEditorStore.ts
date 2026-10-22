@@ -11,6 +11,7 @@ import { DEFAULT_LOCAL_COMPANY } from '../types/companyProfile';
 import { canEditDocument, documentTextContextFor } from '../components/pdf/editor/documentEditorState';
 import { resolveDocumentText } from '../../shared/documentTexts';
 import { calculateProjectFinancialSummary } from '../engine/financeEngine';
+import { OptionalTextRow } from '../components/pdf/editor/OptionalTextRow';
 
 const store = () => useSimulationStore.getState();
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -122,6 +123,39 @@ assert.equal(canEditDocument({ project: { ...writable, syncStatus: 'conflict' },
   assert.ok(readFileSync('src/components/pdf/editor/EditableText.tsx', 'utf8').includes('editor.activeInstance === instance'));
   // Without a provider (tests, standalone renders) the pages fall back to read-only texts.
   assert.ok(!renderToStaticMarkup(description).includes('data-pdf-chrome'));
+}
+
+// 9. Conflicted proposals stay read-only for layout and text writes: nothing persists and the sync status never flips to pending.
+{
+  store().createNewProject({ name: 'Conflicto Layout', province: 'Santiago' });
+  const conflictId = store().activeProjectId;
+  useSimulationStore.setState((state) => ({ projects: state.projects.map((item) => (item.id === conflictId ? { ...item, syncStatus: 'conflict' as const } : item)) }));
+  const conflicted = () => store().projects.find((item) => item.id === conflictId)!;
+  const snapshot = structuredClone(conflicted());
+  store().setDocumentLayout({ sectionOrder: ['cover'] } as never);
+  store().setDocumentTexts({ 'quotation.warranty.panel': 'No debe guardarse' });
+  assert.equal(conflicted().syncStatus, 'conflict', 'El conflicto no pasa a pendiente');
+  assert.deepEqual(conflicted().customization, snapshot.customization, 'Layout y textos no cambian en un conflicto');
+  assert.equal(conflicted().updatedAt, snapshot.updatedAt);
+  useSimulationStore.setState((state) => ({ projects: state.projects.map((item) => (item.id === conflictId ? { ...item, syncStatus: undefined, isDeleted: true } : item)) }));
+  store().setDocumentLayout({ sectionOrder: ['cover'] } as never);
+  assert.deepEqual(conflicted().customization, snapshot.customization, 'La papelera tampoco admite cambios de layout');
+}
+
+// 10. Empty optional rows are editor chrome (never printed); populated ones stay printable.
+{
+  const optional = structuredClone(before);
+  optional.isDeleted = false;
+  optional.client = { ...optional.client, contactEmail: '' };
+  optional.customization = { ...optional.customization, clientEmail: '' };
+  const summary = calculateProjectFinancialSummary(optional);
+  const renderRow = (project: typeof optional) => renderToStaticMarkup(
+    React.createElement(DocumentEditorProvider, { project, summary, currentDateStr: '21/10/2026', mode: 'edit', writable: true, children: React.createElement(OptionalTextRow, { k: 'client.email', children: React.createElement('p', null, 'FILA') }) }),
+  );
+  assert.match(renderRow(optional), /data-pdf-chrome[^>]*>.*FILA/, 'Fila vacía: cromo del editor en modo edición');
+  const filled = { ...optional, customization: { ...optional.customization, clientEmail: 'ventas@clinica.test' } };
+  const filledHtml = renderRow(filled);
+  assert.ok(filledHtml.includes('FILA') && !filledHtml.includes('data-pdf-chrome'), 'Fila con valor: se imprime');
 }
 
 console.log('PASS: document editor store actions (texts, undo, templates, read-only rules).');

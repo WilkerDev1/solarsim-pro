@@ -3,7 +3,7 @@ import { cleanClientName, getTariffDisplayName } from '../../../shared/proposalP
 import { customItemsTaxBreakdown, LEY5707_CREDIT_RATE } from '../../../shared/financialRules';
 import { ELECTSUN_LOGO_COLOR_BASE64 } from '../../../shared/electsunLogoColor';
 import { escapeHtml, formatInlineMarkdown, formatMarkdown, safeLogoUrl, scriptJson } from './escaping';
-import { createDocumentTextContext, docTextKey, viewerText } from '../../../shared/documentTexts';
+import { createDocumentTextContext, docTextKey, interpolate, viewerText } from '../../../shared/documentTexts';
 
 export function renderExpiredPage(companyName = 'electsun', companyPhone = '+1 (809) 378-6590'): string {
   return `<!DOCTYPE html>
@@ -238,6 +238,8 @@ export function renderProposalPage(stored: StoredProposal): string {
   const textContext = createDocumentTextContext({
     clientName, quoteValidityDays, distributor, tariffCode: rawTariffCode, isZeroExport, gridExportFeePct: exportFee, hasBattery,
     hasBatteryStorage: hasBattery, companyName,
+    // Misma cadena que la app (documentTextContext): persona de contacto → empresa → nombre del cliente.
+    clientContactPerson: client.contactPerson || client.company || clientName || '', clientPhone, clientEmail: custom.clientEmail || client.contactEmail || '',
   });
   const customRecord = custom as Record<string, unknown>;
   const docText = (key: string) => viewerText(key, customRecord, client, textContext);
@@ -256,7 +258,7 @@ export function renderProposalPage(stored: StoredProposal): string {
   // Custom Executive Summary & Page 6 fields
   const projectSummarySubtitle = published('projectDescription.subtitle')
     ?? (custom.projectSummarySubtitle && custom.projectSummarySubtitle.trim()
-      ? custom.projectSummarySubtitle.trim()
+      ? interpolate(custom.projectSummarySubtitle.trim(), textContext)
       : `Criterios de dimensionamiento técnico y solar para ${clientName}`);
 
   const rawPanelDesc = panelBrandModel.replace(/^m[oó]dulos?\s+/i, '').trim();
@@ -304,7 +306,7 @@ export function renderProposalPage(stored: StoredProposal): string {
       }).join(' y ')
     : `${batteryCount} ${batteryCount === 1 ? 'Batería' : 'Baterías'} ${cleanBatteryModel}`;
 
-  const rawEngineeringScope = custom.projectEngineeringScopeText?.trim() || specs.installationServicesDesc?.trim() || 'junto con todos los componentes de ingeniería complementarios (estructuras de montaje en aluminio anodizado de alta resistencia, cableado fotovoltaico resistente a rayos UV, protecciones en CC/CA, interruptores de desconexión y supresores de sobretensión) para garantizar un funcionamiento seguro, eficiente y duradero del sistema.';
+  const rawEngineeringScope = (custom.projectEngineeringScopeText?.trim() && interpolate(custom.projectEngineeringScopeText.trim(), textContext)) || specs.installationServicesDesc?.trim() || 'junto con todos los componentes de ingeniería complementarios (estructuras de montaje en aluminio anodizado de alta resistencia, cableado fotovoltaico resistente a rayos UV, protecciones en CC/CA, interruptores de desconexión y supresores de sobretensión) para garantizar un funcionamiento seguro, eficiente y duradero del sistema.';
   const engineeringScopeText = rawEngineeringScope.replace(/\.+$/, '');
 
   const equipmentSummary = [
@@ -320,7 +322,7 @@ export function renderProposalPage(stored: StoredProposal): string {
     if (!custom.customProjectSummaryParagraph1 || !custom.customProjectSummaryParagraph1.trim()) {
       return defaultP1;
     }
-    let text = custom.customProjectSummaryParagraph1.trim();
+    let text = interpolate(custom.customProjectSummaryParagraph1.trim(), textContext);
     text = text
       .replace(/{clientName}/gi, clientName)
       .replace(/{panelCount}/gi, String(panelCount))
@@ -349,7 +351,7 @@ export function renderProposalPage(stored: StoredProposal): string {
     if (!custom.customProjectSummaryParagraph2 || !custom.customProjectSummaryParagraph2.trim()) {
       return defaultP2;
     }
-    let text = custom.customProjectSummaryParagraph2.trim();
+    let text = interpolate(custom.customProjectSummaryParagraph2.trim(), textContext);
     text = text
       .replace(/{inverterCount}/gi, String(inverterCount))
       .replace(/{inverterModel}/gi, multiInvertersDesc)

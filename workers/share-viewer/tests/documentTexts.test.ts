@@ -49,6 +49,22 @@ assert.ok(published.includes('Primer párrafo propio.') && published.includes('<
 assert.ok(published.includes('Párrafo <strong class="font-bold text-slate-950">publicado</strong> para el cliente.'));
 assert.ok(published.includes('Subtítulo publicado'));
 
+// 3b. Legacy raw fields saved with placeholders (e.g. "Guardar en plantilla") render resolved, never literal.
+const withPlaceholders = renderProposalPage(base({
+  projectSummarySubtitle: 'Criterios para {clientName} y {cliente}',
+  projectEngineeringScopeText: 'con soporte de {companyName} para {clientName}.',
+  customProjectSummaryParagraph1: 'Propuesta de {contactName} para {clientName}.',
+}));
+assert.ok(withPlaceholders.includes('Criterios para Cliente Prueba y Cliente Prueba'), 'El subtítulo heredado sustituye marcadores');
+assert.ok(withPlaceholders.includes('para Cliente Prueba.'), 'El alcance heredado sustituye marcadores');
+assert.ok(!/\{(clientName|cliente|companyName|contactName)\}/i.test(withPlaceholders), 'Ningún marcador queda literal');
+assert.ok(renderProposalPage(base({ projectSummarySubtitle: 'Texto {desconocido}' })).includes('Texto {desconocido}'), 'Marcadores desconocidos quedan igual');
+// {contactName} sigue la cadena de la app: persona de contacto → empresa → nombre del cliente.
+const contactClient = (extra: Record<string, unknown>) => ({ client: { name: 'Acme', projectId: 'SP-1', quoteNumber: 'C-1', province: 'Santiago', distributor: 'EDENORTE', ...extra } });
+assert.ok(renderProposalPage(base({ projectSummarySubtitle: 'Atención: {contactName}' }, contactClient({ contactPerson: 'María' }))).includes('Atención: María'), 'Usa la persona de contacto');
+assert.ok(renderProposalPage(base({ projectSummarySubtitle: 'Atención: {contactName}' }, contactClient({ company: 'Acme SRL' }))).includes('Atención: Acme SRL'), 'Sin contacto, usa la empresa');
+assert.ok(renderProposalPage(base({ projectSummarySubtitle: 'Atención: {contactName}' }, contactClient({}))).includes('Atención: Acme'), 'Sin contacto ni empresa, usa el cliente');
+
 // 4. Validation: doc: texts are strings of registry keys only.
 const payload = (customization: Record<string, unknown>) => ({ project: { ...structuredClone(BENCHMARK_PROJECT), customization }, summary: calculateProjectFinancialSummary(BENCHMARK_PROJECT, 'legacy'), validityDays: 7, calculationSnapshot: { mode: 'legacy', capturedAt: new Date().toISOString(), organizationId: 'o', policyVersion: 1 } });
 assert.doesNotThrow(() => parseSharePayload(payload({ 'doc:quotation.warranty.panel': 'ok' })));
