@@ -176,13 +176,16 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
   },
 
-  updateProjectById: (id, edit) => {
+  updateProjectById: (id, edit, options) => {
     const target = get().projects.find((p) => p.id === id);
     if (!target || target.isDeleted || target.deletedAt) return false;
     set((state) => ({
-      projects: state.projects.map((p) => p.id === id
-        ? withNormalizedEquipment(p, { ...p, ...projectMutationMetadata(p, get().syncSettings), updatedAt: new Date().toISOString(), ...edit(p) })
-        : p),
+      projects: state.projects.map((p) => {
+        if (p.id !== id) return p;
+        const next = { ...p, ...projectMutationMetadata(p, get().syncSettings), updatedAt: new Date().toISOString(), ...edit(p) };
+        // A restored snapshot is already a consistent project: merging it with the groups being undone would keep new data.
+        return options?.restore ? next : withNormalizedEquipment(p, next);
+      }),
     }));
     get().triggerAutoSync(false);
     if (id === get().activeProjectId) get().recordUndoState(get().getActiveProject());

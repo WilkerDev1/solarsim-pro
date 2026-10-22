@@ -38,6 +38,12 @@ assert(running.includes('claude mcp add --transport http solarsim'));
 assert(running.includes('bearer_token_env_var'));
 assert(running.includes('Claude Desktop'));
 assert(running.includes('--mcp-stdio'));
+// The TOML block and the shell export are copied separately: pasting the TOML must never include shell syntax.
+const copied: string[] = [];
+const copyButtons = renderToStaticMarkup(React.createElement(McpConnectionPanelView, { status: base, busy: false, onToggle: noop, onCopyToken: noop, onRegenerate: noop, onCopy: (t: string) => copied.push(t) }));
+assert(copyButtons.includes('config.toml'));
+assert.equal((running.match(/<pre/g) || []).length, 4, 'Claude Code, Codex TOML, Codex shell and Claude Desktop blocks');
+assert(!/<pre[^>]*>[^<]*\[mcp_servers\.solarsim\][^<]*export /.test(running), 'no export line inside the TOML block');
 assert(html({ ...base, executablePath: '/opt/SolarSim Pro/solarsim-pro' }).includes('/opt/SolarSim Pro/solarsim-pro'));
 assert(running.includes('Copiar token'));
 assert(running.includes('Regenerar token'));

@@ -16,19 +16,25 @@ export function useAppAssistant(
   const [error, setError] = useState('');
   const [files, setFiles] = useState<ChatFile[]>([]);
   const sessionFiles = useRef<string[]>([]);
+  // Reads in flight: sending waits for them so documents always travel with the prompt they were selected for.
+  const [loadingFiles, setLoadingFiles] = useState(0);
   const addFiles = async (list: FileList | File[]) => {
     setError('');
     // Check the whole selection against the free slots before reading anything into memory.
     const selected = Array.from(list);
     const free = Math.max(0, CHAT_FILE_LIMITS.maxFiles - files.length);
     if (selected.length > free) setError(`Máximo tres archivos por mensaje: se adjuntan ${free} de ${selected.length}.`);
-    for (const f of selected.slice(0, free)) {
+    const batch = selected.slice(0, free);
+    setLoadingFiles((n) => n + batch.length);
+    for (const f of batch) {
       try {
         const registered = registerChatFile(f.name, await f.arrayBuffer());
         sessionFiles.current.push(registered.id);
         setFiles((previous) => [...previous, registered].slice(0, CHAT_FILE_LIMITS.maxFiles));
       } catch (e) {
         setError(e instanceof Error ? e.message : 'No se pudo adjuntar el archivo.');
+      } finally {
+        setLoadingFiles((n) => n - 1);
       }
     }
   };
@@ -48,7 +54,7 @@ export function useAppAssistant(
     []
   );
   const send = async () => {
-    if (busy || !prompt.trim()) return;
+    if (busy || loadingFiles > 0 || !prompt.trim()) return;
     const owner = assistantOwner();
     const s = useSimulationStore.getState();
     const text = prompt.trim();
@@ -102,6 +108,7 @@ export function useAppAssistant(
     send,
     cancel,
     files,
+    loadingFiles: loadingFiles > 0,
     addFiles,
     removeFile: (id: string) => setFiles((previous) => previous.filter((f) => f.id !== id)),
     reset: () => {

@@ -30,6 +30,8 @@ El asistente general usa function calling de Gemini con las declaraciones genera
 | `draft` | crear, duplicar o editar propuestas, aplicar el borrador del asistente de propuestas | Se aplica al momento, con actividad y **Deshacer** |
 | `guarded` | catálogo, precios, estado técnico, decisión y reportes comerciales, papelera | Siempre pide confirmación; nunca puede ponerse en «permitir» |
 
+Una edición de propuesta que toque precios (margen, mano de obra, costos unitarios, grupos de equipos con precio, extras o descuentos) se trata como `guarded` completa, aunque la herramienta sea de borrador.
+
 - La política es **por dispositivo** y distingue dos orígenes: asistentes de la app y agentes externos. Se configura en Ajustes → **Agentes e IA**.
 - Ningún agente supera la cuenta: los lectores solo consultan, y las propuestas en papelera o en conflicto no cambian. Cada ejecución y cada deshacer revalidan los permisos actuales.
 - En el asistente de propuestas, «Aplicar» tras revisar el borrador cuenta como confirmación.
