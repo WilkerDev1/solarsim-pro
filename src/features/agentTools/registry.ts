@@ -140,6 +140,10 @@ function undoEntry(entry: AgentActivityEntry) {
   }
   const current = s.projects.find((p) => p.id === entry.targetId);
   if (!current) return { success: false, error: 'La propuesta ya no existe.' };
+  // A client link may only be restored while that client still exists (the API rejects links to deleted clients).
+  const previousClientId = fields.includes('clientId') ? restored.clientId : undefined;
+  if (typeof previousClientId === 'string' && !s.clients.some((c) => c.id === previousClientId))
+    return { success: false, error: 'El cliente enlazado antes ya no existe en el directorio.' };
   if (current.isDeleted || current.syncStatus === 'conflict') return { success: false, error: 'La propuesta no admite cambios (papelera o conflicto).' };
   if (fingerprint(pick(current, fields)) !== entry.undo!.afterFingerprint)
     return { success: false, error: 'La propuesta cambió después; usa el historial de versiones para revertir.' };

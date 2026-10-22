@@ -57,6 +57,23 @@ assert.equal(store.getState().undoAgentActivity(unlink.activityId).success, true
 assert.equal(project('cl-p2').clientId, clientId);
 assert.equal((await executeAgentTool({ name: 'link_proposal_to_client', args: { proposalId: 'cl-p1', clientId: 'ghost' } }, ctx())).status, 'error');
 
+// 4b. Undo of an unlink is refused once the previous client was deleted.
+const tmp = await executeAgentTool({ name: 'create_client', args: { name: 'Temporal' } }, ctx());
+const tmpId = (tmp as any).data.clientId;
+await executeAgentTool({ name: 'link_proposal_to_client', args: { proposalId: 'cl-p2', clientId: tmpId } }, ctx());
+const tmpUnlink = await executeAgentTool({ name: 'link_proposal_to_client', args: { proposalId: 'cl-p2', clientId: null } }, ctx());
+assert(tmpUnlink.status === 'applied');
+store.getState().deleteClientRecord(tmpId);
+assert.equal(store.getState().undoAgentActivity(tmpUnlink.activityId).success, false);
+assert.equal(project('cl-p2').clientId, undefined, 'no dangling link to a deleted client');
+await executeAgentTool({ name: 'link_proposal_to_client', args: { proposalId: 'cl-p2', clientId } }, ctx());
+
+// 4c. Search stays within the payload budget with long notes (compact projection).
+for (let i = 0; i < 20; i++) store.getState().createClientRecord({ name: `Cliente ${i}`, notes: 'n'.repeat(3900) });
+const many = await executeAgentTool({ name: 'search_clients', args: {} }, ctx());
+assert(many.status === 'ok', JSON.stringify(many).slice(0, 200));
+assert.equal((many.data as any).clients[0].notes, undefined);
+
 // 5. Deletion is guarded and unlinks local proposals.
 const removal = await executeAgentTool({ name: 'delete_client', args: { id: clientId } }, ctx());
 assert(removal.status === 'pending_confirmation');

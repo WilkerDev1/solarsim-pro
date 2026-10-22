@@ -25,7 +25,9 @@ const clientData = (c: ClientRecord, proposalCount = 0) => ({
 const searchClients: NativeHandler = (args) => {
   const counts = linkedProposalCounts(visibleAssistantProjects());
   const clients = filterClients(store().clients, String(args.query || ''), args.kind || 'all').slice(0, 20);
-  return { data: { clients: clients.map((c) => clientData(c, counts.get(c.id) ?? 0)), limit: 20 } };
+  // Compact projection: notes and address can be long; get_client returns the full record.
+  const compact = (c: ClientRecord) => ({ id: c.id, kind: c.kind, name: c.name, taxId: c.taxId, phone: c.phone, email: c.email, province: c.province, proposalCount: counts.get(c.id) ?? 0 });
+  return { data: { clients: clients.map(compact), limit: 20 } };
 };
 
 const getClient: NativeHandler = (args) => {
