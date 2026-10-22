@@ -183,11 +183,11 @@ const renderRates = (project: ProjectSimulation, extra: Record<string, unknown> 
 }
 
 // --- Tarifas: perfil de carga y proyección de autoconsumo ---
-assert.equal(activeLoadPreset('residential', 90), 'residential');
-assert.equal(activeLoadPreset(undefined, 75), 'commercial');
-assert.equal(activeLoadPreset('commercial', 35), 'residential', 'el 35% gana, como en el selector anterior');
-assert.equal(activeLoadPreset('custom', 90), 'industrial');
-assert.equal(activeLoadPreset('custom', 50), 'custom');
+assert.equal(activeLoadPreset('residential', 90), 'residential', 'el preset explícito manda');
+assert.equal(activeLoadPreset(undefined, 75), 'commercial', 'sin preset se infiere del porcentaje');
+assert.equal(activeLoadPreset(undefined, 50), 'custom');
+assert.equal(activeLoadPreset('commercial', 35), 'commercial');
+for (const ratio of [35, 75, 90]) assert.equal(activeLoadPreset('custom', ratio), 'custom', `Manual explícito al ${ratio}% se respeta`);
 assert.deepEqual(loadProfileChange('commercial'), { daytimeLoadRatio: 75, daytimeSelfConsumptionRatio: 75, loadProfilePreset: 'commercial' });
 assert.deepEqual(loadProfileChange('custom'), { loadProfilePreset: 'custom' }, 'Manual conserva el slider');
 assert.deepEqual(daytimeSliderChange(60), { daytimeLoadRatio: 60, daytimeSelfConsumptionRatio: 60, loadProfilePreset: 'custom' });
@@ -215,6 +215,18 @@ assert.deepEqual(daytimeSliderChange(60), { daytimeLoadRatio: 60, daytimeSelfCon
   );
   assert.match(battery, /Batería <b/, 'con batería la leyenda suma el segmento BESS');
   assert.match(battery, /bg-pd-bess/);
+}
+
+// Manual explícito con 35/75/90: el selector muestra «Manual» y los cambios de tarifa no recalculan el perfil.
+for (const ratio of [35, 75, 90]) {
+  const manual = renderRates(makeProject({ specs: { daytimeLoadRatio: ratio, loadProfilePreset: 'custom' } }), { projectionEnabled: true });
+  assert.match(manual, /<option value="custom" selected="">Manual<\/option>/, `selector en Manual al ${ratio}%`);
+  assert.doesNotMatch(manual, /<option value="(residential|commercial|industrial)" selected/);
+}
+{
+  const ctx = { matrix: undefined, avgMonthlyConsumption: 900, dopExchangeRate: 60, rates: { distributor: 'EDESUR', tariffCode: 'BTS2' } as never, canWriteSpecs: true };
+  assert.equal(planTariffChange({ ...ctx, loadProfilePreset: 'custom' }, 'BTD').specs, null);
+  assert.ok(planTariffChange({ ...ctx, loadProfilePreset: loadProfileChange('residential').loadProfilePreset }, 'BTD').specs, 'al elegir un preset vuelven las recomendaciones');
 }
 
 console.log('testParameterDockClientRates: ok');

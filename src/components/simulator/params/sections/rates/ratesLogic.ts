@@ -2,7 +2,7 @@ import { DEFAULT_RD_TARIFF_MATRIX, getReferenceEnergyRateUSD } from '../../../..
 import { getRecommendedLoadProfile } from '../../../../../engine/solarEngine';
 import type { ProjectSimulation, SystemSpecs, UtilityRates } from '../../../../../types';
 import { mapTariffCodeOnDistributorChange, type UtilityDistributor } from '../../../../../types/tariffs';
-import type { LoadProfilePreset } from '../../logic/loadProfilePreview';
+import { detectLoadProfilePreset, type LoadProfilePreset } from '../../logic/loadProfilePreview';
 
 type TariffMatrix = Parameters<typeof getReferenceEnergyRateUSD>[0];
 
@@ -82,12 +82,10 @@ export function planTariffChange(ctx: ChangeContext, newCode: string): TariffCha
 export const exportFeeValue = (rates: { isZeroExport?: boolean; gridExportFeePct?: number }): number =>
   rates.isZeroExport ? 0 : (rates.gridExportFeePct ?? 25);
 
-/** Perfil de carga activo: el primero que casa por preset o por el porcentaje diurno (35/75/90). */
+/** Perfil de carga activo: el preset explícito manda (incluido «Manual»); solo sin preset se infiere del porcentaje (35/75/90). */
 export function activeLoadPreset(preset: string | undefined, daytimeRatio: number): LoadProfilePreset {
-  if (preset === 'residential' || daytimeRatio === 35) return 'residential';
-  if (preset === 'commercial' || (preset !== 'residential' && daytimeRatio === 75)) return 'commercial';
-  if (preset === 'industrial' || daytimeRatio === 90) return 'industrial';
-  return 'custom';
+  if (preset === 'residential' || preset === 'commercial' || preset === 'industrial' || preset === 'custom') return preset;
+  return detectLoadProfilePreset(daytimeRatio);
 }
 
 /** Cambios de specs al elegir un perfil; «Manual» solo marca el preset y conserva el slider. */
