@@ -85,3 +85,26 @@ store.getState().setAgentPolicy({ external: { read: 'allow', draft: 'deny', guar
 await settle();
 assert.equal(ready.length, after, 'disposed bridge stops announcing');
 console.log('MCP bridge host: tool snapshot, execution, labels and policy refresh verified.');
+
+// Device feature contract: registered, device-scoped (not part of the one-key organization settings) and off by default.
+{
+  const { DEVICE_APPLICATION_FEATURES, isDeviceFeatureAvailable, DEFAULT_FEATURE_SETTINGS, isFeatureSettings } = await import('../../shared/applicationFeatures');
+  const feature = DEVICE_APPLICATION_FEATURES.find((f) => f.id === 'localMcpServer');
+  assert(feature, 'local MCP is registered');
+  assert.equal(feature.scope, 'device');
+  assert.equal(feature.defaultEnabled, false);
+  assert.equal(isDeviceFeatureAvailable('localMcpServer'), true);
+  assert.equal(isDeviceFeatureAvailable('nope' as never), false);
+  assert.equal(isFeatureSettings({ ...DEFAULT_FEATURE_SETTINGS, localMcpServer: true }), false, '2.6.x validation keeps exactly one organization key');
+
+  // When the capability is unavailable the bridge announces no tools and refuses forwarded calls.
+  const quiet: McpRendererSnapshot[] = [];
+  const answers: AgentToolOutcome[] = [];
+  let push: (m: McpInvokeMessage) => void = () => {};
+  const off = connectMcpBridge({ ...api, onInvoke: (cb) => { push = cb; return () => {}; }, ready: (s) => { quiet.push(s); }, respond: (_id, o) => { answers.push(o); } }, { available: () => false });
+  assert.deepEqual(quiet[0].tools, []);
+  push({ requestId: 'u1', call: { name: 'search_projects', args: {} } });
+  await settle();
+  assert(answers[0].status === 'error' && answers[0].code === 'unavailable');
+  off();
+}

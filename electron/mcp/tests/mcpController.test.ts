@@ -66,4 +66,12 @@ assert.equal(await isUp(), true, 'enable issued while disabling must leave the e
 assert.equal(loadMcpConfig(file).enabled, true);
 await controller.setEnabled(false);
 assert.equal(await isUp(), false);
+// An unavailable capability never opens the endpoint, whatever mcp.json says.
+let available = false;
+const gated = new McpController({ configFile: file, version: '0.0.0-test', send: () => false, copyText: () => {}, featureAvailable: () => available });
+const blocked = await gated.setEnabled(true);
+assert.equal(blocked.running, false);
+assert.match(blocked.error ?? '', /no está disponible/);
+assert.equal(await isUp(), false);
+await gated.setEnabled(false);
 console.log('MCP controller: enable, disable, token rotation and port conflicts verified.');

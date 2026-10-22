@@ -1,5 +1,6 @@
 // Owns the local MCP server lifecycle: config, bridge, HTTP endpoint. No Electron imports; IPC lives in ipc.ts.
 import type { McpInvokeMessage, McpServerStatus } from '../../shared/agentTools/bridge';
+import { isDeviceFeatureAvailable } from '../../shared/applicationFeatures';
 import { generateMcpToken, loadMcpConfig, saveMcpConfig, type McpConfig } from './config';
 import { LocalMcpServer, MCP_PATH } from './mcpServer';
 import { RendererBridge } from './rendererBridge';
@@ -10,6 +11,8 @@ export interface McpControllerOptions {
   send: (message: McpInvokeMessage) => boolean;
   /** Writes to the system clipboard (main process only). */
   copyText: (text: string) => void;
+  /** Effective availability of the `localMcpServer` device feature (defaults to the shared registry). */
+  featureAvailable?: () => boolean;
 }
 
 export class McpController {
@@ -76,6 +79,10 @@ export class McpController {
 
   private async startServer(): Promise<void> {
     this.error = undefined;
+    if (!(this.options.featureAvailable ?? (() => isDeviceFeatureAvailable('localMcpServer')))()) {
+      this.error = 'El servidor MCP local no está disponible en esta versión.';
+      return;
+    }
     try {
       await this.server.start(this.config.port);
     } catch (error) {
