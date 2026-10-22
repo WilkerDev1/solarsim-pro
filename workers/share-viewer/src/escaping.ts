@@ -1,3 +1,4 @@
+import { renderRichTextHtml } from '../../../shared/documentTexts/richText';
 /** Context-specific encoding. Only generated markup may bypass these functions. */
 export function escapeHtml(value: unknown): string {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
@@ -7,8 +8,12 @@ export function scriptJson(value: unknown): string {
 }
 export function formatMarkdown(text?: string | null, boldClass = 'font-bold text-slate-950'): string {
   if (!text) return '';
-  // No raw HTML, links, images or script attributes are part of this restricted format.
-  return escapeHtml(text).replace(/\*\*([^*]+)\*\*/g, `<strong class="${escapeHtml(boldClass)}">$1</strong>`);
+  // Subconjunto compartido con el editor (negrita, cursiva, viñetas, párrafos): todo escapado, sin HTML crudo.
+  return renderRichTextHtml(text, { boldClass });
+}
+/** Lo mismo, pero un texto de una línea no abre un bloque (etiquetas y garantías dentro de un `<span>`). */
+export function formatInlineMarkdown(text?: string | null, boldClass = 'font-bold text-slate-950'): string {
+  return text ? renderRichTextHtml(text, { boldClass, inline: true }) : '';
 }
 export function safeLogoUrl(value: unknown, fallback: string): string {
   if (typeof value !== 'string') return fallback;

@@ -1,4 +1,5 @@
 import type { ShareProposalPayload } from './types';
+import { DOC_TEXT_PREFIX, getDocumentTextDefinition, isDocTextKey } from '../../../shared/documentTexts';
 export const MAX_SHARE_BYTES = 2 * 1024 * 1024;
 export class RequestValidationError extends Error {
   constructor(message: string, public readonly status: 400 | 413 = 400) { super(message); }
@@ -75,7 +76,15 @@ export function parseSharePayload(value: unknown): ShareProposalPayload {
     for (const field of fields) if (record[field] !== undefined && typeof record[field] !== 'boolean') throw new RequestValidationError(`${field} debe ser booleano.`);
   }
   const custom = project.customization === undefined ? {} : requireRecord(project.customization, 'customization');
+  let publishedTexts = 0;
   for (const [key, item] of Object.entries(custom)) {
+    // Textos del documento publicados como `doc:<clave>`: solo claves del registro, siempre strings.
+    if (key.startsWith(DOC_TEXT_PREFIX)) {
+      if (!isDocTextKey(key) || !getDocumentTextDefinition(key.slice(DOC_TEXT_PREFIX.length))) throw new RequestValidationError('La personalización contiene un texto del documento desconocido.');
+      if (typeof item !== 'string' || item.length > 10000) throw new RequestValidationError('La personalización contiene un valor no válido.');
+      if (++publishedTexts > 60) throw new RequestValidationError('La personalización contiene demasiados textos del documento.');
+      continue;
+    }
     if (key === 'showSelfConsumptionInProposal') { if (typeof item !== 'boolean') throw new RequestValidationError('El desglose debe ser booleano.'); }
     else if (typeof item !== 'string' || item.length > (key.endsWith('LogoBase64') ? MAX_SHARE_BYTES : 30000)) throw new RequestValidationError('La personalización contiene un valor no válido.');
   }
