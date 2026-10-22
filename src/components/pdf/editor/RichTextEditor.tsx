@@ -8,6 +8,8 @@ export type EditorCommand = 'bold' | 'italic' | 'list';
 export interface RichTextEditorHandle {
   command: (command: EditorCommand) => void;
   value: () => string;
+  /** Confirma el campo activo (guarda lo escrito y lo cierra). */
+  commit: () => void;
   /** Marca el editor como cerrado sin confirmar (restablecer, deshacer). */
   dismiss: () => void;
 }
@@ -55,7 +57,7 @@ export const RichTextEditor = React.forwardRef<RichTextEditorHandle, RichTextEdi
       document.execCommand(EXEC[command]);
     };
 
-    useImperativeHandle(handleRef, () => ({ command: run, value, dismiss: () => { done.current = true; } }));
+    useImperativeHandle(handleRef, () => ({ command: run, value, commit, dismiss: () => { done.current = true; } }));
 
     useLayoutEffect(() => {
       const element = ref.current;
