@@ -82,6 +82,11 @@ const before = structuredClone(trashed());
 assert.equal(before.isDeleted, true);
 store().setDocumentTexts({ 'quotation.warranty.inverter': 'No debe guardarse' });
 assert.deepEqual(trashed().customization, before.customization);
+// History is read-only for trashed proposals too (undo/redo cannot rewrite them).
+useSimulationStore.setState({ undoStack: [structuredClone(before), { ...structuredClone(before), client: { ...before.client, name: 'Otro nombre' } }], redoStack: [structuredClone(before)], canUndo: true, canRedo: true });
+store().undo();
+store().redo();
+assert.deepEqual(trashed().client, before.client, 'Deshacer/rehacer no modifican la papelera');
 assert.equal(canEditDocument({ project: before, user: null }), false, 'Papelera: solo lectura');
 
 // 7. Readers and conflicted proposals are read-only; writers in local mode can edit.

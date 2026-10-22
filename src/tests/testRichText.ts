@@ -6,6 +6,7 @@ import {
   renderRichTextHtml,
   serializeEditableDom,
   richTextToPlain,
+  richTextToEditorHtml,
   type NodeLike,
 } from '../../shared/documentTexts/richText';
 
@@ -82,5 +83,10 @@ assert.equal(renderRichTextHtml('Sistema 5*3 y 2*4').includes('<em>'), false, 'D
 // Adjacent bold runs merge and whitespace inside markers moves outside.
 assert.equal(serializeEditableDom(el('div', [el('b', [text('Hola ')]), el('b', [text('mundo')])])), '**Hola mundo**');
 assert.equal(serializeEditableDom(el('div', [text('a'), el('b', [text(' b ')]), text('c')])), 'a **b** c');
+
+// 7. Editor HTML (contentEditable) is escaped and round-trips through serializeEditableDom.
+const editorHtml = richTextToEditorHtml('Hola **<b>mundo</b>** y *cursiva*\nlínea\n\n- uno\n- dos');
+assert.equal(editorHtml, '<div>Hola <strong>&lt;b&gt;mundo&lt;/b&gt;</strong> y <em>cursiva</em></div><div>línea</div><div><br></div><ul><li>uno</li><li>dos</li></ul>');
+assert.equal(richTextToEditorHtml(''), '<div><br></div>');
 
 console.log('PASS: rich text parse/serialize/sanitize/render and DOM serialization.');

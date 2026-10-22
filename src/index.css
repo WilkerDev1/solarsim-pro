@@ -51,6 +51,10 @@
 }
 
 @media print {
+  /* Cromo del editor del documento: nunca se imprime ni se exporta. */
+  [data-pdf-chrome] {
+    display: none !important;
+  }
   @page {
     size: 210mm 297mm;
     margin: 0;

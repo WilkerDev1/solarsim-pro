@@ -40,4 +40,5 @@ useSimulationStore.setState({
   },
 });
 document.documentElement.classList.toggle('dark', params.get('theme') === 'dark');
+(window as unknown as { qaStore: typeof useSimulationStore }).qaStore = useSimulationStore; // inspección desde la consola
 createRoot(document.getElementById('root')!).render(<PDFProposalView />);

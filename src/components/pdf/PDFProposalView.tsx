@@ -1,4 +1,5 @@
 import React, { useRef, useState, useMemo } from 'react';
+import { flushSync } from 'react-dom';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { PDFColorTheme, PDF_COLOR_THEMES } from '../../constants/pdfThemes';
 import { resolveProposalAttachmentBytes } from '../../services/proposalAttachmentResolver';
@@ -9,6 +10,7 @@ import { PDFSectionId } from '../../constants/pdfSections';
 import { buildPdfLayout, normalizeSectionOrder } from '../../utils/pdfLayout';
 import { formatProposalDate } from '../../utils/formatDateUtils';
 import { DocumentEditorProvider } from './editor/DocumentEditorContext';
+import { DocumentEditorToolbar } from './editor/DocumentEditorToolbar';
 import { canEditDocument, type DocumentEditorMode } from './editor/documentEditorState';
 
 // Modular Page Components
@@ -89,7 +91,9 @@ export const PDFProposalView: React.FC = () => {
 
   const handleExportPDF = async () => {
     if (!pdfRef.current) return;
-    setIsExporting(true);
+    // Modo 'export': el editor se desmonta y la hoja queda sin cromo antes de la captura.
+    flushSync(() => setIsExporting(true));
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
 
     try {
       const pages = Array.from(pdfRef.current.querySelectorAll<HTMLElement>('.pdf-page'));
@@ -144,6 +148,13 @@ export const PDFProposalView: React.FC = () => {
 
   // Una propuesta en papelera, con conflicto o de un lector se ve pero no se edita.
   const writable = canEditDocument({ project, user: currentUser });
+  const readOnlyReason = writable
+    ? null
+    : project.isDeleted
+      ? 'Propuesta en papelera: solo lectura. Restáurala para editar el documento.'
+      : project.syncStatus === 'conflict'
+      ? 'Esta propuesta tiene un conflicto de sincronización: resuélvelo antes de editar el documento.'
+      : 'Tu cuenta solo puede consultar esta propuesta.';
   const editing = isEditMode && writable;
   const editorMode: DocumentEditorMode = isExporting ? 'export' : editing ? 'edit' : 'view';
   const editorActions = useMemo(() => ({
@@ -271,35 +282,6 @@ export const PDFProposalView: React.FC = () => {
           </div>
         )}
 
-        {/* Live Edit Mode Floating Banner */}
-        {editing && (
-          <div className="w-[850px] bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center justify-between gap-4 border border-blue-400/40 animate-in fade-in slide-in-from-top-2 sticky top-0 z-40">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-white shrink-0 shadow-xs">
-                <span className="text-sm animate-bounce">✏️</span>
-              </div>
-              <div>
-                <h4 className="text-xs font-black tracking-wide flex items-center gap-2">
-                  MODO EDICIÓN EN VIVO ACTIVO
-                  <span className="text-[9.5px] bg-amber-400 text-slate-950 font-extrabold px-2 py-0.5 rounded-full">
-                    Tiempo Real
-                  </span>
-                </h4>
-                <p className="text-[11px] text-blue-100 font-medium">
-                  Haz clic sobre cualquier texto para modificarlo. <kbd className="bg-blue-900/60 px-1 py-0.5 rounded text-[10px] text-amber-200">Ctrl+B</kbd> pone negrita, <kbd className="bg-blue-900/60 px-1 py-0.5 rounded text-[10px] text-amber-200">Esc</kbd> cancela y <strong>Guardar en plantilla</strong> lo usa en las próximas propuestas de la empresa.
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setIsEditMode(false)}
-              className="px-4 py-2 rounded-xl bg-white hover:bg-blue-50 text-blue-950 font-black text-xs shadow-md transition-all cursor-pointer active:scale-95 shrink-0"
-            >
-              Listo / Finalizar
-            </button>
-          </div>
-        )}
-
         <ProposalAnnexSync project={project} />
 
         <DocumentEditorProvider
@@ -311,6 +293,7 @@ export const PDFProposalView: React.FC = () => {
           writable={writable}
           actions={editorActions}
         >
+          <DocumentEditorToolbar isEditMode={editing} setIsEditMode={setIsEditMode} readOnlyReason={readOnlyReason} />
           <div ref={pdfRef} className="flex flex-col gap-8 print:gap-0">
             {effectiveSectionOrder.map((sectionId) => (sectionVisibility[sectionId] ? renderSection(sectionId) : null))}
           </div>
