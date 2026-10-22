@@ -9,9 +9,15 @@ import { createApplicationMenu } from './menu/appMenu';
 import { registerAutoUpdater } from './updater/autoUpdaterHandler';
 import { registerAIInvoiceHandlers } from './ai/aiInvoiceHandler';
 import { createMcpController, registerMcpIpc, watchMcpWindow } from './mcp/ipc';
+import { runMcpStdio } from './mcp/stdioMain';
+
+// Modo proxy para clientes solo-stdio (Claude Desktop): decide antes de crear ventanas o tomar el bloqueo de instancia.
+const stdioMode = process.argv.includes('--mcp-stdio');
 
 // 1. Una sola instancia: el servidor MCP local escucha en un puerto fijo y los datos viven en un único perfil.
-if (!app.requestSingleInstanceLock()) {
+if (stdioMode) {
+  runMcpStdio();
+} else if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', () => {

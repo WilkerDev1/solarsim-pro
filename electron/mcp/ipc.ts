@@ -30,6 +30,7 @@ export function createMcpController(getWindow: () => BrowserWindow | null): McpC
       return true;
     },
     copyText: (text) => clipboard.writeText(text),
+    executablePath: app.isPackaged ? process.env.APPIMAGE || process.env.PORTABLE_EXECUTABLE_FILE || app.getPath('exe') : undefined,
   });
 }
 

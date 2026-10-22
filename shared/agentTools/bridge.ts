@@ -20,6 +20,8 @@ export interface McpServerStatus {
   url: string;
   error?: string;
   clients: { name: string; lastSeenAt: string }[];
+  /** Packaged executable for stdio hosts (`--mcp-stdio`); absent in development builds. */
+  executablePath?: string;
 }
 
 export interface ElectronMcpApi {
