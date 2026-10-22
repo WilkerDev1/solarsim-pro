@@ -4,6 +4,8 @@ import { customItemsTaxBreakdown, LEY5707_CREDIT_RATE } from '../../../shared/fi
 import { ELECTSUN_LOGO_COLOR_BASE64 } from '../../../shared/electsunLogoColor';
 import { escapeHtml, formatInlineMarkdown, formatMarkdown, safeLogoUrl, scriptJson } from './escaping';
 import { createDocumentTextContext, docTextKey, interpolate, viewerText } from '../../../shared/documentTexts';
+import { ENERGY_FLOW_CSS, renderEnergyFlowSection } from './energyFlow';
+import { isBuiltInFeatureAvailable } from '../../../shared/applicationFeatures';
 
 export function renderExpiredPage(companyName = 'electsun', companyPhone = '+1 (809) 378-6590'): string {
   return `<!DOCTYPE html>
@@ -403,6 +405,7 @@ export function renderProposalPage(stored: StoredProposal): string {
   <style>
     body { font-family: 'Plus Jakarta Sans', sans-serif; }
     .font-mono { font-family: 'JetBrains Mono', monospace; }
+${ENERGY_FLOW_CSS}
     
     /* Electsun Corporate Color Accents */
     :root {
@@ -490,6 +493,9 @@ export function renderProposalPage(stored: StoredProposal): string {
         </div>
       </div>
     </header>
+
+    <!-- FLUJO ENERGÉTICO ANIMADO (guía visual aproximada) -->
+    ${isBuiltInFeatureAvailable('proposalEnergyFlowDiagram') ? renderEnergyFlowSection({ hybrid: hasBattery && totalBESSKWh > 0, isZeroExport, annualProductionKWh, monthly: monthlyData, calculationMode: stored.calculationSnapshot?.mode }) : ''}
 
     <!-- 2. RESUMEN EJECUTIVO DE LA SOLUCIÓN PROPUESTA -->
     <section class="bg-white border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">

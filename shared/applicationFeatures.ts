@@ -43,7 +43,13 @@ export const BUILT_IN_APPLICATION_FEATURES = [{
   id: 'clientsDirectory', title: 'Directorio de clientes',
   description: 'Clientes de la organización enlazados a propuestas, con resumen de estados; no cambia los datos impresos ni el cálculo.',
   stage: 'stable' as FeatureStage, available: true, visibilityWhenDisabled: 'labelled' as const, defaultEnabled: true, configurable: false,
+}, {
+  id: 'proposalEnergyFlowDiagram', title: 'Diagrama de flujo energético en la propuesta web',
+  description: 'Guía visual animada y aproximada de a dónde va la producción solar (casa, batería y red); no cambia el cálculo energético.',
+  stage: 'stable' as FeatureStage, available: true, visibilityWhenDisabled: 'labelled' as const, defaultEnabled: true, configurable: false,
 }] as const;
+export type BuiltInFeatureId = (typeof BUILT_IN_APPLICATION_FEATURES)[number]['id'];
+export const isBuiltInFeatureAvailable = (id: BuiltInFeatureId): boolean => BUILT_IN_APPLICATION_FEATURES.some((f) => f.id === id && f.available && f.defaultEnabled);
 
 /**
  * Capabilities decided per device. They are not part of `ApplicationFeatureSettings`: 2.6.x clients and the API validate exactly one
