@@ -81,6 +81,36 @@ const PROPOSAL_AND_CATALOG_TOOLS: AgentToolDefinition[] = [
     inputSchema: object({ id: id('ID de la propuesta.') }, ['id']),
   },
   {
+    name: 'list_document_texts', title: 'Consultar textos del documento', kind: 'read', category: 'documents', surfaces: [...ALL],
+    description: 'Lista los textos editables del PDF de una propuesta (clave, etiqueta, texto actual, si está personalizado y si admite plantilla). Filtra por sección: company, client, cover, aboutUs, benefits, techIntro, projectDescription, quotation, etc.',
+    inputSchema: object({ proposalId: id('ID de la propuesta.'), section: { type: 'string', maxLength: 40 } }, ['proposalId']),
+  },
+  {
+    name: 'set_document_text', title: 'Editar texto del documento', kind: 'draft', category: 'documents', surfaces: [...ALL],
+    description: 'Cambia un texto del PDF por su clave (p. ej. quotation.warranty.panel, client.phone, aboutUs.intro). Admite **negrita**, *cursiva* y viñetas "- " en textos enriquecidos y placeholders como {clientName}. Consulta las claves con list_document_texts.',
+    inputSchema: object({ proposalId: id('ID de la propuesta.'), key: { type: 'string', minLength: 3, maxLength: 80 }, text: { type: 'string', maxLength: 8000 } }, ['proposalId', 'key', 'text']),
+  },
+  {
+    name: 'reset_document_text', title: 'Restablecer texto del documento', kind: 'draft', category: 'documents', surfaces: [...ALL],
+    description: 'Vuelve un texto del PDF a su valor predeterminado (los textos dinámicos vuelven a calcularse).',
+    inputSchema: object({ proposalId: id('ID de la propuesta.'), key: { type: 'string', minLength: 3, maxLength: 80 } }, ['proposalId', 'key']),
+  },
+  {
+    name: 'set_document_layout', title: 'Diseño del documento', kind: 'draft', category: 'documents', surfaces: [...ALL],
+    description: 'Oculta secciones del PDF, cambia el tema de color o la cabecera/pie. Secciones: cover, tableOfContents, executiveSummary, aboutUs, benefits, techIntro, projectDescription, energy, quotation, roi, cashFlow, costMatrix.',
+    inputSchema: object({
+      proposalId: id('ID de la propuesta.'),
+      hiddenSections: { type: 'array', maxItems: 12, items: { type: 'string', maxLength: 40 } },
+      themeId: { type: 'string', maxLength: 40 },
+      showHeadersFooters: { type: 'boolean' },
+    }, ['proposalId']),
+  },
+  {
+    name: 'save_document_text_to_company_template', title: 'Guardar textos en la plantilla de la empresa', kind: 'guarded', category: 'documents', surfaces: [...ALL],
+    description: 'Guarda textos (no los del cliente) como plantilla de la empresa emisora para futuras propuestas. Requiere la propuesta abierta y confirmación.',
+    inputSchema: object({ proposalId: id('ID de la propuesta abierta.'), keys: { type: 'array', maxItems: 40, items: { type: 'string', maxLength: 80 } } }, ['proposalId', 'keys']),
+  },
+  {
     name: 'apply_proposal_draft', title: 'Aplicar borrador del asistente de propuestas', kind: 'draft', category: 'proposals', card: 'proposal',
     surfaces: ['proposal-assistant'],
     description: 'Aplica el borrador revisado del asistente de propuestas (crear o actualizar la propuesta abierta). Uso interno de la interfaz de revisión.',
