@@ -2,6 +2,67 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Parameter dock (variante C): tokens planos, un solo acento. Los componentes de params/ui los consumen por clase (bg-pd-*, text-pd-*). */
+:root {
+  --pd-panel: #ffffff;
+  --pd-border: #e4e4e7;
+  --pd-text: #18181b;
+  --pd-muted: #52525b;
+  --pd-strong: #3f3f46;
+  --pd-subtle: #71717a;
+  --pd-field: #f4f4f5;
+  --pd-field-border: #e4e4e7;
+  --pd-field-ro: #fafafa;
+  --pd-field-ro-border: #d4d4d8;
+  --pd-outline: #d4d4d8;
+  --pd-item: #fafafa;
+  --pd-icon-tile: #18181b;
+  --pd-icon-tile-border: #18181b;
+  --pd-icon-tile-text: #ffffff;
+  --pd-accent: #047857;
+  --pd-on-accent: #ffffff;
+  --pd-warn-bg: #fef3c7;
+  --pd-warn-text: #92400e;
+  --pd-negative: #be123c;
+  --pd-switch-off: #d4d4d8;
+  --pd-knob: #ffffff;
+  --pd-chip-bg: #e4e4e7;
+  --pd-chip-text: #3f3f46;
+  --pd-solar: #f59e0b;
+  --pd-grid: #a1a1aa;
+  --pd-bess: #0891b2;
+}
+
+.dark {
+  --pd-panel: #18181b;
+  --pd-border: #2e2e33;
+  --pd-text: #fafafa;
+  --pd-muted: #a1a1aa;
+  --pd-strong: #d4d4d8;
+  --pd-subtle: #71717a;
+  --pd-field: #27272a;
+  --pd-field-border: #3f3f46;
+  --pd-field-ro: #1f1f22;
+  --pd-field-ro-border: #3f3f46;
+  --pd-outline: #3f3f46;
+  --pd-item: #202023;
+  --pd-icon-tile: #27272a;
+  --pd-icon-tile-border: #3f3f46;
+  --pd-icon-tile-text: #fafafa;
+  --pd-accent: #10b981;
+  --pd-on-accent: #052e1c;
+  --pd-warn-bg: #3a2a0c;
+  --pd-warn-text: #fcd34d;
+  --pd-negative: #fda4af;
+  --pd-switch-off: #3f3f46;
+  --pd-knob: #fafafa;
+  --pd-chip-bg: #3f3f46;
+  --pd-chip-text: #e4e4e7;
+  --pd-solar: #fbbf24;
+  --pd-grid: #71717a;
+  --pd-bess: #22d3ee;
+}
+
 @layer base {
   button:focus-visible, a:focus-visible, input:focus-visible,
   select:focus-visible, textarea:focus-visible, summary:focus-visible {
