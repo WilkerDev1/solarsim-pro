@@ -7,6 +7,9 @@ import {
   StackedField, StatStrip, Stepper, SubHeader, SubHeaderIconButton, SubHeaderTextButton, ToggleGroup, WarnChip,
 } from '../components/simulator/params/ui';
 
+import { commitStepperDraft } from '../components/simulator/params/ui/Stepper';
+import { nextRadioIndex } from '../components/simulator/params/ui/ToggleGroup';
+
 const h = React.createElement;
 const noop = () => {};
 const render = (node: React.ReactElement) => renderToStaticMarkup(node);
@@ -128,6 +131,26 @@ const render = (node: React.ReactElement) => renderToStaticMarkup(node);
   const off = render(h(ToggleGroup, { ariaLabel: 'x', value: 'a', onChange: noop, disabled: true, options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] }));
   assert.equal((off.match(/disabled=""/g) ?? []).length, 2, 'todos los botones deshabilitados');
   assert.match(off, /disabled:opacity-50/);
+}
+
+// --- Teclado: borrador del Stepper y navegación por flechas del radiogroup ---
+{
+  assert.equal(commitStepperDraft('25', 10, 10, 50), 25);
+  assert.equal(commitStepperDraft('', 12, 10, 50), 12, 'vacío vuelve al valor actual');
+  assert.equal(commitStepperDraft('abc', 12, 10, 50), 12);
+  assert.equal(commitStepperDraft('2', 12, 10, 50), 10, 'se limita solo al confirmar');
+  assert.equal(commitStepperDraft('99', 12, 10, 50), 50);
+  assert.equal(nextRadioIndex(0, 'ArrowRight', 3), 1);
+  assert.equal(nextRadioIndex(2, 'ArrowDown', 3), 0, 'da la vuelta');
+  assert.equal(nextRadioIndex(0, 'ArrowLeft', 3), 2);
+  assert.equal(nextRadioIndex(1, 'Home', 3), 0);
+  assert.equal(nextRadioIndex(1, 'End', 3), 2);
+  assert.equal(nextRadioIndex(1, 'a', 3), null);
+  const group = render(h(ToggleGroup, { ariaLabel: 'x', value: 'b', onChange: noop, options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] }));
+  assert.match(group, /tabindex="-1"[^>]*>A</);
+  assert.match(group, /tabindex="0"[^>]*>B</);
+  const none = render(h(ToggleGroup, { ariaLabel: 'x', value: 'z', onChange: noop, options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] }));
+  assert.match(none, /tabindex="0"[^>]*>A</, 'sin selección el primero es la parada de tabulador');
 }
 
 // --- SquareSwitch: role=switch, 34x20, 5px corners, 3px knob ---
