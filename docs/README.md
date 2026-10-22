@@ -13,6 +13,7 @@ Documentos canónicos y vigentes. No se mantienen documentos fechados: el histor
 - [Catálogo de equipos](EQUIPMENT_CATALOG.md): modelos, ofertas de proveedores, fichas, vistas previas y anexos automáticos.
 - [Centro empresarial](COMPANY_CENTER.md): organizaciones, equipos, membretes y aislamiento.
 - [Seguimiento comercial](PROPOSAL_COMMERCIAL_TRACKING.md): decisiones del cliente, responsables y reportes.
+- [Directorio de clientes](CLIENTS.md): clientes por organización, enlace opcional con propuestas y resumen de estados.
 - [Subsistema IA](AI_SCANNERS_SPECIFICATION.md) y [tarifas en el flujo IA](AI_TARIFF_CONTEXT.md).
 - [Agentes y herramientas de IA](AGENT_TOOLS.md): registro común, permisos, actividad y deshacer, precios automáticos.
 - [Visor de propuestas (Worker)](../workers/share-viewer/README.md).

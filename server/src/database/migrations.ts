@@ -3,6 +3,7 @@ import { sharedResources } from "./004_shared_resources.js";
 import { baselineSchema } from "./001_baseline.js";
 import { featurePolicyAndTombstones } from "./002_feature_policy_and_tombstones.js";
 import { companyManagement } from "./003_company_management.js";
+import { clients } from "./005_clients.js";
 /** Additive, recorded migrations, guarded by a cross-process transaction lock. */
 export async function migrateDatabase(pool: Pool): Promise<void> {
   const client = await pool.connect();
@@ -30,6 +31,7 @@ export async function migrateDatabase(pool: Pool): Promise<void> {
       },
       { version: 3, name: "company_management", run: companyManagement },
       { version: 4, name: "shared_resources", run: sharedResources },
+      { version: 5, name: "clients", run: clients },
     ]) {
       if (applied.has(migration.version)) continue;
       await migration.run(client);

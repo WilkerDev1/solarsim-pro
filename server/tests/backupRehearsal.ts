@@ -68,7 +68,7 @@ try {
     (
       await pool.query("SELECT version FROM schema_migrations ORDER BY version")
     ).rows.map((row) => row.version),
-    [1, 2, 3, 4],
+    [1, 2, 3, 4, 5],
   );
   assert.equal(
     Number(
@@ -91,7 +91,7 @@ try {
       counts: before,
       projectContentPreserved: true,
       migrationReplay: "pass",
-      migrations: [1, 2, 3, 4],
+      migrations: [1, 2, 3, 4, 5],
       orphanProjects: 0,
       recovering: false,
     }),

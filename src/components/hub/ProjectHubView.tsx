@@ -5,6 +5,7 @@ import { useSimulationStore } from "../../store/useSimulationStore";
 import { useEnergyCalculationMode } from "../../features/application/useApplicationFeatures";
 import { calculateProjectFinancialSummary } from "../../engine/financeEngine";
 import { ProposalCommercialPanel } from "../../features/proposals/ProposalCommercialPanel";
+import { ProposalClientSection } from "../clients/ProposalClientLink";
 import {
   getProjectPanels,
   getProjectInverters,
@@ -327,6 +328,7 @@ export const ProjectHubView = () => {
           )}
         </div>
         <aside className="summary-side">
+          <ProposalClientSection key={`client-${ownerKey}`} project={project} />
           <ProposalCommercialPanel key={ownerKey} project={project} />
         </aside>
       </div>
