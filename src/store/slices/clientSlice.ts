@@ -36,16 +36,10 @@ export const createClientSlice: SimulationSlice<ClientSlice> = (set, get) => {
     if (get().syncSettings.authToken && get().syncSettings.autoSyncEnabled) void get().syncClientsWithServer();
   };
   // Server deletions unlink proposals locally too; the push would otherwise be rejected as invalid_client.
+  // Versions are never inferred: the server's own revision arrives with the project pull, and unsynced work keeps its CAS base.
   const unlinkDeleted = (deleted: Set<string>) =>
     set((s) => s.projects.some((p) => p.clientId && deleted.has(p.clientId))
-      ? {
-          projects: s.projects.map((p) => {
-            if (!p.clientId || !deleted.has(p.clientId)) return p;
-            // The server unlinked its copy and bumped its version once; a synced local copy must follow to keep its CAS base.
-            const follow = p.syncStatus === 'synced' && Number.isSafeInteger(p.baseVersion);
-            return { ...p, clientId: undefined, ...(follow ? { version: (p.version ?? p.baseVersion!) + 1, baseVersion: p.baseVersion! + 1 } : {}) };
-          }),
-        }
+      ? { projects: s.projects.map((p) => (p.clientId && deleted.has(p.clientId) ? { ...p, clientId: undefined } : p)) }
       : {});
 
   return {
@@ -133,14 +127,31 @@ export const createClientSlice: SimulationSlice<ClientSlice> = (set, get) => {
     },
     resolveClientConflict: (id, resolution) => {
       const state = get(), change = state.clientChanges[id];
-      if (!change?.serverClient || (change.ownerId && change.ownerId !== state.syncSettings.currentUser?.id)) return;
+      if (!(change?.serverClient || change?.serverDeleted) || (change.ownerId && change.ownerId !== state.syncSettings.currentUser?.id)) return;
       // Discarding local work is always allowed to its owner; keeping it requires write access.
       if (resolution === 'keep_local' && !writable()) return;
       const changes = { ...state.clientChanges };
+      if (change.serverDeleted) {
+        // The id is a tombstone: keeping the edits recreates the client under a new id.
+        const local = state.clients.find((c) => c.id === id);
+        delete changes[id];
+        const user = state.syncSettings.currentUser;
+        const copy: ClientRecord | null = resolution === 'keep_local' && local
+          ? { ...local, id: `client-${crypto.randomUUID()}`, createdById: user?.id, createdBy: user?.name || 'Local', createdAt: new Date().toISOString(), version: undefined, updatedAt: undefined, baseVersion: 0 }
+          : null;
+        if (copy) changes[copy.id] = { revision: crypto.randomUUID(), ownerId: user?.id, baseVersion: 0 };
+        set({
+          clients: [...state.clients.filter((c) => c.id !== id), ...(copy ? [copy] : [])],
+          clientChanges: changes,
+          clientSyncFeedback: null,
+        });
+        if (copy) sync();
+        return;
+      }
       if (resolution === 'accept_server') {
         delete changes[id];
         set({
-          clients: [...state.clients.filter((c) => c.id !== id), change.serverClient],
+          clients: [...state.clients.filter((c) => c.id !== id), change.serverClient!],
           clientChanges: changes,
           clientSyncFeedback: null,
         });
@@ -148,7 +159,7 @@ export const createClientSlice: SimulationSlice<ClientSlice> = (set, get) => {
         changes[id] = {
           revision: crypto.randomUUID(),
           ownerId: change.ownerId,
-          baseVersion: change.serverClient.baseVersion ?? change.serverClient.version ?? 0,
+          baseVersion: change.serverClient!.baseVersion ?? change.serverClient!.version ?? 0,
         };
         set({ clientChanges: changes, clientSyncFeedback: null });
         sync();
@@ -212,8 +223,15 @@ export const createClientSlice: SimulationSlice<ClientSlice> = (set, get) => {
             if (!current()) return SESSION_CHANGED;
             if (change.ownerId && change.ownerId !== user.id) continue;
             const local = get().clients.find((c) => c.id === id);
-            if (!local || deleted.has(id)) continue;
-            if (change.serverClient) {
+            if (!local) continue;
+            if (deleted.has(id) && !change.serverClient) {
+              // Deleted by a teammate while this device holds unsynced edits: kept for review, never pushed.
+              set((s) => ({ clientChanges: { ...s.clientChanges, [id]: { ...s.clientChanges[id], serverDeleted: true } } }));
+              failures++;
+              continue;
+            }
+            if (deleted.has(id)) continue;
+            if (change.serverClient || change.serverDeleted) {
               failures++;
               continue;
             }
@@ -257,7 +275,10 @@ export const createClientSlice: SimulationSlice<ClientSlice> = (set, get) => {
           }
           if (!current()) return SESSION_CHANGED;
           set((s) => {
-            const changes = Object.fromEntries(Object.entries(s.clientChanges).filter(([id]) => !deleted.has(id)));
+            // Unsynced edits to a tombstoned client stay as a deletion conflict; everything else about it is dropped.
+            const changes = Object.fromEntries(
+              Object.entries(s.clientChanges).filter(([id, c]) => !deleted.has(id) || (c.serverDeleted && s.clients.some((x) => x.id === id))),
+            );
             const pending = s.clients.filter((c) => changes[c.id]);
             const hidden = new Set(s.clientDeletionQueue.map((c) => c.id));
             const clients = [
@@ -269,7 +290,7 @@ export const createClientSlice: SimulationSlice<ClientSlice> = (set, get) => {
               clientChanges: changes,
               activeClientId: clients.some((c) => c.id === s.activeClientId) ? s.activeClientId : null,
               clientSyncFeedback:
-                failures || Object.values(changes).some((c) => c.serverClient)
+                failures || Object.values(changes).some((c) => c.serverClient || c.serverDeleted)
                   ? `${failures} cliente(s) pendientes: hay cambios o permisos distintos. Sincroniza y revisa.`
                   : null,
             };

@@ -42,6 +42,9 @@ Las escrituras van a `clientChanges` (revisión + `baseVersion`) y los borrados 
 - Un borrado obsoleto (409) devuelve el registro del servidor para revisarlo.
 - Los borradores nunca publicados se eliminan sin petición.
 - Con sesión, borrar un cliente publicado no desenlaza sus propuestas hasta que el servidor confirma el borrado (llega en `deletedIds`); un 409 conserva los enlaces. En modo local, o si el cliente nunca se publicó, el desenlace es inmediato.
+- Cuando `deletedIds` trae un cliente, las propuestas locales pierden solo el enlace: nunca se adelanta su `baseVersion` por inferencia; la revisión autoritativa llega con la descarga de proyectos y el trabajo sin sincronizar conserva su base para que el CAS arbitre.
+- Un cliente editado sin conexión y borrado por otro miembro no se descarta: queda como conflicto de borrado (`serverDeleted`) y el usuario elige descartar su copia o conservarla como cliente nuevo (el id borrado nunca se revive).
+- La búsqueda por teléfono compara solo dígitos: `8095551234` y `5551234` encuentran `809-555-1234`.
 - El propietario de un conflicto puede aceptar la versión del servidor aunque haya perdido el permiso de escritura; conservar la local exige ese permiso.
 
 `syncProjectsWithServer` sincroniza los clientes justo después de las carpetas. Como el push acepta ids desconocidos, un fallo de clientes no bloquea las propuestas: el mensaje final indica «clientes pendientes». Los `deletedIds` del servidor desenlazan también las copias locales.

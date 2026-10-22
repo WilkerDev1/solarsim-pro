@@ -58,7 +58,7 @@ try {
   assert.equal((await store.getState().syncClientsWithServer()).success, true);
   assert.deepEqual(store.getState().clients.map((c) => c.id), ['client-a']);
   assert.equal(store.getState().projects.find((p) => p.id === 'p-gone')!.clientId, undefined);
-  assert.equal(store.getState().projects.find((p) => p.id === 'p-gone')!.baseVersion, 2, 'Synced copies follow the server version bump');
+  assert.equal(store.getState().projects.find((p) => p.id === 'p-gone')!.baseVersion, 1, 'Synced copies keep their confirmed version until the project pull delivers the server revision');
   assert.equal(store.getState().projects.find((p) => p.id === 'p-kept')!.clientId, 'client-a');
 
   // Offline creation is durable and published once the connection returns.

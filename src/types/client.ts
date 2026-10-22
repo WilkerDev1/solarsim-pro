@@ -18,6 +18,8 @@ export interface ClientChange {
   ownerId?: string;
   baseVersion: number;
   serverClient?: ClientRecord;
+  /** A teammate deleted the client while this device still had unsynced edits; the local copy is kept for review. */
+  serverDeleted?: boolean;
 }
 
 export interface ClientDeletionCommand {

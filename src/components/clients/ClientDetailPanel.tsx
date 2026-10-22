@@ -26,7 +26,8 @@ export function ClientDetailPanel({ client, readOnly }: { client: ClientRecord; 
     [projects, client.id, mode],
   );
   const conflict = clientChanges[client.id]?.serverClient;
-  const pending = !!clientChanges[client.id] && !conflict;
+  const deletedByOther = !!clientChanges[client.id]?.serverDeleted;
+  const pending = !!clientChanges[client.id] && !conflict && !deletedByOther;
   return (
     <div className="cl-content">
       <div className="cl-identity">
@@ -55,6 +56,16 @@ export function ClientDetailPanel({ client, readOnly }: { client: ClientRecord; 
           </button>
         )}
       </div>
+
+      {deletedByOther && (
+        <div className="cl-notice cl-error" role="alert">
+          Otro miembro eliminó este cliente mientras tenías cambios sin sincronizar. Conserva tu copia como un cliente nuevo o descártala.
+          <div className="cl-actions">
+            <button type="button" onClick={() => resolveClientConflict(client.id, 'accept_server')}>Descartar mi copia</button>
+            <button type="button" onClick={() => resolveClientConflict(client.id, 'keep_local')}>Conservar como cliente nuevo</button>
+          </div>
+        </div>
+      )}
 
       {conflict && (
         <div className="cl-notice cl-error" role="alert">
