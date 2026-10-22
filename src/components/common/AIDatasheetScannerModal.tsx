@@ -10,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { useSimulationStore } from "../../store/useSimulationStore";
+import { useShallow } from 'zustand/react/shallow';
 import {
   ExtractedDatasheetData,
   ExtractedEquipmentVariant,
@@ -48,7 +49,7 @@ const technicalFields = {
 } as const;
 
 export const AIDatasheetScannerModal: React.FC = () => {
-  const state = useSimulationStore();
+  const state = useSimulationStore(useShallow((s) => ({ isAIDatasheetModalOpen: s.isAIDatasheetModalOpen, closeAIDatasheetModal: s.closeAIDatasheetModal, equipmentCatalog: s.equipmentCatalog, geminiApiKey: s.geminiApiKey, geminiModel: s.geminiModel, sidebarTheme: s.sidebarTheme, syncSettings: s.syncSettings, sessionGeneration: s.sessionGeneration, openSettingsModal: s.openSettingsModal })));
   const {
     isAIDatasheetModalOpen: open,
     closeAIDatasheetModal,

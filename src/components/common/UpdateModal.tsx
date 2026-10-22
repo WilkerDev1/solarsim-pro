@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import {
   X,
   RefreshCw,
@@ -18,7 +19,7 @@ import {
 import { UpdateInfo, PlatformInfo } from '../../types';
 
 export const UpdateModal: React.FC = () => {
-  const { isUpdateModalOpen, closeUpdateModal, updateInfo, setUpdateInfo, sidebarTheme } = useSimulationStore();
+  const { isUpdateModalOpen, closeUpdateModal, updateInfo, setUpdateInfo, sidebarTheme } = useSimulationStore(useShallow((s) => ({ isUpdateModalOpen: s.isUpdateModalOpen, closeUpdateModal: s.closeUpdateModal, updateInfo: s.updateInfo, setUpdateInfo: s.setUpdateInfo, sidebarTheme: s.sidebarTheme })));
   const isDark = sidebarTheme === 'dark';
 
   const [appVersion, setAppVersion] = useState('1.0.0');

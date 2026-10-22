@@ -11,6 +11,7 @@ import {
   Paperclip,
 } from 'lucide-react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useAppAssistant } from '../useAppAssistant';
 import { assistantOwner } from '../tools';
 import { ChatMessage } from './ChatMessage';
@@ -32,7 +33,7 @@ function AssistantPanel({
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const ai = useAppAssistant(projectId, transport);
-  const state = useSimulationStore();
+  const state = useSimulationStore(useShallow((s) => ({ projects: s.projects, isSettingsModalOpen: s.isSettingsModalOpen, isAIInvoiceModalOpen: s.isAIInvoiceModalOpen, isAIDatasheetModalOpen: s.isAIDatasheetModalOpen, isAIPriceCatalogModalOpen: s.isAIPriceCatalogModalOpen, isNewProjectModalOpen: s.isNewProjectModalOpen, activeConflict: s.activeConflict, isTrashActive: s.isTrashActive, openSettingsModal: s.openSettingsModal, geminiApiKey: s.geminiApiKey })));
   const log = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const project = state.projects.find((p) => p.id === projectId);
@@ -271,7 +272,7 @@ function AssistantPanel({
 export function AppAssistant({
   transport,
 }: { transport?: GeminiTransport } = {}) {
-  const state = useSimulationStore();
+  const state = useSimulationStore(useShallow((s) => ({ activeView: s.activeView, activeProjectId: s.activeProjectId, appAssistantEnabled: s.appAssistantEnabled })));
   const projectId = ['simulator', 'project-hub'].includes(state.activeView)
     ? state.activeProjectId
     : undefined;

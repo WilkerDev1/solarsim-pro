@@ -3,6 +3,7 @@ import { PROPOSAL_DECISIONS, commercialState } from '../../../shared/proposalCom
 import { ProposalSalesSummary } from '../../features/proposals/ProposalSalesSummary';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import {
   Search,
   Plus,
@@ -44,7 +45,7 @@ export const DashboardView: React.FC = () => {
     sidebarTheme,
     dashboardViewMode,
     setDashboardViewMode,
-  } = useSimulationStore();
+  } = useSimulationStore(useShallow((s) => ({ projects: s.projects, searchQuery: s.searchQuery, setSearchQuery: s.setSearchQuery, openNewProjectModal: s.openNewProjectModal, activeFolderId: s.activeFolderId, setActiveFolderId: s.setActiveFolderId, activeTeamMemberFilter: s.activeTeamMemberFilter, setActiveTeamMemberFilter: s.setActiveTeamMemberFilter, folders: s.folders, syncSettings: s.syncSettings, sidebarTheme: s.sidebarTheme, dashboardViewMode: s.dashboardViewMode, setDashboardViewMode: s.setDashboardViewMode })));
 
   const isDark = sidebarTheme === 'dark';
   const [showFiltersModal, setShowFiltersModal] = useState(false);

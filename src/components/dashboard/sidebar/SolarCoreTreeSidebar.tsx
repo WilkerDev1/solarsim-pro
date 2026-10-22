@@ -1,6 +1,7 @@
 import { canAdminister } from '../../../../shared/permissions';
 import React, { useState } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import {
   Folder,
   FolderOpen,
@@ -51,7 +52,7 @@ export const SolarCoreTreeSidebar: React.FC = () => {
     localUserProfile,
     getActiveCompany,
     setActiveView,
-  } = useSimulationStore();
+  } = useSimulationStore(useShallow((s) => ({ projects: s.projects, folders: s.folders, folderSyncFeedback: s.folderSyncFeedback, folderChanges: s.folderChanges, resolveFolderConflict: s.resolveFolderConflict, syncFoldersWithServer: s.syncFoldersWithServer, activeFolderId: s.activeFolderId, setActiveFolderId: s.setActiveFolderId, activeTeamMemberFilter: s.activeTeamMemberFilter, setActiveTeamMemberFilter: s.setActiveTeamMemberFilter, setActiveProject: s.setActiveProject, syncSettings: s.syncSettings, openSettingsModal: s.openSettingsModal, moveProjectToFolder: s.moveProjectToFolder, deleteFolder: s.deleteFolder, isTrashActive: s.isTrashActive, setIsTrashActive: s.setIsTrashActive, moveToTrash: s.moveToTrash, localUserProfile: s.localUserProfile, getActiveCompany: s.getActiveCompany, setActiveView: s.setActiveView })));
 
   const currentUser = syncSettings.currentUser;
   const activeCompany = getActiveCompany();

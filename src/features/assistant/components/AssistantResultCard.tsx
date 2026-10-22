@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { EquipmentImagePreview } from '../../../components/common/equipment/EquipmentImagePreview';
 import { fetchEquipmentAsset } from '../../../services/equipmentAssetService';
 import { assistantFieldLabel, assistantValueLabel } from '../labels';
@@ -10,7 +11,7 @@ import {
   visibleAssistantEquipment,
 } from '../tools';
 export function AssistantResultCard({ card }: { card: AssistantCard }) {
-  const state = useSimulationStore();
+  const state = useSimulationStore(useShallow((s) => ({ syncSettings: s.syncSettings, setActiveProject: s.setActiveProject, openSettingsModal: s.openSettingsModal })));
   const [preview, setPreview] = useState<{
     url: string;
     pdf: boolean;

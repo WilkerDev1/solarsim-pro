@@ -11,6 +11,7 @@ import {
   Package,
 } from "lucide-react";
 import { useSimulationStore } from "../../store/useSimulationStore";
+import { useShallow } from 'zustand/react/shallow';
 import type {
   EquipmentSupplierPrice,
   SolarEquipmentItem,
@@ -44,7 +45,7 @@ function writable(item?: SolarEquipmentItem) {
 }
 export function SupplierManagerSection(props: Props) {
   const { workspaceScope, sessionGeneration, syncSettings } =
-    useSimulationStore();
+    useSimulationStore(useShallow((s) => ({ workspaceScope: s.workspaceScope, sessionGeneration: s.sessionGeneration, syncSettings: s.syncSettings })));
   return (
     <SupplierWorkspace
       key={`${workspaceScope}|${sessionGeneration}|${syncSettings.currentUser?.id || "local"}`}
@@ -53,7 +54,7 @@ export function SupplierManagerSection(props: Props) {
   );
 }
 function SupplierWorkspace({ isDark }: Props) {
-  const { equipmentCatalog, equipmentChanges } = useSimulationStore();
+  const { equipmentCatalog, equipmentChanges } = useSimulationStore(useShallow((s) => ({ equipmentCatalog: s.equipmentCatalog, equipmentChanges: s.equipmentChanges })));
   const [supplier, setSupplier] = useState("");
   const [supplierQuery, setSupplierQuery] = useState("");
   const [query, setQuery] = useState("");

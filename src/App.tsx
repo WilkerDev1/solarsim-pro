@@ -1,15 +1,21 @@
 import React, { useEffect, lazy, Suspense } from 'react';
 import { useSimulationStore } from './store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Header } from './components/common/Header';
 import { PrimaryIconDock } from './components/layout/PrimaryIconDock';
 import { SolarCoreTreeSidebar } from './components/dashboard/sidebar/SolarCoreTreeSidebar';
 import { DashboardView } from './components/dashboard/DashboardView';
 import { TrashView } from './components/dashboard/TrashView';
-const SimulatorView = lazy(() => import('./components/simulator/SimulatorView').then((module) => ({ default: module.SimulatorView })));
-const PDFProposalView = lazy(() => import('./components/pdf/PDFProposalView').then((module) => ({ default: module.PDFProposalView })));
-const ProjectHubView = lazy(() => import('./components/hub/ProjectHubView').then((module) => ({ default: module.ProjectHubView })));
-const CompanyProfileHubView = lazy(() => import('./components/companies/CompanyProfileHubView').then((module) => ({ default: module.CompanyProfileHubView })));
-const ClientsHubView = lazy(() => import('./components/clients/ClientsHubView').then((module) => ({ default: module.ClientsHubView })));
+const loadSimulatorView = () => import('./components/simulator/SimulatorView');
+const loadPDFProposalView = () => import('./components/pdf/PDFProposalView');
+const loadProjectHubView = () => import('./components/hub/ProjectHubView');
+const loadCompanyProfileHubView = () => import('./components/companies/CompanyProfileHubView');
+const loadClientsHubView = () => import('./components/clients/ClientsHubView');
+const SimulatorView = lazy(() => loadSimulatorView().then((module) => ({ default: module.SimulatorView })));
+const PDFProposalView = lazy(() => loadPDFProposalView().then((module) => ({ default: module.PDFProposalView })));
+const ProjectHubView = lazy(() => loadProjectHubView().then((module) => ({ default: module.ProjectHubView })));
+const CompanyProfileHubView = lazy(() => loadCompanyProfileHubView().then((module) => ({ default: module.CompanyProfileHubView })));
+const ClientsHubView = lazy(() => loadClientsHubView().then((module) => ({ default: module.ClientsHubView })));
 import { ConflictResolutionModal } from './components/common/ConflictResolutionModal';
 import { NewProjectModal } from './components/common/NewProjectModal';
 import { UpdateModal } from './components/common/UpdateModal';
@@ -28,7 +34,7 @@ import { AgentRuntimeHost } from './features/agentTools/AgentRuntimeHost';
 import { draftOwnerKey } from './utils/draftOwnerKey';
 
 export const App: React.FC = () => {
-  const { sessionGeneration, workspaceScope, activeView, setActiveView, sidebarTheme, syncSettings, syncProjectsWithServer, isTrashActive, isSettingsModalOpen, activeConflict, loadOrganizationFeaturePolicy } = useSimulationStore();
+  const { sessionGeneration, workspaceScope, activeView, setActiveView, sidebarTheme, syncSettings, syncProjectsWithServer, isTrashActive, isSettingsModalOpen, activeConflict, loadOrganizationFeaturePolicy } = useSimulationStore(useShallow((s) => ({ sessionGeneration: s.sessionGeneration, workspaceScope: s.workspaceScope, activeView: s.activeView, setActiveView: s.setActiveView, sidebarTheme: s.sidebarTheme, syncSettings: s.syncSettings, syncProjectsWithServer: s.syncProjectsWithServer, isTrashActive: s.isTrashActive, isSettingsModalOpen: s.isSettingsModalOpen, activeConflict: s.activeConflict, loadOrganizationFeaturePolicy: s.loadOrganizationFeaturePolicy })));
   const settingsOwner = draftOwnerKey(workspaceScope, syncSettings, true);
   const isDark = sidebarTheme === 'dark';
 
@@ -71,6 +77,14 @@ export const App: React.FC = () => {
     if (syncSettings.currentUser && syncSettings.authToken) void loadOrganizationFeaturePolicy();
   }, [syncSettings.currentUser?.id, syncSettings.currentUser?.organizationId, syncSettings.serverUrl]);
 
+  // Precarga las vistas diferidas tras el arranque para que navegar no muestre pantallas de carga.
+  useEffect(() => {
+    // En serie: el chunk del PDF es grande y no debe competir con el arranque.
+    const preload = async () => { for (const load of [loadProjectHubView, loadSimulatorView, loadClientsHubView, loadCompanyProfileHubView, loadPDFProposalView]) await load().catch(() => undefined); };
+    const handle = setTimeout(() => void preload(), 3000);
+    return () => clearTimeout(handle);
+  }, []);
+
   // 🌓 Sincronización del Modo Oscuro con Tailwind (html.dark)
   useEffect(() => {
     if (isDark) {
@@ -81,7 +95,6 @@ export const App: React.FC = () => {
   }, [isDark]);
 
   return (
-    <Suspense fallback={<div role="status" className="flex h-screen items-center justify-center text-sm text-slate-600">Cargando SolarSim…</div>}>
     <div aria-hidden={!!activeConflict || undefined} {...(activeConflict ? { inert: '' } : {})}
       className={`h-screen w-screen flex flex-row overflow-hidden transition-colors duration-200 ${
         isDark ? 'dark bg-[#10141d] text-zinc-100' : 'bg-[#f4f6fa] text-slate-900'
@@ -107,32 +120,35 @@ export const App: React.FC = () => {
                 {isTrashActive ? <TrashView /> : <DashboardView />}
               </div>
             )}
-            {activeView === 'project-hub' && <ProjectHubView />}
-            {activeView === 'companies-hub' && <CompanyProfileHubView />}
-            {activeView === 'clients-hub' && <ClientsHubView />}
-            {activeView === 'simulator' && <SimulatorView />}
-            {activeView === 'pdf-preview' && <PDFProposalView />}
+            <Suspense fallback={<div role="status" className="flex flex-1 items-center justify-center text-sm text-slate-500 dark:text-zinc-400">Cargando…</div>}>
+              {activeView === 'project-hub' && <ProjectHubView />}
+              {activeView === 'companies-hub' && <CompanyProfileHubView />}
+              {activeView === 'clients-hub' && <ClientsHubView />}
+              {activeView === 'simulator' && <SimulatorView />}
+              {activeView === 'pdf-preview' && <PDFProposalView />}
+            </Suspense>
           </ErrorBoundary>
         </main>
       </div>
 
-      <AppAssistant />
+      <Suspense fallback={null}>
+        <AppAssistant />
+      </Suspense>
       <AgentRuntimeHost key={`agent-runtime-${sessionGeneration}`} />
 
       {/* Global Modals Mounted at Root Level */}
       <ConflictResolutionModal key={`conflict-resolution-${sessionGeneration}`} />
       <NewProjectModal key={`new-project-${sessionGeneration}`} />
       <UpdateModal />
-      <AIInvoiceScannerModal key={`ai-invoice-${sessionGeneration}`} />
-      <AIDatasheetScannerModal key={`ai-datasheet-${sessionGeneration}`} />
+      <Suspense fallback={null}><AIInvoiceScannerModal key={`ai-invoice-${sessionGeneration}`} /></Suspense>
+      <Suspense fallback={null}><AIDatasheetScannerModal key={`ai-datasheet-${sessionGeneration}`} /></Suspense>
       <ImportConflictModal key={`import-conflict-${sessionGeneration}`} />
       <ShareProposalModal key={`share-proposal-${sessionGeneration}`} />
       <SettingsModal key={`settings-modal-${settingsOwner}`} />
-      <AIPriceCatalogScannerModal key={`ai-catalog-${sessionGeneration}`} />
+      <Suspense fallback={null}><AIPriceCatalogScannerModal key={`ai-catalog-${sessionGeneration}`} /></Suspense>
       <SupplierPricesDetailModal key={`supplier-prices-${sessionGeneration}`} />
       <ConfirmDialog />
     </div>
-    </Suspense>
   );
 };
 

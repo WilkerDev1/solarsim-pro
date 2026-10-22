@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { SettingsSidebar } from './SettingsSidebar';
 import { settingsSections, resolveSettingsSection, SettingsSectionId } from './settingsNavigation';
 import { ProfileSection } from './sections/ProfileSection';
@@ -18,7 +19,7 @@ const sectionComponents: Record<SettingsSectionId, React.ComponentType> = {
 };
 
 export const SettingsModal: React.FC = () => {
-  const { isSettingsModalOpen, closeSettingsModal, sidebarTheme, toggleSidebarTheme, settingsActiveTab } = useSimulationStore();
+  const { isSettingsModalOpen, closeSettingsModal, sidebarTheme, toggleSidebarTheme, settingsActiveTab } = useSimulationStore(useShallow((s) => ({ isSettingsModalOpen: s.isSettingsModalOpen, closeSettingsModal: s.closeSettingsModal, sidebarTheme: s.sidebarTheme, toggleSidebarTheme: s.toggleSidebarTheme, settingsActiveTab: s.settingsActiveTab })));
   const [activeSection, setActiveSection] = useState<SettingsSectionId>('cuenta');
   const [visitedSections, setVisitedSections] = useState<Set<SettingsSectionId>>(new Set());
   const scrollRef = useRef<HTMLElement>(null);

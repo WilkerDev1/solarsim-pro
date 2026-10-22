@@ -10,6 +10,7 @@ import {
   Download,
 } from "lucide-react";
 import { useSimulationStore } from "../../store/useSimulationStore";
+import { useShallow } from 'zustand/react/shallow';
 import { DEFAULT_LOCAL_COMPANY, CompanyProfile } from "../../types";
 import { CompanyFields } from "./CompanyFields";
 import { OrganizationManagement } from "./OrganizationManagement";
@@ -19,7 +20,7 @@ import { confirmAction } from "../common/confirmAction";
 
 type Section = "profiles" | "organization" | "consultant";
 export function CompanyProfileHubView() {
-  const store = useSimulationStore();
+  const store = useSimulationStore(useShallow((s) => ({ companies: s.companies, activeCompanyId: s.activeCompanyId, localUserProfile: s.localUserProfile, sidebarTheme: s.sidebarTheme, sessionGeneration: s.sessionGeneration, workspaceScope: s.workspaceScope, syncSettings: s.syncSettings, saveOrganizationCompanyProfile: s.saveOrganizationCompanyProfile, addCompany: s.addCompany, updateCompany: s.updateCompany, setActiveView: s.setActiveView, updateLocalUserProfile: s.updateLocalUserProfile, deleteCompany: s.deleteCompany, setActiveCompany: s.setActiveCompany })));
   const {
     companies,
     activeCompanyId,

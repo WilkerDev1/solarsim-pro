@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import {
   ShareProposalService,
   SharedProposalRecord,
@@ -40,7 +41,7 @@ export const CloudflareProposalsSection: React.FC = () => {
     sidebarTheme,
     syncSettings,
     sessionGeneration,
-  } = useSimulationStore();
+  } = useSimulationStore(useShallow((s) => ({ projects: s.projects, setActiveProject: s.setActiveProject, setActiveView: s.setActiveView, closeSettingsModal: s.closeSettingsModal, sidebarTheme: s.sidebarTheme, syncSettings: s.syncSettings, sessionGeneration: s.sessionGeneration })));
   const historyScope = ShareProposalService.getHistoryScopeKey();
   const requestIdentity = `${historyScope}|${syncSettings.currentUser?.id || ""}|${sessionGeneration}`;
   const activeIdentity = useRef(requestIdentity);

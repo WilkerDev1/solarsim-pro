@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { AlertTriangle, X } from 'lucide-react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 
+import { useShallow } from 'zustand/react/shallow';
 type Choice = 'fork' | 'accept_server' | 'keep_local';
 const choices: { id: Choice; title: string; description: string }[] = [
   { id: 'fork', title: 'Guardar una copia', description: 'Conserva la propuesta de la nube y crea otra con tus cambios. No pierdes ninguna versión.' },
@@ -11,7 +12,7 @@ const choices: { id: Choice; title: string; description: string }[] = [
   { id: 'keep_local', title: 'Enviar mis cambios', description: 'Sustituye el contenido de la nube si su versión no ha cambiado. Si cambia, podrás revisarlo de nuevo.' },
 ];
 export const ConflictResolutionModal: React.FC = () => {
-  const { activeConflict, resolveConflict, setActiveConflict, sidebarTheme, syncSettings } = useSimulationStore();
+  const { activeConflict, resolveConflict, setActiveConflict, sidebarTheme, syncSettings } = useSimulationStore(useShallow((s) => ({ activeConflict: s.activeConflict, resolveConflict: s.resolveConflict, setActiveConflict: s.setActiveConflict, sidebarTheme: s.sidebarTheme, syncSettings: s.syncSettings })));
   const [choice, setChoice] = useState<Choice>('fork');
   const dialog = useRef<HTMLDivElement>(null);
   useEffect(() => {

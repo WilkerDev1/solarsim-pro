@@ -5,6 +5,7 @@ import { BENCHMARK_PROJECT } from '../../../../engine/referenceCase';
 import { calculateProjectFinancialSummary } from '../../../../engine/financeEngine';
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useSimulationStore } from '../../../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { parseProposalWithAI } from '../../../../services/geminiInvoiceService';
 import { calculateRecommendedPanelCount, calculateMonthlySolarProduction, getMonthlySolarProductionFactors } from '../../../../engine/solarEngine';
 import { getProvinceHSP } from '../../../../data/rdProvinces';
@@ -17,7 +18,7 @@ import { aiWorkspaceKey, proposalFileType, readProposalFile, PROPOSAL_FILES_LIMI
 
 export interface ProposalMessage { role: 'user' | 'assistant'; text: string; files?: string[]; kind?: 'error' }
 export function useAIInvoiceScanner() {
-  const state = useSimulationStore();
+  const state = useSimulationStore(useShallow((s) => ({ isAIInvoiceModalOpen: s.isAIInvoiceModalOpen, geminiApiKey: s.geminiApiKey, geminiModel: s.geminiModel, equipmentCatalog: s.equipmentCatalog, activeProjectId: s.activeProjectId, projects: s.projects, defaultSimulationSettings: s.defaultSimulationSettings, tariffMatrix: s.tariffMatrix, syncSettings: s.syncSettings, sessionGeneration: s.sessionGeneration, sidebarTheme: s.sidebarTheme, closeAIInvoiceModal: s.closeAIInvoiceModal, openSettingsModal: s.openSettingsModal })));
   const { isAIInvoiceModalOpen, geminiApiKey, geminiModel, equipmentCatalog, activeProjectId, projects,
     defaultSimulationSettings: defaults, tariffMatrix } = state;
   const workspace = aiWorkspaceKey(state);

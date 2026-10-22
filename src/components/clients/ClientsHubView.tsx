@@ -3,6 +3,7 @@ import { Plus, RefreshCw, Search, Users } from 'lucide-react';
 import { canWrite } from '../../../shared/permissions';
 import { CLIENT_KINDS, type ClientKind } from '../../../shared/clients';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { filterClients, linkedProposalCounts } from '../../utils/clientSummary';
 import { draftOwnerKey } from '../../utils/draftOwnerKey';
 import { ClientDetailPanel } from './ClientDetailPanel';
@@ -20,7 +21,7 @@ function ClientsHub() {
   const {
     clients, projects, sidebarTheme, syncSettings, clientSyncFeedback, activeClientId, setActiveClientId,
     createClientRecord, syncClientsWithServer,
-  } = useSimulationStore();
+  } = useSimulationStore(useShallow((s) => ({ clients: s.clients, projects: s.projects, sidebarTheme: s.sidebarTheme, syncSettings: s.syncSettings, clientSyncFeedback: s.clientSyncFeedback, activeClientId: s.activeClientId, setActiveClientId: s.setActiveClientId, createClientRecord: s.createClientRecord, syncClientsWithServer: s.syncClientsWithServer })));
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<ClientKind | 'all'>('all');
   const [creating, setCreating] = useState(false);

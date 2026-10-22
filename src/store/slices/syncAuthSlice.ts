@@ -5,6 +5,7 @@ import { projectDifferences } from '../sync/projectDifferences';
 import { SimulationSlice, SyncAuthSlice } from '../types';
 import { featureScope } from '../../../shared/applicationFeatures';
 import { ownsProject, reconcilePulledProjects, acknowledgeProjectPush } from '../sync/projectReconciliation';
+import { reuseRecord } from '../sync/structuralSharing';
 import { SyncService, registerTokenRenewedListener, registerSessionInvalidatedListener, clearInvalidToken } from '../../services/syncService';
 import { acknowledgeQueuedProjectDeletions, createProjectDeletion, ProjectDeletionCommand } from '../sync/projectDeletion';
 import type { ProjectConflictInfo, ProjectSimulation } from '../../types';
@@ -231,12 +232,13 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
       if (!pull.success || !pull.projects) throw new Error(pull.error || 'No se pudieron descargar los proyectos.');
       set((state) => {
         const projects = reconcilePulledProjects(state.projects, pull.projects!, pull.deletedIds || [], new Set(state.projectDeletionQueue.filter((item) => item.scope === scope).map((item) => item.id)), serverUrl, currentUser.organizationId);
-        const projectConflicts = Object.fromEntries(Object.entries(state.projectConflicts).filter(([, conflict]) => conflict.scope !== scope || projects.some(project => project.id === conflict.projectId && project.syncStatus === 'conflict')));
+        let projectConflicts = Object.fromEntries(Object.entries(state.projectConflicts).filter(([, conflict]) => conflict.scope !== scope || projects.some(project => project.id === conflict.projectId && project.syncStatus === 'conflict')));
         for (const project of projects) {
           if (project.syncStatus === 'conflict' && ownsProject(project, serverUrl, currentUser.organizationId) && pull.deletedIds?.includes(project.id)) {
             projectConflicts[scope + '|' + project.id] = { scope, reason: 'deleted', projectId: project.id, localVersion: project.baseVersion ?? 0, serverVersion: 0, localProject: project, serverProject: { ...project, isDeleted: true }, lastModifiedByName: '', lastModifiedAt: '', diffs: [] };
           }
         }
+        projectConflicts = reuseRecord(state.projectConflicts, projectConflicts);
         const activeConflict = state.activeConflict?.scope === scope ? projectConflicts[scope + '|' + state.activeConflict.projectId] ?? null : state.activeConflict;
         return { projects, projectConflicts, activeConflict };
       });

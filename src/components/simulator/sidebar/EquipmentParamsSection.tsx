@@ -3,6 +3,7 @@ import React from 'react';
 import { editEquipmentGroup, selectCatalogEquipment } from '../../../utils/equipmentGroups';
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs, PanelItemSpec, InverterItemSpec, BatteryItemSpec } from '../../../types';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { SearchableEquipmentSelect } from './SearchableEquipmentSelect';
 import { BatteryEquipmentSection } from './BatteryEquipmentSection';
 import { SolarEquipmentItem } from '../../../types/equipment';
@@ -36,7 +37,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
   isDark,
   updateSpecs,
 }) => {
-  const { equipmentCatalog, openAIDatasheetModal } = useSimulationStore();
+  const { equipmentCatalog, openAIDatasheetModal } = useSimulationStore(useShallow((s) => ({ equipmentCatalog: s.equipmentCatalog, openAIDatasheetModal: s.openAIDatasheetModal })));
 
   const projectPanels = getProjectPanels(project.specs);
   const extraPanels = projectPanels.slice(1);

@@ -5,6 +5,7 @@ import { PROPOSAL_DECISIONS, commercialState } from '../../../shared/proposalCom
 import { calculateProjectFinancialSummary } from '../../engine/financeEngine';
 import { useEnergyCalculationMode } from '../../features/application/useApplicationFeatures';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import type { ClientRecord } from '../../types/client';
 import { DOCUMENT_STATUS_LABELS, clientProposals, summarizeClient } from '../../utils/clientSummary';
 import { projectDate } from '../dashboard/projectPresentation';
@@ -18,7 +19,7 @@ const money = (value: number) =>
 /** One client: optional data, linked proposals and the summary of their document and commercial states. */
 export function ClientDetailPanel({ client, readOnly }: { client: ClientRecord; readOnly: boolean }) {
   const { projects, clients, clientChanges, updateClientRecord, deleteClientRecord, resolveClientConflict, linkProposalToClient, setActiveProject, syncSettings } =
-    useSimulationStore();
+    useSimulationStore(useShallow((s) => ({ projects: s.projects, clients: s.clients, clientChanges: s.clientChanges, updateClientRecord: s.updateClientRecord, deleteClientRecord: s.deleteClientRecord, resolveClientConflict: s.resolveClientConflict, linkProposalToClient: s.linkProposalToClient, setActiveProject: s.setActiveProject, syncSettings: s.syncSettings })));
   const mode = useEnergyCalculationMode();
   const linked = useMemo(() => clientProposals(projects, client.id), [projects, client.id]);
   const summary = useMemo(

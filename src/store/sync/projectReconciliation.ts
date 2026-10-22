@@ -1,5 +1,6 @@
 import { ProjectSimulation } from '../../types';
 import { projectDifferences } from './projectDifferences';
+import { reuseArray, reuseIfEqual } from './structuralSharing';
 import { SyncPushOutcome } from '../../services/syncService';
 
 export function ownsProject(project: ProjectSimulation, serverUrl: string, organizationId: string): boolean {
@@ -35,13 +36,13 @@ export function reconcilePulledProjects(local: ProjectSimulation[], remote: Proj
     } else if (project.syncStatus === 'pending' || project.syncStatus === 'conflict') {
       next.push({ ...project, organizationId, syncServerUrl: serverUrl, baseVersion: project.baseVersion ?? project.version ?? 1 });
     } else {
-      next.push({ ...server, organizationId, syncServerUrl: serverUrl, baseVersion: server.version ?? 1, syncStatus: 'synced' });
+      next.push(reuseIfEqual(project, { ...server, organizationId, syncServerUrl: serverUrl, baseVersion: server.version ?? 1, syncStatus: 'synced' }));
     }
   }
   for (const project of remoteMap.values()) {
     if (!pendingDeletions.has(project.id) && !deleted.has(project.id) && !next.some((item) => item.id === project.id)) next.unshift({ ...project, organizationId, syncServerUrl: serverUrl, baseVersion: project.version ?? 1, syncStatus: 'synced' });
   }
-  return next;
+  return reuseArray(local, next);
 }
 
 export function acknowledgeProjectPush(fresh: ProjectSimulation[], sent: ProjectSimulation[], outcomes: SyncPushOutcome[], serverUrl: string, organizationId: string) {

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import {
   FileText,
   Sun,
@@ -23,7 +24,7 @@ export const Header: React.FC = () => {
     exportProjectAsJSON,
     saveFeedbackMessage,
     sidebarTheme,
-  } = useSimulationStore();
+  } = useSimulationStore(useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, getActiveProject: s.getActiveProject, openShareModal: s.openShareModal, saveActiveProject: s.saveActiveProject, exportProjectAsJSON: s.exportProjectAsJSON, saveFeedbackMessage: s.saveFeedbackMessage, sidebarTheme: s.sidebarTheme })));
 
   const isDark = sidebarTheme === 'dark';
   const activeProject = getActiveProject();

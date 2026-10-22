@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { RD_PROVINCES } from '../../data/rdProvinces';
 import { X, Building2, MapPin, Zap, ArrowRight, ChevronDown, ChevronUp, SlidersHorizontal, Sparkles } from 'lucide-react';
 import electsunEmblem from '../../assets/electsun-emblem-transparent.png';
@@ -13,7 +14,7 @@ import type { ClientRecord } from '../../types/client';
 import '../clients/client-link.css';
 
 export const NewProjectModal: React.FC = () => {
-  const { isNewProjectModalOpen, closeNewProjectModal, createNewProject, openAIInvoiceModal, sidebarTheme, clients, linkProposalToClient, updateClient } = useSimulationStore();
+  const { isNewProjectModalOpen, closeNewProjectModal, createNewProject, openAIInvoiceModal, sidebarTheme, clients, linkProposalToClient, updateClient } = useSimulationStore(useShallow((s) => ({ isNewProjectModalOpen: s.isNewProjectModalOpen, closeNewProjectModal: s.closeNewProjectModal, createNewProject: s.createNewProject, openAIInvoiceModal: s.openAIInvoiceModal, sidebarTheme: s.sidebarTheme, clients: s.clients, linkProposalToClient: s.linkProposalToClient, updateClient: s.updateClient })));
   const isDark = sidebarTheme === 'dark';
 
   const nameInputRef = useRef<HTMLInputElement>(null);

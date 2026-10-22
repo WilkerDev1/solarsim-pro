@@ -9,6 +9,7 @@ import {
 } from "../../../shared/proposalCommercial";
 import type { ProjectSimulation } from "../../types";
 import { useSimulationStore } from "../../store/useSimulationStore";
+import { useShallow } from 'zustand/react/shallow';
 import { SyncService } from "../../services/syncService";
 import { canEditCommercial } from "./commercial";
 import { ProposalDecisionField } from "./ProposalDecisionField";
@@ -20,7 +21,7 @@ export function ProposalCommercialPanel({
 }: {
   project: ProjectSimulation;
 }) {
-  const state = useSimulationStore(),
+  const state = useSimulationStore(useShallow((s) => ({ syncSettings: s.syncSettings, sessionGeneration: s.sessionGeneration, projects: s.projects, addProposalCommercialReport: s.addProposalCommercialReport }))),
     current = commercialState(project);
   const [editing, setEditing] = useState(false),
     [note, setNote] = useState("");

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
+import { useShallow } from 'zustand/react/shallow';
 import {
   Sun,
   Moon,
@@ -45,7 +46,7 @@ export const PrimaryIconDock: React.FC<PrimaryIconDockProps> = ({
     setIsTrashActive,
     projects,
     geminiModel,
-  } = useSimulationStore();
+  } = useSimulationStore(useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, sidebarTheme: s.sidebarTheme, toggleSidebarTheme: s.toggleSidebarTheme, openNewProjectModal: s.openNewProjectModal, openAIInvoiceModal: s.openAIInvoiceModal, openAIDatasheetModal: s.openAIDatasheetModal, openAIPriceCatalogModal: s.openAIPriceCatalogModal, openUpdateModal: s.openUpdateModal, openSettingsModal: s.openSettingsModal, isSettingsModalOpen: s.isSettingsModalOpen, closeSettingsModal: s.closeSettingsModal, updateInfo: s.updateInfo, setActiveFolderId: s.setActiveFolderId, setActiveTeamMemberFilter: s.setActiveTeamMemberFilter, isTrashActive: s.isTrashActive, setIsTrashActive: s.setIsTrashActive, projects: s.projects, geminiModel: s.geminiModel })));
 
   const [isAIMenuOpen, setIsAIMenuOpen] = useState(false);
   const aiMenuRef = useRef<HTMLDivElement>(null);

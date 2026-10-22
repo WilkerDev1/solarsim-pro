@@ -12,6 +12,7 @@ import React from "react";
 import { Cloud, FileText, Laptop } from "lucide-react";
 import { ProjectSimulation } from "../../types";
 import { useSimulationStore } from "../../store/useSimulationStore";
+import { useShallow } from 'zustand/react/shallow';
 import {
   calculateTotalDCCapacityKWp,
   calculateTotalPanelCount,
@@ -74,7 +75,7 @@ export function ProjectDocumentList({
 }
 
 function ProjectDocumentRow({ project }: { project: ProjectSimulation }) {
-  const { projects, setActiveProject } = useSimulationStore();
+  const { projects, setActiveProject } = useSimulationStore(useShallow((s) => ({ projects: s.projects, setActiveProject: s.setActiveProject })));
   const family = proposalFamily(project, projects),
     drop = useProposalLinkDrop(project);
   return (

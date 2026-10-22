@@ -4,6 +4,7 @@ import React from 'react';
 import { ProjectSimulation, UtilityRates, SystemSpecs } from '../../../types';
 import { Receipt, ChevronDown, Sparkles, Check, Home, Building2, Factory, BatteryCharging, Sliders, Sun, Zap } from 'lucide-react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { getReferenceEnergyRateUSD, DEFAULT_RD_TARIFF_MATRIX } from '../../../data/rdTariffs';
 import { getProvinceHSP } from '../../../data/rdProvinces';
 import { getRecommendedLoadProfile } from '../../../engine/solarEngine';
@@ -32,7 +33,7 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
   updateSpecs,
 }) => {
   const projectionEnabled = useSelfConsumptionProjection();
-  const { tariffMatrix } = useSimulationStore();
+  const { tariffMatrix } = useSimulationStore(useShallow((s) => ({ tariffMatrix: s.tariffMatrix })));
 
   const avgMonthlyConsumption =
     project.monthlyConsumption && project.monthlyConsumption.length > 0

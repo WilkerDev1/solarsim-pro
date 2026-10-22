@@ -3,6 +3,7 @@ import { resolveProjectEquipment, supplierQuotesItem } from '../../../utils/equi
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs } from '../../../types';
 import { SolarEquipmentItem, EquipmentSupplierPrice } from '../../../types/equipment';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { DollarSign, ChevronDown, Sliders, Tag, Sparkles, Building2, Check, RefreshCw } from 'lucide-react';
 import { getProjectPanels, getProjectInverters, getProjectBatteries } from '../../../utils/equipmentSpecsUtils';
 
@@ -23,7 +24,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
   isDark,
   updateSpecs,
 }) => {
-  const { equipmentCatalog, openSupplierPriceModal } = useSimulationStore();
+  const { equipmentCatalog, openSupplierPriceModal } = useSimulationStore(useShallow((s) => ({ equipmentCatalog: s.equipmentCatalog, openSupplierPriceModal: s.openSupplierPriceModal })));
 
 
   const selectedPanel = resolveProjectEquipment(

@@ -1,11 +1,12 @@
 import { canWrite } from '../../../../shared/permissions';
 import React from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { EquipmentManagerSettingsTab } from '../../common/EquipmentManagerSettingsTab';
 
 export const EquipmentSection: React.FC = () => {
   const isDark = useSimulationStore((s) => s.sidebarTheme === 'dark');
-  const { equipmentConflicts, equipmentCatalog, resolveEquipmentConflict, syncSettings } = useSimulationStore();
+  const { equipmentConflicts, equipmentCatalog, resolveEquipmentConflict, syncSettings } = useSimulationStore(useShallow((s) => ({ equipmentConflicts: s.equipmentConflicts, equipmentCatalog: s.equipmentCatalog, resolveEquipmentConflict: s.resolveEquipmentConflict, syncSettings: s.syncSettings })));
 
   const canEditCatalog = canWrite(syncSettings.currentUser);
 

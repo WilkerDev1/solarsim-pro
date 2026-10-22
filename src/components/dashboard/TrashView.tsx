@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { TrashProjectCard } from './TrashProjectCard';
 import {
   Trash2,
@@ -16,7 +17,7 @@ export const TrashView: React.FC = () => {
     projects,
     emptyTrash,
     setIsTrashActive,
-  } = useSimulationStore();
+  } = useSimulationStore(useShallow((s) => ({ projects: s.projects, emptyTrash: s.emptyTrash, setIsTrashActive: s.setIsTrashActive })));
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showConfirmEmpty, setShowConfirmEmpty] = useState(false);

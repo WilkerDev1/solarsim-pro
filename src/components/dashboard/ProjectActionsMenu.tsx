@@ -4,13 +4,14 @@ import { createPortal } from 'react-dom';
 import { AlertTriangle, Copy, MoreHorizontal, Loader2, Share2, Trash2, UserRound } from 'lucide-react';
 import { ProjectSimulation } from '../../types';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { confirmAction } from '../common/confirmAction';
 import { ClientLinkDialog } from '../clients/ProposalClientLink';
 import { canEditCommercial } from '../../features/proposals/commercial';
 
 /** Shared document actions. Portal keeps menus outside scrolling tables/cards. */
 export function ProjectActionsMenu({ project }: { project: ProjectSimulation }) {
-  const { duplicateProject, deleteProject, setActiveProject, openShareModal, syncSettings, sidebarTheme, openProjectConflict } = useSimulationStore();
+  const { duplicateProject, deleteProject, setActiveProject, openShareModal, syncSettings, sidebarTheme, openProjectConflict } = useSimulationStore(useShallow((s) => ({ duplicateProject: s.duplicateProject, deleteProject: s.deleteProject, setActiveProject: s.setActiveProject, openShareModal: s.openShareModal, syncSettings: s.syncSettings, sidebarTheme: s.sidebarTheme, openProjectConflict: s.openProjectConflict })));
   const [conflictError, setConflictError] = useState('');
   const [openingConflict, setOpeningConflict] = useState(false);
   const [linkingClient, setLinkingClient] = useState(false);

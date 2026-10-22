@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { FolderPlus, X, Palette, EyeOff } from 'lucide-react';
 import { ProjectFolder } from '../../../types';
 
@@ -23,7 +24,7 @@ export const CreateFolderModal: React.FC<CreateFolderModalProps> = ({
   onClose,
   folderToEdit,
 }) => {
-  const { createFolder, updateFolder } = useSimulationStore();
+  const { createFolder, updateFolder } = useSimulationStore(useShallow((s) => ({ createFolder: s.createFolder, updateFolder: s.updateFolder })));
   const [name, setName] = useState(folderToEdit?.name || '');
   const [color, setColor] = useState(folderToEdit?.color || '#10b981');
   const [description, setDescription] = useState(folderToEdit?.description || '');

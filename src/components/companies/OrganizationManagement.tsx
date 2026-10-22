@@ -5,6 +5,7 @@ import {
   OrganizationSummary,
 } from "../../services/companyService";
 import { useSimulationStore } from "../../store/useSimulationStore";
+import { useShallow } from 'zustand/react/shallow';
 import { CompanyFields } from "./CompanyFields";
 import type { CompanyProfile } from "../../types";
 import { OrganizationSection } from "../settings/sections/OrganizationSection";
@@ -16,7 +17,7 @@ export function OrganizationManagement({
   registerLeaveGuard?: (guard: (() => Promise<boolean>) | null) => void;
 }) {
   const { syncSettings, sessionGeneration, switchOrganization } =
-    useSimulationStore();
+    useSimulationStore(useShallow((s) => ({ syncSettings: s.syncSettings, sessionGeneration: s.sessionGeneration, switchOrganization: s.switchOrganization })));
   const [organizations, setOrganizations] = useState<OrganizationSummary[]>([]);
   const [draft, setDraft] = useState<Partial<CompanyProfile>>({});
   const [savedDraft, setSavedDraft] = useState<Partial<CompanyProfile>>({});
