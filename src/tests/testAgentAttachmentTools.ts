@@ -48,6 +48,13 @@ assert(await PDFAttachmentStorage.getAttachment(manual.id), 'bytes are stored fo
 const base64 = Buffer.from(bytes).toString('base64');
 const fromAgent = await executeAgentTool({ name: 'attach_file_to_proposal', args: { proposalId: project.id, fileName: 'certificado.pdf', contentBase64: base64 } }, ctx());
 assert(fromAgent.status === 'applied');
+// A request cancelled while the PDF was being read never applies.
+const controller = new AbortController();
+const pendingAttach = executeAgentTool({ name: 'attach_file_to_proposal', args: { proposalId: project.id, fileName: 'cancelado.pdf', contentBase64: base64 } }, { ...ctx(), signal: controller.signal });
+controller.abort();
+const cancelled = await pendingAttach;
+assert(cancelled.status === 'error' && cancelled.code === 'cancelled');
+assert(!attachments().some((a) => a.fileName === 'cancelado.pdf'));
 const notPdf = await executeAgentTool({ name: 'attach_file_to_proposal', args: { proposalId: project.id, fileName: 'x.pdf', contentBase64: Buffer.from('<html>').toString('base64') } }, ctx());
 assert.equal(notPdf.status, 'error', 'only real PDFs (signature check)');
 const image = registerChatFile('foto.png', new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0]).buffer);

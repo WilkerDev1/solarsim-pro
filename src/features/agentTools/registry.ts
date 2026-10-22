@@ -223,6 +223,9 @@ async function executeNative(handler: NativeHandler, definition: AgentToolDefini
   } catch (error) {
     return { status: 'error', code: 'tool_failed', message: error instanceof Error ? error.message : 'Herramienta no disponible.' };
   }
+  // Preparation may have awaited (e.g. counting PDF pages): the request could be cancelled or the session changed meanwhile.
+  if (ctx.signal?.aborted) return { status: 'error', code: 'cancelled', message: 'Solicitud cancelada.' };
+  if (ctx.owner !== assistantOwner()) return { status: 'error', code: 'stale_owner', message: 'El espacio o la sesión cambió.' };
   if (JSON.stringify(result.data ?? null).length > MAX_RESULT_BYTES)
     return { status: 'error', code: 'result_too_large', message: 'Resultado demasiado grande. Usa filtros más concretos.' };
   if (!result.plan) return { status: 'ok', data: result.data, cards: result.cards };
