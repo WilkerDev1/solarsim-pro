@@ -16,14 +16,12 @@ import {
   wattPricePatch,
   wholeMarginPctFromMultiplier,
 } from '../params/logic/pricingSync';
-import { DollarSign, ChevronDown, Sliders, Tag, Sparkles, Building2, Check, RefreshCw } from 'lucide-react';
+import { Sliders, Tag, Sparkles, Building2, Check, RefreshCw } from 'lucide-react';
 import { getProjectPanels, getProjectInverters, getProjectBatteries } from '../../../utils/equipmentSpecsUtils';
 
 interface PricingParamsSectionProps {
   project: ProjectSimulation;
   summary: FinancialSummaryResult;
-  isOpen: boolean;
-  onToggle: () => void;
   isDark: boolean;
   updateSpecs: (specs: Partial<SystemSpecs>) => void;
 }
@@ -31,8 +29,6 @@ interface PricingParamsSectionProps {
 export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
   project,
   summary,
-  isOpen,
-  onToggle,
   isDark,
   updateSpecs,
 }) => {
@@ -137,31 +133,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
     updateSpecs(newSpecs);
   };
   return (
-    <div
-      className={`rounded-xl border overflow-hidden transition-all ${
-        isDark ? 'border-[#27272a] bg-[#1a1a24]' : 'border-slate-200 bg-white shadow-xs'
-      }`}
-    >
-      <button
-        type="button"
-        onClick={onToggle}
-        className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors text-slate-800 hover:bg-slate-50 dark:text-zinc-200 dark:hover:bg-[#222230]`}
-      >
-        <div className="flex items-center gap-2">
-          <DollarSign className="w-4 h-4 text-emerald-500 shrink-0" />
-          <span>4. Costos y Margen de Venta</span>
-        </div>
-        <ChevronDown
-          className={`w-4 h-4 text-zinc-400 transition-transform duration-200 ${
-            isOpen ? 'rotate-180 text-emerald-500' : ''
-          }`}
-        />
-      </button>
-
-      {isOpen && (
-        <div
-          className={`p-3.5 pt-2 space-y-3 border-t border-slate-100 bg-slate-50/50 dark:border-[#27272a] dark:bg-[#14141c]/50`}
-        >
+    <div className="space-y-3">
           {/* Selector de Modo de Fijación de Precio */}
           <div
             className={`flex rounded-xl p-1 border shadow-2xs bg-slate-200/70 border-slate-300 dark:bg-[#121216] dark:border-[#2b2b3a]`}
@@ -726,8 +698,6 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({
               })()}
             </>
           )}
-        </div>
-      )}
     </div>
   );
 };

@@ -9,7 +9,7 @@ import { useCatalogPowerSync } from '../params/hooks/useCatalogPowerSync';
 import { SearchableEquipmentSelect } from './SearchableEquipmentSelect';
 import { BatteryEquipmentSection } from './BatteryEquipmentSection';
 import { SolarEquipmentItem } from '../../../types/equipment';
-import { Sun, ChevronDown, Sparkles, Sliders, BatteryCharging, Cpu, Zap, Plus, Trash2 } from 'lucide-react';
+import { Sun, Sparkles, Sliders, BatteryCharging, Cpu, Zap, Plus, Trash2 } from 'lucide-react';
 import {
   getProjectPanels,
   getProjectInverters,
@@ -25,8 +25,6 @@ import {
 interface EquipmentParamsSectionProps {
   project: ProjectSimulation;
   summary: FinancialSummaryResult;
-  isOpen: boolean;
-  onToggle: () => void;
   isDark: boolean;
   updateSpecs: (specs: Partial<SystemSpecs>) => void;
 }
@@ -34,8 +32,6 @@ interface EquipmentParamsSectionProps {
 export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
   project,
   summary,
-  isOpen,
-  onToggle,
   isDark,
   updateSpecs,
 }) => {
@@ -104,31 +100,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
   const isDetailed = !!project.specs.isDetailed;
 
   return (
-    <div
-      className={`rounded-xl border overflow-hidden transition-all ${
-        isDark ? 'border-[#27272a] bg-[#1a1a24]' : 'border-slate-200 bg-white shadow-xs'
-      }`}
-    >
-      <button
-        type="button"
-        onClick={onToggle}
-        className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors text-slate-800 hover:bg-slate-50 dark:text-zinc-200 dark:hover:bg-[#222230]`}
-      >
-        <div className="flex items-center gap-2">
-          <Sun className="w-4 h-4 text-emerald-500 shrink-0" />
-          <span>3. Equipamiento y Sistema</span>
-        </div>
-        <ChevronDown
-          className={`w-4 h-4 text-zinc-400 transition-transform duration-200 ${
-            isOpen ? 'rotate-180 text-emerald-500' : ''
-          }`}
-        />
-      </button>
-
-      {isOpen && (
-        <div
-          className={`p-3.5 pt-2 space-y-3.5 border-t border-slate-100 bg-slate-50/50 dark:border-[#27272a] dark:bg-[#14141c]/50`}
-        >
+    <div className="space-y-3.5">
           {/* Selector de modo Simple (Catálogo) / Detallado (Manual) */}
           <div
             className={`flex rounded-lg p-1 border bg-slate-200/80 border-slate-300/60 dark:bg-[#121214] dark:border-[#27272a]`}
@@ -817,8 +789,6 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({
           {/* 🔋 ALMACENAMIENTO (BATERÍA) CON MODO SIMPLE Y DETALLADO */}
           {/* ========================================== */}
           <BatteryEquipmentSection project={project} summary={summary} isDark={isDark} isDetailed={isDetailed} updateSpecs={updateSpecs} />
-        </div>
-      )}
     </div>
   );
 };

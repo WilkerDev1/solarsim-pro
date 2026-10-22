@@ -2,7 +2,7 @@ import { getTariffDisplayName } from '../../../../shared/proposalPresentation';
 import { useSelfConsumptionProjection } from '../../../features/application/useApplicationFeatures';
 import React from 'react';
 import { ProjectSimulation, UtilityRates, SystemSpecs } from '../../../types';
-import { Receipt, ChevronDown, Sparkles, Check, Home, Building2, Factory, BatteryCharging, Sliders, Sun, Zap } from 'lucide-react';
+import { Sparkles, Check, Home, Building2, Factory, BatteryCharging, Sliders, Sun, Zap } from 'lucide-react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
 import { getReferenceEnergyRateUSD, DEFAULT_RD_TARIFF_MATRIX } from '../../../data/rdTariffs';
@@ -16,8 +16,6 @@ import {
 
 interface RatesParamsSectionProps {
   project: ProjectSimulation;
-  isOpen: boolean;
-  onToggle: () => void;
   isDark: boolean;
   updateRates: (rates: Partial<UtilityRates>) => void;
   updateSpecs?: (specs: Partial<SystemSpecs>) => void;
@@ -25,8 +23,6 @@ interface RatesParamsSectionProps {
 
 export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
   project,
-  isOpen,
-  onToggle,
   isDark,
   updateRates,
   updateSpecs,
@@ -105,31 +101,7 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
 
 
   return (
-    <div
-      className={`rounded-xl border overflow-hidden transition-all ${
-        isDark ? 'border-[#27272a] bg-[#1a1a24]' : 'border-slate-200 bg-white shadow-xs'
-      }`}
-    >
-      <button
-        type="button"
-        onClick={onToggle}
-        className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors text-slate-800 hover:bg-slate-50 dark:text-zinc-200 dark:hover:bg-[#222230]`}
-      >
-        <div className="flex items-center gap-2">
-          <Receipt className="w-4 h-4 text-emerald-500 shrink-0" />
-          <span>2. Tarifas y Distribuidora</span>
-        </div>
-        <ChevronDown
-          className={`w-4 h-4 text-zinc-400 transition-transform duration-200 ${
-            isOpen ? 'rotate-180 text-emerald-500' : ''
-          }`}
-        />
-      </button>
-
-      {isOpen && (
-        <div
-          className={`p-3.5 pt-2 space-y-3 border-t border-slate-100 bg-slate-50/50 dark:border-[#27272a] dark:bg-[#14141c]/50`}
-        >
+    <div className="space-y-3">
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className={`block text-xs font-medium text-slate-600 dark:text-zinc-300`}>
@@ -502,8 +474,6 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({
               </div>
             );
           })()}
-        </div>
-      )}
     </div>
   );
 };

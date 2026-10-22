@@ -1,5 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ProjectSimulation, FinancialSummaryResult, ClientInfo, SystemSpecs, UtilityRates, FinancialParams } from '../../../types';
+import { useSimulationStore } from '../../../store/useSimulationStore';
+import { ParameterDockPanel } from './ParameterDockPanel';
+import {
+  allSections, anySectionOpen, financialsBadge, loadOpenSections, saveOpenSections, toggleSection as toggleSectionState,
+  type DockSectionKey, type OpenSections,
+} from '../params/logic/dockSections';
 import { ClientParamsSection } from './ClientParamsSection';
 import { RatesParamsSection } from './RatesParamsSection';
 import { EquipmentParamsSection } from './EquipmentParamsSection';
@@ -43,77 +49,32 @@ export const ParameterSidebar: React.FC<ParameterSidebarProps> = ({
 }) => {
   const [isIdUnlocked, setIsIdUnlocked] = useState(false);
 
-  // Accordion state for sidebar parameter categories (default: all collapsed)
-  const [openSections, setOpenSections] = useState<{ [key: string]: boolean }>({
-    client: false,
-    rates: false,
-    equipment: false,
-    costs: false,
-    financials: false,
-  });
+  const userId = useSimulationStore((st) => st.syncSettings.currentUser?.id);
+  const [openSections, setOpenSections] = useState<OpenSections>(() => loadOpenSections(userId));
 
-  const toggleSection = (sectionKey: string) => {
-    setOpenSections((prev) => ({
-      ...prev,
-      [sectionKey]: !prev[sectionKey],
-    }));
+  // Recarga el estado recordado si cambia el usuario autenticado.
+  const loadedFor = useRef(userId);
+  useEffect(() => {
+    if (loadedFor.current === userId) return;
+    loadedFor.current = userId;
+    setOpenSections(loadOpenSections(userId));
+  }, [userId]);
+
+  const updateOpen = (next: OpenSections) => {
+    setOpenSections(next);
+    saveOpenSections(next, userId);
   };
+  const toggleSection = (key: DockSectionKey) => updateOpen(toggleSectionState(openSections, key));
+  const toggleAllSections = () => updateOpen(allSections(!anySectionOpen(openSections)));
+  const badge = financialsBadge(project.financials);
 
-  const allSectionsOpen = Object.values(openSections).every(Boolean);
-  const toggleAllSections = () => {
-    const nextState = !allSectionsOpen;
-    setOpenSections({
-      client: nextState,
-      rates: nextState,
-      equipment: nextState,
-      costs: nextState,
-      financials: nextState,
-    });
-  };
-
-  return (
-    <>
-      {/* Left Sidebar: Parameters */}
-      <aside
-        style={{ width: `${Math.max(sidebarWidth || 380, 380)}px` }}
-        className={`flex flex-col shrink-0 h-full overflow-y-auto z-10 transition-[background-color,border-color,color] duration-200 ${
-          isDark
-            ? 'bg-[#18181b] border-r border-[#27272a] text-zinc-100 shadow-xl'
-            : 'bg-white border-r border-slate-200 text-slate-800 shadow-sm'
-        }`}
-      >
-        <div
-          className={`p-4 border-b transition-colors border-slate-200 bg-slate-50/80 dark:border-[#27272a] dark:bg-[#121214]`}
-        >
-          <h2 className={`font-bold text-sm uppercase tracking-wider text-slate-900 dark:text-zinc-100`}>
-            Parámetros
-          </h2>
-          <p className={`text-[11px] mt-0.5 text-slate-500 dark:text-zinc-400`}>
-            Configurar restricciones del sistema
-          </p>
-        </div>
-
-        <div className="p-4 space-y-3 flex-1 overflow-y-auto">
-          {/* Barra de control rápido: Expandir / Colapsar Todo */}
-          <div className="flex justify-between items-center px-1 pb-0.5">
-            <span className={`text-[11px] font-semibold text-slate-500 dark:text-zinc-400`}>
-              Categorías de Configuración
-            </span>
-            <button
-              type="button"
-              onClick={toggleAllSections}
-              className={`text-[10px] font-bold px-2 py-0.5 rounded transition-colors cursor-pointer text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-[#27272a]`}
-            >
-              {allSectionsOpen ? 'Colapsar Todo' : 'Expandir Todo'}
-            </button>
-          </div>
-
-          {/* 1. SECCIÓN: Proyecto y Cliente */}
+  const renderBody = (key: DockSectionKey): React.ReactNode => {
+    switch (key) {
+      case 'client':
+        return (
           <ClientParamsSection
             project={project}
             projects={projects}
-            isOpen={openSections.client}
-            onToggle={() => toggleSection('client')}
             isDark={isDark}
             isIdUnlocked={isIdUnlocked}
             setIsIdUnlocked={setIsIdUnlocked}
@@ -122,46 +83,34 @@ export const ParameterSidebar: React.FC<ParameterSidebarProps> = ({
             onFetchSolarApi={onFetchSolarApi}
             updateClient={updateClient}
           />
+        );
+      case 'rates':
+        return <RatesParamsSection project={project} isDark={isDark} updateRates={updateRates} updateSpecs={updateSpecs} />;
+      case 'equipment':
+        return <EquipmentParamsSection project={project} summary={summary} isDark={isDark} updateSpecs={updateSpecs} />;
+      case 'costs':
+        return <PricingParamsSection project={project} summary={summary} isDark={isDark} updateSpecs={updateSpecs} />;
+      case 'financials':
+        return <FinancialsParamsSection project={project} isDark={isDark} updateFinancials={updateFinancials} />;
+    }
+  };
 
-          {/* 2. SECCIÓN: Tarifas y Distribuidora */}
-          <RatesParamsSection
-            project={project}
-            isOpen={openSections.rates}
-            onToggle={() => toggleSection('rates')}
-            isDark={isDark}
-            updateRates={updateRates}
-            updateSpecs={updateSpecs}
-          />
-
-          {/* 3. SECCIÓN: Equipamiento y Sistema */}
-          <EquipmentParamsSection
-            project={project}
-            summary={summary}
-            isOpen={openSections.equipment}
-            onToggle={() => toggleSection('equipment')}
-            isDark={isDark}
-            updateSpecs={updateSpecs}
-          />
-
-          {/* 4. SECCIÓN: Costos y Margen de Venta */}
-          <PricingParamsSection
-            project={project}
-            summary={summary}
-            isOpen={openSections.costs}
-            onToggle={() => toggleSection('costs')}
-            isDark={isDark}
-            updateSpecs={updateSpecs}
-          />
-
-          {/* 5. SECCIÓN: Finanzas e Incentivos */}
-          <FinancialsParamsSection
-            project={project}
-            isOpen={openSections.financials}
-            onToggle={() => toggleSection('financials')}
-            isDark={isDark}
-            updateFinancials={updateFinancials}
-          />
-        </div>
+  return (
+    <>
+      {/* Left Sidebar: Parameters */}
+      <aside
+        style={{ width: `${Math.max(sidebarWidth || 380, 380)}px` }}
+        className={`flex flex-col shrink-0 h-full overflow-y-auto z-10 transition-[background-color,border-color,color] duration-200 ${
+          isDark ? 'bg-[#18181b] border-r border-[#27272a] shadow-xl' : 'bg-white border-r border-slate-200 shadow-sm'
+        }`}
+      >
+        <ParameterDockPanel
+          open={openSections}
+          onToggle={toggleSection}
+          onToggleAll={toggleAllSections}
+          financialsBadge={badge}
+          renderBody={renderBody}
+        />
       </aside>
 
       {/* Vertical Drag Handle for Sidebar Resizing */}
