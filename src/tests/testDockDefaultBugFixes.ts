@@ -106,6 +106,14 @@ const projectOf = (specs: Partial<SystemSpecs> = {}): ProjectSimulation => ({ ..
     assert.equal(valueOf(html, 'pd-price-w'), '1.2', 'la vista sigue la cadena del motor: financials.pricePerWattUSD');
     assert.equal(valueOf(html, 'pd-price-kwp'), '1200');
   }
+  {
+    // $/kWp guardado que ya no corresponde al $/W efectivo (obsoleto): se deriva del $/W.
+    const project = projectOf({ pricingMode: 'direct_watt', pricePerWattUSD: 0, pricePerKWpUSD: 999 } as unknown as Partial<SystemSpecs>);
+    const html = render(h(PricingParamsSection, { project: { ...project, financials: { ...project.financials, pricePerWattUSD: 1.2 } }, summary: {} as never, updateSpecs: noop }));
+    assert.equal(valueOf(html, 'pd-price-kwp'), '1200', '$/kWp obsoleto no se muestra');
+    const synced = projectOf({ pricingMode: 'direct_watt', pricePerWattUSD: 1.235, pricePerKWpUSD: 1234.56 } as unknown as Partial<SystemSpecs>);
+    assert.equal(valueOf(render(h(PricingParamsSection, { project: synced, summary: {} as never, updateSpecs: noop })), 'pd-price-kwp'), '1234.56', 'un $/kWp sincronizado (redondeo de $/W a 3 decimales) se conserva');
+  }
   const finance = readFileSync('src/engine/financeEngine.ts', 'utf8');
   assert(finance.includes('resolvePricePerWattUSD('), 'financeEngine usa el helper compartido');
   assert.equal(valueOf(direct({ pricePerWattUSD: 0.5, pricePerKWpUSD: 0 }), 'pd-price-kwp'), '500', '$/kWp 0 también cae al valor derivado');
