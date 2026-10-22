@@ -18,9 +18,12 @@ export function useAppAssistant(
   const sessionFiles = useRef<string[]>([]);
   const addFiles = async (list: FileList | File[]) => {
     setError('');
-    for (const f of Array.from(list)) {
+    // Check the whole selection against the free slots before reading anything into memory.
+    const selected = Array.from(list);
+    const free = Math.max(0, CHAT_FILE_LIMITS.maxFiles - files.length);
+    if (selected.length > free) setError(`Máximo tres archivos por mensaje: se adjuntan ${free} de ${selected.length}.`);
+    for (const f of selected.slice(0, free)) {
       try {
-        if (files.length >= CHAT_FILE_LIMITS.maxFiles) throw new Error('Máximo tres archivos por mensaje.');
         const registered = registerChatFile(f.name, await f.arrayBuffer());
         sessionFiles.current.push(registered.id);
         setFiles((previous) => [...previous, registered].slice(0, CHAT_FILE_LIMITS.maxFiles));
