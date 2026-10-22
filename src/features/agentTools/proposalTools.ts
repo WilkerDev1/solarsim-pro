@@ -3,7 +3,7 @@ import { buildProjectFromDraft } from '../../store/slices/aiSlice';
 import type { ExtractedInvoiceData, ProjectSimulation } from '../../types';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import {
-  canWriteWorkspace, findVisibleEquipment, findVisibleProject, fingerprint, proposalCard, requireEditableProject, store,
+  canWriteWorkspace, findVisibleEquipment, findVisibleProject, fingerprint, pickFields, proposalCard, PROJECT_SECTIONS, requireEditableProject, store,
   type NativeHandler,
 } from './nativeTools';
 
@@ -167,7 +167,42 @@ const moveProposalToTrash: NativeHandler = (args) => {
   };
 };
 
+/** Proposal assistant (Sparkles): the user's click on «Aplicar» after reviewing is the human confirmation. */
+const applyProposalDraft: NativeHandler = (args) => {
+  const createNew = !!args.createNew;
+  const draft = args.draft as ExtractedInvoiceData;
+  const preview = buildProjectFromDraft(store(), draft, createNew);
+  if ('error' in preview) throw new Error(preview.error);
+  return {
+    data: { status: 'ready' },
+    plan: {
+      title: createNew ? `Crear propuesta para ${preview.project.client.name}` : `Actualizar ${preview.project.client.name}`,
+      targetType: 'project',
+      changes: [{ label: 'Cliente', value: preview.project.client.name }, { label: 'Modalidad', value: 'Simple (Catálogo IA) · matriz de costos' }],
+      execute() {
+        const s = store();
+        const previous = createNew ? undefined : s.projects.find((p) => p.id === s.activeProjectId);
+        // applyExtractedInvoice also rewrites aiSource (notes, consumption provenance): undo must restore it too.
+        const fields = [...PROJECT_SECTIONS, 'aiSource'];
+        const before = previous ? pickFields(previous, fields) : undefined;
+        const projectsBefore = s.projects;
+        s.applyExtractedInvoice(draft, createNew);
+        const after = store();
+        if (after.projects === projectsBefore) throw new Error(after.saveFeedbackMessage || 'No se pudo aplicar el borrador.');
+        const project = after.projects.find((p) => p.id === after.activeProjectId)!;
+        return {
+          targetId: project.id, data: { proposalId: project.id, code: project.client.projectId }, cards: [proposalCard(project)],
+          undo: before
+            ? { before, fields, afterFingerprint: fingerprint(pickFields(project, fields)) }
+            : { op: 'trash', before: {}, afterFingerprint: '' },
+        };
+      },
+    },
+  };
+};
+
 export const PROPOSAL_TOOL_HANDLERS: Record<string, NativeHandler> = {
+  apply_proposal_draft: applyProposalDraft,
   create_proposal: createProposal,
   duplicate_proposal: duplicateProposal,
   open_proposal: openProposal,

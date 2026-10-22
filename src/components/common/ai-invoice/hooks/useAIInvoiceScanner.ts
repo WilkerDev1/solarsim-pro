@@ -1,3 +1,5 @@
+import { executeAgentTool } from '../../../../features/agentTools/registry';
+import { assistantOwner } from '../../../../features/assistant/tools';
 import { createAIProposalBase, prepareProposalDraftProject, proposalReconciliationIssues } from '../../../../utils/proposalDraftProject';
 import { BENCHMARK_PROJECT } from '../../../../engine/referenceCase';
 import { calculateProjectFinancialSummary } from '../../../../engine/financeEngine';
@@ -142,11 +144,14 @@ export function useAIInvoiceScanner() {
   useEffect(() => { setReviewConfirmed(false); }, [reviewSnapshot]);
   const blockingIssues = validatedDraft?.validationIssues?.filter(issue => issue.severity === 'error') || [];
   const canApply = !!validatedDraft && !blockingIssues.length && reviewConfirmed && draftScope === scope && !isProcessing;
-  const apply = (createNew: boolean) => {
+  // Applies through the shared agent registry: same permissions, activity log, undo and pricing policy as every agent.
+  const apply = async (createNew: boolean) => {
     const current = useSimulationStore.getState();
     if (!canApply || aiWorkspaceKey(current) !== workspace || (!createNew && current.activeProjectId !== activeProjectId)) return;
-    const before=current.projects;current.applyExtractedInvoice(validatedDraft!, createNew);
-    if(useSimulationStore.getState().projects!==before)reset();else setErrorMsg(useSimulationStore.getState().saveFeedbackMessage || 'No se pudo aplicar; tu borrador y conversación se conservan.');
+    const outcome = await executeAgentTool({ name: 'apply_proposal_draft', args: { draft: validatedDraft as unknown as Record<string, unknown>, createNew } },
+      { source: 'proposal-assistant', owner: assistantOwner() });
+    if (outcome.status === 'applied') reset();
+    else setErrorMsg(outcome.status === 'error' ? outcome.message : 'No se pudo aplicar; tu borrador y conversación se conservan.');
   };
   const updateDraft = (updates: Partial<ExtractedInvoiceData>) => { setExtractedData(previous => previous ? {...validatedDraft,...updates} as ExtractedInvoiceData : null); setReviewConfirmed(false); };
   return { isAIInvoiceModalOpen, isDark:state.sidebarTheme === 'dark', geminiApiKey, activeProject,

@@ -3,6 +3,7 @@ import { useSimulationStore } from '../../store/useSimulationStore';
 import { assistantOwner } from './tools';
 import { executeForAssistant } from '../agentTools/registry';
 import { AssistantRunError, runAssistant } from './service';
+import { CHAT_FILE_LIMITS, forgetChatFiles, registerChatFile, type ChatFile } from './chatFiles';
 import type { GeminiTransport } from '../../../shared/geminiTransport';
 import type { AssistantMessage } from './types';
 export function useAppAssistant(
@@ -13,6 +14,24 @@ export function useAppAssistant(
   const [prompt, setPrompt] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [files, setFiles] = useState<ChatFile[]>([]);
+  const sessionFiles = useRef<string[]>([]);
+  const addFiles = async (list: FileList | File[]) => {
+    setError('');
+    // Check the whole selection against the free slots before reading anything into memory.
+    const selected = Array.from(list);
+    const free = Math.max(0, CHAT_FILE_LIMITS.maxFiles - files.length);
+    if (selected.length > free) setError(`Máximo tres archivos por mensaje: se adjuntan ${free} de ${selected.length}.`);
+    for (const f of selected.slice(0, free)) {
+      try {
+        const registered = registerChatFile(f.name, await f.arrayBuffer());
+        sessionFiles.current.push(registered.id);
+        setFiles((previous) => [...previous, registered].slice(0, CHAT_FILE_LIMITS.maxFiles));
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'No se pudo adjuntar el archivo.');
+      }
+    }
+  };
   const controller = useRef<AbortController>();
   const sequence = useRef(0);
   const cancel = () => {
@@ -24,6 +43,7 @@ export function useAppAssistant(
     () => () => {
       sequence.current++;
       controller.current?.abort();
+      forgetChatFiles(sessionFiles.current);
     },
     []
   );
@@ -35,7 +55,10 @@ export function useAppAssistant(
     const request = ++sequence.current;
     const abort = new AbortController();
     controller.current = abort;
-    setMessages((previous) => [...previous, { role: 'user', text }]);
+    const attached = files;
+    setFiles([]);
+    const label = attached.length ? `${text}\n\n📎 ${attached.map((f) => f.name).join(', ')}` : text;
+    setMessages((previous) => [...previous, { role: 'user', text: label }]);
     setPrompt('');
     setBusy(true);
     setError('');
@@ -51,6 +74,7 @@ export function useAppAssistant(
         history: messages,
         activeProjectId: projectId,
         transport,
+        files: attached,
         signal: abort.signal,
         execute: (call) => {
           if (!valid()) throw new Error('Solicitud cancelada.');
@@ -77,8 +101,14 @@ export function useAppAssistant(
     error,
     send,
     cancel,
+    files,
+    addFiles,
+    removeFile: (id: string) => setFiles((previous) => previous.filter((f) => f.id !== id)),
     reset: () => {
       cancel();
+      forgetChatFiles(sessionFiles.current);
+      sessionFiles.current = [];
+      setFiles([]);
       setMessages([]);
       setError('');
       setPrompt('');

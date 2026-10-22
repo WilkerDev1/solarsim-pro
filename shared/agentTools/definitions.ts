@@ -81,6 +81,12 @@ const PROPOSAL_AND_CATALOG_TOOLS: AgentToolDefinition[] = [
     inputSchema: object({ id: id('ID de la propuesta.') }, ['id']),
   },
   {
+    name: 'apply_proposal_draft', title: 'Aplicar borrador del asistente de propuestas', kind: 'draft', category: 'proposals', card: 'proposal',
+    surfaces: ['proposal-assistant'],
+    description: 'Aplica el borrador revisado del asistente de propuestas (crear o actualizar la propuesta abierta). Uso interno de la interfaz de revisión.',
+    inputSchema: object({ draft: { type: 'object', description: 'Borrador normalizado y revisado por el usuario.' }, createNew: { type: 'boolean' } }, ['draft', 'createNew']),
+  },
+  {
     name: 'audit_catalog', title: 'Auditar inventario', kind: 'read', category: 'catalog', card: 'catalog-audit', surfaces: [...ALL],
     description: 'Audita el catálogo: precios ausentes o vencidos, sin ficha o imagen, sin potencia nominal, duplicados, sin stock, precios atípicos y equipos de propuestas que no están en el catálogo.',
     inputSchema: object({ staleDays: { type: 'integer', minimum: 1, maximum: 3650 }, type: { type: 'string', enum: ['panel', 'inverter', 'battery'] } }),

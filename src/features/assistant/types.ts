@@ -27,6 +27,8 @@ export interface AssistantMessage {
   actions?: AssistantAction[];
   /** Changes already applied under the drafts-free policy; each one can be undone. */
   applied?: { activityId: string; title: string }[];
+  /** Rich cards beyond project/equipment (audit tables, clients, attachments…), rendered by cards/registry. */
+  agentCards?: import('../../../shared/agentCards').AgentCard[];
 }
 export interface AssistantToolCall {
   name: string;
@@ -37,4 +39,5 @@ export interface AssistantToolResult {
   cards?: AssistantCard[];
   action?: AssistantAction;
   activityId?: string;
+  agentCards?: import('../../../shared/agentCards').AgentCard[];
 }

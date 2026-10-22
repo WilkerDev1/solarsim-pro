@@ -88,7 +88,11 @@ const transport: GeminiTransport = async (_url, body: any) => {
                   last.functionResponse.response.result?.status ===
                   'pending_confirmation'
                     ? 'Preparé el cambio. Confírmalo para recalcular la simulación.'
-                    : 'Aquí tienes los datos actuales de la aplicación. Puedes abrir la propuesta o revisar un equipo.',
+                    : last.functionResponse.response.result?.status === 'applied'
+                      ? 'Listo: **cobertura al 90 %**. Puedes deshacerlo desde la tarjeta.'
+                      : last.functionResponse.name === 'audit_catalog'
+                        ? '## Auditoría\n- Revisa los equipos **sin precio**.\n- Vincula *fichas técnicas* faltantes.\n\nDetalle en la tarjeta.'
+                        : 'Aquí tienes los datos actuales de la aplicación. Puedes abrir la propuesta o revisar un equipo.',
               },
             ],
           },
@@ -107,6 +111,8 @@ const transport: GeminiTransport = async (_url, body: any) => {
           ],
         },
       }
+    : /audit/i.test(text)
+      ? { name: 'audit_catalog', args: {} }
     : /equipo/i.test(text)
       ? {
           name: 'search_equipment',
