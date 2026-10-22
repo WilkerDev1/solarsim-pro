@@ -250,7 +250,7 @@ export function renderProposalPage(stored: StoredProposal): string {
   const batteryWarranty = docText('quotation.warranty.battery');
   const workmanshipWarranty = docText('quotation.warranty.workmanship');
   const servicesText = docText('quotation.servicesIncluded');
-  const serviceItems = servicesText.split(/[,;\n]/).map((s: string) => s.replace(/^\s*[-•]\s*/, '').replace(/\*/g, '').trim()).filter((s: string) => s.length > 0);
+  const serviceItems = servicesText.split(/[,;\n]/).map((s: string) => s.replace(/^\s*[-•]\s*/, '').trim()).filter((s: string) => s.length > 0);
   const validityNote = docText('quotation.validityNote');
 
   // Custom Executive Summary & Page 6 fields
@@ -801,7 +801,7 @@ export function renderProposalPage(stored: StoredProposal): string {
           ${serviceItems.map((item: string) => `
             <div class="flex items-start gap-1.5 text-orange-950 font-medium">
               <span class="text-orange-600 font-bold shrink-0">✓</span>
-              <span>${escapeHtml(item)}</span>
+              <span>${formatInlineMarkdown(item)}</span>
             </div>
           `).join('')}
         </div>

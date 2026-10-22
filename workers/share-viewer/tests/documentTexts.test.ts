@@ -44,6 +44,7 @@ assert.ok(!published.includes('heredado'));
 assert.ok(published.includes('30 años <strong class="font-bold text-slate-950">lineales</strong> &lt;img src=x&gt;'));
 assert.ok(!published.includes('<img src=x>'));
 assert.ok(published.includes('Permisos y trámites') && published.includes('Planos eléctricos'));
+assert.ok(renderProposalPage(base({ 'doc:quotation.servicesIncluded': '- **Permisos** y trámites\n- Planos' })).includes('<strong class="font-bold text-slate-950">Permisos</strong> y trámites'), 'La negrita de la lista de servicios se conserva');
 assert.ok(published.includes('Primer párrafo propio.') && published.includes('<em>clave</em>'));
 assert.ok(published.includes('Párrafo <strong class="font-bold text-slate-950">publicado</strong> para el cliente.'));
 assert.ok(published.includes('Subtítulo publicado'));
