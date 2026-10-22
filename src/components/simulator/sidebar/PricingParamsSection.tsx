@@ -5,7 +5,6 @@ import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useSupplierCleanup } from '../params/hooks/useSupplierCleanup';
 import {
-  DEFAULT_PRICE_PER_WATT_USD,
   marginPctFromMultiplier,
   multiplierFromMarginInput,
   multiplierFromQuickMargin,
@@ -13,6 +12,13 @@ import {
   wattPricePatch,
   wholeMarginPctFromMultiplier,
 } from '../params/logic/pricingSync';
+import {
+  DEFAULT_DOP_RATE,
+  DEFAULT_PRICE_PER_WATT_USD,
+  DEFAULT_SALE_MARGIN_MULTIPLIER,
+  FALLBACK_COST_PER_WP_USD,
+  FALLBACK_SALE_PER_WP_USD,
+} from '../params/logic/dockDefaults';
 import { ChipGroup, ParamRow, StatStrip, ToggleGroup } from '../params/ui';
 import { DirectPrice } from '../params/sections/pricing/DirectPrice';
 import { NumberField } from '../params/sections/pricing/NumberField';
@@ -55,7 +61,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
 
   const isDirect = specs.pricingMode === 'direct_watt';
   const matrix = summary?.costMatrix;
-  const multiplier = specs.saleMarginMultiplier || 1.25;
+  const multiplier = specs.saleMarginMultiplier || DEFAULT_SALE_MARGIN_MULTIPLIER;
 
   const setMode = (mode: 'cost_matrix' | 'direct_watt') => {
     if (mode === 'cost_matrix') {
@@ -66,8 +72,8 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
     updateSpecs({ pricingMode: 'direct_watt', ...wattPricePatch(autoWp) });
   };
 
-  const autoSaleWp = roundedWattPrice(matrix?.salePricePerWattUSD, 1.08);
-  const costWp = Math.round((matrix?.costPerWattUSD || 0.86) * 100) / 100;
+  const autoSaleWp = roundedWattPrice(matrix?.salePricePerWattUSD, FALLBACK_SALE_PER_WP_USD);
+  const costWp = Math.round((matrix?.costPerWattUSD || FALLBACK_COST_PER_WP_USD) * 100) / 100;
   const profitWp = Math.max(0, Math.round((autoSaleWp - costWp) * 100) / 100);
 
   return (
@@ -85,7 +91,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
               id="pd-dop-rate"
               prefix="RD$"
               step="0.5"
-              value={specs.dopExchangeRate !== undefined ? specs.dopExchangeRate : 60.0}
+              value={specs.dopExchangeRate !== undefined ? specs.dopExchangeRate : DEFAULT_DOP_RATE}
               onValue={(v) => updateSpecs({ dopExchangeRate: v })}
             />
           </ParamRow>

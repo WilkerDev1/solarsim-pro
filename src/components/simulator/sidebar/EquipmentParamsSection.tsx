@@ -3,6 +3,7 @@ import { ProjectSimulation, FinancialSummaryResult, SystemSpecs } from '../../..
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useCatalogPowerSync } from '../params/hooks/useCatalogPowerSync';
+import { DEFAULT_SYSTEM_LOSSES_PCT, DEFAULT_TARGET_COVERAGE_PCT } from '../params/logic/dockDefaults';
 import { BatteryEquipmentSection } from './BatteryEquipmentSection';
 import { Field, ParamRow, StatStrip, ToggleGroup } from '../params/ui';
 import { AdvancedDisclosure } from '../params/sections/equipment/AdvancedDisclosure';
@@ -33,8 +34,8 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({ 
 
   const totalDCKWp = calculateTotalDCCapacityKWp(specs);
   const totalInverterKW = calculateTotalInverterPowerKW(specs);
-  const losses = specs.systemLosses !== undefined ? specs.systemLosses : 25;
-  const autoInfo = `Calcula los paneles para cubrir el ${project.rates.targetCoveragePct ?? 95}% del consumo, con ${specs.systemLosses ?? 25}% de pérdidas.`;
+  const losses = specs.systemLosses !== undefined ? specs.systemLosses : DEFAULT_SYSTEM_LOSSES_PCT;
+  const autoInfo = `Calcula los paneles para cubrir el ${project.rates.targetCoveragePct ?? DEFAULT_TARGET_COVERAGE_PCT}% del consumo, con ${specs.systemLosses ?? DEFAULT_SYSTEM_LOSSES_PCT}% de pérdidas.`;
   const common = { mode, specs, catalog: equipmentCatalog, updateSpecs, onOpenScanner: openAIDatasheetModal } as const;
 
   return (

@@ -3,11 +3,10 @@ import { getRecommendedLoadProfile } from '../../../../../engine/solarEngine';
 import type { ProjectSimulation, SystemSpecs, UtilityRates } from '../../../../../types';
 import { mapTariffCodeOnDistributorChange, type UtilityDistributor } from '../../../../../types/tariffs';
 import { detectLoadProfilePreset, type LoadProfilePreset } from '../../logic/loadProfilePreview';
+import { DEFAULT_DOP_RATE, DEFAULT_GRID_EXPORT_FEE_PCT, DEFAULT_MONTHLY_CONSUMPTION_KWH } from '../../logic/dockDefaults';
 
 type TariffMatrix = Parameters<typeof getReferenceEnergyRateUSD>[0];
 
-export const DEFAULT_MONTHLY_CONSUMPTION_KWH = 900;
-const DEFAULT_DOP_RATE = 60.0;
 export const DAYTIME_MIN = 15;
 export const DAYTIME_MAX = 95;
 
@@ -80,7 +79,7 @@ export function planTariffChange(ctx: ChangeContext, newCode: string): TariffCha
 
 /** Valor del cargo de exportación que muestra el campo: 0 con inyección cero. */
 export const exportFeeValue = (rates: { isZeroExport?: boolean; gridExportFeePct?: number }): number =>
-  rates.isZeroExport ? 0 : (rates.gridExportFeePct ?? 25);
+  rates.isZeroExport ? 0 : (rates.gridExportFeePct ?? DEFAULT_GRID_EXPORT_FEE_PCT);
 
 /** Perfil de carga activo: el preset explícito manda (incluido «Manual»); solo sin preset se infiere del porcentaje (35/75/90). */
 export function activeLoadPreset(preset: string | undefined, daytimeRatio: number): LoadProfilePreset {

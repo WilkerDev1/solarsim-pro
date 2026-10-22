@@ -1,6 +1,7 @@
 import { getProvinceHSP } from '../../../../data/rdProvinces';
 import { getRecommendedLoadProfile } from '../../../../engine/solarEngine';
 import type { ProjectSimulation } from '../../../../types';
+import { DEFAULT_BATTERY_DOD_PCT, DEFAULT_SYSTEM_LOSSES_PCT, PREVIEW_BATTERY_EFFICIENCY_PCT } from './dockDefaults';
 import { calculateTotalBatteryCapacityKWh, calculateTotalDCCapacityKWp } from '../../../../utils/equipmentSpecsUtils';
 
 export type LoadProfilePreset = 'residential' | 'commercial' | 'industrial' | 'custom';
@@ -39,8 +40,8 @@ export function computeLoadProfilePreview(
 ): LoadProfilePreview {
   const totalBatteryKWh = calculateTotalBatteryCapacityKWh(project.specs);
   const hasBattery = !!(project.specs.hasBattery && totalBatteryKWh > 0);
-  const batteryDodPct = project.specs.batteryDOD !== undefined ? project.specs.batteryDOD : 90;
-  const batteryEffPct = project.specs.batteryEfficiencyPct !== undefined ? project.specs.batteryEfficiencyPct : 90;
+  const batteryDodPct = project.specs.batteryDOD !== undefined ? project.specs.batteryDOD : DEFAULT_BATTERY_DOD_PCT;
+  const batteryEffPct = project.specs.batteryEfficiencyPct !== undefined ? project.specs.batteryEfficiencyPct : PREVIEW_BATTERY_EFFICIENCY_PCT;
   const dailyUsableBatteryKWh = hasBattery ? totalBatteryKWh * (batteryDodPct / 100) * (batteryEffPct / 100) : 0;
 
   const recommendedProfile = getRecommendedLoadProfile(currentTariffCode, avgMonthlyConsumption);
@@ -58,7 +59,7 @@ export function computeLoadProfilePreview(
   const provinceHsp = customHspList && customHspList.length > 0
     ? customHspList.reduce((a: number, b: number) => a + b, 0) / customHspList.length
     : provinceData.avgHSP;
-  const systemLossesPct = project.specs.systemLosses !== undefined ? project.specs.systemLosses : 25.0;
+  const systemLossesPct = project.specs.systemLosses !== undefined ? project.specs.systemLosses : DEFAULT_SYSTEM_LOSSES_PCT;
   const avgDailyProd = dcCapacityKWp * provinceHsp * (1 - systemLossesPct / 100);
 
   // Flujos físicos de energía diaria
