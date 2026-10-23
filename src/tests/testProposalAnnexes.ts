@@ -86,7 +86,13 @@ assert.deepEqual(deduped.attachedPdfs.map((att) => att.id), ['att-manual', 'att-
   const partial = catalog.filter((item) => item.id !== 'inv'); // the inverter's catalog record has not arrived
   const pendingIds = unresolvedEquipmentIds(loading, partial);
   assert.equal(pendingIds.has('inv'), true);
-  assert.equal(pendingIds.has('pa'), false, 'Resolved equipment is not pending');
+  assert.equal(unresolvedEquipmentIds(loading, catalog).size, 0, 'A fully resolved catalog protects nothing');
+  // Shared datasheet: the annex's representative variant (pa) is removed while the other (pb) is still unresolved.
+  const shared = structuredClone(loading);
+  shared.specs.panels = [{ id: 'g2', catalogItemId: 'pb', brandModel: 'QA 620 W', powerW: 620, count: 4 }];
+  const noPb = catalog.filter((item) => item.id !== 'pb');
+  const sharedKept = applyAnnexPlan(before, planDatasheetAnnexes(shared, noPb), NOW, unresolvedEquipmentIds(shared, noPb));
+  assert.equal(sharedKept.attachedPdfs.some((att) => att.id === catalogAnnexId('sheet-family')), true, 'Shared annex survives while a contributing variant is unresolved');
   const during = applyAnnexPlan(before, planDatasheetAnnexes(loading, partial), NOW, pendingIds);
   assert.equal(during.changed, false, 'Nothing is deleted or rewritten while the record is missing');
   assert.equal(during.attachedPdfs, before.attachedPdfs);

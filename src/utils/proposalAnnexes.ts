@@ -39,9 +39,11 @@ export function workspaceCatalog(catalog: SolarEquipmentItem[], serverUrl: strin
 }
 
 /**
- * Ids of equipment in use (count > 0) that the catalog cannot resolve yet, typically because the proposal
- * was pulled before the equipment catalog finished syncing. Their annexes must survive: the datasheet is
- * unknown for now, not gone.
+ * Catalog item ids whose automatic annexes must be kept because some equipment in use (count > 0) is not
+ * resolved in the catalog yet, typically a proposal pulled before the equipment catalog finished syncing.
+ * The datasheet of an unresolved item is unknown, so it cannot be tied to one annex (variants share assets,
+ * legacy groups have no catalogItemId): while anything in use is unresolved, every automatic annex is kept.
+ * This is transient: once the catalog resolves everything, the exact plan applies again.
  */
 export function unresolvedEquipmentIds(project: ProjectSimulation, catalog: SolarEquipmentItem[]): Set<string> {
   const groups = [
@@ -49,21 +51,11 @@ export function unresolvedEquipmentIds(project: ProjectSimulation, catalog: Sola
     ...getProjectInverters(project.specs).map((group) => ({ group, kind: 'inverter' as const })),
     ...getProjectBatteries(project.specs).map((group) => ({ group, kind: 'battery' as const })),
   ];
+  const unresolved = groups.some(({ group, kind }) => group.count > 0 && !resolveGroupCatalogItem(group, kind, catalog));
   const ids = new Set<string>();
-  let anonymous = false;
-  for (const { group, kind } of groups) {
-    if (group.count <= 0 || resolveGroupCatalogItem(group, kind, catalog)) continue;
-    if (group.catalogItemId) ids.add(group.catalogItemId);
-    else anonymous = true;
-    if (group.id) ids.add(group.id);
-  }
-  if (anonymous) {
-    // Legacy or name-only groups (no catalogItemId) cannot be tied to one annex: while they are unresolved,
-    // every automatic annex whose catalog record is also missing is kept.
-    const known = new Set(catalog.map((item) => item.id));
-    for (const att of project.customization?.attachedPdfs ?? []) {
-      if (att.origin === 'catalog' && att.catalogItemId && !known.has(att.catalogItemId)) ids.add(att.catalogItemId);
-    }
+  if (!unresolved) return ids;
+  for (const att of project.customization?.attachedPdfs ?? []) {
+    if (att.origin === 'catalog' && att.catalogItemId) ids.add(att.catalogItemId);
   }
   return ids;
 }
