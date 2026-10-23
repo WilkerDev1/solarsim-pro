@@ -401,3 +401,21 @@ test("history restore keeps the current client link and never revives a deleted 
     "updated",
   );
 });
+
+test("concurrent first PUTs with the same id: exactly one wins", async () => {
+  for (let i = 0; i < 5; i++) {
+    const id = `client-concurrent-${i}`;
+    const results = await Promise.all(
+      ["A", "B", "C"].map((name) =>
+        request("PUT", `/api/clients/${id}`, admin, { name, baseVersion: 0 }),
+      ),
+    );
+    assert.deepEqual(results.map((r) => r.status).sort(), [200, 409, 409]);
+    const winner = results.find((r) => r.status === 200)!;
+    const row = (
+      await pool.query("SELECT name,version FROM clients WHERE id=$1", [id])
+    ).rows[0];
+    assert.equal(row.version, 1);
+    assert.equal(row.name, winner.body.client.name);
+  }
+});

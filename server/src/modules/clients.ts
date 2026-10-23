@@ -91,7 +91,7 @@ export function registerClientRoutes(
       const value = input.value;
       const result = await client.query(
         `INSERT INTO clients (organization_id,id,kind,name,tax_id,phone,email,address,province,notes,created_by_id,created_by_name)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(organization_id,id) DO UPDATE SET kind=EXCLUDED.kind,name=EXCLUDED.name,tax_id=EXCLUDED.tax_id,phone=EXCLUDED.phone,email=EXCLUDED.email,address=EXCLUDED.address,province=EXCLUDED.province,notes=EXCLUDED.notes,version=clients.version+1,updated_at=clock_timestamp() RETURNING *`,
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(organization_id,id) DO UPDATE SET kind=EXCLUDED.kind,name=EXCLUDED.name,tax_id=EXCLUDED.tax_id,phone=EXCLUDED.phone,email=EXCLUDED.email,address=EXCLUDED.address,province=EXCLUDED.province,notes=EXCLUDED.notes,version=clients.version+1,updated_at=clock_timestamp() WHERE clients.version=$13 AND clients.deleted_at IS NULL RETURNING *`,
         [
           user.organizationId,
           id,
@@ -105,8 +105,28 @@ export function registerClientRoutes(
           value.notes,
           user.id,
           user.name,
+          data.baseVersion,
         ],
       );
+      // Defense in depth: the organization lock already serializes writers, but the
+      // upsert itself must never overwrite a row that is not at the expected version.
+      if (!result.rows[0]) {
+        const current = (
+          await client.query(
+            "SELECT * FROM clients WHERE organization_id=$1 AND id=$2",
+            [user.organizationId, id],
+          )
+        ).rows[0];
+        await client.query("ROLLBACK");
+        return c.json(
+          {
+            error: "El cliente cambió. Sincroniza antes de editar.",
+            client:
+              current && !current.deleted_at ? clientRecord(current) : null,
+          },
+          409,
+        );
+      }
       await client.query("COMMIT");
       return c.json({ success: true, client: clientRecord(result.rows[0]) });
     } catch (error) {
