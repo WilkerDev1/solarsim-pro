@@ -63,9 +63,9 @@ export function unresolvedEquipmentIds(project: ProjectSimulation, catalog: Sola
     return ids;
   }
   // All unresolved groups are identifiable: annexes stay pending except those of items a group was detached from by hand
-  // (`detachedCatalogItemId`), unless some group in use still points at that item.
+  // (`detachedCatalogItemIds`), unless some group in use still points at that item.
   const detached = new Set<string>();
-  for (const { group } of groups) if (group.manualModel && group.detachedCatalogItemId) detached.add(group.detachedCatalogItemId);
+  for (const { group } of groups) for (const id of group.detachedCatalogItemIds ?? []) detached.add(id);
   const inUse = new Set<string>();
   for (const { group, kind } of groups) {
     if (group.count <= 0) continue;

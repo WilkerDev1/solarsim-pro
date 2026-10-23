@@ -5,6 +5,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { SystemSpecs } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
 import { editEquipmentGroup, normalizeEquipmentEdit, resolveGroupCatalogItem, selectCatalogEquipment, type EquipmentKind } from '../utils/equipmentGroups';
+import type { ProjectSimulation } from '../types';
+import { unresolvedEquipmentIds } from '../utils/proposalAnnexes';
 import { resolveAnnualDegradationPct } from '../engine/financeEngine';
 import { catalogPanelGroupPatch } from '../utils/catalogGroupPatch';
 import { buildCatalogSelectionUpdate } from '../components/simulator/params/logic/catalogSelection';
@@ -303,7 +305,7 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
   const linked = { id: 'panel-k1', catalogItemId: 'k1', brandModel: 'Panel K 550', powerW: 550, count: 4 };
 
   const other = run('panel', linked, 'Panel K 600');
-  assert.equal(other.catalogItemId, undefined, 'otro modelo: se olvida el catalogItemId anterior');
+  assert.equal(other.catalogItemId, 'k2', 'el nombre exacto de otro modelo del catálogo lo vincula a ese modelo');
   assert.equal(resolveGroupCatalogItem(other, 'panel', linkedCatalog)?.id, 'k2', 'resuelve por el nombre nuevo, no por el id anterior');
   assert.equal(resolveGroupCatalogItem(run('panel', linked, 'Panel Propio X'), 'panel', linkedCatalog), null, 'un modelo a mano no adjunta ninguna ficha');
 
@@ -337,14 +339,36 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
   }
   // El catálogo anterior queda registrado de forma explícita, sea cual sea el id del grupo.
   {
-    assert.equal((run('panel', { ...linked, id: 'g-xyz' }, 'Panel Propio X') as { detachedCatalogItemId?: string }).detachedCatalogItemId, 'k1', 'desde catalogItemId');
-    assert.equal((run('panel', { id: 'k1', catalogItemId: 'k1', brandModel: 'Panel K 550', powerW: 1, count: 1 }, 'Otro') as { detachedCatalogItemId?: string }).detachedCatalogItemId, 'k1', 'desde el id igual al id del catálogo');
-    assert.equal((run('panel', { id: 'g-1', brandModel: 'Panel K 550', powerW: 1, count: 1 }, 'Otro') as { detachedCatalogItemId?: string }).detachedCatalogItemId, 'k1', 'desde el modelo resuelto por nombre');
-    const detached = { ...linked, id: 'g-xyz', catalogItemId: undefined, manualModel: true, detachedCatalogItemId: 'k1' };
-    assert.equal((run('panel', detached, 'Otro más') as { detachedCatalogItemId?: string }).detachedCatalogItemId, 'k1', 'una nueva edición conserva el registro');
+    assert.deepEqual((run('panel', { ...linked, id: 'g-xyz' }, 'Panel Propio X') as { detachedCatalogItemIds?: string[] }).detachedCatalogItemIds, ['k1'], 'desde catalogItemId');
+    assert.deepEqual((run('panel', { id: 'k1', catalogItemId: 'k1', brandModel: 'Panel K 550', powerW: 1, count: 1 }, 'Otro') as { detachedCatalogItemIds?: string[] }).detachedCatalogItemIds, ['k1'], 'desde el id igual al id del catálogo');
+    assert.deepEqual((run('panel', { id: 'g-1', brandModel: 'Panel K 550', powerW: 1, count: 1 }, 'Otro') as { detachedCatalogItemIds?: string[] }).detachedCatalogItemIds, ['k1'], 'desde el modelo resuelto por nombre');
+    const detached = { ...linked, id: 'g-xyz', catalogItemId: undefined, manualModel: true, detachedCatalogItemIds: ['k1'] };
+    assert.deepEqual((run('panel', detached, 'Otro más') as { detachedCatalogItemIds?: string[] }).detachedCatalogItemIds, ['k1'], 'una nueva edición conserva el registro');
     const specs = { panels: [detached] } as unknown as SystemSpecs;
-    const picked = normalizeEquipmentEdit(specs, selectCatalogEquipment(specs, 'panel', 0, linkedCatalog[1]));
-    assert.equal((picked.panels![0] as { detachedCatalogItemId?: string }).detachedCatalogItemId, undefined, 'elegir del catálogo lo limpia');
+    const picked = normalizeEquipmentEdit(specs, selectCatalogEquipment(specs, 'panel', 0, linkedCatalog[0]));
+    assert.equal((picked.panels![0] as { detachedCatalogItemIds?: string[] }).detachedCatalogItemIds, undefined, 'elegir ese equipo lo saca de la lista');
+    const other = normalizeEquipmentEdit(specs, selectCatalogEquipment(specs, 'panel', 0, linkedCatalog[1]));
+    assert.deepEqual((other.panels![0] as { detachedCatalogItemIds?: string[] }).detachedCatalogItemIds, ['k1'], 'elegir otro equipo conserva el que se dejó');
+  }
+  // Ediciones sucesivas: modelo A → nombre exacto de B (revincula) → nombre propio (desvincula B), con otro grupo identificable sin resolver.
+  {
+    const state = { specs: { panels: [
+      { id: 'g1', catalogItemId: 'k1', brandModel: 'Panel K 550', powerW: 550, count: 4 },
+      { id: 'g2', catalogItemId: 'zz', brandModel: 'Sin sincronizar', powerW: 400, count: 2 },
+    ], inverters: [{ id: 'i0', brandModel: 'Sin uso', powerKW: 1, count: 0 }], batteries: [{ id: 'b0', brandModel: 'Sin uso', capacityKWh: 1, count: 0 }] } as unknown as SystemSpecs };
+    const edit = (name: string) => createGroupActions('panel', state.specs, linkedCatalog, patch => { state.specs = normalizeEquipmentEdit(state.specs, patch); }).setBrand(0, name);
+    const annex = (id: string) => ({ id: `att-${id}`, origin: 'catalog', catalogItemId: id });
+    const pendingNow = () => unresolvedEquipmentIds({ specs: state.specs, customization: { attachedPdfs: [annex('k1'), annex('k2'), annex('zz')] } } as unknown as ProjectSimulation, linkedCatalog);
+    edit('Panel K 600');
+    const relinked = state.specs.panels![0] as { catalogItemId?: string; manualModel?: boolean; count: number };
+    assert.equal(relinked.catalogItemId, 'k2', 'escribir el nombre exacto de B deja el grupo vinculado a B');
+    assert.equal(relinked.manualModel, undefined);
+    assert.equal(relinked.count, 4, 'solo cambian los campos de vínculo');
+    edit('Panel Propio X');
+    const pending = pendingNow();
+    assert.equal(pending.has('k2'), false, 'B ya no lo usa nadie: su anexo sale');
+    assert.equal(pending.has('k1'), false, 'A tampoco lo usa nadie: su anexo sale');
+    assert.equal(pending.has('zz'), true, 'el grupo identificable sin resolver conserva su anexo');
   }
   // Mayúsculas y espacios no cambian de modelo: se conserva el vínculo.
   for (const same of ['  Panel K 550 ', 'panel k 550', 'Panel  K   550']) {
