@@ -33,6 +33,14 @@ const render = (node: React.ReactElement) => renderToStaticMarkup(node);
   }
 }
 
+// --- SelectField: la animación del panel no usa opacity (si no corre, el panel debe seguir visible) ---
+{
+  const css = readFileSync('src/index.css', 'utf8');
+  const keyframes = css.match(/@keyframes pd-select-in\s*\{([\s\S]*?\n\})/)?.[1] ?? '';
+  assert.ok(keyframes.includes('transform'), 'keyframes pd-select-in definidos');
+  assert.doesNotMatch(keyframes, /opacity/, 'pd-select-in no toca opacity');
+}
+
 // --- ParamSection: header button with aria-expanded / aria-controls, collapsible body, optional badge ---
 {
   const open = render(h(ParamSection, { id: 'cli', title: 'Proyecto y cliente', icon: h('svg', { 'data-icon': 'user' }), open: true, onToggle: noop }, h('p', null, 'cuerpo')));
