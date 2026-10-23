@@ -308,7 +308,7 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
   assert.equal(resolveGroupCatalogItem(run('panel', linked, 'Panel Propio X'), 'panel', linkedCatalog), null, 'un modelo a mano no adjunta ninguna ficha');
 
   const idIsCatalogId = run('panel', { ...linked, id: 'k1' }, 'Panel Propio X');
-  assert.notEqual(idIsCatalogId.id, 'k1', 'si el id del grupo es un id del catálogo, también se renueva');
+  assert.equal(idIsCatalogId.id, 'k1', 'el id no cambia: es la clave de la fila y cambiarlo quita el foco al escribir');
   assert.equal(resolveGroupCatalogItem(idIsCatalogId, 'panel', linkedCatalog), null);
   assert.equal(run('inverter', { id: 'ki', catalogItemId: 'ki', brandModel: 'Inversor K 8', powerKW: 8, count: 1 }, 'Inversor Z').catalogItemId, undefined, 'inversores igual');
 
@@ -320,7 +320,8 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
       return state.specs.panels![0];
     };
     const edited = offline('Panel Propio X');
-    assert.notEqual(edited.id, 'k1', 'el id copiado del catálogo se renueva aunque el catálogo esté vacío');
+    assert.equal(edited.id, 'k1', 'el id se conserva (clave estable de la fila)');
+    assert.deepEqual(groupViews({ panels: [edited] } as unknown as SystemSpecs, 'panel').map(view => view.key), ['k1'], 'la clave de la fila no cambia al escribir el primer carácter');
     assert.equal(edited.catalogItemId, undefined);
     assert.equal(resolveGroupCatalogItem(edited, 'panel', linkedCatalog), null, 'al sincronizar el catálogo no reaparece el modelo anterior');
     assert.equal(offline('panel k 550').id, 'k1', 'mismo modelo: no se toca');

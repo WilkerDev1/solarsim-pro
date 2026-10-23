@@ -147,13 +147,14 @@ type CatalogEntry = Pick<SolarEquipmentItem, 'id' | 'type' | 'displayName'> & Pa
  * datasheet of a different model.
  */
 export function resolveGroupCatalogItem<T extends CatalogEntry>(
-  group: { id?: string; catalogItemId?: string; brandModel?: string },
+  group: { id?: string; catalogItemId?: string; manualModel?: boolean; brandModel?: string },
   kind: EquipmentKind,
   catalog: readonly T[]
 ): T | null {
   const candidates = catalog.filter((item) => item.type === kind);
   const byId = (id?: string) => (id ? candidates.find((item) => item.id === id) : undefined);
-  const exact = byId(group.catalogItemId) ?? byId(group.id);
+  // A model the user rewrote by hand never resolves by id: its id may be the old catalog item's id.
+  const exact = group.manualModel ? undefined : byId(group.catalogItemId) ?? byId(group.id);
   if (exact) return exact;
   const named = group.brandModel ? candidates.filter((item) => item.displayName === group.brandModel) : [];
   return named.length === 1 ? named[0] : null;

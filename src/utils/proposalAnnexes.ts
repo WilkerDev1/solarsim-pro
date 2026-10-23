@@ -52,11 +52,27 @@ export function unresolvedEquipmentIds(project: ProjectSimulation, catalog: Sola
     ...getProjectInverters(project.specs).map((group) => ({ group, kind: 'inverter' as const })),
     ...getProjectBatteries(project.specs).map((group) => ({ group, kind: 'battery' as const })),
   ];
-  const unresolved = groups.some(({ group, kind }) => group.count > 0 && !group.manualModel && !resolveGroupCatalogItem(group, kind, catalog));
+  const unresolvedGroups = groups.filter(({ group, kind }) => group.count > 0 && !group.manualModel && !resolveGroupCatalogItem(group, kind, catalog));
   const ids = new Set<string>();
-  if (!unresolved) return ids;
+  if (!unresolvedGroups.length) return ids;
+  // Items a group detached by hand used to be (its id is the old catalog id, or `<kind>-<id>`), unless another group still uses them.
+  const detached = new Set<string>();
+  for (const { group, kind } of groups) {
+    if (!group.manualModel) continue;
+    detached.add(group.id);
+    if (group.id.startsWith(`${kind}-`)) detached.add(group.id.slice(kind.length + 1));
+  }
+  const inUse = new Set<string>();
+  for (const { group, kind } of groups) {
+    if (group.count <= 0) continue;
+    const item = resolveGroupCatalogItem(group, kind, catalog);
+    if (item) inUse.add(item.id);
+    else if (!group.manualModel) [group.id, group.catalogItemId].forEach((id) => id && inUse.add(id));
+  }
   for (const att of project.customization?.attachedPdfs ?? []) {
-    if (att.origin === 'catalog' && att.catalogItemId) ids.add(att.catalogItemId);
+    if (att.origin !== 'catalog' || !att.catalogItemId) continue;
+    if (detached.has(att.catalogItemId) && !inUse.has(att.catalogItemId)) continue;
+    ids.add(att.catalogItemId);
   }
   return ids;
 }

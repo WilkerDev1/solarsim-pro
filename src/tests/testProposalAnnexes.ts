@@ -106,6 +106,21 @@ assert.deepEqual(deduped.attachedPdfs.map((att) => att.id), ['att-manual', 'att-
     const result = applyAnnexPlan(before, planDatasheetAnnexes(manual, catalog), NOW, unresolvedEquipmentIds(manual, catalog));
     assert.equal(result.attachedPdfs.some((att) => att.id === catalogAnnexId('sheet-inverter')), false, 'old model datasheet leaves the export');
   }
+  // One model detached by hand while another group is still unresolved: only the unresolved group's annex is kept.
+  {
+    const mixed = structuredClone(loading);
+    mixed.specs.inverters = [{ id: 'inv', brandModel: 'Inversor propio', powerKW: 8, count: 1, manualModel: true }];
+    const noPanels = catalog.filter((item) => item.type !== 'panel'); // the panel records have not arrived
+    const pending = unresolvedEquipmentIds(mixed, noPanels);
+    assert.equal(pending.has('inv'), false, 'the detached model is not protected');
+    assert.equal(pending.has('pa'), true, 'the unresolved group keeps its annex');
+    const result = applyAnnexPlan(before, planDatasheetAnnexes(mixed, noPanels), NOW, pending);
+    assert.deepEqual(result.attachedPdfs.map((att) => att.id), ['att-manual', catalogAnnexId('sheet-family')]);
+    // Another group still uses the detached item: its annex stays.
+    const shared = structuredClone(mixed);
+    shared.specs.inverters = [...shared.specs.inverters!, { id: 'g8', catalogItemId: 'inv', brandModel: 'QA Inversor 8K', powerKW: 8, count: 1 }];
+    assert.equal(unresolvedEquipmentIds(shared, noPanels).has('inv'), true);
+  }
   // The record arrives: the same annex objects survive, nothing is recreated.
   assert.equal(applyAnnexPlan(before, planDatasheetAnnexes(loading, catalog), NOW, unresolvedEquipmentIds(loading, catalog)).changed, false);
   // The proposal stops using the equipment (count 0 or removed group): the annex is removed even if the catalog is still partial.
