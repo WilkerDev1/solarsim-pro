@@ -105,25 +105,23 @@ section('4. Nombres de reserva unificados y sin batería.', () => {
   assert.equal(none.batteryCapacityKWh, 0);
 });
 
-// 5. Borrador de IA: arma grupos con el módulo y no escribe el espejo.
-section('5. Borrador de IA: arma grupos con el módulo y no escribe el espejo.', () => {
+// 5. Borrador de IA: arma los grupos sin escribir campos heredados a mano.
+section('5. Borrador de IA: arma los grupos sin escribir campos heredados a mano.', () => {
   const data = {
     monthlyConsumptionKWh: Array(12).fill(1000), averageMonthlyKWh: 1000, province: 'Santiago', distributor: 'EDENORTE', tariffCode: 'BTS1',
     panels: [{ id: 'p', brandModel: 'P', powerW: 600, count: 10, unitPriceUSD: 100 }], inverters: [{ id: 'i', brandModel: 'I', powerKW: 5, count: 1, unitPriceUSD: 900 }],
     batteries: [{ id: 'b', brandModel: 'B', capacityKWh: 10, count: 1, unitPriceUSD: 1500, dodPct: 80, efficiencyPct: 90 }],
   };
   const base = createAIProposalBase(BENCHMARK_PROJECT, { defaultBatteryDOD: 85 } as never, 'Santiago');
-  assert.deepEqual(mirrorKeys(base.specs), [], 'la base de IA ya no lleva espejo');
+  assert.equal(base.specs.batteries![0].dodPct, 85, 'la base de IA trae grupos');
   assert.equal(readEquipment(base.specs).batteries[0].dodPct, 85, 'el DOD por defecto vive en el grupo');
   const grounded = prepareProposalDraftProject(base, data as never, DEFAULT_RD_TARIFF_MATRIX as never, { isNew: true });
-  assert.deepEqual(mirrorKeys(grounded.specs), [], 'borrador con grupos: sin espejo');
   assert.equal(grounded.specs.panels![0].count, 10);
   assert.equal(grounded.specs.batteries![0].dodPct, 80);
   // Borrador por selección única (sin grupos de catálogo): también termina en grupos.
   const selected = prepareProposalDraftProject(base, { ...data, panels: undefined, inverters: undefined, batteries: undefined, recommendedPanelCount: 12, selectedPanelWatts: 550,
     selectedPanelModel: 'Longi 550', selectedPanelUnitPriceUSD: 90, selectedInverterModel: 'Growatt 8K', selectedInverterPowerKW: 8, selectedInverterCount: 2, selectedInverterUnitPriceUSD: 1200,
     hasBattery: true, selectedBatteryModel: 'Dyness 10', selectedBatteryCapacityKWh: 10, selectedBatteryCount: 2, selectedBatteryUnitPriceUSD: 1400 } as never, DEFAULT_RD_TARIFF_MATRIX as never, { isNew: true });
-  assert.deepEqual(mirrorKeys(selected.specs), [], 'borrador por selección: sin espejo');
   assert.deepEqual([selected.specs.panels![0].brandModel, selected.specs.panels![0].powerW, selected.specs.panels![0].count, selected.specs.panels![0].unitPriceUSD], ['Longi 550', 550, 12, 90]);
   assert.deepEqual([selected.specs.inverters![0].brandModel, selected.specs.inverters![0].powerKW, selected.specs.inverters![0].count], ['Growatt 8K', 8, 2]);
   assert.deepEqual([selected.specs.batteries![0].brandModel, selected.specs.batteries![0].capacityKWh, selected.specs.batteries![0].count, selected.specs.batteries![0].unitPriceUSD], ['Dyness 10', 10, 2, 1400]);

@@ -7,7 +7,8 @@ import { resolveAITariffSelection } from './aiTariffContext';
 import { getReferenceEnergyRateUSD } from '../data/rdTariffs';
 import { resolveSystemLossesPct, DEFAULT_SYSTEM_LOSSES_PCT, DEFAULT_BATTERY_DOD_PCT, DEFAULT_BATTERY_EFFICIENCY_PCT } from '../../shared/projectDefaults';
 import { enforceAutomatedPricing } from '../../shared/automatedProposalPolicy';
-import { editEquipment, migrateLegacySpecs, readEquipment, type EquipmentKind } from '../../shared/equipment';
+import { editEquipment, readEquipment, type EquipmentKind } from '../../shared/equipment';
+import { withEquipmentGroups } from './equipmentGroups';
 
 /** Un solo grupo por tipo recibe la selección escalar del borrador (con varios modelos se conservan, como antes). */
 function patchSingleGroup(specs:SystemSpecs,kind:EquipmentKind,patch:Record<string,unknown>):SystemSpecs {
@@ -60,7 +61,8 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
       specs=patchSingleGroup(specs,'inverter',{brandModel:data.selectedInverterModel||undefined,powerKW:data.selectedInverterPowerKW,count:data.selectedInverterCount,unitPriceUSD:data.selectedInverterUnitPriceUSD});
       specs=patchSingleGroup(specs,'battery',{brandModel:data.selectedBatteryModel||undefined,capacityKWh:data.selectedBatteryCapacityKWh,count:data.selectedBatteryCount,unitPriceUSD:data.selectedBatteryUnitPriceUSD});
     }
-    specs=migrateLegacySpecs(specs);
+    // Grupos completos; el único escritor de campos heredados es equipmentGroups (la oleada 2 lo retira).
+    specs=withEquipmentGroups(specs);
     const fx=data.dopExchangeRate || base.rates.usdExchangeRate || 60;
     const tariff=resolveAITariffSelection(tariffMatrix,data.distributor,data.tariffCode);
     const reference=tariff?getReferenceEnergyRateUSD(tariffMatrix,data.distributor,tariff.code,data.averageMonthlyKWh,fx):undefined;
@@ -76,9 +78,9 @@ export function createAIProposalBase(template:ProjectSimulation,defaults:Default
  const base=structuredClone(template);
 
       base.specs={...base.specs,pricePerWattUSD:defaults.defaultDirectPriceUSDPerWp,systemLosses:defaults.defaultSystemLosses ?? DEFAULT_SYSTEM_LOSSES_PCT,annualDegradation:defaults.defaultAnnualDegradation ?? 0.4,isDetailed:false,pricingMode:'cost_matrix',saleMarginMultiplier:1+(defaults.defaultTargetMarginPct ?? 28)/100,panels:undefined,inverters:undefined,batteries:undefined,installationUnitPriceUSD:0};
-      // Grupos desde el módulo (sin espejo); el DOD por defecto vive en el grupo de batería.
-      const migrated=migrateLegacySpecs(base.specs);
-      base.specs={...migrated,batteries:migrated.batteries?.map((group,index)=>index===0?{...group,dodPct:defaults.defaultBatteryDOD ?? DEFAULT_BATTERY_DOD_PCT}:group)};
+      // Grupos explícitos; el DOD por defecto vive en el grupo de batería.
+      const withGroups=withEquipmentGroups(base.specs);
+      base.specs=withEquipmentGroups({...withGroups,batteries:withGroups.batteries?.map((group,index)=>index===0?{...group,dodPct:defaults.defaultBatteryDOD ?? DEFAULT_BATTERY_DOD_PCT}:group)});
       base.rates={...base.rates,targetCoveragePct:defaults.defaultTargetCoveragePct ?? 95,isZeroExport:defaults.defaultZeroExport,currency:defaults.currency || 'USD',annualEnergyInflationPct:defaults.annualEnergyTariffEscalationPct ?? 3.5};
       base.financials={...base.financials,applyLey5707:defaults.applyLey5707,applyITBISExemption:defaults.applyITBISExemption,discountRatePct:defaults.discountRatePct,projectLifespanYears:defaults.lifespanYears,pricePerWattUSD:defaults.defaultDirectPriceUSDPerWp,customItems:[],customDiscounts:[],customCostUSD:undefined,customLey5707CreditUSD:undefined,customITBISSavedUSD:undefined};
       base.client={...base.client,company:'',address:'',contactPhone:'',contactEmail:'',contactPerson:'',location:province,customMonthlyHSP:undefined,coordinates:undefined};

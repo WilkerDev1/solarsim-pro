@@ -22,7 +22,7 @@ import type {
 const SCALAR_EQUIPMENT_FIELDS: Record<string, EquipmentKind> = {
   panelPowerW: 'panel', panelCount: 'panel', panelUnitPriceUSD: 'panel',
   inverterPowerKW: 'inverter', inverterCount: 'inverter', inverterUnitPriceUSD: 'inverter',
-  batteryCapacityKWh: 'battery', batteryCount: 'battery', batteryUnitPriceUSD: 'battery', batteryCostUSD: 'battery', batteryDOD: 'battery', batteryEfficiencyPct: 'battery',
+  batteryCapacityKWh: 'battery', batteryCount: 'battery', batteryUnitPriceUSD: 'battery', batteryDOD: 'battery', batteryEfficiencyPct: 'battery',
 };
 export function assistantOwner() {
   const s = useSimulationStore.getState();
@@ -293,6 +293,11 @@ export function executeAssistantTool(
       const p = target as ReturnType<typeof visibleAssistantProjects>[number];
       const equipment = readEquipment({ ...p.specs, hasBattery: true });
       for (const e of edits) {
+        // `batteryCostUSD` no llega a ningún grupo: con grupos guardados se rechaza como siempre.
+        if (e.section === 'specs' && e.field === 'batteryCostUSD' && p.specs.batteries?.length)
+          throw new Error(
+            'Esta propuesta usa grupos de equipos. Edita sus modelos y cantidades en el simulador o en el borrador de propuestas.'
+          );
         const scalarKind = e.section === 'specs' ? SCALAR_EQUIPMENT_FIELDS[e.field] : undefined;
         if (scalarKind && equipment[{ panel: 'panels', inverter: 'inverters', battery: 'batteries' }[scalarKind] as 'panels'].length > 1)
           throw new Error(
