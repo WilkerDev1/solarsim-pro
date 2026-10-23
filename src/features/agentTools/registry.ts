@@ -14,6 +14,7 @@ import { CATALOG_TOOL_HANDLERS } from './catalogTools';
 import { DOCUMENT_TOOL_HANDLERS } from './documentTools';
 import { ATTACHMENT_TOOL_HANDLERS } from './attachmentTools';
 import { CLIENT_TOOL_HANDLERS } from './clientTools';
+import { touchesPricing } from '../assistant/pricingFields';
 import { assistantFieldLabel, assistantValueLabel } from '../assistant/labels';
 import type { AssistantAction, AssistantCard, AssistantToolResult } from '../assistant/types';
 
@@ -72,14 +73,7 @@ function decodeArgs(args: Record<string, unknown>): Record<string, unknown> {
   };
 }
 
-/** Fields that change what the customer pays (costs, margins, labor, extras, discounts, equipment groups with unit prices). */
-const PRICING_FIELDS: Record<string, readonly string[]> = {
-  specs: ['saleMarginMultiplier', 'installationUnitPriceUSD', 'panelUnitPriceUSD', 'inverterUnitPriceUSD', 'batteryUnitPriceUSD', 'batteryCostUSD',
-    'autoSupplierPricing', 'panels', 'inverters', 'batteries'],
-  financials: ['customItems', 'customDiscounts'],
-};
-export const touchesPricing = (action: AssistantAction): boolean =>
-  action.kind === 'project' && action.edits.some((e) => PRICING_FIELDS[e.section]?.includes(e.field));
+export { touchesPricing };
 
 const describeChanges = (action: AssistantAction): AgentChange[] =>
   action.edits.map((e) => ({ label: assistantFieldLabel(e.field), value: assistantValueLabel(e.value) }));
