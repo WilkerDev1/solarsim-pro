@@ -1,4 +1,4 @@
-import { DEFAULT_PRICE_PER_WATT_USD } from '../../../shared/projectDefaults';
+import { DEFAULT_PRICE_PER_WATT_USD, resolveBatteryDodPct } from '../../../shared/projectDefaults';
 import { createProjectId } from '../../utils/projectId';
 import { commercialCopy } from '../../../shared/proposalCommercial';
 import { projectMutationMetadata } from '../sync/projectMutation';
@@ -120,6 +120,8 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
         specs: {
           ...BENCHMARK_PROJECT.specs,
           ...(raw.specs || {}),
+          // El 80 % del caso de referencia no es un default: sin DOD válido, el del proyecto es el del motor.
+          batteryDOD: resolveBatteryDodPct(raw.specs?.batteryDOD),
           panelCount: typeof raw.specs?.panelCount === 'number' && raw.specs.panelCount > 0 ? raw.specs.panelCount : 10,
           panelPowerW: typeof raw.specs?.panelPowerW === 'number' && raw.specs.panelPowerW > 0 ? raw.specs.panelPowerW : 620,
         },
