@@ -1,5 +1,7 @@
 import type { BatteryItemSpec, InverterItemSpec, PanelItemSpec, SystemSpecs } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
+import type { EquipmentKind } from '../../shared/equipment';
+import { DEFAULT_UNIT_PRICE_USD } from '../../shared/equipment';
 import { getProjectBatteries, getProjectInverters, getProjectPanels } from './equipmentSpecsUtils';
 
 /**
@@ -9,7 +11,8 @@ import { getProjectBatteries, getProjectInverters, getProjectPanels } from './eq
  * engines read from the legacy fields (battery DoD/efficiency/lifespan, panel degradation, …) are not
  * group identity and are never rewritten from a group.
  */
-export type EquipmentKind = 'panel' | 'inverter' | 'battery';
+export type { EquipmentKind };
+export { DEFAULT_UNIT_PRICE_USD };
 type GroupItem = { panel: PanelItemSpec; inverter: InverterItemSpec; battery: BatteryItemSpec };
 type ListKey = 'panels' | 'inverters' | 'batteries';
 
@@ -25,9 +28,6 @@ const KINDS: EquipmentKind[] = ['panel', 'inverter', 'battery'];
 
 /** Group fields whose legacy scalar edit applies to the first group even when the project has several. */
 const PRIMARY_SCALAR_FIELDS: Record<EquipmentKind, string[]> = { panel: [], inverter: [], battery: ['dodPct', 'efficiencyPct'] };
-
-/** Unit price the cost matrix assumes for a legacy single-model project without one. */
-export const DEFAULT_UNIT_PRICE_USD: Record<EquipmentKind, number> = { panel: 103.32, inverter: 2300.0, battery: 1990.0 };
 
 function groupsOf<K extends EquipmentKind>(specs: SystemSpecs, kind: K): GroupItem[K][] {
   const saved = specs[LIST_KEY[kind]] as GroupItem[K][] | undefined;

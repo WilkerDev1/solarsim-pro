@@ -1,4 +1,5 @@
 import { SystemSpecs, PanelItemSpec, InverterItemSpec, BatteryItemSpec } from '../types';
+import { deriveLegacyGroup } from '../../shared/equipment/legacy';
 
 /**
  * Returns a normalized array of panel models for the project.
@@ -9,27 +10,8 @@ export function getProjectPanels(specs: SystemSpecs): PanelItemSpec[] {
   if (specs.panels && Array.isArray(specs.panels) && specs.panels.length > 0) {
     return specs.panels;
   }
-  return [
-    {
-      id: 'primary-panel',
-      brandModel: specs.panelBrandModel || 'Módulo Canadian Solar TOPBiHiKu6 620W',
-      powerW: specs.panelPowerW || 620,
-      count: specs.panelCount || 0,
-      unitPriceUSD: specs.panelUnitPriceUSD,
-      weightKilos: specs.panelWeightKilos,
-      efficiencyPct: specs.panelEfficiency,
-      tempCoeff: specs.tempCoeff,
-      annualDegradation: specs.annualDegradation,
-      selectedSupplierInfo: specs.selectedSupplierInfo?.panel
-        ? {
-            supplierName: specs.selectedSupplierInfo.panel.supplierName,
-            priceUSD: specs.selectedSupplierInfo.panel.priceUSD,
-            updatedAt: specs.selectedSupplierInfo.panel.updatedAt,
-            supplierPriceId: specs.selectedSupplierInfo.panel.supplierPriceId,
-          }
-        : undefined,
-    },
-  ];
+  // La derivación desde los campos heredados vive en shared/equipment (único lector del espejo).
+  return [deriveLegacyGroup(specs, 'panel')];
 }
 
 /**
@@ -41,25 +23,8 @@ export function getProjectInverters(specs: SystemSpecs): InverterItemSpec[] {
   if (specs.inverters && Array.isArray(specs.inverters) && specs.inverters.length > 0) {
     return specs.inverters;
   }
-  return [
-    {
-      id: 'primary-inverter',
-      brandModel: specs.inverterBrandModel || 'Inversor Solar Inteligente',
-      powerKW: specs.inverterPowerKW || 8,
-      count: specs.inverterCount !== undefined ? specs.inverterCount : 1,
-      unitPriceUSD: specs.inverterUnitPriceUSD,
-      weightKilos: specs.inverterWeightKilos,
-      efficiencyPct: specs.inverterEfficiencyPct,
-      selectedSupplierInfo: specs.selectedSupplierInfo?.inverter
-        ? {
-            supplierName: specs.selectedSupplierInfo.inverter.supplierName,
-            priceUSD: specs.selectedSupplierInfo.inverter.priceUSD,
-            updatedAt: specs.selectedSupplierInfo.inverter.updatedAt,
-            supplierPriceId: specs.selectedSupplierInfo.inverter.supplierPriceId,
-          }
-        : undefined,
-    },
-  ];
+  // La derivación desde los campos heredados vive en shared/equipment (único lector del espejo).
+  return [deriveLegacyGroup(specs, 'inverter')];
 }
 
 /**
@@ -73,28 +38,8 @@ export function getProjectBatteries(specs: SystemSpecs): BatteryItemSpec[] {
   if (specs.batteries && Array.isArray(specs.batteries) && specs.batteries.length > 0) {
     return specs.batteries;
   }
-  return [
-    {
-      id: 'primary-battery',
-      brandModel: specs.batteryBrandModel || 'Batería de Litio LiFePO4',
-      capacityKWh: specs.batteryCapacityKWh || 16.08,
-      count: specs.batteryCount !== undefined ? specs.batteryCount : 1,
-      unitPriceUSD: specs.batteryUnitPriceUSD,
-      weightKilos: specs.batteryWeightKilos,
-      dodPct: specs.batteryDOD, // vacío permitido: el motor aplica el default (shared/projectDefaults)
-      efficiencyPct: specs.batteryEfficiencyPct,
-      lifespanYears: specs.batteryLifespanYears || 10,
-      replacementCostUSD: specs.batteryReplacementCostUSD,
-      selectedSupplierInfo: specs.selectedSupplierInfo?.battery
-        ? {
-            supplierName: specs.selectedSupplierInfo.battery.supplierName,
-            priceUSD: specs.selectedSupplierInfo.battery.priceUSD,
-            updatedAt: specs.selectedSupplierInfo.battery.updatedAt,
-            supplierPriceId: specs.selectedSupplierInfo.battery.supplierPriceId,
-          }
-        : undefined,
-    },
-  ];
+  // La derivación desde los campos heredados vive en shared/equipment (único lector del espejo).
+  return [deriveLegacyGroup(specs, 'battery')];
 }
 
 /**
