@@ -163,4 +163,19 @@ const draftBaseFor = () => createAIProposalBase(BENCHMARK_PROJECT, { defaultBatt
   assert.equal(prepared.specs.batteries![1].efficiencyPct, 90);
 }
 
+// ── Reordenar o reemplazar la lista no cambia el resultado ─────────────────────────────────
+{
+  const A = group('A', 10, 1, { dodPct: 70, efficiencyPct: 80 });
+  const B = group('B', 10, 1);
+  const start = { ...base.specs, hasBattery: true, batteries: [A, B], batteryDOD: 70, batteryEfficiencyPct: 80 } as unknown as SystemSpecs;
+  const ab = normalizeEquipmentEdit(start, { batteries: [A, B] } as Partial<SystemSpecs>);
+  const ba = normalizeEquipmentEdit(start, { batteries: [B, A] } as Partial<SystemSpecs>);
+  close(resolveBatteryBankDodPct(ab), resolveBatteryBankDodPct(ba), 'DOD igual con [A, B] y [B, A]');
+  close(resolveBatteryBankEfficiencyPct(ab), resolveBatteryBankEfficiencyPct(ba), 'eficiencia igual con [A, B] y [B, A]');
+  assert.equal(usable(ab), usable(ba), 'energía útil igual con [A, B] y [B, A]');
+  close(20 * (resolveBatteryBankDodPct(ba) / 100) * (resolveBatteryBankEfficiencyPct(ba) / 100), 10 * 0.7 * 0.8 + 10 * 0.9 * 0.9, 'B usa 90/90: 13.7 kWh');
+  assert.equal(ba.batteryDOD, undefined, 'el espejo se reinicia: el nuevo principal no tiene dato propio');
+  assert.equal(ba.batteryEfficiencyPct, undefined);
+}
+
 console.log('testBatteryBankDefaults: ok');
