@@ -248,7 +248,9 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
       },
       specs: {
         ...BENCHMARK_PROJECT.specs,
-        ...(defs?.defaultPricingMode === 'direct' ? { pricePerWattUSD: directWattPrice, pricePerKWpUSD: Math.round(directWattPrice * 1000 * 100) / 100 } : {}),
+        // El $/W del caso de referencia (1.134971) no es un default: todo proyecto nuevo parte del ajuste.
+        pricePerWattUSD: directWattPrice,
+        pricePerKWpUSD: Math.round(directWattPrice * 1000 * 100) / 100,
         isDetailed: false, // Simple (Catálogo IA): equipos del catálogo con precios de proveedor
         pricingMode: defs?.defaultPricingMode === 'direct' ? 'direct_watt' : 'cost_matrix',
         panelPowerW: defs?.defaultPanelPowerW || 620,
