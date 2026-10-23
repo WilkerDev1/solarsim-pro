@@ -13,6 +13,7 @@ import { getProjectBatteries } from '../utils/equipmentSpecsUtils';
 import { buildCatalogSelectionUpdate } from '../components/simulator/params/logic/catalogSelection';
 import { readFileSync } from 'node:fs';
 import { editEquipmentGroup, normalizeEquipmentEdit, selectCatalogEquipment } from '../utils/equipmentGroups';
+import * as shared from '../../shared/projectDefaults';
 import { resolveBatteryBankDodPct, resolveBatteryBankEfficiencyPct, resolvePrimaryBatteryEfficiencyPct } from '../../shared/projectDefaults';
 import type { ProjectSimulation, SystemSpecs } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
@@ -176,6 +177,15 @@ const draftBaseFor = () => createAIProposalBase(BENCHMARK_PROJECT, { defaultBatt
   close(20 * (resolveBatteryBankDodPct(ba) / 100) * (resolveBatteryBankEfficiencyPct(ba) / 100), 10 * 0.7 * 0.8 + 10 * 0.9 * 0.9, 'B usa 90/90: 13.7 kWh');
   assert.equal(ba.batteryDOD, undefined, 'el espejo se reinicia: el nuevo principal no tiene dato propio');
   assert.equal(ba.batteryEfficiencyPct, undefined);
+}
+
+// ── Porcentajes > 100 no son válidos ──────────────────────────────────────────────────────
+{
+  assert.equal(shared.resolveBatteryEfficiencyPct(150), 90);
+  assert.equal(shared.resolveBatteryDodPct(101), 90);
+  assert.equal(shared.resolveBatteryEfficiencyPct(100), 100);
+  close(resolveBatteryBankEfficiencyPct(bank({ efficiencyPct: 150 })), (32 * 95 + 15 * 90) / 47, 'un grupo con eficiencia > 100 usa 90');
+  assert(usable(bank({ dodPct: 500, efficiencyPct: 500 })) <= 47, 'la energía útil nunca supera la capacidad nominal');
 }
 
 console.log('testBatteryBankDefaults: ok');
