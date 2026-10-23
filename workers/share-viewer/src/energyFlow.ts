@@ -124,17 +124,49 @@ function legend(s: ModeScenario): string {
       </ul>`;
 }
 
-// Without JavaScript the day panel simply stays visible; the script only swaps which panel is hidden.
-const TOGGLE_SCRIPT = `(function () {
+// Without JavaScript the day panel simply stays visible and the navigation stays hidden; the script swaps panels.
+export const ENERGY_FLOW_TOGGLE_SCRIPT = `(function () {
       var root = document.querySelector('[data-energy-flow]');
       if (!root) return;
       var buttons = root.querySelectorAll('[data-energy-mode-button]');
       var panels = root.querySelectorAll('[data-energy-mode-panel]');
-      function select(mode) {
-        for (var i = 0; i < panels.length; i++) panels[i].hidden = panels[i].getAttribute('data-energy-mode-panel') !== mode;
-        for (var j = 0; j < buttons.length; j++) buttons[j].setAttribute('aria-pressed', buttons[j].getAttribute('data-energy-mode-button') === mode ? 'true' : 'false');
+      var dots = root.querySelectorAll('[data-energy-mode-dot]');
+      var prev = root.querySelector('[data-energy-mode-step="-1"]');
+      var next = root.querySelector('[data-energy-mode-step="1"]');
+      var counter = root.querySelector('[data-energy-mode-counter]');
+      var swipe = root.querySelector('[data-energy-mode-swipe]');
+      var nav = root.querySelector('[data-energy-mode-nav]');
+      var current = 0;
+      for (var s = 0; s < panels.length; s++) if (!panels[s].hidden) { current = s; break; }
+      function select(index) {
+        if (index < 0 || index >= panels.length || index === current) return;
+        var forward = index > current;
+        current = index;
+        for (var i = 0; i < panels.length; i++) {
+          panels[i].classList.remove('ef-from-right', 'ef-from-left');
+          panels[i].hidden = i !== index;
+        }
+        panels[index].classList.add(forward ? 'ef-from-right' : 'ef-from-left');
+        for (var j = 0; j < buttons.length; j++) buttons[j].setAttribute('aria-pressed', j === index ? 'true' : 'false');
+        for (var d = 0; d < dots.length; d++) dots[d].classList.toggle('ef-pos-on', d === index);
+        if (counter) counter.textContent = 'Situación ' + (index + 1) + ' de ' + panels.length;
+        if (prev) prev.disabled = index === 0;
+        if (next) { next.disabled = index === panels.length - 1; next.classList.remove('ef-nudge'); }
       }
-      for (var k = 0; k < buttons.length; k++) buttons[k].addEventListener('click', function (e) { select(e.currentTarget.getAttribute('data-energy-mode-button')); });
+      for (var k = 0; k < buttons.length; k++) buttons[k].addEventListener('click', (function (n) { return function () { select(n); }; })(k));
+      if (prev) prev.addEventListener('click', function () { select(current - 1); });
+      if (next) next.addEventListener('click', function () { select(current + 1); });
+      if (swipe) {
+        var sx = 0, sy = 0;
+        swipe.addEventListener('touchstart', function (e) { sx = e.changedTouches[0].clientX; sy = e.changedTouches[0].clientY; }, { passive: true });
+        swipe.addEventListener('touchend', function (e) {
+          var dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
+          if (Math.abs(dx) >= 40 && Math.abs(dx) > Math.abs(dy) * 1.5) select(current + (dx < 0 ? 1 : -1));
+        }, { passive: true });
+      }
+      if (prev) prev.disabled = current === 0;
+      if (next) next.disabled = current === panels.length - 1;
+      if (nav) nav.hidden = false;
     })();`;
 
 /** Animated energy-flow diagram with one panel per situation (day, night, outage), above section 1. */
@@ -175,8 +207,19 @@ export function renderEnergyFlowSection(input: EnergyFlowScenarioInput): string 
       <div class="no-print flex flex-wrap gap-1 p-1 rounded-3xl sm:rounded-full bg-slate-100 w-fit max-w-full" role="group" aria-label="Situación a mostrar">
           ${buttons}
       </div>
+      <div data-energy-mode-swipe class="ef-swipe space-y-3">
       ${panels}
-      <script>${TOGGLE_SCRIPT}</script>
+      </div>
+      <div data-energy-mode-nav class="no-print flex items-center justify-between gap-3" hidden>
+        <button data-energy-mode-step="-1" type="button" aria-label="Situación anterior" class="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full border border-slate-200 bg-white text-slate-600 hover:text-orange-600 hover:border-orange-300 hover:bg-orange-50 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 disabled:opacity-40 disabled:cursor-default disabled:hover:text-slate-600 disabled:hover:border-slate-200 disabled:hover:bg-white" disabled><svg viewBox="0 0 24 24" class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <div class="min-w-0 flex flex-col items-center gap-1.5 text-center">
+          <div class="flex items-center gap-1.5" aria-hidden="true">${scenarios.map((_, i) => `<span data-energy-mode-dot="" class="ef-pos${i === 0 ? ' ef-pos-on' : ''}"></span>`).join('')}</div>
+          <span data-energy-mode-counter aria-live="polite" class="text-[11px] sm:text-xs font-semibold text-slate-600">Situación 1 de ${scenarios.length}</span>
+          <span class="sm:hidden text-[11px] text-slate-500">← Deslice para ver otras situaciones →</span>
+        </div>
+        <button data-energy-mode-step="1" type="button" aria-label="Situación siguiente" class="ef-nudge shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full border border-slate-200 bg-white text-slate-600 hover:text-orange-600 hover:border-orange-300 hover:bg-orange-50 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 disabled:opacity-40 disabled:cursor-default disabled:hover:text-slate-600 disabled:hover:border-slate-200 disabled:hover:bg-white"><svg viewBox="0 0 24 24" class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+      </div>
+      <script>${ENERGY_FLOW_TOGGLE_SCRIPT}</script>
     </section>`;
 }
 
@@ -207,7 +250,16 @@ export const ENERGY_FLOW_CSS = `
     .ef-btn[aria-pressed="true"] { background: #fff; color: #c2410c; box-shadow: 0 1px 2px rgba(15, 23, 42, .12); }
     .ef-panel { animation: ef-fade .25s ease-out; }
     @keyframes ef-fade { from { opacity: 0; } to { opacity: 1; } }
-    @media (prefers-reduced-motion: reduce) { .ef-flow, .ef-dot, .ef-tw, .ef-panel { animation: none; } }
+    .ef-swipe { touch-action: pan-y; }
+    .ef-pos { display: inline-block; width: 6px; height: 6px; border-radius: 999px; background: #cbd5e1; transition: width .2s ease, background-color .2s ease; }
+    .ef-pos-on { width: 18px; background: #f97316; }
+    .ef-nudge { animation: ef-nudge 1.2s ease-in-out 1.5s 3; }
+    @keyframes ef-nudge { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(5px); } }
+    .ef-from-right { animation: ef-in-right .28s ease-out; }
+    .ef-from-left { animation: ef-in-left .28s ease-out; }
+    @keyframes ef-in-right { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+    @keyframes ef-in-left { from { opacity: 0; transform: translateX(-24px); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .ef-nudge, .ef-from-right, .ef-from-left, .ef-flow, .ef-dot, .ef-tw, .ef-panel { animation: none; } }
     @media print {
       .ef-section [data-energy-mode-panel] { display: none !important; }
       .ef-section [data-energy-mode-panel="day"] { display: block !important; }

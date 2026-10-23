@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { renderProposalPage } from '../src/template';
 import { energyFlowScenarios, type EnergyFlowScenarioInput, type ModeScenario } from '../src/energyFlowScenarios';
+import { ENERGY_FLOW_TOGGLE_SCRIPT } from '../src/energyFlow';
+import vm from 'node:vm';
 import { BUILT_IN_APPLICATION_FEATURES, isBuiltInFeatureAvailable } from '../../../shared/applicationFeatures';
 
 // --- Pure scenarios -------------------------------------------------------
@@ -272,6 +274,63 @@ assert.ok(onGridHtml.includes('prefers-reduced-motion'), 'Animation respects red
 assert.ok(onGridHtml.includes('@media print') && /data-energy-mode-panel="day"\]/.test(onGridHtml.slice(onGridHtml.indexOf('<style>'), onGridHtml.indexOf('</style>'))), 'Print shows only the day mode');
 assert.ok(/class="[^"]*no-print[^"]*"[^>]*role="group"|role="group"[^>]*class="[^"]*no-print/.test(section(onGridHtml)), 'Buttons are hidden when printing');
 assert.ok(section(onGridHtml).includes('<script>'), 'A small script toggles the modes');
+
+
+// Mode navigation is discoverable: arrows, position dots, a counter and, on phones, a swipe hint.
+const nav = section(hybridHtml);
+assert.ok(/data-energy-mode-nav[^>]*hidden/.test(nav), 'Navigation stays hidden until the script runs');
+assert.ok(/data-energy-mode-step="-1"[^>]*aria-label="Situación anterior"|aria-label="Situación anterior"[^>]*data-energy-mode-step="-1"/.test(nav));
+assert.ok(/data-energy-mode-step="1"[^>]*aria-label="Situación siguiente"|aria-label="Situación siguiente"[^>]*data-energy-mode-step="1"/.test(nav));
+assert.equal(nav.match(/data-energy-mode-dot=/g)?.length, 5);
+assert.ok(nav.includes('Situación 1 de 5') && /sm:hidden[^>]*>[^<]*Deslice/.test(nav), 'Counter and phone swipe hint');
+assert.ok(/data-energy-mode-swipe/.test(nav) && /\.ef-swipe\s*\{[^}]*touch-action:\s*pan-y/.test(hybridHtml), 'Swipe area keeps vertical scrolling');
+assert.ok(/class="[^"]*no-print[^"]*"[^>]*data-energy-mode-nav|data-energy-mode-nav[^>]*class="[^"]*no-print/.test(nav), 'Navigation is hidden when printing');
+assert.ok(/prefers-reduced-motion[^}]*ef-nudge/.test(hybridHtml) || /prefers-reduced-motion: reduce\) \{[^}]*\.ef-nudge/.test(hybridHtml));
+
+// Behaviour of the real toggle script on a minimal DOM.
+type Listener = (e: any) => void;
+class El {
+  attrs: Record<string, string>; hidden = false; disabled = false; textContent = ''; listeners: Record<string, Listener[]> = {};
+  classes = new Set<string>();
+  classList = { add: (c: string) => this.classes.add(c), remove: (...c: string[]) => c.forEach((x) => this.classes.delete(x)), contains: (c: string) => this.classes.has(c),
+    toggle: (c: string, on?: boolean) => { const v = on ?? !this.classes.has(c); if (v) this.classes.add(c); else this.classes.delete(c); return v; } };
+  constructor(attrs: Record<string, string> = {}) { this.attrs = attrs; }
+  getAttribute(n: string) { return this.attrs[n] ?? null; }
+  setAttribute(n: string, v: string) { this.attrs[n] = v; }
+  removeAttribute(n: string) { delete this.attrs[n]; }
+  addEventListener(t: string, fn: Listener) { (this.listeners[t] ??= []).push(fn); }
+  fire(t: string, e: any = {}) { for (const fn of this.listeners[t] ?? []) fn({ currentTarget: this, ...e }); }
+}
+const modeIds = ['day', 'batteryFull', 'night', 'outageDay', 'outageNight'];
+const btns = modeIds.map((m, i) => new El({ 'data-energy-mode-button': m, 'aria-pressed': String(i === 0) }));
+const pnls = modeIds.map((m, i) => Object.assign(new El({ 'data-energy-mode-panel': m }), { hidden: i !== 0 }));
+const dots = modeIds.map(() => new El({ 'data-energy-mode-dot': '' }));
+const prev = new El({ 'data-energy-mode-step': '-1' }); const next = new El({ 'data-energy-mode-step': '1' });
+const counter = new El(); const swipeArea = new El(); const navEl = new El({ hidden: '' }); navEl.hidden = true;
+next.classes.add('ef-nudge');
+const root = new El();
+const lists: Record<string, El[]> = { '[data-energy-mode-button]': btns, '[data-energy-mode-panel]': pnls, '[data-energy-mode-dot]': dots };
+const single: Record<string, El> = { '[data-energy-mode-step="-1"]': prev, '[data-energy-mode-step="1"]': next, '[data-energy-mode-counter]': counter, '[data-energy-mode-swipe]': swipeArea, '[data-energy-mode-nav]': navEl };
+Object.assign(root, { querySelectorAll: (q: string) => lists[q] ?? [], querySelector: (q: string) => single[q] ?? null });
+vm.runInNewContext(ENERGY_FLOW_TOGGLE_SCRIPT, { document: { querySelector: (q: string) => (q === '[data-energy-flow]' ? root : null) }, Math });
+const shown = () => pnls.findIndex((p) => !p.hidden);
+const swipeBy = (dx: number, dy = 0) => { swipeArea.fire('touchstart', { changedTouches: [{ clientX: 200, clientY: 300 }] }); swipeArea.fire('touchend', { changedTouches: [{ clientX: 200 + dx, clientY: 300 + dy }] }); };
+assert.equal(navEl.hidden, false, 'Script reveals the navigation');
+assert.equal(prev.disabled, true);
+swipeBy(-80); assert.equal(shown(), 1, 'Right-to-left swipe shows the next situation');
+assert.equal(btns[1].attrs['aria-pressed'], 'true'); assert.equal(btns[0].attrs['aria-pressed'], 'false');
+assert.ok(dots[1].classes.has('ef-pos-on') && !dots[0].classes.has('ef-pos-on'));
+assert.equal(counter.textContent, 'Situación 2 de 5');
+assert.ok(!next.classes.has('ef-nudge'), 'The nudge stops after the first interaction');
+assert.ok(pnls[1].classes.has('ef-from-right'));
+swipeBy(80); assert.equal(shown(), 0, 'Left-to-right swipe goes back'); assert.ok(pnls[0].classes.has('ef-from-left'));
+swipeBy(80); assert.equal(shown(), 0, 'No wrap before the first situation');
+swipeBy(-20); assert.equal(shown(), 0, 'Short drags are ignored');
+swipeBy(-60, 120); assert.equal(shown(), 0, 'Mostly vertical gestures keep scrolling the page');
+next.fire('click'); next.fire('click'); assert.equal(shown(), 2, 'Next arrow advances');
+prev.fire('click'); assert.equal(shown(), 1, 'Previous arrow goes back');
+btns[4].fire('click'); assert.equal(shown(), 4); assert.equal(next.disabled, true);
+swipeBy(-80); assert.equal(shown(), 4, 'No wrap after the last situation');
 
 // Already published links (no summary, no monthly data) still render, and the gate removes the section when off.
 const legacy = proposal({ summary: { monthlyBreakdown: undefined } });
