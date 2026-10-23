@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { annexAttemptKey, annexesToCount, releaseFailedAttempt } from '../utils/annexPageCountAttempts';
+import { annexAttemptKey, annexesToCount, releaseFailedAttempt, sessionAllowsRetry } from '../utils/annexPageCountAttempts';
 import type { AttachedPDFDocument } from '../types';
 
 const annex = (id: string, extra: Partial<AttachedPDFDocument> = {}): AttachedPDFDocument => ({
@@ -27,3 +27,12 @@ assert.deepEqual(annexesToCount(attached, attempted).map((att) => att.id), ['a']
 assert.equal(annexesToCount([annex('a', { uploadedAt: '2026-10-22T00:00:00.000Z' })], new Set([annexAttemptKey(attached[0])])).length, 1);
 assert.deepEqual(annexesToCount(undefined, attempted), []);
 console.log('Annex page count: failed fetches release their attempt so they can be retried, without loops.');
+
+// Session change => retry: an expired token followed by a new sign-in releases failed attempts without an `online` event.
+{
+  const expired = { sessionGeneration: 3, authToken: undefined };
+  assert.equal(sessionAllowsRetry(expired, { ...expired }), false, 'same session: no retry');
+  assert.equal(sessionAllowsRetry(expired, { sessionGeneration: 3, authToken: 'new' }), true, 'signing back in retries');
+  assert.equal(sessionAllowsRetry({ sessionGeneration: 3, authToken: 'a' }, { sessionGeneration: 4, authToken: 'a' }), true, 'new session generation retries');
+  assert.equal(sessionAllowsRetry({ sessionGeneration: 3, authToken: null }, { sessionGeneration: 3, authToken: undefined }), false, 'null and undefined are the same signed-out state');
+}

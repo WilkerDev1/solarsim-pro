@@ -21,3 +21,13 @@ export function annexesToCount(attached: readonly AttachedPDFDocument[] | undefi
 export function releaseFailedAttempt(attempted: Set<string>, att: AnnexIdentity): void {
   attempted.delete(annexAttemptKey(att));
 }
+
+export interface AnnexSessionSnapshot { sessionGeneration: number; authToken?: string | null }
+
+/**
+ * A sign-in, sign-out, token refresh or session switch can make a previously failed fetch succeed, even with the same
+ * catalog and attachment references and no `online` event. Only a real credential change counts as a retry trigger.
+ */
+export function sessionAllowsRetry(prev: AnnexSessionSnapshot, next: AnnexSessionSnapshot): boolean {
+  return prev.sessionGeneration !== next.sessionGeneration || (prev.authToken ?? '') !== (next.authToken ?? '');
+}

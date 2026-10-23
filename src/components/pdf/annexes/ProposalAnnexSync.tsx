@@ -22,6 +22,7 @@ export const ProposalAnnexSync: React.FC<ProposalAnnexSyncProps> = ({ project })
   const serverUrl = useSimulationStore((state) => state.syncSettings.serverUrl);
   const user = useSimulationStore((state) => state.syncSettings.currentUser);
   const sessionGeneration = useSimulationStore((state) => state.sessionGeneration);
+  const authToken = useSimulationStore((state) => state.syncSettings.authToken); // primitive: signing in again retries failed fetches
   const allowed = canWrite(user) && !live.isDeleted && live.syncStatus !== 'conflict';
   const attachedPdfs = live.customization?.attachedPdfs;
   const dismissed = live.customization?.dismissedDatasheetKeys;
@@ -78,7 +79,7 @@ export const ProposalAnnexSync: React.FC<ProposalAnnexSyncProps> = ({ project })
     })();
     // A cancelled run hands its unfinished annexes to the next run, which starts right after this cleanup.
     return () => { cancelled = true; started.forEach((key) => counted.current.delete(key)); };
-  }, [allowed, live.id, attachedPdfs, catalog, onlineTick]);
+  }, [allowed, live.id, attachedPdfs, catalog, onlineTick, sessionGeneration, authToken]);
 
   return null;
 };
