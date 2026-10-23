@@ -12,14 +12,8 @@ import {
   wattPricePatch,
   wholeMarginPctFromMultiplier,
 } from '../params/logic/pricingSync';
-import {
-  DEFAULT_DOP_RATE,
-  DEFAULT_PRICE_PER_WATT_USD,
-  DEFAULT_SALE_MARGIN_MULTIPLIER,
-  FALLBACK_COST_PER_WP_USD,
-  FALLBACK_SALE_PER_WP_USD,
-} from '../params/logic/dockDefaults';
-import { ChipGroup, ParamRow, StatStrip, ToggleGroup } from '../params/ui';
+import { resolveDopRate, resolvePricePerWattUSD, resolveSaleMarginMultiplier } from '../params/logic/dockDefaults';
+import { ChipGroup, CommitNumberField, ParamRow, StatStrip, ToggleGroup } from '../params/ui';
 import { DirectPrice } from '../params/sections/pricing/DirectPrice';
 import { NumberField } from '../params/sections/pricing/NumberField';
 import { UnitCosts } from '../params/sections/pricing/UnitCosts';
@@ -32,6 +26,8 @@ interface PricingParamsSectionProps {
   updateSpecs: (specs: Partial<SystemSpecs>) => void;
 }
 
+/** Texto cuando una cifra no se puede calcular. */
+const NO_VALUE = '—';
 const MARGIN_OPTIONS = [10, 15, 20, 25, 30, 35].map((pct) => ({ value: pct, label: String(pct) }));
 const MODE_OPTIONS = [
   { value: 'cost_matrix' as const, label: 'Desglosado' },
@@ -61,20 +57,25 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
 
   const isDirect = specs.pricingMode === 'direct_watt';
   const matrix = summary?.costMatrix;
-  const multiplier = specs.saleMarginMultiplier || DEFAULT_SALE_MARGIN_MULTIPLIER;
+  const multiplier = resolveSaleMarginMultiplier(specs.saleMarginMultiplier);
 
   const setMode = (mode: 'cost_matrix' | 'direct_watt') => {
     if (mode === 'cost_matrix') {
       updateSpecs({ pricingMode: 'cost_matrix' });
       return;
     }
-    const autoWp = roundedWattPrice(matrix?.salePricePerWattUSD, specs.pricePerWattUSD, DEFAULT_PRICE_PER_WATT_USD);
+    const autoWp = roundedWattPrice(matrix?.salePricePerWattUSD, resolvePricePerWattUSD(specs, project.financials));
     updateSpecs({ pricingMode: 'direct_watt', ...wattPricePatch(autoWp) });
   };
 
-  const autoSaleWp = roundedWattPrice(matrix?.salePricePerWattUSD, FALLBACK_SALE_PER_WP_USD);
-  const costWp = Math.round((matrix?.costPerWattUSD || FALLBACK_COST_PER_WP_USD) * 100) / 100;
-  const profitWp = Math.max(0, Math.round((autoSaleWp - costWp) * 100) / 100);
+  // Valores reales de la matriz; si no se pueden calcular (sin matriz o no finitos) se muestra «—», nunca una cifra inventada.
+  const finiteOrNull = (value: number | undefined): number | null => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+  const cents = (value: number) => Math.round(value * 100) / 100;
+  const costWp = finiteOrNull(matrix?.costPerWattUSD);
+  const saleWp = finiteOrNull(matrix?.salePricePerWattUSD);
+  const saleKWp = finiteOrNull(matrix?.precioKilosVentasUSD) ?? (saleWp === null ? null : saleWp * 1000);
+  const profitWp = costWp === null || saleWp === null ? null : Math.max(0, cents(cents(saleWp) - cents(costWp)));
+  const dollars = (value: number | null) => (value === null ? NO_VALUE : `$${cents(value).toFixed(2)}`);
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -83,16 +84,18 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
       </ParamRow>
 
       {isDirect ? (
-        <DirectPrice specs={specs} summary={summary} updateSpecs={updateSpecs} />
+        <DirectPrice specs={specs} summary={summary} financialsPricePerWattUSD={project.financials?.pricePerWattUSD} updateSpecs={updateSpecs} />
       ) : (
         <>
           <ParamRow label="Tasa DOP/USD" htmlFor="pd-dop-rate">
-            <NumberField
+            <CommitNumberField
               id="pd-dop-rate"
               prefix="RD$"
               step="0.5"
-              value={specs.dopExchangeRate !== undefined ? specs.dopExchangeRate : DEFAULT_DOP_RATE}
-              onValue={(v) => updateSpecs({ dopExchangeRate: v })}
+              min={0.01}
+              belowMin="revert"
+              value={resolveDopRate(specs.dopExchangeRate)}
+              onCommit={(rate) => updateSpecs({ dopExchangeRate: rate })}
             />
           </ParamRow>
           <ParamRow label="Margen de ganancia" htmlFor="pd-margin">
@@ -122,14 +125,14 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
           />
           <StatStrip
             items={[
-              { label: 'Costo /Wp', value: `$${costWp.toFixed(2)}` },
-              { label: 'Ganancia /Wp', value: `+$${profitWp.toFixed(2)}` },
-              { label: 'Venta /Wp', value: `$${autoSaleWp.toFixed(2)}`, tone: 'accent' },
+              { label: 'Costo /Wp', value: dollars(costWp) },
+              { label: 'Ganancia /Wp', value: profitWp === null ? NO_VALUE : `+$${profitWp.toFixed(2)}` },
+              { label: 'Venta /Wp', value: dollars(saleWp), tone: 'accent' },
             ]}
           />
           <div className="flex items-baseline justify-between text-[13px] text-pd-muted">
             <span>Venta /kWp</span>
-            <span className="font-mono text-pd-text">${usd(matrix?.precioKilosVentasUSD || autoSaleWp * 1000)}</span>
+            <span className="font-mono text-pd-text">{saleKWp === null ? NO_VALUE : `$${usd(saleKWp)}`}</span>
           </div>
         </>
       )}

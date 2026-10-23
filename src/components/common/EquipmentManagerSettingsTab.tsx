@@ -234,7 +234,8 @@ export const EquipmentManagerSettingsTab: React.FC<
       capacityAh: type === "battery" ? 314 : undefined,
       voltageV: type === "battery" ? 51.2 : undefined,
       dodPct: type === "battery" ? 90 : undefined,
-      batteryEfficiencyPct: type === "battery" ? 95 : undefined,
+      // Sin dato: el motor aplica el 90 % por defecto (shared/projectDefaults), el catálogo no lo fuerza.
+      batteryEfficiencyPct: undefined,
       efficiencyPct:
         type === "panel" ? 22.2 : type === "inverter" ? 97.5 : undefined,
       tempCoeff: type === "panel" ? -0.29 : undefined,

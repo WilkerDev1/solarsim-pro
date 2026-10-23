@@ -54,7 +54,7 @@ Capacidad útil y autonomía informadas en el resumen financiero:
 
 $$E_{bat,util} = C_{nominal} \times \frac{\text{DoD}}{100} \times \frac{\eta}{100}$$
 
-con `batteryDOD` (80 si falta) y `batteryEfficiencyPct` (92 si falta). El despacho físico de `solarEngine.ts` usa sus propios valores por defecto (90/90); ver el documento de balance energético.
+con `batteryDOD` y `batteryEfficiencyPct` (90/90 si faltan o no son > 0; constantes únicas en `shared/projectDefaults.ts`, las mismas que usan `solarEngine.ts`, el dock y `getProjectBatteries`). Antes el resumen financiero usaba 80/92 y el despacho físico 90/90.
 
 $$L_{prom} = \frac{E_{consumo\_anual}}{365 \times 24}, \qquad T_{autonomía} = \frac{E_{bat,util}}{L_{prom}} \quad [\text{h}]$$
 

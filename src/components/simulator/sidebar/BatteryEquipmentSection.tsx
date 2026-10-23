@@ -2,9 +2,10 @@ import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs } from '../../../types';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
+import { editEquipmentGroup } from '../../../utils/equipmentGroups';
 import { calculateTotalBatteryCapacityKWh, calculateTotalBatteryCount, getProjectBatteries } from '../../../utils/equipmentSpecsUtils';
-import { DEFAULT_BATTERY_DOD_PCT, DEFAULT_BATTERY_EFFICIENCY_PCT } from '../params/logic/dockDefaults';
-import { Field, ParamRow, StatStrip, ToggleGroup } from '../params/ui';
+import { BATTERY_PCT_RANGE, resolvePrimaryBatteryDodPct, resolvePrimaryBatteryEfficiencyPct } from '../params/logic/dockDefaults';
+import { CommitNumberField, Field, ParamRow, StatStrip, ToggleGroup } from '../params/ui';
 import { AdvancedDisclosure } from '../params/sections/equipment/AdvancedDisclosure';
 import { EquipmentGroupList } from '../params/sections/equipment/EquipmentGroupList';
 
@@ -55,25 +56,23 @@ export const BatteryEquipmentSection: React.FC<BatteryEquipmentSectionProps> = (
         <>
           <AdvancedDisclosure>
             <ParamRow label="Profundidad de descarga" htmlFor="dock-battery-dod">
-              <Field
+              <CommitNumberField
                 id="dock-battery-dod"
-                type="number"
-                mono
                 step={5}
                 suffix="%"
-                value={specs.batteryDOD || DEFAULT_BATTERY_DOD_PCT}
-                onChange={(value) => updateSpecs({ batteryDOD: parseFloat(value) || DEFAULT_BATTERY_DOD_PCT })}
+                {...BATTERY_PCT_RANGE}
+                value={resolvePrimaryBatteryDodPct(specs)}
+                onCommit={(value) => updateSpecs(editEquipmentGroup(specs, 'battery', { type: 'update', index: 0, patch: { dodPct: value } }))}
               />
             </ParamRow>
             <ParamRow label="Eficiencia de carga" htmlFor="dock-battery-efficiency">
-              <Field
+              <CommitNumberField
                 id="dock-battery-efficiency"
-                type="number"
-                mono
                 step={1}
                 suffix="%"
-                value={specs.batteryEfficiencyPct || DEFAULT_BATTERY_EFFICIENCY_PCT}
-                onChange={(value) => updateSpecs({ batteryEfficiencyPct: parseFloat(value) || DEFAULT_BATTERY_EFFICIENCY_PCT })}
+                {...BATTERY_PCT_RANGE}
+                value={resolvePrimaryBatteryEfficiencyPct(specs)}
+                onCommit={(value) => updateSpecs(editEquipmentGroup(specs, 'battery', { type: 'update', index: 0, patch: { efficiencyPct: value } }))}
               />
             </ParamRow>
             <ParamRow label="Reemplazo año 10" htmlFor="dock-battery-replacement">

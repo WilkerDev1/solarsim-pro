@@ -19,6 +19,7 @@ import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentC
 import { canEditDocument } from '../../components/pdf/editor/documentEditorState';
 import { normalizeDocumentLayout } from '../../../shared/documentLayout';
 import { applyDocumentTextPatch, companyTemplateTextPatch, documentTextsPatch } from '../../../shared/documentTexts';
+import { DEFAULT_GRID_EXPORT_FEE_PCT, DEFAULT_TARGET_COVERAGE_PCT, DEFAULT_BATTERY_CAPACITY_KWH, DEFAULT_BATTERY_DOD_PCT, DEFAULT_PRICE_PER_WATT_USD, DEFAULT_SYSTEM_LOSSES_PCT, resolveSystemLossesPct } from '../../../shared/projectDefaults';
 import { documentTextContextFor } from '../../utils/documentTextContext';
 
 /** Specs with the panel count the engine recommends for this consumption, province and coverage target. */
@@ -28,7 +29,7 @@ function withRecommendedPanels(specs: SystemSpecs, client: ClientInfo, monthlyCo
     monthlyConsumption,
     specs.panelPowerW || 620,
     targetCoveragePct,
-    specs.systemLosses !== undefined ? specs.systemLosses : 25.0,
+    resolveSystemLossesPct(specs),
     client.customMonthlyHSP
   );
   // Goes through the group normalizer so a single panel group receives the recommendation too.
@@ -202,6 +203,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
 
   createNewProject: (payload) => {
     const defs = get().defaultSimulationSettings;
+    const directWattPrice = defs?.defaultDirectPriceUSDPerWp || DEFAULT_PRICE_PER_WATT_USD;
     const id = createProjectId();
     const name = typeof payload === 'string' ? payload : (payload?.name || 'Nuevo Proyecto Solar');
     const company = typeof payload === 'object' && payload?.company ? payload.company : 'Cliente Comercial';
@@ -246,6 +248,9 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
       },
       specs: {
         ...BENCHMARK_PROJECT.specs,
+        // El $/W del caso de referencia (1.134971) no es un default: todo proyecto nuevo parte del ajuste.
+        pricePerWattUSD: directWattPrice,
+        pricePerKWpUSD: Math.round(directWattPrice * 1000 * 100) / 100,
         isDetailed: false, // Simple (Catálogo IA): equipos del catálogo con precios de proveedor
         pricingMode: defs?.defaultPricingMode === 'direct' ? 'direct_watt' : 'cost_matrix',
         panelPowerW: defs?.defaultPanelPowerW || 620,
@@ -253,18 +258,18 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
         inverterBrandModel: defs?.defaultInverterModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)',
         inverterPowerKW: defs?.defaultInverterPowerKW || 8.0,
         inverterCount: 1,
-        systemLosses: defs?.defaultSystemLosses !== undefined ? defs.defaultSystemLosses : 25.0,
+        systemLosses: defs?.defaultSystemLosses !== undefined ? defs.defaultSystemLosses : DEFAULT_SYSTEM_LOSSES_PCT,
         annualDegradation: defs?.defaultAnnualDegradation || 0.40,
         autoCalculatePanels: defs?.defaultAutoCalculatePanels || false,
         hasBattery: defs?.defaultHasBattery || false,
-        batteryCapacityKWh: defs?.defaultBatteryCapacityKWh || 16.08,
-        batteryDOD: defs?.defaultBatteryDOD || 90,
+        batteryCapacityKWh: defs?.defaultBatteryCapacityKWh || DEFAULT_BATTERY_CAPACITY_KWH,
+        batteryDOD: defs?.defaultBatteryDOD || DEFAULT_BATTERY_DOD_PCT,
       },
       rates: {
         ...BENCHMARK_PROJECT.rates,
-        targetCoveragePct: defs?.defaultTargetCoveragePct || 95,
+        targetCoveragePct: defs?.defaultTargetCoveragePct || DEFAULT_TARGET_COVERAGE_PCT,
         isZeroExport: defs?.defaultZeroExport || false,
-        gridExportFeePct: defs?.defaultApplySieRetention ? 25.0 : 0.0,
+        gridExportFeePct: defs?.defaultApplySieRetention ? DEFAULT_GRID_EXPORT_FEE_PCT : 0,
         distributor,
         tariffCode,
         currency: defs?.currency || 'USD',
@@ -273,7 +278,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
       financials: {
         applyLey5707: defs?.applyLey5707 !== undefined ? defs.applyLey5707 : true,
         applyITBISExemption: defs?.applyITBISExemption !== undefined ? defs.applyITBISExemption : true,
-        pricePerWattUSD: defs?.defaultDirectPriceUSDPerWp || 1.05,
+        pricePerWattUSD: defs?.defaultDirectPriceUSDPerWp || DEFAULT_PRICE_PER_WATT_USD,
         discountRatePct: defs?.discountRatePct || 12,
         projectLifespanYears: defs?.lifespanYears || 25,
         co2FactorKgPerKWh: BENCHMARK_PROJECT.financials?.co2FactorKgPerKWh || 0.481,
@@ -747,7 +752,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
             updatedSpecs.batteries = updatedSpecs.batteries.map((item, index) => index ? item : {
               ...item, brandModel: updatedSpecs.batteryBrandModel || item.brandModel,
               capacityKWh: updatedSpecs.batteryCapacityKWh || item.capacityKWh,
-              dodPct: updatedSpecs.batteryDOD, unitPriceUSD: supplierPrice.priceUSD,
+              dodPct: updatedSpecs.batteryDOD, efficiencyPct: updatedSpecs.batteryEfficiencyPct, unitPriceUSD: supplierPrice.priceUSD,
               selectedSupplierInfo: selectedSupplierInfo.battery,
             });
           }

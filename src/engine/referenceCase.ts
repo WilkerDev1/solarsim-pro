@@ -1,5 +1,8 @@
 import { ProjectSimulation } from '../types';
 
+/** DOD (%) del caso de referencia. Solo describe este caso: no es el default de proyectos (ver `DEFAULT_BATTERY_DOD_PCT`). */
+export const BENCHMARK_BATTERY_DOD_PCT = 80;
+
 export const BENCHMARK_PROJECT: ProjectSimulation = {
   id: 'benchmark-centro-medico',
   createdAt: '2026-08-01T10:00:00Z',
@@ -47,7 +50,7 @@ export const BENCHMARK_PROJECT: ProjectSimulation = {
     tempCoeff: -0.35,
     systemLosses: 14.0,
     annualDegradation: 0.5,
-    batteryDOD: 80,
+    batteryDOD: BENCHMARK_BATTERY_DOD_PCT,
   },
   rates: {
     energyCostPerKWh: 0.221,
