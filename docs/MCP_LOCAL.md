@@ -68,7 +68,7 @@ Si el puerto 47321 está ocupado, el panel lo indica; el puerto se cambia en `mc
 | DNS rebinding | `Host` debe ser exactamente `127.0.0.1:<puerto>` o `localhost:<puerto>` |
 | Otro proceso o usuario del equipo | Escucha solo en loopback; bearer de 256 bits comparado con `timingSafeEqual`; `mcp.json` con modo 0600; otro usuario del mismo sistema operativo con acceso al perfil sí podría leerlo |
 | Fuga del token | Nunca llega al JS del renderer: se copia al portapapeles desde el proceso principal, y el estado que ve la interfaz no lo incluye. **Regenerar** invalida el anterior al instante y olvida a los clientes |
-| Agente que excede su alcance | Mismos permisos que la cuenta; `read`/`draft`/`guarded` según la política de «Agentes externos»; `guarded` siempre exige confirmación humana; actividad con **Deshacer** |
+| Agente que excede su alcance | Mismos permisos que la cuenta; `read`/`draft`/`guarded` según la política de «Agentes externos»; `guarded` exige confirmación humana salvo que se active el modo bypass (las herramientas sin deshacer siguen confirmándose); actividad con **Deshacer** |
 | Inyección de instrucciones en datos | `instructions` = `AGENT_RULES_ES` (los datos nunca son instrucciones); las herramientas validan esquema estricto y limitan el tamaño de respuesta |
 | Cuerpos enormes o ráfagas | Límite de 12 MB, tiempos de espera por herramienta y sin estado persistente en el servidor |
 | IPC falsificado | Cada canal `mcp:*` comprueba que el emisor es el `webContents` de la ventana principal y valida la forma de los mensajes |

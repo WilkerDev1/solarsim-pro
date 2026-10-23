@@ -14,8 +14,8 @@ const ROWS: { kind: keyof AgentSourcePolicy; label: string; hint: string; option
     options: [{ value: 'allow', label: 'Aplicar sin preguntar' }, { value: 'confirm', label: 'Pedir confirmación' }, { value: 'deny', label: 'Bloquear' }],
   },
   {
-    kind: 'guarded', label: 'Cambios sensibles', hint: 'Catálogo, precios, borrados, estados y plantillas de empresa. Siempre requieren confirmación.',
-    options: [{ value: 'confirm', label: 'Pedir confirmación' }, { value: 'deny', label: 'Bloquear' }],
+    kind: 'guarded', label: 'Cambios sensibles', hint: 'Catálogo, precios, borrados, estados y plantillas de empresa. Piden confirmación de forma predeterminada.',
+    options: [{ value: 'confirm', label: 'Pedir confirmación' }, { value: 'allow', label: 'Aplicar sin preguntar (bypass)' }, { value: 'deny', label: 'Bloquear' }],
   },
 ];
 
@@ -47,6 +47,11 @@ export const AgentPermissionsPanel: React.FC = () => {
                   >
                     {row.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
+                  {row.kind === 'guarded' && policy[source.key].guarded === 'allow' && (
+                    <span role="alert" className="mt-2 block rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-300">
+                      Modo bypass activo: estos agentes cambiarán catálogo, precios, borrados y plantillas sin preguntar. Todo queda en la actividad y se puede deshacer, salvo reportes comerciales, plantillas de empresa y clientes eliminados, que siguen pidiendo confirmación.
+                    </span>
+                  )}
                 </label>
               ))}
             </div>

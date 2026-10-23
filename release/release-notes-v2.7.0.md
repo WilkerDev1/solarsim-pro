@@ -33,6 +33,7 @@ Versión de funciones: nuevo dock de parámetros, directorio de clientes, editor
 - Herramientas para crear y gestionar propuestas, auditar el inventario, editar textos y diseño, gestionar anexos y consultar el directorio de clientes.
 - Permisos por tipo de herramienta, registro de actividad con deshacer y confirmaciones antes de cambiar precios.
 - Las propuestas automáticas usan siempre el modo catálogo y la matriz de costos.
+- Modo bypass opcional en Ajustes → Agentes e IA: los cambios sensibles pueden aplicarse sin preguntar, con aviso visible, actividad y deshacer; los permisos de la cuenta y las validaciones siguen vigentes.
 
 ## MCP
 
