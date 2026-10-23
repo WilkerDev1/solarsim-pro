@@ -12,6 +12,23 @@ export const DEFAULT_BATTERY_EFFICIENCY_PCT = 90;
 /** Rango válido de DOD y eficiencia (%) al editarlos. */
 export const BATTERY_PCT_RANGE = { min: 1, max: 100 } as const;
 
+// ── Tarifas ──
+/** Cobertura objetivo (%) cuando la tarifa no la define. */
+export const DEFAULT_TARGET_COVERAGE_PCT = 95;
+/** Retención de exportación SIE (%) cuando la tarifa no la define. */
+export const DEFAULT_GRID_EXPORT_FEE_PCT = 25;
+
+// ── Sistema ──
+/** Pérdidas del sistema (%) cuando el proyecto no las define. */
+export const DEFAULT_SYSTEM_LOSSES_PCT = 25;
+/** Pérdidas (%) que el motor asume en modo detallado cuando el proyecto no las define (otro concepto: modelo de pérdidas desglosado). */
+export const DEFAULT_DETAILED_SYSTEM_LOSSES_PCT = 14;
+/** Capacidad (kWh) de una batería sin capacidad. */
+export const DEFAULT_BATTERY_CAPACITY_KWH = 16.08;
+/** Pérdidas efectivas (%): las del proyecto (un 0 explícito se conserva); si faltan, 14 en modo detallado y 25 en simple. */
+export const resolveSystemLossesPct = (specs: { systemLosses?: number | null; isDetailed?: boolean }): number =>
+  specs.systemLosses !== undefined && specs.systemLosses !== null ? specs.systemLosses : specs.isDetailed ? DEFAULT_DETAILED_SYSTEM_LOSSES_PCT : DEFAULT_SYSTEM_LOSSES_PCT;
+
 // ── Costos y margen ──
 /** Tasa RD$ por US$ cuando falta o no es válida (≤ 0). */
 export const DEFAULT_DOP_RATE = 60;

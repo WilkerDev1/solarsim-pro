@@ -1,5 +1,5 @@
 import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
-import { resolveBatteryBankDodPct, resolveBatteryBankEfficiencyPct } from '../../shared/projectDefaults';
+import { DEFAULT_SYSTEM_LOSSES_PCT, resolveSystemLossesPct, resolveBatteryBankDodPct, resolveBatteryBankEfficiencyPct } from '../../shared/projectDefaults';
 import { SystemSpecs, MonthlyEnergyResult } from '../types';
 import { getProvinceHSP } from '../data/rdProvinces';
 import { calculateTotalDCCapacityKWp, calculateTotalBatteryCapacityKWh } from '../utils/equipmentSpecsUtils';
@@ -8,7 +8,7 @@ const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Jul
 const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 /** Unrounded monthly generation per kWp, shared with theoretical draft consumption. */
-export function getMonthlySolarProductionFactors(provinceName:string,systemLosses=25,customMonthlyHSP?:number[]):number[]{
+export function getMonthlySolarProductionFactors(provinceName:string,systemLosses=DEFAULT_SYSTEM_LOSSES_PCT,customMonthlyHSP?:number[]):number[]{
   const province=getProvinceHSP(provinceName);
   return DAYS_IN_MONTH.map((days,i)=>{const hsp=customMonthlyHSP?.length===12&&customMonthlyHSP[i]>0?customMonthlyHSP[i]:province.monthlyHSP[i];return hsp*days*(1-systemLosses/100);});
 }
@@ -30,7 +30,7 @@ export function calculateRecommendedPanelCount(
   monthlyConsumptionKWh: number[],
   panelPowerW: number,
   targetCoveragePct: number = 95,
-  systemLossesPct: number = 25.0,
+  systemLossesPct: number = DEFAULT_SYSTEM_LOSSES_PCT,
   customMonthlyHSP?: number[]
 ): {
   recommendedPanelCount: number;
@@ -137,8 +137,8 @@ export function calculateMonthlySolarProduction(
   const dcCapacityKWp = calculateTotalDCCapacityKWp(specs);
   const province = getProvinceHSP(provinceName);
 
-  // Losses factor: total efficiency percentage (default: 25.0% losses -> 0.75 derate factor)
-  const systemLossesPct = specs.systemLosses !== undefined ? specs.systemLosses : (specs.isDetailed ? 14.0 : 25.0);
+  // Losses factor: total efficiency percentage (default from shared/projectDefaults -> derate factor)
+  const systemLossesPct = resolveSystemLossesPct(specs);
   const derateFactor = 1 - (systemLossesPct / 100);
 
   const generationFactors=getMonthlySolarProductionFactors(provinceName,systemLossesPct,customMonthlyHSP);

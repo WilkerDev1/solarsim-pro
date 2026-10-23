@@ -1,3 +1,4 @@
+import { DEFAULT_PRICE_PER_WATT_USD } from '../../../shared/projectDefaults';
 import { createProjectId } from '../../utils/projectId';
 import { commercialCopy } from '../../../shared/proposalCommercial';
 import { projectMutationMetadata } from '../sync/projectMutation';
@@ -133,7 +134,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
             ...rawFin,
             applyLey5707: rawFin.applyLey5707 !== undefined ? rawFin.applyLey5707 : true,
             applyITBISExemption: rawFin.applyITBISExemption !== undefined ? rawFin.applyITBISExemption : true,
-            pricePerWattUSD: rawFin.pricePerWattUSD || 1.05,
+            pricePerWattUSD: rawFin.pricePerWattUSD || DEFAULT_PRICE_PER_WATT_USD,
             discountRatePct: rawFin.discountRatePct || 12,
             projectLifespanYears: rawFin.projectLifespanYears || 25,
             co2FactorKgPerKWh: rawFin.co2FactorKgPerKWh || 0.481,

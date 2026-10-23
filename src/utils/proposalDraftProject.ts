@@ -5,12 +5,12 @@ import type { GlobalTariffMatrix } from '../types/tariffs';
 import { calculateRecommendedPanelCount } from '../engine/solarEngine';
 import { resolveAITariffSelection } from './aiTariffContext';
 import { getReferenceEnergyRateUSD } from '../data/rdTariffs';
-import { DEFAULT_BATTERY_DOD_PCT, DEFAULT_BATTERY_EFFICIENCY_PCT } from '../../shared/projectDefaults';
+import { DEFAULT_SYSTEM_LOSSES_PCT, DEFAULT_BATTERY_DOD_PCT, DEFAULT_BATTERY_EFFICIENCY_PCT } from '../../shared/projectDefaults';
 import { enforceAutomatedPricing } from '../../shared/automatedProposalPolicy';
 /** Pure adapter shared by preview and application. No store mutation, metadata or network. */
 export function prepareProposalDraftProject(base:ProjectSimulation,data:ExtractedInvoiceData,tariffMatrix:GlobalTariffMatrix,options:{isNew?:boolean;defaultBatteryDOD?:number}={}):ProjectSimulation {
   const province=data.province || base.client.province;
-  const losses=base.specs.systemLosses ?? 25;
+  const losses=base.specs.systemLosses ?? DEFAULT_SYSTEM_LOSSES_PCT;
   const createNewProject=Boolean(options.isNew);
   const defaults={defaultBatteryDOD:options.defaultBatteryDOD};
   const isGrounded=Array.isArray(data.panels)||Array.isArray(data.inverters)||Array.isArray(data.batteries);
@@ -74,7 +74,7 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
 export function createAIProposalBase(template:ProjectSimulation,defaults:DefaultSimulationSettings,province:string):ProjectSimulation {
  const base=structuredClone(template);
 
-      base.specs={...base.specs,pricePerWattUSD:defaults.defaultDirectPriceUSDPerWp,systemLosses:defaults.defaultSystemLosses ?? 25,annualDegradation:defaults.defaultAnnualDegradation ?? 0.4,isDetailed:false,pricingMode:'cost_matrix',saleMarginMultiplier:1+(defaults.defaultTargetMarginPct ?? 28)/100,panels:undefined,inverters:undefined,batteries:undefined,installationUnitPriceUSD:0};
+      base.specs={...base.specs,pricePerWattUSD:defaults.defaultDirectPriceUSDPerWp,systemLosses:defaults.defaultSystemLosses ?? DEFAULT_SYSTEM_LOSSES_PCT,annualDegradation:defaults.defaultAnnualDegradation ?? 0.4,isDetailed:false,pricingMode:'cost_matrix',saleMarginMultiplier:1+(defaults.defaultTargetMarginPct ?? 28)/100,panels:undefined,inverters:undefined,batteries:undefined,installationUnitPriceUSD:0};
       base.rates={...base.rates,targetCoveragePct:defaults.defaultTargetCoveragePct ?? 95,isZeroExport:defaults.defaultZeroExport,currency:defaults.currency || 'USD',annualEnergyInflationPct:defaults.annualEnergyTariffEscalationPct ?? 3.5};
       base.financials={...base.financials,applyLey5707:defaults.applyLey5707,applyITBISExemption:defaults.applyITBISExemption,discountRatePct:defaults.discountRatePct,projectLifespanYears:defaults.lifespanYears,pricePerWattUSD:defaults.defaultDirectPriceUSDPerWp,customItems:[],customDiscounts:[],customCostUSD:undefined,customLey5707CreditUSD:undefined,customITBISSavedUSD:undefined};
       base.client={...base.client,company:'',address:'',contactPhone:'',contactEmail:'',contactPerson:'',location:province,customMonthlyHSP:undefined,coordinates:undefined};

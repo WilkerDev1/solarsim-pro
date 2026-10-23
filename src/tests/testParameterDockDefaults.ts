@@ -221,9 +221,11 @@ assert.deepEqual(DEFAULT_UNIT_PRICE_USD, { panel: 103.32, inverter: 2300, batter
 {
   const preview = (specs: Partial<SystemSpecs>) => computeLoadProfilePreview(projectOf({ hasBattery: true, batteryCapacityKWh: 16, batteryCount: 1, batteries: undefined, ...specs }), 'BTS2', 900);
   const unset = { batteryDOD: undefined, batteryEfficiencyPct: undefined, systemLosses: undefined } as Partial<SystemSpecs>;
-  assert.deepEqual(preview(unset), preview({ batteryDOD: 90, batteryEfficiencyPct: 90, systemLosses: 25 }));
-  assert.notDeepEqual(preview(unset), preview({ batteryDOD: 50, batteryEfficiencyPct: 90, systemLosses: 25 }));
-  assert.notDeepEqual(preview(unset), preview({ batteryDOD: 90, batteryEfficiencyPct: 95, systemLosses: 25 }), 'la eficiencia de la vista previa es 90, no 95');
+  // El proyecto de referencia es detallado: sin pérdidas guardadas el motor (y ahora la vista previa) asume 14 %, no 25 %.
+  assert.deepEqual(preview(unset), preview({ batteryDOD: 90, batteryEfficiencyPct: 90, systemLosses: 14 }), 'detallado sin pérdidas: 14 (antes 25)');
+  assert.deepEqual(preview({ ...unset, isDetailed: false }), preview({ batteryDOD: 90, batteryEfficiencyPct: 90, systemLosses: 25, isDetailed: false }));
+  assert.notDeepEqual(preview(unset), preview({ batteryDOD: 50, batteryEfficiencyPct: 90, systemLosses: 14 }));
+  assert.notDeepEqual(preview(unset), preview({ batteryDOD: 90, batteryEfficiencyPct: 95, systemLosses: 14 }), 'la eficiencia de la vista previa es 90, no 95');
 }
 
 // ── Fuente única: las constantes coinciden con el caso de referencia y los literales viven solo en dockDefaults ──

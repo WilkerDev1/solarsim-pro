@@ -1,7 +1,7 @@
 import { getProvinceHSP } from '../../../../data/rdProvinces';
 import { getRecommendedLoadProfile } from '../../../../engine/solarEngine';
 import type { ProjectSimulation } from '../../../../types';
-import { DEFAULT_SYSTEM_LOSSES_PCT, resolveBatteryBankDodPct, resolveBatteryBankEfficiencyPct } from './dockDefaults';
+import { resolveSystemLossesPct, resolveBatteryBankDodPct, resolveBatteryBankEfficiencyPct } from './dockDefaults';
 import { calculateTotalBatteryCapacityKWh, calculateTotalDCCapacityKWp } from '../../../../utils/equipmentSpecsUtils';
 
 export type LoadProfilePreset = 'residential' | 'commercial' | 'industrial' | 'custom';
@@ -59,7 +59,7 @@ export function computeLoadProfilePreview(
   const provinceHsp = customHspList && customHspList.length > 0
     ? customHspList.reduce((a: number, b: number) => a + b, 0) / customHspList.length
     : provinceData.avgHSP;
-  const systemLossesPct = project.specs.systemLosses !== undefined ? project.specs.systemLosses : DEFAULT_SYSTEM_LOSSES_PCT;
+  const systemLossesPct = resolveSystemLossesPct(project.specs);
   const avgDailyProd = dcCapacityKWp * provinceHsp * (1 - systemLossesPct / 100);
 
   // Flujos físicos de energía diaria

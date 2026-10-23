@@ -9,7 +9,13 @@ export {
   BATTERY_PCT_RANGE,
   DEFAULT_BATTERY_DOD_PCT,
   DEFAULT_BATTERY_EFFICIENCY_PCT,
+  DEFAULT_BATTERY_CAPACITY_KWH,
+  DEFAULT_DETAILED_SYSTEM_LOSSES_PCT,
   DEFAULT_DOP_RATE,
+  DEFAULT_GRID_EXPORT_FEE_PCT,
+  DEFAULT_TARGET_COVERAGE_PCT,
+  DEFAULT_SYSTEM_LOSSES_PCT,
+  resolveSystemLossesPct,
   DEFAULT_INSTALLATION_USD_PER_KWP,
   DEFAULT_PRICE_PER_WATT_USD,
   DEFAULT_SALE_MARGIN_MULTIPLIER,
@@ -33,18 +39,10 @@ export {
 export const SAMPLE_GPS_COORDINATES = '18.4861, -69.9312';
 
 // ── Tarifas ──
-/** Cobertura objetivo (%) cuando la tarifa no la define (`??`: un 0 explícito se conserva). */
-export const DEFAULT_TARGET_COVERAGE_PCT = 95;
-/** Retención de exportación SIE (%) cuando la tarifa no la define (`??`: un 0 explícito se conserva). */
-export const DEFAULT_GRID_EXPORT_FEE_PCT = 25;
 /** Consumo mensual (kWh) usado para la tarifa de referencia si el proyecto no tiene meses. */
 export const DEFAULT_MONTHLY_CONSUMPTION_KWH = 900;
 
 // ── Equipamiento ──
-/** Pérdidas del sistema (%) cuando el proyecto no las define (`??`). */
-export const DEFAULT_SYSTEM_LOSSES_PCT = 25;
-/** Capacidad (kWh) de una batería del catálogo sin capacidad (`||`). */
-export const DEFAULT_BATTERY_CAPACITY_KWH = 16.08;
 /** Valores que toma un panel del catálogo al que le faltan datos (`||`). */
 export const DEFAULT_CATALOG_PANEL = { powerW: 550, efficiencyPct: 22, tempCoeff: -0.29, annualDegradation: 0.4 } as const;
 /** Potencia (kW) de un inversor del catálogo sin potencia (`||`). */
