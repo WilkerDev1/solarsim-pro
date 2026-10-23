@@ -79,6 +79,11 @@ assert.equal(hFull.houseKW, 1.2);
 assert.equal(hFull.gridState, 'export');
 assert.equal(hFull.gridKW, 3.3);
 assert.ok(/batería está llena/.test(hFull.description) && /inyecta a la red/.test(hFull.description), hFull.description);
+// A full battery takes no charge but can still cover a solar shortfall.
+const tinyFull: EnergyFlowScenarioInput = { ...hybridBase, systemCapacityKWp: 1, annualConsumptionKWh: 30000 };
+assert.equal(pick(tinyFull, 'batteryFull').houseKW, pick(tinyFull, 'day').houseKW);
+assert.equal(pick(tinyFull, 'batteryFull').batteryState, 'discharging');
+assert.equal(pick(tinyFull, 'batteryFull').gridState, 'idle');
 const hFullZero = pick({ ...hybridBase, isZeroExport: true }, 'batteryFull');
 assert.equal(hFullZero.gridState, 'idle');
 assert.equal(hFullZero.productionKW, hFullZero.houseKW, 'Zero export trims production to the house load');

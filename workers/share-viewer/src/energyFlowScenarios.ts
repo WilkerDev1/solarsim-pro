@@ -68,11 +68,11 @@ function loads(input: EnergyFlowScenarioInput, productionKW: number): { day: num
 interface SolveOptions { zeroExport: boolean; gridConnected: boolean; gridImport: boolean }
 
 // `inverter` caps the AC output (house + export); DC-coupled battery charging is not limited by it.
-function solveDay(load: number, potential: number, batteryLimit: number, inverter: number, o: SolveOptions): Flows {
+function solveDay(load: number, potential: number, batteryLimit: number, inverter: number, o: SolveOptions, chargeLimit = batteryLimit): Flows {
   const solarHouse = Math.min(potential, load, inverter);
   const surplus = potential - solarHouse;
   const canExport = o.gridConnected && !o.zeroExport;
-  const solarBattery = Math.min(surplus, batteryLimit);
+  const solarBattery = Math.min(surplus, chargeLimit);
   // Zero export (and any island) trims production instead of sending the rest anywhere.
   const exported = canExport ? Math.min(surplus - solarBattery, inverter - solarHouse) : 0;
   const deficit = load - solarHouse;
@@ -146,7 +146,7 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
     night: boolean; gridConnected: boolean; inverterState: ModeScenario['inverterState']; batteryFull?: boolean;
   }): ModeScenario => {
     const house = f.solarHouse + f.batteryHouse + f.gridHouse;
-    const batteryState: BatteryState | undefined = !hybrid ? undefined : o.batteryFull ? 'full'
+    const batteryState: BatteryState | undefined = !hybrid ? undefined : o.batteryFull && f.batteryHouse <= 0 ? 'full'
       : f.batteryHouse > 0 ? 'discharging' : f.solarBattery > 0 ? 'charging' : 'idle';
     const gridState: GridState = !o.gridConnected ? 'disconnected'
       : f.exported > 0 ? 'export' : f.gridHouse > 0 ? 'import' : 'idle';
@@ -187,8 +187,8 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
     ];
   }
 
-  // A full battery takes no charge: the surplus covers the house and goes to the grid (unless zero export).
-  const full = solveDay(load.day, potential, 0, inverter, { zeroExport: isZeroExport, gridConnected: true, gridImport: false });
+  // A full battery takes no charge (the surplus covers the house and goes to the grid unless zero export), but it can still discharge.
+  const full = solveDay(load.day, potential, batteryLimit, inverter, { zeroExport: isZeroExport, gridConnected: true, gridImport: false }, 0);
   const island = solveDay(load.day, potential, batteryLimit, inverter, { zeroExport: true, gridConnected: false, gridImport: false });
   const islandNight = solveNight(load.night, batteryLimit, false, inverter);
   const capped = (f: Flows, wanted: number) => (wanted - (f.solarHouse + f.batteryHouse) > 0.05
