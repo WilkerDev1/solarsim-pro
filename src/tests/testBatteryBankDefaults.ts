@@ -43,8 +43,10 @@ assert.equal(resolveBatteryBankEfficiencyPct({ ...base.specs, batteries: undefin
 assert.equal(resolveBatteryBankEfficiencyPct({ ...base.specs, batteries: [], batteryEfficiencyPct: 91 } as unknown as SystemSpecs), 91);
 assert.equal(resolveBatteryBankEfficiencyPct({ ...base.specs, batteries: [group('A', 0, 0)], batteryEfficiencyPct: 87 } as unknown as SystemSpecs), 87, 'capacidad total 0: escalar');
 assert.equal(resolveBatteryBankDodPct({ ...base.specs, batteries: undefined, batteryDOD: 0 } as SystemSpecs), 90);
-// El primer grupo sin dato propio hereda el escalar (espejo del primer grupo), los demás usan 90.
-close(resolveBatteryBankEfficiencyPct(bank({}, {}, { batteryEfficiencyPct: 80 })), (32 * 80 + 15 * 90) / 47, 'primer grupo hereda el espejo');
+// Los grupos son la fuente: un grupo sin dato (también el primero) usa 90 aunque el escalar guarde un valor viejo.
+close(resolveBatteryBankEfficiencyPct(bank({}, {}, { batteryEfficiencyPct: 80 })), (32 * 90 + 15 * 90) / 47, 'primer grupo sin dato: 90, no el escalar obsoleto');
+close(resolveBatteryBankDodPct(bank({}, {}, { batteryDOD: 80 })), 90, 'DOD del primer grupo sin dato: 90');
+assert.equal(shared.resolveBatteryEfficiencyPct(0.5), 90, 'por debajo del mínimo (1 %) no es válido');
 
 // ── Motor: financeEngine, solarEngine y equipmentSpecsUtils ────────────────────────────────
 const project = (specs: SystemSpecs): ProjectSimulation => ({ ...base, specs });

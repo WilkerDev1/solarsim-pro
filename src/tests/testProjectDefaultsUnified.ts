@@ -58,6 +58,11 @@ assert(!readFileSync('src/components/settings/sections/SimulationPreferencesSect
   const aiBase = createAIProposalBase(BENCHMARK_PROJECT, DEFAULT_SIMULATION_SETTINGS, 'Santiago');
   assert.equal(aiBase.specs.batteryDOD, 90, 'base de propuesta IA: 90, no 80');
   assert.equal(fresh.specs.batteryDOD, 90, 'proyecto nuevo: 90');
+  const withGroupValues = { ...importable, client: { ...importable.client, name: 'Importado espejo', projectId: 'IMP-3', quoteNumber: 'IMP-3' }, specs: { ...importable.specs, batteries: [{ ...bankGroups[0], dodPct: 70, efficiencyPct: 85 }, bankGroups[1]] } };
+  assert.ok(store().importProjectsFromJSON([withGroupValues as never]).success);
+  const mirrored = store().projects.find((p) => p.client.name === 'Importado espejo')!;
+  assert.equal(mirrored.specs.batteryDOD, 70, 'el espejo importado sale del grupo principal');
+  assert.equal(mirrored.specs.batteryEfficiencyPct, 85);
   assert.equal(BENCHMARK_PROJECT.specs.batteryDOD, 80, 'el caso de referencia conserva su 80');
 }
 
