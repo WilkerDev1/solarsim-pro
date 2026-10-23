@@ -366,7 +366,7 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
     const partial = setup(true);
     partial.edit('Panel K 600');
     partial.edit('Panel Propio X');
-    assert.deepEqual([...partial.pending()].sort(), ['k1', 'k2', 'zz'], '(2) con otro grupo sin resolver se conservan todos los anexos, incluso el del modelo desvinculado');
+    assert.deepEqual([...partial.pending()].sort(), ['zz'], '(2) con el catálogo cargado solo se conserva el anexo del grupo sin resolver; el del modelo desvinculado se retira');
   }
   // Mayúsculas y espacios no cambian de modelo: se conserva el vínculo.
   for (const same of ['  Panel K 550 ', 'panel k 550', 'Panel  K   550']) {

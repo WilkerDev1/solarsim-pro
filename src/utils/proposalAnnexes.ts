@@ -42,11 +42,17 @@ export function workspaceCatalog(catalog: SolarEquipmentItem[], serverUrl: strin
  * Catalog item ids whose automatic annexes must be kept because some equipment in use (count > 0) is not
  * resolved in the catalog yet, typically a proposal pulled before the equipment catalog finished syncing.
  *
- * Final rule: groups rewritten by hand (`manualModel`) are intentionally off the catalog and never count as unresolved,
- * so their old datasheet is not kept forever. If ANY other in-use group is unresolved, EVERY attached catalog annex stays
- * pending: the datasheet of an unresolved item is unknown (variants share assets, legacy groups have no catalogItemId),
- * and during a partial sync we never remove datasheets. A stale annex may linger until the sync finishes; the first plan
- * after that removes it because no group uses it. Dropping a needed datasheet is the worse error.
+ * Final rule (permanent problems are worse than temporary ones):
+ * 1. Catalog not loaded yet (the workspace catalog is empty): any unresolved in-use group protects EVERY attached
+ *    catalog annex, because during a partial sync we never remove datasheets.
+ * 2. Catalog loaded: only the ids that unresolved in-use groups POINT TO are pending (`catalogItemId`, or the group's
+ *    `id`, which the resolver also tries). Those items may still be syncing or were deleted from the catalog, and the
+ *    equipment is still in use, so their own annex stays.
+ * 3. Groups with no catalog reference (legacy/manual without catalogItemId, an id that is not a catalog id, no unique
+ *    name match) behave like `manualModel` groups: definitively manual, they protect nothing. Their old annexes leave
+ *    through the normal plan; otherwise one unmatched manual group would keep obsolete datasheets forever.
+ * 4. Accepted trade-off: if a detached item shares a PDF asset with an unresolved item B, the shared annex may
+ *    disappear temporarily and is recreated when B resolves. That gap is temporary; the stale annex was permanent.
  */
 export function unresolvedEquipmentIds(project: ProjectSimulation, catalog: SolarEquipmentItem[]): Set<string> {
   const groups = [
@@ -54,11 +60,12 @@ export function unresolvedEquipmentIds(project: ProjectSimulation, catalog: Sola
     ...getProjectInverters(project.specs).map((group) => ({ group, kind: 'inverter' as const })),
     ...getProjectBatteries(project.specs).map((group) => ({ group, kind: 'battery' as const })),
   ];
-  const unresolved = groups.some(({ group, kind }) => group.count > 0 && !group.manualModel && !resolveGroupCatalogItem(group, kind, catalog));
+  const unresolved = groups.filter(({ group, kind }) => group.count > 0 && !group.manualModel && !resolveGroupCatalogItem(group, kind, catalog));
   const ids = new Set<string>();
-  if (!unresolved) return ids;
+  if (!unresolved.length) return ids;
+  const referenced = new Set(unresolved.flatMap(({ group }) => [group.catalogItemId, group.id].filter((id): id is string => !!id)));
   for (const att of project.customization?.attachedPdfs ?? []) {
-    if (att.origin === 'catalog' && att.catalogItemId) ids.add(att.catalogItemId);
+    if (att.origin === 'catalog' && att.catalogItemId && (catalog.length === 0 || referenced.has(att.catalogItemId))) ids.add(att.catalogItemId);
   }
   return ids;
 }
