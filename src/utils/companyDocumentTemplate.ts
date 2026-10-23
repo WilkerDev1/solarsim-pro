@@ -3,9 +3,13 @@ import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../constants/defaultDocumentCust
 import { companyDocumentSnapshot } from './companyDocumentSnapshot';
 import { KNOWN_FACTORY_VALUES, templateTexts } from '../../shared/documentTexts';
 
-/** Keep reusable document settings, excluding private data from a particular proposal. */
+/**
+ * Keep reusable document settings, excluding private data from a particular proposal.
+ * Annex state (files, TOC entries and dismissed datasheet keys) is per proposal: it is also
+ * stripped when a template is applied, so templates saved by older versions need no migration.
+ */
 export function reusableDocumentTemplate(customization: DocumentCustomization): DocumentCustomization {
-  const { contactName, clientPhone, clientEmail, quoteDate, attachedPdfs, extraTocItems, ...template } = customization;
+  const { contactName, clientPhone, clientEmail, quoteDate, attachedPdfs, extraTocItems, dismissedDatasheetKeys, ...template } = customization;
   return structuredClone(templateTexts(template));
 }
 
