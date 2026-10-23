@@ -55,8 +55,8 @@ export const MANUAL_BRAND_PLACEHOLDER = {
 /** Marca que imprime la cotización para un grupo de paneles sin nombre (distinta del marcador del modo Manual del dock). */
 export const QUOTATION_PANEL_BRAND_FALLBACK = 'Módulos CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)';
 
-/** Porcentaje válido para DOD y eficiencia: finito, > 0 y ≤ 100. */
-const isPercent = (value: number | undefined | null): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= 100;
+/** Porcentaje válido para DOD y eficiencia: finito y dentro de `BATTERY_PCT_RANGE` (1-100). */
+const isPercent = (value: number | undefined | null): value is number => typeof value === 'number' && Number.isFinite(value) && value >= BATTERY_PCT_RANGE.min && value <= BATTERY_PCT_RANGE.max;
 
 /** Número finito y > 0: la regla común de «dato válido» para tasa, multiplicador, DOD y eficiencia. */
 const isPositive = (value: number | undefined | null): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0;
@@ -65,9 +65,9 @@ const isPositive = (value: number | undefined | null): value is number => typeof
 export const resolveDopRate = (rate: number | undefined | null): number => (isPositive(rate) ? rate : DEFAULT_DOP_RATE);
 /** Multiplicador de venta a usar: el del proyecto si es > 0; si no, el default. */
 export const resolveSaleMarginMultiplier = (multiplier: number | undefined | null): number => (isPositive(multiplier) ? multiplier : DEFAULT_SALE_MARGIN_MULTIPLIER);
-/** DOD (%) a usar: el del proyecto si es en (0, 100]; si no, el default. */
+/** DOD (%) a usar: el del proyecto si está en 1-100; si no, el default. */
 export const resolveBatteryDodPct = (dod: number | undefined | null): number => (isPercent(dod) ? dod : DEFAULT_BATTERY_DOD_PCT);
-/** Eficiencia de batería (%) a usar: la del proyecto si es en (0, 100]; si no, el default. */
+/** Eficiencia de batería (%) a usar: la del proyecto si está en 1-100; si no, el default. */
 export const resolveBatteryEfficiencyPct = (efficiency: number | undefined | null): number => (isPercent(efficiency) ? efficiency : DEFAULT_BATTERY_EFFICIENCY_PCT);
 /** `true` si el precio directo ($/Wp o $/kWp) es utilizable: finito y > 0, como exige el motor. */
 export const isValidDirectPrice = (price: number | undefined | null): price is number => isPositive(price);
@@ -88,18 +88,17 @@ interface BankSpecs {
   batteryEfficiencyPct?: number | null;
 }
 
-/** Valor de un grupo: el propio si es válido; el primero hereda antes el escalar del proyecto (espejo del primer grupo); el resto, el default. */
+/** Valor de un grupo: el propio si es válido; si no, el default. Los grupos son la fuente: el escalar del proyecto solo es el espejo y no se hereda. */
 function groupPct(specs: BankSpecs, index: number, field: 'dodPct' | 'efficiencyPct'): number {
   const own = specs.batteries?.[index]?.[field];
   if (isPercent(own)) return own;
-  if (field === 'dodPct') return index === 0 ? resolveBatteryDodPct(specs.batteryDOD) : DEFAULT_BATTERY_DOD_PCT;
-  return index === 0 ? resolveBatteryEfficiencyPct(specs.batteryEfficiencyPct) : DEFAULT_BATTERY_EFFICIENCY_PCT;
+  return field === 'dodPct' ? DEFAULT_BATTERY_DOD_PCT : DEFAULT_BATTERY_EFFICIENCY_PCT;
 }
 
 /**
  * Promedio ponderado del banco. El DOD pesa por capacidad total del grupo (`capacityKWh × count`); la eficiencia pesa por
  * esa capacidad × el DOD del grupo, de modo que `total × DOD × η` conserva la energía útil Σ(Cᵢ·DOD ᵢ·ηᵢ) (con el mismo DOD
- * en todos los grupos es el promedio ponderado por capacidad). Sin grupos o con capacidad total 0 se usa el escalar del proyecto.
+ * en todos los grupos es el promedio ponderado por capacidad). Solo sin grupos o con capacidad total 0 se usa el escalar del proyecto.
  */
 function weightedBankPct(specs: BankSpecs, field: 'dodPct' | 'efficiencyPct', scalar: number): number {
   const groups = Array.isArray(specs.batteries) ? specs.batteries : [];
@@ -124,7 +123,7 @@ export const resolveBatteryBankDodPct = (specs: BankSpecs): number =>
 
 /** Eficiencia (%) que ve el dock para la batería principal: la del primer grupo si es válida; si no, la del proyecto. */
 export const resolvePrimaryBatteryEfficiencyPct = (specs: BankSpecs): number =>
-  resolveBatteryEfficiencyPct(isPercent(specs.batteries?.[0]?.efficiencyPct) ? specs.batteries?.[0]?.efficiencyPct : specs.batteryEfficiencyPct);
+  resolveBatteryEfficiencyPct(specs.batteries?.length ? specs.batteries[0].efficiencyPct : specs.batteryEfficiencyPct);
 /** DOD (%) que ve el dock para la batería principal: el del primer grupo si es válido; si no, el del proyecto. */
 export const resolvePrimaryBatteryDodPct = (specs: BankSpecs): number =>
-  resolveBatteryDodPct(isPercent(specs.batteries?.[0]?.dodPct) ? specs.batteries?.[0]?.dodPct : specs.batteryDOD);
+  resolveBatteryDodPct(specs.batteries?.length ? specs.batteries[0].dodPct : specs.batteryDOD);
