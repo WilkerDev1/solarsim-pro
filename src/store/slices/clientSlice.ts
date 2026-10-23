@@ -222,9 +222,18 @@ export const createClientSlice: SimulationSlice<ClientSlice> = (set, get) => {
           }
           for (const [id, change] of Object.entries(get().clientChanges)) {
             if (!current()) return SESSION_CHANGED;
-            if (change.ownerId && change.ownerId !== user.id) continue;
+            const foreign = !!change.ownerId && change.ownerId !== user.id;
             const local = get().clients.find((c) => c.id === id);
             if (!local) continue;
+            if (foreign) {
+              // A teammate's retained change is never uploaded or resolved here, but a tombstone must still
+              // protect it from the final reconciliation so its owner sees the deletion conflict.
+              if (deleted.has(id) && !change.serverDeleted)
+                set((s) => ({
+                  clientChanges: { ...s.clientChanges, [id]: { ...s.clientChanges[id], serverClient: undefined, serverDeleted: true } },
+                }));
+              continue;
+            }
             if (deleted.has(id)) {
               // Deleted by a teammate while this device holds unsynced edits: kept for review, never pushed.
               // An earlier update conflict is superseded: the server record no longer exists.
@@ -304,7 +313,7 @@ export const createClientSlice: SimulationSlice<ClientSlice> = (set, get) => {
               clientChanges: changes,
               activeClientId: clients.some((c) => c.id === s.activeClientId) ? s.activeClientId : null,
               clientSyncFeedback:
-                failures || Object.values(changes).some((c) => c.serverClient || c.serverDeleted)
+                failures || Object.values(changes).some((c) => (c.serverClient || c.serverDeleted) && (!c.ownerId || c.ownerId === user.id))
                   ? `${failures} cliente(s) pendientes: hay cambios o permisos distintos. Sincroniza y revisa.`
                   : null,
             };
