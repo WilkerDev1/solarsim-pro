@@ -154,3 +154,12 @@
     box-sizing: border-box !important;
   }
 }
+
+/* Panel del SelectField del dock: aparece con un fundido corto, salvo que el usuario prefiera menos movimiento. */
+@keyframes pd-select-in {
+  from { opacity: 0; transform: scale(0.97) translateY(-2px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pd-select-panel { animation: pd-select-in 120ms ease-out; }
+}
