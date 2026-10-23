@@ -6,6 +6,8 @@ import { escapeHtml, formatInlineMarkdown, formatMarkdown, safeLogoUrl, scriptJs
 import { createDocumentTextContext, docTextKey, interpolate, viewerText } from '../../../shared/documentTexts';
 import { ENERGY_FLOW_CSS, renderEnergyFlowSection } from './energyFlow';
 import { isBuiltInFeatureAvailable } from '../../../shared/applicationFeatures';
+import { EQUIPMENT_FALLBACK_NAME, equipmentTotals, readEquipment } from '../../../shared/equipment';
+import { mainModelPhrase } from '../../../shared/documentTexts/equipmentPhrases';
 
 export function renderExpiredPage(companyName = 'electsun', companyPhone = '+1 (809) 378-6590'): string {
   return `<!DOCTYPE html>
@@ -89,34 +91,20 @@ export function renderProposalPage(stored: StoredProposal): string {
   const isZeroExport = !!rates.isZeroExport;
   const exportFee = rates.gridExportFeePct ?? 25;
 
-  const systemCapacityKWp = Number(summary?.systemCapacityKWp || ((specs.panelCount || 0) * (specs.panelPowerW || 0)) / 1000).toFixed(2);
-  const rawPanels: any[] = Array.isArray(specs.panels) && specs.panels.length > 0
-    ? specs.panels
-    : [{ brandModel: specs.panelBrandModel || 'Módulos Monocristalinos Tier-1 TOPCon', powerW: specs.panelPowerW || 0, count: specs.panelCount || 0 }];
-
-  const rawInverters: any[] = Array.isArray(specs.inverters) && specs.inverters.length > 0
-    ? specs.inverters
-    : [{ brandModel: specs.inverterBrandModel || 'Inversor Solar On-Grid / Híbrido', powerKW: specs.inverterPowerKW || (Number(systemCapacityKWp) * 0.9).toFixed(1), count: specs.inverterCount || 1 }];
-
+  // Equipos solo por `shared/equipment`: un enlace antiguo (solo espejo) y uno nuevo (solo grupos) dan lo mismo.
+  const equipment = readEquipment(specs);
+  const totals = equipmentTotals(equipment);
+  const systemCapacityKWp = Number(summary?.systemCapacityKWp || totals.capacityKWp).toFixed(2);
+  const rawPanels: any[] = equipment.panels;
+  const rawInverters: any[] = equipment.inverters;
   const hasBattery = specs.hasBattery || false;
-  const rawBatteries: any[] = hasBattery && Array.isArray(specs.batteries) && specs.batteries.length > 0
-    ? specs.batteries
-    : (hasBattery ? [{ brandModel: specs.batteryBrandModel || 'Banco de Baterías de Litio LiFePO4', capacityKWh: specs.batteryCapacityKWh || 0, count: specs.batteryCount || 1 }] : []);
+  const rawBatteries: any[] = equipment.batteries;
 
-  const totalBESSKWh = rawBatteries.reduce((sum: number, b: any) => sum + (Number(b.capacityKWh) || 0) * (Number(b.count) || 0), 0);
+  const totalBESSKWh = totals.batteryNominalKWh;
 
-  const panelCount = rawPanels.reduce((sum: number, p: any) => sum + (Number(p.count) || 0), 0) || specs.panelCount || 0;
-  const panelPowerW = specs.panelPowerW || (rawPanels[0]?.powerW || 0);
-  const panelBrandModel = specs.panelBrandModel || rawPanels[0]?.brandModel || 'Módulos Monocristalinos Tier-1 TOPCon';
-  const inverterBrandModel = specs.inverterBrandModel || rawInverters[0]?.brandModel || 'Inversor Solar On-Grid / Híbrido';
-  const inverterCount = rawInverters.reduce((sum: number, inv: any) => sum + (Number(inv.count) || 0), 0) || specs.inverterCount || 1;
-  const inverterPowerKW = specs.inverterPowerKW || rawInverters[0]?.powerKW || (Number(systemCapacityKWp) * 0.9).toFixed(1);
-  const batteryCapacityKWh = specs.batteryCapacityKWh || rawBatteries[0]?.capacityKWh || 0;
-  const batteryCount = rawBatteries.reduce((sum: number, b: any) => sum + (Number(b.count) || 0), 0) || specs.batteryCount || 1;
-  const batteryBrandModel = specs.batteryBrandModel || rawBatteries[0]?.brandModel || 'Banco de Baterías de Litio LiFePO4';
-  const displayBatteryModel = batteryCapacityKWh > 0 && !batteryBrandModel.toLowerCase().includes('kwh')
-    ? `${batteryBrandModel} (${batteryCapacityKWh} kWh)`
-    : batteryBrandModel;
+  const panelCount = totals.panelCount;
+  const inverterCount = totals.inverterCount || 1;
+  const batteryCount = totals.batteryCount || 1;
   const rawInstallationDesc = specs.installationServicesDesc || 'Instalación y Accesorios (Estructura de montaje en aluminio anodizado, cableado fotovoltaico resistente a rayos UV, protecciones en CC/CA, interruptores de desconexión y puesta en marcha).';
   const installationServicesDesc = rawInstallationDesc.includes('Notas del Sistema:')
     ? (rawInstallationDesc.split('Notas del Sistema:')[0].trim().replace(/\.\s*$/, '') + '.')
@@ -263,50 +251,31 @@ export function renderProposalPage(stored: StoredProposal): string {
       ? interpolate(custom.projectSummarySubtitle.trim(), textContext)
       : `Criterios de dimensionamiento técnico y solar para ${clientName}`);
 
-  const rawPanelDesc = panelBrandModel.replace(/^m[oó]dulos?\s+/i, '').trim();
-  const cleanPanelModel = (rawPanelDesc.toLowerCase().includes('w') || panelPowerW <= 0)
+  // Frases: modelo principal con su potencia y «y N modelo(s) más» (ADR 0001). Las tablas listan todos los modelos.
+  const panelPhrase = mainModelPhrase(equipment, 'panel');
+  const rawPanelDesc = panelPhrase.name.replace(/^m[oó]dulos?\s+/i, '').trim();
+  const panelPowerW = panelPhrase.main?.powerW || 0;
+  const cleanPanelModel = ((rawPanelDesc.toLowerCase().includes('w') || panelPowerW <= 0)
     ? rawPanelDesc
-    : `${rawPanelDesc} (${panelPowerW}W)`;
+    : `${rawPanelDesc} (${panelPowerW}W)`) + panelPhrase.more;
 
-  const rawInverterDesc = inverterBrandModel.replace(/^inversor(?:es)?\s+/i, '').trim();
-  const cleanInverterModel = (rawInverterDesc.toLowerCase().includes('kw') || Number(inverterPowerKW) <= 0)
+  const inverterPhrase = mainModelPhrase(equipment, 'inverter');
+  const rawInverterDesc = inverterPhrase.name.replace(/^inversor(?:es)?\s+/i, '').trim();
+  const inverterPowerKW = inverterPhrase.main?.powerKW || (Number(systemCapacityKWp) * 0.9).toFixed(1);
+  const cleanInverterModel = ((rawInverterDesc.toLowerCase().includes('kw') || Number(inverterPowerKW) <= 0)
     ? rawInverterDesc
-    : `${rawInverterDesc} (${inverterPowerKW} kW)`;
+    : `${rawInverterDesc} (${inverterPowerKW} kW)`) + inverterPhrase.more;
 
-  const rawBatteryDesc = batteryBrandModel.replace(/^bater[íi]as?\s+/i, '').trim();
-  const cleanBatteryModel = (rawBatteryDesc.toLowerCase().includes('kwh') || batteryCapacityKWh <= 0)
+  const batteryPhrase = mainModelPhrase(equipment, 'battery');
+  const rawBatteryDesc = batteryPhrase.name.replace(/^bater[íi]as?\s+/i, '').trim();
+  const batteryCapacityKWh = batteryPhrase.main?.capacityKWh || 0;
+  const cleanBatteryModel = ((rawBatteryDesc.toLowerCase().includes('kwh') || batteryCapacityKWh <= 0)
     ? rawBatteryDesc
-    : `${rawBatteryDesc} (${batteryCapacityKWh} kWh)`;
+    : `${rawBatteryDesc} (${batteryCapacityKWh} kWh)`) + batteryPhrase.more;
 
-  const multiPanelsDesc = rawPanels.length > 1
-    ? rawPanels.map((p: any) => {
-        const rawBrand = (p.brandModel || `${p.powerW}W`).replace(/^m[oó]dulos?\s+/i, '').trim();
-        const cleanBrand = (rawBrand.toLowerCase().includes('w') || (p.powerW || 0) <= 0)
-          ? rawBrand
-          : `${rawBrand} (${p.powerW}W)`;
-        return `${p.count} ${p.count === 1 ? 'Módulo' : 'Módulos'} ${cleanBrand}`;
-      }).join(' y ')
-    : `${panelCount} ${panelCount === 1 ? 'Módulo' : 'Módulos'} ${cleanPanelModel}`;
-
-  const multiInvertersDesc = rawInverters.length > 1
-    ? rawInverters.map((inv: any) => {
-        const rawBrand = (inv.brandModel || `${inv.powerKW} kW`).replace(/^inversor(?:es)?\s+/i, '').trim();
-        const cleanBrand = (rawBrand.toLowerCase().includes('kw') || (inv.powerKW || 0) <= 0)
-          ? rawBrand
-          : `${rawBrand} (${inv.powerKW} kW)`;
-        return `${inv.count} ${inv.count === 1 ? 'Inversor' : 'Inversores'} ${cleanBrand}`;
-      }).join(' y ')
-    : `${inverterCount} ${inverterCount === 1 ? 'Inversor' : 'Inversores'} ${cleanInverterModel}`;
-
-  const multiBatteriesDesc = rawBatteries.length > 1
-    ? rawBatteries.map((b: any) => {
-        const rawBrand = (b.brandModel || `${b.capacityKWh} kWh`).replace(/^bater[íi]as?\s+/i, '').trim();
-        const cleanBrand = (rawBrand.toLowerCase().includes('kwh') || (b.capacityKWh || 0) <= 0)
-          ? rawBrand
-          : `${rawBrand} (${b.capacityKWh} kWh)`;
-        return `${b.count} ${b.count === 1 ? 'Batería' : 'Baterías'} ${cleanBrand}`;
-      }).join(' y ')
-    : `${batteryCount} ${batteryCount === 1 ? 'Batería' : 'Baterías'} ${cleanBatteryModel}`;
+  const multiPanelsDesc = `${panelCount} ${panelCount === 1 ? 'Módulo' : 'Módulos'} ${cleanPanelModel}`;
+  const multiInvertersDesc = `${inverterCount} ${inverterCount === 1 ? 'Inversor' : 'Inversores'} ${cleanInverterModel}`;
+  const multiBatteriesDesc = `${batteryCount} ${batteryCount === 1 ? 'Batería' : 'Baterías'} ${cleanBatteryModel}`;
 
   const rawEngineeringScope = (custom.projectEngineeringScopeText?.trim() && interpolate(custom.projectEngineeringScopeText.trim(), textContext)) || specs.installationServicesDesc?.trim() || 'junto con todos los componentes de ingeniería complementarios (estructuras de montaje en aluminio anodizado de alta resistencia, cableado fotovoltaico resistente a rayos UV, protecciones en CC/CA, interruptores de desconexión y supresores de sobretensión) para garantizar un funcionamiento seguro, eficiente y duradero del sistema.';
   const engineeringScopeText = rawEngineeringScope.replace(/\.+$/, '');
@@ -670,21 +639,21 @@ ${ENERGY_FLOW_CSS}
           <tbody class="divide-y divide-slate-200 text-[10.5px] sm:text-[11px] font-semibold text-slate-800">
             ${rawPanels.map((p: any, idx: number) => `
             <tr class="${idx % 2 === 0 ? 'bg-white' : 'bg-sky-50/30'}">
-              <td class="px-3 sm:px-4 py-2 font-bold">${escapeHtml(p.brandModel || 'Módulos Fotovoltaicos')}</td>
+              <td class="px-3 sm:px-4 py-2 font-bold">${escapeHtml(p.brandModel || EQUIPMENT_FALLBACK_NAME.panel)}</td>
               <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${escapeHtml(p.count)}</td>
               <td class="px-2 sm:px-4 py-2 text-center text-slate-500 font-normal">UD</td>
             </tr>
             `).join('')}
             ${rawInverters.map((inv: any, idx: number) => `
             <tr class="${idx % 2 === 0 ? 'bg-sky-50/30' : 'bg-white'}">
-              <td class="px-3 sm:px-4 py-2 font-bold">${escapeHtml(inv.brandModel || 'Inversor Solar')}</td>
+              <td class="px-3 sm:px-4 py-2 font-bold">${escapeHtml(inv.brandModel || EQUIPMENT_FALLBACK_NAME.inverter)}</td>
               <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${escapeHtml(inv.count)}</td>
               <td class="px-2 sm:px-4 py-2 text-center text-slate-500 font-normal">UD</td>
             </tr>
             `).join('')}
             ${hasBattery ? rawBatteries.map((bat: any, idx: number) => `
             <tr class="${idx % 2 === 0 ? 'bg-white' : 'bg-sky-50/30'}">
-              <td class="px-3 sm:px-4 py-2 font-bold">${escapeHtml((bat.capacityKWh > 0 && !bat.brandModel?.toLowerCase().includes('kwh')) ? `${bat.brandModel} (${bat.capacityKWh} kWh)` : (bat.brandModel || 'Batería'))}</td>
+              <td class="px-3 sm:px-4 py-2 font-bold">${escapeHtml((() => { const name = bat.brandModel || EQUIPMENT_FALLBACK_NAME.battery; return bat.capacityKWh > 0 && !name.toLowerCase().includes('kwh') ? `${name} (${bat.capacityKWh} kWh)` : name; })())}</td>
               <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${escapeHtml(bat.count)}</td>
               <td class="px-2 sm:px-4 py-2 text-center text-slate-500 font-normal">UD</td>
             </tr>

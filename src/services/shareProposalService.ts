@@ -1,3 +1,4 @@
+import { equipmentTotals, readEquipment } from '../../shared/equipment';
 import { isWriterRole } from '../../shared/permissions';
 import { webHeaderLogo } from '../utils/documentLogo';
 import { fetchWithSessionRetry } from './syncService';
@@ -402,7 +403,7 @@ export class ShareProposalService {
       if ((!result.clientName || ['Propuesta Solar', 'Cliente Solar', 'Cliente'].includes(result.clientName)) && project.client?.name) result.clientName = project.client.name;
       if ((!result.projectCode || result.projectCode === result.projectId || result.projectCode.startsWith('proj-')) && project.client?.projectId) result.projectCode = project.client.projectId;
       if ((!result.quoteNumber || result.quoteNumber === 'C-0001') && project.client?.quoteNumber) result.quoteNumber = project.client.quoteNumber;
-      if (!result.systemKWp) result.systemKWp = Number(((project.specs.panelCount * project.specs.panelPowerW) / 1000).toFixed(2));
+      if (!result.systemKWp) result.systemKWp = Number(equipmentTotals(readEquipment(project.specs)).capacityKWp.toFixed(2));
       if (!result.location) result.location = project.client.province || project.client.location;
       if (!result.companyName) result.companyName = project.client.company;
       if (JSON.stringify(result) !== JSON.stringify(record)) hasChanges = true;
