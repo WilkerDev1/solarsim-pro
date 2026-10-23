@@ -8,6 +8,10 @@ export interface AssistantEdit {
 export interface AssistantAction {
   id: string;
   kind: 'project' | 'equipment';
+  /** Real target of a native plan (the legacy `kind` only distinguishes project/equipment). */
+  targetType?: 'project' | 'equipment' | 'client';
+  /** Confirmation copy that matches what the plan really changes; the card falls back to the legacy text. */
+  impact?: string;
   targetId: string;
   title: string;
   edits: AssistantEdit[];
