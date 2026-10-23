@@ -15,7 +15,7 @@ const pick = (input: EnergyFlowScenarioInput, mode: string): ModeScenario => {
 const active = (s: ModeScenario) => Object.entries(s.lines).filter(([, l]) => l?.active).map(([k]) => k).sort();
 
 assert.deepEqual(energyFlowScenarios(base).map((s) => s.mode), ['day', 'night', 'outage']);
-assert.deepEqual(energyFlowScenarios(hybridBase).map((s) => s.mode), ['day', 'night', 'outageDay', 'outageNight']);
+assert.deepEqual(energyFlowScenarios(hybridBase).map((s) => s.mode), ['day', 'batteryFull', 'night', 'outageDay', 'outageNight']);
 
 // On-grid, day: the house is served first and the surplus is exported.
 const gDay = pick(base, 'day');
@@ -63,13 +63,26 @@ assert.equal(gOut.productionKW, 0);
 assert.ok(gOut.note && /normativa/i.test(gOut.note));
 assert.equal(gOut.pill.text, 'Inversor apagado por seguridad');
 
-// Hybrid, day: house first, then battery charge; an illustrative share of the surplus (25 %) is always exported.
+// Hybrid, day: house first, then battery charge, then export of what the battery cannot take.
 const hDay = pick(hybridBase, 'day');
 assert.equal(hDay.batteryState, 'charging');
-assert.equal(hDay.batteryKW, 2.5);
-assert.equal(hDay.gridState, 'export');
-assert.equal(hDay.gridKW, 0.8);
-assert.equal(pick({ ...hybridBase, isZeroExport: true }, 'day').gridState, 'idle', 'Zero export never shows the illustrative export');
+assert.equal(hDay.batteryKW, 3.3);
+assert.equal(hDay.gridState, 'idle');
+
+// Hybrid, battery full: the surplus no longer charges the battery, so it covers the house and is exported.
+const hFull = pick(hybridBase, 'batteryFull');
+assert.equal(hFull.label, 'Batería llena');
+assert.equal(hFull.batteryState, 'full');
+assert.equal(hFull.batteryKW, 0);
+assert.equal(hFull.lines.battery!.active, false);
+assert.equal(hFull.houseKW, 1.2);
+assert.equal(hFull.gridState, 'export');
+assert.equal(hFull.gridKW, 3.3);
+assert.ok(/batería está llena/.test(hFull.description) && /inyecta a la red/.test(hFull.description), hFull.description);
+const hFullZero = pick({ ...hybridBase, isZeroExport: true }, 'batteryFull');
+assert.equal(hFullZero.gridState, 'idle');
+assert.equal(hFullZero.productionKW, hFullZero.houseKW, 'Zero export trims production to the house load');
+assert.ok(/inyección cero/.test(hFullZero.description), hFullZero.description);
 assert.equal(hDay.pill.text, 'Cargando batería');
 assert.equal(hDay.lines.battery!.reverse, false);
 // A 2 kWh bank limits power to 1 kW; the rest is exported (or trimmed under zero export).
@@ -219,7 +232,8 @@ const modes = (html: string, expected: string[]) => {
   for (const mode of expected.slice(1)) assert.ok(/\shidden[\s>]/.test(panelTag(html, mode)), `${mode} panel starts hidden`);
 };
 modes(onGridHtml, ['day', 'night', 'outage']);
-modes(hybridHtml, ['day', 'night', 'outageDay', 'outageNight']);
+modes(hybridHtml, ['day', 'batteryFull', 'night', 'outageDay', 'outageNight']);
+assert.ok(/Batería llena/.test(hybridHtml));
 // Desktop hides the text legend: the labelled SVG's accessible name carries each node's label and kW value.
 const fullAria = hybridHtml.match(/data-energy-flow-svg="full"[^>]*aria-label="([^"]*)"/)?.[1] ?? hybridHtml.match(/aria-label="([^"]*)"[^>]*data-energy-flow-svg="full"/)?.[1] ?? '';
 assert.ok(/Producción solar ≈[0-9.]+ kW/.test(fullAria) && /Consumo de la casa/.test(fullAria), fullAria);

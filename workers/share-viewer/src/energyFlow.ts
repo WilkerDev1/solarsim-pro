@@ -32,7 +32,7 @@ function describeNodes(s: ModeScenario): NodeInfo[] {
   }];
   if (s.batteryState) {
     nodes.push({
-      key: 'battery', icon: 'battery', pal: PALETTE.battery, muted: s.batteryState === 'idle', value: kw(s.batteryKW),
+      key: 'battery', icon: 'battery', pal: PALETTE.battery, muted: s.batteryState === 'idle', value: s.batteryState === 'full' ? 'Llena' : kw(s.batteryKW),
       label: `Batería · ${s.batteryState === 'charging' ? 'cargando' : s.batteryState === 'discharging' ? 'descargando' : 'en reposo'}`,
     });
   }
