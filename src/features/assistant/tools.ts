@@ -10,6 +10,7 @@ import {
 } from '../../../shared/applicationFeatures';
 import { buildAITariffContext } from '../../utils/aiTariffContext';
 import { editableAssistantFields, validateAssistantEdits } from './validation';
+import { touchesPricingEdits } from './pricingFields';
 import { AUTOMATED_PRICING } from '../../../shared/automatedProposalPolicy';
 import type {
   AssistantAction,
@@ -223,8 +224,9 @@ export function executeAssistantTool(
     if (kind === 'project' && (target as any).syncStatus === 'conflict')
       throw new Error('Resuelve primero el conflicto de esta propuesta.');
     const edits = validateAssistantEdits(args.edits, kind);
-    // Agent edits that affect pricing always leave the proposal in catalog mode with the cost matrix.
-    if (kind === 'project' && edits.some((e) => e.section === 'specs' || e.section === 'financials')) {
+    // Agent edits that affect pricing leave the proposal in catalog mode with the cost matrix. Unrelated edits
+    // (e.g. system losses) never switch the mode: that change is guarded and needs its own confirmation.
+    if (kind === 'project' && touchesPricingEdits(edits)) {
       const specs = (target as unknown as { specs: Record<string, unknown> }).specs;
       for (const [field, value] of Object.entries(AUTOMATED_PRICING))
         if (specs[field] !== value) edits.push({ section: 'specs', field, value });
