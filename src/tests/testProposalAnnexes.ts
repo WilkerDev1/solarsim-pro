@@ -106,40 +106,20 @@ assert.deepEqual(deduped.attachedPdfs.map((att) => att.id), ['att-manual', 'att-
     const result = applyAnnexPlan(before, planDatasheetAnnexes(manual, catalog), NOW, unresolvedEquipmentIds(manual, catalog));
     assert.equal(result.attachedPdfs.some((att) => att.id === catalogAnnexId('sheet-inverter')), false, 'old model datasheet leaves the export');
   }
-  // One model detached by hand while another group is still unresolved: only the unresolved group's annex is kept.
+  // One model detached by hand while another group is still unresolved: nothing is removed during the partial sync.
   {
     const mixed = structuredClone(loading);
-    mixed.specs.inverters = [{ id: 'inv', brandModel: 'Inversor propio', powerKW: 8, count: 1, manualModel: true, detachedCatalogItemIds: ['inv'] }];
+    mixed.specs.inverters = [{ id: 'inv', brandModel: 'Inversor propio', powerKW: 8, count: 1, manualModel: true }];
     const noPanels = catalog.filter((item) => item.type !== 'panel'); // the panel records have not arrived
     const pending = unresolvedEquipmentIds(mixed, noPanels);
-    assert.equal(pending.has('inv'), false, 'the detached model is not protected');
-    assert.equal(pending.has('pa'), true, 'the unresolved group keeps its annex');
-    const result = applyAnnexPlan(before, planDatasheetAnnexes(mixed, noPanels), NOW, pending);
-    assert.deepEqual(result.attachedPdfs.map((att) => att.id), ['att-manual', catalogAnnexId('sheet-family')]);
-    // Stable id unrelated to the catalog: the former catalog id is stored explicitly.
-    const unrelated = structuredClone(mixed);
-    unrelated.specs.inverters = [{ id: 'g-xyz', brandModel: 'Inversor propio', powerKW: 8, count: 1, manualModel: true, detachedCatalogItemIds: ['inv'] }];
-    const unrelatedPending = unresolvedEquipmentIds(unrelated, noPanels);
-    assert.equal(unrelatedPending.has('inv'), false, 'the former catalog id, not the group id, identifies the detached item');
-    assert.equal(unrelatedPending.has('pa'), true);
-    // Unknown unresolved group (no catalog id at all): nothing can be ruled out, every automatic annex stays.
-    const unknown = structuredClone(mixed);
-    unknown.specs.panels = [{ id: 'legacy-1', brandModel: 'Panel sin identificar', powerW: 600, count: 4 }];
-    const unknownPending = unresolvedEquipmentIds(unknown, noPanels);
-    assert.equal(unknownPending.has('inv'), true, 'detached item stays while an unidentifiable group is unresolved');
-    assert.equal(unknownPending.has('pa'), true);
-    // Identifiable unresolved group pointing at the detached item itself: its annex stays.
-    const same = structuredClone(mixed);
-    const noInv = catalog.filter((item) => item.id !== 'inv');
-    same.specs.inverters = [
-      { id: 'inv', brandModel: 'Inversor propio', powerKW: 8, count: 1, manualModel: true, detachedCatalogItemIds: ['inv'] },
-      { id: 'g-other', catalogItemId: 'inv', brandModel: 'QA Inversor 8K', powerKW: 8, count: 1 },
-    ];
-    assert.equal(unresolvedEquipmentIds(same, noInv).has('inv'), true, 'an identifiable unresolved group that points to the item keeps it');
-    // Another group still uses the detached item: its annex stays.
-    const shared = structuredClone(mixed);
-    shared.specs.inverters = [...shared.specs.inverters!, { id: 'g8', catalogItemId: 'inv', brandModel: 'QA Inversor 8K', powerKW: 8, count: 1 }];
-    assert.equal(unresolvedEquipmentIds(shared, noPanels).has('inv'), true);
+    assert.equal(pending.has('inv'), true, 'the detached/shared annex stays while the catalog is partially synced');
+    assert.equal(pending.has('pa'), true);
+    assert.equal(applyAnnexPlan(before, planDatasheetAnnexes(mixed, noPanels), NOW, pending).changed, false);
+    // The sync finishes: the group is still detached, no group uses the item and the plan removes its annex.
+    const done = applyAnnexPlan(before, planDatasheetAnnexes(mixed, catalog), NOW, unresolvedEquipmentIds(mixed, catalog));
+    assert.equal(done.attachedPdfs.some((att) => att.id === catalogAnnexId('sheet-inverter')), false);
+    // The detached group never resolves through its old catalog id (cases of the id fallback live in testParameterDockEquipment).
+    assert.equal(unresolvedEquipmentIds(mixed, catalog).size, 0);
   }
   // The record arrives: the same annex objects survive, nothing is recreated.
   assert.equal(applyAnnexPlan(before, planDatasheetAnnexes(loading, catalog), NOW, unresolvedEquipmentIds(loading, catalog)).changed, false);

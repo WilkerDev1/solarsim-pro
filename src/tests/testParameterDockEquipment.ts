@@ -337,38 +337,36 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
     const picked = normalizeEquipmentEdit(specs, selectCatalogEquipment(specs, 'panel', 0, linkedCatalog[1]));
     assert.equal(picked.panels![0].manualModel, undefined, 'seleccionar del catálogo vuelve a vincular');
   }
-  // El catálogo anterior queda registrado de forma explícita, sea cual sea el id del grupo.
+  // Ediciones sucesivas: modelo A → nombre exacto de B (revincula) → nombre propio. Los anexos solo se retiran sin grupos pendientes.
   {
-    assert.deepEqual((run('panel', { ...linked, id: 'g-xyz' }, 'Panel Propio X') as { detachedCatalogItemIds?: string[] }).detachedCatalogItemIds, ['k1'], 'desde catalogItemId');
-    assert.deepEqual((run('panel', { id: 'k1', catalogItemId: 'k1', brandModel: 'Panel K 550', powerW: 1, count: 1 }, 'Otro') as { detachedCatalogItemIds?: string[] }).detachedCatalogItemIds, ['k1'], 'desde el id igual al id del catálogo');
-    assert.deepEqual((run('panel', { id: 'g-1', brandModel: 'Panel K 550', powerW: 1, count: 1 }, 'Otro') as { detachedCatalogItemIds?: string[] }).detachedCatalogItemIds, ['k1'], 'desde el modelo resuelto por nombre');
-    const detached = { ...linked, id: 'g-xyz', catalogItemId: undefined, manualModel: true, detachedCatalogItemIds: ['k1'] };
-    assert.deepEqual((run('panel', detached, 'Otro más') as { detachedCatalogItemIds?: string[] }).detachedCatalogItemIds, ['k1'], 'una nueva edición conserva el registro');
-    const specs = { panels: [detached] } as unknown as SystemSpecs;
-    const picked = normalizeEquipmentEdit(specs, selectCatalogEquipment(specs, 'panel', 0, linkedCatalog[0]));
-    assert.equal((picked.panels![0] as { detachedCatalogItemIds?: string[] }).detachedCatalogItemIds, undefined, 'elegir ese equipo lo saca de la lista');
-    const other = normalizeEquipmentEdit(specs, selectCatalogEquipment(specs, 'panel', 0, linkedCatalog[1]));
-    assert.deepEqual((other.panels![0] as { detachedCatalogItemIds?: string[] }).detachedCatalogItemIds, ['k1'], 'elegir otro equipo conserva el que se dejó');
-  }
-  // Ediciones sucesivas: modelo A → nombre exacto de B (revincula) → nombre propio (desvincula B), con otro grupo identificable sin resolver.
-  {
-    const state = { specs: { panels: [
-      { id: 'g1', catalogItemId: 'k1', brandModel: 'Panel K 550', powerW: 550, count: 4 },
-      { id: 'g2', catalogItemId: 'zz', brandModel: 'Sin sincronizar', powerW: 400, count: 2 },
-    ], inverters: [{ id: 'i0', brandModel: 'Sin uso', powerKW: 1, count: 0 }], batteries: [{ id: 'b0', brandModel: 'Sin uso', capacityKWh: 1, count: 0 }] } as unknown as SystemSpecs };
-    const edit = (name: string) => createGroupActions('panel', state.specs, linkedCatalog, patch => { state.specs = normalizeEquipmentEdit(state.specs, patch); }).setBrand(0, name);
-    const annex = (id: string) => ({ id: `att-${id}`, origin: 'catalog', catalogItemId: id });
-    const pendingNow = () => unresolvedEquipmentIds({ specs: state.specs, customization: { attachedPdfs: [annex('k1'), annex('k2'), annex('zz')] } } as unknown as ProjectSimulation, linkedCatalog);
-    edit('Panel K 600');
-    const relinked = state.specs.panels![0] as { catalogItemId?: string; manualModel?: boolean; count: number };
+    const setup = (withUnresolved: boolean) => {
+      const state = { specs: { panels: [
+        { id: 'g1', catalogItemId: 'k1', brandModel: 'Panel K 550', powerW: 550, count: 4 },
+        ...(withUnresolved ? [{ id: 'g2', catalogItemId: 'zz', brandModel: 'Sin sincronizar', powerW: 400, count: 2 }] : []),
+      ], inverters: [{ id: 'i0', brandModel: 'Sin uso', powerKW: 1, count: 0 }], batteries: [{ id: 'b0', brandModel: 'Sin uso', capacityKWh: 1, count: 0 }] } as unknown as SystemSpecs };
+      const edit = (name: string) => createGroupActions('panel', state.specs, linkedCatalog, patch => { state.specs = normalizeEquipmentEdit(state.specs, patch); }).setBrand(0, name);
+      const annex = (id: string) => ({ id: `att-${id}`, origin: 'catalog', catalogItemId: id });
+      const pending = () => unresolvedEquipmentIds({ specs: state.specs, customization: { attachedPdfs: [annex('k1'), annex('k2'), annex('zz')] } } as unknown as ProjectSimulation, linkedCatalog);
+      return { state, edit, pending };
+    };
+    const lone = setup(false);
+    lone.edit('Panel K 600');
+    const relinked = lone.state.specs.panels![0] as { catalogItemId?: string; manualModel?: boolean; count: number };
     assert.equal(relinked.catalogItemId, 'k2', 'escribir el nombre exacto de B deja el grupo vinculado a B');
-    assert.equal(relinked.manualModel, undefined);
+    assert.equal(relinked.manualModel, undefined, 'revincular quita manualModel');
     assert.equal(relinked.count, 4, 'solo cambian los campos de vínculo');
-    edit('Panel Propio X');
-    const pending = pendingNow();
-    assert.equal(pending.has('k2'), false, 'B ya no lo usa nadie: su anexo sale');
-    assert.equal(pending.has('k1'), false, 'A tampoco lo usa nadie: su anexo sale');
-    assert.equal(pending.has('zz'), true, 'el grupo identificable sin resolver conserva su anexo');
+    lone.edit('Panel Propio X');
+    assert.equal((lone.state.specs.panels![0] as { manualModel?: boolean }).manualModel, true);
+    assert.equal(lone.pending().size, 0, '(1) un grupo manual sin otros pendientes no protege ningún anexo: el plan retira la ficha anterior');
+    // (5) Volver a escribir el nombre exacto revincula un grupo manual.
+    lone.edit('Panel K 550');
+    assert.equal((lone.state.specs.panels![0] as { catalogItemId?: string; manualModel?: boolean }).catalogItemId, 'k1');
+    assert.equal((lone.state.specs.panels![0] as { manualModel?: boolean }).manualModel, undefined);
+
+    const partial = setup(true);
+    partial.edit('Panel K 600');
+    partial.edit('Panel Propio X');
+    assert.deepEqual([...partial.pending()].sort(), ['k1', 'k2', 'zz'], '(2) con otro grupo sin resolver se conservan todos los anexos, incluso el del modelo desvinculado');
   }
   // Mayúsculas y espacios no cambian de modelo: se conserva el vínculo.
   for (const same of ['  Panel K 550 ', 'panel k 550', 'Panel  K   550']) {

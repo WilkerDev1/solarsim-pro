@@ -41,10 +41,12 @@ export function workspaceCatalog(catalog: SolarEquipmentItem[], serverUrl: strin
 /**
  * Catalog item ids whose automatic annexes must be kept because some equipment in use (count > 0) is not
  * resolved in the catalog yet, typically a proposal pulled before the equipment catalog finished syncing.
- * The datasheet of an unresolved item is unknown, so it cannot be tied to one annex (variants share assets,
- * legacy groups have no catalogItemId): while anything in use is unresolved, every automatic annex is kept.
- * A group the user rewrote by hand (`manualModel`) is not pending: it will never resolve, so its old annex goes.
- * This is transient: once the catalog resolves everything, the exact plan applies again.
+ *
+ * Final rule: groups rewritten by hand (`manualModel`) are intentionally off the catalog and never count as unresolved,
+ * so their old datasheet is not kept forever. If ANY other in-use group is unresolved, EVERY attached catalog annex stays
+ * pending: the datasheet of an unresolved item is unknown (variants share assets, legacy groups have no catalogItemId),
+ * and during a partial sync we never remove datasheets. A stale annex may linger until the sync finishes; the first plan
+ * after that removes it because no group uses it. Dropping a needed datasheet is the worse error.
  */
 export function unresolvedEquipmentIds(project: ProjectSimulation, catalog: SolarEquipmentItem[]): Set<string> {
   const groups = [
@@ -52,30 +54,11 @@ export function unresolvedEquipmentIds(project: ProjectSimulation, catalog: Sola
     ...getProjectInverters(project.specs).map((group) => ({ group, kind: 'inverter' as const })),
     ...getProjectBatteries(project.specs).map((group) => ({ group, kind: 'battery' as const })),
   ];
-  const unresolvedGroups = groups.filter(({ group, kind }) => group.count > 0 && !group.manualModel && !resolveGroupCatalogItem(group, kind, catalog));
+  const unresolved = groups.some(({ group, kind }) => group.count > 0 && !group.manualModel && !resolveGroupCatalogItem(group, kind, catalog));
   const ids = new Set<string>();
-  if (!unresolvedGroups.length) return ids;
-  const attached = (project.customization?.attachedPdfs ?? []).filter((att) => att.origin === 'catalog' && att.catalogItemId);
-  // Closed rule. An unresolved group is identifiable when it carries a `catalogItemId`; one that does not (legacy group,
-  // synthetic id) could still need any datasheet, so nothing can be ruled out: every automatic annex stays pending.
-  if (unresolvedGroups.some(({ group }) => !group.catalogItemId)) {
-    for (const att of attached) ids.add(att.catalogItemId!);
-    return ids;
-  }
-  // All unresolved groups are identifiable: annexes stay pending except those of items a group was detached from by hand
-  // (`detachedCatalogItemIds`), unless some group in use still points at that item.
-  const detached = new Set<string>();
-  for (const { group } of groups) for (const id of group.detachedCatalogItemIds ?? []) detached.add(id);
-  const inUse = new Set<string>();
-  for (const { group, kind } of groups) {
-    if (group.count <= 0) continue;
-    const item = resolveGroupCatalogItem(group, kind, catalog);
-    if (item) inUse.add(item.id);
-    else if (!group.manualModel) [group.id, group.catalogItemId].forEach((id) => id && inUse.add(id));
-  }
-  for (const att of attached) {
-    if (detached.has(att.catalogItemId!) && !inUse.has(att.catalogItemId!)) continue;
-    ids.add(att.catalogItemId!);
+  if (!unresolved) return ids;
+  for (const att of project.customization?.attachedPdfs ?? []) {
+    if (att.origin === 'catalog' && att.catalogItemId) ids.add(att.catalogItemId);
   }
   return ids;
 }

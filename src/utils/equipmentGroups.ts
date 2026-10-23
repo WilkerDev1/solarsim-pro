@@ -160,11 +160,6 @@ export function resolveGroupCatalogItem<T extends CatalogEntry>(
   return named.length === 1 ? named[0] : null;
 }
 
-function withoutId(ids: string[] | undefined, id: string): string[] | undefined {
-  const rest = (ids ?? []).filter((entry) => entry !== id);
-  return rest.length ? rest : undefined;
-}
-
 /**
  * The `updateSpecs` patch that points group `index` of `kind` at a catalog item: identity, magnitude and
  * `catalogItemId`, plus caller fields such as price. Selecting into the next free slot adds the group.
@@ -183,8 +178,6 @@ export function selectCatalogEquipment<K extends EquipmentKind>(
   const identity = {
     catalogItemId: item.id,
     manualModel: undefined,
-    // Elegir B del catálogo lo vuelve a usar: sale de la lista de dejados, los demás se conservan.
-    detachedCatalogItemIds: withoutId(groups[index]?.detachedCatalogItemIds, item.id),
     brandModel: item.displayName,
     ...(magnitude !== undefined && Number.isFinite(magnitude) && magnitude > 0 ? { [field]: magnitude } : {}),
     ...extra,
