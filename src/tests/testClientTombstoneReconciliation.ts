@@ -152,8 +152,10 @@ try {
   assert.ok(store.getState().clients.some((c) => c.id === 'client-foreign'), 'Another account cannot resolve the conflict');
   await store.getState().syncClientsWithServer();
   assert.ok(store.getState().clientChanges['client-foreign']?.serverDeleted, 'The conflict survives later passes');
+  assert.equal(store.getState().clientSyncFeedback, null, "The active account is not alerted about another account's conflict");
   store.setState({ syncSettings: { ...store.getState().syncSettings, currentUser: user } });
   await store.getState().syncClientsWithServer();
+  assert.match(store.getState().clientSyncFeedback ?? '', /pendientes/, 'The owner is alerted');
   assert.equal(store.getState().clientChanges['client-foreign'].serverDeleted, true, 'The owner sees the deletion conflict');
   assert.deepEqual(puts, [], 'The tombstoned id is never pushed');
 

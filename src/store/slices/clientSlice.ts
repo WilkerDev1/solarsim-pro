@@ -313,7 +313,7 @@ export const createClientSlice: SimulationSlice<ClientSlice> = (set, get) => {
               clientChanges: changes,
               activeClientId: clients.some((c) => c.id === s.activeClientId) ? s.activeClientId : null,
               clientSyncFeedback:
-                failures || Object.values(changes).some((c) => c.serverClient || c.serverDeleted)
+                failures || Object.values(changes).some((c) => (c.serverClient || c.serverDeleted) && (!c.ownerId || c.ownerId === user.id))
                   ? `${failures} cliente(s) pendientes: hay cambios o permisos distintos. Sincroniza y revisa.`
                   : null,
             };
