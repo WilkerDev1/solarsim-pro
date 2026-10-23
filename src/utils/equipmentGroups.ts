@@ -178,6 +178,7 @@ export function selectCatalogEquipment<K extends EquipmentKind>(
   const identity = {
     catalogItemId: item.id,
     manualModel: undefined,
+    detachedCatalogItemId: undefined,
     brandModel: item.displayName,
     ...(magnitude !== undefined && Number.isFinite(magnitude) && magnitude > 0 ? { [field]: magnitude } : {}),
     ...extra,

@@ -335,6 +335,17 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
     const picked = normalizeEquipmentEdit(specs, selectCatalogEquipment(specs, 'panel', 0, linkedCatalog[1]));
     assert.equal(picked.panels![0].manualModel, undefined, 'seleccionar del catálogo vuelve a vincular');
   }
+  // El catálogo anterior queda registrado de forma explícita, sea cual sea el id del grupo.
+  {
+    assert.equal((run('panel', { ...linked, id: 'g-xyz' }, 'Panel Propio X') as { detachedCatalogItemId?: string }).detachedCatalogItemId, 'k1', 'desde catalogItemId');
+    assert.equal((run('panel', { id: 'k1', catalogItemId: 'k1', brandModel: 'Panel K 550', powerW: 1, count: 1 }, 'Otro') as { detachedCatalogItemId?: string }).detachedCatalogItemId, 'k1', 'desde el id igual al id del catálogo');
+    assert.equal((run('panel', { id: 'g-1', brandModel: 'Panel K 550', powerW: 1, count: 1 }, 'Otro') as { detachedCatalogItemId?: string }).detachedCatalogItemId, 'k1', 'desde el modelo resuelto por nombre');
+    const detached = { ...linked, id: 'g-xyz', catalogItemId: undefined, manualModel: true, detachedCatalogItemId: 'k1' };
+    assert.equal((run('panel', detached, 'Otro más') as { detachedCatalogItemId?: string }).detachedCatalogItemId, 'k1', 'una nueva edición conserva el registro');
+    const specs = { panels: [detached] } as unknown as SystemSpecs;
+    const picked = normalizeEquipmentEdit(specs, selectCatalogEquipment(specs, 'panel', 0, linkedCatalog[1]));
+    assert.equal((picked.panels![0] as { detachedCatalogItemId?: string }).detachedCatalogItemId, undefined, 'elegir del catálogo lo limpia');
+  }
   // Mayúsculas y espacios no cambian de modelo: se conserva el vínculo.
   for (const same of ['  Panel K 550 ', 'panel k 550', 'Panel  K   550']) {
     assert.equal(run('panel', linked, same).catalogItemId, 'k1', `«${same}» sigue siendo el mismo modelo`);

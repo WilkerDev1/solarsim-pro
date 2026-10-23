@@ -55,13 +55,9 @@ export function unresolvedEquipmentIds(project: ProjectSimulation, catalog: Sola
   const unresolvedGroups = groups.filter(({ group, kind }) => group.count > 0 && !group.manualModel && !resolveGroupCatalogItem(group, kind, catalog));
   const ids = new Set<string>();
   if (!unresolvedGroups.length) return ids;
-  // Items a group detached by hand used to be (its id is the old catalog id, or `<kind>-<id>`), unless another group still uses them.
+  // Catalog items a group was detached from by hand (stored explicitly), unless another group still uses them.
   const detached = new Set<string>();
-  for (const { group, kind } of groups) {
-    if (!group.manualModel) continue;
-    detached.add(group.id);
-    if (group.id.startsWith(`${kind}-`)) detached.add(group.id.slice(kind.length + 1));
-  }
+  for (const { group } of groups) if (group.manualModel && group.detachedCatalogItemId) detached.add(group.detachedCatalogItemId);
   const inUse = new Set<string>();
   for (const { group, kind } of groups) {
     if (group.count <= 0) continue;

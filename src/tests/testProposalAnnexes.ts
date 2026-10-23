@@ -109,13 +109,19 @@ assert.deepEqual(deduped.attachedPdfs.map((att) => att.id), ['att-manual', 'att-
   // One model detached by hand while another group is still unresolved: only the unresolved group's annex is kept.
   {
     const mixed = structuredClone(loading);
-    mixed.specs.inverters = [{ id: 'inv', brandModel: 'Inversor propio', powerKW: 8, count: 1, manualModel: true }];
+    mixed.specs.inverters = [{ id: 'inv', brandModel: 'Inversor propio', powerKW: 8, count: 1, manualModel: true, detachedCatalogItemId: 'inv' }];
     const noPanels = catalog.filter((item) => item.type !== 'panel'); // the panel records have not arrived
     const pending = unresolvedEquipmentIds(mixed, noPanels);
     assert.equal(pending.has('inv'), false, 'the detached model is not protected');
     assert.equal(pending.has('pa'), true, 'the unresolved group keeps its annex');
     const result = applyAnnexPlan(before, planDatasheetAnnexes(mixed, noPanels), NOW, pending);
     assert.deepEqual(result.attachedPdfs.map((att) => att.id), ['att-manual', catalogAnnexId('sheet-family')]);
+    // Stable id unrelated to the catalog: the former catalog id is stored explicitly.
+    const unrelated = structuredClone(mixed);
+    unrelated.specs.inverters = [{ id: 'g-xyz', brandModel: 'Inversor propio', powerKW: 8, count: 1, manualModel: true, detachedCatalogItemId: 'inv' }];
+    const unrelatedPending = unresolvedEquipmentIds(unrelated, noPanels);
+    assert.equal(unrelatedPending.has('inv'), false, 'the former catalog id, not the group id, identifies the detached item');
+    assert.equal(unrelatedPending.has('pa'), true);
     // Another group still uses the detached item: its annex stays.
     const shared = structuredClone(mixed);
     shared.specs.inverters = [...shared.specs.inverters!, { id: 'g8', catalogItemId: 'inv', brandModel: 'QA Inversor 8K', powerKW: 8, count: 1 }];

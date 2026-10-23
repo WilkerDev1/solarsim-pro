@@ -154,7 +154,7 @@ const normalizeModelName = (name: string) => name.normalize('NFD').replace(/[\u0
  * puede ser otro modelo, y adjuntar la ficha técnica equivocada es peor que no adjuntar ninguna. Además del
  * `catalogItemId` se renueva un `id` de grupo que sea un id del catálogo, porque `resolveGroupCatalogItem` también lo resuelve.
  */
-function detachedCatalogIdentity(kind: EquipmentKind, group: { id?: string; catalogItemId?: string; manualModel?: boolean; brandModel?: string }, brandModel: string, catalog: SolarEquipmentItem[]): { catalogItemId?: undefined; manualModel?: true } {
+function detachedCatalogIdentity(kind: EquipmentKind, group: { id?: string; catalogItemId?: string; manualModel?: boolean; detachedCatalogItemId?: string; brandModel?: string }, brandModel: string, catalog: SolarEquipmentItem[]): { catalogItemId?: undefined; manualModel?: true; detachedCatalogItemId?: string } {
   const linked = resolveGroupCatalogItem(group, kind, catalog);
   const reference = linked?.displayName ?? group.brandModel ?? '';
   if (normalizeModelName(brandModel) === normalizeModelName(reference)) return {};
@@ -162,7 +162,9 @@ function detachedCatalogIdentity(kind: EquipmentKind, group: { id?: string; cata
   const idIsCatalogId = !!group.id && (group.id === group.catalogItemId || catalog.some(item => item.type === kind && item.id === group.id));
   if (group.catalogItemId === undefined && !idIsCatalogId && !linked) return {};
   // El id no se toca (es la clave de la fila: cambiarlo quitaría el foco al escribir); `manualModel` impide que el resolvedor vuelva a usarlo.
-  return { ...(group.catalogItemId !== undefined ? { catalogItemId: undefined } : {}), manualModel: true };
+  // El equipo anterior se guarda de forma explícita: identifica su anexo aunque el id del grupo no tenga relación con el catálogo.
+  const detachedCatalogItemId = group.detachedCatalogItemId ?? group.catalogItemId ?? linked?.id ?? (idIsCatalogId ? group.id : undefined);
+  return { ...(group.catalogItemId !== undefined ? { catalogItemId: undefined } : {}), manualModel: true, ...(detachedCatalogItemId ? { detachedCatalogItemId } : {}) };
 }
 
 export interface GroupActions<K extends EquipmentKind> {
