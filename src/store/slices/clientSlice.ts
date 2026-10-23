@@ -225,13 +225,15 @@ export const createClientSlice: SimulationSlice<ClientSlice> = (set, get) => {
             if (change.ownerId && change.ownerId !== user.id) continue;
             const local = get().clients.find((c) => c.id === id);
             if (!local) continue;
-            if (deleted.has(id) && !change.serverClient) {
+            if (deleted.has(id)) {
               // Deleted by a teammate while this device holds unsynced edits: kept for review, never pushed.
-              set((s) => ({ clientChanges: { ...s.clientChanges, [id]: { ...s.clientChanges[id], serverDeleted: true } } }));
+              // An earlier update conflict is superseded: the server record no longer exists.
+              set((s) => ({
+                clientChanges: { ...s.clientChanges, [id]: { ...s.clientChanges[id], serverClient: undefined, serverDeleted: true } },
+              }));
               failures++;
               continue;
             }
-            if (deleted.has(id)) continue;
             if (change.serverClient || change.serverDeleted) {
               failures++;
               continue;
