@@ -40,6 +40,27 @@ store().createNewProject({ name: 'Directo', province: 'Santiago', distributor: '
 }
 assert(!readFileSync('src/components/settings/sections/SimulationPreferencesSection.tsx', 'utf8').includes('|| 1.05'), 'el editor de ajustes no repite 1.05');
 
+// ── Batería: el 80 % del caso de referencia no se filtra a importaciones ni a proyectos nuevos ──
+{
+  const bankGroups = [
+    { id: 'g1', brandModel: 'G1', capacityKWh: 10, count: 1 },
+    { id: 'g2', brandModel: 'G2', capacityKWh: 10, count: 1 },
+  ];
+  const { batteryDOD: _omit, ...specsNoDod } = fresh.specs as unknown as Record<string, unknown>;
+  void _omit;
+  const importable = { ...fresh, id: '', client: { ...fresh.client, name: 'Importado banco', projectId: 'IMP-2', quoteNumber: 'IMP-2' }, specs: { ...specsNoDod, hasBattery: true, batteries: bankGroups } };
+  assert.ok(store().importProjectsFromJSON([importable as never]).success);
+  const bank = store().projects.find((p) => p.client.name === 'Importado banco')!;
+  assert.equal(bank.specs.batteryDOD, 90, 'espejo importado sin DOD: 90, no 80');
+  assert.equal(shared.resolveBatteryBankDodPct(bank.specs), 90, 'grupos importados sin DOD: 90');
+  assert.equal(shared.resolveBatteryBankEfficiencyPct(bank.specs), 90);
+  const { createAIProposalBase } = await import('../utils/proposalDraftProject');
+  const aiBase = createAIProposalBase(BENCHMARK_PROJECT, DEFAULT_SIMULATION_SETTINGS, 'Santiago');
+  assert.equal(aiBase.specs.batteryDOD, 90, 'base de propuesta IA: 90, no 80');
+  assert.equal(fresh.specs.batteryDOD, 90, 'proyecto nuevo: 90');
+  assert.equal(BENCHMARK_PROJECT.specs.batteryDOD, 80, 'el caso de referencia conserva su 80');
+}
+
 // ── Pérdidas del sistema: un solo concepto (25 %), y 14 % solo en modo detallado sin dato ──
 assert.equal(shared.DEFAULT_SYSTEM_LOSSES_PCT, 25);
 assert.equal(shared.DEFAULT_DETAILED_SYSTEM_LOSSES_PCT, 14);
