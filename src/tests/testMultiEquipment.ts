@@ -15,7 +15,7 @@ import {
 } from '../utils/equipmentSpecsUtils';
 import { calculateCostMatrixSummary, calculateFinancialSummary } from '../engine/financeEngine';
 import { calculateMonthlySolarProduction } from '../engine/solarEngine';
-import { BENCHMARK_PROJECT } from '../engine/referenceCase';
+import { BENCHMARK_LEGACY_SPECS, BENCHMARK_PROJECT } from '../engine/referenceCase';
 
 console.log('=====================================================');
 console.log('🧪 RUNNING MULTI-EQUIPMENT (INVERTERS, PANELS, BESS) TEST SUITE');
@@ -27,7 +27,7 @@ console.log('=====================================================\n');
 // --------------------------------------------------------------------------
 console.log('--- TEST 1: Multi-Inverter (2x 10kW + 2x 5kW = 30kW AC) ---');
 const multiInverterSpecs: SystemSpecs = {
-  ...BENCHMARK_PROJECT.specs,
+  ...BENCHMARK_LEGACY_SPECS,
   inverterCount: 2,
   inverterPowerKW: 10,
   inverterBrandModel: 'Inversor Luxpower LXP 10K',
@@ -280,22 +280,22 @@ console.log(' ✅ PASS: Financial summary, DC kWp, and BESS kWh match multi-equi
 // TEST 6: Strict Backward Compatibility with BENCHMARK_PROJECT
 // --------------------------------------------------------------------------
 console.log('--- TEST 6: Strict Backward Compatibility (BENCHMARK_PROJECT) ---');
-const benchPanels = getProjectPanels(BENCHMARK_PROJECT.specs);
-const benchInverters = getProjectInverters(BENCHMARK_PROJECT.specs);
-const benchBatteries = getProjectBatteries(BENCHMARK_PROJECT.specs);
+const benchPanels = getProjectPanels(BENCHMARK_LEGACY_SPECS);
+const benchInverters = getProjectInverters(BENCHMARK_LEGACY_SPECS);
+const benchBatteries = getProjectBatteries(BENCHMARK_LEGACY_SPECS);
 
-if (benchPanels.length !== 1 || benchPanels[0].count !== BENCHMARK_PROJECT.specs.panelCount) {
+if (benchPanels.length !== 1 || benchPanels[0].count !== BENCHMARK_LEGACY_SPECS.panelCount) {
   throw new Error(`❌ Benchmark panels fallback failed: ${JSON.stringify(benchPanels)}`);
 }
-if (benchInverters.length !== 1 || benchInverters[0].count !== BENCHMARK_PROJECT.specs.inverterCount) {
+if (benchInverters.length !== 1 || benchInverters[0].count !== BENCHMARK_LEGACY_SPECS.inverterCount) {
   throw new Error(`❌ Benchmark inverters fallback failed: ${JSON.stringify(benchInverters)}`);
 }
-if (BENCHMARK_PROJECT.specs.hasBattery && (benchBatteries.length !== 1 || benchBatteries[0].count !== BENCHMARK_PROJECT.specs.batteryCount)) {
+if (BENCHMARK_LEGACY_SPECS.hasBattery && (benchBatteries.length !== 1 || benchBatteries[0].count !== BENCHMARK_LEGACY_SPECS.batteryCount)) {
   throw new Error(`❌ Benchmark batteries fallback failed: ${JSON.stringify(benchBatteries)}`);
 }
 
-const benchDCCapacity = calculateTotalDCCapacityKWp(BENCHMARK_PROJECT.specs);
-const expectedBenchDC = (BENCHMARK_PROJECT.specs.panelCount * BENCHMARK_PROJECT.specs.panelPowerW) / 1000;
+const benchDCCapacity = calculateTotalDCCapacityKWp(BENCHMARK_LEGACY_SPECS);
+const expectedBenchDC = (BENCHMARK_LEGACY_SPECS.panelCount * BENCHMARK_LEGACY_SPECS.panelPowerW) / 1000;
 if (benchDCCapacity !== expectedBenchDC) {
   throw new Error(`❌ Benchmark DC capacity mismatch: expected ${expectedBenchDC}, got ${benchDCCapacity}`);
 }

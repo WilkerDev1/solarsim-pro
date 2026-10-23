@@ -278,7 +278,7 @@ export function executeAssistantTool(
       throw new Error(
         'Selecciona grupos explícitos o dimensionamiento automático, no ambos.'
       );
-    // Scalar shortcuts cannot silently detach/misprice a multi-model installation.
+    // Scalar shortcuts cannot silently detach/misprice a multi-model installation (con un solo modelo, llegan a su grupo).
     if (kind === 'project') {
       const p = target as ReturnType<typeof visibleAssistantProjects>[number];
       for (const e of edits) {
@@ -287,7 +287,7 @@ export function executeAssistantTool(
           /^(panel|inverter|battery)/.test(e.field) &&
           !['panels', 'inverters', 'batteries'].includes(e.field) &&
           [p.specs.panels, p.specs.inverters, p.specs.batteries].some(
-            (g) => g?.length
+            (g) => (g?.length ?? 0) > 1
           )
         )
           throw new Error(

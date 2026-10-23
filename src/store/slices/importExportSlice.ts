@@ -4,7 +4,8 @@ import { commercialCopy } from '../../../shared/proposalCommercial';
 import { projectMutationMetadata } from '../sync/projectMutation';
 import { SimulationSlice, ImportExportSlice } from '../types';
 import { ProjectSimulation, SystemSpecs } from '../../types';
-import { BENCHMARK_PROJECT } from '../../engine/referenceCase';
+import { BENCHMARK_LEGACY_SPECS, BENCHMARK_PROJECT } from '../../engine/referenceCase';
+import { migrateLegacySpecs } from '../../../shared/equipment';
 import { generateNextProjectSequence, generateDuplicateProjectIdentifiers } from '../initialData';
 
 /**
@@ -133,8 +134,9 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
           projectId: raw.client?.projectId || 'SP-2026-001',
           quoteNumber: raw.client?.quoteNumber || 'C-0001',
         },
-        specs: {
-          ...BENCHMARK_PROJECT.specs,
+        // Un archivo heredado (espejo) o nuevo (grupos) queda solo con grupos; la migración no cambia los resultados.
+        specs: migrateLegacySpecs({
+          ...BENCHMARK_LEGACY_SPECS,
           ...(raw.specs || {}),
           // El 80 % del caso de referencia no es un default: sin DOD válido, el del proyecto es el del motor.
           // El espejo escalar sale del grupo principal; sin dato propio, DOD del motor y eficiencia sin dato.
@@ -144,7 +146,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
           pricePerKWpUSD: raw.specs?.pricePerKWpUSD,
           panelCount: typeof raw.specs?.panelCount === 'number' && raw.specs.panelCount > 0 ? raw.specs.panelCount : 10,
           panelPowerW: typeof raw.specs?.panelPowerW === 'number' && raw.specs.panelPowerW > 0 ? raw.specs.panelPowerW : 620,
-        },
+        }),
         rates: {
           ...BENCHMARK_PROJECT.rates,
           ...(raw.rates || {}),

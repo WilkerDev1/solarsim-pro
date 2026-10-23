@@ -1,7 +1,8 @@
 import { createProjectId } from '../../utils/projectId';
 import { canEditCommercial } from '../../features/proposals/commercial';
 import { isProposalLink } from '../../../shared/proposalLinks';
-import { normalizeEquipmentEdit, normalizeSpecsChange, selectCatalogEquipment } from '../../utils/equipmentGroups';
+import { editEquipmentGroup, normalizeEquipmentEdit, normalizeSpecsChange, selectCatalogEquipment } from '../../utils/equipmentGroups';
+import { applyLegacyEquipmentPatch, editEquipment, readEquipment } from '../../../shared/equipment';
 import { commercialCopy, commercialState, isProposalCommercial } from '../../../shared/proposalCommercial';
 import { companyDocumentCustomization, reusableDocumentTemplate } from '../../utils/companyDocumentTemplate';
 import { DEFAULT_SIMULATION_SETTINGS } from '../defaultSimulationSettings';
@@ -27,13 +28,15 @@ function withRecommendedPanels(specs: SystemSpecs, client: ClientInfo, monthlyCo
   const rec = calculateRecommendedPanelCount(
     client.province,
     monthlyConsumption,
-    specs.panelPowerW || 620,
+    readEquipment(specs).panels[0]?.powerW || 620,
     targetCoveragePct,
     resolveSystemLossesPct(specs),
     client.customMonthlyHSP
   );
-  // Goes through the group normalizer so a single panel group receives the recommendation too.
-  return normalizeEquipmentEdit(specs, { panelCount: rec.recommendedPanelCount });
+  // Only a single panel group receives the recommendation; with several models the count is not auto-calculated.
+  return readEquipment(specs).panels.length === 1
+    ? editEquipment(specs, 'panel', { type: 'update', index: 0, patch: { count: rec.recommendedPanelCount } })
+    : specs;
 }
 
 /** Keeps equipment groups and their legacy mirror consistent whatever path changed the specs. */
@@ -246,25 +249,25 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
         quoteNumber: seq.quoteNumber,
         quoteValidityDays: defs?.defaultQuoteValidityDays || 7,
       },
-      specs: {
-        ...BENCHMARK_PROJECT.specs,
+      specs: applyLegacyEquipmentPatch(BENCHMARK_PROJECT.specs, {
         // El $/W del caso de referencia (1.134971) no es un default: todo proyecto nuevo parte del ajuste.
         pricePerWattUSD: directWattPrice,
         pricePerKWpUSD: Math.round(directWattPrice * 1000 * 100) / 100,
         isDetailed: false, // Simple (Catálogo IA): equipos del catálogo con precios de proveedor
         pricingMode: defs?.defaultPricingMode === 'direct' ? 'direct_watt' : 'cost_matrix',
-        panelPowerW: defs?.defaultPanelPowerW || 620,
-        panelBrandModel: defs?.defaultPanelModel || BENCHMARK_PROJECT.specs.panelBrandModel,
-        inverterBrandModel: defs?.defaultInverterModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)',
-        inverterPowerKW: defs?.defaultInverterPowerKW || 8.0,
-        inverterCount: 1,
         systemLosses: defs?.defaultSystemLosses !== undefined ? defs.defaultSystemLosses : DEFAULT_SYSTEM_LOSSES_PCT,
         annualDegradation: defs?.defaultAnnualDegradation || 0.40,
         autoCalculatePanels: defs?.defaultAutoCalculatePanels || false,
         hasBattery: defs?.defaultHasBattery || false,
+        // Los equipos por defecto entran al grupo único de cada tipo (el espejo heredado no se escribe).
+        panelPowerW: defs?.defaultPanelPowerW || 620,
+        panelBrandModel: defs?.defaultPanelModel || readEquipment(BENCHMARK_PROJECT.specs).panels[0].brandModel,
+        inverterBrandModel: defs?.defaultInverterModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)',
+        inverterPowerKW: defs?.defaultInverterPowerKW || 8.0,
+        inverterCount: 1,
         batteryCapacityKWh: defs?.defaultBatteryCapacityKWh || DEFAULT_BATTERY_CAPACITY_KWH,
         batteryDOD: defs?.defaultBatteryDOD || DEFAULT_BATTERY_DOD_PCT,
-      },
+      }),
       rates: {
         ...BENCHMARK_PROJECT.rates,
         targetCoveragePct: defs?.defaultTargetCoveragePct || DEFAULT_TARGET_COVERAGE_PCT,
@@ -580,35 +583,34 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
 
   updateSpecs: (specsPartial) => updateActiveProject((p, state) => {
     let specs = normalizeEnabledBatteries(normalizeEquipmentEdit(p.specs, specsPartial));
+    const before = readEquipment(p.specs);
+    const after = readEquipment(specs);
+    // Editing the first panel group's quantity (dock, assistant) is a manual quantity: it turns auto-calculation off.
+    const panelCountEdited = specsPartial.panelCount !== undefined || (specsPartial.panels !== undefined && after.panels[0]?.count !== before.panels[0]?.count);
     const shouldAutoCalc = specsPartial.autoCalculatePanels !== undefined
       ? specsPartial.autoCalculatePanels
-      : (p.specs.autoCalculatePanels && specsPartial.panelCount === undefined);
+      : (p.specs.autoCalculatePanels && !panelCountEdited);
 
     if (shouldAutoCalc) {
       specs = { ...withRecommendedPanels(specs, p.client, p.monthlyConsumption, p.rates.targetCoveragePct ?? 95), autoCalculatePanels: true };
-    } else if (specsPartial.panelCount !== undefined && specsPartial.autoCalculatePanels === undefined) {
+    } else if (panelCountEdited && specsPartial.autoCalculatePanels === undefined) {
       specs.autoCalculatePanels = false;
     }
 
-    // When any model changes, drop selected suppliers that do not quote the submitted models.
-    const modelKeys = [['panel', 'panelBrandModel'], ['inverter', 'inverterBrandModel'], ['battery', 'batteryBrandModel']] as const;
-    if (!specsPartial.selectedSupplierInfo && modelKeys.some(([, key]) => specsPartial[key] && specsPartial[key] !== p.specs[key])) {
-      const supplierInfo = { ...(specs.selectedSupplierInfo || {}) };
-      let changed = false;
-      for (const [kind, modelKey] of modelKeys) {
-        const model = specsPartial[modelKey];
-        if (!model) continue;
-        const current = supplierInfo[kind];
-        const item = state.equipmentCatalog.find((e) => e.type === kind && e.displayName === model);
-        const quoted = (item?.supplierPrices || []).some(
-          (sp) => sp.id === current?.supplierPriceId || sp.supplierName.toLowerCase().trim() === current?.supplierName?.toLowerCase().trim()
-        );
-        if (!quoted) {
-          delete supplierInfo[kind];
-          changed = true;
-        }
-      }
-      if (changed) specs.selectedSupplierInfo = supplierInfo;
+    // When a primary model changes, drop the selected supplier that does not quote the new model (suppliers live in the group).
+    const lists = [['panel', 'panels'], ['inverter', 'inverters'], ['battery', 'batteries']] as const;
+    for (const [kind, key] of lists) {
+      const previous = before[key][0];
+      const current = readEquipment(specs)[key][0];
+      if (!current?.brandModel || current.brandModel === previous?.brandModel) continue;
+      if (JSON.stringify(current.selectedSupplierInfo) !== JSON.stringify(previous?.selectedSupplierInfo)) continue; // the edit chose the supplier
+      const supplier = current.selectedSupplierInfo;
+      if (!supplier) continue;
+      const item = state.equipmentCatalog.find((e) => e.type === kind && e.displayName === current.brandModel);
+      const quoted = (item?.supplierPrices || []).some(
+        (sp) => sp.id === supplier.supplierPriceId || sp.supplierName.toLowerCase().trim() === supplier.supplierName?.toLowerCase().trim()
+      );
+      if (!quoted) specs = editEquipment(specs, kind, { type: 'update', index: 0, patch: { selectedSupplierInfo: undefined } });
     }
 
     return { specs, financials: withoutStaleFinancialOverrides(p, p.financials) };
@@ -683,84 +685,30 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     set((state) => ({
       projects: state.projects.map((p) => {
         if (p.id === state.activeProjectId) {
-          const updatedSpecs = { ...p.specs };
-          const selectedSupplierInfo = { ...(updatedSpecs.selectedSupplierInfo || {}) };
-
           // Si no se pasó equipmentItem explícito, buscarlo en equipmentCatalog por supplierPrice.id
           const targetItem = equipmentItem || state.equipmentCatalog.find(
             (e) => e.type === equipmentType && e.supplierPrices?.some((sp) => sp.id === supplierPrice.id)
           );
+          const supplierInfo = {
+            supplierName: supplierPrice.supplierName,
+            priceUSD: supplierPrice.priceUSD,
+            updatedAt: supplierPrice.updatedAt,
+            supplierPriceId: supplierPrice.id,
+          };
+          let updatedSpecs: SystemSpecs = { ...p.specs };
+          if (equipmentType === 'battery') updatedSpecs.hasBattery = true;
+          if (equipmentType === 'panel' && targetItem?.efficiencyPct) updatedSpecs.panelEfficiency = targetItem.efficiencyPct;
 
-          if (equipmentType === 'panel') {
-            updatedSpecs.panelUnitPriceUSD = supplierPrice.priceUSD;
-            if (targetItem) {
-              updatedSpecs.panelBrandModel = targetItem.displayName;
-              if (targetItem.powerW) updatedSpecs.panelPowerW = targetItem.powerW;
-              if (targetItem.efficiencyPct) updatedSpecs.panelEfficiency = targetItem.efficiencyPct;
-            }
-            selectedSupplierInfo.panel = {
-              supplierName: supplierPrice.supplierName,
-              priceUSD: supplierPrice.priceUSD,
-              updatedAt: supplierPrice.updatedAt,
-              supplierPriceId: supplierPrice.id,
-            };
-          } else if (equipmentType === 'inverter') {
-            updatedSpecs.inverterUnitPriceUSD = supplierPrice.priceUSD;
-            if (targetItem) {
-              updatedSpecs.inverterBrandModel = targetItem.displayName;
-              if (targetItem.powerKW) updatedSpecs.inverterPowerKW = targetItem.powerKW;
-            }
-            selectedSupplierInfo.inverter = {
-              supplierName: supplierPrice.supplierName,
-              priceUSD: supplierPrice.priceUSD,
-              updatedAt: supplierPrice.updatedAt,
-              supplierPriceId: supplierPrice.id,
-            };
-          } else if (equipmentType === 'battery') {
-            updatedSpecs.batteryUnitPriceUSD = supplierPrice.priceUSD;
-            updatedSpecs.hasBattery = true;
-            if (targetItem) {
-              updatedSpecs.batteryBrandModel = targetItem.displayName;
-              if (targetItem.capacityKWh) updatedSpecs.batteryCapacityKWh = targetItem.capacityKWh;
-              if (targetItem.dodPct) updatedSpecs.batteryDOD = targetItem.dodPct;
-              if (targetItem.batteryEfficiencyPct) updatedSpecs.batteryEfficiencyPct = targetItem.batteryEfficiencyPct;
-            }
-            selectedSupplierInfo.battery = {
-              supplierName: supplierPrice.supplierName,
-              priceUSD: supplierPrice.priceUSD,
-              updatedAt: supplierPrice.updatedAt,
-              supplierPriceId: supplierPrice.id,
-            };
+          // The primary group takes price and supplier (and the catalog identity, for datasheet annexes); unmigrated projects migrate here.
+          const extras: Record<string, unknown> = { unitPriceUSD: supplierPrice.priceUSD, selectedSupplierInfo: supplierInfo };
+          if (equipmentType === 'battery' && targetItem) {
+            if (targetItem.dodPct) extras.dodPct = targetItem.dodPct;
+            if (targetItem.batteryEfficiencyPct) extras.efficiencyPct = targetItem.batteryEfficiencyPct;
           }
-
-          // Group arrays drive the engines. Keep their primary row in sync with the sidebar.
-          if (equipmentType === 'panel' && updatedSpecs.panels?.length) {
-            updatedSpecs.panels = updatedSpecs.panels.map((item, index) => index ? item : {
-              ...item, brandModel: updatedSpecs.panelBrandModel || item.brandModel,
-              powerW: updatedSpecs.panelPowerW, unitPriceUSD: supplierPrice.priceUSD,
-              selectedSupplierInfo: selectedSupplierInfo.panel,
-            });
-          }
-          if (equipmentType === 'inverter' && updatedSpecs.inverters?.length) {
-            updatedSpecs.inverters = updatedSpecs.inverters.map((item, index) => index ? item : {
-              ...item, brandModel: updatedSpecs.inverterBrandModel || item.brandModel,
-              powerKW: updatedSpecs.inverterPowerKW, unitPriceUSD: supplierPrice.priceUSD,
-              selectedSupplierInfo: selectedSupplierInfo.inverter,
-            });
-          }
-          if (equipmentType === 'battery' && updatedSpecs.batteries?.length) {
-            updatedSpecs.batteries = updatedSpecs.batteries.map((item, index) => index ? item : {
-              ...item, brandModel: updatedSpecs.batteryBrandModel || item.brandModel,
-              capacityKWh: updatedSpecs.batteryCapacityKWh || item.capacityKWh,
-              dodPct: updatedSpecs.batteryDOD, efficiencyPct: updatedSpecs.batteryEfficiencyPct, unitPriceUSD: supplierPrice.priceUSD,
-              selectedSupplierInfo: selectedSupplierInfo.battery,
-            });
-          }
-          updatedSpecs.selectedSupplierInfo = selectedSupplierInfo;
-          // The primary group remembers its catalog item (datasheet annexes); unmigrated projects migrate here.
-          if (targetItem) Object.assign(updatedSpecs, selectCatalogEquipment(updatedSpecs, equipmentType, 0, targetItem, {
-            unitPriceUSD: supplierPrice.priceUSD, selectedSupplierInfo: selectedSupplierInfo[equipmentType],
-          }));
+          const patch = targetItem
+            ? selectCatalogEquipment(updatedSpecs, equipmentType, 0, targetItem, extras)
+            : editEquipmentGroup(updatedSpecs, equipmentType, { type: 'update', index: 0, patch: extras });
+          updatedSpecs = normalizeEquipmentEdit(updatedSpecs, patch);
           const nextFinancials = withoutStaleFinancialOverrides(p, p.financials);
 
           return {

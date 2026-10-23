@@ -79,19 +79,22 @@ const item = (extra: object = {}) => ({ id: 'n', type: 'battery', displayName: '
 for (const missing of [undefined, 0, '', NaN]) {
   const catalogItem = item({ batteryEfficiencyPct: missing, dodPct: missing });
   const primary = buildCatalogSelectionUpdate({ ...base.specs } as SystemSpecs, 'battery', catalogItem);
-  assert.equal(primary.batteryEfficiencyPct, 90, `principal desde catálogo con eficiencia ${String(missing)}: 90, no 0 ni 95`);
-  assert.equal(primary.batteryDOD, 90);
+  const primaryGroup = { ...base.specs, ...primary }.batteries![0];
+  assert.equal(primaryGroup.efficiencyPct, 90, `principal desde catálogo con eficiencia ${String(missing)}: 90, no 0 ni 95`);
+  assert.equal(primaryGroup.dodPct, 90);
+  assert.equal('batteryEfficiencyPct' in primary, false, 'la selección no escribe el espejo');
   const specs = bank({ dodPct: 90 });
   const edit = selectCatalogEquipment(specs, 'battery', 1, catalogItem, { efficiencyPct: undefined, dodPct: undefined });
   const next = { ...specs, ...edit } as SystemSpecs;
   assert.equal(resolveBatteryBankEfficiencyPct(next), resolveBatteryBankEfficiencyPct(bank({ efficiencyPct: 90 })), 'modelo #2 sin eficiencia en el banco: 90 en el motor');
 }
 
-// ── Dock: el campo de la batería principal edita el grupo 1 y el espejo ────────────────────
+// ── Dock: el campo de la batería principal edita el grupo 1 ────────────────────
 {
   const specs = bank({ dodPct: 90, efficiencyPct: 90 });
   const patch = editEquipmentGroup(specs, 'battery', { type: 'update', index: 0, patch: { efficiencyPct: 80 } });
-  assert.equal(patch.batteryEfficiencyPct, 80, 'el espejo escalar sigue al primer grupo');
+  assert.equal(patch.batteries![0].efficiencyPct, 80, 'DOD y eficiencia viven solo en el grupo');
+  assert.equal('batteryEfficiencyPct' in patch, false, 'sin espejo escalar');
   const next = { ...specs, ...patch } as SystemSpecs;
   close(resolveBatteryBankEfficiencyPct(next), (32 * 80 + 15 * 90) / 47, 'el motor ve el cambio del dock con varios modelos');
   assert.equal(resolvePrimaryBatteryEfficiencyPct(next), 80);
@@ -127,7 +130,7 @@ const draftBaseFor = () => createAIProposalBase(BENCHMARK_PROJECT, { defaultBatt
   store().applySupplierPriceToProject('battery', offer, entry);
   const specs = store().getActiveProject().specs;
   assert.equal(specs.batteries![0].efficiencyPct, 85, 'el grupo principal toma la eficiencia del catálogo');
-  assert.equal(specs.batteryEfficiencyPct, 85);
+  assert.equal('batteryEfficiencyPct' in specs, false, 'el precio de proveedor no escribe el espejo');
   close(resolveBatteryBankEfficiencyPct(specs), 87.5, 'el motor ve el cambio');
 }
 
@@ -138,7 +141,7 @@ const draftBaseFor = () => createAIProposalBase(BENCHMARK_PROJECT, { defaultBatt
   assert.equal(next.batteries![0].efficiencyPct, 80, 'la eficiencia escalar llega al primer grupo');
   assert.equal(next.batteries![0].dodPct, 70);
   assert.equal(next.batteries![1].efficiencyPct, 90, 'los demás grupos no cambian');
-  assert.equal(next.batteryEfficiencyPct, 80);
+  assert.equal('batteryEfficiencyPct' in next, false, 'DOD y eficiencia solo por grupo');
   close(resolveBatteryBankEfficiencyPct(next), (32 * 0.7 * 80 + 15 * 0.9 * 90) / (32 * 0.7 + 15 * 0.9), 'el motor usa el valor editado');
 }
 
@@ -177,8 +180,7 @@ const draftBaseFor = () => createAIProposalBase(BENCHMARK_PROJECT, { defaultBatt
   close(resolveBatteryBankEfficiencyPct(ab), resolveBatteryBankEfficiencyPct(ba), 'eficiencia igual con [A, B] y [B, A]');
   assert.equal(usable(ab), usable(ba), 'energía útil igual con [A, B] y [B, A]');
   close(20 * (resolveBatteryBankDodPct(ba) / 100) * (resolveBatteryBankEfficiencyPct(ba) / 100), 10 * 0.7 * 0.8 + 10 * 0.9 * 0.9, 'B usa 90/90: 13.7 kWh');
-  assert.equal(ba.batteryDOD, undefined, 'el espejo se reinicia: el nuevo principal no tiene dato propio');
-  assert.equal(ba.batteryEfficiencyPct, undefined);
+  assert.equal('batteryDOD' in ba || 'batteryEfficiencyPct' in ba, false, 'sin espejo escalar');
 }
 
 // ── Porcentajes > 100 no son válidos ──────────────────────────────────────────────────────

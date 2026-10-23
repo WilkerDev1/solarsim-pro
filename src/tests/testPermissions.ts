@@ -32,7 +32,7 @@ assert.deepEqual(store.getState().projects.find((p) => p.id === id), before, 'Ed
 store.getState().restoreProject(id);
 store.setState({ activeProjectId: id });
 store.getState().updateSpecs({ panelCount: 12 });
-assert.equal(store.getState().projects.find((p) => p.id === id)?.specs.panelCount, 12, 'Restored proposals are editable again');
+assert.equal(store.getState().projects.find((p) => p.id === id)?.specs.panels?.[0].count, 12, 'Restored proposals are editable again');
 
 // 3. Role checks live in shared/permissions.ts, not scattered through the app.
 const roots = ['src', 'shared'];

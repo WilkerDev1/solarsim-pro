@@ -9,6 +9,7 @@ import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentC
 import { normalizeFeatureSettings, featureScope, isFeatureSettings } from '../../../shared/applicationFeatures';
 import { migrateDefaultSimulationSettings } from '../defaultSimulationSettings';
 import { normalizeAgentPolicy } from '../slices/agentSlice';
+import { migrateLegacySpecs } from '../../../shared/equipment';
 
 export function hydrateSimulationStore(state: SimulationStore | undefined): void {
   if (state && state.projects && Array.isArray(state.projects)) {
@@ -72,6 +73,14 @@ export function hydrateSimulationStore(state: SimulationStore | undefined): void
             batteryCapacityKWh: updated.specs.batteryCapacityKWh || 16.08,
           },
         };
+      }
+      // Datos locales heredados: los equipos pasan a grupos una sola vez (idempotente; no cambia ningún resultado).
+      if (updated.specs) {
+        const migrated = migrateLegacySpecs(updated.specs);
+        if (migrated !== updated.specs) {
+          hasChanges = true;
+          updated = { ...updated, specs: migrated };
+        }
       }
       // Sanitize legacy ghost overrides from all stored projects to guarantee 100% dynamic calculation
       if (updated.financials && updated.id !== 'benchmark-centro-medico') {

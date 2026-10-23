@@ -143,7 +143,8 @@ assert.equal(
   state.getState().getActiveProject().specs.panels?.[0].brandModel,
   pnl.displayName
 );
-assert.equal(state.getState().getActiveProject().specs.panelCount, 7);
+assert.equal(state.getState().getActiveProject().specs.panels?.reduce((n, g) => n + g.count, 0), 7); // cantidad total de los grupos (no hay espejo)
+assert.equal('panelCount' in state.getState().getActiveProject().specs, false);
 assert.equal(
   state.getState().getActiveProject().specs.autoCalculatePanels,
   false

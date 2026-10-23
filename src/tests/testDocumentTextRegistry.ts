@@ -1,3 +1,4 @@
+import { readEquipment } from '../../shared/equipment';
 import assert from 'node:assert/strict';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateProjectFinancialSummary } from '../engine/financeEngine';
@@ -75,7 +76,10 @@ function legacySites(project: ProjectSimulation, summary: FinancialSummaryResult
     return [p1, p2, p3, p4];
   };
   const clientName = cleanClientName(project.client.name || 'Cliente');
-  const s = project.specs;
+  // Oráculo independiente: lee el primer grupo de cada tipo como los campos sueltos que usaba el formato heredado.
+  const groups = readEquipment(project.specs);
+  const [g1, g2, g3] = [groups.panels[0], groups.inverters[0], groups.batteries[0]];
+  const s = { ...project.specs, panelBrandModel: g1?.brandModel, panelPowerW: g1?.powerW, panelCount: g1?.count, inverterBrandModel: g2?.brandModel, inverterPowerKW: g2?.powerKW, inverterCount: g2?.count, batteryBrandModel: g3?.brandModel, batteryCapacityKWh: g3?.capacityKWh, batteryCount: g3?.count } as typeof project.specs;
   const rawPanelModel = s.panelBrandModel || 'Módulos Monocristalinos TOPCon';
   const panelModel = (rawPanelModel.toLowerCase().includes('w') || (s.panelPowerW || 0) <= 0) ? rawPanelModel : `${rawPanelModel} (${s.panelPowerW}W)`;
   const rawInverterModel = s.inverterBrandModel || 'Inversor Solar Inteligente';

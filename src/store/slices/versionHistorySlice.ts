@@ -9,6 +9,7 @@ import { calculateProjectFinancialSummary } from '../../engine/financeEngine';
 import { effectiveFeatureSettings } from '../../features/application/featurePolicy';
 import { energyCalculationMode } from '../../../shared/applicationFeatures';
 import { restoreProjectContent } from '../sync/projectMutation';
+import { equipmentTotals, readEquipment } from '../../../shared/equipment';
 import { SimulationSlice, VersionHistorySlice } from '../types';
 import { ProjectSimulation, ProjectSnapshot, DiffFieldChange, ProjectConflictInfo } from '../../types';
 
@@ -142,7 +143,7 @@ export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (
       createdAt: now,
       systemCapacityKWp: dcKWp,
       netInvestmentUSD: netInvestment,
-      panelCount: project.specs.panelCount || 0,
+      panelCount: equipmentTotals(readEquipment(project.specs)).panelCount,
       data: JSON.parse(JSON.stringify(project)),
     };
 
@@ -226,45 +227,52 @@ export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (
       });
     }
 
-    // Specs changes
-    if (p1.specs.panelCount !== p2.specs.panelCount) {
+    // Specs changes: los equipos se comparan por sus grupos (módulo shared/equipment), no por campos sueltos.
+    const e1 = readEquipment(p1.specs);
+    const e2 = readEquipment(p2.specs);
+    const t1 = equipmentTotals(e1);
+    const t2 = equipmentTotals(e2);
+    const powers = (powerW: number[]) => powerW.map((w) => `${w}W`).join(' + ') || 'Sin módulos';
+    const panelPowers = (e: typeof e1) => powers(e.panels.map((p) => p.powerW));
+    if (t1.panelCount !== t2.panelCount) {
       diffs.push({
         field: 'Cantidad de Paneles',
         section: 'Equipos',
-        oldValue: p1.specs.panelCount,
-        newValue: p2.specs.panelCount,
-        formattedOld: `${p1.specs.panelCount} módulos`,
-        formattedNew: `${p2.specs.panelCount} módulos`,
+        oldValue: t1.panelCount,
+        newValue: t2.panelCount,
+        formattedOld: `${t1.panelCount} módulos`,
+        formattedNew: `${t2.panelCount} módulos`,
       });
     }
-    if (p1.specs.panelPowerW !== p2.specs.panelPowerW) {
+    if (panelPowers(e1) !== panelPowers(e2) || t1.capacityKWp !== t2.capacityKWp) {
       diffs.push({
         field: 'Potencia de Panel',
         section: 'Equipos',
-        oldValue: p1.specs.panelPowerW,
-        newValue: p2.specs.panelPowerW,
-        formattedOld: `${p1.specs.panelPowerW}W`,
-        formattedNew: `${p2.specs.panelPowerW}W`,
+        oldValue: t1.capacityKWp,
+        newValue: t2.capacityKWp,
+        formattedOld: `${panelPowers(e1)} · ${t1.capacityKWp} kWp`,
+        formattedNew: `${panelPowers(e2)} · ${t2.capacityKWp} kWp`,
       });
     }
-    if (p1.specs.inverterPowerKW !== p2.specs.inverterPowerKW) {
+    if (t1.inverterKW !== t2.inverterKW) {
       diffs.push({
         field: 'Inversor AC',
         section: 'Equipos',
-        oldValue: p1.specs.inverterPowerKW,
-        newValue: p2.specs.inverterPowerKW,
-        formattedOld: `${p1.specs.inverterPowerKW} kW`,
-        formattedNew: `${p2.specs.inverterPowerKW} kW`,
+        oldValue: t1.inverterKW,
+        newValue: t2.inverterKW,
+        formattedOld: `${t1.inverterKW} kW`,
+        formattedNew: `${t2.inverterKW} kW`,
       });
     }
-    if (p1.specs.hasBattery !== p2.specs.hasBattery || p1.specs.batteryCapacityKWh !== p2.specs.batteryCapacityKWh) {
+    const battery = (hasBattery: boolean | undefined, totals: typeof t1) => (hasBattery ? `${totals.batteryNominalKWh} kWh` : 'Sin Baterías');
+    if (!!p1.specs.hasBattery !== !!p2.specs.hasBattery || t1.batteryNominalKWh !== t2.batteryNominalKWh) {
       diffs.push({
         field: 'Baterías BESS',
         section: 'Equipos',
-        oldValue: p1.specs.hasBattery ? `${p1.specs.batteryCapacityKWh} kWh` : 'Sin Baterías',
-        newValue: p2.specs.hasBattery ? `${p2.specs.batteryCapacityKWh} kWh` : 'Sin Baterías',
-        formattedOld: p1.specs.hasBattery ? `${p1.specs.batteryCapacityKWh} kWh` : 'Sin Baterías',
-        formattedNew: p2.specs.hasBattery ? `${p2.specs.batteryCapacityKWh} kWh` : 'Sin Baterías',
+        oldValue: battery(p1.specs.hasBattery, t1),
+        newValue: battery(p2.specs.hasBattery, t2),
+        formattedOld: battery(p1.specs.hasBattery, t1),
+        formattedNew: battery(p2.specs.hasBattery, t2),
       });
     }
 

@@ -1,5 +1,7 @@
 import React from 'react';
 import { supplierQuotesItem } from '../../../../utils/equipmentMatchingUtils';
+import { LIST_KEY, migrateLegacySpecs } from '../../../../../shared/equipment';
+import { editEquipmentGroup } from '../../../../utils/equipmentGroups';
 import type { SystemSpecs } from '../../../../types';
 import type { SolarEquipmentItem } from '../../../../types/equipment';
 
@@ -12,7 +14,9 @@ interface SupplierCleanupArgs {
   updateSpecs: (specs: Partial<SystemSpecs>) => void;
 }
 
-/** Limpieza protectora de proveedores huérfanos solo si el proveedor no existe en ningún equipo del catálogo. */
+const KINDS = ['panel', 'inverter', 'battery'] as const;
+
+/** Limpieza protectora de proveedores huérfanos del grupo principal, solo si el proveedor no existe en ningún equipo del catálogo. */
 export function useSupplierCleanup({
   specs,
   equipmentCatalog,
@@ -21,46 +25,21 @@ export function useSupplierCleanup({
   batterySupplierMatches,
   updateSpecs,
 }: SupplierCleanupArgs): void {
+  const migrated = migrateLegacySpecs(specs);
+  const primary = (kind: (typeof KINDS)[number]) => migrated[LIST_KEY[kind]]?.[0];
+  const signature = KINDS.map((kind) => `${primary(kind)?.brandModel}|${primary(kind)?.selectedSupplierInfo?.supplierPriceId}|${primary(kind)?.selectedSupplierInfo?.supplierName}`).join('#');
   React.useEffect(() => {
-    const info = specs.selectedSupplierInfo;
-    if (!info) return;
-
-    let needsCleanup = false;
-    const cleanedInfo = { ...info };
-
-    if (info.panel && !panelSupplierMatches) {
-      const existsInCatalog = equipmentCatalog.some((e) => e.type === 'panel' && supplierQuotesItem(e, info.panel));
-      if (!existsInCatalog) {
-        delete cleanedInfo.panel;
-        needsCleanup = true;
-      }
+    const matches = { panel: panelSupplierMatches, inverter: inverterSupplierMatches, battery: batterySupplierMatches };
+    let patch: Partial<SystemSpecs> = {};
+    let current = migrated;
+    for (const kind of KINDS) {
+      const info = primary(kind)?.selectedSupplierInfo;
+      if (!info || matches[kind]) continue;
+      if (equipmentCatalog.some((e) => e.type === kind && supplierQuotesItem(e, info))) continue;
+      const edit = editEquipmentGroup(current, kind, { type: 'update', index: 0, patch: { selectedSupplierInfo: undefined } });
+      patch = { ...patch, ...edit };
+      current = { ...current, ...edit };
     }
-    if (info.inverter && !inverterSupplierMatches) {
-      const existsInCatalog = equipmentCatalog.some((e) => e.type === 'inverter' && supplierQuotesItem(e, info.inverter));
-      if (!existsInCatalog) {
-        delete cleanedInfo.inverter;
-        needsCleanup = true;
-      }
-    }
-    if (info.battery && !batterySupplierMatches) {
-      const existsInCatalog = equipmentCatalog.some((e) => e.type === 'battery' && supplierQuotesItem(e, info.battery));
-      if (!existsInCatalog) {
-        delete cleanedInfo.battery;
-        needsCleanup = true;
-      }
-    }
-
-    if (needsCleanup) {
-      updateSpecs({ selectedSupplierInfo: cleanedInfo });
-    }
-  }, [
-    specs.selectedSupplierInfo,
-    specs.panelBrandModel,
-    specs.inverterBrandModel,
-    specs.batteryBrandModel,
-    panelSupplierMatches,
-    inverterSupplierMatches,
-    batterySupplierMatches,
-    equipmentCatalog,
-  ]);
+    if (Object.keys(patch).length > 0) updateSpecs(patch);
+  }, [signature, panelSupplierMatches, inverterSupplierMatches, batterySupplierMatches, equipmentCatalog]);
 }
