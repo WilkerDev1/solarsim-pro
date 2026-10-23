@@ -63,11 +63,13 @@ assert.equal(gOut.productionKW, 0);
 assert.ok(gOut.note && /normativa/i.test(gOut.note));
 assert.equal(gOut.pill.text, 'Inversor apagado por seguridad');
 
-// Hybrid, day: house first, then battery charge, then export of what the battery cannot take.
+// Hybrid, day: house first, then battery charge; an illustrative share of the surplus (25 %) is always exported.
 const hDay = pick(hybridBase, 'day');
 assert.equal(hDay.batteryState, 'charging');
-assert.equal(hDay.batteryKW, 3.3);
-assert.equal(hDay.gridState, 'idle');
+assert.equal(hDay.batteryKW, 2.5);
+assert.equal(hDay.gridState, 'export');
+assert.equal(hDay.gridKW, 0.8);
+assert.equal(pick({ ...hybridBase, isZeroExport: true }, 'day').gridState, 'idle', 'Zero export never shows the illustrative export');
 assert.equal(hDay.pill.text, 'Cargando batería');
 assert.equal(hDay.lines.battery!.reverse, false);
 // A 2 kWh bank limits power to 1 kW; the rest is exported (or trimmed under zero export).
@@ -81,7 +83,7 @@ assert.equal(hSmallZero.gridKW, 0);
 assert.equal(hSmallZero.productionKW, 2.2);
 assert.equal(pick({ ...hybridBase, totalBESSKWh: 0.5 }, 'day').batteryKW, 1, 'Power limit never drops below 1 kW');
 
-// Hybrid, night: battery feeds the house through the inverter; the grid only completes the rest.
+// Hybrid, night: the battery feeds the house through the inverter; hybrid diagrams never draw energy from the grid.
 const hNight = pick(hybridBase, 'night');
 assert.equal(hNight.batteryState, 'discharging');
 assert.equal(hNight.batteryKW, 0.8);
@@ -91,9 +93,12 @@ assert.equal(hNight.lines.house.color, 'g');
 const heavy = { ...small, annualConsumptionKWh: 40000 }; // night load 3.65 kW, battery limited to 1 kW
 const hHeavy = pick(heavy, 'night');
 assert.equal(hHeavy.batteryKW, 1);
-assert.equal(hHeavy.gridKW, 2.7);
-assert.equal(hHeavy.gridState, 'import');
-assert.equal(hHeavy.houseKW, 3.7);
+assert.equal(hHeavy.gridKW, 0);
+assert.equal(hHeavy.gridState, 'idle');
+assert.equal(hHeavy.houseKW, 1);
+for (const input of [hybridBase, small, heavy, { ...hybridBase, systemCapacityKWp: 1, annualConsumptionKWh: 30000 }, { ...heavy, isZeroExport: true }]) {
+  for (const sc of energyFlowScenarios(input)) assert.notEqual(sc.gridState, 'import', `${sc.mode} never imports in a hybrid diagram`);
+}
 
 // Hybrid, outage: island mode. The grid never takes part and the load is capped by what the system can deliver.
 // Backup capability is not recorded in the proposal: island modes state it as a condition.
