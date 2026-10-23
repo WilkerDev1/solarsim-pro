@@ -79,4 +79,13 @@ assert(!attachments().some((a) => a.id === catalogId));
 await executeAgentTool({ name: 'sync_catalog_datasheets', args: { proposalId: project.id } }, ctx());
 assert(!attachments().some((a) => a.origin === 'catalog'), 'dismissed datasheets stay out');
 assert.equal(store.getState().undoAgentActivity(store.getState().agentActivity.find((a) => a.tool === 'remove_proposal_attachment')!.id).success, true);
+// 5. Catalog still loading: equipment in use that cannot be resolved keeps its automatic annex.
+assert(attachments().some((a) => a.origin === 'catalog'), 'precondition: the automatic annex is back after undo');
+const annexBefore = attachments().find((a) => a.origin === 'catalog')!;
+store.setState({ equipmentCatalog: catalog.filter((e) => e.id !== annexBefore.catalogItemId) });
+const whileLoading = await executeAgentTool({ name: 'sync_catalog_datasheets', args: { proposalId: project.id } }, ctx());
+assert.equal(whileLoading.status, 'ok', JSON.stringify(whileLoading)); // nothing to change
+assert.deepEqual(attachments().find((a) => a.id === annexBefore.id), annexBefore, 'The annex is kept untouched while its equipment is unresolved');
+store.setState({ equipmentCatalog: catalog });
+
 console.log('PASS: agent attachment tools: catalog datasheets, chat/base64 PDFs with page count, list, toggle, guarded removal and undo.');

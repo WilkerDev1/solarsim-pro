@@ -1,5 +1,5 @@
 import type { AttachedPDFDocument, ProjectSimulation } from '../../types';
-import { applyAnnexPlan, dismissAnnex, planDatasheetAnnexes, workspaceCatalog } from '../../utils/proposalAnnexes';
+import { applyAnnexPlan, dismissAnnex, planDatasheetAnnexes, unresolvedEquipmentIds, workspaceCatalog } from '../../utils/proposalAnnexes';
 import { PDFAttachmentStorage } from '../../services/pdfAttachmentStorage';
 import { PDFMergeService } from '../../services/pdfMergeService';
 import { detectChatFileType, getChatFile, CHAT_FILE_LIMITS } from '../assistant/chatFiles';
@@ -42,13 +42,13 @@ const syncCatalogDatasheets: NativeHandler = (args) => {
   const project = requireEditableProject(args.proposalId);
   const s = store();
   const catalog = workspaceCatalog(s.equipmentCatalog, s.syncSettings.serverUrl, s.syncSettings.currentUser?.organizationId);
-  const preview = applyAnnexPlan(project.customization || {}, planDatasheetAnnexes(project, catalog), new Date().toISOString());
+  const preview = applyAnnexPlan(project.customization || {}, planDatasheetAnnexes(project, catalog), new Date().toISOString(), unresolvedEquipmentIds(project, catalog));
   if (!preview.changed) return { data: { status: 'unchanged', attachments: (project.customization?.attachedPdfs ?? []).map(summary) } };
   return {
     data: { status: 'ready' },
     plan: customizationPlan(project.id, `Fichas del catálogo: ${project.client.name}`,
       [{ label: 'Anexos del catálogo', value: `${preview.attachedPdfs.filter((a) => a.origin === 'catalog').length} fichas` }],
-      (customization, p) => ({ attachedPdfs: applyAnnexPlan(customization, planDatasheetAnnexes(p, catalog), new Date().toISOString()).attachedPdfs })),
+      (customization, p) => ({ attachedPdfs: applyAnnexPlan(customization, planDatasheetAnnexes(p, catalog), new Date().toISOString(), unresolvedEquipmentIds(p, catalog)).attachedPdfs })),
   };
 };
 
