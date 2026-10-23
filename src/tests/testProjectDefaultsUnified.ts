@@ -21,6 +21,7 @@ assert.equal(shared.DEFAULT_PRICE_PER_WATT_USD, 1.13);
 store().createNewProject({ name: 'Nuevo', province: 'Santiago', distributor: 'EDENORTE', tariffCode: 'BTS2' });
 const fresh = store().getActiveProject();
 assert.equal(fresh.financials.pricePerWattUSD, 1.13, 'proyecto nuevo: 1.13 (antes 1.05)');
+assert.equal(fresh.specs.pricePerWattUSD, 1.13, 'proyecto nuevo en modo matriz: tampoco hereda el 1.134971 del caso de referencia');
 const withoutPrice = { ...fresh, id: '', client: { ...fresh.client, name: 'Importado', projectId: 'IMP-1', quoteNumber: 'IMP-1' }, financials: { ...fresh.financials, pricePerWattUSD: undefined } };
 const importResult = store().importProjectsFromJSON([withoutPrice as never]);
 assert.ok(importResult.success);
