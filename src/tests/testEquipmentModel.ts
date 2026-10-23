@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { calculateCostMatrixSummary } from '../engine/financeEngine';
+import { calculateCostMatrixSummary, calculateFinancialSummary } from '../engine/financeEngine';
+import { calculateMonthlySolarProduction } from '../engine/solarEngine';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateTotalBatteryCapacityKWh, calculateTotalDCCapacityKWp, calculateTotalInverterPowerKW, calculateTotalPanelCount, getProjectBatteries, getProjectInverters, getProjectPanels } from '../utils/equipmentSpecsUtils';
 import {
@@ -66,7 +67,7 @@ const inverter = (id: string, powerKW: number, count: number): InverterItemSpec 
     assert.deepEqual(mirrorKeys(once), [], `${name}: no mirror field survives`);
     assert.ok(!('selectedSupplierInfo' in once), `${name}: supplier mirror removed`);
     assert.deepEqual(migrateLegacySpecs(once), once, `${name}: idempotent`);
-    if (name !== 'multi') assert.deepEqual(readEquipment(once), readEquipment(specs), `${name}: reading is unchanged by migrating (multi carries the weight the group lacked)`);
+    assert.deepEqual(readEquipment(once), readEquipment(specs), `${name}: reading is unchanged by migrating`);
     assert.equal(once.hasBattery, specs.hasBattery, `${name}: system parameters stay`);
     assert.equal(once.panelEfficiency, specs.panelEfficiency);
     assert.equal(once.annualDegradation, specs.annualDegradation);
@@ -79,19 +80,16 @@ const inverter = (id: string, powerKW: number, count: number): InverterItemSpec 
   const dormant = migrateLegacySpecs({ ...noMirror(base), hasBattery: false, batteryDOD: 70, batteryEfficiencyPct: 88 } as SystemSpecs);
   assert.deepEqual([dormant.batteries?.[0].dodPct, dormant.batteries?.[0].efficiencyPct], [70, 88], 'hasBattery false: a customized DOD/efficiency alone keeps the battery group');
 
-  // Data the group lacks is carried from the mirror into the first group; data the group has is never overwritten.
-  const carried = migrateLegacySpecs({
+  // Migración invariante: con grupos guardados el espejo solo se borra; nada se traslada a los grupos.
+  const unpriced = migrateLegacySpecs({
     ...base,
     panels: [panel('a', 600, 10, { unitPriceUSD: undefined }), panel('b', 700, 5, { unitPriceUSD: undefined })],
     selectedSupplierInfo: { panel: { supplierName: 'Dist', priceUSD: 95, supplierPriceId: 'sp1' } },
   });
-  assert.equal(carried.panels![0].unitPriceUSD, 103.32, 'price carried into the first group');
-  assert.equal(carried.panels![0].weightKilos, base.panelWeightKilos, 'weight carried');
-  assert.equal(carried.panels![0].selectedSupplierInfo?.supplierName, 'Dist', 'supplier carried');
-  assert.equal(carried.panels![1].unitPriceUSD, undefined, 'other groups are not touched');
-  assert.equal(carried.panels![0].count, 10, 'group quantity wins over the mirror');
-  const kept = migrateLegacySpecs({ ...base, panels: [panel('a', 600, 10, { unitPriceUSD: 77 })] });
-  assert.equal(kept.panels![0].unitPriceUSD, 77, 'group price wins over the mirror');
+  assert.equal(unpriced.panels![0].unitPriceUSD, undefined, 'a group without price stays without price (the engine counts it as 0)');
+  assert.equal(unpriced.panels![0].weightKilos, undefined, 'weight is not carried');
+  assert.equal(unpriced.panels![0].selectedSupplierInfo, undefined, 'supplier is not carried');
+  assert.equal(unpriced.panels![0].count, 10, 'group quantity wins over the mirror');
   const dod = migrateLegacySpecs({ ...base, batteries: [{ id: 'b', brandModel: 'B', capacityKWh: 10, count: 1 }] });
   assert.equal(dod.batteries![0].dodPct, undefined, 'a stale scalar DOD is not inherited by the group (the engine ignores it)');
   const already = migrateLegacySpecs(fixtures.groupsOnly);
@@ -165,6 +163,35 @@ const inverter = (id: string, powerKW: number, count: number): InverterItemSpec 
   const none = equipmentTotals(readEquipment({ ...base, hasBattery: false } as SystemSpecs));
   assert.equal(none.batteryNominalKWh, 0);
   assert.equal(none.batteryCount, 0);
+}
+
+// 6. Migración invariante: ningún resultado visible cambia (matriz de costos, motor financiero y energía).
+{
+  const fixtures: Record<string, SystemSpecs> = {
+    reference: base,
+    legacyOnly: { ...base, panelUnitPriceUSD: undefined, inverterUnitPriceUSD: undefined, batteryUnitPriceUSD: undefined, panelWeightKilos: undefined } as unknown as SystemSpecs,
+    groupsOnly: { ...noMirror(base), panels: [panel('a', 600, 10), panel('b', 700, 5)], inverters: [inverter('i', 10, 2)], batteries: [{ id: 'b1', brandModel: 'Bat', capacityKWh: 10, count: 2, unitPriceUSD: 900 }] } as SystemSpecs,
+    mixedGroupWithoutPrice: { ...base, panels: [panel('a', 600, 10, { unitPriceUSD: undefined })], selectedSupplierInfo: { panel: { supplierName: 'Dist', priceUSD: 95 } } },
+    multiGroup: { ...base, panels: [panel('a', 600, 10), panel('b', 700, 5)], inverters: [inverter('i', 10, 2), inverter('j', 5, 1)], batteries: [{ id: 'b1', brandModel: 'Bat', capacityKWh: 5, count: 4, dodPct: 80 }, { id: 'b2', brandModel: 'Bat2', capacityKWh: 16, count: 1, efficiencyPct: 95 }] },
+    batteryOffWithLeftovers: { ...base, hasBattery: false, batteryCount: 2, batteryDOD: 70 },
+    batteryOffWithGroups: { ...base, hasBattery: false, batteries: [{ id: 'b1', brandModel: 'Bat', capacityKWh: 10, count: 2, unitPriceUSD: 900 }] },
+  };
+  const modes = ['legacy', 'self_consumption'] as const;
+  for (const [name, specs] of Object.entries(fixtures)) {
+    const migrated = migrateLegacySpecs(specs);
+    assert.deepEqual(mirrorKeys(migrated), [], `${name}: mirror removed`);
+    assert.deepEqual(readEquipment(migrated), readEquipment(specs), `${name}: readEquipment before == after`);
+    const kwp = calculateTotalDCCapacityKWp(specs);
+    assert.deepEqual(equipmentTotals(readEquipment(migrated)), equipmentTotals(readEquipment(specs)), `${name}: totals`);
+    assert.deepEqual(calculateCostMatrixSummary(migrated, kwp), calculateCostMatrixSummary(specs, kwp), `${name}: cost matrix`);
+    assert.equal(calculateTotalDCCapacityKWp(migrated), kwp, `${name}: kWp`);
+    for (const mode of modes) {
+      const run = (s: SystemSpecs) => calculateFinancialSummary(BENCHMARK_PROJECT.client.province, s, BENCHMARK_PROJECT.rates, BENCHMARK_PROJECT.financials, BENCHMARK_PROJECT.monthlyConsumption, undefined, mode);
+      assert.deepEqual(run(migrated), run(specs), `${name}/${mode}: financial summary (price, cost, energy, indicators)`);
+    }
+    const produce = (s: SystemSpecs) => calculateMonthlySolarProduction(BENCHMARK_PROJECT.client.province, s, BENCHMARK_PROJECT.monthlyConsumption, BENCHMARK_PROJECT.rates.energyCostPerKWh, BENCHMARK_PROJECT.rates.gridExportFeePct);
+    assert.deepEqual(produce(migrated), produce(specs), `${name}: monthly production`);
+  }
 }
 
 console.log('Equipment model: reading, migration, editing, description and totals verified.');

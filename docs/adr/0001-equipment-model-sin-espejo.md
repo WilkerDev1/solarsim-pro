@@ -19,7 +19,8 @@ El módulo `shared/equipment/` (portable: cliente, API y Worker) expone `readEqu
 Decisiones de diseño de la oleada 1:
 
 - `editEquipment` migra la propuesta antes de editar, nunca escribe el espejo y lo borra si existía; devuelve las specs completas.
-- `migrateLegacySpecs` traslada al primer grupo precio, peso y proveedor que solo tenía el espejo; no hereda DOD ni eficiencia (el motor los ignora cuando hay grupos); con `hasBattery` falso conserva en un grupo los datos de batería para no perderlos al reactivarla.
+- **Migración invariante**: una migración de datos no cambia ningún resultado que el usuario ve (costo, precio, kWp, energía, finanzas, textos). `migrateLegacySpecs` con grupos ya guardados solo borra el espejo y no traslada nada a los grupos: ni cantidad, potencia, capacidad, precio, DOD o eficiencia (afectan cálculos; hoy el motor ignora el espejo y un grupo sin precio cuenta 0), ni peso ni proveedor (se ven en la matriz de costos, las fichas y los anexos). Sin grupos, los construye exactamente como `getProject*` los deriva hoy, con `DEFAULT_UNIT_PRICE_USD`. Una prueba de invarianza ejecuta el motor antes y después de migrar.
+- Con `hasBattery` falso, la migración conserva en un grupo los datos de batería para no perderlos al reactivarla; `readEquipment` lo oculta mientras esté apagada.
 - `describeEquipment` cuenta modelos distintos por nombre; sin grupos devuelve texto vacío.
 - La energía útil del banco queda fuera (candidato #1 del informe de arquitectura): `equipmentTotals` solo da capacidad nominal.
 
