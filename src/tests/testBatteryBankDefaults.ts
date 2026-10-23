@@ -98,6 +98,7 @@ for (const file of ['src/components/common/AIDatasheetScannerModal.tsx', 'src/co
   assert(!/batteryEfficiencyPct[^\n]{0,40}\b95\b/.test(text) && !text.includes('"battery" ? 95'), `${file} no fuerza 95`);
 }
 
+const draftBaseFor = () => createAIProposalBase(BENCHMARK_PROJECT, { defaultBatteryDOD: 90 } as never, 'Santiago');
 // ── Borrador de IA: los escalares reflejan el primer grupo, no un promedio del banco ───────
 {
   const draftBase = createAIProposalBase(BENCHMARK_PROJECT, { defaultBatteryDOD: 90 } as never, 'Santiago');
@@ -146,6 +147,20 @@ for (const file of ['src/components/common/AIDatasheetScannerModal.tsx', 'src/co
   assert.equal(added.dodPct, 85);
   const bare = buildNewItem('battery', { ...base.specs, hasBattery: true } as SystemSpecs, [item({ id: 'c2', displayName: 'Sin dato', batteryEfficiencyPct: 0 })]);
   assert.equal(bare.efficiencyPct, 90, 'catálogo sin eficiencia: 90');
+}
+
+// El escalar de un proyecto existente solo es el valor del grupo principal.
+{
+  const existing = { ...draftBaseFor(), specs: { ...draftBaseFor().specs, batteryDOD: 80, batteryEfficiencyPct: 85 } };
+  const data = {
+    monthlyConsumptionKWh: Array(12).fill(1000), averageMonthlyKWh: 1000, province: 'Santiago', distributor: 'EDENORTE', tariffCode: 'BTS1',
+    panels: [{ id: 'p', brandModel: 'P', powerW: 600, count: 10 }], inverters: [{ id: 'i', brandModel: 'I', powerKW: 5, count: 1 }],
+    batteries: [group('G1', 10, 1), group('G2', 10, 1)],
+  };
+  const prepared = prepareProposalDraftProject(existing, data as never, DEFAULT_RD_TARIFF_MATRIX as never, { isNew: false });
+  assert.equal(prepared.specs.batteries![0].dodPct, 80);
+  assert.equal(prepared.specs.batteries![1].dodPct, 90, 'el segundo grupo sin dato usa 90, no el escalar del principal');
+  assert.equal(prepared.specs.batteries![1].efficiencyPct, 90);
 }
 
 console.log('testBatteryBankDefaults: ok');

@@ -5,12 +5,12 @@ import type { GlobalTariffMatrix } from '../types/tariffs';
 import { calculateRecommendedPanelCount } from '../engine/solarEngine';
 import { resolveAITariffSelection } from './aiTariffContext';
 import { getReferenceEnergyRateUSD } from '../data/rdTariffs';
-import { DEFAULT_SYSTEM_LOSSES_PCT, DEFAULT_BATTERY_DOD_PCT, DEFAULT_BATTERY_EFFICIENCY_PCT } from '../../shared/projectDefaults';
+import { resolveSystemLossesPct, DEFAULT_SYSTEM_LOSSES_PCT, DEFAULT_BATTERY_DOD_PCT, DEFAULT_BATTERY_EFFICIENCY_PCT } from '../../shared/projectDefaults';
 import { enforceAutomatedPricing } from '../../shared/automatedProposalPolicy';
 /** Pure adapter shared by preview and application. No store mutation, metadata or network. */
 export function prepareProposalDraftProject(base:ProjectSimulation,data:ExtractedInvoiceData,tariffMatrix:GlobalTariffMatrix,options:{isNew?:boolean;defaultBatteryDOD?:number}={}):ProjectSimulation {
   const province=data.province || base.client.province;
-  const losses=base.specs.systemLosses ?? DEFAULT_SYSTEM_LOSSES_PCT;
+  const losses=resolveSystemLossesPct(base.specs);
   const createNewProject=Boolean(options.isNew);
   const defaults={defaultBatteryDOD:options.defaultBatteryDOD};
   const isGrounded=Array.isArray(data.panels)||Array.isArray(data.inverters)||Array.isArray(data.batteries);
@@ -55,7 +55,8 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
         // son el espejo del primer grupo, no un promedio del banco (se promediaría dos veces).
         const defaultDod=createNewProject?(defaults.defaultBatteryDOD ?? DEFAULT_BATTERY_DOD_PCT):(base.specs.batteryDOD ?? DEFAULT_BATTERY_DOD_PCT);
         const defaultEfficiency=base.specs.batteryEfficiencyPct ?? DEFAULT_BATTERY_EFFICIENCY_PCT;
-        specs.batteries=data.batteries.map(group=>({...group,dodPct:group.dodPct ?? defaultDod,efficiencyPct:group.efficiencyPct ?? defaultEfficiency}));
+        // El escalar del proyecto solo es el valor del grupo principal; los demás grupos sin dato usan el default.
+        specs.batteries=data.batteries.map((group,index)=>({...group,dodPct:group.dodPct ?? (index===0||createNewProject?defaultDod:DEFAULT_BATTERY_DOD_PCT),efficiencyPct:group.efficiencyPct ?? (index===0?defaultEfficiency:DEFAULT_BATTERY_EFFICIENCY_PCT)}));
         specs.batteryDOD=specs.batteries[0].dodPct ?? defaultDod;
         specs.batteryEfficiencyPct=specs.batteries[0].efficiencyPct;
       }
