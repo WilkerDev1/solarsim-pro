@@ -122,6 +122,20 @@ assert.deepEqual(deduped.attachedPdfs.map((att) => att.id), ['att-manual', 'att-
     const unrelatedPending = unresolvedEquipmentIds(unrelated, noPanels);
     assert.equal(unrelatedPending.has('inv'), false, 'the former catalog id, not the group id, identifies the detached item');
     assert.equal(unrelatedPending.has('pa'), true);
+    // Unknown unresolved group (no catalog id at all): nothing can be ruled out, every automatic annex stays.
+    const unknown = structuredClone(mixed);
+    unknown.specs.panels = [{ id: 'legacy-1', brandModel: 'Panel sin identificar', powerW: 600, count: 4 }];
+    const unknownPending = unresolvedEquipmentIds(unknown, noPanels);
+    assert.equal(unknownPending.has('inv'), true, 'detached item stays while an unidentifiable group is unresolved');
+    assert.equal(unknownPending.has('pa'), true);
+    // Identifiable unresolved group pointing at the detached item itself: its annex stays.
+    const same = structuredClone(mixed);
+    const noInv = catalog.filter((item) => item.id !== 'inv');
+    same.specs.inverters = [
+      { id: 'inv', brandModel: 'Inversor propio', powerKW: 8, count: 1, manualModel: true, detachedCatalogItemId: 'inv' },
+      { id: 'g-other', catalogItemId: 'inv', brandModel: 'QA Inversor 8K', powerKW: 8, count: 1 },
+    ];
+    assert.equal(unresolvedEquipmentIds(same, noInv).has('inv'), true, 'an identifiable unresolved group that points to the item keeps it');
     // Another group still uses the detached item: its annex stays.
     const shared = structuredClone(mixed);
     shared.specs.inverters = [...shared.specs.inverters!, { id: 'g8', catalogItemId: 'inv', brandModel: 'QA Inversor 8K', powerKW: 8, count: 1 }];

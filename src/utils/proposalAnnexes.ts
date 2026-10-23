@@ -55,7 +55,15 @@ export function unresolvedEquipmentIds(project: ProjectSimulation, catalog: Sola
   const unresolvedGroups = groups.filter(({ group, kind }) => group.count > 0 && !group.manualModel && !resolveGroupCatalogItem(group, kind, catalog));
   const ids = new Set<string>();
   if (!unresolvedGroups.length) return ids;
-  // Catalog items a group was detached from by hand (stored explicitly), unless another group still uses them.
+  const attached = (project.customization?.attachedPdfs ?? []).filter((att) => att.origin === 'catalog' && att.catalogItemId);
+  // Closed rule. An unresolved group is identifiable when it carries a `catalogItemId`; one that does not (legacy group,
+  // synthetic id) could still need any datasheet, so nothing can be ruled out: every automatic annex stays pending.
+  if (unresolvedGroups.some(({ group }) => !group.catalogItemId)) {
+    for (const att of attached) ids.add(att.catalogItemId!);
+    return ids;
+  }
+  // All unresolved groups are identifiable: annexes stay pending except those of items a group was detached from by hand
+  // (`detachedCatalogItemId`), unless some group in use still points at that item.
   const detached = new Set<string>();
   for (const { group } of groups) if (group.manualModel && group.detachedCatalogItemId) detached.add(group.detachedCatalogItemId);
   const inUse = new Set<string>();
@@ -65,10 +73,9 @@ export function unresolvedEquipmentIds(project: ProjectSimulation, catalog: Sola
     if (item) inUse.add(item.id);
     else if (!group.manualModel) [group.id, group.catalogItemId].forEach((id) => id && inUse.add(id));
   }
-  for (const att of project.customization?.attachedPdfs ?? []) {
-    if (att.origin !== 'catalog' || !att.catalogItemId) continue;
-    if (detached.has(att.catalogItemId) && !inUse.has(att.catalogItemId)) continue;
-    ids.add(att.catalogItemId);
+  for (const att of attached) {
+    if (detached.has(att.catalogItemId!) && !inUse.has(att.catalogItemId!)) continue;
+    ids.add(att.catalogItemId!);
   }
   return ids;
 }
