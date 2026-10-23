@@ -15,6 +15,36 @@ const folderContent = (folder: ProjectFolder) => ({
   visibility: folder.visibility ?? "public",
 });
 
+type FolderReceiptState = Pick<FolderSlice, "folders" | "folderChanges" | "folderDeletionQueue">;
+// Clear an acknowledged change and store the server's folder in the same update, so a later failure
+// in the pass cannot leave the folder marked clean with a stale version. A newer local revision stays
+// pending and only adopts the server version as its base.
+const installReceipt = (
+  s: FolderReceiptState,
+  id: string,
+  revision: string,
+  server: ProjectFolder,
+): Partial<FolderReceiptState> => {
+  const changes = { ...s.folderChanges };
+  const acknowledged = changes[id]?.revision === revision;
+  if (acknowledged) delete changes[id];
+  else if (changes[id])
+    changes[id] = { ...changes[id], baseVersion: server.version ?? changes[id].baseVersion };
+  return {
+    folders: s.folders.map((f) =>
+      f.id !== id
+        ? f
+        : acknowledged
+          ? server
+          : { ...f, version: server.version, baseVersion: server.version },
+    ),
+    folderChanges: changes,
+    folderDeletionQueue: s.folderDeletionQueue.map((command) =>
+      command.id === id ? { ...command, baseVersion: server.version ?? command.baseVersion } : command,
+    ),
+  };
+};
+
 export const createFolderSlice: SimulationSlice<FolderSlice> = (set, get) => {
   let running: {
     generation: number;
@@ -354,11 +384,8 @@ export const createFolderSlice: SimulationSlice<FolderSlice> = (set, get) => {
             const serverFolder = remote.get(id);
             if (serverFolder && contentEqual(folderContent(serverFolder), folderContent(f))) {
               // Recover a lost PUT receipt only from identical authoritative content.
-              set((s) => {
-                const changes = { ...s.folderChanges };
-                delete changes[id];
-                return { folderChanges: changes };
-              });
+              // Install the authoritative folder together with the cleared change, as the PUT branch does.
+              set((s) => installReceipt(s, id, change.revision, serverFolder));
               continue;
             }
             if (serverFolder && change.baseVersion === 0) {
@@ -392,23 +419,7 @@ export const createFolderSlice: SimulationSlice<FolderSlice> = (set, get) => {
               continue;
             }
             remote.set(id, saved.folder);
-            set((s) => {
-              const changes = { ...s.folderChanges };
-              if (changes[id]?.revision === change.revision) delete changes[id];
-              else if (changes[id])
-                changes[id] = {
-                  ...changes[id],
-                  baseVersion: saved.folder.version,
-                };
-              return {
-                folderChanges: changes,
-                folderDeletionQueue: s.folderDeletionQueue.map((command) =>
-                  command.id === id
-                    ? { ...command, baseVersion: saved.folder.version }
-                    : command,
-                ),
-              };
-            });
+            set((s) => installReceipt(s, id, change.revision, saved.folder));
           }
           if (!current())
             return { success: false, message: "La sesión cambió." };

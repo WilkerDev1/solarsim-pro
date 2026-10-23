@@ -241,10 +241,19 @@ export const createClientSlice: SimulationSlice<ClientSlice> = (set, get) => {
             const serverClient = remote.get(id);
             if (serverClient && contentEqual(clientContent(serverClient), clientContent(local))) {
               // Recover a lost PUT receipt only from identical authoritative content.
+              // The authoritative metadata is installed together with the cleared change, as in the PUT branch.
               set((s) => {
                 const changes = { ...s.clientChanges };
-                if (changes[id]?.revision === change.revision) delete changes[id];
-                return { clientChanges: changes };
+                const acknowledged = changes[id]?.revision === change.revision;
+                if (acknowledged) delete changes[id];
+                else if (changes[id]) changes[id] = { ...changes[id], baseVersion: serverClient.version ?? changes[id].baseVersion };
+                return {
+                  clients: s.clients.map((c) =>
+                    c.id !== id ? c : acknowledged ? serverClient : { ...c, version: serverClient.version, baseVersion: serverClient.version },
+                  ),
+                  clientChanges: changes,
+                  clientDeletionQueue: s.clientDeletionQueue.map((c) => (c.id === id ? { ...c, baseVersion: serverClient.version ?? c.baseVersion } : c)),
+                };
               });
               continue;
             }
