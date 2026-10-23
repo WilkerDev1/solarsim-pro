@@ -44,6 +44,12 @@ function mirrorOf<K extends EquipmentKind>(specs: SystemSpecs, kind: K, first: G
   for (const [field, legacy] of Object.entries(MIRROR[kind]) as [keyof GroupItem[K], keyof SystemSpecs][]) {
     if (first[field] !== undefined) mirror[legacy as string] = first[field];
   }
+  // DOD/eficiencia: si el primer grupo no tiene dato propio, el espejo se reinicia para que un escalar del principal anterior no se herede.
+  if (kind === 'battery') {
+    for (const field of PRIMARY_SCALAR_FIELDS.battery) {
+      if (first[field as keyof GroupItem[K]] === undefined) mirror[(MIRROR.battery as Record<string, string>)[field]] = undefined;
+    }
+  }
   if (first.selectedSupplierInfo) mirror.selectedSupplierInfo = { ...specs.selectedSupplierInfo, [kind]: first.selectedSupplierInfo };
   return mirror as Partial<SystemSpecs>;
 }
