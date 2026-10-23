@@ -41,9 +41,12 @@ export function workspaceCatalog(catalog: SolarEquipmentItem[], serverUrl: strin
 /**
  * Catalog item ids whose automatic annexes must be kept because some equipment in use (count > 0) is not
  * resolved in the catalog yet, typically a proposal pulled before the equipment catalog finished syncing.
- * The datasheet of an unresolved item is unknown, so it cannot be tied to one annex (variants share assets,
- * legacy groups have no catalogItemId): while anything in use is unresolved, every automatic annex is kept.
- * This is transient: once the catalog resolves everything, the exact plan applies again.
+ *
+ * Final rule: groups rewritten by hand (`manualModel`) are intentionally off the catalog and never count as unresolved,
+ * so their old datasheet is not kept forever. If ANY other in-use group is unresolved, EVERY attached catalog annex stays
+ * pending: the datasheet of an unresolved item is unknown (variants share assets, legacy groups have no catalogItemId),
+ * and during a partial sync we never remove datasheets. A stale annex may linger until the sync finishes; the first plan
+ * after that removes it because no group uses it. Dropping a needed datasheet is the worse error.
  */
 export function unresolvedEquipmentIds(project: ProjectSimulation, catalog: SolarEquipmentItem[]): Set<string> {
   const groups = [
@@ -51,7 +54,7 @@ export function unresolvedEquipmentIds(project: ProjectSimulation, catalog: Sola
     ...getProjectInverters(project.specs).map((group) => ({ group, kind: 'inverter' as const })),
     ...getProjectBatteries(project.specs).map((group) => ({ group, kind: 'battery' as const })),
   ];
-  const unresolved = groups.some(({ group, kind }) => group.count > 0 && !resolveGroupCatalogItem(group, kind, catalog));
+  const unresolved = groups.some(({ group, kind }) => group.count > 0 && !group.manualModel && !resolveGroupCatalogItem(group, kind, catalog));
   const ids = new Set<string>();
   if (!unresolved) return ids;
   for (const att of project.customization?.attachedPdfs ?? []) {

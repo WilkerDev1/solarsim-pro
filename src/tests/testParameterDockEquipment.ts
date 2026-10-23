@@ -4,7 +4,10 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { SystemSpecs } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
-import { editEquipmentGroup, normalizeEquipmentEdit, selectCatalogEquipment, type EquipmentKind } from '../utils/equipmentGroups';
+import { editEquipmentGroup, normalizeEquipmentEdit, resolveGroupCatalogItem, selectCatalogEquipment, type EquipmentKind } from '../utils/equipmentGroups';
+import type { ProjectSimulation } from '../types';
+import { unresolvedEquipmentIds } from '../utils/proposalAnnexes';
+import { resolveAnnualDegradationPct } from '../engine/financeEngine';
 import { catalogPanelGroupPatch } from '../utils/catalogGroupPatch';
 import { buildCatalogSelectionUpdate } from '../components/simulator/params/logic/catalogSelection';
 import {
@@ -264,6 +267,115 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
   const menuAt = markup.indexOf('role="listbox"');
   assert.ok(trailingAt > 0 && menuAt > trailingAt, 'el contador va junto al disparador y el menú después');
   assert.ok(/data-trailing[^>]*>\+<\/span><\/div><div class="mt-1\.5 w-full/.test(markup), 'el menú queda fuera de la fila del disparador');
+}
+
+// --- «+» en un panel copia también los campos propios del modelo (degradación), como la selección del catálogo ---
+{
+  const degradingCatalog: SolarEquipmentItem[] = [
+    catalogItem({ id: 'dp1', type: 'panel', displayName: 'Panel Lento', powerW: 550, annualDegradation: 0.3, efficiencyPct: 21.5, tempCoeff: -0.29, weightKg: 28 }),
+    catalogItem({ id: 'dp2', type: 'panel', displayName: 'Panel Rapido', powerW: 600, annualDegradation: 0.8, efficiencyPct: 20.1, tempCoeff: -0.35, weightKg: 31 }),
+  ];
+  const state = { specs: { panelCount: 10, panelPowerW: 550, panelBrandModel: 'Panel Lento', panels: [{ id: 'pa', catalogItemId: 'dp1', brandModel: 'Panel Lento', powerW: 550, count: 10, annualDegradation: 0.3 }] } as unknown as SystemSpecs };
+  const updateSpecs = (patch: Partial<SystemSpecs>) => { state.specs = normalizeEquipmentEdit(state.specs, patch); };
+  createGroupActions('panel', state.specs, degradingCatalog, updateSpecs).add();
+  const added = state.specs.panels![1];
+  assert.equal(added.catalogItemId, 'dp2');
+  assert.equal(added.annualDegradation, 0.8, '«+» conserva la degradación del modelo agregado');
+  assert.deepEqual(
+    [added.efficiencyPct, added.tempCoeff, added.weightKilos],
+    [20.1, -0.35, 31],
+    'eficiencia, coeficiente térmico y peso también salen del catálogo'
+  );
+  assert.ok(Math.abs(resolveAnnualDegradationPct(state.specs) - (0.3 * 5500 + 0.8 * 6000) / 11500) < 1e-9, 'la proyección a 25 años pondera por potencia DC, no queda toda en 0.3');
+}
+
+// --- Editar a mano la marca/modelo de un grupo del catálogo rompe el vínculo con la ficha técnica ---
+{
+  const linkedCatalog: SolarEquipmentItem[] = [
+    catalogItem({ id: 'k1', type: 'panel', displayName: 'Panel K 550', powerW: 550 }),
+    catalogItem({ id: 'k2', type: 'panel', displayName: 'Panel K 600', powerW: 600 }),
+    catalogItem({ id: 'ki', type: 'inverter', displayName: 'Inversor K 8', powerKW: 8 }),
+  ];
+  const run = (kind: EquipmentKind, group: Record<string, unknown>, name: string) => {
+    const key = kind === 'panel' ? 'panels' : kind === 'inverter' ? 'inverters' : 'batteries';
+    const state = { specs: { [key]: [group] } as unknown as SystemSpecs };
+    createGroupActions(kind, state.specs, linkedCatalog, patch => { state.specs = normalizeEquipmentEdit(state.specs, patch); }).setBrand(0, name);
+    return (state.specs[key] as Array<{ id: string; catalogItemId?: string; brandModel: string }>)[0];
+  };
+  const linked = { id: 'panel-k1', catalogItemId: 'k1', brandModel: 'Panel K 550', powerW: 550, count: 4 };
+
+  const other = run('panel', linked, 'Panel K 600');
+  assert.equal(other.catalogItemId, 'k2', 'el nombre exacto de otro modelo del catálogo lo vincula a ese modelo');
+  assert.equal(resolveGroupCatalogItem(other, 'panel', linkedCatalog)?.id, 'k2', 'resuelve por el nombre nuevo, no por el id anterior');
+  assert.equal(resolveGroupCatalogItem(run('panel', linked, 'Panel Propio X'), 'panel', linkedCatalog), null, 'un modelo a mano no adjunta ninguna ficha');
+
+  const idIsCatalogId = run('panel', { ...linked, id: 'k1' }, 'Panel Propio X');
+  assert.equal(idIsCatalogId.id, 'k1', 'el id no cambia: es la clave de la fila y cambiarlo quita el foco al escribir');
+  assert.equal(resolveGroupCatalogItem(idIsCatalogId, 'panel', linkedCatalog), null);
+  assert.equal(run('inverter', { id: 'ki', catalogItemId: 'ki', brandModel: 'Inversor K 8', powerKW: 8, count: 1 }, 'Inversor Z').catalogItemId, undefined, 'inversores igual');
+
+  // Catálogo aún sin sincronizar: el id igual al catalogItemId (propuestas de IA) también es identidad de catálogo.
+  {
+    const offline = (name: string) => {
+      const state = { specs: { panels: [{ id: 'k1', catalogItemId: 'k1', brandModel: 'Panel K 550', powerW: 550, count: 4 }] } as unknown as SystemSpecs };
+      createGroupActions('panel', state.specs, [], patch => { state.specs = normalizeEquipmentEdit(state.specs, patch); }).setBrand(0, name);
+      return state.specs.panels![0];
+    };
+    const edited = offline('Panel Propio X');
+    assert.equal(edited.id, 'k1', 'el id se conserva (clave estable de la fila)');
+    assert.deepEqual(groupViews({ panels: [edited] } as unknown as SystemSpecs, 'panel').map(view => view.key), ['k1'], 'la clave de la fila no cambia al escribir el primer carácter');
+    assert.equal(edited.catalogItemId, undefined);
+    assert.equal(resolveGroupCatalogItem(edited, 'panel', linkedCatalog), null, 'al sincronizar el catálogo no reaparece el modelo anterior');
+    assert.equal(offline('panel k 550').id, 'k1', 'mismo modelo: no se toca');
+  }
+  // Desvincular a propósito se marca como modelo manual; elegir del catálogo lo quita.
+  {
+    const detached = run('panel', linked, 'Panel Propio X') as { manualModel?: boolean };
+    assert.equal(detached.manualModel, true);
+    assert.equal(run('panel', linked, 'panel k 550').hasOwnProperty('manualModel'), false, 'mismo modelo: sin marca');
+    const specs = { panels: [{ ...detached, id: 'x', brandModel: 'Panel Propio X', powerW: 1, count: 1 }] } as unknown as SystemSpecs;
+    const picked = normalizeEquipmentEdit(specs, selectCatalogEquipment(specs, 'panel', 0, linkedCatalog[1]));
+    assert.equal(picked.panels![0].manualModel, undefined, 'seleccionar del catálogo vuelve a vincular');
+  }
+  // Ediciones sucesivas: modelo A → nombre exacto de B (revincula) → nombre propio. Los anexos solo se retiran sin grupos pendientes.
+  {
+    const setup = (withUnresolved: boolean) => {
+      const state = { specs: { panels: [
+        { id: 'g1', catalogItemId: 'k1', brandModel: 'Panel K 550', powerW: 550, count: 4 },
+        ...(withUnresolved ? [{ id: 'g2', catalogItemId: 'zz', brandModel: 'Sin sincronizar', powerW: 400, count: 2 }] : []),
+      ], inverters: [{ id: 'i0', brandModel: 'Sin uso', powerKW: 1, count: 0 }], batteries: [{ id: 'b0', brandModel: 'Sin uso', capacityKWh: 1, count: 0 }] } as unknown as SystemSpecs };
+      const edit = (name: string) => createGroupActions('panel', state.specs, linkedCatalog, patch => { state.specs = normalizeEquipmentEdit(state.specs, patch); }).setBrand(0, name);
+      const annex = (id: string) => ({ id: `att-${id}`, origin: 'catalog', catalogItemId: id });
+      const pending = () => unresolvedEquipmentIds({ specs: state.specs, customization: { attachedPdfs: [annex('k1'), annex('k2'), annex('zz')] } } as unknown as ProjectSimulation, linkedCatalog);
+      return { state, edit, pending };
+    };
+    const lone = setup(false);
+    lone.edit('Panel K 600');
+    const relinked = lone.state.specs.panels![0] as { catalogItemId?: string; manualModel?: boolean; count: number };
+    assert.equal(relinked.catalogItemId, 'k2', 'escribir el nombre exacto de B deja el grupo vinculado a B');
+    assert.equal(relinked.manualModel, undefined, 'revincular quita manualModel');
+    assert.equal(relinked.count, 4, 'solo cambian los campos de vínculo');
+    lone.edit('Panel Propio X');
+    assert.equal((lone.state.specs.panels![0] as { manualModel?: boolean }).manualModel, true);
+    assert.equal(lone.pending().size, 0, '(1) un grupo manual sin otros pendientes no protege ningún anexo: el plan retira la ficha anterior');
+    // (5) Volver a escribir el nombre exacto revincula un grupo manual.
+    lone.edit('Panel K 550');
+    assert.equal((lone.state.specs.panels![0] as { catalogItemId?: string; manualModel?: boolean }).catalogItemId, 'k1');
+    assert.equal((lone.state.specs.panels![0] as { manualModel?: boolean }).manualModel, undefined);
+
+    const partial = setup(true);
+    partial.edit('Panel K 600');
+    partial.edit('Panel Propio X');
+    assert.deepEqual([...partial.pending()].sort(), ['k1', 'k2', 'zz'], '(2) con otro grupo sin resolver se conservan todos los anexos, incluso el del modelo desvinculado');
+  }
+  // Mayúsculas y espacios no cambian de modelo: se conserva el vínculo.
+  for (const same of ['  Panel K 550 ', 'panel k 550', 'Panel  K   550']) {
+    assert.equal(run('panel', linked, same).catalogItemId, 'k1', `«${same}» sigue siendo el mismo modelo`);
+  }
+  // Un cambio de un carácter puede ser otro modelo (550 → 560): el vínculo se rompe.
+  assert.equal(run('panel', linked, 'Panel K 560').catalogItemId, undefined);
+  // Un grupo escrito a mano (sin catálogo) no se toca.
+  assert.equal(run('panel', { id: 'm', brandModel: 'Mio', powerW: 400, count: 2 }, 'Mio 2').id, 'm');
 }
 
 // --- Las secciones usan solo tokens pd-*, sin isDark ni colores sueltos, y la cantidad de batería no salta editEquipmentGroup ---

@@ -32,6 +32,7 @@ export interface PanelItemSpec {
   requestedModel?: string;
   id: string;
   catalogItemId?: string; // ID del equipo del catálogo; se escribe con utils/equipmentGroups.ts
+  manualModel?: boolean; // El usuario reescribió a mano un modelo del catálogo: no es un equipo pendiente de sincronizar
   brandModel: string;
   powerW: number;
   count: number;
@@ -48,6 +49,7 @@ export interface InverterItemSpec {
   requestedModel?: string;
   id: string;
   catalogItemId?: string;
+  manualModel?: boolean;
   brandModel: string;
   powerKW: number;
   count: number;
@@ -62,6 +64,7 @@ export interface BatteryItemSpec {
   requestedModel?: string;
   id: string;
   catalogItemId?: string;
+  manualModel?: boolean;
   brandModel: string;
   capacityKWh: number;
   count: number;
