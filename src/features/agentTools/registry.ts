@@ -162,9 +162,21 @@ function undoEntry(entry: AgentActivityEntry) {
     : { success: false, error: 'No se pudo restaurar el estado anterior; usa el historial de versiones.' };
 }
 
+/** Copy for the confirmation card of a native plan: it names what the plan really changes, never the open proposal by default. */
+function nativeImpact(tool: string, targetType: NativePlan['targetType']): string {
+  if (targetType === 'client') return 'Cambiará el directorio de clientes.';
+  if (targetType === 'equipment') return 'Cambiará el catálogo compartido.';
+  if (tool === 'save_document_text_to_company_template') return 'Cambiará la plantilla de documentos de la empresa.';
+  return 'Cambiará una propuesta del espacio de trabajo.';
+}
+
 installAgentRuntime({
   apply(pending: PendingAgentAction) {
     try {
+      // Confirming is a new write: today's policy and account role win over those from when the action was queued.
+      if (store().agentPolicy[agentPolicyKey(pending.source)][pending.kind === 'guarded' ? 'guarded' : 'draft'] === 'deny')
+        return { success: false, error: 'Los permisos de agentes de este dispositivo ya no permiten esta acción.' };
+      if (!canWriteNow()) return { success: false, error: 'Tu cuenta solo puede consultar.' };
       if (isNativePlan(pending.plan)) {
         const meta = { source: pending.source, clientLabel: pending.clientLabel, tool: pending.tool, kind: pending.kind === 'guarded' ? 'guarded' : 'draft' } as const;
         return { success: true, activityId: runNativePlan(pending.plan, meta).activityId };
@@ -286,7 +298,8 @@ export async function executeForAssistant(call: AgentToolCall, ctx: AgentToolCon
     const pending = store().pendingAgentActions.find((a) => a.id === outcome.actionId)!;
     const action: AssistantAction = isNativePlan(pending.plan)
       // Native plans are shown with their human-readable changes; confirmation always goes through the queue by id.
-      ? { id: pending.id, kind: pending.plan.targetType === 'equipment' ? 'equipment' : 'project', targetId: '', title: pending.title, fingerprint: '', owner: ctx.owner,
+      ? { id: pending.id, kind: pending.plan.targetType === 'equipment' ? 'equipment' : 'project', targetType: pending.plan.targetType,
+          impact: nativeImpact(pending.tool, pending.plan.targetType), targetId: '', title: pending.title, fingerprint: '', owner: ctx.owner,
           edits: pending.changes.map((c) => ({ section: 'client' as const, field: c.label, value: c.value })) }
       : (pending.plan as AssistantAction);
     return { data: { status: 'pending_confirmation', changes: pending.changes }, cards, action };

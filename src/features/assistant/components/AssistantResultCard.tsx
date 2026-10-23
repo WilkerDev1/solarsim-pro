@@ -174,9 +174,9 @@ export function AssistantActionCard({
       <div className="assistant-result-content">
         <h3>{action.title}</h3>
         <p>
-          {action.kind === 'equipment'
+          {action.impact ?? (action.kind === 'equipment'
             ? 'Cambiará el catálogo compartido.'
-            : 'Cambiará la propuesta abierta y recalculará el simulador.'}
+            : 'Cambiará la propuesta abierta y recalculará el simulador.')}
         </p>
         <dl className="assistant-changes">
           {action.edits.map((e) => (
