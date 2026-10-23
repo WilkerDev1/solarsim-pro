@@ -98,6 +98,11 @@ assert.equal(hHeavy.houseKW, 3.7);
 // Hybrid, outage: island mode. The grid never takes part and the load is capped by what the system can deliver.
 // Backup capability is not recorded in the proposal: island modes state it as a condition.
 for (const mode of ['outageDay', 'outageNight'] as const) assert.ok(/respaldo/i.test(pick(hybridBase, mode).note ?? ''), `${mode} is conditional on backup output`);
+// Outage copy follows the modeled battery direction: a small array cannot be "charging" the battery.
+const weakSun = pick({ ...hybridBase, systemCapacityKWp: 1 }, 'outageDay');
+assert.equal(weakSun.batteryState, 'discharging');
+assert.ok(!/cargan la batería/.test(weakSun.description) && /batería/.test(weakSun.description), weakSun.description);
+assert.ok(/cargan la batería/.test(pick(hybridBase, 'outageDay').description));
 const oDay = pick(hybridBase, 'outageDay');
 assert.equal(oDay.gridState, 'disconnected');
 assert.equal(oDay.lines.grid.active, false);
@@ -185,6 +190,9 @@ const modes = (html: string, expected: string[]) => {
 };
 modes(onGridHtml, ['day', 'night', 'outage']);
 modes(hybridHtml, ['day', 'night', 'outageDay', 'outageNight']);
+// Desktop hides the text legend: the labelled SVG's accessible name carries each node's label and kW value.
+const fullAria = hybridHtml.match(/data-energy-flow-svg="full"[^>]*aria-label="([^"]*)"/)?.[1] ?? hybridHtml.match(/aria-label="([^"]*)"[^>]*data-energy-flow-svg="full"/)?.[1] ?? '';
+assert.ok(/Producción solar ≈[0-9.]+ kW/.test(fullAria) && /Consumo de la casa/.test(fullAria), fullAria);
 assert.ok(onGridHtml.includes('De noche') && onGridHtml.includes('Apagón') && !onGridHtml.includes('Apagón de día'));
 assert.ok(hybridHtml.includes('Apagón de día') && hybridHtml.includes('Apagón de noche'));
 assert.ok(hybridHtml.includes('Batería · cargando') && hybridHtml.includes('Batería · descargando'));

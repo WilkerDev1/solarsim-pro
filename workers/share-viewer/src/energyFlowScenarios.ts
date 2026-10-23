@@ -186,7 +186,11 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
     make('outageDay', island, {
       label: 'Apagón de día', title: 'Apagón de día', night: false, gridConnected: false, inverterState: 'on',
       note: BACKUP_NOTE,
-      description: 'Sin red, el sistema pasa a modo isla: los paneles alimentan la casa y cargan la batería, y la casa sigue con energía.' + capped(island, load.day),
+      description: 'Sin red, el sistema pasa a modo isla: '
+        + (island.solarBattery > 0 ? 'los paneles alimentan la casa y cargan la batería'
+          : island.batteryHouse > 0 ? 'los paneles y la batería alimentan juntos la casa'
+          : 'los paneles alimentan la casa')
+        + ', y la casa sigue con energía.' + capped(island, load.day),
       pill: { text: 'Modo isla', tone: 'amber' },
     }),
     make('outageNight', islandNight, {

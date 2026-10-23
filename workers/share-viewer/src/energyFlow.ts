@@ -146,7 +146,8 @@ export function renderEnergyFlowSection(input: EnergyFlowScenarioInput): string 
 
   const buttons = scenarios.map((s, i) => `<button type="button" data-energy-mode-button="${s.mode}" aria-pressed="${i === 0}" class="ef-btn px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-bold whitespace-nowrap text-slate-600 hover:text-slate-900 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1">${s.label}</button>`).join('\n          ');
   const panels = scenarios.map((s, i) => {
-    const aria = `${system}, ${s.title.toLowerCase()}: ${s.description}`;
+    // The text legend is phone-only, so the accessible name also lists every node and its value.
+    const aria = `${system}, ${s.title.toLowerCase()}: ${s.description} ${describeNodes(s).map((n) => `${n.label} ${n.value}`).join('; ')}.`;
     return `<div data-energy-mode-panel="${s.mode}" class="ef-panel space-y-3"${i === 0 ? '' : ' hidden'}>
       <div class="flex flex-wrap items-start justify-between gap-2">
         <div class="min-w-0 flex-1 basis-60 space-y-1">
