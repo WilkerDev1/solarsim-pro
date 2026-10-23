@@ -113,6 +113,16 @@ for (const input of [base, hybridBase, { ...base, isZeroExport: true }, { ...hyb
   }
 }
 
+// The inverter's AC rating caps what the system can deliver, also during an outage.
+const bigBank: EnergyFlowScenarioInput = { ...hybridBase, totalBESSKWh: 40, annualConsumptionKWh: 87600, inverterPowerKW: 5 };
+for (const mode of ['day', 'night', 'outageDay', 'outageNight']) {
+  const sc = pick(bigBank, mode);
+  assert.ok(sc.houseKW - (sc.gridState === 'import' ? sc.gridKW : 0) <= 5.05, `${mode} inverter output ${sc.houseKW} kW within 5 kW`);
+}
+assert.ok(/limitada/.test(pick(bigBank, 'outageDay').description) && /limitada/.test(pick(bigBank, 'outageNight').description));
+// Unknown inverter rating keeps the previous behaviour.
+assert.deepEqual(pick({ ...bigBank, inverterPowerKW: 0 }, 'outageNight').houseKW, pick({ ...bigBank, inverterPowerKW: undefined }, 'outageNight').houseKW);
+
 // Outage copy follows the modeled battery direction: a small array cannot be "charging" the battery.
 const weakSun = pick({ ...hybridBase, systemCapacityKWp: 1 }, 'outageDay');
 assert.equal(weakSun.batteryState, 'discharging');

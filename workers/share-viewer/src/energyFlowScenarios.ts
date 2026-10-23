@@ -17,6 +17,8 @@ export interface EnergyFlowScenarioInput {
   systemCapacityKWp: number;
   annualConsumptionKWh: number;
   totalBESSKWh: number;
+  /** Total AC rating of the installed inverters; unknown or 0 means no cap. */
+  inverterPowerKW?: number;
 }
 
 export interface FlowLine {
@@ -62,19 +64,20 @@ function loads(input: EnergyFlowScenarioInput, productionKW: number): { day: num
   return { day: Math.max(MIN_LOAD_KW, average * 1.2), night: Math.max(MIN_LOAD_KW, average * 0.8) };
 }
 
-function solveDay(load: number, potential: number, batteryLimit: number, zeroExport: boolean, canExport: boolean): Flows {
-  const solarHouse = Math.min(potential, load);
+// `inverter` caps the AC output (house + export); DC-coupled battery charging is not limited by it.
+function solveDay(load: number, potential: number, batteryLimit: number, zeroExport: boolean, canExport: boolean, inverter: number): Flows {
+  const solarHouse = Math.min(potential, load, inverter);
   const surplus = potential - solarHouse;
   const solarBattery = Math.min(surplus, batteryLimit);
   // Zero export (and any island) trims production instead of sending the rest anywhere.
-  const exported = zeroExport || !canExport ? 0 : surplus - solarBattery;
+  const exported = zeroExport || !canExport ? 0 : Math.min(surplus - solarBattery, inverter - solarHouse);
   const deficit = load - solarHouse;
-  const batteryHouse = Math.min(batteryLimit, deficit);
+  const batteryHouse = Math.max(0, Math.min(batteryLimit, deficit, inverter - solarHouse - exported));
   return { production: solarHouse + solarBattery + exported, solarHouse, solarBattery, exported, batteryHouse, gridHouse: canExport ? deficit - batteryHouse : 0 };
 }
 
-function solveNight(load: number, batteryLimit: number, canUseGrid: boolean): Flows {
-  const batteryHouse = Math.min(batteryLimit, load);
+function solveNight(load: number, batteryLimit: number, canUseGrid: boolean, inverter: number): Flows {
+  const batteryHouse = Math.min(batteryLimit, load, inverter);
   return { production: 0, solarHouse: 0, solarBattery: 0, exported: 0, batteryHouse, gridHouse: canUseGrid ? load - batteryHouse : 0 };
 }
 
@@ -131,6 +134,7 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
   const potential = safe(input.systemCapacityKWp) * MIDDAY_FACTOR;
   const batteryLimit = hybrid ? Math.max(1, safe(input.totalBESSKWh) * 0.5) : 0;
   const load = loads(input, potential);
+  const inverter = safe(input.inverterPowerKW ?? 0) || Infinity;
 
   const make = (mode: EnergyFlowMode, f: Flows, o: {
     label: string; title: string; description: string; note?: string; pill: ModeScenario['pill'];
@@ -150,8 +154,8 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
     };
   };
 
-  const day = solveDay(load.day, potential, batteryLimit, isZeroExport, true);
-  const night = solveNight(load.night, batteryLimit, true);
+  const day = solveDay(load.day, potential, batteryLimit, isZeroExport, true, inverter);
+  const night = solveNight(load.night, batteryLimit, true, inverter);
   const dayPill = (f: Flows): ModeScenario['pill'] => ({
     text: f.solarBattery > 0 ? 'Cargando batería' : f.batteryHouse > 0 ? 'Batería apoyando' : isZeroExport ? 'Inyección cero' : 'En operación',
     tone: 'green',
@@ -169,7 +173,7 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
         description: 'De noche no hay producción solar: la casa consume energía de la red eléctrica, igual que antes de instalar el sistema.',
         pill: { text: 'Sin producción solar', tone: 'indigo' },
       }),
-      make('outage', solveNight(0, 0, false), {
+      make('outage', solveNight(0, 0, false, inverter), {
         label: 'Apagón', title: 'Apagón', night: false, gridConnected: false, inverterState: 'off',
         description: 'Cuando falla la red, el inversor se apaga por seguridad y la casa se queda sin energía hasta que regrese el servicio.',
         note: 'Por normativa, un sistema de inyección sin baterías se desconecta cuando falla la red. Un sistema híbrido con baterías y salida de respaldo sí puede mantener la casa con energía.',
@@ -178,8 +182,8 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
     ];
   }
 
-  const island = solveDay(load.day, potential, batteryLimit, true, false);
-  const islandNight = solveNight(load.night, batteryLimit, false);
+  const island = solveDay(load.day, potential, batteryLimit, true, false, inverter);
+  const islandNight = solveNight(load.night, batteryLimit, false, inverter);
   const capped = (f: Flows, wanted: number) => (wanted - (f.solarHouse + f.batteryHouse) > 0.05
     ? ' La potencia disponible es limitada, por lo que conviene priorizar los equipos esenciales.' : '');
   return [
