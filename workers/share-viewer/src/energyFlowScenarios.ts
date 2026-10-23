@@ -1,6 +1,9 @@
 // Pure model behind the proposal's energy-flow diagram. Every number is an approximate visual guide
 // derived from the proposal's headline figures (never a simulation result), so it works for old links too.
 
+// The proposal does not record whether the inverter can form an island, so backup is stated as a condition.
+const BACKUP_NOTE = 'El respaldo durante un apagón requiere un inversor híbrido con salida de respaldo (backup) y cubre las cargas conectadas a esa salida.';
+
 export type EnergyFlowMode = 'day' | 'night' | 'outage' | 'outageDay' | 'outageNight';
 export type FlowColor = 'o' | 'g' | 'b'; // solar (orange), battery (green), grid (blue)
 export type FlowSpeed = 's1' | 's2' | 's3';
@@ -157,7 +160,7 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
       make('outage', solveNight(0, 0, false), {
         label: 'Apagón', title: 'Apagón', night: false, gridConnected: false, inverterState: 'off',
         description: 'Cuando falla la red, el inversor se apaga por seguridad y la casa se queda sin energía hasta que regrese el servicio.',
-        note: 'Por normativa, un sistema de inyección sin baterías se desconecta cuando falla la red. Un sistema híbrido con baterías sí puede mantener la casa con energía.',
+        note: 'Por normativa, un sistema de inyección sin baterías se desconecta cuando falla la red. Un sistema híbrido con baterías y salida de respaldo sí puede mantener la casa con energía.',
         pill: { text: 'Inversor apagado por seguridad', tone: 'amber' },
       }),
     ];
@@ -182,11 +185,13 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
     }),
     make('outageDay', island, {
       label: 'Apagón de día', title: 'Apagón de día', night: false, gridConnected: false, inverterState: 'on',
+      note: BACKUP_NOTE,
       description: 'Sin red, el sistema pasa a modo isla: los paneles alimentan la casa y cargan la batería, y la casa sigue con energía.' + capped(island, load.day),
       pill: { text: 'Modo isla', tone: 'amber' },
     }),
     make('outageNight', islandNight, {
       label: 'Apagón de noche', title: 'Apagón de noche', night: true, gridConnected: false, inverterState: 'on',
+      note: BACKUP_NOTE,
       description: 'Sin red y sin sol, la batería alimenta la casa en modo isla mientras tenga carga.' + capped(islandNight, load.night),
       pill: { text: 'Modo isla', tone: 'amber' },
     }),

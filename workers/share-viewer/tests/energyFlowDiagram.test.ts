@@ -96,6 +96,8 @@ assert.equal(hHeavy.gridState, 'import');
 assert.equal(hHeavy.houseKW, 3.7);
 
 // Hybrid, outage: island mode. The grid never takes part and the load is capped by what the system can deliver.
+// Backup capability is not recorded in the proposal: island modes state it as a condition.
+for (const mode of ['outageDay', 'outageNight'] as const) assert.ok(/respaldo/i.test(pick(hybridBase, mode).note ?? ''), `${mode} is conditional on backup output`);
 const oDay = pick(hybridBase, 'outageDay');
 assert.equal(oDay.gridState, 'disconnected');
 assert.equal(oDay.lines.grid.active, false);
