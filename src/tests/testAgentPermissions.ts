@@ -23,10 +23,10 @@ const coverage = (value: number) => ({ name: 'propose_project_update', args: { i
 const internal = () => ({ source: 'app-assistant' as const, owner: assistantOwner() });
 const external = () => ({ source: 'mcp' as const, owner: assistantOwner(), clientLabel: 'claude-code' });
 
-// 1. Defaults follow the user's decision: reads free, drafts applied with undo, guarded changes confirmed. Guarded can never be "allow".
+// 1. Defaults follow the user's decision: reads free, drafts applied with undo, guarded changes confirmed. Guarded is bypassed only by an explicit choice.
 assert.deepEqual(DEFAULT_AGENT_POLICY.internal, { read: 'allow', draft: 'allow', guarded: 'confirm' });
 assert.deepEqual(DEFAULT_AGENT_POLICY.external, { read: 'allow', draft: 'allow', guarded: 'confirm' });
-assert.equal(normalizeAgentPolicy({ external: { read: 'allow', draft: 'allow', guarded: 'allow' } } as any).external.guarded, 'confirm');
+assert.equal(normalizeAgentPolicy({ external: { read: 'allow', draft: 'allow', guarded: 'allow' } } as any).external.guarded, 'allow', 'bypass is a valid persisted choice');
 assert.equal(normalizeAgentPolicy(undefined).internal.draft, 'allow');
 
 // 2. Draft tool applies immediately and is recorded with an undo entry.

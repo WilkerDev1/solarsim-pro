@@ -5,8 +5,8 @@ export type AgentPolicyLevel = 'allow' | 'confirm' | 'deny';
 export interface AgentSourcePolicy {
   read: 'allow' | 'deny';
   draft: AgentPolicyLevel;
-  /** Catalog, prices, deletions and commercial status always need a human: never "allow". */
-  guarded: 'confirm' | 'deny';
+  /** Catalog, prices, deletions and commercial status. `allow` is the explicit "bypass" mode: no confirmation, validations and undo stay. */
+  guarded: AgentPolicyLevel;
 }
 /** `internal` = in-app assistants; `external` = agents connected through the local MCP server. */
 export interface AgentPolicy {
@@ -23,7 +23,7 @@ export function normalizeAgentPolicy(value: Partial<AgentPolicy> | undefined): A
   const one = (raw: Partial<AgentSourcePolicy> | undefined, fallback: AgentSourcePolicy): AgentSourcePolicy => ({
     read: raw?.read === 'deny' ? 'deny' : 'allow',
     draft: raw?.draft === 'confirm' || raw?.draft === 'deny' ? raw.draft : fallback.draft,
-    guarded: raw?.guarded === 'deny' ? 'deny' : 'confirm',
+    guarded: raw?.guarded === 'allow' || raw?.guarded === 'deny' ? raw.guarded : 'confirm',
   });
   return { internal: one(value?.internal, DEFAULT_AGENT_POLICY.internal), external: one(value?.external, DEFAULT_AGENT_POLICY.external) };
 }
