@@ -99,8 +99,27 @@ assert.deepEqual(deduped.attachedPdfs.map((att) => att.id), ['att-manual', 'att-
   unused.specs.inverters = [{ id: 'g3', catalogItemId: 'inv', brandModel: 'QA Inversor 8K', powerKW: 8, count: 0 }];
   const gone = applyAnnexPlan(before, planDatasheetAnnexes(unused, partial), NOW, unresolvedEquipmentIds(unused, partial));
   assert.deepEqual(gone.attachedPdfs.map((att) => att.id), ['att-manual', catalogAnnexId('sheet-family')]);
-  unused.specs.inverters = [];
-  assert.deepEqual(applyAnnexPlan(before, planDatasheetAnnexes(unused, partial), NOW, unresolvedEquipmentIds(unused, partial)).attachedPdfs.map((att) => att.id), ['att-manual', catalogAnnexId('sheet-family')]);
+}
+
+// 3c. Legacy (unmigrated) proposals have synthetic group ids and no catalogItemId: still protected while the catalog is empty.
+{
+  const legacy = project();
+  legacy.customization!.attachedPdfs = first.attachedPdfs.map((att) => (att.id === catalogAnnexId('sheet-inverter') ? { ...att, title: 'Inversor — revisada' } : att));
+  legacy.specs.inverters = undefined;
+  legacy.specs.inverterBrandModel = 'QA Inversor 8K';
+  legacy.specs.inverterPowerKW = 8;
+  legacy.specs.inverterCount = 1;
+  const before = legacy.customization!;
+  const none: SolarEquipmentItem[] = [];
+  const during = applyAnnexPlan(before, planDatasheetAnnexes(legacy, none), NOW, unresolvedEquipmentIds(legacy, none));
+  assert.equal(during.changed, false, 'Legacy groups do not lose their annexes while the catalog is empty');
+  assert.equal(during.attachedPdfs, before.attachedPdfs);
+  const gone = structuredClone(legacy);
+  gone.specs.inverterCount = 0;
+  gone.specs.panels = [];
+  gone.specs.panelBrandModel = undefined;
+  gone.specs.panelCount = 0;
+  assert.deepEqual(applyAnnexPlan(before, planDatasheetAnnexes(gone, none), NOW, unresolvedEquipmentIds(gone, none)).attachedPdfs.map((att) => att.id), ['att-manual']);
 }
 
 // 4. Dismiss and restore.
