@@ -194,4 +194,43 @@ assert.equal(restoredSpecs.panelBrandModel, legacyBefore.panelBrandModel);
 assert.equal(restoredSpecs.panelCount, legacyBefore.panelCount);
 assert(!restoredSpecs.panels?.some((g) => g.id === altPanel.id), 'no replacement group survives the undo');
 
+// 18. A direct_watt proposal never switches mode as a side effect: unrelated edits keep it, mode/price-basis edits are guarded.
+const setDirectWatt = () => {
+  reset();
+  store.getState().updateProjectById(project.id, (p) => ({ specs: { ...p.specs, pricingMode: 'direct_watt', isDetailed: true } }));
+};
+const specsOf = () => store.getState().getActiveProject().specs;
+const losses = (value: number) => ({ name: 'propose_project_update', args: { id: project.id, title: 'Pérdidas', edits: [{ section: 'specs', field: 'systemLosses', valueJson: String(value) }] } });
+setDirectWatt();
+store.getState().setAgentPolicy({ external: { read: 'allow', draft: 'allow', guarded: 'deny' } });
+const lossesDenied = await executeAgentTool(losses(15), external());
+assert.equal(lossesDenied.status, 'applied', 'system losses are a plain draft edit');
+assert.equal(specsOf().systemLosses, 15);
+assert.equal(specsOf().pricingMode, 'direct_watt', 'guarded: deny: the pricing mode must not change');
+assert.equal(specsOf().isDetailed, true);
+setDirectWatt();
+store.getState().setAgentPolicy({ external: { read: 'allow', draft: 'allow', guarded: 'confirm' } });
+const lossesConfirm = await executeAgentTool(losses(14), external());
+assert.equal(lossesConfirm.status, 'applied');
+assert.equal(specsOf().pricingMode, 'direct_watt');
+// Mode fields are not agent-editable at all (whitelist), and the price basis is guarded.
+for (const [field, valueJson] of [['pricingMode', '"cost_matrix"'], ['isDetailed', 'false'], ['directPriceSurplusTarget', '"labor"'], ['pricePerWattUSD', '1.2']] as const) {
+  setDirectWatt();
+  const rejected = await executeAgentTool({ name: 'propose_project_update', args: { id: project.id, edits: [{ section: 'specs', field, valueJson }] } }, external());
+  assert.equal(rejected.status, 'error', `${field} cannot be edited by agents`);
+  assert.equal(specsOf().pricingMode, 'direct_watt');
+}
+setDirectWatt();
+const rate = { name: 'propose_project_update', args: { id: project.id, edits: [{ section: 'specs', field: 'dopExchangeRate', valueJson: '61' }] } };
+store.getState().setAgentPolicy({ external: { read: 'allow', draft: 'allow', guarded: 'deny' } });
+assert.equal((await executeAgentTool(rate, external())).status, 'error', 'dopExchangeRate is blocked with guarded: deny');
+store.getState().setAgentPolicy({ external: { read: 'allow', draft: 'allow', guarded: 'confirm' } });
+assert.equal((await executeAgentTool(rate, external())).status, 'pending_confirmation');
+assert.equal(specsOf().pricingMode, 'direct_watt');
+for (const [section, field, valueJson] of [['financials', 'applyITBISExemption', 'false'], ['financials', 'applyLey5707', 'false'], ['rates', 'usdExchangeRate', '61']] as const) {
+  reset();
+  const outcome = await executeAgentTool({ name: 'propose_project_update', args: { id: project.id, edits: [{ section, field, valueJson }] } }, external());
+  assert.equal(outcome.status, 'pending_confirmation', `${field} changes the contract price: confirmation required`);
+}
+
 console.log('PASS: agent policy (read/draft/guarded × source), immediate drafts with undo, confirmations, status tool, readers and persistence.');
