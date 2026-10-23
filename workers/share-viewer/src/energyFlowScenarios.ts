@@ -4,11 +4,11 @@
 // The proposal does not record whether the inverter can form an island, so backup is stated as a condition.
 const BACKUP_NOTE = 'El respaldo durante un apagón requiere un inversor híbrido con salida de respaldo (backup) y cubre las cargas conectadas a esa salida.';
 
-export type EnergyFlowMode = 'day' | 'night' | 'outage' | 'outageDay' | 'outageNight';
+export type EnergyFlowMode = 'day' | 'batteryFull' | 'night' | 'outage' | 'outageDay' | 'outageNight';
 export type FlowColor = 'o' | 'g' | 'b'; // solar (orange), battery (green), grid (blue)
 export type FlowSpeed = 's1' | 's2' | 's3';
 export type PillTone = 'green' | 'indigo' | 'amber';
-export type BatteryState = 'charging' | 'discharging' | 'idle';
+export type BatteryState = 'charging' | 'discharging' | 'idle' | 'full';
 export type GridState = 'export' | 'import' | 'idle' | 'disconnected';
 
 export interface EnergyFlowScenarioInput {
@@ -64,21 +64,26 @@ function loads(input: EnergyFlowScenarioInput, productionKW: number): { day: num
   return { day: Math.max(MIN_LOAD_KW, average * 1.2), night: Math.max(MIN_LOAD_KW, average * 0.8) };
 }
 
+// Hybrid diagrams never draw energy from the grid: the battery covers the house at night and on shortfalls.
+interface SolveOptions { zeroExport: boolean; gridConnected: boolean; gridImport: boolean }
+
 // `inverter` caps the AC output (house + export); DC-coupled battery charging is not limited by it.
-function solveDay(load: number, potential: number, batteryLimit: number, zeroExport: boolean, canExport: boolean, inverter: number): Flows {
+function solveDay(load: number, potential: number, batteryLimit: number, inverter: number, o: SolveOptions, chargeLimit = batteryLimit): Flows {
   const solarHouse = Math.min(potential, load, inverter);
   const surplus = potential - solarHouse;
-  const solarBattery = Math.min(surplus, batteryLimit);
+  const canExport = o.gridConnected && !o.zeroExport;
+  const solarBattery = Math.min(surplus, chargeLimit);
   // Zero export (and any island) trims production instead of sending the rest anywhere.
-  const exported = zeroExport || !canExport ? 0 : Math.min(surplus - solarBattery, inverter - solarHouse);
+  const exported = canExport ? Math.min(surplus - solarBattery, inverter - solarHouse) : 0;
   const deficit = load - solarHouse;
   const batteryHouse = Math.max(0, Math.min(batteryLimit, deficit, inverter - solarHouse - exported));
-  return { production: solarHouse + solarBattery + exported, solarHouse, solarBattery, exported, batteryHouse, gridHouse: canExport ? deficit - batteryHouse : 0 };
+  const gridHouse = o.gridConnected && o.gridImport ? deficit - batteryHouse : 0;
+  return { production: solarHouse + solarBattery + exported, solarHouse, solarBattery, exported, batteryHouse, gridHouse };
 }
 
-function solveNight(load: number, batteryLimit: number, canUseGrid: boolean, inverter: number): Flows {
+function solveNight(load: number, batteryLimit: number, gridImport: boolean, inverter: number): Flows {
   const batteryHouse = Math.min(batteryLimit, load, inverter);
-  return { production: 0, solarHouse: 0, solarBattery: 0, exported: 0, batteryHouse, gridHouse: canUseGrid ? load - batteryHouse : 0 };
+  return { production: 0, solarHouse: 0, solarBattery: 0, exported: 0, batteryHouse, gridHouse: gridImport ? load - batteryHouse : 0 };
 }
 
 const OFF: Omit<FlowLine, 'color'> = { active: false, speed: 's3', thin: false, reverse: false };
@@ -92,7 +97,7 @@ function describeFlows(prefix: string, f: Flows, trimmedForZeroExport: boolean):
   let text = f.solarHouse > 0
     ? `sus paneles alimentan la casa${helpers.length ? `; ${join(helpers)} ${verb('completan', 'completa')} la diferencia` : ''}`
     : helpers.length ? `${join(helpers)} ${verb('alimentan', 'alimenta')} la casa` : 'la casa se queda sin energía';
-  if (f.solarBattery > 0) text += f.exported > 0 ? ', el excedente carga la batería y lo que ya no cabe se inyecta a la red' : ' y el excedente carga la batería';
+  if (f.solarBattery > 0) text += f.exported > 0 ? ', el excedente carga la batería y una parte se inyecta a la red' : ' y el excedente carga la batería';
   else if (f.exported > 0) text += ' y el excedente se inyecta a la red';
   if (trimmedForZeroExport) text += '; con inyección cero el sistema ajusta su producción y no inyecta a la red';
   return `${prefix}${text}.`;
@@ -138,10 +143,10 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
 
   const make = (mode: EnergyFlowMode, f: Flows, o: {
     label: string; title: string; description: string; note?: string; pill: ModeScenario['pill'];
-    night: boolean; gridConnected: boolean; inverterState: ModeScenario['inverterState'];
+    night: boolean; gridConnected: boolean; inverterState: ModeScenario['inverterState']; batteryFull?: boolean;
   }): ModeScenario => {
     const house = f.solarHouse + f.batteryHouse + f.gridHouse;
-    const batteryState: BatteryState | undefined = !hybrid ? undefined
+    const batteryState: BatteryState | undefined = !hybrid ? undefined : o.batteryFull && f.batteryHouse <= 0 ? 'full'
       : f.batteryHouse > 0 ? 'discharging' : f.solarBattery > 0 ? 'charging' : 'idle';
     const gridState: GridState = !o.gridConnected ? 'disconnected'
       : f.exported > 0 ? 'export' : f.gridHouse > 0 ? 'import' : 'idle';
@@ -154,8 +159,8 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
     };
   };
 
-  const day = solveDay(load.day, potential, batteryLimit, isZeroExport, true, inverter);
-  const night = solveNight(load.night, batteryLimit, true, inverter);
+  const day = solveDay(load.day, potential, batteryLimit, inverter, { zeroExport: isZeroExport, gridConnected: true, gridImport: !hybrid });
+  const night = solveNight(load.night, batteryLimit, !hybrid, inverter);
   const dayPill = (f: Flows): ModeScenario['pill'] => ({
     text: f.solarBattery > 0 ? 'Cargando batería' : f.batteryHouse > 0 ? 'Batería apoyando' : isZeroExport ? 'Inyección cero' : 'En operación',
     tone: 'green',
@@ -182,7 +187,9 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
     ];
   }
 
-  const island = solveDay(load.day, potential, batteryLimit, true, false, inverter);
+  // A full battery takes no charge (the surplus covers the house and goes to the grid unless zero export), but it can still discharge.
+  const full = solveDay(load.day, potential, batteryLimit, inverter, { zeroExport: isZeroExport, gridConnected: true, gridImport: false }, 0);
+  const island = solveDay(load.day, potential, batteryLimit, inverter, { zeroExport: true, gridConnected: false, gridImport: false });
   const islandNight = solveNight(load.night, batteryLimit, false, inverter);
   const capped = (f: Flows, wanted: number) => (wanted - (f.solarHouse + f.batteryHouse) > 0.05
     ? ' La potencia disponible es limitada, por lo que conviene priorizar los equipos esenciales.' : '');
@@ -191,6 +198,11 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
       label: 'De día', title: 'De día', night: false, gridConnected: true, inverterState: 'on',
       description: describeFlows('De día, ', day, isZeroExport && potential - day.production > 0.05),
       pill: dayPill(day),
+    }),
+    make('batteryFull', full, {
+      label: 'Batería llena', title: 'Batería llena', night: false, gridConnected: true, inverterState: 'on', batteryFull: true,
+      description: describeFlows('Cuando la batería está llena, ', full, isZeroExport && potential - full.production > 0.05),
+      pill: { text: isZeroExport ? 'Inyección cero' : 'Batería llena', tone: 'green' },
     }),
     make('night', night, {
       label: 'De noche', title: 'De noche', night: true, gridConnected: true, inverterState: 'on',

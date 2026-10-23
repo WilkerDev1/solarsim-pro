@@ -32,8 +32,8 @@ function describeNodes(s: ModeScenario): NodeInfo[] {
   }];
   if (s.batteryState) {
     nodes.push({
-      key: 'battery', icon: 'battery', pal: PALETTE.battery, muted: s.batteryState === 'idle', value: kw(s.batteryKW),
-      label: `Batería · ${s.batteryState === 'charging' ? 'cargando' : s.batteryState === 'discharging' ? 'descargando' : 'en reposo'}`,
+      key: 'battery', icon: 'battery', pal: PALETTE.battery, muted: s.batteryState === 'idle', value: s.batteryState === 'full' ? 'Llena' : kw(s.batteryKW),
+      label: `Batería · ${s.batteryState === 'charging' ? 'cargando' : s.batteryState === 'discharging' ? 'descargando' : s.batteryState === 'full' ? 'cargada' : 'en reposo'}`,
     });
   }
   const gridLabel = s.gridState === 'export' ? 'Excedente a la red'
