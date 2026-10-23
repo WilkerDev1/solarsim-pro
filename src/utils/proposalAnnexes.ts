@@ -76,7 +76,7 @@ export function applyAnnexPlan(
   state: AnnexState,
   plan: PlannedDatasheetAnnex[],
   nowIso: string,
-  pendingItemIds: ReadonlySet<string> = new Set(),
+  pendingItemIds: ReadonlySet<string>,
 ): { attachedPdfs: AttachedPDFDocument[]; changed: boolean } {
   const current = state.attachedPdfs ?? [];
   const dismissed = new Set(state.dismissedDatasheetKeys ?? []);

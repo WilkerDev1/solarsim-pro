@@ -43,7 +43,7 @@ assert.deepEqual(planDatasheetAnnexes(p, catalog).map((annex) => annex.key), ['s
 const manual: AttachedPDFDocument = { id: 'att-manual', fileName: 'Plano.pdf', fileSize: 10, pageCount: 2, title: 'Plano', uploadedAt: NOW, enabled: true, addToTableOfContents: true };
 const base = project();
 base.customization!.attachedPdfs = [manual];
-const first = applyAnnexPlan(base.customization!, planDatasheetAnnexes(base, catalog), NOW);
+const first = applyAnnexPlan(base.customization!, planDatasheetAnnexes(base, catalog), NOW, new Set());
 assert.equal(first.changed, true);
 assert.deepEqual(first.attachedPdfs.map((att) => att.id), ['att-manual', catalogAnnexId('sheet-family'), catalogAnnexId('sheet-inverter')]);
 const auto = first.attachedPdfs[1];
@@ -56,26 +56,26 @@ assert.equal(catalogAnnexId('sheet-family'), catalogAnnexId('sheet-family'), 'De
 
 // Idempotent: a second pass changes nothing (no write, no sync churn).
 base.customization!.attachedPdfs = first.attachedPdfs;
-const again = applyAnnexPlan(base.customization!, planDatasheetAnnexes(base, catalog), NOW);
+const again = applyAnnexPlan(base.customization!, planDatasheetAnnexes(base, catalog), NOW, new Set());
 assert.equal(again.changed, false);
 assert.equal(again.attachedPdfs, base.customization!.attachedPdfs);
 
 // User edits to an automatic annex (title, enabled, order, index) survive later passes.
 const edited = first.attachedPdfs.map((att) => (att.id === catalogAnnexId('sheet-inverter') ? { ...att, title: 'Inversor — hoja oficial', enabled: false, addToTableOfContents: true } : att)).reverse();
 base.customization!.attachedPdfs = edited;
-assert.equal(applyAnnexPlan(base.customization!, planDatasheetAnnexes(base, catalog), NOW).changed, false);
+assert.equal(applyAnnexPlan(base.customization!, planDatasheetAnnexes(base, catalog), NOW, new Set()).changed, false);
 
 // 3. Removed equipment drops its automatic annex; manual annexes stay even if they came from the catalog.
 const legacyManual: AttachedPDFDocument = { ...manual, id: 'att-legacy', sourceDatasheetKey: 'sheet-inverter', title: 'Ficha adjuntada a mano' };
 base.customization!.attachedPdfs = [...first.attachedPdfs, legacyManual];
 base.specs.inverters = [{ id: 'g3', catalogItemId: 'inv', brandModel: 'QA Inversor 8K', powerKW: 8, count: 0 }];
-const removed = applyAnnexPlan(base.customization!, planDatasheetAnnexes(base, catalog), NOW);
+const removed = applyAnnexPlan(base.customization!, planDatasheetAnnexes(base, catalog), NOW, new Set());
 assert.deepEqual(removed.attachedPdfs.map((att) => att.id), ['att-manual', catalogAnnexId('sheet-family'), 'att-legacy']);
 
 // A manual annex with the same source key prevents a duplicate automatic one.
 base.specs.inverters = [{ id: 'g3', catalogItemId: 'inv', brandModel: 'QA Inversor 8K', powerKW: 8, count: 1 }];
 base.customization!.attachedPdfs = [manual, legacyManual];
-const deduped = applyAnnexPlan(base.customization!, planDatasheetAnnexes(base, catalog), NOW);
+const deduped = applyAnnexPlan(base.customization!, planDatasheetAnnexes(base, catalog), NOW, new Set());
 assert.deepEqual(deduped.attachedPdfs.map((att) => att.id), ['att-manual', 'att-legacy', catalogAnnexId('sheet-family')]);
 
 // 3b. Catalog still loading: equipment in use that is not in the catalog yet keeps its annex (and the user's edits).
@@ -97,7 +97,7 @@ assert.deepEqual(deduped.attachedPdfs.map((att) => att.id), ['att-manual', 'att-
   assert.equal(during.changed, false, 'Nothing is deleted or rewritten while the record is missing');
   assert.equal(during.attachedPdfs, before.attachedPdfs);
   // Without the pending set the annex would be dropped (the old behaviour this guards against).
-  assert.equal(applyAnnexPlan(before, planDatasheetAnnexes(loading, partial), NOW).changed, true);
+  assert.equal(applyAnnexPlan(before, planDatasheetAnnexes(loading, partial), NOW, new Set()).changed, true);
   // The record arrives: the same annex objects survive, nothing is recreated.
   assert.equal(applyAnnexPlan(before, planDatasheetAnnexes(loading, catalog), NOW, unresolvedEquipmentIds(loading, catalog)).changed, false);
   // The proposal stops using the equipment (count 0 or removed group): the annex is removed even if the catalog is still partial.
@@ -133,10 +133,10 @@ base.customization!.attachedPdfs = first.attachedPdfs;
 const dismissed = dismissAnnex(base.customization!, catalogAnnexId('sheet-family'));
 assert.deepEqual(dismissed.dismissedDatasheetKeys, ['sheet-family']);
 assert.deepEqual(dismissed.attachedPdfs.map((att) => att.id), ['att-manual', catalogAnnexId('sheet-inverter')]);
-const afterDismiss = applyAnnexPlan({ ...base.customization!, ...dismissed }, planDatasheetAnnexes(base, catalog), NOW);
+const afterDismiss = applyAnnexPlan({ ...base.customization!, ...dismissed }, planDatasheetAnnexes(base, catalog), NOW, new Set());
 assert.equal(afterDismiss.changed, false, 'A dismissed datasheet is not re-added');
 assert.deepEqual(dismissAnnex(base.customization!, 'att-manual'), { attachedPdfs: [first.attachedPdfs[1], first.attachedPdfs[2]] }, 'Removing a manual annex does not record a dismissal');
-const restored = applyAnnexPlan({ ...base.customization!, ...dismissed, ...restoreDismissedAnnexes() }, planDatasheetAnnexes(base, catalog), NOW);
+const restored = applyAnnexPlan({ ...base.customization!, ...dismissed, ...restoreDismissedAnnexes() }, planDatasheetAnnexes(base, catalog), NOW, new Set());
 assert.deepEqual(restored.attachedPdfs.map((att) => att.id), ['att-manual', catalogAnnexId('sheet-inverter'), catalogAnnexId('sheet-family')]);
 
 // 5. Attachment bytes: IndexedDB → preview cache → server, saved back for the next export.
