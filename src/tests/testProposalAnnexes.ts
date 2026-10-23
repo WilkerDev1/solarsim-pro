@@ -87,12 +87,16 @@ assert.deepEqual(deduped.attachedPdfs.map((att) => att.id), ['att-manual', 'att-
   const pendingIds = unresolvedEquipmentIds(loading, partial);
   assert.equal(pendingIds.has('inv'), true);
   assert.equal(unresolvedEquipmentIds(loading, catalog).size, 0, 'A fully resolved catalog protects nothing');
-  // Shared datasheet: the annex's representative variant (pa) is removed while the other (pb) is still unresolved.
+  // Shared datasheet (accepted trade-off): the annex's representative variant (pa) is detached while the other (pb) is
+  // unresolved. The shared annex may disappear for a moment (pending only covers the ids groups point to) and is
+  // recreated once pb resolves; a permanent stale annex was the worse outcome.
   const shared = structuredClone(loading);
   shared.specs.panels = [{ id: 'g2', catalogItemId: 'pb', brandModel: 'QA 620 W', powerW: 620, count: 4 }];
   const noPb = catalog.filter((item) => item.id !== 'pb');
-  const sharedKept = applyAnnexPlan(before, planDatasheetAnnexes(shared, noPb), NOW, unresolvedEquipmentIds(shared, noPb));
-  assert.equal(sharedKept.attachedPdfs.some((att) => att.id === catalogAnnexId('sheet-family')), true, 'Shared annex survives while a contributing variant is unresolved');
+  const sharedGap = applyAnnexPlan(before, planDatasheetAnnexes(shared, noPb), NOW, unresolvedEquipmentIds(shared, noPb));
+  assert.equal(sharedGap.attachedPdfs.some((att) => att.id === catalogAnnexId('sheet-family')), false, 'Temporary gap: the shared annex is not protected by a different item');
+  const sharedBack = applyAnnexPlan(sharedGap, planDatasheetAnnexes(shared, catalog), NOW, unresolvedEquipmentIds(shared, catalog));
+  assert.equal(sharedBack.attachedPdfs.some((att) => att.id === catalogAnnexId('sheet-family')), true, 'Recreated when pb resolves');
   const during = applyAnnexPlan(before, planDatasheetAnnexes(loading, partial), NOW, pendingIds);
   assert.equal(during.changed, false, 'Nothing is deleted or rewritten while the record is missing');
   assert.equal(during.attachedPdfs, before.attachedPdfs);
@@ -106,15 +110,18 @@ assert.deepEqual(deduped.attachedPdfs.map((att) => att.id), ['att-manual', 'att-
     const result = applyAnnexPlan(before, planDatasheetAnnexes(manual, catalog), NOW, unresolvedEquipmentIds(manual, catalog));
     assert.equal(result.attachedPdfs.some((att) => att.id === catalogAnnexId('sheet-inverter')), false, 'old model datasheet leaves the export');
   }
-  // One model detached by hand while another group is still unresolved: nothing is removed during the partial sync.
+  // One model detached by hand while panels are unresolved in a loaded (partial) catalog: only the panels' own annexes
+  // are protected; the detached inverter's annex leaves (this case used to keep it until the sync finished).
   {
     const mixed = structuredClone(loading);
     mixed.specs.inverters = [{ id: 'inv', brandModel: 'Inversor propio', powerKW: 8, count: 1, manualModel: true }];
     const noPanels = catalog.filter((item) => item.type !== 'panel'); // the panel records have not arrived
     const pending = unresolvedEquipmentIds(mixed, noPanels);
-    assert.equal(pending.has('inv'), true, 'the detached/shared annex stays while the catalog is partially synced');
+    assert.equal(pending.has('inv'), false, 'the detached item is not protected by unrelated unresolved groups');
     assert.equal(pending.has('pa'), true);
-    assert.equal(applyAnnexPlan(before, planDatasheetAnnexes(mixed, noPanels), NOW, pending).changed, false);
+    const partialPlan = applyAnnexPlan(before, planDatasheetAnnexes(mixed, noPanels), NOW, pending);
+    assert.equal(partialPlan.attachedPdfs.some((att) => att.id === catalogAnnexId('sheet-family')), true, 'the unresolved panel annex stays');
+    assert.equal(partialPlan.attachedPdfs.some((att) => att.id === catalogAnnexId('sheet-inverter')), false);
     // The sync finishes: the group is still detached, no group uses the item and the plan removes its annex.
     const done = applyAnnexPlan(before, planDatasheetAnnexes(mixed, catalog), NOW, unresolvedEquipmentIds(mixed, catalog));
     assert.equal(done.attachedPdfs.some((att) => att.id === catalogAnnexId('sheet-inverter')), false);
@@ -149,6 +156,49 @@ assert.deepEqual(deduped.attachedPdfs.map((att) => att.id), ['att-manual', 'att-
   gone.specs.panelBrandModel = undefined;
   gone.specs.panelCount = 0;
   assert.deepEqual(applyAnnexPlan(before, planDatasheetAnnexes(gone, none), NOW, unresolvedEquipmentIds(gone, none)).attachedPdfs.map((att) => att.id), ['att-manual']);
+}
+
+// 3d. Scope of the pending set with a LOADED catalog: only what unresolved groups point to is protected.
+{
+  const withAnnexes = () => {
+    const proposal = project();
+    proposal.customization!.attachedPdfs = applyAnnexPlan(proposal.customization!, planDatasheetAnnexes(proposal, catalog), NOW, new Set()).attachedPdfs;
+    return proposal;
+  };
+  const ids = (proposal: ProjectSimulation, items: SolarEquipmentItem[]) =>
+    applyAnnexPlan(proposal.customization!, planDatasheetAnnexes(proposal, items), NOW, unresolvedEquipmentIds(proposal, items)).attachedPdfs.map((att) => att.id);
+  // (a) An unmatched manual inverter (no catalogItemId, no manualModel) stays while a panel is replaced: the old panel sheet leaves.
+  {
+    const proposal = withAnnexes();
+    proposal.specs.panels = [{ id: 'g1', catalogItemId: 'pa', brandModel: 'QA 600 W', powerW: 600, count: 0 }, { id: 'g5', catalogItemId: 'photo2', brandModel: 'QA Nuevo', powerW: 700, count: 4 }];
+    proposal.specs.inverters = [{ id: 'g3', brandModel: 'Inversor sin ficha', powerKW: 8, count: 1 }];
+    const withNew = [...catalog, entry('photo2', 'panel', 'QA Nuevo', { datasheetAssetId: 'sheet-new' })];
+    assert.equal(unresolvedEquipmentIds(proposal, withNew).size, 0, 'a group without catalog reference protects nothing once the catalog is loaded');
+    assert.deepEqual(ids(proposal, withNew), [catalogAnnexId('sheet-new')], 'only the new panel sheet remains; old panel and inverter sheets are removed');
+  }
+  // (b) A group pointing to an id missing from the loaded catalog keeps its own annex; unused ones are removed.
+  {
+    const proposal = withAnnexes();
+    proposal.specs.panels = [{ id: 'g1', catalogItemId: 'pa', brandModel: 'QA 600 W', powerW: 600, count: 10 }, { id: 'g2', catalogItemId: 'pb', brandModel: 'QA 620 W', powerW: 400, count: 0 }];
+    proposal.specs.inverters = [{ id: 'g3', catalogItemId: 'inv', brandModel: 'QA Inversor 8K', powerKW: 8, count: 0 }];
+    const noPa = catalog.filter((item) => item.id !== 'pa');
+    assert.deepEqual([...unresolvedEquipmentIds(proposal, noPa)], ['pa']);
+    assert.deepEqual(ids(proposal, noPa), [catalogAnnexId('sheet-family')], 'the annex of the deleted/unsynced item stays; the unused inverter annex is removed');
+  }
+  // (c) Catalog not loaded: everything is kept, including annexes nobody points to.
+  {
+    const proposal = withAnnexes();
+    proposal.specs.inverters = [{ id: 'g3', brandModel: 'Inversor sin ficha', powerKW: 8, count: 1 }];
+    assert.deepEqual([...unresolvedEquipmentIds(proposal, [])].sort(), ['inv', 'pa'].sort());
+    assert.deepEqual(ids(proposal, []), proposal.customization!.attachedPdfs!.map((att) => att.id));
+  }
+  // (d) manualModel never protects.
+  {
+    const proposal = withAnnexes();
+    proposal.specs.inverters = [{ id: 'inv', catalogItemId: 'inv', brandModel: 'Inversor propio', powerKW: 8, count: 1, manualModel: true }];
+    assert.equal(unresolvedEquipmentIds(proposal, catalog).size, 0);
+    assert.equal(ids(proposal, catalog).includes(catalogAnnexId('sheet-inverter')), false);
+  }
 }
 
 // 4. Dismiss and restore.

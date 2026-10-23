@@ -1,10 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { ProjectSimulation } from '../../../types';
 import { canWrite } from '../../../../shared/permissions';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { applyAnnexPlan, planDatasheetAnnexes, unresolvedEquipmentIds, workspaceCatalog } from '../../../utils/proposalAnnexes';
 import { resolveProposalAttachmentBytes } from '../../../services/proposalAttachmentResolver';
 import { PDFMergeService } from '../../../services/pdfMergeService';
+import { annexAttemptKey, annexesToCount, releaseFailedAttempt } from '../../../utils/annexPageCountAttempts';
 
 export interface ProposalAnnexSyncProps {
   project: ProjectSimulation;
@@ -25,6 +26,13 @@ export const ProposalAnnexSync: React.FC<ProposalAnnexSyncProps> = ({ project })
   const attachedPdfs = live.customization?.attachedPdfs;
   const dismissed = live.customization?.dismissedDatasheetKeys;
   const counted = useRef(new Set<string>());
+  // Bumped when connectivity returns so annexes whose bytes failed to load are tried again.
+  const [onlineTick, setOnlineTick] = useState(0);
+  useEffect(() => {
+    const onOnline = () => setOnlineTick((tick) => tick + 1);
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, []);
 
   const isTarget = () => {
     const state = useSimulationStore.getState();
@@ -44,9 +52,8 @@ export const ProposalAnnexSync: React.FC<ProposalAnnexSyncProps> = ({ project })
   // Page count and size of new automatic annexes, once their bytes reach this device.
   useEffect(() => {
     if (!allowed) return;
-    // Keyed by id and creation time: a dismissed annex that is restored later is counted again.
-    const attempt = (att: { id: string; uploadedAt: string }) => `${att.id}|${att.uploadedAt}`;
-    const pending = (attachedPdfs ?? []).filter((att) => att.origin === 'catalog' && att.pageCountPending && !counted.current.has(attempt(att)));
+    const attempt = annexAttemptKey;
+    const pending = annexesToCount(attachedPdfs, counted.current);
     if (!pending.length) return;
     let cancelled = false;
     const started = new Set<string>();
@@ -57,7 +64,7 @@ export const ProposalAnnexSync: React.FC<ProposalAnnexSyncProps> = ({ project })
         counted.current.add(attempt(annex));
         const bytes = await resolveProposalAttachmentBytes(annex);
         if (cancelled) return;
-        if (!bytes) { started.delete(attempt(annex)); continue; } // not retried until remount
+        if (!bytes) { started.delete(attempt(annex)); releaseFailedAttempt(counted.current, annex); continue; } // retried on catalog/attachment change or when back online
         const pageCount = await PDFMergeService.getPdfPageCount(bytes.slice(0)).catch(() => 1);
         if (cancelled) return;
         started.delete(attempt(annex));
@@ -71,7 +78,7 @@ export const ProposalAnnexSync: React.FC<ProposalAnnexSyncProps> = ({ project })
     })();
     // A cancelled run hands its unfinished annexes to the next run, which starts right after this cleanup.
     return () => { cancelled = true; started.forEach((key) => counted.current.delete(key)); };
-  }, [allowed, live.id, attachedPdfs]);
+  }, [allowed, live.id, attachedPdfs, catalog, onlineTick]);
 
   return null;
 };
