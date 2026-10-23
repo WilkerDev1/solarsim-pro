@@ -105,6 +105,25 @@ try {
   assert.equal((await store.getState().syncClientsWithServer()).success, true);
   assert.deepEqual(calls, ['GET ']);
 
+  // A recovered receipt is installed when it is acknowledged: a later PUT that throws in the same pass cannot orphan it.
+  const recovered = store.getState().createClientRecord({ name: 'Recibo recuperado' });
+  const crashing = store.getState().createClientRecord({ name: 'Falla después' });
+  assert.ok(recovered.ok && crashing.ok);
+  remote.set(recovered.client.id, record(recovered.client.id, 'Recibo recuperado', 1));
+  failPutFor = crashing.client.id;
+  assert.equal((await store.getState().syncClientsWithServer()).success, false);
+  failPutFor = null;
+  const installed = store.getState().clients.find((c) => c.id === recovered.client.id)!;
+  assert.equal(installed.version, 1, 'The recovered client carries the server version');
+  assert.equal(installed.baseVersion, 1);
+  assert.equal(installed.updatedAt, '2026-10-01T00:00:00.000Z');
+  assert.equal(store.getState().clientChanges[recovered.client.id], undefined);
+  store.getState().updateClientRecord(recovered.client.id, { phone: '809-555-2222' });
+  assert.equal(store.getState().clientChanges[recovered.client.id].baseVersion, 1);
+  assert.equal((await store.getState().syncClientsWithServer()).success, true, 'No CAS conflict against its own creation');
+  assert.equal(remote.get(recovered.client.id)!.version, 2);
+  assert.equal(remote.get(recovered.client.id)!.phone, '809-555-2222');
+
   // Concurrent edits conflict through CAS; the user chooses which version survives.
   remote.set('client-a', record('client-a', 'Cliente A (otro equipo)', 2));
   store.getState().updateClientRecord('client-a', { name: 'Cliente A (local)' });
