@@ -98,11 +98,26 @@ assert.equal(hHeavy.houseKW, 3.7);
 // Hybrid, outage: island mode. The grid never takes part and the load is capped by what the system can deliver.
 // Backup capability is not recorded in the proposal: island modes state it as a condition.
 for (const mode of ['outageDay', 'outageNight'] as const) assert.ok(/respaldo/i.test(pick(hybridBase, mode).note ?? ''), `${mode} is conditional on backup output`);
+// Copy is derived from the modeled flows, so undersized or panel-less systems never claim flows that do not exist.
+const undersized: EnergyFlowScenarioInput = { ...base, systemCapacityKWp: 1, annualConsumptionKWh: 30000 };
+const smallDay = pick(undersized, 'day');
+assert.ok(smallDay.gridState === 'import' && !/inyecta/.test(smallDay.description) && /la red completa/.test(smallDay.description), smallDay.description);
+const smallHybridDay = pick({ ...undersized, hybrid: true, totalBESSKWh: 10 }, 'day');
+assert.ok(smallHybridDay.batteryState === 'discharging' && !/carga la batería|inyecta/.test(smallHybridDay.description) && /batería/.test(smallHybridDay.description), smallHybridDay.description);
+const noPanels = pick({ ...hybridBase, systemCapacityKWp: 0 }, 'outageDay');
+assert.ok(!/paneles/.test(noPanels.description) && /la batería alimenta la casa/.test(noPanels.description), noPanels.description);
+for (const input of [base, hybridBase, { ...base, isZeroExport: true }, { ...hybridBase, isZeroExport: true }]) {
+  for (const sc of energyFlowScenarios(input)) {
+    if (/inyecta a la red/.test(sc.description) && !/no inyecta/.test(sc.description)) assert.equal(sc.gridState, 'export', `${sc.mode}: ${sc.description}`);
+    if (/carga la batería|cargan la batería/.test(sc.description)) assert.equal(sc.batteryState, 'charging', `${sc.mode}: ${sc.description}`);
+  }
+}
+
 // Outage copy follows the modeled battery direction: a small array cannot be "charging" the battery.
 const weakSun = pick({ ...hybridBase, systemCapacityKWp: 1 }, 'outageDay');
 assert.equal(weakSun.batteryState, 'discharging');
-assert.ok(!/cargan la batería/.test(weakSun.description) && /batería/.test(weakSun.description), weakSun.description);
-assert.ok(/cargan la batería/.test(pick(hybridBase, 'outageDay').description));
+assert.ok(!/carga la batería/.test(weakSun.description) && /batería/.test(weakSun.description), weakSun.description);
+assert.ok(/carga la batería/.test(pick(hybridBase, 'outageDay').description));
 const oDay = pick(hybridBase, 'outageDay');
 assert.equal(oDay.gridState, 'disconnected');
 assert.equal(oDay.lines.grid.active, false);

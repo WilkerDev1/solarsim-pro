@@ -80,6 +80,21 @@ function solveNight(load: number, batteryLimit: number, canUseGrid: boolean): Fl
 
 const OFF: Omit<FlowLine, 'color'> = { active: false, speed: 's3', thin: false, reverse: false };
 
+const join = (items: string[]) => (items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} y ${items[items.length - 1]}`);
+
+/** Spanish copy built from the modeled flows, so the text never claims a flow the diagram does not draw. */
+function describeFlows(prefix: string, f: Flows, trimmedForZeroExport: boolean): string {
+  const helpers = [f.batteryHouse > 0 ? 'la batería' : '', f.gridHouse > 0 ? 'la red' : ''].filter(Boolean);
+  const verb = (plural: string, singular: string) => (helpers.length > 1 ? plural : singular);
+  let text = f.solarHouse > 0
+    ? `sus paneles alimentan la casa${helpers.length ? `; ${join(helpers)} ${verb('completan', 'completa')} la diferencia` : ''}`
+    : helpers.length ? `${join(helpers)} ${verb('alimentan', 'alimenta')} la casa` : 'la casa se queda sin energía';
+  if (f.solarBattery > 0) text += f.exported > 0 ? ', el excedente carga la batería y lo que ya no cabe se inyecta a la red' : ' y el excedente carga la batería';
+  else if (f.exported > 0) text += ' y el excedente se inyecta a la red';
+  if (trimmedForZeroExport) text += '; con inyección cero el sistema ajusta su producción y no inyecta a la red';
+  return `${prefix}${text}.`;
+}
+
 function buildLines(f: Flows, hybrid: boolean, gridConnected: boolean): ModeScenario['lines'] {
   const houseServed = f.solarHouse + f.batteryHouse + f.gridHouse;
   const values = {
@@ -146,10 +161,7 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
     return [
       make('day', day, {
         label: 'De día', title: 'De día', night: false, gridConnected: true, inverterState: 'on',
-        description: (isZeroExport
-          ? 'De día, sus paneles alimentan la casa; con inyección cero el sistema ajusta su producción al consumo y no envía excedente a la red.'
-          : 'De día, sus paneles alimentan la casa y el excedente se inyecta a la red.')
-          + (day.gridHouse > 0 ? ' Si la casa consume más de lo que producen los paneles, la red completa la diferencia.' : ''),
+        description: describeFlows('De día, ', day, isZeroExport && potential - day.production > 0.05),
         pill: { text: isZeroExport ? 'Inyección cero' : 'En operación', tone: 'green' },
       }),
       make('night', night, {
@@ -173,30 +185,24 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
   return [
     make('day', day, {
       label: 'De día', title: 'De día', night: false, gridConnected: true, inverterState: 'on',
-      description: 'De día, sus paneles alimentan la casa, el excedente carga la batería'
-        + (isZeroExport ? ' y el sistema ajusta la producción para no inyectar a la red.' : ' y solo lo que ya no cabe se inyecta a la red.')
-        + (day.batteryHouse > 0 ? ' Si la casa consume más de lo que producen los paneles, la batería aporta la diferencia.' : ''),
+      description: describeFlows('De día, ', day, isZeroExport && potential - day.production > 0.05),
       pill: dayPill(day),
     }),
     make('night', night, {
       label: 'De noche', title: 'De noche', night: true, gridConnected: true, inverterState: 'on',
-      description: 'De noche, la batería alimenta la casa a través del inversor y la red solo aporta lo que la batería no alcance a cubrir.',
+      description: describeFlows('De noche, sin producción solar, ', night, false),
       pill: night.batteryHouse > 0 ? { text: 'Batería descargando', tone: 'indigo' } : { text: 'Sin producción solar', tone: 'indigo' },
     }),
     make('outageDay', island, {
       label: 'Apagón de día', title: 'Apagón de día', night: false, gridConnected: false, inverterState: 'on',
       note: BACKUP_NOTE,
-      description: 'Sin red, el sistema pasa a modo isla: '
-        + (island.solarBattery > 0 ? 'los paneles alimentan la casa y cargan la batería'
-          : island.batteryHouse > 0 ? 'los paneles y la batería alimentan juntos la casa'
-          : 'los paneles alimentan la casa')
-        + ', y la casa sigue con energía.' + capped(island, load.day),
+      description: describeFlows('Sin red, el sistema pasa a modo isla: ', island, false) + capped(island, load.day),
       pill: { text: 'Modo isla', tone: 'amber' },
     }),
     make('outageNight', islandNight, {
       label: 'Apagón de noche', title: 'Apagón de noche', night: true, gridConnected: false, inverterState: 'on',
       note: BACKUP_NOTE,
-      description: 'Sin red y sin sol, la batería alimenta la casa en modo isla mientras tenga carga.' + capped(islandNight, load.night),
+      description: describeFlows('Sin red y sin sol, en modo isla ', islandNight, false) + capped(islandNight, load.night),
       pill: { text: 'Modo isla', tone: 'amber' },
     }),
   ];
