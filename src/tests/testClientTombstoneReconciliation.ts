@@ -135,6 +135,28 @@ try {
   assert.ok(casCopy && casCopy.id !== 'client-cas' && casCopy.phone === '809-555-4321', 'Keep local recreates the client with the edits');
   assert.equal(store.getState().clientChanges[casCopy.id].baseVersion, 0);
 
+  // 4. A teammate's retained pending edit is kept as a deletion conflict for its owner; the other account neither pushes nor resolves it.
+  const other = { ...user, id: 'teammate', name: 'Otro', email: 'otro@example.invalid' };
+  remote = new Map();
+  deletedIds = ['client-foreign'];
+  reset([], [record('client-foreign', 'Cliente ajeno', 1)]);
+  assert.ok(store.getState().updateClientRecord('client-foreign', { phone: '809-555-7777' }).ok);
+  assert.equal(store.getState().clientChanges['client-foreign'].ownerId, user.id);
+  store.setState({ syncSettings: { ...store.getState().syncSettings, currentUser: other } });
+  puts.length = 0;
+  await store.getState().syncClientsWithServer();
+  assert.deepEqual(puts, [], "Another account never uploads the owner's change");
+  assert.ok(store.getState().clients.some((c) => c.id === 'client-foreign' && c.phone === '809-555-7777'), "The owner's edits are not lost");
+  assert.equal(store.getState().clientChanges['client-foreign']?.serverDeleted, true, 'The tombstone is recorded for the retained change');
+  store.getState().resolveClientConflict('client-foreign', 'accept_server');
+  assert.ok(store.getState().clients.some((c) => c.id === 'client-foreign'), 'Another account cannot resolve the conflict');
+  await store.getState().syncClientsWithServer();
+  assert.ok(store.getState().clientChanges['client-foreign']?.serverDeleted, 'The conflict survives later passes');
+  store.setState({ syncSettings: { ...store.getState().syncSettings, currentUser: user } });
+  await store.getState().syncClientsWithServer();
+  assert.equal(store.getState().clientChanges['client-foreign'].serverDeleted, true, 'The owner sees the deletion conflict');
+  assert.deepEqual(puts, [], 'The tombstoned id is never pushed');
+
   console.log('Client tombstone reconciliation OK');
 } finally {
   ClientSyncService.setTransportFactory(null);
