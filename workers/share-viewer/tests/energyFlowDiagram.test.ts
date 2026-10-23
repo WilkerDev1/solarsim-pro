@@ -234,6 +234,7 @@ const modes = (html: string, expected: string[]) => {
 modes(onGridHtml, ['day', 'night', 'outage']);
 modes(hybridHtml, ['day', 'batteryFull', 'night', 'outageDay', 'outageNight']);
 assert.ok(/Batería llena/.test(hybridHtml));
+assert.ok(hybridHtml.includes('Batería · cargada') && !/Batería · en reposo[^<]*<\/span>\s*<span[^>]*>Llena/.test(hybridHtml), 'A full battery is labelled as charged, not idle');
 // Desktop hides the text legend: the labelled SVG's accessible name carries each node's label and kW value.
 const fullAria = hybridHtml.match(/data-energy-flow-svg="full"[^>]*aria-label="([^"]*)"/)?.[1] ?? hybridHtml.match(/aria-label="([^"]*)"[^>]*data-energy-flow-svg="full"/)?.[1] ?? '';
 assert.ok(/Producción solar ≈[0-9.]+ kW/.test(fullAria) && /Consumo de la casa/.test(fullAria), fullAria);
