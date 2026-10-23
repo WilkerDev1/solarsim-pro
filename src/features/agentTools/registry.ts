@@ -203,7 +203,7 @@ export async function executeAgentTool(call: AgentToolCall, ctx: AgentToolContex
   if (ctx.signal?.aborted) return { status: 'error', code: 'cancelled', message: 'Solicitud cancelada.' };
   if (definition.name === 'get_agent_action_status') return actionStatus(args, ctx);
   const native = NATIVE_HANDLERS[definition.name];
-  if (native) return executeNative(native, definition, args, ctx, policy);
+  if (native) return executeNative(native, definition, args, ctx);
   let result: AssistantToolResult;
   try {
     result = executeAssistantTool({ name: call.name, args: decodeArgs(args) }, ctx.owner, { requireAssistantEnabled: ctx.source === 'app-assistant' });
@@ -234,7 +234,7 @@ export async function executeAgentTool(call: AgentToolCall, ctx: AgentToolContex
   return { status: 'pending_confirmation', actionId: action.id, summary: action.title, cards: [...(cards ?? []), pendingCard(action.id, action.title, changes)] };
 }
 
-async function executeNative(handler: NativeHandler, definition: AgentToolDefinition, args: Record<string, unknown>, ctx: AgentToolContext, policy: AgentSourcePolicy): Promise<AgentToolOutcome> {
+async function executeNative(handler: NativeHandler, definition: AgentToolDefinition, args: Record<string, unknown>, ctx: AgentToolContext): Promise<AgentToolOutcome> {
   if (ctx.owner !== assistantOwner()) return { status: 'error', code: 'stale_owner', message: 'El espacio o la sesión cambió.' };
   let result;
   try {
@@ -249,6 +249,12 @@ async function executeNative(handler: NativeHandler, definition: AgentToolDefini
     return { status: 'error', code: 'result_too_large', message: 'Resultado demasiado grande. Usa filtros más concretos.' };
   if (!result.plan) return { status: 'ok', data: result.data, cards: result.cards };
   const kind = definition.kind === 'guarded' ? 'guarded' : 'draft';
+  // The policy or the account role may have changed while the handler awaited: decide with today's permissions,
+  // never with the ones captured before the await.
+  const policy: AgentSourcePolicy = store().agentPolicy[agentPolicyKey(ctx.source)];
+  if (policy[kind] === 'deny')
+    return { status: 'error', code: 'denied', message: 'Los permisos de agentes de este dispositivo no permiten esta acción.' };
+  if (!canWriteNow()) return { status: 'error', code: 'tool_failed', message: 'Tu cuenta solo puede consultar.' };
   const meta = { source: ctx.source, clientLabel: ctx.clientLabel, tool: definition.name, kind } as const;
   // In the proposal assistant the user already reviewed and clicked «Aplicar»: that click is the confirmation.
   const confirmedInUi = ctx.source === 'proposal-assistant' && policy.draft === 'confirm';
