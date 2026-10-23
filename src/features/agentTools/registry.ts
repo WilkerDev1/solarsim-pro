@@ -5,7 +5,7 @@ import type { AgentSource, AgentToolCall, AgentToolDefinition, AgentToolOutcome 
 import type { AgentCard } from '../../../shared/agentCards';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { isWriterRole } from '../../../shared/permissions';
-import { agentPolicyKey, installAgentRuntime, type AgentActivityEntry, type AgentChange, type PendingAgentAction } from '../../store/slices/agentSlice';
+import { agentPolicyKey, installAgentRuntime, type AgentActivityEntry, type AgentSourcePolicy, type AgentChange, type PendingAgentAction } from '../../store/slices/agentSlice';
 import { editableAssistantFields } from '../assistant/validation';
 import { applyAssistantAction, assistantOwner, executeAssistantTool } from '../assistant/tools';
 import type { AgentToolContext, NativeHandler, NativePlan } from './nativeTools';
@@ -22,6 +22,11 @@ export type { AgentToolContext } from './nativeTools';
 const NATIVE_HANDLERS: Record<string, NativeHandler> = { ...PROPOSAL_TOOL_HANDLERS, ...CATALOG_TOOL_HANDLERS, ...DOCUMENT_TOOL_HANDLERS, ...ATTACHMENT_TOOL_HANDLERS, ...CLIENT_TOOL_HANDLERS };
 
 const MAX_RESULT_BYTES = 64000;
+/**
+ * Guarded tools whose effect the activity log cannot undo (the server keeps commercial reports; company templates and the
+ * directory deletion are outside the proposal). Bypass mode never skips the confirmation for them.
+ */
+export const BYPASS_EXEMPT_TOOLS: ReadonlySet<string> = new Set(['add_commercial_report', 'save_document_text_to_company_template', 'delete_client']);
 const PROJECT_SECTIONS = ['client', 'specs', 'rates', 'financials', 'monthlyConsumption', 'customization'] as const;
 const store = () => useSimulationStore.getState();
 /** Queued plans carry no card of their own: expose the pending changes so MCP Apps hosts (and the app) can render them. */
@@ -198,7 +203,7 @@ export async function executeAgentTool(call: AgentToolCall, ctx: AgentToolContex
   if (ctx.signal?.aborted) return { status: 'error', code: 'cancelled', message: 'Solicitud cancelada.' };
   if (definition.name === 'get_agent_action_status') return actionStatus(args, ctx);
   const native = NATIVE_HANDLERS[definition.name];
-  if (native) return executeNative(native, definition, args, ctx, policy.draft);
+  if (native) return executeNative(native, definition, args, ctx, policy);
   let result: AssistantToolResult;
   try {
     result = executeAssistantTool({ name: call.name, args: decodeArgs(args) }, ctx.owner, { requireAssistantEnabled: ctx.source === 'app-assistant' });
@@ -215,7 +220,8 @@ export async function executeAgentTool(call: AgentToolCall, ctx: AgentToolContex
   if (kind === 'guarded' && policy.guarded === 'deny')
     return { status: 'error', code: 'denied', message: 'Los permisos de agentes de este dispositivo no permiten cambiar precios.' };
   const meta = { source: ctx.source, clientLabel: ctx.clientLabel, tool: definition.name, kind } as const;
-  if (kind === 'draft' && policy.draft === 'allow') {
+  // Bypass (guarded = allow) only skips the human click: validations, permissions and the undoable activity entry stay.
+  if ((kind === 'draft' && policy.draft === 'allow') || (kind === 'guarded' && policy.guarded === 'allow')) {
     try {
       const activityId = applyPlan(action, meta);
       return { status: 'applied', data: { status: 'applied', edits: action.edits }, activityId, cards };
@@ -228,7 +234,7 @@ export async function executeAgentTool(call: AgentToolCall, ctx: AgentToolContex
   return { status: 'pending_confirmation', actionId: action.id, summary: action.title, cards: [...(cards ?? []), pendingCard(action.id, action.title, changes)] };
 }
 
-async function executeNative(handler: NativeHandler, definition: AgentToolDefinition, args: Record<string, unknown>, ctx: AgentToolContext, draftPolicy: string): Promise<AgentToolOutcome> {
+async function executeNative(handler: NativeHandler, definition: AgentToolDefinition, args: Record<string, unknown>, ctx: AgentToolContext, policy: AgentSourcePolicy): Promise<AgentToolOutcome> {
   if (ctx.owner !== assistantOwner()) return { status: 'error', code: 'stale_owner', message: 'El espacio o la sesión cambió.' };
   let result;
   try {
@@ -245,8 +251,9 @@ async function executeNative(handler: NativeHandler, definition: AgentToolDefini
   const kind = definition.kind === 'guarded' ? 'guarded' : 'draft';
   const meta = { source: ctx.source, clientLabel: ctx.clientLabel, tool: definition.name, kind } as const;
   // In the proposal assistant the user already reviewed and clicked «Aplicar»: that click is the confirmation.
-  const confirmedInUi = ctx.source === 'proposal-assistant' && draftPolicy === 'confirm';
-  if (kind === 'draft' && (draftPolicy === 'allow' || confirmedInUi)) {
+  const confirmedInUi = ctx.source === 'proposal-assistant' && policy.draft === 'confirm';
+  const bypassed = kind === 'guarded' && policy.guarded === 'allow' && !BYPASS_EXEMPT_TOOLS.has(definition.name);
+  if ((kind === 'draft' && (policy.draft === 'allow' || confirmedInUi)) || bypassed) {
     try {
       const { activityId, execution } = runNativePlan(result.plan, meta);
       return { status: 'applied', data: { status: 'applied', ...(execution.data as object) }, activityId, cards: execution.cards ?? result.cards };
