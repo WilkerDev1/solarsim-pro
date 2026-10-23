@@ -9,6 +9,7 @@ import {
   featureScope,
 } from '../../../shared/applicationFeatures';
 import { buildAITariffContext } from '../../utils/aiTariffContext';
+import { readEquipment, type EquipmentKind } from '../../../shared/equipment';
 import { editableAssistantFields, validateAssistantEdits } from './validation';
 import { touchesPricingEdits } from './pricingFields';
 import { AUTOMATED_PRICING } from '../../../shared/automatedProposalPolicy';
@@ -17,6 +18,12 @@ import type {
   AssistantToolCall,
   AssistantToolResult,
 } from './types';
+/** Campos escalares del asistente que equivalen a un dato de grupo; el almacén los aplica al grupo único. */
+const SCALAR_EQUIPMENT_FIELDS: Record<string, EquipmentKind> = {
+  panelPowerW: 'panel', panelCount: 'panel', panelUnitPriceUSD: 'panel',
+  inverterPowerKW: 'inverter', inverterCount: 'inverter', inverterUnitPriceUSD: 'inverter',
+  batteryCapacityKWh: 'battery', batteryCount: 'battery', batteryUnitPriceUSD: 'battery', batteryDOD: 'battery', batteryEfficiencyPct: 'battery',
+};
 export function assistantOwner() {
   const s = useSimulationStore.getState();
   return `${draftOwnerKey(s.workspaceScope, s.syncSettings, true)}|${s.sessionGeneration}`;
@@ -170,6 +177,8 @@ export function executeAssistantTool(
           province: p.client.province,
         },
         specs: p.specs,
+        // Equipos normalizados: igual para propuestas con espejo antiguo o solo con grupos.
+        equipment: readEquipment(p.specs),
         rates: p.rates,
         financials: p.financials,
         monthlyConsumption: p.monthlyConsumption,
@@ -278,18 +287,19 @@ export function executeAssistantTool(
       throw new Error(
         'Selecciona grupos explícitos o dimensionamiento automático, no ambos.'
       );
-    // Scalar shortcuts cannot silently detach/misprice a multi-model installation (con un solo modelo, llegan a su grupo).
+    // Scalar shortcuts cannot silently detach/misprice a multi-model installation. Con un solo modelo por tipo
+    // llegan al grupo; los parámetros de sistema (vida útil, pérdidas…) nunca se bloquean por tener grupos.
     if (kind === 'project') {
       const p = target as ReturnType<typeof visibleAssistantProjects>[number];
+      const equipment = readEquipment({ ...p.specs, hasBattery: true });
       for (const e of edits) {
-        if (
-          e.section === 'specs' &&
-          /^(panel|inverter|battery)/.test(e.field) &&
-          !['panels', 'inverters', 'batteries'].includes(e.field) &&
-          [p.specs.panels, p.specs.inverters, p.specs.batteries].some(
-            (g) => (g?.length ?? 0) > 1
-          )
-        )
+        // `batteryCostUSD` no llega a ningún grupo: con grupos guardados se rechaza como siempre.
+        if (e.section === 'specs' && e.field === 'batteryCostUSD' && p.specs.batteries?.length)
+          throw new Error(
+            'Esta propuesta usa grupos de equipos. Edita sus modelos y cantidades en el simulador o en el borrador de propuestas.'
+          );
+        const scalarKind = e.section === 'specs' ? SCALAR_EQUIPMENT_FIELDS[e.field] : undefined;
+        if (scalarKind && equipment[{ panel: 'panels', inverter: 'inverters', battery: 'batteries' }[scalarKind] as 'panels'].length > 1)
           throw new Error(
             'Esta propuesta usa grupos de equipos. Edita sus modelos y cantidades en el simulador o en el borrador de propuestas.'
           );
@@ -384,13 +394,7 @@ export function applyAssistantAction(action: AssistantAction, options: { require
           });
           if (key === 'batteries')
             specs.hasBattery = (specs[key] as unknown[]).length > 0;
-          if (key === 'panels') {
-            specs.autoCalculatePanels = false;
-            specs.panelCount = (specs[key] as { count: number }[]).reduce(
-              (n, g) => n + g.count,
-              0
-            );
-          }
+          if (key === 'panels') specs.autoCalculatePanels = false;
         }
       s.updateSpecs(specs);
     }

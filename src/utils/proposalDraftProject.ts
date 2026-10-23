@@ -7,6 +7,16 @@ import { resolveAITariffSelection } from './aiTariffContext';
 import { getReferenceEnergyRateUSD } from '../data/rdTariffs';
 import { resolveSystemLossesPct, DEFAULT_SYSTEM_LOSSES_PCT, DEFAULT_BATTERY_DOD_PCT, DEFAULT_BATTERY_EFFICIENCY_PCT } from '../../shared/projectDefaults';
 import { enforceAutomatedPricing } from '../../shared/automatedProposalPolicy';
+import { editEquipment, readEquipment, type EquipmentKind } from '../../shared/equipment';
+import { withEquipmentGroups } from './equipmentGroups';
+
+/** Un solo grupo por tipo recibe la selección escalar del borrador (con varios modelos se conservan, como antes). */
+function patchSingleGroup(specs:SystemSpecs,kind:EquipmentKind,patch:Record<string,unknown>):SystemSpecs {
+  const clean=Object.fromEntries(Object.entries(patch).filter(([,value])=>value!==undefined));
+  if(!Object.keys(clean).length) return specs;
+  const groups=readEquipment({...specs,hasBattery:true})[kind==='panel'?'panels':kind==='inverter'?'inverters':'batteries'];
+  return groups.length>1?specs:editEquipment(specs,kind,{type:'update',index:0,patch:clean} as never);
+}
 /** Pure adapter shared by preview and application. No store mutation, metadata or network. */
 export function prepareProposalDraftProject(base:ProjectSimulation,data:ExtractedInvoiceData,tariffMatrix:GlobalTariffMatrix,options:{isNew?:boolean;defaultBatteryDOD?:number}={}):ProjectSimulation {
   const province=data.province || base.client.province;
@@ -14,21 +24,11 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
   const createNewProject=Boolean(options.isNew);
   const defaults={defaultBatteryDOD:options.defaultBatteryDOD};
   const isGrounded=Array.isArray(data.panels)||Array.isArray(data.inverters)||Array.isArray(data.batteries);
-    const panelW=data.selectedPanelWatts ?? base.specs.panelPowerW;
+    const panelW=data.selectedPanelWatts ?? readEquipment(base.specs).panels[0]?.powerW ?? 0;
     const coverage=data.targetCoveragePct ?? base.rates.targetCoveragePct ?? 95;
     const count=data.recommendedPanelCount || calculateRecommendedPanelCount(province,data.monthlyConsumptionKWh,panelW,coverage,losses,base.client.customMonthlyHSP).recommendedPanelCount;
     const dcKWp=(data.panels || []).reduce((sum,g)=>sum+g.powerW*g.count/1000,0);
-    const specs:SystemSpecs={...base.specs,panelPowerW:panelW,panelCount:count,autoCalculatePanels:false,dopExchangeRate:data.dopExchangeRate || base.rates.usdExchangeRate || 60,
-      ...(data.selectedPanelModel?{panelBrandModel:data.selectedPanelModel}:{}),
-      ...(data.selectedPanelUnitPriceUSD!==undefined?{panelUnitPriceUSD:data.selectedPanelUnitPriceUSD}:{}),
-      ...(data.selectedInverterModel?{inverterBrandModel:data.selectedInverterModel}:{}),
-      ...(data.selectedInverterPowerKW!==undefined?{inverterPowerKW:data.selectedInverterPowerKW}:{}),
-      ...(data.selectedInverterCount!==undefined?{inverterCount:data.selectedInverterCount}:{}),
-      ...(data.selectedInverterUnitPriceUSD!==undefined?{inverterUnitPriceUSD:data.selectedInverterUnitPriceUSD}:{}),
-      ...(data.selectedBatteryModel?{batteryBrandModel:data.selectedBatteryModel}:{}),
-      ...(data.selectedBatteryCapacityKWh!==undefined?{batteryCapacityKWh:data.selectedBatteryCapacityKWh}:{}),
-      ...(data.selectedBatteryCount!==undefined?{batteryCount:data.selectedBatteryCount}:{}),
-      ...(data.selectedBatteryUnitPriceUSD!==undefined?{batteryUnitPriceUSD:data.selectedBatteryUnitPriceUSD}:{}),
+    let specs:SystemSpecs={...base.specs,autoCalculatePanels:false,dopExchangeRate:data.dopExchangeRate || base.rates.usdExchangeRate || 60,
       ...(data.hasBattery!==undefined?{hasBattery:data.hasBattery}:{}),
       ...(data.targetMarginPct!==undefined?{saleMarginMultiplier:1+data.targetMarginPct/100}:{}),
       ...(data.commercial?.installationTotalUSD!==undefined&&dcKWp>0?{installationUnitPriceUSD:data.commercial.installationTotalUSD/dcKWp}:data.commercial?.installationUnitPriceUSD!==undefined?{installationUnitPriceUSD:data.commercial.installationUnitPriceUSD}:{}),
@@ -46,21 +46,23 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
       specs.panels=data.panels?.map(group=>({...group}));
       specs.inverters=data.inverters?.map(group=>({...group}));
       specs.batteries=data.batteries?.map(group=>({...group}));
-      specs.panelUnitPriceUSD=data.panels?.[0]?.unitPriceUSD ?? 0;
-      specs.inverterUnitPriceUSD=data.inverters?.[0]?.unitPriceUSD ?? 0;
-      specs.batteryUnitPriceUSD=data.batteries?.[0]?.unitPriceUSD ?? 0;
       specs.hasBattery=Boolean(data.batteries?.length);
       if (data.batteries?.length) {
-        // El motor pondera DOD y eficiencia por grupo: cada grupo lleva los suyos (o el default) y los escalares
-        // son el espejo del primer grupo, no un promedio del banco (se promediaría dos veces).
-        const defaultDod=createNewProject?(defaults.defaultBatteryDOD ?? DEFAULT_BATTERY_DOD_PCT):(base.specs.batteryDOD ?? DEFAULT_BATTERY_DOD_PCT);
-        const defaultEfficiency=base.specs.batteryEfficiencyPct ?? DEFAULT_BATTERY_EFFICIENCY_PCT;
-        // El escalar del proyecto solo es el valor del grupo principal; los demás grupos sin dato usan el default.
+        // El motor pondera DOD y eficiencia por grupo: cada grupo lleva los suyos (o el default). Solo el grupo
+        // principal hereda el valor del proyecto existente; los demás sin dato usan el default.
+        const baseBattery=readEquipment({...base.specs,hasBattery:true}).batteries[0];
+        const defaultDod=createNewProject?(defaults.defaultBatteryDOD ?? DEFAULT_BATTERY_DOD_PCT):(baseBattery?.dodPct ?? DEFAULT_BATTERY_DOD_PCT);
+        const defaultEfficiency=baseBattery?.efficiencyPct ?? DEFAULT_BATTERY_EFFICIENCY_PCT;
         specs.batteries=data.batteries.map((group,index)=>({...group,dodPct:group.dodPct ?? (index===0||createNewProject?defaultDod:DEFAULT_BATTERY_DOD_PCT),efficiencyPct:group.efficiencyPct ?? (index===0?defaultEfficiency:DEFAULT_BATTERY_EFFICIENCY_PCT)}));
-        specs.batteryDOD=specs.batteries[0].dodPct ?? defaultDod;
-        specs.batteryEfficiencyPct=specs.batteries[0].efficiencyPct;
       }
+    } else {
+      // Selección única (sin grupos de catálogo): se aplica al grupo, nunca a campos sueltos.
+      specs=patchSingleGroup(specs,'panel',{brandModel:data.selectedPanelModel||undefined,powerW:panelW,count,unitPriceUSD:data.selectedPanelUnitPriceUSD});
+      specs=patchSingleGroup(specs,'inverter',{brandModel:data.selectedInverterModel||undefined,powerKW:data.selectedInverterPowerKW,count:data.selectedInverterCount,unitPriceUSD:data.selectedInverterUnitPriceUSD});
+      specs=patchSingleGroup(specs,'battery',{brandModel:data.selectedBatteryModel||undefined,capacityKWh:data.selectedBatteryCapacityKWh,count:data.selectedBatteryCount,unitPriceUSD:data.selectedBatteryUnitPriceUSD});
     }
+    // Grupos completos; el único escritor de campos heredados es equipmentGroups (la oleada 2 lo retira).
+    specs=withEquipmentGroups(specs);
     const fx=data.dopExchangeRate || base.rates.usdExchangeRate || 60;
     const tariff=resolveAITariffSelection(tariffMatrix,data.distributor,data.tariffCode);
     const reference=tariff?getReferenceEnergyRateUSD(tariffMatrix,data.distributor,tariff.code,data.averageMonthlyKWh,fx):undefined;
@@ -75,7 +77,10 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
 export function createAIProposalBase(template:ProjectSimulation,defaults:DefaultSimulationSettings,province:string):ProjectSimulation {
  const base=structuredClone(template);
 
-      base.specs={...base.specs,batteryDOD:defaults.defaultBatteryDOD ?? DEFAULT_BATTERY_DOD_PCT,pricePerWattUSD:defaults.defaultDirectPriceUSDPerWp,systemLosses:defaults.defaultSystemLosses ?? DEFAULT_SYSTEM_LOSSES_PCT,annualDegradation:defaults.defaultAnnualDegradation ?? 0.4,isDetailed:false,pricingMode:'cost_matrix',saleMarginMultiplier:1+(defaults.defaultTargetMarginPct ?? 28)/100,panels:undefined,inverters:undefined,batteries:undefined,installationUnitPriceUSD:0};
+      base.specs={...base.specs,pricePerWattUSD:defaults.defaultDirectPriceUSDPerWp,systemLosses:defaults.defaultSystemLosses ?? DEFAULT_SYSTEM_LOSSES_PCT,annualDegradation:defaults.defaultAnnualDegradation ?? 0.4,isDetailed:false,pricingMode:'cost_matrix',saleMarginMultiplier:1+(defaults.defaultTargetMarginPct ?? 28)/100,panels:undefined,inverters:undefined,batteries:undefined,installationUnitPriceUSD:0};
+      // Grupos explícitos; el DOD por defecto vive en el grupo de batería.
+      const withGroups=withEquipmentGroups(base.specs);
+      base.specs=withEquipmentGroups({...withGroups,batteries:withGroups.batteries?.map((group,index)=>index===0?{...group,dodPct:defaults.defaultBatteryDOD ?? DEFAULT_BATTERY_DOD_PCT}:group)});
       base.rates={...base.rates,targetCoveragePct:defaults.defaultTargetCoveragePct ?? 95,isZeroExport:defaults.defaultZeroExport,currency:defaults.currency || 'USD',annualEnergyInflationPct:defaults.annualEnergyTariffEscalationPct ?? 3.5};
       base.financials={...base.financials,applyLey5707:defaults.applyLey5707,applyITBISExemption:defaults.applyITBISExemption,discountRatePct:defaults.discountRatePct,projectLifespanYears:defaults.lifespanYears,pricePerWattUSD:defaults.defaultDirectPriceUSDPerWp,customItems:[],customDiscounts:[],customCostUSD:undefined,customLey5707CreditUSD:undefined,customITBISSavedUSD:undefined};
       base.client={...base.client,company:'',address:'',contactPhone:'',contactEmail:'',contactPerson:'',location:province,customMonthlyHSP:undefined,coordinates:undefined};

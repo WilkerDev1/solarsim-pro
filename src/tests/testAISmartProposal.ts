@@ -164,19 +164,19 @@ store.applyExtractedInvoice(unpricedExtractedData, true);
 const unpricedProj = useSimulationStore.getState().getActiveProject();
 
 console.log(`Client: "${unpricedProj.client.name}"`);
-console.log(`Inverter Selected: "${unpricedProj.specs.inverterBrandModel}" (unitPrice: $${unpricedProj.specs.inverterUnitPriceUSD})`);
-console.log(`Battery Selected: "${unpricedProj.specs.batteryBrandModel}" (unitPrice: $${unpricedProj.specs.batteryUnitPriceUSD})`);
+console.log(`Inverter Selected: "${unpricedProj.specs.inverters?.[0]?.brandModel}" (unitPrice: $${unpricedProj.specs.inverters?.[0]?.unitPriceUSD})`);
+console.log(`Battery Selected: "${unpricedProj.specs.batteries?.[0]?.brandModel}" (unitPrice: $${unpricedProj.specs.batteries?.[0]?.unitPriceUSD})`);
 
 if (unpricedProj.client.name !== 'Josia Moscoso') {
   throw new Error(`❌ Expected client name "Josia Moscoso", got "${unpricedProj.client.name}"`);
 }
 
-if (!unpricedProj.specs.inverterBrandModel?.includes('WeCo')) {
-  throw new Error(`❌ Expected inverter to contain WeCo, got "${unpricedProj.specs.inverterBrandModel}"`);
+if (!unpricedProj.specs.inverters?.[0]?.brandModel?.includes('WeCo')) {
+  throw new Error(`❌ Expected inverter to contain WeCo, got "${unpricedProj.specs.inverters?.[0]?.brandModel}"`);
 }
 
-if (!unpricedProj.specs.batteryBrandModel?.includes('WeCo')) {
-  throw new Error(`❌ Expected battery to contain WeCo, got "${unpricedProj.specs.batteryBrandModel}"`);
+if (!unpricedProj.specs.batteries?.[0]?.brandModel?.includes('WeCo')) {
+  throw new Error(`❌ Expected battery to contain WeCo, got "${unpricedProj.specs.batteries?.[0]?.brandModel}"`);
 }
 
 console.log(' ✅ PASS: Propuesta creada exitosamente con equipos sin precio asignado (WeCo)\n');

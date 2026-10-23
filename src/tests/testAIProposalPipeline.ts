@@ -107,7 +107,7 @@ useSimulationStore.getState().applyExtractedInvoice(normalized,true);
 const project=useSimulationStore.getState().getActiveProject();
 assert.equal(useSimulationStore.getState().projects.length,before.length+1);
 assert.equal(calculateTotalDCCapacityKWp(project.specs),10.2);assert.equal(calculateTotalBatteryCapacityKWh(project.specs),32);
-assert.equal(project.specs.saleMarginMultiplier,1);assert.equal(project.specs.panelUnitPriceUSD,100);assert.equal(project.specs.inverterUnitPriceUSD,0);
+assert.equal(project.specs.saleMarginMultiplier,1);assert.equal(project.specs.panels?.[0].unitPriceUSD,100);
 assert.equal(project.specs.panels?.[1].unitPriceUSD,undefined,'missing supplier price stays unknown on the committed multi-model group');
 assert.equal(project.specs.inverters?.[0].unitPriceUSD,undefined);
 assert.equal(project.specs.batteries?.[0].unitPriceUSD,undefined);

@@ -1,3 +1,4 @@
+import { equipmentTotals, readEquipment } from '../../../shared/equipment';
 import type { StoredProposal } from './types';
 import type { Env } from './bindings';
 export function generateProposalId(): string { return crypto.randomUUID().replace(/-/g, ''); }
@@ -28,7 +29,7 @@ export function proposalMetadata(stored: StoredProposal, origin: string) {
     clientName: client?.name || 'Cliente Solar',
     projectCode: client?.projectId || stored.project?.id || 'SP-XXXX',
     quoteNumber: client?.quoteNumber || 'C-0001',
-    systemKWp: stored.summary?.systemCapacityKWp ?? Number(((Number(specs?.panelCount) * Number(specs?.panelPowerW)) / 1000 || 0).toFixed(2)),
+    systemKWp: stored.summary?.systemCapacityKWp ?? (specs ? Number(equipmentTotals(readEquipment(specs)).capacityKWp.toFixed(2)) : 0),
     location: client?.province || client?.location || 'República Dominicana',
     companyName: stored.project?.customization?.companyName || 'electsun',
     createdAt: stored.createdAt, expiresAt: stored.expiresAt, validityDays: stored.validityDays,

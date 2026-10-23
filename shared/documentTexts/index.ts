@@ -6,6 +6,7 @@
 export * from './sections';
 export * from './factoryTexts';
 export * from './context';
+export * from './equipmentPhrases';
 export * from './registry';
 export * from './resolve';
 export * from './write';

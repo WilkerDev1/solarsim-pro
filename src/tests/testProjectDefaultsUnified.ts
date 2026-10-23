@@ -58,7 +58,7 @@ assert(!readFileSync('src/components/settings/sections/SimulationPreferencesSect
   assert.equal(shared.resolveBatteryBankEfficiencyPct(bank.specs), 90);
   const { createAIProposalBase } = await import('../utils/proposalDraftProject');
   const aiBase = createAIProposalBase(BENCHMARK_PROJECT, DEFAULT_SIMULATION_SETTINGS, 'Santiago');
-  assert.equal(aiBase.specs.batteryDOD, 90, 'base de propuesta IA: 90, no 80');
+  assert.equal(aiBase.specs.batteries![0].dodPct, 90, 'base de propuesta IA: 90, no 80');
   assert.equal(fresh.specs.batteries![0].dodPct, 90, 'proyecto nuevo: 90');
   const withGroupValues = { ...importable, client: { ...importable.client, name: 'Importado espejo', projectId: 'IMP-3', quoteNumber: 'IMP-3' }, specs: { ...importable.specs, batteries: [{ ...bankGroups[0], dodPct: 70, efficiencyPct: 85 }, bankGroups[1]] } };
   assert.ok(store().importProjectsFromJSON([withGroupValues as never]).success);
