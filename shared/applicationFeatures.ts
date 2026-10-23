@@ -45,7 +45,7 @@ export const BUILT_IN_APPLICATION_FEATURES = [{
   stage: 'stable' as FeatureStage, available: true, visibilityWhenDisabled: 'labelled' as const, defaultEnabled: true, configurable: false,
 }, {
   id: 'proposalEnergyFlowDiagram', title: 'Diagrama de flujo energético en la propuesta web',
-  description: 'Guía visual animada y aproximada de a dónde va la producción solar (casa, batería y red); no cambia el cálculo energético.',
+  description: 'Diagrama animado e interactivo con valores aproximados de cómo fluye la energía (paneles, casa, batería y red) de día, de noche y en un apagón; no cambia el cálculo energético.',
   stage: 'stable' as FeatureStage, available: true, visibilityWhenDisabled: 'labelled' as const, defaultEnabled: true, configurable: false,
 }] as const;
 export type BuiltInFeatureId = (typeof BUILT_IN_APPLICATION_FEATURES)[number]['id'];

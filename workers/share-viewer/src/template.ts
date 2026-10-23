@@ -495,7 +495,7 @@ ${ENERGY_FLOW_CSS}
     </header>
 
     <!-- FLUJO ENERGÉTICO ANIMADO (guía visual aproximada) -->
-    ${isBuiltInFeatureAvailable('proposalEnergyFlowDiagram') ? renderEnergyFlowSection({ hybrid: hasBattery && totalBESSKWh > 0, isZeroExport, annualProductionKWh, monthly: monthlyData, calculationMode: stored.calculationSnapshot?.mode }) : ''}
+    ${isBuiltInFeatureAvailable('proposalEnergyFlowDiagram') ? renderEnergyFlowSection({ hybrid: hasBattery && totalBESSKWh > 0, isZeroExport, systemCapacityKWp: Number(systemCapacityKWp), annualConsumptionKWh, totalBESSKWh }) : ''}
 
     <!-- 2. RESUMEN EJECUTIVO DE LA SOLUCIÓN PROPUESTA -->
     <section class="bg-white border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">
