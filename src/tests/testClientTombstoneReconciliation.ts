@@ -16,6 +16,7 @@ const record = (id: string, name: string, version: number): ClientRecord => ({
 let remote = new Map<string, ClientRecord>();
 let deletedIds: string[] = [];
 const puts: string[] = [];
+let casConflictId: string | null = null;
 
 ClientSyncService.setTransportFactory(() => async (path, init = {}) => {
   const method = init.method || 'GET';
@@ -25,6 +26,7 @@ ClientSyncService.setTransportFactory(() => async (path, init = {}) => {
     puts.push(id);
     const body = JSON.parse(String(init.body));
     if (deletedIds.includes(id)) return Response.json({ error: 'borrado' }, { status: 409 });
+    if (id === casConflictId) return Response.json({ error: 'conflicto', client: remote.get(id) }, { status: 409 });
     const saved = { ...record(id, body.name, (remote.get(id)?.version ?? 0) + 1), phone: body.phone ?? '' };
     remote.set(id, saved);
     return Response.json({ success: true, client: saved });
@@ -104,6 +106,35 @@ try {
   reset([], [record('client-clean', 'Limpio', 1)]);
   assert.equal((await store.getState().syncClientsWithServer()).success, true);
   assert.equal(store.getState().clients.length, 0);
+  // 3. An unresolved CAS conflict followed by a teammate's deletion becomes a deletion conflict, never a silent loss.
+  const base = record('client-cas', 'Cliente CAS', 1);
+  const teammate = { ...record('client-cas', 'Cliente CAS', 2), phone: '809-000-0000', updatedAt: '2026-10-02T00:00:00.000Z' };
+  remote = new Map([['client-cas', teammate]]);
+  deletedIds = [];
+  reset([], [base]);
+  store.getState().updateClientRecord('client-cas', { phone: '809-555-4321' });
+  puts.length = 0;
+  casConflictId = 'client-cas';
+  assert.equal((await store.getState().syncClientsWithServer()).success, false);
+  casConflictId = null;
+  assert.ok(store.getState().clientChanges['client-cas'].serverClient, 'The CAS conflict is recorded');
+  remote = new Map();
+  deletedIds = ['client-cas'];
+  puts.length = 0;
+  assert.equal((await store.getState().syncClientsWithServer()).success, false, 'The deletion conflict is surfaced');
+  assert.deepEqual(puts, [], 'A tombstoned id is never pushed');
+  const casKept = store.getState().clients.find((c) => c.id === 'client-cas');
+  assert.ok(casKept, 'Local edits survive the tombstone');
+  assert.equal(casKept.phone, '809-555-4321');
+  assert.equal(store.getState().clientChanges['client-cas'].serverDeleted, true);
+  assert.equal(store.getState().clientChanges['client-cas'].serverClient, undefined);
+  await store.getState().syncClientsWithServer();
+  assert.ok(store.getState().clients.some((c) => c.id === 'client-cas'), 'The deletion conflict survives later passes');
+  store.getState().resolveClientConflict('client-cas', 'keep_local');
+  const casCopy = store.getState().clients.find((c) => c.name === 'Cliente CAS');
+  assert.ok(casCopy && casCopy.id !== 'client-cas' && casCopy.phone === '809-555-4321', 'Keep local recreates the client with the edits');
+  assert.equal(store.getState().clientChanges[casCopy.id].baseVersion, 0);
+
   console.log('Client tombstone reconciliation OK');
 } finally {
   ClientSyncService.setTransportFactory(null);
