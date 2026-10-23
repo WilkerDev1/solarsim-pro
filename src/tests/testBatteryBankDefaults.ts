@@ -113,7 +113,7 @@ const draftBaseFor = () => createAIProposalBase(BENCHMARK_PROJECT, { defaultBatt
   const prepared = prepareProposalDraftProject(draftBase, data as never, DEFAULT_RD_TARIFF_MATRIX as never, { isNew: true });
   close(resolveBatteryBankDodPct(prepared.specs), 85, 'DOD del banco = (90 + 80) / 2, sin promediar dos veces');
   close(20 * (resolveBatteryBankDodPct(prepared.specs) / 100) * (resolveBatteryBankEfficiencyPct(prepared.specs) / 100), 10 * 0.9 * 0.9 + 10 * 0.8 * 0.8, 'energía útil del banco = Σ(C·DOD·η) = 14.5 kWh');
-  assert.equal(prepared.specs.batteryDOD, 90, 'el escalar es el del primer grupo');
+  assert.equal(prepared.specs.batteries![0].dodPct, 90, 'el DOD del primer grupo es el default');
 }
 
 // ── Catálogo → proyecto con grupos: el precio de proveedor sincroniza la eficiencia del grupo principal ──
@@ -154,7 +154,8 @@ const draftBaseFor = () => createAIProposalBase(BENCHMARK_PROJECT, { defaultBatt
 
 // El escalar de un proyecto existente solo es el valor del grupo principal.
 {
-  const existing = { ...draftBaseFor(), specs: { ...draftBaseFor().specs, batteryDOD: 80, batteryEfficiencyPct: 85 } };
+  const existingBase = draftBaseFor();
+  const existing = { ...existingBase, specs: { ...existingBase.specs, batteries: existingBase.specs.batteries!.map((group) => ({ ...group, dodPct: 80, efficiencyPct: 85 })) } };
   const data = {
     monthlyConsumptionKWh: Array(12).fill(1000), averageMonthlyKWh: 1000, province: 'Santiago', distributor: 'EDENORTE', tariffCode: 'BTS1',
     panels: [{ id: 'p', brandModel: 'P', powerW: 600, count: 10 }], inverters: [{ id: 'i', brandModel: 'I', powerKW: 5, count: 1 }],

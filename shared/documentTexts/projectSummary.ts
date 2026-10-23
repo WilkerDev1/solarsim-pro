@@ -1,6 +1,8 @@
 /**
  * Párrafos 1 y 2 de «Descripción del proyecto». Un texto personalizado mantiene sincronizados
  * los números (paneles, kWp, producción, cobertura, inversores y baterías) con la simulación.
+ * `project.specs` no son las specs de la propuesta: son los totales de todos los grupos que arma el
+ * contexto de textos (`DocumentTextContext`); estas funciones no leen equipos.
  */
 /**
  * Dynamically resolves technical values in Project Summary Paragraph 1

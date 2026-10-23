@@ -49,6 +49,7 @@ function validateTree(value: unknown, depth = 0): void {
   }
   throw new RequestValidationError('La estructura contiene valores no permitidos.');
 }
+const GROUP_NUMBER_FIELDS = ['count', 'powerW', 'powerKW', 'capacityKWh', 'unitPriceUSD', 'weightKilos', 'dodPct', 'efficiencyPct'];
 function textFields(record: Record<string, unknown>, fields: string[], maxLength = 30000): void {
   for (const field of fields) {
     const value = record[field];
@@ -91,7 +92,15 @@ export function parseSharePayload(value: unknown): ShareProposalPayload {
   for (const field of ['panels', 'inverters', 'batteries']) {
     if (specs[field] === undefined) continue;
     if (!Array.isArray(specs[field]) || specs[field].length > 50) throw new RequestValidationError('La lista de equipos no es válida.');
-    for (const item of specs[field]) textFields(requireRecord(item, field), ['brandModel'], 1000);
+    for (const item of specs[field]) {
+      const group = requireRecord(item, field);
+      textFields(group, ['brandModel'], 1000);
+      // Con grupos como única fuente (sin espejo), sus números se validan como los del espejo.
+      for (const numeric of GROUP_NUMBER_FIELDS) {
+        const amount = group[numeric];
+        if (amount !== undefined && amount !== null && (typeof amount !== 'number' || !Number.isFinite(amount) || amount < 0)) throw new RequestValidationError(`${numeric} debe ser un número positivo.`);
+      }
+    }
   }
   if (financials.customItems !== undefined) {
     if (!Array.isArray(financials.customItems)) throw new RequestValidationError('Los ítems no son válidos.');

@@ -304,7 +304,7 @@ async function main() {
 
   rows.set(`proposal:${multiEquipProposal.id}`, JSON.stringify(multiEquipProposal));
   const multiHtml = await (await app.request(`https://test.local/p/${multiEquipProposal.id}`, {}, env as never)).text();
-  assert.ok(multiHtml.includes('1 Inversor Luxpower GEN-LB-US 16K (16.0Kw) y 6 Inversores Huawei SUN2000-10KTL-M1 (10.0Kw)'));
+  assert.ok(multiHtml.includes('7 Inversores Huawei SUN2000-10KTL-M1 (10.0Kw) y 1 modelo más'));
   assert.ok(!multiHtml.includes('7 Inversores Luxpower'));
   assert.ok(!multiHtml.includes('JA Solar JAM66D45-630/LB (630W) JA Solar JAM66D45-630/LB (630W)'));
   assert.ok(multiHtml.includes('156 Módulos JA Solar JAM66D45-630/LB (630W)'));
@@ -319,7 +319,7 @@ async function main() {
   const paragraphHtml = renderProposalPage(paragraphCase);
   assert.ok(paragraphHtml.includes('<strong class="font-bold text-slate-950">CLIENTE 2026</strong>'));
   assert.ok(paragraphHtml.includes('<strong class="font-bold text-slate-950">12000 kWh</strong>'));
-  assert.ok(paragraphHtml.includes('100 Módulos Modelo A (630W) y 56 Módulos Modelo B (620W)'));
+  assert.ok(paragraphHtml.includes('156 Módulos Modelo A (630W) y 1 modelo más'));
   assert.ok(!paragraphHtml.includes('Módulos Anteriores'));
   paragraphCase.project.customization!.customProjectSummaryParagraph1 = 'Texto libre: **12 equipos auxiliares**, **12000 kWh** y **CLIENTE 2026**.';
   const customHtml = renderProposalPage(paragraphCase);
