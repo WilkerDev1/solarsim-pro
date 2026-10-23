@@ -85,7 +85,8 @@ assert.deepEqual(deduped.attachedPdfs.map((att) => att.id), ['att-manual', 'att-
   const before = loading.customization!;
   const partial = catalog.filter((item) => item.id !== 'inv'); // the inverter's catalog record has not arrived
   const pendingIds = unresolvedEquipmentIds(loading, partial);
-  assert.deepEqual([...pendingIds], ['inv']);
+  assert.equal(pendingIds.has('inv'), true);
+  assert.equal(pendingIds.has('pa'), false, 'Resolved equipment is not pending');
   const during = applyAnnexPlan(before, planDatasheetAnnexes(loading, partial), NOW, pendingIds);
   assert.equal(during.changed, false, 'Nothing is deleted or rewritten while the record is missing');
   assert.equal(during.attachedPdfs, before.attachedPdfs);
@@ -97,9 +98,9 @@ assert.deepEqual(deduped.attachedPdfs.map((att) => att.id), ['att-manual', 'att-
   const unused = structuredClone(loading);
   unused.specs.inverters = [{ id: 'g3', catalogItemId: 'inv', brandModel: 'QA Inversor 8K', powerKW: 8, count: 0 }];
   const gone = applyAnnexPlan(before, planDatasheetAnnexes(unused, partial), NOW, unresolvedEquipmentIds(unused, partial));
-  assert.deepEqual(gone.attachedPdfs.map((att) => att.id), [catalogAnnexId('sheet-family')]);
+  assert.deepEqual(gone.attachedPdfs.map((att) => att.id), ['att-manual', catalogAnnexId('sheet-family')]);
   unused.specs.inverters = [];
-  assert.deepEqual(applyAnnexPlan(before, planDatasheetAnnexes(unused, partial), NOW, unresolvedEquipmentIds(unused, partial)).attachedPdfs.map((att) => att.id), [catalogAnnexId('sheet-family')]);
+  assert.deepEqual(applyAnnexPlan(before, planDatasheetAnnexes(unused, partial), NOW, unresolvedEquipmentIds(unused, partial)).attachedPdfs.map((att) => att.id), ['att-manual', catalogAnnexId('sheet-family')]);
 }
 
 // 4. Dismiss and restore.

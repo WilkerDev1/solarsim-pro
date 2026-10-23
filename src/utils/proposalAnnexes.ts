@@ -1,6 +1,8 @@
 import type { AttachedPDFDocument, DocumentCustomization, ProjectSimulation } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
 import { datasheetFileName, proposalDatasheets } from './proposalDatasheets';
+import { getProjectPanels, getProjectInverters, getProjectBatteries } from './equipmentSpecsUtils';
+import { resolveGroupCatalogItem } from './equipmentGroups';
 
 /**
  * Automatic datasheet annexes. Every equipment group in use (count > 0) whose catalog item has a PDF
@@ -36,6 +38,26 @@ export function workspaceCatalog(catalog: SolarEquipmentItem[], serverUrl: strin
     (!item.syncServerUrl || item.syncServerUrl.replace(/\/+$/, '') === server));
 }
 
+/**
+ * Ids of equipment in use (count > 0) that the catalog cannot resolve yet, typically because the proposal
+ * was pulled before the equipment catalog finished syncing. Their annexes must survive: the datasheet is
+ * unknown for now, not gone.
+ */
+export function unresolvedEquipmentIds(project: ProjectSimulation, catalog: SolarEquipmentItem[]): Set<string> {
+  const groups = [
+    ...getProjectPanels(project.specs).map((group) => ({ group, kind: 'panel' as const })),
+    ...getProjectInverters(project.specs).map((group) => ({ group, kind: 'inverter' as const })),
+    ...getProjectBatteries(project.specs).map((group) => ({ group, kind: 'battery' as const })),
+  ];
+  const ids = new Set<string>();
+  for (const { group, kind } of groups) {
+    if (group.count <= 0 || resolveGroupCatalogItem(group, kind, catalog)) continue;
+    if (group.catalogItemId) ids.add(group.catalogItemId);
+    if (group.id) ids.add(group.id);
+  }
+  return ids;
+}
+
 /** Same id on every device, so two devices syncing one proposal never duplicate an annex. */
 export function catalogAnnexId(key: string): string {
   return `att-catalog-${key.replace(/[^A-Za-z0-9_-]/g, '_')}`;
@@ -43,13 +65,24 @@ export function catalogAnnexId(key: string): string {
 
 type AnnexState = Pick<DocumentCustomization, 'attachedPdfs' | 'dismissedDatasheetKeys'>;
 
-/** Reconciles the annex list with the plan. `changed: false` returns the same array (nothing to write). */
-export function applyAnnexPlan(state: AnnexState, plan: PlannedDatasheetAnnex[], nowIso: string): { attachedPdfs: AttachedPDFDocument[]; changed: boolean } {
+/**
+ * Reconciles the annex list with the plan. `changed: false` returns the same array (nothing to write).
+ * `pendingItemIds` (see `unresolvedEquipmentIds`) protects automatic annexes whose equipment is still in use
+ * but not resolved in the catalog: they are neither removed nor recreated, so their edits survive.
+ */
+export function applyAnnexPlan(
+  state: AnnexState,
+  plan: PlannedDatasheetAnnex[],
+  nowIso: string,
+  pendingItemIds: ReadonlySet<string> = new Set(),
+): { attachedPdfs: AttachedPDFDocument[]; changed: boolean } {
   const current = state.attachedPdfs ?? [];
   const dismissed = new Set(state.dismissedDatasheetKeys ?? []);
   const wanted = plan.filter((annex) => !dismissed.has(annex.key));
   const wantedKeys = new Set(wanted.map((annex) => annex.key));
-  const kept = current.filter((att) => att.origin !== 'catalog' || (att.sourceDatasheetKey !== undefined && wantedKeys.has(att.sourceDatasheetKey)));
+  const kept = current.filter((att) => att.origin !== 'catalog'
+    || (att.sourceDatasheetKey !== undefined && wantedKeys.has(att.sourceDatasheetKey))
+    || (att.catalogItemId !== undefined && pendingItemIds.has(att.catalogItemId)));
   const present = new Set(kept.map((att) => att.sourceDatasheetKey).filter(Boolean));
   const additions: AttachedPDFDocument[] = wanted
     .filter((annex) => !present.has(annex.key))

@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import type { ProjectSimulation } from '../../../types';
 import { canWrite } from '../../../../shared/permissions';
 import { useSimulationStore } from '../../../store/useSimulationStore';
-import { applyAnnexPlan, planDatasheetAnnexes, workspaceCatalog } from '../../../utils/proposalAnnexes';
+import { applyAnnexPlan, planDatasheetAnnexes, unresolvedEquipmentIds, workspaceCatalog } from '../../../utils/proposalAnnexes';
 import { resolveProposalAttachmentBytes } from '../../../services/proposalAttachmentResolver';
 import { PDFMergeService } from '../../../services/pdfMergeService';
 
@@ -34,8 +34,10 @@ export const ProposalAnnexSync: React.FC<ProposalAnnexSyncProps> = ({ project })
 
   useEffect(() => {
     if (!allowed || !isTarget()) return;
-    const plan = planDatasheetAnnexes(live, workspaceCatalog(catalog, serverUrl, user?.organizationId));
-    const result = applyAnnexPlan(live.customization ?? {}, plan, new Date().toISOString());
+    const visible = workspaceCatalog(catalog, serverUrl, user?.organizationId);
+    const plan = planDatasheetAnnexes(live, visible);
+    // Equipment still missing from the catalog (it may be mid-sync) keeps its annex until the proposal stops using it.
+    const result = applyAnnexPlan(live.customization ?? {}, plan, new Date().toISOString(), unresolvedEquipmentIds(live, visible));
     if (result.changed) useSimulationStore.getState().updateDocumentCustomization({ attachedPdfs: result.attachedPdfs });
   }, [allowed, live.id, live.specs, attachedPdfs, dismissed, catalog, serverUrl, user?.organizationId, sessionGeneration]);
 
