@@ -1,4 +1,5 @@
 import type { BatteryItemSpec, InverterItemSpec, PanelItemSpec, SystemSpecs } from '../types';
+import type { SolarEquipmentItem } from '../types/equipment';
 import { getProjectBatteries, getProjectInverters, getProjectPanels } from './equipmentSpecsUtils';
 
 /**
@@ -18,9 +19,12 @@ const LIST_KEY: Record<EquipmentKind, ListKey> = { panel: 'panels', inverter: 'i
 const MIRROR: { [K in EquipmentKind]: Partial<Record<keyof GroupItem[K], keyof SystemSpecs>> } = {
   panel: { brandModel: 'panelBrandModel', powerW: 'panelPowerW', count: 'panelCount', unitPriceUSD: 'panelUnitPriceUSD', weightKilos: 'panelWeightKilos' },
   inverter: { brandModel: 'inverterBrandModel', powerKW: 'inverterPowerKW', count: 'inverterCount', unitPriceUSD: 'inverterUnitPriceUSD', weightKilos: 'inverterWeightKilos' },
-  battery: { brandModel: 'batteryBrandModel', capacityKWh: 'batteryCapacityKWh', count: 'batteryCount', unitPriceUSD: 'batteryUnitPriceUSD', weightKilos: 'batteryWeightKilos' },
+  battery: { brandModel: 'batteryBrandModel', capacityKWh: 'batteryCapacityKWh', dodPct: 'batteryDOD', efficiencyPct: 'batteryEfficiencyPct', count: 'batteryCount', unitPriceUSD: 'batteryUnitPriceUSD', weightKilos: 'batteryWeightKilos' },
 };
 const KINDS: EquipmentKind[] = ['panel', 'inverter', 'battery'];
+
+/** Group fields whose legacy scalar edit applies to the first group even when the project has several. */
+const PRIMARY_SCALAR_FIELDS: Record<EquipmentKind, string[]> = { panel: [], inverter: [], battery: ['dodPct', 'efficiencyPct'] };
 
 /** Unit price the cost matrix assumes for a legacy single-model project without one. */
 export const DEFAULT_UNIT_PRICE_USD: Record<EquipmentKind, number> = { panel: 103.32, inverter: 2300.0, battery: 1990.0 };
@@ -39,6 +43,12 @@ function mirrorOf<K extends EquipmentKind>(specs: SystemSpecs, kind: K, first: G
   const mirror: Record<string, unknown> = {};
   for (const [field, legacy] of Object.entries(MIRROR[kind]) as [keyof GroupItem[K], keyof SystemSpecs][]) {
     if (first[field] !== undefined) mirror[legacy as string] = first[field];
+  }
+  // DOD/eficiencia: si el primer grupo no tiene dato propio, el espejo se reinicia para que un escalar del principal anterior no se herede.
+  if (kind === 'battery') {
+    for (const field of PRIMARY_SCALAR_FIELDS.battery) {
+      if (first[field as keyof GroupItem[K]] === undefined) mirror[(MIRROR.battery as Record<string, string>)[field]] = undefined;
+    }
   }
   if (first.selectedSupplierInfo) mirror.selectedSupplierInfo = { ...specs.selectedSupplierInfo, [kind]: first.selectedSupplierInfo };
   return mirror as Partial<SystemSpecs>;
@@ -109,12 +119,73 @@ export function normalizeEquipmentEdit(current: SystemSpecs, patch: Partial<Syst
       }
       const single = groups[0] ?? groupsOf(merged, kind)[0];
       groups = single ? [{ ...single, ...fromPatch }] : groupsOf(merged, kind);
-    } else if (!supplierChanged(kind)) continue;
+    } else {
+      // Con varios grupos los motores leen los grupos; un valor escalar de DOD/eficiencia (asistente, importaciones) es del primero.
+      const primary: Record<string, unknown> = {};
+      for (const field of PRIMARY_SCALAR_FIELDS[kind]) {
+        const legacy = (MIRROR[kind] as Record<string, keyof SystemSpecs>)[field];
+        if (legacy && patch[legacy] !== undefined) primary[field] = patch[legacy];
+      }
+      if (Object.keys(primary).length) groups[0] = { ...groups[0], ...primary };
+      else if (!supplierChanged(kind)) continue;
+    }
     // The selected supplier belongs to the primary group, like supplier pricing does.
     if (supplierChanged(kind) && groups[0]) groups[0] = { ...groups[0], selectedSupplierInfo: patch.selectedSupplierInfo?.[kind] };
     lists[kind] = groups;
   }
   return withGroups(merged, touched, lists);
+}
+
+/** Catalog field that sizes each kind of group. */
+const MAGNITUDE = { panel: 'powerW', inverter: 'powerKW', battery: 'capacityKWh' } as const;
+
+type CatalogEntry = Pick<SolarEquipmentItem, 'id' | 'type' | 'displayName'> & Partial<Pick<SolarEquipmentItem, 'powerW' | 'powerKW' | 'capacityKWh'>>;
+
+/**
+ * Catalog item behind a group, in order of certainty: its `catalogItemId`, a catalog id used as group id
+ * (AI proposals), then a unique exact name. An ambiguous name never resolves: guessing could attach the
+ * datasheet of a different model.
+ */
+export function resolveGroupCatalogItem<T extends CatalogEntry>(
+  group: { id?: string; catalogItemId?: string; manualModel?: boolean; brandModel?: string },
+  kind: EquipmentKind,
+  catalog: readonly T[]
+): T | null {
+  const candidates = catalog.filter((item) => item.type === kind);
+  const byId = (id?: string) => (id ? candidates.find((item) => item.id === id) : undefined);
+  // A model the user rewrote by hand never resolves by id: its id may be the old catalog item's id.
+  const exact = group.manualModel ? undefined : byId(group.catalogItemId) ?? byId(group.id);
+  if (exact) return exact;
+  const named = group.brandModel ? candidates.filter((item) => item.displayName === group.brandModel) : [];
+  return named.length === 1 ? named[0] : null;
+}
+
+/**
+ * The `updateSpecs` patch that points group `index` of `kind` at a catalog item: identity, magnitude and
+ * `catalogItemId`, plus caller fields such as price. Selecting into the next free slot adds the group.
+ * Like any group edit, an unmigrated project migrates here, on its first equipment edit.
+ */
+export function selectCatalogEquipment<K extends EquipmentKind>(
+  specs: SystemSpecs,
+  kind: K,
+  index: number,
+  item: CatalogEntry,
+  extra: Partial<GroupItem[K]> = {}
+): Partial<SystemSpecs> {
+  const groups = groupsOf(specs, kind);
+  const field = MAGNITUDE[kind];
+  const magnitude = item[field];
+  const identity = {
+    catalogItemId: item.id,
+    manualModel: undefined,
+    brandModel: item.displayName,
+    ...(magnitude !== undefined && Number.isFinite(magnitude) && magnitude > 0 ? { [field]: magnitude } : {}),
+    ...extra,
+  } as Partial<GroupItem[K]>;
+  if (groups[index]) return editEquipmentGroup(specs, kind, { type: 'update', index, patch: identity });
+  if (index !== groups.length) return {};
+  const added = { id: `${kind}-${item.id}`, count: 1, [field]: magnitude ?? 0, ...identity } as unknown as GroupItem[K];
+  return editEquipmentGroup(specs, kind, { type: 'add', item: added });
 }
 
 /** `normalizeEquipmentEdit` for callers that produce the next specs instead of a patch. */

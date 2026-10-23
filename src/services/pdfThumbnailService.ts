@@ -37,91 +37,87 @@ if (typeof window !== 'undefined' && pdfjsLib.GlobalWorkerOptions) {
   }
 }
 
+type PdfDocumentProxy = Awaited<ReturnType<typeof pdfjsLib.getDocument>['promise']>;
+
+const withTimeout = <T,>(work: Promise<T>, ms: number, fallback: T) =>
+  Promise.race([work, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
+
+async function openDocument<T>(buffer: ArrayBuffer | Uint8Array, use: (pdf: PdfDocumentProxy) => Promise<T>): Promise<T> {
+  const data = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  // Clonar buffer para que PDF.js no lo transfiera ni desvincule
+  const loadingTask = pdfjsLib.getDocument({ data: data.slice(0), useSystemFonts: true, disableFontFace: true });
+  try {
+    return await use(await loadingTask.promise);
+  } finally {
+    try { void loadingTask.destroy(); } catch (_) {}
+  }
+}
+
+async function renderPage(pdf: PdfDocumentProxy, pageNumber: number, targetWidth: number): Promise<Blob | null> {
+  const page = await pdf.getPage(pageNumber);
+  const originalViewport = page.getViewport({ scale: 1 });
+  const viewport = page.getViewport({ scale: targetWidth / Math.max(originalViewport.width, 1) });
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.floor(viewport.width);
+  canvas.height = Math.floor(viewport.height);
+  const context = canvas.getContext('2d', { alpha: false });
+  if (!context) return null;
+  // Fondo blanco inicial (simulando hoja de papel física)
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  // @ts-ignore pdfjs 6 acepta canvasContext
+  await page.render({ canvasContext: context, viewport }).promise;
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+  // Liberar memoria gráfica del canvas inmediatamente
+  canvas.width = 0;
+  canvas.height = 0;
+  return blob;
+}
+
+const canRender = () => typeof window !== 'undefined' && typeof document !== 'undefined';
+
 /**
  * 🖼️ PDFThumbnailService
- * 
- * Genera vistas previas en miniatura (thumbnails) en alta definición de la
- * primera página de archivos PDF adjuntos (fichas técnicas, diagramas, certificados).
+ *
+ * Renderiza páginas de PDF adjuntos (fichas técnicas, diagramas, certificados) a JPEG
+ * para vistas previas del catálogo y del dock de anexos.
  */
 export class PDFThumbnailService {
-  /**
-   * Genera una miniatura en Base64 JPEG de la primera página del documento PDF.
-   * Con límite de tiempo estricto (timeout de 2500ms) para garantizar que nunca
-   * bloquee la subida de archivos si el PDF es corrupto o el worker tiene anomalías.
-   * 
-   * @param buffer ArrayBuffer o Uint8Array con los bytes del PDF
-   * @param targetWidth Ancho deseado en píxeles (default: 160px para nitidez en retina displays)
-   */
-  static async generateThumbnail(
-    buffer: ArrayBuffer | Uint8Array,
-    targetWidth: number = 160
-  ): Promise<string> {
-    if (typeof window === 'undefined' || typeof document === 'undefined') {
-      return '';
-    }
+  /** Primera página como JPEG; `null` si el PDF es inválido o tarda más que `timeoutMs`. */
+  static async renderFirstPage(buffer: ArrayBuffer | Uint8Array, targetWidth = 160, timeoutMs = 8000): Promise<Blob | null> {
+    if (!canRender()) return null;
+    const work = openDocument(buffer, async (pdf) => (pdf.numPages < 1 ? null : renderPage(pdf, 1, targetWidth))).catch((err) => {
+      console.warn('Advertencia generando miniatura de PDF (usando fallback visual sin bloquear):', err);
+      return null;
+    });
+    return withTimeout(work, timeoutMs, null);
+  }
 
-    const renderProcess = async (): Promise<string> => {
-      let loadingTask: any = null;
-      try {
-        const data = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
-        // Clonar buffer para que PDF.js no lo transfiera ni desvincule
-        const dataCopy = data.slice(0);
-
-        loadingTask = pdfjsLib.getDocument({
-          data: dataCopy,
-          useSystemFonts: true,
-          disableFontFace: true,
-        });
-
-        const pdfDoc = await loadingTask.promise;
-        if (pdfDoc.numPages < 1) return '';
-
-        const page = await pdfDoc.getPage(1);
-        const originalViewport = page.getViewport({ scale: 1 });
-        const scale = targetWidth / Math.max(originalViewport.width, 1);
-        const viewport = page.getViewport({ scale });
-
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.floor(viewport.width);
-        canvas.height = Math.floor(viewport.height);
-        const context = canvas.getContext('2d', { alpha: false });
-
-        if (!context) return '';
-
-        // Fondo blanco inicial (simulando hoja de papel física)
-        context.fillStyle = '#ffffff';
-        context.fillRect(0, 0, canvas.width, canvas.height);
-
-        // @ts-ignore
-        const renderTask = page.render({
-          canvasContext: context,
-          viewport: viewport,
-        });
-
-        await renderTask.promise;
-
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-
-        // Liberar memoria gráfica del canvas inmediatamente
-        canvas.width = 0;
-        canvas.height = 0;
-
-        return dataUrl;
-      } catch (err) {
-        console.warn('Advertencia generando miniatura de PDF (usando fallback visual sin bloquear):', err);
-        if (loadingTask && typeof loadingTask.destroy === 'function') {
-          try {
-            loadingTask.destroy();
-          } catch (_) {}
-        }
-        return '';
+  /** Las primeras `maxPages` páginas como JPEG y el total de páginas del documento. */
+  static async renderPages(buffer: ArrayBuffer | Uint8Array, targetWidth = 720, maxPages = 8): Promise<{ pages: Blob[]; pageCount: number }> {
+    if (!canRender()) return { pages: [], pageCount: 0 };
+    return openDocument(buffer, async (pdf) => {
+      const pages: Blob[] = [];
+      for (let number = 1; number <= Math.min(pdf.numPages, maxPages); number++) {
+        const page = await renderPage(pdf, number, targetWidth);
+        if (page) pages.push(page);
       }
-    };
+      return { pages, pageCount: pdf.numPages };
+    });
+  }
 
-    // Timeout de seguridad: Si no responde en 2.5s, retornar cadena vacía de inmediato
-    return Promise.race([
-      renderProcess(),
-      new Promise<string>((resolve) => setTimeout(() => resolve(''), 2500)),
-    ]);
+  /**
+   * Miniatura en Data URL JPEG de la primera página (envoltura de `renderFirstPage`).
+   * Límite de 2500 ms para no bloquear la subida si el PDF es corrupto o el worker falla.
+   */
+  static async generateThumbnail(buffer: ArrayBuffer | Uint8Array, targetWidth: number = 160): Promise<string> {
+    const blob = await PDFThumbnailService.renderFirstPage(buffer, targetWidth, 2500);
+    if (!blob) return '';
+    return new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(blob);
+    });
   }
 }

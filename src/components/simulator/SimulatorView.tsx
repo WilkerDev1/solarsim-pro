@@ -1,9 +1,13 @@
 import { isReaderRole } from '../../../shared/permissions';
 import React, { useState, useCallback, useEffect } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
+import { energyCalculationMode } from '../../../shared/applicationFeatures';
+import { effectiveFeatureSettings } from '../../features/application/featurePolicy';
 import { fetchSolarRadiationByCoordinates } from '../../services/solarRadiationApi';
 import { Shield, Trash2, RotateCcw, ArrowLeft, Undo2, Redo2 } from 'lucide-react';
 import { ParameterSidebar } from './sidebar/ParameterSidebar';
+import { SAMPLE_GPS_COORDINATES } from './params/logic/dockDefaults';
 import { EnergyAnalysisTab } from './tabs/EnergyAnalysisTab';
 import { QuotationEquipmentsTab } from './tabs/QuotationEquipmentsTab';
 import { FinancialReturnTab } from './tabs/FinancialReturnTab';
@@ -22,12 +26,10 @@ export const SimulatorView: React.FC = () => {
     updateMonthlyConsumption,
     updateAllMonthlyConsumption,
     setMonthlyConsumption,
-    saveActiveProject,
     openAIInvoiceModal,
     syncSettings,
     sidebarWidth,
     setSidebarWidth,
-    sidebarTheme,
     restoreProject,
     hardDeleteProject,
     setActiveView,
@@ -36,11 +38,10 @@ export const SimulatorView: React.FC = () => {
     canRedo,
     undo,
     redo,
-  } = useSimulationStore();
+  } = useSimulationStore(useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId, getActiveProject: s.getActiveProject, getFinancialSummary: s.getFinancialSummary, updateClient: s.updateClient, updateSpecs: s.updateSpecs, updateRates: s.updateRates, updateFinancials: s.updateFinancials, updateMonthlyConsumption: s.updateMonthlyConsumption, updateAllMonthlyConsumption: s.updateAllMonthlyConsumption, setMonthlyConsumption: s.setMonthlyConsumption, openAIInvoiceModal: s.openAIInvoiceModal, syncSettings: s.syncSettings, sidebarWidth: s.sidebarWidth, setSidebarWidth: s.setSidebarWidth, restoreProject: s.restoreProject, hardDeleteProject: s.hardDeleteProject, setActiveView: s.setActiveView, setIsTrashActive: s.setIsTrashActive, canUndo: s.canUndo, canRedo: s.canRedo, undo: s.undo, redo: s.redo, energyMode: energyCalculationMode(effectiveFeatureSettings(s)) })));
 
   const project = getActiveProject();
   const summary = getFinancialSummary();
-  const isDark = sidebarTheme === 'dark';
 
   // Navigation tab for the right content area
   const [activeMainTab, setActiveMainTab] = useState<'energia' | 'cotizacion' | 'retorno'>('energia');
@@ -114,10 +115,10 @@ export const SimulatorView: React.FC = () => {
 
   // Handler for GPS satellite solar radiation fetching
   const handleFetchSolarApi = async () => {
-    const coords = project.client.coordinates || '18.4861, -69.9312';
+    const coords = project.client.coordinates || SAMPLE_GPS_COORDINATES;
     const parts = coords.split(',').map((p) => parseFloat(p.trim()));
     if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) {
-      setSolarApiStatus('⚠️ Formato inválido. Usa: Latitud, Longitud (ej: 18.4861, -69.9312)');
+      setSolarApiStatus(`⚠️ Formato inválido. Usa: Latitud, Longitud (ej: ${SAMPLE_GPS_COORDINATES})`);
       return;
     }
 
@@ -145,7 +146,6 @@ export const SimulatorView: React.FC = () => {
         project={project}
         projects={projects}
         summary={summary}
-        isDark={isDark}
         sidebarWidth={sidebarWidth}
         isDragging={isDragging}
         onMouseDown={handleMouseDown}
@@ -156,7 +156,6 @@ export const SimulatorView: React.FC = () => {
         updateSpecs={project.isDeleted ? () => {} : updateSpecs}
         updateRates={project.isDeleted ? () => {} : updateRates}
         updateFinancials={project.isDeleted ? () => {} : updateFinancials}
-        saveActiveProject={project.isDeleted ? () => {} : saveActiveProject}
       />
 
       {/* Main Content Area */}

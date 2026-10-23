@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
+import { useShallow } from 'zustand/react/shallow';
 import {
   Sun,
   Moon,
@@ -13,6 +14,7 @@ import {
   Trash2,
   X,
   Building2,
+  Users,
 } from "lucide-react";
 
 interface PrimaryIconDockProps {
@@ -44,7 +46,7 @@ export const PrimaryIconDock: React.FC<PrimaryIconDockProps> = ({
     setIsTrashActive,
     projects,
     geminiModel,
-  } = useSimulationStore();
+  } = useSimulationStore(useShallow((s) => ({ activeView: s.activeView, setActiveView: s.setActiveView, sidebarTheme: s.sidebarTheme, toggleSidebarTheme: s.toggleSidebarTheme, openNewProjectModal: s.openNewProjectModal, openAIInvoiceModal: s.openAIInvoiceModal, openAIDatasheetModal: s.openAIDatasheetModal, openAIPriceCatalogModal: s.openAIPriceCatalogModal, openUpdateModal: s.openUpdateModal, openSettingsModal: s.openSettingsModal, isSettingsModalOpen: s.isSettingsModalOpen, closeSettingsModal: s.closeSettingsModal, updateInfo: s.updateInfo, setActiveFolderId: s.setActiveFolderId, setActiveTeamMemberFilter: s.setActiveTeamMemberFilter, isTrashActive: s.isTrashActive, setIsTrashActive: s.setIsTrashActive, projects: s.projects, geminiModel: s.geminiModel })));
 
   const [isAIMenuOpen, setIsAIMenuOpen] = useState(false);
   const aiMenuRef = useRef<HTMLDivElement>(null);
@@ -176,6 +178,40 @@ export const PrimaryIconDock: React.FC<PrimaryIconDockProps> = ({
             {!assistantActive &&
               !isSettingsModalOpen &&
               activeView === "companies-hub" && (
+                <span className="absolute -left-2 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-emerald-400 rounded-r-full" />
+              )}
+          </button>
+
+          {/* Directorio de clientes */}
+          <button
+            onClick={() => {
+              beforeNavigate?.();
+              if (isSettingsModalOpen) closeSettingsModal();
+              setActiveView("clients-hub");
+              setIsTrashActive(false);
+              setIsAIMenuOpen(false);
+            }}
+            className={`w-11 h-11 rounded-lg flex items-center justify-center transition-all cursor-pointer relative ${
+              !assistantActive &&
+              !isSettingsModalOpen &&
+              activeView === "clients-hub"
+                ? "bg-emerald-900/60 text-emerald-300"
+                : "text-slate-400 hover:text-white hover:bg-[#283243]"
+            }`}
+            aria-current={
+              !assistantActive &&
+              !isSettingsModalOpen &&
+              activeView === "clients-hub"
+                ? "page"
+                : undefined
+            }
+            aria-label="Clientes"
+            title="Clientes: directorio y propuestas enlazadas"
+          >
+            <Users className="w-5 h-5" />
+            {!assistantActive &&
+              !isSettingsModalOpen &&
+              activeView === "clients-hub" && (
                 <span className="absolute -left-2 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-emerald-400 rounded-r-full" />
               )}
           </button>

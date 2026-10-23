@@ -3,6 +3,10 @@ import { useSimulationStore } from '../store/useSimulationStore';
 import type { ExtractedDatasheetData } from '../types/equipment';
 import { planDatasheetImport } from '../utils/datasheetImport';
 import { uploadEquipmentAsset } from './equipmentAssetService';
+import { datasheetFileName } from '../utils/proposalDatasheets';
+
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_IMAGES = 6;
 
 export interface DatasheetImportReceipt {
   created: number;
@@ -66,9 +70,26 @@ export async function attachImportedDatasheet(receipt: DatasheetImportReceipt, f
     return state;
   };
   const state = ensureCurrent();
-  const asset = await uploadEquipmentAsset(receipt.server, state.syncSettings.authToken!, file, 'datasheet', signal);
+  // A scanned photo is an equipment image: it previews in the catalog but never becomes a PDF annex.
+  const kind = IMAGE_TYPES.includes(file.type) ? 'image' : 'datasheet';
+  const asset = await uploadEquipmentAsset(receipt.server, state.syncSettings.authToken!, file, kind, signal);
   const current = ensureCurrent();
-  for (const id of receipt.ids) current.updateEquipmentItem(id, { datasheetAssetId: asset.id, datasheetName: asset.name });
-  if (!receipt.ids.every(id => useSimulationStore.getState().equipmentCatalog.some(item => item.id === id && item.datasheetAssetId === asset.id)))
-    throw new Error('No se pudo vincular la ficha a todos los equipos. Revisa sus adjuntos en el catálogo.');
+  for (const id of receipt.ids) {
+    const item = current.equipmentCatalog.find(item => item.id === id)!;
+    if (kind === 'datasheet') {
+      // The server keeps the first upload's name for identical files; each model names it after itself.
+      current.updateEquipmentItem(id, { datasheetAssetId: asset.id, datasheetName: datasheetFileName(item.displayName, file.type) });
+    } else if (!(item.imageAssetIds || []).includes(asset.id)) {
+      if ((item.imageAssetIds?.length || 0) >= MAX_IMAGES) continue; // reported below as not linked
+      const ids = item.imageAssetIds || [];
+      current.updateEquipmentItem(id, { imageAssetIds: [...ids, asset.id], imageNames: [...ids.map((_, index) => item.imageNames?.[index] || `Imagen ${index + 1}`), item.displayName] });
+    }
+  }
+  const linked = (item: { datasheetAssetId?: string; imageAssetIds?: string[] }) =>
+    kind === 'datasheet' ? item.datasheetAssetId === asset.id : (item.imageAssetIds || []).includes(asset.id);
+  const unlinked = receipt.ids.map(id => useSimulationStore.getState().equipmentCatalog.find(item => item.id === id)).filter(item => !item || !linked(item));
+  // A full gallery is reported, so the scanner keeps the photo pending instead of claiming it was attached.
+  const full = unlinked.find(item => kind === 'image' && (item?.imageAssetIds?.length || 0) >= MAX_IMAGES);
+  if (full) throw new Error(`${full.displayName} ya tiene ${MAX_IMAGES} imágenes. Quita una en el catálogo y vuelve a intentar.`);
+  if (unlinked.length) throw new Error('No se pudo vincular el archivo a todos los equipos. Revisa sus adjuntos en el catálogo.');
 }

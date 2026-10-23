@@ -6,6 +6,7 @@ import { DEFAULT_LOCAL_COMPANY } from '../types/companyProfile';
 import { documentLogo, webHeaderLogo } from '../utils/documentLogo';
 import { PDFCoverPage } from '../components/pdf/pages/PDFCoverPage';
 import { PDFHeaderBanner } from '../components/pdf/PDFHeaderBanner';
+import { DocumentEditorProvider } from '../components/pdf/editor/DocumentEditorContext';
 import { companyDocumentCustomization } from '../utils/companyDocumentTemplate';
 import { serializeSimulationStore } from '../store/persistence/serializeSimulationStore';
 import { hydrateSimulationStore } from '../store/persistence/hydrateSimulationStore';
@@ -56,7 +57,8 @@ for (const name of ['ELECTSUN', 'Electsun Dominicana S.R.L.', 'Otra empresa']) {
 }
 const theme = { id: 'test', name: 'Test', primary: '#123456', secondary: '#345678', accent: '#123456', accentDark: '#123456', accentLightBg: '#fff', accentBorder: '#123456', barColor: '#123456' };
 for (const name of ['Electsun', 'Otra empresa S.R.L.']) {
-  const header = renderToStaticMarkup(React.createElement(PDFHeaderBanner, { activeTheme: theme, projectId: next.id, clientName: next.client.name, systemCapacityKWp: 10, location: 'QA', currentDateStr: '7 octubre', pageTitle: 'QA', customization: { ...next.customization, companyName: name } }));
+  const headerProject = { ...next, customization: { ...next.customization, companyName: name } };
+  const header = renderToStaticMarkup(React.createElement(DocumentEditorProvider, { project: headerProject, summary: store().getFinancialSummary(), currentDateStr: '7 octubre', children: React.createElement(PDFHeaderBanner, { activeTheme: theme, projectId: next.id, clientName: next.client.name, systemCapacityKWp: 10, location: 'QA', currentDateStr: '7 octubre', pageTitle: 'QA', customization: headerProject.customization }) }));
   assert.ok(header.includes('src="data:image/png;base64,Yg=="'));
 }
 const legacy = companyDocumentCustomization(issuerA, { quoteDate: '1990-01-01', clientEmail: 'old-client@example.test', attachedPdfs: [{ id: 'private', fileName: 'private.pdf', fileSize: 100, pageCount: 1, title: 'Private', uploadedAt: '', enabled: true, addToTableOfContents: true }], extraTocItems: [{ id: 'private', title: 'Private' }] }, {});

@@ -383,6 +383,54 @@ El arrastre espera (850ms) sobre destino antes de activar contorno, fondo contex
 
 Esta actualización documental se basa en las fuentes construidas citadas. No atribuye revisión visual a las capturas nuevas de `.impeccable/review/four-updates/`, que no se abrieron en este registro, ni confirma despliegue o sincronización entre dispositivos. No añade seguimiento comercial a Finanzas del simulador.
 
+## Dock de parámetros (variante C)
+
+El dock de parámetros del simulador (`src/components/simulator/sidebar/` y `params/`) usa un sistema plano propio, independiente de los roles `cc-*` del centro empresarial. Los colores son variables CSS `--pd-*` en `src/index.css`: los valores claros van en `:root` y los oscuros en `.dark`. Se registran como `pd-*` en `tailwind.config.js` (`theme.extend.colors`) y se consumen por clase (`bg-pd-panel`, `text-pd-muted`, `border-pd-border`). El modo oscuro vive en los tokens: ningún componente del dock lee `isDark` ni escribe un color suelto de Tailwind (`emerald-*`, `slate-*`, `amber-*`).
+
+### Tokens `pd-*`
+
+| Token | Claro | Oscuro | Uso |
+| --- | --- | --- | --- |
+| `pd-panel` | `#ffffff` | `#18181b` | Fondo del panel del dock |
+| `pd-border` | `#e4e4e7` | `#2e2e33` | Bordes y divisores de sección |
+| `pd-text` | `#18181b` | `#fafafa` | Títulos y valores |
+| `pd-muted` | `#52525b` | `#a1a1aa` | Etiquetas y unidades |
+| `pd-strong` | `#3f3f46` | `#d4d4d8` | Encabezado del dock y texto de campos deshabilitados |
+| `pd-subtle` | `#71717a` | `#71717a` | Texto terciario e iconos de ayuda |
+| `pd-field` | `#f4f4f5` | `#27272a` | Campos, selects y botones inactivos |
+| `pd-field-border` | `#e4e4e7` | `#3f3f46` | Borde de campos |
+| `pd-field-ro` | `#fafafa` | `#1f1f22` | Fondo de campos de solo lectura |
+| `pd-field-ro-border` | `#d4d4d8` | `#3f3f46` | Borde punteado de campos de solo lectura |
+| `pd-outline` | `#d4d4d8` | `#3f3f46` | Contorno de botones secundarios |
+| `pd-item` | `#fafafa` | `#202023` | Tarjetas de ítem y franjas de indicadores |
+| `pd-icon-tile` | `#18181b` | `#27272a` | Fondo del cuadro de icono de sección |
+| `pd-icon-tile-border` | `#18181b` | `#3f3f46` | Borde del cuadro de icono |
+| `pd-icon-tile-text` | `#ffffff` | `#fafafa` | Icono del cuadro de icono |
+| `pd-accent` | `#047857` | `#10b981` | Único acento: selección, interruptor activo, acción principal |
+| `pd-on-accent` | `#ffffff` | `#052e1c` | Texto o icono sobre el acento |
+| `pd-warn-bg` | `#fef3c7` | `#3a2a0c` | Fondo del chip «valor distinto al oficial» |
+| `pd-warn-text` | `#92400e` | `#fcd34d` | Texto del chip de advertencia |
+| `pd-negative` | `#be123c` | `#fda4af` | Descuentos y acciones destructivas |
+| `pd-switch-off` | `#d4d4d8` | `#3f3f46` | Interruptor apagado |
+| `pd-knob` | `#ffffff` | `#fafafa` | Botón interior del interruptor apagado |
+| `pd-chip-bg` | `#e4e4e7` | `#3f3f46` | Fondo de chips informativos |
+| `pd-chip-text` | `#3f3f46` | `#e4e4e7` | Texto de chips informativos |
+| `pd-solar` | `#f59e0b` | `#fbbf24` | Leyenda de energía: solar |
+| `pd-grid` | `#a1a1aa` | `#71717a` | Leyenda de energía: red |
+| `pd-bess` | `#0891b2` | `#22d3ee` | Leyenda de energía: batería |
+
+### Reglas de uso
+
+- **Un solo acento, solo para estado activo.** `pd-accent` aparece únicamente en la opción seleccionada, el interruptor activo, el margen seleccionado, el precio de venta y el atajo «Hoy». No colorea secciones, encabezados ni decoración.
+- **Interruptor cuadrado.** `SquareSwitch` mide 34 × 20 px, con esquinas de 5 px y botón interior de 16 px con esquinas de 3 px y margen de 2 px. Nunca es redondo. Lleva `role="switch"` y `aria-checked`.
+- **Campos de solo lectura con borde punteado.** Un valor bloqueado (identificadores) usa `Field` con la variante `locked`: borde punteado `pd-field-ro-border` sobre `pd-field-ro`. El texto deshabilitado sigue legible (`-webkit-text-fill-color` con `pd-strong`).
+- **Sin fondos de color por sección, sin emojis ni párrafos explicativos.** Las explicaciones (Ley 57-07, SIE-007, la nota de DGII) van en un `InfoTip` (icono ⓘ con tooltip y `aria-label` con el texto completo).
+- **Valor distinto al oficial.** Solo `WarnChip` usa `pd-warn-bg` y `pd-warn-text`. Los descuentos y las acciones destructivas usan `pd-negative`.
+- **Leyenda de energía.** `pd-solar`, `pd-grid` y `pd-bess` solo existen en `EnergyLegend`.
+- **Forma y tipografía.** Radio de 6 px en campos, botones, interruptor y cuadro de icono; 12 px en el panel. Inter, con valores numéricos e identificadores en `font-mono`. Etiquetas de 13 px en filas y de 12 px sobre campos; subencabezados de 11 px en mayúsculas con espaciado de .08em. Encabezado de sección de 48 px con cuadro de icono de 28 px.
+- **Contraste.** Mínimo de 4.5:1 en texto, en ambos modos.
+- **Componentes base cerrados.** Viven en `params/ui/`; si una sección necesita algo más, lo crea en su propia carpeta en vez de editarlos.
+
 ## Do's and Don'ts
 
 ### Do:

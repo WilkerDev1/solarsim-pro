@@ -1,10 +1,11 @@
 import { isAdminRole, isReaderRole, normalizeRole } from '../../../../shared/permissions';
 import React, { useEffect, useRef, useState } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { User, Edit3, LogOut, RefreshCw, CheckCircle2, AlertCircle, Shield, Building2, Eye, EyeOff } from 'lucide-react';
 
 export const ProfileSection: React.FC = () => {
-  const { syncSettings, loginUser, registerUser, logoutUser, validateSession } = useSimulationStore();
+  const { syncSettings, loginUser, registerUser, logoutUser, validateSession } = useSimulationStore(useShallow((s) => ({ syncSettings: s.syncSettings, loginUser: s.loginUser, registerUser: s.registerUser, logoutUser: s.logoutUser, validateSession: s.validateSession })));
   const currentUser = syncSettings.currentUser;
   const mounted = useRef(true);
   const authRequest = useRef(0);

@@ -1,6 +1,7 @@
 import { isWriterRole } from '../../../shared/permissions';
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
+import { useShallow } from 'zustand/react/shallow';
 import { SolarEquipmentItem, EquipmentType } from "../../types/equipment";
 import { SupplierManagerSection } from "./SupplierManagerSection";
 import {
@@ -28,6 +29,7 @@ import {
 } from "lucide-react";
 import { EquipmentOffersEditor } from "./equipment/EquipmentOffersEditor";
 import { EquipmentAssetsEditor } from "./equipment/EquipmentAssetsEditor";
+import { CatalogEquipmentRow } from "./equipment/CatalogEquipmentRow";
 import { EquipmentEditorModal } from "./EquipmentEditorModal";
 import { normalizeBrandName } from "../../utils/equipmentBrandUtils";
 import { confirmAction } from "./confirmAction";
@@ -52,7 +54,7 @@ export const EquipmentManagerSettingsTab: React.FC<
     syncSettings,
     equipmentConflicts,
     resolveEquipmentConflict,
-  } = useSimulationStore();
+  } = useSimulationStore(useShallow((s) => ({ equipmentCatalog: s.equipmentCatalog, addEquipmentItem: s.addEquipmentItem, updateEquipmentItem: s.updateEquipmentItem, removeEquipmentItem: s.removeEquipmentItem, resetEquipmentCatalogToDefaults: s.resetEquipmentCatalogToDefaults, openAIDatasheetModal: s.openAIDatasheetModal, openAIPriceCatalogModal: s.openAIPriceCatalogModal, openSupplierPriceModal: s.openSupplierPriceModal, syncEquipmentWithServer: s.syncEquipmentWithServer, syncSettings: s.syncSettings, equipmentConflicts: s.equipmentConflicts, resolveEquipmentConflict: s.resolveEquipmentConflict })));
 
   const canEdit =
     !syncSettings.currentUser ||
@@ -232,7 +234,8 @@ export const EquipmentManagerSettingsTab: React.FC<
       capacityAh: type === "battery" ? 314 : undefined,
       voltageV: type === "battery" ? 51.2 : undefined,
       dodPct: type === "battery" ? 90 : undefined,
-      batteryEfficiencyPct: type === "battery" ? 95 : undefined,
+      // Sin dato: el motor aplica el 90 % por defecto (shared/projectDefaults), el catálogo no lo fuerza.
+      batteryEfficiencyPct: undefined,
       efficiencyPct:
         type === "panel" ? 22.2 : type === "inverter" ? 97.5 : undefined,
       tempCoeff: type === "panel" ? -0.29 : undefined,
@@ -678,148 +681,19 @@ export const EquipmentManagerSettingsTab: React.FC<
                     : "divide-y divide-slate-200"
                 }
               >
-                {filteredItems.map((item) => {
-                  const prices = (item.supplierPrices || []).filter(
-                    (offer) =>
-                      Number.isFinite(offer.priceUSD) &&
-                      offer.priceUSD > 0 &&
-                      offer.stockStatus !== "out_of_stock",
-                  );
-                  const nominal =
-                    item.type === "panel"
-                      ? `${item.powerW ?? "—"} Wp`
-                      : item.type === "inverter"
-                        ? `${item.powerKW ?? "—"} kW AC`
-                        : `${item.capacityKWh ?? "—"} kWh`;
-                  const conflict = equipmentConflicts[item.id];
-                  return (
-                    <React.Fragment key={item.id}>
-                      <tr
-                        className="hover:bg-slate-50 dark:hover:bg-zinc-800/50"
-                      >
-                        <td className="max-w-sm px-4 py-3">
-                          <button
-                            onClick={() => handleOpenEdit(item)}
-                            className={`text-left font-semibold hover:underline focus-visible:ring-2 focus-visible:ring-emerald-500 text-slate-900 dark:text-zinc-100`}
-                          >
-                            {item.displayName}
-                          </button>
-                          <p
-                            className={`mt-1 text-xs text-slate-600 dark:text-zinc-400`}
-                          >
-                            {item.brand || "Sin marca"} ·{" "}
-                            {item.modelSeries || "Sin modelo"} ·{" "}
-                            {item.type === "panel"
-                              ? "Panel"
-                              : item.type === "inverter"
-                                ? "Inversor"
-                                : "Batería"}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3 tabular-nums">
-                          <span className="font-medium">{nominal}</span>
-                          <p
-                            className={`mt-1 text-xs text-slate-600 dark:text-zinc-400`}
-                          >
-                            {item.type === "panel"
-                              ? item.efficiencyPct !== undefined
-                                ? `${item.efficiencyPct}% eficiencia`
-                                : "Eficiencia sin dato"
-                              : item.type === "inverter"
-                                ? item.mpptCount !== undefined
-                                  ? `${item.mpptCount} MPPT`
-                                  : "MPPT sin dato"
-                                : item.dodPct !== undefined
-                                  ? `${item.dodPct}% DoD`
-                                  : "DoD sin dato"}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <button
-                            className="text-left font-medium hover:underline focus-visible:ring-2 focus-visible:ring-emerald-500"
-                            onClick={() => openSupplierPriceModal(item)}
-                          >
-                            {prices.length
-                              ? `$${Math.min(...prices.map((p) => p.priceUSD)).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                              : "Sin precio disponible"}
-                          </button>
-                          <p
-                            className={`mt-1 text-xs text-slate-600 dark:text-zinc-400`}
-                          >
-                            {item.supplierPrices?.length || 0} ofertas
-                            registradas
-                          </p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex gap-2">
-                            <button
-                              className={button}
-                              onClick={() => handleOpenEdit(item)}
-                            >
-                              {canEdit ? "Editar" : "Consultar"}
-                            </button>
-                            <button
-                              className={button}
-                              disabled={!canEdit}
-                              aria-label={`Eliminar ${item.displayName}`}
-                              onClick={() => setItemToDelete(item)}
-                            >
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                      {conflict && (
-                        <tr>
-                          <td
-                            colSpan={4}
-                            className={`px-4 py-3 bg-amber-50 text-amber-950 dark:bg-amber-950 dark:text-amber-100`}
-                          >
-                            <p className="mb-2 text-sm">
-                              Cambios de este equipo pendientes de resolver con
-                              el servidor.
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                className={button}
-                                disabled={!canEdit || !conflict.serverItem}
-                                onClick={() =>
-                                  resolveEquipmentConflict(
-                                    item.id,
-                                    "accept_server",
-                                  )
-                                }
-                              >
-                                Usar servidor
-                              </button>
-                              <button
-                                className={button}
-                                disabled={!canEdit || !conflict.serverItem}
-                                onClick={() =>
-                                  resolveEquipmentConflict(
-                                    item.id,
-                                    "keep_local",
-                                  )
-                                }
-                              >
-                                Conservar local
-                              </button>
-                              <button
-                                className={button}
-                                disabled={!canEdit}
-                                onClick={() =>
-                                  resolveEquipmentConflict(item.id, "fork")
-                                }
-                              >
-                                Guardar copia
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
+                {filteredItems.map((item) => (
+                  <CatalogEquipmentRow
+                    key={item.id}
+                    item={item}
+                    conflict={equipmentConflicts[item.id]}
+                    canEdit={canEdit}
+                    button={button}
+                    handleOpenEdit={handleOpenEdit}
+                    openSupplierPriceModal={openSupplierPriceModal}
+                    setItemToDelete={setItemToDelete}
+                    resolveEquipmentConflict={resolveEquipmentConflict}
+                  />
+                ))}
                 {!filteredItems.length && (
                   <tr>
                     <td colSpan={4} className="px-6 py-10 text-center">

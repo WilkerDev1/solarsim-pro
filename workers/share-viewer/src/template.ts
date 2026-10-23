@@ -2,7 +2,10 @@ import { StoredProposal } from './types';
 import { cleanClientName, getTariffDisplayName } from '../../../shared/proposalPresentation';
 import { customItemsTaxBreakdown, LEY5707_CREDIT_RATE } from '../../../shared/financialRules';
 import { ELECTSUN_LOGO_COLOR_BASE64 } from '../../../shared/electsunLogoColor';
-import { escapeHtml, formatMarkdown, safeLogoUrl, scriptJson } from './escaping';
+import { escapeHtml, formatInlineMarkdown, formatMarkdown, safeLogoUrl, scriptJson } from './escaping';
+import { createDocumentTextContext, docTextKey, interpolate, viewerText } from '../../../shared/documentTexts';
+import { ENERGY_FLOW_CSS, renderEnergyFlowSection } from './energyFlow';
+import { isBuiltInFeatureAvailable } from '../../../shared/applicationFeatures';
 
 export function renderExpiredPage(companyName = 'electsun', companyPhone = '+1 (809) 378-6590'): string {
   return `<!DOCTYPE html>
@@ -233,28 +236,32 @@ export function renderProposalPage(stored: StoredProposal): string {
   const year10Obj = cf25[9] || year1Obj;
   const year25Obj = cf25[cf25.length - 1] || year1Obj;
 
-  const panelWarranty = custom.panelWarrantyText || '25 Años';
-  const inverterWarranty = custom.inverterWarrantyText || '5 a 10 Años';
-  const batteryWarranty = custom.batteryWarrantyText || '5 a 10 Años';
-  const workmanshipWarranty = custom.workmanshipWarrantyText || '1 Año';
-  const servicesText = custom.servicesIncludedText || 'Instalación del contador bidireccional en las EDES, Aprobación de crédito fiscal (CNE) y el Ministerio de Hacienda, Trámites completos ante organismos reguladores';
-  const serviceItems = servicesText.split(/[,;\n]/).map((s: string) => s.trim()).filter((s: string) => s.length > 0);
-  const validityNote = custom.validityNote || `* Equipos según disponibilidad de inventario | * Propuesta válida por ${quoteValidityDays} días | * Precios en USD *`;
-
-  // Dynamic Regulatory text
-  const regP1 = isZeroExport
-    ? 'El sistema fotovoltaico operará bajo la modalidad de Inyección Cero (Zero-Export con limitador antivertido), suministrando energía prioritariamente a los consumos internos del inmueble y evitando cualquier inyección de excedentes hacia la red eléctrica de distribución.'
-    : `La energía generada mensualmente se descontará del consumo tomado de la red de ${isCEPM ? 'CEPM' : 'la distribuidora eléctrica (EDES)'}. Cuando la producción supere el consumo, el excedente se acreditará como descuento en su factura eléctrica bajo el régimen de Medición Neta.`;
-  const regP2 = 'La presente propuesta ha sido elaborada conforme a la Resolución SIE-007-2026-REG y se basa en criterios técnicos y el historial de consumo del cliente.';
-  const regP3 = 'Los ahorros indicados son estimados y pueden variar según los hábitos de consumo, el perfil de carga y las condiciones reales de operación del sistema.';
-  const regP4 = isZeroExport
-    ? `Al operar con limitador antivertido (inyección cero)${hasBattery ? ' y almacenamiento en baterías de litio' : ''}, la totalidad de la energía solar se aprovecha internamente, por lo que el proyecto no genera cargos por derecho de uso de la red bajo la normativa vigente.`
-    : `Para la tarifa ${tariffDisplayName}, el análisis económico considera el cargo por derecho de uso de la red, equivalente al ${exportFee}% del valor de la energía excedente exportada, conforme al régimen de Medición Neta y la normativa vigente (Resolución SIE-007-2026-REG). Por esta razón, el sistema se diseña para optimizar la inyección y el aprovechamiento de la energía solar, obteniendo así el mayor retorno de inversión posible.${hasBattery ? '' : ' Cuando resulte conveniente, se recomendará la incorporación de baterías de litio para incrementar el aprovechamiento directo de la energía generada.'}`;
+  // Textos del documento: publicado (`doc:`) → campo heredado de enlaces antiguos → texto compartido por defecto.
+  const textContext = createDocumentTextContext({
+    clientName, quoteValidityDays, distributor, tariffCode: rawTariffCode, isZeroExport, gridExportFeePct: exportFee, hasBattery,
+    hasBatteryStorage: hasBattery, companyName,
+    // Misma cadena que la app (documentTextContext): persona de contacto → empresa → nombre del cliente.
+    clientContactPerson: client.contactPerson || client.company || clientName || '', clientPhone, clientEmail: custom.clientEmail || client.contactEmail || '',
+  });
+  const customRecord = custom as Record<string, unknown>;
+  const docText = (key: string) => viewerText(key, customRecord, client, textContext);
+  const published = (key: string): string | undefined => {
+    const value = customRecord[docTextKey(key)];
+    return typeof value === 'string' && value.trim() ? value : undefined;
+  };
+  const panelWarranty = docText('quotation.warranty.panel');
+  const inverterWarranty = docText('quotation.warranty.inverter');
+  const batteryWarranty = docText('quotation.warranty.battery');
+  const workmanshipWarranty = docText('quotation.warranty.workmanship');
+  const servicesText = docText('quotation.servicesIncluded');
+  const serviceItems = servicesText.split(/[,;\n]/).map((s: string) => s.replace(/^\s*[-•]\s*/, '').trim()).filter((s: string) => s.length > 0);
+  const validityNote = docText('quotation.validityNote');
 
   // Custom Executive Summary & Page 6 fields
-  const projectSummarySubtitle = custom.projectSummarySubtitle && custom.projectSummarySubtitle.trim()
-    ? custom.projectSummarySubtitle.trim()
-    : `Criterios de dimensionamiento técnico y solar para ${clientName}`;
+  const projectSummarySubtitle = published('projectDescription.subtitle')
+    ?? (custom.projectSummarySubtitle && custom.projectSummarySubtitle.trim()
+      ? interpolate(custom.projectSummarySubtitle.trim(), textContext)
+      : `Criterios de dimensionamiento técnico y solar para ${clientName}`);
 
   const rawPanelDesc = panelBrandModel.replace(/^m[oó]dulos?\s+/i, '').trim();
   const cleanPanelModel = (rawPanelDesc.toLowerCase().includes('w') || panelPowerW <= 0)
@@ -301,7 +308,7 @@ export function renderProposalPage(stored: StoredProposal): string {
       }).join(' y ')
     : `${batteryCount} ${batteryCount === 1 ? 'Batería' : 'Baterías'} ${cleanBatteryModel}`;
 
-  const rawEngineeringScope = custom.projectEngineeringScopeText?.trim() || specs.installationServicesDesc?.trim() || 'junto con todos los componentes de ingeniería complementarios (estructuras de montaje en aluminio anodizado de alta resistencia, cableado fotovoltaico resistente a rayos UV, protecciones en CC/CA, interruptores de desconexión y supresores de sobretensión) para garantizar un funcionamiento seguro, eficiente y duradero del sistema.';
+  const rawEngineeringScope = (custom.projectEngineeringScopeText?.trim() && interpolate(custom.projectEngineeringScopeText.trim(), textContext)) || specs.installationServicesDesc?.trim() || 'junto con todos los componentes de ingeniería complementarios (estructuras de montaje en aluminio anodizado de alta resistencia, cableado fotovoltaico resistente a rayos UV, protecciones en CC/CA, interruptores de desconexión y supresores de sobretensión) para garantizar un funcionamiento seguro, eficiente y duradero del sistema.';
   const engineeringScopeText = rawEngineeringScope.replace(/\.+$/, '');
 
   const equipmentSummary = [
@@ -313,11 +320,11 @@ export function renderProposalPage(stored: StoredProposal): string {
 
   const defaultP2 = `Adicionalmente, se contempla la instalación de **${equipmentSummary}** ${engineeringScopeText}.`;
 
-  const resolvedP1 = (() => {
+  const resolvedP1 = published('projectDescription.paragraph1') ?? (() => {
     if (!custom.customProjectSummaryParagraph1 || !custom.customProjectSummaryParagraph1.trim()) {
       return defaultP1;
     }
-    let text = custom.customProjectSummaryParagraph1.trim();
+    let text = interpolate(custom.customProjectSummaryParagraph1.trim(), textContext);
     text = text
       .replace(/{clientName}/gi, clientName)
       .replace(/{panelCount}/gi, String(panelCount))
@@ -342,11 +349,11 @@ export function renderProposalPage(stored: StoredProposal): string {
     return text;
   })();
 
-  const resolvedP2 = (() => {
+  const resolvedP2 = published('projectDescription.paragraph2') ?? (() => {
     if (!custom.customProjectSummaryParagraph2 || !custom.customProjectSummaryParagraph2.trim()) {
       return defaultP2;
     }
-    let text = custom.customProjectSummaryParagraph2.trim();
+    let text = interpolate(custom.customProjectSummaryParagraph2.trim(), textContext);
     text = text
       .replace(/{inverterCount}/gi, String(inverterCount))
       .replace(/{inverterModel}/gi, multiInvertersDesc)
@@ -369,10 +376,7 @@ export function renderProposalPage(stored: StoredProposal): string {
     return text;
   })();
 
-  const customRegNote = custom.regulatoryNote;
-  const regParagraphs: string[] = (customRegNote && customRegNote.trim() !== '')
-    ? customRegNote.split('\n\n').filter(Boolean)
-    : [regP1, regP2, regP3, regP4];
+  const regParagraphs: string[] = docText('projectDescription.regulatoryNote').split('\n\n').filter(Boolean);
 
   const cleanPhone = companyPhone.replace(/[^0-9]/g, '');
   const whatsappMessage = encodeURIComponent(
@@ -401,6 +405,7 @@ export function renderProposalPage(stored: StoredProposal): string {
   <style>
     body { font-family: 'Plus Jakarta Sans', sans-serif; }
     .font-mono { font-family: 'JetBrains Mono', monospace; }
+${ENERGY_FLOW_CSS}
     
     /* Electsun Corporate Color Accents */
     :root {
@@ -488,6 +493,9 @@ export function renderProposalPage(stored: StoredProposal): string {
         </div>
       </div>
     </header>
+
+    <!-- FLUJO ENERGÉTICO ANIMADO (guía visual aproximada) -->
+    ${isBuiltInFeatureAvailable('proposalEnergyFlowDiagram') ? renderEnergyFlowSection({ hybrid: hasBattery && totalBESSKWh > 0, isZeroExport, annualProductionKWh, monthly: monthlyData, calculationMode: stored.calculationSnapshot?.mode }) : ''}
 
     <!-- 2. RESUMEN EJECUTIVO DE LA SOLUCIÓN PROPUESTA -->
     <section class="bg-white border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">
@@ -788,10 +796,10 @@ export function renderProposalPage(stored: StoredProposal): string {
           <h4 class="font-black uppercase tracking-wider text-sky-950 border-b border-sky-200 pb-1 flex items-center gap-1.5">
             🛡️ Garantías Oficiales
           </h4>
-          <div>• <span class="font-bold text-slate-600">Paneles Solares:</span> <span class="font-bold text-slate-900">${escapeHtml(panelWarranty)}</span></div>
-          <div>• <span class="font-bold text-slate-600">Inversor Solar:</span> <span class="font-bold text-slate-900">${escapeHtml(inverterWarranty)}</span></div>
-          <div>• <span class="font-bold text-slate-600">Batería de Respaldo:</span> <span class="font-bold text-slate-900">${escapeHtml(batteryWarranty)}</span></div>
-          <div>• <span class="font-bold text-slate-600">Instalación y Mano de Obra:</span> <span class="font-bold text-slate-900">${escapeHtml(workmanshipWarranty)}</span></div>
+          <div>• <span class="font-bold text-slate-600">Paneles Solares:</span> <span class="font-bold text-slate-900">${formatInlineMarkdown(panelWarranty)}</span></div>
+          <div>• <span class="font-bold text-slate-600">Inversor Solar:</span> <span class="font-bold text-slate-900">${formatInlineMarkdown(inverterWarranty)}</span></div>
+          <div>• <span class="font-bold text-slate-600">Batería de Respaldo:</span> <span class="font-bold text-slate-900">${formatInlineMarkdown(batteryWarranty)}</span></div>
+          <div>• <span class="font-bold text-slate-600">Instalación y Mano de Obra:</span> <span class="font-bold text-slate-900">${formatInlineMarkdown(workmanshipWarranty)}</span></div>
         </div>
 
         <div class="bg-orange-50/60 border border-orange-200 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 space-y-1.5 text-xs">
@@ -801,14 +809,14 @@ export function renderProposalPage(stored: StoredProposal): string {
           ${serviceItems.map((item: string) => `
             <div class="flex items-start gap-1.5 text-orange-950 font-medium">
               <span class="text-orange-600 font-bold shrink-0">✓</span>
-              <span>${escapeHtml(item)}</span>
+              <span>${formatInlineMarkdown(item)}</span>
             </div>
           `).join('')}
         </div>
       </div>
 
       <div class="text-center text-[10px] text-slate-500 font-semibold italic">
-        ${escapeHtml(validityNote)}
+        ${formatInlineMarkdown(validityNote, "font-bold text-slate-700")}
       </div>
     </section>
 

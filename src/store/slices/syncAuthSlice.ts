@@ -5,6 +5,7 @@ import { projectDifferences } from '../sync/projectDifferences';
 import { SimulationSlice, SyncAuthSlice } from '../types';
 import { featureScope } from '../../../shared/applicationFeatures';
 import { ownsProject, reconcilePulledProjects, acknowledgeProjectPush } from '../sync/projectReconciliation';
+import { reuseRecord } from '../sync/structuralSharing';
 import { SyncService, registerTokenRenewedListener, registerSessionInvalidatedListener, clearInvalidToken } from '../../services/syncService';
 import { acknowledgeQueuedProjectDeletions, createProjectDeletion, ProjectDeletionCommand } from '../sync/projectDeletion';
 import type { ProjectConflictInfo, ProjectSimulation } from '../../types';
@@ -222,18 +223,22 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
     try {
       const folders = await get().syncFoldersWithServer();
       ensureCurrent();
+      // Clients are independent records: unknown ids are accepted by the push, so their errors never block proposals.
+      const clients = await get().syncClientsWithServer();
+      ensureCurrent();
       // Folder errors must not prevent downloading independent project updates.
       const pull = await SyncService.pullProjects(serverUrl, token());
       ensureCurrent();
       if (!pull.success || !pull.projects) throw new Error(pull.error || 'No se pudieron descargar los proyectos.');
       set((state) => {
         const projects = reconcilePulledProjects(state.projects, pull.projects!, pull.deletedIds || [], new Set(state.projectDeletionQueue.filter((item) => item.scope === scope).map((item) => item.id)), serverUrl, currentUser.organizationId);
-        const projectConflicts = Object.fromEntries(Object.entries(state.projectConflicts).filter(([, conflict]) => conflict.scope !== scope || projects.some(project => project.id === conflict.projectId && project.syncStatus === 'conflict')));
+        let projectConflicts = Object.fromEntries(Object.entries(state.projectConflicts).filter(([, conflict]) => conflict.scope !== scope || projects.some(project => project.id === conflict.projectId && project.syncStatus === 'conflict')));
         for (const project of projects) {
           if (project.syncStatus === 'conflict' && ownsProject(project, serverUrl, currentUser.organizationId) && pull.deletedIds?.includes(project.id)) {
             projectConflicts[scope + '|' + project.id] = { scope, reason: 'deleted', projectId: project.id, localVersion: project.baseVersion ?? 0, serverVersion: 0, localProject: project, serverProject: { ...project, isDeleted: true }, lastModifiedByName: '', lastModifiedAt: '', diffs: [] };
           }
         }
+        projectConflicts = reuseRecord(state.projectConflicts, projectConflicts);
         const activeConflict = state.activeConflict?.scope === scope ? projectConflicts[scope + '|' + state.activeConflict.projectId] ?? null : state.activeConflict;
         return { projects, projectConflicts, activeConflict };
       });
@@ -324,7 +329,7 @@ export const createSyncAuthSlice: SimulationSlice<SyncAuthSlice> = (set, get) =>
       const pendingConfirmations = get().projects.filter(project => project.pendingCanonicalAck && ownsProject(project, serverUrl, currentUser.organizationId)).length;
       const unresolvedConflicts = get().projects.filter(project => project.syncStatus === 'conflict' && ownsProject(project, serverUrl, currentUser.organizationId)).length;
       conflicts = Math.max(conflicts, unresolvedConflicts);
-      const message = !folders.success ? `Proyectos descargados; carpetas pendientes: ${folders.message}` : pendingConfirmations ? `${pendingConfirmations} documento(s) guardados en la nube, pendientes de verificar. Vuelve a sincronizar.` : deletionErrors ? `${deletionErrors} eliminación(es) pendientes de confirmar; otros proyectos procesados.` : conflicts ? `${conflicts} proyecto(s) requieren resolver conflictos.` : 'Sincronización completada.';
+      const message = !folders.success ? `Proyectos descargados; carpetas pendientes: ${folders.message}` : pendingConfirmations ? `${pendingConfirmations} documento(s) guardados en la nube, pendientes de verificar. Vuelve a sincronizar.` : deletionErrors ? `${deletionErrors} eliminación(es) pendientes de confirmar; otros proyectos procesados.` : conflicts ? `${conflicts} proyecto(s) requieren resolver conflictos.` : !clients.success ? `Proyectos sincronizados; clientes pendientes: ${clients.message}` : 'Sincronización completada.';
       set((state) => ({ isSyncing: false, syncFeedbackMessage: silent ? null : message, syncSettings: { ...state.syncSettings, lastSyncTimestamp: deletionErrors ? state.syncSettings.lastSyncTimestamp : pull.serverTimestamp || state.syncSettings.lastSyncTimestamp } }));
       if (folders.success && (get().projects.some((project) => project.syncStatus === 'pending' && !project.pendingCanonicalAck && ownsProject(project, serverUrl, currentUser.organizationId)) || (!deletionErrors && get().projectDeletionQueue.some((command) => command.scope === scope)))) get().triggerAutoSync();
       return { success: folders.success && conflicts === 0 && deletionErrors === 0 && pendingConfirmations === 0, message };

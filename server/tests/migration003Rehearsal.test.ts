@@ -294,6 +294,7 @@ test("Comprehensive Migration 003 rehearsal: preserves all 8 business tables, co
     { version: 2, name: "feature_policy_and_tombstones" },
     { version: 3, name: "company_management" },
     { version: 4, name: "shared_resources" },
+    { version: 5, name: "clients" },
   ]);
 
   // 4. Verify ZERO data loss: row counts of all 8 tables are strictly preserved

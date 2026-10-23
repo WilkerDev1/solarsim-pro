@@ -23,7 +23,9 @@ Los enlaces existentes sin snapshot conservan la vista clásica y el resumen pre
 
 El API backend debe incorporar el endpoint de autorización y la política de organización antes de actualizar el Worker y el escritorio. Este cambio no requiere migrar los valores KV existentes ni tocar la base de datos del visor.
 
-Los logotipos personalizados admiten imágenes PNG, JPEG, WebP o GIF en base64 y URLs HTTPS; no se interpretan logotipos SVG/HTML suministrados por usuarios. Los textos permiten únicamente énfasis `**en negrita**`; el HTML suministrado por usuarios se presenta como texto.
+Los logotipos personalizados admiten imágenes PNG, JPEG, WebP o GIF en base64 y URLs HTTPS; no se interpretan logotipos SVG/HTML suministrados por usuarios. Los textos admiten el subconjunto compartido con el editor (`**negrita**`, `*cursiva*`, viñetas con `- ` y párrafos); el HTML suministrado por usuarios se presenta como texto.
+
+Los textos editados en el documento viajan como cadenas `doc:<clave>` dentro de `customization` (solo claves del registro `shared/documentTexts`, hasta 10 000 caracteres). El visor prefiere `doc:<clave>`, luego el campo heredado y por último el texto por defecto compartido, así que los enlaces anteriores siguen renderizándose igual. Ver [docs/PROPOSAL_DOCUMENT_EDITOR.md](../../docs/PROPOSAL_DOCUMENT_EDITOR.md).
 
 ## Verificación local
 

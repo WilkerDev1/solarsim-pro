@@ -1,9 +1,27 @@
+import { DEFAULT_PRICE_PER_WATT_USD, resolveBatteryDodPct, resolveBatteryEfficiencyPct, resolvePricePerWattUSD } from '../../../shared/projectDefaults';
+import { createProjectId } from '../../utils/projectId';
 import { commercialCopy } from '../../../shared/proposalCommercial';
 import { projectMutationMetadata } from '../sync/projectMutation';
 import { SimulationSlice, ImportExportSlice } from '../types';
-import { ProjectSimulation } from '../../types';
+import { ProjectSimulation, SystemSpecs } from '../../types';
 import { BENCHMARK_PROJECT } from '../../engine/referenceCase';
 import { generateNextProjectSequence, generateDuplicateProjectIdentifiers } from '../initialData';
+
+/**
+ * Espejo escalar de DOD/eficiencia de un proyecto importado. Con grupos, sale del grupo principal (sin dato propio: DOD del motor
+ * y eficiencia vacía, nunca el 80 % del caso de referencia ni un escalar obsoleto); sin grupos, del escalar del archivo.
+ */
+function importedBatteryMirror(specs: Partial<SystemSpecs> | undefined): Pick<SystemSpecs, 'batteryDOD' | 'batteryEfficiencyPct'> {
+  const primary = specs?.batteries?.[0];
+  if (specs?.batteries?.length) {
+    const efficiency = primary?.efficiencyPct;
+    return {
+      batteryDOD: resolveBatteryDodPct(primary?.dodPct),
+      batteryEfficiencyPct: efficiency !== undefined && resolveBatteryEfficiencyPct(efficiency) === efficiency ? efficiency : undefined,
+    };
+  }
+  return { batteryDOD: resolveBatteryDodPct(specs?.batteryDOD), batteryEfficiencyPct: specs?.batteryEfficiencyPct };
+}
 
 export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set, get) => ({
   pendingImportConflict: null,
@@ -15,7 +33,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
 
     const exportPayload = {
       app: 'SolarSim Pro',
-      version: '2.6.1',
+      version: '2.7.0',
       exportedAt: new Date().toISOString(),
       type: 'single_project',
       project,
@@ -46,7 +64,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
     const { projects } = get();
     const exportPayload = {
       app: 'SolarSim Pro',
-      version: '2.6.1',
+      version: '2.7.0',
       exportedAt: new Date().toISOString(),
       type: 'projects_backup',
       totalProjects: projects.length,
@@ -104,7 +122,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
       importedList = importedList.map((raw) => ({
         ...BENCHMARK_PROJECT,
         ...raw,
-        id: typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : `proj-${Date.now()}`,
+        id: typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : createProjectId(),
         createdAt: raw.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         status: raw.status || 'Draft',
@@ -118,6 +136,12 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
         specs: {
           ...BENCHMARK_PROJECT.specs,
           ...(raw.specs || {}),
+          // El 80 % del caso de referencia no es un default: sin DOD válido, el del proyecto es el del motor.
+          // El espejo escalar sale del grupo principal; sin dato propio, DOD del motor y eficiencia sin dato.
+          ...importedBatteryMirror(raw.specs),
+          // El $/W y $/kWp del caso de referencia no son un precio del proyecto importado.
+          pricePerWattUSD: resolvePricePerWattUSD(raw.specs, raw.financials),
+          pricePerKWpUSD: raw.specs?.pricePerKWpUSD,
           panelCount: typeof raw.specs?.panelCount === 'number' && raw.specs.panelCount > 0 ? raw.specs.panelCount : 10,
           panelPowerW: typeof raw.specs?.panelPowerW === 'number' && raw.specs.panelPowerW > 0 ? raw.specs.panelPowerW : 620,
         },
@@ -132,7 +156,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
             ...rawFin,
             applyLey5707: rawFin.applyLey5707 !== undefined ? rawFin.applyLey5707 : true,
             applyITBISExemption: rawFin.applyITBISExemption !== undefined ? rawFin.applyITBISExemption : true,
-            pricePerWattUSD: rawFin.pricePerWattUSD || 1.05,
+            pricePerWattUSD: rawFin.pricePerWattUSD || DEFAULT_PRICE_PER_WATT_USD,
             discountRatePct: rawFin.discountRatePct || 12,
             projectLifespanYears: rawFin.projectLifespanYears || 25,
             co2FactorKgPerKWh: rawFin.co2FactorKgPerKWh || 0.481,
@@ -197,7 +221,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
       for (const proj of importedList) {
         let finalId = proj.id;
         if (!finalId || existingIds.has(finalId)) {
-          finalId = `proj-imported-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`;
+          finalId = createProjectId("proj-imported");
         }
         existingIds.add(finalId);
 
@@ -262,7 +286,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
 
     if (strategy === 'next_sequence') {
       const nextSeq = generateNextProjectSequence(currentProjects);
-      const newId = `proj-imported-${Date.now()}`;
+      const newId = createProjectId("proj-imported");
       const newProj: ProjectSimulation = {
         ...incomingProject,
         commercial: commercialCopy(incomingProject, currentUser || undefined),
@@ -300,7 +324,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
       targetActiveId = conflictingProject.id;
       toastMsg = `¡Proyecto "${incomingProject.client.name}" sobrescrito con éxito!`;
     } else if (strategy === 'copy_version') {
-      const newId = `proj-imported-${Date.now()}`;
+      const newId = createProjectId("proj-imported");
       const dupIdentifiers = generateDuplicateProjectIdentifiers(incomingProject, currentProjects);
       const newProj: ProjectSimulation = {
         ...incomingProject,

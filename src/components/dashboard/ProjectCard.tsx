@@ -17,6 +17,7 @@ import {
   calculateTotalPanelCount,
 } from "../../utils/equipmentSpecsUtils";
 import { ProjectActionsMenu } from "./ProjectActionsMenu";
+import { ProposalClientBadge } from "../clients/ProposalClientLink";
 import {
   projectDate,
   projectSyncLabel,
@@ -77,6 +78,7 @@ export const ProjectCard: React.FC<{ project: ProjectSimulation }> = ({
           {project.client.name || "Sin nombre"}
         </button>
       </h3>
+      <ProposalClientBadge project={project} />
       <p className="mt-2 flex items-start gap-1.5 text-xs text-slate-500 dark:text-zinc-400">
         <MapPin className="h-3.5 w-3.5 shrink-0" />
         {project.client.province || project.client.location || "Sin ubicación"}

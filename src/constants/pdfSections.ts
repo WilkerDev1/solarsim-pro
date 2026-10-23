@@ -1,28 +1,6 @@
-export type PDFSectionId =
-  | 'cover'
-  | 'tableOfContents'
-  | 'executiveSummary'
-  | 'aboutUs'
-  | 'benefits'
-  | 'techIntro'
-  | 'projectDescription'
-  | 'energy'
-  | 'quotation'
-  | 'roi'
-  | 'cashFlow'
-  | 'costMatrix';
+import { DOCUMENT_SECTION_IDS, type DocumentSectionId } from '../../shared/documentTexts/sections';
 
-export const DEFAULT_PDF_SECTION_ORDER: PDFSectionId[] = [
-  'cover',
-  'tableOfContents',
-  'executiveSummary',
-  'aboutUs',
-  'benefits',
-  'techIntro',
-  'projectDescription',
-  'energy',
-  'quotation',
-  'roi',
-  'cashFlow',
-  'costMatrix',
-];
+/** Ids de las secciones internas del PDF; los nombres viven en shared/documentTexts/sections. */
+export type PDFSectionId = DocumentSectionId;
+
+export const DEFAULT_PDF_SECTION_ORDER: PDFSectionId[] = [...DOCUMENT_SECTION_IDS];

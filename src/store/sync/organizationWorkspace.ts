@@ -17,6 +17,9 @@ const keys = [
   "folders",
   "folderChanges",
   "folderDeletionQueue",
+  "clients",
+  "clientChanges",
+  "clientDeletionQueue",
   "equipmentCatalog",
   "deletedEquipmentIds",
   "equipmentChanges",
@@ -32,11 +35,15 @@ const keys = [
   "companies",
   "activeCompanyId",
   "localUserProfile",
+  "agentActivity",
 ] as const;
+// Keys added after 2.6 are optional: archives written by older versions lack them and fall back to emptyWorkspace().
+type OptionalWorkspaceKey = "agentActivity";
 export type OrganizationWorkspace = Pick<
   SimulationStore,
-  (typeof keys)[number]
->;
+  Exclude<(typeof keys)[number], OptionalWorkspaceKey>
+> &
+  Partial<Pick<SimulationStore, OptionalWorkspaceKey>>;
 // Cached identity keeps the offline workspace selected even when its token expires.
 // Only explicit logout (no currentUser) returns to the personal local workspace.
 export const workspaceScope = (session: SyncSettings): string =>
@@ -57,6 +64,9 @@ export function emptyWorkspace(): OrganizationWorkspace {
     folders: [],
     folderChanges: {},
     folderDeletionQueue: [],
+    clients: [],
+    clientChanges: {},
+    clientDeletionQueue: [],
     equipmentCatalog: DEFAULT_EQUIPMENT_CATALOG,
     deletedEquipmentIds: [],
     equipmentChanges: {},
@@ -72,6 +82,7 @@ export function emptyWorkspace(): OrganizationWorkspace {
     companies: [DEFAULT_LOCAL_COMPANY],
     activeCompanyId: DEFAULT_LOCAL_COMPANY.id,
     localUserProfile: DEFAULT_LOCAL_USER,
+    agentActivity: [],
   });
 }
 /** One-time partition of legacy mixed project caches. No document is reassigned. */
@@ -296,6 +307,9 @@ export function changeWorkspace(
     ...workspace,
     folderChanges: workspace.folderChanges || {},
     folderDeletionQueue: workspace.folderDeletionQueue || [],
+    clients: workspace.clients || [],
+    clientChanges: workspace.clientChanges || {},
+    clientDeletionQueue: workspace.clientDeletionQueue || [],
     folders: workspace.folders.filter(
       (f) =>
         f.visibility !== "private" ||
@@ -313,6 +327,7 @@ export function changeWorkspace(
         : null,
       activeTeamMemberFilter: null,
       folderSyncFeedback: null,
+      clientSyncFeedback: null,
       workspaceScope: initialized.workspaceScope,
       organizationWorkspaces: {
         ...initialized.organizationWorkspaces,
@@ -331,8 +346,11 @@ export function changeWorkspace(
     workspaceScope: nextScope,
     organizationWorkspaces: archives,
     activeFolderId: null,
+    activeClientId: null,
+    clientSyncFeedback: null,
     activeConflict: null,
     pendingImportConflict: null,
+    pendingAgentActions: [],
     undoStack: [],
     redoStack: [],
     canUndo: false,

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { ProjectSimulation } from '../../types';
 import { calculateDCCapacityKWp } from '../../engine/solarEngine';
 import {
@@ -23,7 +24,7 @@ export const TrashProjectCard: React.FC<TrashProjectCardProps> = ({ project }) =
     setActiveProject,
     restoreProject,
     hardDeleteProject,
-  } = useSimulationStore();
+  } = useSimulationStore(useShallow((s) => ({ setActiveProject: s.setActiveProject, restoreProject: s.restoreProject, hardDeleteProject: s.hardDeleteProject })));
 
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 

@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import {
   Database,
   Download,
@@ -11,7 +12,7 @@ import {
 } from 'lucide-react';
 
 export const BackupSection: React.FC = () => {
-  const { projects, exportAllProjectsAsJSON, importProjectsFromJSON } = useSimulationStore();
+  const { projects, exportAllProjectsAsJSON, importProjectsFromJSON } = useSimulationStore(useShallow((s) => ({ projects: s.projects, exportAllProjectsAsJSON: s.exportAllProjectsAsJSON, importProjectsFromJSON: s.importProjectsFromJSON })));
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [backupMsg, setBackupMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -126,7 +127,7 @@ export const BackupSection: React.FC = () => {
 
         {/* Versión & Sistema */}
         <div className="pt-4 border-t border-slate-100 dark:border-[#27272a] flex flex-wrap items-center justify-between text-xs text-slate-400 dark:text-zinc-500">
-          <span>SolarSim Pro v2.6.1 • Motor Financiero Auditado Ley 57-07</span>
+          <span>SolarSim Pro v2.7.0 • Motor Financiero Auditado Ley 57-07</span>
           <span>Arquitectura Zustand Slices + PostgreSQL Sync</span>
         </div>
       </div>

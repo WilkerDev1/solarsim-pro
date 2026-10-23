@@ -1,4 +1,5 @@
 import { registerFolderRoutes } from "./modules/folders.js";
+import { registerClientRoutes } from "./modules/clients.js";
 import { registerEquipmentAssetRoutes } from "./modules/equipmentAssets.js";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -63,7 +64,7 @@ export function createApp(options: {
       return c.json({
         status: "ok",
         service: "SolarSim Pro Sync API",
-        version: "2.6.1",
+        version: "2.7.0",
         database: "connected",
       });
     } catch {
@@ -76,6 +77,7 @@ export function createApp(options: {
   registerProjectsRoutes(app, deps);
   registerEquipmentRoutes(app, deps);
   registerFolderRoutes(app, deps);
+  registerClientRoutes(app, deps);
   registerEquipmentAssetRoutes(app, deps);
   registerTariffsRoutes(app, deps);
   registerNotificationsRoutes(app, deps);

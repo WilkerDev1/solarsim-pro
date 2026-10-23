@@ -1,6 +1,7 @@
 import React from "react";
 import { SolarEquipmentItem } from "../../types/equipment";
 import { Sun, Cpu, BatteryCharging, Edit2, Check, X } from "lucide-react";
+import { DEFAULT_BATTERY_EFFICIENCY_PCT } from "../../../shared/projectDefaults";
 import { EquipmentOffersEditor } from "./equipment/EquipmentOffersEditor";
 import { EquipmentAssetsEditor } from "./equipment/EquipmentAssetsEditor";
 
@@ -547,7 +548,8 @@ export const EquipmentEditorModal: React.FC<EquipmentEditorModalProps> = ({
                   <input
                     type="number"
                     step="1"
-                    value={editingItem.batteryEfficiencyPct || 95}
+                    value={editingItem.batteryEfficiencyPct || ""}
+                    placeholder={String(DEFAULT_BATTERY_EFFICIENCY_PCT)}
                     onChange={(e) =>
                       setEditingItem({
                         ...editingItem,

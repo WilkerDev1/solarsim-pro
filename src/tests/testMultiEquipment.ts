@@ -255,8 +255,11 @@ if (financialSummary.systemCapacityKWp !== 17.9) {
   throw new Error(`❌ Financial summary systemCapacityKWp expected 17.9, got ${financialSummary.systemCapacityKWp}`);
 }
 
-if (financialSummary.batteryUsableKWh !== 19.4) {
-  throw new Error(`❌ Financial summary batteryUsableKWh expected 19.4, got ${financialSummary.batteryUsableKWh}`);
+// El resumen usa DOD y eficiencia de cada grupo, ponderados por capacidad (90 % y 95 % en ambos modelos):
+// 26.32 kWh × 0.90 × 0.95 = 22.5 kWh. Antes usaba solo los escalares del proyecto (DOD 80 %, eficiencia 92 %)
+// y daba 19.4 kWh; con el escalar de eficiencia unificado en 90 % habría dado 19.0 kWh.
+if (financialSummary.batteryUsableKWh !== 22.5) {
+  throw new Error(`❌ Financial summary batteryUsableKWh expected 22.5, got ${financialSummary.batteryUsableKWh}`);
 }
 
 if (financialSummary.batteryBackupAutonomyHours <= 0) {

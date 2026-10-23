@@ -3,10 +3,11 @@ import React, { useEffect } from 'react';
 import { LockKeyhole, RefreshCw } from 'lucide-react';
 import { BUILT_IN_APPLICATION_FEATURES, APPLICATION_FEATURES, featureScope } from '../../../../shared/applicationFeatures';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { effectiveFeatureSettings } from '../../../features/application/featurePolicy';
 
 export function ApplicationFeaturesSection() {
-  const state = useSimulationStore();
+  const state = useSimulationStore(useShallow((s) => ({ syncSettings: s.syncSettings, organizationFeaturePolicies: s.organizationFeaturePolicies, featurePolicyRequest: s.featurePolicyRequest, localFeatureSettings: s.localFeatureSettings, loadOrganizationFeaturePolicy: s.loadOrganizationFeaturePolicy, appAssistantEnabled: s.appAssistantEnabled, setAppAssistantEnabled: s.setAppAssistantEnabled, saveOrganizationFeaturePolicy: s.saveOrganizationFeaturePolicy, setLocalFeatureSettings: s.setLocalFeatureSettings })));
   const user = state.syncSettings.currentUser;
   const scope = user ? featureScope(state.syncSettings.serverUrl, user.organizationId) : null;
   const policy = scope ? state.organizationFeaturePolicies[scope] : undefined;

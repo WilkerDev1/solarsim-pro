@@ -2,9 +2,11 @@ import { isWriterRole } from '../../../shared/permissions';
 import { useMemo, useState } from "react";
 import { ArrowLeft, MapPin, Share2, FileText } from "lucide-react";
 import { useSimulationStore } from "../../store/useSimulationStore";
+import { useShallow } from 'zustand/react/shallow';
 import { useEnergyCalculationMode } from "../../features/application/useApplicationFeatures";
 import { calculateProjectFinancialSummary } from "../../engine/financeEngine";
 import { ProposalCommercialPanel } from "../../features/proposals/ProposalCommercialPanel";
+import { ProposalClientSection } from "../clients/ProposalClientLink";
 import {
   getProjectPanels,
   getProjectInverters,
@@ -34,7 +36,7 @@ export const ProjectHubView = () => {
     syncSettings,
     workspaceScope,
     sessionGeneration,
-  } = useSimulationStore();
+  } = useSimulationStore(useShallow((s) => ({ projects: s.projects, activeProjectId: s.activeProjectId, setActiveView: s.setActiveView, openShareModal: s.openShareModal, restoreProject: s.restoreProject, syncSettings: s.syncSettings, workspaceScope: s.workspaceScope, sessionGeneration: s.sessionGeneration })));
   const project = projects.find((p) => p.id === activeProjectId);
   const mode = useEnergyCalculationMode();
   const summary = useMemo(
@@ -327,6 +329,7 @@ export const ProjectHubView = () => {
           )}
         </div>
         <aside className="summary-side">
+          <ProposalClientSection key={`client-${ownerKey}`} project={project} />
           <ProposalCommercialPanel key={ownerKey} project={project} />
         </aside>
       </div>

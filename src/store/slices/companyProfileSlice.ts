@@ -16,6 +16,8 @@ export const createCompanyProfileSlice: SimulationSlice<CompanyProfileSlice> = (
   const apply = (profile: Partial<CompanyProfile>, organizationId: string, version: number) => set(state => {
     const id = 'org-company:' + organizationId;
     const existing = state.companies.find(company => company.id === id);
+    // The profile is versioned by the server: an already applied version would only bump updatedAt.
+    if (existing?.organizationProfileVersion === version) return {};
     const first = !existing;
     const company: CompanyProfile = { ...DEFAULT_LOCAL_COMPANY, ...profile, id, organizationId, organizationProfileVersion: version, isDefault: first ? true : existing.isDefault, createdAt: existing?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
     const companies = normalizeCompanyProfiles([company, ...state.companies.filter(c => c.id !== id).map(c => first ? { ...c, isDefault: false } : c)]);

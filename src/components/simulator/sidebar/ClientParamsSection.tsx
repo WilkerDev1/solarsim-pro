@@ -1,16 +1,15 @@
 import React from 'react';
 import { ProjectSimulation, ClientInfo } from '../../../types';
-import { RD_PROVINCES } from '../../../data/rdProvinces';
 import { generateNextProjectSequence, findDuplicateProjectInfo } from '../../../store/useSimulationStore';
-import { User, ChevronDown, Globe, Loader2, CheckCircle2, Lock, Unlock, AlertTriangle, Calendar } from 'lucide-react';
-import { getProposalDateInputValue, formatProposalDate } from '../../../utils/formatDateUtils';
+import { StackedField, Field } from '../params/ui';
+import { displayContactPerson, displayPhone } from '../params/sections/client/clientLogic';
+import { IdentifiersBlock } from '../params/sections/client/IdentifiersBlock';
+import { RadiationSource } from '../params/sections/client/RadiationSource';
 
 interface ClientParamsSectionProps {
   project: ProjectSimulation;
   projects: ProjectSimulation[];
-  isOpen: boolean;
-  onToggle: () => void;
-  isDark: boolean;
+  /** El dock ya no pinta según el tema: los tokens pd-* cambian solos. Se acepta para no romper al contenedor. */
   isIdUnlocked: boolean;
   setIsIdUnlocked: (val: boolean) => void;
   isFetchingSolar: boolean;
@@ -19,12 +18,10 @@ interface ClientParamsSectionProps {
   updateClient: (client: Partial<ClientInfo>) => void;
 }
 
+/** Cuerpo de «Proyecto y cliente». */
 export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
   project,
   projects,
-  isOpen,
-  onToggle,
-  isDark,
   isIdUnlocked,
   setIsIdUnlocked,
   isFetchingSolar,
@@ -32,374 +29,47 @@ export const ClientParamsSection: React.FC<ClientParamsSectionProps> = ({
   onFetchSolarApi,
   updateClient,
 }) => {
+  const { client } = project;
+  const duplicate = findDuplicateProjectInfo(client.projectId, client.quoteNumber || '', project.id, projects);
+  const assignNext = () => {
+    const next = generateNextProjectSequence(projects);
+    updateClient({ projectId: next.projectId, quoteNumber: next.quoteNumber });
+  };
+
   return (
-    <div
-      className={`rounded-xl border overflow-hidden transition-all ${
-        isDark ? 'border-[#27272a] bg-[#1a1a24]' : 'border-slate-200 bg-white shadow-xs'
-      }`}
-    >
-      <button
-        type="button"
-        onClick={onToggle}
-        className={`w-full p-3 text-left font-bold text-xs flex items-center justify-between cursor-pointer transition-colors text-slate-800 hover:bg-slate-50 dark:text-zinc-200 dark:hover:bg-[#222230]`}
-      >
-        <div className="flex items-center gap-2">
-          <User className="w-4 h-4 text-emerald-500 shrink-0" />
-          <span>1. Proyecto y Cliente</span>
-        </div>
-        <ChevronDown
-          className={`w-4 h-4 text-zinc-400 transition-transform duration-200 ${
-            isOpen ? 'rotate-180 text-emerald-500' : ''
-          }`}
-        />
-      </button>
-
-      {isOpen && (
-        <div
-          className={`p-3.5 pt-2 space-y-3 border-t border-slate-100 bg-slate-50/50 dark:border-[#27272a] dark:bg-[#14141c]/50`}
-        >
-          <div>
-            <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
-              Nombre del Cliente
-            </label>
-            <input
-              type="text"
-              value={project.client.name}
-              onChange={(e) => updateClient({ name: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                isDark
-                  ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:bg-[#202024] focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500'
-                  : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600 focus:border-emerald-600'
-              }`}
-            />
-          </div>
-
-          <div>
-            <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
-              Ubicación (Ciudad / Proyecto)
-            </label>
-            <input
-              type="text"
-              value={project.client.location}
-              onChange={(e) => updateClient({ location: e.target.value })}
-              className={`w-full border rounded-lg px-3 py-1.5 text-xs transition-all ${
-                isDark
-                  ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:ring-1 focus:ring-emerald-500'
-                  : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600'
-              }`}
-            />
-          </div>
-
-          <div>
-            <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
-              Dirección del Cliente
-            </label>
-            <input
-              type="text"
-              value={project.client.address ?? ''}
-              onChange={(e) => updateClient({ address: e.target.value })}
-              placeholder="Ej: Av. 27 de Febrero #45, Santo Domingo"
-              className={`w-full border rounded-lg px-3 py-1.5 text-xs transition-all ${
-                isDark
-                  ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:ring-1 focus:ring-emerald-500'
-                  : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600'
-              }`}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
-                Teléfono del Cliente
-              </label>
-              <input
-                type="text"
-                value={
-                  project.client.contactPhone && !project.client.contactPhone.includes('555-0199')
-                    ? project.client.contactPhone
-                    : ''
-                }
-                onChange={(e) => updateClient({ contactPhone: e.target.value })}
-                placeholder="Ej: 809-000-0000"
-                className={`w-full border rounded-lg px-3 py-1.5 text-xs transition-all ${
-                  isDark
-                    ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:ring-1 focus:ring-emerald-500'
-                    : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600'
-                }`}
-              />
-            </div>
-
-            <div>
-              <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
-                Atención / Contacto
-              </label>
-              <input
-                type="text"
-                value={project.client.contactPerson ?? project.customization?.contactName ?? project.client.company ?? ''}
-                onChange={(e) => updateClient({ contactPerson: e.target.value })}
-                placeholder="Persona o dpto."
-                className={`w-full border rounded-lg px-3 py-1.5 text-xs transition-all ${
-                  isDark
-                    ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:ring-1 focus:ring-emerald-500'
-                    : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600'
-                }`}
-              />
-            </div>
-          </div>
-
-          {/* Selector de Fuente de Radiación Solar: Provincia vs GPS Satelital */}
-          <div>
-            <label className={`block text-xs font-medium mb-1.5 text-slate-600 dark:text-zinc-300`}>
-              Fuente de Radiación Solar
-            </label>
-            <div
-              className={`flex rounded-lg p-1 border bg-slate-200/80 border-slate-300/60 dark:bg-[#121214] dark:border-[#27272a]`}
-            >
-              <button
-                type="button"
-                onClick={() => updateClient({ solarSourceMode: 'province' })}
-                className={`flex-1 rounded-md py-1 text-[11px] font-semibold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                  (project.client.solarSourceMode || 'province') === 'province'
-                    ? isDark
-                      ? 'bg-[#27272a] shadow-xs text-emerald-400 font-bold'
-                      : 'bg-white shadow-xs text-emerald-800 font-bold'
-                    : isDark
-                    ? 'text-zinc-400 hover:text-zinc-200'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <span className="material-symbols-outlined text-[14px]">map</span> Provincia (Offline)
-              </button>
-              <button
-                type="button"
-                onClick={() => updateClient({ solarSourceMode: 'gps' })}
-                className={`flex-1 rounded-md py-1 text-[11px] font-semibold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                  project.client.solarSourceMode === 'gps'
-                    ? isDark
-                      ? 'bg-[#27272a] shadow-xs text-emerald-400 font-bold'
-                      : 'bg-white shadow-xs text-emerald-800 font-bold'
-                    : isDark
-                    ? 'text-zinc-400 hover:text-zinc-200'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Globe className="w-3.5 h-3.5" /> GPS Satelital (Online)
-              </button>
-            </div>
-          </div>
-
-          {/* Opción 1: Selección por Provincia */}
-          {(project.client.solarSourceMode || 'province') === 'province' && (
-            <div>
-              <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
-                Seleccionar Provincia
-              </label>
-              <select
-                value={project.client.province}
-                onChange={(e) => {
-                  updateClient({
-                    province: e.target.value,
-                    customMonthlyHSP: undefined,
-                  });
-                }}
-                className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer transition-all ${
-                  isDark
-                    ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:ring-1 focus:ring-emerald-500'
-                    : 'bg-slate-50 border-slate-300 text-slate-800 focus:ring-1 focus:ring-emerald-600'
-                }`}
-              >
-                {RD_PROVINCES.map((prov) => (
-                  <option key={prov.code} value={prov.name}>
-                    {prov.name} ({prov.avgHSP} HSP)
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Opción 2: Obtener por GPS / Coordenadas */}
-          {project.client.solarSourceMode === 'gps' && (
-            <div
-              className={`space-y-2 p-3 rounded-lg border bg-emerald-50/50 border-emerald-200 dark:bg-[#202024] dark:border-emerald-900/60`}
-            >
-              <label className={`block text-xs font-semibold text-emerald-900 dark:text-emerald-400`}>
-                Coordenadas GPS (Latitud, Longitud)
-              </label>
-              <input
-                type="text"
-                value={project.client.coordinates || '18.4861, -69.9312'}
-                onChange={(e) => updateClient({ coordinates: e.target.value })}
-                placeholder="18.4861, -69.9312"
-                className={`w-full border rounded-lg px-3 py-1.5 text-xs font-semibold transition-all bg-white border-slate-300 text-slate-800 dark:bg-[#18181b] dark:border-[#3f3f46] dark:text-zinc-100`}
-              />
-              <button
-                type="button"
-                onClick={onFetchSolarApi}
-                disabled={isFetchingSolar}
-                className="w-full py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-md text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
-              >
-                {isFetchingSolar ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Obteniendo de NASA...
-                  </>
-                ) : (
-                  <>
-                    <Globe className="w-3.5 h-3.5" /> Obtener Radiación Satelital Online
-                  </>
-                )}
-              </button>
-              {solarApiStatus && (
-                <p
-                  className={`text-[10px] font-medium mt-1 flex items-center gap-1 text-emerald-700 dark:text-emerald-300`}
-                >
-                  <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" /> {solarApiStatus}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* ID del Proyecto & N° Cotización con Bloqueo/Auto y Validación */}
-          {(() => {
-            const duplicateCheck = findDuplicateProjectInfo(
-              project.client.projectId,
-              project.client.quoteNumber || '',
-              project.id,
-              projects
-            );
-
-            return (
-              <div className="space-y-2 pt-1">
-                <div className="flex items-center justify-between">
-                  <span className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 text-slate-500 dark:text-zinc-400`}>
-                    <span>Código & Cotización</span>
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold border bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-700/50`}>
-                      Auto
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setIsIdUnlocked(!isIdUnlocked)}
-                    className={`text-[11px] font-bold flex items-center gap-1 px-2 py-0.5 rounded-lg border transition-colors cursor-pointer ${
-                      isIdUnlocked
-                        ? 'border-amber-500/50 text-amber-400 bg-amber-500/10'
-                        : isDark
-                        ? 'border-[#3f3f46] text-zinc-400 hover:text-zinc-200 bg-[#24242e]'
-                        : 'border-slate-300 text-slate-600 hover:text-slate-900 bg-slate-100'
-                    }`}
-                    title={isIdUnlocked ? 'Bloquear identificadores automáticos' : 'Desbloquear para editar manualmente el ID o cotización'}
-                  >
-                    {isIdUnlocked ? <Unlock className="w-3 h-3 text-amber-400" /> : <Lock className="w-3 h-3" />}
-                    <span>{isIdUnlocked ? 'Editable' : 'Bloqueado'}</span>
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
-                      ID del Proyecto
-                    </label>
-                    <input
-                      type="text"
-                      value={project.client.projectId}
-                      disabled={!isIdUnlocked}
-                      onChange={(e) => updateClient({ projectId: e.target.value })}
-                      className={`w-full border rounded-lg px-3 py-1.5 text-xs font-mono font-bold transition-all ${
-                        !isIdUnlocked
-                          ? 'opacity-80 cursor-not-allowed ' + (isDark ? 'bg-[#18181f] border-[#2f2f3c] text-emerald-400' : 'bg-slate-100 border-slate-200 text-emerald-800')
-                          : duplicateCheck.isProjectIdDuplicate
-                          ? 'border-red-500 bg-red-500/10 text-red-300 ring-1 ring-red-500'
-                          : isDark
-                          ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:border-emerald-500'
-                          : 'bg-white border-slate-300 text-slate-800 focus:border-emerald-600'
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <label className={`block text-xs font-medium mb-1 text-slate-600 dark:text-zinc-300`}>
-                      N° Cotización
-                    </label>
-                    <input
-                      type="text"
-                      value={project.client.quoteNumber || 'C-0030'}
-                      disabled={!isIdUnlocked}
-                      onChange={(e) => updateClient({ quoteNumber: e.target.value })}
-                      className={`w-full border rounded-lg px-3 py-1.5 text-xs font-mono font-bold transition-all ${
-                        !isIdUnlocked
-                          ? 'opacity-80 cursor-not-allowed ' + (isDark ? 'bg-[#18181f] border-[#2f2f3c] text-emerald-400' : 'bg-slate-100 border-slate-200 text-emerald-800')
-                          : duplicateCheck.isQuoteDuplicate
-                          ? 'border-red-500 bg-red-500/10 text-red-300 ring-1 ring-red-500'
-                          : isDark
-                          ? 'bg-[#27272a] border-[#3f3f46] text-zinc-100 focus:border-emerald-500'
-                          : 'bg-white border-slate-300 text-slate-800 focus:border-emerald-600'
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                {/* Fecha de Emisión / Cotización */}
-                <div className="pt-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <label className={`text-xs font-medium flex items-center gap-1.5 text-slate-600 dark:text-zinc-300`}>
-                      <Calendar className="w-3.5 h-3.5 text-emerald-500" />
-                      <span>Fecha de Cotización / Emisión</span>
-                    </label>
-                    {project.client.quoteDate && (
-                      <button
-                        type="button"
-                        onClick={() => updateClient({ quoteDate: undefined })}
-                        className="text-[10.5px] font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
-                        title="Restablecer a fecha actual"
-                      >
-                        Restablecer a Hoy
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="date"
-                      value={getProposalDateInputValue(project.client.quoteDate)}
-                      onChange={(e) => updateClient({ quoteDate: e.target.value })}
-                      className={`flex-1 border rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all bg-white border-slate-300 text-slate-800 focus:border-emerald-600 dark:bg-[#27272a] dark:border-[#3f3f46] dark:text-zinc-100 dark:focus:border-emerald-500`}
-                    />
-                    <span className={`text-xs font-bold font-mono px-2 py-1.5 rounded-lg border shrink-0 bg-slate-100 border-slate-200 text-slate-800 dark:bg-[#181820] dark:border-[#333344] dark:text-emerald-400`}>
-                      {formatProposalDate(project.client.quoteDate, 'numeric')}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Warning if Duplicate */}
-                {(duplicateCheck.isProjectIdDuplicate || duplicateCheck.isQuoteDuplicate) && (
-                  <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/30 flex items-start gap-2 text-red-400 text-[11px] animate-in fade-in">
-                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <span>
-                        {duplicateCheck.isProjectIdDuplicate && duplicateCheck.isQuoteDuplicate
-                          ? `Este ID y cotización ya pertenecen a "${duplicateCheck.duplicateProjectName}".`
-                          : duplicateCheck.isProjectIdDuplicate
-                          ? `El ID "${project.client.projectId}" ya está registrado en "${duplicateCheck.duplicateProjectName}".`
-                          : `La cotización "${project.client.quoteNumber}" ya está en uso por "${duplicateCheck.duplicateProjectName}".`}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const nextSeq = generateNextProjectSequence(projects);
-                          updateClient({
-                            projectId: nextSeq.projectId,
-                            quoteNumber: nextSeq.quoteNumber,
-                          });
-                        }}
-                        className="block text-emerald-400 hover:text-emerald-300 underline font-bold mt-1 cursor-pointer"
-                      >
-                        🪄 Asignar siguiente código libre automáticamente
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-        </div>
-      )}
+    <div className="space-y-2.5">
+      <StackedField label="Nombre del cliente" htmlFor="pd-cli-name">
+        <Field id="pd-cli-name" value={client.name} onChange={value => updateClient({ name: value })} />
+      </StackedField>
+      <StackedField label="Ubicación" htmlFor="pd-cli-location">
+        <Field id="pd-cli-location" value={client.location} onChange={value => updateClient({ location: value })} />
+      </StackedField>
+      <StackedField label="Dirección" htmlFor="pd-cli-address">
+        <Field id="pd-cli-address" value={client.address ?? ''} placeholder="Av. 27 de Febrero #45" onChange={value => updateClient({ address: value })} />
+      </StackedField>
+      <div className="grid grid-cols-2 gap-2.5">
+        <StackedField label="Teléfono" htmlFor="pd-cli-phone">
+          <Field id="pd-cli-phone" value={displayPhone(client)} placeholder="809-000-0000" onChange={value => updateClient({ contactPhone: value })} />
+        </StackedField>
+        <StackedField label="Atención" htmlFor="pd-cli-contact">
+          <Field id="pd-cli-contact" value={displayContactPerson(project)} placeholder="Persona o dpto." onChange={value => updateClient({ contactPerson: value })} />
+        </StackedField>
+      </div>
+      <RadiationSource
+        client={client}
+        isFetchingSolar={isFetchingSolar}
+        solarApiStatus={solarApiStatus}
+        onFetchSolarApi={onFetchSolarApi}
+        updateClient={updateClient}
+      />
+      <IdentifiersBlock
+        client={client}
+        isIdUnlocked={isIdUnlocked}
+        setIsIdUnlocked={setIsIdUnlocked}
+        duplicate={duplicate}
+        onAssignNext={assignNext}
+        updateClient={updateClient}
+      />
     </div>
   );
 };

@@ -166,7 +166,7 @@ async function runAuthInvalidationTests() {
         [scopeB]: {
           projects: [projectB],
           activeProjectId: projectB.id,
-          folders: [], folderChanges: {}, folderDeletionQueue: [],
+          folders: [], folderChanges: {}, folderDeletionQueue: [], clients: [], clientChanges: {}, clientDeletionQueue: [],
           equipmentCatalog: [],
           deletedEquipmentIds: [],
           equipmentChanges: {},

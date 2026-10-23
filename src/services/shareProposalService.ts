@@ -7,6 +7,8 @@ import { useSimulationStore } from '../store/useSimulationStore';
 import { energyCalculationMode, featureScope } from '../../shared/applicationFeatures';
 import { effectiveFeatureSettings } from '../features/application/featurePolicy';
 import { calculateProjectFinancialSummary } from '../engine/financeEngine';
+import { publishedDocumentTexts } from '../../shared/documentTexts';
+import { buildDocumentTextContext } from '../utils/documentTextContext';
 
 export interface ShareResult {
   success: boolean;
@@ -257,6 +259,8 @@ export class ShareProposalService {
           aboutUsTransitionText: project.customization?.aboutUsTransitionText,
           whyChooseUsText: project.customization?.whyChooseUsText,
           showSelfConsumptionInProposal: project.customization?.showSelfConsumptionInProposal,
+          // Textos editados en la hoja: el Worker solo acepta strings, así que se publican resueltos como doc:<clave>.
+          ...publishedDocumentTexts(project, buildDocumentTextContext(project, summary, { currentDateStr: '', company: state.companies.find((company) => company.id === project.companyProfileId) })),
         },
       };
 

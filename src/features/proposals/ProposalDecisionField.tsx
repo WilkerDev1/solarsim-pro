@@ -6,6 +6,7 @@ import {
 } from "../../../shared/proposalCommercial";
 import type { ProjectSimulation } from "../../types";
 import { useSimulationStore } from "../../store/useSimulationStore";
+import { useShallow } from 'zustand/react/shallow';
 import { canEditCommercial } from "./commercial";
 import "./proposal-commercial.css";
 export function ProposalDecisionField({
@@ -13,7 +14,7 @@ export function ProposalDecisionField({
 }: {
   project: ProjectSimulation;
 }) {
-  const { syncSettings, setProposalCommercialState } = useSimulationStore();
+  const { syncSettings, setProposalCommercialState } = useSimulationStore(useShallow((s) => ({ syncSettings: s.syncSettings, setProposalCommercialState: s.setProposalCommercialState })));
   const [error, setError] = useState("");
   return (
     <div

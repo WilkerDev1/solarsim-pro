@@ -17,6 +17,9 @@ import { QRCodeSVG } from 'qrcode.react';
 import { ProjectSimulation, FinancialSummaryResult } from '../../types';
 import { ShareProposalService, ShareResult, DEFAULT_WORKER_URL } from '../../services/shareProposalService';
 import { useSimulationStore } from '../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
+import { energyCalculationMode } from '../../../shared/applicationFeatures';
+import { effectiveFeatureSettings } from '../../features/application/featurePolicy';
 import { createShareRequestGuard } from './shareRequestGuard';
 
 interface ShareProposalModalProps {
@@ -28,7 +31,7 @@ interface ShareProposalModalProps {
 }
 
 export const ShareProposalModal: React.FC<ShareProposalModalProps> = (props) => {
-  const store = useSimulationStore();
+  const store = useSimulationStore(useShallow((s) => ({ isShareModalOpen: s.isShareModalOpen, closeShareModal: s.closeShareModal, sidebarTheme: s.sidebarTheme, getActiveProject: s.getActiveProject, getFinancialSummary: s.getFinancialSummary, syncSettings: s.syncSettings, sessionGeneration: s.sessionGeneration, openSettingsModal: s.openSettingsModal, projects: s.projects, activeProjectId: s.activeProjectId, energyMode: energyCalculationMode(effectiveFeatureSettings(s)) })));
   const isOpen = props.isOpen !== undefined ? props.isOpen : store.isShareModalOpen;
   const closeModal = props.onClose || store.closeShareModal;
   const isDark = props.isDark !== undefined ? props.isDark : store.sidebarTheme === 'dark';

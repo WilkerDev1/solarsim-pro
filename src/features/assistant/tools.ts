@@ -10,6 +10,8 @@ import {
 } from '../../../shared/applicationFeatures';
 import { buildAITariffContext } from '../../utils/aiTariffContext';
 import { editableAssistantFields, validateAssistantEdits } from './validation';
+import { touchesPricingEdits } from './pricingFields';
+import { AUTOMATED_PRICING } from '../../../shared/automatedProposalPolicy';
 import type {
   AssistantAction,
   AssistantToolCall,
@@ -65,13 +67,14 @@ function canWrite() {
 }
 export function executeAssistantTool(
   call: AssistantToolCall,
-  owner: string
+  owner: string,
+  options: { requireAssistantEnabled?: boolean } = {}
 ): AssistantToolResult {
   if (owner !== assistantOwner())
     throw new Error('El espacio o la sesión cambió.');
   const { name, args } = call;
   const s = useSimulationStore.getState();
-  if (!s.appAssistantEnabled)
+  if (options.requireAssistantEnabled !== false && !s.appAssistantEnabled)
     throw new Error(
       'Activa el asistente experimental en Funciones de la aplicación.'
     );
@@ -221,6 +224,13 @@ export function executeAssistantTool(
     if (kind === 'project' && (target as any).syncStatus === 'conflict')
       throw new Error('Resuelve primero el conflicto de esta propuesta.');
     const edits = validateAssistantEdits(args.edits, kind);
+    // Agent edits that affect pricing leave the proposal in catalog mode with the cost matrix. Unrelated edits
+    // (e.g. system losses) never switch the mode: that change is guarded and needs its own confirmation.
+    if (kind === 'project' && touchesPricingEdits(edits)) {
+      const specs = (target as unknown as { specs: Record<string, unknown> }).specs;
+      for (const [field, value] of Object.entries(AUTOMATED_PRICING))
+        if (specs[field] !== value) edits.push({ section: 'specs', field, value });
+    }
     const groups = edits.filter(
       (e) =>
         e.section === 'specs' &&
@@ -302,16 +312,18 @@ export function executeAssistantTool(
   throw new Error('Herramienta no permitida.');
 }
 /** Revalidate live owner, permission and target before every confirmed mutation. */
-export function applyAssistantAction(action: AssistantAction) {
+export function applyAssistantAction(action: AssistantAction, options: { requireAssistantEnabled?: boolean } = {}) {
   const fresh = executeAssistantTool(
     {
       name:
         action.kind === 'project'
           ? 'propose_project_update'
           : 'propose_equipment_update',
-      args: { id: action.targetId, title: action.title, edits: action.edits },
+      // Policy edits are re-derived by the planner; agents cannot submit them directly.
+      args: { id: action.targetId, title: action.title, edits: action.edits.filter((e) => !(e.section === 'specs' && e.field in AUTOMATED_PRICING)) },
     },
-    action.owner
+    action.owner,
+    options
   ).action!;
   if (fresh.fingerprint !== action.fingerprint)
     throw new Error(
@@ -390,34 +402,3 @@ export function applyAssistantAction(action: AssistantAction) {
     if (consumption) s.setMonthlyConsumption(consumption.value as number[]);
   }
 }
-export const assistantToolDescriptions = [
-  [
-    'search_projects',
-    'Busca propuestas del espacio actual por nombre, código o provincia. Máximo12.',
-  ],
-  [
-    'get_project',
-    'Consulta datos y resultados calculados de una propuesta por id.',
-  ],
-  [
-    'get_simulation',
-    'Consulta la simulación actual o indicada; los resultados provienen del motor real.',
-  ],
-  [
-    'search_equipment',
-    'Busca catálogo por marca/modelo. unavailableOnly indica sin oferta confirmada in_stock, no implica agotado.',
-  ],
-  [
-    'get_equipment',
-    'Consulta un equipo con ofertas y referencias de adjuntos.',
-  ],
-  ['get_tariffs', 'Consulta las referencias de tarifa y procedencia.'],
-  [
-    'propose_project_update',
-    `Prepara campos para confirmar en la propuesta abierta. No modifica. Grupos panels/inverters/batteries requieren [{id del catálogo,count,unitPriceUSD confirmado}], no inventes precios. customItems/customDiscounts son listas completas con ids y descripción. Campos: ${JSON.stringify({ ...editableAssistantFields, equipment: undefined })}`,
-  ],
-  [
-    'propose_equipment_update',
-    `Prepara cambios de especificaciones del catálogo para confirmar. Preserva id, ofertas y adjuntos. Campos: ${editableAssistantFields.equipment.join(',')}`,
-  ],
-] as const;

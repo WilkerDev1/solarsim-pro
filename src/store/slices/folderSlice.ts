@@ -4,6 +4,7 @@ import { ProjectFolder } from "../../types";
 import { fetchWithSessionRetry } from "../../services/syncService";
 import { ownsProject } from "../sync/projectReconciliation";
 import { contentEqual } from "../sync/projectDifferences";
+import { reuseArray, reuseIfEqual, reuseRecord } from "../sync/structuralSharing";
 
 // Compare the editable definition, excluding server attribution and receipt metadata.
 const folderContent = (folder: ProjectFolder) => ({
@@ -13,6 +14,36 @@ const folderContent = (folder: ProjectFolder) => ({
   hideFromGeneral: folder.hideFromGeneral ?? false,
   visibility: folder.visibility ?? "public",
 });
+
+type FolderReceiptState = Pick<FolderSlice, "folders" | "folderChanges" | "folderDeletionQueue">;
+// Clear an acknowledged change and store the server's folder in the same update, so a later failure
+// in the pass cannot leave the folder marked clean with a stale version. A newer local revision stays
+// pending and only adopts the server version as its base.
+const installReceipt = (
+  s: FolderReceiptState,
+  id: string,
+  revision: string,
+  server: ProjectFolder,
+): Partial<FolderReceiptState> => {
+  const changes = { ...s.folderChanges };
+  const acknowledged = changes[id]?.revision === revision;
+  if (acknowledged) delete changes[id];
+  else if (changes[id])
+    changes[id] = { ...changes[id], baseVersion: server.version ?? changes[id].baseVersion };
+  return {
+    folders: s.folders.map((f) =>
+      f.id !== id
+        ? f
+        : acknowledged
+          ? server
+          : { ...f, version: server.version, baseVersion: server.version },
+    ),
+    folderChanges: changes,
+    folderDeletionQueue: s.folderDeletionQueue.map((command) =>
+      command.id === id ? { ...command, baseVersion: server.version ?? command.baseVersion } : command,
+    ),
+  };
+};
 
 export const createFolderSlice: SimulationSlice<FolderSlice> = (set, get) => {
   let running: {
@@ -353,11 +384,8 @@ export const createFolderSlice: SimulationSlice<FolderSlice> = (set, get) => {
             const serverFolder = remote.get(id);
             if (serverFolder && contentEqual(folderContent(serverFolder), folderContent(f))) {
               // Recover a lost PUT receipt only from identical authoritative content.
-              set((s) => {
-                const changes = { ...s.folderChanges };
-                delete changes[id];
-                return { folderChanges: changes };
-              });
+              // Install the authoritative folder together with the cleared change, as the PUT branch does.
+              set((s) => installReceipt(s, id, change.revision, serverFolder));
               continue;
             }
             if (serverFolder && change.baseVersion === 0) {
@@ -391,23 +419,7 @@ export const createFolderSlice: SimulationSlice<FolderSlice> = (set, get) => {
               continue;
             }
             remote.set(id, saved.folder);
-            set((s) => {
-              const changes = { ...s.folderChanges };
-              if (changes[id]?.revision === change.revision) delete changes[id];
-              else if (changes[id])
-                changes[id] = {
-                  ...changes[id],
-                  baseVersion: saved.folder.version,
-                };
-              return {
-                folderChanges: changes,
-                folderDeletionQueue: s.folderDeletionQueue.map((command) =>
-                  command.id === id
-                    ? { ...command, baseVersion: saved.folder.version }
-                    : command,
-                ),
-              };
-            });
+            set((s) => installReceipt(s, id, change.revision, saved.folder));
           }
           if (!current())
             return { success: false, message: "La sesión cambió." };
@@ -418,17 +430,22 @@ export const createFolderSlice: SimulationSlice<FolderSlice> = (set, get) => {
             const hiddenDeletes = new Set(
               s.folderDeletionQueue.map((c) => c.id),
             );
-            const folders = [
+            const folders = reuseArray(s.folders, [
               ...pending,
-              ...[...remote.values()].filter(
-                (f) =>
-                  !pending.some((p) => p.id === f.id) &&
-                  !hiddenDeletes.has(f.id),
-              ),
-            ];
-            const changes = Object.fromEntries(
-              Object.entries(s.folderChanges).filter(
-                ([id]) => !deleted.has(id),
+              ...[...remote.values()]
+                .filter(
+                  (f) =>
+                    !pending.some((p) => p.id === f.id) &&
+                    !hiddenDeletes.has(f.id),
+                )
+                .map((f) => reuseIfEqual(s.folders.find((v) => v.id === f.id), f)),
+            ]);
+            const changes = reuseRecord(
+              s.folderChanges,
+              Object.fromEntries(
+                Object.entries(s.folderChanges).filter(
+                  ([id]) => !deleted.has(id),
+                ),
               ),
             );
             return {

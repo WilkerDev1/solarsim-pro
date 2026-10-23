@@ -71,6 +71,8 @@ export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (
   undo: () => {
     const { undoStack, redoStack, activeProjectId, projects } = get();
     if (undoStack.length <= 1) return;
+    // La papelera es de solo lectura también para el historial.
+    if (projects.find((p) => p.id === activeProjectId)?.isDeleted) return;
 
     const currentProject = projects.find((p) => p.id === activeProjectId);
     if (!currentProject) return;
@@ -96,8 +98,9 @@ export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (
   },
 
   redo: () => {
-    const { undoStack, redoStack, activeProjectId } = get();
+    const { undoStack, redoStack, activeProjectId, projects } = get();
     if (redoStack.length === 0) return;
+    if (projects.find((p) => p.id === activeProjectId)?.isDeleted) return;
 
     const newRedoStack = [...redoStack];
     const nextState = newRedoStack.pop()!;

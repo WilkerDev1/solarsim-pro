@@ -1,8 +1,11 @@
+import { executeAgentTool } from '../../../../features/agentTools/registry';
+import { assistantOwner } from '../../../../features/assistant/tools';
 import { createAIProposalBase, prepareProposalDraftProject, proposalReconciliationIssues } from '../../../../utils/proposalDraftProject';
 import { BENCHMARK_PROJECT } from '../../../../engine/referenceCase';
 import { calculateProjectFinancialSummary } from '../../../../engine/financeEngine';
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useSimulationStore } from '../../../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { parseProposalWithAI } from '../../../../services/geminiInvoiceService';
 import { calculateRecommendedPanelCount, calculateMonthlySolarProduction, getMonthlySolarProductionFactors } from '../../../../engine/solarEngine';
 import { getProvinceHSP } from '../../../../data/rdProvinces';
@@ -15,7 +18,7 @@ import { aiWorkspaceKey, proposalFileType, readProposalFile, PROPOSAL_FILES_LIMI
 
 export interface ProposalMessage { role: 'user' | 'assistant'; text: string; files?: string[]; kind?: 'error' }
 export function useAIInvoiceScanner() {
-  const state = useSimulationStore();
+  const state = useSimulationStore(useShallow((s) => ({ isAIInvoiceModalOpen: s.isAIInvoiceModalOpen, geminiApiKey: s.geminiApiKey, geminiModel: s.geminiModel, equipmentCatalog: s.equipmentCatalog, activeProjectId: s.activeProjectId, projects: s.projects, defaultSimulationSettings: s.defaultSimulationSettings, tariffMatrix: s.tariffMatrix, syncSettings: s.syncSettings, sessionGeneration: s.sessionGeneration, sidebarTheme: s.sidebarTheme, closeAIInvoiceModal: s.closeAIInvoiceModal, openSettingsModal: s.openSettingsModal })));
   const { isAIInvoiceModalOpen, geminiApiKey, geminiModel, equipmentCatalog, activeProjectId, projects,
     defaultSimulationSettings: defaults, tariffMatrix } = state;
   const workspace = aiWorkspaceKey(state);
@@ -50,7 +53,7 @@ export function useAIInvoiceScanner() {
       annualSpecificYieldKWhPerKWp: yieldInfo.annualSpecificYieldKWhPerKWp,
       monthlySpecificYieldKWhPerKWp:getMonthlySolarProductionFactors(province,losses ?? 25,target?.client.customMonthlyHSP),
       calculationMode: mode,
-      commercial: {pricingMode:target?.specs.pricingMode || (defaults.defaultPricingMode==='direct'?'direct_watt':'cost_matrix'),markupPct:(target?.specs.saleMarginMultiplier!==undefined?(target.specs.saleMarginMultiplier-1)*100:defaults.defaultTargetMarginPct),installationUnitPriceUSD:target?.specs.installationUnitPriceUSD ?? 0,pricePerWattUSD:target?.specs.pricePerWattUSD ?? defaults.defaultDirectPriceUSDPerWp,directPriceSurplusTarget:target?.specs.directPriceSurplusTarget || 'margin',customItems:target?.financials.customItems || [],customDiscounts:target?.financials.customDiscounts || []},
+      commercial: {pricingMode:'cost_matrix',markupPct:(target?.specs.saleMarginMultiplier!==undefined?(target.specs.saleMarginMultiplier-1)*100:defaults.defaultTargetMarginPct),installationUnitPriceUSD:target?.specs.installationUnitPriceUSD ?? 0,pricePerWattUSD:target?.specs.pricePerWattUSD ?? defaults.defaultDirectPriceUSDPerWp,directPriceSurplusTarget:target?.specs.directPriceSurplusTarget || 'margin',customItems:target?.financials.customItems || [],customDiscounts:target?.financials.customDiscounts || []},
       equipmentPrices:target?[...(target.specs.panels || []),...(target.specs.inverters || []),...(target.specs.batteries || [])].filter(g=>g.unitPriceUSD!==undefined).map(g=>({id:g.id,unitPriceUSD:g.unitPriceUSD!})):[],
     } as AIProposalContext;
   }, [extractedData?.province, target, defaults, tariffMatrix, mode]);
@@ -142,11 +145,14 @@ export function useAIInvoiceScanner() {
   useEffect(() => { setReviewConfirmed(false); }, [reviewSnapshot]);
   const blockingIssues = validatedDraft?.validationIssues?.filter(issue => issue.severity === 'error') || [];
   const canApply = !!validatedDraft && !blockingIssues.length && reviewConfirmed && draftScope === scope && !isProcessing;
-  const apply = (createNew: boolean) => {
+  // Applies through the shared agent registry: same permissions, activity log, undo and pricing policy as every agent.
+  const apply = async (createNew: boolean) => {
     const current = useSimulationStore.getState();
     if (!canApply || aiWorkspaceKey(current) !== workspace || (!createNew && current.activeProjectId !== activeProjectId)) return;
-    const before=current.projects;current.applyExtractedInvoice(validatedDraft!, createNew);
-    if(useSimulationStore.getState().projects!==before)reset();else setErrorMsg(useSimulationStore.getState().saveFeedbackMessage || 'No se pudo aplicar; tu borrador y conversación se conservan.');
+    const outcome = await executeAgentTool({ name: 'apply_proposal_draft', args: { draft: validatedDraft as unknown as Record<string, unknown>, createNew } },
+      { source: 'proposal-assistant', owner: assistantOwner() });
+    if (outcome.status === 'applied') reset();
+    else setErrorMsg(outcome.status === 'error' ? outcome.message : 'No se pudo aplicar; tu borrador y conversación se conservan.');
   };
   const updateDraft = (updates: Partial<ExtractedInvoiceData>) => { setExtractedData(previous => previous ? {...validatedDraft,...updates} as ExtractedInvoiceData : null); setReviewConfirmed(false); };
   return { isAIInvoiceModalOpen, isDark:state.sidebarTheme === 'dark', geminiApiKey, activeProject,

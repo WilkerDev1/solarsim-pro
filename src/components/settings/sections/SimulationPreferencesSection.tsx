@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
+import { useShallow } from 'zustand/react/shallow';
 import {
   Coins,
   Zap,
@@ -20,13 +21,14 @@ import { RD_PROVINCES } from '../../../data/rdProvinces';
 import { UtilityDistributor, getDistributorTariffOptions } from '../../../types/tariffs';
 import { AITariffResolutionModal } from './AITariffResolutionModal';
 import { TariffPreferencesPanel } from './TariffPreferencesPanel';
+import { DEFAULT_PRICE_PER_WATT_USD } from '../../../../shared/projectDefaults';
 
 export const SimulationPreferencesSection: React.FC = () => {
   const {
     defaultSimulationSettings,
     updateDefaultSimulationSettings,
     equipmentCatalog,
-  } = useSimulationStore();
+  } = useSimulationStore(useShallow((s) => ({ defaultSimulationSettings: s.defaultSimulationSettings, updateDefaultSimulationSettings: s.updateDefaultSimulationSettings, equipmentCatalog: s.equipmentCatalog })));
   const defs = defaultSimulationSettings;
 
   const [isAITariffModalOpen, setIsAITariffModalOpen] = useState(false);
@@ -257,7 +259,7 @@ export const SimulationPreferencesSection: React.FC = () => {
             onClick={toggleAll}
             className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
           >
-            {allExpanded ? 'Colapsar Todo' : 'Expandir Todo'}
+            {allExpanded ? 'Colapsar todo' : 'Expandir todo'}
           </button>
         </div>
 
@@ -272,7 +274,7 @@ export const SimulationPreferencesSection: React.FC = () => {
                 <User className="w-4 h-4" />
               </div>
               <div>
-                <span className="text-sm font-bold text-slate-900 dark:text-white">1. Proyecto y Cliente</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white">Proyecto y cliente</span>
                 <span className="block text-[11px] text-slate-400 dark:text-zinc-500">Provincia, distribuidora y validez de cotización</span>
               </div>
             </div>
@@ -370,7 +372,7 @@ export const SimulationPreferencesSection: React.FC = () => {
                 <Sun className="w-4 h-4" />
               </div>
               <div>
-                <span className="text-sm font-bold text-slate-900 dark:text-white">3. Equipamiento y Sistema</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white">Equipamiento</span>
                 <span className="block text-[11px] text-slate-400 dark:text-zinc-500">Paneles solares, inversores, almacenamiento BESS y pérdidas</span>
               </div>
             </div>
@@ -481,7 +483,7 @@ export const SimulationPreferencesSection: React.FC = () => {
                 <DollarSign className="w-4 h-4" />
               </div>
               <div>
-                <span className="text-sm font-bold text-slate-900 dark:text-white">4. Costos y Margen de Venta</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white">Costos y margen</span>
                 <span className="block text-[11px] text-slate-400 dark:text-zinc-500">Precio directo $/Wp, márgenes brutos y compensación</span>
               </div>
             </div>
@@ -496,11 +498,11 @@ export const SimulationPreferencesSection: React.FC = () => {
                 </label>
                 <select
                   value={defs.defaultPricingMode}
-                  onChange={(e) => updateDefaultSimulationSettings({ defaultPricingMode: e.target.value as 'direct' | 'matrix' })}
+                  onChange={(e) => updateDefaultSimulationSettings({ defaultPricingMode: e.target.value as 'direct' | 'matrix', pricingModeChosenByUser: true })}
                   className="w-full px-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-800 dark:text-zinc-200"
                 >
-                  <option value="direct">Precio Directo ($/Wp Llave en Mano)</option>
-                  <option value="matrix">Matriz de Costos Detallada (Equipos + Estructura + Mano de Obra)</option>
+                  <option value="matrix">Matriz de costos con precios del catálogo (recomendado)</option>
+                  <option value="direct">Precio directo ($/Wp llave en mano)</option>
                 </select>
               </div>
 
@@ -512,7 +514,7 @@ export const SimulationPreferencesSection: React.FC = () => {
                   type="number"
                   step={0.05}
                   value={defs.defaultDirectPriceUSDPerWp}
-                  onChange={(e) => updateDefaultSimulationSettings({ defaultDirectPriceUSDPerWp: parseFloat(e.target.value) || 1.05 })}
+                  onChange={(e) => updateDefaultSimulationSettings({ defaultDirectPriceUSDPerWp: parseFloat(e.target.value) || DEFAULT_PRICE_PER_WATT_USD })}
                   className="w-full px-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-800 dark:text-zinc-200"
                 />
               </div>
@@ -559,8 +561,8 @@ export const SimulationPreferencesSection: React.FC = () => {
                 <Landmark className="w-4 h-4" />
               </div>
               <div>
-                <span className="text-sm font-bold text-slate-900 dark:text-white">5. Finanzas e Incentivos (Ley 57-07)</span>
-                <span className="block text-[11px] text-slate-400 dark:text-zinc-500">Amortización fiscal, escalación de tarifa y vida útil</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-white">Finanzas</span>
+                <span className="block text-[11px] text-slate-400 dark:text-zinc-500">Ley 57-07, amortización fiscal, escalación de tarifa y vida útil</span>
               </div>
             </div>
             {openAccordions.cat5 ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}

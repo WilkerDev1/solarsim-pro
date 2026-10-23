@@ -8,6 +8,7 @@ import {
   FinancialSummaryResult,
   UpdateInfo,
   DocumentCustomization,
+  DocumentLayoutSettings,
   ExtractedInvoiceData,
   SyncSettings,
   UserProfile,
@@ -59,6 +60,8 @@ export interface DefaultSimulationSettings {
 
   // 4. Costos y Margen de Venta
   defaultPricingMode: 'direct' | 'matrix';
+  /** Set when the user picks the pricing mode in Ajustes; otherwise a stored "direct" migrates to "matrix". */
+  pricingModeChosenByUser?: boolean;
   defaultDirectPriceUSDPerWp: number;
   defaultTargetMarginPct: number;
   defaultExcessEnergyDestiny: 'net_metering' | 'direct_sale';
@@ -74,10 +77,15 @@ export interface DefaultSimulationSettings {
   annualEnergyTariffEscalationPct: number;
 }
 
+/** Vistas principales de la aplicación. `clients-hub` lo implementa el directorio de clientes. */
+export type AppView = 'dashboard' | 'simulator' | 'pdf-preview' | 'project-hub' | 'companies-hub' | 'clients-hub';
+/** Pestañas del modal de Ajustes. `agents` agrupa permisos, actividad y conexión MCP. */
+export type SettingsTab = 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare' | 'features' | 'agents';
+
 export interface ProjectSlice {
   projects: ProjectSimulation[];
   activeProjectId: string;
-  activeView: 'dashboard' | 'simulator' | 'pdf-preview' | 'project-hub' | 'companies-hub';
+  activeView: AppView;
   searchQuery: string;
   statusFilter: string;
   defaultSimulationSettings: DefaultSimulationSettings;
@@ -87,7 +95,7 @@ export interface ProjectSlice {
   isTrashActive: boolean;
   setIsTrashActive: (active: boolean) => void;
 
-  setActiveView: (view: 'dashboard' | 'simulator' | 'pdf-preview' | 'project-hub' | 'companies-hub') => void;
+  setActiveView: (view: AppView) => void;
   setActiveProject: (id: string, targetView?: 'simulator' | 'project-hub') => void;
   setSearchQuery: (query: string) => void;
   setStatusFilter: (filter: string) => void;
@@ -97,7 +105,11 @@ export interface ProjectSlice {
   resetDefaultDocumentCustomization: () => void;
 
   createNewProject: (payload?: string | NewProjectPayload) => void;
-  duplicateProject: (id: string) => void;
+  /** Edits any proposal by id (agents); refuses trashed proposals. Returns false when nothing changed. */
+  /** `restore: true` writes the sections verbatim (undo of a snapshot): no equipment normalization against the current groups. */
+  updateProjectById: (id: string, edit: (project: ProjectSimulation) => Partial<ProjectSimulation>, options?: { restore?: boolean }) => boolean;
+  /** Returns the new proposal id. `activate: false` keeps the user on the current proposal (agents). */
+  duplicateProject: (id: string, options?: { activate?: boolean }) => string | undefined;
   moveToTrash: (id: string) => void;
   deleteProject: (id: string) => void; // Compatibilidad: delega en moveToTrash
   restoreProject: (id: string) => void;
@@ -118,6 +130,12 @@ export interface ProjectSlice {
   updateAllMonthlyConsumption: (value: number) => void;
   setMonthlyConsumption: (monthlyConsumption: number[], lockAutoPanels?: boolean) => void;
   updateDocumentCustomization: (customization: Partial<DocumentCustomization>) => void;
+  /** Diseño persistente del documento (secciones visibles, tema, cabecera/pie). Registra deshacer. */
+  setDocumentLayout: (patch: Partial<DocumentLayoutSettings>) => void;
+  /** Textos del documento por clave estable (`null` restablece). Registra deshacer. */
+  setDocumentTexts: (values: Record<string, string | null>) => void;
+  /** Guarda textos en la plantilla de la empresa emisora (con placeholders; nunca datos del cliente). */
+  saveDocumentTextsToCompanyTemplate: (keys: readonly string[] | 'all') => { saved: string[]; skipped: string[] };
   applySupplierPriceToProject: (
     equipmentType: 'panel' | 'inverter' | 'battery',
     supplierPrice: import('../types/equipment').EquipmentSupplierPrice,
@@ -213,7 +231,7 @@ export interface UISlice {
   isAIPriceCatalogModalOpen: boolean;
   isShareModalOpen: boolean;
   isSettingsModalOpen: boolean;
-  settingsActiveTab: 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare' | 'features';
+  settingsActiveTab: SettingsTab;
   updateInfo: UpdateInfo;
   saveFeedbackMessage: string | null;
 
@@ -240,9 +258,9 @@ export interface UISlice {
   closeAISettingsModal: () => void;
   openShareModal: () => void;
   closeShareModal: () => void;
-  openSettingsModal: (tab?: 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare' | 'features') => void;
+  openSettingsModal: (tab?: SettingsTab) => void;
   closeSettingsModal: () => void;
-  setSettingsActiveTab: (tab: 'sync' | 'account' | 'share' | 'ai' | 'equipment' | 'cloudflare' | 'features') => void;
+  setSettingsActiveTab: (tab: SettingsTab) => void;
   setUpdateInfo: (info: UpdateInfo) => void;
 
   toggleSidebarTheme: () => void;
@@ -317,7 +335,9 @@ export interface NotificationSlice {
 }
 
 import { TariffSlice } from './slices/tariffSlice';
+import { ClientSlice } from './slices/clientSlice';
 import { FeatureSettingsSlice } from './slices/featureSettingsSlice';
+import { AgentSlice } from './slices/agentSlice';
 
 export type SimulationStore = ProjectSlice &
   EquipmentSlice &
@@ -326,11 +346,13 @@ export type SimulationStore = ProjectSlice &
   AISlice &
   UISlice &
   FolderSlice &
+  ClientSlice &
   TariffSlice &
   CompanyProfileSlice &
   VersionHistorySlice &
   NotificationSlice &
-  FeatureSettingsSlice;
+  FeatureSettingsSlice &
+  AgentSlice;
 
 export type SimulationState = SimulationStore;
 export type SimulationSlice<T> = StateCreator<SimulationStore, [], [], T>;

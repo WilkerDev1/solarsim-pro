@@ -1,5 +1,6 @@
 import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
 import { DEFAULT_UNIT_PRICE_USD } from '../utils/equipmentGroups';
+import { DEFAULT_INSTALLATION_USD_PER_KWP, DEFAULT_PRICE_PER_WATT_USD, resolveBatteryBankDodPct, resolveBatteryBankEfficiencyPct, resolveDopRate, resolvePricePerWattUSD, resolveSaleMarginMultiplier } from '../../shared/projectDefaults';
 import { ITBIS_RATE, LEY5707_CREDIT_RATE, appliesItemMargin, customItemsTaxBreakdown, isItemItbisExonerated } from '../../shared/financialRules';
 import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem, CustomQuotationItem, CustomQuotationDiscount, ProjectSimulation } from '../types';
 import { calculateDCCapacityKWp, calculateMonthlySolarProduction } from './solarEngine';
@@ -20,8 +21,8 @@ export function calculateCostMatrixSummary(
   customItems?: CustomQuotationItem[],
   customDiscounts?: CustomQuotationDiscount[]
 ): CostMatrixSummary {
-  const rate = specs.dopExchangeRate || 60.0;
-  const margin = specs.saleMarginMultiplier || 1.25;
+  const rate = resolveDopRate(specs.dopExchangeRate);
+  const margin = resolveSaleMarginMultiplier(specs.saleMarginMultiplier);
 
   const panels = getProjectPanels(specs);
   const inverters = getProjectInverters(specs);
@@ -129,7 +130,7 @@ export function calculateCostMatrixSummary(
   // Row Final: Installation & Materials
   const installationKilos = 1;
   const installationQty = Math.round(realDCKWp * 1000) / 1000;
-  const installationUnitUSD = specs.installationUnitPriceUSD !== undefined ? specs.installationUnitPriceUSD : 170.0;
+  const installationUnitUSD = specs.installationUnitPriceUSD !== undefined ? specs.installationUnitPriceUSD : DEFAULT_INSTALLATION_USD_PER_KWP;
 
   const installTotalUSD = installationQty * installationUnitUSD;
   const installTotalDOP = installTotalUSD * rate;
@@ -271,7 +272,7 @@ export function calculateCostMatrixSummary(
 
   const costPerWattUSD = totalNetoUSD / (capacityKW * 1000);
   const salePricePerWattUSD = porcentajeVentaUSD / (capacityKW * 1000);
-  const solarSalePricePerWattUSD = capacityKW > 0 ? Math.round((solarOnlyVentaUSD / (capacityKW * 1000)) * 100) / 100 : 1.13;
+  const solarSalePricePerWattUSD = capacityKW > 0 ? Math.round((solarOnlyVentaUSD / (capacityKW * 1000)) * 100) / 100 : DEFAULT_PRICE_PER_WATT_USD;
 
   const marginOnSalePct = porcentajeVentaUSD > 0 ? Math.round((gananciaUSD / porcentajeVentaUSD) * 10000) / 100 : 0;
   const markupOnCostPct = totalNetoUSD > 0 ? Math.round((gananciaUSD / totalNetoUSD) * 10000) / 100 : 0;
@@ -372,6 +373,27 @@ function calculateIRR(initialInvestment: number, cashFlows: number[]): number {
 /**
  * Calculates complete financial and regulatory proposal model.
  */
+const isDegradationPct = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 5;
+
+/**
+ * Annual production degradation (%) used by the 25-year cash flow.
+ * Detailed mode uses the configured value. Simple (catalog) mode uses the DC-weighted degradation of the catalog
+ * panel groups, then the configured value, then 0.5%.
+ */
+export function resolveAnnualDegradationPct(specs: SystemSpecs): number {
+  if (specs.isDetailed) return specs.annualDegradation;
+  let weighted = 0;
+  let watts = 0;
+  for (const group of specs.panels || []) {
+    const groupWatts = (group.powerW || 0) * (group.count || 0);
+    if (groupWatts <= 0 || !isDegradationPct(group.annualDegradation)) continue;
+    weighted += group.annualDegradation * groupWatts;
+    watts += groupWatts;
+  }
+  if (watts > 0) return weighted / watts;
+  return isDegradationPct(specs.annualDegradation) ? specs.annualDegradation : 0.5;
+}
+
 export function calculateFinancialSummary(
   provinceName: string,
   specs: SystemSpecs,
@@ -392,14 +414,12 @@ export function calculateFinancialSummary(
 
   // Pricing Mode: 'cost_matrix' (default) vs 'direct_watt' (manual $/W or $/kW base price)
   const isDirectWatt = specs.pricingMode === 'direct_watt' || (!specs.isDetailed && specs.pricingMode !== 'cost_matrix');
-  const effectivePricePerWatt = specs.pricePerWattUSD !== undefined && specs.pricePerWattUSD > 0
-    ? specs.pricePerWattUSD
-    : (financials.pricePerWattUSD !== undefined && financials.pricePerWattUSD > 0 ? financials.pricePerWattUSD : 1.13);
+  const effectivePricePerWatt = resolvePricePerWattUSD(specs, financials);
 
   const customItemsTotalUSD = Math.round(customItems.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPriceUSD || 0)), 0) * 100) / 100;
   
   // ITBIS differentiation: Exonerated by Ley 57-07 vs Charged to Client
-  const customItemsTaxes = customItemsTaxBreakdown(customItems, costMatrix.saleMarginMultiplier || specs.saleMarginMultiplier || 1.25);
+  const customItemsTaxes = customItemsTaxBreakdown(customItems, resolveSaleMarginMultiplier(costMatrix.saleMarginMultiplier > 0 ? costMatrix.saleMarginMultiplier : specs.saleMarginMultiplier));
   const customItemsSaleTotalUSD = customItemsTaxes.saleTotalUSD;
   const nonExoneratedCustomITBISUSD = customItemsTaxes.nonExoneratedITBISUSD;
   const customItemsITBISUSD = customItemsTaxes.exoneratedITBISUSD;
@@ -513,7 +533,7 @@ export function calculateFinancialSummary(
 
   // ITBIS exoneration calculation (allows explicit custom override e.g. 1866.11 or dynamic calculation from cost matrix)
   const matrixITBISUSD = costMatrix.baseItbisUSD !== undefined ? costMatrix.baseItbisUSD : (costMatrix.itbisUSD || 0);
-  const commercialITBISUSD = Math.round(matrixITBISUSD * (costMatrix.saleMarginMultiplier || specs.saleMarginMultiplier || 1.25) * 100) / 100;
+  const commercialITBISUSD = Math.round(matrixITBISUSD * (resolveSaleMarginMultiplier(costMatrix.saleMarginMultiplier > 0 ? costMatrix.saleMarginMultiplier : specs.saleMarginMultiplier)) * 100) / 100;
 
   const baseITBISSaved = (financials.customITBISSavedUSD !== undefined && financials.customITBISSavedUSD > 0)
     ? financials.customITBISSavedUSD
@@ -561,8 +581,8 @@ export function calculateFinancialSummary(
     : 0;
 
   // Battery Usable Capacity & Backup Autonomy calculation
-  const batteryDodPct = specs.batteryDOD || 80;
-  const batteryEffPct = specs.batteryEfficiencyPct || 92;
+  const batteryDodPct = resolveBatteryBankDodPct(specs);
+  const batteryEffPct = resolveBatteryBankEfficiencyPct(specs);
   const totalBatteryKWh = calculateTotalBatteryCapacityKWh(specs);
   const batteryUsableKWh = specs.hasBattery
     ? Math.round(((totalBatteryKWh || specs.batteryCapacityKWh) * (batteryDodPct / 100) * (batteryEffPct / 100)) * 10) / 10
@@ -575,7 +595,7 @@ export function calculateFinancialSummary(
     : 0;
 
   // 25-Year Cash Flow Projection
-  const annualDegradationPct = specs.isDetailed ? specs.annualDegradation : 0.5;
+  const annualDegradationPct = resolveAnnualDegradationPct(specs);
   const annualInflationPct = rates.annualEnergyInflationPct || 3.5;
   const annualTaxCredit = financials.applyLey5707 ? ley5707CreditUSD / 3 : 0;
 
@@ -652,7 +672,7 @@ export function calculateFinancialSummary(
   // Effective sale price per Watt and per kWp (dynamic across both cost matrix and direct watt modes):
   const salePricePerWattUSD = dcCapacityKWp > 0
     ? Math.round((grossInvestmentUSD / (dcCapacityKWp * 1000)) * 10000) / 10000
-    : (costMatrix.salePricePerWattUSD || effectivePricePerWatt || 1.13);
+    : (costMatrix.salePricePerWattUSD || effectivePricePerWatt || DEFAULT_PRICE_PER_WATT_USD);
 
   const salePricePerKWpUSD = dcCapacityKWp > 0
     ? Math.round((grossInvestmentUSD / dcCapacityKWp) * 100) / 100

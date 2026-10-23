@@ -1,6 +1,7 @@
+import { createProjectId } from '../../utils/projectId';
 import { canEditCommercial } from '../../features/proposals/commercial';
 import { isProposalLink } from '../../../shared/proposalLinks';
-import { normalizeEquipmentEdit, normalizeSpecsChange } from '../../utils/equipmentGroups';
+import { normalizeEquipmentEdit, normalizeSpecsChange, selectCatalogEquipment } from '../../utils/equipmentGroups';
 import { commercialCopy, commercialState, isProposalCommercial } from '../../../shared/proposalCommercial';
 import { companyDocumentCustomization, reusableDocumentTemplate } from '../../utils/companyDocumentTemplate';
 import { DEFAULT_SIMULATION_SETTINGS } from '../defaultSimulationSettings';
@@ -15,6 +16,11 @@ import { calculateFinancialSummary, calculateCostMatrixSummary } from '../../eng
 import { calculateRecommendedPanelCount } from '../../engine/solarEngine';
 import { projectMutationMetadata } from '../sync/projectMutation';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
+import { canEditDocument } from '../../components/pdf/editor/documentEditorState';
+import { normalizeDocumentLayout } from '../../../shared/documentLayout';
+import { applyDocumentTextPatch, companyTemplateTextPatch, documentTextsPatch } from '../../../shared/documentTexts';
+import { DEFAULT_GRID_EXPORT_FEE_PCT, DEFAULT_TARGET_COVERAGE_PCT, DEFAULT_BATTERY_CAPACITY_KWH, DEFAULT_BATTERY_DOD_PCT, DEFAULT_PRICE_PER_WATT_USD, DEFAULT_SYSTEM_LOSSES_PCT, resolveSystemLossesPct } from '../../../shared/projectDefaults';
+import { documentTextContextFor } from '../../utils/documentTextContext';
 
 /** Specs with the panel count the engine recommends for this consumption, province and coverage target. */
 function withRecommendedPanels(specs: SystemSpecs, client: ClientInfo, monthlyConsumption: number[], targetCoveragePct: number): SystemSpecs {
@@ -23,7 +29,7 @@ function withRecommendedPanels(specs: SystemSpecs, client: ClientInfo, monthlyCo
     monthlyConsumption,
     specs.panelPowerW || 620,
     targetCoveragePct,
-    specs.systemLosses !== undefined ? specs.systemLosses : 25.0,
+    resolveSystemLossesPct(specs),
     client.customMonthlyHSP
   );
   // Goes through the group normalizer so a single panel group receives the recommendation too.
@@ -51,6 +57,13 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
   const isActiveProjectTrashed = () => {
     const state = get();
     return !!state.projects.find((p) => p.id === (state.activeProjectId || state.getActiveProject()?.id))?.isDeleted;
+  };
+
+  /** Same rule as the editor UI: writers only, never trashed or conflicted proposals. */
+  const canEditActiveDocument = () => {
+    const state = get();
+    const active = state.projects.find((p) => p.id === (state.activeProjectId || state.getActiveProject()?.id));
+    return !!active && canEditDocument({ project: active, user: state.syncSettings.currentUser });
   };
 
   /** Applies an edit to the active project, stamps mutation metadata, then auto-syncs and records undo. */
@@ -172,9 +185,26 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
   },
 
+  updateProjectById: (id, edit, options) => {
+    const target = get().projects.find((p) => p.id === id);
+    if (!target || target.isDeleted || target.deletedAt) return false;
+    set((state) => ({
+      projects: state.projects.map((p) => {
+        if (p.id !== id) return p;
+        const next = { ...p, ...projectMutationMetadata(p, get().syncSettings), updatedAt: new Date().toISOString(), ...edit(p) };
+        // A restored snapshot is already a consistent project: merging it with the groups being undone would keep new data.
+        return options?.restore ? next : withNormalizedEquipment(p, next);
+      }),
+    }));
+    get().triggerAutoSync(false);
+    if (id === get().activeProjectId) get().recordUndoState(get().getActiveProject());
+    return true;
+  },
+
   createNewProject: (payload) => {
     const defs = get().defaultSimulationSettings;
-    const id = `proj-${Date.now()}`;
+    const directWattPrice = defs?.defaultDirectPriceUSDPerWp || DEFAULT_PRICE_PER_WATT_USD;
+    const id = createProjectId();
     const name = typeof payload === 'string' ? payload : (payload?.name || 'Nuevo Proyecto Solar');
     const company = typeof payload === 'object' && payload?.company ? payload.company : 'Cliente Comercial';
     const province = typeof payload === 'object' && payload?.province ? payload.province : (defs?.defaultProvince || 'Santo Domingo / Distrito Nacional');
@@ -218,24 +248,28 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
       },
       specs: {
         ...BENCHMARK_PROJECT.specs,
+        // El $/W del caso de referencia (1.134971) no es un default: todo proyecto nuevo parte del ajuste.
+        pricePerWattUSD: directWattPrice,
+        pricePerKWpUSD: Math.round(directWattPrice * 1000 * 100) / 100,
+        isDetailed: false, // Simple (Catálogo IA): equipos del catálogo con precios de proveedor
         pricingMode: defs?.defaultPricingMode === 'direct' ? 'direct_watt' : 'cost_matrix',
         panelPowerW: defs?.defaultPanelPowerW || 620,
         panelBrandModel: defs?.defaultPanelModel || BENCHMARK_PROJECT.specs.panelBrandModel,
         inverterBrandModel: defs?.defaultInverterModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)',
         inverterPowerKW: defs?.defaultInverterPowerKW || 8.0,
         inverterCount: 1,
-        systemLosses: defs?.defaultSystemLosses !== undefined ? defs.defaultSystemLosses : 25.0,
+        systemLosses: defs?.defaultSystemLosses !== undefined ? defs.defaultSystemLosses : DEFAULT_SYSTEM_LOSSES_PCT,
         annualDegradation: defs?.defaultAnnualDegradation || 0.40,
         autoCalculatePanels: defs?.defaultAutoCalculatePanels || false,
         hasBattery: defs?.defaultHasBattery || false,
-        batteryCapacityKWh: defs?.defaultBatteryCapacityKWh || 16.08,
-        batteryDOD: defs?.defaultBatteryDOD || 90,
+        batteryCapacityKWh: defs?.defaultBatteryCapacityKWh || DEFAULT_BATTERY_CAPACITY_KWH,
+        batteryDOD: defs?.defaultBatteryDOD || DEFAULT_BATTERY_DOD_PCT,
       },
       rates: {
         ...BENCHMARK_PROJECT.rates,
-        targetCoveragePct: defs?.defaultTargetCoveragePct || 95,
+        targetCoveragePct: defs?.defaultTargetCoveragePct || DEFAULT_TARGET_COVERAGE_PCT,
         isZeroExport: defs?.defaultZeroExport || false,
-        gridExportFeePct: defs?.defaultApplySieRetention ? 25.0 : 0.0,
+        gridExportFeePct: defs?.defaultApplySieRetention ? DEFAULT_GRID_EXPORT_FEE_PCT : 0,
         distributor,
         tariffCode,
         currency: defs?.currency || 'USD',
@@ -244,7 +278,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
       financials: {
         applyLey5707: defs?.applyLey5707 !== undefined ? defs.applyLey5707 : true,
         applyITBISExemption: defs?.applyITBISExemption !== undefined ? defs.applyITBISExemption : true,
-        pricePerWattUSD: defs?.defaultDirectPriceUSDPerWp || 1.05,
+        pricePerWattUSD: defs?.defaultDirectPriceUSDPerWp || DEFAULT_PRICE_PER_WATT_USD,
         discountRatePct: defs?.discountRatePct || 12,
         projectLifespanYears: defs?.lifespanYears || 25,
         co2FactorKgPerKWh: BENCHMARK_PROJECT.financials?.co2FactorKgPerKWh || 0.481,
@@ -274,12 +308,12 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     }
   },
 
-  duplicateProject: (id) => {
+  duplicateProject: (id, options) => {
     const original = get().projects.find((p) => p.id === id);
-    if (!original) return;
+    if (!original) return undefined;
 
     const dupIdentifiers = generateDuplicateProjectIdentifiers(original, get().projects);
-    const newId = `proj-${Date.now()}`;
+    const newId = createProjectId();
     const currentUser = get().syncSettings?.currentUser;
     const clonedFinancials = { ...original.financials };
     delete clonedFinancials.customITBISSavedUSD;
@@ -315,7 +349,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
 
     set((state) => ({
       projects: [cloned, ...state.projects],
-      activeProjectId: newId,
+      ...(options?.activate === false ? {} : { activeProjectId: newId }),
       saveFeedbackMessage: `¡Proyecto duplicado como versión ${dupIdentifiers.versionSuffix}! ✨`,
     }));
 
@@ -324,6 +358,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     if (get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) {
       get().triggerAutoSync(true);
     }
+    return newId;
   },
 
   moveToTrash: (id) => {
@@ -536,6 +571,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     const customization = { ...(p.customization || {}) };
     if (clientPartial.contactPhone !== undefined) customization.clientPhone = clientPartial.contactPhone;
     if (clientPartial.contactPerson !== undefined) customization.contactName = clientPartial.contactPerson;
+    if (clientPartial.contactEmail !== undefined) customization.clientEmail = clientPartial.contactEmail;
     const specs = p.specs.autoCalculatePanels && clientPartial.province
       ? withRecommendedPanels(p.specs, client, p.monthlyConsumption, p.rates.targetCoveragePct ?? 95)
       : { ...p.specs };
@@ -600,34 +636,46 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
   setMonthlyConsumption: (monthlyConsumption, lockAutoPanels = false) =>
     updateActiveConsumption(() => monthlyConsumption.map((v) => Math.max(0, v)), lockAutoPanels),
 
-  updateDocumentCustomization: (customizationPartial) => {
-    if (isActiveProjectTrashed()) return;
-    set((state) => {
-      const targetId = state.activeProjectId || state.getActiveProject()?.id;
-      return {
-        projects: state.projects.map((p) => {
-          if (p.id === targetId) {
-            const updatedClient = { ...p.client };
-            if (customizationPartial.clientPhone !== undefined) {
-              updatedClient.contactPhone = customizationPartial.clientPhone;
-            }
-            if (customizationPartial.contactName !== undefined) {
-              updatedClient.contactPerson = customizationPartial.contactName;
-            }
-            return {
-              ...p,
-              ...projectMutationMetadata(p, get().syncSettings),
-              updatedAt: new Date().toISOString(),
-              client: updatedClient,
-              customization: { ...(p.customization || {}), ...customizationPartial },
-            };
-          }
-          return p;
-        }),
-      };
-    });
+  updateDocumentCustomization: (customizationPartial) => updateActiveProject((p) => {
+    // Contacto, teléfono y correo del documento son espejo de los datos del cliente.
+    const client = { ...p.client };
+    if (customizationPartial.clientPhone !== undefined) client.contactPhone = customizationPartial.clientPhone;
+    if (customizationPartial.contactName !== undefined) client.contactPerson = customizationPartial.contactName;
+    if (customizationPartial.clientEmail !== undefined) client.contactEmail = customizationPartial.clientEmail;
+    return { client, customization: { ...(p.customization || {}), ...customizationPartial } };
+  }),
 
-    get().triggerAutoSync(false);
+  setDocumentLayout: (patch) => !canEditActiveDocument() ? undefined : updateActiveProject((p) => ({
+    customization: { ...(p.customization || {}), layout: normalizeDocumentLayout({ ...(p.customization?.layout || {}), ...patch }) },
+  })),
+
+  setDocumentTexts: (values) => !canEditActiveDocument() ? undefined : updateActiveProject((p, state) => {
+    const ctx = documentTextContextFor(state, p, energyCalculationMode(effectiveFeatureSettings(state)));
+    const patch = documentTextsPatch(values, p, ctx);
+    const next = applyDocumentTextPatch({ customization: p.customization || {}, client: p.client }, patch);
+    return { customization: next.customization, client: next.client };
+  }),
+
+  saveDocumentTextsToCompanyTemplate: (keys) => {
+    const state = get();
+    const active = state.getActiveProject();
+    const companyId = active?.companyProfileId || (state.companies.length === 1 ? state.companies[0].id : undefined);
+    const company = state.companies.find((item) => item.id === companyId);
+    if (!active || !company) {
+      set({ saveFeedbackMessage: 'Selecciona la empresa emisora de esta propuesta antes de guardar su plantilla.' });
+      return { saved: [], skipped: keys === 'all' ? [] : [...keys] };
+    }
+    const template = state.documentTemplatesByCompany[company.id] || reusableDocumentTemplate(companyDocumentCustomization(company, state.defaultDocumentCustomization, state.documentTemplatesByCompany));
+    const ctx = documentTextContextFor(state, active, energyCalculationMode(effectiveFeatureSettings(state)));
+    const { patch, saved, skipped } = companyTemplateTextPatch(keys, active, ctx, template);
+    if (!saved.length) return { saved, skipped };
+    set((current) => ({
+      defaultDocumentCustomization: { ...(current.defaultDocumentCustomization || DEFAULT_DOCUMENT_CUSTOMIZATION), ...patch },
+      documentTemplatesByCompany: { ...current.documentTemplatesByCompany, [company.id]: { ...template, ...patch } },
+      saveFeedbackMessage: saved.length === 1 ? 'Texto guardado en la plantilla de la empresa 📑' : `${saved.length} textos guardados en la plantilla de la empresa 📑`,
+    }));
+    setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
+    return { saved, skipped };
   },
 
   applySupplierPriceToProject: (equipmentType, supplierPrice, equipmentItem) => {
@@ -704,11 +752,15 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
             updatedSpecs.batteries = updatedSpecs.batteries.map((item, index) => index ? item : {
               ...item, brandModel: updatedSpecs.batteryBrandModel || item.brandModel,
               capacityKWh: updatedSpecs.batteryCapacityKWh || item.capacityKWh,
-              dodPct: updatedSpecs.batteryDOD, unitPriceUSD: supplierPrice.priceUSD,
+              dodPct: updatedSpecs.batteryDOD, efficiencyPct: updatedSpecs.batteryEfficiencyPct, unitPriceUSD: supplierPrice.priceUSD,
               selectedSupplierInfo: selectedSupplierInfo.battery,
             });
           }
           updatedSpecs.selectedSupplierInfo = selectedSupplierInfo;
+          // The primary group remembers its catalog item (datasheet annexes); unmigrated projects migrate here.
+          if (targetItem) Object.assign(updatedSpecs, selectCatalogEquipment(updatedSpecs, equipmentType, 0, targetItem, {
+            unitPriceUSD: supplierPrice.priceUSD, selectedSupplierInfo: selectedSupplierInfo[equipmentType],
+          }));
           const nextFinancials = withoutStaleFinancialOverrides(p, p.financials);
 
           return {

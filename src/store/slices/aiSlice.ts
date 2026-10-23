@@ -1,9 +1,10 @@
+import { createProjectId } from '../../utils/projectId';
 import { isReaderRole } from '../../../shared/permissions';
 import { prepareProposalDraftProject, createAIProposalBase } from '../../utils/proposalDraftProject';
 import { companyDocumentCustomization } from '../../utils/companyDocumentTemplate';
 import { projectMutationMetadata } from '../sync/projectMutation';
-import { SimulationSlice, AISlice } from '../types';
-import type { ProjectSimulation } from '../../types';
+import { SimulationSlice, AISlice, SimulationStore } from '../types';
+import type { ProjectSimulation, ExtractedInvoiceData } from '../../types';
 import { BENCHMARK_PROJECT } from '../../engine/referenceCase';
 import { generateNextProjectSequence } from '../initialData';
 import { calculateRecommendedPanelCount, getMonthlySolarProductionFactors } from '../../engine/solarEngine';
@@ -20,15 +21,11 @@ const normalizeProvinceName = (raw?: string): string => {
     || (query.includes('punta cana') || query.includes('higuey') ? 'La Altagracia (Punta Cana / Higüey)' : getProvinceHSP(raw).name);
 };
 
-export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
-  geminiApiKey: '', geminiModel: DEFAULT_GEMINI_MODEL,
-  setGeminiApiKey: key=>set({geminiApiKey:key}),
-  setGeminiModel: model=>set({geminiModel:model || DEFAULT_GEMINI_MODEL}),
-  applyExtractedInvoice: (input,createNewProject=false)=>{
-    const state=get();
+/** Pure: validates the draft against today's inventory and builds the proposal without touching the store. */
+export function buildProjectFromDraft(state:SimulationStore,input:ExtractedInvoiceData,createNewProject=false):{project:ProjectSimulation;previous?:ProjectSimulation}|{error:string} {
     const current=state.projects.find(p=>p.id===state.activeProjectId);
-    if(isReaderRole(state.syncSettings.currentUser?.role)) {set({saveFeedbackMessage:'Tu rol permite consultar propuestas, no crearlas ni modificarlas.'});return;}
-    if(!createNewProject && (!current || current.isDeleted || current.deletedAt || (current.organizationId && current.organizationId!==state.syncSettings.currentUser?.organizationId))) {set({saveFeedbackMessage:'No se puede actualizar esta propuesta.'});return;}
+    if(isReaderRole(state.syncSettings.currentUser?.role)) return {error:'Tu rol permite consultar propuestas, no crearlas ni modificarlas.'};
+    if(!createNewProject && (!current || current.isDeleted || current.deletedAt || (current.organizationId && current.organizationId!==state.syncSettings.currentUser?.organizationId))) return {error:'No se puede actualizar esta propuesta.'};
     const isGrounded=Array.isArray(input.panels) || Array.isArray(input.inverters) || Array.isArray(input.batteries);
     const province=normalizeProvinceName(input.province || input.municipality || (!createNewProject?current?.client.province:state.defaultSimulationSettings.defaultProvince));
     const defaults=state.defaultSimulationSettings;
@@ -39,16 +36,15 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
       annualSpecificYieldKWhPerKWp:calculateRecommendedPanelCount(province,Array(12).fill(0),620,95,losses,base.client.customMonthlyHSP).annualSpecificYieldKWhPerKWp,
       monthlySpecificYieldKWhPerKWp:getMonthlySolarProductionFactors(province,losses,base.client.customMonthlyHSP),
       tariffReference:buildAITariffContext(state.tariffMatrix)}):input;
-    if(isGrounded && data.requiresReview) {set({saveFeedbackMessage:data.validationIssues?.find(i=>i.severity==='error')?.message || 'Revisa los datos pendientes antes de aplicar.'});return;}
-    if(data.monthlyConsumptionKWh.length!==12 || data.monthlyConsumptionKWh.some(n=>!Number.isFinite(n) || n<0)) {set({saveFeedbackMessage:'Completa los doce consumos mensuales antes de aplicar.'});return;}
+    if(isGrounded && data.requiresReview) return {error:data.validationIssues?.find(i=>i.severity==='error')?.message || 'Revisa los datos pendientes antes de aplicar.'};
+    if(data.monthlyConsumptionKWh.length!==12 || data.monthlyConsumptionKWh.some(n=>!Number.isFinite(n) || n<0)) return {error:'Completa los doce consumos mensuales antes de aplicar.'};
     const now=new Date().toISOString();
     const prepared=prepareProposalDraftProject(base,data,state.tariffMatrix,{isNew:createNewProject,defaultBatteryDOD:defaults.defaultBatteryDOD});
     const {specs,rates}=prepared;
     const seq=createNewProject?generateNextProjectSequence(state.projects):undefined;
     const user=state.syncSettings.currentUser;
-    if(!createNewProject) state.recordUndoState(current!);
     const project:ProjectSimulation={...base,
-      ...(createNewProject?{id:`proj-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`}`,createdAt:now,status:'Draft',
+      ...(createNewProject?{id:createProjectId(),createdAt:now,status:'Draft',
         authorId:user?.id || 'local-user',authorName:user?.name || 'Ing. Solar',authorEmail:user?.email || '',version:1,baseVersion:0,
         organizationId:user?.organizationId,syncServerUrl:user?state.syncSettings.serverUrl.trim().replace(/\/+$/,''):undefined,syncStatus:user?'pending':'local_only',companyProfileId:state.activeCompanyId}
         :projectMutationMetadata(base,state.syncSettings)),
@@ -67,6 +63,19 @@ export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
         notes:data.specialTechnicalNotes!==undefined || data.aiNotes!==undefined ? ([data.specialTechnicalNotes,data.aiNotes].filter(Boolean).join('\n') || undefined) : base.aiSource?.notes},
       ...(createNewProject?{customization:{...companyDocumentCustomization(state.getActiveCompany(),state.defaultDocumentCustomization,state.documentTemplatesByCompany),contactName:data.clientName,clientPhone:data.phone,clientEmail:data.email}}:{}),
     };
+    return {project,previous:createNewProject?undefined:current};
+}
+
+export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
+  geminiApiKey: '', geminiModel: DEFAULT_GEMINI_MODEL,
+  setGeminiApiKey: key=>set({geminiApiKey:key}),
+  setGeminiModel: model=>set({geminiModel:model || DEFAULT_GEMINI_MODEL}),
+  applyExtractedInvoice: (input,createNewProject=false)=>{
+    const state=get();
+    const built=buildProjectFromDraft(state,input,createNewProject);
+    if('error' in built) {set({saveFeedbackMessage:built.error});return;}
+    const {project,previous}=built;
+    if(previous) state.recordUndoState(previous);
     set({projects:createNewProject?[project,...state.projects]:state.projects.map(p=>p.id===project.id?project:p),activeProjectId:project.id,
       activeView:'simulator',isAIInvoiceModalOpen:false,saveFeedbackMessage:`Propuesta ${project.client.projectId} ${createNewProject?'creada':'actualizada'}.`});
     if(get().syncSettings.autoSyncEnabled && get().syncSettings.authToken) get().triggerAutoSync(true);
