@@ -203,6 +203,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
 
   createNewProject: (payload) => {
     const defs = get().defaultSimulationSettings;
+    const directWattPrice = defs?.defaultDirectPriceUSDPerWp || DEFAULT_PRICE_PER_WATT_USD;
     const id = createProjectId();
     const name = typeof payload === 'string' ? payload : (payload?.name || 'Nuevo Proyecto Solar');
     const company = typeof payload === 'object' && payload?.company ? payload.company : 'Cliente Comercial';
@@ -247,6 +248,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
       },
       specs: {
         ...BENCHMARK_PROJECT.specs,
+        ...(defs?.defaultPricingMode === 'direct' ? { pricePerWattUSD: directWattPrice, pricePerKWpUSD: Math.round(directWattPrice * 1000 * 100) / 100 } : {}),
         isDetailed: false, // Simple (Catálogo IA): equipos del catálogo con precios de proveedor
         pricingMode: defs?.defaultPricingMode === 'direct' ? 'direct_watt' : 'cost_matrix',
         panelPowerW: defs?.defaultPanelPowerW || 620,

@@ -21,6 +21,7 @@ import { RD_PROVINCES } from '../../../data/rdProvinces';
 import { UtilityDistributor, getDistributorTariffOptions } from '../../../types/tariffs';
 import { AITariffResolutionModal } from './AITariffResolutionModal';
 import { TariffPreferencesPanel } from './TariffPreferencesPanel';
+import { DEFAULT_PRICE_PER_WATT_USD } from '../../../../shared/projectDefaults';
 
 export const SimulationPreferencesSection: React.FC = () => {
   const {
@@ -513,7 +514,7 @@ export const SimulationPreferencesSection: React.FC = () => {
                   type="number"
                   step={0.05}
                   value={defs.defaultDirectPriceUSDPerWp}
-                  onChange={(e) => updateDefaultSimulationSettings({ defaultDirectPriceUSDPerWp: parseFloat(e.target.value) || 1.05 })}
+                  onChange={(e) => updateDefaultSimulationSettings({ defaultDirectPriceUSDPerWp: parseFloat(e.target.value) || DEFAULT_PRICE_PER_WATT_USD })}
                   className="w-full px-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-800 dark:text-zinc-200"
                 />
               </div>
