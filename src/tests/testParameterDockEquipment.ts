@@ -4,7 +4,8 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { SystemSpecs } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
-import { editEquipmentGroup, normalizeEquipmentEdit, selectCatalogEquipment, type EquipmentKind } from '../utils/equipmentGroups';
+import { editEquipmentGroup, normalizeEquipmentEdit, resolveGroupCatalogItem, selectCatalogEquipment, type EquipmentKind } from '../utils/equipmentGroups';
+import { resolveAnnualDegradationPct } from '../engine/financeEngine';
 import { catalogPanelGroupPatch } from '../utils/catalogGroupPatch';
 import { buildCatalogSelectionUpdate } from '../components/simulator/params/logic/catalogSelection';
 import {
@@ -264,6 +265,61 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
   const menuAt = markup.indexOf('role="listbox"');
   assert.ok(trailingAt > 0 && menuAt > trailingAt, 'el contador va junto al disparador y el menú después');
   assert.ok(/data-trailing[^>]*>\+<\/span><\/div><div class="mt-1\.5 w-full/.test(markup), 'el menú queda fuera de la fila del disparador');
+}
+
+// --- «+» en un panel copia también los campos propios del modelo (degradación), como la selección del catálogo ---
+{
+  const degradingCatalog: SolarEquipmentItem[] = [
+    catalogItem({ id: 'dp1', type: 'panel', displayName: 'Panel Lento', powerW: 550, annualDegradation: 0.3, efficiencyPct: 21.5, tempCoeff: -0.29, weightKg: 28 }),
+    catalogItem({ id: 'dp2', type: 'panel', displayName: 'Panel Rapido', powerW: 600, annualDegradation: 0.8, efficiencyPct: 20.1, tempCoeff: -0.35, weightKg: 31 }),
+  ];
+  const state = { specs: { panelCount: 10, panelPowerW: 550, panelBrandModel: 'Panel Lento', panels: [{ id: 'pa', catalogItemId: 'dp1', brandModel: 'Panel Lento', powerW: 550, count: 10, annualDegradation: 0.3 }] } as unknown as SystemSpecs };
+  const updateSpecs = (patch: Partial<SystemSpecs>) => { state.specs = normalizeEquipmentEdit(state.specs, patch); };
+  createGroupActions('panel', state.specs, degradingCatalog, updateSpecs).add();
+  const added = state.specs.panels![1];
+  assert.equal(added.catalogItemId, 'dp2');
+  assert.equal(added.annualDegradation, 0.8, '«+» conserva la degradación del modelo agregado');
+  assert.deepEqual(
+    [added.efficiencyPct, added.tempCoeff, added.weightKilos],
+    [20.1, -0.35, 31],
+    'eficiencia, coeficiente térmico y peso también salen del catálogo'
+  );
+  assert.ok(Math.abs(resolveAnnualDegradationPct(state.specs) - (0.3 * 5500 + 0.8 * 6000) / 11500) < 1e-9, 'la proyección a 25 años pondera por potencia DC, no queda toda en 0.3');
+}
+
+// --- Editar a mano la marca/modelo de un grupo del catálogo rompe el vínculo con la ficha técnica ---
+{
+  const linkedCatalog: SolarEquipmentItem[] = [
+    catalogItem({ id: 'k1', type: 'panel', displayName: 'Panel K 550', powerW: 550 }),
+    catalogItem({ id: 'k2', type: 'panel', displayName: 'Panel K 600', powerW: 600 }),
+    catalogItem({ id: 'ki', type: 'inverter', displayName: 'Inversor K 8', powerKW: 8 }),
+  ];
+  const run = (kind: EquipmentKind, group: Record<string, unknown>, name: string) => {
+    const key = kind === 'panel' ? 'panels' : kind === 'inverter' ? 'inverters' : 'batteries';
+    const state = { specs: { [key]: [group] } as unknown as SystemSpecs };
+    createGroupActions(kind, state.specs, linkedCatalog, patch => { state.specs = normalizeEquipmentEdit(state.specs, patch); }).setBrand(0, name);
+    return (state.specs[key] as Array<{ id: string; catalogItemId?: string; brandModel: string }>)[0];
+  };
+  const linked = { id: 'panel-k1', catalogItemId: 'k1', brandModel: 'Panel K 550', powerW: 550, count: 4 };
+
+  const other = run('panel', linked, 'Panel K 600');
+  assert.equal(other.catalogItemId, undefined, 'otro modelo: se olvida el catalogItemId anterior');
+  assert.equal(resolveGroupCatalogItem(other, 'panel', linkedCatalog)?.id, 'k2', 'resuelve por el nombre nuevo, no por el id anterior');
+  assert.equal(resolveGroupCatalogItem(run('panel', linked, 'Panel Propio X'), 'panel', linkedCatalog), null, 'un modelo a mano no adjunta ninguna ficha');
+
+  const idIsCatalogId = run('panel', { ...linked, id: 'k1' }, 'Panel Propio X');
+  assert.notEqual(idIsCatalogId.id, 'k1', 'si el id del grupo es un id del catálogo, también se renueva');
+  assert.equal(resolveGroupCatalogItem(idIsCatalogId, 'panel', linkedCatalog), null);
+  assert.equal(run('inverter', { id: 'ki', catalogItemId: 'ki', brandModel: 'Inversor K 8', powerKW: 8, count: 1 }, 'Inversor Z').catalogItemId, undefined, 'inversores igual');
+
+  // Mayúsculas y espacios no cambian de modelo: se conserva el vínculo.
+  for (const same of ['  Panel K 550 ', 'panel k 550', 'Panel  K   550']) {
+    assert.equal(run('panel', linked, same).catalogItemId, 'k1', `«${same}» sigue siendo el mismo modelo`);
+  }
+  // Un cambio de un carácter puede ser otro modelo (550 → 560): el vínculo se rompe.
+  assert.equal(run('panel', linked, 'Panel K 560').catalogItemId, undefined);
+  // Un grupo escrito a mano (sin catálogo) no se toca.
+  assert.equal(run('panel', { id: 'm', brandModel: 'Mio', powerW: 400, count: 2 }, 'Mio 2').id, 'm');
 }
 
 // --- Las secciones usan solo tokens pd-*, sin isDark ni colores sueltos, y la cantidad de batería no salta editEquipmentGroup ---
