@@ -43,6 +43,7 @@ export function workspaceCatalog(catalog: SolarEquipmentItem[], serverUrl: strin
  * resolved in the catalog yet, typically a proposal pulled before the equipment catalog finished syncing.
  * The datasheet of an unresolved item is unknown, so it cannot be tied to one annex (variants share assets,
  * legacy groups have no catalogItemId): while anything in use is unresolved, every automatic annex is kept.
+ * A group the user rewrote by hand (`manualModel`) is not pending: it will never resolve, so its old annex goes.
  * This is transient: once the catalog resolves everything, the exact plan applies again.
  */
 export function unresolvedEquipmentIds(project: ProjectSimulation, catalog: SolarEquipmentItem[]): Set<string> {
@@ -51,7 +52,7 @@ export function unresolvedEquipmentIds(project: ProjectSimulation, catalog: Sola
     ...getProjectInverters(project.specs).map((group) => ({ group, kind: 'inverter' as const })),
     ...getProjectBatteries(project.specs).map((group) => ({ group, kind: 'battery' as const })),
   ];
-  const unresolved = groups.some(({ group, kind }) => group.count > 0 && !resolveGroupCatalogItem(group, kind, catalog));
+  const unresolved = groups.some(({ group, kind }) => group.count > 0 && !group.manualModel && !resolveGroupCatalogItem(group, kind, catalog));
   const ids = new Set<string>();
   if (!unresolved) return ids;
   for (const att of project.customization?.attachedPdfs ?? []) {

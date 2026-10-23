@@ -154,14 +154,18 @@ const normalizeModelName = (name: string) => name.normalize('NFD').replace(/[\u0
  * puede ser otro modelo, y adjuntar la ficha técnica equivocada es peor que no adjuntar ninguna. Además del
  * `catalogItemId` se renueva un `id` de grupo que sea un id del catálogo, porque `resolveGroupCatalogItem` también lo resuelve.
  */
-function detachedCatalogIdentity(kind: EquipmentKind, group: { id?: string; catalogItemId?: string; brandModel?: string }, brandModel: string, catalog: SolarEquipmentItem[]): { catalogItemId?: undefined; id?: string } {
+function detachedCatalogIdentity(kind: EquipmentKind, group: { id?: string; catalogItemId?: string; brandModel?: string }, brandModel: string, catalog: SolarEquipmentItem[]): { catalogItemId?: undefined; id?: string; manualModel?: true } {
   const linked = resolveGroupCatalogItem(group, kind, catalog);
   const reference = linked?.displayName ?? group.brandModel ?? '';
   if (normalizeModelName(brandModel) === normalizeModelName(reference)) return {};
-  const idIsCatalogId = !!group.id && catalog.some(item => item.type === kind && item.id === group.id);
+  // Un id igual al catalogItemId es identidad de catálogo (propuestas de IA) aunque el catálogo aún no haya sincronizado.
+  const idIsCatalogId = !!group.id && (group.id === group.catalogItemId || catalog.some(item => item.type === kind && item.id === group.id));
+  if (group.catalogItemId === undefined && !idIsCatalogId && !linked) return {};
   return {
     ...(group.catalogItemId !== undefined ? { catalogItemId: undefined } : {}),
     ...(idIsCatalogId ? { id: `${kind}-${Date.now()}` } : {}),
+    // Desvinculado a propósito: no es un equipo del catálogo pendiente de cargar, así que su ficha anterior debe salir.
+    manualModel: true,
   };
 }
 

@@ -98,6 +98,14 @@ assert.deepEqual(deduped.attachedPdfs.map((att) => att.id), ['att-manual', 'att-
   assert.equal(during.attachedPdfs, before.attachedPdfs);
   // Without the pending set the annex would be dropped (the old behaviour this guards against).
   assert.equal(applyAnnexPlan(before, planDatasheetAnnexes(loading, partial), NOW, new Set()).changed, true);
+  // A group the user detached by hand is not pending: its old annex is removed, not kept forever.
+  {
+    const manual = structuredClone(loading);
+    manual.specs.inverters = [{ id: 'g9', brandModel: 'Inversor propio', powerKW: 8, count: 1, manualModel: true }];
+    assert.equal(unresolvedEquipmentIds(manual, catalog).size, 0, 'manual model protects nothing');
+    const result = applyAnnexPlan(before, planDatasheetAnnexes(manual, catalog), NOW, unresolvedEquipmentIds(manual, catalog));
+    assert.equal(result.attachedPdfs.some((att) => att.id === catalogAnnexId('sheet-inverter')), false, 'old model datasheet leaves the export');
+  }
   // The record arrives: the same annex objects survive, nothing is recreated.
   assert.equal(applyAnnexPlan(before, planDatasheetAnnexes(loading, catalog), NOW, unresolvedEquipmentIds(loading, catalog)).changed, false);
   // The proposal stops using the equipment (count 0 or removed group): the annex is removed even if the catalog is still partial.

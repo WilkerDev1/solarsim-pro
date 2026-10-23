@@ -312,6 +312,28 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
   assert.equal(resolveGroupCatalogItem(idIsCatalogId, 'panel', linkedCatalog), null);
   assert.equal(run('inverter', { id: 'ki', catalogItemId: 'ki', brandModel: 'Inversor K 8', powerKW: 8, count: 1 }, 'Inversor Z').catalogItemId, undefined, 'inversores igual');
 
+  // Catálogo aún sin sincronizar: el id igual al catalogItemId (propuestas de IA) también es identidad de catálogo.
+  {
+    const offline = (name: string) => {
+      const state = { specs: { panels: [{ id: 'k1', catalogItemId: 'k1', brandModel: 'Panel K 550', powerW: 550, count: 4 }] } as unknown as SystemSpecs };
+      createGroupActions('panel', state.specs, [], patch => { state.specs = normalizeEquipmentEdit(state.specs, patch); }).setBrand(0, name);
+      return state.specs.panels![0];
+    };
+    const edited = offline('Panel Propio X');
+    assert.notEqual(edited.id, 'k1', 'el id copiado del catálogo se renueva aunque el catálogo esté vacío');
+    assert.equal(edited.catalogItemId, undefined);
+    assert.equal(resolveGroupCatalogItem(edited, 'panel', linkedCatalog), null, 'al sincronizar el catálogo no reaparece el modelo anterior');
+    assert.equal(offline('panel k 550').id, 'k1', 'mismo modelo: no se toca');
+  }
+  // Desvincular a propósito se marca como modelo manual; elegir del catálogo lo quita.
+  {
+    const detached = run('panel', linked, 'Panel Propio X') as { manualModel?: boolean };
+    assert.equal(detached.manualModel, true);
+    assert.equal(run('panel', linked, 'panel k 550').hasOwnProperty('manualModel'), false, 'mismo modelo: sin marca');
+    const specs = { panels: [{ ...detached, id: 'x', brandModel: 'Panel Propio X', powerW: 1, count: 1 }] } as unknown as SystemSpecs;
+    const picked = normalizeEquipmentEdit(specs, selectCatalogEquipment(specs, 'panel', 0, linkedCatalog[1]));
+    assert.equal(picked.panels![0].manualModel, undefined, 'seleccionar del catálogo vuelve a vincular');
+  }
   // Mayúsculas y espacios no cambian de modelo: se conserva el vínculo.
   for (const same of ['  Panel K 550 ', 'panel k 550', 'Panel  K   550']) {
     assert.equal(run('panel', linked, same).catalogItemId, 'k1', `«${same}» sigue siendo el mismo modelo`);
