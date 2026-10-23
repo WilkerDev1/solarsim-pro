@@ -91,7 +91,8 @@ export function deriveLegacyGroupWithPrice<K extends EquipmentKind>(specs: Syste
 export function hasLegacyBatteryData(specs: SystemSpecs): boolean {
   return Boolean(
     specs.batteryBrandModel || specs.batteryCapacityKWh > 0 || (specs.batteryCount ?? 0) > 0 ||
-    specs.batteryUnitPriceUSD !== undefined || specs.batteryWeightKilos !== undefined || specs.selectedSupplierInfo?.battery
+    specs.batteryUnitPriceUSD !== undefined || specs.batteryWeightKilos !== undefined ||
+    specs.batteryDOD !== undefined || specs.batteryEfficiencyPct !== undefined || specs.selectedSupplierInfo?.battery
   );
 }
 

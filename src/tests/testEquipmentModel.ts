@@ -76,6 +76,9 @@ const inverter = (id: string, powerKW: number, count: number): InverterItemSpec 
   assert.deepEqual(readEquipment(noBattery).batteries, [], 'and stays hidden while hasBattery is false');
   assert.equal(migrateLegacySpecs({ ...noMirror(base), hasBattery: false } as SystemSpecs).batteries, undefined, 'no battery data, no battery group');
 
+  const dormant = migrateLegacySpecs({ ...noMirror(base), hasBattery: false, batteryDOD: 70, batteryEfficiencyPct: 88 } as SystemSpecs);
+  assert.deepEqual([dormant.batteries?.[0].dodPct, dormant.batteries?.[0].efficiencyPct], [70, 88], 'hasBattery false: a customized DOD/efficiency alone keeps the battery group');
+
   // Data the group lacks is carried from the mirror into the first group; data the group has is never overwritten.
   const carried = migrateLegacySpecs({
     ...base,
