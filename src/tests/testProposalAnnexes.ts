@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
-import { applyAnnexPlan, catalogAnnexId, dismissAnnex, planDatasheetAnnexes, restoreDismissedAnnexes } from '../utils/proposalAnnexes';
+import { applyAnnexPlan, catalogAnnexId, dismissAnnex, planDatasheetAnnexes, restoreDismissedAnnexes, unresolvedEquipmentIds } from '../utils/proposalAnnexes';
 import { createProposalAttachmentResolver } from '../services/proposalAttachmentResolver';
 import { missingAnnexesConfirmation } from '../components/pdf/annexes/confirmMissingAnnexes';
 import type { AttachedPDFDocument, ProjectSimulation } from '../types';
@@ -77,6 +77,30 @@ base.specs.inverters = [{ id: 'g3', catalogItemId: 'inv', brandModel: 'QA Invers
 base.customization!.attachedPdfs = [manual, legacyManual];
 const deduped = applyAnnexPlan(base.customization!, planDatasheetAnnexes(base, catalog), NOW);
 assert.deepEqual(deduped.attachedPdfs.map((att) => att.id), ['att-manual', 'att-legacy', catalogAnnexId('sheet-family')]);
+
+// 3b. Catalog still loading: equipment in use that is not in the catalog yet keeps its annex (and the user's edits).
+{
+  const loading = project();
+  loading.customization!.attachedPdfs = first.attachedPdfs.map((att) => (att.id === catalogAnnexId('sheet-inverter') ? { ...att, title: 'Inversor — revisada', enabled: false, addToTableOfContents: true } : att));
+  const before = loading.customization!;
+  const partial = catalog.filter((item) => item.id !== 'inv'); // the inverter's catalog record has not arrived
+  const pendingIds = unresolvedEquipmentIds(loading, partial);
+  assert.deepEqual([...pendingIds], ['inv']);
+  const during = applyAnnexPlan(before, planDatasheetAnnexes(loading, partial), NOW, pendingIds);
+  assert.equal(during.changed, false, 'Nothing is deleted or rewritten while the record is missing');
+  assert.equal(during.attachedPdfs, before.attachedPdfs);
+  // Without the pending set the annex would be dropped (the old behaviour this guards against).
+  assert.equal(applyAnnexPlan(before, planDatasheetAnnexes(loading, partial), NOW).changed, true);
+  // The record arrives: the same annex objects survive, nothing is recreated.
+  assert.equal(applyAnnexPlan(before, planDatasheetAnnexes(loading, catalog), NOW, unresolvedEquipmentIds(loading, catalog)).changed, false);
+  // The proposal stops using the equipment (count 0 or removed group): the annex is removed even if the catalog is still partial.
+  const unused = structuredClone(loading);
+  unused.specs.inverters = [{ id: 'g3', catalogItemId: 'inv', brandModel: 'QA Inversor 8K', powerKW: 8, count: 0 }];
+  const gone = applyAnnexPlan(before, planDatasheetAnnexes(unused, partial), NOW, unresolvedEquipmentIds(unused, partial));
+  assert.deepEqual(gone.attachedPdfs.map((att) => att.id), [catalogAnnexId('sheet-family')]);
+  unused.specs.inverters = [];
+  assert.deepEqual(applyAnnexPlan(before, planDatasheetAnnexes(unused, partial), NOW, unresolvedEquipmentIds(unused, partial)).attachedPdfs.map((att) => att.id), [catalogAnnexId('sheet-family')]);
+}
 
 // 4. Dismiss and restore.
 base.customization!.attachedPdfs = first.attachedPdfs;
