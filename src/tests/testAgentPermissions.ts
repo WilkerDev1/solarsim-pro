@@ -227,7 +227,7 @@ assert.equal((await executeAgentTool(rate, external())).status, 'error', 'dopExc
 store.getState().setAgentPolicy({ external: { read: 'allow', draft: 'allow', guarded: 'confirm' } });
 assert.equal((await executeAgentTool(rate, external())).status, 'pending_confirmation');
 assert.equal(specsOf().pricingMode, 'direct_watt');
-for (const [section, field, valueJson] of [['financials', 'applyITBISExemption', 'false'], ['financials', 'applyLey5707', 'false'], ['rates', 'usdExchangeRate', '61']] as const) {
+for (const [section, field, valueJson] of [['specs', 'panelPowerW', '600'], ['specs', 'panelCount', '30'], ['specs', 'inverterCount', '2'], ['specs', 'batteryCount', '2'], ['financials', 'applyITBISExemption', 'false'], ['financials', 'applyLey5707', 'false'], ['rates', 'usdExchangeRate', '61']] as const) {
   reset();
   const outcome = await executeAgentTool({ name: 'propose_project_update', args: { id: project.id, edits: [{ section, field, valueJson }] } }, external());
   assert.equal(outcome.status, 'pending_confirmation', `${field} changes the contract price: confirmation required`);

@@ -5,7 +5,9 @@ export const PRICING_FIELDS: Record<string, readonly string[]> = {
   specs: ['saleMarginMultiplier', 'installationUnitPriceUSD', 'panelUnitPriceUSD', 'inverterUnitPriceUSD', 'batteryUnitPriceUSD', 'batteryCostUSD',
     'autoSupplierPricing', 'panels', 'inverters', 'batteries',
     // Calculation mode and price basis: switching them changes the contract price.
-    'pricingMode', 'isDetailed', 'directPriceSurplusTarget', 'pricePerWattUSD', 'dopExchangeRate'],
+    'pricingMode', 'isDetailed', 'directPriceSurplusTarget', 'pricePerWattUSD', 'dopExchangeRate',
+    // Scalar sizing of legacy proposals: capacity drives the price (per watt, per unit, battery cost).
+    'panelPowerW', 'panelCount', 'inverterPowerKW', 'inverterCount', 'hasBattery', 'batteryCapacityKWh', 'batteryCount', 'autoCalculatePanels'],
   rates: ['usdExchangeRate'],
   financials: ['customItems', 'customDiscounts', 'applyITBISExemption', 'applyLey5707'],
 };
