@@ -51,7 +51,8 @@ assert.match(duplicateMessage({ isProjectIdDuplicate: true, isQuoteDuplicate: tr
   assert.match(html, /role="radiogroup"[^>]*aria-label="Radiación solar"/);
   assert.match(html, /aria-checked="true"[^>]*>Provincia</, 'Provincia activa');
   assert.match(html, /id="pd-cli-province"/);
-  assert.match(html, /<option value="Santo Domingo \/ Distrito Nacional" selected="">/);
+  assert.match(html, /<button[^>]*id="pd-cli-province"[^>]*role="combobox"|<button[^>]*role="combobox"[^>]*id="pd-cli-province"/, 'provincia: disparador del listbox');
+  assert.match(html, /role="combobox"[\s\S]*Santo Domingo \/ Distrito Nacional/, 'provincia seleccionada visible en el disparador');
   assert.match(html, /\d+(\.\d+)? HSP/, 'distintivo de HSP de la provincia');
   assert.doesNotMatch(html, /pd-cli-coords/, 'sin coordenadas en modo Provincia');
   assert.match(html, /Bloqueado/);
@@ -115,8 +116,8 @@ const renderRates = (project: ProjectSimulation, extra: Record<string, unknown> 
 {
   const html = renderRates(makeProject());
   assert.match(html, /id="pd-rates-distributor"/);
-  assert.match(html, /<option value="EDESUR" selected="">EDESUR<\/option>/);
-  assert.match(html, /<option value="CEPM">CEPM<\/option>/);
+  assert.match(html, /<button[^>]*id="pd-rates-distributor"[^>]*>[\s\S]*?EDESUR[\s\S]*?<\/button>/, 'distribuidora seleccionada en el disparador');
+  assert.doesNotMatch(html, /<option/, 'sin opciones nativas');
   assert.match(html, /id="pd-rates-tariff"/);
   assert.match(html, /Oficial \$0\.\d{3}/, 'chip de precio oficial cuando el precio difiere');
   assert.match(html, /id="pd-rates-coverage"[^>]*value="95"/, 'cobertura por defecto 95');
@@ -197,8 +198,7 @@ assert.deepEqual(daytimeSliderChange(60), { daytimeLoadRatio: 60, daytimeSelfCon
   assert.match(html, /id="pd-rates-daytime"[^>]*type="range"|type="range"[^>]*id="pd-rates-daytime"/);
   assert.match(html, /min="15"/);
   assert.match(html, /max="95"/);
-  assert.match(html, /<option value="residential" selected="">Residencial 35%<\/option>/);
-  assert.match(html, /<option value="custom">Manual<\/option>/);
+  assert.match(html, /<button[^>]*role="combobox"[^>]*>[\s\S]*?Residencial 35%[\s\S]*?<\/button>/, 'perfil seleccionado en el disparador');
   assert.match(html, /Solar/);
   assert.match(html, /Red/);
   assert.doesNotMatch(html, /Batería <b/, 'sin batería no hay segmento BESS');
@@ -220,8 +220,8 @@ assert.deepEqual(daytimeSliderChange(60), { daytimeLoadRatio: 60, daytimeSelfCon
 // Manual explícito con 35/75/90: el selector muestra «Manual» y los cambios de tarifa no recalculan el perfil.
 for (const ratio of [35, 75, 90]) {
   const manual = renderRates(makeProject({ specs: { daytimeLoadRatio: ratio, loadProfilePreset: 'custom' } }), { projectionEnabled: true });
-  assert.match(manual, /<option value="custom" selected="">Manual<\/option>/, `selector en Manual al ${ratio}%`);
-  assert.doesNotMatch(manual, /<option value="(residential|commercial|industrial)" selected/);
+  assert.match(manual, /<button[^>]*role="combobox"[^>]*>[\s\S]*?Manual[\s\S]*?<\/button>/, `selector en Manual al ${ratio}%`);
+  assert.doesNotMatch(manual, /role="combobox"[^>]*>[\s\S]{0,200}?Residencial 35%/, 'no muestra un perfil predefinido');
 }
 {
   const ctx = { matrix: undefined, avgMonthlyConsumption: 900, dopExchangeRate: 60, rates: { distributor: 'EDESUR', tariffCode: 'BTS2' } as never, canWriteSpecs: true };

@@ -33,6 +33,14 @@ const render = (node: React.ReactElement) => renderToStaticMarkup(node);
   }
 }
 
+// --- SelectField: la animación del panel no usa opacity (si no corre, el panel debe seguir visible) ---
+{
+  const css = readFileSync('src/index.css', 'utf8');
+  const keyframes = css.match(/@keyframes pd-select-in\s*\{([\s\S]*?\n\})/)?.[1] ?? '';
+  assert.ok(keyframes.includes('transform'), 'keyframes pd-select-in definidos');
+  assert.doesNotMatch(keyframes, /opacity/, 'pd-select-in no toca opacity');
+}
+
 // --- ParamSection: header button with aria-expanded / aria-controls, collapsible body, optional badge ---
 {
   const open = render(h(ParamSection, { id: 'cli', title: 'Proyecto y cliente', icon: h('svg', { 'data-icon': 'user' }), open: true, onToggle: noop }, h('p', null, 'cuerpo')));
@@ -95,23 +103,30 @@ const render = (node: React.ReactElement) => renderToStaticMarkup(node);
   assert.match(action, />Hoy</);
 }
 
-// --- SelectField: native select, own arrow, badge slot ---
+// --- SelectField: listbox propio (combobox select-only), flecha dentro del botón, insignia ---
 {
   const html = render(h(SelectField, {
     id: 'prov', value: 'sd', onChange: noop, badge: '5.28',
     options: [{ value: 'sd', label: 'Santo Domingo' }, { value: 'st', label: 'Santiago' }],
   }));
-  assert.match(html, /<select[^>]*id="prov"/);
-  assert.match(html, /<option value="sd" selected="">Santo Domingo<\/option>/);
-  assert.match(html, /<option value="st">Santiago<\/option>/);
-  assert.match(html, /appearance-none/);
-  assert.match(html, /<svg[^>]*aria-hidden="true"/, 'flecha propia');
-  assert.match(html, />5\.28</);
+  assert.doesNotMatch(html, /<select|<option/, 'ya no es el select nativo');
+  const trigger = html.match(/<button[^>]*>/)?.[0] ?? '';
+  assert.match(trigger, /id="prov"/, 'el label externo apunta al disparador');
+  assert.match(trigger, /type="button"/);
+  assert.match(trigger, /role="combobox"/);
+  assert.match(trigger, /aria-haspopup="listbox"/);
+  assert.match(trigger, /aria-expanded="false"/);
+  assert.match(html, /<button[^>]*>[\s\S]*Santo Domingo[\s\S]*5\.28[\s\S]*<svg[^>]*aria-hidden="true"[\s\S]*<\/button>/, 'texto, insignia y flecha dentro del botón');
+  assert.doesNotMatch(html, /role="listbox"/, 'cerrado: sin panel');
   assert.match(html, /font-mono/);
   const labelled = render(h(SelectField, { value: 'a', onChange: noop, ariaLabel: 'Perfil de carga', options: [{ value: 'a', label: 'Residencial' }] }));
   assert.match(labelled, /aria-label="Perfil de carga"/);
   const off = render(h(SelectField, { value: 'a', onChange: noop, ariaLabel: 'x', disabled: true, options: [{ value: 'a', label: 'A' }] }));
-  assert.match(off, /<select[^>]*\sdisabled=""/);
+  assert.match(off.match(/<button[^>]*>/)?.[0] ?? '', /\sdisabled=""/);
+  const unknown = render(h(SelectField, { value: 'zz', onChange: noop, ariaLabel: 'x', options: [{ value: 'a', label: 'A' }] }));
+  assert.match(unknown, /<button/, 'valor fuera de la lista no rompe el render');
+  const hinted = render(h(SelectField, { value: 'a', onChange: noop, ariaLabel: 'x', defaultOpen: true, options: [{ value: 'a', label: 'A', hint: '5.1' }, { value: 'b', label: 'B', hint: '4.9' }] }));
+  assert.match(hinted, /aria-expanded="true"/);
 }
 
 // --- ToggleGroup: radiogroup, exactly one radio checked, accent fill on the active one ---

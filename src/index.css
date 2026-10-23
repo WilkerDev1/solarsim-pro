@@ -154,3 +154,13 @@
     box-sizing: border-box !important;
   }
 }
+
+/* Panel del SelectField del dock: entra con un desplazamiento corto, salvo que el usuario prefiera menos movimiento.
+   Sin opacity a propósito: si la animación no corre (ventana sin pintar cuadros), el panel sigue visible. */
+@keyframes pd-select-in {
+  from { transform: scale(0.97) translateY(-2px); }
+  to { transform: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pd-select-panel { animation: pd-select-in 120ms ease-out; }
+}
