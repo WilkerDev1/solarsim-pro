@@ -1,6 +1,6 @@
 import type { SystemSpecs } from '../../../../../types';
 import type { EquipmentSupplierPrice, SolarEquipmentItem } from '../../../../../types/equipment';
-import { DEFAULT_UNIT_PRICE_USD, editEquipmentGroup } from '../../../../../utils/equipmentGroups';
+import { editEquipmentGroup } from '../../../../../utils/equipmentGroups';
 
 export type PricedKind = 'panel' | 'inverter' | 'battery';
 
@@ -40,7 +40,10 @@ export function manualUnitPricePatch(specs: SystemSpecs, kind: PricedKind, index
   return { autoSupplierPricing: false, ...editEquipmentGroup(specs, kind, { type: 'update', index, patch: { unitPriceUSD: value } }) };
 }
 
-/** Precio mostrado de un modelo: el propio, si no el valor por defecto de la matriz de costos. */
-export function displayedUnitPrice(own: number | undefined, kind: PricedKind): number {
-  return own !== undefined ? own : DEFAULT_UNIT_PRICE_USD[kind];
+/**
+ * Precio mostrado de un modelo: el propio, o `undefined` («sin precio») si no tiene. El motor cuenta 0 para un grupo sin
+ * precio (p. ej. de un borrador de IA); mostrarle un precio de referencia inventaría un costo que no está en los totales.
+ */
+export function displayedUnitPrice(own: number | undefined): number | undefined {
+  return own;
 }

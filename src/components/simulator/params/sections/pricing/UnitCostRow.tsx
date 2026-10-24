@@ -12,7 +12,8 @@ export interface UnitCostRowProps {
   /** Proveedor asignado al modelo, bajo el precio. */
   supplierName?: string;
   supplierTitle?: string;
-  value: number;
+  /** `undefined`: sin precio (campo vacío); el motor cuenta 0. */
+  value: number | undefined;
   onChange: (value: number) => void;
 }
 
@@ -40,7 +41,7 @@ export const UnitCostRow: React.FC<UnitCostRowProps> = ({
       </span>
     </div>
     <div className="min-w-0">
-      <NumberField id={id} step="any" prefix="$" value={value} onValue={onChange} />
+      <NumberField id={id} step="any" prefix="$" value={value} placeholder={value === undefined ? 'Sin precio' : undefined} onValue={onChange} />
       {supplierName && (
         <span className="mt-0.5 block truncate text-[11px] text-pd-muted" title={supplierTitle}>{supplierName}</span>
       )}
