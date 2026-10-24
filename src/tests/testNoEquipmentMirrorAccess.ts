@@ -22,7 +22,8 @@ const LEGACY_READERS = new Set([
 ]);
 const LEGACY_DIRS = ['shared/equipment/'];
 
-const SCAN_DIRS = ['src', 'shared', 'workers/share-viewer/src', 'server/src', 'electron'];
+// `scripts/` incluye los ensayos de QA (`scripts/qa`): un ensayo que escribe el espejo se detiene tras la normalización.
+const SCAN_DIRS = ['src', 'shared', 'workers/share-viewer/src', 'server/src', 'electron', 'scripts'];
 const SKIP_DIRS = new Set(['node_modules', 'dist', 'tests', 'release', '.wrangler']);
 
 const fields = [...LEGACY_MIRROR_FIELDS, 'selectedSupplierInfo'].join('|');
@@ -34,7 +35,7 @@ function walk(dir: string, out: string[] = []): string[] {
     const full = path.join(dir, name);
     if (statSync(full).isDirectory()) {
       if (!SKIP_DIRS.has(name)) walk(full, out);
-    } else if (/\.(ts|tsx)$/.test(name) && !/\.d\.ts$/.test(name)) out.push(full);
+    } else if (/\.(ts|tsx|mts|mjs|cjs)$/.test(name) && !/\.d\.m?ts$/.test(name)) out.push(full);
   }
   return out;
 }

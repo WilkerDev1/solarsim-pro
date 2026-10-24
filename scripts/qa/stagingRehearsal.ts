@@ -1,6 +1,7 @@
 /** Explicit network rehearsal, excluded from npm test. Synthetic accounts only. */
 import assert from 'node:assert/strict';
 import { BENCHMARK_PROJECT } from '../../src/engine/referenceCase';
+import { editEquipment, readEquipment } from '../../shared/equipment';
 import { SyncService } from '../../src/services/syncService';
 import { ShareProposalService } from '../../src/services/shareProposalService';
 import { calculateProjectFinancialSummary } from '../../src/engine/financeEngine';
@@ -26,7 +27,7 @@ const created = await SyncService.pushProjects(api, a.token, [original]);
 assert.equal(created.success, true);
 const outcome = created.results![0]; assert.ok(outcome.status !== 'conflict');
 let canonical = outcome.project!;
-const writeA = await SyncService.pushProjects(api, a.token, [{ ...canonical, specs: { ...canonical.specs, panelCount: 44 }, baseVersion: canonical.version }]);
+const writeA = await SyncService.pushProjects(api, a.token, [{ ...canonical, specs: editEquipment(canonical.specs, 'panel', { type: 'update', index: 0, patch: { count: 44 } }), baseVersion: canonical.version }]);
 assert.equal(writeA.success, true); assert.ok(writeA.results![0].status !== 'conflict');
 const writeB = await SyncService.pushProjects(api, b.token, [{ ...canonical, monthlyConsumption: canonical.monthlyConsumption.map((value, index) => index === 0 ? 4000 : value), baseVersion: canonical.version }]);
 assert.equal(writeB.results![0].status, 'conflict');
@@ -38,7 +39,7 @@ const rejectedLegacy = await noBase.json();
 assert.equal(rejectedLegacy.results[0].status, 'conflict');
 assert.equal(rejectedLegacy.results[0].reason, 'base_version_required', 'Legacy client cannot bypass mandatory CAS');
 const pull = await SyncService.pullProjects(api, a.token); canonical = pull.projects!.find(project => project.id === original.id)!;
-assert.equal(canonical.specs.panelCount, 44);
+assert.equal(readEquipment(canonical.specs).panels[0].count, 44, 'the panel group edit round-trips through the API');
 useSimulationStore.setState({ syncSettings: {serverUrl:api,authToken:a.token,currentUser:a.user,autoSyncEnabled:false,lastSyncTimestamp:null} });
 const startPolicy = await fetch(api+'/api/organization/features',{headers:{...clientHeaders,Authorization:'Bearer '+a.token}}).then(r=>r.json());
 if(startPolicy.settings.selfConsumptionProjection) { const reset=await fetch(api+'/api/organization/features',{method:'PATCH',headers:{...clientHeaders,'Content-Type':'application/json',Authorization:'Bearer '+a.token},body:JSON.stringify({baseVersion:startPolicy.version,settings:{selfConsumptionProjection:false}})}); assert.equal(reset.status,200); await reset.text(); }
