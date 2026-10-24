@@ -1,8 +1,9 @@
 import { getProvinceHSP } from '../../../../data/rdProvinces';
 import { getRecommendedLoadProfile } from '../../../../engine/solarEngine';
 import type { ProjectSimulation } from '../../../../types';
-import { resolveSystemLossesPct, resolveBatteryBankDodPct, resolveBatteryBankEfficiencyPct } from './dockDefaults';
-import { batteryBankSpecs, calculateTotalBatteryCapacityKWh, calculateTotalDCCapacityKWp } from '../../../../utils/equipmentSpecsUtils';
+import { resolveSystemLossesPct } from './dockDefaults';
+import { calculateTotalDCCapacityKWp } from '../../../../utils/equipmentSpecsUtils';
+import { batteryBank, readEquipment } from '../../../../../shared/equipment';
 
 export type LoadProfilePreset = 'residential' | 'commercial' | 'industrial' | 'custom';
 
@@ -38,12 +39,9 @@ export function computeLoadProfilePreview(
   currentTariffCode: string,
   avgMonthlyConsumption: number
 ): LoadProfilePreview {
-  const totalBatteryKWh = calculateTotalBatteryCapacityKWh(project.specs);
-  const hasBattery = !!(project.specs.hasBattery && totalBatteryKWh > 0);
-  const bank = batteryBankSpecs(project.specs);
-  const batteryDodPct = resolveBatteryBankDodPct(bank);
-  const batteryEffPct = resolveBatteryBankEfficiencyPct(bank);
-  const dailyUsableBatteryKWh = hasBattery ? totalBatteryKWh * (batteryDodPct / 100) * (batteryEffPct / 100) : 0;
+  const bank = batteryBank(readEquipment(project.specs));
+  const hasBattery = bank.hasStorage;
+  const dailyUsableBatteryKWh = bank.usableKWh;
 
   const recommendedProfile = getRecommendedLoadProfile(currentTariffCode, avgMonthlyConsumption);
   const currentDaytimeRatio = project.specs.daytimeLoadRatio ?? project.specs.daytimeSelfConsumptionRatio ?? recommendedProfile.daytimeRatio;

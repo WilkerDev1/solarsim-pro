@@ -14,7 +14,7 @@ import { buildCatalogSelectionUpdate } from '../components/simulator/params/logi
 import { readFileSync } from 'node:fs';
 import { editEquipmentGroup, normalizeEquipmentEdit, selectCatalogEquipment } from '../utils/equipmentGroups';
 import * as shared from '../../shared/projectDefaults';
-import { resolveBatteryBankDodPct, resolveBatteryBankEfficiencyPct, resolvePrimaryBatteryEfficiencyPct } from '../../shared/projectDefaults';
+import { batteryBank, readEquipment } from '../../shared/equipment';
 import type { ProjectSimulation, LegacyProjectSpecs } from '../types';
 import { legacyPatch } from './legacyFixtures';
 import type { SolarEquipmentItem } from '../types/equipment';
@@ -25,28 +25,32 @@ const bank = (second: object, firstExtra: object = { dodPct: 90, efficiencyPct: 
   ...base.specs, hasBattery: true, dodPct: 90, efficiencyPct: undefined, ...scalar,
   batteries: [group('A', 16, 2, firstExtra), group('B', 15, 1, second)],
 } as unknown as LegacyProjectSpecs);
+const bankOf = (specs: object) => batteryBank(readEquipment(specs as never));
 const close = (a: number, b: number, msg: string) => assert(Math.abs(a - b) < 1e-9, `${msg}: ${a} vs ${b}`);
 
 // ── Helper compartido ──────────────────────────────────────────────────────────────────────
-close(resolveBatteryBankEfficiencyPct(bank({ dodPct: 90 })), (32 * 95 + 15 * 90) / 47, 'banco mixto: 2×16 kWh al 95 % + 1×15 kWh sin dato');
-assert.equal(Math.round(resolveBatteryBankEfficiencyPct(bank({})) * 10) / 10, 93.4);
+close(bankOf(bank({ dodPct: 90 })).efficiencyPct, (32 * 95 + 15 * 90) / 47, 'banco mixto: 2×16 kWh al 95 % + 1×15 kWh sin dato');
+assert.equal(Math.round(bankOf(bank({})).efficiencyPct * 10) / 10, 93.4);
 for (const invalid of [undefined, 0, '', NaN, -5, null]) {
-  close(resolveBatteryBankEfficiencyPct(bank({ efficiencyPct: invalid })), (32 * 95 + 15 * 90) / 47, `grupo con eficiencia ${String(invalid)} usa 90`);
+  close(bankOf(bank({ efficiencyPct: invalid })).efficiencyPct, (32 * 95 + 15 * 90) / 47, `grupo con eficiencia ${String(invalid)} usa 90`);
 }
-close(resolveBatteryBankEfficiencyPct(bank({ efficiencyPct: 80 })), (32 * 95 + 15 * 80) / 47, 'cada grupo pesa por capacidad × cantidad');
-close(resolveBatteryBankDodPct(bank({ dodPct: 70 }, { dodPct: 90 })), (32 * 90 + 15 * 70) / 47, 'DOD ponderado');
-close(resolveBatteryBankDodPct(bank({}, { dodPct: 80 })), (32 * 80 + 15 * 90) / 47, 'DOD sin dato: 90');
-// Un solo modelo y sin grupos: igual que hoy (el escalar, con el default si falta).
+close(bankOf(bank({ efficiencyPct: 80 })).efficiencyPct, (32 * 95 + 15 * 80) / 47, 'cada grupo pesa por capacidad × cantidad');
+close(bankOf(bank({ dodPct: 70 }, { dodPct: 90 })).dodPct, (32 * 90 + 15 * 70) / 47, 'DOD ponderado');
+close(bankOf(bank({}, { dodPct: 80 })).dodPct, (32 * 80 + 15 * 90) / 47, 'DOD sin dato: 90');
+// Un solo modelo: su eficiencia.
 const single = { ...base.specs, hasBattery: true, batteries: [group('A', 10, 1, { efficiencyPct: 93 })], efficiencyPct: 93 } as unknown as LegacyProjectSpecs;
-assert.equal(resolveBatteryBankEfficiencyPct(single), 93);
-assert.equal(resolveBatteryBankEfficiencyPct({ batteries: undefined, efficiencyPct: 88 }), 88, 'sin grupos: escalar');
-assert.equal(resolveBatteryBankEfficiencyPct({ batteries: undefined, efficiencyPct: undefined }), 90, 'sin grupos ni escalar: 90');
-assert.equal(resolveBatteryBankEfficiencyPct({ batteries: [], efficiencyPct: 91 }), 91);
-assert.equal(resolveBatteryBankEfficiencyPct({ batteries: [group('A', 0, 0)], efficiencyPct: 87 }), 87, 'capacidad total 0: escalar');
-assert.equal(resolveBatteryBankDodPct({ batteries: undefined, dodPct: 0 }), 90);
+assert.equal(bankOf(single).efficiencyPct, 93);
+// Sin capacidad (banco vacío, grupo de 0 kWh) el banco informa el DOD y la eficiencia del primer grupo, o los defaults.
+const noCapacity = (groups: object[]) => bankOf({ ...base.specs, hasBattery: true, batteries: groups });
+assert.equal(noCapacity([group('A', 0, 0, { efficiencyPct: 87 })]).efficiencyPct, 87, 'capacidad total 0: la del primer grupo');
+assert.equal(noCapacity([group('A', 0, 0, { dodPct: 70 })]).dodPct, 70, 'capacidad total 0: el DOD del primer grupo');
+assert.equal(noCapacity([group('A', 0, 0)]).efficiencyPct, 90, 'capacidad total 0 sin dato: 90');
+assert.equal(noCapacity([group('A', 0, 0, { dodPct: 0 })]).dodPct, 90, 'capacidad total 0 con dato inválido: 90');
+assert.equal(bankOf({ ...base.specs, hasBattery: false, batteries: [group('A', 10, 1, { efficiencyPct: 80 })] }).efficiencyPct, 90, 'sin batería: defaults');
+assert.equal(bankOf({ ...base.specs, hasBattery: false, batteries: [group('A', 10, 1)] }).hasStorage, false, 'sin batería: no almacena');
 // Los grupos son la fuente: un grupo sin dato (también el primero) usa 90 aunque el escalar guarde un valor viejo.
-close(resolveBatteryBankEfficiencyPct(bank({}, {}, { efficiencyPct: 80 })), (32 * 90 + 15 * 90) / 47, 'primer grupo sin dato: 90, no el escalar obsoleto');
-close(resolveBatteryBankDodPct(bank({}, {}, { dodPct: 80 })), 90, 'DOD del primer grupo sin dato: 90');
+close(bankOf(bank({}, {}, { efficiencyPct: 80 })).efficiencyPct, (32 * 90 + 15 * 90) / 47, 'primer grupo sin dato: 90, no el escalar obsoleto');
+close(bankOf(bank({}, {}, { dodPct: 80 })).dodPct, 90, 'DOD del primer grupo sin dato: 90');
 assert.equal(shared.resolveBatteryEfficiencyPct(0.5), 90, 'por debajo del mínimo (1 %) no es válido');
 
 // ── Motor: financeEngine, solarEngine y equipmentSpecsUtils ────────────────────────────────
@@ -87,7 +91,7 @@ for (const missing of [undefined, 0, '', NaN]) {
   const specs = bank({ dodPct: 90 });
   const edit = selectCatalogEquipment(specs, 'battery', 1, catalogItem, { efficiencyPct: undefined, dodPct: undefined });
   const next = { ...specs, ...edit } as LegacyProjectSpecs;
-  assert.equal(resolveBatteryBankEfficiencyPct(next), resolveBatteryBankEfficiencyPct(bank({ efficiencyPct: 90 })), 'modelo #2 sin eficiencia en el banco: 90 en el motor');
+  assert.equal(bankOf(next).efficiencyPct, bankOf(bank({ efficiencyPct: 90 })).efficiencyPct, 'modelo #2 sin eficiencia en el banco: 90 en el motor');
 }
 
 // ── Dock: el campo de la batería principal edita el grupo 1 ────────────────────
@@ -97,8 +101,8 @@ for (const missing of [undefined, 0, '', NaN]) {
   assert.equal(patch.batteries![0].efficiencyPct, 80, 'DOD y eficiencia viven solo en el grupo');
   assert.equal('batteryEfficiencyPct' in patch, false, 'sin espejo escalar');
   const next = { ...specs, ...patch } as LegacyProjectSpecs;
-  close(resolveBatteryBankEfficiencyPct(next), (32 * 80 + 15 * 90) / 47, 'el motor ve el cambio del dock con varios modelos');
-  assert.equal(resolvePrimaryBatteryEfficiencyPct(next), 80);
+  close(bankOf(next).efficiencyPct, (32 * 80 + 15 * 90) / 47, 'el motor ve el cambio del dock con varios modelos');
+  assert.equal(getProjectBatteries(next as never)[0].efficiencyPct, 80, 'el dock edita el primer grupo');
 }
 for (const file of ['src/components/common/AIDatasheetScannerModal.tsx', 'src/components/common/EquipmentEditorModal.tsx', 'src/components/common/EquipmentManagerSettingsTab.tsx']) {
   const text = readFileSync(file, 'utf8');
@@ -115,8 +119,8 @@ const draftBaseFor = () => createAIProposalBase(BENCHMARK_PROJECT, { defaultBatt
     batteries: [group('G1', 10, 1), group('G2', 10, 1, { dodPct: 80, efficiencyPct: 80 })],
   };
   const prepared = prepareProposalDraftProject(draftBase, data as never, DEFAULT_RD_TARIFF_MATRIX as never, { isNew: true });
-  close(resolveBatteryBankDodPct(prepared.specs), 85, 'DOD del banco = (90 + 80) / 2, sin promediar dos veces');
-  close(20 * (resolveBatteryBankDodPct(prepared.specs) / 100) * (resolveBatteryBankEfficiencyPct(prepared.specs) / 100), 10 * 0.9 * 0.9 + 10 * 0.8 * 0.8, 'energía útil del banco = Σ(C·DOD·η) = 14.5 kWh');
+  close(bankOf(prepared.specs).dodPct, 85, 'DOD del banco = (90 + 80) / 2, sin promediar dos veces');
+  close(bankOf(prepared.specs).usableKWh, 10 * 0.9 * 0.9 + 10 * 0.8 * 0.8, 'energía útil del banco = Σ(C·DOD·η) = 14.5 kWh');
   assert.equal(prepared.specs.batteries![0].dodPct, 90, 'el DOD del primer grupo es el default');
 }
 
@@ -132,7 +136,7 @@ const draftBaseFor = () => createAIProposalBase(BENCHMARK_PROJECT, { defaultBatt
   const specs = store().getActiveProject().specs;
   assert.equal(specs.batteries![0].efficiencyPct, 85, 'el grupo principal toma la eficiencia del catálogo');
   assert.equal('batteryEfficiencyPct' in specs, false, 'el precio de proveedor no escribe el espejo');
-  close(resolveBatteryBankEfficiencyPct(specs), 87.5, 'el motor ve el cambio');
+  close(bankOf(specs).efficiencyPct, 87.5, 'el motor ve el cambio');
 }
 
 // ── Edición escalar (asistente, importaciones) con varios modelos: va al grupo principal ────
@@ -143,7 +147,7 @@ const draftBaseFor = () => createAIProposalBase(BENCHMARK_PROJECT, { defaultBatt
   assert.equal(next.batteries![0].dodPct, 70);
   assert.equal(next.batteries![1].efficiencyPct, 90, 'los demás grupos no cambian');
   assert.equal('batteryEfficiencyPct' in next, false, 'DOD y eficiencia solo por grupo');
-  close(resolveBatteryBankEfficiencyPct(next), (32 * 0.7 * 80 + 15 * 0.9 * 90) / (32 * 0.7 + 15 * 0.9), 'el motor usa el valor editado');
+  close(bankOf(next).efficiencyPct, (32 * 0.7 * 80 + 15 * 0.9 * 90) / (32 * 0.7 + 15 * 0.9), 'el motor usa el valor editado');
 }
 
 // ── «+» con un modelo del catálogo: el grupo nuevo lleva sus DOD y eficiencia ───────────────
@@ -178,10 +182,10 @@ const draftBaseFor = () => createAIProposalBase(BENCHMARK_PROJECT, { defaultBatt
   const start = { ...base.specs, hasBattery: true, batteries: [A, B], batteryDOD: 70, batteryEfficiencyPct: 80 } as unknown as LegacyProjectSpecs;
   const ab = normalizeEquipmentEdit(start, { batteries: [A, B] } as Partial<LegacyProjectSpecs>);
   const ba = normalizeEquipmentEdit(start, { batteries: [B, A] } as Partial<LegacyProjectSpecs>);
-  close(resolveBatteryBankDodPct(ab), resolveBatteryBankDodPct(ba), 'DOD igual con [A, B] y [B, A]');
-  close(resolveBatteryBankEfficiencyPct(ab), resolveBatteryBankEfficiencyPct(ba), 'eficiencia igual con [A, B] y [B, A]');
+  close(bankOf(ab).dodPct, bankOf(ba).dodPct, 'DOD igual con [A, B] y [B, A]');
+  close(bankOf(ab).efficiencyPct, bankOf(ba).efficiencyPct, 'eficiencia igual con [A, B] y [B, A]');
   assert.equal(usable(ab), usable(ba), 'energía útil igual con [A, B] y [B, A]');
-  close(20 * (resolveBatteryBankDodPct(ba) / 100) * (resolveBatteryBankEfficiencyPct(ba) / 100), 10 * 0.7 * 0.8 + 10 * 0.9 * 0.9, 'B usa 90/90: 13.7 kWh');
+  close(bankOf(ba).usableKWh, 10 * 0.7 * 0.8 + 10 * 0.9 * 0.9, 'B usa 90/90: 13.7 kWh');
   assert.equal('batteryDOD' in ba || 'batteryEfficiencyPct' in ba, false, 'sin espejo escalar');
 }
 
@@ -190,7 +194,7 @@ const draftBaseFor = () => createAIProposalBase(BENCHMARK_PROJECT, { defaultBatt
   assert.equal(shared.resolveBatteryEfficiencyPct(150), 90);
   assert.equal(shared.resolveBatteryDodPct(101), 90);
   assert.equal(shared.resolveBatteryEfficiencyPct(100), 100);
-  close(resolveBatteryBankEfficiencyPct(bank({ efficiencyPct: 150 })), (32 * 95 + 15 * 90) / 47, 'un grupo con eficiencia > 100 usa 90');
+  close(bankOf(bank({ efficiencyPct: 150 })).efficiencyPct, (32 * 95 + 15 * 90) / 47, 'un grupo con eficiencia > 100 usa 90');
   assert(usable(bank({ dodPct: 500, efficiencyPct: 500 })) <= 47, 'la energía útil nunca supera la capacidad nominal');
 }
 

@@ -24,13 +24,9 @@ export {
   SAMPLE_PHONE_MARKER,
   SAMPLE_QUOTE_NUMBER,
   isValidDirectPrice,
-  resolveBatteryBankDodPct,
-  resolveBatteryBankEfficiencyPct,
   resolveBatteryDodPct,
   resolveBatteryEfficiencyPct,
   resolveDopRate,
-  resolvePrimaryBatteryDodPct,
-  resolvePrimaryBatteryEfficiencyPct,
   resolvePricePerWattUSD,
   resolveSaleMarginMultiplier,
 } from '../../../../../shared/projectDefaults';

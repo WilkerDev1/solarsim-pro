@@ -3,8 +3,8 @@ import { ProjectSimulation, FinancialSummaryResult, SystemSpecs } from '../../..
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
 import { editEquipmentGroup } from '../../../utils/equipmentGroups';
-import { batteryBankSpecs, calculateTotalBatteryCapacityKWh, calculateTotalBatteryCount, getProjectBatteries } from '../../../utils/equipmentSpecsUtils';
-import { BATTERY_PCT_RANGE, resolvePrimaryBatteryDodPct, resolvePrimaryBatteryEfficiencyPct } from '../params/logic/dockDefaults';
+import { calculateTotalBatteryCapacityKWh, calculateTotalBatteryCount, getProjectBatteries } from '../../../utils/equipmentSpecsUtils';
+import { BATTERY_PCT_RANGE, resolveBatteryDodPct, resolveBatteryEfficiencyPct } from '../params/logic/dockDefaults';
 import { CommitNumberField, Field, ParamRow, StatStrip, ToggleGroup } from '../params/ui';
 import { AdvancedDisclosure } from '../params/sections/equipment/AdvancedDisclosure';
 import { EquipmentGroupList } from '../params/sections/equipment/EquipmentGroupList';
@@ -61,7 +61,7 @@ export const BatteryEquipmentSection: React.FC<BatteryEquipmentSectionProps> = (
                 step={5}
                 suffix="%"
                 {...BATTERY_PCT_RANGE}
-                value={resolvePrimaryBatteryDodPct(batteryBankSpecs(specs))}
+                value={resolveBatteryDodPct(getProjectBatteries(specs)[0]?.dodPct)}
                 onCommit={(value) => updateSpecs(editEquipmentGroup(specs, 'battery', { type: 'update', index: 0, patch: { dodPct: value } }))}
               />
             </ParamRow>
@@ -71,7 +71,7 @@ export const BatteryEquipmentSection: React.FC<BatteryEquipmentSectionProps> = (
                 step={1}
                 suffix="%"
                 {...BATTERY_PCT_RANGE}
-                value={resolvePrimaryBatteryEfficiencyPct(batteryBankSpecs(specs))}
+                value={resolveBatteryEfficiencyPct(getProjectBatteries(specs)[0]?.efficiencyPct)}
                 onCommit={(value) => updateSpecs(editEquipmentGroup(specs, 'battery', { type: 'update', index: 0, patch: { efficiencyPct: value } }))}
               />
             </ParamRow>
