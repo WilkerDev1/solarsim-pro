@@ -90,7 +90,7 @@ assert.equal(averageMonthlyConsumption({ monthlyConsumption: [100, 300] }), 200)
     projectionEnabled: false, updateRates: noop, updateSpecs: noop,
   } as never));
   assert.equal(valueOf(ratesHtml({}), 'pd-rates-coverage'), '95');
-  assert.equal(valueOf(ratesHtml({ targetCoveragePct: 0 }), 'pd-rates-coverage'), '0', '?? conserva el 0 de cobertura');
+  assert.equal(valueOf(ratesHtml({ targetCoveragePct: 0 }), 'pd-rates-coverage'), '95', 'cobertura 0 = sin dato: se muestra el 95 % que usa el dimensionamiento (ADR 0003; antes mostraba 0)');
   assert.equal(valueOf(ratesHtml({}), 'pd-rates-export'), '25');
   assert.equal(valueOf(ratesHtml({ gridExportFeePct: 0 }), 'pd-rates-export'), '0');
   assert.match(ratesHtml({}), /retención del 25%/);
@@ -104,7 +104,7 @@ assert.equal(averageMonthlyConsumption({ monthlyConsumption: [100, 300] }), 200)
     summary: emptySummary, updateSpecs: noop,
   }));
   assert.match(section({}), /cubrir el 95% del consumo, con 25% de pérdidas/);
-  assert.match(section({ systemLosses: 0 }, { targetCoveragePct: 0 }), /cubrir el 0% del consumo, con 0% de pérdidas/);
+  assert.match(section({ systemLosses: 0 }, { targetCoveragePct: 0 }), /cubrir el 95% del consumo, con 0% de pérdidas/); // ADR 0003: cobertura 0 = sin dato (95 %); pérdidas 0 sí vale
   assert.match(section({ systemLosses: 14 }, { targetCoveragePct: 90 }), /cubrir el 90% del consumo, con 14% de pérdidas/);
 }
 {

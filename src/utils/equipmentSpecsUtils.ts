@@ -26,15 +26,6 @@ export const calculateTotalBatteryCapacityKWh = (specs: SystemSpecs): number => 
 export const calculateTotalBatteryCount = (specs: SystemSpecs): number => totalsOf(specs).batteryCount;
 
 /**
- * Banco de baterías para `resolveBatteryBank*` (`shared/projectDefaults`): DOD y eficiencia salen solo de los grupos.
- * Los escalares son los del primer grupo y únicamente cuentan si la capacidad total del banco es 0.
- */
-export function batteryBankSpecs(specs: SystemSpecs): { batteries: BatteryItemSpec[]; dodPct?: number; efficiencyPct?: number } {
-  const batteries = readEquipment(specs).batteries;
-  return { batteries, dodPct: batteries[0]?.dodPct, efficiencyPct: batteries[0]?.efficiencyPct };
-}
-
-/**
  * Formats a natural language technical summary of inverters.
  * Example: "2 Inversores Luxpower 10k y 2 Inversores Luxpower 5k"
  */

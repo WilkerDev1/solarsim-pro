@@ -58,6 +58,9 @@ export const createVersionHistorySlice: SimulationSlice<VersionHistorySlice> = (
           lastRecordedProjectId = project.id;
         }
 
+        // Un estado idéntico al último no es un paso: abrir o reabrir una propuesta no deja entradas de deshacer (ADR 0004).
+        const last = currentStack[currentStack.length - 1];
+        if (currentStack === state.undoStack && last && JSON.stringify(last) === JSON.stringify(cloned)) return {};
         const newStack = [...currentStack, cloned].slice(-50); // Keep max 50
         return {
           undoStack: newStack,

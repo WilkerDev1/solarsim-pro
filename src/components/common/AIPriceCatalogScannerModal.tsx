@@ -7,6 +7,7 @@ import {
   GeminiPriceCatalogService,
   ScanPriceCatalogOptions,
 } from "../../services/geminiPriceCatalogService";
+import { resolveAssumptions } from "../../../shared/assumptions";
 import {
   ExtractedPriceCatalogResult,
   ExtractedPriceCatalogItem,
@@ -185,7 +186,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
 
     try {
       const project = getActiveProject();
-      const dopRate = project?.rates?.usdExchangeRate || 60.0;
+      const dopRate = resolveAssumptions(project).dopExchangeRate;
 
       const result = await GeminiPriceCatalogService.scanAndMatchPriceCatalog({
         fileBase64,

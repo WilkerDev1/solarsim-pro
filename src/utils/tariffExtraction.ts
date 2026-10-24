@@ -1,3 +1,4 @@
+import { DEFAULT_GRID_EXPORT_FEE_PCT } from '../../shared/assumptions';
 import { GlobalTariffMatrix, UtilityDistributor, UtilityTariffDetails } from '../types/tariffs';
 import { getTariffSource, TARIFF_DISTRIBUTORS } from './aiTariffContext';
 
@@ -36,7 +37,7 @@ export function mergeExtractedTariffs(raw: unknown, current: GlobalTariffMatrix)
         code, name: typeof value.name === 'string' ? value.name.slice(0, 200) : old?.name || code,
         description: typeof value.description === 'string' ? value.description.slice(0, 1000) : old?.description || '',
         currency, baseEnergyRateDOP: currency === old?.currency ? old.baseEnergyRateDOP : 0, fixedChargeDOP: currency === old?.currency ? old.fixedChargeDOP : 0,
-        netMeteringRetentionPct: old?.netMeteringRetentionPct ?? 25,
+        netMeteringRetentionPct: old?.netMeteringRetentionPct ?? DEFAULT_GRID_EXPORT_FEE_PCT,
       };
       for (const field of numericFields) {
         if (value[field] === undefined || value[field] === null) continue;

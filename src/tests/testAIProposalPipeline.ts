@@ -1,4 +1,4 @@
-import {resolveBatteryBankDodPct,resolveBatteryBankEfficiencyPct} from '../../shared/projectDefaults';
+import {batteryBank,readEquipment} from '../../shared/equipment';
 import assert from 'node:assert/strict';
 import { normalizeProposalDraft, buildProposalRequest, robustParseJson } from '../../shared/aiProposal';
 import { requestGeminiJson, GeminiRequestError, geminiResponseText, type GeminiTransport } from '../../shared/geminiTransport';
@@ -114,7 +114,7 @@ assert.equal(project.specs.batteries?.[0].unitPriceUSD,undefined);
 assert.equal(calculateCostMatrixSummary(project.specs,10.2).items[1].unitPriceUSD,0,'unpriced second panel must not inherit first panel cost');
 assert.deepEqual(project.specs.inverters?.map(i=>i.id),['inv-a','inv-b']);
 const usefulBatteryKWh=16*0.9*0.95+16*0.8*0.9;
-assert(Math.abs(32*(resolveBatteryBankDodPct(project.specs)/100)*(resolveBatteryBankEfficiencyPct(project.specs)/100)-usefulBatteryKWh)<1e-9,'BESS bank (per-group DoD/efficiency weighted by the engine) preserves each group useful energy');
+assert(Math.abs(batteryBank(readEquipment(project.specs)).usableKWh-usefulBatteryKWh)<1e-9,'BESS bank (per-group DoD/efficiency weighted by the engine) preserves each group useful energy');
 const batterySummary=calculateFinancialSummary(project.client.province,project.specs,project.rates,project.financials,project.monthlyConsumption);
 assert.equal(batterySummary.batteryUsableKWh,Math.round(usefulBatteryKWh*10)/10,'actual financial engine reads adapted BESS values');
 useSimulationStore.setState({defaultSimulationSettings:{...useSimulationStore.getState().defaultSimulationSettings,defaultProvince:'Santiago',defaultPricingMode:'direct',defaultDirectPriceUSDPerWp:2.5}});

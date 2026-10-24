@@ -1,8 +1,9 @@
 import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
-import { DEFAULT_SYSTEM_LOSSES_PCT, resolveSystemLossesPct, resolveBatteryBankDodPct, resolveBatteryBankEfficiencyPct } from '../../shared/projectDefaults';
+import { DEFAULT_SYSTEM_LOSSES_PCT, DEFAULT_TARGET_COVERAGE_PCT, resolveAssumption, resolveSystemLosses } from '../../shared/assumptions';
 import { SystemSpecs, MonthlyEnergyResult } from '../types';
 import { getProvinceHSP } from '../data/rdProvinces';
-import { batteryBankSpecs, calculateTotalDCCapacityKWp, calculateTotalBatteryCapacityKWh } from '../utils/equipmentSpecsUtils';
+import { calculateTotalDCCapacityKWp } from '../utils/equipmentSpecsUtils';
+import { batteryBank, readEquipment } from '../../shared/equipment';
 
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -29,7 +30,7 @@ export function calculateRecommendedPanelCount(
   provinceName: string,
   monthlyConsumptionKWh: number[],
   panelPowerW: number,
-  targetCoveragePct: number = 95,
+  targetCoveragePct: number = DEFAULT_TARGET_COVERAGE_PCT,
   systemLossesPct: number = DEFAULT_SYSTEM_LOSSES_PCT,
   customMonthlyHSP?: number[]
 ): {
@@ -55,7 +56,8 @@ export function calculateRecommendedPanelCount(
   }
 
   const totalAnnualConsumption = monthlyConsumptionKWh.reduce((sum, v) => sum + (Number(v) || 0), 0);
-  const safeCoverage = Math.max(1, targetCoveragePct) / 100;
+  // Cobertura 0 o fuera de rango = sin dato: se dimensiona con el valor resuelto (ADR 0003), no con 1 %.
+  const safeCoverage = Math.max(1, resolveAssumption('targetCoveragePct', targetCoveragePct)) / 100;
   const targetAnnualKWh = totalAnnualConsumption * safeCoverage;
 
   const requiredCapacityKWp = targetAnnualKWh / annualSpecificYield;
@@ -138,7 +140,7 @@ export function calculateMonthlySolarProduction(
   const province = getProvinceHSP(provinceName);
 
   // Losses factor: total efficiency percentage (default from shared/projectDefaults -> derate factor)
-  const systemLossesPct = resolveSystemLossesPct(specs);
+  const systemLossesPct = resolveSystemLosses(specs);
   const derateFactor = 1 - (systemLossesPct / 100);
 
   const generationFactors=getMonthlySolarProductionFactors(provinceName,systemLossesPct,customMonthlyHSP);
@@ -146,17 +148,12 @@ export function calculateMonthlySolarProduction(
   // SIE-007-2026-REG / Net Metering Regulations:
   // - Grid export fee / retention (~25%) applies to all exported energy across all tariffs (BTS1, BTS2, BTD, MTD1, MTD2, etc.).
   // - Zero-Export systems (antivertido) do not inject to grid, resulting in 0 exported kWh and 0 export fees.
-  const effectiveGridExportFeePct = !isZeroExport ? (gridExportFeePct ?? 25) : 0;
+  const effectiveGridExportFeePct = !isZeroExport ? resolveAssumption('gridExportFeePct', gridExportFeePct) : 0;
 
   // BESS battery specifications
-  const totalBatteryKWh = calculateTotalBatteryCapacityKWh(specs);
-  const hasBatteryStorage = !!(specs.hasBattery && totalBatteryKWh > 0);
-  const bank = batteryBankSpecs(specs);
-  const batteryDodPct = resolveBatteryBankDodPct(bank);
-  const batteryEffPct = resolveBatteryBankEfficiencyPct(bank);
-  const dailyUsableBatteryKWh = hasBatteryStorage
-    ? totalBatteryKWh * (batteryDodPct / 100) * (batteryEffPct / 100)
-    : 0;
+  const bank = batteryBank(readEquipment(specs));
+  const hasBatteryStorage = bank.hasStorage;
+  const dailyUsableBatteryKWh = bank.usableKWh;
 
   // Calculate project-wide average monthly consumption to determine profile preset consistently
   const totalProjectCons = (monthlyConsumptionKWh && monthlyConsumptionKWh.length > 0)

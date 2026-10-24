@@ -12,6 +12,7 @@ import { getProvinceHSP } from '../../../../data/rdProvinces';
 import { ExtractedInvoiceData } from '../../../../types/aiInvoice';
 import { FilePreview } from '../types';
 import { normalizeProposalDraft, AIProposalContext } from '../../../../../shared/aiProposal';
+import { resolveAssumption, resolveAssumptions } from '../../../../../shared/assumptions';
 import { buildAITariffContext } from '../../../../utils/aiTariffContext';
 import { useEnergyCalculationMode } from '../../../../features/application/useApplicationFeatures';
 import { aiWorkspaceKey, proposalFileType, readProposalFile, PROPOSAL_FILES_LIMIT } from '../workspace';
@@ -41,17 +42,18 @@ export function useAIInvoiceScanner() {
   const target = useCurrentProject ? activeProject : undefined;
   const context = useMemo(() => {
     const province = extractedData?.province || target?.client.province || defaults.defaultProvince;
-    const losses = target?.specs.systemLosses ?? defaults.defaultSystemLosses;
+    // ADR 0003 (c): una propuesta guardada usa sus supuestos efectivos; los ajustes del usuario solo siembran la nueva.
+    const losses = target ? resolveAssumptions(target).systemLossesPct : resolveAssumption('systemLossesPct', defaults.defaultSystemLosses);
     const yieldInfo = calculateRecommendedPanelCount(province, Array(12).fill(0), 620, 95, losses, target?.client.customMonthlyHSP);
     return {
-      province, systemLosses: losses, targetCoveragePct: target?.rates.targetCoveragePct ?? defaults.defaultTargetCoveragePct,
+      province, systemLosses: losses, targetCoveragePct: target ? resolveAssumptions(target).targetCoveragePct : resolveAssumption('targetCoveragePct', defaults.defaultTargetCoveragePct),
       customMonthlyHSP: target?.client.customMonthlyHSP,
       monthlyConsumptionKWh: target?.monthlyConsumption,
       distributor: target?.rates.distributor,
       tariffCode: target?.rates.tariffCode,
       tariffReference: buildAITariffContext(tariffMatrix),
       annualSpecificYieldKWhPerKWp: yieldInfo.annualSpecificYieldKWhPerKWp,
-      monthlySpecificYieldKWhPerKWp:getMonthlySolarProductionFactors(province,losses ?? 25,target?.client.customMonthlyHSP),
+      monthlySpecificYieldKWhPerKWp:getMonthlySolarProductionFactors(province,losses,target?.client.customMonthlyHSP),
       calculationMode: mode,
       commercial: {pricingMode:'cost_matrix',markupPct:(target?.specs.saleMarginMultiplier!==undefined?(target.specs.saleMarginMultiplier-1)*100:defaults.defaultTargetMarginPct),installationUnitPriceUSD:target?.specs.installationUnitPriceUSD ?? 0,pricePerWattUSD:target?.specs.pricePerWattUSD ?? defaults.defaultDirectPriceUSDPerWp,directPriceSurplusTarget:target?.specs.directPriceSurplusTarget || 'margin',customItems:target?.financials.customItems || [],customDiscounts:target?.financials.customDiscounts || []},
       equipmentPrices:target?[...(target.specs.panels || []),...(target.specs.inverters || []),...(target.specs.batteries || [])].filter(g=>g.unitPriceUSD!==undefined).map(g=>({id:g.id,unitPriceUSD:g.unitPriceUSD!})):[],
@@ -106,7 +108,7 @@ export function useAIInvoiceScanner() {
       if (!isCurrent()) return;
       const payload = { apiKey:geminiApiKey, model:geminiModel, files:attachments,
         projectRequirementsText:prompt.trim() || 'Analiza los documentos adjuntos conservando los acuerdos del borrador.',
-        equipmentCatalog, dopExchangeRate: extractedData?.dopExchangeRate ?? target?.rates.usdExchangeRate ?? 60.5,
+        equipmentCatalog, dopExchangeRate: extractedData?.dopExchangeRate ?? resolveAssumption('dopExchangeRate', target?.specs.dopExchangeRate, target?.rates.usdExchangeRate),
         context: { ...context, reviewNotes:attentionIssues.map(i=>i.message),conversation:[...messages.filter(m=>!m.kind),userMessage].slice(-20).map(m=>({role:m.role,text:m.text.slice(-1800)})), currentDraft: validatedDraft || undefined, currentClient: target?.client },
       };
       let result: ExtractedInvoiceData;

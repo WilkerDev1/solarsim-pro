@@ -5,12 +5,14 @@ import { resolveProjectEquipment } from '../../../../../utils/equipmentMatchingU
 import { getProjectBatteries, getProjectInverters, getProjectPanels } from '../../../../../utils/equipmentSpecsUtils';
 import type { SystemSpecs } from '../../../../../types';
 import type { SolarEquipmentItem } from '../../../../../types/equipment';
-import { DEFAULT_INSTALLATION_USD_PER_KWP } from '../../logic/dockDefaults';
+import { resolveAssumption } from '../../../../../../shared/assumptions';
 import { bestSupplierPricingPatch, displayedUnitPrice, manualUnitPricePatch, type PricedKind } from './supplierPricing';
 import { UnitCostRow } from './UnitCostRow';
 
 interface UnitCostsProps {
   specs: SystemSpecs;
+  /** Mano de obra efectiva (US$/kWp) del proyecto completo; sin ella se resuelve de `specs`. */
+  installationUsdPerKwp?: number;
   equipmentCatalog: SolarEquipmentItem[];
   /** Equipos principales ya resueltos en el catálogo (los usa «Mejor proveedor»). */
   selected: { panel?: SolarEquipmentItem | null; inverter?: SolarEquipmentItem | null; battery?: SolarEquipmentItem | null };
@@ -21,7 +23,7 @@ interface UnitCostsProps {
 const LABELS: Record<PricedKind, string> = { panel: 'Panel', inverter: 'Inversor', battery: 'Batería' };
 
 /** Costos unitarios por modelo y «Mejor proveedor». Solo se dibuja en modo Desglosado. */
-export const UnitCosts: React.FC<UnitCostsProps> = ({ specs, equipmentCatalog, selected, openSupplierPriceModal, updateSpecs }) => {
+export const UnitCosts: React.FC<UnitCostsProps> = ({ specs, installationUsdPerKwp, equipmentCatalog, selected, openSupplierPriceModal, updateSpecs }) => {
   const hasAnySupplierPrices =
     (selected.panel?.supplierPrices?.length || 0) > 0 ||
     (selected.inverter?.supplierPrices?.length || 0) > 0 ||
@@ -104,7 +106,7 @@ export const UnitCosts: React.FC<UnitCostsProps> = ({ specs, equipmentCatalog, s
         id="pd-cost-installation"
         label="Mano de obra y mat."
         detail="por kWp"
-        value={specs.installationUnitPriceUSD !== undefined ? specs.installationUnitPriceUSD : DEFAULT_INSTALLATION_USD_PER_KWP}
+        value={installationUsdPerKwp ?? resolveAssumption('installationUsdPerKwp', specs.installationUnitPriceUSD)}
         onChange={(value) => updateSpecs({ installationUnitPriceUSD: value })}
       />
     </>

@@ -6,6 +6,7 @@ import { calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { formatProposalDate } from './formatDateUtils';
 import { mainModelPhrase } from '../../shared/documentTexts/equipmentPhrases';
 import { equipmentTotals, readEquipment } from '../../shared/equipment';
+import { resolveAssumptions } from '../../shared/assumptions';
 
 type SummaryFields = Pick<FinancialSummaryResult, 'annualConsumptionKWh' | 'annualProductionKWh' | 'systemCapacityKWp' | 'energyCoveragePct'>;
 
@@ -16,6 +17,7 @@ export function buildDocumentTextContext(
   options: { currentDateStr: string; company?: CompanyProfile },
 ): DocumentTextContext {
   const { specs, client, rates } = project;
+  const assumptions = resolveAssumptions(project);
   const clientName = cleanClientName(client.name || 'Cliente');
 
   // Equipos solo por `shared/equipment`: frases con el modelo principal y «y N modelo(s) más»; totales de todos los grupos.
@@ -58,11 +60,11 @@ export function buildDocumentTextContext(
         }
       : undefined,
     currentDateStr: options.currentDateStr,
-    quoteValidityDays: client.quoteValidityDays || 7,
+    quoteValidityDays: assumptions.quoteValidityDays,
     distributor: client.distributor || rates.distributor || 'EDES',
     tariffCode: rates.tariffCode || '',
     isZeroExport: !!rates.isZeroExport,
-    gridExportFeePct: rates.gridExportFeePct ?? 25,
+    gridExportFeePct: assumptions.gridExportFeePct,
     hasBattery: !!specs.hasBattery,
     hasBatteryStorage: totals.batteryNominalKWh > 0,
     annualConsumptionKWh: summary.annualConsumptionKWh,

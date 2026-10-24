@@ -1,8 +1,33 @@
 /**
  * Valores por defecto de proyecto compartidos por el motor (`src/engine`), el store y la interfaz.
- * Módulo neutral: TypeScript puro, sin dependencias. Cualquier default que el motor y el dock
- * deban ver igual vive aquí; `dockDefaults.ts` lo re-exporta para la interfaz.
+ * Módulo neutral: TypeScript puro. Los SUPUESTOS del proyecto (cambio, pérdidas, inflación, descuento, vida, cobertura,
+ * retención, vigencia, degradación, reemplazo de batería, $/W, margen, mano de obra) viven en `assumptions.ts` (ADR 0003);
+ * aquí se re-exportan sus constantes y los `resolve*` de un solo campo son envoltorios finos de esa misma tabla.
+ * `dockDefaults.ts` lo re-exporta para la interfaz.
  */
+import {
+  DEFAULT_DETAILED_SYSTEM_LOSSES_PCT,
+  DEFAULT_DOP_RATE,
+  DEFAULT_GRID_EXPORT_FEE_PCT,
+  DEFAULT_INSTALLATION_USD_PER_KWP,
+  DEFAULT_PRICE_PER_WATT_USD,
+  DEFAULT_SALE_MARGIN_MULTIPLIER,
+  DEFAULT_SYSTEM_LOSSES_PCT,
+  DEFAULT_TARGET_COVERAGE_PCT,
+  resolveAssumption,
+  resolveSystemLosses,
+} from "./assumptions.js";
+
+export {
+  DEFAULT_DETAILED_SYSTEM_LOSSES_PCT,
+  DEFAULT_DOP_RATE,
+  DEFAULT_GRID_EXPORT_FEE_PCT,
+  DEFAULT_INSTALLATION_USD_PER_KWP,
+  DEFAULT_PRICE_PER_WATT_USD,
+  DEFAULT_SALE_MARGIN_MULTIPLIER,
+  DEFAULT_SYSTEM_LOSSES_PCT,
+  DEFAULT_TARGET_COVERAGE_PCT,
+};
 
 // ── Batería ──
 /** Profundidad de descarga (%) cuando el proyecto no la define o no es válida (≤ 0). */
@@ -12,33 +37,11 @@ export const DEFAULT_BATTERY_EFFICIENCY_PCT = 90;
 /** Rango válido de DOD y eficiencia (%) al editarlos. */
 export const BATTERY_PCT_RANGE = { min: 1, max: 100 } as const;
 
-// ── Tarifas ──
-/** Cobertura objetivo (%) cuando la tarifa no la define. */
-export const DEFAULT_TARGET_COVERAGE_PCT = 95;
-/** Retención de exportación SIE (%) cuando la tarifa no la define. */
-export const DEFAULT_GRID_EXPORT_FEE_PCT = 25;
-
 // ── Sistema ──
-/** Pérdidas del sistema (%) cuando el proyecto no las define. */
-export const DEFAULT_SYSTEM_LOSSES_PCT = 25;
-/** Pérdidas (%) que el motor asume en modo detallado cuando el proyecto no las define (otro concepto: modelo de pérdidas desglosado). */
-export const DEFAULT_DETAILED_SYSTEM_LOSSES_PCT = 14;
 /** Capacidad (kWh) de una batería sin capacidad. */
 export const DEFAULT_BATTERY_CAPACITY_KWH = 16.08;
 /** Pérdidas efectivas (%): las del proyecto (un 0 explícito se conserva); si faltan, 14 en modo detallado y 25 en simple. */
-export const resolveSystemLossesPct = (specs: { systemLosses?: number | null; isDetailed?: boolean }): number =>
-  specs.systemLosses !== undefined && specs.systemLosses !== null ? specs.systemLosses : specs.isDetailed ? DEFAULT_DETAILED_SYSTEM_LOSSES_PCT : DEFAULT_SYSTEM_LOSSES_PCT;
-
-// ── Costos y margen ──
-/** Tasa RD$ por US$ cuando falta o no es válida (≤ 0). */
-export const DEFAULT_DOP_RATE = 60;
-/** Multiplicador de venta (1.25 = 25 % de margen) cuando falta o no es válido (≤ 0). */
-export const DEFAULT_SALE_MARGIN_MULTIPLIER = 1.25;
-/** Mano de obra (US$ por kWp) cuando el proyecto no la define (`!== undefined`: un 0 explícito se conserva). */
-export const DEFAULT_INSTALLATION_USD_PER_KWP = 170;
-
-/** Precio directo por Wp (US$) cuando el proyecto no trae uno válido (> 0). Es el del motor (`financeEngine`), que determina los totales. */
-export const DEFAULT_PRICE_PER_WATT_USD = 1.13;
+export const resolveSystemLossesPct = (specs: { systemLosses?: number | null; isDetailed?: boolean }): number => resolveSystemLosses(specs);
 
 // ── Marcadores de ejemplo (vienen de `BENCHMARK_PROJECT`, `src/engine/referenceCase.ts`) ──
 /** Número de cotización de ejemplo que se muestra si el proyecto no tiene uno. */
@@ -62,9 +65,9 @@ const isPercent = (value: number | undefined | null): value is number => typeof 
 const isPositive = (value: number | undefined | null): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0;
 
 /** Tasa a usar: la del proyecto si es > 0; si no, el default. La usan la vista y el cálculo. */
-export const resolveDopRate = (rate: number | undefined | null): number => (isPositive(rate) ? rate : DEFAULT_DOP_RATE);
+export const resolveDopRate = (rate: number | undefined | null): number => resolveAssumption("dopExchangeRate", rate);
 /** Multiplicador de venta a usar: el del proyecto si es > 0; si no, el default. */
-export const resolveSaleMarginMultiplier = (multiplier: number | undefined | null): number => (isPositive(multiplier) ? multiplier : DEFAULT_SALE_MARGIN_MULTIPLIER);
+export const resolveSaleMarginMultiplier = (multiplier: number | undefined | null): number => resolveAssumption("saleMarginMultiplier", multiplier);
 /** DOD (%) a usar: el del proyecto si está en 1-100; si no, el default. */
 export const resolveBatteryDodPct = (dod: number | undefined | null): number => (isPercent(dod) ? dod : DEFAULT_BATTERY_DOD_PCT);
 /** Eficiencia de batería (%) a usar: la del proyecto si está en 1-100; si no, el default. */
@@ -78,57 +81,5 @@ export const isValidDirectPrice = (price: number | undefined | null): price is n
 export const resolvePricePerWattUSD = (
   specs: { pricePerWattUSD?: number | null } | undefined,
   financials?: { pricePerWattUSD?: number | null } | undefined,
-): number => (isPositive(specs?.pricePerWattUSD) ? specs.pricePerWattUSD : isPositive(financials?.pricePerWattUSD) ? financials.pricePerWattUSD : DEFAULT_PRICE_PER_WATT_USD);
+): number => resolveAssumption("pricePerWattUSD", specs?.pricePerWattUSD, financials?.pricePerWattUSD);
 
-// ── Banco de baterías ──
-interface BankGroup { capacityKWh?: number; count?: number; dodPct?: number | null; efficiencyPct?: number | null }
-/**
- * Banco de baterías: los grupos y, solo para un banco sin capacidad, el DOD y la eficiencia del primer grupo.
- * No son campos de la propuesta (el espejo `batteryDOD`/`batteryEfficiencyPct` ya no existe): los arma
- * `batteryBankSpecs` (`src/utils/equipmentSpecsUtils`).
- */
-interface BankSpecs {
-  batteries?: BankGroup[];
-  dodPct?: number | null;
-  efficiencyPct?: number | null;
-}
-
-/** Valor de un grupo: el propio si es válido; si no, el default. Los grupos son la fuente: el escalar del proyecto solo es el espejo y no se hereda. */
-function groupPct(specs: BankSpecs, index: number, field: 'dodPct' | 'efficiencyPct'): number {
-  const own = specs.batteries?.[index]?.[field];
-  if (isPercent(own)) return own;
-  return field === 'dodPct' ? DEFAULT_BATTERY_DOD_PCT : DEFAULT_BATTERY_EFFICIENCY_PCT;
-}
-
-/**
- * Promedio ponderado del banco. El DOD pesa por capacidad total del grupo (`capacityKWh × count`); la eficiencia pesa por
- * esa capacidad × el DOD del grupo, de modo que `total × DOD × η` conserva la energía útil Σ(Cᵢ·DOD ᵢ·ηᵢ) (con el mismo DOD
- * en todos los grupos es el promedio ponderado por capacidad). Solo sin grupos o con capacidad total 0 se usa el escalar del banco (`dodPct`/`efficiencyPct`).
- */
-function weightedBankPct(specs: BankSpecs, field: 'dodPct' | 'efficiencyPct', scalar: number): number {
-  const groups = Array.isArray(specs.batteries) ? specs.batteries : [];
-  let weighted = 0;
-  let total = 0;
-  groups.forEach((group, index) => {
-    const capacity = (Number(group?.capacityKWh) || 0) * (Number(group?.count) || 0);
-    if (!(capacity > 0)) return;
-    const weight = field === 'efficiencyPct' ? capacity * groupPct(specs, index, 'dodPct') : capacity;
-    weighted += weight * groupPct(specs, index, field);
-    total += weight;
-  });
-  return total > 0 ? weighted / total : scalar;
-}
-
-/** Eficiencia (%) del banco: promedio ponderado de la de cada grupo. Un solo modelo: la suya. */
-export const resolveBatteryBankEfficiencyPct = (specs: BankSpecs): number =>
-  weightedBankPct(specs, 'efficiencyPct', resolveBatteryEfficiencyPct(specs.efficiencyPct));
-/** DOD (%) del banco: promedio ponderado por capacidad del de cada grupo. */
-export const resolveBatteryBankDodPct = (specs: BankSpecs): number =>
-  weightedBankPct(specs, 'dodPct', resolveBatteryDodPct(specs.dodPct));
-
-/** Eficiencia (%) que ve el dock para la batería principal: la del primer grupo si es válida; si no, la del proyecto. */
-export const resolvePrimaryBatteryEfficiencyPct = (specs: BankSpecs): number =>
-  resolveBatteryEfficiencyPct(specs.batteries?.length ? specs.batteries[0].efficiencyPct : specs.efficiencyPct);
-/** DOD (%) que ve el dock para la batería principal: el del primer grupo si es válido; si no, el del proyecto. */
-export const resolvePrimaryBatteryDodPct = (specs: BankSpecs): number =>
-  resolveBatteryDodPct(specs.batteries?.length ? specs.batteries[0].dodPct : specs.dodPct);

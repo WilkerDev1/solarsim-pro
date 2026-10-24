@@ -5,7 +5,9 @@ import type { GlobalTariffMatrix } from '../types/tariffs';
 import { calculateRecommendedPanelCount } from '../engine/solarEngine';
 import { resolveAITariffSelection } from './aiTariffContext';
 import { getReferenceEnergyRateUSD } from '../data/rdTariffs';
-import { resolveSystemLossesPct, DEFAULT_SYSTEM_LOSSES_PCT, DEFAULT_BATTERY_DOD_PCT, DEFAULT_BATTERY_EFFICIENCY_PCT } from '../../shared/projectDefaults';
+import { resolveSystemLossesPct, DEFAULT_BATTERY_DOD_PCT, DEFAULT_BATTERY_EFFICIENCY_PCT } from '../../shared/projectDefaults';
+import { assumptionFields, resolveAssumption, resolveAssumptions } from '../../shared/assumptions';
+import { DEFAULT_TARGET_MARGIN_PCT } from '../store/defaultSimulationSettings';
 import { enforceAutomatedPricing } from '../../shared/automatedProposalPolicy';
 import { editEquipment, readEquipment, type EquipmentKind } from '../../shared/equipment';
 import { migrateLegacySpecs } from '../../shared/equipment';
@@ -37,10 +39,10 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
   const defaults={defaultBatteryDOD:options.defaultBatteryDOD};
   const isGrounded=Array.isArray(data.panels)||Array.isArray(data.inverters)||Array.isArray(data.batteries);
     const panelW=data.selectedPanelWatts ?? readEquipment(base.specs).panels[0]?.powerW ?? 0;
-    const coverage=data.targetCoveragePct ?? base.rates.targetCoveragePct ?? 95;
+    const coverage=resolveAssumption('targetCoveragePct',data.targetCoveragePct,resolveAssumptions(base).targetCoveragePct);
     const count=data.recommendedPanelCount || calculateRecommendedPanelCount(province,data.monthlyConsumptionKWh,panelW,coverage,losses,base.client.customMonthlyHSP).recommendedPanelCount;
     const dcKWp=(data.panels || []).reduce((sum,g)=>sum+g.powerW*g.count/1000,0);
-    let specs:SystemSpecs={...base.specs,autoCalculatePanels:false,dopExchangeRate:data.dopExchangeRate || base.rates.usdExchangeRate || 60,
+    let specs:SystemSpecs={...base.specs,autoCalculatePanels:false,dopExchangeRate:resolveAssumption('dopExchangeRate',data.dopExchangeRate,base.rates.usdExchangeRate,base.specs.dopExchangeRate),
       ...(data.hasBattery!==undefined?{hasBattery:data.hasBattery}:{}),
       ...(data.targetMarginPct!==undefined?{saleMarginMultiplier:1+data.targetMarginPct/100}:{}),
       ...(data.commercial?.installationTotalUSD!==undefined&&dcKWp>0?{installationUnitPriceUSD:data.commercial.installationTotalUSD/dcKWp}:data.commercial?.installationUnitPriceUSD!==undefined?{installationUnitPriceUSD:data.commercial.installationUnitPriceUSD}:{}),
@@ -80,7 +82,7 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
       if(supplier) specs=editEquipment(specs,kind,{type:'update',index:0,patch:{selectedSupplierInfo:supplier}} as never);
     }
     specs=migrateLegacySpecs(specs);
-    const fx=data.dopExchangeRate || base.rates.usdExchangeRate || 60;
+    const fx=resolveAssumption('dopExchangeRate',data.dopExchangeRate,base.rates.usdExchangeRate,base.specs.dopExchangeRate);
     const tariff=resolveAITariffSelection(tariffMatrix,data.distributor,data.tariffCode);
     const reference=tariff?getReferenceEnergyRateUSD(tariffMatrix,data.distributor,tariff.code,data.averageMonthlyKWh,fx):undefined;
     const energy=data.energyCostPerKWhDOP!==undefined?data.energyCostPerKWhDOP/fx:data.energyCostPerKWhUSD ?? reference;
@@ -94,12 +96,14 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
 export function createAIProposalBase(template:ProjectSimulation,defaults:DefaultSimulationSettings,province:string):ProjectSimulation {
  const base=structuredClone(template);
 
-      base.specs={...base.specs,pricePerWattUSD:defaults.defaultDirectPriceUSDPerWp,systemLosses:defaults.defaultSystemLosses ?? DEFAULT_SYSTEM_LOSSES_PCT,annualDegradation:defaults.defaultAnnualDegradation ?? 0.4,isDetailed:false,pricingMode:'cost_matrix',saleMarginMultiplier:1+(defaults.defaultTargetMarginPct ?? 28)/100,installationUnitPriceUSD:0};
+      // ADR 0003 (d): los ajustes del usuario primero, luego las constantes compartidas (la misma fábrica que el proyecto nuevo).
+      const seeded=assumptionFields(undefined,defaults);
+      base.specs={...base.specs,pricePerWattUSD:seeded.specs.pricePerWattUSD,systemLosses:seeded.specs.systemLosses,annualDegradation:seeded.specs.annualDegradation,isDetailed:false,pricingMode:'cost_matrix',saleMarginMultiplier:1+(defaults.defaultTargetMarginPct ?? DEFAULT_TARGET_MARGIN_PCT)/100,installationUnitPriceUSD:0};
       // Grupos explícitos; el DOD por defecto vive en el grupo de batería.
       const withGroups=withoutInheritedPanelDegradation(migrateLegacySpecs(base.specs)); // la degradación configurada manda sobre el 0.5 % de la referencia
       base.specs={...withGroups,batteries:withGroups.batteries?.map((group,index)=>index===0?{...group,dodPct:defaults.defaultBatteryDOD ?? DEFAULT_BATTERY_DOD_PCT}:group)};
-      base.rates={...base.rates,targetCoveragePct:defaults.defaultTargetCoveragePct ?? 95,isZeroExport:defaults.defaultZeroExport,currency:defaults.currency || 'USD',annualEnergyInflationPct:defaults.annualEnergyTariffEscalationPct ?? 3.5};
-      base.financials={...base.financials,applyLey5707:defaults.applyLey5707,applyITBISExemption:defaults.applyITBISExemption,discountRatePct:defaults.discountRatePct,projectLifespanYears:defaults.lifespanYears,pricePerWattUSD:defaults.defaultDirectPriceUSDPerWp,customItems:[],customDiscounts:[],customCostUSD:undefined,customLey5707CreditUSD:undefined,customITBISSavedUSD:undefined};
+      base.rates={...base.rates,targetCoveragePct:seeded.rates.targetCoveragePct,isZeroExport:defaults.defaultZeroExport,currency:defaults.currency || 'USD',annualEnergyInflationPct:seeded.rates.annualEnergyInflationPct};
+      base.financials={...base.financials,applyLey5707:defaults.applyLey5707,applyITBISExemption:defaults.applyITBISExemption,discountRatePct:seeded.financials.discountRatePct,projectLifespanYears:seeded.financials.projectLifespanYears,pricePerWattUSD:seeded.financials.pricePerWattUSD,customItems:[],customDiscounts:[],customCostUSD:undefined,customLey5707CreditUSD:undefined,customITBISSavedUSD:undefined};
       base.client={...base.client,company:'',address:'',contactPhone:'',contactEmail:'',contactPerson:'',location:province,customMonthlyHSP:undefined,coordinates:undefined};
  return base;
 }

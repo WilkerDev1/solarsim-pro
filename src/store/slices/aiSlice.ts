@@ -1,6 +1,7 @@
 import { createProjectId } from '../../utils/projectId';
 import { isReaderRole } from '../../../shared/permissions';
 import { prepareProposalDraftProject, createAIProposalBase } from '../../utils/proposalDraftProject';
+import { normalizeIncomingSpecs, normalizeProjectEquipment } from '../../domain/projectEdit';
 import { companyDocumentCustomization } from '../../utils/companyDocumentTemplate';
 import { projectMutationMetadata } from '../sync/projectMutation';
 import { SimulationSlice, AISlice, SimulationStore } from '../types';
@@ -9,6 +10,7 @@ import { BENCHMARK_PROJECT } from '../../engine/referenceCase';
 import { generateNextProjectSequence } from '../initialData';
 import { calculateRecommendedPanelCount, getMonthlySolarProductionFactors } from '../../engine/solarEngine';
 import { normalizeProposalDraft } from '../../../shared/aiProposal';
+import { resolveAssumption, resolveAssumptions } from '../../../shared/assumptions';
 import { DEFAULT_GEMINI_MODEL } from '../../../shared/geminiTransport';
 import { buildAITariffContext } from '../../utils/aiTariffContext';
 import { RD_PROVINCES, getProvinceHSP } from '../../data/rdProvinces';
@@ -30,7 +32,7 @@ export function buildProjectFromDraft(state:SimulationStore,input:ExtractedInvoi
     const province=normalizeProvinceName(input.province || input.municipality || (!createNewProject?current?.client.province:state.defaultSimulationSettings.defaultProvince));
     const defaults=state.defaultSimulationSettings;
     const base:ProjectSimulation=createNewProject?createAIProposalBase(BENCHMARK_PROJECT,defaults,province):current!;
-    const losses=base.specs.systemLosses ?? 25;
+    const losses=resolveAssumptions(base).systemLossesPct;
     // Revalidate against today's inventory before committing any change. Legacy callers retain their API.
     const data=isGrounded?normalizeProposalDraft(input,state.equipmentCatalog,{province,systemLosses:losses,
       annualSpecificYieldKWhPerKWp:calculateRecommendedPanelCount(province,Array(12).fill(0),620,95,losses,base.client.customMonthlyHSP).annualSpecificYieldKWhPerKWp,
@@ -55,7 +57,7 @@ export function buildProjectFromDraft(state:SimulationStore,input:ExtractedInvoi
         nic:data.nic ?? base.client.nic,nis:data.nis ?? base.client.nis,rnc:data.rnc ?? base.client.rnc,
         contractNumber:data.contractNumber ?? base.client.contractNumber,circuit:data.circuit ?? base.client.circuit,
         meterNumber:data.meterNumber ?? base.client.meterNumber,voltagePhase:data.voltagePhase ?? base.client.voltagePhase,
-        ...(seq?{projectId:seq.projectId,quoteNumber:seq.quoteNumber,quoteValidityDays:7}:{}),},
+        ...(seq?{projectId:seq.projectId,quoteNumber:seq.quoteNumber,quoteValidityDays:resolveAssumption('quoteValidityDays',defaults.defaultQuoteValidityDays)}:{}),},
       financials:prepared.financials,
       specs,rates,monthlyConsumption:[...data.monthlyConsumptionKWh],
       aiSource:{...base.aiSource,consumptionSource:data.consumptionSource,energyRateSource:data.energyRateSource,
@@ -63,7 +65,8 @@ export function buildProjectFromDraft(state:SimulationStore,input:ExtractedInvoi
         notes:data.specialTechnicalNotes!==undefined || data.aiNotes!==undefined ? ([data.specialTechnicalNotes,data.aiNotes].filter(Boolean).join('\n') || undefined) : base.aiSource?.notes},
       ...(createNewProject?{customization:{...companyDocumentCustomization(state.getActiveCompany(),state.defaultDocumentCustomization,state.documentTemplatesByCompany),contactName:data.clientName,clientPhone:data.phone,clientEmail:data.email}}:{}),
     };
-    return {project,previous:createNewProject?undefined:current};
+    // ADR 0004 (d): el borrador entra con la misma normalización que una edición (existente) o que una importación (nueva); sin autodimensionar.
+    return {project:createNewProject?{...project,specs:normalizeIncomingSpecs(project.specs)}:normalizeProjectEquipment(current!,project),previous:createNewProject?undefined:current};
 }
 
 export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({

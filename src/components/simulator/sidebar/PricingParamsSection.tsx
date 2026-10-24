@@ -1,10 +1,9 @@
 import { readEquipment } from '../../../../shared/equipment';
 import React from 'react';
-import { resolveProjectEquipment, supplierQuotesItem } from '../../../utils/equipmentMatchingUtils';
+import { resolveProjectEquipment } from '../../../utils/equipmentMatchingUtils';
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs } from '../../../types';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
-import { useSupplierCleanup } from '../params/hooks/useSupplierCleanup';
 import {
   marginPctFromMultiplier,
   multiplierFromMarginInput,
@@ -13,7 +12,8 @@ import {
   wattPricePatch,
   wholeMarginPctFromMultiplier,
 } from '../params/logic/pricingSync';
-import { resolveDopRate, resolvePricePerWattUSD, resolveSaleMarginMultiplier } from '../params/logic/dockDefaults';
+import { resolveAssumptions } from '../../../../shared/assumptions';
+import { resolvePricePerWattUSD } from '../params/logic/dockDefaults';
 import { ChipGroup, CommitNumberField, ParamRow, StatStrip, ToggleGroup } from '../params/ui';
 import { DirectPrice } from '../params/sections/pricing/DirectPrice';
 import { NumberField } from '../params/sections/pricing/NumberField';
@@ -49,19 +49,11 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
   const selectedInverter = resolveProjectEquipment(equipmentCatalog, 'inverter', inverter?.brandModel, inverter?.powerKW, info.inverter?.supplierPriceId);
   const selectedBattery = resolveProjectEquipment(equipmentCatalog, 'battery', battery?.brandModel, battery?.capacityKWh, info.battery?.supplierPriceId);
 
-  // La limpieza escribe en el proyecto: vive aquí (siempre montada), no en una vista que dependa del modo.
-  useSupplierCleanup({
-    specs,
-    equipmentCatalog,
-    panelSupplierMatches: supplierQuotesItem(selectedPanel, info.panel),
-    inverterSupplierMatches: supplierQuotesItem(selectedInverter, info.inverter),
-    batterySupplierMatches: supplierQuotesItem(selectedBattery, info.battery),
-    updateSpecs,
-  });
-
   const isDirect = specs.pricingMode === 'direct_watt';
   const matrix = summary?.costMatrix;
-  const multiplier = resolveSaleMarginMultiplier(specs.saleMarginMultiplier);
+  // Tasa, margen y mano de obra mostrados = los que usa la matriz de costos (supuestos efectivos del proyecto completo).
+  const assumptions = resolveAssumptions(project);
+  const multiplier = assumptions.saleMarginMultiplier;
 
   const setMode = (mode: 'cost_matrix' | 'direct_watt') => {
     if (mode === 'cost_matrix') {
@@ -98,7 +90,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
               step="0.5"
               min={0.01}
               belowMin="revert"
-              value={resolveDopRate(specs.dopExchangeRate)}
+              value={assumptions.dopExchangeRate}
               onCommit={(rate) => updateSpecs({ dopExchangeRate: rate })}
             />
           </ParamRow>
@@ -122,6 +114,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
           />
           <UnitCosts
             specs={specs}
+            installationUsdPerKwp={assumptions.installationUsdPerKwp}
             equipmentCatalog={equipmentCatalog}
             selected={{ panel: selectedPanel, inverter: selectedInverter, battery: selectedBattery }}
             openSupplierPriceModal={openSupplierPriceModal}

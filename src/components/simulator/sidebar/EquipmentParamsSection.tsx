@@ -2,8 +2,8 @@ import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs } from '../../../types';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
-import { useCatalogPowerSync } from '../params/hooks/useCatalogPowerSync';
-import { DEFAULT_TARGET_COVERAGE_PCT, resolveSystemLossesPct } from '../params/logic/dockDefaults';
+import { resolveAssumption, resolveAssumptions } from '../../../../shared/assumptions';
+import { resolveSystemLossesPct } from '../params/logic/dockDefaults';
 import { BatteryEquipmentSection } from './BatteryEquipmentSection';
 import { Field, ParamRow, StatStrip, ToggleGroup } from '../params/ui';
 import { AdvancedDisclosure } from '../params/sections/equipment/AdvancedDisclosure';
@@ -29,13 +29,10 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({ 
   const isDetailed = !!specs.isDetailed;
   const mode = isDetailed ? 'manual' : 'catalog';
 
-  // Efecto que escribe en el proyecto: el cuerpo sigue montado aunque la sección esté plegada.
-  useCatalogPowerSync(specs, equipmentCatalog, updateSpecs);
-
   const totalDCKWp = calculateTotalDCCapacityKWp(specs);
   const totalInverterKW = calculateTotalInverterPowerKW(specs);
   const losses = resolveSystemLossesPct(specs);
-  const autoInfo = `Calcula los paneles para cubrir el ${project.rates.targetCoveragePct ?? DEFAULT_TARGET_COVERAGE_PCT}% del consumo, con ${losses}% de pérdidas.`;
+  const autoInfo = `Calcula los paneles para cubrir el ${resolveAssumptions(project).targetCoveragePct}% del consumo, con ${losses}% de pérdidas.`;
   const common = { mode, specs, catalog: equipmentCatalog, updateSpecs, onOpenScanner: openAIDatasheetModal } as const;
 
   return (
@@ -97,7 +94,7 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({ 
                 mono
                 step={0.1}
                 suffix="%"
-                value={specs.annualDegradation}
+                value={resolveAssumption('annualDegradationPct', specs.annualDegradation)}
                 onChange={(value) => updateSpecs({ annualDegradation: parseFloat(value) || 0 })}
               />
             </ParamRow>

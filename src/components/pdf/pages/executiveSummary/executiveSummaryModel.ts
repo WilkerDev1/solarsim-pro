@@ -1,4 +1,5 @@
 import type { FinancialSummaryResult, ProjectSimulation } from '../../../../types';
+import { resolveAssumptions } from '../../../../../shared/assumptions';
 import {
   getProjectPanels,
   getProjectInverters,
@@ -41,7 +42,9 @@ export function executiveSummaryModel(project: ProjectSimulation, summary: Finan
   const primaryPanel = panels[0] || { powerW: 620, brandModel: 'Módulo Tier-1' };
   const totalPanels = panels.reduce((sum, p) => sum + (p.count || 0), 0);
   const systemCapacityKWp = summary.systemCapacityKWp || 0;
-  const lossesPercent = project.specs.systemLosses ?? 25;
+  // ADR 0003 (e): pérdidas y cambio salen de los supuestos efectivos, los mismos que usa el motor.
+  const assumptions = resolveAssumptions(project);
+  const lossesPercent = assumptions.systemLossesPct;
   const performanceRatio = Math.max(10, Math.round(100 - lossesPercent));
 
   // --- 2. Datos Conversión AC ---
@@ -60,7 +63,7 @@ export function executiveSummaryModel(project: ProjectSimulation, summary: Finan
     grossInvestmentUSD + (project.financials.applyITBISExemption ? summary.itbisSavedUSD || 0 : 0);
   const costPerWattUSD =
     systemCapacityKWp > 0 ? grossInvestmentUSD / (systemCapacityKWp * 1000) : project.specs.pricePerWattUSD || 0;
-  const exchangeRate = project.rates.usdExchangeRate || project.specs.dopExchangeRate || 60.0;
+  const exchangeRate = assumptions.dopExchangeRate;
   const tariffUSD = project.rates.energyCostPerKWh || 0.18;
   const tariffDOP = tariffUSD * exchangeRate;
   const tariffCode = project.rates.tariffCode || 'BTS2';

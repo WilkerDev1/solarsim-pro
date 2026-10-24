@@ -1,3 +1,4 @@
+import { resolveAssumption } from './assumptions';
 import { COMMERCIAL_SCHEMA, normalizeCommercial, commercialMarkup, type AIProposalCommercial } from './aiProposalCommercial';
 import type { SolarEquipmentItem, EquipmentType } from '../src/types/equipment';
 import type { ExtractedInvoiceData } from '../src/types/aiInvoice';
@@ -181,7 +182,7 @@ export function normalizeProposalDraft(rawDraft: unknown, catalog: SolarEquipmen
   else if(consumptionSource!=='theoretical')issue('missing_consumption','Completa doce consumos mensuales o indica un promedio mensual antes de crear la propuesta.');
   if (consumption.length && consumption.every(n=>n===0)) issue('zero_consumption','Todos los meses tienen consumo cero; confirma el suministro.','warning');
   if (consumption.length && consumptionSource==='estimated' && !issues.some(i=>i.code==='estimated_consumption')) issue('estimated_consumption','Historial estimado: confirma los doce consumos antes de cotizar.','warning');
-  const coverage = Math.max(1,Math.min(300,num(raw.targetCoveragePct) ?? context.targetCoveragePct ?? 95));
+  const coverage = Math.max(1,Math.min(300,resolveAssumption('targetCoveragePct', num(raw.targetCoveragePct), context.targetCoveragePct)));
   const panels:PanelItemSpec[]=groups('panel','panels');
   const inverters:InverterItemSpec[]=groups('inverter','inverters');
   const batteries:BatteryItemSpec[]=raw.hasBattery===false ? [] : groups('battery','batteries');
@@ -198,7 +199,7 @@ export function normalizeProposalDraft(rawDraft: unknown, catalog: SolarEquipmen
   const tariff = Array.isArray(schedules) ? schedules.find((s:any)=>s.distributor===distributor)?.tariffs?.find((t:any)=>t.code===tariffCode) : undefined;
   if (tariffCode && (!Array.isArray(schedules) || !schedules.some(s=>s.distributor===distributor && Array.isArray(s.tariffs) && s.tariffs.some((t:any)=>t.code===tariffCode)))) issue('unknown_tariff',`La tarifa ${tariffCode} de ${distributor} no se pudo confirmar con la matriz disponible.`);
   let rateDOP=raw.energyRateSource==='reference'?undefined:num(raw.energyCostPerKWhDOP);
-  const exchange=num(raw.dopExchangeRate) || 60;
+  const exchange=resolveAssumption('dopExchangeRate', num(raw.dopExchangeRate));
   const invalidExchange=raw.dopExchangeRate!==undefined&&(!(typeof raw.dopExchangeRate==='number')||!Number.isFinite(raw.dopExchangeRate)||raw.dopExchangeRate<=0);
   if(invalidExchange)issue('invalid_exchange','El cambio RD$ por USD debe ser positivo y finito.');
   let referenceRate=raw.energyRateSource==='reference';
