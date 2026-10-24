@@ -195,4 +195,74 @@ const inverter = (id: string, powerKW: number, count: number): InverterItemSpec 
   }
 }
 
+// 7. Migración invariante con respaldo del espejo: hasta 2.7.0, con grupos de batería de capacidad total 0 el motor financiero
+// calculaba la energía útil y la autonomía con `batteryCapacityKWh`, `batteryDOD` y `batteryEfficiencyPct` del espejo (los del
+// grupo se ignoraban). Como el espejo se borra, esos valores pasan al primer grupo.
+// Fuente de los valores esperados: el motor de la etiqueta v2.7.0 (extraído del repositorio) ejecutado sobre estas mismas
+// fixtures (caso de referencia, modo legacy, mismas tarifas y consumo). Comprobación a mano: 16 kWh × 80 % × 90 % = 11,52 ⇒ 11,5;
+// 20 × 70 % × 85 % = 11,9; 16 × 90 % × 90 % = 12,96 ⇒ 13; 10 × 2 × 90 % × 90 % = 16,2.
+{
+  const bat = (extra: Record<string, unknown> = {}) => ({ id: 'b', brandModel: 'Bat', capacityKWh: 10, count: 1, unitPriceUSD: 900, ...extra });
+  const cases: { name: string; patch: Record<string, unknown>; usable: number; autonomy: number; first?: Record<string, unknown> }[] = [
+    { name: 'capacidad 0 + espejo 16 kWh al 80 %', patch: { batteryCapacityKWh: 16, batteryCount: 1, batteryDOD: 80, batteries: [bat({ capacityKWh: 0 })] }, usable: 11.5, autonomy: 2.6, first: { capacityKWh: 16, dodPct: 80, efficiencyPct: undefined } },
+    { name: 'grupo sin DOD ni eficiencia + espejo con valores', patch: { batteryCapacityKWh: 20, batteryDOD: 70, batteryEfficiencyPct: 85, batteries: [bat({ capacityKWh: 0 })] }, usable: 11.9, autonomy: 2.6, first: { capacityKWh: 20, dodPct: 70, efficiencyPct: 85 } },
+    { name: 'DOD y eficiencia propios del grupo se ignoraban con capacidad 0', patch: { batteryCapacityKWh: 16, batteryDOD: 80, batteries: [bat({ capacityKWh: 0, dodPct: 60, efficiencyPct: 70 })] }, usable: 11.5, autonomy: 2.6, first: { capacityKWh: 16, dodPct: 80, efficiencyPct: 90 } },
+    { name: 'espejo sin DOD: default 90 % aunque el grupo traiga 60 %', patch: { batteryCapacityKWh: 16, batteryDOD: undefined, batteries: [bat({ capacityKWh: 0, dodPct: 60 })] }, usable: 13, autonomy: 2.9, first: { capacityKWh: 16, dodPct: 90 } },
+    { name: 'capacidad 0 con 2 unidades: capacidad × cantidad sigue siendo la del espejo', patch: { batteryCapacityKWh: 16, batteryDOD: 80, batteries: [bat({ capacityKWh: 0, count: 2 })] }, usable: 11.5, autonomy: 2.6, first: { capacityKWh: 8, count: 2 } },
+    { name: 'cantidad 0 con otra capacidad: manda la del espejo', patch: { batteryCapacityKWh: 16, batteryDOD: 80, batteries: [bat({ capacityKWh: 10, count: 0 })] }, usable: 11.5, autonomy: 2.6, first: { capacityKWh: 16, count: 0 } },
+    { name: 'capacidad 0 y cantidad 0', patch: { batteryCapacityKWh: 16, batteryDOD: 80, batteries: [bat({ capacityKWh: 0, count: 0 })] }, usable: 11.5, autonomy: 2.6, first: { capacityKWh: 16, count: 0 } },
+    { name: 'varios grupos en 0: solo el primero', patch: { batteryCapacityKWh: 16, batteryDOD: 80, batteries: [bat({ capacityKWh: 0 }), bat({ id: 'b2', capacityKWh: 0, count: 2 })] }, usable: 11.5, autonomy: 2.6, first: { capacityKWh: 16 } },
+    { name: 'lista de grupos vacía y cantidad 0: se deriva del espejo', patch: { batteryCapacityKWh: 16, batteryCount: 0, batteryDOD: 80, batteries: [] }, usable: 11.5, autonomy: 2.6, first: { capacityKWh: 16, count: 0, dodPct: 80 } },
+    { name: 'control: capacidad total > 0, el espejo no se leía', patch: { batteryCapacityKWh: 16, batteryDOD: 70, batteryEfficiencyPct: 80, batteries: [bat({ capacityKWh: 10, count: 2 })] }, usable: 16.2, autonomy: 3.6, first: { capacityKWh: 10, count: 2, dodPct: undefined, efficiencyPct: undefined } },
+    { name: 'batería apagada', patch: { hasBattery: false, batteryCapacityKWh: 16, batteryDOD: 80, batteries: [bat({ capacityKWh: 0 })] }, usable: 0, autonomy: 0 },
+  ];
+  const summary = (s: LegacyProjectSpecs, mode: 'legacy' | 'self_consumption' = 'legacy') => calculateFinancialSummary(BENCHMARK_PROJECT.client.province, s, BENCHMARK_PROJECT.rates, BENCHMARK_PROJECT.financials, BENCHMARK_PROJECT.monthlyConsumption, undefined, mode);
+  for (const { name, patch, usable, autonomy, first } of cases) {
+    const specs = { ...base, ...patch } as LegacyProjectSpecs;
+    const migrated = migrateLegacySpecs(specs);
+    assert.deepEqual(mirrorKeys(migrated), [], `${name}: mirror removed`);
+    assert.deepEqual(migrateLegacySpecs(migrated), migrated, `${name}: idempotent`);
+    assert.deepEqual(readEquipment(migrated), readEquipment(specs), `${name}: readEquipment before == after migrating`);
+    for (const [label, s] of [['before', specs], ['after', migrated]] as const) {
+      const result = summary(s);
+      assert.equal(result.batteryUsableKWh, usable, `${name}: usable kWh ${label} migrating equals v2.7.0`);
+      assert.equal(result.batteryBackupAutonomyHours, autonomy, `${name}: autonomy ${label} migrating equals v2.7.0`);
+    }
+    if (first) {
+      const group = migrated.batteries![0] as unknown as Record<string, unknown>;
+      for (const [key, value] of Object.entries(first)) assert.equal(group[key], value, `${name}: first group ${key}`);
+    }
+    // Lo demás no se traslada: cantidad y precio quedan como estaban en el grupo, y el costo y la inversión no cambian.
+    const untouched = migrateLegacySpecs({ ...specs, batteryCapacityKWh: undefined }); // mismo resto, sin respaldo que trasladar
+    const kwp = calculateTotalDCCapacityKWp(specs);
+    assert.equal(calculateCostMatrixSummary(migrated, kwp).equipmentCostUSD, calculateCostMatrixSummary(untouched, kwp).equipmentCostUSD, `${name}: equipment cost unchanged`);
+    if (specs.batteries?.length) assert.deepEqual(migrated.batteries!.map((b) => [b.count, b.unitPriceUSD]), specs.batteries.map((b) => [b.count, b.unitPriceUSD]).map(([count, price], i) => [i === 0 && first?.count !== undefined ? first.count : count, price]), `${name}: counts and prices untouched`);
+    assert.equal(summary(migrated).contractPriceUSD, summary(untouched).contractPriceUSD, `${name}: price unchanged`);
+  }
+
+  // Sin capacidad de respaldo en el espejo no hay nada que trasladar: el grupo queda tal cual.
+  for (const mirrorKWh of [undefined, 0, -4]) {
+    const groups = [bat({ capacityKWh: 0 })];
+    const migrated = migrateLegacySpecs({ ...base, batteryCapacityKWh: mirrorKWh, batteries: groups } as LegacyProjectSpecs);
+    assert.deepEqual(migrated.batteries, groups, `mirror capacity ${String(mirrorKWh)}: nothing to carry`);
+  }
+  const positive = { ...base, batteryCapacityKWh: 16, batteries: [bat({ capacityKWh: 10, count: 2 })] } as LegacyProjectSpecs;
+  assert.equal(migrateLegacySpecs(positive).batteries, positive.batteries, 'positive group capacity: the same array, the mirror was never read');
+
+  // Batería apagada con el respaldo guardado: sigue oculta, y al reactivarla da lo que daba 2.7.0 (11,5 kWh útiles).
+  const dormant = migrateLegacySpecs({ ...base, hasBattery: false, batteryCapacityKWh: 16, batteryDOD: 80, batteries: [bat({ capacityKWh: 0 })] } as LegacyProjectSpecs);
+  assert.deepEqual(readEquipment(dormant).batteries, [], 'hasBattery false: still hidden');
+  assert.equal(summary({ ...dormant, hasBattery: true }).batteryUsableKWh, 11.5, 'reactivating the battery gives what 2.7.0 gave');
+
+  // Editar otra cosa también migra con el respaldo.
+  const edited = editEquipment({ ...base, batteryCapacityKWh: 16, batteryDOD: 80, batteries: [bat({ capacityKWh: 0 })] } as LegacyProjectSpecs, 'panel', { type: 'update', index: 0, patch: { count: 30 } });
+  assert.equal(summary(edited).batteryUsableKWh, 11.5, 'editEquipment keeps the usable energy');
+
+  // Efecto conocido (ADR 0001): con la capacidad trasladada el banco ya no vale 0 en la proyección física (opcional, desactivada por defecto).
+  const physical = (s: LegacyProjectSpecs) => calculateMonthlySolarProduction(BENCHMARK_PROJECT.client.province, s, BENCHMARK_PROJECT.monthlyConsumption, BENCHMARK_PROJECT.rates.energyCostPerKWh, BENCHMARK_PROJECT.rates.gridExportFeePct, undefined, undefined, undefined, 'self_consumption');
+  const carried = { ...base, batteryCapacityKWh: 16, batteryDOD: 80, batteries: [bat({ capacityKWh: 0 })] } as LegacyProjectSpecs;
+  assert.ok(physical(migrateLegacySpecs(carried)).some((m) => (m.batteryContributionKWh ?? 0) > 0), 'physical mode: the carried capacity now dispatches');
+  assert.deepEqual(physical(migrateLegacySpecs(carried)).map((m) => m.productionKWh), physical(migrateLegacySpecs({ ...carried, batteryCapacityKWh: undefined })).map((m) => m.productionKWh), 'production is unchanged');
+}
+
 console.log('Equipment model: reading, migration, editing, description and totals verified.');
