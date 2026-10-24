@@ -91,6 +91,26 @@ export function applyProjectEdit(project: ProjectSimulation, edit: ProjectEdit, 
   return normalizeProjectEquipment(project, next);
 }
 
+/**
+ * Edición del documento (textos, datos de contacto de la hoja) que reescribe un espejo de `project.client`. La parte del
+ * cliente es una edición `client` más: reconcilia con el catálogo y autodimensiona igual que `updateClient`. La
+ * personalización que calculó el documento se conserva tal cual. Si el cliente no cambia (garantía, diseño…), no es una
+ * edición de specs y solo se devuelve la personalización. Devuelve solo los campos que el llamador debe fusionar.
+ */
+export function applyDocumentClientEdit(
+  project: ProjectSimulation,
+  next: { customization: ProjectSimulation['customization']; client: ClientInfo },
+  ctx: ProjectEditContext
+): Pick<ProjectSimulation, 'customization' | 'client'> & Partial<Pick<ProjectSimulation, 'specs'>> {
+  const patch: Record<string, unknown> = {};
+  for (const key of new Set([...Object.keys(project.client), ...Object.keys(next.client)]) as Set<keyof ClientInfo>) {
+    if (project.client[key] !== next.client[key]) patch[key] = next.client[key];
+  }
+  if (Object.keys(patch).length === 0) return { customization: next.customization, client: next.client };
+  const edited = applyProjectEdit({ ...project, customization: next.customization }, { kind: 'client', patch: patch as Partial<ClientInfo> }, ctx);
+  return { customization: next.customization, client: edited.client, specs: edited.specs };
+}
+
 /** Mantiene los grupos de equipos consistentes (y sin espejo heredado) sea cual sea la ruta que cambió las specs. */
 export function normalizeProjectEquipment(previous: ProjectSimulation, next: ProjectSimulation): ProjectSimulation {
   return next.specs === previous.specs ? next : { ...next, specs: normalizeSpecsChange(previous.specs, next.specs) };

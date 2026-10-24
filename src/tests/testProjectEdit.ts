@@ -5,6 +5,9 @@ import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { calculateRecommendedPanelCount } from '../engine/solarEngine';
 import { applyProjectEdit, type ProjectEdit } from '../domain/projectEdit';
+import { DEFAULT_AGENT_POLICY } from '../store/slices/agentSlice';
+import { executeAgentTool } from '../features/agentTools/registry';
+import { assistantOwner } from '../features/assistant/tools';
 import { EquipmentParamsSection } from '../components/simulator/sidebar/EquipmentParamsSection';
 import { PricingParamsSection } from '../components/simulator/sidebar/PricingParamsSection';
 import { resolveAssumptions } from '../../shared/assumptions';
@@ -463,6 +466,65 @@ async function main() {
       await wait(3100); // el mensaje de confirmación se limpia solo
       assert.equal(store.getState().saveFeedbackMessage, null, 'el mensaje se borra tras unos segundos');
     });
+  }
+
+  { // Revisión de PR #101 (ronda 2): el editor del documento y las herramientas de agente escriben los espejos del cliente
+    // por la misma ruta que `updateClient`: reconcilian con el catálogo y autodimensionan; el texto y la personalización quedan intactos.
+    const staleAuto = (id: string) => baseProject((q) => {
+      q.id = id;
+      withPrimary(q, 'panel', { brandModel: 'Panel A 550W', powerW: 600, count: 5, selectedSupplierInfo: { supplierName: 'Ghost', priceUSD: 1, updatedAt: '2026-01-01' } });
+    });
+    const reference = (id: string, patch: Partial<ProjectSimulation['client']>) => viaModule(staleAuto(id), { kind: 'client', patch });
+    const run = async (id: string, action: (s: ReturnType<typeof store.getState>) => void) => inStore(staleAuto(id), async () => {
+      action(store.getState());
+      return store.getState().projects[0];
+    });
+
+    const phone = await run('doc-phone', (s) => s.setDocumentTexts({ 'client.phone': '809-555-0101', 'quotation.warranty.panel': '30 años' }));
+    const expected = reference('doc-phone', { contactPhone: '809-555-0101' });
+    assert.equal(panelsOf(phone)[0].powerW, 550, 'setDocumentTexts con un espejo del cliente reconcilia la potencia');
+    assert.equal(panelsOf(phone)[0].selectedSupplierInfo, undefined, 'y suelta el proveedor huérfano');
+    assert.equal(countOf(phone), countOf(expected), 'y recalcula la cantidad igual que updateClient');
+    assert.notEqual(countOf(phone), 5);
+    assert.equal(phone.client.contactPhone, '809-555-0101');
+    assert.equal(phone.customization?.clientPhone, '809-555-0101', 'el espejo del documento queda intacto');
+    assert.equal(phone.customization?.panelWarrantyText, '30 años', 'el texto del documento queda intacto');
+
+    const custom = await run('doc-custom', (s) => s.updateDocumentCustomization({ clientEmail: 'a@b.com', contactName: 'Ana' }));
+    assert.deepEqual([custom.client.contactEmail, custom.client.contactPerson, custom.customization?.clientEmail, custom.customization?.contactName], ['a@b.com', 'Ana', 'a@b.com', 'Ana']);
+    assert.equal(panelsOf(custom)[0].powerW, 550, 'updateDocumentCustomization con un espejo del cliente reconcilia');
+    assert.equal(countOf(custom), countOf(reference('doc-custom', { contactEmail: 'a@b.com', contactPerson: 'Ana' })), 'y recalcula como updateClient');
+
+    // Una edición del documento que no toca el cliente (garantía, diseño, anexos) no es una edición de specs: no reconcilia.
+    const textOnly = await run('doc-text', (s) => s.setDocumentTexts({ 'quotation.warranty.panel': '30 años' }));
+    assert.deepEqual([panelsOf(textOnly)[0].powerW, countOf(textOnly)], [600, 5], 'solo texto: ni reconciliación ni autodimensionado');
+    const customOnly = await run('doc-custom-only', (s) => s.updateDocumentCustomization({ themeId: 'x' } as never));
+    assert.deepEqual([panelsOf(customOnly)[0].powerW, countOf(customOnly)], [600, 5], 'personalización sin espejos del cliente: no reconcilia');
+
+    // Herramienta de agente sobre una propuesta que no está abierta: misma ruta, y deshacer devuelve también las specs.
+    await wait(UNDO_DEBOUNCE_MS);
+    const original = store.getState();
+    try {
+      const target = staleAuto('doc-tool');
+      store.setState({ workspaceScope: 'local', projects: [baseProject((q) => { q.id = 'doc-open'; }), structuredClone(target)], activeProjectId: 'doc-open', equipmentCatalog: CATALOG, sessionGeneration: 0,
+        agentPolicy: DEFAULT_AGENT_POLICY, agentActivity: [], pendingAgentActions: [],
+        syncSettings: { ...store.getState().syncSettings, currentUser: null, authToken: null, autoSyncEnabled: false } });
+      const ctx = { source: 'mcp' as const, owner: assistantOwner(), clientLabel: 'claude-code' };
+      const applied = await executeAgentTool({ name: 'set_document_text', args: { proposalId: 'doc-tool', key: 'client.phone', text: '809-555-0202' } }, ctx);
+      assert.equal(applied.status, 'applied', JSON.stringify(applied));
+      const after = store.getState().projects.find((q) => q.id === 'doc-tool')!;
+      assert.equal(panelsOf(after)[0].powerW, 550, 'set_document_text con un espejo del cliente reconcilia');
+      assert.equal(countOf(after), countOf(reference('doc-tool', { contactPhone: '809-555-0202' })), 'y recalcula la cantidad');
+      assert.equal(store.getState().undoAgentActivity(applied.activityId).success, true);
+      const undone = store.getState().projects.find((q) => q.id === 'doc-tool')!;
+      assert.deepEqual([panelsOf(undone)[0].powerW, countOf(undone), undone.client.contactPhone], [600, 5, target.client.contactPhone], 'deshacer devuelve cliente, personalización y specs');
+      const warranty = await executeAgentTool({ name: 'set_document_text', args: { proposalId: 'doc-tool', key: 'quotation.warranty.panel', text: 'x' } }, ctx);
+      assert.equal(warranty.status, 'applied');
+      const textOnlyTool = store.getState().projects.find((q) => q.id === 'doc-tool')!;
+      assert.deepEqual([panelsOf(textOnlyTool)[0].powerW, countOf(textOnlyTool)], [600, 5], 'texto sin espejo: la herramienta no toca las specs');
+    } finally {
+      store.setState(original, true);
+    }
   }
 
   console.log('PASS: edición de proyecto (caracterización del store, módulo puro, precio de proveedor, reconciliación y vista sin escrituras).');

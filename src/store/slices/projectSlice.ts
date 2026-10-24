@@ -2,7 +2,7 @@ import { createProjectId } from '../../utils/projectId';
 import { canEditCommercial } from '../../features/proposals/commercial';
 import { isProposalLink } from '../../../shared/proposalLinks';
 import { withoutInheritedPanelDegradation } from '../../utils/equipmentGroups';
-import { applyProjectEdit, normalizeProjectEquipment, type ProjectEdit } from '../../domain/projectEdit';
+import { applyDocumentClientEdit, applyProjectEdit, normalizeProjectEquipment, type ProjectEdit } from '../../domain/projectEdit';
 import { editEquipment, readEquipment } from '../../../shared/equipment';
 import { commercialCopy, commercialState, isProposalCommercial } from '../../../shared/proposalCommercial';
 import { companyDocumentCustomization, reusableDocumentTemplate } from '../../utils/companyDocumentTemplate';
@@ -556,13 +556,13 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
   setMonthlyConsumption: (monthlyConsumption, lockAutoPanels = false) =>
     editActiveProject({ kind: 'consumption', monthlyConsumption, lockAutoPanels }),
 
-  updateDocumentCustomization: (customizationPartial) => updateActiveProject((p) => {
-    // Contacto, teléfono y correo del documento son espejo de los datos del cliente.
+  updateDocumentCustomization: (customizationPartial) => updateActiveProject((p, state) => {
+    // Contacto, teléfono y correo del documento son espejo de los datos del cliente: esa parte es una edición `client` (ADR 0004).
     const client = { ...p.client };
     if (customizationPartial.clientPhone !== undefined) client.contactPhone = customizationPartial.clientPhone;
     if (customizationPartial.contactName !== undefined) client.contactPerson = customizationPartial.contactName;
     if (customizationPartial.clientEmail !== undefined) client.contactEmail = customizationPartial.clientEmail;
-    return { client, customization: { ...(p.customization || {}), ...customizationPartial } };
+    return applyDocumentClientEdit(p, { customization: { ...(p.customization || {}), ...customizationPartial }, client }, { equipmentCatalog: state.equipmentCatalog });
   }),
 
   setDocumentLayout: (patch) => !canEditActiveDocument() ? undefined : updateActiveProject((p) => ({
@@ -573,7 +573,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     const ctx = documentTextContextFor(state, p, energyCalculationMode(effectiveFeatureSettings(state)));
     const patch = documentTextsPatch(values, p, ctx);
     const next = applyDocumentTextPatch({ customization: p.customization || {}, client: p.client }, patch);
-    return { customization: next.customization, client: next.client };
+    return applyDocumentClientEdit(p, { customization: next.customization, client: next.client as ProjectSimulation['client'] }, { equipmentCatalog: state.equipmentCatalog });
   }),
 
   saveDocumentTextsToCompanyTemplate: (keys) => {
