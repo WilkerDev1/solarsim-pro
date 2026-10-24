@@ -241,6 +241,7 @@ export const SimulationPreferencesSection: React.FC = () => {
                   type="number"
                   min={10}
                   max={40}
+                  step={1}
                   value={defs.lifespanYears}
                   onChange={(e) => updateDefaultSimulationSettings({ lifespanYears: parseInt(e.target.value) || DEFAULT_PROJECT_LIFESPAN_YEARS })}
                   className="w-full px-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-800 dark:text-zinc-200"
@@ -348,6 +349,7 @@ export const SimulationPreferencesSection: React.FC = () => {
                   type="number"
                   min={1}
                   max={60}
+                  step={1}
                   value={defs.defaultQuoteValidityDays}
                   onChange={(e) => updateDefaultSimulationSettings({ defaultQuoteValidityDays: parseInt(e.target.value) || DEFAULT_QUOTE_VALIDITY_DAYS })}
                   className="w-full px-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-800 dark:text-zinc-200"

@@ -21,6 +21,16 @@ try {
     assert.equal(isValidAssumption(key, rule.max), true, `${key}: el máximo es válido`);
     assert.equal(resolveAssumption(key, undefined, rule.max), rule.max, `${key}: el primer candidato válido gana`);
   }
+  // Conteos de años y días: un entero. Una fracción no es válida y cae al default.
+  const counts: AssumptionKey[] = ['projectLifespanYears', 'batteryReplacementYear', 'quoteValidityDays'];
+  for (const key of counts) {
+    assert.equal(ASSUMPTION_RULES[key].integer, true, `${key}: es un conteo entero`);
+    assert.equal(resolveAssumption(key, 7.5), ASSUMPTION_RULES[key].default, `${key}: 7.5 cae al default`);
+    assert.equal(resolveAssumption(key, 7.5, 8), 8, `${key}: el siguiente candidato entero gana`);
+    assert.equal(resolveAssumption(key, 7), 7);
+  }
+  assert.equal(resolveAssumption('discountRatePct', 7.5), 7.5, 'los porcentajes admiten decimales');
+  assert.equal(resolveAssumptions({ financials: { projectLifespanYears: 25.5 }, specs: { batteryLifespanYears: 7.5 }, client: { quoteValidityDays: 7.5 } }).projectLifespanYears, DEFAULT_PROJECT_LIFESPAN_YEARS);
   const zerosKept: AssumptionKey[] = ['annualEnergyInflationPct', 'discountRatePct', 'systemLossesPct', 'annualDegradationPct', 'installationUsdPerKwp'];
   const zerosMissing: AssumptionKey[] = ['dopExchangeRate', 'projectLifespanYears', 'quoteValidityDays', 'targetCoveragePct', 'pricePerWattUSD', 'saleMarginMultiplier'];
   for (const key of zerosKept) assert.equal(ASSUMPTION_RULES[key].zeroIsMissing, false, `${key}: 0 explícito se respeta`);

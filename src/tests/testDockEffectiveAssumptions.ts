@@ -43,6 +43,8 @@ const variants: Record<string, ProjectSimulation> = {
   discountMissing: variant((p) => { p.financials = without(p.financials, 'discountRatePct'); }),
   discountOutOfRange: variant((p) => { p.financials.discountRatePct = 400; }),
   lossesOutOfRange: variant((p) => { p.specs.systemLosses = 150; }),
+  lifespanFractional: variant((p) => { p.financials.projectLifespanYears = 25.5; }),
+  batteryYearFractional: variant((p) => { p.specs.hasBattery = true; p.specs.batteryReplacementCostUSD = 3500; p.specs.batteryLifespanYears = 7.5; }),
   degradationOutOfRange: variant((p) => { p.specs.annualDegradation = 12; }),
 };
 
@@ -59,6 +61,15 @@ for (const [name, project] of Object.entries(variants)) {
   assert.equal(Number(valueOf(pricing, 'pd-margin')), Math.round((summary.costMatrix.saleMarginMultiplier - 1) * 100 * 10) / 10, label('margen mostrado = margen de la matriz'));
   assert.equal(Number(valueOf(pricing, 'pd-cost-installation')), installation.unitPriceUSD, label('mano de obra mostrada = la de la matriz'));
   assert.equal(installation.unitPriceUSD, used.installationUsdPerKwp, label('la matriz usa la mano de obra resuelta'));
+
+  // Años enteros: el flujo recorre la vida resuelta y la reposición de baterías cae en el año resuelto (una fracción no la pierde).
+  assert.equal(summary.cashFlow25Years.length, used.projectLifespanYears, label('el flujo recorre la vida resuelta'));
+  assert.ok(Number.isInteger(used.projectLifespanYears) && Number.isInteger(used.batteryReplacementYear), label('años enteros'));
+  if (project.specs.hasBattery && project.specs.batteryReplacementCostUSD) {
+    const plain = calculateProjectFinancialSummary({ ...project, specs: { ...project.specs, batteryReplacementCostUSD: 0 } });
+    const row = (s: typeof summary) => s.cashFlow25Years[used.batteryReplacementYear - 1].netCashFlowUSD;
+    assert.ok(Math.abs(row(plain) - row(summary) - project.specs.batteryReplacementCostUSD) < 0.01, label('la reposición cae en el año resuelto'));
+  }
 
   // Finanzas: la tasa de descuento mostrada es la del VAN.
   const finHtml = render(h(FinancialsParamsSection, { project, updateFinancials: noop }));

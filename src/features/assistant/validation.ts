@@ -315,7 +315,7 @@ export function validateAssistantEdits(
       if (percentages.has(field) && value > 100)
         throw new Error(`${field} no puede superar 100%.`);
       if (
-        /Count$|^panelCount$|^cycles$|^mpptCount$|^projectLifespanYears$|^quoteValidityDays$/.test(
+        /Count$|^panelCount$|^cycles$|^mpptCount$|^projectLifespanYears$|^batteryLifespanYears$|^quoteValidityDays$/.test(
           field
         ) &&
         !Number.isInteger(value)

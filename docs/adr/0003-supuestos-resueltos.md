@@ -42,7 +42,7 @@ Cambios de comportamiento (cada uno cubierto en `testResolvedAssumptions`, que s
 - Con la tasa de cambio solo en `rates`, la matriz de costos la usa (antes usaba 60).
 - Degradación sin dato en modo simple: 0,4 % (el de los ajustes de fábrica); antes el motor usaba 0,5 %. Una propuesta guardada siempre trae el campo.
 - El dock muestra el valor efectivo que usa el cálculo, resuelto sobre el proyecto completo (tasa DOP/USD con `rates` de respaldo, cobertura, retención, mano de obra, margen, descuento, degradación); una cobertura de 0 o fuera de rango dimensiona los paneles con 95 % (antes 1 %) en el dock, el borrador de IA y su normalizador. `testDockEffectiveAssumptions` lo comprueba para cada campo.
-- Un valor fuera del rango de la tabla (por ejemplo, pérdidas de 120 %) cae al default.
+- Un valor fuera del rango de la tabla (por ejemplo, pérdidas de 120 %) cae al default. Los conteos de años y días (vida del proyecto, año de reemplazo de batería, vigencia) deben ser enteros: una fracción cae al default, porque el flujo itera años enteros (0 de 51 propuestas tienen fracciones).
 - Propuestas de IA nuevas toman la vigencia de los ajustes (antes 7 días fijos) y el cambio 60 (antes 60,5 en el formulario).
 
 ## Consecuencias
