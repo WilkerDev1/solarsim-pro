@@ -138,7 +138,14 @@ test("MIN_CLIENT_VERSION is read from the environment, defaults to 2.7.1 and rej
     readConfig({ ...base, MIN_CLIENT_VERSION: "" }).minClientVersion,
     "2.7.1",
   );
-  for (const bad of ["2.8", "v2.8.0", "latest", "2.8.0.1"])
+  for (const bad of [
+    "2.8",
+    "v2.8.0",
+    "latest",
+    "2.8.0.1",
+    "2.8.0-beta.1",
+    "2.8.0+build.5",
+  ])
     assert.throws(
       () => readConfig({ ...base, MIN_CLIENT_VERSION: bad }),
       /MIN_CLIENT_VERSION/,

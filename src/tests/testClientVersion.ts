@@ -8,6 +8,7 @@ import {
   formatClientHeader,
   isClientGateOpen,
   isClientOutdated,
+  isStableSemver,
   parseClientHeader,
 } from '../../shared/clientVersion';
 
@@ -45,6 +46,9 @@ assert.equal(isClientOutdated('desktop/2.8.0-beta.1', '2.7.1'), false);
 assert.equal(isClientOutdated('desktop/latest', '2.7.1'), true, 'malformado');
 assert.equal(isClientOutdated('2.7.1', '2.7.1'), true, 'sin nombre');
 assert.equal(isClientOutdated('desktop/2.7.1', 'no-es-semver'), true, 'un mínimo inválido nunca deja pasar a nadie');
+
+assert.deepEqual(['2.7.1', '0.0.0', '10.20.30'].map(isStableSemver), [true, true, true]);
+assert.deepEqual(['2.7.1-beta.1', '2.7.1+build', '2.7', 'v2.7.1', ''].map(isStableSemver), [false, false, false, false, false], 'el mínimo configurado es major.minor.patch');
 
 assert.deepEqual(clientOutdatedBody('2.7.1'), {
   error: 'client_outdated',

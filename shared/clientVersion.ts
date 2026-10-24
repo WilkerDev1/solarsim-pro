@@ -70,6 +70,9 @@ export function compareSemver(a: string, b: string): number | null {
 
 export const isSemver = (value: string): boolean => parseSemver(value) !== null;
 
+/** `major.minor.patch` sin prelanzamiento ni metadatos: el único formato válido para el mínimo configurado. */
+export const isStableSemver = (value: string): boolean => parseSemver(value)?.prerelease.length === 0 && !value.includes('+');
+
 export const formatClientHeader = (name: string, version: string): string => `${name}/${version}`;
 
 /** `nombre/versión` estricto; cualquier otra forma es `null`. */

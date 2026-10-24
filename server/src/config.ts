@@ -1,6 +1,6 @@
 import {
   DEFAULT_MIN_CLIENT_VERSION,
-  isSemver,
+  isStableSemver,
 } from "../../shared/clientVersion.js";
 export interface ServerConfig {
   jwtSecret: string;
@@ -24,10 +24,10 @@ export function assertJwtSecret(secret: unknown): asserts secret is string {
       "JWT_SECRET must be a private random secret of at least 32 characters; public defaults are rejected.",
     );
 }
-/** `MIN_CLIENT_VERSION` must be a plain semver; an empty value means the default. A typo fails at startup, never at runtime. */
+/** `MIN_CLIENT_VERSION` must be a stable semver (major.minor.patch); an empty value means the default. A typo fails at startup, never at runtime. */
 export function parseMinClientVersion(value: unknown): string {
   if (value === undefined || value === "") return DEFAULT_MIN_CLIENT_VERSION;
-  if (typeof value !== "string" || !isSemver(value))
+  if (typeof value !== "string" || !isStableSemver(value))
     throw new Error(
       "MIN_CLIENT_VERSION must be a semver such as 2.7.1 (major.minor.patch).",
     );
