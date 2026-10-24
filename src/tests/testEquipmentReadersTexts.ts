@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { BENCHMARK_PROJECT } from '../engine/referenceCase';
+import { BENCHMARK_LEGACY_SPECS, BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { buildDocumentTextContext } from '../utils/documentTextContext';
 import { createAIProposalBase, prepareProposalDraftProject } from '../utils/proposalDraftProject';
@@ -24,6 +24,7 @@ const battery = (id: string, brandModel: string, capacityKWh: number, count: num
 
 const legacyProject = (): ProjectSimulation => {
   const project = structuredClone(BENCHMARK_PROJECT);
+  project.specs = { ...BENCHMARK_LEGACY_SPECS }; // formato heredado: solo espejo, sin grupos
   Object.assign(project.specs, {
     panelBrandModel: 'JA Solar JAM72', panelPowerW: 580, panelCount: 20,
     inverterBrandModel: 'Deye SUN', inverterPowerKW: 10, inverterCount: 1,

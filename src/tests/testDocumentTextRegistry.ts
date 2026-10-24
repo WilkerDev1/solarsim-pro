@@ -97,8 +97,8 @@ function legacySites(project: ProjectSimulation, summary: FinancialSummaryResult
   const defaultParagraph1 = `El consumo promedio anual de **${clientName}** es de **${fmt(summary.annualConsumptionKWh)} kWh**, por lo que se le propone la instalación de **${panelsSummaryText}**, alcanzando una potencia DC instalada de **${summary.systemCapacityKWp.toFixed(2)} kWp**. La producción energética estimada para este sistema es de **${fmt(summary.annualProductionKWh)} kWh anuales**, representando el **${summary.energyCoveragePct.toFixed(1)}%** del consumo total del cliente.`;
   const scope = cust.projectEngineeringScopeText !== undefined && cust.projectEngineeringScopeText.trim() !== '' ? cust.projectEngineeringScopeText.trim() : DEFAULT_DOCUMENT_CUSTOMIZATION.projectEngineeringScopeText || '';
   const defaultParagraph2 = `Adicionalmente, se contempla la instalación de **${invertersSummaryText}**${s.hasBattery && totalBESSKWh > 0 ? ` y **${batteriesSummaryText}**` : ''} ${scope}`;
-  const p1 = resolveDynamicProjectSummaryParagraph1(cust.customProjectSummaryParagraph1, defaultParagraph1, project, summary, clientName, hasMultiPanels ? panelsSummaryText : panelModel);
-  const p2 = resolveDynamicProjectSummaryParagraph2(cust.customProjectSummaryParagraph2, defaultParagraph2, project, hasMultiInverters ? invertersSummaryText : inverterModel, hasMultiBatteries ? batteriesSummaryText : batteryModel, scope);
+  const p1 = resolveDynamicProjectSummaryParagraph1(cust.customProjectSummaryParagraph1, defaultParagraph1, { ...project, specs: s }, summary, clientName, hasMultiPanels ? panelsSummaryText : panelModel);
+  const p2 = resolveDynamicProjectSummaryParagraph2(cust.customProjectSummaryParagraph2, defaultParagraph2, { ...project, specs: s }, hasMultiInverters ? invertersSummaryText : inverterModel, hasMultiBatteries ? batteriesSummaryText : batteryModel, scope);
 
   // PDFPage2Quotation
   const contactName = cust.contactName !== undefined ? cust.contactName : (project.client.contactPerson || project.client.company || clientName || '');
