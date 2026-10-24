@@ -6,6 +6,7 @@ import { deriveLegacyGroupWithPrice, savedBankGroups, savedGroups } from './lega
 import type { Equipment, LegacySystemSpecs } from './types.js';
 
 export { DEFAULT_UNIT_PRICE_USD, LEGACY_MIRROR_FIELDS, LEGACY_MIRROR_NUMBER_FIELDS, LEGACY_MIRROR_TEXT_FIELDS, deriveLegacyGroup } from './legacy.js';
+export { batteryAutonomyHours, batteryBank, type BatteryBank } from './battery.js';
 export { editEquipment } from './edit.js';
 export { applyLegacyEquipmentPatch } from './legacyPatch.js';
 export { migrateLegacySpecs } from './migrate.js';

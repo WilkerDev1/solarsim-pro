@@ -24,8 +24,8 @@ export interface EquipmentTotals {
  * `equipmentSpecsUtils` y de la matriz de costos (inversores y baterías sin cantidad cuentan 1 en el costo;
  * un grupo sin precio aporta 0).
  *
- * TODO(candidato #1): la energía útil del banco (capacidad × DOD × eficiencia por grupo) no se calcula aquí;
- * vivirá en un único módulo de energía útil y no debe duplicarse en este.
+ * La energía útil del banco (capacidad × DOD × eficiencia por grupo) no se calcula aquí: vive solo en
+ * `battery.ts` (`batteryBank`, ADR 0002) y no debe duplicarse en este módulo.
  */
 export function equipmentTotals(equipment: Equipment): EquipmentTotals {
   const sum = <T>(items: T[], pick: (item: T) => number) => items.reduce((total, item) => total + pick(item), 0);

@@ -1,5 +1,5 @@
 import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
-import { DEFAULT_INSTALLATION_USD_PER_KWP, DEFAULT_PRICE_PER_WATT_USD, resolveBatteryBankDodPct, resolveBatteryBankEfficiencyPct, resolveDopRate, resolvePricePerWattUSD, resolveSaleMarginMultiplier } from '../../shared/projectDefaults';
+import { DEFAULT_INSTALLATION_USD_PER_KWP, DEFAULT_PRICE_PER_WATT_USD, resolveDopRate, resolvePricePerWattUSD, resolveSaleMarginMultiplier } from '../../shared/projectDefaults';
 import { ITBIS_RATE, LEY5707_CREDIT_RATE, appliesItemMargin, customItemsTaxBreakdown, isItemItbisExonerated } from '../../shared/financialRules';
 import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem, CustomQuotationItem, CustomQuotationDiscount, ProjectSimulation } from '../types';
 import { calculateDCCapacityKWp, calculateMonthlySolarProduction } from './solarEngine';
@@ -8,9 +8,8 @@ import {
   getProjectInverters,
   getProjectBatteries,
   calculateTotalDCCapacityKWp,
-  calculateTotalBatteryCapacityKWh,
-  batteryBankSpecs,
 } from '../utils/equipmentSpecsUtils';
+import { batteryAutonomyHours, batteryBank, readEquipment } from '../../shared/equipment';
 
 /**
  * Calculates internal cost matrix, sale price multiplier, and net profit matching Excel spreadsheet.
@@ -575,19 +574,10 @@ export function calculateFinancialSummary(
     : 0;
 
   // Battery Usable Capacity & Backup Autonomy calculation
-  const bank = batteryBankSpecs(specs);
-  const batteryDodPct = resolveBatteryBankDodPct(bank);
-  const batteryEffPct = resolveBatteryBankEfficiencyPct(bank);
-  const totalBatteryKWh = calculateTotalBatteryCapacityKWh(specs);
-  const batteryUsableKWh = specs.hasBattery
-    ? Math.round(((totalBatteryKWh || bank.batteries[0]?.capacityKWh || 0) * (batteryDodPct / 100) * (batteryEffPct / 100)) * 10) / 10
-    : 0;
-
+  const bank = batteryBank(readEquipment(specs));
+  const batteryUsableKWh = Math.round(bank.usableKWh * 10) / 10;
   const avgDailyConsumptionKWh = annualConsumptionKWh > 0 ? annualConsumptionKWh / 365 : 100;
-  const avgHourlyLoadKW = avgDailyConsumptionKWh / 24;
-  const batteryBackupAutonomyHours = (specs.hasBattery && avgHourlyLoadKW > 0)
-    ? Math.round((batteryUsableKWh / avgHourlyLoadKW) * 10) / 10
-    : 0;
+  const batteryBackupAutonomyHours = batteryAutonomyHours(bank, avgDailyConsumptionKWh);
 
   // 25-Year Cash Flow Projection
   const annualDegradationPct = resolveAnnualDegradationPct(specs);

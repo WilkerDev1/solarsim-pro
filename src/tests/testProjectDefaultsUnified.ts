@@ -10,6 +10,7 @@ import { useSimulationStore } from '../store/useSimulationStore';
 import { DEFAULT_SIMULATION_SETTINGS } from '../store/defaultSimulationSettings';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import * as shared from '../../shared/projectDefaults';
+import { batteryBank, readEquipment } from '../../shared/equipment';
 import { EquipmentParamsSection } from '../components/simulator/sidebar/EquipmentParamsSection';
 import type { SystemSpecs } from '../types';
 
@@ -54,8 +55,8 @@ assert(!readFileSync('src/components/settings/sections/SimulationPreferencesSect
   assert.ok(store().importProjectsFromJSON([importable as never]).success);
   const bank = store().projects.find((p) => p.client.name === 'Importado banco')!;
   assert.equal('batteryDOD' in bank.specs, false, 'lo importado no escribe el espejo; sin DOD el motor usa 90, no 80');
-  assert.equal(shared.resolveBatteryBankDodPct(bank.specs), 90, 'grupos importados sin DOD: 90');
-  assert.equal(shared.resolveBatteryBankEfficiencyPct(bank.specs), 90);
+  assert.equal(batteryBank(readEquipment(bank.specs)).dodPct, 90, 'grupos importados sin DOD: 90');
+  assert.equal(batteryBank(readEquipment(bank.specs)).efficiencyPct, 90);
   const { createAIProposalBase } = await import('../utils/proposalDraftProject');
   const aiBase = createAIProposalBase(BENCHMARK_PROJECT, DEFAULT_SIMULATION_SETTINGS, 'Santiago');
   assert.equal(aiBase.specs.batteries![0].dodPct, 90, 'base de propuesta IA: 90, no 80');
@@ -73,7 +74,7 @@ assert(!readFileSync('src/components/settings/sections/SimulationPreferencesSect
   assert.equal(staleImported.specs.batteries![0].dodPct, undefined, 'grupo sin dato: el escalar obsoleto no se hereda');
   assert.equal(staleImported.specs.batteries![0].efficiencyPct, undefined);
   assert.equal('batteryDOD' in staleImported.specs, false);
-  assert.equal(shared.resolveBatteryBankDodPct(staleImported.specs), 90);
+  assert.equal(batteryBank(readEquipment(staleImported.specs)).dodPct, 90);
   // Importado en modo directo sin $/W: ni el 1.134971 del caso de referencia ni su $/kWp.
   const { pricePerWattUSD: _w, pricePerKWpUSD: _k, ...noPrice } = importable.specs as Record<string, unknown>;
   void _w; void _k;

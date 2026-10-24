@@ -1,8 +1,9 @@
 import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
-import { DEFAULT_SYSTEM_LOSSES_PCT, resolveSystemLossesPct, resolveBatteryBankDodPct, resolveBatteryBankEfficiencyPct } from '../../shared/projectDefaults';
+import { DEFAULT_SYSTEM_LOSSES_PCT, resolveSystemLossesPct } from '../../shared/projectDefaults';
 import { SystemSpecs, MonthlyEnergyResult } from '../types';
 import { getProvinceHSP } from '../data/rdProvinces';
-import { batteryBankSpecs, calculateTotalDCCapacityKWp, calculateTotalBatteryCapacityKWh } from '../utils/equipmentSpecsUtils';
+import { calculateTotalDCCapacityKWp } from '../utils/equipmentSpecsUtils';
+import { batteryBank, readEquipment } from '../../shared/equipment';
 
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -149,14 +150,9 @@ export function calculateMonthlySolarProduction(
   const effectiveGridExportFeePct = !isZeroExport ? (gridExportFeePct ?? 25) : 0;
 
   // BESS battery specifications
-  const totalBatteryKWh = calculateTotalBatteryCapacityKWh(specs);
-  const hasBatteryStorage = !!(specs.hasBattery && totalBatteryKWh > 0);
-  const bank = batteryBankSpecs(specs);
-  const batteryDodPct = resolveBatteryBankDodPct(bank);
-  const batteryEffPct = resolveBatteryBankEfficiencyPct(bank);
-  const dailyUsableBatteryKWh = hasBatteryStorage
-    ? totalBatteryKWh * (batteryDodPct / 100) * (batteryEffPct / 100)
-    : 0;
+  const bank = batteryBank(readEquipment(specs));
+  const hasBatteryStorage = bank.hasStorage;
+  const dailyUsableBatteryKWh = bank.usableKWh;
 
   // Calculate project-wide average monthly consumption to determine profile preset consistently
   const totalProjectCons = (monthlyConsumptionKWh && monthlyConsumptionKWh.length > 0)

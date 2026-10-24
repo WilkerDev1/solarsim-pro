@@ -7,7 +7,8 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { BENCHMARK_LEGACY_SPECS, BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateCostMatrixSummary, calculateProjectFinancialSummary } from '../engine/financeEngine';
-import { batteryBankSpecs, getProjectBatteries } from '../utils/equipmentSpecsUtils';
+import { getProjectBatteries } from '../utils/equipmentSpecsUtils';
+import { batteryBank, readEquipment } from '../../shared/equipment';
 import type { ProjectSimulation, LegacyProjectSpecs } from '../types';
 import * as shared from '../../shared/projectDefaults';
 import * as dockDefaults from '../components/simulator/params/logic/dockDefaults';
@@ -63,8 +64,8 @@ const projectOf = (specs: Partial<LegacyProjectSpecs> = {}): ProjectSimulation =
   const unset = getProjectBatteries(withBattery({ batteryEfficiencyPct: undefined, batteryDOD: undefined }))[0];
   assert.equal(unset.efficiencyPct, undefined, 'el grupo puede guardar el dato vacío');
   assert.equal(unset.dodPct, undefined);
-  assert.equal(shared.resolveBatteryBankEfficiencyPct(batteryBankSpecs(withBattery({ batteryEfficiencyPct: undefined, batteryDOD: undefined }))), 90, 'el motor aplica el 90');
-  assert.equal(shared.resolveBatteryBankDodPct(batteryBankSpecs(withBattery({ batteryEfficiencyPct: undefined, batteryDOD: undefined }))), 90);
+  assert.equal(batteryBank(readEquipment(withBattery({ batteryEfficiencyPct: undefined, batteryDOD: undefined }))).efficiencyPct, 90, 'el motor aplica el 90');
+  assert.equal(batteryBank(readEquipment(withBattery({ batteryEfficiencyPct: undefined, batteryDOD: undefined }))).dodPct, 90);
   const preview = (specs: Partial<LegacyProjectSpecs>) => computeLoadProfilePreview(projectOf(withBattery(specs)), 'BTS2', 900);
   assert.deepEqual(preview({ batteryEfficiencyPct: undefined, batteryDOD: undefined }), preview({ batteryEfficiencyPct: 90, batteryDOD: 90 }));
 }

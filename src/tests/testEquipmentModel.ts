@@ -201,6 +201,8 @@ const inverter = (id: string, powerKW: number, count: number): InverterItemSpec 
 // Fuente de los valores esperados: el motor de la etiqueta v2.7.0 (extraído del repositorio) ejecutado sobre estas mismas
 // fixtures (caso de referencia, modo legacy, mismas tarifas y consumo). Comprobación a mano: 16 kWh × 80 % × 90 % = 11,52 ⇒ 11,5;
 // 20 × 70 % × 85 % = 11,9; 16 × 90 % × 90 % = 12,96 ⇒ 13; 10 × 2 × 90 % × 90 % = 16,2.
+// Excepción (ADR 0002, decisión (b)): los tres casos con cantidad 0 esperan 0 kWh y 0 h. 2.7.0 daba 11,5 kWh y 2,6 h porque
+// con un banco de 0 kWh el motor financiero recurría a la capacidad del primer grupo; ahora «Sí batería» con 0 kWh es sin almacenamiento.
 {
   const bat = (extra: Record<string, unknown> = {}) => ({ id: 'b', brandModel: 'Bat', capacityKWh: 10, count: 1, unitPriceUSD: 900, ...extra });
   const cases: { name: string; patch: Record<string, unknown>; usable: number; autonomy: number; first?: Record<string, unknown> }[] = [
@@ -209,10 +211,10 @@ const inverter = (id: string, powerKW: number, count: number): InverterItemSpec 
     { name: 'DOD y eficiencia propios del grupo se ignoraban con capacidad 0', patch: { batteryCapacityKWh: 16, batteryDOD: 80, batteries: [bat({ capacityKWh: 0, dodPct: 60, efficiencyPct: 70 })] }, usable: 11.5, autonomy: 2.6, first: { capacityKWh: 16, dodPct: 80, efficiencyPct: 90 } },
     { name: 'espejo sin DOD: default 90 % aunque el grupo traiga 60 %', patch: { batteryCapacityKWh: 16, batteryDOD: undefined, batteries: [bat({ capacityKWh: 0, dodPct: 60 })] }, usable: 13, autonomy: 2.9, first: { capacityKWh: 16, dodPct: 90 } },
     { name: 'capacidad 0 con 2 unidades: capacidad × cantidad sigue siendo la del espejo', patch: { batteryCapacityKWh: 16, batteryDOD: 80, batteries: [bat({ capacityKWh: 0, count: 2 })] }, usable: 11.5, autonomy: 2.6, first: { capacityKWh: 8, count: 2 } },
-    { name: 'cantidad 0 con otra capacidad: manda la del espejo', patch: { batteryCapacityKWh: 16, batteryDOD: 80, batteries: [bat({ capacityKWh: 10, count: 0 })] }, usable: 11.5, autonomy: 2.6, first: { capacityKWh: 16, count: 0 } },
-    { name: 'capacidad 0 y cantidad 0', patch: { batteryCapacityKWh: 16, batteryDOD: 80, batteries: [bat({ capacityKWh: 0, count: 0 })] }, usable: 11.5, autonomy: 2.6, first: { capacityKWh: 16, count: 0 } },
+    { name: 'cantidad 0 con otra capacidad: manda la del espejo', patch: { batteryCapacityKWh: 16, batteryDOD: 80, batteries: [bat({ capacityKWh: 10, count: 0 })] }, usable: 0, autonomy: 0, first: { capacityKWh: 16, count: 0 } },
+    { name: 'capacidad 0 y cantidad 0', patch: { batteryCapacityKWh: 16, batteryDOD: 80, batteries: [bat({ capacityKWh: 0, count: 0 })] }, usable: 0, autonomy: 0, first: { capacityKWh: 16, count: 0 } },
     { name: 'varios grupos en 0: solo el primero', patch: { batteryCapacityKWh: 16, batteryDOD: 80, batteries: [bat({ capacityKWh: 0 }), bat({ id: 'b2', capacityKWh: 0, count: 2 })] }, usable: 11.5, autonomy: 2.6, first: { capacityKWh: 16 } },
-    { name: 'lista de grupos vacía y cantidad 0: se deriva del espejo', patch: { batteryCapacityKWh: 16, batteryCount: 0, batteryDOD: 80, batteries: [] }, usable: 11.5, autonomy: 2.6, first: { capacityKWh: 16, count: 0, dodPct: 80 } },
+    { name: 'lista de grupos vacía y cantidad 0: se deriva del espejo', patch: { batteryCapacityKWh: 16, batteryCount: 0, batteryDOD: 80, batteries: [] }, usable: 0, autonomy: 0, first: { capacityKWh: 16, count: 0, dodPct: 80 } },
     { name: 'control: capacidad total > 0, el espejo no se leía', patch: { batteryCapacityKWh: 16, batteryDOD: 70, batteryEfficiencyPct: 80, batteries: [bat({ capacityKWh: 10, count: 2 })] }, usable: 16.2, autonomy: 3.6, first: { capacityKWh: 10, count: 2, dodPct: undefined, efficiencyPct: undefined } },
     { name: 'batería apagada', patch: { hasBattery: false, batteryCapacityKWh: 16, batteryDOD: 80, batteries: [bat({ capacityKWh: 0 })] }, usable: 0, autonomy: 0 },
   ];
