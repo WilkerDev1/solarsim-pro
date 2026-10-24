@@ -21,7 +21,7 @@ function patchSingleGroup(specs:SystemSpecs,kind:EquipmentKind,patch:Record<stri
   // Reemplazar el modelo del grupo no puede dejar la identidad de catálogo del equipo anterior (resolveGroupCatalogItem la
   // prioriza sobre el nombre y se seguiría anexando su ficha): nombre exacto y único del catálogo ⇒ se vincula a ese equipo;
   // si no, el grupo queda manual. Misma regla que el dock (detachedCatalogIdentity).
-  const identity=typeof clean.brandModel==='string'&&groups[0]?detachedCatalogIdentity(kind,groups[0],clean.brandModel,catalog):{};
+  const identity=typeof clean.brandModel==='string'&&groups[0]?detachedCatalogIdentity(kind,groups[0],clean.brandModel,catalog,catalog.length>0):{};
   return editEquipment(specs,kind,{type:'update',index:0,patch:{...clean,...identity}} as never);
 }
 /** Primer grupo del tipo (sin ocultar la batería apagada), o `undefined` si no hay. */

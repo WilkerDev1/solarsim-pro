@@ -86,6 +86,15 @@ assert.deepEqual(keys(linkedProject()), ['ds-inv-a', 'ds-panel-a']);
   assert.equal(next.specs.panels![0].manualModel, true);
 }
 
+// 5b. Vínculo solo por id del grupo y catálogo sin cargar: al cargar, el id viejo no puede resolver el modelo ya cambiado.
+{
+  const next = apply({ ...linkedProject('panel-a'), specs: { ...linkedProject('panel-a').specs, panels: [{ id: 'panel-a', brandModel: 'Panel A 600W', powerW: 600, count: 12, unitPriceUSD: 100 }] } },
+    { selectedPanelModel: 'Panel C Desconocido' }, {});
+  assert.equal(next.specs.panels![0].manualModel, true);
+  assert.equal(resolveGroupCatalogItem(next.specs.panels![0], 'panel', catalog), null, 'con el catálogo ya cargado no se adjunta la ficha anterior');
+  assert.deepEqual(keys(next), ['ds-inv-a']);
+}
+
 // 6. Mismo modelo (o solo cambian mayúsculas): el vínculo se conserva.
 {
   const same = apply(linkedProject(), { selectedPanelModel: 'Panel A 600W' });
