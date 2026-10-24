@@ -26,7 +26,7 @@ Los instaladores están en [Releases](https://github.com/WilkerDev1/solarsim-pro
 | Windows x64 | instalador (`Setup`) y portable |
 | Linux x64 | AppImage, `.deb`, `.pacman` y `.tar.gz` |
 
-Los paquetes Linux y los manifiestos de actualización se firman con la clave GPG de SolarSim (`solarsim-public-key.asc` en cada release). Con `.deb` y `.pacman`, la aplicación verifica esas firmas antes de instalar una actualización. AppImage no se actualiza sola: se reemplaza a mano después de verificar su `.sig`. Windows se actualiza con electron-updater y no tiene firma Authenticode ni GPG. macOS y ARM no se publican. Detalles en [docs/MAINTENANCE_AND_UPDATES.md](docs/MAINTENANCE_AND_UPDATES.md).
+Los paquetes Linux y los manifiestos JSON de actualización (`latest.json`, `update.json`) se firman con la clave GPG de SolarSim (`solarsim-public-key.asc` en cada release). Los YAML de electron-updater (`latest.yml`, `latest-linux.yml`) no llevan firma GPG. Con `.deb` y `.pacman`, la aplicación verifica esas firmas antes de instalar una actualización. AppImage no se actualiza sola: se reemplaza a mano después de verificar su `.sig`. Windows se actualiza con electron-updater y no tiene firma Authenticode ni GPG. macOS y ARM no se publican. Detalles en [docs/MAINTENANCE_AND_UPDATES.md](docs/MAINTENANCE_AND_UPDATES.md).
 
 ## Arquitectura
 
