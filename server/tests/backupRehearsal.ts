@@ -3,6 +3,11 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import pg from "pg";
 import { migrateDatabase } from "../src/database/migrations.js";
+import {
+  LEGACY_MIRROR_FIELDS,
+  equipmentTotals,
+  readEquipment,
+} from "../../shared/equipment/index.js";
 const socket = process.argv[2];
 if (
   !socket ||
@@ -45,11 +50,31 @@ try {
   const fingerprint = async () =>
     (
       await pool.query(
-        "SELECT md5(coalesce(string_agg(data_json::text, '' ORDER BY id), '')) AS fingerprint FROM projects",
+        "SELECT md5(coalesce(string_agg((data_json - 'specs')::text, '' ORDER BY id), '')) AS fingerprint FROM projects",
       )
     ).rows[0].fingerprint;
+  // Migration 006 rewrites only `specs`: the equipment totals of every restored project must be the same afterwards.
+  const equipment = async () =>
+    Object.fromEntries(
+      (
+        await pool.query(
+          "SELECT id, data_json->'specs' AS specs FROM projects ORDER BY id",
+        )
+      ).rows.map((row) => [
+        row.id,
+        row.specs && typeof row.specs === "object"
+          ? {
+              totals: equipmentTotals(readEquipment(row.specs)),
+              mirror: [...LEGACY_MIRROR_FIELDS, "selectedSupplierInfo"].filter(
+                (field) => field in row.specs,
+              ),
+            }
+          : null,
+      ]),
+    );
   const before = await counts(),
-    beforeContent = await fingerprint();
+    beforeContent = await fingerprint(),
+    beforeEquipment = await equipment();
   await migrateDatabase(pool);
   assert.deepEqual(
     await counts(),
@@ -59,16 +84,27 @@ try {
   assert.equal(
     await fingerprint(),
     beforeContent,
-    "Project document content is preserved",
+    "Project document content (outside specs) is preserved",
+  );
+  const afterEquipment = await equipment();
+  assert.deepEqual(
+    Object.entries(afterEquipment).map(([id, item]) => [id, item?.totals]),
+    Object.entries(beforeEquipment).map(([id, item]) => [id, item?.totals]),
+    "Equipment totals are unchanged by migration 006",
+  );
+  assert.ok(
+    Object.values(afterEquipment).every((item) => !item?.mirror.length),
+    "No project keeps the legacy equipment mirror",
   );
   await migrateDatabase(pool);
   assert.deepEqual(await counts(), before, "Migration replay is idempotent");
   assert.equal(await fingerprint(), beforeContent);
+  assert.deepEqual(await equipment(), afterEquipment);
   assert.deepEqual(
     (
       await pool.query("SELECT version FROM schema_migrations ORDER BY version")
     ).rows.map((row) => row.version),
-    [1, 2, 3, 4, 5],
+    [1, 2, 3, 4, 5, 6],
   );
   assert.equal(
     Number(
@@ -90,8 +126,9 @@ try {
       result: "pass",
       counts: before,
       projectContentPreserved: true,
+      equipmentTotalsPreserved: true,
       migrationReplay: "pass",
-      migrations: [1, 2, 3, 4, 5],
+      migrations: [1, 2, 3, 4, 5, 6],
       orphanProjects: 0,
       recovering: false,
     }),

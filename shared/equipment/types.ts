@@ -1,6 +1,77 @@
-import type { BatteryItemSpec, InverterItemSpec, PanelItemSpec, SystemSpecs } from '../../src/types';
+/**
+ * Tipos propios del módulo (TypeScript puro): la API los compila con `NodeNext` y no puede importar los tipos del
+ * renderer. Son copias estructurales de `PanelItemSpec`/`InverterItemSpec`/`BatteryItemSpec` y del subconjunto de
+ * `SystemSpecs` que este módulo lee o escribe; `src/tests/testEquipmentTypeParity.ts` falla al compilar si divergen.
+ */
+interface SupplierInfo {
+  supplierName: string;
+  priceUSD: number;
+  updatedAt?: string;
+  supplierPriceId?: string;
+}
 
-export type { BatteryItemSpec, InverterItemSpec, PanelItemSpec, SystemSpecs };
+interface ItemSpecBase {
+  priceSource?: 'manual' | 'supplier';
+  requestedModel?: string;
+  id: string;
+  catalogItemId?: string;
+  manualModel?: boolean;
+  brandModel: string;
+  count: number;
+  unitPriceUSD?: number;
+  weightKilos?: number;
+  efficiencyPct?: number;
+  selectedSupplierInfo?: SupplierInfo;
+}
+
+export interface PanelItemSpec extends ItemSpecBase {
+  powerW: number;
+  tempCoeff?: number;
+  annualDegradation?: number;
+}
+
+export interface InverterItemSpec extends ItemSpecBase {
+  powerKW: number;
+}
+
+export interface BatteryItemSpec extends ItemSpecBase {
+  capacityKWh: number;
+  dodPct?: number;
+  lifespanYears?: number;
+  replacementCostUSD?: number;
+}
+
+/** Campos de `SystemSpecs` que lee o escribe este módulo: los grupos y el espejo heredado. */
+export interface EquipmentSpecs {
+  hasBattery?: boolean;
+  panels?: PanelItemSpec[];
+  inverters?: InverterItemSpec[];
+  batteries?: BatteryItemSpec[];
+  panelBrandModel?: string;
+  panelPowerW?: number;
+  panelCount?: number;
+  panelUnitPriceUSD?: number;
+  panelWeightKilos?: number;
+  panelEfficiency?: number;
+  tempCoeff?: number;
+  annualDegradation?: number;
+  inverterBrandModel?: string;
+  inverterPowerKW?: number;
+  inverterCount?: number;
+  inverterUnitPriceUSD?: number;
+  inverterWeightKilos?: number;
+  inverterEfficiencyPct?: number;
+  batteryBrandModel?: string;
+  batteryCapacityKWh?: number;
+  batteryCount?: number;
+  batteryUnitPriceUSD?: number;
+  batteryWeightKilos?: number;
+  batteryDOD?: number;
+  batteryEfficiencyPct?: number;
+  batteryLifespanYears?: number;
+  batteryReplacementCostUSD?: number;
+  selectedSupplierInfo?: { panel?: SupplierInfo; inverter?: SupplierInfo; battery?: SupplierInfo };
+}
 
 export type EquipmentKind = 'panel' | 'inverter' | 'battery';
 

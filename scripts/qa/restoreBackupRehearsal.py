@@ -54,7 +54,7 @@ try:
         raise RuntimeError('Restore failed; private SQL diagnostics intentionally not printed.')
     subprocess.run(['node', '--import', 'tsx', 'server/tests/backupRehearsal.ts', str(socket)], cwd=root, check=True)
     subprocess.run(['docker', 'exec', container_id, 'pg_amcheck', '--heapallindexed', '--parent-check', '--install-missing', '-U', 'solarsim_qa', '-d', 'solarsim_qa'], check=True)
-    print('PASS: backup restore, migrations 001-004 twice, contents/counts/orphans and pg_amcheck. No network, no production writes.')
+    print('PASS: backup restore, migrations 001-006 twice, contents/equipment totals/counts/orphans and pg_amcheck. No network, no production writes.')
 finally:
     if container_id:
         subprocess.run(['docker', 'rm', '-f', container_id], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
