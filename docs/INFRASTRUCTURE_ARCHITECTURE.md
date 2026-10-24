@@ -15,12 +15,12 @@ Las direcciones, usuarios y comandos SSH exactos no se publican en este reposito
 | Destino | Cómo se llega |
 |---|---|
 | `app-server` desde la oficina | SSH por la LAN (alias `app-server`). |
-| `app-server` desde fuera | Por Tailscale, saltando por el nodo Proxmox (`ssh -J <nodo> <usuario>@<app-server>`). |
+| `app-server` desde fuera | Por Tailscale, saltando por el nodo Proxmox (comando exacto en el archivo privado). |
 | Estado del CT | `pct status 100` en el nodo Proxmox. |
 | API pública | `https://solarsim.electsun.net` (Cloudflare → `cloudflared-tunnel` → `caddy-proxy` → `solarsim-api:3000`). Solo HTTP: no sirve para desplegar. |
 | Visor de propuestas | `https://propuesta.electsun.net/p/<id>` (Worker `solarsim-share-viewer`, KV `PROPOSALS_KV`). Se despliega con `wrangler` desde cualquier lugar con la cuenta de Cloudflare. |
 
-En el CT (usuario `agente`):
+En el CT (con el usuario de servicio indicado en el archivo privado):
 
 - `~/servicios/solarsim-api/` contiene `docker-compose.yml` (la imagen en ejecución), `.env` (0600, no imprimir) y las candidatas `docker-compose.<versión>-<sha>.candidate.yml`.
 - `~/servicios/solarsim-build-<versión>-<sha>/` es el contexto de build: solo `server/` y `shared/` de la revisión aprobada (`git archive <sha> server shared`). No es un checkout git.
@@ -39,7 +39,7 @@ En el CT (usuario `agente`):
 
 ## Despliegue de la API
 
-1. **Checkpoint.** Crear un directorio privado de respaldo (por ejemplo `/home/agente/backups/solarsim-<versión>-<fecha>`) con: dump PostgreSQL en formato custom, su `pg_restore --list`, la composición vigente (`docker-compose.before.yml`) y la imagen API en ejecución. Un listado de backup o un snapshot del CT no constituyen prueba de restauración.
+1. **Checkpoint.** Crear un directorio privado de respaldo (por ejemplo `~/backups/solarsim-<versión>-<fecha>` en la cuenta de servicio) con: dump PostgreSQL en formato custom, su `pg_restore --list`, la composición vigente (`docker-compose.before.yml`) y la imagen API en ejecución. Un listado de backup o un snapshot del CT no constituyen prueba de restauración.
 
    ```bash
    umask 077; D=~/backups/solarsim-<versión>-<sha>-$(date -u +%Y%m%dT%H%M%SZ); mkdir -m 700 "$D"
