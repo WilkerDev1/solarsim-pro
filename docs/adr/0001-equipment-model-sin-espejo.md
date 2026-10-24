@@ -40,6 +40,12 @@ Decisiones de la oleada 5 (tipos y release 2.7.1):
 - `createNewProject` escribe los defaults en el grupo con `editEquipment` en lugar de pasar por `applyLegacyEquipmentPatch`. `updateSpecs` decide si la cantidad de paneles se editó comparando el primer grupo antes y después, no mirando `panelCount` en el parche: un parche heredado `panelCount` que no cambia ninguna cantidad (p. ej. con varios modelos) ya no apaga el dimensionamiento automático.
 - **`editEquipmentGroup`/`normalizeEquipmentEdit` no se retiran en esta oleada**: siguen siendo compuertas finas (una línea sobre `editEquipment`/`applyLegacyEquipmentPatch`) que usan el dock y el asistente; quitarlas no cambia resultados y queda como limpieza posterior.
 
+Hallazgos de la revisión de la release 2.7.1 (todos con prueba):
+
+- **El espejo no sobrevive a ninguna edición ni cruza la frontera de sincronización.** `applyLegacyEquipmentPatch` migra `current` también con un parche sin campos de equipo (una instantánea anterior a 2.7.1 podía conservar el espejo tras editar solo un parámetro de sistema). `SyncService` migra con `migrateLegacySpecs` lo que baja (`pullProjects`, proyectos y `serverProject` de los resultados) y lo que sube (cuerpo de `pushProjects`); la restauración del historial del servidor (`POST /api/projects/:id/history/:versionId/restore`) migra las specs de la instantánea antes de guardarlas, sin reescribir `project_version_history`.
+- **Un proyecto nuevo no hereda valores por grupo que le ganen a lo configurado.** El grupo de paneles del caso de referencia trae `annualDegradation: 0.5` y, en modo simple, `resolveAnnualDegradationPct` prioriza el del grupo sobre el del sistema. `createNewProject` y `createAIProposalBase` quitan ese campo de los grupos heredados (`withoutInheritedPanelDegradation`); el caso de referencia, en modo detallado, no cambia.
+- **Un borrador de IA con selección escalar que cambia el modelo de un grupo vinculado al catálogo** aplica la regla del dock (`detachedCatalogIdentity`, ahora en `src/utils/equipmentGroups.ts`): nombre exacto y único del catálogo ⇒ se vincula a ese equipo; si no, `manualModel` y sin `catalogItemId`, para no anexar la ficha del equipo anterior.
+
 ### Retiro de la lectura heredada
 
 La lectura de datos viejos (`deriveLegacyGroup`, `MIRROR`, `LegacyEquipmentFields`, `LegacyProjectSpecs`, `applyLegacyEquipmentPatch`, la rama heredada de `readEquipment` y la rehidratación) se conserva a propósito y se retira por partes:

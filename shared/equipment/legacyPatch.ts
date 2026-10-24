@@ -15,7 +15,8 @@ const sameJson = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringif
  *
  * Reglas:
  * - Un parche sin campos de equipo (ni listas, ni `hasBattery`, ni proveedor) se mezcla tal cual.
- * - Antes de aplicar se migra la propuesta (`migrateLegacySpecs`), así que un proyecto heredado queda en grupos.
+ * - Siempre se migra la propuesta (`migrateLegacySpecs`, idempotente), también con un parche sin campos de equipo,
+ *   así que un proyecto heredado queda en grupos y el espejo no sobrevive a ninguna edición.
  * - Una lista de grupos en el parche manda sobre los campos sueltos del mismo tipo.
  * - Con un solo grupo, cada campo suelto llega al grupo; con varios, solo DOD y eficiencia de batería (del primero).
  * - `selectedSupplierInfo[tipo]` pertenece al primer grupo del tipo.
@@ -32,7 +33,9 @@ export function applyLegacyEquipmentPatch<S extends LegacySystemSpecs>(current: 
   for (const kind of EQUIPMENT_KINDS) for (const legacy of Object.values(MIRROR[kind])) delete rest[legacy as string];
   delete rest.selectedSupplierInfo;
   for (const kind of EQUIPMENT_KINDS) if (rest[LIST_KEY[kind]] === undefined) delete rest[LIST_KEY[kind]];
-  if (!EQUIPMENT_KINDS.some(touches) && patch.hasBattery === undefined) return { ...current, ...(rest as Partial<S>) };
+  // Sin campos de equipo el parche se mezcla tal cual, pero `current` también se normaliza: una instantánea anterior
+  // a 2.7.1 (historial local o del servidor) puede traer el espejo y una edición de otro parámetro no debe conservarlo.
+  if (!EQUIPMENT_KINDS.some(touches) && patch.hasBattery === undefined) return { ...migrateLegacySpecs(current), ...(rest as Partial<S>) };
 
   let merged: S = { ...migrateLegacySpecs(current), ...(rest as Partial<S>) };
   // Activar la batería de un proyecto sin datos de batería crea su grupo.

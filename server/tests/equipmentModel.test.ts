@@ -358,3 +358,79 @@ test("project capacity comes from the groups the client saves, not from the lega
   );
   assert.equal(await capacity("cap-groups"), 12);
 });
+
+test("restoring a pre-2.7.1 history snapshot saves groups only and leaves the immutable history untouched", async () => {
+  const admin = (await (
+    await app.request("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Historial",
+        email: "historial@example.test",
+        password: "isolated-password",
+      }),
+    })
+  ).json()) as any;
+  const headers = {
+    Authorization: `Bearer ${admin.token}`,
+    "Content-Type": "application/json",
+  };
+  const pushed = await app.request("/api/sync/push", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      projects: [
+        {
+          id: "hist-restore",
+          client: { name: "Cliente", projectId: "SP-HIST" },
+          monthlyConsumption: Array(12).fill(500),
+          specs: {
+            ...base,
+            hasBattery: false,
+            panels: [group("p1", { powerW: 600, count: 20 })],
+            inverters: [group("i1", { powerKW: 5, count: 1 })],
+          },
+        },
+      ],
+    }),
+  });
+  assert.equal(pushed.status, 200);
+  const version = ((await pushed.json()) as any).results[0].version;
+  // What 2.7.0 stored in the history: groups plus the mirror of the first one.
+  await pool.query(
+    "INSERT INTO project_version_history (id,project_id,version_number,label,author_name,data_json) VALUES ('h-legacy','hist-restore',99,'v99','Ana',$1)",
+    [JSON.stringify(stored(fixtures["mixed"], "hist-restore"))],
+  );
+  const snapshotOf = async () =>
+    (
+      await pool.query(
+        "SELECT data_json FROM project_version_history WHERE id='h-legacy'",
+      )
+    ).rows[0].data_json;
+  const snapshotBefore = await snapshotOf();
+
+  const restored = await app.request(
+    "/api/projects/hist-restore/history/h-legacy/restore",
+    { method: "POST", headers, body: JSON.stringify({ baseVersion: version }) },
+  );
+  assert.equal(restored.status, 200);
+  const specs = await specsOf("hist-restore");
+  for (const key of mirrorKeys)
+    assert.ok(!(key in specs), `${key} is not reintroduced by the restore`);
+  assert.deepEqual(
+    equipmentTotals(readEquipment(specs)),
+    equipmentTotals(readEquipment(fixtures["mixed"]!)),
+    "the restored equipment is the snapshot's",
+  );
+  const response = (await restored.json()) as any;
+  for (const key of mirrorKeys)
+    assert.ok(
+      !(key in response.project.specs),
+      `${key} is not returned either`,
+    );
+  assert.deepEqual(
+    await snapshotOf(),
+    snapshotBefore,
+    "the snapshot itself is not rewritten",
+  );
+});

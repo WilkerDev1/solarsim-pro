@@ -1,7 +1,7 @@
 import { createProjectId } from '../../utils/projectId';
 import { canEditCommercial } from '../../features/proposals/commercial';
 import { isProposalLink } from '../../../shared/proposalLinks';
-import { editEquipmentGroup, normalizeEquipmentEdit, normalizeSpecsChange, selectCatalogEquipment } from '../../utils/equipmentGroups';
+import { editEquipmentGroup, normalizeEquipmentEdit, normalizeSpecsChange, selectCatalogEquipment, withoutInheritedPanelDegradation } from '../../utils/equipmentGroups';
 import { editEquipment, readEquipment } from '../../../shared/equipment';
 import { commercialCopy, commercialState, isProposalCommercial } from '../../../shared/proposalCommercial';
 import { companyDocumentCustomization, reusableDocumentTemplate } from '../../utils/companyDocumentTemplate';
@@ -53,6 +53,7 @@ function newProjectSpecs(defs: SimulationStore['defaultSimulationSettings'] | un
     autoCalculatePanels: defs?.defaultAutoCalculatePanels || false,
     hasBattery: defs?.defaultHasBattery || false,
   };
+  specs = withoutInheritedPanelDegradation(specs); // el 0.5 % de la referencia no puede ganarle a lo configurado
   const referencePanelModel = readEquipment(BENCHMARK_PROJECT.specs).panels[0].brandModel;
   specs = editEquipment(specs, 'panel', { type: 'update', index: 0, patch: { powerW: defs?.defaultPanelPowerW || 620, brandModel: defs?.defaultPanelModel || referencePanelModel } });
   specs = editEquipment(specs, 'inverter', { type: 'update', index: 0, patch: { brandModel: defs?.defaultInverterModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)', powerKW: defs?.defaultInverterPowerKW || 8.0, count: 1 } });
