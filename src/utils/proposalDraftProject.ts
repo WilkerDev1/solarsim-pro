@@ -17,6 +17,11 @@ function patchSingleGroup(specs:SystemSpecs,kind:EquipmentKind,patch:Record<stri
   const groups=readEquipment({...specs,hasBattery:true})[kind==='panel'?'panels':kind==='inverter'?'inverters':'batteries'];
   return groups.length>1?specs:editEquipment(specs,kind,{type:'update',index:0,patch:clean} as never);
 }
+/** Primer grupo del tipo (sin ocultar la batería apagada), o `undefined` si no hay. */
+function firstGroup<K extends 'panels'|'inverters'|'batteries'>(specs:SystemSpecs,key:K):SystemSpecs[K] {
+  const first=readEquipment({...specs,hasBattery:true})[key][0];
+  return (first?[first]:undefined) as SystemSpecs[K];
+}
 /** Pure adapter shared by preview and application. No store mutation, metadata or network. */
 export function prepareProposalDraftProject(base:ProjectSimulation,data:ExtractedInvoiceData,tariffMatrix:GlobalTariffMatrix,options:{isNew?:boolean;defaultBatteryDOD?:number}={}):ProjectSimulation {
   const province=data.province || base.client.province;
@@ -37,7 +42,8 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
       ...(data.autoSupplierPricing!==undefined?{autoSupplierPricing:data.autoSupplierPricing}:{}),
       ...(data.selectedSupplierInfo?{selectedSupplierInfo:data.selectedSupplierInfo}:{}),
       ...(isGrounded?{panels:data.panels,inverters:data.inverters,batteries:data.batteries}:{
-        ...(data.selectedPanelModel?{panels:undefined}:{}),...(data.selectedInverterModel?{inverters:undefined}:{}),...(data.selectedBatteryModel || data.hasBattery===false?{batteries:undefined}:{}),
+        // La selección única reemplaza al modelo principal: se conserva solo el primer grupo (con su cantidad, potencia y precio) como base del parche.
+        ...(data.selectedPanelModel?{panels:firstGroup(base.specs,'panels')}:{}),...(data.selectedInverterModel?{inverters:firstGroup(base.specs,'inverters')}:{}),...(data.selectedBatteryModel || data.hasBattery===false?{batteries:firstGroup(base.specs,'batteries')}:{}),
       }),
       ...(base.specs.installationServicesDesc?.includes('Notas del Sistema:')?{installationServicesDesc:base.specs.installationServicesDesc.split('Notas del Sistema:')[0].trim()}:{}),
     };

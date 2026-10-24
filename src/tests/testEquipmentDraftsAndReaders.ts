@@ -40,6 +40,16 @@ for (const [name, draft] of Object.entries(drafts)) {
 assert.equal(equipmentTotals(readEquipment(drafts.grupos.specs)).panelCount, 14);
 assert.equal(equipmentTotals(readEquipment(drafts.seleccionUnica.specs)).panelCount, 12);
 
+// 1b. Selección escalar solo con el modelo: conserva cantidad, potencia y capacidad del grupo existente.
+{
+  const model = prepareProposalDraftProject(BENCHMARK_PROJECT, { ...data, panels: undefined, inverters: undefined, batteries: undefined, selectedInverterModel: 'Otro inversor', selectedBatteryModel: 'Otra batería' } as never, tariff, { isNew: false });
+  assert.equal(model.specs.inverters![0].brandModel, 'Otro inversor');
+  assert.equal(model.specs.inverters![0].count, BENCHMARK_PROJECT.specs.inverters![0].count, 'la cantidad de inversores no se reinicia');
+  assert.equal(model.specs.batteries![0].count, BENCHMARK_PROJECT.specs.batteries![0].count);
+  assert.equal(model.specs.batteries![0].capacityKWh, BENCHMARK_PROJECT.specs.batteries![0].capacityKWh);
+  assert.deepEqual(mirror(model.specs), []);
+}
+
 // 2. Portada del PDF y pestaña de energía: kWp y cantidades salen de los grupos.
 const theme = { id: 'test', name: 'Test', primary: '#123456', secondary: '#345678', accent: '#123456', accentDark: '#123456', accentLightBg: '#fff', accentBorder: '#123456', barColor: '#123456' };
 const project = drafts.grupos;
