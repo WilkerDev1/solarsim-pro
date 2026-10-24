@@ -20,6 +20,12 @@ Sin cuenta, la elección es local y persistente. Con cuenta, prevalece la polít
 
 Las respuestas de una sesión anterior se descartan aunque se vuelva a iniciar sesión con la misma cuenta. Cambiar de servidor u organización no reutiliza políticas ajenas. La preferencia local sigue disponible al cerrar sesión.
 
+## Supuestos y edición de propuestas
+
+Los ajustes del usuario (Ajustes → simulación) solo definen los valores de las propuestas **nuevas**; una propuesta guardada a la que le falta un supuesto usa el valor fijo del sistema (`shared/assumptions.ts`, [ADR 0003](adr/0003-supuestos-resueltos.md)), igual en todos los equipos y en la propuesta web. El dock muestra el valor efectivo que usa el cálculo. Un valor fuera de rango cae al default; los años y días deben ser enteros.
+
+Todas las ediciones de equipos, tarifas, cliente, consumo y precio de proveedor pasan por `applyProjectEdit` ([ADR 0004](adr/0004-edicion-de-proyecto.md)): con el autocálculo activo, los paneles se recalculan cuando cambia cualquier dato del dimensionado (potencia, consumo, provincia, horas de sol del cliente, cobertura o pérdidas). Abrir o ver una propuesta no la modifica: no sincroniza, no sube de versión ni deja entradas de deshacer. La corrección de potencia según el catálogo y la limpieza de proveedores huérfanos se aplican en la siguiente edición real, y aplicar un precio de proveedor se puede deshacer.
+
 ## Explorador y Ajustes
 
 Tarjetas y lista compacta comparten búsqueda, filtros, acciones y arrastre. La preferencia de visualización se persiste. Ajustes muestra una categoría con navegación agrupada y conserva los formularios visitados mientras permanece abierto; Escape vuelve al espacio de trabajo. Verde identifica selección/acción principal; los avisos usan colores de estado.
@@ -48,7 +54,7 @@ El asistente general flotante es una función experimental local y apagada por d
 
 ### BESS y fichas técnicas en propuestas (2026-10-14)
 
-Activar almacenamiento confirma al menos una unidad real; conserva cantidades positivas previas. La cantidad del editor refleja el estado usado por el motor. Aplicar ofertas actualiza también el grupo principal de equipos cuando hay múltiples modelos. Cambiar ofertas invalida los totales financieros manuales antiguos fuera del benchmark, igual que editar parámetros. El cálculo financiero y la diferencia entre recargo sobre costo y margen sobre venta conservan sus contratos.
+Activar almacenamiento confirma al menos una unidad real; conserva cantidades positivas previas. La cantidad del editor refleja el estado usado por el motor. Un banco de 0 kWh equivale a «sin almacenamiento» en simulación, finanzas, PDF y vista previa del dock (energía útil y autonomía salen solo de `batteryBank`/`batteryAutonomyHours`, [ADR 0002](adr/0002-banco-de-baterias.md)). Aplicar ofertas actualiza también el grupo principal de equipos cuando hay múltiples modelos. Cambiar ofertas invalida los totales financieros manuales antiguos fuera del benchmark, igual que editar parámetros. El cálculo financiero y la diferencia entre recargo sobre costo y margen sobre venta conservan sus contratos.
 
 El importador permite elegir si vincular el documento escaneado a los equipos creados/actualizados. Guardar el catálogo sigue siendo local primero; vincular requiere cuenta y conexión, con reintento del adjunto independiente. En anexos PDF se detectan coincidencias exactas del catálogo entre equipos activos, se deduplican documentos y se ofrece adjuntarlos. Las fichas de imagen no se añaden como PDF. Un segundo dispositivo puede recuperar el binario sin duplicar la metadata. Cambiar de propuesta o sesión durante una descarga impide aplicar su resultado.
 

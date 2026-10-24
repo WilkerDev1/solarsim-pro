@@ -19,6 +19,8 @@ La API devuelve `{ success, userId, organizationId, featurePolicy: { version, se
 
 Cada publicación nueva incluye `calculationSnapshot: { mode, capturedAt, organizationId, policyVersion }`. El servicio de escritorio confirma la política y calcula el resumen con ese modo en la misma operación. El modo `legacy` conserva cinco columnas y dos barras; `self_consumption` admite autoconsumo, crédito neto, aporte de baterías y curva adicional. La preferencia visual de la propuesta puede ocultar estos detalles sin cambiar el cálculo guardado.
 
+La vigencia, la retención de exportación y la tasa de cambio que muestra el visor salen de `shared/assumptions.ts` (`resolveAssumptions`), el mismo módulo que usa la aplicación ([ADR 0003](../../docs/adr/0003-supuestos-resueltos.md)); un dato ausente o fuera de rango toma el valor fijo del sistema, igual en todos los equipos.
+
 Los enlaces existentes sin snapshot conservan la vista clásica y el resumen previamente guardado. Se siguen aceptando sus identificadores cortos para lectura. El vencimiento se comprueba al leer, además del TTL de KV. Las nuevas publicaciones usan UUID aleatorios de 128 bits.
 
 El API backend debe incorporar el endpoint de autorización y la política de organización antes de actualizar el Worker y el escritorio. Este cambio no requiere migrar los valores KV existentes ni tocar la base de datos del visor.
