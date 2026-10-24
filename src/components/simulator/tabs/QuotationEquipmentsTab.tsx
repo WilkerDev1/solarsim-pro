@@ -3,6 +3,7 @@ import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import { ShieldCheck, CheckCircle2, Check } from 'lucide-react';
 import { getProjectPanels, getProjectInverters, getProjectBatteries } from '../../../utils/equipmentSpecsUtils';
 import { MANUAL_BRAND_PLACEHOLDER, QUOTATION_PANEL_BRAND_FALLBACK, SAMPLE_PHONE_MARKER, SAMPLE_QUOTE_NUMBER, resolveSaleMarginMultiplier } from '../../../../shared/projectDefaults';
+import { resolveAssumptions } from '../../../../shared/assumptions';
 import { formatProposalDate } from '../../../utils/formatDateUtils';
 
 interface QuotationEquipmentsTabProps {
@@ -51,7 +52,7 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
         </div>
         <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">VALIDEZ OFERTA</span>
-          <span className="text-lg font-bold text-amber-700">{project.client.quoteValidityDays || 7} Días</span>
+          <span className="text-lg font-bold text-amber-700">{resolveAssumptions(project).quoteValidityDays} Días</span>
         </div>
       </div>
 
@@ -100,7 +101,7 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
               <div className="space-y-1 text-right">
                 <div><span className="font-bold text-slate-600">N° Cotización:</span> <span className="font-bold text-slate-900">{project.client.quoteNumber || SAMPLE_QUOTE_NUMBER}</span></div>
                 <div><span className="font-bold text-slate-600">Fecha:</span> <span className="font-semibold text-slate-800">{currentDateStr}</span></div>
-                <div><span className="font-bold text-slate-600">Válido por:</span> <span className="font-bold text-emerald-700">{project.client.quoteValidityDays || 7} Días</span></div>
+                <div><span className="font-bold text-slate-600">Válido por:</span> <span className="font-bold text-emerald-700">{resolveAssumptions(project).quoteValidityDays} Días</span></div>
               </div>
             </div>
           </div>
@@ -296,7 +297,7 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
 
           {/* LEGAL SUBTEXT BETWEEN ASTERISKS */}
           <div className="text-center text-[10px] text-slate-500 font-semibold italic pt-1">
-            * Equipos según disponibilidad de inventario | * Propuesta válida por {project.client.quoteValidityDays || 7} días | * Precios en USD *
+            * Equipos según disponibilidad de inventario | * Propuesta válida por {resolveAssumptions(project).quoteValidityDays} días | * Precios en USD *
           </div>
         </div>
 

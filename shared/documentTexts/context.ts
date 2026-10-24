@@ -1,3 +1,5 @@
+import { DEFAULT_GRID_EXPORT_FEE_PCT, DEFAULT_QUOTE_VALIDITY_DAYS } from '../assumptions.js';
+
 /**
  * Datos de la propuesta que necesitan los textos dinámicos (nombre del cliente, equipos, tarifa…).
  * Es un objeto plano: la app lo construye desde el proyecto (`src/utils/documentTextContext.ts`)
@@ -54,11 +56,11 @@ const EMPTY_CONTEXT: DocumentTextContext = {
   clientProvince: '',
   companyName: 'electsun',
   currentDateStr: '',
-  quoteValidityDays: 7,
+  quoteValidityDays: DEFAULT_QUOTE_VALIDITY_DAYS,
   distributor: 'EDES',
   tariffCode: 'BTS2',
   isZeroExport: false,
-  gridExportFeePct: 25,
+  gridExportFeePct: DEFAULT_GRID_EXPORT_FEE_PCT,
   hasBattery: false,
   hasBatteryStorage: false,
   annualConsumptionKWh: 0,

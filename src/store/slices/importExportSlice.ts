@@ -1,4 +1,5 @@
-import { DEFAULT_PRICE_PER_WATT_USD, resolveBatteryDodPct, resolveBatteryEfficiencyPct, resolvePricePerWattUSD } from '../../../shared/projectDefaults';
+import { resolveBatteryDodPct, resolveBatteryEfficiencyPct } from '../../../shared/projectDefaults';
+import { assumptionFields } from '../../../shared/assumptions';
 import { createProjectId } from '../../utils/projectId';
 import { commercialCopy } from '../../../shared/proposalCommercial';
 import { projectMutationMetadata } from '../sync/projectMutation';
@@ -122,7 +123,10 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
       }
 
       // Sanitize each project to guarantee complete numeric integrity and valid defaults
-      importedList = importedList.map((raw) => ({
+      importedList = importedList.map((raw) => {
+      // ADR 0003 (d): el dato del archivo si existe; si falta, la constante compartida (los ajustes del usuario no entran).
+      const assumptions = assumptionFields(raw);
+      return {
         ...BENCHMARK_PROJECT,
         ...raw,
         id: typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : createProjectId(),
@@ -135,6 +139,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
           name: typeof raw.client?.name === 'string' ? raw.client.name.trim() : 'Cliente Importado',
           projectId: raw.client?.projectId || 'SP-2026-001',
           quoteNumber: raw.client?.quoteNumber || 'C-0001',
+          quoteValidityDays: assumptions.client.quoteValidityDays,
         },
         // Un archivo heredado (espejo) o nuevo (grupos) queda solo con grupos; la migración no cambia los resultados.
         specs: migrateLegacySpecs<LegacyProjectSpecs>({
@@ -143,8 +148,10 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
           // El 80 % del caso de referencia no es un default: sin DOD válido, el del proyecto es el del motor.
           // El espejo escalar sale del grupo principal; sin dato propio, DOD del motor y eficiencia sin dato.
           ...importedBatteryMirror(raw.specs),
-          // El $/W y $/kWp del caso de referencia no son un precio del proyecto importado.
-          pricePerWattUSD: resolvePricePerWattUSD(raw.specs, raw.financials),
+          // Supuestos: el dato del archivo o la constante compartida; el 14 %, el 0.5 %, el $/W y $/kWp del caso de referencia no son un default.
+          ...assumptions.specs,
+          // Sin modo propio el archivo es simple, como un proyecto nuevo (el modo detallado del caso de referencia no es un default).
+          isDetailed: typeof raw.specs?.isDetailed === 'boolean' ? raw.specs.isDetailed : false,
           pricePerKWpUSD: raw.specs?.pricePerKWpUSD,
           // Un archivo sin grupos trae el espejo; sin cantidad o potencia válidas, el proyecto parte de 10 × 620 W.
           panelCount: positive((raw.specs as LegacyProjectSpecs | undefined)?.panelCount) ?? 10,
@@ -153,6 +160,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
         rates: {
           ...BENCHMARK_PROJECT.rates,
           ...(raw.rates || {}),
+          ...assumptions.rates,
           energyCostPerKWh: typeof raw.rates?.energyCostPerKWh === 'number' && raw.rates.energyCostPerKWh > 0 ? raw.rates.energyCostPerKWh : 0.20,
         },
         financials: (() => {
@@ -161,10 +169,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
             ...rawFin,
             applyLey5707: rawFin.applyLey5707 !== undefined ? rawFin.applyLey5707 : true,
             applyITBISExemption: rawFin.applyITBISExemption !== undefined ? rawFin.applyITBISExemption : true,
-            pricePerWattUSD: rawFin.pricePerWattUSD || DEFAULT_PRICE_PER_WATT_USD,
-            discountRatePct: rawFin.discountRatePct || 12,
-            projectLifespanYears: rawFin.projectLifespanYears || 25,
-            co2FactorKgPerKWh: rawFin.co2FactorKgPerKWh || 0.481,
+            ...assumptions.financials,
             customItems: Array.isArray(rawFin.customItems) ? rawFin.customItems : [],
           };
           delete (fin as any).customITBISSavedUSD;
@@ -179,7 +184,8 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
           ...BENCHMARK_PROJECT.customization,
           ...(raw.customization || {}),
         },
-      }));
+      };
+      });
 
       const currentProjects = get().projects;
 

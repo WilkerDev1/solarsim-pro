@@ -1,3 +1,4 @@
+import { resolveAssumption, DEFAULT_QUOTE_VALIDITY_DAYS } from '../assumptions.js';
 import type { DocumentTextContext } from './context';
 import { getDocumentTextDefinition, type DocumentTextDefinition } from './registry';
 import { defaultDocumentText, resolveDocumentText, type DocumentTextClient, type DocumentTextCustomization, type DocumentTextSource } from './resolve';
@@ -32,7 +33,7 @@ export function documentTextPatch(key: string, value: string, source: DocumentTe
   if (definition.clientField) {
     if (definition.clientField === 'quoteValidityDays') {
       const days = parseInt(text.replace(/\D/g, ''), 10);
-      return { client: { quoteValidityDays: Number.isNaN(days) || days <= 0 ? 7 : days } };
+      return { client: { quoteValidityDays: resolveAssumption('quoteValidityDays', days) } };
     }
     return { client: { [definition.clientField]: text } };
   }
@@ -54,7 +55,7 @@ export function documentTextResetPatch(key: string, source: DocumentTextSource):
   const definition = requireDefinition(key);
   if (definition.clientField) {
     if (definition.resettable === false) return {};
-    return { client: { [definition.clientField]: definition.clientField === 'quoteValidityDays' ? 7 : '' } };
+    return { client: { [definition.clientField]: definition.clientField === 'quoteValidityDays' ? DEFAULT_QUOTE_VALIDITY_DAYS : '' } };
   }
   if (definition.legacyField) {
     // Los datos de empresa/contacto distinguen «vacío» de «sin definir»: restablecer quita el campo

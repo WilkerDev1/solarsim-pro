@@ -13,7 +13,8 @@ import {
   wattPricePatch,
   wholeMarginPctFromMultiplier,
 } from '../params/logic/pricingSync';
-import { resolveDopRate, resolvePricePerWattUSD, resolveSaleMarginMultiplier } from '../params/logic/dockDefaults';
+import { resolveAssumptions } from '../../../../shared/assumptions';
+import { resolvePricePerWattUSD } from '../params/logic/dockDefaults';
 import { ChipGroup, CommitNumberField, ParamRow, StatStrip, ToggleGroup } from '../params/ui';
 import { DirectPrice } from '../params/sections/pricing/DirectPrice';
 import { NumberField } from '../params/sections/pricing/NumberField';
@@ -61,7 +62,9 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
 
   const isDirect = specs.pricingMode === 'direct_watt';
   const matrix = summary?.costMatrix;
-  const multiplier = resolveSaleMarginMultiplier(specs.saleMarginMultiplier);
+  // Tasa, margen y mano de obra mostrados = los que usa la matriz de costos (supuestos efectivos del proyecto completo).
+  const assumptions = resolveAssumptions(project);
+  const multiplier = assumptions.saleMarginMultiplier;
 
   const setMode = (mode: 'cost_matrix' | 'direct_watt') => {
     if (mode === 'cost_matrix') {
@@ -98,7 +101,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
               step="0.5"
               min={0.01}
               belowMin="revert"
-              value={resolveDopRate(specs.dopExchangeRate)}
+              value={assumptions.dopExchangeRate}
               onCommit={(rate) => updateSpecs({ dopExchangeRate: rate })}
             />
           </ParamRow>
@@ -122,6 +125,7 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
           />
           <UnitCosts
             specs={specs}
+            installationUsdPerKwp={assumptions.installationUsdPerKwp}
             equipmentCatalog={equipmentCatalog}
             selected={{ panel: selectedPanel, inverter: selectedInverter, battery: selectedBattery }}
             openSupplierPriceModal={openSupplierPriceModal}

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ProposalConsumptionReview } from './ProposalConsumptionReview';
 import { ProposalCommercialReview } from './ProposalCommercialReview';
 import type { AIProposalContext } from '../../../../../shared/aiProposal';
+import { resolveAssumption } from '../../../../../shared/assumptions';
 import type { FinancialSummaryResult } from '../../../../types';
 import { Plus, Trash2 } from 'lucide-react';
 import type { ExtractedInvoiceData } from '../../../../types/aiInvoice';
@@ -25,7 +26,7 @@ export function ProposalDraftReview({draft,catalog,matrix,context,preview,produc
   const source = tariff ? getTariffSource(matrix,tariff) : null;
   const setRate = (value:string) => {
     const dop = value === '' ? undefined : Number(value);
-    update({energyRateSource:dop===undefined?"reference":"manual",energyCostPerKWhDOP:dop,energyCostPerKWhUSD:dop===undefined ? undefined : dop/(draft.dopExchangeRate || 60.5)});
+    update({energyRateSource:dop===undefined?"reference":"manual",energyCostPerKWhDOP:dop,energyCostPerKWhUSD:dop===undefined ? undefined : dop/resolveAssumption('dopExchangeRate', draft.dopExchangeRate)});
   };
   const groups = [
     {key:'panels' as const,type:'panel' as const,label:'Paneles',unit:'W',value:(e:SolarEquipmentItem)=>e.powerW},
@@ -45,7 +46,7 @@ export function ProposalDraftReview({draft,catalog,matrix,context,preview,produc
         <label>Distribuidora<select value={draft.distributor || ''} onChange={e=>update({distributor:e.target.value as ExtractedInvoiceData['distributor'],tariffCode:'',energyCostPerKWhDOP:undefined,energyCostPerKWhUSD:undefined,energyRateSource:'reference'})}><option value="">Selecciona distribuidora</option>{Object.keys(matrix.schedules).map(d=><option key={d}>{d}</option>)}</select></label>
         <label>Tarifa<select value={draft.tariffCode || ''} onChange={e=>update({tariffCode:e.target.value,energyCostPerKWhDOP:undefined,energyCostPerKWhUSD:undefined,energyRateSource:'reference'})}><option value="">Selecciona tarifa</option>{Object.values(matrix.schedules[draft.distributor]?.tariffs || {}).map(t=><option key={t.code} value={t.code}>{t.code} · {t.name}</option>)}</select></label>
         <label>Tarifa de energía (RD$/kWh)<input type="number" min="0" step="0.0001" value={draft.energyCostPerKWhDOP ?? ''} onChange={e=>setRate(e.target.value)}/></label>
-        <label>Cambio (RD$ por USD)<input type="number" min="1" step="0.01" value={draft.dopExchangeRate || 60.5} onChange={e=>{const rate=Number(e.target.value);if(rate>0)update({dopExchangeRate:rate,energyCostPerKWhUSD:draft.energyCostPerKWhDOP===undefined?undefined:draft.energyCostPerKWhDOP/rate});}}/></label>
+        <label>Cambio (RD$ por USD)<input type="number" min="1" step="0.01" value={resolveAssumption('dopExchangeRate', draft.dopExchangeRate)} onChange={e=>{const rate=Number(e.target.value);if(rate>0)update({dopExchangeRate:rate,energyCostPerKWhUSD:draft.energyCostPerKWhDOP===undefined?undefined:draft.energyCostPerKWhDOP/rate});}}/></label>
       </div>
       {source && <p className="proposal-note">Referencia de catálogo: {source.resolutionCode} · desde {source.effectiveDate}. Confirma que corresponde al período de la factura. Los cargos fijos y de demanda no son tarifa de energía.</p>}
     {source?.fieldSources && <p className="proposal-note">Procedencia por campo: {Object.entries(source.fieldSources).map(([field,s])=>`${tariffSourceFieldLabel(field)}: ${s.resolutionCode}`).join(' · ')}</p>}

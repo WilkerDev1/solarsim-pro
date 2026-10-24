@@ -20,7 +20,8 @@ import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentC
 import { canEditDocument } from '../../components/pdf/editor/documentEditorState';
 import { normalizeDocumentLayout } from '../../../shared/documentLayout';
 import { applyDocumentTextPatch, companyTemplateTextPatch, documentTextsPatch } from '../../../shared/documentTexts';
-import { DEFAULT_GRID_EXPORT_FEE_PCT, DEFAULT_TARGET_COVERAGE_PCT, DEFAULT_BATTERY_CAPACITY_KWH, DEFAULT_BATTERY_DOD_PCT, DEFAULT_PRICE_PER_WATT_USD, DEFAULT_SYSTEM_LOSSES_PCT, resolveSystemLossesPct } from '../../../shared/projectDefaults';
+import { DEFAULT_BATTERY_CAPACITY_KWH, DEFAULT_BATTERY_DOD_PCT, resolveSystemLossesPct } from '../../../shared/projectDefaults';
+import { assumptionFields, resolveAssumption, resolveAssumptions, type AssumptionFields } from '../../../shared/assumptions';
 import { documentTextContextFor } from '../../utils/documentTextContext';
 
 /** Specs with the panel count the engine recommends for this consumption, province and coverage target. */
@@ -29,7 +30,7 @@ function withRecommendedPanels(specs: SystemSpecs, client: ClientInfo, monthlyCo
     client.province,
     monthlyConsumption,
     readEquipment(specs).panels[0]?.powerW || 620,
-    targetCoveragePct,
+    resolveAssumption('targetCoveragePct', targetCoveragePct), // la frontera: 0 o fuera de rango dimensiona con el valor resuelto, no con 1 %
     resolveSystemLossesPct(specs),
     client.customMonthlyHSP
   );
@@ -40,7 +41,8 @@ function withRecommendedPanels(specs: SystemSpecs, client: ClientInfo, monthlyCo
 }
 
 /** Specs of a new proposal: the reference case with the user's defaults written straight into the single group of each kind. */
-function newProjectSpecs(defs: SimulationStore['defaultSimulationSettings'] | undefined, directWattPrice: number): SystemSpecs {
+function newProjectSpecs(defs: SimulationStore['defaultSimulationSettings'] | undefined, assumptions: AssumptionFields): SystemSpecs {
+  const directWattPrice = assumptions.specs.pricePerWattUSD;
   let specs: SystemSpecs = {
     ...BENCHMARK_PROJECT.specs,
     // El $/W del caso de referencia (1.134971) no es un default: todo proyecto nuevo parte del ajuste.
@@ -48,8 +50,11 @@ function newProjectSpecs(defs: SimulationStore['defaultSimulationSettings'] | un
     pricePerKWpUSD: Math.round(directWattPrice * 1000 * 100) / 100,
     isDetailed: false, // Simple (Catálogo IA): equipos del catálogo con precios de proveedor
     pricingMode: defs?.defaultPricingMode === 'direct' ? 'direct_watt' : 'cost_matrix',
-    systemLosses: defs?.defaultSystemLosses !== undefined ? defs.defaultSystemLosses : DEFAULT_SYSTEM_LOSSES_PCT,
-    annualDegradation: defs?.defaultAnnualDegradation || 0.40,
+    systemLosses: assumptions.specs.systemLosses,
+    annualDegradation: assumptions.specs.annualDegradation,
+    dopExchangeRate: assumptions.specs.dopExchangeRate,
+    saleMarginMultiplier: assumptions.specs.saleMarginMultiplier,
+    installationUnitPriceUSD: assumptions.specs.installationUnitPriceUSD,
     autoCalculatePanels: defs?.defaultAutoCalculatePanels || false,
     hasBattery: defs?.defaultHasBattery || false,
   };
@@ -108,7 +113,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
       const monthlyConsumption = nextConsumption(p.monthlyConsumption);
       let specs = { ...p.specs };
       if (lockAutoPanels) specs.autoCalculatePanels = false;
-      else if (specs.autoCalculatePanels) specs = withRecommendedPanels(specs, p.client, monthlyConsumption, p.rates.targetCoveragePct ?? 95);
+      else if (specs.autoCalculatePanels) specs = withRecommendedPanels(specs, p.client, monthlyConsumption, resolveAssumptions(p).targetCoveragePct);
       return {
         monthlyConsumption,
         aiSource: p.aiSource?.consumptionSource === 'theoretical' ? { ...p.aiSource, consumptionSource: 'estimated' } : p.aiSource,
@@ -227,7 +232,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
 
   createNewProject: (payload) => {
     const defs = get().defaultSimulationSettings;
-    const directWattPrice = defs?.defaultDirectPriceUSDPerWp || DEFAULT_PRICE_PER_WATT_USD;
+    // ADR 0003 (d): ajustes del usuario primero, luego las constantes compartidas; la misma fábrica que importar y la IA.
+    const assumptions = assumptionFields(undefined, defs);
     const id = createProjectId();
     const name = typeof payload === 'string' ? payload : (payload?.name || 'Nuevo Proyecto Solar');
     const company = typeof payload === 'object' && payload?.company ? payload.company : 'Cliente Comercial';
@@ -268,26 +274,27 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
         contactPerson: company || '',
         projectId: seq.projectId,
         quoteNumber: seq.quoteNumber,
-        quoteValidityDays: defs?.defaultQuoteValidityDays || 7,
+        quoteValidityDays: assumptions.client.quoteValidityDays,
       },
-      specs: newProjectSpecs(defs, directWattPrice),
+      specs: newProjectSpecs(defs, assumptions),
       rates: {
         ...BENCHMARK_PROJECT.rates,
-        targetCoveragePct: defs?.defaultTargetCoveragePct || DEFAULT_TARGET_COVERAGE_PCT,
+        targetCoveragePct: assumptions.rates.targetCoveragePct,
         isZeroExport: defs?.defaultZeroExport || false,
-        gridExportFeePct: defs?.defaultApplySieRetention ? DEFAULT_GRID_EXPORT_FEE_PCT : 0,
+        gridExportFeePct: assumptions.rates.gridExportFeePct,
+        usdExchangeRate: assumptions.rates.usdExchangeRate,
         distributor,
         tariffCode,
         currency: defs?.currency || 'USD',
-        annualEnergyInflationPct: defs?.annualEnergyTariffEscalationPct || 3.5,
+        annualEnergyInflationPct: assumptions.rates.annualEnergyInflationPct,
       },
       financials: {
         applyLey5707: defs?.applyLey5707 !== undefined ? defs.applyLey5707 : true,
         applyITBISExemption: defs?.applyITBISExemption !== undefined ? defs.applyITBISExemption : true,
-        pricePerWattUSD: defs?.defaultDirectPriceUSDPerWp || DEFAULT_PRICE_PER_WATT_USD,
-        discountRatePct: defs?.discountRatePct || 12,
-        projectLifespanYears: defs?.lifespanYears || 25,
-        co2FactorKgPerKWh: BENCHMARK_PROJECT.financials?.co2FactorKgPerKWh || 0.481,
+        pricePerWattUSD: assumptions.financials.pricePerWattUSD,
+        discountRatePct: assumptions.financials.discountRatePct,
+        projectLifespanYears: assumptions.financials.projectLifespanYears,
+        co2FactorKgPerKWh: assumptions.financials.co2FactorKgPerKWh,
         customItems: [],
       },
       companyProfileId: get().activeCompanyId,
@@ -579,7 +586,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     if (clientPartial.contactPerson !== undefined) customization.contactName = clientPartial.contactPerson;
     if (clientPartial.contactEmail !== undefined) customization.clientEmail = clientPartial.contactEmail;
     const specs = p.specs.autoCalculatePanels && clientPartial.province
-      ? withRecommendedPanels(p.specs, client, p.monthlyConsumption, p.rates.targetCoveragePct ?? 95)
+      ? withRecommendedPanels(p.specs, client, p.monthlyConsumption, resolveAssumptions(p).targetCoveragePct)
       : { ...p.specs };
     return { client, specs, customization };
   }),
@@ -595,7 +602,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
       : (p.specs.autoCalculatePanels && !panelCountEdited);
 
     if (shouldAutoCalc) {
-      specs = { ...withRecommendedPanels(specs, p.client, p.monthlyConsumption, p.rates.targetCoveragePct ?? 95), autoCalculatePanels: true };
+      specs = { ...withRecommendedPanels(specs, p.client, p.monthlyConsumption, resolveAssumptions(p).targetCoveragePct), autoCalculatePanels: true };
     } else if (panelCountEdited && specsPartial.autoCalculatePanels === undefined) {
       specs.autoCalculatePanels = false;
     }
@@ -619,12 +626,15 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     return { specs, financials: withoutStaleFinancialOverrides(p, p.financials) };
   }),
 
-  updateRates: (ratesPartial) => updateActiveProject((p) => ({
-    rates: { ...p.rates, ...ratesPartial },
-    specs: p.specs.autoCalculatePanels && ratesPartial.targetCoveragePct !== undefined
-      ? withRecommendedPanels(p.specs, p.client, p.monthlyConsumption, ratesPartial.targetCoveragePct)
-      : { ...p.specs },
-  })),
+  updateRates: (ratesPartial) => updateActiveProject((p) => {
+    const rates = { ...p.rates, ...ratesPartial };
+    return {
+      rates,
+      specs: p.specs.autoCalculatePanels && ratesPartial.targetCoveragePct !== undefined
+        ? withRecommendedPanels(p.specs, p.client, p.monthlyConsumption, resolveAssumptions({ rates }).targetCoveragePct)
+        : { ...p.specs },
+    };
+  }),
 
   updateFinancials: (finPartial) => updateActiveProject((p) => ({
     financials: withoutStaleFinancialOverrides(p, { ...p.financials, ...finPartial }),

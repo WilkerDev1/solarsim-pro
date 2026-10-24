@@ -1,6 +1,7 @@
 import { StoredProposal } from './types';
 import { cleanClientName, getTariffDisplayName } from '../../../shared/proposalPresentation';
 import { customItemsTaxBreakdown, LEY5707_CREDIT_RATE } from '../../../shared/financialRules';
+import { resolveAssumption, resolveAssumptions } from '../../../shared/assumptions';
 import { ELECTSUN_LOGO_COLOR_BASE64 } from '../../../shared/electsunLogoColor';
 import { escapeHtml, formatInlineMarkdown, formatMarkdown, safeLogoUrl, scriptJson } from './escaping';
 import { createDocumentTextContext, docTextKey, interpolate, viewerText } from '../../../shared/documentTexts';
@@ -81,7 +82,9 @@ export function renderProposalPage(stored: StoredProposal): string {
   const clientName = cleanClientName(rawClientName);
   const projectId = client.projectId || 'SP-2026-001';
   const quoteNumber = client.quoteNumber || 'C-0001';
-  const quoteValidityDays = client.quoteValidityDays || stored.validityDays || 7;
+  // ADR 0003: los mismos supuestos efectivos que la aplicación; la vigencia guardada en el enlace va antes del default.
+  const assumptions = resolveAssumptions(project);
+  const quoteValidityDays = resolveAssumption('quoteValidityDays', client.quoteValidityDays, stored.validityDays);
   const province = client.province || client.location || 'Santo Domingo';
   const clientAddress = client.address || `${province}, República Dominicana`;
   const distributor = rates.distributor || client.distributor || 'EDEESTE';
@@ -89,7 +92,7 @@ export function renderProposalPage(stored: StoredProposal): string {
   const tariffDisplayName = getTariffDisplayName(distributor, rawTariffCode);
   const isCEPM = distributor === 'CEPM';
   const isZeroExport = !!rates.isZeroExport;
-  const exportFee = rates.gridExportFeePct ?? 25;
+  const exportFee = assumptions.gridExportFeePct;
 
   // Equipos solo por `shared/equipment`: un enlace antiguo (solo espejo) y uno nuevo (solo grupos) dan lo mismo.
   const equipment = readEquipment(specs);
@@ -162,7 +165,7 @@ export function renderProposalPage(stored: StoredProposal): string {
   // Older publications lack this amount; recompute it with the engine's item rules.
   const customItemsNonExoneratedITBISUSD = Number(summary?.customItemsNonExoneratedITBISUSD ?? customItemsTaxBreakdown(
     financials?.customItems || [],
-    Number(summary?.costMatrix?.saleMarginMultiplier || project.specs?.saleMarginMultiplier || 1.25),
+    resolveAssumption('saleMarginMultiplier', summary?.costMatrix?.saleMarginMultiplier, project.specs?.saleMarginMultiplier),
   ).nonExoneratedITBISUSD);
   const subTotalSinITBIS = Number(
     summary?.commercialPreTaxSubtotalUSD ?? 

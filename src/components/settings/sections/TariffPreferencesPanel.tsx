@@ -4,6 +4,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { Receipt, ChevronDown, ChevronUp, Check, Sparkles, Cloud, RefreshCw, Zap, Coins, DollarSign } from 'lucide-react';
 import { UtilityDistributor, getDistributorTariffOptions } from '../../../types/tariffs';
 import { confirmAction } from '../../common/confirmAction';
+import { DEFAULT_GRID_EXPORT_FEE_PCT } from '../../../../shared/assumptions';
 
 interface TariffPreferencesPanelProps {
   isOpen: boolean;
@@ -418,10 +419,10 @@ export const TariffPreferencesPanel: React.FC<TariffPreferencesPanelProps> = ({ 
                               type="number"
                               min={0}
                               max={100}
-                              value={tariff.netMeteringRetentionPct ?? 25}
+                              value={tariff.netMeteringRetentionPct ?? DEFAULT_GRID_EXPORT_FEE_PCT}
                               onChange={(e) =>
                                 updateDistributorTariff(prefDistributorTab, tariff.code, {
-                                  netMeteringRetentionPct: parseFloat(e.target.value) || 25,
+                                  netMeteringRetentionPct: parseFloat(e.target.value) || DEFAULT_GRID_EXPORT_FEE_PCT,
                                 })
                               }
                               className="w-16 px-2 py-1 rounded-lg text-xs font-mono border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#18181b]"
