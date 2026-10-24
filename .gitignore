@@ -25,3 +25,6 @@ docs/qa/
 
 # Capturas locales de revisión de impeccable
 .impeccable/review/
+
+# Datos privados de infraestructura (direcciones, usuarios, accesos): nunca se versionan
+docs/private/
