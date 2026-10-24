@@ -1,6 +1,6 @@
 # SolarSim Pro 2.7.2
 
-Versión de mantenimiento: la energía de la batería, los supuestos del proyecto y las ediciones se calculan cada uno en un solo lugar. No hay migración de datos ni cambio de versión mínima: los clientes 2.7.1 siguen sincronizando. Ninguna de las propuestas reales en producción cambia sus resultados.
+Versión de mantenimiento: la energía de la batería, los supuestos del proyecto y las ediciones se calculan cada uno en un solo lugar. No hay migración de datos ni cambio de versión mínima: los datos guardados no se reescriben y los clientes 2.7.1 siguen sincronizando. Las cifras calculadas sí pueden cambiar en los casos que corrige esta versión (descritos abajo: banco de 0 kWh, inflación 0, pérdidas del PDF en modo detallado, valores inválidos o fuera de rango). Al publicar, ninguna de las propuestas reales en producción caía en esos casos.
 
 ## Banco de baterías (#99)
 
