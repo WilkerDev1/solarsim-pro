@@ -4,6 +4,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import pg from "pg";
 import jwt from "jsonwebtoken";
 import { createApp } from "../src/app.js";
+import { asClient } from "./helpers/clientHeader.js";
 import { migrateDatabase } from "../src/database/migrations.js";
 import { readConfig } from "../src/config.js";
 import {
@@ -78,7 +79,7 @@ before(
     pool = database.pool;
     await migrateDatabase(pool);
     await migrateDatabase(pool); // idempotent upgrades preserve records
-    app = createApp({ pool, jwtSecret: secret, logging: false });
+    app = asClient(createApp({ pool, jwtSecret: secret, logging: false }));
     admin = await register("admin");
     other = await register("other", "Otra empresa");
     editor = await provision("EDITOR", "editor");

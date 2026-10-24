@@ -1,8 +1,8 @@
-import { deriveLegacyGroupWithPrice, hasLegacyBatteryData, hasMirror, savedGroups, withoutMirror } from './legacy';
-import { EQUIPMENT_KINDS, LIST_KEY, type EquipmentKind, type SystemSpecs } from './types';
+import { deriveLegacyGroupWithPrice, hasLegacyBatteryData, hasMirror, savedGroups, withoutMirror } from './legacy.js';
+import { EQUIPMENT_KINDS, LIST_KEY, type EquipmentKind, type EquipmentSpecs } from './types.js';
 
 /** ¿Hay que construir el grupo de batería? Con batería activa siempre; apagada, solo si los campos sueltos traen datos propios. */
-const wantsBatteryGroup = (specs: SystemSpecs) => Boolean(specs.hasBattery) || hasLegacyBatteryData(specs);
+const wantsBatteryGroup = (specs: EquipmentSpecs) => Boolean(specs.hasBattery) || hasLegacyBatteryData(specs);
 
 /**
  * Deja la propuesta solo con grupos: construye los que falten desde el espejo heredado y borra el espejo
@@ -23,11 +23,11 @@ const wantsBatteryGroup = (specs: SystemSpecs) => Boolean(specs.hasBattery) || h
  * El tipo `SystemSpecs` aún declara obligatorios algunos campos sueltos; hasta que las oleadas siguientes los
  * vuelvan opcionales, el resultado puede carecer de ellos.
  */
-export function migrateLegacySpecs(specs: SystemSpecs): SystemSpecs {
+export function migrateLegacySpecs<S extends EquipmentSpecs>(specs: S): S {
   const needsGroups = (kind: EquipmentKind) => !savedGroups(specs, kind) && (kind !== 'battery' || wantsBatteryGroup(specs));
   if (!hasMirror(specs) && !EQUIPMENT_KINDS.some(needsGroups)) return specs;
 
-  const next: SystemSpecs = withoutMirror(specs);
+  const next = withoutMirror(specs);
   for (const kind of EQUIPMENT_KINDS) {
     const saved = savedGroups(specs, kind);
     if (saved) (next as unknown as Record<string, unknown>)[LIST_KEY[kind]] = saved;

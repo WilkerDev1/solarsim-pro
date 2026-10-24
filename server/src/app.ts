@@ -7,7 +7,9 @@ import { logger } from "hono/logger";
 import { bodyLimit } from "hono/body-limit";
 import { HTTPException } from "hono/http-exception";
 import type { Pool } from "pg";
-import { assertJwtSecret } from "./config.js";
+import { CLIENT_HEADER } from "../../shared/clientVersion.js";
+import { assertJwtSecret, parseMinClientVersion } from "./config.js";
+import { registerClientVersionGate } from "./clientVersionGate.js";
 import { createAuthenticator } from "./security.js";
 import { registerAuthRoutes } from "./modules/auth.js";
 import { registerUsersRoutes } from "./modules/users.js";
@@ -22,8 +24,11 @@ export function createApp(options: {
   pool: Pool;
   jwtSecret: string;
   logging?: boolean;
+  /** Lowest accepted client (MIN_CLIENT_VERSION); defaults to the shared 2.7.1 floor. */
+  minClientVersion?: string;
 }) {
   assertJwtSecret(options.jwtSecret);
+  const minClientVersion = parseMinClientVersion(options.minClientVersion);
   const app = new Hono();
   const deps = {
     ...options,
@@ -35,11 +40,12 @@ export function createApp(options: {
     cors({
       origin: "*",
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-      allowHeaders: ["Content-Type", "Authorization"],
+      allowHeaders: ["Content-Type", "Authorization", CLIENT_HEADER],
       exposeHeaders: ["X-Renewed-Token"],
       maxAge: 600,
     }),
   );
+  registerClientVersionGate(app, minClientVersion);
   app.use(
     "*",
     bodyLimit({

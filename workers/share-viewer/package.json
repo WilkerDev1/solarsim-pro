@@ -8,7 +8,7 @@
     "deploy": "wrangler deploy",
     "types": "wrangler types",
     "build": "wrangler types && tsc",
-    "test": "tsx tests/publicationIntegrity.test.ts && tsx tests/shareSnapshot.test.ts && tsx tests/sharedHistory.test.ts && tsx tests/webProposalDiscount.test.ts && tsx tests/legacyItbisFallback.test.ts && tsx tests/documentTexts.test.ts && tsx tests/energyFlowDiagram.test.ts && tsx tests/equipmentReaders.test.ts"
+    "test": "tsx tests/publicationIntegrity.test.ts && tsx tests/shareSnapshot.test.ts && tsx tests/sharedHistory.test.ts && tsx tests/webProposalDiscount.test.ts && tsx tests/legacyItbisFallback.test.ts && tsx tests/documentTexts.test.ts && tsx tests/energyFlowDiagram.test.ts && tsx tests/equipmentReaders.test.ts && tsx tests/clientIdentity.test.ts"
   },
   "dependencies": {
     "hono": "^4.13.12"
