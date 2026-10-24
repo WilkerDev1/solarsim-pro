@@ -52,7 +52,7 @@ export const UnitCosts: React.FC<UnitCostsProps> = ({ specs, equipmentCatalog, s
           onOpenSuppliers={model.equipment ? () => openSupplierPriceModal(model.equipment!) : undefined}
           supplierName={info?.supplierName}
           supplierTitle={info ? `Proveedor: ${info.supplierName} ($${info.priceUSD} USD)` : undefined}
-          value={displayedUnitPrice(model.unitPriceUSD, kind)}
+          value={displayedUnitPrice(model.unitPriceUSD)}
           onChange={(value) => updateSpecs(manualUnitPricePatch(specs, kind, idx, value))}
         />
       );

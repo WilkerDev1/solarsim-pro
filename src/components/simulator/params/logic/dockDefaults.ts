@@ -1,7 +1,8 @@
 /**
  * Valores por defecto que el dock de parámetros muestra cuando el proyecto no trae dato propio.
  * Son solo de presentación: no cambian el proyecto guardado ni los cálculos. Los precios unitarios
- * por modelo salen de `DEFAULT_UNIT_PRICE_USD` (`src/utils/equipmentGroups.ts`), que también usa el motor.
+ * por modelo NO se muestran por defecto: un grupo sin precio se ve «sin precio» porque el motor cuenta 0 (`DEFAULT_UNIT_PRICE_USD`
+ * solo rellena proyectos antiguos sin grupos, en `shared/equipment`, y el motor lee el mismo valor).
  * Los que comparten motor y dock (DOD, eficiencia de batería, tasa, multiplicador, mano de obra, marcadores
  * de ejemplo y marcas del modo Manual) viven en `shared/projectDefaults.ts` y se re-exportan aquí.
  */

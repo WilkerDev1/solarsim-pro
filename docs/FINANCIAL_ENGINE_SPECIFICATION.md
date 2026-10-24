@@ -74,7 +74,7 @@ Si el consumo anual es 0 se asume 100 kWh/día para el promedio.
 
 Un ítem adicional se considera exonerado según `exonerateITBIS` (o, en datos antiguos, `applyITBIS`; exonerado si ambos faltan). Precios por defecto cuando un proyecto antiguo no tiene grupos: panel 103.32, inversor 2300, batería 1990 e instalación 170 USD/kWp.
 
-Con grupos multi-equipo, cada grupo usa su propio `unitPriceUSD`. Un grupo sin precio no hereda el de otro modelo ni un precio de referencia: aporta 0 y la cotización muestra que faltan costos; ese subtotal es provisional. Los proyectos antiguos sin grupos conservan la resolución escalar.
+Con grupos multi-equipo, cada grupo usa su propio `unitPriceUSD`. Un grupo sin precio no hereda el de otro modelo ni un precio de referencia: aporta 0 y la cotización muestra que faltan costos; ese subtotal es provisional. El dock («Costos unitarios») muestra ese grupo con el campo vacío («Sin precio»), nunca con un precio de referencia. Los proyectos antiguos sin grupos conservan la resolución escalar.
 
 ### 3.2 Totales, margen y precio de lista
 

@@ -141,8 +141,8 @@ const equipment = (type: 'panel' | 'inverter' | 'battery', displayName: string, 
   assert.equal(bat.batteries?.[0].unitPriceUSD, 2100);
   assert.equal(bat.autoSupplierPricing, false);
 
-  assert.equal(displayedUnitPrice(50, 'panel'), 50);
-  assert.equal(displayedUnitPrice(undefined, 'inverter'), 2300);
+  assert.equal(displayedUnitPrice(50), 50);
+  assert.equal(displayedUnitPrice(undefined), undefined, 'un grupo sin precio no muestra uno de referencia');
 
   const html = render(h(PricingParamsSection, { project: projectOf({ pricingMode: 'cost_matrix', installationUnitPriceUSD: 185 }), summary: summaryOf(projectOf()), updateSpecs: noop }));
   assert.match(html, /id="pd-cost-installation"[^>]*value="185"|value="185"[^>]*id="pd-cost-installation"/);

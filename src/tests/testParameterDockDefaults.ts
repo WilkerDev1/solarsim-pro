@@ -9,6 +9,7 @@ import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { BENCHMARK_LEGACY_SPECS, BENCHMARK_PROJECT } from '../engine/referenceCase';
+import { calculateCostMatrixSummary } from '../engine/financeEngine';
 import { DEFAULT_RD_TARIFF_MATRIX, getReferenceEnergyRateUSD } from '../data/rdTariffs';
 import type { ProjectSimulation, LegacyProjectSpecs } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
@@ -163,8 +164,8 @@ assert.equal(marginPctFromMultiplier(0), 25, 'multiplicador 0: 1.25');
 assert.equal(marginPctFromMultiplier(1.3), 30);
 assert.equal(wholeMarginPctFromMultiplier(undefined), 25);
 assert.equal(wholeMarginPctFromMultiplier(0), 25);
-assert.deepEqual((['panel', 'inverter', 'battery'] as const).map((k) => displayedUnitPrice(undefined, k)), [103.32, 2300, 1990]);
-assert.equal(displayedUnitPrice(0, 'panel'), 0, 'un precio propio de 0 se respeta');
+assert.equal(displayedUnitPrice(undefined), undefined, 'sin precio propio no se muestra el de la matriz de costos: el motor cuenta 0');
+assert.equal(displayedUnitPrice(0), 0, 'un precio propio de 0 se respeta');
 assert.deepEqual(DEFAULT_UNIT_PRICE_USD, { panel: 103.32, inverter: 2300, battery: 1990 });
 {
   const bare = { ...base.specs, panels: undefined, inverters: undefined, batteries: undefined, hasBattery: true, autoSupplierPricing: false,
@@ -176,6 +177,27 @@ assert.deepEqual(DEFAULT_UNIT_PRICE_USD, { panel: 103.32, inverter: 2300, batter
     ['103.32', '2300', '1990', '170'], 'costos unitarios por defecto sin precio propio',
   );
   assert.doesNotMatch(costs({ ...bare, installationUnitPriceUSD: 0 } as LegacyProjectSpecs), /value="170"/, 'mano de obra 0 se respeta');
+}
+// Un grupo guardado sin precio (borrador de IA) se muestra «sin precio» y el motor lo cuenta 0; con precio se muestra.
+{
+  const unpriced = { ...base.specs, hasBattery: true, autoSupplierPricing: false, installationUnitPriceUSD: 170,
+    panels: [{ id: 'p1', brandModel: 'Panel sin precio', powerW: 600, count: 10 }, { id: 'p2', brandModel: 'Panel con precio', powerW: 600, count: 2, unitPriceUSD: 95 }],
+    inverters: [{ id: 'i1', brandModel: 'Inversor sin precio', powerKW: 5, count: 1 }],
+    batteries: [{ id: 'b1', brandModel: 'Batería con precio', capacityKWh: 10, count: 1, unitPriceUSD: 1500 }] } as typeof base.specs;
+  const html = render(h(UnitCosts, { specs: unpriced, equipmentCatalog: [], selected: {}, openSupplierPriceModal: noop, updateSpecs: noop }));
+  const input = (id: string) => html.match(new RegExp(`<input[^>]*id="${id}"[^>]*>`))?.[0] ?? '';
+  const valueOfInput = (id: string) => input(id).match(/value="([^"]*)"/)?.[1];
+  assert.equal(valueOfInput('pd-cost-panel-0'), '', 'panel sin precio: campo vacío');
+  assert.match(input('pd-cost-panel-0'), /placeholder="Sin precio"/);
+  assert.equal(valueOfInput('pd-cost-inverter-0'), '', 'inversor sin precio: campo vacío');
+  assert.equal(valueOfInput('pd-cost-panel-1'), '95', 'con precio se muestra el precio');
+  assert.equal(valueOfInput('pd-cost-battery-0'), '1500');
+  assert.doesNotMatch(html, /value="(103\.32|2300|1990)"/, 'ningún precio de referencia inventado');
+  const matrix = calculateCostMatrixSummary(unpriced, 7.2);
+  const row = (name: string) => matrix.items.find((item) => item.name === name)!;
+  assert.equal(row('Panel sin precio').unitPriceUSD, 0, 'el motor cuenta 0 para el grupo sin precio');
+  assert.equal(row('Inversor sin precio').unitPriceUSD, 0);
+  assert.equal(row('Panel con precio').unitPriceUSD, 95);
 }
 {
   const pricing = (specs: object, summary: unknown = {}) => render(h(PricingParamsSection, {
