@@ -4,21 +4,23 @@ Runbook único para operar la API y su base de datos. Las composiciones de `infr
 
 ## Topología
 
-Host Proxmox `pve01`; CT100 `app-server` (10.0.0.103) con Docker: `solarsim-api`, `solarsim-db` (PostgreSQL 16), `caddy-proxy`, `cloudflared-tunnel` y la web corporativa, todos en la red Docker externa `solarsim_net`. No confundir este CT con `electsun-core`. El acceso autorizado pasa por `pve01`; si el host no responde, comprobar su estado desde el nodo en lugar de insistir con SSH. El visor de propuestas es un Worker de Cloudflare independiente (ver [workers/share-viewer/README.md](../workers/share-viewer/README.md)).
+Host Proxmox `pve01`; CT100 `app-server` con Docker: `solarsim-api`, `solarsim-db` (PostgreSQL 16), `caddy-proxy`, `cloudflared-tunnel` y la web corporativa, todos en la red Docker externa `solarsim_net`. No confundir este CT con `electsun-core`. El acceso autorizado pasa por `pve01`; si el host no responde, comprobar su estado desde el nodo en lugar de insistir con SSH. El visor de propuestas es un Worker de Cloudflare independiente (ver [workers/share-viewer/README.md](../workers/share-viewer/README.md)).
 
 Antes de operar, comprobar conectividad, CT activo, salud de contenedores y espacio libre: cualquier estado registrado antes es una fotografía, no una garantía.
 
 ### Acceso y dominios
 
+Las direcciones, usuarios y comandos SSH exactos no se publican en este repositorio: están en `docs/private/ACCESO_PRODUCCION.md`, un archivo local no versionado (`.gitignore`). Pídelo al responsable de la infraestructura.
+
 | Destino | Cómo se llega |
 |---|---|
-| `app-server` desde la oficina | `ssh agente@10.0.0.103` (alias `app-server`); la IP solo existe en la LAN. |
-| `app-server` desde fuera | Por Tailscale, saltando por el nodo Proxmox: `ssh -J root@100.73.34.56 agente@10.0.0.103`. |
-| Estado del CT | `ssh root@100.73.34.56 'pct status 100'`. |
+| `app-server` desde la oficina | SSH por la LAN (alias `app-server`). |
+| `app-server` desde fuera | Por Tailscale, saltando por el nodo Proxmox (comando exacto en el archivo privado). |
+| Estado del CT | `pct status 100` en el nodo Proxmox. |
 | API pública | `https://solarsim.electsun.net` (Cloudflare → `cloudflared-tunnel` → `caddy-proxy` → `solarsim-api:3000`). Solo HTTP: no sirve para desplegar. |
 | Visor de propuestas | `https://propuesta.electsun.net/p/<id>` (Worker `solarsim-share-viewer`, KV `PROPOSALS_KV`). Se despliega con `wrangler` desde cualquier lugar con la cuenta de Cloudflare. |
 
-En el CT (usuario `agente`):
+En el CT (con el usuario de servicio indicado en el archivo privado):
 
 - `~/servicios/solarsim-api/` contiene `docker-compose.yml` (la imagen en ejecución), `.env` (0600, no imprimir) y las candidatas `docker-compose.<versión>-<sha>.candidate.yml`.
 - `~/servicios/solarsim-build-<versión>-<sha>/` es el contexto de build: solo `server/` y `shared/` de la revisión aprobada (`git archive <sha> server shared`). No es un checkout git.
@@ -37,7 +39,7 @@ En el CT (usuario `agente`):
 
 ## Despliegue de la API
 
-1. **Checkpoint.** Crear un directorio privado de respaldo (por ejemplo `/home/agente/backups/solarsim-<versión>-<fecha>`) con: dump PostgreSQL en formato custom, su `pg_restore --list`, la composición vigente (`docker-compose.before.yml`) y la imagen API en ejecución. Un listado de backup o un snapshot del CT no constituyen prueba de restauración.
+1. **Checkpoint.** Crear un directorio privado de respaldo (por ejemplo `~/backups/solarsim-<versión>-<fecha>` en la cuenta de servicio) con: dump PostgreSQL en formato custom, su `pg_restore --list`, la composición vigente (`docker-compose.before.yml`) y la imagen API en ejecución. Un listado de backup o un snapshot del CT no constituyen prueba de restauración.
 
    ```bash
    umask 077; D=~/backups/solarsim-<versión>-<sha>-$(date -u +%Y%m%dT%H%M%SZ); mkdir -m 700 "$D"
@@ -51,7 +53,7 @@ En el CT (usuario `agente`):
 3. **Compatibilidad de clientes.** La API exige `baseVersion` (CAS), publicación autenticada y, desde la 2.7.1, `X-SolarSim-Client` con versión ≥ `MIN_CLIENT_VERSION` (426 en caso contrario; ver más abajo). Los clientes 2.6.0 y 2.7.0 dejan de sincronizar: coordinar la versión de escritorio y del Worker, avisar al equipo y exportar el trabajo pendiente de quienes vayan a cambiar.
 4. **Construir y reemplazar solo la API.** La imagen se etiqueta `solarsim-api-api:<versión>-<sha corto>` para poder volver a ella. PostgreSQL, Caddy y el túnel no se recrean.
 
-   - Subir el contexto y construir en el CT (con `S="ssh -J root@100.73.34.56 agente@10.0.0.103"` desde fuera de la oficina):
+   - Subir el contexto y construir en el CT (con `S` = el comando SSH hacia `app-server`; desde fuera de la oficina, el salto por el nodo Proxmox):
 
      ```bash
      git archive <sha> server shared | $S 'B=~/servicios/solarsim-build-<versión>-<sha>; mkdir -p $B && tar -x -C $B && cd $B && docker build -f server/Dockerfile -t solarsim-api-api:<versión>-<sha> .'
