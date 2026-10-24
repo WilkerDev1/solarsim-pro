@@ -357,7 +357,7 @@ export async function runCompatibilityChecks(
       // Test GET /api/organization/features with token
       const res = await fetch(`${apiUrl}/api/organization/features`, {
         method: 'GET',
-        headers: { Authorization: `Bearer ${authToken}` },
+        headers: { Authorization: `Bearer ${authToken}`, [CLIENT_IDENTITY_HEADER]: CLIENT_IDENTITY_VALUE },
         redirect: 'manual',
         signal: AbortSignal.timeout(6000),
       });
