@@ -50,6 +50,14 @@ assert.equal(equipmentTotals(readEquipment(drafts.seleccionUnica.specs)).panelCo
   assert.deepEqual(mirror(model.specs), []);
 }
 
+// 1c. El proveedor elegido en el borrador llega al grupo principal (y no queda a nivel de specs).
+{
+  const supplier = { supplierName: 'Dist QA', priceUSD: 95, supplierPriceId: 'sp-q' };
+  const withSupplier = prepareProposalDraftProject(BENCHMARK_PROJECT, { ...data, panels: undefined, inverters: undefined, batteries: undefined, selectedPanelModel: 'Panel Q', selectedSupplierInfo: { panel: supplier } } as never, tariff, { isNew: false });
+  assert.deepEqual(withSupplier.specs.panels![0].selectedSupplierInfo, supplier);
+  assert.deepEqual(mirror(withSupplier.specs), []);
+}
+
 // 2. Portada del PDF y pestaña de energía: kWp y cantidades salen de los grupos.
 const theme = { id: 'test', name: 'Test', primary: '#123456', secondary: '#345678', accent: '#123456', accentDark: '#123456', accentLightBg: '#fff', accentBorder: '#123456', barColor: '#123456' };
 const project = drafts.grupos;

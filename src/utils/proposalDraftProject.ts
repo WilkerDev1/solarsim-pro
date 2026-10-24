@@ -67,7 +67,11 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
       specs=patchSingleGroup(specs,'inverter',{brandModel:data.selectedInverterModel||undefined,powerKW:data.selectedInverterPowerKW,count:data.selectedInverterCount,unitPriceUSD:data.selectedInverterUnitPriceUSD});
       specs=patchSingleGroup(specs,'battery',{brandModel:data.selectedBatteryModel||undefined,capacityKWh:data.selectedBatteryCapacityKWh,count:data.selectedBatteryCount,unitPriceUSD:data.selectedBatteryUnitPriceUSD});
     }
-    // Solo grupos: un borrador nunca escribe el espejo heredado.
+    // El proveedor elegido pertenece al grupo principal de cada tipo; el borrador nunca escribe el espejo heredado.
+    for(const kind of ['panel','inverter','battery'] as const) {
+      const supplier=data.selectedSupplierInfo?.[kind];
+      if(supplier) specs=editEquipment(specs,kind,{type:'update',index:0,patch:{selectedSupplierInfo:supplier}} as never);
+    }
     specs=migrateLegacySpecs(specs);
     const fx=data.dopExchangeRate || base.rates.usdExchangeRate || 60;
     const tariff=resolveAITariffSelection(tariffMatrix,data.distributor,data.tariffCode);
