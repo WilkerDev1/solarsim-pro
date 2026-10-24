@@ -339,6 +339,41 @@ runSupplierPriceMatrix(viaModule, 'módulo');
     const corrected = { ...auto, rates: { ...auto.rates, targetCoveragePct: 80 }, specs: { ...auto.specs, ...editEquipmentGroup(auto.specs, 'panel', { type: 'update', index: 0, patch: { powerW: 550 } }) } };
     assert.equal(countOf(next), expectedCount(corrected), '(c) el conteo se calcula con la potencia ya corregida');
   }
+
+  { // Regla general (revisión de PR #101): con autocálculo, si la reconciliación cambió la potencia del panel principal en
+    // CUALQUIER tipo de edición, la cantidad se recalcula; producción y finanzas no se mueven sin sostener la cobertura.
+    const auto = () => { const p = stale(); p.specs.autoCalculatePanels = true; withPrimary(p, 'panel', { count: 5 }); return p; };
+    const corrected = (patch: (p: ProjectSimulation) => void = () => {}) => {
+      const p = auto();
+      patch(p);
+      p.specs = { ...p.specs, ...editEquipmentGroup(p.specs, 'panel', { type: 'update', index: 0, patch: { powerW: 550 } }) };
+      return p;
+    };
+    for (const apply of [viaModule, viaStore]) {
+      const label = apply === viaModule ? 'módulo' : 'store';
+      const rates = apply(auto(), { kind: 'rates', patch: { energyCostPerKWh: 0.3 } });
+      assert.equal(panelsOf(rates)[0].powerW, 550);
+      assert.equal(countOf(rates), expectedCount(corrected()), `${label}: tarifa distinta de la cobertura: la potencia corregida recalcula`);
+      assert.notEqual(countOf(rates), 5, 'la prueba distingue la cantidad desfasada');
+      const client = apply(auto(), { kind: 'client', patch: { name: 'Otro' } });
+      assert.equal(countOf(client), expectedCount(corrected()), `${label}: dato del cliente distinto de la provincia: recalcula`);
+      const consumption = apply(auto(), { kind: 'consumption', monthlyConsumption: Array(12).fill(900) });
+      assert.equal(countOf(consumption), expectedCount(corrected(), { monthly: Array(12).fill(900) }), `${label}: consumo con la potencia corregida`);
+      // Financieras: no tocan las specs ni reconcilian; la potencia desfasada y la cantidad se quedan como estaban.
+      const financials = apply(auto(), { kind: 'financials', patch: { discountRatePct: 12 } });
+      assert.deepEqual([panelsOf(financials)[0].powerW, countOf(financials)], [600, 5], `${label}: finanzas no reconcilia ni recalcula`);
+      // Sin autocálculo la potencia se corrige y la cantidad manual se respeta.
+      const manual = auto();
+      manual.specs.autoCalculatePanels = false;
+      const kept = apply(manual, { kind: 'rates', patch: { energyCostPerKWh: 0.3 } });
+      assert.deepEqual([panelsOf(kept)[0].powerW, countOf(kept)], [550, 5], `${label}: sin autocálculo la cantidad manual se respeta`);
+      // Otras entradas del dimensionamiento: HSP propio del cliente (el de los meses) recalcula; sin cambio de entradas, no.
+      const hsp = apply(baseProject((q) => withPrimary(q, 'panel', { count: 77 })), { kind: 'client', patch: { customMonthlyHSP: Array(12).fill(3) } });
+      assert.equal(countOf(hsp), expectedCount({ ...baseProject(), client: { ...baseProject().client, customMonthlyHSP: Array(12).fill(3) } }), `${label}: un HSP propio recalcula`);
+      const same = apply(baseProject((q) => withPrimary(q, 'panel', { count: 77 })), { kind: 'rates', patch: { energyCostPerKWh: 0.3 } });
+      assert.equal(countOf(same), 77, `${label}: sin cambio de entradas de dimensionamiento no se recalcula`);
+    }
+  }
 }
 
 // ── Mirar no escribe (decisión c) y deshacer (decisión b): contra el store ───────────────────

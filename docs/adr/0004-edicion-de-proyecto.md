@@ -21,7 +21,7 @@ Las reglas para aplicar un cambio a una propuesta estaban repartidas en `project
    - el panel o inversor principal que está en el catálogo (por nombre exacto) toma su potencia unitaria;
    - el proveedor del grupo principal que ningún equipo del mismo tipo cotiza (`supplierQuotesItem`: id de oferta o nombre sin mayúsculas ni espacios) se suelta.
 
-   Lo que la propia edición fijó (una potencia escrita a mano, un proveedor elegido) se respeta. Con el catálogo sin cargar (vacío) no se reconcilia nada: el efecto anterior habría soltado todos los proveedores. La potencia corregida entra al autodimensionado de esa misma edición.
+   Lo que la propia edición fijó (una potencia escrita a mano, un proveedor elegido) se respeta. Con el catálogo sin cargar (vacío) no se reconcilia nada: el efecto anterior habría soltado todos los proveedores. Con `autoCalculatePanels` activo, el autodimensionado corre después de reconciliar en todo tipo de edición salvo `financials` (que no toca las specs): se recalcula la cantidad si el cambio lo pide (cobertura, provincia, consumo) o si cambió alguna entrada del dimensionamiento (potencia del panel principal, consumo, provincia, HSP propio, cobertura o pérdidas resueltas), por ejemplo la potencia corregida por el catálogo. Una edición de `specs` con autocálculo siempre recalcula.
 5. **El precio de proveedor es una edición más.** Pasa por `updateActiveProject`: se normaliza, recalcula la cantidad de paneles si el autocálculo está activo y la potencia del modelo cambió, sincroniza y se puede deshacer.
 6. **Entrada de datos de golpe.** La importación de `.json` y el borrador de IA no autodimensionan: la importación normaliza con `normalizeIncomingSpecs` y la IA sobre una propuesta existente usa `normalizeProjectEquipment`, la misma normalización que una edición. `assumptionFields` y `newProjectSpecs` (ADR 0003) no cambian.
 7. **Deshacer sin pasos vacíos.** `recordUndoState` descarta una instantánea idéntica a la última, así que reabrir una propuesta no deja entradas de deshacer.
@@ -31,7 +31,7 @@ Las reglas para aplicar un cambio a una propuesta estaban repartidas en `project
 
 - Aplicar un precio de proveedor con autocálculo activo recalcula la cantidad de paneles si el modelo cambió de potencia (antes la dejaba desfasada) y se puede deshacer (antes no dejaba entrada).
 - Abrir una propuesta ya no corrige la potencia del modelo principal ni suelta proveedores huérfanos: no hay escrituras, sincronización ni entradas de deshacer al mirar. Esas correcciones ocurren en la siguiente edición real.
-- Una potencia corregida por el catálogo entra al autodimensionado de la edición que la corrige.
+- Una potencia corregida por el catálogo recalcula la cantidad de paneles (con autocálculo) en cualquier tipo de edición, y un `customMonthlyHSP` nuevo del cliente también recalcula (antes solo la provincia).
 - Con el catálogo vacío no se sueltan proveedores huérfanos (antes, al montar el dock sin catálogo cargado, se soltaban).
 - Una importación con baterías habilitadas y cantidad no positiva queda con cantidad 1, como cualquier edición.
 - Un consumo mensual negativo existente en otros meses se lleva a 0 al editar un mes (antes solo se limitaba el mes editado).

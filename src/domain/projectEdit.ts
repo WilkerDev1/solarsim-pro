@@ -1,7 +1,7 @@
 import type { ClientInfo, FinancialParams, LegacyProjectSpecs, ProjectSimulation, SystemSpecs, UtilityRates } from '../types';
 import type { EquipmentSupplierPrice, SolarEquipmentItem } from '../types/equipment';
 import { LIST_KEY, editEquipment, migrateLegacySpecs, readEquipment, type EquipmentKind } from '../../shared/equipment';
-import { resolveAssumption } from '../../shared/assumptions';
+import { resolveAssumption, resolveAssumptions } from '../../shared/assumptions';
 import { resolveSystemLossesPct } from '../../shared/projectDefaults';
 import { calculateRecommendedPanelCount } from '../engine/solarEngine';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
@@ -59,8 +59,7 @@ export function applyProjectEdit(project: ProjectSimulation, edit: ProjectEdit, 
       break;
     case 'rates': {
       const rates = { ...project.rates, ...edit.patch };
-      const specs = reconcileWithCatalog(project.specs, project.specs, catalog);
-      next = { ...project, rates, specs: edit.patch.targetCoveragePct !== undefined ? sizeIfAuto({ ...project, rates }, specs) : { ...specs } };
+      next = resizeIfNeeded(project, { ...project, rates, specs: { ...reconcileWithCatalog(project.specs, project.specs, catalog) } }, edit.patch.targetCoveragePct !== undefined);
       break;
     }
     case 'client': {
@@ -69,23 +68,23 @@ export function applyProjectEdit(project: ProjectSimulation, edit: ProjectEdit, 
       if (edit.patch.contactPhone !== undefined) customization.clientPhone = edit.patch.contactPhone;
       if (edit.patch.contactPerson !== undefined) customization.contactName = edit.patch.contactPerson;
       if (edit.patch.contactEmail !== undefined) customization.clientEmail = edit.patch.contactEmail;
-      const specs = reconcileWithCatalog(project.specs, project.specs, catalog);
-      next = { ...project, client, customization, specs: edit.patch.province ? sizeIfAuto({ ...project, client }, specs) : { ...specs } };
+      next = resizeIfNeeded(project, { ...project, client, customization, specs: { ...reconcileWithCatalog(project.specs, project.specs, catalog) } }, !!edit.patch.province);
       break;
     }
     case 'consumption': {
       const monthlyConsumption = edit.monthlyConsumption.map((value) => Math.max(0, value));
-      const reconciled = reconcileWithCatalog(project.specs, project.specs, catalog);
-      const specs = edit.lockAutoPanels ? { ...reconciled, autoCalculatePanels: false } : sizeIfAuto({ ...project, monthlyConsumption }, reconciled);
-      next = {
+      const reconciled = { ...reconcileWithCatalog(project.specs, project.specs, catalog) };
+      const specs = edit.lockAutoPanels ? { ...reconciled, autoCalculatePanels: false } : reconciled;
+      next = resizeIfNeeded(project, {
         ...project,
         monthlyConsumption,
         aiSource: project.aiSource?.consumptionSource === 'theoretical' ? { ...project.aiSource, consumptionSource: 'estimated' } : project.aiSource,
         specs,
-      };
+      }, true);
       break;
     }
     case 'financials':
+      // Sin reconciliación ni entradas de dimensionamiento: la cantidad de paneles no se toca.
       next = { ...project, financials: withoutStaleFinancialOverrides(project, { ...project.financials, ...edit.patch }) };
       break;
   }
@@ -131,9 +130,24 @@ function withRecommendedPanels(project: ProjectSimulation, specs: SystemSpecs): 
     : specs;
 }
 
-/** Recomienda la cantidad de paneles solo si el proyecto la tiene en automático; `project` ya lleva el cambio que la motiva. */
-function sizeIfAuto(project: ProjectSimulation, specs: SystemSpecs): SystemSpecs {
-  return specs.autoCalculatePanels ? withRecommendedPanels(project, specs) : { ...specs };
+/** Entradas del dimensionamiento: potencia del panel principal, consumo, provincia y HSP propio, cobertura y pérdidas resueltas. */
+const sizingInputs = (project: ProjectSimulation) => {
+  const assumptions = resolveAssumptions(project);
+  return JSON.stringify([
+    readEquipment(project.specs).panels[0]?.powerW, project.monthlyConsumption, project.client.province, project.client.customMonthlyHSP,
+    assumptions.targetCoveragePct, assumptions.systemLossesPct,
+  ]);
+};
+
+/**
+ * El único punto donde las ediciones que no son de specs autodimensionan, DESPUÉS de reconciliar con el catálogo: con
+ * `autoCalculatePanels` activo la cantidad se recalcula si el cambio lo pide (`forced`: cobertura, provincia, consumo) o si
+ * alguna entrada del dimensionamiento cambió por el camino, por ejemplo la potencia que corrigió el catálogo. Así la
+ * producción y las finanzas no se mueven sin sostener la cobertura objetivo, sea cual sea la edición. `next` ya trae el cambio.
+ */
+function resizeIfNeeded(before: ProjectSimulation, next: ProjectSimulation, forced: boolean): ProjectSimulation {
+  if (!next.specs.autoCalculatePanels || !(forced || sizingInputs(before) !== sizingInputs(next))) return next;
+  return { ...next, specs: withRecommendedPanels(next, next.specs) };
 }
 
 // ── Specs ───────────────────────────────────────────────────────────────────────────────────
