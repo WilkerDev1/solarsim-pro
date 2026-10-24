@@ -54,7 +54,7 @@ Capacidad útil y autonomía informadas en el resumen financiero:
 
 $$E_{bat,util} = C_{nominal} \times \frac{\text{DoD}}{100} \times \frac{\eta}{100}$$
 
-con `batteryDOD` y `batteryEfficiencyPct` (90/90 si faltan o no son > 0; constantes únicas en `shared/projectDefaults.ts`, las mismas que usan `solarEngine.ts`, el dock y `getProjectBatteries`). Antes el resumen financiero usaba 80/92 y el despacho físico 90/90.
+con el DOD y la eficiencia de cada grupo de baterías (`dodPct` y `efficiencyPct`, ponderados por grupo; 90/90 si faltan o no son > 0; constantes únicas en `shared/projectDefaults.ts`, las mismas que usan `solarEngine.ts`, el dock y `getProjectBatteries`). Antes el resumen financiero usaba 80/92 y el despacho físico 90/90.
 
 $$L_{prom} = \frac{E_{consumo\_anual}}{365 \times 24}, \qquad T_{autonomía} = \frac{E_{bat,util}}{L_{prom}} \quad [\text{h}]$$
 
@@ -74,7 +74,7 @@ Si el consumo anual es 0 se asume 100 kWh/día para el promedio.
 
 Un ítem adicional se considera exonerado según `exonerateITBIS` (o, en datos antiguos, `applyITBIS`; exonerado si ambos faltan). Precios por defecto cuando un proyecto antiguo no tiene grupos: panel 103.32, inversor 2300, batería 1990 e instalación 170 USD/kWp.
 
-Con grupos multi-equipo, cada grupo usa su propio `unitPriceUSD`. Un grupo sin precio no hereda el de otro modelo ni un precio de referencia: aporta 0 y la cotización muestra que faltan costos; ese subtotal es provisional. Los proyectos antiguos sin grupos conservan la resolución escalar.
+Con grupos multi-equipo, cada grupo usa su propio `unitPriceUSD`. Un grupo sin precio no hereda el de otro modelo ni un precio de referencia: aporta 0 y la cotización muestra que faltan costos; ese subtotal es provisional. El dock («Costos unitarios») muestra ese grupo con el campo vacío («Sin precio»), nunca con un precio de referencia. Los proyectos antiguos sin grupos conservan la resolución escalar.
 
 ### 3.2 Totales, margen y precio de lista
 

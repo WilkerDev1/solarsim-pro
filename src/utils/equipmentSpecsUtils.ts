@@ -1,153 +1,37 @@
 import { SystemSpecs, PanelItemSpec, InverterItemSpec, BatteryItemSpec } from '../types';
+import { equipmentTotals, readEquipment } from '../../shared/equipment';
 
 /**
- * Returns a normalized array of panel models for the project.
- * If specs.panels is set and non-empty, returns it.
- * Otherwise, synthesizes a single PanelItemSpec from the base fields for 100% backward compatibility.
+ * Lectores de equipos del cliente: todos pasan por `shared/equipment` (`readEquipment`, `equipmentTotals`), el único
+ * lugar que conoce el espejo heredado. Con grupos guardados se devuelven tal cual; sin ellos se derivan de los
+ * campos heredados (datos viejos o enlaces publicados). Con `hasBattery` falso no hay baterías.
  */
-export function getProjectPanels(specs: SystemSpecs): PanelItemSpec[] {
-  if (specs.panels && Array.isArray(specs.panels) && specs.panels.length > 0) {
-    return specs.panels;
-  }
-  return [
-    {
-      id: 'primary-panel',
-      brandModel: specs.panelBrandModel || 'Módulo Canadian Solar TOPBiHiKu6 620W',
-      powerW: specs.panelPowerW || 620,
-      count: specs.panelCount || 0,
-      unitPriceUSD: specs.panelUnitPriceUSD,
-      weightKilos: specs.panelWeightKilos,
-      efficiencyPct: specs.panelEfficiency,
-      tempCoeff: specs.tempCoeff,
-      annualDegradation: specs.annualDegradation,
-      selectedSupplierInfo: specs.selectedSupplierInfo?.panel
-        ? {
-            supplierName: specs.selectedSupplierInfo.panel.supplierName,
-            priceUSD: specs.selectedSupplierInfo.panel.priceUSD,
-            updatedAt: specs.selectedSupplierInfo.panel.updatedAt,
-            supplierPriceId: specs.selectedSupplierInfo.panel.supplierPriceId,
-          }
-        : undefined,
-    },
-  ];
-}
+export const getProjectPanels = (specs: SystemSpecs): PanelItemSpec[] => readEquipment(specs).panels;
+export const getProjectInverters = (specs: SystemSpecs): InverterItemSpec[] => readEquipment(specs).inverters;
+export const getProjectBatteries = (specs: SystemSpecs): BatteryItemSpec[] => readEquipment(specs).batteries;
+
+const totalsOf = (specs: SystemSpecs) => equipmentTotals(readEquipment(specs));
+
+/** Potencia DC pico (kWp) de todos los modelos de panel. */
+export const calculateTotalDCCapacityKWp = (specs: SystemSpecs): number => totalsOf(specs).capacityKWp;
+/** Cantidad total de paneles. */
+export const calculateTotalPanelCount = (specs: SystemSpecs): number => totalsOf(specs).panelCount;
+/** Potencia nominal total de inversores (kW). */
+export const calculateTotalInverterPowerKW = (specs: SystemSpecs): number => totalsOf(specs).inverterKW;
+/** Cantidad total de inversores. */
+export const calculateTotalInverterCount = (specs: SystemSpecs): number => totalsOf(specs).inverterCount;
+/** Capacidad nominal total del banco (kWh); 0 sin batería. No es energía útil. */
+export const calculateTotalBatteryCapacityKWh = (specs: SystemSpecs): number => totalsOf(specs).batteryNominalKWh;
+/** Cantidad total de baterías; 0 sin batería. */
+export const calculateTotalBatteryCount = (specs: SystemSpecs): number => totalsOf(specs).batteryCount;
 
 /**
- * Returns a normalized array of inverter models for the project.
- * If specs.inverters is set and non-empty, returns it.
- * Otherwise, synthesizes a single InverterItemSpec from the base fields for 100% backward compatibility.
+ * Banco de baterías para `resolveBatteryBank*` (`shared/projectDefaults`): DOD y eficiencia salen solo de los grupos.
+ * Los escalares son los del primer grupo y únicamente cuentan si la capacidad total del banco es 0.
  */
-export function getProjectInverters(specs: SystemSpecs): InverterItemSpec[] {
-  if (specs.inverters && Array.isArray(specs.inverters) && specs.inverters.length > 0) {
-    return specs.inverters;
-  }
-  return [
-    {
-      id: 'primary-inverter',
-      brandModel: specs.inverterBrandModel || 'Inversor Solar Inteligente',
-      powerKW: specs.inverterPowerKW || 8,
-      count: specs.inverterCount !== undefined ? specs.inverterCount : 1,
-      unitPriceUSD: specs.inverterUnitPriceUSD,
-      weightKilos: specs.inverterWeightKilos,
-      efficiencyPct: specs.inverterEfficiencyPct,
-      selectedSupplierInfo: specs.selectedSupplierInfo?.inverter
-        ? {
-            supplierName: specs.selectedSupplierInfo.inverter.supplierName,
-            priceUSD: specs.selectedSupplierInfo.inverter.priceUSD,
-            updatedAt: specs.selectedSupplierInfo.inverter.updatedAt,
-            supplierPriceId: specs.selectedSupplierInfo.inverter.supplierPriceId,
-          }
-        : undefined,
-    },
-  ];
-}
-
-/**
- * Returns a normalized array of battery models for the project.
- * If specs.hasBattery is false, returns an empty array.
- * If specs.batteries is set and non-empty, returns it.
- * Otherwise, synthesizes a single BatteryItemSpec from the base fields for 100% backward compatibility.
- */
-export function getProjectBatteries(specs: SystemSpecs): BatteryItemSpec[] {
-  if (!specs.hasBattery) return [];
-  if (specs.batteries && Array.isArray(specs.batteries) && specs.batteries.length > 0) {
-    return specs.batteries;
-  }
-  return [
-    {
-      id: 'primary-battery',
-      brandModel: specs.batteryBrandModel || 'Batería de Litio LiFePO4',
-      capacityKWh: specs.batteryCapacityKWh || 16.08,
-      count: specs.batteryCount !== undefined ? specs.batteryCount : 1,
-      unitPriceUSD: specs.batteryUnitPriceUSD,
-      weightKilos: specs.batteryWeightKilos,
-      dodPct: specs.batteryDOD, // vacío permitido: el motor aplica el default (shared/projectDefaults)
-      efficiencyPct: specs.batteryEfficiencyPct,
-      lifespanYears: specs.batteryLifespanYears || 10,
-      replacementCostUSD: specs.batteryReplacementCostUSD,
-      selectedSupplierInfo: specs.selectedSupplierInfo?.battery
-        ? {
-            supplierName: specs.selectedSupplierInfo.battery.supplierName,
-            priceUSD: specs.selectedSupplierInfo.battery.priceUSD,
-            updatedAt: specs.selectedSupplierInfo.battery.updatedAt,
-            supplierPriceId: specs.selectedSupplierInfo.battery.supplierPriceId,
-          }
-        : undefined,
-    },
-  ];
-}
-
-/**
- * Calculates total DC peak capacity in kWp across all panel models.
- */
-export function calculateTotalDCCapacityKWp(specs: SystemSpecs): number {
-  const panels = getProjectPanels(specs);
-  const totalWatts = panels.reduce((sum, p) => sum + (p.powerW || 0) * (p.count || 0), 0);
-  return Math.round((totalWatts / 1000) * 1000) / 1000;
-}
-
-/**
- * Calculates total count of solar panels across all models.
- */
-export function calculateTotalPanelCount(specs: SystemSpecs): number {
-  const panels = getProjectPanels(specs);
-  return panels.reduce((sum, p) => sum + (p.count || 0), 0);
-}
-
-/**
- * Calculates total nominal inverter capacity in kW across all inverter models.
- */
-export function calculateTotalInverterPowerKW(specs: SystemSpecs): number {
-  const inverters = getProjectInverters(specs);
-  const totalKW = inverters.reduce((sum, inv) => sum + (inv.powerKW || 0) * (inv.count || 0), 0);
-  return Math.round(totalKW * 100) / 100;
-}
-
-/**
- * Calculates total count of inverters across all models.
- */
-export function calculateTotalInverterCount(specs: SystemSpecs): number {
-  const inverters = getProjectInverters(specs);
-  return inverters.reduce((sum, inv) => sum + (inv.count || 0), 0);
-}
-
-/**
- * Calculates total nominal BESS battery capacity in kWh across all battery models.
- */
-export function calculateTotalBatteryCapacityKWh(specs: SystemSpecs): number {
-  if (!specs.hasBattery) return 0;
-  const batteries = getProjectBatteries(specs);
-  const totalKWh = batteries.reduce((sum, b) => sum + (b.capacityKWh || 0) * (b.count || 0), 0);
-  return Math.round(totalKWh * 100) / 100;
-}
-
-/**
- * Calculates total count of batteries across all models.
- */
-export function calculateTotalBatteryCount(specs: SystemSpecs): number {
-  if (!specs.hasBattery) return 0;
-  const batteries = getProjectBatteries(specs);
-  return batteries.reduce((sum, b) => sum + (b.count || 0), 0);
+export function batteryBankSpecs(specs: SystemSpecs): { batteries: BatteryItemSpec[]; dodPct?: number; efficiencyPct?: number } {
+  const batteries = readEquipment(specs).batteries;
+  return { batteries, dodPct: batteries[0]?.dodPct, efficiencyPct: batteries[0]?.efficiencyPct };
 }
 
 /**

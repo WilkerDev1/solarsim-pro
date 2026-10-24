@@ -32,7 +32,7 @@ export interface DocumentTextContext {
   energyCoveragePct: number;
 
   panelCount: number;
-  /** «38 Módulos …» o el resumen de varios grupos. */
+  /** «38 Módulos …»; con varios modelos, el principal y «y N modelo(s) más». */
   panelsSummaryText: string;
   /** Modelo usado para sincronizar un párrafo personalizado (resumen si hay varios grupos). */
   panelModelText: string;
@@ -40,6 +40,7 @@ export interface DocumentTextContext {
   invertersSummaryText: string;
   inverterModelText: string;
   batteryCount: number;
+  /** Capacidad nominal total del banco (kWh), suma de todos los grupos. */
   batteryCapacityKWh: number;
   batteriesSummaryText: string;
   batteryModelText: string;

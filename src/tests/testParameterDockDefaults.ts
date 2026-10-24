@@ -8,9 +8,10 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { BENCHMARK_PROJECT } from '../engine/referenceCase';
+import { BENCHMARK_LEGACY_SPECS, BENCHMARK_PROJECT } from '../engine/referenceCase';
+import { calculateCostMatrixSummary } from '../engine/financeEngine';
 import { DEFAULT_RD_TARIFF_MATRIX, getReferenceEnergyRateUSD } from '../data/rdTariffs';
-import type { ProjectSimulation, SystemSpecs } from '../types';
+import type { ProjectSimulation, LegacyProjectSpecs } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
 import { DEFAULT_UNIT_PRICE_USD } from '../utils/equipmentGroups';
 import { getProjectBatteries } from '../utils/equipmentSpecsUtils';
@@ -36,8 +37,9 @@ const noop = () => {};
 const render = (node: React.ReactElement) => renderToStaticMarkup(node);
 const valueOf = (html: string, id: string): string | undefined => new RegExp(`id="${id}"[^>]*value="([^"]*)"`).exec(html)?.[1];
 
-const base = structuredClone(BENCHMARK_PROJECT);
-const projectOf = (specs: Partial<SystemSpecs> = {}, extra: Partial<ProjectSimulation> = {}): ProjectSimulation =>
+// Propuesta heredada (solo espejo, sin grupos): el dock y el motor la leen por el módulo de equipos.
+const base = { ...structuredClone(BENCHMARK_PROJECT), specs: { ...BENCHMARK_LEGACY_SPECS } };
+const projectOf = (specs: Partial<LegacyProjectSpecs> = {}, extra: Partial<ProjectSimulation> = {}): ProjectSimulation =>
   ({ ...base, ...extra, specs: { ...base.specs, ...specs } });
 const emptySummary = { batteryUsableKWh: 0, batteryBackupAutonomyHours: 0, systemCapacityKWp: 0 } as never;
 
@@ -107,14 +109,17 @@ assert.equal(averageMonthlyConsumption({ monthlyConsumption: [100, 300] }), 200)
 }
 {
   const list = (kind: 'panel' | 'inverter' | 'battery', specs: object) => render(h(EquipmentGroupList, {
-    kind, mode: 'manual', specs: { panelCount: 10, panelPowerW: 500, hasBattery: true, ...specs } as SystemSpecs,
+    kind, mode: 'manual', specs: { panelCount: 10, panelPowerW: 500, hasBattery: true, ...specs } as LegacyProjectSpecs,
     catalog: [], updateSpecs: noop, onOpenScanner: noop, enabled: true,
   } as never));
-  assert.match(list('panel', {}), /value="Módulos Canadian Solar CS6\.1-72TB-600 \(600W\)"/);
-  assert.match(list('inverter', { inverterCount: 1, inverterPowerKW: 5 }), /value="Inversor Lux Power LXP-LB-US 8K \(8\.0Kw\)"/);
-  assert.match(list('battery', { batteryCount: 1, batteryCapacityKWh: 5 }), /value="Batería Hinaess 16 KwH-48 vdc\."/);
-  assert.match(list('panel', { panelBrandModel: 'Mi panel' }), /value="Mi panel"/);
-  assert.doesNotMatch(list('panel', { panelBrandModel: 'Mi panel' }), /Canadian Solar CS6\.1-72TB-600/);
+  // El modelo principal sin nombre (grupo con marca vacía) muestra el marcador del modo Manual.
+  assert.match(list('panel', { panels: [{ id: 'p0', brandModel: '', powerW: 500, count: 10 }] }), /value="Módulos Canadian Solar CS6\.1-72TB-600 \(600W\)"/);
+  assert.match(list('inverter', { inverters: [{ id: 'i0', brandModel: '', powerKW: 5, count: 1 }] }), /value="Inversor Lux Power LXP-LB-US 8K \(8\.0Kw\)"/);
+  assert.match(list('battery', { batteries: [{ id: 'b0', brandModel: '', capacityKWh: 5, count: 1 }] }), /value="Batería Hinaess 16 KwH-48 vdc\."/);
+  assert.match(list('panel', { panels: [{ id: 'p0', brandModel: 'Mi panel', powerW: 500, count: 10 }] }), /value="Mi panel"/);
+  assert.doesNotMatch(list('panel', { panels: [{ id: 'p0', brandModel: 'Mi panel', powerW: 500, count: 10 }] }), /Canadian Solar CS6\.1-72TB-600/);
+  // Un proyecto heredado migrado nombra su panel sin marca con el nombre de reserva de la matriz de costos.
+  assert.match(list('panel', {}), /value="Módulo Canadian Solar TOPBiHiKu6 620W"/);
 }
 
 // ── Batería: DOD y eficiencia (0 guardado = default) y selección de catálogo vacía ─────────
@@ -136,21 +141,21 @@ assert.equal(averageMonthlyConsumption({ monthlyConsumption: [100, 300] }), 200)
 }
 {
   const empty = (type: SolarEquipmentItem['type']) => ({ id: 'x', type, displayName: 'X', brand: 'B' }) as SolarEquipmentItem;
-  const specs = { panelCount: 1, panelPowerW: 500 } as SystemSpecs;
+  const specs = { panelCount: 1, panelPowerW: 500 } as LegacyProjectSpecs;
+  const groupOf = <K extends 'panels' | 'inverters' | 'batteries'>(patch: Partial<LegacyProjectSpecs>, key: K): NonNullable<LegacyProjectSpecs[K]>[number] => patch[key]![0] as NonNullable<LegacyProjectSpecs[K]>[number];
   const bat = buildCatalogSelectionUpdate(specs, 'battery', empty('battery'));
-  assert.equal(bat.batteryCapacityKWh, 16.08);
-  assert.equal(bat.batteryDOD, 90);
-  assert.equal(bat.batteryEfficiencyPct, 90);
-  const group = getProjectBatteries({ ...specs, hasBattery: true, ...bat } as SystemSpecs)[0];
+  assert.deepEqual([groupOf(bat, 'batteries').capacityKWh, groupOf(bat, 'batteries').dodPct, groupOf(bat, 'batteries').efficiencyPct], [16.08, 90, 90]);
+  assert.equal('batteryCapacityKWh' in bat || 'batteryDOD' in bat || 'batteryEfficiencyPct' in bat, false, 'la selección no escribe el espejo');
+  const group = getProjectBatteries({ ...specs, hasBattery: true, ...bat } as LegacyProjectSpecs)[0];
   assert.equal(group.capacityKWh, 16.08);
   assert.equal(group.dodPct, 90);
-  const zero = buildCatalogSelectionUpdate(specs, 'battery', { ...empty('battery'), capacityKWh: 0, dodPct: 0, batteryEfficiencyPct: 0 });
-  assert.deepEqual([zero.batteryCapacityKWh, zero.batteryDOD, zero.batteryEfficiencyPct], [16.08, 90, 90], 'ceros del catálogo: valores por defecto');
-  const real = buildCatalogSelectionUpdate(specs, 'battery', { ...empty('battery'), capacityKWh: 10, dodPct: 80, batteryEfficiencyPct: 92 });
-  assert.deepEqual([real.batteryCapacityKWh, real.batteryDOD, real.batteryEfficiencyPct], [10, 80, 92]);
+  const zero = groupOf(buildCatalogSelectionUpdate(specs, 'battery', { ...empty('battery'), capacityKWh: 0, dodPct: 0, batteryEfficiencyPct: 0 }), 'batteries');
+  assert.deepEqual([zero.capacityKWh, zero.dodPct, zero.efficiencyPct], [16.08, 90, 90], 'ceros del catálogo: valores por defecto');
+  const real = groupOf(buildCatalogSelectionUpdate(specs, 'battery', { ...empty('battery'), capacityKWh: 10, dodPct: 80, batteryEfficiencyPct: 92 }), 'batteries');
+  assert.deepEqual([real.capacityKWh, real.dodPct, real.efficiencyPct], [10, 80, 92]);
   const panel = buildCatalogSelectionUpdate(specs, 'panel', empty('panel'));
-  assert.deepEqual([panel.panelPowerW, panel.panelEfficiency, panel.tempCoeff, panel.annualDegradation], [550, 22, -0.29, 0.4]);
-  assert.equal(buildCatalogSelectionUpdate(specs, 'inverter', empty('inverter')).inverterPowerKW, 8);
+  assert.deepEqual([groupOf(panel, 'panels').powerW, panel.panelEfficiency, panel.tempCoeff, panel.annualDegradation], [550, 22, -0.29, 0.4]);
+  assert.equal(groupOf(buildCatalogSelectionUpdate(specs, 'inverter', empty('inverter')), 'inverters').powerKW, 8);
 }
 
 // ── Costos y margen ────────────────────────────────────────────────────────────────────────
@@ -159,19 +164,40 @@ assert.equal(marginPctFromMultiplier(0), 25, 'multiplicador 0: 1.25');
 assert.equal(marginPctFromMultiplier(1.3), 30);
 assert.equal(wholeMarginPctFromMultiplier(undefined), 25);
 assert.equal(wholeMarginPctFromMultiplier(0), 25);
-assert.deepEqual((['panel', 'inverter', 'battery'] as const).map((k) => displayedUnitPrice(undefined, undefined, k)), [103.32, 2300, 1990]);
-assert.equal(displayedUnitPrice(0, undefined, 'panel'), 0, 'un precio propio de 0 se respeta');
+assert.equal(displayedUnitPrice(undefined), undefined, 'sin precio propio no se muestra el de la matriz de costos: el motor cuenta 0');
+assert.equal(displayedUnitPrice(0), 0, 'un precio propio de 0 se respeta');
 assert.deepEqual(DEFAULT_UNIT_PRICE_USD, { panel: 103.32, inverter: 2300, battery: 1990 });
 {
   const bare = { ...base.specs, panels: undefined, inverters: undefined, batteries: undefined, hasBattery: true, autoSupplierPricing: false,
-    panelUnitPriceUSD: undefined, inverterUnitPriceUSD: undefined, batteryUnitPriceUSD: undefined, installationUnitPriceUSD: undefined } as SystemSpecs;
-  const costs = (specs: SystemSpecs) => render(h(UnitCosts, { specs, equipmentCatalog: [], selected: {}, openSupplierPriceModal: noop, updateSpecs: noop }));
+    panelUnitPriceUSD: undefined, inverterUnitPriceUSD: undefined, batteryUnitPriceUSD: undefined, installationUnitPriceUSD: undefined } as LegacyProjectSpecs;
+  const costs = (specs: LegacyProjectSpecs) => render(h(UnitCosts, { specs, equipmentCatalog: [], selected: {}, openSupplierPriceModal: noop, updateSpecs: noop }));
   const html = costs(bare);
   assert.deepEqual(
     [...html.matchAll(/<input[^>]*value="([^"]*)"/g)].map((m) => m[1]).filter((v) => ['103.32', '2300', '1990', '170'].includes(v)),
     ['103.32', '2300', '1990', '170'], 'costos unitarios por defecto sin precio propio',
   );
-  assert.doesNotMatch(costs({ ...bare, installationUnitPriceUSD: 0 } as SystemSpecs), /value="170"/, 'mano de obra 0 se respeta');
+  assert.doesNotMatch(costs({ ...bare, installationUnitPriceUSD: 0 } as LegacyProjectSpecs), /value="170"/, 'mano de obra 0 se respeta');
+}
+// Un grupo guardado sin precio (borrador de IA) se muestra «sin precio» y el motor lo cuenta 0; con precio se muestra.
+{
+  const unpriced = { ...base.specs, hasBattery: true, autoSupplierPricing: false, installationUnitPriceUSD: 170,
+    panels: [{ id: 'p1', brandModel: 'Panel sin precio', powerW: 600, count: 10 }, { id: 'p2', brandModel: 'Panel con precio', powerW: 600, count: 2, unitPriceUSD: 95 }],
+    inverters: [{ id: 'i1', brandModel: 'Inversor sin precio', powerKW: 5, count: 1 }],
+    batteries: [{ id: 'b1', brandModel: 'Batería con precio', capacityKWh: 10, count: 1, unitPriceUSD: 1500 }] } as typeof base.specs;
+  const html = render(h(UnitCosts, { specs: unpriced, equipmentCatalog: [], selected: {}, openSupplierPriceModal: noop, updateSpecs: noop }));
+  const input = (id: string) => html.match(new RegExp(`<input[^>]*id="${id}"[^>]*>`))?.[0] ?? '';
+  const valueOfInput = (id: string) => input(id).match(/value="([^"]*)"/)?.[1];
+  assert.equal(valueOfInput('pd-cost-panel-0'), '', 'panel sin precio: campo vacío');
+  assert.match(input('pd-cost-panel-0'), /placeholder="Sin precio"/);
+  assert.equal(valueOfInput('pd-cost-inverter-0'), '', 'inversor sin precio: campo vacío');
+  assert.equal(valueOfInput('pd-cost-panel-1'), '95', 'con precio se muestra el precio');
+  assert.equal(valueOfInput('pd-cost-battery-0'), '1500');
+  assert.doesNotMatch(html, /value="(103\.32|2300|1990)"/, 'ningún precio de referencia inventado');
+  const matrix = calculateCostMatrixSummary(unpriced, 7.2);
+  const row = (name: string) => matrix.items.find((item) => item.name === name)!;
+  assert.equal(row('Panel sin precio').unitPriceUSD, 0, 'el motor cuenta 0 para el grupo sin precio');
+  assert.equal(row('Inversor sin precio').unitPriceUSD, 0);
+  assert.equal(row('Panel con precio').unitPriceUSD, 95);
 }
 {
   const pricing = (specs: object, summary: unknown = {}) => render(h(PricingParamsSection, {
@@ -192,7 +218,7 @@ assert.deepEqual(DEFAULT_UNIT_PRICE_USD, { panel: 103.32, inverter: 2300, batter
 }
 {
   const direct = (specs: object, matrix?: object) => render(h(DirectPrice, {
-    specs: { ...base.specs, pricingMode: 'direct_watt', ...specs } as SystemSpecs,
+    specs: { ...base.specs, pricingMode: 'direct_watt', ...specs } as LegacyProjectSpecs,
     summary: { systemCapacityKWp: 10, costMatrix: matrix } as never, updateSpecs: noop,
   }));
   const html = direct({ pricePerWattUSD: undefined, pricePerKWpUSD: undefined });
@@ -219,8 +245,8 @@ assert.deepEqual(DEFAULT_UNIT_PRICE_USD, { panel: 103.32, inverter: 2300, batter
 
 // ── Vista previa de autoconsumo: DOD 90, eficiencia 90 y pérdidas 25 cuando son undefined ──
 {
-  const preview = (specs: Partial<SystemSpecs>) => computeLoadProfilePreview(projectOf({ hasBattery: true, batteryCapacityKWh: 16, batteryCount: 1, batteries: undefined, ...specs }), 'BTS2', 900);
-  const unset = { batteryDOD: undefined, batteryEfficiencyPct: undefined, systemLosses: undefined } as Partial<SystemSpecs>;
+  const preview = (specs: Partial<LegacyProjectSpecs>) => computeLoadProfilePreview(projectOf({ hasBattery: true, batteryCapacityKWh: 16, batteryCount: 1, batteries: undefined, ...specs }), 'BTS2', 900);
+  const unset = { batteryDOD: undefined, batteryEfficiencyPct: undefined, systemLosses: undefined } as Partial<LegacyProjectSpecs>;
   // El proyecto de referencia es detallado: sin pérdidas guardadas el motor (y ahora la vista previa) asume 14 %, no 25 %.
   assert.deepEqual(preview(unset), preview({ batteryDOD: 90, batteryEfficiencyPct: 90, systemLosses: 14 }), 'detallado sin pérdidas: 14 (antes 25)');
   assert.deepEqual(preview({ ...unset, isDetailed: false }), preview({ batteryDOD: 90, batteryEfficiencyPct: 90, systemLosses: 25, isDetailed: false }));

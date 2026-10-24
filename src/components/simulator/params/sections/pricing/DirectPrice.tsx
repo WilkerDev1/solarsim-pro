@@ -1,4 +1,5 @@
 import React from 'react';
+import { equipmentTotals, readEquipment } from '../../../../../../shared/equipment';
 import { Sparkles } from 'lucide-react';
 import { CommitNumberField, InfoTip, ParamRow, StatStrip, SubHeader, SubHeaderTextButton, ToggleGroup } from '../../ui';
 import type { FinancialSummaryResult, SystemSpecs } from '../../../../../types';
@@ -22,6 +23,7 @@ const TIP =
 
 /** Modo Directo: $/W y $/kWp sincronizados, destino del excedente y resumen de margen. */
 export const DirectPrice: React.FC<DirectPriceProps> = ({ specs, summary, financialsPricePerWattUSD, updateSpecs }) => {
+  const bankTotals = equipmentTotals(readEquipment(specs));
   // Ambos campos salen del mismo valor. El motor ignora un $/Wp ≤ 0 (usa financials y luego el default): la vista sigue la misma cadena.
   const wattPrice = resolvePricePerWattUSD(specs, { pricePerWattUSD: financialsPricePerWattUSD });
   const kwpPrice = isValidDirectPrice(specs.pricePerKWpUSD) && Math.abs(specs.pricePerKWpUSD / 1000 - wattPrice) <= 0.00051 ? specs.pricePerKWpUSD : pricePerKWpFromWatt(wattPrice);
@@ -71,7 +73,7 @@ export const DirectPrice: React.FC<DirectPriceProps> = ({ specs, summary, financ
         <div className="flex items-baseline justify-between text-[13px] text-pd-muted">
           <span>Almacenamiento incluido</span>
           <span className="font-mono text-pd-text">
-            {specs.batteryCount || 1} ud ({((specs.batteryCapacityKWh || 5) * (specs.batteryCount || 1)).toFixed(1)} kWh)
+            {bankTotals.batteryCount || 1} ud ({bankTotals.batteryNominalKWh.toFixed(1)} kWh)
           </span>
         </div>
       )}

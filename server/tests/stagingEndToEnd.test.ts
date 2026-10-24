@@ -17,6 +17,11 @@ import {
   fetchWithSessionRetry,
 } from "../../src/services/syncService.js";
 import { CompanyService } from "../../src/services/companyService.js";
+import {
+  CLIENT_IDENTITY_VALUE,
+  CLIENT_VERSION,
+} from "../../src/services/clientIdentity.js";
+import { asClient } from "./helpers/clientHeader.js";
 import type { ProjectSimulation } from "../../src/types/index.js";
 
 const jwtSecret = "staging-e2e-secret-key-32-chars-long-0123456789";
@@ -24,6 +29,7 @@ const jwtSecret = "staging-e2e-secret-key-32-chars-long-0123456789";
 let database: EphemeralPostgres;
 let pool: pg.Pool;
 let apiApp: ReturnType<typeof createApp>;
+let apiClient: ReturnType<typeof createApp>;
 let workerApp: ReturnType<typeof createShareViewer>;
 const kvStore = new Map<string, string>();
 
@@ -41,7 +47,14 @@ before(async () => {
   await migrateDatabase(pool);
 
   // 3. Create API application instance
-  apiApp = createApp({ pool, jwtSecret, logging: false });
+  // The suite runs the real client code: the API accepts the version the client itself reports (package.json).
+  apiApp = createApp({
+    pool,
+    jwtSecret,
+    logging: false,
+    minClientVersion: CLIENT_VERSION,
+  });
+  apiClient = asClient(apiApp, CLIENT_IDENTITY_VALUE);
 
   // 4. Create Worker instance with fetch routed to the synthetic API instance
   const apiFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -52,7 +65,7 @@ before(async () => {
   workerApp = createShareViewer(apiFetch as typeof fetch);
 
   // 5. Register Admin user (Ana)
-  const anaReg = await apiApp.request("/api/auth/register", {
+  const anaReg = await apiClient.request("/api/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -68,7 +81,7 @@ before(async () => {
   anaUser = anaData.user;
 
   // 6. Provision and register Reader user (Vera) in the same organization
-  const veraProvision = await apiApp.request("/api/users", {
+  const veraProvision = await apiClient.request("/api/users", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${anaToken}`,
@@ -83,7 +96,7 @@ before(async () => {
   });
   assert.equal(veraProvision.status, 200);
 
-  const veraLogin = await apiApp.request("/api/auth/login", {
+  const veraLogin = await apiClient.request("/api/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -229,13 +242,13 @@ test("Staging E2E: completo ciclo de confirmación de política, publicación we
     );
 
     // D. Update organization feature policy to physical projection (with CAS baseVersion)
-    const policyGet = await apiApp.request("/api/organization/features", {
+    const policyGet = await apiClient.request("/api/organization/features", {
       headers: { Authorization: `Bearer ${anaToken}` },
     });
     const currentPolicy = (await policyGet.json()) as any;
     assert.equal(currentPolicy.version, 1);
 
-    const policyPatch = await apiApp.request("/api/organization/features", {
+    const policyPatch = await apiClient.request("/api/organization/features", {
       method: "PATCH",
       headers: {
         Authorization: `Bearer ${anaToken}`,

@@ -1,8 +1,9 @@
+import { LEGACY_MIRROR_FIELDS } from '../../shared/equipment';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { SystemSpecs } from '../types';
+import type { LegacyProjectSpecs } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
 import { editEquipmentGroup, normalizeEquipmentEdit, resolveGroupCatalogItem, selectCatalogEquipment, type EquipmentKind } from '../utils/equipmentGroups';
 import type { ProjectSimulation } from '../types';
@@ -33,9 +34,9 @@ const catalog: SolarEquipmentItem[] = [
 ];
 
 /** updateSpecs como el store: aplica el parche con la normalización de equipos y registra cada llamada. */
-function harness(initial: Partial<SystemSpecs>) {
-  const state = { specs: { panelCount: 10, panelPowerW: 500, ...initial } as SystemSpecs, calls: [] as Array<Partial<SystemSpecs>> };
-  const updateSpecs = (patch: Partial<SystemSpecs>) => {
+function harness(initial: Partial<LegacyProjectSpecs>) {
+  const state = { specs: { panelCount: 10, panelPowerW: 500, ...initial } as LegacyProjectSpecs, calls: [] as Array<Partial<LegacyProjectSpecs>> };
+  const updateSpecs = (patch: Partial<LegacyProjectSpecs>) => {
     state.calls.push(patch);
     state.specs = normalizeEquipmentEdit(state.specs, patch);
   };
@@ -43,7 +44,7 @@ function harness(initial: Partial<SystemSpecs>) {
   return { state, actions };
 }
 
-const multi = (): Partial<SystemSpecs> => ({
+const multi = (): Partial<LegacyProjectSpecs> => ({
   hasBattery: true,
   panelBrandModel: 'Panel A 550', panelPowerW: 550, panelCount: 10,
   panels: [
@@ -79,7 +80,7 @@ const multi = (): Partial<SystemSpecs> => ({
   assert.equal(state.specs.hasBattery, true);
   assert.equal(state.specs.batteries?.[1].capacityKWh, 5);
 
-  const empty = buildNewItem('battery', { hasBattery: true, batteryBrandModel: 'x' } as SystemSpecs, [], 7);
+  const empty = buildNewItem('battery', { hasBattery: true, batteryBrandModel: 'x' } as LegacyProjectSpecs, [], 7);
   assert.deepEqual([empty.id, empty.brandModel, empty.capacityKWh, empty.unitPriceUSD], ['battery-7', 'Batería Dyness A48100 (5.12 kWh)', 5.12, 850], 'sin catálogo usa el modelo por defecto');
 }
 
@@ -102,13 +103,13 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
   assert.deepEqual(state.calls[0], editEquipmentGroup(before, kind, { type: 'update', index: 0, patch: { count: 7 } }), `${kind}: cantidad por editEquipmentGroup`);
   const list = state.specs[kind === 'panel' ? 'panels' : kind === 'inverter' ? 'inverters' : 'batteries']!;
   assert.equal(list[0].count, 7);
-  const mirror = { panel: 'panelCount', inverter: 'inverterCount', battery: 'batteryCount' }[kind] as 'panelCount' | 'inverterCount' | 'batteryCount';
-  assert.equal(state.specs[mirror], 7, `${kind}: el espejo sigue a la lista`);
+  const listKey = kind === 'panel' ? 'panels' : kind === 'inverter' ? 'inverters' : 'batteries';
+  assert.equal(LEGACY_MIRROR_FIELDS.some((field) => field in state.specs), false, `${kind}: la edición no deja espejo`);
   actions(kind).setBrand(0, 'Otro');
-  assert.equal(list.length >= 1 && state.specs[`${kind}BrandModel` as 'panelBrandModel'], 'Otro');
+  assert.equal(state.specs[listKey]![0].brandModel, 'Otro');
   actions(kind).setMagnitude(0, 12.5);
-  const magnitude = { panel: 'panelPowerW', inverter: 'inverterPowerKW', battery: 'batteryCapacityKWh' }[kind] as 'panelPowerW';
-  assert.equal(state.specs[magnitude], 12.5);
+  const magnitude = { panel: 'powerW', inverter: 'powerKW', battery: 'capacityKWh' }[kind] as 'powerW';
+  assert.equal((state.specs[listKey]![0] as unknown as Record<string, number>)[magnitude], 12.5);
 }
 
 // --- Regresión: cantidad de baterías en modo Manual ya no deja la lista vieja ---
@@ -116,12 +117,12 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
   const { state, actions } = harness(multi());
   actions('battery').setCount(0, 9);
   assert.equal(state.specs.batteries?.[0].count, 9, 'batteries[0].count se actualiza');
-  assert.equal(state.specs.batteryCount, 9);
-  assert.ok(!('batteryCount' in state.calls[0]) || state.calls[0].batteries !== undefined, 'el parche lleva la lista, no solo el campo heredado');
+  assert.equal('batteryCount' in state.specs, false);
+  assert.ok(state.calls[0].batteries !== undefined, 'el parche lleva la lista');
   // Proyecto heredado sin lista: también migra por editEquipmentGroup
   const legacy = harness({ hasBattery: true, batteryBrandModel: 'Bat', batteryCapacityKWh: 5, batteryCount: 2 });
   legacy.actions('battery').setCount(0, 3);
-  assert.equal(legacy.state.specs.batteryCount, 3);
+  assert.equal('batteryCount' in legacy.state.specs, false);
   assert.equal(legacy.state.specs.batteries?.[0].count, 3);
   assert.deepEqual(legacy.state.calls[0].batteries?.map(b => b.count), [3]);
 }
@@ -132,7 +133,7 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
   const before = state.specs;
   actions('panel').select(0, catalog[0]);
   assert.deepEqual(state.calls[0], buildCatalogSelectionUpdate(before, 'panel', catalog[0]), 'principal: buildCatalogSelectionUpdate');
-  assert.equal(state.calls[0].selectedSupplierInfo?.panel?.supplierName, 'Alfa', 'conserva la info de proveedor');
+  assert.equal(state.calls[0].panels?.[0].selectedSupplierInfo?.supplierName, 'Alfa', 'conserva la info de proveedor');
 
   const second = harness(multi());
   const base = second.state.specs;
@@ -144,17 +145,17 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
   assert.equal(second.state.specs.panels?.[0].brandModel, 'Panel A 550', 'el principal no cambia');
 
   second.actions('inverter').select(0, catalog[3]);
-  assert.equal(second.state.specs.inverterBrandModel, 'Inversor 5');
+  assert.equal(second.state.specs.inverters?.[0].brandModel, 'Inversor 5');
   assert.equal(second.state.specs.inverters?.[0].powerKW, 5);
 }
 // --- Vista del grupo y formatos ---
 {
-  const views = groupViews(multi() as SystemSpecs, 'panel');
+  const views = groupViews(multi() as LegacyProjectSpecs, 'panel');
   assert.deepEqual(views.map(v => [v.brandModel, v.magnitude, v.count]), [['Panel A 550', 550, 10], ['Panel B 600', 600, 4]]);
-  const legacy = groupViews({ panelPowerW: 500, panelCount: 3 } as SystemSpecs, 'panel');
-  assert.equal(legacy[0].brandModel, '', 'sin nombre heredado queda el marcador');
+  const legacy = groupViews({ panelPowerW: 500, panelCount: 3 } as LegacyProjectSpecs, 'panel');
+  assert.equal(legacy[0].brandModel, 'Módulo Canadian Solar TOPBiHiKu6 620W', 'sin nombre heredado: el nombre de reserva de la matriz de costos');
   assert.equal(legacy[0].count, 3);
-  assert.deepEqual(groupViews({ hasBattery: false } as SystemSpecs, 'battery'), []);
+  assert.deepEqual(groupViews({ hasBattery: false } as LegacyProjectSpecs, 'battery'), []);
   assert.equal(formatKW(8), '8.0');
   assert.equal(formatKW(7.68), '7.68');
   assert.equal(formatDcAcRatio(8.82, 8), '1.10');
@@ -163,8 +164,8 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
 
 // --- Marcado ---
 const render = (node: React.ReactElement) => renderToStaticMarkup(node);
-const listProps = (kind: EquipmentKind, mode: 'catalog' | 'manual', specs: Partial<SystemSpecs>) => ({
-  kind, mode, specs: specs as SystemSpecs, catalog, updateSpecs: noop, onOpenScanner: noop,
+const listProps = (kind: EquipmentKind, mode: 'catalog' | 'manual', specs: Partial<LegacyProjectSpecs>) => ({
+  kind, mode, specs: specs as LegacyProjectSpecs, catalog, updateSpecs: noop, onOpenScanner: noop,
 });
 {
   const panelsCatalog = render(h(EquipmentGroupList, { ...listProps('panel', 'catalog', multi()), autoCalculate: { checked: true, onChange: noop, info: 'Calculando para cubrir el 95%' } }));
@@ -275,8 +276,8 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
     catalogItem({ id: 'dp1', type: 'panel', displayName: 'Panel Lento', powerW: 550, annualDegradation: 0.3, efficiencyPct: 21.5, tempCoeff: -0.29, weightKg: 28 }),
     catalogItem({ id: 'dp2', type: 'panel', displayName: 'Panel Rapido', powerW: 600, annualDegradation: 0.8, efficiencyPct: 20.1, tempCoeff: -0.35, weightKg: 31 }),
   ];
-  const state = { specs: { panelCount: 10, panelPowerW: 550, panelBrandModel: 'Panel Lento', panels: [{ id: 'pa', catalogItemId: 'dp1', brandModel: 'Panel Lento', powerW: 550, count: 10, annualDegradation: 0.3 }] } as unknown as SystemSpecs };
-  const updateSpecs = (patch: Partial<SystemSpecs>) => { state.specs = normalizeEquipmentEdit(state.specs, patch); };
+  const state = { specs: { panelCount: 10, panelPowerW: 550, panelBrandModel: 'Panel Lento', panels: [{ id: 'pa', catalogItemId: 'dp1', brandModel: 'Panel Lento', powerW: 550, count: 10, annualDegradation: 0.3 }] } as unknown as LegacyProjectSpecs };
+  const updateSpecs = (patch: Partial<LegacyProjectSpecs>) => { state.specs = normalizeEquipmentEdit(state.specs, patch); };
   createGroupActions('panel', state.specs, degradingCatalog, updateSpecs).add();
   const added = state.specs.panels![1];
   assert.equal(added.catalogItemId, 'dp2');
@@ -298,7 +299,7 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
   ];
   const run = (kind: EquipmentKind, group: Record<string, unknown>, name: string) => {
     const key = kind === 'panel' ? 'panels' : kind === 'inverter' ? 'inverters' : 'batteries';
-    const state = { specs: { [key]: [group] } as unknown as SystemSpecs };
+    const state = { specs: { [key]: [group] } as unknown as LegacyProjectSpecs };
     createGroupActions(kind, state.specs, linkedCatalog, patch => { state.specs = normalizeEquipmentEdit(state.specs, patch); }).setBrand(0, name);
     return (state.specs[key] as Array<{ id: string; catalogItemId?: string; brandModel: string }>)[0];
   };
@@ -317,13 +318,13 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
   // Catálogo aún sin sincronizar: el id igual al catalogItemId (propuestas de IA) también es identidad de catálogo.
   {
     const offline = (name: string) => {
-      const state = { specs: { panels: [{ id: 'k1', catalogItemId: 'k1', brandModel: 'Panel K 550', powerW: 550, count: 4 }] } as unknown as SystemSpecs };
+      const state = { specs: { panels: [{ id: 'k1', catalogItemId: 'k1', brandModel: 'Panel K 550', powerW: 550, count: 4 }] } as unknown as LegacyProjectSpecs };
       createGroupActions('panel', state.specs, [], patch => { state.specs = normalizeEquipmentEdit(state.specs, patch); }).setBrand(0, name);
       return state.specs.panels![0];
     };
     const edited = offline('Panel Propio X');
     assert.equal(edited.id, 'k1', 'el id se conserva (clave estable de la fila)');
-    assert.deepEqual(groupViews({ panels: [edited] } as unknown as SystemSpecs, 'panel').map(view => view.key), ['k1'], 'la clave de la fila no cambia al escribir el primer carácter');
+    assert.deepEqual(groupViews({ panels: [edited] } as unknown as LegacyProjectSpecs, 'panel').map(view => view.key), ['k1'], 'la clave de la fila no cambia al escribir el primer carácter');
     assert.equal(edited.catalogItemId, undefined);
     assert.equal(resolveGroupCatalogItem(edited, 'panel', linkedCatalog), null, 'al sincronizar el catálogo no reaparece el modelo anterior');
     assert.equal(offline('panel k 550').id, 'k1', 'mismo modelo: no se toca');
@@ -333,7 +334,7 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
     const detached = run('panel', linked, 'Panel Propio X') as { manualModel?: boolean };
     assert.equal(detached.manualModel, true);
     assert.equal(run('panel', linked, 'panel k 550').hasOwnProperty('manualModel'), false, 'mismo modelo: sin marca');
-    const specs = { panels: [{ ...detached, id: 'x', brandModel: 'Panel Propio X', powerW: 1, count: 1 }] } as unknown as SystemSpecs;
+    const specs = { panels: [{ ...detached, id: 'x', brandModel: 'Panel Propio X', powerW: 1, count: 1 }] } as unknown as LegacyProjectSpecs;
     const picked = normalizeEquipmentEdit(specs, selectCatalogEquipment(specs, 'panel', 0, linkedCatalog[1]));
     assert.equal(picked.panels![0].manualModel, undefined, 'seleccionar del catálogo vuelve a vincular');
   }
@@ -343,7 +344,7 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
       const state = { specs: { panels: [
         { id: 'g1', catalogItemId: 'k1', brandModel: 'Panel K 550', powerW: 550, count: 4 },
         ...(withUnresolved ? [{ id: 'g2', catalogItemId: 'zz', brandModel: 'Sin sincronizar', powerW: 400, count: 2 }] : []),
-      ], inverters: [{ id: 'i0', brandModel: 'Sin uso', powerKW: 1, count: 0 }], batteries: [{ id: 'b0', brandModel: 'Sin uso', capacityKWh: 1, count: 0 }] } as unknown as SystemSpecs };
+      ], inverters: [{ id: 'i0', brandModel: 'Sin uso', powerKW: 1, count: 0 }], batteries: [{ id: 'b0', brandModel: 'Sin uso', capacityKWh: 1, count: 0 }] } as unknown as LegacyProjectSpecs };
       const edit = (name: string) => createGroupActions('panel', state.specs, linkedCatalog, patch => { state.specs = normalizeEquipmentEdit(state.specs, patch); }).setBrand(0, name);
       const annex = (id: string) => ({ id: `att-${id}`, origin: 'catalog', catalogItemId: id });
       const pending = () => unresolvedEquipmentIds({ specs: state.specs, customization: { attachedPdfs: [annex('k1'), annex('k2'), annex('zz')] } } as unknown as ProjectSimulation, linkedCatalog);

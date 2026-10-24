@@ -13,6 +13,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:?Set a private database password}
       DB_NAME: ${DB_NAME:-solarsim_prod}
       JWT_SECRET: ${JWT_SECRET:?Set a private random JWT secret (32+ characters)}
+      MIN_CLIENT_VERSION: ${MIN_CLIENT_VERSION:-2.7.1}
     networks:
       - solarsim_net
 

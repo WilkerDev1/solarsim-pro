@@ -1,5 +1,6 @@
 import { useSelfConsumptionProjection } from '../../../features/application/useApplicationFeatures';
 import React, { useState } from 'react';
+import { describePanelConfiguration, readEquipment } from '../../../../shared/equipment';
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs } from '../../../types';
 import {
   ComposedChart,
@@ -33,6 +34,7 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
   updateSpecs,
 }) => {
   const projectionEnabled = useSelfConsumptionProjection();
+  const panelsLabel = describePanelConfiguration(readEquipment(project.specs));
   const showSelfConsumption = projectionEnabled && project.specs.showSelfConsumptionBreakdown !== false;
   const totalConsumptionKWh = (summary?.monthlyBreakdown || []).reduce((sum, m) => sum + (m.consumptionKWh || 0), 0);
   const totalProductionKWh = (summary?.monthlyBreakdown || []).reduce((sum, m) => sum + (m.productionKWh || 0), 0);
@@ -93,7 +95,7 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
             <span className="text-xs text-slate-500 font-semibold">kWp</span>
           </div>
           <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
-            {project.specs.panelCount} módulos × {project.specs.panelPowerW}W
+            {panelsLabel}
           </span>
         </div>
 

@@ -1,26 +1,27 @@
 import assert from 'node:assert/strict';
 import { useSimulationStore as store } from '../store/useSimulationStore';
-import { BENCHMARK_PROJECT } from '../engine/referenceCase';
+import { BENCHMARK_LEGACY_SPECS, BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { getProjectBatteries } from '../utils/equipmentSpecsUtils';
 import { calculateCostMatrixSummary } from '../engine/financeEngine';
 import { normalizeCommercial, commercialMarkup } from '../../shared/aiProposalCommercial';
 
-const project = structuredClone(BENCHMARK_PROJECT);
+const project = { ...structuredClone(BENCHMARK_PROJECT), specs: { ...BENCHMARK_LEGACY_SPECS } }; // propuesta heredada
 project.id = 'qa-battery-transition';
 project.specs = { ...project.specs, hasBattery: false, batteryCount: 0, batteryUnitPriceUSD: 1685, batteries: undefined };
 store.setState({ projects: [project], activeProjectId: project.id,
   syncSettings: { ...store.getState().syncSettings, currentUser: null, authToken: null, autoSyncEnabled: false } });
 store.getState().updateSpecs({ hasBattery: true });
 let specs = store.getState().projects[0].specs;
-assert.equal(specs.batteryCount, 1);
+assert.equal(specs.batteries![0].count, 1);
+assert.equal('batteryCount' in specs, false, 'activar la batería no escribe el espejo');
 assert.equal(getProjectBatteries(specs)[0].count, 1);
 const enabled = calculateCostMatrixSummary(specs, 8.19);
 const disabled = calculateCostMatrixSummary({ ...specs, hasBattery: false }, 8.19);
 assert.ok(enabled.totalNetoUSD > disabled.totalNetoUSD, 'Enabling one battery increases actual cost');
-store.getState().updateSpecs({ batteryCount: 3 });
+store.getState().updateSpecs({ batteries: [{ ...store.getState().projects[0].specs.batteries![0], count: 3 }] });
 store.getState().updateSpecs({ hasBattery: false });
 store.getState().updateSpecs({ hasBattery: true });
-assert.equal(store.getState().projects[0].specs.batteryCount, 3, 'Toggle preserves an existing bank');
+assert.equal(store.getState().projects[0].specs.batteries![0].count, 3, 'Toggle preserves an existing bank');
 store.getState().updateSpecs({ batteries: [{ id: 'primary', brandModel: 'QA battery', capacityKWh: 15, count: 0, unitPriceUSD: 1 }], hasBattery: true });
 store.setState({ projects: store.getState().projects.map(p => ({ ...p, financials: { ...p.financials, customCostUSD: 100, customITBISSavedUSD: 10, customLey5707CreditUSD: 40 } })) });
 const offer = { id: 'qa-price', supplierName: 'QA', priceUSD: 1685, updatedAt: '2026-10-14' };

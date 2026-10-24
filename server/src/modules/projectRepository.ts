@@ -4,6 +4,10 @@ import {
   type ProposalCommercial,
   type ProposalCommercialReport,
 } from "../../../shared/proposalCommercial.js";
+import {
+  equipmentTotals,
+  readEquipment,
+} from "../../../shared/equipment/index.js";
 import { resolveMembership } from "../membership.js";
 import type { PoolClient } from "pg";
 import type { AuthUser } from "../dependencies.js";
@@ -204,17 +208,13 @@ export async function saveProject(
   };
   delete (data as any).forceOverwrite;
   delete (data as any).forceNewVersion;
-  const capacity = Array.isArray(input.specs?.panelGroups)
-    ? input.specs.panelGroups.reduce(
-        (sum: number, group: any) =>
-          sum +
-          ((Number(group.panelPowerW) || 0) * (Number(group.panelCount) || 0)) /
-            1000,
-        0,
-      )
-    : ((Number(input.specs?.panelPowerW) || 0) *
-        (Number(input.specs?.panelCount) || 0)) /
-      1000;
+  // Capacity comes from the groups clients save (`specs.panels`); old documents derive them from the legacy mirror.
+  const capacity =
+    input.specs &&
+    typeof input.specs === "object" &&
+    !Array.isArray(input.specs)
+      ? equipmentTotals(readEquipment(input.specs)).capacityKWp
+      : 0;
   const deleted = input.isDeleted === true;
   const deletedAt = deleted ? (existing?.deleted_at ?? new Date()) : null;
   if (existing) await checkpoint(client, existing);

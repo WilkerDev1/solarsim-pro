@@ -1,5 +1,6 @@
 import type { ShareProposalPayload } from './types';
 import { DOC_TEXT_PREFIX, getDocumentTextDefinition, isDocTextKey } from '../../../shared/documentTexts';
+import { LEGACY_MIRROR_NUMBER_FIELDS, LEGACY_MIRROR_TEXT_FIELDS } from '../../../shared/equipment';
 export const MAX_SHARE_BYTES = 2 * 1024 * 1024;
 export class RequestValidationError extends Error {
   constructor(message: string, public readonly status: 400 | 413 = 400) { super(message); }
@@ -49,6 +50,7 @@ function validateTree(value: unknown, depth = 0): void {
   }
   throw new RequestValidationError('La estructura contiene valores no permitidos.');
 }
+const GROUP_NUMBER_FIELDS = ['count', 'powerW', 'powerKW', 'capacityKWh', 'unitPriceUSD', 'weightKilos', 'dodPct', 'efficiencyPct'];
 function textFields(record: Record<string, unknown>, fields: string[], maxLength = 30000): void {
   for (const field of fields) {
     const value = record[field];
@@ -65,10 +67,11 @@ export function parseSharePayload(value: unknown): ShareProposalPayload {
   const rates = requireRecord(project.rates, 'rates');
   const financials = requireRecord(project.financials, 'financials');
   textFields(client, ['name','projectId','quoteNumber','province','location','address','contactPhone','solarSourceMode','coordinates','distributor','tariffCode'], 1000);
-  textFields(specs, ['panelBrandModel','inverterBrandModel','batteryBrandModel','installationServicesDesc']);
+  // Un cliente 2.6.x/2.7.0 aún puede publicar en el formato viejo: sus campos los nombra `shared/equipment` (ADR 0001, retiro de la lectura heredada).
+  textFields(specs, [...LEGACY_MIRROR_TEXT_FIELDS, 'installationServicesDesc']);
   textFields(rates, ['distributor','tariffCode']);
   for (const record of [client, specs, rates]) {
-    for (const field of ['quoteValidityDays','panelCount','panelPowerW','inverterCount','inverterPowerKW','batteryCount','batteryCapacityKWh','gridExportFeePct']) {
+    for (const field of ['quoteValidityDays', ...LEGACY_MIRROR_NUMBER_FIELDS, 'gridExportFeePct']) {
       if (record[field] !== undefined && (typeof record[field] !== 'number' || !Number.isFinite(record[field]) || (record[field] as number) < 0)) throw new RequestValidationError(`${field} debe ser un número positivo.`);
     }
   }
@@ -91,7 +94,15 @@ export function parseSharePayload(value: unknown): ShareProposalPayload {
   for (const field of ['panels', 'inverters', 'batteries']) {
     if (specs[field] === undefined) continue;
     if (!Array.isArray(specs[field]) || specs[field].length > 50) throw new RequestValidationError('La lista de equipos no es válida.');
-    for (const item of specs[field]) textFields(requireRecord(item, field), ['brandModel'], 1000);
+    for (const item of specs[field]) {
+      const group = requireRecord(item, field);
+      textFields(group, ['brandModel'], 1000);
+      // Con grupos como única fuente (sin espejo), sus números se validan como los del espejo.
+      for (const numeric of GROUP_NUMBER_FIELDS) {
+        const amount = group[numeric];
+        if (amount !== undefined && amount !== null && (typeof amount !== 'number' || !Number.isFinite(amount) || amount < 0)) throw new RequestValidationError(`${numeric} debe ser un número positivo.`);
+      }
+    }
   }
   if (financials.customItems !== undefined) {
     if (!Array.isArray(financials.customItems)) throw new RequestValidationError('Los ítems no son válidos.');

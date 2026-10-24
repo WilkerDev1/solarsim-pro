@@ -13,7 +13,7 @@ El Worker publica copias inmutables de propuestas y las entrega mediante enlaces
 
 ## Autorización y compatibilidad
 
-`POST /api/share` requiere un JWT vigente de un usuario ADMIN o EDITOR. El Worker verifica cada publicación mediante `POST {AUTH_API_URL}/api/auth/share-authorization`. La URL es configuración del operador y debe utilizar HTTPS; nunca procede del contenido de la propuesta. No contiene una clave de firma compartida con el frontend.
+`POST /api/share` requiere un JWT vigente de un usuario ADMIN o EDITOR. El Worker verifica cada publicación mediante `POST {AUTH_API_URL}/api/auth/share-authorization`. La URL es configuración del operador y debe utilizar HTTPS; nunca procede del contenido de la propuesta. No contiene una clave de firma compartida con el frontend. En cada autorización envía `X-SolarSim-Client: share-viewer/<versión de package.json>`; con una versión mínima activa en la API, un Worker atrasado recibe 426 y la publicación responde 503 (ver [versión mínima de cliente](../../docs/DATABASE_AND_API_SPECIFICATION.md#versión-mínima-de-cliente)).
 
 La API devuelve `{ success, userId, organizationId, featurePolicy: { version, settings } }`. Una política de otra organización, una versión antigua o un modo incompatible producen HTTP 409 antes de escribir en KV. Si la API no está disponible, el Worker no publica. No es posible publicar anónimamente ni con una cuenta de lectura.
 

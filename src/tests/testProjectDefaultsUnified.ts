@@ -27,8 +27,9 @@ const importResult = store().importProjectsFromJSON([withoutPrice as never]);
 assert.ok(importResult.success);
 const imported = store().projects.find((p) => p.client.name === 'Importado')!;
 assert.equal(imported.financials.pricePerWattUSD, 1.13, 'proyecto importado sin $/W: 1.13 (antes 1.05)');
-assert.equal(fresh.specs.batteryCapacityKWh, shared.DEFAULT_BATTERY_CAPACITY_KWH);
-assert.equal(fresh.specs.batteryDOD, shared.DEFAULT_BATTERY_DOD_PCT);
+assert.equal(fresh.specs.batteries![0].capacityKWh, shared.DEFAULT_BATTERY_CAPACITY_KWH);
+assert.equal(fresh.specs.batteries![0].dodPct, shared.DEFAULT_BATTERY_DOD_PCT);
+assert.equal('batteryCapacityKWh' in fresh.specs, false, 'un proyecto nuevo nace sin espejo');
 
 // Modo directo por defecto: el $/W del proyecto sale del ajuste, no del caso de referencia (1.134971).
 store().updateDefaultSimulationSettings({ defaultPricingMode: 'direct' } as never);
@@ -52,24 +53,26 @@ assert(!readFileSync('src/components/settings/sections/SimulationPreferencesSect
   const importable = { ...fresh, id: '', client: { ...fresh.client, name: 'Importado banco', projectId: 'IMP-2', quoteNumber: 'IMP-2' }, specs: { ...specsNoDod, hasBattery: true, batteries: bankGroups } };
   assert.ok(store().importProjectsFromJSON([importable as never]).success);
   const bank = store().projects.find((p) => p.client.name === 'Importado banco')!;
-  assert.equal(bank.specs.batteryDOD, 90, 'espejo importado sin DOD: 90, no 80');
+  assert.equal('batteryDOD' in bank.specs, false, 'lo importado no escribe el espejo; sin DOD el motor usa 90, no 80');
   assert.equal(shared.resolveBatteryBankDodPct(bank.specs), 90, 'grupos importados sin DOD: 90');
   assert.equal(shared.resolveBatteryBankEfficiencyPct(bank.specs), 90);
   const { createAIProposalBase } = await import('../utils/proposalDraftProject');
   const aiBase = createAIProposalBase(BENCHMARK_PROJECT, DEFAULT_SIMULATION_SETTINGS, 'Santiago');
-  assert.equal(aiBase.specs.batteryDOD, 90, 'base de propuesta IA: 90, no 80');
-  assert.equal(fresh.specs.batteryDOD, 90, 'proyecto nuevo: 90');
+  assert.equal(aiBase.specs.batteries![0].dodPct, 90, 'base de propuesta IA: 90, no 80');
+  assert.equal(fresh.specs.batteries![0].dodPct, 90, 'proyecto nuevo: 90');
   const withGroupValues = { ...importable, client: { ...importable.client, name: 'Importado espejo', projectId: 'IMP-3', quoteNumber: 'IMP-3' }, specs: { ...importable.specs, batteries: [{ ...bankGroups[0], dodPct: 70, efficiencyPct: 85 }, bankGroups[1]] } };
   assert.ok(store().importProjectsFromJSON([withGroupValues as never]).success);
   const mirrored = store().projects.find((p) => p.client.name === 'Importado espejo')!;
-  assert.equal(mirrored.specs.batteryDOD, 70, 'el espejo importado sale del grupo principal');
-  assert.equal(mirrored.specs.batteryEfficiencyPct, 85);
+  assert.equal(mirrored.specs.batteries![0].dodPct, 70, 'DOD y eficiencia importados viven en el grupo principal');
+  assert.equal(mirrored.specs.batteries![0].efficiencyPct, 85);
+  assert.equal('batteryDOD' in mirrored.specs, false);
   // Con grupos, un escalar obsoleto no se conserva si el grupo principal no tiene dato.
   const stale = { ...importable, client: { ...importable.client, name: 'Importado obsoleto', projectId: 'IMP-4', quoteNumber: 'IMP-4' }, specs: { ...importable.specs, batteryDOD: 80, batteryEfficiencyPct: 80 } };
   assert.ok(store().importProjectsFromJSON([stale as never]).success);
   const staleImported = store().projects.find((p) => p.client.name === 'Importado obsoleto')!;
-  assert.equal(staleImported.specs.batteryDOD, 90, 'espejo con grupo sin dato: 90, no el escalar obsoleto');
-  assert.equal(staleImported.specs.batteryEfficiencyPct, undefined);
+  assert.equal(staleImported.specs.batteries![0].dodPct, undefined, 'grupo sin dato: el escalar obsoleto no se hereda');
+  assert.equal(staleImported.specs.batteries![0].efficiencyPct, undefined);
+  assert.equal('batteryDOD' in staleImported.specs, false);
   assert.equal(shared.resolveBatteryBankDodPct(staleImported.specs), 90);
   // Importado en modo directo sin $/W: ni el 1.134971 del caso de referencia ni su $/kWp.
   const { pricePerWattUSD: _w, pricePerKWpUSD: _k, ...noPrice } = importable.specs as Record<string, unknown>;
@@ -79,7 +82,7 @@ assert(!readFileSync('src/components/settings/sections/SimulationPreferencesSect
   const directImported = store().projects.find((p) => p.client.name === 'Importado directo')!;
   assert.equal(directImported.specs.pricePerWattUSD, directImported.financials.pricePerWattUSD, '$/W del importado: el de financials, no el del caso de referencia');
   assert.equal(directImported.specs.pricePerKWpUSD, undefined);
-  assert.equal(BENCHMARK_PROJECT.specs.batteryDOD, 80, 'el caso de referencia conserva su 80');
+  assert.equal(BENCHMARK_PROJECT.specs.batteries![0].dodPct, 80, 'el caso de referencia conserva su 80');
 }
 
 // ── Pérdidas del sistema: un solo concepto (25 %), y 14 % solo en modo detallado sin dato ──

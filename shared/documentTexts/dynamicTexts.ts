@@ -36,7 +36,7 @@ export function syncProjectSummaryParagraph1(stored: string, ctx: DocumentTextCo
   return resolveDynamicProjectSummaryParagraph1(
     stored,
     projectSummaryParagraph1Default(ctx),
-    { specs: { panelCount: ctx.panelCount } },
+    { panelCount: ctx.panelCount },
     ctx,
     ctx.clientName,
     ctx.panelModelText,
@@ -47,7 +47,7 @@ export function syncProjectSummaryParagraph2(stored: string, ctx: DocumentTextCo
   return resolveDynamicProjectSummaryParagraph2(
     stored,
     projectSummaryParagraph2Default(ctx, scopeText),
-    { specs: { inverterCount: ctx.inverterCount, hasBattery: ctx.hasBattery, batteryCapacityKWh: ctx.batteryCapacityKWh, batteryCount: ctx.batteryCount } },
+    { inverterCount: ctx.inverterCount, hasBattery: ctx.hasBattery, batteryNominalKWh: ctx.batteryCapacityKWh, batteryCount: ctx.batteryCount },
     ctx.inverterModelText,
     ctx.batteryModelText,
     scopeText,

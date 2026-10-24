@@ -12,7 +12,7 @@ JWT_SECRET y DB_PASSWORD son obligatorios, privados y sin fallback conocido. PAT
 
 | Ruta | Permisos y contrato |
 | --- | --- |
-| GET /api/health | Consulta BD y devuelve 503 si no está disponible. |
+| GET /api/health | Consulta BD y devuelve 503 si no está disponible. Abierta: no exige versión de cliente. |
 | POST /api/auth/login, register, refresh | Credenciales o token según ruta; sin log de secretos. |
 | GET /api/auth/me | Usuario actual; estado/rol desde BD. |
 | GET/PATCH /api/organization/features | GET autenticado; PATCH ADMIN con `{settings,baseVersion}`. Política `{organizationId,version,settings}`. 409 si cambió. |
@@ -24,7 +24,7 @@ JWT_SECRET y DB_PASSWORD son obligatorios, privados y sin fallback conocido. PAT
 | POST /api/auth/accept-invitation | Aceptación de invitación y asignación de rol contextual. |
 | GET/POST/PATCH/DELETE /api/users | Administración de miembros del tenant actual (no usar ruta legacy). |
 | POST /api/sync/pull | `{lastSyncTimestamp?}`; devuelve proyectos completos, deletedIds y watermark SQL textual. No convertir cursor a Date ni truncar microsegundos. |
-| POST /api/sync/push | `{projects}` con baseVersion. Nuevo=0; existente=última versión confirmada. |
+| POST /api/sync/push | `{projects}` con baseVersion. Nuevo=0; existente=última versión confirmada. `system_capacity_kwp` se calcula con `equipmentTotals(readEquipment(specs))` (grupos `specs.panels`; las propuestas heredadas derivan el grupo del espejo). |
 | DELETE /api/projects/:id | `?baseVersion=N`, eliminación suave CAS. |
 | POST /api/projects/:id/restore | `?baseVersion=N`, restauración de papelera CAS. |
 | DELETE /api/projects/:id?permanent=true | baseVersion obligatorio; solo un proyecto en papelera. Tombstone durable. |
@@ -57,3 +57,31 @@ La migración aditiva 004 incorpora `project_folders` y `equipment_assets`. Las 
 ## Clientes
 
 La migración aditiva 005 incorpora `clients` (PK `(organization_id, id)`, versión, autoría y `deleted_at`) y los índices `clients(id)`, `clients(organization_id, tax_id)` y `projects(organization_id, data_json->>'clientId')`. El enlace vive en `data_json.clientId` de la propuesta. Es independiente de los datos impresos y la restauración de historial lo conserva. Contrato completo: [directorio de clientes](CLIENTS.md).
+
+## Versión mínima de cliente
+
+Cada cliente se identifica con `X-SolarSim-Client: <nombre>/<versión>` (`desktop/2.7.1`, `share-viewer/2.7.1`); la versión sale de `package.json` en la compilación. El servidor MCP local no llama a la API: sus herramientas pasan por el renderer, que se presenta como `desktop`. Un middleware (`server/src/clientVersionGate.ts`, registrado después de CORS) rechaza **toda ruta `/api/*` de datos** cuando el encabezado falta, está malformado (solo se acepta `nombre/semver`) o su versión es menor que `MIN_CLIENT_VERSION`:
+
+```json
+HTTP 426 Upgrade Required
+{ "error": "client_outdated", "minVersion": "2.7.1", "message": "Actualiza SolarSim a la versión 2.7.1 o superior para seguir sincronizando." }
+```
+
+- **Rutas abiertas**: `GET /api/health`, `POST /api/auth/login`, `POST /api/auth/refresh`, `GET /api/auth/me` y cualquier `OPTIONS` (preflight CORS). `/api/auth/me` queda abierta porque solo devuelve la identidad de la sesión y porque la renovación de token (`X-Renewed-Token`) no debe cortarse: un cliente rechazado conserva su sesión, la ve válida y puede mostrar el aviso de actualización en vez de parecer desconectado. Registro, invitaciones, autorización del visor y todo lo demás sí exigen versión.
+- **Comparación semver** (SemVer 2.0.0, `shared/clientVersion.ts`): numérica, no de texto (`2.10.0 > 2.7.1`); un prelanzamiento es anterior a su versión final (`2.7.1-beta.1 < 2.7.1`); los metadatos `+build` no cuentan. Cualquier encabezado malformado cuenta como obsoleto.
+- **Configuración**: variable de entorno `MIN_CLIENT_VERSION` (por defecto `2.7.1`). Debe ser `major.minor.patch` estable (sin prelanzamiento ni `+build`); un valor inválido hace fallar el arranque, nunca las solicitudes. Está declarada en `infra/services/solarsim-api/docker-compose.yml`. `createApp({ minClientVersion })` la inyecta en las pruebas.
+- **CORS**: `X-SolarSim-Client` está en `allowHeaders` (API y Worker); el 426 lleva cabeceras CORS para que el renderer lo lea.
+- **Cliente 2.7.1+**: ante un 426 `client_outdated` deja de reintentar rutas de datos de ese servidor (devuelve un 426 local sin tocar la red hasta reiniciar), conserva el trabajo local pendiente y muestra el aviso fijo «Actualiza SolarSim para seguir sincronizando» con la versión mínima y un botón que abre el actualizador. Salud, inicio de sesión, renovación e identidad siguen funcionando. Las llamadas al Worker no llevan el encabezado ni se bloquean.
+- **Worker**: envía `share-viewer/<versión>` en cada autorización. Si la API lo rechaza (visor atrasado), la publicación responde 503 y el Worker registra el 426.
+
+Procedimiento para subir el mínimo: [Mantenimiento y releases](MAINTENANCE_AND_UPDATES.md#versión-mínima-de-cliente).
+
+## Migración 006: equipos sin espejo
+
+`server/src/database/006_equipment_groups.ts` ejecuta `migrateLegacySpecs` ([ADR 0001](adr/0001-equipment-model-sin-espejo.md)) sobre `data_json.specs` de **todos** los proyectos (también los de la papelera y los de otras organizaciones): los que solo tenían el espejo reciben sus grupos y a todos se les borran `panelBrandModel`, `panelPowerW`, `panelCount`… y `selectedSupplierInfo` de nivel superior. Es invariante (no cambia costo, precio, kWp, energía, finanzas ni textos; un banco de baterías de capacidad total 0 conserva en su primer grupo la capacidad, el DOD y la eficiencia del espejo que el motor anterior usaba como respaldo), idempotente y transaccional (la transacción única de `migrateDatabase` con el bloqueo de migraciones; filas bloqueadas con `FOR UPDATE` por lotes de 200).
+
+- **No sube `version` ni `updated_at`** y no recalcula `system_capacity_kwp`. El documento es equivalente y todo lector pasa por `readEquipment`; subir la versión crearía falsos conflictos de CAS para quien tenga la propuesta abierta y, como el pull incremental se basa en `updated_at`, obligaría a todos los clientes a descargar de nuevo cada propuesta. La capacidad guardada la usa solo el historial; se corrige en el siguiente guardado de cada propuesta.
+- **`project_version_history` no se toca**: es el registro inmutable de versiones, sus instantáneas se leen con `readEquipment` y restaurar una pasa por `saveProject`, que recalcula la capacidad con los grupos.
+- **Capacidad al guardar**: `saveProject` usa `equipmentTotals(readEquipment(specs)).capacityKWp`. Antes leía `specs.panelGroups`, que ningún cliente guarda, y para propuestas multigrupo solo contaba el espejo (el primer grupo).
+- **Pruebas**: `server/tests/equipmentModel.test.ts` (solo heredado, mixto, multigrupo, sin batería, batería apagada con datos, ya limpio, `specs` nulo, 450 filas que cruzan lotes; totales iguales antes y después, sin espejo, versión/fechas intactas, historial y catálogo intactos, reaplicar no cambia nada) y los ensayos de restauración (`backupRehearsal.ts` y `migration003Rehearsal.test.ts`, migraciones 1 a 6).
+- **Después de 006** una API sigue aceptando documentos con espejo (restaurar una instantánea antigua o empujar una caché atrasada): son equivalentes y se leen igual. Los clientes 2.6.0 y 2.7.0 ya no pueden sincronizar por la versión mínima.

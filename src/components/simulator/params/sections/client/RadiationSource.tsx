@@ -19,7 +19,7 @@ const SOURCE_OPTIONS: Array<{ value: SolarSourceMode; label: string }> = [
   { value: 'gps', label: 'GPS' },
 ];
 
-const PROVINCE_OPTIONS = RD_PROVINCES.map(province => ({ value: province.name, label: province.name }));
+const PROVINCE_OPTIONS = RD_PROVINCES.map(province => ({ value: province.name, label: province.name, hint: String(province.avgHSP) }));
 
 /** Fuente de radiación: provincia (sin conexión) o coordenadas GPS (consulta en línea). */
 export const RadiationSource: React.FC<RadiationSourceProps> = ({ client, isFetchingSolar, solarApiStatus, onFetchSolarApi, updateClient }) => {

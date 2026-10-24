@@ -1,5 +1,9 @@
 import { ProjectSimulation, UserProfile, UserRole } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
+import { migrateLegacySpecs } from '../../shared/equipment';
+import { CLIENT_OUTDATED, isClientGateOpen } from '../../shared/clientVersion';
+import { CLIENT_IDENTITY_HEADER, CLIENT_IDENTITY_VALUE } from './clientIdentity';
+import { clientOutdatedText, getClientOutdated, isServerBlocked, reportClientOutdated } from './clientVersionGate';
 
 export type EquipmentPushOutcome =
   | { id: string; status: 'created' | 'updated'; version: number; item: SolarEquipmentItem }
@@ -108,12 +112,32 @@ export async function clearInvalidToken(serverUrl: string, token: string): Promi
 
 const refreshRequests = new Map<string, Promise<string | null>>();
 
+/** Identidad del cliente en una solicitud, conservando la forma de los encabezados que recibió. */
+function withClientIdentity(headers: HeadersInit | undefined): HeadersInit {
+  if (headers instanceof Headers) { const copy = new Headers(headers); copy.set(CLIENT_IDENTITY_HEADER, CLIENT_IDENTITY_VALUE); return copy; }
+  if (Array.isArray(headers)) return [...headers.filter(([name]) => name.toLowerCase() !== CLIENT_IDENTITY_HEADER.toLowerCase()), [CLIENT_IDENTITY_HEADER, CLIENT_IDENTITY_VALUE]];
+  return { ...headers, [CLIENT_IDENTITY_HEADER]: CLIENT_IDENTITY_VALUE };
+}
+
+/** 426 con la forma `client_outdated` de la API; el cuerpo se reescribe con el texto en español para quien lo muestre. */
+const outdatedResponse = (minVersion: string | null) => Response.json({ success: false, error: clientOutdatedText(minVersion), code: CLIENT_OUTDATED, minVersion }, { status: 426 });
+
 /** One bounded refresh on 401. A revoked account or forbidden role is never retried. */
 export async function fetchWithSessionRetry(url: string, init: RequestInit = {}, sessionServerUrl?: string): Promise<Response> {
-  const send = (options: RequestInit) => fetch(url, { ...options, signal: options.signal ?? AbortSignal.timeout(12000) });
   const authorization = new Headers(init.headers).get('Authorization');
   // Worker requests authenticate against the API, so their renewal origin must be explicit.
-  const base = sessionServerUrl?.trim().replace(/\/+$/, '') || url.slice(0, url.indexOf('/api/'));
+  const apiStart = url.indexOf('/api/');
+  const base = sessionServerUrl?.trim().replace(/\/+$/, '') || url.slice(0, apiStart);
+  // Solo las solicitudes a la propia API llevan la identidad del cliente y se detienen con la versión mínima.
+  const toApi = apiStart >= 0 && url.slice(0, apiStart).replace(/\/+$/, '') === base;
+  const route = toApi ? url.slice(apiStart).split(/[?#]/)[0] : '';
+  const send = async (options: RequestInit) => {
+    const response = await fetch(url, { ...options, ...(toApi ? { headers: withClientIdentity(options.headers) } : {}), signal: options.signal ?? AbortSignal.timeout(12000) });
+    if (!toApi || response.status !== 426) return response;
+    const body = await response.clone().json().catch(() => null);
+    if (body?.error !== CLIENT_OUTDATED) return response;
+    return outdatedResponse(reportClientOutdated(base, body.minVersion).minVersion);
+  };
   const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
   const key = base && token ? await computeTokenKey(base, token) : null;
 
@@ -124,6 +148,8 @@ export async function fetchWithSessionRetry(url: string, init: RequestInit = {},
       headers: { 'Content-Type': 'application/json' },
     });
   }
+  // La API ya dijo que esta versión no puede sincronizar: no se reintenta hasta actualizar (trabajo local intacto).
+  if (toApi && !isClientGateOpen(init.method ?? 'GET', route) && isServerBlocked(base)) return outdatedResponse(getClientOutdated()?.minVersion ?? null);
 
   const response = await send(init);
   if (response.status !== 401 || !token || !base || /\/api\/auth\/(?:refresh|login|register)$/.test(url)) return response;
@@ -134,7 +160,7 @@ export async function fetchWithSessionRetry(url: string, init: RequestInit = {},
       try {
         const refreshed = await fetch(`${base}/api/auth/refresh`, {
           method: 'POST',
-          headers: { Authorization: authorization! },
+          headers: withClientIdentity({ Authorization: authorization! }),
           signal: AbortSignal.timeout(8000),
         });
         if (refreshed.status === 401 || refreshed.status === 403) {
@@ -172,6 +198,21 @@ export async function fetchWithSessionRetry(url: string, init: RequestInit = {},
     notifySessionInvalidated({ serverUrl: base, token: renewed });
   }
   return retried;
+}
+
+/**
+ * Frontera de sincronización (ADR 0001): lo que viaja de ida y vuelta lleva los equipos solo como grupos. Una instantánea
+ * anterior a 2.7.1 (historial del servidor restaurado, cliente viejo) puede traer el espejo heredado; `migrateLegacySpecs`
+ * es invariante e idempotente, y devuelve el mismo objeto si no hay nada que migrar.
+ */
+function withGroupsOnly<P extends ProjectSimulation | undefined>(project: P): P {
+  if (!project?.specs || typeof project.specs !== 'object') return project;
+  const specs = migrateLegacySpecs(project.specs);
+  return specs === project.specs ? project : { ...project, specs };
+}
+function outcomeWithGroupsOnly(outcome: SyncPushOutcome): SyncPushOutcome {
+  if (outcome.status === 'conflict') return outcome.serverProject ? { ...outcome, serverProject: withGroupsOnly(outcome.serverProject) } : outcome;
+  return outcome.project ? { ...outcome, project: withGroupsOnly(outcome.project) } : outcome;
 }
 
 function validatePushResults(results: unknown, ids: string[], content: 'project'): SyncPushOutcome[];
@@ -467,7 +508,7 @@ export class SyncService {
       if (error) return { success: false, error };
       return {
         success: true,
-        projects: Array.isArray(data.projects) ? data.projects : (() => { throw new Error('Respuesta de proyectos inválida.'); })(),
+        projects: Array.isArray(data.projects) ? data.projects.map(withGroupsOnly) : (() => { throw new Error('Respuesta de proyectos inválida.'); })(),
         deletedIds: data.deletedIds || [],
         serverTimestamp: data.serverTimestamp,
         count: data.count || 0,
@@ -482,7 +523,7 @@ export class SyncService {
    */
   static async pushProjects(serverUrl: string, token: string, projects: ProjectSimulation[]): Promise<SyncPushResult> {
     try {
-      const { data, error } = await this.readSuccess(await this.send(serverUrl, token, 'POST', '/api/sync/push', { projects }), 'Error al subir proyectos');
+      const { data, error } = await this.readSuccess(await this.send(serverUrl, token, 'POST', '/api/sync/push', { projects: projects.map(withGroupsOnly) }), 'Error al subir proyectos');
       if (error) return { success: false, error };
 
       if (Array.isArray(data.results) && data.results.some((result: any) => result.awaitingConfirmation !== undefined)) throw new Error('Confirmación de sincronización inválida.');
@@ -506,7 +547,7 @@ export class SyncService {
         success: true,
         message: data.message,
         serverTimestamp: data.serverTimestamp,
-        results: validatePushResults(data.results, projects.map((item) => item.id), 'project'),
+        results: validatePushResults(data.results, projects.map((item) => item.id), 'project').map(outcomeWithGroupsOnly),
       };
     } catch (err: any) {
       return { success: false, error: err.message || 'Error de conexión al enviar proyectos' };

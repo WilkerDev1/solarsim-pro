@@ -4,6 +4,7 @@ import { PDFAttachmentStorage } from '../../../src/services/pdfAttachmentStorage
 import { PDFDocument } from 'pdf-lib';
 import { useSimulationStore as store } from '../../../src/store/useSimulationStore';
 import { BENCHMARK_PROJECT } from '../../../src/engine/referenceCase';
+import { editEquipment } from '../../../shared/equipment';
 import { PDFAttachmentsSection } from '../../../src/components/pdf/controls/PDFAttachmentsSection';
 import { EquipmentParamsSection } from '../../../src/components/simulator/sidebar/EquipmentParamsSection';
 import { ProposalAnnexSync } from '../../../src/components/pdf/annexes/ProposalAnnexSync';
@@ -11,9 +12,11 @@ import { ProposalAnnexSync } from '../../../src/components/pdf/annexes/ProposalA
 const withAssets = new URLSearchParams(location.search).has('assets');
 import '../../../src/index.css';
 const p = structuredClone(BENCHMARK_PROJECT);
-p.id = 'qa-simulator-datasheets'; p.specs.hasBattery = false; p.specs.batteryCount = 0;
-p.specs.panelBrandModel = 'QA Panel'; p.specs.batteryBrandModel = 'QA Battery';
-p.specs.panels = undefined; p.specs.batteries = undefined; p.customization = { ...p.customization, attachedPdfs: [] };
+p.id = 'qa-simulator-datasheets';
+// Equipment lives in groups only (ADR 0001): a switched-off battery bank of 0 units and a panel named like the catalog item.
+p.specs = editEquipment(editEquipment({ ...p.specs, hasBattery: false }, 'battery', { type: 'update', index: 0, patch: { count: 0, brandModel: 'QA Battery' } }),
+  'panel', { type: 'update', index: 0, patch: { brandModel: 'QA Panel' } });
+p.customization = { ...p.customization, attachedPdfs: [] };
 store.setState({ projects: [p], activeProjectId: p.id, workspaceScope: 'local', sidebarTheme: 'light', equipmentCatalog: [
   { id: 'qa-panel', type: 'panel', brand: 'QA', modelSeries: 'QA', displayName: 'QA Panel', powerW: 620, datasheetUrl: 'https://qa.example.invalid/panel.pdf', datasheetName: 'QA Panel.pdf', createdAt: '2026-10-14', updatedAt: '2026-10-14' }
 ], syncSettings: { ...store.getState().syncSettings, currentUser: null, authToken: null, autoSyncEnabled: false } });
@@ -40,7 +43,7 @@ function Fixture() {
   const summary = store(s => s.getFinancialSummary());
   return <main className="grid grid-cols-2 gap-6 p-6 bg-slate-50 min-h-screen">
     <section><EquipmentParamsSection project={project} summary={summary} updateSpecs={store.getState().updateSpecs} isDark={false} isOpen={true} onToggle={() => {}} />
-      <p role="status">Cantidad real de baterías: {project.specs.batteryCount}. Costo total: {summary.costMatrix.totalNetoUSD.toFixed(2)} USD.</p>
+      <p role="status">Cantidad real de baterías: {project.specs.batteries?.reduce((sum, group) => sum + (group.count ?? 0), 0) ?? 0}. Costo total: {summary.costMatrix.totalNetoUSD.toFixed(2)} USD.</p>
     </section><section><button onClick={async () => {
       for (const att of project.customization?.attachedPdfs || []) await PDFAttachmentStorage.deleteAttachment(att.id);
       store.getState().updateDocumentCustomization({ attachedPdfs: [...(project.customization?.attachedPdfs || [])] });

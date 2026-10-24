@@ -221,7 +221,7 @@ store.createNewProject({ name: 'Proyecto de Prueba Catálogo Batería' });
 
 // Simular que el proyecto activo tenía un nombre legado de batería
 store.updateSpecs({
-  batteryBrandModel: 'Banco de Baterías de Litio HinaESS PowerGem Max 16.08kWh',
+  batteries: [{ id: 'legacy-battery', brandModel: 'Banco de Baterías de Litio HinaESS PowerGem Max 16.08kWh', capacityKWh: 16.08, count: 1 }],
   hasBattery: true,
 });
 
@@ -229,25 +229,30 @@ store.updateSpecs({
 store.applySupplierPriceToProject('battery', testSupplierPrice, hinaessItem);
 
 const activeProject = useSimulationStore.getState().getActiveProject();
+const batteryGroup = activeProject.specs.batteries?.[0];
 
-console.log(`Battery Model in Project: "${activeProject.specs.batteryBrandModel}"`);
-console.log(`Battery Unit Price in Project: $${activeProject.specs.batteryUnitPriceUSD}`);
-console.log('Battery Supplier Info in Project:', activeProject.specs.selectedSupplierInfo?.battery);
+console.log(`Battery Model in Project: "${batteryGroup?.brandModel}"`);
+console.log(`Battery Unit Price in Project: $${batteryGroup?.unitPriceUSD}`);
+console.log('Battery Supplier Info in Project:', batteryGroup?.selectedSupplierInfo);
 
-if (activeProject.specs.batteryUnitPriceUSD !== 1990) {
-  throw new Error(`❌ Expected batteryUnitPriceUSD to be 1990, got ${activeProject.specs.batteryUnitPriceUSD}`);
+if (batteryGroup?.unitPriceUSD !== 1990) {
+  throw new Error(`❌ Expected battery unitPriceUSD to be 1990, got ${batteryGroup?.unitPriceUSD}`);
 }
 
-if (activeProject.specs.batteryBrandModel !== hinaessItem.displayName) {
-  throw new Error(`❌ Expected batteryBrandModel to be synchronized to "${hinaessItem.displayName}", got "${activeProject.specs.batteryBrandModel}"`);
+if (batteryGroup?.brandModel !== hinaessItem.displayName) {
+  throw new Error(`❌ Expected battery brandModel to be synchronized to "${hinaessItem.displayName}", got "${batteryGroup?.brandModel}"`);
 }
 
-if (activeProject.specs.selectedSupplierInfo?.battery?.supplierName !== 'YAKE POWER') {
-  throw new Error(`❌ Expected selectedSupplierInfo.battery.supplierName to be "YAKE POWER", got "${activeProject.specs.selectedSupplierInfo?.battery?.supplierName}"`);
+if (batteryGroup?.selectedSupplierInfo?.supplierName !== 'YAKE POWER') {
+  throw new Error(`❌ Expected the battery group supplier to be "YAKE POWER", got "${batteryGroup?.selectedSupplierInfo?.supplierName}"`);
 }
 
-if (activeProject.specs.selectedSupplierInfo?.battery?.supplierPriceId !== 'sp-test-yake-1990') {
+if (batteryGroup?.selectedSupplierInfo?.supplierPriceId !== 'sp-test-yake-1990') {
   throw new Error(`❌ Expected supplierPriceId to match "sp-test-yake-1990"`);
+}
+
+if ('batteryBrandModel' in activeProject.specs || 'selectedSupplierInfo' in activeProject.specs) {
+  throw new Error('❌ Applying a supplier price must not write the legacy mirror');
 }
 
 // Limpiar el precio de prueba y el proyecto

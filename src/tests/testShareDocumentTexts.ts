@@ -3,7 +3,7 @@ import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { buildDocumentTextContext } from '../utils/documentTextContext';
 import { docTextKey, isDocTextKey, publishedDocumentTexts, VIEWER_TEXT_KEYS, viewerText, DOCUMENT_TEXT_KEYS } from '../../shared/documentTexts';
-import type { ProjectSimulation } from '../types';
+import type { LegacyProjectSpecs, ProjectSimulation } from '../types';
 
 const ctxFor = (project: ProjectSimulation) => buildDocumentTextContext(project, calculateProjectFinancialSummary(project), { currentDateStr: '21/10/2026' });
 const base: ProjectSimulation = { ...structuredClone(BENCHMARK_PROJECT), customization: {} };
@@ -51,7 +51,7 @@ assert.equal(isDocTextKey('texts'), false);
     { id: 'b', brandModel: 'Panel B (620W)', powerW: 620, count: 20 },
   ] as never;
   groups.specs.hasBattery = true;
-  groups.specs.batteryCapacityKWh = 10;
+  (groups.specs as LegacyProjectSpecs).batteryCapacityKWh = 10;
   groups.customization = {
     customProjectSummaryParagraph1: 'Se instalarán {panelCount} paneles.',
     customProjectSummaryParagraph2: 'Adicionalmente, se contempla la instalación de **1 Inversor viejo y 1 Batería vieja** con estructura propia.',

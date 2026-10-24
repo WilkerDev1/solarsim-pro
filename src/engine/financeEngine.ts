@@ -1,5 +1,4 @@
 import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
-import { DEFAULT_UNIT_PRICE_USD } from '../utils/equipmentGroups';
 import { DEFAULT_INSTALLATION_USD_PER_KWP, DEFAULT_PRICE_PER_WATT_USD, resolveBatteryBankDodPct, resolveBatteryBankEfficiencyPct, resolveDopRate, resolvePricePerWattUSD, resolveSaleMarginMultiplier } from '../../shared/projectDefaults';
 import { ITBIS_RATE, LEY5707_CREDIT_RATE, appliesItemMargin, customItemsTaxBreakdown, isItemItbisExonerated } from '../../shared/financialRules';
 import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem, CustomQuotationItem, CustomQuotationDiscount, ProjectSimulation } from '../types';
@@ -10,6 +9,7 @@ import {
   getProjectBatteries,
   calculateTotalDCCapacityKWp,
   calculateTotalBatteryCapacityKWh,
+  batteryBankSpecs,
 } from '../utils/equipmentSpecsUtils';
 
 /**
@@ -38,9 +38,7 @@ export function calculateCostMatrixSummary(
 
   const panelItems: CostMatrixItem[] = panels.map((p) => {
     const qty = p.count || 0;
-    const unitUSD = p.unitPriceUSD !== undefined
-      ? p.unitPriceUSD
-      : (specs.panels?.length ? 0 : (specs.panelUnitPriceUSD !== undefined ? specs.panelUnitPriceUSD : DEFAULT_UNIT_PRICE_USD.panel));
+    const unitUSD = p.unitPriceUSD ?? 0; // un proyecto sin grupos ya trae el precio por defecto (readEquipment)
     const itemTotalUSD = qty * unitUSD;
     const itemTotalDOP = itemTotalUSD * rate;
     const itemKilos = Math.round((((p.powerW || 620) * qty) / 1000) * 1000) / 1000;
@@ -68,9 +66,7 @@ export function calculateCostMatrixSummary(
 
   const inverterItems: CostMatrixItem[] = inverters.map((inv) => {
     const qty = inv.count !== undefined ? inv.count : 1;
-    const unitUSD = inv.unitPriceUSD !== undefined
-      ? inv.unitPriceUSD
-      : (specs.inverters?.length ? 0 : (specs.inverterUnitPriceUSD !== undefined ? specs.inverterUnitPriceUSD : DEFAULT_UNIT_PRICE_USD.inverter));
+    const unitUSD = inv.unitPriceUSD ?? 0;
     const itemTotalUSD = qty * unitUSD;
     const itemTotalDOP = itemTotalUSD * rate;
     const itemKilos = inv.powerKW || inv.weightKilos || 12;
@@ -99,9 +95,7 @@ export function calculateCostMatrixSummary(
   const batteryItems: CostMatrixItem[] = specs.hasBattery
     ? batteries.map((b) => {
         const qty = b.count !== undefined ? b.count : 1;
-        const unitUSD = b.unitPriceUSD !== undefined
-          ? b.unitPriceUSD
-          : (specs.batteries?.length ? 0 : (specs.batteryUnitPriceUSD !== undefined ? specs.batteryUnitPriceUSD : DEFAULT_UNIT_PRICE_USD.battery));
+        const unitUSD = b.unitPriceUSD ?? 0;
         const itemTotalUSD = qty * unitUSD;
         const itemTotalDOP = itemTotalUSD * rate;
         const itemItbisDOP = itemTotalDOP * ITBIS_RATE; // 18% ITBIS
@@ -581,11 +575,12 @@ export function calculateFinancialSummary(
     : 0;
 
   // Battery Usable Capacity & Backup Autonomy calculation
-  const batteryDodPct = resolveBatteryBankDodPct(specs);
-  const batteryEffPct = resolveBatteryBankEfficiencyPct(specs);
+  const bank = batteryBankSpecs(specs);
+  const batteryDodPct = resolveBatteryBankDodPct(bank);
+  const batteryEffPct = resolveBatteryBankEfficiencyPct(bank);
   const totalBatteryKWh = calculateTotalBatteryCapacityKWh(specs);
   const batteryUsableKWh = specs.hasBattery
-    ? Math.round(((totalBatteryKWh || specs.batteryCapacityKWh) * (batteryDodPct / 100) * (batteryEffPct / 100)) * 10) / 10
+    ? Math.round(((totalBatteryKWh || bank.batteries[0]?.capacityKWh || 0) * (batteryDodPct / 100) * (batteryEffPct / 100)) * 10) / 10
     : 0;
 
   const avgDailyConsumptionKWh = annualConsumptionKWh > 0 ? annualConsumptionKWh / 365 : 100;

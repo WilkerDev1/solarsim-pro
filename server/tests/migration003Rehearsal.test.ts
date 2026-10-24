@@ -7,6 +7,10 @@ import {
 } from "./helpers/ephemeralPostgres.js";
 import { migrateDatabase } from "../src/database/migrations.js";
 import { resolveMembership } from "../src/membership.js";
+import {
+  equipmentTotals,
+  readEquipment,
+} from "../../shared/equipment/index.js";
 
 let database: EphemeralPostgres;
 let pool: pg.Pool;
@@ -251,7 +255,7 @@ test("Comprehensive Migration 003 rehearsal: preserves all 8 business tables, co
   // Content fingerprints (JSON + business attributes)
   const projectFingerprintBefore = (
     await pool.query(
-      "SELECT md5(string_agg(id || ':' || version::text || ':' || client_name || ':' || data_json::text, '|' ORDER BY id)) AS fp FROM projects",
+      "SELECT md5(string_agg(id || ':' || version::text || ':' || client_name || ':' || (data_json - 'specs')::text, '|' ORDER BY id)) AS fp FROM projects",
     )
   ).rows[0].fp;
 
@@ -279,6 +283,13 @@ test("Comprehensive Migration 003 rehearsal: preserves all 8 business tables, co
     )
   ).rows[0].fp;
 
+  // Migration 006 rewrites only `specs` (legacy mirror -> groups); the rest of each document is fingerprinted above.
+  const specsBefore = new Map<string, any>(
+    (
+      await pool.query("SELECT id, data_json->'specs' AS specs FROM projects")
+    ).rows.map((row) => [row.id, row.specs]),
+  );
+
   // 2. Execute migration sequence (001 baseline -> 002 feature policy -> 003 company management)
   await migrateDatabase(pool);
 
@@ -295,6 +306,7 @@ test("Comprehensive Migration 003 rehearsal: preserves all 8 business tables, co
     { version: 3, name: "company_management" },
     { version: 4, name: "shared_resources" },
     { version: 5, name: "clients" },
+    { version: 6, name: "equipment_groups" },
   ]);
 
   // 4. Verify ZERO data loss: row counts of all 8 tables are strictly preserved
@@ -342,14 +354,27 @@ test("Comprehensive Migration 003 rehearsal: preserves all 8 business tables, co
   // 5. Verify bit-exact preservation of JSON documents and critical relations
   const projectFingerprintAfter = (
     await pool.query(
-      "SELECT md5(string_agg(id || ':' || version::text || ':' || client_name || ':' || data_json::text, '|' ORDER BY id)) AS fp FROM projects",
+      "SELECT md5(string_agg(id || ':' || version::text || ':' || client_name || ':' || (data_json - 'specs')::text, '|' ORDER BY id)) AS fp FROM projects",
     )
   ).rows[0].fp;
   assert.equal(
     projectFingerprintAfter,
     projectFingerprintBefore,
-    "Project JSON and metadata intact",
+    "Project JSON (outside specs) and metadata intact",
   );
+  for (const row of (
+    await pool.query("SELECT id, data_json->'specs' AS specs FROM projects")
+  ).rows) {
+    assert.deepEqual(
+      equipmentTotals(readEquipment(row.specs)),
+      equipmentTotals(readEquipment(specsBefore.get(row.id))),
+      `${row.id}: equipment totals survive migration 006`,
+    );
+    assert.ok(
+      !("panelCount" in row.specs) && Array.isArray(row.specs.panels),
+      `${row.id}: groups only`,
+    );
+  }
 
   const equipmentFingerprintAfter = (
     await pool.query(
@@ -510,7 +535,7 @@ test("Comprehensive Migration 003 rehearsal: preserves all 8 business tables, co
   assert.equal(
     (
       await pool.query(
-        "SELECT md5(string_agg(id || ':' || version::text || ':' || client_name || ':' || data_json::text, '|' ORDER BY id)) AS fp FROM projects",
+        "SELECT md5(string_agg(id || ':' || version::text || ':' || client_name || ':' || (data_json - 'specs')::text, '|' ORDER BY id)) AS fp FROM projects",
       )
     ).rows[0].fp,
     projectFingerprintBefore,

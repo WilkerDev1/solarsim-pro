@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
 import { ProjectSimulation } from '../../types';
-import { calculateDCCapacityKWp } from '../../engine/solarEngine';
+import { equipmentTotals, readEquipment } from '../../../shared/equipment';
 import {
   MapPin,
   Zap,
@@ -29,7 +29,8 @@ export const TrashProjectCard: React.FC<TrashProjectCardProps> = ({ project }) =
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
   // DC System capacity
-  const dcKWp = calculateDCCapacityKWp(project.specs?.panelPowerW || 620, project.specs?.panelCount || 0);
+  const trashTotals = project.specs ? equipmentTotals(readEquipment(project.specs)) : undefined;
+  const dcKWp = trashTotals?.capacityKWp ?? 0;
 
   // Calculation of days remaining (30 days total retention)
   const { daysRemaining, deletedDateFormatted } = React.useMemo(() => {
@@ -159,7 +160,7 @@ export const TrashProjectCard: React.FC<TrashProjectCardProps> = ({ project }) =
             Paneles / Inv.
           </span>
           <span className="text-sm font-bold text-slate-700 dark:text-zinc-300 font-mono mt-0.5">
-            {project.specs?.panelCount || 0} uds
+            {trashTotals?.panelCount || 0} uds
           </span>
         </div>
       </div>

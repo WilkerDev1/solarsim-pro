@@ -4,6 +4,7 @@ import {
   isProposalCommercial,
   reportContent,
 } from "../../../shared/proposalCommercial.js";
+import { migrateLegacySpecs } from "../../../shared/equipment/index.js";
 import { resolveMembership } from "../membership.js";
 import { lockCurrentMembership } from "../membership.js";
 import { readObjectBody } from "../request.js";
@@ -577,6 +578,11 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
         user,
         {
           ...snapshot.data_json,
+          // The history is immutable and may predate 2.7.1 (it can carry the legacy mirror): what is restored is groups only.
+          ...(snapshot.data_json?.specs &&
+          typeof snapshot.data_json.specs === "object"
+            ? { specs: migrateLegacySpecs(snapshot.data_json.specs) }
+            : {}),
           commercial: row.data_json.commercial,
           proposalLink: row.data_json.proposalLink,
           // The client link is directory metadata, like the commercial state: history never revives a removed or deleted link.

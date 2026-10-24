@@ -187,7 +187,7 @@ try {
     allServices.forEach(alive);
     // Check the nonce immediately before every seed mutation, including a recycled API port.
     await ready(api + '/qa-instance', [apiProcess], instanceId);
-    const response = await fetch(api + path, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(10000), headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) });
+    const response = await fetch(api + path, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(10000), headers: { 'Content-Type': 'application/json', 'X-SolarSim-Client': 'desktop/2.7.1', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) });
     const data = await response.json(); assert.ok(response.ok && data.success, `${path}: ${data.error}`); return data;
   };
   const admin = await request('/api/auth/register', { name: 'Ana QA', email: 'ana@staging.example.invalid', password, organizationName: 'QA SolarSim — A' });

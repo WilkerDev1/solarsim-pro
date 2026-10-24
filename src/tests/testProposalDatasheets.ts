@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-import { BENCHMARK_PROJECT } from '../engine/referenceCase';
+import { BENCHMARK_LEGACY_SPECS, BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { datasheetDisplayName, datasheetFileName, proposalDatasheets } from '../utils/proposalDatasheets';
 import type { SolarEquipmentItem } from '../types/equipment';
-const p = structuredClone(BENCHMARK_PROJECT);
+const p = { ...structuredClone(BENCHMARK_PROJECT), specs: { ...BENCHMARK_LEGACY_SPECS } };
 p.specs.panels = [{ id: 'a', brandModel: 'QA A', powerW: 600, count: 10 }, { id: 'b', brandModel: 'QA B', powerW: 620, count: 5 }];
 p.specs.inverters = [{ id: 'c', brandModel: 'QA I', powerKW: 8, count: 0 }];
 p.specs.hasBattery = false;

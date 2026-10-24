@@ -4,15 +4,8 @@ import type { CompanyProfile, FinancialSummaryResult, ProjectSimulation } from '
 import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
 import { calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { formatProposalDate } from './formatDateUtils';
-import {
-  calculateTotalBatteryCapacityKWh,
-  calculateTotalBatteryCount,
-  calculateTotalInverterCount,
-  calculateTotalPanelCount,
-  formatBatteriesSummary,
-  formatInvertersSummary,
-  formatPanelsSummary,
-} from './equipmentSpecsUtils';
+import { mainModelPhrase } from '../../shared/documentTexts/equipmentPhrases';
+import { equipmentTotals, readEquipment } from '../../shared/equipment';
 
 type SummaryFields = Pick<FinancialSummaryResult, 'annualConsumptionKWh' | 'annualProductionKWh' | 'systemCapacityKWp' | 'energyCoveragePct'>;
 
@@ -25,23 +18,24 @@ export function buildDocumentTextContext(
   const { specs, client, rates } = project;
   const clientName = cleanClientName(client.name || 'Cliente');
 
-  const rawPanelModel = specs.panelBrandModel || 'Módulos Monocristalinos TOPCon';
-  const panelModel = rawPanelModel.toLowerCase().includes('w') || (specs.panelPowerW || 0) <= 0 ? rawPanelModel : `${rawPanelModel} (${specs.panelPowerW}W)`;
-  const rawInverterModel = specs.inverterBrandModel || 'Inversor Solar Inteligente';
-  const inverterModel = rawInverterModel.toLowerCase().includes('kw') || (specs.inverterPowerKW || 0) <= 0
-    ? rawInverterModel
-    : `${rawInverterModel} (${specs.inverterPowerKW || (summary.systemCapacityKWp * 0.9).toFixed(1)} kW)`;
-  const rawBatteryModel = specs.batteryBrandModel || 'Batería de Litio LiFePO4';
-  const batteryModel = rawBatteryModel.toLowerCase().includes('kwh') || (specs.batteryCapacityKWh || 0) <= 0
-    ? rawBatteryModel
-    : `${rawBatteryModel} (${specs.batteryCapacityKWh} kWh)`;
+  // Equipos solo por `shared/equipment`: frases con el modelo principal y «y N modelo(s) más»; totales de todos los grupos.
+  const equipment = readEquipment(specs);
+  const totals = equipmentTotals(equipment);
+  const panel = mainModelPhrase(equipment, 'panel');
+  const panelW = panel.main?.powerW || 0;
+  const panelModel = (panel.name.toLowerCase().includes('w') || panelW <= 0 ? panel.name : `${panel.name} (${panelW}W)`) + panel.more;
+  const inverterUnit = mainModelPhrase(equipment, 'inverter');
+  const inverterKW = inverterUnit.main?.powerKW || 0;
+  const inverterModel = (inverterUnit.name.toLowerCase().includes('kw') || inverterKW <= 0 ? inverterUnit.name : `${inverterUnit.name} (${inverterKW} kW)`) + inverterUnit.more;
+  const batteryUnit = mainModelPhrase(equipment, 'battery');
+  const batteryKWh = batteryUnit.main?.capacityKWh || 0;
+  const batteryModel = (batteryUnit.name.toLowerCase().includes('kwh') || batteryKWh <= 0 ? batteryUnit.name : `${batteryUnit.name} (${batteryKWh} kWh)`) + batteryUnit.more;
 
-  const multiPanels = !!(specs.panels && specs.panels.length > 1);
-  const multiInverters = !!(specs.inverters && specs.inverters.length > 1);
-  const multiBatteries = !!(specs.batteries && specs.batteries.length > 1);
-  const panelsSummaryText = multiPanels ? formatPanelsSummary(specs) : `${specs.panelCount} ${panelModel}`;
-  const invertersSummaryText = multiInverters ? formatInvertersSummary(specs) : `${specs.inverterCount || 1} ${inverterModel}`;
-  const batteriesSummaryText = multiBatteries ? formatBatteriesSummary(specs) : `${specs.batteryCount || 1} ${batteryModel}`;
+  const inverterCount = totals.inverterCount || 1;
+  const batteryCount = totals.batteryCount || 1;
+  const panelsSummaryText = `${totals.panelCount} ${panelModel}`;
+  const invertersSummaryText = `${inverterCount} ${inverterModel}`;
+  const batteriesSummaryText = `${batteryCount} ${batteryModel}`;
   const company = options.company;
 
   return createDocumentTextContext({
@@ -70,22 +64,22 @@ export function buildDocumentTextContext(
     isZeroExport: !!rates.isZeroExport,
     gridExportFeePct: rates.gridExportFeePct ?? 25,
     hasBattery: !!specs.hasBattery,
-    hasBatteryStorage: !!specs.hasBattery && calculateTotalBatteryCapacityKWh(specs) > 0,
+    hasBatteryStorage: totals.batteryNominalKWh > 0,
     annualConsumptionKWh: summary.annualConsumptionKWh,
     annualProductionKWh: summary.annualProductionKWh,
     systemCapacityKWp: summary.systemCapacityKWp,
     energyCoveragePct: summary.energyCoveragePct,
-    // Totales de todos los grupos de equipos (el campo suelto solo refleja el primero).
-    panelCount: calculateTotalPanelCount(specs),
+    panelCount: totals.panelCount,
     panelsSummaryText,
-    panelModelText: multiPanels ? panelsSummaryText : panelModel,
-    inverterCount: calculateTotalInverterCount(specs) || 1,
+    // Con varios modelos el texto sincronizable es el resumen completo (con cantidad); con uno, solo el modelo.
+    panelModelText: panel.more ? panelsSummaryText : panelModel,
+    inverterCount,
     invertersSummaryText,
-    inverterModelText: multiInverters ? invertersSummaryText : inverterModel,
-    batteryCount: calculateTotalBatteryCount(specs) || 1,
-    batteryCapacityKWh: specs.batteryCapacityKWh || 0,
+    inverterModelText: inverterUnit.more ? invertersSummaryText : inverterModel,
+    batteryCount,
+    batteryCapacityKWh: totals.batteryNominalKWh,
     batteriesSummaryText,
-    batteryModelText: multiBatteries ? batteriesSummaryText : batteryModel,
+    batteryModelText: batteryUnit.more ? batteriesSummaryText : batteryModel,
   });
 }
 

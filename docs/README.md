@@ -5,6 +5,7 @@ Documentos canónicos y vigentes. No se mantienen documentos fechados: el histor
 ## Arquitectura y contratos
 
 - [Arquitectura modular](ARCHITECTURE.md): límites, dependencias permitidas y puntos de entrada.
+- [Decisiones de arquitectura (ADR)](adr/0001-equipment-model-sin-espejo.md): EquipmentModel sin espejo heredado. Vocabulario en el [glosario](../GLOSSARY.md).
 - [Funciones y modos de cálculo](APPLICATION_FEATURES.md): legacy predeterminado, proyección experimental, política de organización y compatibilidad.
 - [Motor financiero](FINANCIAL_ENGINE_SPECIFICATION.md): matriz de costos, Ley 57-07, flujo de caja e indicadores.
 - [Balance energético físico](ENERGY_BALANCE_AND_SELF_CONSUMPTION_SPECIFICATION.md): autoconsumo y despacho BESS del modelo opcional.
