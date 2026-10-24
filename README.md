@@ -47,7 +47,7 @@ flowchart LR
 | Carpeta | Contenido |
 |---|---|
 | `src/` | Aplicación React 18 + TypeScript + Zustand + Tailwind: vistas, store, motores de cálculo (`engine/`) y reglas de edición (`domain/`). |
-| `electron/` | Proceso principal de Electron 44: llamadas a IA, ventanas, impresión, actualizador firmado y servidor MCP local. |
+| `electron/` | Proceso principal de Electron 44: llamadas a IA, ventanas, impresión, actualizador (con verificación GPG en Linux) y servidor MCP local. |
 | `shared/` | TypeScript puro que comparten la aplicación, la API y el Worker: equipos (`equipment/`), supuestos (`assumptions.ts`), reglas fiscales, permisos y textos del documento. |
 | `server/` | API de sincronización con Hono y PostgreSQL 16 en Docker: JWT, organizaciones y roles, control de versiones (CAS), migraciones y versión mínima de cliente. |
 | `workers/share-viewer/` | Cloudflare Worker que publica copias inmutables de las propuestas web. |
