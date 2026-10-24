@@ -1,10 +1,9 @@
 import { readEquipment } from '../../../../shared/equipment';
 import React from 'react';
-import { resolveProjectEquipment, supplierQuotesItem } from '../../../utils/equipmentMatchingUtils';
+import { resolveProjectEquipment } from '../../../utils/equipmentMatchingUtils';
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs } from '../../../types';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
-import { useSupplierCleanup } from '../params/hooks/useSupplierCleanup';
 import {
   marginPctFromMultiplier,
   multiplierFromMarginInput,
@@ -49,16 +48,6 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
   const selectedPanel = resolveProjectEquipment(equipmentCatalog, 'panel', panel?.brandModel, panel?.powerW, info.panel?.supplierPriceId);
   const selectedInverter = resolveProjectEquipment(equipmentCatalog, 'inverter', inverter?.brandModel, inverter?.powerKW, info.inverter?.supplierPriceId);
   const selectedBattery = resolveProjectEquipment(equipmentCatalog, 'battery', battery?.brandModel, battery?.capacityKWh, info.battery?.supplierPriceId);
-
-  // La limpieza escribe en el proyecto: vive aquí (siempre montada), no en una vista que dependa del modo.
-  useSupplierCleanup({
-    specs,
-    equipmentCatalog,
-    panelSupplierMatches: supplierQuotesItem(selectedPanel, info.panel),
-    inverterSupplierMatches: supplierQuotesItem(selectedInverter, info.inverter),
-    batterySupplierMatches: supplierQuotesItem(selectedBattery, info.battery),
-    updateSpecs,
-  });
 
   const isDirect = specs.pricingMode === 'direct_watt';
   const matrix = summary?.costMatrix;

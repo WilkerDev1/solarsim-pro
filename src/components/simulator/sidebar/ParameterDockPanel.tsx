@@ -18,7 +18,7 @@ export interface ParameterDockPanelProps {
   onToggle: (key: DockSectionKey) => void;
   onToggleAll: () => void;
   financialsBadge: FinancialsBadge;
-  /** Cuerpo de cada sección; siempre montado (oculto con hidden al colapsar) para no reiniciar efectos como useCatalogPowerSync. */
+  /** Cuerpo de cada sección; siempre montado (oculto con hidden al colapsar) para conservar el estado local de cada sección (campos en edición). */
   renderBody: (key: DockSectionKey) => React.ReactNode;
 }
 

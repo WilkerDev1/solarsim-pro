@@ -1,11 +1,17 @@
 import assert from 'node:assert/strict';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
+import { calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { calculateRecommendedPanelCount } from '../engine/solarEngine';
+import { applyProjectEdit, type ProjectEdit } from '../domain/projectEdit';
+import { EquipmentParamsSection } from '../components/simulator/sidebar/EquipmentParamsSection';
+import { PricingParamsSection } from '../components/simulator/sidebar/PricingParamsSection';
 import { resolveAssumptions } from '../../shared/assumptions';
 import { readEquipment } from '../../shared/equipment';
 import { editEquipmentGroup } from '../utils/equipmentGroups';
 import { useSimulationStore as store } from '../store/useSimulationStore';
-import type { ClientInfo, FinancialParams, ProjectSimulation, SystemSpecs, UtilityRates } from '../types';
+import type { ProjectSimulation } from '../types';
 import type { EquipmentSupplierPrice, SolarEquipmentItem } from '../types/equipment';
 
 /**
@@ -18,12 +24,7 @@ import type { EquipmentSupplierPrice, SolarEquipmentItem } from '../types/equipm
  */
 
 // ── Datos de prueba ─────────────────────────────────────────────────────────────────────────
-type Edit =
-  | { kind: 'specs'; patch: Partial<SystemSpecs> }
-  | { kind: 'rates'; patch: Partial<UtilityRates> }
-  | { kind: 'client'; patch: Partial<ClientInfo> }
-  | { kind: 'consumption'; monthlyConsumption: number[]; lockAutoPanels?: boolean }
-  | { kind: 'financials'; patch: Partial<FinancialParams> };
+type Edit = ProjectEdit;
 
 const offer = (id: string, supplierName: string, priceUSD: number): EquipmentSupplierPrice => ({ id, supplierName, priceUSD, updatedAt: '2026-01-01' });
 const item = (extra: Partial<SolarEquipmentItem> & Pick<SolarEquipmentItem, 'id' | 'type' | 'displayName'>): SolarEquipmentItem =>
@@ -73,11 +74,20 @@ const viaStore: Apply = (project, edit, catalog = CATALOG) => {
     else if (edit.kind === 'rates') s.updateRates(edit.patch);
     else if (edit.kind === 'client') s.updateClient(edit.patch);
     else if (edit.kind === 'financials') s.updateFinancials(edit.patch);
+    else if (edit.kind === 'supplierPrice') s.applySupplierPriceToProject(edit.equipmentType, edit.supplierPrice, edit.equipmentItem);
     else s.setMonthlyConsumption(edit.monthlyConsumption, edit.lockAutoPanels);
     return store.getState().projects[0];
   } finally {
     store.setState(original, true);
   }
+};
+
+/** `applyProjectEdit` sin Zustand; además comprueba que no muta el proyecto de entrada. */
+const viaModule: Apply = (project, edit, catalog = CATALOG) => {
+  const frozen = structuredClone(project);
+  const next = applyProjectEdit(project, edit, { equipmentCatalog: catalog });
+  assert.deepEqual(project, frozen, 'applyProjectEdit no muta el proyecto de entrada');
+  return next;
 };
 
 // ── Matriz de escenarios ────────────────────────────────────────────────────────────────────
@@ -206,66 +216,221 @@ function runMatrix(apply: Apply, label: string) {
 }
 
 runMatrix(viaStore, 'store');
+runMatrix(viaModule, 'módulo');
 
-// ── Precio de proveedor aplicado desde el catálogo (solo store: hoy rodea `updateActiveProject`) ────
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-const UNDO_DEBOUNCE_MS = 700; // recordUndoState agrupa en 600 ms
+// ── Precio de proveedor aplicado desde el catálogo ──────────────────────────────────────────
+function runSupplierPriceMatrix(apply: Apply, label: string) {
+  const t = (name: string) => `${label}: ${name}`;
+  const priceEdit = (equipmentType: 'panel' | 'inverter' | 'battery', equipmentItem: SolarEquipmentItem): Edit =>
+    ({ kind: 'supplierPrice', equipmentType, supplierPrice: equipmentItem.supplierPrices![0], equipmentItem });
 
-/** Aplica un precio de proveedor desde el modal del catálogo y devuelve el estado resultante del store. */
-async function applySupplierPrice(project: ProjectSimulation, kind: 'panel' | 'inverter' | 'battery', price: EquipmentSupplierPrice, target?: SolarEquipmentItem) {
-  await wait(UNDO_DEBOUNCE_MS); // deja correr el temporizador de deshacer que dejó la edición anterior
-  const original = store.getState();
-  try {
-    store.setState({ projects: [structuredClone(project)], activeProjectId: project.id, equipmentCatalog: CATALOG });
-    store.getState().setActiveProject(project.id, 'simulator'); // base del historial de deshacer
-    const undoBefore = store.getState().undoStack.length;
-    store.getState().applySupplierPriceToProject(kind, price, target);
-    const immediate = store.getState();
-    await wait(UNDO_DEBOUNCE_MS);
-    const settled = store.getState();
-    return { project: settled.projects[0], feedback: immediate.saveFeedbackMessage, undoGrew: settled.undoStack.length - undoBefore, canUndo: settled.canUndo, undo: settled.undo, getProject: () => store.getState().projects[0] };
-  } finally {
-    // el llamador usa `getProject` antes de que se restaure el estado: se restaura al terminar `main`
-    pendingRestores.push(() => store.setState(original, true));
-  }
-}
-const pendingRestores: Array<() => void> = [];
-
-async function main() {
   { // Batería: el precio activa el almacenamiento y trae la identidad, el DOD y la eficiencia del catálogo.
-    const p = baseProject((q) => { q.id = 'proj-edit-battery'; q.specs.hasBattery = false; q.financials = { ...q.financials, customCostUSD: 30 }; });
-    const price = CATALOG[4].supplierPrices![0];
-    const result = await applySupplierPrice(p, 'battery', price, CATALOG[4]);
-    const group = readEquipment(result.project.specs).batteries[0];
-    assert.equal(result.project.specs.hasBattery, true, 'el precio de una batería activa el almacenamiento');
+    const p = baseProject((q) => { q.specs.hasBattery = false; q.financials = { ...q.financials, customCostUSD: 30 }; });
+    const next = apply(p, priceEdit('battery', CATALOG[4]));
+    const group = readEquipment(next.specs).batteries[0];
+    assert.equal(next.specs.hasBattery, true, t('el precio de una batería activa el almacenamiento'));
     assert.deepEqual(
       [group.catalogItemId, group.brandModel, group.capacityKWh, group.unitPriceUSD, group.dodPct, group.efficiencyPct],
       ['b-a', 'Batería A', 10, 2000, 90, 95],
-      'el grupo principal toma identidad, capacidad, precio, DOD y eficiencia del catálogo'
+      t('el grupo principal toma identidad, capacidad, precio, DOD y eficiencia del catálogo')
     );
     assert.deepEqual(group.selectedSupplierInfo, { supplierName: 'Alfa', priceUSD: 2000, updatedAt: '2026-01-01', supplierPriceId: 'sp-ba' });
-    assert.equal(result.project.financials.customCostUSD, undefined, 'se limpian las sobrescrituras financieras');
-    assert.match(result.feedback ?? '', /Precio aplicado: Alfa \(\$2000 USD\)/, 'mensaje de confirmación');
+    assert.equal(next.financials.customCostUSD, undefined, t('se limpian las sobrescrituras financieras'));
   }
 
   { // Panel sin `equipmentItem`: el equipo se busca en el catálogo por el id del precio; la eficiencia del equipo se copia.
-    const p = baseProject((q) => { q.id = 'proj-edit-panel'; q.specs.autoCalculatePanels = false; });
-    const result = await applySupplierPrice(p, 'panel', CATALOG[1].supplierPrices![0]);
-    const group = readEquipment(result.project.specs).panels[0];
-    assert.deepEqual([group.catalogItemId, group.powerW, group.unitPriceUSD, group.selectedSupplierInfo?.supplierPriceId], ['p-b', 700, 130, 'sp-b1']);
-    assert.equal(result.project.specs.panelEfficiency, 22.4, 'la eficiencia del módulo se copia al proyecto');
+    const p = baseProject((q) => { q.specs.autoCalculatePanels = false; });
+    const next = apply(p, { kind: 'supplierPrice', equipmentType: 'panel', supplierPrice: CATALOG[1].supplierPrices![0] });
+    const group = readEquipment(next.specs).panels[0];
+    assert.deepEqual([group.catalogItemId, group.powerW, group.unitPriceUSD, group.selectedSupplierInfo?.supplierPriceId], ['p-b', 700, 130, 'sp-b1'], t('equipo hallado por el id del precio'));
+    assert.equal(next.specs.panelEfficiency, 22.4, t('la eficiencia del módulo se copia al proyecto'));
+    assert.equal(countOf(next), countOf(p), t('sin autocálculo la cantidad no cambia'));
   }
 
-  { // HOY el precio rodea `updateActiveProject`: no autodimensiona y no registra deshacer.
-    const p = baseProject((q) => { q.id = 'proj-edit-auto'; });
-    const result = await applySupplierPrice(p, 'panel', CATALOG[1].supplierPrices![0]);
-    assert.equal(result.project.specs.autoCalculatePanels, true);
-    assert.equal(countOf(result.project), countOf(p), 'HOY: el modelo cambia de potencia y la cantidad no se recalcula');
-    assert.equal(result.undoGrew, 0, 'HOY: aplicar un precio no deja entrada de deshacer');
+  { // Decisión (b): el precio es una edición más. Con autocálculo y un modelo de otra potencia, la cantidad se recalcula.
+    // (Antes rodeaba `updateActiveProject`: el modelo pasaba de 620 W a 700 W y la cantidad se quedaba en 38.)
+    const p = baseProject();
+    const next = apply(p, priceEdit('panel', CATALOG[1]));
+    assert.equal(panelsOf(next)[0].powerW, 700);
+    assert.equal(next.specs.autoCalculatePanels, true);
+    const withNewPower = { ...p, specs: { ...p.specs, ...editEquipmentGroup(p.specs, 'panel', { type: 'update', index: 0, patch: { powerW: 700 } }) } };
+    assert.equal(countOf(next), expectedCount(withNewPower), t('(b) la cantidad se recalcula con la potencia del modelo nuevo'));
+    assert.notEqual(countOf(next), countOf(p), t('la prueba distingue la cantidad previa'));
   }
 
-  pendingRestores.reverse().forEach((restore) => restore());
-  console.log('PASS: edición de proyecto (caracterización del store).');
+  { // Decisión (b): con autocálculo, el precio de otro tipo de equipo deja la cantidad en el valor que recomienda el motor.
+    const p = baseProject();
+    const next = apply(p, priceEdit('inverter', CATALOG[3]));
+    assert.equal(readEquipment(next.specs).inverters[0].unitPriceUSD, 2500);
+    assert.equal(countOf(next), expectedCount(p), t('(b) la cantidad sigue siendo la recomendada'));
+  }
+}
+runSupplierPriceMatrix(viaStore, 'store');
+runSupplierPriceMatrix(viaModule, 'módulo');
+
+// ── Reconciliación con el catálogo (decisión c): corre en la siguiente edición, nunca al mirar ─────
+{
+  const stale = () => baseProject((q) => {
+    q.specs.autoCalculatePanels = false;
+    withPrimary(q, 'panel', { brandModel: 'Panel A 550W', powerW: 600, selectedSupplierInfo: { supplierName: 'Ghost', priceUSD: 1, updatedAt: '2026-01-01' } });
+    withPrimary(q, 'inverter', { brandModel: 'Inversor A 10K', powerKW: 8 });
+  });
+  const primary = (p: ProjectSimulation) => ({ panel: panelsOf(p)[0], inverter: readEquipment(p.specs).inverters[0] });
+
+  for (const [label, edit] of [
+    ['specs', { kind: 'specs', patch: { systemLosses: 11 } }],
+    ['rates', { kind: 'rates', patch: { energyCostPerKWh: 0.3 } }],
+    ['client', { kind: 'client', patch: { name: 'Otro' } }],
+    ['consumption', { kind: 'consumption', monthlyConsumption: Array(12).fill(900) }],
+  ] as [string, Edit][]) {
+    const next = viaModule(stale(), edit);
+    assert.equal(primary(next).panel.powerW, 550, `(c) ${label}: el panel toma la potencia del catálogo en la siguiente edición`);
+    assert.equal(primary(next).inverter.powerKW, 10, `(c) ${label}: el inversor toma la potencia del catálogo`);
+    assert.equal(primary(next).panel.selectedSupplierInfo, undefined, `(c) ${label}: se suelta el proveedor que ningún panel del catálogo cotiza`);
+    assert.deepEqual(viaStore(stale(), edit).specs, next.specs, `(c) ${label}: el store aplica la misma reconciliación`);
+  }
+
+  { // Las finanzas no tocan las specs: la reconciliación no corre.
+    const next = viaModule(stale(), { kind: 'financials', patch: { discountRatePct: 12 } });
+    assert.equal(primary(next).panel.powerW, 600);
+  }
+
+  { // Lo que la propia edición fijó se respeta: una potencia manual o un proveedor elegido no se revierten en el acto.
+    const manual = viaModule(stale(), { kind: 'specs', patch: editEquipmentGroup(stale().specs, 'panel', { type: 'update', index: 0, patch: { powerW: 580 } }) });
+    assert.equal(primary(manual).panel.powerW, 580, '(c) la potencia escrita por la edición no se revierte');
+    const chosen = viaModule(stale(), { kind: 'specs', patch: editEquipmentGroup(stale().specs, 'panel', { type: 'update', index: 0, patch: { selectedSupplierInfo: { supplierName: 'Nuevo', priceUSD: 5, updatedAt: '2026-01-01' } } }) });
+    assert.equal(primary(chosen).panel.selectedSupplierInfo?.supplierName, 'Nuevo', '(c) el proveedor elegido por la edición se conserva');
+  }
+
+  { // Un proveedor cotizado por algún equipo del tipo se conserva; modelos fuera del catálogo no se tocan.
+    const quoted = baseProject((q) => withPrimary(q, 'panel', { selectedSupplierInfo: { supplierName: ' ALFA', priceUSD: 1, updatedAt: '2026-01-01' } }));
+    assert.equal(primary(viaModule(quoted, { kind: 'rates', patch: { energyCostPerKWh: 0.3 } })).panel.selectedSupplierInfo?.supplierName, ' ALFA', '(c) el proveedor sigue cotizado por un panel del catálogo');
+    const unknown = baseProject((q) => withPrimary(q, 'panel', { brandModel: 'Modelo ajeno', powerW: 480 }));
+    assert.equal(primary(viaModule(unknown, { kind: 'rates', patch: { energyCostPerKWh: 0.3 } })).panel.powerW, 480, '(c) un modelo fuera del catálogo no se toca');
+  }
+
+  { // El proveedor se busca entre los equipos del mismo tipo: «Alfa» cotiza un inversor y una batería, no un panel ajeno.
+    const ghosts = baseProject((q) => {
+      withPrimary(q, 'panel', { selectedSupplierInfo: { supplierName: 'Ghost', priceUSD: 1, updatedAt: '2026-01-01' } });
+      withPrimary(q, 'inverter', { selectedSupplierInfo: { supplierName: 'Ghost2', priceUSD: 2, updatedAt: '2026-01-01' } });
+      withPrimary(q, 'battery', { selectedSupplierInfo: { supplierName: 'Alfa', priceUSD: 3, updatedAt: '2026-01-01' } });
+    });
+    const next = viaModule(ghosts, { kind: 'rates', patch: { energyCostPerKWh: 0.3 } });
+    assert.deepEqual(
+      [primary(next).panel.selectedSupplierInfo, primary(next).inverter.selectedSupplierInfo, readEquipment(next.specs).batteries[0].selectedSupplierInfo?.supplierName],
+      [undefined, undefined, 'Alfa'],
+      '(c) los proveedores sin oferta en el catálogo salen; el que una batería del catálogo cotiza se queda'
+    );
+    const onlyPanelAlfa = [CATALOG[0]];
+    const kept = viaModule(baseProject((q) => withPrimary(q, 'battery', { selectedSupplierInfo: { supplierName: 'Alfa', priceUSD: 3, updatedAt: '2026-01-01' } })), { kind: 'rates', patch: { energyCostPerKWh: 0.3 } }, onlyPanelAlfa);
+    assert.equal(readEquipment(kept.specs).batteries[0].selectedSupplierInfo, undefined, '(c) «Alfa» solo cotiza un panel: no basta para una batería');
+  }
+
+  { // Catálogo sin cargar (vacío): no hay con qué reconciliar; nada se toca.
+    const next = viaModule(stale(), { kind: 'rates', patch: { energyCostPerKWh: 0.3 } }, []);
+    assert.equal(primary(next).panel.powerW, 600);
+    assert.equal(primary(next).panel.selectedSupplierInfo?.supplierName, 'Ghost');
+  }
+
+  { // La potencia corregida entra al autodimensionado de la misma edición.
+    const auto = stale();
+    auto.specs.autoCalculatePanels = true;
+    const next = viaModule(auto, { kind: 'rates', patch: { targetCoveragePct: 80 } });
+    const corrected = { ...auto, rates: { ...auto.rates, targetCoveragePct: 80 }, specs: { ...auto.specs, ...editEquipmentGroup(auto.specs, 'panel', { type: 'update', index: 0, patch: { powerW: 550 } }) } };
+    assert.equal(countOf(next), expectedCount(corrected), '(c) el conteo se calcula con la potencia ya corregida');
+  }
+}
+
+// ── Mirar no escribe (decisión c) y deshacer (decisión b): contra el store ───────────────────
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const UNDO_DEBOUNCE_MS = 700; // recordUndoState agrupa en 600 ms
+
+/** Instala `project` como activo con el historial de deshacer vacío, ejecuta `body` y restaura el store. */
+async function inStore<T>(project: ProjectSimulation, body: () => Promise<T>): Promise<T> {
+  await wait(UNDO_DEBOUNCE_MS); // deja correr el temporizador de deshacer de la prueba anterior
+  const original = store.getState();
+  try {
+    store.setState({ projects: [structuredClone(project)], activeProjectId: project.id, equipmentCatalog: CATALOG, undoStack: [], redoStack: [], canUndo: false, canRedo: false });
+    store.getState().setActiveProject(project.id, 'simulator'); // abrir la propuesta: inicia la base del historial
+    return await body();
+  } finally {
+    store.setState(original, true);
+  }
+}
+
+/** Ejecuta los efectos que registran los componentes al renderizarse (el render estático no los corre). */
+function renderAndRunEffects(render: () => void): number {
+  const patched = React as unknown as Record<'useEffect' | 'useLayoutEffect', unknown>;
+  const originals = { useEffect: patched.useEffect, useLayoutEffect: patched.useLayoutEffect };
+  const effects: Array<() => unknown> = [];
+  patched.useEffect = patched.useLayoutEffect = (fn: () => unknown) => { effects.push(fn); };
+  try { render(); } finally { Object.assign(patched, originals); }
+  effects.forEach((run) => run());
+  return effects.length;
+}
+
+async function main() {
+  { // Decisión (c): abrir una propuesta con datos desfasados del catálogo y montar el dock no escribe nada.
+    const stale = baseProject((q) => {
+      q.id = 'proj-edit-view';
+      q.specs.autoCalculatePanels = false;
+      withPrimary(q, 'panel', { brandModel: 'Panel A 550W', powerW: 600, selectedSupplierInfo: { supplierName: 'Ghost', priceUSD: 1, updatedAt: '2026-01-01' } });
+      withPrimary(q, 'inverter', { brandModel: 'Inversor A 10K', powerKW: 8 });
+    });
+    await inStore(stale, async () => {
+      let autoSyncCalls = 0;
+      store.setState({ triggerAutoSync: () => { autoSyncCalls += 1; } });
+      const before = store.getState();
+      const project = before.projects[0];
+      const summary = calculateProjectFinancialSummary(project);
+      const effectCount = renderAndRunEffects(() => {
+        const { updateSpecs } = store.getState();
+        renderToStaticMarkup(React.createElement(EquipmentParamsSection, { project, summary, updateSpecs } as never));
+        renderToStaticMarkup(React.createElement(PricingParamsSection, { project, summary, updateSpecs } as never));
+      });
+      assert.ok(effectCount >= 0);
+      await wait(UNDO_DEBOUNCE_MS);
+      const after = store.getState();
+      assert.equal(after.projects, before.projects, '(c) ver el proyecto no escribe: el arreglo de proyectos es el mismo');
+      assert.equal(after.projects[0], project, '(c) ni reemplaza la propuesta');
+      assert.equal(autoSyncCalls, 0, '(c) ni dispara sincronización');
+      assert.equal(after.undoStack, before.undoStack, '(c) ni registra deshacer');
+      assert.equal(after.undoStack.length, 1, 'solo la base que inicia al abrir la propuesta');
+      after.setActiveProject(project.id, 'simulator'); // reabrir la misma propuesta
+      await wait(UNDO_DEBOUNCE_MS);
+      assert.equal(store.getState().undoStack.length, 1, '(c) reabrir la misma propuesta tampoco agrega entradas de deshacer');
+      assert.equal(store.getState().canUndo, false);
+      // La siguiente edición real sí reconcilia con el catálogo.
+      after.updateRates({ energyCostPerKWh: 0.3 });
+      const edited = store.getState().projects[0];
+      assert.equal(panelsOf(edited)[0].powerW, 550, '(c) la siguiente edición real corrige la potencia');
+      assert.equal(panelsOf(edited)[0].selectedSupplierInfo, undefined, '(c) y suelta el proveedor huérfano');
+    });
+  }
+
+  { // Decisión (b): aplicar un precio deja una entrada de deshacer y deshacer lo revierte.
+    // (Antes: «aplicar un precio no deja entrada de deshacer».)
+    const p = baseProject((q) => { q.id = 'proj-edit-undo'; });
+    await inStore(p, async () => {
+      assert.equal(store.getState().undoStack.length, 1);
+      store.getState().applySupplierPriceToProject('panel', CATALOG[1].supplierPrices![0], CATALOG[1]);
+      assert.match(store.getState().saveFeedbackMessage ?? '', /Precio aplicado: Beta \(\$130 USD\)/, 'el mensaje de confirmación se conserva');
+      await wait(UNDO_DEBOUNCE_MS);
+      const applied = store.getState();
+      assert.equal(applied.undoStack.length, 2, '(b) el precio deja una entrada de deshacer');
+      assert.equal(applied.canUndo, true);
+      assert.equal(panelsOf(applied.projects[0])[0].selectedSupplierInfo?.supplierName, 'Beta');
+      applied.undo();
+      const restored = store.getState().projects[0];
+      assert.equal(panelsOf(restored)[0].selectedSupplierInfo, undefined, '(b) deshacer quita el proveedor');
+      assert.equal(panelsOf(restored)[0].powerW, 620);
+      assert.equal(countOf(restored), 38, '(b) y devuelve la cantidad de paneles anterior');
+      await wait(3100); // el mensaje de confirmación se limpia solo
+      assert.equal(store.getState().saveFeedbackMessage, null, 'el mensaje se borra tras unos segundos');
+    });
+  }
+
+  console.log('PASS: edición de proyecto (caracterización del store, módulo puro, precio de proveedor, reconciliación y vista sin escrituras).');
 }
 
 main().catch((error) => { console.error(error); process.exit(1); });

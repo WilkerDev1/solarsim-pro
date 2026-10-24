@@ -1,6 +1,7 @@
 import { createProjectId } from '../../utils/projectId';
 import { isReaderRole } from '../../../shared/permissions';
 import { prepareProposalDraftProject, createAIProposalBase } from '../../utils/proposalDraftProject';
+import { normalizeIncomingSpecs, normalizeProjectEquipment } from '../../domain/projectEdit';
 import { companyDocumentCustomization } from '../../utils/companyDocumentTemplate';
 import { projectMutationMetadata } from '../sync/projectMutation';
 import { SimulationSlice, AISlice, SimulationStore } from '../types';
@@ -64,7 +65,8 @@ export function buildProjectFromDraft(state:SimulationStore,input:ExtractedInvoi
         notes:data.specialTechnicalNotes!==undefined || data.aiNotes!==undefined ? ([data.specialTechnicalNotes,data.aiNotes].filter(Boolean).join('\n') || undefined) : base.aiSource?.notes},
       ...(createNewProject?{customization:{...companyDocumentCustomization(state.getActiveCompany(),state.defaultDocumentCustomization,state.documentTemplatesByCompany),contactName:data.clientName,clientPhone:data.phone,clientEmail:data.email}}:{}),
     };
-    return {project,previous:createNewProject?undefined:current};
+    // ADR 0004 (d): el borrador entra con la misma normalización que una edición (existente) o que una importación (nueva); sin autodimensionar.
+    return {project:createNewProject?{...project,specs:normalizeIncomingSpecs(project.specs)}:normalizeProjectEquipment(current!,project),previous:createNewProject?undefined:current};
 }
 
 export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({

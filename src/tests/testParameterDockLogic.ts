@@ -1,8 +1,6 @@
 import { LEGACY_MIRROR_FIELDS } from '../../shared/equipment';
 import { normalizeEquipmentEdit } from '../utils/equipmentGroups';
 import assert from 'node:assert/strict';
-import React from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
 import type { CustomQuotationDiscount, CustomQuotationItem, ProjectSimulation, LegacyProjectSpecs } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
 import { editEquipmentGroup } from '../utils/equipmentGroups';
@@ -20,8 +18,6 @@ import {
   wattPricePatch,
   wholeMarginPctFromMultiplier,
 } from '../components/simulator/params/logic/pricingSync';
-import { useCatalogPowerSync } from '../components/simulator/params/hooks/useCatalogPowerSync';
-import { useSupplierCleanup } from '../components/simulator/params/hooks/useSupplierCleanup';
 
 /** Characterization of the parameter dock logic: pins the behavior the sidebar sections had inline. */
 const close = (actual: number, expected: number, message?: string) =>
@@ -206,58 +202,7 @@ close(multiplierFromMarginInput(-10), 1);
 close(multiplierFromMarginInput(12.3456), 1.123);
 close(multiplierFromQuickMargin(30), 1.3);
 
-// ── Effect hooks (render once; effects are verified through a stubbed React.useEffect) ──────
-function runEffects(body: () => void): Array<() => void> {
-  const original = React.useEffect;
-  const effects: Array<() => void> = [];
-  (React as { useEffect: unknown }).useEffect = (fn: () => void) => { effects.push(fn); };
-  try {
-    renderToStaticMarkup(React.createElement(() => { body(); return null; }));
-  } finally {
-    (React as { useEffect: unknown }).useEffect = original;
-  }
-  return effects;
-}
-{
-  const catalog = [
-    catalogItem({ id: 'p1', type: 'panel', displayName: 'Panel X', powerW: 600 }),
-    catalogItem({ id: 'i1', type: 'inverter', displayName: 'Inv X', powerKW: 10 }),
-  ];
-  const updates: Array<Partial<LegacyProjectSpecs>> = [];
-  const effects = runEffects(() => useCatalogPowerSync({ panelBrandModel: 'Panel X', panelPowerW: 550, inverterBrandModel: 'Inv X', inverterPowerKW: 10 } as LegacyProjectSpecs, catalog, (u) => updates.push(u)));
-  effects.forEach((run) => run());
-  assert.equal(updates.length, 1, 'only the stale panel power is rewritten; matching inverter untouched');
-  assert.deepEqual(Object.keys(updates[0]), ['panels'], 'the patch is the panel group list');
-  assert.equal(updates[0].panels?.[0].powerW, 600);
-  const none: Array<Partial<LegacyProjectSpecs>> = [];
-  runEffects(() => useCatalogPowerSync({ panelBrandModel: 'Unknown', panelPowerW: 550 } as LegacyProjectSpecs, catalog, (u) => none.push(u))).forEach((run) => run());
-  assert.deepEqual(none, [], 'models outside the catalog are not touched');
-}
-{
-  const catalog = [catalogItem({ id: 'p1', type: 'panel', displayName: 'Panel X', supplierPrices: [supplier('s1', 'Alfa', 100)] })];
-  const info = { panel: { supplierName: 'Ghost', priceUSD: 1 }, inverter: { supplierName: 'Ghost2', priceUSD: 2 }, battery: { supplierName: 'Alfa', priceUSD: 3 } };
-  const updates: Array<Partial<LegacyProjectSpecs>> = [];
-  runEffects(() => useSupplierCleanup({
-    specs: { selectedSupplierInfo: info } as LegacyProjectSpecs, equipmentCatalog: catalog,
-    panelSupplierMatches: false, inverterSupplierMatches: false, batterySupplierMatches: false, updateSpecs: (u) => updates.push(u),
-  })).forEach((run) => run());
-  // Ghost suppliers are removed; the battery supplier exists on a catalog panel but the lookup is per type, so it goes too.
-  assert.equal(updates.length, 1);
-  const cleaned = normalizeEquipmentEdit({ selectedSupplierInfo: info } as LegacyProjectSpecs, updates[0]);
-  assert.deepEqual([cleaned.panels?.[0].selectedSupplierInfo, cleaned.inverters?.[0].selectedSupplierInfo, cleaned.batteries?.[0].selectedSupplierInfo], [undefined, undefined, undefined], 'orphan suppliers leave their groups');
-  assert.equal('selectedSupplierInfo' in cleaned, false);
-  const kept: Array<Partial<LegacyProjectSpecs>> = [];
-  runEffects(() => useSupplierCleanup({
-    specs: { selectedSupplierInfo: { panel: { supplierName: 'Alfa', priceUSD: 100 } } } as LegacyProjectSpecs, equipmentCatalog: catalog,
-    panelSupplierMatches: false, inverterSupplierMatches: false, batterySupplierMatches: false, updateSpecs: (u) => kept.push(u),
-  })).forEach((run) => run());
-  assert.deepEqual(kept, [], 'a supplier still quoted by some catalog item of that type is kept');
-  const matched: Array<Partial<LegacyProjectSpecs>> = [];
-  runEffects(() => useSupplierCleanup({
-    specs: { selectedSupplierInfo: info } as LegacyProjectSpecs, equipmentCatalog: catalog,
-    panelSupplierMatches: true, inverterSupplierMatches: true, batterySupplierMatches: true, updateSpecs: (u) => matched.push(u),
-  })).forEach((run) => run());
-  assert.deepEqual(matched, [], 'nothing is cleaned while the selected equipment matches its supplier');
-}
+// Los efectos del dock que escribían en el proyecto (potencia del catálogo, proveedor huérfano) ya no existen:
+// ADR 0004, sus reglas viven en `applyProjectEdit` y se prueban en testProjectEdit.
 
-console.log('PASS: parameter dock logic (catalog selection, load profile preview, quotation adjustments, pricing sync, effect hooks).');
+console.log('PASS: parameter dock logic (catalog selection, load profile preview, quotation adjustments, pricing sync).');
