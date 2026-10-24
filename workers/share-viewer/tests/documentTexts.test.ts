@@ -66,7 +66,8 @@ assert.ok(renderProposalPage(base({ projectSummarySubtitle: 'Atención: {contact
 assert.ok(renderProposalPage(base({ projectSummarySubtitle: 'Atención: {contactName}' }, contactClient({}))).includes('Atención: Acme'), 'Sin contacto ni empresa, usa el cliente');
 
 // 4. Validation: doc: texts are strings of registry keys only.
-const payload = (customization: Record<string, unknown>) => ({ project: { ...structuredClone(BENCHMARK_PROJECT), customization }, summary: calculateProjectFinancialSummary(BENCHMARK_PROJECT, 'legacy'), validityDays: 7, calculationSnapshot: { mode: 'legacy', capturedAt: new Date().toISOString(), organizationId: 'o', policyVersion: 1 } });
+// El cuerpo real llega como JSON: sin valores `undefined` (los grupos derivados los traen).
+const payload = (customization: Record<string, unknown>) => JSON.parse(JSON.stringify({ project: { ...structuredClone(BENCHMARK_PROJECT), customization }, summary: calculateProjectFinancialSummary(BENCHMARK_PROJECT, 'legacy'), validityDays: 7, calculationSnapshot: { mode: 'legacy', capturedAt: new Date().toISOString(), organizationId: 'o', policyVersion: 1 } }));
 assert.doesNotThrow(() => parseSharePayload(payload({ 'doc:quotation.warranty.panel': 'ok' })));
 for (const bad of [{ 'doc:inexistente.clave': 'x' }, { 'doc:quotation.warranty.panel': 5 }, { 'doc:quotation.warranty.panel': 'x'.repeat(10001) }, { 'doc:__proto__': 'x' }]) {
   assert.throws(() => parseSharePayload(payload(bad)), RequestValidationError);
