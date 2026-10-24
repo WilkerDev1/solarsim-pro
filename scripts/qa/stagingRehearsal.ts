@@ -5,6 +5,8 @@ import { SyncService } from '../../src/services/syncService';
 import { ShareProposalService } from '../../src/services/shareProposalService';
 import { calculateProjectFinancialSummary } from '../../src/engine/financeEngine';
 import { useSimulationStore } from '../../src/store/useSimulationStore';
+import { CLIENT_IDENTITY_HEADER, CLIENT_IDENTITY_VALUE } from '../../src/services/clientIdentity';
+const clientHeaders = { [CLIENT_IDENTITY_HEADER]: CLIENT_IDENTITY_VALUE };
 const api = process.env.QA_API_URL || 'http://127.0.0.1:3101';
 const worker = process.env.QA_WORKER_URL;
 if (new URL(api).hostname !== '127.0.0.1' || !worker || !/^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/.test(worker)) throw new Error('Use the loopback synthetic API and its temporary HTTPS Worker tunnel. Production is forbidden.');
@@ -30,7 +32,7 @@ const writeB = await SyncService.pushProjects(api, b.token, [{ ...canonical, mon
 assert.equal(writeB.results![0].status, 'conflict');
 if (writeB.results![0].status === 'conflict') { assert.equal(writeB.results![0].serverVersion, 2); assert.equal(writeB.results![0].lastModifiedByName, a.user.name); }
 assert.equal((await SyncService.pushProjects(api, viewer.token, [original])).success, false);
-const noBase = await fetch(api + '/api/sync/push', {method: 'POST', headers: {'Content-Type':'application/json',Authorization:'Bearer '+a.token},body:JSON.stringify({projects:[{...original,baseVersion:undefined}]})});
+const noBase = await fetch(api + '/api/sync/push', {method: 'POST', headers:{...clientHeaders,'Content-Type':'application/json',Authorization:'Bearer '+a.token},body:JSON.stringify({projects:[{...original,baseVersion:undefined}]})});
 assert.equal(noBase.status, 200);
 const rejectedLegacy = await noBase.json();
 assert.equal(rejectedLegacy.results[0].status, 'conflict');
@@ -38,16 +40,16 @@ assert.equal(rejectedLegacy.results[0].reason, 'base_version_required', 'Legacy 
 const pull = await SyncService.pullProjects(api, a.token); canonical = pull.projects!.find(project => project.id === original.id)!;
 assert.equal(canonical.specs.panelCount, 44);
 useSimulationStore.setState({ syncSettings: {serverUrl:api,authToken:a.token,currentUser:a.user,autoSyncEnabled:false,lastSyncTimestamp:null} });
-const startPolicy = await fetch(api+'/api/organization/features',{headers:{Authorization:'Bearer '+a.token}}).then(r=>r.json());
-if(startPolicy.settings.selfConsumptionProjection) { const reset=await fetch(api+'/api/organization/features',{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+a.token},body:JSON.stringify({baseVersion:startPolicy.version,settings:{selfConsumptionProjection:false}})}); assert.equal(reset.status,200); await reset.text(); }
+const startPolicy = await fetch(api+'/api/organization/features',{headers:{...clientHeaders,Authorization:'Bearer '+a.token}}).then(r=>r.json());
+if(startPolicy.settings.selfConsumptionProjection) { const reset=await fetch(api+'/api/organization/features',{method:'PATCH',headers:{...clientHeaders,'Content-Type':'application/json',Authorization:'Bearer '+a.token},body:JSON.stringify({baseVersion:startPolicy.version,settings:{selfConsumptionProjection:false}})}); assert.equal(reset.status,200); await reset.text(); }
 const shared = await ShareProposalService.shareProposal(canonical, calculateProjectFinancialSummary(canonical, 'legacy'), 7, worker);
 assert.equal(shared.success, true, shared.error); assert.ok(shared.shareUrl);
 const html = await fetch(shared.shareUrl!); assert.equal(html.status, 200); assert.match(await html.text(), /QA integrada/);
 const unauthorizedShare = await fetch(worker+'/api/share',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+viewer.token},body:'{}'}); assert.equal(unauthorizedShare.status,403); await unauthorizedShare.text();
 const initialPublication = await fetch(worker+'/api/share/'+shared.shareUrl!.split('/').at(-1)).then(r=>r.json());
 assert.equal(initialPublication.calculationSnapshot.mode,'legacy');
-const policy = await fetch(api+'/api/organization/features',{headers:{Authorization:'Bearer '+a.token}}).then(response => response.json());
-const changedPolicy = await fetch(api+'/api/organization/features',{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+a.token},body:JSON.stringify({baseVersion:policy.version,settings:{selfConsumptionProjection:true}})});
+const policy = await fetch(api+'/api/organization/features',{headers:{...clientHeaders,Authorization:'Bearer '+a.token}}).then(response => response.json());
+const changedPolicy = await fetch(api+'/api/organization/features',{method:'PATCH',headers:{...clientHeaders,'Content-Type':'application/json',Authorization:'Bearer '+a.token},body:JSON.stringify({baseVersion:policy.version,settings:{selfConsumptionProjection:true}})});
 assert.equal(changedPolicy.status,200);
 await changedPolicy.text();
 const physical = await ShareProposalService.shareProposal(canonical, calculateProjectFinancialSummary(canonical,'self_consumption'), 7, worker);

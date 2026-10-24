@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { CLIENT_IDENTITY_HEADER } from './clientIdentity';
 import type { StoredProposal } from './types';
 import type { Env } from './bindings';
 import { renderExpiredPage, renderProposalPage } from './template';
@@ -10,7 +11,7 @@ import { isRecord, parseSharePayload, readBoundedJson, RequestValidationError, v
 /** Construct an app without deployment or network side effects; tests inject authorization fetch. */
 export function createShareViewer(requestFetch: typeof fetch = fetch) {
 const app = new Hono<{ Bindings: Env }>();
-app.use('*', cors({ origin: '*', allowMethods: ['GET', 'POST', 'OPTIONS'], allowHeaders: ['Content-Type', 'Authorization'] }));
+app.use('*', cors({ origin: '*', allowMethods: ['GET', 'POST', 'OPTIONS'], allowHeaders: ['Content-Type', 'Authorization', CLIENT_IDENTITY_HEADER] }));
 app.use('*', async (c, next) => {
   c.header('X-Content-Type-Options', 'nosniff');
   c.header('Referrer-Policy', 'no-referrer');

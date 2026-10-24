@@ -12,6 +12,7 @@
  *    Este sondeo no acredita despliegue: siempre informa los contratos autenticados
  *    y de escritura omitidos, que deben verificarse en el ensayo aislado de staging.
  */
+import { CLIENT_IDENTITY_HEADER, CLIENT_IDENTITY_VALUE } from '../../src/services/clientIdentity';
 
 export interface CompatibilityCheckResult {
   name: string;
@@ -122,7 +123,7 @@ export async function runCompatibilityChecks(
     try {
       const res = await fetch(`${apiUrl}${path}`, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', [CLIENT_IDENTITY_HEADER]: CLIENT_IDENTITY_VALUE },
         body: method !== 'GET' ? '{}' : undefined,
         redirect: 'manual',
         signal: AbortSignal.timeout(6000),
@@ -134,6 +135,13 @@ export async function runCompatibilityChecks(
           category: 'API_ROUTES',
           status: isMandatory ? 'FAIL' : 'WARN',
           message: `404 Not Found — La ruta no existe en el backend. Requerida para: ${requiredFor}.`,
+        });
+      } else if (res.status === 426) {
+        results.push({
+          name: `Ruta API: ${method} ${path}`,
+          category: 'API_ROUTES',
+          status: 'WARN',
+          message: `HTTP 426: la API exige una versión de cliente mayor que ${CLIENT_IDENTITY_VALUE}; no se pudo comprobar el rechazo anónimo.`,
         });
       } else if (res.status === 401) {
         // Anonymous rejection only; middleware may run before route matching.
