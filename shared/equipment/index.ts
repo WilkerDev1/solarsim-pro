@@ -2,7 +2,7 @@
  * EquipmentModel: único dueño de los grupos de equipos (`panels`, `inverters`, `batteries`) y del espejo
  * heredado de un solo modelo. TypeScript puro (cliente, API y Worker). Ver docs/adr/0001-equipment-model-sin-espejo.md.
  */
-import { deriveLegacyGroupWithPrice, savedGroups } from './legacy.js';
+import { deriveLegacyGroupWithPrice, savedBankGroups, savedGroups } from './legacy.js';
 import type { Equipment, LegacySystemSpecs } from './types.js';
 
 export { DEFAULT_UNIT_PRICE_USD, LEGACY_MIRROR_FIELDS, LEGACY_MIRROR_NUMBER_FIELDS, LEGACY_MIRROR_TEXT_FIELDS, deriveLegacyGroup } from './legacy.js';
@@ -21,6 +21,6 @@ export function readEquipment(specs: LegacySystemSpecs): Equipment {
   return {
     panels: savedGroups(specs, 'panel') ?? [deriveLegacyGroupWithPrice(specs, 'panel')],
     inverters: savedGroups(specs, 'inverter') ?? [deriveLegacyGroupWithPrice(specs, 'inverter')],
-    batteries: !specs.hasBattery ? [] : savedGroups(specs, 'battery') ?? [deriveLegacyGroupWithPrice(specs, 'battery')],
+    batteries: !specs.hasBattery ? [] : savedBankGroups(specs) ?? [deriveLegacyGroupWithPrice(specs, 'battery')],
   };
 }

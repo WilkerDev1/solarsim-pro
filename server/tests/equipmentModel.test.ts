@@ -105,6 +105,30 @@ const fixtures: Record<string, Record<string, unknown> | null> = {
     batteryCapacityKWh: 10,
     batteryCount: 2,
   },
+  // Hasta 2.7.0 el motor calculaba la energía útil de un banco de capacidad 0 con el espejo (capacidad, DOD, eficiencia).
+  "battery-zero-capacity": {
+    ...base,
+    hasBattery: true,
+    panels: [group("p1", { powerW: 600, count: 10 })],
+    inverters: [group("i1", { powerKW: 5, count: 1 })],
+    batteries: [group("b1", { capacityKWh: 0, count: 1 })],
+    batteryCapacityKWh: 16,
+    batteryCount: 1,
+    batteryDOD: 80,
+  },
+  "battery-zero-capacity-mirror-values": {
+    ...base,
+    hasBattery: true,
+    panels: [group("p1", { powerW: 600, count: 10 })],
+    inverters: [group("i1", { powerKW: 5, count: 1 })],
+    batteries: [
+      group("b1", { capacityKWh: 0, count: 2, dodPct: 60, efficiencyPct: 70 }),
+    ],
+    batteryCapacityKWh: 20,
+    batteryCount: 2,
+    batteryDOD: 70,
+    batteryEfficiencyPct: 85,
+  },
   "already-clean": {
     ...base,
     hasBattery: false,
@@ -268,6 +292,37 @@ test("migration 006 turns every stored project into groups-only, without changin
   assert.equal(offBattery.batteries[0].capacityKWh, 10);
   assert.deepEqual(readEquipment(offBattery).batteries, []);
   assert.equal((await specsOf("no-battery")).batteries, undefined);
+  // Respaldo del espejo (ADR 0001): el valor que el motor anterior usaba pasa al primer grupo y nada más cambia.
+  const zero = (await specsOf("battery-zero-capacity")).batteries;
+  assert.deepEqual(
+    zero.map((g: any) => [
+      g.capacityKWh,
+      g.count,
+      g.dodPct,
+      g.efficiencyPct,
+      g.unitPriceUSD,
+    ]),
+    [[16, 1, 80, undefined, 100]],
+    "capacity 0 + mirror 16 kWh at 80 % DOD: the group takes the mirror capacity and DOD (usable 16 x 0.8 x 0.9 = 11.5 kWh as in 2.7.0)",
+  );
+  const zeroMirror = (await specsOf("battery-zero-capacity-mirror-values"))
+    .batteries;
+  assert.deepEqual(
+    zeroMirror.map((g: any) => [
+      g.capacityKWh,
+      g.count,
+      g.dodPct,
+      g.efficiencyPct,
+      g.unitPriceUSD,
+    ]),
+    [[10, 2, 70, 85, 100]],
+    "2 units: capacity x count stays the mirror 20 kWh, and the mirror DOD and efficiency win over the group ones the old engine ignored (20 x 0.7 x 0.85 = 11.9 kWh)",
+  );
+  assert.equal(
+    equipmentTotals(readEquipment(await specsOf("battery-zero-capacity")))
+      .batteryNominalKWh,
+    16,
+  );
   // The trashed project is migrated too, and the immutable history and catalog are not touched.
   assert.equal((await rowOf("mixed")).is_deleted, true);
   assert.equal(await fingerprint("project_version_history"), historyBefore);

@@ -1,4 +1,5 @@
-import { LIST_KEY, type EquipmentGroups, type EquipmentKind, type LegacyEquipmentFields, type LegacySystemSpecs } from './types.js';
+import { resolveBatteryDodPct, resolveBatteryEfficiencyPct } from '../projectDefaults.js';
+import { LIST_KEY, type BatteryItemSpec, type EquipmentGroups, type EquipmentKind, type LegacyEquipmentFields, type LegacySystemSpecs } from './types.js';
 
 /**
  * Único lugar que conoce el «espejo heredado»: los campos sueltos de un solo modelo (`panelBrandModel`,
@@ -84,6 +85,44 @@ export function deriveLegacyGroup<K extends EquipmentKind>(specs: LegacySystemSp
 export function savedGroups<K extends EquipmentKind>(specs: LegacySystemSpecs, kind: K): EquipmentGroups[K][] | undefined {
   const saved = specs[LIST_KEY[kind]];
   return Array.isArray(saved) && saved.length > 0 ? (saved as EquipmentGroups[K][]) : undefined;
+}
+
+/**
+ * Respaldo del espejo en el banco de baterías. Hasta 2.7.0, con grupos guardados cuya capacidad total
+ * (`capacidad × cantidad`, redondeada a 2 decimales) era 0, el motor financiero calculaba la energía útil y la
+ * autonomía con `batteryCapacityKWh` del espejo y con su `batteryDOD`/`batteryEfficiencyPct` (válidos, o el
+ * default 90 %), ignorando los del grupo. Como el espejo se borra, ese valor pasa al primer grupo (el que el
+ * espejo copiaba) para que la energía útil no cambie:
+ * - capacidad: la del espejo si el grupo no tiene cantidad; con cantidad, la del espejo entre la cantidad, de modo
+ *   que `capacidad × cantidad` sigue siendo la del espejo (el motor actual, con capacidad total 0, usa la capacidad
+ *   del primer grupo);
+ * - DOD y eficiencia: los efectivos del espejo, solo si el grupo no resolvía a lo mismo.
+ * No se toca nada más (cantidad, precio, peso, proveedor). Sin espejo con capacidad > 0, o con capacidad total
+ * positiva (el espejo no se leía), devuelve los mismos grupos. Idempotente: el resultado ya no tiene espejo.
+ */
+export function withMirrorBankFallback(specs: LegacySystemSpecs, groups: BatteryItemSpec[]): BatteryItemSpec[] {
+  const mirrorKWh = specs.batteryCapacityKWh;
+  if (typeof mirrorKWh !== 'number' || !Number.isFinite(mirrorKWh) || mirrorKWh <= 0) return groups;
+  const totalKWh = Math.round(groups.reduce((sum, group) => sum + (Number(group?.capacityKWh) || 0) * (Number(group?.count) || 0), 0) * 100) / 100;
+  if (totalKWh > 0) return groups;
+  const [first, ...rest] = groups;
+  if (!first) return groups;
+  const count = Number(first.count) || 0;
+  const dodPct = resolveBatteryDodPct(specs.batteryDOD);
+  const efficiencyPct = resolveBatteryEfficiencyPct(specs.batteryEfficiencyPct);
+  const carried: BatteryItemSpec = {
+    ...first,
+    capacityKWh: count > 0 ? mirrorKWh / count : mirrorKWh,
+    ...(resolveBatteryDodPct(first.dodPct) === dodPct ? {} : { dodPct }),
+    ...(resolveBatteryEfficiencyPct(first.efficiencyPct) === efficiencyPct ? {} : { efficiencyPct }),
+  };
+  return [carried, ...rest];
+}
+
+/** Grupos de batería guardados con el respaldo del espejo aplicado, o `undefined` si no hay grupos. */
+export function savedBankGroups(specs: LegacySystemSpecs): BatteryItemSpec[] | undefined {
+  const saved = savedGroups(specs, 'battery');
+  return saved && withMirrorBankFallback(specs, saved);
 }
 
 /** Grupo heredado con el precio por defecto de la matriz de costos, que se fija al volverse explícito. */
