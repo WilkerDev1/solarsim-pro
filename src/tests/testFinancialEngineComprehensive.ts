@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import { calculateFinancialSummary } from '../engine/financeEngine';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { ITBIS_RATE, LEY5707_CREDIT_RATE, appliesItemMargin, customItemsTaxBreakdown, isItemItbisExonerated } from '../../shared/financialRules';
-import { SystemSpecs, UtilityRates, FinancialParams } from '../types';
+import { LegacyProjectSpecs, UtilityRates, FinancialParams } from '../types';
+import { legacySpecs } from './legacyFixtures';
 
 // Base Setup
-const defaultSpecs: SystemSpecs = {
+const defaultSpecs: LegacyProjectSpecs = {
   isDetailed: false,
   panelPowerW: 620,
   panelCount: 11, // 6.82 kWp
@@ -66,7 +67,7 @@ assert(
 );
 
 // TEST 2: Dynamic Storage Addition (3 Batteries)
-const specsWithBattery: SystemSpecs = {
+const specsWithBattery: LegacyProjectSpecs = {
   ...defaultSpecs,
   pricingMode: 'cost_matrix',
   hasBattery: true,
@@ -95,7 +96,7 @@ assert(
 );
 
 // In direct_watt mode, the price per watt is all-inclusive (turnkey)
-const specsDirectWattWithBattery: SystemSpecs = {
+const specsDirectWattWithBattery: LegacyProjectSpecs = {
   ...specsWithBattery,
   pricingMode: 'direct_watt',
   pricePerWattUSD: 1.38,
@@ -168,7 +169,7 @@ const cfYear4 = resWithBattery.cashFlow25Years[3];
 assert(cfYear4.taxCreditUSD === 0, 'Crédito fiscal es 0 después del Año 3');
 
 // TEST 6: Battery Replacement Cost in Year 10
-const specsWithReplacement: SystemSpecs = {
+const specsWithReplacement: LegacyProjectSpecs = {
   ...specsWithBattery,
   batteryLifespanYears: 10,
   batteryReplacementCostUSD: 3500,
@@ -190,7 +191,7 @@ assert(
 );
 
 // TEST 7: Detailed Cost Matrix Mode
-const specsDetailed: SystemSpecs = {
+const specsDetailed: LegacyProjectSpecs = {
   ...specsWithBattery,
   isDetailed: true,
   panelUnitPriceUSD: 103.32,
@@ -277,7 +278,7 @@ assert(
 );
 
 // --- TEST 10: Commercial Pre-Tax Subtotal & Zero Wholesale Cost Leakage ---
-const giovanniSpecs: SystemSpecs = {
+const giovanniSpecs: LegacyProjectSpecs = {
   ...defaultSpecs,
   panelCount: 21,
   panelPowerW: 615,
@@ -368,7 +369,7 @@ assert(
 );
 
 // TEST 11: Dynamic Sale Price Per Watt & Per KWp Reactivity (María Teresa Benchmark)
-const specsMariaTeresa: SystemSpecs = {
+const specsMariaTeresa: LegacyProjectSpecs = {
   ...defaultSpecs,
   panelPowerW: 615,
   panelCount: 11, // 6.765 kWp
@@ -400,7 +401,7 @@ assert(Math.abs(resMT40.salePricePerWattUSD - 1.31) < 0.02, `Precio de venta $/W
 assert(Math.abs(resMT40.salePricePerKWpUSD - 1311.97) < 1.0, `Precio de venta $/kWp al 40% es ~$1,311.97 ($${resMT40.salePricePerKWpUSD})`);
 
 // 2. Updating margin to 32.5% (1.325x) - verify dynamic recalculation without manual sync
-const specsMT325: SystemSpecs = {
+const specsMT325: LegacyProjectSpecs = {
   ...specsMariaTeresa,
   saleMarginMultiplier: 1.325,
 };
@@ -418,7 +419,7 @@ assert(Math.abs(resMT325.salePricePerWattUSD - 1.24) < 0.02, `Precio de venta $/
 assert(Math.abs(resMT325.salePricePerKWpUSD - 1241.69) < 1.0, `Precio de venta $/kWp al 32.5% se actualiza a ~$1,241.69 ($${resMT325.salePricePerKWpUSD})`);
 
 // 3. Direct Watt mode verification
-const specsDirectWatt: SystemSpecs = {
+const specsDirectWatt: LegacyProjectSpecs = {
   ...specsMariaTeresa,
   pricingMode: 'direct_watt',
   pricePerWattUSD: 1.18,
@@ -436,7 +437,7 @@ assert(resDirect.salePricePerWattUSD === 1.18, `Modo Directo $/W respeta valor m
 assert(resDirect.salePricePerKWpUSD === 1180, `Modo Directo $/kWp respeta 1,180.00 ($${resDirect.salePricePerKWpUSD})`);
 
 // --- TEST 12: Custom Items in Cost Matrix (Jenny Rodríguez Cáceres - Comisión Gilda Audit Case) ---
-const jennySpecs: SystemSpecs = {
+const jennySpecs: LegacyProjectSpecs = {
   ...defaultSpecs,
   panelCount: 13,
   panelPowerW: 630,
@@ -586,7 +587,7 @@ assert(
 // --- TEST 14: Universal Project Duplication and Dynamic Equipment Recalculation ---
 
 // Project A: Large system with 3 batteries
-const projectASpecs: SystemSpecs = {
+const projectASpecs: LegacyProjectSpecs = {
   ...defaultSpecs,
   panelCount: 38,
   panelPowerW: 620, // 23.56 kWp
@@ -622,7 +623,7 @@ assert(resProjectA.itbisSavedUSD > 2000, `Project A ITBIS exonerado es dinámico
 assert(resProjectA.grossInvestmentUSD === resProjectA.costMatrix.porcentajeVentaUSD, 'Project A Cotización y Hoja de Costos coinciden');
 
 // Simulate cloning project and modifying equipment: removing batteries, changing inverter to 10kW
-const clonedSpecs: SystemSpecs = {
+const clonedSpecs: LegacyProjectSpecs = {
   ...projectASpecs,
   panelCount: 16,
   panelPowerW: 590, // 9.44 kWp
@@ -655,7 +656,7 @@ assert(resCloned.batteryInvestmentUSD === 0, 'Inversión en baterías es 0 tras 
 assert(resCloned.itbisSavedUSD < resProjectA.itbisSavedUSD, `ITBIS exonerado se redujo proporcionalmente ($${resCloned.itbisSavedUSD} < $${resProjectA.itbisSavedUSD})`);
 assert(resCloned.itbisSavedUSD > 0, `ITBIS exonerado para 9.44 kWp es positivo ($${resCloned.itbisSavedUSD})`);
 // TEST 15: Commercial Discounts (Fixed vs Percentage, Profit Recalculation, Cash Flow Year 0 & DGII Ley 57-07)
-const specsDiscountTest: SystemSpecs = {
+const specsDiscountTest: LegacyProjectSpecs = {
   ...defaultSpecs,
   panelCount: 16,
   panelPowerW: 620, // 9.92 kWp
@@ -833,7 +834,7 @@ assert(Math.abs(benchmark.paybackYears - 2.3) <= 0.8, `Referencia: payback ~2.3 
 
 // TEST 17: El margen de ítems extra está activado por defecto; solo applyMargin === false lo quita (ambos modos de precio).
 for (const pricingMode of ['cost_matrix', 'direct_watt'] as const) {
-  const specs: SystemSpecs = { ...defaultSpecs, pricingMode, isDetailed: pricingMode === 'cost_matrix', panelUnitPriceUSD: 100, inverterUnitPriceUSD: 1500, installationUnitPriceUSD: 150, saleMarginMultiplier: 1.4 };
+  const specs: LegacyProjectSpecs = { ...defaultSpecs, pricingMode, isDetailed: pricingMode === 'cost_matrix', panelUnitPriceUSD: 100, inverterUnitPriceUSD: 1500, installationUnitPriceUSD: 150, saleMarginMultiplier: 1.4 };
   const withItem = (applyMargin?: boolean) => calculateFinancialSummary(
     'Santo Domingo / Distrito Nacional',
     specs,
@@ -871,7 +872,7 @@ assert.deepEqual(breakdown, { saleTotalUSD: 450, exoneratedITBISUSD: 50.4, nonEx
 for (const applyITBISExemption of [true, false]) {
   const r = calculateFinancialSummary(
     'Santo Domingo / Distrito Nacional',
-    { ...defaultSpecs, pricingMode: 'cost_matrix', isDetailed: true, hasBattery: true, batteryCount: 1, batteryCapacityKWh: 16, batteryUnitPriceUSD: 1990, panelUnitPriceUSD: 100, inverterUnitPriceUSD: 1500, installationUnitPriceUSD: 150, saleMarginMultiplier: 1.3 },
+    legacySpecs({ ...defaultSpecs, pricingMode: 'cost_matrix', isDetailed: true, hasBattery: true, batteryCount: 1, batteryCapacityKWh: 16, batteryUnitPriceUSD: 1990, panelUnitPriceUSD: 100, inverterUnitPriceUSD: 1500, installationUnitPriceUSD: 150, saleMarginMultiplier: 1.3 }),
     defaultRates,
     { ...defaultFinancials, applyITBISExemption },
     monthlyConsumption

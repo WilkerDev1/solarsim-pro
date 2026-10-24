@@ -4,7 +4,7 @@ import { calculateMonthlySolarProduction } from '../engine/solarEngine';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateTotalBatteryCapacityKWh, calculateTotalDCCapacityKWp, calculateTotalInverterPowerKW, calculateTotalPanelCount } from '../utils/equipmentSpecsUtils';
 import { LEGACY_MIRROR_FIELDS, migrateLegacySpecs } from '../../shared/equipment';
-import type { ProjectSimulation, SystemSpecs } from '../types';
+import type { LegacyProjectSpecs, ProjectSimulation, SystemSpecs } from '../types';
 
 /**
  * Oleada 2 del plan EquipmentModel: el motor lee los equipos solo de los grupos. Con specs que traen ÚNICAMENTE
@@ -35,14 +35,14 @@ const multiGroups: Partial<SystemSpecs> = {
   hasBattery: true,
 };
 // Lo que la app escribía antes: grupos + espejo del primer grupo.
-const multiWithMirror: SystemSpecs = {
+const multiWithMirror: LegacyProjectSpecs = {
   ...ref.specs, ...multiGroups,
   panelBrandModel: 'Panel A 620', panelPowerW: 620, panelCount: 20, panelUnitPriceUSD: 100, panelWeightKilos: 28,
   inverterBrandModel: 'Inversor 8', inverterPowerKW: 8, inverterCount: 1, inverterUnitPriceUSD: 2300,
   batteryBrandModel: 'Bat 10', batteryCapacityKWh: 10, batteryCount: 2, batteryUnitPriceUSD: 1800, batteryDOD: 90, batteryEfficiencyPct: 96,
 };
 // Banco con cantidad 0: el motor financiero recurría al escalar de capacidad del espejo.
-const zeroCountWithMirror: SystemSpecs = {
+const zeroCountWithMirror: LegacyProjectSpecs = {
   ...ref.specs,
   hasBattery: true,
   batteries: [{ id: 'bz', brandModel: 'Bat 10', capacityKWh: 10, count: 0, unitPriceUSD: 1800, dodPct: 85, efficiencyPct: 93 }],

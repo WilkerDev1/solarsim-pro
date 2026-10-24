@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { resolveDynamicProjectSummaryParagraph1 } from '../utils/textFormatter';
 
-const project = { specs: { panelCount: 38 } };
+const project = { panelCount: 38 };
 const summary = { systemCapacityKWp: 23.56, annualProductionKWh: 45000, annualConsumptionKWh: 12000, energyCoveragePct: 95 };
 const panels = '20 Módulos Modelo A (620W) y 18 Módulos Modelo B (610W)';
 const resolve = (text: string, model = panels) => resolveDynamicProjectSummaryParagraph1(text, 'default', project, summary, 'CLIENTE 2026', model);

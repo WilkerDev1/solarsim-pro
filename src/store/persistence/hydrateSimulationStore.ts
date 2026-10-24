@@ -1,6 +1,7 @@
 import { normalizeCompanyProfiles } from './companyProfiles';
 import { initializeWorkspaces } from '../sync/organizationWorkspace';
 import type { SimulationStore } from '../types';
+import type { LegacyProjectSpecs } from '../../types';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../../data/defaultEquipmentCatalog';
 import { normalizeStoredTariffMatrix } from '../../utils/tariffExtraction';
 import { DEFAULT_RD_TARIFF_MATRIX } from '../../data/rdTariffs';
@@ -57,22 +58,22 @@ export function hydrateSimulationStore(state: SimulationStore | undefined): void
           },
         };
       }
+      // Datos locales heredados (espejo de un solo modelo): se leen aquí, antes de migrarlos a grupos.
+      const legacySpecs: LegacyProjectSpecs | undefined = updated.specs;
       if (
-        updated.specs?.batteryBrandModel &&
-        (updated.specs.batteryBrandModel.toLowerCase().includes('hinaess') ||
-          updated.specs.batteryBrandModel.toLowerCase().includes('powergem') ||
-          updated.specs.batteryBrandModel.toLowerCase().includes('banco de baterías de litio')) &&
-        updated.specs.batteryBrandModel !== 'Batería Hinaess 16 KwH-48 vdc.'
+        legacySpecs?.batteryBrandModel &&
+        (legacySpecs.batteryBrandModel.toLowerCase().includes('hinaess') ||
+          legacySpecs.batteryBrandModel.toLowerCase().includes('powergem') ||
+          legacySpecs.batteryBrandModel.toLowerCase().includes('banco de baterías de litio')) &&
+        legacySpecs.batteryBrandModel !== 'Batería Hinaess 16 KwH-48 vdc.'
       ) {
         hasChanges = true;
-        updated = {
-          ...updated,
-          specs: {
-            ...updated.specs,
-            batteryBrandModel: 'Batería Hinaess 16 KwH-48 vdc.',
-            batteryCapacityKWh: updated.specs.batteryCapacityKWh || 16.08,
-          },
+        const renamed: LegacyProjectSpecs = {
+          ...legacySpecs,
+          batteryBrandModel: 'Batería Hinaess 16 KwH-48 vdc.',
+          batteryCapacityKWh: legacySpecs.batteryCapacityKWh || 16.08,
         };
+        updated = { ...updated, specs: renamed };
       }
       // Datos locales heredados: los equipos pasan a grupos una sola vez (idempotente; no cambia ningún resultado).
       if (updated.specs) {

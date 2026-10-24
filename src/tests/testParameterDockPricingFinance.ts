@@ -3,7 +3,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { BENCHMARK_LEGACY_SPECS, BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateFinancialSummary } from '../engine/financeEngine';
-import type { CustomQuotationDiscount, CustomQuotationItem, FinancialParams, ProjectSimulation, SystemSpecs } from '../types';
+import type { CustomQuotationDiscount, CustomQuotationItem, FinancialParams, ProjectSimulation, LegacyProjectSpecs } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
 import { PricingParamsSection } from '../components/simulator/sidebar/PricingParamsSection';
 import { UnitCosts } from '../components/simulator/params/sections/pricing/UnitCosts';
@@ -26,8 +26,8 @@ const close = (actual: number, expected: number, message: string) =>
 
 // Propuesta heredada (solo espejo, sin grupos): el dock y el motor la leen por el módulo de equipos.
 const base = { ...structuredClone(BENCHMARK_PROJECT), specs: { ...BENCHMARK_LEGACY_SPECS } };
-const specsOf = (extra: Partial<SystemSpecs> = {}): SystemSpecs => ({ ...base.specs, ...extra });
-const projectOf = (specs: Partial<SystemSpecs> = {}, financials: Partial<FinancialParams> = {}): ProjectSimulation =>
+const specsOf = (extra: Partial<LegacyProjectSpecs> = {}): LegacyProjectSpecs => ({ ...base.specs, ...extra });
+const projectOf = (specs: Partial<LegacyProjectSpecs> = {}, financials: Partial<FinancialParams> = {}): ProjectSimulation =>
   ({ ...base, specs: specsOf(specs), financials: { ...base.financials, ...financials } });
 const summaryOf = (p: ProjectSimulation) =>
   calculateFinancialSummary(p.client.province, p.specs, p.rates, p.financials, p.monthlyConsumption, p.client.customMonthlyHSP);
@@ -100,7 +100,7 @@ const equipment = (type: 'panel' | 'inverter' | 'battery', displayName: string, 
 
   // El botón aparece solo si hay proveedores y refleja el modo automático.
   const catalog = [equipment('panel', 'PANEL-T', [sp('p1', 'A', 100), sp('p2', 'B', 90)])];
-  const renderCosts = (current: SystemSpecs, items: SolarEquipmentItem[]) =>
+  const renderCosts = (current: LegacyProjectSpecs, items: SolarEquipmentItem[]) =>
     render(h(UnitCosts, {
       specs: current,
       equipmentCatalog: items,
@@ -160,7 +160,7 @@ const equipment = (type: 'panel' | 'inverter' | 'battery', displayName: string, 
     }
     return out;
   };
-  const calls: Partial<SystemSpecs>[] = [];
+  const calls: Partial<LegacyProjectSpecs>[] = [];
   const panel = equipment('panel', 'PANEL-T', [sp('p1', 'A', 100), sp('p2', 'B', 90)]);
   const specs = specsOf({ hasBattery: false, autoSupplierPricing: true, panels: undefined, panelBrandModel: 'PANEL-T', panelPowerW: 600 });
   const tree = UnitCosts({ specs, equipmentCatalog: [panel], selected: { panel }, openSupplierPriceModal: (item) => calls.push({ panelBrandModel: item.displayName }), updateSpecs: (p) => calls.push(p) });

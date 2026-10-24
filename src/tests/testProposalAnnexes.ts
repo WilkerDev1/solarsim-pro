@@ -3,7 +3,7 @@ import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { applyAnnexPlan, catalogAnnexId, dismissAnnex, planDatasheetAnnexes, restoreDismissedAnnexes, unresolvedEquipmentIds } from '../utils/proposalAnnexes';
 import { createProposalAttachmentResolver } from '../services/proposalAttachmentResolver';
 import { missingAnnexesConfirmation } from '../components/pdf/annexes/confirmMissingAnnexes';
-import type { AttachedPDFDocument, ProjectSimulation } from '../types';
+import type { AttachedPDFDocument, LegacyProjectSpecs, ProjectSimulation } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
 
 const NOW = '2026-10-21T12:00:00.000Z';
@@ -142,19 +142,19 @@ assert.deepEqual(deduped.attachedPdfs.map((att) => att.id), ['att-manual', 'att-
   const legacy = project();
   legacy.customization!.attachedPdfs = first.attachedPdfs.map((att) => (att.id === catalogAnnexId('sheet-inverter') ? { ...att, title: 'Inversor — revisada' } : att));
   legacy.specs.inverters = undefined;
-  legacy.specs.inverterBrandModel = 'QA Inversor 8K';
-  legacy.specs.inverterPowerKW = 8;
-  legacy.specs.inverterCount = 1;
+  (legacy.specs as LegacyProjectSpecs).inverterBrandModel = 'QA Inversor 8K';
+  (legacy.specs as LegacyProjectSpecs).inverterPowerKW = 8;
+  (legacy.specs as LegacyProjectSpecs).inverterCount = 1;
   const before = legacy.customization!;
   const none: SolarEquipmentItem[] = [];
   const during = applyAnnexPlan(before, planDatasheetAnnexes(legacy, none), NOW, unresolvedEquipmentIds(legacy, none));
   assert.equal(during.changed, false, 'Legacy groups do not lose their annexes while the catalog is empty');
   assert.equal(during.attachedPdfs, before.attachedPdfs);
   const gone = structuredClone(legacy);
-  gone.specs.inverterCount = 0;
+  (gone.specs as LegacyProjectSpecs).inverterCount = 0;
   gone.specs.panels = [];
-  gone.specs.panelBrandModel = undefined;
-  gone.specs.panelCount = 0;
+  (gone.specs as LegacyProjectSpecs).panelBrandModel = undefined;
+  (gone.specs as LegacyProjectSpecs).panelCount = 0;
   assert.deepEqual(applyAnnexPlan(before, planDatasheetAnnexes(gone, none), NOW, unresolvedEquipmentIds(gone, none)).attachedPdfs.map((att) => att.id), ['att-manual']);
 }
 

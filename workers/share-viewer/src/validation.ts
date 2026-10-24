@@ -1,5 +1,6 @@
 import type { ShareProposalPayload } from './types';
 import { DOC_TEXT_PREFIX, getDocumentTextDefinition, isDocTextKey } from '../../../shared/documentTexts';
+import { LEGACY_MIRROR_NUMBER_FIELDS, LEGACY_MIRROR_TEXT_FIELDS } from '../../../shared/equipment';
 export const MAX_SHARE_BYTES = 2 * 1024 * 1024;
 export class RequestValidationError extends Error {
   constructor(message: string, public readonly status: 400 | 413 = 400) { super(message); }
@@ -66,10 +67,11 @@ export function parseSharePayload(value: unknown): ShareProposalPayload {
   const rates = requireRecord(project.rates, 'rates');
   const financials = requireRecord(project.financials, 'financials');
   textFields(client, ['name','projectId','quoteNumber','province','location','address','contactPhone','solarSourceMode','coordinates','distributor','tariffCode'], 1000);
-  textFields(specs, ['panelBrandModel','inverterBrandModel','batteryBrandModel','installationServicesDesc']);
+  // Un cliente 2.6.x/2.7.0 aún puede publicar en el formato viejo: sus campos los nombra `shared/equipment` (ADR 0001, retiro de la lectura heredada).
+  textFields(specs, [...LEGACY_MIRROR_TEXT_FIELDS, 'installationServicesDesc']);
   textFields(rates, ['distributor','tariffCode']);
   for (const record of [client, specs, rates]) {
-    for (const field of ['quoteValidityDays','panelCount','panelPowerW','inverterCount','inverterPowerKW','batteryCount','batteryCapacityKWh','gridExportFeePct']) {
+    for (const field of ['quoteValidityDays', ...LEGACY_MIRROR_NUMBER_FIELDS, 'gridExportFeePct']) {
       if (record[field] !== undefined && (typeof record[field] !== 'number' || !Number.isFinite(record[field]) || (record[field] as number) < 0)) throw new RequestValidationError(`${field} debe ser un número positivo.`);
     }
   }

@@ -7,8 +7,8 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { BENCHMARK_LEGACY_SPECS, BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateCostMatrixSummary, calculateProjectFinancialSummary } from '../engine/financeEngine';
-import { getProjectBatteries } from '../utils/equipmentSpecsUtils';
-import type { ProjectSimulation, SystemSpecs } from '../types';
+import { batteryBankSpecs, getProjectBatteries } from '../utils/equipmentSpecsUtils';
+import type { ProjectSimulation, LegacyProjectSpecs } from '../types';
 import * as shared from '../../shared/projectDefaults';
 import * as dockDefaults from '../components/simulator/params/logic/dockDefaults';
 import { commitNumberDraft } from '../components/simulator/params/logic/commitNumberDraft';
@@ -23,7 +23,7 @@ const render = (node: React.ReactElement) => renderToStaticMarkup(node);
 const valueOf = (html: string, id: string): string | undefined => new RegExp(`id="${id}"[^>]*value="([^"]*)"`).exec(html)?.[1];
 // Propuesta heredada (solo espejo, sin grupos): el dock y el motor siguen leyéndola por el módulo de equipos.
 const base = { ...structuredClone(BENCHMARK_PROJECT), specs: { ...BENCHMARK_LEGACY_SPECS } };
-const projectOf = (specs: Partial<SystemSpecs> = {}): ProjectSimulation => ({ ...base, specs: { ...base.specs, ...specs } });
+const projectOf = (specs: Partial<LegacyProjectSpecs> = {}): ProjectSimulation => ({ ...base, specs: { ...base.specs, ...specs } });
 
 // ── Bug 1: borrador de DOD/eficiencia ───────────────────────────────────────────────────────
 {
@@ -46,7 +46,7 @@ const projectOf = (specs: Partial<SystemSpecs> = {}): ProjectSimulation => ({ ..
   assert.equal(dockDefaults.DEFAULT_BATTERY_EFFICIENCY_PCT, shared.DEFAULT_BATTERY_EFFICIENCY_PCT);
   assert.equal(dockDefaults.DEFAULT_BATTERY_DOD_PCT, shared.DEFAULT_BATTERY_DOD_PCT);
   const battery = (specs: object) => render(h(BatteryEquipmentSection, {
-    project: projectOf({ hasBattery: true, batteryDOD: undefined, batteryEfficiencyPct: undefined, ...specs } as Partial<SystemSpecs>),
+    project: projectOf({ hasBattery: true, batteryDOD: undefined, batteryEfficiencyPct: undefined, ...specs } as Partial<LegacyProjectSpecs>),
     summary: { batteryUsableKWh: 0, batteryBackupAutonomyHours: 0 } as never, isDetailed: true, updateSpecs: noop,
   }));
   assert.equal(valueOf(battery({}), 'dock-battery-efficiency'), '90', 'el campo muestra lo que usa el motor');
@@ -54,8 +54,8 @@ const projectOf = (specs: Partial<SystemSpecs> = {}): ProjectSimulation => ({ ..
   assert.equal(valueOf(battery({ batteryDOD: 0, batteryEfficiencyPct: 0 }), 'dock-battery-efficiency'), '90');
   assert.equal(valueOf(battery({ batteryDOD: 70, batteryEfficiencyPct: 88 }), 'dock-battery-efficiency'), '88');
 
-  const withBattery = (specs: Partial<SystemSpecs>) => ({ ...base.specs, hasBattery: true, batteries: undefined, batteryCapacityKWh: 10, batteryCount: 1, ...specs } as SystemSpecs);
-  const usable = (specs: Partial<SystemSpecs>) => calculateProjectFinancialSummary(projectOf(withBattery(specs))).batteryUsableKWh;
+  const withBattery = (specs: Partial<LegacyProjectSpecs>) => ({ ...base.specs, hasBattery: true, batteries: undefined, batteryCapacityKWh: 10, batteryCount: 1, ...specs } as LegacyProjectSpecs);
+  const usable = (specs: Partial<LegacyProjectSpecs>) => calculateProjectFinancialSummary(projectOf(withBattery(specs))).batteryUsableKWh;
   const reference = usable({ batteryDOD: 90, batteryEfficiencyPct: 90 });
   assert.equal(usable({ batteryDOD: 90, batteryEfficiencyPct: undefined }), reference, 'financeEngine usa 90, no 92');
   assert.equal(usable({ batteryDOD: undefined, batteryEfficiencyPct: 90 }), reference, 'DOD ausente: 90, no 80');
@@ -63,9 +63,9 @@ const projectOf = (specs: Partial<SystemSpecs> = {}): ProjectSimulation => ({ ..
   const unset = getProjectBatteries(withBattery({ batteryEfficiencyPct: undefined, batteryDOD: undefined }))[0];
   assert.equal(unset.efficiencyPct, undefined, 'el grupo puede guardar el dato vacío');
   assert.equal(unset.dodPct, undefined);
-  assert.equal(shared.resolveBatteryBankEfficiencyPct(withBattery({ batteryEfficiencyPct: undefined, batteryDOD: undefined })), 90, 'el motor aplica el 90');
-  assert.equal(shared.resolveBatteryBankDodPct(withBattery({ batteryEfficiencyPct: undefined, batteryDOD: undefined })), 90);
-  const preview = (specs: Partial<SystemSpecs>) => computeLoadProfilePreview(projectOf(withBattery(specs)), 'BTS2', 900);
+  assert.equal(shared.resolveBatteryBankEfficiencyPct(batteryBankSpecs(withBattery({ batteryEfficiencyPct: undefined, batteryDOD: undefined }))), 90, 'el motor aplica el 90');
+  assert.equal(shared.resolveBatteryBankDodPct(batteryBankSpecs(withBattery({ batteryEfficiencyPct: undefined, batteryDOD: undefined }))), 90);
+  const preview = (specs: Partial<LegacyProjectSpecs>) => computeLoadProfilePreview(projectOf(withBattery(specs)), 'BTS2', 900);
   assert.deepEqual(preview({ batteryEfficiencyPct: undefined, batteryDOD: undefined }), preview({ batteryEfficiencyPct: 90, batteryDOD: 90 }));
 }
 
@@ -89,7 +89,7 @@ const projectOf = (specs: Partial<SystemSpecs> = {}): ProjectSimulation => ({ ..
 // ── Bug 3: precio directo coherente ─────────────────────────────────────────────────────────
 {
   const direct = (specs: object) => render(h(DirectPrice, {
-    specs: { ...base.specs, pricingMode: 'direct_watt', pricePerWattUSD: undefined, pricePerKWpUSD: undefined, ...specs } as unknown as SystemSpecs,
+    specs: { ...base.specs, pricingMode: 'direct_watt', pricePerWattUSD: undefined, pricePerKWpUSD: undefined, ...specs } as unknown as LegacyProjectSpecs,
     summary: { systemCapacityKWp: 10 } as never, updateSpecs: noop,
   }));
   for (const zero of [0, -1]) {
@@ -104,17 +104,17 @@ const projectOf = (specs: Partial<SystemSpecs> = {}): ProjectSimulation => ({ ..
   assert.equal(shared.resolvePricePerWattUSD({}, { pricePerWattUSD: -1 }), 1.13);
   assert.equal(shared.resolvePricePerWattUSD({ pricePerWattUSD: NaN }, undefined), 1.13);
   for (const specsPrice of [0, -1, undefined]) {
-    const project = projectOf({ pricingMode: 'direct_watt', pricePerWattUSD: specsPrice, pricePerKWpUSD: undefined } as unknown as Partial<SystemSpecs>);
+    const project = projectOf({ pricingMode: 'direct_watt', pricePerWattUSD: specsPrice, pricePerKWpUSD: undefined } as unknown as Partial<LegacyProjectSpecs>);
     const html = render(h(PricingParamsSection, { project: { ...project, financials: { ...project.financials, pricePerWattUSD: 1.2 } }, summary: {} as never, updateSpecs: noop }));
     assert.equal(valueOf(html, 'pd-price-w'), '1.2', 'la vista sigue la cadena del motor: financials.pricePerWattUSD');
     assert.equal(valueOf(html, 'pd-price-kwp'), '1200');
   }
   {
     // $/kWp guardado que ya no corresponde al $/W efectivo (obsoleto): se deriva del $/W.
-    const project = projectOf({ pricingMode: 'direct_watt', pricePerWattUSD: 0, pricePerKWpUSD: 999 } as unknown as Partial<SystemSpecs>);
+    const project = projectOf({ pricingMode: 'direct_watt', pricePerWattUSD: 0, pricePerKWpUSD: 999 } as unknown as Partial<LegacyProjectSpecs>);
     const html = render(h(PricingParamsSection, { project: { ...project, financials: { ...project.financials, pricePerWattUSD: 1.2 } }, summary: {} as never, updateSpecs: noop }));
     assert.equal(valueOf(html, 'pd-price-kwp'), '1200', '$/kWp obsoleto no se muestra');
-    const synced = projectOf({ pricingMode: 'direct_watt', pricePerWattUSD: 1.235, pricePerKWpUSD: 1234.56 } as unknown as Partial<SystemSpecs>);
+    const synced = projectOf({ pricingMode: 'direct_watt', pricePerWattUSD: 1.235, pricePerKWpUSD: 1234.56 } as unknown as Partial<LegacyProjectSpecs>);
     assert.equal(valueOf(render(h(PricingParamsSection, { project: synced, summary: {} as never, updateSpecs: noop })), 'pd-price-kwp'), '1234.56', 'un $/kWp sincronizado (redondeo de $/W a 3 decimales) se conserva');
   }
   const finance = readFileSync('src/engine/financeEngine.ts', 'utf8');
@@ -134,10 +134,10 @@ const projectOf = (specs: Partial<SystemSpecs> = {}): ProjectSimulation => ({ ..
   assert.equal(shared.resolveSaleMarginMultiplier(0), 1.25);
   assert.equal(shared.resolveSaleMarginMultiplier(-1), 1.25);
   assert.equal(shared.resolveSaleMarginMultiplier(1.3), 1.3);
-  const pricing = (specs: object) => render(h(PricingParamsSection, { project: projectOf({ pricingMode: 'cost_matrix', ...specs } as Partial<SystemSpecs>), summary: {} as never, updateSpecs: noop }));
+  const pricing = (specs: object) => render(h(PricingParamsSection, { project: projectOf({ pricingMode: 'cost_matrix', ...specs } as Partial<LegacyProjectSpecs>), summary: {} as never, updateSpecs: noop }));
   for (const rate of [0, -5]) assert.equal(valueOf(pricing({ dopExchangeRate: rate }), 'pd-dop-rate'), '60', 'la vista usa la misma regla que el cálculo');
   assert.equal(valueOf(pricing({ dopExchangeRate: 58 }), 'pd-dop-rate'), '58');
-  const matrix = (specs: Partial<SystemSpecs>) => calculateCostMatrixSummary({ ...base.specs, ...specs } as SystemSpecs, 5);
+  const matrix = (specs: Partial<LegacyProjectSpecs>) => calculateCostMatrixSummary({ ...base.specs, ...specs } as LegacyProjectSpecs, 5);
   assert.equal(matrix({ dopExchangeRate: -5 }).dopExchangeRate, 60, 'el motor ignora una tasa negativa');
   assert.equal(matrix({ saleMarginMultiplier: -1 }).saleMarginMultiplier, 1.25, 'el motor ignora un multiplicador negativo');
   assert.equal(matrix({ saleMarginMultiplier: 0 }).saleMarginMultiplier, 1.25);

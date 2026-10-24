@@ -7,7 +7,7 @@ import { calculateFinancialSummary } from '../engine/financeEngine';
 import { LEGACY_MIRROR_FIELDS, migrateLegacySpecs, readEquipment } from '../../shared/equipment';
 import { createGroupActions } from '../components/simulator/params/sections/equipment/equipmentGroupModel';
 import { buildCatalogSelectionUpdate } from '../components/simulator/params/logic/catalogSelection';
-import type { ProjectSimulation, SystemSpecs } from '../types';
+import type { ProjectSimulation, LegacyProjectSpecs } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
 
 /**
@@ -16,7 +16,7 @@ import type { SolarEquipmentItem } from '../types/equipment';
  * restauración de versiones y rehidratación local dejan las specs solo con grupos.
  */
 const mirror = (specs: object) => [...LEGACY_MIRROR_FIELDS, 'selectedSupplierInfo'].filter((key) => key in specs);
-const legacyProject = (id: string, specs: Partial<SystemSpecs> = {}): ProjectSimulation => {
+const legacyProject = (id: string, specs: Partial<LegacyProjectSpecs> = {}): ProjectSimulation => {
   const project = structuredClone(BENCHMARK_PROJECT);
   project.id = id;
   project.status = 'Draft';
@@ -28,7 +28,7 @@ const offline = { ...store.getState().syncSettings, currentUser: null, authToken
 const load = (...projects: ProjectSimulation[]) => store.setState({ projects, activeProjectId: projects[0].id, syncSettings: offline });
 const active = () => store.getState().projects.find((p) => p.id === store.getState().activeProjectId)!;
 const specsOf = () => active().specs;
-const updateSpecs = (patch: Partial<SystemSpecs>) => store.getState().updateSpecs(patch);
+const updateSpecs = (patch: Partial<LegacyProjectSpecs>) => store.getState().updateSpecs(patch);
 
 const item = (over: Partial<SolarEquipmentItem> & Pick<SolarEquipmentItem, 'id' | 'type' | 'displayName'>): SolarEquipmentItem => ({ brand: 'Marca', modelSeries: 'S', createdAt: '2026-01-01', updatedAt: '2026-01-01', ...over } as SolarEquipmentItem);
 const sp = (id: string, name: string, priceUSD: number) => ({ id, supplierName: name, priceUSD, updatedAt: '2026-10-01' });
@@ -142,7 +142,7 @@ const catalog = [panelCatalog, inverterCatalog, batteryCatalog];
 // 7. Importación: un archivo heredado (con espejo) y uno nuevo quedan solo con grupos, con los mismos números.
 {
   const legacyFile = legacyProject('import-legacy');
-  const modernFile = { ...legacyProject('import-modern'), specs: { ...migrateLegacySpecs(legacyProject('x').specs), panelCount: 99 } as SystemSpecs };
+  const modernFile = { ...legacyProject('import-modern'), specs: { ...migrateLegacySpecs(legacyProject('x').specs), panelCount: 99 } as LegacyProjectSpecs };
   load(legacyProject('base'));
   const result = store.getState().importProjectsFromJSON({ projects: [legacyFile, modernFile] });
   assert.equal(result.success, true);
@@ -153,7 +153,7 @@ const catalog = [panelCatalog, inverterCatalog, batteryCatalog];
     assert.ok(imported!.specs.panels?.length);
   }
   const imported = store.getState().projects.find((p) => p.id === 'import-legacy')!;
-  const run = (specs: SystemSpecs) => calculateFinancialSummary(imported.client.province, specs, imported.rates, imported.financials, imported.monthlyConsumption);
+  const run = (specs: LegacyProjectSpecs) => calculateFinancialSummary(imported.client.province, specs, imported.rates, imported.financials, imported.monthlyConsumption);
   assert.equal(run(imported.specs).systemCapacityKWp, 23.56, 'importar no cambia los kWp del caso de referencia');
 }
 

@@ -41,26 +41,37 @@ export interface BatteryItemSpec extends ItemSpecBase {
   replacementCostUSD?: number;
 }
 
-/** Campos de `SystemSpecs` que lee o escribe este módulo: los grupos y el espejo heredado. */
+/** Campos de `SystemSpecs` que lee o escribe este módulo: los grupos y los parámetros de sistema que sirven de reserva a un grupo. */
 export interface EquipmentSpecs {
   hasBattery?: boolean;
   panels?: PanelItemSpec[];
   inverters?: InverterItemSpec[];
   batteries?: BatteryItemSpec[];
+  panelEfficiency?: number;
+  tempCoeff?: number;
+  annualDegradation?: number;
+  inverterEfficiencyPct?: number;
+  batteryLifespanYears?: number;
+  batteryReplacementCostUSD?: number;
+}
+
+/**
+ * Espejo heredado: los campos sueltos de un solo modelo que hasta 2.7.0 se escribían como copia del primer grupo.
+ * Solo existen en datos viejos (clientes 2.6.x, enlaces publicados en Worker KV, archivos `.json` importados).
+ * `SystemSpecs` ya no los declara: leerlos fuera de `shared/equipment` es un error de compilación, y las pocas
+ * lecturas de datos viejos (hidratación, importación, visor) tipan esos datos como `LegacySystemSpecs`.
+ */
+export interface LegacyEquipmentFields {
   panelBrandModel?: string;
   panelPowerW?: number;
   panelCount?: number;
   panelUnitPriceUSD?: number;
   panelWeightKilos?: number;
-  panelEfficiency?: number;
-  tempCoeff?: number;
-  annualDegradation?: number;
   inverterBrandModel?: string;
   inverterPowerKW?: number;
   inverterCount?: number;
   inverterUnitPriceUSD?: number;
   inverterWeightKilos?: number;
-  inverterEfficiencyPct?: number;
   batteryBrandModel?: string;
   batteryCapacityKWh?: number;
   batteryCount?: number;
@@ -68,10 +79,12 @@ export interface EquipmentSpecs {
   batteryWeightKilos?: number;
   batteryDOD?: number;
   batteryEfficiencyPct?: number;
-  batteryLifespanYears?: number;
-  batteryReplacementCostUSD?: number;
+  /** Proveedor elegido por tipo; hoy vive en cada grupo (`selectedSupplierInfo`). */
   selectedSupplierInfo?: { panel?: SupplierInfo; inverter?: SupplierInfo; battery?: SupplierInfo };
 }
+
+/** Propuesta tal como se guardaba hasta 2.7.0: grupos opcionales más el espejo heredado. Solo para leer datos viejos. */
+export type LegacySystemSpecs = EquipmentSpecs & LegacyEquipmentFields;
 
 export type EquipmentKind = 'panel' | 'inverter' | 'battery';
 

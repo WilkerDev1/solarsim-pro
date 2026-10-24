@@ -31,11 +31,28 @@ Decisiones de la oleada 4:
 
 - La energía útil del banco queda fuera (candidato #1 del informe de arquitectura): `equipmentTotals` solo da capacidad nominal.
 
+Decisiones de la oleada 5 (tipos y release 2.7.1):
+
+- **`SystemSpecs` ya no declara el espejo.** Los 17 campos sueltos de `LEGACY_MIRROR_FIELDS` y el `selectedSupplierInfo` por tipo viven en `LegacyEquipmentFields` (`shared/equipment/types.ts`); `LegacySystemSpecs` (grupos + espejo) y, en el renderer, `LegacyProjectSpecs` (`SystemSpecs & LegacyEquipmentFields`) tipan datos VIEJOS. `specs.panelCount` fuera de ellos es un error de `npm run lint`, y `src/tests/testEquipmentTypeParity.ts` falla al compilar si alguien devuelve un campo del espejo a `SystemSpecs`. Los parámetros de sistema que no son identidad del equipo (`panelEfficiency`, `tempCoeff`, `annualDegradation`, `inverterEfficiencyPct`, `batteryLifespanYears`, `batteryReplacementCostUSD`, pérdidas, autoconsumo…) siguen en `SystemSpecs`.
+- **Quién puede leer el espejo**: `shared/equipment` (`readEquipment`, `migrateLegacySpecs`, `applyLegacyEquipmentPatch`), la rehidratación local (`hydrateSimulationStore`), la importación de `.json` (`importExportSlice`) y el visor Worker al leer instantáneas viejas (siempre mediante `readEquipment`). Las pruebas que simulan clientes viejos usan `LegacyProjectSpecs` y `src/tests/legacyFixtures.ts`.
+- **Guarda por búsqueda de texto** (`src/tests/testNoEquipmentMirrorAccess.ts`): ningún archivo de `src/`, `shared/`, `workers/share-viewer/src`, `server/src` ni `electron/` fuera de esa lista accede a `specs.<campo del espejo>` (cubre `any`, JSON sin tipar y tipos estructurales propios que el compilador no ve). Los totales (`equipmentTotals(...).panelCount`) y los campos del catálogo no son el espejo.
+- **Restos que el compilador no veía** y que la guarda encontró: `projectSummary.ts` y `dynamicTexts.ts` (los textos recibían un falso `{ specs: { panelCount… } }`; ahora reciben los totales) y `BankSpecs` de `projectDefaults.ts` (sus escalares `batteryDOD`/`batteryEfficiencyPct` pasan a `dodPct`/`efficiencyPct`: no son campos de la propuesta, los arma `batteryBankSpecs` desde el primer grupo).
+- `createNewProject` escribe los defaults en el grupo con `editEquipment` en lugar de pasar por `applyLegacyEquipmentPatch`. `updateSpecs` decide si la cantidad de paneles se editó comparando el primer grupo antes y después, no mirando `panelCount` en el parche: un parche heredado `panelCount` que no cambia ninguna cantidad (p. ej. con varios modelos) ya no apaga el dimensionamiento automático.
+- **`editEquipmentGroup`/`normalizeEquipmentEdit` no se retiran en esta oleada**: siguen siendo compuertas finas (una línea sobre `editEquipment`/`applyLegacyEquipmentPatch`) que usan el dock y el asistente; quitarlas no cambia resultados y queda como limpieza posterior.
+
+### Retiro de la lectura heredada
+
+La lectura de datos viejos (`deriveLegacyGroup`, `MIRROR`, `LegacyEquipmentFields`, `LegacyProjectSpecs`, `applyLegacyEquipmentPatch`, la rama heredada de `readEquipment` y la rehidratación) se conserva a propósito y se retira por partes:
+
+- **Worker**: cuando no quede en su KV ninguna instantánea publicada antes de 2.7.1 (una instantánea vieja es la que trae `specs` sin `panels`/`inverters`). Las instantáneas vencen con su vigencia (máximo 90 días); un cliente 2.6.x/2.7.0 aún puede publicar en formato viejo hasta que actualice, así que se comprueba el KV y no la fecha de la release.
+- **Archivos `.json` importados y datos locales**: mientras haya copias de seguridad de 2.6.x/2.7.0 en uso. Plazo máximo previsto: **3 años desde 2.7.1** (octubre de 2029); pasado ese plazo se retira la importación heredada, se borra `LegacyEquipmentFields` y `readEquipment` deja de derivar grupos.
+- Al retirarla, la guarda `testNoEquipmentMirrorAccess` pasa a prohibir los campos en todas partes y `LEGACY_READERS` queda vacía.
+
 ## Consecuencias
 
-- La oleada 1 es aditiva: crea el módulo, hace que `getProject*` y `DEFAULT_UNIT_PRICE_USD` salgan de él y no cambia ningún comportamiento. Las oleadas 2 a 5 migran a los llamadores, luego la persistencia y retiran `editEquipmentGroup`/`normalizeEquipmentEdit`.
+- La oleada 1 es aditiva: crea el módulo, hace que `getProject*` y `DEFAULT_UNIT_PRICE_USD` salgan de él y no cambia ningún comportamiento. Las oleadas 2 a 4 migran a los llamadores y la persistencia; la 5 quita el espejo del tipo `SystemSpecs` y prepara la release 2.7.1.
 - Código nuevo usa `shared/equipment`, no los campos heredados.
-- Mientras `SystemSpecs` declare obligatorios algunos campos sueltos, un resultado migrado puede carecer de ellos; se vuelven opcionales y luego se eliminan en las oleadas siguientes.
+- `SystemSpecs` ya no declara los campos sueltos (oleada 5): un resultado migrado es un `SystemSpecs` válido.
 - Clientes 2.6.0 dejarán de funcionar con datos migrados; por eso la decisión 3.
 
 ## Alternativas rechazadas

@@ -7,8 +7,7 @@ import { DEFAULT_UNIT_PRICE_USD, LIST_KEY, applyLegacyEquipmentPatch, editEquipm
  * Compuertas del cliente sobre `shared/equipment` (ADR 0001). Los grupos (`panels`, `inverters`, `batteries`) son
  * la única fuente: ninguna función de aquí escribe el espejo heredado (`panelCount`, `batteryDOD`…); el módulo lo borra.
  * Los parámetros de sistema que no son identidad del equipo (degradación, pérdidas…) no se tocan desde un grupo.
- * `editEquipmentGroup` y `normalizeEquipmentEdit` solo existen para quien arma parches de `updateSpecs`; la
- * oleada 5 los retira cuando todos los llamadores usen `editEquipment`.
+ * `editEquipmentGroup` y `normalizeEquipmentEdit` son compuertas finas para quien arma parches de `updateSpecs`.
  */
 export type { EquipmentKind };
 export { DEFAULT_UNIT_PRICE_USD };

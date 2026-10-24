@@ -33,7 +33,7 @@ $$E_{directo} = \min(P_{diario}, L_{dia}), \qquad E_{excedente} = \max(0, P_{dia
 
 $$E_{bat,util} = C_{nominal} \times \frac{\text{DoD}}{100} \times \frac{\eta}{100}$$
 
-con `batteryDOD` y `batteryEfficiencyPct` (90 y 90 si faltan en este motor). $C_{nominal}$ es la suma de capacidad × cantidad de los grupos de baterías. Solo aplica con `hasBattery` y capacidad positiva.
+con el DOD y la eficiencia de cada grupo de baterías (`dodPct` y `efficiencyPct`; 90 y 90 si faltan en este motor). $C_{nominal}$ es la suma de capacidad × cantidad de los grupos de baterías. Solo aplica con `hasBattery` y capacidad positiva.
 
 En régimen diario estacionario la batería solo puede recargar lo que descargó la noche anterior:
 

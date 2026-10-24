@@ -90,16 +90,16 @@ En el CT (usuario `agente`):
 La 2.7.1 elimina el espejo heredado de los equipos (ADR 0001, oleada 4). `package.json` (raíz, `server/` y `workers/share-viewer/`) debe decir `2.7.1` antes de construir: el cliente y el Worker se identifican con esa versión y la API de la 2.7.1 rechaza todo lo anterior, así que un build de `beta` que aún diga `2.7.0` no puede hablar con ella (`npm run release:bump -- 2.7.1`, ver [Mantenimiento y releases](MAINTENANCE_AND_UPDATES.md)). Precondición: la release debe incluir las oleadas 2 y 3 del plan (lectores del renderer y escritor `equipmentGroups.ts` que usan `shared/equipment` y no escriben el espejo); la 006 solo borra el espejo una vez, y si un cliente aún lo lee o lo reescribe, las vistas muestran valores vacíos o el espejo reaparece. Orden obligatorio:
 
 1. **Checkpoint** (paso 1) y **ensayo** (paso 2) con la imagen candidata. Antes de seguir, anotar los conteos de proyectos y, si se quiere una comprobación extra, una muestra de `system_capacity_kwp` y `version`: la migración no los modifica.
-2. **API con la migración 006.** Al arrancar aplica `migrateLegacySpecs` a `data_json.specs` de todos los proyectos (también papelera y otras organizaciones) en una sola transacción; no cambia `version`, `updated_at` ni el historial. `MIN_CLIENT_VERSION` queda en `2.7.1` por defecto. Comprobar en la base:
+2. **Worker 2.7.1** (paso 6) antes de la API: es inofensivo con la API anterior, publica snapshots sin espejo y, con la versión mínima activa, evita la ventana en la que el Worker viejo (sin `X-SolarSim-Client`) recibe 426 de la API.
+3. **Avisar al equipo antes de subir la API**, con la fecha y hora: desde ese momento SolarSim 2.6.x y 2.7.0 dejan de sincronizar (el trabajo local no se pierde) y deben actualizar a 2.7.1. Tener la release de escritorio firmada lista para publicar de inmediato.
+4. **API con la migración 006.** Al arrancar aplica `migrateLegacySpecs` a `data_json.specs` de todos los proyectos (también papelera y otras organizaciones) en una sola transacción; no cambia `version`, `updated_at` ni el historial. `MIN_CLIENT_VERSION` queda en `2.7.1` por defecto. El ensayo debe terminar en `"migrations":[1,2,3,4,5,6]` con los mismos conteos que producción. Comprobar en la base:
 
    ```bash
    docker exec solarsim-db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT version, name FROM schema_migrations ORDER BY version" -c "SELECT count(*) AS proyectos, count(*) FILTER (WHERE (data_json->\$q\$specs\$q\$) ? \$q\$panelCount\$q\$) AS con_espejo FROM projects"'
    ```
 
    Esperado: la fila `6 | equipment_groups`, el mismo número de proyectos que antes y `con_espejo = 0`.
-3. **Worker 2.7.1** (paso 6), de inmediato o antes de la API según la nota de arriba.
-4. **Release de escritorio 2.7.1** firmada y publicada (ver [Mantenimiento y releases](MAINTENANCE_AND_UPDATES.md)). Los clientes 2.7.1+ publican snapshots sin espejo al Worker, que por eso debe estar desplegado antes.
-5. **Avisar al equipo** de que actualice; mientras no lo haga, su sincronización devuelve 426 y el trabajo local queda pendiente.
+5. **Publicar la release de escritorio 2.7.1** firmada (ver [Mantenimiento y releases](MAINTENANCE_AND_UPDATES.md)) y confirmar que quienes sincronizan actualizaron; mientras no lo hagan, su sincronización devuelve 426 y el trabajo local queda pendiente.
 
 Rollback: la imagen API anterior es compatible con los datos migrados (nunca leyó `specs`, salvo para calcular `system_capacity_kwp`, que calcularía en 0 para propuestas solo con grupos hasta volver a la 2.7.1). La 006 no se revierte con DDL; si hay que deshacerla, restaurar el checkpoint en una base nueva (sección siguiente).
 

@@ -1,8 +1,8 @@
 /**
  * Párrafos 1 y 2 de «Descripción del proyecto». Un texto personalizado mantiene sincronizados
  * los números (paneles, kWp, producción, cobertura, inversores y baterías) con la simulación.
- * `project.specs` no son las specs de la propuesta: son los totales de todos los grupos que arma el
- * contexto de textos (`DocumentTextContext`); estas funciones no leen equipos.
+ * Reciben los totales de todos los grupos que arma el contexto de textos (`DocumentTextContext`); no leen
+ * equipos ni specs.
  */
 /**
  * Dynamically resolves technical values in Project Summary Paragraph 1
@@ -12,7 +12,7 @@
 export function resolveDynamicProjectSummaryParagraph1(
   customText: string | undefined | null,
   defaultText: string,
-  project: { specs: { panelCount: number; panelBrandModel?: string; panelPowerW?: number } },
+  totals: { panelCount: number },
   summary: { systemCapacityKWp: number; annualProductionKWh: number; annualConsumptionKWh: number; energyCoveragePct: number },
   clientName: string,
   panelModel: string
@@ -24,7 +24,7 @@ export function resolveDynamicProjectSummaryParagraph1(
   let text = customText.trim();
   const isPreformattedPanels = /^\d+\s+M[oó]dulo/i.test(panelModel) || panelModel.includes(' y ');
   const rawModel = panelModel.replace(/^m[oó]dulos?\s+/i, '').trim();
-  const modLabel = project.specs.panelCount > 1 ? 'Módulos' : 'Módulo';
+  const modLabel = totals.panelCount > 1 ? 'Módulos' : 'Módulo';
   const formattedPanelDesc = isPreformattedPanels
     ? panelModel
     : `${modLabel} ${rawModel}`;
@@ -32,7 +32,7 @@ export function resolveDynamicProjectSummaryParagraph1(
   // 1. Support explicit placeholders:
   text = text
     .replace(/{clientName}/gi, clientName)
-    .replace(/{panelCount}/gi, String(project.specs.panelCount))
+    .replace(/{panelCount}/gi, String(totals.panelCount))
     .replace(/{panelModel}/gi, formattedPanelDesc)
     .replace(/{systemCapacityKWp}/gi, `${summary.systemCapacityKWp.toFixed(2)} kWp`)
     .replace(/{annualProductionKWh}/gi, `${summary.annualProductionKWh.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kWh`)
@@ -44,7 +44,7 @@ export function resolveDynamicProjectSummaryParagraph1(
   // value can also be bold and must never be mistaken for technical equipment.
   text = text.replace(
     /\*\*\s*\d+\s+M[oó]dulos?\s+[^*]+\*\*/i,
-    () => `**${isPreformattedPanels ? formattedPanelDesc : `${project.specs.panelCount} ${formattedPanelDesc}`}**`
+    () => `**${isPreformattedPanels ? formattedPanelDesc : `${totals.panelCount} ${formattedPanelDesc}`}**`
   );
 
   text = text.replace(
@@ -86,7 +86,7 @@ export function resolveDynamicProjectSummaryParagraph1(
 export function resolveDynamicProjectSummaryParagraph2(
   customText: string | undefined | null,
   defaultText: string,
-  project: { specs: { inverterCount?: number; hasBattery?: boolean; batteryCapacityKWh?: number; batteryCount?: number } },
+  totals: { inverterCount?: number; hasBattery?: boolean; batteryNominalKWh?: number; batteryCount?: number },
   inverterModel: string,
   batteryModel: string,
   scopeText: string
@@ -96,8 +96,8 @@ export function resolveDynamicProjectSummaryParagraph2(
   }
 
   let text = customText.trim();
-  const invCount = project.specs.inverterCount || 1;
-  const batCount = project.specs.batteryCount || 1;
+  const invCount = totals.inverterCount || 1;
+  const batCount = totals.batteryCount || 1;
 
   const isPreformattedInverters = /^\d+\s+Inversor/i.test(inverterModel) || inverterModel.includes(' y ');
   const rawInverter = inverterModel.replace(/^inversor(?:es)?\s+/i, '').trim();
@@ -121,7 +121,7 @@ export function resolveDynamicProjectSummaryParagraph2(
     .replace(/{batteryModel}/gi, formattedBatteryDesc)
     .replace(/{scopeText}/gi, scopeText);
 
-  const hasStorage = !!project.specs.hasBattery && (project.specs.batteryCapacityKWh || 0) > 0;
+  const hasStorage = !!totals.hasBattery && (totals.batteryNominalKWh || 0) > 0;
   const inverterBlock = isPreformattedInverters ? formattedInverterDesc : `${invCount} ${formattedInverterDesc}`;
   const batteryBlock = isPreformattedBatteries ? formattedBatteryDesc : `${batCount} ${formattedBatteryDesc}`;
 
@@ -143,7 +143,7 @@ export function resolveDynamicProjectSummaryParagraph2(
   );
 
   // 3. Keep battery count and model synchronized if has battery:
-  if (project.specs.hasBattery && (project.specs.batteryCapacityKWh || 0) > 0) {
+  if (totals.hasBattery && (totals.batteryNominalKWh || 0) > 0) {
     if (/Bater[íi]a/i.test(text)) {
       text = text.replace(
         /y\s+\*\*\s*(?:\d+\s+)?(?:Bater[íi]as?\s+)?[^*]+\*\*/i,

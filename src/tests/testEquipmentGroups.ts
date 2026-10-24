@@ -3,21 +3,22 @@ import { calculateFinancialSummary } from '../engine/financeEngine';
 import { BENCHMARK_LEGACY_SPECS, BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { editEquipmentGroup, normalizeEquipmentEdit } from '../utils/equipmentGroups';
 import { LEGACY_MIRROR_FIELDS, migrateLegacySpecs } from '../../shared/equipment';
-import type { SystemSpecs } from '../types';
+import { legacyPatch } from './legacyFixtures';
+import type { LegacyProjectSpecs } from '../types';
 
 // 1. Migrating legacy single-model specs into groups never changes engine results (the mirror is dropped).
 const base = BENCHMARK_LEGACY_SPECS;
 const mirrorKeys = (specs: object) => [...LEGACY_MIRROR_FIELDS, 'selectedSupplierInfo'].filter((key) => key in specs);
-const fixtures: Record<string, SystemSpecs> = {
+const fixtures: Record<string, LegacyProjectSpecs> = {
   benchmark: base,
   noBattery: { ...base, hasBattery: false, batteryCount: 0 },
-  sparse: { ...base, panelUnitPriceUSD: undefined, inverterUnitPriceUSD: undefined, batteryUnitPriceUSD: undefined, batteryDOD: undefined, panelWeightKilos: undefined, inverterCount: undefined, batteryCount: undefined } as unknown as SystemSpecs,
+  sparse: { ...base, panelUnitPriceUSD: undefined, inverterUnitPriceUSD: undefined, batteryUnitPriceUSD: undefined, batteryDOD: undefined, panelWeightKilos: undefined, inverterCount: undefined, batteryCount: undefined } as unknown as LegacyProjectSpecs,
   directWatt: { ...base, pricingMode: 'direct_watt', isDetailed: false },
   supplier: { ...base, selectedSupplierInfo: { panel: { supplierName: 'Dist', priceUSD: 95, supplierPriceId: 'sp1' }, battery: { supplierName: 'Dist B', priceUSD: 1800 } } },
 };
 for (const [name, specs] of Object.entries(fixtures)) {
   for (const mode of ['legacy', 'self_consumption'] as const) {
-    const run = (s: SystemSpecs) => calculateFinancialSummary(BENCHMARK_PROJECT.client.province, s, BENCHMARK_PROJECT.rates, BENCHMARK_PROJECT.financials, BENCHMARK_PROJECT.monthlyConsumption, undefined, mode);
+    const run = (s: LegacyProjectSpecs) => calculateFinancialSummary(BENCHMARK_PROJECT.client.province, s, BENCHMARK_PROJECT.rates, BENCHMARK_PROJECT.financials, BENCHMARK_PROJECT.monthlyConsumption, undefined, mode);
     const migrated = migrateLegacySpecs(specs);
     assert.ok(migrated.panels?.length && migrated.inverters?.length, `${name}: groups materialized`);
     assert.deepEqual(mirrorKeys(migrated), [], `${name}: no mirror after migrating`);
@@ -45,16 +46,16 @@ assert.equal(batteryEdit.batteries![0].count, 4);
 assert.equal(batteryEdit.batteries![0].dodPct, single.batteries![0].dodPct, 'DOD y eficiencia son del grupo');
 
 // 3. Legacy-field patches (assistant, imports) reach the single group and never rewrite the mirror.
-const merged = normalizeEquipmentEdit(single, { panelCount: 44, panelBrandModel: 'Canadian 615' });
+const merged = normalizeEquipmentEdit(single, legacyPatch({ panelCount: 44, panelBrandModel: 'Canadian 615' }));
 assert.equal(merged.panels![0].count, 44);
 assert.equal(merged.panels![0].brandModel, 'Canadian 615');
 assert.deepEqual(mirrorKeys(merged), []);
-const legacyMerged = normalizeEquipmentEdit(base, { panelCount: 44 });
+const legacyMerged = normalizeEquipmentEdit(base, legacyPatch({ panelCount: 44 }));
 assert.equal(legacyMerged.panels![0].count, 44);
 assert.equal(legacyMerged.inverters![0].count, 2, 'an unmigrated project migrates on its first equipment edit');
 assert.deepEqual(mirrorKeys(legacyMerged), []);
 const multi = normalizeEquipmentEdit(single, editEquipmentGroup(single, 'inverter', { type: 'add', item: { id: 'i2', brandModel: 'Lux 5K', powerKW: 5, count: 1 } }));
-const ignored = normalizeEquipmentEdit(multi, { inverterCount: 9 });
+const ignored = normalizeEquipmentEdit(multi, legacyPatch({ inverterCount: 9 }));
 assert.equal(ignored.inverters![0].count, multi.inverters![0].count, 'With several groups the engine reads the groups, so a legacy edit cannot silently rewrite one');
 assert.deepEqual(mirrorKeys(ignored), []);
 const untouched = normalizeEquipmentEdit(single, { pricePerWattUSD: 1.2 });
@@ -66,7 +67,7 @@ const store = () => useSimulationStore.getState();
 store().createNewProject({ name: 'Grupos', province: 'Santiago', distributor: 'EDENORTE', tariffCode: 'BTS2' });
 assert.ok(store().getActiveProject().specs.panels?.length, 'A new project is born with groups and no mirror');
 assert.deepEqual(mirrorKeys(store().getActiveProject().specs), []);
-store().updateSpecs({ panelBrandModel: 'Canadian 615', panelPowerW: 615 });
+store().updateSpecs(legacyPatch({ panelBrandModel: 'Canadian 615', panelPowerW: 615 }));
 let specs = store().getActiveProject().specs;
 assert.equal(specs.panels?.length, 1);
 assert.equal(specs.panels![0].brandModel, 'Canadian 615');
@@ -105,7 +106,7 @@ const recommendedFor = (powerW: number) => {
 };
 // 6a. Changing the panel model on a legacy auto-sized project keeps the recommendation.
 fresh('Auto legado');
-store().updateSpecs({ panelBrandModel: 'Panel 400', panelPowerW: 400 });
+store().updateSpecs(legacyPatch({ panelBrandModel: 'Panel 400', panelPowerW: 400 }));
 specs = store().getActiveProject().specs;
 assert.equal(specs.autoCalculatePanels, true);
 assert.equal(specs.panels![0].count, recommendedFor(400), 'Legacy auto-sizing recomputes for the new wattage');
@@ -116,13 +117,13 @@ assert.equal(specs.autoCalculatePanels, true, 'A wattage edit keeps automatic si
 assert.equal(specs.panels![0].count, recommendedFor(600));
 assert.deepEqual(Object.keys(editEquipmentGroup(specs, 'panel', { type: 'update', index: 0, patch: { brandModel: 'Otro' } })).sort(), ['panels'], 'Only the list is patched');
 // 6c. A new supplier selection reaches the group; clearing it also clears the group.
-store().updateSpecs({ panelUnitPriceUSD: 100, selectedSupplierInfo: { panel: { supplierName: 'Viejo', priceUSD: 100, supplierPriceId: 'old' } } });
-store().updateSpecs({ panelUnitPriceUSD: 80, selectedSupplierInfo: { panel: { supplierName: 'Nuevo', priceUSD: 80, supplierPriceId: 'new' } } });
+store().updateSpecs(legacyPatch({ panelUnitPriceUSD: 100, selectedSupplierInfo: { panel: { supplierName: 'Viejo', priceUSD: 100, supplierPriceId: 'old' } } }));
+store().updateSpecs(legacyPatch({ panelUnitPriceUSD: 80, selectedSupplierInfo: { panel: { supplierName: 'Nuevo', priceUSD: 80, supplierPriceId: 'new' } } }));
 specs = store().getActiveProject().specs;
 assert.equal('selectedSupplierInfo' in specs, false, 'The supplier lives in the group');
 assert.equal(specs.panels![0].selectedSupplierInfo?.supplierPriceId, 'new');
 assert.equal(specs.panels![0].unitPriceUSD, 80);
-store().updateSpecs({ selectedSupplierInfo: {} });
+store().updateSpecs(legacyPatch({ selectedSupplierInfo: {} }));
 specs = store().getActiveProject().specs;
 assert.equal(specs.panels![0].selectedSupplierInfo, undefined, 'A cleared supplier is cleared in the group');
 // 7. Catalog identity: groups remember the catalog item they came from (datasheets, previews, audits).

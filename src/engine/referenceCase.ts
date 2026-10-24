@@ -1,4 +1,4 @@
-import { ProjectSimulation, SystemSpecs } from '../types';
+import { LegacyProjectSpecs, ProjectSimulation } from '../types';
 import { migrateLegacySpecs } from '../../shared/equipment';
 
 /** DOD (%) del caso de referencia. Solo describe este caso: no es el default de proyectos (ver `DEFAULT_BATTERY_DOD_PCT`). */
@@ -9,7 +9,7 @@ export const BENCHMARK_BATTERY_DOD_PCT = 80;
  * sueltos del formato heredado. `BENCHMARK_PROJECT` los guarda ya como grupos (`migrateLegacySpecs` es invariante:
  * kWp, costos y finanzas no cambian), así que ningún proyecto nuevo nace con el espejo.
  */
-export const BENCHMARK_LEGACY_SPECS: SystemSpecs = {
+export const BENCHMARK_LEGACY_SPECS: LegacyProjectSpecs = {
   isDetailed: true,
   panelPowerW: 620,
   autoCalculatePanels: false,

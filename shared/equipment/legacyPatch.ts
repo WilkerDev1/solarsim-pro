@@ -1,6 +1,6 @@
 import { MIRROR, deriveLegacyGroupWithPrice } from './legacy.js';
 import { migrateLegacySpecs } from './migrate.js';
-import { EQUIPMENT_KINDS, LIST_KEY, type EquipmentKind, type EquipmentSpecs } from './types.js';
+import { EQUIPMENT_KINDS, LIST_KEY, type EquipmentKind, type LegacyEquipmentFields, type LegacySystemSpecs } from './types.js';
 
 /** Campos de grupo cuyo valor escalar (asistente, importaciones) se aplica al primer grupo aunque haya varios. */
 const PRIMARY_SCALAR_FIELDS: Record<EquipmentKind, readonly string[]> = { panel: [], inverter: [], battery: ['dodPct', 'efficiencyPct'] };
@@ -21,9 +21,9 @@ const sameJson = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringif
  * - `selectedSupplierInfo[tipo]` pertenece al primer grupo del tipo.
  * - Valores `undefined` del parche se ignoran, como siempre.
  */
-export function applyLegacyEquipmentPatch<S extends EquipmentSpecs>(current: S, patch: Partial<S>): S {
+export function applyLegacyEquipmentPatch<S extends LegacySystemSpecs>(current: S, patch: Partial<S> & LegacyEquipmentFields): S {
   const legacyOf = (kind: EquipmentKind) =>
-    Object.entries(MIRROR[kind]).filter(([, legacy]) => patch[legacy as keyof EquipmentSpecs] !== undefined) as [string, keyof EquipmentSpecs][];
+    Object.entries(MIRROR[kind]).filter(([, legacy]) => patch[legacy as keyof LegacyEquipmentFields] !== undefined) as [string, keyof LegacyEquipmentFields][];
   const currentSupplier = (kind: EquipmentKind) => migrateLegacySpecs(current)[LIST_KEY[kind]]?.[0]?.selectedSupplierInfo;
   const supplierChanged = (kind: EquipmentKind) => patch.selectedSupplierInfo !== undefined && !sameJson(patch.selectedSupplierInfo[kind], currentSupplier(kind));
   const touches = (kind: EquipmentKind) => patch[LIST_KEY[kind]] !== undefined || legacyOf(kind).length > 0 || supplierChanged(kind);

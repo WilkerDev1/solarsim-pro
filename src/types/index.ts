@@ -1,4 +1,5 @@
 import type { ExtractedInvoiceData, GeminiModelInfo } from './aiInvoice';
+import type { LegacyEquipmentFields } from '../../shared/equipment';
 
 export interface ClientInfo {
   nic?: string;
@@ -80,20 +81,11 @@ export interface BatteryItemSpec {
 export interface SystemSpecs {
   isDetailed: boolean;
   pricingMode?: 'cost_matrix' | 'direct_watt'; // 'cost_matrix' (default) or 'direct_watt' (manual $/W or $/kW)
-  panelPowerW: number;
   autoCalculatePanels?: boolean;
-  panelCount: number;
   pricePerWattUSD: number;       // USD per Wp e.g. 1.13
   pricePerKWpUSD?: number;       // USD per kWp e.g. 1130.00
-  panelBrandModel?: string;      // e.g. "CANADIAN SOLAR TOPHIKU6 CS6.1-72TD (620W)"
-  inverterPowerKW: number;
-  inverterBrandModel?: string;   // e.g. "Lux Power LXP-LB-US 8K (8.0Kw)"
-  inverterCount?: number;        // e.g. 2
   hasBattery: boolean;
-  batteryCapacityKWh: number;
-  batteryCount?: number;         // e.g. 3
   batteryCostUSD?: number;       // Total battery cost in USD
-  batteryBrandModel?: string;    // e.g. "Hinaess 16 KwH-48 vdc"
   installationServicesDesc?: string;
 
   // 🔄 Múltiples Modelos de Equipos (Multi-Equipment Groups)
@@ -104,31 +96,18 @@ export interface SystemSpecs {
   // Cost & Profit Matrix params matching Excel sheet
   dopExchangeRate?: number;          // RD$ per USD e.g. 60.0
   saleMarginMultiplier?: number;     // Sales Factor e.g. 1.25 (25% margin)
-  panelUnitPriceUSD?: number;        // e.g. 103.32 USD
-  panelWeightKilos?: number;         // e.g. 30.75
-  inverterUnitPriceUSD?: number;     // e.g. 2300.00 USD
-  inverterWeightKilos?: number;      // e.g. 12
   inverterEfficiencyPct?: number;    // % e.g. 97.5
-  batteryUnitPriceUSD?: number;      // e.g. 1990.00 USD
-  batteryWeightKilos?: number;       // e.g. 32
   installationUnitPriceUSD?: number; // e.g. 170.00 USD per kWp
   directPriceSurplusTarget?: 'margin' | 'labor'; // Where excess direct price goes: profit margin (default) or installation labor
   
   // 🏷️ Auto-costo Inteligente desde Proveedores del Catálogo
   autoSupplierPricing?: boolean;     // Sincronizar automáticamente costos unitarios con el proveedor seleccionado
-  selectedSupplierInfo?: {
-    panel?: { supplierName: string; priceUSD: number; updatedAt?: string; supplierPriceId?: string };
-    inverter?: { supplierName: string; priceUSD: number; updatedAt?: string; supplierPriceId?: string };
-    battery?: { supplierName: string; priceUSD: number; updatedAt?: string; supplierPriceId?: string };
-  };
 
   // Detailed params
   panelEfficiency: number;      // % e.g. 21.8
   tempCoeff: number;            // %/°C e.g. -0.35
   systemLosses: number;         // % e.g. 25.0
   annualDegradation: number;    // % e.g. 0.5
-  batteryDOD: number;           // % e.g. 80
-  batteryEfficiencyPct?: number;       // % e.g. 92
   batteryNightLoadSharePct?: number;   // % e.g. 50
   batteryLifespanYears?: number;       // e.g. 10
   batteryReplacementCostUSD?: number;  // e.g. 3500 (Optional replacement cost at Year 10)
@@ -137,6 +116,12 @@ export interface SystemSpecs {
   loadProfilePreset?: 'residential' | 'commercial' | 'industrial' | 'custom'; // Preset de perfil de consumo
   showSelfConsumptionBreakdown?: boolean; // Default true: Permite alternar entre vista moderna y clásica/legacy sin autoconsumo en tablas y gráficas
 }
+
+/**
+ * Propuesta tal como se guardaba hasta 2.7.0 (con el espejo de un solo modelo). Solo para LEER datos viejos antes de
+ * `migrateLegacySpecs` (hidratación, importación, fixtures de pruebas); `SystemSpecs` ya no declara esos campos.
+ */
+export type LegacyProjectSpecs = SystemSpecs & LegacyEquipmentFields;
 
 export interface UtilityRates {
   energyCostPerKWh: number;     // USD per kWh e.g. 0.18
