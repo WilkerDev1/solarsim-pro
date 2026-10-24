@@ -20,6 +20,11 @@ export const LEGACY_MIRROR_FIELDS: readonly (keyof LegacyEquipmentFields)[] = [
   'batteryBrandModel', 'batteryCapacityKWh', 'batteryDOD', 'batteryEfficiencyPct', 'batteryCount', 'batteryUnitPriceUSD', 'batteryWeightKilos',
 ];
 
+/** Campos de texto del espejo que el visor valida al recibir una publicación en el formato viejo (clientes 2.6.x/2.7.0). */
+export const LEGACY_MIRROR_TEXT_FIELDS = ['panelBrandModel', 'inverterBrandModel', 'batteryBrandModel'] as const satisfies readonly (keyof LegacyEquipmentFields)[];
+/** Campos numéricos del espejo que el visor valida al recibir una publicación en el formato viejo. */
+export const LEGACY_MIRROR_NUMBER_FIELDS = ['panelCount', 'panelPowerW', 'inverterCount', 'inverterPowerKW', 'batteryCount', 'batteryCapacityKWh'] as const satisfies readonly (keyof LegacyEquipmentFields)[];
+
 /** Precio unitario que la matriz de costos asume para un proyecto heredado sin precio propio. */
 export const DEFAULT_UNIT_PRICE_USD: Record<EquipmentKind, number> = { panel: 103.32, inverter: 2300.0, battery: 1990.0 };
 

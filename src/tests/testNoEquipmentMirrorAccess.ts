@@ -9,6 +9,9 @@ import { LEGACY_MIRROR_FIELDS } from '../../shared/equipment';
  * estructurales propios): ningún archivo fuera de la lista de lectura de datos viejos puede acceder a un campo
  * del espejo a través de unas specs (`specs.panelCount`, `project.specs.batteryDOD`, `specs['panelPowerW']`).
  * Los totales (`equipmentTotals(...).panelCount`) y los campos del catálogo no son el espejo y no se tocan.
+ * No ve nombres de campo guardados como texto (listas de validación, contrato del asistente): los del visor viven en
+ * `shared/equipment` (`LEGACY_MIRROR_TEXT_FIELDS`/`LEGACY_MIRROR_NUMBER_FIELDS`) y los del asistente se traducen con
+ * `applyLegacyEquipmentPatch`.
  */
 const root = process.cwd();
 
