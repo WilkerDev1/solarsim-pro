@@ -9,7 +9,7 @@ export { DEFAULT_UNIT_PRICE_USD, LEGACY_MIRROR_FIELDS, deriveLegacyGroup } from 
 export { editEquipment } from './edit';
 export { applyLegacyEquipmentPatch } from './legacyPatch';
 export { migrateLegacySpecs } from './migrate';
-export { EQUIPMENT_FALLBACK_NAME, describeEquipment, equipmentTotals, mainEquipmentGroup, type EquipmentTotals } from './summary';
+export { EQUIPMENT_FALLBACK_NAME, describeEquipment, describePanelConfiguration, uniformPanelWatts, equipmentTotals, mainEquipmentGroup, type EquipmentTotals } from './summary';
 export { EQUIPMENT_KINDS, LIST_KEY, type BatteryItemSpec, type Equipment, type EquipmentEdit, type EquipmentGroups, type EquipmentKind, type InverterItemSpec, type PanelItemSpec } from './types';
 
 /**

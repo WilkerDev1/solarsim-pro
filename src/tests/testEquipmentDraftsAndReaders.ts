@@ -46,11 +46,11 @@ const project = drafts.grupos;
 const summary = calculateProjectFinancialSummary(project);
 assert.equal(summary.systemCapacityKWp, 8, '10×600 + 4×500 W');
 const cover = renderToStaticMarkup(React.createElement(PDFCoverPage, { project, summary, activeTheme: theme as never, currentDateStr: '7 octubre 2026' }));
-assert.match(cover, /14 Módulos Tier-1 \(600W\)/, 'la portada cuenta todos los paneles y nombra el modelo principal');
+assert.match(cover, /10 × 600W \+ 4 × 500W/, 'la portada describe la configuración real');
 assert.doesNotMatch(cover.replace(/data:[^"]*/g, ''), /undefined|NaN/);
 
 const energy = renderToStaticMarkup(React.createElement(EnergyAnalysisTab, { project, summary, openAIInvoiceModal: () => {}, updateMonthlyConsumption: () => {} }));
-assert.match(energy, /14 módulos × 600W/);
+assert.match(energy, /10 × 600W \+ 4 × 500W/);
 assert.match(energy, />8</, 'kWp del resumen');
 assert.doesNotMatch(energy.replace(/data:[^"]*/g, ''), /undefined|NaN/);
 

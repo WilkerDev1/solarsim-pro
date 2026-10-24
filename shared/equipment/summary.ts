@@ -84,3 +84,24 @@ export function describeEquipment(equipment: Equipment, kind: EquipmentKind, opt
   const others = new Set((equipment[LIST[kind]] as EquipmentGroups[EquipmentKind][]).map((g) => modelKey(g.brandModel)).filter((key) => key !== mainKey));
   return others.size === 0 ? name : `${name} y ${others.size} ${others.size === 1 ? 'modelo' : 'modelos'} más`;
 }
+
+/** Potencia común de todos los módulos (W), o `undefined` si hay potencias distintas o ningún módulo. */
+export function uniformPanelWatts(equipment: Equipment): number | undefined {
+  const watts = new Set(equipment.panels.filter((p) => (p.count || 0) > 0).map((p) => p.powerW || 0));
+  return watts.size === 1 ? [...watts][0] : undefined;
+}
+
+/**
+ * Configuración de paneles para documentos y pestañas: «14 × 600W» con una potencia común; «10 × 600W + 4 × 500W»
+ * con potencias distintas (hasta 3 grupos); «17 módulos · 9.65 kWp» con más. Nunca atribuye la potencia del modelo
+ * principal a todos los módulos.
+ */
+export function describePanelConfiguration(equipment: Equipment): string {
+  const totals = equipmentTotals(equipment);
+  const used = equipment.panels.filter((p) => (p.count || 0) > 0);
+  if (used.length === 0) return '0 × 0W';
+  const watts = uniformPanelWatts(equipment);
+  if (watts !== undefined) return `${totals.panelCount} × ${watts}W`;
+  if (used.length > 3) return `${totals.panelCount} módulos · ${totals.capacityKWp} kWp`;
+  return used.map((p) => `${p.count} × ${p.powerW || 0}W`).join(' + ');
+}
