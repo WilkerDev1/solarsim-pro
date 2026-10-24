@@ -6,6 +6,7 @@ import { PDF_COLOR_THEMES } from '../../constants/pdfThemes';
 import { documentTextContextFor } from '../../utils/documentTextContext';
 import { effectiveFeatureSettings } from '../application/featurePolicy';
 import type { ProjectSimulation } from '../../types';
+import { applyDocumentClientEdit } from '../../domain/projectEdit';
 import { withSectionVisible, type DocumentLayout } from '../../../shared/documentLayout';
 import type { DocumentSectionId } from '../../../shared/documentTexts';
 import { findVisibleProject, fingerprint, pickFields, requireEditableProject, store, type NativeHandler } from './nativeTools';
@@ -28,14 +29,16 @@ function textsPlan(proposalId: string, values: Record<string, string | null>, ti
       changes: Object.entries(values).map(([key, value]) => ({ label: getDocumentTextDefinition(key)!.label, value: value === null ? '(predeterminado)' : value.slice(0, 200) })),
       execute() {
         const current = requireEditableProject(proposalId);
-        const before = pickFields(current, TEXT_FIELDS);
         const ok = store().updateProjectById(current.id, (p) => {
           const next = applyDocumentTextPatch({ customization: p.customization || {}, client: p.client }, documentTextsPatch(values, p, contextFor(p)));
-          return { customization: next.customization as ProjectSimulation['customization'], client: next.client as ProjectSimulation['client'] };
+          // Los espejos del cliente son una edición `client` (ADR 0004): reconcilia y autodimensiona como updateClient.
+          return applyDocumentClientEdit(p, { customization: next.customization as ProjectSimulation['customization'], client: next.client as ProjectSimulation['client'] }, { equipmentCatalog: store().equipmentCatalog });
         });
         if (!ok) throw new Error('La propuesta no admite cambios.');
         const after = store().projects.find((p) => p.id === current.id)!;
-        return { targetId: current.id, undo: { before, fields: [...TEXT_FIELDS], afterFingerprint: fingerprint(pickFields(after, TEXT_FIELDS)) } };
+        // Si la edición del cliente corrigió las specs, deshacer también las devuelve.
+        const fields = after.specs !== current.specs ? [...TEXT_FIELDS, 'specs'] : [...TEXT_FIELDS];
+        return { targetId: current.id, undo: { before: pickFields(current, fields), fields, afterFingerprint: fingerprint(pickFields(after, fields)) } };
       },
     },
   };

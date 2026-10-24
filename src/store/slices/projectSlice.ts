@@ -1,7 +1,8 @@
 import { createProjectId } from '../../utils/projectId';
 import { canEditCommercial } from '../../features/proposals/commercial';
 import { isProposalLink } from '../../../shared/proposalLinks';
-import { editEquipmentGroup, normalizeEquipmentEdit, normalizeSpecsChange, selectCatalogEquipment, withoutInheritedPanelDegradation } from '../../utils/equipmentGroups';
+import { withoutInheritedPanelDegradation } from '../../utils/equipmentGroups';
+import { applyDocumentClientEdit, applyProjectEdit, normalizeProjectEquipment, type ProjectEdit } from '../../domain/projectEdit';
 import { editEquipment, readEquipment } from '../../../shared/equipment';
 import { commercialCopy, commercialState, isProposalCommercial } from '../../../shared/proposalCommercial';
 import { companyDocumentCustomization, reusableDocumentTemplate } from '../../utils/companyDocumentTemplate';
@@ -9,36 +10,18 @@ import { DEFAULT_SIMULATION_SETTINGS } from '../defaultSimulationSettings';
 import { energyCalculationMode } from '../../../shared/applicationFeatures';
 import { effectiveFeatureSettings } from '../../features/application/featurePolicy';
 import { SimulationSlice, ProjectSlice, SimulationStore } from '../types';
-import { ClientInfo, FinancialParams, ProjectSimulation, SystemSpecs } from '../../types';
-import { normalizeEnabledBatteries } from '../../utils/batteryState';
+import { ProjectSimulation, SystemSpecs } from '../../types';
 import { BENCHMARK_PROJECT } from '../../engine/referenceCase';
 import { INITIAL_PROJECTS, generateNextProjectSequence, generateDuplicateProjectIdentifiers } from '../initialData';
 import { calculateFinancialSummary, calculateCostMatrixSummary } from '../../engine/financeEngine';
-import { calculateRecommendedPanelCount } from '../../engine/solarEngine';
 import { projectMutationMetadata } from '../sync/projectMutation';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
 import { canEditDocument } from '../../components/pdf/editor/documentEditorState';
 import { normalizeDocumentLayout } from '../../../shared/documentLayout';
 import { applyDocumentTextPatch, companyTemplateTextPatch, documentTextsPatch } from '../../../shared/documentTexts';
-import { DEFAULT_BATTERY_CAPACITY_KWH, DEFAULT_BATTERY_DOD_PCT, resolveSystemLossesPct } from '../../../shared/projectDefaults';
-import { assumptionFields, resolveAssumption, resolveAssumptions, type AssumptionFields } from '../../../shared/assumptions';
+import { DEFAULT_BATTERY_CAPACITY_KWH, DEFAULT_BATTERY_DOD_PCT } from '../../../shared/projectDefaults';
+import { assumptionFields, type AssumptionFields } from '../../../shared/assumptions';
 import { documentTextContextFor } from '../../utils/documentTextContext';
-
-/** Specs with the panel count the engine recommends for this consumption, province and coverage target. */
-function withRecommendedPanels(specs: SystemSpecs, client: ClientInfo, monthlyConsumption: number[], targetCoveragePct: number): SystemSpecs {
-  const rec = calculateRecommendedPanelCount(
-    client.province,
-    monthlyConsumption,
-    readEquipment(specs).panels[0]?.powerW || 620,
-    resolveAssumption('targetCoveragePct', targetCoveragePct), // la frontera: 0 o fuera de rango dimensiona con el valor resuelto, no con 1 %
-    resolveSystemLossesPct(specs),
-    client.customMonthlyHSP
-  );
-  // Only a single panel group receives the recommendation; with several models the count is not auto-calculated.
-  return readEquipment(specs).panels.length === 1
-    ? editEquipment(specs, 'panel', { type: 'update', index: 0, patch: { count: rec.recommendedPanelCount } })
-    : specs;
-}
 
 /** Specs of a new proposal: the reference case with the user's defaults written straight into the single group of each kind. */
 function newProjectSpecs(defs: SimulationStore['defaultSimulationSettings'] | undefined, assumptions: AssumptionFields): SystemSpecs {
@@ -65,22 +48,6 @@ function newProjectSpecs(defs: SimulationStore['defaultSimulationSettings'] | un
   return editEquipment(specs, 'battery', { type: 'update', index: 0, patch: { capacityKWh: defs?.defaultBatteryCapacityKWh || DEFAULT_BATTERY_CAPACITY_KWH, dodPct: defs?.defaultBatteryDOD || DEFAULT_BATTERY_DOD_PCT } });
 }
 
-/** Keeps equipment groups and their legacy mirror consistent whatever path changed the specs. */
-function withNormalizedEquipment(previous: ProjectSimulation, next: ProjectSimulation): ProjectSimulation {
-  return next.specs === previous.specs ? next : { ...next, specs: normalizeSpecsChange(previous.specs, next.specs) };
-}
-
-/** Manual override fields only survive on the audited reference case; edits elsewhere recompute them. */
-function withoutStaleFinancialOverrides(project: ProjectSimulation, financials: FinancialParams): FinancialParams {
-  const next = { ...financials };
-  if (project.id !== 'benchmark-centro-medico') {
-    delete next.customITBISSavedUSD;
-    delete next.customLey5707CreditUSD;
-    delete next.customCostUSD;
-  }
-  return next;
-}
-
 export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
   /** Proposals in the trash are read-only until restored, whatever UI or tool calls the store. */
   const isActiveProjectTrashed = () => {
@@ -100,7 +67,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     if (isActiveProjectTrashed()) return;
     set((state) => ({
       projects: state.projects.map((p) => p.id === state.activeProjectId
-        ? withNormalizedEquipment(p, { ...p, ...projectMutationMetadata(p, get().syncSettings), updatedAt: new Date().toISOString(), ...edit(p, state) })
+        ? { ...p, ...edit(p, state), ...projectMutationMetadata(p, get().syncSettings), updatedAt: new Date().toISOString() }
         : p),
     }));
     get().triggerAutoSync(false);
@@ -108,18 +75,9 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     if (active) get().recordUndoState(active);
   };
 
-  const updateActiveConsumption = (nextConsumption: (current: number[]) => number[], lockAutoPanels = false) =>
-    updateActiveProject((p) => {
-      const monthlyConsumption = nextConsumption(p.monthlyConsumption);
-      let specs = { ...p.specs };
-      if (lockAutoPanels) specs.autoCalculatePanels = false;
-      else if (specs.autoCalculatePanels) specs = withRecommendedPanels(specs, p.client, monthlyConsumption, resolveAssumptions(p).targetCoveragePct);
-      return {
-        monthlyConsumption,
-        aiSource: p.aiSource?.consumptionSource === 'theoretical' ? { ...p.aiSource, consumptionSource: 'estimated' } : p.aiSource,
-        specs,
-      };
-    });
+  /** ADR 0004: las reglas de la edición viven en `applyProjectEdit`; aquí solo se persiste, sincroniza y deshace. */
+  const editActiveProject = (edit: ProjectEdit) =>
+    updateActiveProject((p, state) => applyProjectEdit(p, edit, { equipmentCatalog: state.equipmentCatalog }));
 
   return {
   projects: INITIAL_PROJECTS,
@@ -222,7 +180,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
         if (p.id !== id) return p;
         const next = { ...p, ...projectMutationMetadata(p, get().syncSettings), updatedAt: new Date().toISOString(), ...edit(p) };
         // A restored snapshot is already a consistent project: merging it with the groups being undone would keep new data.
-        return options?.restore ? next : withNormalizedEquipment(p, next);
+        return options?.restore ? next : normalizeProjectEquipment(p, next);
       }),
     }));
     get().triggerAutoSync(false);
@@ -579,85 +537,32 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     }
   },
 
-  updateClient: (clientPartial) => updateActiveProject((p) => {
-    const client = { ...p.client, ...clientPartial };
-    const customization = { ...(p.customization || {}) };
-    if (clientPartial.contactPhone !== undefined) customization.clientPhone = clientPartial.contactPhone;
-    if (clientPartial.contactPerson !== undefined) customization.contactName = clientPartial.contactPerson;
-    if (clientPartial.contactEmail !== undefined) customization.clientEmail = clientPartial.contactEmail;
-    const specs = p.specs.autoCalculatePanels && clientPartial.province
-      ? withRecommendedPanels(p.specs, client, p.monthlyConsumption, resolveAssumptions(p).targetCoveragePct)
-      : { ...p.specs };
-    return { client, specs, customization };
+  updateClient: (patch) => editActiveProject({ kind: 'client', patch }),
+
+  updateSpecs: (patch) => editActiveProject({ kind: 'specs', patch }),
+
+  updateRates: (patch) => editActiveProject({ kind: 'rates', patch }),
+
+  updateFinancials: (patch) => editActiveProject({ kind: 'financials', patch }),
+
+  updateMonthlyConsumption: (index, value) => updateActiveProject((p, state) => {
+    const monthlyConsumption = [...p.monthlyConsumption];
+    monthlyConsumption[index] = value;
+    return applyProjectEdit(p, { kind: 'consumption', monthlyConsumption }, { equipmentCatalog: state.equipmentCatalog });
   }),
 
-  updateSpecs: (specsPartial) => updateActiveProject((p, state) => {
-    let specs = normalizeEnabledBatteries(normalizeEquipmentEdit(p.specs, specsPartial));
-    const before = readEquipment(p.specs);
-    const after = readEquipment(specs);
-    // Editing the first panel group's quantity (dock, assistant) is a manual quantity: it turns auto-calculation off.
-    const panelCountEdited = after.panels[0]?.count !== before.panels[0]?.count;
-    const shouldAutoCalc = specsPartial.autoCalculatePanels !== undefined
-      ? specsPartial.autoCalculatePanels
-      : (p.specs.autoCalculatePanels && !panelCountEdited);
-
-    if (shouldAutoCalc) {
-      specs = { ...withRecommendedPanels(specs, p.client, p.monthlyConsumption, resolveAssumptions(p).targetCoveragePct), autoCalculatePanels: true };
-    } else if (panelCountEdited && specsPartial.autoCalculatePanels === undefined) {
-      specs.autoCalculatePanels = false;
-    }
-
-    // When a primary model changes, drop the selected supplier that does not quote the new model (suppliers live in the group).
-    const lists = [['panel', 'panels'], ['inverter', 'inverters'], ['battery', 'batteries']] as const;
-    for (const [kind, key] of lists) {
-      const previous = before[key][0];
-      const current = readEquipment(specs)[key][0];
-      if (!current?.brandModel || current.brandModel === previous?.brandModel) continue;
-      if (JSON.stringify(current.selectedSupplierInfo) !== JSON.stringify(previous?.selectedSupplierInfo)) continue; // the edit chose the supplier
-      const supplier = current.selectedSupplierInfo;
-      if (!supplier) continue;
-      const item = state.equipmentCatalog.find((e) => e.type === kind && e.displayName === current.brandModel);
-      const quoted = (item?.supplierPrices || []).some(
-        (sp) => sp.id === supplier.supplierPriceId || sp.supplierName.toLowerCase().trim() === supplier.supplierName?.toLowerCase().trim()
-      );
-      if (!quoted) specs = editEquipment(specs, kind, { type: 'update', index: 0, patch: { selectedSupplierInfo: undefined } });
-    }
-
-    return { specs, financials: withoutStaleFinancialOverrides(p, p.financials) };
-  }),
-
-  updateRates: (ratesPartial) => updateActiveProject((p) => {
-    const rates = { ...p.rates, ...ratesPartial };
-    return {
-      rates,
-      specs: p.specs.autoCalculatePanels && ratesPartial.targetCoveragePct !== undefined
-        ? withRecommendedPanels(p.specs, p.client, p.monthlyConsumption, resolveAssumptions({ rates }).targetCoveragePct)
-        : { ...p.specs },
-    };
-  }),
-
-  updateFinancials: (finPartial) => updateActiveProject((p) => ({
-    financials: withoutStaleFinancialOverrides(p, { ...p.financials, ...finPartial }),
-  })),
-
-  updateMonthlyConsumption: (index, value) => updateActiveConsumption((current) => {
-    const next = [...current];
-    next[index] = Math.max(0, value);
-    return next;
-  }),
-
-  updateAllMonthlyConsumption: (value) => updateActiveConsumption(() => Array(12).fill(Math.max(0, value))),
+  updateAllMonthlyConsumption: (value) => editActiveProject({ kind: 'consumption', monthlyConsumption: Array(12).fill(value) }),
 
   setMonthlyConsumption: (monthlyConsumption, lockAutoPanels = false) =>
-    updateActiveConsumption(() => monthlyConsumption.map((v) => Math.max(0, v)), lockAutoPanels),
+    editActiveProject({ kind: 'consumption', monthlyConsumption, lockAutoPanels }),
 
-  updateDocumentCustomization: (customizationPartial) => updateActiveProject((p) => {
-    // Contacto, teléfono y correo del documento son espejo de los datos del cliente.
+  updateDocumentCustomization: (customizationPartial) => updateActiveProject((p, state) => {
+    // Contacto, teléfono y correo del documento son espejo de los datos del cliente: esa parte es una edición `client` (ADR 0004).
     const client = { ...p.client };
     if (customizationPartial.clientPhone !== undefined) client.contactPhone = customizationPartial.clientPhone;
     if (customizationPartial.contactName !== undefined) client.contactPerson = customizationPartial.contactName;
     if (customizationPartial.clientEmail !== undefined) client.contactEmail = customizationPartial.clientEmail;
-    return { client, customization: { ...(p.customization || {}), ...customizationPartial } };
+    return applyDocumentClientEdit(p, { customization: { ...(p.customization || {}), ...customizationPartial }, client }, { equipmentCatalog: state.equipmentCatalog });
   }),
 
   setDocumentLayout: (patch) => !canEditActiveDocument() ? undefined : updateActiveProject((p) => ({
@@ -668,7 +573,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     const ctx = documentTextContextFor(state, p, energyCalculationMode(effectiveFeatureSettings(state)));
     const patch = documentTextsPatch(values, p, ctx);
     const next = applyDocumentTextPatch({ customization: p.customization || {}, client: p.client }, patch);
-    return { customization: next.customization, client: next.client };
+    return applyDocumentClientEdit(p, { customization: next.customization, client: next.client as ProjectSimulation['client'] }, { equipmentCatalog: state.equipmentCatalog });
   }),
 
   saveDocumentTextsToCompanyTemplate: (keys) => {
@@ -695,50 +600,10 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
 
   applySupplierPriceToProject: (equipmentType, supplierPrice, equipmentItem) => {
     if (isActiveProjectTrashed()) return;
-    set((state) => ({
-      projects: state.projects.map((p) => {
-        if (p.id === state.activeProjectId) {
-          // Si no se pasó equipmentItem explícito, buscarlo en equipmentCatalog por supplierPrice.id
-          const targetItem = equipmentItem || state.equipmentCatalog.find(
-            (e) => e.type === equipmentType && e.supplierPrices?.some((sp) => sp.id === supplierPrice.id)
-          );
-          const supplierInfo = {
-            supplierName: supplierPrice.supplierName,
-            priceUSD: supplierPrice.priceUSD,
-            updatedAt: supplierPrice.updatedAt,
-            supplierPriceId: supplierPrice.id,
-          };
-          let updatedSpecs: SystemSpecs = { ...p.specs };
-          if (equipmentType === 'battery') updatedSpecs.hasBattery = true;
-          if (equipmentType === 'panel' && targetItem?.efficiencyPct) updatedSpecs.panelEfficiency = targetItem.efficiencyPct;
-
-          // The primary group takes price and supplier (and the catalog identity, for datasheet annexes); unmigrated projects migrate here.
-          const extras: Record<string, unknown> = { unitPriceUSD: supplierPrice.priceUSD, selectedSupplierInfo: supplierInfo };
-          if (equipmentType === 'battery' && targetItem) {
-            if (targetItem.dodPct) extras.dodPct = targetItem.dodPct;
-            if (targetItem.batteryEfficiencyPct) extras.efficiencyPct = targetItem.batteryEfficiencyPct;
-          }
-          const patch = targetItem
-            ? selectCatalogEquipment(updatedSpecs, equipmentType, 0, targetItem, extras)
-            : editEquipmentGroup(updatedSpecs, equipmentType, { type: 'update', index: 0, patch: extras });
-          updatedSpecs = normalizeEquipmentEdit(updatedSpecs, patch);
-          const nextFinancials = withoutStaleFinancialOverrides(p, p.financials);
-
-          return {
-            ...p,
-            ...projectMutationMetadata(p, get().syncSettings),
-            updatedAt: new Date().toISOString(),
-            specs: normalizeEnabledBatteries(updatedSpecs),
-            financials: nextFinancials,
-          };
-        }
-        return p;
-      }),
-      saveFeedbackMessage: `¡Precio aplicado: ${supplierPrice.supplierName} ($${supplierPrice.priceUSD} USD)! 🏷️`,
-    }));
-
+    // Decisión (b) del ADR 0004: el precio es una edición más (normaliza, autodimensiona, sincroniza y se puede deshacer).
+    editActiveProject({ kind: 'supplierPrice', equipmentType, supplierPrice, equipmentItem });
+    set({ saveFeedbackMessage: `¡Precio aplicado: ${supplierPrice.supplierName} ($${supplierPrice.priceUSD} USD)! 🏷️` });
     setTimeout(() => set({ saveFeedbackMessage: null }), 3000);
-    get().triggerAutoSync(false);
   },
 
   getActiveProject: () => {

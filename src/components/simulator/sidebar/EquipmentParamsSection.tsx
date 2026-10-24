@@ -2,7 +2,6 @@ import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs } from '../../../types';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
-import { useCatalogPowerSync } from '../params/hooks/useCatalogPowerSync';
 import { resolveAssumption, resolveAssumptions } from '../../../../shared/assumptions';
 import { resolveSystemLossesPct } from '../params/logic/dockDefaults';
 import { BatteryEquipmentSection } from './BatteryEquipmentSection';
@@ -29,9 +28,6 @@ export const EquipmentParamsSection: React.FC<EquipmentParamsSectionProps> = ({ 
   const specs = project.specs;
   const isDetailed = !!specs.isDetailed;
   const mode = isDetailed ? 'manual' : 'catalog';
-
-  // Efecto que escribe en el proyecto: el cuerpo sigue montado aunque la sección esté plegada.
-  useCatalogPowerSync(specs, equipmentCatalog, updateSpecs);
 
   const totalDCKWp = calculateTotalDCCapacityKWp(specs);
   const totalInverterKW = calculateTotalInverterPowerKW(specs);

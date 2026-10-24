@@ -6,7 +6,7 @@ import { projectMutationMetadata } from '../sync/projectMutation';
 import { SimulationSlice, ImportExportSlice } from '../types';
 import { LegacyProjectSpecs, ProjectSimulation } from '../../types';
 import { BENCHMARK_LEGACY_SPECS, BENCHMARK_PROJECT } from '../../engine/referenceCase';
-import { migrateLegacySpecs } from '../../../shared/equipment';
+import { normalizeIncomingSpecs } from '../../domain/projectEdit';
 import { generateNextProjectSequence, generateDuplicateProjectIdentifiers } from '../initialData';
 
 /**
@@ -142,7 +142,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
           quoteValidityDays: assumptions.client.quoteValidityDays,
         },
         // Un archivo heredado (espejo) o nuevo (grupos) queda solo con grupos; la migración no cambia los resultados.
-        specs: migrateLegacySpecs<LegacyProjectSpecs>({
+        specs: normalizeIncomingSpecs({
           ...BENCHMARK_LEGACY_SPECS,
           ...(raw.specs || {}),
           // El 80 % del caso de referencia no es un default: sin DOD válido, el del proyecto es el del motor.
