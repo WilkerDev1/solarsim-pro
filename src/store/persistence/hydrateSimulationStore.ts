@@ -12,10 +12,23 @@ import { migrateDefaultSimulationSettings } from '../defaultSimulationSettings';
 import { normalizeAgentPolicy } from '../slices/agentSlice';
 import { migrateLegacySpecs } from '../../../shared/equipment';
 
-/** Servidores retirados: el dominio anterior y cualquier servidor HTTP sin TLS en la LAN 10.0.0.0/8 (el de antes del túnel). */
+/** FNV-1a de 32 bits en hexadecimal: identifica una URL sin escribirla en el código. */
+export function serverUrlFingerprint(url: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < url.length; i++) {
+    hash ^= url.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+}
+
+/** Huella de la URL exacta del servidor LAN anterior al túnel; la dirección no se publica en el repositorio. */
+const RETIRED_LAN_SERVER_FINGERPRINT = '37709f52';
+
+/** Servidores retirados: el dominio anterior y la URL exacta del servidor LAN previo al túnel (no otros servidores de la red). */
 function isLegacyServerUrl(url: string | undefined): boolean {
   if (url === 'https://api.electsun.com') return true;
-  return /^http:\/\/10(\.\d{1,3}){3}(:\d+)?\/?$/.test(url ?? '');
+  return !!url && url.startsWith('http://10.') && serverUrlFingerprint(url) === RETIRED_LAN_SERVER_FINGERPRINT;
 }
 
 export function hydrateSimulationStore(state: SimulationStore | undefined): void {
@@ -161,8 +174,8 @@ export function hydrateSimulationStore(state: SimulationStore | undefined): void
       state.folders = state.folders.filter((f) => !mockFolderIds.has(f.id));
     }
 
-    // Auto-migrate legacy serverUrl to official Cloudflare domain: the old domain, an empty URL, or the pre-tunnel server,
-    // which was reached over plain HTTP on the office LAN (10.0.0.0/8). The rule avoids listing production addresses.
+    // Auto-migrate legacy serverUrl to official Cloudflare domain: the old domain, an empty URL, or the exact pre-tunnel
+    // LAN server (matched by fingerprint so the production address is not listed in the public repo).
     if (state.syncSettings && (isLegacyServerUrl(state.syncSettings.serverUrl) || !state.syncSettings.serverUrl)) {
       state.syncSettings.serverUrl = 'https://solarsim.electsun.net';
     }
