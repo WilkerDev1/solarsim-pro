@@ -39,7 +39,7 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
   const defaults={defaultBatteryDOD:options.defaultBatteryDOD};
   const isGrounded=Array.isArray(data.panels)||Array.isArray(data.inverters)||Array.isArray(data.batteries);
     const panelW=data.selectedPanelWatts ?? readEquipment(base.specs).panels[0]?.powerW ?? 0;
-    const coverage=data.targetCoveragePct ?? resolveAssumptions(base).targetCoveragePct;
+    const coverage=resolveAssumption('targetCoveragePct',data.targetCoveragePct,resolveAssumptions(base).targetCoveragePct);
     const count=data.recommendedPanelCount || calculateRecommendedPanelCount(province,data.monthlyConsumptionKWh,panelW,coverage,losses,base.client.customMonthlyHSP).recommendedPanelCount;
     const dcKWp=(data.panels || []).reduce((sum,g)=>sum+g.powerW*g.count/1000,0);
     let specs:SystemSpecs={...base.specs,autoCalculatePanels:false,dopExchangeRate:resolveAssumption('dopExchangeRate',data.dopExchangeRate,base.rates.usdExchangeRate,base.specs.dopExchangeRate),

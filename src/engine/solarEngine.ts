@@ -56,7 +56,8 @@ export function calculateRecommendedPanelCount(
   }
 
   const totalAnnualConsumption = monthlyConsumptionKWh.reduce((sum, v) => sum + (Number(v) || 0), 0);
-  const safeCoverage = Math.max(1, targetCoveragePct) / 100;
+  // Cobertura 0 o fuera de rango = sin dato: se dimensiona con el valor resuelto (ADR 0003), no con 1 %.
+  const safeCoverage = Math.max(1, resolveAssumption('targetCoveragePct', targetCoveragePct)) / 100;
   const targetAnnualKWh = totalAnnualConsumption * safeCoverage;
 
   const requiredCapacityKWp = targetAnnualKWh / annualSpecificYield;

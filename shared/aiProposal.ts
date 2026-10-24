@@ -182,7 +182,7 @@ export function normalizeProposalDraft(rawDraft: unknown, catalog: SolarEquipmen
   else if(consumptionSource!=='theoretical')issue('missing_consumption','Completa doce consumos mensuales o indica un promedio mensual antes de crear la propuesta.');
   if (consumption.length && consumption.every(n=>n===0)) issue('zero_consumption','Todos los meses tienen consumo cero; confirma el suministro.','warning');
   if (consumption.length && consumptionSource==='estimated' && !issues.some(i=>i.code==='estimated_consumption')) issue('estimated_consumption','Historial estimado: confirma los doce consumos antes de cotizar.','warning');
-  const coverage = Math.max(1,Math.min(300,num(raw.targetCoveragePct) ?? resolveAssumption('targetCoveragePct', context.targetCoveragePct)));
+  const coverage = Math.max(1,Math.min(300,resolveAssumption('targetCoveragePct', num(raw.targetCoveragePct), context.targetCoveragePct)));
   const panels:PanelItemSpec[]=groups('panel','panels');
   const inverters:InverterItemSpec[]=groups('inverter','inverters');
   const batteries:BatteryItemSpec[]=raw.hasBattery===false ? [] : groups('battery','batteries');

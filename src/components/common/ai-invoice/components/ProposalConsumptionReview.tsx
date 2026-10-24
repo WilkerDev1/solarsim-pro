@@ -16,7 +16,7 @@ export function ProposalConsumptionReview({draft,context,production,update}:Prop
   const max=Math.max(1,...observed.map(n=>n ?? 0),...(production || []));
   const panels=draft.panels || [];
   const chosen=panels[adjustable];
-  const sizing=calculateRecommendedPanelCount(draft.province || context.province || '',complete?observed as number[]:Array(12).fill(0),chosen?.powerW || 620,draft.targetCoveragePct,context.systemLosses,context.customMonthlyHSP);
+  const sizing=calculateRecommendedPanelCount(draft.province || context.province || '',complete?observed as number[]:Array(12).fill(0),chosen?.powerW || 620,resolveAssumption('targetCoveragePct',draft.targetCoveragePct),context.systemLosses,context.customMonthlyHSP);
   const otherKWp=panels.reduce((sum,g,i)=>sum+(i===adjustable?0:g.powerW*g.count/1000),0);
   const remainingKWh=sizing.targetAnnualKWh-otherKWp*sizing.annualSpecificYieldKWhPerKWp;
   const suggested=chosen?.powerW && remainingKWh>0?Math.ceil(remainingKWh/(sizing.annualSpecificYieldKWhPerKWp*chosen.powerW/1000)):0;

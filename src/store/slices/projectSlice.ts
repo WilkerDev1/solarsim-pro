@@ -21,7 +21,7 @@ import { canEditDocument } from '../../components/pdf/editor/documentEditorState
 import { normalizeDocumentLayout } from '../../../shared/documentLayout';
 import { applyDocumentTextPatch, companyTemplateTextPatch, documentTextsPatch } from '../../../shared/documentTexts';
 import { DEFAULT_BATTERY_CAPACITY_KWH, DEFAULT_BATTERY_DOD_PCT, resolveSystemLossesPct } from '../../../shared/projectDefaults';
-import { assumptionFields, resolveAssumptions, type AssumptionFields } from '../../../shared/assumptions';
+import { assumptionFields, resolveAssumption, resolveAssumptions, type AssumptionFields } from '../../../shared/assumptions';
 import { documentTextContextFor } from '../../utils/documentTextContext';
 
 /** Specs with the panel count the engine recommends for this consumption, province and coverage target. */
@@ -30,7 +30,7 @@ function withRecommendedPanels(specs: SystemSpecs, client: ClientInfo, monthlyCo
     client.province,
     monthlyConsumption,
     readEquipment(specs).panels[0]?.powerW || 620,
-    targetCoveragePct,
+    resolveAssumption('targetCoveragePct', targetCoveragePct), // la frontera: 0 o fuera de rango dimensiona con el valor resuelto, no con 1 %
     resolveSystemLossesPct(specs),
     client.customMonthlyHSP
   );
@@ -626,12 +626,15 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     return { specs, financials: withoutStaleFinancialOverrides(p, p.financials) };
   }),
 
-  updateRates: (ratesPartial) => updateActiveProject((p) => ({
-    rates: { ...p.rates, ...ratesPartial },
-    specs: p.specs.autoCalculatePanels && ratesPartial.targetCoveragePct !== undefined
-      ? withRecommendedPanels(p.specs, p.client, p.monthlyConsumption, ratesPartial.targetCoveragePct)
-      : { ...p.specs },
-  })),
+  updateRates: (ratesPartial) => updateActiveProject((p) => {
+    const rates = { ...p.rates, ...ratesPartial };
+    return {
+      rates,
+      specs: p.specs.autoCalculatePanels && ratesPartial.targetCoveragePct !== undefined
+        ? withRecommendedPanels(p.specs, p.client, p.monthlyConsumption, resolveAssumptions({ rates }).targetCoveragePct)
+        : { ...p.specs },
+    };
+  }),
 
   updateFinancials: (finPartial) => updateActiveProject((p) => ({
     financials: withoutStaleFinancialOverrides(p, { ...p.financials, ...finPartial }),

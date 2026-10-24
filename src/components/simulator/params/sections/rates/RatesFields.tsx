@@ -3,7 +3,7 @@ import { getTariffDisplayName } from '../../../../../../shared/proposalPresentat
 import type { ProjectSimulation, SystemSpecs, UtilityRates } from '../../../../../types';
 import { getDistributorTariffOptions, type UtilityDistributor } from '../../../../../types/tariffs';
 import { Field, FieldAction, InfoTip, ParamRow, SelectField, ToggleGroup, WarnChip } from '../../ui';
-import { DEFAULT_GRID_EXPORT_FEE_PCT, DEFAULT_TARGET_COVERAGE_PCT } from '../../logic/dockDefaults';
+import { resolveAssumptions } from '../../../../../../shared/assumptions';
 import { SelfConsumptionPanel } from './SelfConsumptionPanel';
 import {
   averageMonthlyConsumption,
@@ -38,13 +38,15 @@ const parseNumber = (raw: string) => parseFloat(raw) || 0;
 
 export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix, projectionEnabled, updateRates, updateSpecs }) => {
   const { rates } = project;
+  // El valor que se muestra es el que usa el cálculo: supuestos efectivos del proyecto completo (ADR 0003).
+  const assumptions = resolveAssumptions(project);
   const avgMonthlyConsumption = averageMonthlyConsumption(project);
   const distributor = currentDistributor(rates);
   const tariffCode = currentTariffCode(rates);
   const context: ChangeContext = {
     matrix: tariffMatrix,
     avgMonthlyConsumption,
-    dopExchangeRate: project.specs?.dopExchangeRate,
+    dopExchangeRate: assumptions.dopExchangeRate,
     rates,
     loadProfilePreset: project.specs?.loadProfilePreset,
     canWriteSpecs: !!updateSpecs,
@@ -66,7 +68,7 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
   const referenceText = `Oficial $${reference.toFixed(3)}`;
   const exportTip = zeroExport
     ? 'Inyección cero activa: el sistema no vuelca excedentes a la red pública, por lo que no aplica retención ni cargo por uso de red.'
-    : `Medición neta (${getTariffDisplayName(distributor, rates.tariffCode || '')}): retención del ${rates.gridExportFeePct ?? DEFAULT_GRID_EXPORT_FEE_PCT}% por derecho de uso de red bajo la Res. SIE-007-2026-REG sobre los kWh excedentes exportados a la red de ${distributor}.`;
+    : `Medición neta (${getTariffDisplayName(distributor, rates.tariffCode || '')}): retención del ${assumptions.gridExportFeePct}% por derecho de uso de red bajo la Res. SIE-007-2026-REG sobre los kWh excedentes exportados a la red de ${distributor}.`;
 
   return (
     <div className="space-y-2.5">
@@ -113,7 +115,7 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
           step="1"
           mono
           suffix="%"
-          value={rates.targetCoveragePct ?? DEFAULT_TARGET_COVERAGE_PCT}
+          value={assumptions.targetCoveragePct}
           onChange={value => updateRates({ targetCoveragePct: parseNumber(value) })}
         />
       </ParamRow>
@@ -128,7 +130,7 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
           mono
           suffix="%"
           disabled={zeroExport}
-          value={exportFeeValue(rates)}
+          value={exportFeeValue(rates, assumptions.gridExportFeePct)}
           onChange={value => updateRates({ gridExportFeePct: parseNumber(value) })}
           right={<InfoTip text={exportTip} />}
         />
