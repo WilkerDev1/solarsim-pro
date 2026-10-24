@@ -13,7 +13,9 @@ Simulador técnico-económico de escritorio para diseñar y cotizar sistemas fot
 - **Propuestas:** documento PDF editable en la hoja, propuesta web publicada con enlace y QR, y fichas técnicas anexadas automáticamente.
 - **Catálogo:** paneles, inversores y baterías con precios por proveedor, compartido por organización.
 - **Trabajo en equipo:** organizaciones con roles ADMIN, EDITOR y LECTOR, sincronización con control de versiones e historial. Sin conexión el trabajo se guarda en el equipo y se sincroniza después.
-- **Asistente IA:** lectura de facturas, fichas técnicas y listas de precios, y borradores de propuesta con Google Gemini (clave del usuario). Ningún borrador se aplica sin revisión.
+- **Asistente IA:** lectura de facturas, fichas técnicas y listas de precios con Google Gemini (clave del usuario).
+  - El asistente de propuestas prepara un borrador que se revisa antes de aplicarlo.
+  - El asistente general (experimental) y los agentes externos conectados por MCP pueden editar propuestas según la política de permisos. Cada cambio queda registrado y se puede deshacer ([docs/AGENT_TOOLS.md](docs/AGENT_TOOLS.md)).
 
 ## Descarga
 
@@ -73,8 +75,8 @@ El entorno de pruebas del cliente hace que `fetch` falle, así que las pruebas i
 
 ### Flujo de trabajo
 
-- `beta` es la rama de desarrollo y `main` solo recibe releases aprobadas.
-- Cada cambio entra por pull request a `beta`, con mensajes [Conventional Commits](https://www.conventionalcommits.org/es/) en español.
+- `beta` es la rama de desarrollo y `main` la de releases aprobadas.
+- Los cambios normales entran por pull request a `beta`, con mensajes [Conventional Commits](https://www.conventionalcommits.org/es/) en español. `main` solo recibe el merge de `beta` en cada release y hotfixes aprobados.
 - Antes de fusionar: CI en verde y revisión sin hallazgos.
 - Las releases suben a la vez la versión de la aplicación, la API y el Worker (`npm run release:bump -- X.Y.Z`); el tag `vX.Y.Z` en `main` genera los instaladores en GitHub Actions.
 - [AGENTS.md](AGENTS.md) reúne los contratos, invariantes y comprobaciones obligatorias para contribuir.
