@@ -112,7 +112,7 @@ La 2.7.2 (banco de baterías, supuestos y edición de proyecto: ADR 0002 a 0004)
 1. **Checkpoint** (paso 1) y **ensayo de restauración** (paso 2) con la imagen candidata: siguen siendo obligatorios aunque no haya migración.
 2. **Worker 2.7.2** (paso 6): toma vigencia, retención y tasa de cambio de `shared/assumptions.ts`. Es compatible con la API 2.7.1 y con la 2.7.2.
 3. **API 2.7.2** (paso 4): recrear solo `api`; no se aplica ninguna migración nueva. Verificar (paso 5) que `/api/health` informa `2.7.2`.
-4. **Publicar la release de escritorio 2.7.2** firmada. No hay que avisar al equipo ni esperar actualizaciones: nadie queda sin sincronizar.
+4. **Publicar la release de escritorio 2.7.2** firmada. La 2.7.2 no bloquea a ningún cliente 2.7.1 o posterior (`MIN_CLIENT_VERSION` sigue en 2.7.1), así que no hace falta coordinar el cambio. Las instalaciones 2.7.0 o anteriores que aún queden siguen recibiendo 426 como desde la 2.7.1: si alguien las usa, avisarle para que actualice y sincronice su trabajo pendiente.
 
 Rollback: la imagen API anterior es compatible (mismos datos y migraciones). La sección anterior (2.7.1) se conserva como historial de la migración 006 y de la versión mínima.
 
