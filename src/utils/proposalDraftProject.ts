@@ -9,13 +9,20 @@ import { resolveSystemLossesPct, DEFAULT_SYSTEM_LOSSES_PCT, DEFAULT_BATTERY_DOD_
 import { enforceAutomatedPricing } from '../../shared/automatedProposalPolicy';
 import { editEquipment, readEquipment, type EquipmentKind } from '../../shared/equipment';
 import { migrateLegacySpecs } from '../../shared/equipment';
+import { detachedCatalogIdentity, withoutInheritedPanelDegradation } from './equipmentGroups';
+import type { SolarEquipmentItem } from '../types/equipment';
 
 /** Un solo grupo por tipo recibe la selección escalar del borrador (con varios modelos se conservan, como antes). */
-function patchSingleGroup(specs:SystemSpecs,kind:EquipmentKind,patch:Record<string,unknown>):SystemSpecs {
+function patchSingleGroup(specs:SystemSpecs,kind:EquipmentKind,patch:Record<string,unknown>,catalog:readonly SolarEquipmentItem[]=[]):SystemSpecs {
   const clean=Object.fromEntries(Object.entries(patch).filter(([,value])=>value!==undefined));
   if(!Object.keys(clean).length) return specs;
   const groups=readEquipment({...specs,hasBattery:true})[kind==='panel'?'panels':kind==='inverter'?'inverters':'batteries'];
-  return groups.length>1?specs:editEquipment(specs,kind,{type:'update',index:0,patch:clean} as never);
+  if(groups.length>1) return specs;
+  // Reemplazar el modelo del grupo no puede dejar la identidad de catálogo del equipo anterior (resolveGroupCatalogItem la
+  // prioriza sobre el nombre y se seguiría anexando su ficha): nombre exacto y único del catálogo ⇒ se vincula a ese equipo;
+  // si no, el grupo queda manual. Misma regla que el dock (detachedCatalogIdentity).
+  const identity=typeof clean.brandModel==='string'&&groups[0]?detachedCatalogIdentity(kind,groups[0],clean.brandModel,catalog,catalog.length>0):{};
+  return editEquipment(specs,kind,{type:'update',index:0,patch:{...clean,...identity}} as never);
 }
 /** Primer grupo del tipo (sin ocultar la batería apagada), o `undefined` si no hay. */
 function firstGroup<K extends 'panels'|'inverters'|'batteries'>(specs:SystemSpecs,key:K):SystemSpecs[K] {
@@ -23,7 +30,7 @@ function firstGroup<K extends 'panels'|'inverters'|'batteries'>(specs:SystemSpec
   return (first?[first]:undefined) as SystemSpecs[K];
 }
 /** Pure adapter shared by preview and application. No store mutation, metadata or network. */
-export function prepareProposalDraftProject(base:ProjectSimulation,data:ExtractedInvoiceData,tariffMatrix:GlobalTariffMatrix,options:{isNew?:boolean;defaultBatteryDOD?:number}={}):ProjectSimulation {
+export function prepareProposalDraftProject(base:ProjectSimulation,data:ExtractedInvoiceData,tariffMatrix:GlobalTariffMatrix,options:{isNew?:boolean;defaultBatteryDOD?:number;catalog?:readonly SolarEquipmentItem[]}={}):ProjectSimulation {
   const province=data.province || base.client.province;
   const losses=resolveSystemLossesPct(base.specs);
   const createNewProject=Boolean(options.isNew);
@@ -63,9 +70,9 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
       }
     } else {
       // Selección única (sin grupos de catálogo): se aplica al grupo, nunca a campos sueltos.
-      specs=patchSingleGroup(specs,'panel',{brandModel:data.selectedPanelModel||undefined,powerW:panelW,count,unitPriceUSD:data.selectedPanelUnitPriceUSD});
-      specs=patchSingleGroup(specs,'inverter',{brandModel:data.selectedInverterModel||undefined,powerKW:data.selectedInverterPowerKW,count:data.selectedInverterCount,unitPriceUSD:data.selectedInverterUnitPriceUSD});
-      specs=patchSingleGroup(specs,'battery',{brandModel:data.selectedBatteryModel||undefined,capacityKWh:data.selectedBatteryCapacityKWh,count:data.selectedBatteryCount,unitPriceUSD:data.selectedBatteryUnitPriceUSD});
+      specs=patchSingleGroup(specs,'panel',{brandModel:data.selectedPanelModel||undefined,powerW:panelW,count,unitPriceUSD:data.selectedPanelUnitPriceUSD},options.catalog);
+      specs=patchSingleGroup(specs,'inverter',{brandModel:data.selectedInverterModel||undefined,powerKW:data.selectedInverterPowerKW,count:data.selectedInverterCount,unitPriceUSD:data.selectedInverterUnitPriceUSD},options.catalog);
+      specs=patchSingleGroup(specs,'battery',{brandModel:data.selectedBatteryModel||undefined,capacityKWh:data.selectedBatteryCapacityKWh,count:data.selectedBatteryCount,unitPriceUSD:data.selectedBatteryUnitPriceUSD},options.catalog);
     }
     // El proveedor elegido pertenece al grupo principal de cada tipo; el borrador nunca escribe el espejo heredado.
     for(const kind of ['panel','inverter','battery'] as const) {
@@ -89,7 +96,7 @@ export function createAIProposalBase(template:ProjectSimulation,defaults:Default
 
       base.specs={...base.specs,pricePerWattUSD:defaults.defaultDirectPriceUSDPerWp,systemLosses:defaults.defaultSystemLosses ?? DEFAULT_SYSTEM_LOSSES_PCT,annualDegradation:defaults.defaultAnnualDegradation ?? 0.4,isDetailed:false,pricingMode:'cost_matrix',saleMarginMultiplier:1+(defaults.defaultTargetMarginPct ?? 28)/100,installationUnitPriceUSD:0};
       // Grupos explícitos; el DOD por defecto vive en el grupo de batería.
-      const withGroups=migrateLegacySpecs(base.specs);
+      const withGroups=withoutInheritedPanelDegradation(migrateLegacySpecs(base.specs)); // la degradación configurada manda sobre el 0.5 % de la referencia
       base.specs={...withGroups,batteries:withGroups.batteries?.map((group,index)=>index===0?{...group,dodPct:defaults.defaultBatteryDOD ?? DEFAULT_BATTERY_DOD_PCT}:group)};
       base.rates={...base.rates,targetCoveragePct:defaults.defaultTargetCoveragePct ?? 95,isZeroExport:defaults.defaultZeroExport,currency:defaults.currency || 'USD',annualEnergyInflationPct:defaults.annualEnergyTariffEscalationPct ?? 3.5};
       base.financials={...base.financials,applyLey5707:defaults.applyLey5707,applyITBISExemption:defaults.applyITBISExemption,discountRatePct:defaults.discountRatePct,projectLifespanYears:defaults.lifespanYears,pricePerWattUSD:defaults.defaultDirectPriceUSDPerWp,customItems:[],customDiscounts:[],customCostUSD:undefined,customLey5707CreditUSD:undefined,customITBISSavedUSD:undefined};

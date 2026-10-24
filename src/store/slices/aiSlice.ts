@@ -39,7 +39,7 @@ export function buildProjectFromDraft(state:SimulationStore,input:ExtractedInvoi
     if(isGrounded && data.requiresReview) return {error:data.validationIssues?.find(i=>i.severity==='error')?.message || 'Revisa los datos pendientes antes de aplicar.'};
     if(data.monthlyConsumptionKWh.length!==12 || data.monthlyConsumptionKWh.some(n=>!Number.isFinite(n) || n<0)) return {error:'Completa los doce consumos mensuales antes de aplicar.'};
     const now=new Date().toISOString();
-    const prepared=prepareProposalDraftProject(base,data,state.tariffMatrix,{isNew:createNewProject,defaultBatteryDOD:defaults.defaultBatteryDOD});
+    const prepared=prepareProposalDraftProject(base,data,state.tariffMatrix,{isNew:createNewProject,defaultBatteryDOD:defaults.defaultBatteryDOD,catalog:state.equipmentCatalog});
     const {specs,rates}=prepared;
     const seq=createNewProject?generateNextProjectSequence(state.projects):undefined;
     const user=state.syncSettings.currentUser;

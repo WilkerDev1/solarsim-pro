@@ -1,7 +1,7 @@
 import type { BatteryItemSpec, InverterItemSpec, PanelItemSpec, SystemSpecs } from '../../../../../types';
 import type { SolarEquipmentItem } from '../../../../../types/equipment';
 import { catalogPanelGroupPatch } from '../../../../../utils/catalogGroupPatch';
-import { editEquipmentGroup, resolveGroupCatalogItem, selectCatalogEquipment, type EquipmentKind } from '../../../../../utils/equipmentGroups';
+import { detachedCatalogIdentity, editEquipmentGroup, selectCatalogEquipment, type EquipmentKind } from '../../../../../utils/equipmentGroups';
 import { readEquipment } from '../../../../../../shared/equipment';
 import { buildCatalogSelectionUpdate } from '../../logic/catalogSelection';
 import { MANUAL_BRAND_PLACEHOLDER, resolveBatteryDodPct, resolveBatteryEfficiencyPct } from '../../logic/dockDefaults';
@@ -136,33 +136,6 @@ function secondaryCatalogExtras(kind: EquipmentKind, item: SolarEquipmentItem, c
 /** Cantidad en unidades enteras, mínimo 1: el Stepper acepta fracciones y los equipos no se cuentan en fracciones. */
 export function wholeCount(count: number): number {
   return Number.isFinite(count) ? Math.max(1, Math.trunc(count)) : 1;
-}
-
-type CatalogLinkedGroup = { id?: string; catalogItemId?: string; manualModel?: boolean; brandModel?: string };
-type CatalogLinkPatch = { catalogItemId?: string; manualModel?: true };
-
-/** Nombre sin diferencias de mayúsculas, acentos ni espacios: «  panel  K 550 » es el mismo modelo que «Panel K 550». */
-const normalizeModelName = (name: string) => name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().split(/\s+/).filter(Boolean).join(' ');
-
-/**
- * Identidad de catálogo que debe olvidar un grupo cuando su marca/modelo se reescribe a mano. Solo cambios de
- * mayúsculas, acentos o espacios conservan el vínculo; cualquier otro cambio (incluso de un carácter: 550 → 560)
- * puede ser otro modelo, y adjuntar la ficha técnica equivocada es peor que no adjuntar ninguna. El grupo queda con
- * `manualModel`, con lo que `resolveGroupCatalogItem` ya no lo resuelve por `catalogItemId` ni por `id`; el nombre exacto y
- * único de un equipo del catálogo lo revincula.
- */
-function detachedCatalogIdentity(kind: EquipmentKind, group: CatalogLinkedGroup, brandModel: string, catalog: SolarEquipmentItem[]): CatalogLinkPatch {
-  const linked = resolveGroupCatalogItem(group, kind, catalog);
-  // Un id igual al catalogItemId (propuestas de IA) es identidad de catálogo aunque el catálogo aún no haya sincronizado.
-  const idIsCatalogId = !!group.id && (group.id === group.catalogItemId || catalog.some(item => item.type === kind && item.id === group.id));
-  // Nombre exacto y único de un equipo del catálogo (mismo criterio que el resolvedor): se revincula a ese equipo.
-  const named = catalog.filter(item => item.type === kind && item.displayName === brandModel);
-  if (named.length === 1) return { catalogItemId: named[0].id, manualModel: undefined };
-  const reference = linked?.displayName ?? group.brandModel ?? '';
-  if (normalizeModelName(brandModel) === normalizeModelName(reference)) return {};
-  if (group.catalogItemId === undefined && !idIsCatalogId && !linked && !group.manualModel) return {};
-  // El id no se toca (es la clave de la fila: cambiarlo quitaría el foco al escribir); `manualModel` impide que el resolvedor vuelva a usarlo.
-  return { ...(group.catalogItemId !== undefined ? { catalogItemId: undefined } : {}), manualModel: true };
 }
 
 export interface GroupActions<K extends EquipmentKind> {

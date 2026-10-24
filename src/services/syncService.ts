@@ -1,5 +1,6 @@
 import { ProjectSimulation, UserProfile, UserRole } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
+import { migrateLegacySpecs } from '../../shared/equipment';
 import { CLIENT_OUTDATED, isClientGateOpen } from '../../shared/clientVersion';
 import { CLIENT_IDENTITY_HEADER, CLIENT_IDENTITY_VALUE } from './clientIdentity';
 import { clientOutdatedText, getClientOutdated, isServerBlocked, reportClientOutdated } from './clientVersionGate';
@@ -197,6 +198,21 @@ export async function fetchWithSessionRetry(url: string, init: RequestInit = {},
     notifySessionInvalidated({ serverUrl: base, token: renewed });
   }
   return retried;
+}
+
+/**
+ * Frontera de sincronización (ADR 0001): lo que viaja de ida y vuelta lleva los equipos solo como grupos. Una instantánea
+ * anterior a 2.7.1 (historial del servidor restaurado, cliente viejo) puede traer el espejo heredado; `migrateLegacySpecs`
+ * es invariante e idempotente, y devuelve el mismo objeto si no hay nada que migrar.
+ */
+function withGroupsOnly<P extends ProjectSimulation | undefined>(project: P): P {
+  if (!project?.specs || typeof project.specs !== 'object') return project;
+  const specs = migrateLegacySpecs(project.specs);
+  return specs === project.specs ? project : { ...project, specs };
+}
+function outcomeWithGroupsOnly(outcome: SyncPushOutcome): SyncPushOutcome {
+  if (outcome.status === 'conflict') return outcome.serverProject ? { ...outcome, serverProject: withGroupsOnly(outcome.serverProject) } : outcome;
+  return outcome.project ? { ...outcome, project: withGroupsOnly(outcome.project) } : outcome;
 }
 
 function validatePushResults(results: unknown, ids: string[], content: 'project'): SyncPushOutcome[];
@@ -492,7 +508,7 @@ export class SyncService {
       if (error) return { success: false, error };
       return {
         success: true,
-        projects: Array.isArray(data.projects) ? data.projects : (() => { throw new Error('Respuesta de proyectos inválida.'); })(),
+        projects: Array.isArray(data.projects) ? data.projects.map(withGroupsOnly) : (() => { throw new Error('Respuesta de proyectos inválida.'); })(),
         deletedIds: data.deletedIds || [],
         serverTimestamp: data.serverTimestamp,
         count: data.count || 0,
@@ -507,7 +523,7 @@ export class SyncService {
    */
   static async pushProjects(serverUrl: string, token: string, projects: ProjectSimulation[]): Promise<SyncPushResult> {
     try {
-      const { data, error } = await this.readSuccess(await this.send(serverUrl, token, 'POST', '/api/sync/push', { projects }), 'Error al subir proyectos');
+      const { data, error } = await this.readSuccess(await this.send(serverUrl, token, 'POST', '/api/sync/push', { projects: projects.map(withGroupsOnly) }), 'Error al subir proyectos');
       if (error) return { success: false, error };
 
       if (Array.isArray(data.results) && data.results.some((result: any) => result.awaitingConfirmation !== undefined)) throw new Error('Confirmación de sincronización inválida.');
@@ -531,7 +547,7 @@ export class SyncService {
         success: true,
         message: data.message,
         serverTimestamp: data.serverTimestamp,
-        results: validatePushResults(data.results, projects.map((item) => item.id), 'project'),
+        results: validatePushResults(data.results, projects.map((item) => item.id), 'project').map(outcomeWithGroupsOnly),
       };
     } catch (err: any) {
       return { success: false, error: err.message || 'Error de conexión al enviar proyectos' };

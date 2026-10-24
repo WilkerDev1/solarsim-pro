@@ -130,16 +130,16 @@ export function useAIInvoiceScanner() {
   const draftEnergy=useMemo(()=>{
     if(!validatedDraft || validatedDraft.monthlyConsumptionKWh.length!==12 || !validatedDraft.panels?.length || validatedDraft.panels.some(g=>!g.id||!Number.isFinite(g.powerW)||g.powerW<=0||!Number.isInteger(g.count)||g.count<=0))return null;
     const base=target || createAIProposalBase(BENCHMARK_PROJECT,defaults,validatedDraft.province || context.province || '');
-    const project=prepareProposalDraftProject(base,{...validatedDraft,commercial:{}},tariffMatrix,{isNew:!target,defaultBatteryDOD:defaults.defaultBatteryDOD});
+    const project=prepareProposalDraftProject(base,{...validatedDraft,commercial:{}},tariffMatrix,{isNew:!target,defaultBatteryDOD:defaults.defaultBatteryDOD,catalog:equipmentCatalog});
     return calculateMonthlySolarProduction(project.client.province,project.specs,project.monthlyConsumption,project.rates.energyCostPerKWh,project.rates.gridExportFeePct,project.client.customMonthlyHSP,project.rates.tariffCode,project.rates.isZeroExport,mode).map(m=>m.productionKWh);
-  },[validatedDraft,target,defaults,tariffMatrix,mode,context.province]);
+  },[validatedDraft,target,defaults,tariffMatrix,mode,context.province,equipmentCatalog]);
   const draftPreview=useMemo(()=>{
     if(!validatedDraft || validatedDraft.validationIssues?.some(i=>i.severity==='error' && /extra|discount|customItems|customDiscounts|commercial|markup|margin|installation|pricing|surplus|price|count|spec|source_totals|exchange/.test(i.code)))return null;
     const base=target || createAIProposalBase(BENCHMARK_PROJECT,defaults,validatedDraft.province || context.province || '');
-    const project=prepareProposalDraftProject(base,validatedDraft,tariffMatrix,{isNew:!target,defaultBatteryDOD:defaults.defaultBatteryDOD});
+    const project=prepareProposalDraftProject(base,validatedDraft,tariffMatrix,{isNew:!target,defaultBatteryDOD:defaults.defaultBatteryDOD,catalog:equipmentCatalog});
     const financial=calculateProjectFinancialSummary({...project,monthlyConsumption:project.monthlyConsumption.length===12?project.monthlyConsumption:Array(12).fill(0)},mode);
     return {project,financial};
-  },[validatedDraft,target,defaults,tariffMatrix,mode,context.province]);
+  },[validatedDraft,target,defaults,tariffMatrix,mode,context.province,equipmentCatalog]);
   const attentionIssues=[...(validatedDraft?.validationIssues || []),...(validatedDraft&&draftPreview?proposalReconciliationIssues(validatedDraft,draftPreview.financial):[])];
   const reviewSnapshot = JSON.stringify(validatedDraft);
   useEffect(() => { setReviewConfirmed(false); }, [reviewSnapshot]);
