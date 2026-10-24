@@ -1,5 +1,8 @@
 import { ProjectSimulation, UserProfile, UserRole } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
+import { CLIENT_OUTDATED, isClientGateOpen } from '../../shared/clientVersion';
+import { CLIENT_IDENTITY_HEADER, CLIENT_IDENTITY_VALUE } from './clientIdentity';
+import { clientOutdatedText, getClientOutdated, isServerBlocked, reportClientOutdated } from './clientVersionGate';
 
 export type EquipmentPushOutcome =
   | { id: string; status: 'created' | 'updated'; version: number; item: SolarEquipmentItem }
@@ -108,12 +111,32 @@ export async function clearInvalidToken(serverUrl: string, token: string): Promi
 
 const refreshRequests = new Map<string, Promise<string | null>>();
 
+/** Identidad del cliente en una solicitud, conservando la forma de los encabezados que recibió. */
+function withClientIdentity(headers: HeadersInit | undefined): HeadersInit {
+  if (headers instanceof Headers) { const copy = new Headers(headers); copy.set(CLIENT_IDENTITY_HEADER, CLIENT_IDENTITY_VALUE); return copy; }
+  if (Array.isArray(headers)) return [...headers.filter(([name]) => name.toLowerCase() !== CLIENT_IDENTITY_HEADER.toLowerCase()), [CLIENT_IDENTITY_HEADER, CLIENT_IDENTITY_VALUE]];
+  return { ...headers, [CLIENT_IDENTITY_HEADER]: CLIENT_IDENTITY_VALUE };
+}
+
+/** 426 con la forma `client_outdated` de la API; el cuerpo se reescribe con el texto en español para quien lo muestre. */
+const outdatedResponse = (minVersion: string | null) => Response.json({ success: false, error: clientOutdatedText(minVersion), code: CLIENT_OUTDATED, minVersion }, { status: 426 });
+
 /** One bounded refresh on 401. A revoked account or forbidden role is never retried. */
 export async function fetchWithSessionRetry(url: string, init: RequestInit = {}, sessionServerUrl?: string): Promise<Response> {
-  const send = (options: RequestInit) => fetch(url, { ...options, signal: options.signal ?? AbortSignal.timeout(12000) });
   const authorization = new Headers(init.headers).get('Authorization');
   // Worker requests authenticate against the API, so their renewal origin must be explicit.
-  const base = sessionServerUrl?.trim().replace(/\/+$/, '') || url.slice(0, url.indexOf('/api/'));
+  const apiStart = url.indexOf('/api/');
+  const base = sessionServerUrl?.trim().replace(/\/+$/, '') || url.slice(0, apiStart);
+  // Solo las solicitudes a la propia API llevan la identidad del cliente y se detienen con la versión mínima.
+  const toApi = apiStart >= 0 && url.slice(0, apiStart).replace(/\/+$/, '') === base;
+  const route = toApi ? url.slice(apiStart).split(/[?#]/)[0] : '';
+  const send = async (options: RequestInit) => {
+    const response = await fetch(url, { ...options, ...(toApi ? { headers: withClientIdentity(options.headers) } : {}), signal: options.signal ?? AbortSignal.timeout(12000) });
+    if (!toApi || response.status !== 426) return response;
+    const body = await response.clone().json().catch(() => null);
+    if (body?.error !== CLIENT_OUTDATED) return response;
+    return outdatedResponse(reportClientOutdated(base, body.minVersion).minVersion);
+  };
   const token = authorization?.startsWith('Bearer ') ? authorization.slice(7) : null;
   const key = base && token ? await computeTokenKey(base, token) : null;
 
@@ -124,6 +147,8 @@ export async function fetchWithSessionRetry(url: string, init: RequestInit = {},
       headers: { 'Content-Type': 'application/json' },
     });
   }
+  // La API ya dijo que esta versión no puede sincronizar: no se reintenta hasta actualizar (trabajo local intacto).
+  if (toApi && !isClientGateOpen(init.method ?? 'GET', route) && isServerBlocked(base)) return outdatedResponse(getClientOutdated()?.minVersion ?? null);
 
   const response = await send(init);
   if (response.status !== 401 || !token || !base || /\/api\/auth\/(?:refresh|login|register)$/.test(url)) return response;
@@ -134,7 +159,7 @@ export async function fetchWithSessionRetry(url: string, init: RequestInit = {},
       try {
         const refreshed = await fetch(`${base}/api/auth/refresh`, {
           method: 'POST',
-          headers: { Authorization: authorization! },
+          headers: withClientIdentity({ Authorization: authorization! }),
           signal: AbortSignal.timeout(8000),
         });
         if (refreshed.status === 401 || refreshed.status === 403) {

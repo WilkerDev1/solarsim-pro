@@ -1,4 +1,4 @@
-import type { Equipment, EquipmentGroups, EquipmentKind } from './types';
+import type { Equipment, EquipmentGroups, EquipmentKind } from './types.js';
 
 const LIST = { panel: 'panels', inverter: 'inverters', battery: 'batteries' } as const;
 const round = (value: number, decimals: number) => Math.round(value * 10 ** decimals) / 10 ** decimals;

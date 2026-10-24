@@ -13,6 +13,8 @@ const docker = (...args: string[]) =>
     timeout: 30000,
     stdio: ["ignore", "pipe", "pipe"],
   }).trim();
+// The image enforces the default minimum client version (2.7.1) on every data route.
+const client = { "X-SolarSim-Client": "desktop/2.7.1" };
 const pause = () => new Promise((resolve) => setTimeout(resolve, 300));
 try {
   const password = randomUUID();
@@ -97,7 +99,7 @@ try {
   const loginEmail = `${suffix}@example.invalid`;
   const registration = await fetch(`${base}/api/auth/register`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { ...client, "Content-Type": "application/json" },
     body: JSON.stringify({
       name: "Synthetic QA",
       email: loginEmail,
@@ -108,6 +110,7 @@ try {
   assert.equal(registration.status, 200);
   const auth = (await registration.json()) as { token: string };
   const headers = {
+    ...client,
     Authorization: `Bearer ${auth.token}`,
     "Content-Type": "application/json",
   };
@@ -215,13 +218,13 @@ try {
   );
   const loggedIn = await fetch(rotatedBase + "/api/auth/login", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { ...client, "Content-Type": "application/json" },
     body: JSON.stringify({ email: loginEmail, password: loginPassword }),
   });
   assert.equal(loggedIn.status, 200);
   const renewed = (await loggedIn.json()) as { token: string };
   const retained = await fetch(rotatedBase + "/api/organization/features", {
-    headers: { Authorization: `Bearer ${renewed.token}` },
+    headers: { ...client, Authorization: `Bearer ${renewed.token}` },
   });
   assert.equal(retained.status, 200);
   assert.equal(

@@ -168,6 +168,12 @@ test('Compatibility Checker: no confunde sondeo autenticado parcial con un ensay
       res.end(JSON.stringify({ status: 'ok', service: 'SolarSim Pro Sync API', version: '2.2.1', database: 'connected' }));
       return;
     }
+    // The API's minimum client version gate: every probe must identify itself.
+    if (!/^desktop\/\d+\.\d+\.\d+/.test(String(req.headers['x-solarsim-client'] ?? ''))) {
+      res.writeHead(426, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'client_outdated', minVersion: '2.7.1' }));
+      return;
+    }
     // Protected routes must return 401 when no token is present
     if (!req.headers.authorization) {
       res.writeHead(401, { 'Content-Type': 'application/json' });

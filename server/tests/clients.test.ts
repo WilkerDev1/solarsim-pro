@@ -2,6 +2,7 @@ import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import pg from "pg";
 import { createApp } from "../src/app.js";
+import { asClient } from "./helpers/clientHeader.js";
 import { migrateDatabase } from "../src/database/migrations.js";
 import { normalizeTaxId, validateClientInput } from "../../shared/clients.js";
 import {
@@ -71,7 +72,7 @@ before(
     pool = database.pool;
     await migrateDatabase(pool);
     await migrateDatabase(pool);
-    app = createApp({ pool, jwtSecret: secret, logging: false });
+    app = asClient(createApp({ pool, jwtSecret: secret, logging: false }));
     admin = await register("clients-admin");
     other = await register("clients-other", "Otra empresa");
     editor = await provision("EDITOR", "clients-editor");

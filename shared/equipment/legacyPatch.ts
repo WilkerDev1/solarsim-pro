@@ -1,6 +1,6 @@
-import { MIRROR, deriveLegacyGroupWithPrice } from './legacy';
-import { migrateLegacySpecs } from './migrate';
-import { EQUIPMENT_KINDS, LIST_KEY, type EquipmentKind, type SystemSpecs } from './types';
+import { MIRROR, deriveLegacyGroupWithPrice } from './legacy.js';
+import { migrateLegacySpecs } from './migrate.js';
+import { EQUIPMENT_KINDS, LIST_KEY, type EquipmentKind, type EquipmentSpecs } from './types.js';
 
 /** Campos de grupo cuyo valor escalar (asistente, importaciones) se aplica al primer grupo aunque haya varios. */
 const PRIMARY_SCALAR_FIELDS: Record<EquipmentKind, readonly string[]> = { panel: [], inverter: [], battery: ['dodPct', 'efficiencyPct'] };
@@ -21,9 +21,9 @@ const sameJson = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringif
  * - `selectedSupplierInfo[tipo]` pertenece al primer grupo del tipo.
  * - Valores `undefined` del parche se ignoran, como siempre.
  */
-export function applyLegacyEquipmentPatch(current: SystemSpecs, patch: Partial<SystemSpecs>): SystemSpecs {
+export function applyLegacyEquipmentPatch<S extends EquipmentSpecs>(current: S, patch: Partial<S>): S {
   const legacyOf = (kind: EquipmentKind) =>
-    Object.entries(MIRROR[kind]).filter(([, legacy]) => patch[legacy as keyof SystemSpecs] !== undefined) as [string, keyof SystemSpecs][];
+    Object.entries(MIRROR[kind]).filter(([, legacy]) => patch[legacy as keyof EquipmentSpecs] !== undefined) as [string, keyof EquipmentSpecs][];
   const currentSupplier = (kind: EquipmentKind) => migrateLegacySpecs(current)[LIST_KEY[kind]]?.[0]?.selectedSupplierInfo;
   const supplierChanged = (kind: EquipmentKind) => patch.selectedSupplierInfo !== undefined && !sameJson(patch.selectedSupplierInfo[kind], currentSupplier(kind));
   const touches = (kind: EquipmentKind) => patch[LIST_KEY[kind]] !== undefined || legacyOf(kind).length > 0 || supplierChanged(kind);
@@ -32,9 +32,9 @@ export function applyLegacyEquipmentPatch(current: SystemSpecs, patch: Partial<S
   for (const kind of EQUIPMENT_KINDS) for (const legacy of Object.values(MIRROR[kind])) delete rest[legacy as string];
   delete rest.selectedSupplierInfo;
   for (const kind of EQUIPMENT_KINDS) if (rest[LIST_KEY[kind]] === undefined) delete rest[LIST_KEY[kind]];
-  if (!EQUIPMENT_KINDS.some(touches) && patch.hasBattery === undefined) return { ...current, ...(rest as Partial<SystemSpecs>) };
+  if (!EQUIPMENT_KINDS.some(touches) && patch.hasBattery === undefined) return { ...current, ...(rest as Partial<S>) };
 
-  let merged: SystemSpecs = { ...migrateLegacySpecs(current), ...(rest as Partial<SystemSpecs>) };
+  let merged: S = { ...migrateLegacySpecs(current), ...(rest as Partial<S>) };
   // Activar la batería de un proyecto sin datos de batería crea su grupo.
   if (merged.hasBattery) merged = migrateLegacySpecs(merged);
 

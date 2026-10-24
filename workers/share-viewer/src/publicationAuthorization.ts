@@ -1,5 +1,6 @@
 import type { Env } from './bindings';
 import { isRecord, readBoundedJson } from './validation';
+import { CLIENT_IDENTITY_HEADER, CLIENT_IDENTITY_VALUE } from './clientIdentity';
 export interface PublicationIdentity {
   userId: string;
   userName?: string;
@@ -20,9 +21,11 @@ export async function authorizePublication(env: Env, authorization: string | und
   } catch { throw new AuthorizationError('El servicio de autorización no está configurado.', 503); }
   let response: Response;
   try {
-    response = await requestFetch(endpoint, { method: 'POST', headers: { Authorization: authorization }, redirect: 'manual', signal: AbortSignal.timeout(8000) });
+    response = await requestFetch(endpoint, { method: 'POST', headers: { Authorization: authorization, [CLIENT_IDENTITY_HEADER]: CLIENT_IDENTITY_VALUE }, redirect: 'manual', signal: AbortSignal.timeout(8000) });
   } catch { throw new AuthorizationError('No se pudo verificar la sesión. Intenta nuevamente.', 503); }
   if (response.status === 401 || response.status === 403) throw new AuthorizationError('La cuenta no tiene permiso para publicar propuestas.', response.status);
+  // La API exige una versión mínima de cliente: este despliegue del visor quedó atrás y debe actualizarse.
+  if (response.status === 426) console.error('La API rechazó la versión del visor (426 client_outdated); despliega un visor actualizado.');
   if (!response.ok) throw new AuthorizationError('El servicio de autorización no está disponible.', 503);
   const value: unknown = await readBoundedJson(response, history ? 65536 : 8192).catch(() => null);
   if (!isRecord(value) || value.success !== true || typeof value.userId !== 'string' || typeof value.organizationId !== 'string' || !isRecord(value.featurePolicy) || !Number.isSafeInteger(value.featurePolicy.version) || !isRecord(value.featurePolicy.settings) || typeof value.featurePolicy.settings.selfConsumptionProjection !== 'boolean') throw new AuthorizationError('El servicio de autorización devolvió una respuesta no válida.', 503);

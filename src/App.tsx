@@ -19,6 +19,7 @@ const ClientsHubView = lazy(() => loadClientsHubView().then((module) => ({ defau
 import { ConflictResolutionModal } from './components/common/ConflictResolutionModal';
 import { NewProjectModal } from './components/common/NewProjectModal';
 import { UpdateModal } from './components/common/UpdateModal';
+import { ClientOutdatedNotice } from './components/common/ClientOutdatedNotice';
 const AIInvoiceScannerModal = lazy(() => import('./components/common/ai-invoice/AIInvoiceScannerModal').then((module) => ({ default: module.AIInvoiceScannerModal })));
 const AIDatasheetScannerModal = lazy(() => import('./components/common/AIDatasheetScannerModal').then((module) => ({ default: module.AIDatasheetScannerModal })));
 import { ImportConflictModal } from './components/common/ImportConflictModal';
@@ -140,6 +141,7 @@ export const App: React.FC = () => {
       <ConflictResolutionModal key={`conflict-resolution-${sessionGeneration}`} />
       <NewProjectModal key={`new-project-${sessionGeneration}`} />
       <UpdateModal />
+      <ClientOutdatedNotice />
       <Suspense fallback={null}><AIInvoiceScannerModal key={`ai-invoice-${sessionGeneration}`} /></Suspense>
       <Suspense fallback={null}><AIDatasheetScannerModal key={`ai-datasheet-${sessionGeneration}`} /></Suspense>
       <ImportConflictModal key={`import-conflict-${sessionGeneration}`} />

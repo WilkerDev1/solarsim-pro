@@ -4,7 +4,7 @@ import { calculateMonthlySolarProduction } from '../engine/solarEngine';
 import { BENCHMARK_LEGACY_SPECS, BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateTotalBatteryCapacityKWh, calculateTotalDCCapacityKWp, calculateTotalInverterPowerKW, calculateTotalPanelCount, getProjectBatteries, getProjectInverters, getProjectPanels } from '../utils/equipmentSpecsUtils';
 import {
-  DEFAULT_UNIT_PRICE_USD, LEGACY_MIRROR_FIELDS, describeEquipment, editEquipment, equipmentTotals, migrateLegacySpecs, readEquipment,
+  DEFAULT_UNIT_PRICE_USD, LEGACY_MIRROR_FIELDS, describeEquipment, editEquipment, equipmentTotals, migrateLegacySpecs, readEquipment, type EquipmentSpecs,
 } from '../../shared/equipment';
 import type { InverterItemSpec, PanelItemSpec, SystemSpecs } from '../types';
 
@@ -91,7 +91,7 @@ const inverter = (id: string, powerKW: number, count: number): InverterItemSpec 
   assert.equal(unpriced.panels![0].weightKilos, undefined, 'weight is not carried');
   assert.equal(unpriced.panels![0].selectedSupplierInfo, undefined, 'supplier is not carried');
   assert.equal(unpriced.panels![0].count, 10, 'group quantity wins over the mirror');
-  const dod = migrateLegacySpecs({ ...base, batteries: [{ id: 'b', brandModel: 'B', capacityKWh: 10, count: 1 }] });
+  const dod = migrateLegacySpecs<EquipmentSpecs>({ ...base, batteries: [{ id: 'b', brandModel: 'B', capacityKWh: 10, count: 1 }] });
   assert.equal(dod.batteries![0].dodPct, undefined, 'a stale scalar DOD is not inherited by the group (the engine ignores it)');
   const already = migrateLegacySpecs(fixtures.groupsOnly);
   assert.equal(migrateLegacySpecs(already), already, 'nothing to migrate returns the same object');

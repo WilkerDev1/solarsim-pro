@@ -8,7 +8,11 @@ const pool = createDatabase(config.database);
 try {
   await initDatabase(pool);
   const server = serve({
-    fetch: createApp({ pool, jwtSecret: config.jwtSecret }).fetch,
+    fetch: createApp({
+      pool,
+      jwtSecret: config.jwtSecret,
+      minClientVersion: config.minClientVersion,
+    }).fetch,
     port: config.port,
     hostname: "0.0.0.0",
   });

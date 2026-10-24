@@ -10,7 +10,7 @@ Cada propuesta guarda sus equipos dos veces: los grupos (`specs.panels`, `invert
 
 1. **El espejo deja de persistirse.** Solo se guardan grupos. Los datos viejos se leen derivando los grupos desde los campos heredados únicamente dentro del módulo, y el espejo no se vuelve a escribir.
 2. **Migración completa más adelante**: migración 006 en la API y rehidratación local en el cliente, ambas con `migrateLegacySpecs`. La lectura heredada se conserva solo para propuestas publicadas (Worker KV) y archivos `.json` importados.
-3. **Versión mínima del cliente en la API**: la API exigirá cliente 426 con `MIN_CLIENT_VERSION=2.7.1` en una oleada posterior. No forma parte de la oleada 1.
+3. **Versión mínima del cliente en la API** (oleada 4): cada cliente envía `X-SolarSim-Client: <nombre>/<versión>` y la API responde 426 `client_outdated` en las rutas de datos si falta o es menor que `MIN_CLIENT_VERSION` (por defecto `2.7.1`). Abiertas: salud, inicio de sesión, renovación, `/api/auth/me` y CORS. Contrato en [API y base de datos](../DATABASE_AND_API_SPECIFICATION.md#versión-mínima-de-cliente); cómo subirla en [Mantenimiento y releases](../MAINTENANCE_AND_UPDATES.md#versión-mínima-de-cliente).
 4. **Nombrar equipos en textos**: en frases y resúmenes, el modelo principal + «y N modelo(s) más» cuando hay otros; las tablas listan todos los modelos. Nombres de reserva unificados: «Módulos Monocristalinos Tier-1 TOPCon», «Inversor Solar On-Grid / Híbrido», «Banco de Baterías de Litio LiFePO4».
 5. **Parámetros de sistema** que no son identidad del equipo (degradación, vida útil…) se quedan donde están. DOD y eficiencia de batería pasan a ser solo por grupo (el motor ya los pondera por grupo).
 
@@ -22,6 +22,13 @@ Decisiones de diseño de la oleada 1:
 - **Migración invariante**: una migración de datos no cambia ningún resultado que el usuario ve (costo, precio, kWp, energía, finanzas, textos). `migrateLegacySpecs` con grupos ya guardados solo borra el espejo y no traslada nada a los grupos: ni cantidad, potencia, capacidad, precio, DOD o eficiencia (afectan cálculos; hoy el motor ignora el espejo y un grupo sin precio cuenta 0), ni peso ni proveedor (se ven en la matriz de costos, las fichas y los anexos). Sin grupos, los construye exactamente como `getProject*` los deriva hoy, con `DEFAULT_UNIT_PRICE_USD`. Una prueba de invarianza ejecuta el motor antes y después de migrar.
 - Con `hasBattery` falso, la migración conserva en un grupo los datos de batería para no perderlos al reactivarla; `readEquipment` lo oculta mientras esté apagada.
 - `describeEquipment` cuenta modelos distintos por nombre; sin grupos devuelve texto vacío.
+Decisiones de la oleada 4:
+
+- **Migración 006** aplica `migrateLegacySpecs` a todos los proyectos de la base, también papelera y otras organizaciones. No sube `version` ni `updated_at` (el contenido es equivalente, el cliente también migra al leer y un cambio de `updated_at` forzaría a todos a volver a descargar todo y crearía falsos conflictos de CAS) y no toca `project_version_history` (registro inmutable; sus instantáneas se leen con `readEquipment`).
+- **Capacidad al guardar**: `system_capacity_kwp` sale de `equipmentTotals(readEquipment(specs)).capacityKWp`. Antes la API leía `specs.panelGroups`, un campo que ningún cliente guarda.
+- **`shared/equipment` declara sus propios tipos** (`PanelItemSpec`, `InverterItemSpec`, `BatteryItemSpec`, `EquipmentSpecs`): la API se compila con `NodeNext` y no puede importar los tipos del renderer. Las funciones son genéricas sobre `EquipmentSpecs` y devuelven el tipo que reciben; `src/tests/testEquipmentTypeParity.ts` hace fallar `npm run lint` si los tipos del renderer divergen. Los imports relativos del módulo llevan `.js`.
+- El servidor MCP local no llama a la API (sus herramientas pasan por el renderer, que se presenta como `desktop`), así que no envía el encabezado.
+
 - La energía útil del banco queda fuera (candidato #1 del informe de arquitectura): `equipmentTotals` solo da capacidad nominal.
 
 ## Consecuencias
@@ -37,4 +44,6 @@ Decisiones de diseño de la oleada 1:
 - **Migrar a mano caso por caso en cada llamador**: reparte la lógica heredada en 40 sitios y la deja viva para siempre.
 - **Migrar solo al hidratar, sin módulo común**: sin un único lector, el Worker y los `.json` importados seguirían con su propia interpretación.
 - **Heredar DOD/eficiencia al grupo**: cambiaría resultados del motor, que ya ignora el escalar cuando hay grupos.
-- **Imponer ya la versión mínima de la API**: rompería a clientes en uso antes de que la migración exista.
+- **Imponer ya la versión mínima de la API** (oleada 1): rompería a clientes en uso antes de que la migración exista; por eso llega con la oleada 4.
+- **Subir `version`/`updated_at` en la migración 006**: sería más «honesto» con el CAS, pero fuerza una descarga completa en todos los clientes y falsos conflictos sobre un cambio sin efecto visible.
+- **Migrar `project_version_history`**: reescribe un registro de auditoría sin que ningún lector lo necesite.
