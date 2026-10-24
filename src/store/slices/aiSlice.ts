@@ -9,6 +9,7 @@ import { BENCHMARK_PROJECT } from '../../engine/referenceCase';
 import { generateNextProjectSequence } from '../initialData';
 import { calculateRecommendedPanelCount, getMonthlySolarProductionFactors } from '../../engine/solarEngine';
 import { normalizeProposalDraft } from '../../../shared/aiProposal';
+import { resolveAssumption, resolveAssumptions } from '../../../shared/assumptions';
 import { DEFAULT_GEMINI_MODEL } from '../../../shared/geminiTransport';
 import { buildAITariffContext } from '../../utils/aiTariffContext';
 import { RD_PROVINCES, getProvinceHSP } from '../../data/rdProvinces';
@@ -30,7 +31,7 @@ export function buildProjectFromDraft(state:SimulationStore,input:ExtractedInvoi
     const province=normalizeProvinceName(input.province || input.municipality || (!createNewProject?current?.client.province:state.defaultSimulationSettings.defaultProvince));
     const defaults=state.defaultSimulationSettings;
     const base:ProjectSimulation=createNewProject?createAIProposalBase(BENCHMARK_PROJECT,defaults,province):current!;
-    const losses=base.specs.systemLosses ?? 25;
+    const losses=resolveAssumptions(base).systemLossesPct;
     // Revalidate against today's inventory before committing any change. Legacy callers retain their API.
     const data=isGrounded?normalizeProposalDraft(input,state.equipmentCatalog,{province,systemLosses:losses,
       annualSpecificYieldKWhPerKWp:calculateRecommendedPanelCount(province,Array(12).fill(0),620,95,losses,base.client.customMonthlyHSP).annualSpecificYieldKWhPerKWp,
@@ -55,7 +56,7 @@ export function buildProjectFromDraft(state:SimulationStore,input:ExtractedInvoi
         nic:data.nic ?? base.client.nic,nis:data.nis ?? base.client.nis,rnc:data.rnc ?? base.client.rnc,
         contractNumber:data.contractNumber ?? base.client.contractNumber,circuit:data.circuit ?? base.client.circuit,
         meterNumber:data.meterNumber ?? base.client.meterNumber,voltagePhase:data.voltagePhase ?? base.client.voltagePhase,
-        ...(seq?{projectId:seq.projectId,quoteNumber:seq.quoteNumber,quoteValidityDays:7}:{}),},
+        ...(seq?{projectId:seq.projectId,quoteNumber:seq.quoteNumber,quoteValidityDays:resolveAssumption('quoteValidityDays',defaults.defaultQuoteValidityDays)}:{}),},
       financials:prepared.financials,
       specs,rates,monthlyConsumption:[...data.monthlyConsumptionKWh],
       aiSource:{...base.aiSource,consumptionSource:data.consumptionSource,energyRateSource:data.energyRateSource,

@@ -1,5 +1,6 @@
 import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
+import { resolveAssumptions } from '../../../../shared/assumptions';
 import {
   BarChart,
   Bar,
@@ -20,6 +21,7 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
   project,
   summary,
 }) => {
+  const assumptions = resolveAssumptions(project);
   const cf25 = summary?.cashFlow25Years || [];
   const year1Savings = cf25[0]?.savingsUSD || 0;
   const year1Tax = cf25[0]?.taxCreditUSD || 0;
@@ -73,7 +75,7 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
             <span className="text-xl font-bold text-slate-900">${summary.npvUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
           <span className="text-[11px] text-slate-500 font-medium block mt-0.5">
-            Tasa de descuento: {project.financials.discountRatePct}%
+            Tasa de descuento: {assumptions.discountRatePct}%
           </span>
         </div>
 
@@ -329,7 +331,7 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
               <td className="py-2.5 px-4 text-slate-500 text-[11px] font-normal">Rendimiento anual del proyecto</td>
             </tr>
             <tr>
-              <td className="py-2.5 px-4 font-bold text-slate-800">VAN a tasa descuento {project.financials.discountRatePct}%</td>
+              <td className="py-2.5 px-4 font-bold text-slate-800">VAN a tasa descuento {assumptions.discountRatePct}%</td>
               <td className="py-2.5 px-4 text-right font-bold text-emerald-700">${summary.npvUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               <td className="py-2.5 px-4 text-slate-500 text-[11px] font-normal">Valor actual neto — positivo = proyecto viable</td>
             </tr>
@@ -346,7 +348,7 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
             <tr>
               <td className="py-2.5 px-4 font-bold text-slate-800">Reducción CO2 estimada (25 años)</td>
               <td className="py-2.5 px-4 text-right font-bold text-emerald-700">{(summary.co2AvoidedTonsPerYear * 25).toFixed(2)} Ton</td>
-              <td className="py-2.5 px-4 text-slate-500 text-[11px] font-normal">Factor emisión red RD: {project.financials.co2FactorKgPerKWh || 0.481} kg CO2/kWh</td>
+              <td className="py-2.5 px-4 text-slate-500 text-[11px] font-normal">Factor emisión red RD: {assumptions.co2FactorKgPerKWh} kg CO2/kWh</td>
             </tr>
             <tr>
               <td className="py-2.5 px-4 font-bold text-slate-800">Precio por Watt instalado</td>

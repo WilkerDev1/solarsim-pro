@@ -1,5 +1,5 @@
 import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
-import { DEFAULT_SYSTEM_LOSSES_PCT, resolveSystemLossesPct } from '../../shared/projectDefaults';
+import { DEFAULT_SYSTEM_LOSSES_PCT, DEFAULT_TARGET_COVERAGE_PCT, resolveAssumption, resolveSystemLosses } from '../../shared/assumptions';
 import { SystemSpecs, MonthlyEnergyResult } from '../types';
 import { getProvinceHSP } from '../data/rdProvinces';
 import { calculateTotalDCCapacityKWp } from '../utils/equipmentSpecsUtils';
@@ -30,7 +30,7 @@ export function calculateRecommendedPanelCount(
   provinceName: string,
   monthlyConsumptionKWh: number[],
   panelPowerW: number,
-  targetCoveragePct: number = 95,
+  targetCoveragePct: number = DEFAULT_TARGET_COVERAGE_PCT,
   systemLossesPct: number = DEFAULT_SYSTEM_LOSSES_PCT,
   customMonthlyHSP?: number[]
 ): {
@@ -139,7 +139,7 @@ export function calculateMonthlySolarProduction(
   const province = getProvinceHSP(provinceName);
 
   // Losses factor: total efficiency percentage (default from shared/projectDefaults -> derate factor)
-  const systemLossesPct = resolveSystemLossesPct(specs);
+  const systemLossesPct = resolveSystemLosses(specs);
   const derateFactor = 1 - (systemLossesPct / 100);
 
   const generationFactors=getMonthlySolarProductionFactors(provinceName,systemLossesPct,customMonthlyHSP);
@@ -147,7 +147,7 @@ export function calculateMonthlySolarProduction(
   // SIE-007-2026-REG / Net Metering Regulations:
   // - Grid export fee / retention (~25%) applies to all exported energy across all tariffs (BTS1, BTS2, BTD, MTD1, MTD2, etc.).
   // - Zero-Export systems (antivertido) do not inject to grid, resulting in 0 exported kWh and 0 export fees.
-  const effectiveGridExportFeePct = !isZeroExport ? (gridExportFeePct ?? 25) : 0;
+  const effectiveGridExportFeePct = !isZeroExport ? resolveAssumption('gridExportFeePct', gridExportFeePct) : 0;
 
   // BESS battery specifications
   const bank = batteryBank(readEquipment(specs));

@@ -1,4 +1,5 @@
 import { isReaderRole } from '../../../../shared/permissions';
+import { DEFAULT_GRID_EXPORT_FEE_PCT } from '../../../../shared/assumptions';
 import React, { useState, useRef, useEffect } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
@@ -387,7 +388,7 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                           </td>
                           <td className="p-3">
                             <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-[#27272a] text-[11px] font-semibold text-slate-600 dark:text-zinc-400">
-                              {tariff.netMeteringRetentionPct ?? 25}%
+                              {tariff.netMeteringRetentionPct ?? DEFAULT_GRID_EXPORT_FEE_PCT}%
                             </span>
                             {tariff.source?.fields && !tariff.source.fields.includes('netMeteringRetentionPct') && <span className="block text-[10px] mt-1">Política conservada; no extraída</span>}
                           </td>

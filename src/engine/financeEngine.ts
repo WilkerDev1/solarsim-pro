@@ -1,5 +1,6 @@
 import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
-import { DEFAULT_INSTALLATION_USD_PER_KWP, DEFAULT_PRICE_PER_WATT_USD, resolveDopRate, resolvePricePerWattUSD, resolveSaleMarginMultiplier } from '../../shared/projectDefaults';
+import { resolveAnnualDegradation, resolveAssumptions } from '../../shared/assumptions';
+import { DEFAULT_PRICE_PER_WATT_USD, resolvePricePerWattUSD, resolveSaleMarginMultiplier } from '../../shared/projectDefaults';
 import { ITBIS_RATE, LEY5707_CREDIT_RATE, appliesItemMargin, customItemsTaxBreakdown, isItemItbisExonerated } from '../../shared/financialRules';
 import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem, CustomQuotationItem, CustomQuotationDiscount, ProjectSimulation } from '../types';
 import { calculateDCCapacityKWp, calculateMonthlySolarProduction } from './solarEngine';
@@ -18,10 +19,13 @@ export function calculateCostMatrixSummary(
   specs: SystemSpecs,
   dcCapacityKWp: number,
   customItems?: CustomQuotationItem[],
-  customDiscounts?: CustomQuotationDiscount[]
+  customDiscounts?: CustomQuotationDiscount[],
+  rates?: Pick<UtilityRates, 'usdExchangeRate'>
 ): CostMatrixSummary {
-  const rate = resolveDopRate(specs.dopExchangeRate);
-  const margin = resolveSaleMarginMultiplier(specs.saleMarginMultiplier);
+  // Cambio, margen y mano de obra salen de los supuestos efectivos (ADR 0003).
+  const assumptions = resolveAssumptions({ specs, rates });
+  const rate = assumptions.dopExchangeRate;
+  const margin = assumptions.saleMarginMultiplier;
 
   const panels = getProjectPanels(specs);
   const inverters = getProjectInverters(specs);
@@ -123,7 +127,7 @@ export function calculateCostMatrixSummary(
   // Row Final: Installation & Materials
   const installationKilos = 1;
   const installationQty = Math.round(realDCKWp * 1000) / 1000;
-  const installationUnitUSD = specs.installationUnitPriceUSD !== undefined ? specs.installationUnitPriceUSD : DEFAULT_INSTALLATION_USD_PER_KWP;
+  const installationUnitUSD = assumptions.installationUsdPerKwp;
 
   const installTotalUSD = installationQty * installationUnitUSD;
   const installTotalDOP = installTotalUSD * rate;
@@ -366,26 +370,11 @@ function calculateIRR(initialInvestment: number, cashFlows: number[]): number {
 /**
  * Calculates complete financial and regulatory proposal model.
  */
-const isDegradationPct = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 5;
-
 /**
- * Annual production degradation (%) used by the 25-year cash flow.
- * Detailed mode uses the configured value. Simple (catalog) mode uses the DC-weighted degradation of the catalog
- * panel groups, then the configured value, then 0.5%.
+ * Annual production degradation (%) used by the 25-year cash flow. La regla vive en `shared/assumptions.ts`
+ * (modo detallado: la configurada; modo simple: la ponderada de los grupos de paneles, luego la configurada, luego el default).
  */
-export function resolveAnnualDegradationPct(specs: SystemSpecs): number {
-  if (specs.isDetailed) return specs.annualDegradation;
-  let weighted = 0;
-  let watts = 0;
-  for (const group of specs.panels || []) {
-    const groupWatts = (group.powerW || 0) * (group.count || 0);
-    if (groupWatts <= 0 || !isDegradationPct(group.annualDegradation)) continue;
-    weighted += group.annualDegradation * groupWatts;
-    watts += groupWatts;
-  }
-  if (watts > 0) return weighted / watts;
-  return isDegradationPct(specs.annualDegradation) ? specs.annualDegradation : 0.5;
-}
+export const resolveAnnualDegradationPct = (specs: SystemSpecs): number => resolveAnnualDegradation(specs);
 
 export function calculateFinancialSummary(
   provinceName: string,
@@ -397,13 +386,14 @@ export function calculateFinancialSummary(
   calculationMode: EnergyCalculationMode = 'legacy'
 ): FinancialSummaryResult {
   const dcCapacityKWp = calculateTotalDCCapacityKWp(specs);
+  const assumptions = resolveAssumptions({ specs, rates, financials }); // supuestos efectivos (ADR 0003)
 
   // Custom Quotation Items calculation (Additional Equipment, Materials, and Services)
   const customItems = financials.customItems || [];
   const customDiscounts = financials.customDiscounts || [];
 
   // Calculate cost matrix summary including custom quotation items and discounts
-  const costMatrix = calculateCostMatrixSummary(specs, dcCapacityKWp, customItems, customDiscounts);
+  const costMatrix = calculateCostMatrixSummary(specs, dcCapacityKWp, customItems, customDiscounts, rates);
 
   // Pricing Mode: 'cost_matrix' (default) vs 'direct_watt' (manual $/W or $/kW base price)
   const isDirectWatt = specs.pricingMode === 'direct_watt' || (!specs.isDetailed && specs.pricingMode !== 'cost_matrix');
@@ -559,7 +549,7 @@ export function calculateFinancialSummary(
     specs,
     monthlyConsumptionKWh,
     rates.energyCostPerKWh,
-    rates.gridExportFeePct,
+    assumptions.gridExportFeePct,
     customMonthlyHSP,
     rates.tariffCode,
     rates.isZeroExport,
@@ -580,8 +570,8 @@ export function calculateFinancialSummary(
   const batteryBackupAutonomyHours = batteryAutonomyHours(bank, avgDailyConsumptionKWh);
 
   // 25-Year Cash Flow Projection
-  const annualDegradationPct = resolveAnnualDegradationPct(specs);
-  const annualInflationPct = rates.annualEnergyInflationPct || 3.5;
+  const annualDegradationPct = assumptions.annualDegradationPct;
+  const annualInflationPct = assumptions.annualEnergyInflationPct;
   const annualTaxCredit = financials.applyLey5707 ? ley5707CreditUSD / 3 : 0;
 
   // Initial cash outflow for the client at Year 0:
@@ -594,7 +584,7 @@ export function calculateFinancialSummary(
   let paybackYears = 25.0;
   let paybackFound = false;
 
-  for (let year = 1; year <= financials.projectLifespanYears; year++) {
+  for (let year = 1; year <= assumptions.projectLifespanYears; year++) {
     const degradationFactor = Math.pow(1 - (annualDegradationPct / 100), year - 1);
     const inflationFactor = Math.pow(1 + (annualInflationPct / 100), year - 1);
 
@@ -604,7 +594,7 @@ export function calculateFinancialSummary(
 
     let yearReplacementCost = 0;
     if (specs.hasBattery && specs.batteryReplacementCostUSD && specs.batteryReplacementCostUSD > 0) {
-      const replacementYear = specs.batteryLifespanYears || 10;
+      const replacementYear = assumptions.batteryReplacementYear;
       if (year === replacementYear) {
         yearReplacementCost = specs.batteryReplacementCostUSD;
       }
@@ -635,7 +625,7 @@ export function calculateFinancialSummary(
   const total25YearSavingsUSD = Math.round(cashFlow25Years.reduce((sum, cf) => sum + cf.savingsUSD, 0) * 100) / 100;
 
   // NPV (VAN) Calculation
-  const discountRate = financials.discountRatePct / 100;
+  const discountRate = assumptions.discountRatePct / 100;
   let npvUSD = -initialOutflowUSD;
   for (let t = 0; t < annualNetCashFlows.length; t++) {
     npvUSD += annualNetCashFlows[t] / Math.pow(1 + discountRate, t + 1);
@@ -652,7 +642,7 @@ export function calculateFinancialSummary(
     : 0;
 
   // CO2 avoided calculation (tons/year)
-  const co2AvoidedTonsPerYear = Math.round((annualProductionKWh * (financials.co2FactorKgPerKWh || 0.481) / 1000) * 10) / 10;
+  const co2AvoidedTonsPerYear = Math.round((annualProductionKWh * assumptions.co2FactorKgPerKWh / 1000) * 10) / 10;
 
   // Effective sale price per Watt and per kWp (dynamic across both cost matrix and direct watt modes):
   const salePricePerWattUSD = dcCapacityKWp > 0

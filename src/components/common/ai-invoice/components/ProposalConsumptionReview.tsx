@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ExtractedInvoiceData } from '../../../../types/aiInvoice';
 import type { AIProposalContext } from '../../../../../shared/aiProposal';
+import { resolveAssumption } from '../../../../../shared/assumptions';
 import { calculateRecommendedPanelCount } from '../../../../engine/solarEngine';
 import { INVOICE_MONTH_NAMES } from '../types';
 interface Props {draft:ExtractedInvoiceData;context:AIProposalContext;production:number[]|null;update:(patch:Partial<ExtractedInvoiceData>)=>void}
@@ -30,7 +31,7 @@ export function ProposalConsumptionReview({draft,context,production,update}:Prop
       {complete&&peak>0&&<div className="proposal-peak-action">{peakConfirm?<><p>Se sustituirán los doce meses por {peak} kWh. El historial pasará a estimado.</p><button type="button" onClick={()=>{update({monthlyConsumptionKWh:Array(12).fill(peak),observedMonthlyConsumptionKWh:Array(12).fill(peak),consumptionSource:'estimated'});setPeakConfirm(false);}}>Confirmar estimación con mes pico</button><button type="button" onClick={()=>setPeakConfirm(false)}>Cancelar</button></>:<button type="button" onClick={()=>setPeakConfirm(true)}>Usar mes pico ({peak} kWh) como estimación anual</button>}</div>}
     </section>
     <section><h3>Dimensionamiento revisable</h3><p className="proposal-note">La meta compara generación anual con consumo; no garantiza el mismo ahorro facturable. Cambiar la meta conserva cantidades hasta aplicar el cálculo.</p>
-      <div className="proposal-fields"><label>Cobertura objetivo (%)<input type="number" min="1" max="300" value={draft.targetCoveragePct ?? 95} onChange={e=>update({targetCoveragePct:Number(e.target.value)})}/></label><label>Modelo a dimensionar<select value={adjustable} onChange={e=>setAdjustable(Number(e.target.value))}>{panels.map((g,i)=><option key={i} value={i}>{g.brandModel}</option>)}</select></label></div>
+      <div className="proposal-fields"><label>Cobertura objetivo (%)<input type="number" min="1" max="300" value={resolveAssumption('targetCoveragePct', draft.targetCoveragePct)} onChange={e=>update({targetCoveragePct:Number(e.target.value)})}/></label><label>Modelo a dimensionar<select value={adjustable} onChange={e=>setAdjustable(Number(e.target.value))}>{panels.map((g,i)=><option key={i} value={i}>{g.brandModel}</option>)}</select></label></div>
       <div className="proposal-sizing-result">{draft.consumptionSource==='theoretical'&&<p>La demanda deriva de los equipos: ajusta modelos y cantidades en Equipos. No se redimensiona contra su propia producción.</p>}<p>Objetivo: <strong>{(sizing.targetAnnualKWh/sizing.annualSpecificYieldKWhPerKWp).toFixed(2)} kWp</strong> · Instalado: <strong>{(draft.recommendedCapacityKWp || 0).toFixed(2)} kWp</strong></p>{remainingKWh<=0&&complete?<p>Los otros grupos ya cubren la meta. Revisa manualmente este grupo; no se eliminará automáticamente.</p>:<p>Cantidad sugerida para este modelo: <strong>{complete?suggested:'pendiente'}</strong>. Los demás grupos, inversores y baterías se conservan.</p>}<button type="button" disabled={draft.consumptionSource==='theoretical'||!complete||annual<=0||!chosen||suggested<1||suggested>100000} onClick={()=>update({panels:panels.map((g,i)=>i===adjustable?{...g,count:suggested}:g)})}>Aplicar cantidad sugerida</button></div>
     </section>
   </>;

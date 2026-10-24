@@ -1,3 +1,4 @@
+import { DEFAULT_DOP_RATE } from "../../shared/assumptions";
 import {
   ExtractedPriceCatalogResult,
   ExtractedPriceCatalogItem,
@@ -160,7 +161,7 @@ export class GeminiPriceCatalogService {
       manualSupplierName,
       existingSuppliers = [],
       currentCatalog,
-      dopExchangeRate = 60.0,
+      dopExchangeRate = DEFAULT_DOP_RATE,
       onProgress,
     } = options;
 

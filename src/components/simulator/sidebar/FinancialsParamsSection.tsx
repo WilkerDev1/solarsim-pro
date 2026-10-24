@@ -7,6 +7,7 @@ import { calculateTotalDCCapacityKWp } from '../../../utils/equipmentSpecsUtils'
 import { ParamRow, ToggleGroup } from '../params/ui';
 import { DiscountsList } from '../params/sections/finance/DiscountsList';
 import { ItemsList } from '../params/sections/finance/ItemsList';
+import { resolveAssumptions } from '../../../../shared/assumptions';
 import { NumberField } from '../params/sections/pricing/NumberField';
 import { newCustomDiscount, newCustomItem, patchById, removeById } from '../params/sections/finance/quotationEdits';
 
@@ -27,8 +28,8 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
 
   const matrixSummary = React.useMemo(() => {
     const dcCap = project.specs ? calculateTotalDCCapacityKWp(project.specs) : 1;
-    return calculateCostMatrixSummary(project.specs, dcCap, customItems);
-  }, [project.specs, customItems]);
+    return calculateCostMatrixSummary(project.specs, dcCap, customItems, undefined, project.rates);
+  }, [project.specs, project.rates, customItems]);
 
   const listPriceUSD = matrixSummary.listPorcentajeVentaUSD || matrixSummary.porcentajeVentaUSD || 0;
   const totals = computeQuotationAdjustments(customItems, customDiscounts, listPriceUSD);
@@ -56,7 +57,7 @@ export const FinancialsParamsSection: React.FC<FinancialsParamsSectionProps> = (
           id="pd-discount-rate"
           step="0.1"
           suffix="%"
-          value={project.financials.discountRatePct}
+          value={resolveAssumptions(project).discountRatePct}
           onValue={(discountRatePct) => updateFinancials({ discountRatePct })}
         />
       </ParamRow>

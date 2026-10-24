@@ -22,6 +22,8 @@ import { UtilityDistributor, getDistributorTariffOptions } from '../../../types/
 import { AITariffResolutionModal } from './AITariffResolutionModal';
 import { TariffPreferencesPanel } from './TariffPreferencesPanel';
 import { DEFAULT_PRICE_PER_WATT_USD } from '../../../../shared/projectDefaults';
+import { DEFAULT_ANNUAL_DEGRADATION_PCT, DEFAULT_ENERGY_INFLATION_PCT, DEFAULT_PROJECT_LIFESPAN_YEARS, DEFAULT_QUOTE_VALIDITY_DAYS, DEFAULT_SYSTEM_LOSSES_PCT, DEFAULT_TARGET_COVERAGE_PCT } from '../../../../shared/assumptions';
+import { DEFAULT_TARGET_MARGIN_PCT } from '../../../store/defaultSimulationSettings';
 
 export const SimulationPreferencesSection: React.FC = () => {
   const {
@@ -181,7 +183,7 @@ export const SimulationPreferencesSection: React.FC = () => {
                 min={50}
                 max={150}
                 value={defs.defaultTargetCoveragePct}
-                onChange={(e) => updateDefaultSimulationSettings({ defaultTargetCoveragePct: parseInt(e.target.value) || 95 })}
+                onChange={(e) => updateDefaultSimulationSettings({ defaultTargetCoveragePct: parseInt(e.target.value) || DEFAULT_TARGET_COVERAGE_PCT })}
                 className="w-full accent-emerald-600 cursor-pointer h-2 bg-slate-200 dark:bg-[#27272a] rounded-lg"
               />
             </div>
@@ -210,7 +212,7 @@ export const SimulationPreferencesSection: React.FC = () => {
                   max={50}
                   step={0.5}
                   value={defs.defaultSystemLosses}
-                  onChange={(e) => updateDefaultSimulationSettings({ defaultSystemLosses: parseFloat(e.target.value) || 25.0 })}
+                  onChange={(e) => updateDefaultSimulationSettings({ defaultSystemLosses: parseFloat(e.target.value) || DEFAULT_SYSTEM_LOSSES_PCT })}
                   className="w-full px-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-800 dark:text-zinc-200"
                 />
               </div>
@@ -227,7 +229,7 @@ export const SimulationPreferencesSection: React.FC = () => {
                   max={5}
                   step={0.05}
                   value={defs.defaultAnnualDegradation}
-                  onChange={(e) => updateDefaultSimulationSettings({ defaultAnnualDegradation: parseFloat(e.target.value) || 0.40 })}
+                  onChange={(e) => updateDefaultSimulationSettings({ defaultAnnualDegradation: parseFloat(e.target.value) || DEFAULT_ANNUAL_DEGRADATION_PCT })}
                   className="w-full px-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-800 dark:text-zinc-200"
                 />
               </div>
@@ -240,7 +242,7 @@ export const SimulationPreferencesSection: React.FC = () => {
                   min={10}
                   max={40}
                   value={defs.lifespanYears}
-                  onChange={(e) => updateDefaultSimulationSettings({ lifespanYears: parseInt(e.target.value) || 25 })}
+                  onChange={(e) => updateDefaultSimulationSettings({ lifespanYears: parseInt(e.target.value) || DEFAULT_PROJECT_LIFESPAN_YEARS })}
                   className="w-full px-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-800 dark:text-zinc-200"
                 />
               </div>
@@ -347,7 +349,7 @@ export const SimulationPreferencesSection: React.FC = () => {
                   min={1}
                   max={60}
                   value={defs.defaultQuoteValidityDays}
-                  onChange={(e) => updateDefaultSimulationSettings({ defaultQuoteValidityDays: parseInt(e.target.value) || 7 })}
+                  onChange={(e) => updateDefaultSimulationSettings({ defaultQuoteValidityDays: parseInt(e.target.value) || DEFAULT_QUOTE_VALIDITY_DAYS })}
                   className="w-full px-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-800 dark:text-zinc-200"
                 />
               </div>
@@ -528,7 +530,7 @@ export const SimulationPreferencesSection: React.FC = () => {
                   min={0}
                   max={100}
                   value={defs.defaultTargetMarginPct}
-                  onChange={(e) => updateDefaultSimulationSettings({ defaultTargetMarginPct: parseFloat(e.target.value) || 28 })}
+                  onChange={(e) => updateDefaultSimulationSettings({ defaultTargetMarginPct: parseFloat(e.target.value) || DEFAULT_TARGET_MARGIN_PCT })}
                   className="w-full px-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-800 dark:text-zinc-200"
                 />
               </div>
@@ -593,7 +595,7 @@ export const SimulationPreferencesSection: React.FC = () => {
                   type="number"
                   step={0.1}
                   value={defs.annualEnergyTariffEscalationPct}
-                  onChange={(e) => updateDefaultSimulationSettings({ annualEnergyTariffEscalationPct: parseFloat(e.target.value) || 3.5 })}
+                  onChange={(e) => updateDefaultSimulationSettings({ annualEnergyTariffEscalationPct: parseFloat(e.target.value) || DEFAULT_ENERGY_INFLATION_PCT })}
                   className="w-full px-3.5 py-2 rounded-xl text-sm border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] text-slate-800 dark:text-zinc-200"
                 />
                 <span className="text-[10px] text-slate-400 mt-1 block">Incremento promedio de inflación energética.</span>

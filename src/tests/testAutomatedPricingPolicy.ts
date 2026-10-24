@@ -62,12 +62,12 @@ const dcKWp = (prepared.specs.panels || []).reduce((sum, g) => sum + g.powerW * 
 const perW = Math.round(dcKWp * 1000 * (prepared.specs.pricePerWattUSD || 1.13) * 100) / 100;
 assert.notEqual(summary.grossInvestmentUSD, perW, 'gross investment is not the price-per-W total');
 
-// 6. Degradation in Simple mode follows the catalog panels, then the configured value, then 0.5%.
+// 6. Degradation in Simple mode follows the catalog panels, then the configured value, then the shared default (0.4 %, ADR 0003; before it was a 0.5 % literal).
 const groupSpecs = { ...BENCHMARK_PROJECT.specs, isDetailed: false, annualDegradation: 0.4,
   panels: [{ id: 'a', brandModel: 'A', powerW: 600, count: 10, annualDegradation: 0.3 }, { id: 'b', brandModel: 'B', powerW: 400, count: 10, annualDegradation: 0.55 }] };
 assert(Math.abs(resolveAnnualDegradationPct(groupSpecs) - 0.4) < 1e-9, 'DC-weighted average of catalog panel degradation');
 assert.equal(resolveAnnualDegradationPct({ ...groupSpecs, panels: undefined }), 0.4, 'falls back to the configured degradation');
-assert.equal(resolveAnnualDegradationPct({ ...groupSpecs, panels: undefined, annualDegradation: undefined as unknown as number }), 0.5);
+assert.equal(resolveAnnualDegradationPct({ ...groupSpecs, panels: undefined, annualDegradation: undefined as unknown as number }), 0.4); // ADR 0003: el default de degradación es uno solo (0.4 %), el de los ajustes de fábrica; antes el motor usaba 0.5 %
 assert.equal(resolveAnnualDegradationPct({ ...groupSpecs, isDetailed: true, annualDegradation: 0.7 }), 0.7, 'detailed mode is unchanged');
 
 // 7. Agents cannot switch a proposal to per-W pricing.
