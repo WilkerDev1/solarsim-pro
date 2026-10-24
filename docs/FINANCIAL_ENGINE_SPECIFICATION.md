@@ -2,7 +2,11 @@
 
 Contrato matemático implementado en `src/engine/financeEngine.ts` (`calculateCostMatrixSummary`, `calculateFinancialSummary`, `calculateProjectFinancialSummary`) y, para la energía, `src/engine/solarEngine.ts`. Describe el comportamiento actual del código; no es una validación jurídica de la normativa. Antes de cambiar fórmulas, revisar este documento y [ENERGY_BALANCE_AND_SELF_CONSUMPTION_SPECIFICATION.md](ENERGY_BALANCE_AND_SELF_CONSUMPTION_SPECIFICATION.md).
 
-Todos los importes se calculan en USD; DOP se obtiene con la tasa `dopExchangeRate` (60 si falta). La mayoría de los resultados se redondean a 2 decimales.
+Todos los importes se calculan en USD; DOP se obtiene con la tasa `dopExchangeRate` (`specs.dopExchangeRate`, si no `rates.usdExchangeRate`, si no 60). La mayoría de los resultados se redondean a 2 decimales.
+
+### Supuestos efectivos
+
+Los valores por defecto de este documento (60, 14/25 %, 3,5 %, 12 %, 25 años, 95 %, 25 %, 0,4 %, año 10, 1,13 $/W, 1,25, 170 USD/kWp, 0,481) viven en un solo lugar: `shared/assumptions.ts` ([ADR 0003](adr/0003-supuestos-resueltos.md)). `resolveAssumptions(proyecto)` los resuelve con la tabla `ASSUMPTION_RULES`: un dato ausente, no finito o fuera del rango válido toma el default; un 0 explícito se respeta en inflación, descuento, pérdidas, degradación, mano de obra y retención de exportación, y en tasa de cambio, vida del proyecto, vigencia, cobertura, año de reemplazo, $/W, margen y factor de CO₂ equivale a «sin dato». Los conteos de años y días (vida, año de reemplazo, vigencia) deben ser enteros. Una propuesta guardada nunca toma los ajustes del usuario: estos solo siembran propuestas nuevas (`assumptionFields`). Los motores, el PDF, el dock y el visor leen la misma resolución.
 
 ## 1. Generación y balance energético
 
@@ -18,7 +22,7 @@ $$E_{m} = P_{dc} \times \text{HSP}_{m} \times D_{m} \times (1 - L_{sys})$$
 
 - $\text{HSP}_m$: horas solar pico de la provincia (`src/data/rdProvinces`) o vector personalizado de 12 valores positivos.
 - $D_m$: días del mes (febrero = 28).
-- $L_{sys}$: `systemLosses`; si falta, 14% en modo detallado y 25% en modo simple.
+- $L_{sys}$: `systemLosses` (0 es válido; rango 0–99); si falta o es inválido, 14% en modo detallado y 25% en modo simple (`resolveSystemLosses`).
 
 $$E_{anual} = \sum_{m=1}^{12} E_{m}$$
 
@@ -32,7 +36,7 @@ $$E_{auto,m} = \min\left(C_m,\ E_m \times k\right), \quad k = \begin{cases} 0.90
 
 $$E_{exp,m} = \begin{cases} 0 & \text{inyección cero} \\ \max(0,\ E_m - E_{auto,m}) & \text{medición neta} \end{cases}$$
 
-En ambos modos, la retención (`gridExportFeePct`, 25 si falta; 0 en inyección cero) se aplica solo a la energía exportada:
+En ambos modos, la retención (`gridExportFeePct`, 25 si falta; un 0 explícito se respeta; 0 en inyección cero) se aplica solo a la energía exportada:
 
 $$E_{net\_credit,m} = E_{exp,m} \times \left(1 - \frac{F_{grid}}{100}\right)$$
 
@@ -50,15 +54,15 @@ La cobertura no se limita al 100%; es 0 si el consumo anual es 0.
 
 ## 2. Almacenamiento
 
-Capacidad útil y autonomía informadas en el resumen financiero:
+Capacidad útil y autonomía informadas en el resumen financiero. Las calcula solo `batteryBank` / `batteryAutonomyHours` (`shared/equipment/battery.ts`, [ADR 0002](adr/0002-banco-de-baterias.md)); el motor solar, el resumen financiero, el PDF y la vista previa del dock usan el mismo banco:
 
 $$E_{bat,util} = C_{nominal} \times \frac{\text{DoD}}{100} \times \frac{\eta}{100}$$
 
-con el DOD y la eficiencia de cada grupo de baterías (`dodPct` y `efficiencyPct`, ponderados por grupo; 90/90 si faltan o no son > 0; constantes únicas en `shared/projectDefaults.ts`, las mismas que usan `solarEngine.ts`, el dock y `getProjectBatteries`). Antes el resumen financiero usaba 80/92 y el despacho físico 90/90.
+con $C_{nominal}$ la suma de capacidad × cantidad de los grupos de baterías (2 decimales) y el DOD y la eficiencia de cada grupo (`dodPct` y `efficiencyPct`; 90/90 si faltan o están fuera de 1–100; DOD ponderado por capacidad y eficiencia ponderada por capacidad × DOD). Un banco de 0 kWh (por ejemplo, «Sí batería» con cantidad 0) no almacena: energía útil 0 kWh y autonomía 0 h. El resumen redondea la energía útil a 0,1 kWh.
 
 $$L_{prom} = \frac{E_{consumo\_anual}}{365 \times 24}, \qquad T_{autonomía} = \frac{E_{bat,util}}{L_{prom}} \quad [\text{h}]$$
 
-Si el consumo anual es 0 se asume 100 kWh/día para el promedio.
+La autonomía se redondea a 0,1 h; sin almacenamiento o sin carga es 0. Si el consumo anual es 0 se asume 100 kWh/día para el promedio.
 
 ## 3. Matriz de costos (`calculateCostMatrixSummary`)
 
@@ -152,14 +156,14 @@ $$I_{neta} = \text{Precio de contrato} - \text{Crédito Ley 57-07}$$
 
 Desembolso del año 0: $CF_0 = \text{Precio de contrato}$.
 
-Para $t = 1 \dots N$ (`projectLifespanYears`):
+Para $t = 1 \dots N$ (`projectLifespanYears`, entero; 25 si falta o es 0):
 
 $$CF_t = S_{yr1} \times (1 - d)^{t-1} \times (1 + i)^{t-1} + \text{Crédito}_t - \text{Reemplazo}_t$$
 
-- $d$ (`resolveAnnualDegradationPct`): en modo detallado, `annualDegradation`. En modo simple, la degradación de los grupos de paneles del catálogo ponderada por potencia DC; si ningún grupo la trae, `annualDegradation`; si falta, 0.5%. Hasta 2.6.x el modo simple usaba siempre 0.5%, así que las propuestas simples existentes pueden ver un flujo de caja ligeramente distinto al recalcular (los enlaces publicados conservan su `calculationSnapshot`).
-- $i$: `annualEnergyInflationPct` (3.5% si falta).
+- $d$ (`resolveAnnualDegradation`, `shared/assumptions.ts`): en modo detallado, `annualDegradation`. En modo simple, la degradación de los grupos de paneles del catálogo ponderada por potencia DC; si ningún grupo la trae, `annualDegradation`; si falta o está fuera de 0–5%, 0.4%. Un 0 explícito se respeta. Hasta 2.6.x el modo simple usaba siempre 0.5%, así que las propuestas simples existentes pueden ver un flujo de caja ligeramente distinto al recalcular (los enlaces publicados conservan su `calculationSnapshot`).
+- $i$: `annualEnergyInflationPct` (3.5% si falta o es inválida; una inflación de 0% se respeta).
 - $\text{Crédito}_t = \text{Crédito Ley 57-07}/3$ para $t \le 3$, si no 0.
-- $\text{Reemplazo}_t$ = `batteryReplacementCostUSD` en el año `batteryLifespanYears` (10 si falta), solo con batería y costo positivo.
+- $\text{Reemplazo}_t$ = `batteryReplacementCostUSD` en el año `batteryLifespanYears` (entero; 10 si falta o es 0), solo con batería y costo positivo.
 
 ## 6. Indicadores
 
@@ -167,7 +171,7 @@ $$CF_t = S_{yr1} \times (1 - d)^{t-1} \times (1 + i)^{t-1} + \text{Crédito}_t -
 
 $$\text{Payback} = (k - 1) + \frac{|\text{Acumulado}_{k-1}|}{CF_k}$$
 
-**VAN** con $r$ = `discountRatePct`:
+**VAN** con $r$ = `discountRatePct` (12% si falta; un 0 es válido):
 
 $$\text{VAN} = -CF_0 + \sum_{t=1}^{N} \frac{CF_t}{(1 + r)^t}$$
 

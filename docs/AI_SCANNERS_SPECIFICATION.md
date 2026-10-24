@@ -20,7 +20,7 @@ Contrato del código de esta rama, revisado el 8 de octubre de 2026. Describe co
 - Los consumos observados se distinguen de estimaciones y contexto del proyecto. Un promedio mensual puede producir doce valores estimados, señalados como tales; un historial documental incompleto exige completar los meses ausentes.
 - La intención comercial debe revisarse como margen sobre venta o recargo sobre costo. No son equivalentes. Las notas de ingeniería no se concatenan a la descripción estándar de instalación.
 
-`src/store/slices/aiSlice.ts` vuelve a validar al aplicar y convierte los grupos a las estructuras multi-equipo del proyecto. La creación utiliza el perfil y plantilla documental de la empresa emisora. No se cambian los contratos financieros, el modo legacy predeterminado ni la autorización por organización como efecto de una respuesta IA.
+`src/store/slices/aiSlice.ts` vuelve a validar al aplicar y convierte los grupos a las estructuras multi-equipo del proyecto. Los supuestos de una propuesta nueva de IA salen de `assumptionFields` (vigencia de los ajustes, cambio 60, cobertura 95 % si falta o es inválida; [ADR 0003](adr/0003-supuestos-resueltos.md)) y, sobre una propuesta existente, las specs pasan por `normalizeProjectEquipment`, la misma normalización que una edición ([ADR 0004](adr/0004-edicion-de-proyecto.md)). La creación utiliza el perfil y plantilla documental de la empresa emisora. No se cambian los contratos financieros, el modo legacy predeterminado ni la autorización por organización como efecto de una respuesta IA.
 
 ## Fichas técnicas e inventario
 
