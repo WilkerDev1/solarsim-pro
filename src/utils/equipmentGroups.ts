@@ -80,10 +80,10 @@ const normalizeModelName = (name: string) => name.normalize('NFD').replace(/[\u0
  * mayúsculas, acentos o espacios conservan el vínculo; cualquier otro cambio (incluso de un carácter: 550 → 560)
  * puede ser otro modelo, y adjuntar la ficha técnica equivocada es peor que no adjuntar ninguna. El grupo queda con
  * `manualModel`, con lo que `resolveGroupCatalogItem` ya no lo resuelve por `catalogItemId` ni por `id`; el nombre exacto y
- * único de un equipo del catálogo lo revincula. `catalogLoaded` en falso (catálogo vacío) trata todo id de grupo como posible
- * identidad de catálogo.
+ * único de un equipo del catálogo lo revincula. `catalogLoaded` en falso trata todo id de grupo como posible identidad de
+ * catálogo; si el llamador no lo indica se asume no cargado cuando el catálogo está vacío (el trato conservador).
  */
-export function detachedCatalogIdentity(kind: EquipmentKind, group: CatalogLinkedGroup, brandModel: string, catalog: readonly SolarEquipmentItem[], catalogLoaded = true): CatalogLinkPatch {
+export function detachedCatalogIdentity(kind: EquipmentKind, group: CatalogLinkedGroup, brandModel: string, catalog: readonly SolarEquipmentItem[], catalogLoaded: boolean = catalog.length > 0): CatalogLinkPatch {
   const linked = resolveGroupCatalogItem(group, kind, catalog);
   // Un id igual al catalogItemId (propuestas de IA) es identidad de catálogo aunque el catálogo aún no haya sincronizado.
   // Con el catálogo sin cargar no se puede descartar que el id lo sea: al cargar, el resolvedor lo usaría con el modelo ya cambiado.

@@ -4,9 +4,10 @@ import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { buildProjectFromDraft } from '../store/slices/aiSlice';
 import { prepareProposalDraftProject } from '../utils/proposalDraftProject';
 import { proposalDatasheets } from '../utils/proposalDatasheets';
-import { resolveGroupCatalogItem } from '../utils/equipmentGroups';
+import { detachedCatalogIdentity, resolveGroupCatalogItem } from '../utils/equipmentGroups';
+import { createGroupActions } from '../components/simulator/params/sections/equipment/equipmentGroupModel';
 import { DEFAULT_RD_TARIFF_MATRIX } from '../data/rdTariffs';
-import type { ProjectSimulation } from '../types';
+import type { PanelItemSpec, ProjectSimulation, SystemSpecs } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
 
 /**
@@ -121,5 +122,23 @@ assert.deepEqual(keys(linkedProject()), ['ds-inv-a', 'ds-panel-a']);
   } finally {
     store.setState(original, true);
   }
+}
+// 8. Dock: renombrar a mano un grupo cuyo id es el de un equipo del catálogo, con el catálogo aún vacío, también lo desvincula.
+{
+  const project = linkedProject('panel-a');
+  const group: PanelItemSpec = { id: 'panel-a', brandModel: 'Panel A 600W', powerW: 600, count: 12, unitPriceUSD: 100 };
+  const specs: SystemSpecs = { ...project.specs, panels: [group] };
+  const patches: Partial<SystemSpecs>[] = [];
+  createGroupActions('panel', specs, [], (patch) => patches.push(patch)).setBrand(0, 'Panel C Desconocido');
+  const renamed = patches[0].panels![0];
+  assert.equal(renamed.manualModel, true, 'sin catálogo cargado el id del grupo se trata como posible identidad de catálogo');
+  assert.equal(resolveGroupCatalogItem(renamed, 'panel', catalog), null, 'tras la sincronización el id viejo no resuelve el modelo anterior');
+  // Con el catálogo cargado, un id que no es de catálogo sigue siendo un id cualquiera (no se marca manual por renombrar).
+  const plain: SystemSpecs = { ...specs, panels: [{ ...group, id: 'primary-panel', brandModel: 'Modelo propio' }] };
+  patches.length = 0;
+  createGroupActions('panel', plain, catalog, (patch) => patches.push(patch)).setBrand(0, 'Otro nombre');
+  assert.notEqual(patches[0].panels![0].manualModel, true);
+  // Un llamador que no sabe si el catálogo cargó recibe el trato conservador (no cargado).
+  assert.equal(detachedCatalogIdentity('panel', { id: 'panel-a', brandModel: 'Panel A 600W' }, 'Panel C Desconocido', []).manualModel, true);
 }
 console.log('Scalar proposal drafts re-link or detach the group catalog identity.');

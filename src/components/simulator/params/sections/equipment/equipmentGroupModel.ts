@@ -179,7 +179,7 @@ export function createGroupActions<K extends EquipmentKind>(
     setCount: (index, count) => update(index, { count: wholeCount(count) } as Partial<GroupItem[K]>),
     setBrand: (index, brandModel) => {
       const group = itemsOf(specs, kind)[index];
-      update(index, { brandModel, ...(group ? detachedCatalogIdentity(kind, group, brandModel, catalog) : {}) } as Partial<GroupItem[K]>);
+      update(index, { brandModel, ...(group ? detachedCatalogIdentity(kind, group, brandModel, catalog, catalog.length > 0) : {}) } as Partial<GroupItem[K]>);
     },
     setMagnitude: (index, value) => update(index, { [field]: value } as Partial<GroupItem[K]>),
   };
