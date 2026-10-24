@@ -24,7 +24,7 @@ Los instaladores están en [Releases](https://github.com/WilkerDev1/solarsim-pro
 | Windows x64 | instalador (`Setup`) y portable |
 | Linux x64 | AppImage, `.deb`, `.pacman` y `.tar.gz` |
 
-Los paquetes Linux y los manifiestos de actualización se firman con la clave GPG de SolarSim (`solarsim-public-key.asc` en cada release); la aplicación verifica la firma antes de instalar una actualización. Windows no tiene firma Authenticode. macOS y ARM no se publican. Detalles en [docs/MAINTENANCE_AND_UPDATES.md](docs/MAINTENANCE_AND_UPDATES.md).
+Los paquetes Linux y los manifiestos de actualización se firman con la clave GPG de SolarSim (`solarsim-public-key.asc` en cada release). Con `.deb` y `.pacman`, la aplicación verifica esas firmas antes de instalar una actualización. AppImage no se actualiza sola: se reemplaza a mano después de verificar su `.sig`. Windows se actualiza con electron-updater y no tiene firma Authenticode ni GPG. macOS y ARM no se publican. Detalles en [docs/MAINTENANCE_AND_UPDATES.md](docs/MAINTENANCE_AND_UPDATES.md).
 
 ## Arquitectura
 
@@ -69,7 +69,7 @@ npm --prefix server ci && npm --prefix server test
 npm --prefix workers/share-viewer ci && npm --prefix workers/share-viewer test
 ```
 
-Las pruebas del cliente no pueden llamar a la red: inyectan un transporte sintético, y ninguna escribe en servidores de producción.
+El entorno de pruebas del cliente hace que `fetch` falle, así que las pruebas inyectan un transporte sintético. Ninguna prueba puede escribir en servidores de producción.
 
 ### Flujo de trabajo
 
