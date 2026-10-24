@@ -12,6 +12,12 @@ import { migrateDefaultSimulationSettings } from '../defaultSimulationSettings';
 import { normalizeAgentPolicy } from '../slices/agentSlice';
 import { migrateLegacySpecs } from '../../../shared/equipment';
 
+/** Servidores retirados: el dominio anterior y cualquier servidor HTTP sin TLS en la LAN 10.0.0.0/8 (el de antes del túnel). */
+function isLegacyServerUrl(url: string | undefined): boolean {
+  if (url === 'https://api.electsun.com') return true;
+  return /^http:\/\/10(\.\d{1,3}){3}(:\d+)?\/?$/.test(url ?? '');
+}
+
 export function hydrateSimulationStore(state: SimulationStore | undefined): void {
   if (state && state.projects && Array.isArray(state.projects)) {
     // Remove legacy hardcoded mock projects and purge expired trash projects (>30 days)
@@ -155,9 +161,9 @@ export function hydrateSimulationStore(state: SimulationStore | undefined): void
       state.folders = state.folders.filter((f) => !mockFolderIds.has(f.id));
     }
 
-    // Auto-migrate legacy serverUrl to official Cloudflare domain. (The pre-tunnel LAN address was migrated by every
-    // client that hydrated since 2.x; it is no longer listed so production addresses stay out of the public repo.)
-    if (state.syncSettings && (state.syncSettings.serverUrl === 'https://api.electsun.com' || !state.syncSettings.serverUrl)) {
+    // Auto-migrate legacy serverUrl to official Cloudflare domain: the old domain, an empty URL, or the pre-tunnel server,
+    // which was reached over plain HTTP on the office LAN (10.0.0.0/8). The rule avoids listing production addresses.
+    if (state.syncSettings && (isLegacyServerUrl(state.syncSettings.serverUrl) || !state.syncSettings.serverUrl)) {
       state.syncSettings.serverUrl = 'https://solarsim.electsun.net';
     }
 
