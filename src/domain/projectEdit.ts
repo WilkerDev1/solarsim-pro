@@ -191,8 +191,12 @@ function editSpecs(project: ProjectSimulation, patch: Partial<SystemSpecs>, cata
   return { ...project, specs, financials: withoutStaleFinancialOverrides(project, project.financials) };
 }
 
-/** Cuando cambia el modelo principal, se suelta el proveedor elegido que no cotiza el modelo nuevo (el proveedor vive en el grupo). */
+/**
+ * Cuando cambia el modelo principal, se suelta el proveedor elegido que no cotiza el modelo nuevo (el proveedor vive en el grupo).
+ * Con el catálogo sin cargar (vacío) no se sabe quién cotiza el modelo nuevo y el proveedor se conserva.
+ */
 function dropSupplierOfChangedModel(previous: SystemSpecs, specs: SystemSpecs, catalog: readonly SolarEquipmentItem[]): SystemSpecs {
+  if (catalog.length === 0) return specs;
   const before = readEquipment(previous);
   let result = specs;
   const lists = [['panel', 'panels'], ['inverter', 'inverters'], ['battery', 'batteries']] as const;

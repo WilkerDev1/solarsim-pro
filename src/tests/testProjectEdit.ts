@@ -191,6 +191,9 @@ function runMatrix(apply: Apply, label: string) {
     assert.equal(panelsOf(chosen)[0].selectedSupplierInfo?.supplierName, 'Beta', t('si la edición elige proveedor, se conserva'));
     const same = apply(p, { kind: 'specs', patch: { systemLosses: 11 } });
     assert.equal(panelsOf(same)[0].selectedSupplierInfo?.supplierName, 'Alfa', t('sin cambio de modelo el proveedor queda'));
+    // Con el catálogo sin cargar (vacío) no se sabe quién cotiza el modelo nuevo: el proveedor se conserva.
+    const unloaded = apply(p, { kind: 'specs', patch: editEquipmentGroup(p.specs, 'panel', { type: 'update', index: 0, patch: { brandModel: 'Panel B 700W' } }) }, []);
+    assert.equal(panelsOf(unloaded)[0].selectedSupplierInfo?.supplierName, 'Alfa', t('con el catálogo vacío el cambio de modelo conserva el proveedor'));
   }
 
   { // Sobrescrituras financieras manuales: solo sobreviven en el caso de referencia auditado.
