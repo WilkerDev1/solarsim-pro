@@ -37,8 +37,7 @@ export const UnitCosts: React.FC<UnitCostsProps> = ({ specs, equipmentCatalog, s
       unitPriceUSD?: number;
       selectedSupplierInfo?: { supplierName: string; priceUSD: number };
       equipment: SolarEquipmentItem | undefined;
-    }>,
-    flat: number | undefined
+    }>
   ) =>
     models.map((model, idx) => {
       const count = model.equipment?.supplierPrices?.length || 0;
@@ -53,7 +52,7 @@ export const UnitCosts: React.FC<UnitCostsProps> = ({ specs, equipmentCatalog, s
           onOpenSuppliers={model.equipment ? () => openSupplierPriceModal(model.equipment!) : undefined}
           supplierName={info?.supplierName}
           supplierTitle={info ? `Proveedor: ${info.supplierName} ($${info.priceUSD} USD)` : undefined}
-          value={displayedUnitPrice(model.unitPriceUSD, flat, kind)}
+          value={displayedUnitPrice(model.unitPriceUSD, kind)}
           onChange={(value) => updateSpecs(manualUnitPricePatch(specs, kind, idx, value))}
         />
       );
@@ -84,16 +83,14 @@ export const UnitCosts: React.FC<UnitCostsProps> = ({ specs, equipmentCatalog, s
         getProjectPanels(specs).map((p) => ({
           ...p,
           equipment: resolveProjectEquipment(equipmentCatalog, 'panel', p.brandModel, p.powerW, p.selectedSupplierInfo?.supplierPriceId),
-        })),
-        specs.panelUnitPriceUSD
+        }))
       )}
       {renderModels(
         'inverter',
         getProjectInverters(specs).map((inv) => ({
           ...inv,
           equipment: resolveProjectEquipment(equipmentCatalog, 'inverter', inv.brandModel, inv.powerKW, inv.selectedSupplierInfo?.supplierPriceId),
-        })),
-        specs.inverterUnitPriceUSD
+        }))
       )}
       {specs.hasBattery &&
         renderModels(
@@ -101,8 +98,7 @@ export const UnitCosts: React.FC<UnitCostsProps> = ({ specs, equipmentCatalog, s
           getProjectBatteries(specs).map((bat) => ({
             ...bat,
             equipment: resolveProjectEquipment(equipmentCatalog, 'battery', bat.brandModel, bat.capacityKWh, bat.selectedSupplierInfo?.supplierPriceId),
-          })),
-          specs.batteryUnitPriceUSD
+          }))
         )}
       <UnitCostRow
         id="pd-cost-installation"

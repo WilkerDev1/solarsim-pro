@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { BENCHMARK_PROJECT } from '../engine/referenceCase';
+import { BENCHMARK_LEGACY_SPECS, BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateCostMatrixSummary, calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { getProjectBatteries } from '../utils/equipmentSpecsUtils';
 import type { ProjectSimulation, SystemSpecs } from '../types';
@@ -21,7 +21,8 @@ const h = React.createElement;
 const noop = () => {};
 const render = (node: React.ReactElement) => renderToStaticMarkup(node);
 const valueOf = (html: string, id: string): string | undefined => new RegExp(`id="${id}"[^>]*value="([^"]*)"`).exec(html)?.[1];
-const base = structuredClone(BENCHMARK_PROJECT);
+// Propuesta heredada (solo espejo, sin grupos): el dock y el motor siguen leyéndola por el módulo de equipos.
+const base = { ...structuredClone(BENCHMARK_PROJECT), specs: { ...BENCHMARK_LEGACY_SPECS } };
 const projectOf = (specs: Partial<SystemSpecs> = {}): ProjectSimulation => ({ ...base, specs: { ...base.specs, ...specs } });
 
 // ── Bug 1: borrador de DOD/eficiencia ───────────────────────────────────────────────────────

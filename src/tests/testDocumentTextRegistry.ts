@@ -1,3 +1,4 @@
+import { readEquipment } from '../../shared/equipment';
 import assert from 'node:assert/strict';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateProjectFinancialSummary } from '../engine/financeEngine';
@@ -75,7 +76,10 @@ function legacySites(project: ProjectSimulation, summary: FinancialSummaryResult
     return [p1, p2, p3, p4];
   };
   const clientName = cleanClientName(project.client.name || 'Cliente');
-  const s = project.specs;
+  // Oráculo independiente: lee el primer grupo de cada tipo como los campos sueltos que usaba el formato heredado.
+  const groups = readEquipment(project.specs);
+  const [g1, g2, g3] = [groups.panels[0], groups.inverters[0], groups.batteries[0]];
+  const s = { ...project.specs, panelBrandModel: g1?.brandModel, panelPowerW: g1?.powerW, panelCount: g1?.count, inverterBrandModel: g2?.brandModel, inverterPowerKW: g2?.powerKW, inverterCount: g2?.count, batteryBrandModel: g3?.brandModel, batteryCapacityKWh: g3?.capacityKWh, batteryCount: g3?.count } as typeof project.specs;
   const rawPanelModel = s.panelBrandModel || 'Módulos Monocristalinos TOPCon';
   const panelModel = (rawPanelModel.toLowerCase().includes('w') || (s.panelPowerW || 0) <= 0) ? rawPanelModel : `${rawPanelModel} (${s.panelPowerW}W)`;
   const rawInverterModel = s.inverterBrandModel || 'Inversor Solar Inteligente';
@@ -93,8 +97,8 @@ function legacySites(project: ProjectSimulation, summary: FinancialSummaryResult
   const defaultParagraph1 = `El consumo promedio anual de **${clientName}** es de **${fmt(summary.annualConsumptionKWh)} kWh**, por lo que se le propone la instalación de **${panelsSummaryText}**, alcanzando una potencia DC instalada de **${summary.systemCapacityKWp.toFixed(2)} kWp**. La producción energética estimada para este sistema es de **${fmt(summary.annualProductionKWh)} kWh anuales**, representando el **${summary.energyCoveragePct.toFixed(1)}%** del consumo total del cliente.`;
   const scope = cust.projectEngineeringScopeText !== undefined && cust.projectEngineeringScopeText.trim() !== '' ? cust.projectEngineeringScopeText.trim() : DEFAULT_DOCUMENT_CUSTOMIZATION.projectEngineeringScopeText || '';
   const defaultParagraph2 = `Adicionalmente, se contempla la instalación de **${invertersSummaryText}**${s.hasBattery && totalBESSKWh > 0 ? ` y **${batteriesSummaryText}**` : ''} ${scope}`;
-  const p1 = resolveDynamicProjectSummaryParagraph1(cust.customProjectSummaryParagraph1, defaultParagraph1, project, summary, clientName, hasMultiPanels ? panelsSummaryText : panelModel);
-  const p2 = resolveDynamicProjectSummaryParagraph2(cust.customProjectSummaryParagraph2, defaultParagraph2, project, hasMultiInverters ? invertersSummaryText : inverterModel, hasMultiBatteries ? batteriesSummaryText : batteryModel, scope);
+  const p1 = resolveDynamicProjectSummaryParagraph1(cust.customProjectSummaryParagraph1, defaultParagraph1, { ...project, specs: s }, summary, clientName, hasMultiPanels ? panelsSummaryText : panelModel);
+  const p2 = resolveDynamicProjectSummaryParagraph2(cust.customProjectSummaryParagraph2, defaultParagraph2, { ...project, specs: s }, hasMultiInverters ? invertersSummaryText : inverterModel, hasMultiBatteries ? batteriesSummaryText : batteryModel, scope);
 
   // PDFPage2Quotation
   const contactName = cust.contactName !== undefined ? cust.contactName : (project.client.contactPerson || project.client.company || clientName || '');

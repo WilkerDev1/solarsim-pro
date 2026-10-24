@@ -1,3 +1,4 @@
+import { migrateLegacySpecs } from '../../../shared/equipment';
 import { ProjectSimulation, SyncSettings } from '../../types';
 import { ownsProject } from './projectReconciliation';
 
@@ -8,7 +9,7 @@ export function projectMutationMetadata(project: ProjectSimulation, session: Syn
 }
 
 export function restoreProjectContent(current: ProjectSimulation, snapshot: ProjectSimulation, session: SyncSettings): ProjectSimulation {
-  return { ...current, client: snapshot.client, specs: snapshot.specs, rates: snapshot.rates,
+  return { ...current, client: snapshot.client, specs: migrateLegacySpecs(snapshot.specs), rates: snapshot.rates,
     financials: snapshot.financials, monthlyConsumption: snapshot.monthlyConsumption,
     customization: snapshot.customization, status: snapshot.status,
     ...projectMutationMetadata(current, session), updatedAt: new Date().toISOString() };

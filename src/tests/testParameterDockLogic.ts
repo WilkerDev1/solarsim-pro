@@ -1,3 +1,5 @@
+import { LEGACY_MIRROR_FIELDS } from '../../shared/equipment';
+import { normalizeEquipmentEdit } from '../utils/equipmentGroups';
 import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -36,75 +38,75 @@ const panel = catalogItem({
 });
 const baseSpecs = { panelBrandModel: 'Old', panelPowerW: 400, panelCount: 10, hasBattery: false } as SystemSpecs;
 
-{ // auto pricing takes the cheapest supplier and writes mirror + primary group
+{ // auto pricing takes the cheapest supplier and writes the primary group (never the legacy mirror)
   const patch = buildCatalogSelectionUpdate({ ...baseSpecs, autoSupplierPricing: true }, 'panel', panel);
-  assert.equal(patch.panelBrandModel, 'Panel X 600W');
-  assert.equal(patch.panelPowerW, 600);
+  assert.equal(patch.panels?.[0].brandModel, 'Panel X 600W');
+  assert.equal(patch.panels?.[0].powerW, 600);
+  assert.equal(LEGACY_MIRROR_FIELDS.some((field) => field in patch) || 'selectedSupplierInfo' in patch, false, 'sin espejo');
   assert.equal(patch.panelEfficiency, 23);
   assert.equal(patch.tempCoeff, -0.3);
   assert.equal(patch.annualDegradation, 0.35);
-  assert.equal(patch.panelUnitPriceUSD, 95);
-  assert.deepEqual(patch.selectedSupplierInfo?.panel, { supplierName: 'Beta', priceUSD: 95, updatedAt: '2026-01-01', supplierPriceId: 's-lo' });
+  assert.deepEqual(patch.panels?.[0].selectedSupplierInfo, { supplierName: 'Beta', priceUSD: 95, updatedAt: '2026-01-01', supplierPriceId: 's-lo' });
   assert.equal(patch.panels?.[0].catalogItemId, 'p1');
   assert.equal(patch.panels?.[0].unitPriceUSD, 95);
   assert.equal(patch.panels?.[0].weightKilos, 30);
   assert.equal(patch.panels?.[0].count, 10, 'the group keeps its count');
 }
 { // manual pricing keeps the chosen supplier when the new item still quotes it (by id or by name)
-  const specs = { ...baseSpecs, autoSupplierPricing: false, selectedSupplierInfo: { panel: { supplierName: 'old name', priceUSD: 1, supplierPriceId: 's-hi' } } } as SystemSpecs;
+  const withSupplier = (supplierInfo: object) => ({ ...baseSpecs, autoSupplierPricing: false, panels: [{ id: 'primary-panel', brandModel: 'Old', powerW: 400, count: 10, unitPriceUSD: 103.32, selectedSupplierInfo: supplierInfo }] }) as SystemSpecs;
+  const specs = withSupplier({ supplierName: 'old name', priceUSD: 1, supplierPriceId: 's-hi' });
   const patch = buildCatalogSelectionUpdate(specs, 'panel', panel);
-  assert.equal(patch.selectedSupplierInfo?.panel?.supplierPriceId, 's-hi');
-  assert.equal(patch.selectedSupplierInfo?.panel?.priceUSD, 120, 'price is refreshed from the matched supplier');
-  assert.equal(patch.panelUnitPriceUSD, 103.32, 'manual mode keeps the engine default price, not the supplier price');
-  const byName = buildCatalogSelectionUpdate({ ...specs, selectedSupplierInfo: { panel: { supplierName: '  BETA ', priceUSD: 1 } } } as SystemSpecs, 'panel', panel);
-  assert.equal(byName.selectedSupplierInfo?.panel?.supplierPriceId, 's-lo');
+  assert.equal(patch.panels?.[0].selectedSupplierInfo?.supplierPriceId, 's-hi');
+  assert.equal(patch.panels?.[0].selectedSupplierInfo?.priceUSD, 120, 'price is refreshed from the matched supplier');
+  assert.equal(patch.panels?.[0].unitPriceUSD, 103.32, 'manual mode keeps the engine default price, not the supplier price');
+  const byName = buildCatalogSelectionUpdate(withSupplier({ supplierName: '  BETA ', priceUSD: 1 }), 'panel', panel);
+  assert.equal(byName.panels?.[0].selectedSupplierInfo?.supplierPriceId, 's-lo');
 }
 { // a supplier the new item does not quote is dropped; other kinds' info survives
-  const specs = { ...baseSpecs, selectedSupplierInfo: { panel: { supplierName: 'Gone', priceUSD: 1 }, inverter: { supplierName: 'Keep', priceUSD: 2 } } } as SystemSpecs;
+  const specs = { ...baseSpecs, panels: [{ id: 'p', brandModel: 'Old', powerW: 400, count: 10, selectedSupplierInfo: { supplierName: 'Gone', priceUSD: 1 } }], inverters: [{ id: 'i', brandModel: 'I', powerKW: 8, count: 1, selectedSupplierInfo: { supplierName: 'Keep', priceUSD: 2 } }] } as SystemSpecs;
   const patch = buildCatalogSelectionUpdate(specs, 'panel', panel);
-  assert.equal(patch.selectedSupplierInfo?.panel, undefined);
-  assert.deepEqual(patch.selectedSupplierInfo?.inverter, { supplierName: 'Keep', priceUSD: 2 });
-  assert(!('panel' in (patch.selectedSupplierInfo ?? {})));
+  assert.equal(patch.panels?.[0].selectedSupplierInfo, undefined);
+  assert.equal(patch.inverters, undefined, 'the inverter group is not part of the patch');
+  assert.deepEqual(normalizeEquipmentEdit(specs, patch).inverters?.[0].selectedSupplierInfo, { supplierName: 'Keep', priceUSD: 2 });
 }
 { // auto pricing without supplier prices falls back to the manual branch
   const bare = catalogItem({ id: 'p2', type: 'panel', displayName: 'Bare' });
   const patch = buildCatalogSelectionUpdate({ ...baseSpecs, autoSupplierPricing: true }, 'panel', bare);
-  assert.equal(patch.panelPowerW, 550, 'panel defaults');
+  assert.equal(patch.panels?.[0].powerW, 550, 'panel defaults');
   assert.equal(patch.panelEfficiency, 22);
   assert.equal(patch.tempCoeff, -0.29);
   assert.equal(patch.annualDegradation, 0.4);
-  assert.equal(patch.panelUnitPriceUSD, 103.32, "no supplier price: the mirror carries the engine default");
+  assert.equal(patch.panels?.[0].unitPriceUSD, 103.32, 'no supplier price: the group carries the engine default');
 }
 { // inverter and battery use their own mirror fields and defaults
   const inv = catalogItem({ id: 'i1', type: 'inverter', displayName: 'Inv 10K', powerKW: 10, supplierPrices: [supplier('i-1', 'Alfa', 2000)] });
   const invPatch = buildCatalogSelectionUpdate({ ...baseSpecs, autoSupplierPricing: true, inverterCount: 1 } as SystemSpecs, 'inverter', inv);
-  assert.equal(invPatch.inverterBrandModel, 'Inv 10K');
-  assert.equal(invPatch.inverterPowerKW, 10);
-  assert.equal(invPatch.inverterUnitPriceUSD, 2000);
-  assert.equal(invPatch.selectedSupplierInfo?.inverter?.supplierName, 'Alfa');
+  assert.equal(invPatch.inverters?.[0].brandModel, 'Inv 10K');
+  assert.equal(invPatch.inverters?.[0].powerKW, 10);
+  assert.equal(invPatch.inverters?.[0].unitPriceUSD, 2000);
+  assert.equal(invPatch.inverters?.[0].selectedSupplierInfo?.supplierName, 'Alfa');
   assert.equal(invPatch.inverters?.[0].catalogItemId, 'i1');
   const bareInv = buildCatalogSelectionUpdate(baseSpecs, 'inverter', catalogItem({ id: 'i2', type: 'inverter', displayName: 'Bare' }));
-  assert.equal(bareInv.inverterPowerKW, 8);
+  assert.equal(bareInv.inverters?.[0].powerKW, 8);
 
   const bat = catalogItem({ id: 'b1', type: 'battery', displayName: 'Bat 10', capacityKWh: 10, dodPct: 80, batteryEfficiencyPct: 92, supplierPrices: [supplier('b-1', 'Beta', 1500)] });
   const batPatch = buildCatalogSelectionUpdate({ ...baseSpecs, autoSupplierPricing: true } as SystemSpecs, 'battery', bat);
-  assert.equal(batPatch.batteryBrandModel, 'Bat 10');
-  assert.equal(batPatch.batteryCapacityKWh, 10);
-  assert.equal(batPatch.batteryDOD, 80);
-  assert.equal(batPatch.batteryEfficiencyPct, 92);
-  assert.equal(batPatch.batteryUnitPriceUSD, 1500);
+  assert.equal(batPatch.batteries?.[0].brandModel, 'Bat 10');
+  assert.equal(batPatch.batteries?.[0].capacityKWh, 10);
   assert.equal(batPatch.batteries?.[0].dodPct, 80);
+  assert.equal(batPatch.batteries?.[0].efficiencyPct, 92);
+  assert.equal(batPatch.batteries?.[0].unitPriceUSD, 1500);
   const bareBat = buildCatalogSelectionUpdate(baseSpecs, 'battery', catalogItem({ id: 'b2', type: 'battery', displayName: 'Bare' }));
-  assert.equal(bareBat.batteryCapacityKWh, 16.08);
-  assert.equal(bareBat.batteryDOD, 90);
-  assert.equal(bareBat.batteryEfficiencyPct, 90, 'eficiencia por defecto única (antes 95 en el dock)');
+  assert.equal(bareBat.batteries?.[0].capacityKWh, 16.08);
+  assert.equal(bareBat.batteries?.[0].dodPct, 90);
+  assert.equal(bareBat.batteries?.[0].efficiencyPct, 90, 'eficiencia por defecto única (antes 95 en el dock)');
 }
 { // The battery count in Manual mode goes through editEquipmentGroup like every other group edit, so
-  // batteries[] and the legacy `batteryCount` mirror never drift apart (fixed in T3b; it used to write batteryCount alone).
+  // batteries[] is the only source (the legacy `batteryCount` mirror is not written).
   const specs = { hasBattery: true, batteryBrandModel: 'Bat', batteryCapacityKWh: 5, batteryCount: 2, batteries: [{ id: 'b', brandModel: 'Bat', capacityKWh: 5, count: 2 }] } as SystemSpecs;
-  const manual = { ...specs, ...editEquipmentGroup(specs, 'battery', { type: 'update', index: 0, patch: { count: 7 } }) };
+  const manual = normalizeEquipmentEdit(specs, editEquipmentGroup(specs, 'battery', { type: 'update', index: 0, patch: { count: 7 } }));
   assert.equal(manual.batteries?.[0].count, 7, 'the group count follows the edit');
-  assert.equal(manual.batteryCount, 7, 'the mirror follows the group');
+  assert.equal('batteryCount' in manual, false, 'the mirror is gone: the group is the only source');
 }
 
 // ── Load profile preview ───────────────────────────────────────────────────────────────────
@@ -224,7 +226,9 @@ function runEffects(body: () => void): Array<() => void> {
   const updates: Array<Partial<SystemSpecs>> = [];
   const effects = runEffects(() => useCatalogPowerSync({ panelBrandModel: 'Panel X', panelPowerW: 550, inverterBrandModel: 'Inv X', inverterPowerKW: 10 } as SystemSpecs, catalog, (u) => updates.push(u)));
   effects.forEach((run) => run());
-  assert.deepEqual(updates, [{ panelPowerW: 600 }], 'only the stale panel power is rewritten; matching inverter untouched');
+  assert.equal(updates.length, 1, 'only the stale panel power is rewritten; matching inverter untouched');
+  assert.deepEqual(Object.keys(updates[0]), ['panels'], 'the patch is the panel group list');
+  assert.equal(updates[0].panels?.[0].powerW, 600);
   const none: Array<Partial<SystemSpecs>> = [];
   runEffects(() => useCatalogPowerSync({ panelBrandModel: 'Unknown', panelPowerW: 550 } as SystemSpecs, catalog, (u) => none.push(u))).forEach((run) => run());
   assert.deepEqual(none, [], 'models outside the catalog are not touched');
@@ -238,7 +242,10 @@ function runEffects(body: () => void): Array<() => void> {
     panelSupplierMatches: false, inverterSupplierMatches: false, batterySupplierMatches: false, updateSpecs: (u) => updates.push(u),
   })).forEach((run) => run());
   // Ghost suppliers are removed; the battery supplier exists on a catalog panel but the lookup is per type, so it goes too.
-  assert.deepEqual(updates, [{ selectedSupplierInfo: {} }]);
+  assert.equal(updates.length, 1);
+  const cleaned = normalizeEquipmentEdit({ selectedSupplierInfo: info } as SystemSpecs, updates[0]);
+  assert.deepEqual([cleaned.panels?.[0].selectedSupplierInfo, cleaned.inverters?.[0].selectedSupplierInfo, cleaned.batteries?.[0].selectedSupplierInfo], [undefined, undefined, undefined], 'orphan suppliers leave their groups');
+  assert.equal('selectedSupplierInfo' in cleaned, false);
   const kept: Array<Partial<SystemSpecs>> = [];
   runEffects(() => useSupplierCleanup({
     specs: { selectedSupplierInfo: { panel: { supplierName: 'Alfa', priceUSD: 100 } } } as SystemSpecs, equipmentCatalog: catalog,

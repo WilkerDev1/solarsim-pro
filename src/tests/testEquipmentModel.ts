@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict';
 import { calculateCostMatrixSummary, calculateFinancialSummary } from '../engine/financeEngine';
 import { calculateMonthlySolarProduction } from '../engine/solarEngine';
-import { BENCHMARK_PROJECT } from '../engine/referenceCase';
+import { BENCHMARK_LEGACY_SPECS, BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateTotalBatteryCapacityKWh, calculateTotalDCCapacityKWp, calculateTotalInverterPowerKW, calculateTotalPanelCount, getProjectBatteries, getProjectInverters, getProjectPanels } from '../utils/equipmentSpecsUtils';
 import {
   DEFAULT_UNIT_PRICE_USD, LEGACY_MIRROR_FIELDS, describeEquipment, editEquipment, equipmentTotals, migrateLegacySpecs, readEquipment, type EquipmentSpecs,
 } from '../../shared/equipment';
 import type { InverterItemSpec, PanelItemSpec, SystemSpecs } from '../types';
 
-const base = BENCHMARK_PROJECT.specs;
+// Fixture heredada (solo espejo): el módulo sigue leyéndola y migrándola.
+const base = BENCHMARK_LEGACY_SPECS;
 const mirrorKeys = (specs: object) => LEGACY_MIRROR_FIELDS.filter((key) => key in specs);
 const noMirror = (specs: SystemSpecs): SystemSpecs => {
   const copy: Record<string, unknown> = { ...specs };

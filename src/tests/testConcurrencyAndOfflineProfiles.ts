@@ -1,6 +1,12 @@
+import { editEquipment, equipmentTotals, readEquipment } from '../../shared/equipment';
+import type { SystemSpecs as EquipmentSpecs } from '../types';
 import { useSimulationStore } from '../store/useSimulationStore';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { ProjectSimulation, CompanyProfile, ProjectSnapshot } from '../types';
+
+// Los equipos viven solo en grupos: la cantidad se edita y se lee ahí (no hay panelCount).
+const withPanelCount = (specs: EquipmentSpecs, count: number) => editEquipment(specs, 'panel', { type: 'update', index: 0, patch: { count } });
+const panelCountOf = (specs?: EquipmentSpecs) => (specs ? equipmentTotals(readEquipment(specs)).panelCount : undefined);
 
 function assert(condition: boolean, msg: string) {
   if (!condition) {
@@ -85,7 +91,7 @@ async function runTests() {
     ...JSON.parse(JSON.stringify(BENCHMARK_PROJECT)),
     id: 'test-undo-redo-proj',
     client: { ...BENCHMARK_PROJECT.client, projectId: 'TEST-001', name: 'Proyecto Test Undo' },
-    specs: { ...BENCHMARK_PROJECT.specs, panelCount: 38 },
+    specs: withPanelCount(BENCHMARK_PROJECT.specs, 38),
   };
 
   useSimulationStore.setState((s) => ({
@@ -102,7 +108,7 @@ async function runTests() {
   // Modificar paneles de 38 a 50
   const modified1 = {
     ...testProject,
-    specs: { ...testProject.specs, panelCount: 50 },
+    specs: withPanelCount(testProject.specs, 50),
   };
   useSimulationStore.setState((s) => ({
     projects: s.projects.map((p) => (p.id === testProject.id ? modified1 : p)),
@@ -116,14 +122,14 @@ async function runTests() {
   store.undo();
   let afterUndo = useSimulationStore.getState();
   let currentActive = afterUndo.projects.find((p) => p.id === testProject.id);
-  assert(currentActive?.specs.panelCount === 38, 'Undo restauró los paneles a 38');
+  assert(panelCountOf(currentActive?.specs) === 38, 'Undo restauró los paneles a 38');
   assert(afterUndo.canRedo, 'canRedo es verdadero tras Undo');
 
   // Ejecutar Redo
   store.redo();
   let afterRedo = useSimulationStore.getState();
   currentActive = afterRedo.projects.find((p) => p.id === testProject.id);
-  assert(currentActive?.specs.panelCount === 50, 'Redo restauró los paneles a 50');
+  assert(panelCountOf(currentActive?.specs) === 50, 'Redo restauró los paneles a 50');
   assert(!afterRedo.canRedo, 'canRedo es falso tras agotar redoStack');
 
   // -----------------------------------------------------------------
@@ -140,7 +146,7 @@ async function runTests() {
   // Modificar proyecto a 64 paneles
   const modified2: ProjectSimulation = {
     ...testProject,
-    specs: { ...testProject.specs, panelCount: 64 },
+    specs: withPanelCount(testProject.specs, 64),
   };
   useSimulationStore.setState((s) => ({
     projects: s.projects.map((p) => (p.id === testProject.id ? modified2 : p)),
@@ -164,7 +170,7 @@ async function runTests() {
   const restoreSuccess = store.restoreSnapshot(testProject.id, snaps[1].id);
   assert(restoreSuccess, 'restoreSnapshot ejecutado con éxito');
   const restoredProj = useSimulationStore.getState().projects.find((p) => p.id === testProject.id);
-  assert(restoredProj?.specs.panelCount === 50, 'Proyecto restaurado a 50 paneles de la versión v1');
+  assert(panelCountOf(restoredProj?.specs) === 50, 'Proyecto restaurado a 50 paneles de la versión v1');
 
   // -----------------------------------------------------------------
   // 5. CONFLICTO DE CONCURRENCIA & RESOLUCIÓN
@@ -174,13 +180,13 @@ async function runTests() {
     ...testProject,
     version: 2,
     baseVersion: 1,
-    specs: { ...testProject.specs, panelCount: 45 },
+    specs: withPanelCount(testProject.specs, 45),
   };
 
   const remoteServerProj: ProjectSimulation = {
     ...testProject,
     version: 3, // El servidor ya avanzó a v3 por otro usuario
-    specs: { ...testProject.specs, panelCount: 60 },
+    specs: withPanelCount(testProject.specs, 60),
   };
 
   useSimulationStore.setState({ syncSettings: { ...store.syncSettings, autoSyncEnabled: false, serverUrl: 'https://qa.example.invalid', authToken: 'synthetic', currentUser: { id: 'qa-editor', name: 'QA', email: 'qa@example.invalid', role: 'EDITOR', organizationId: 'qa-org' } }, projects: useSimulationStore.getState().projects.map(project => project.id === testProject.id ? { ...localVersionProj, organizationId: 'qa-org', syncServerUrl: 'https://qa.example.invalid' } : project) });

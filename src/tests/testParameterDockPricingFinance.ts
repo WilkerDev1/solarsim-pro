@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { BENCHMARK_PROJECT } from '../engine/referenceCase';
+import { BENCHMARK_LEGACY_SPECS, BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { calculateFinancialSummary } from '../engine/financeEngine';
 import type { CustomQuotationDiscount, CustomQuotationItem, FinancialParams, ProjectSimulation, SystemSpecs } from '../types';
 import type { SolarEquipmentItem } from '../types/equipment';
@@ -24,7 +24,8 @@ const render = (node: React.ReactElement) => renderToStaticMarkup(node);
 const close = (actual: number, expected: number, message: string) =>
   assert(Math.abs(actual - expected) < 1e-6, `${message}: ${actual} !== ${expected}`);
 
-const base = structuredClone(BENCHMARK_PROJECT);
+// Propuesta heredada (solo espejo, sin grupos): el dock y el motor la leen por el módulo de equipos.
+const base = { ...structuredClone(BENCHMARK_PROJECT), specs: { ...BENCHMARK_LEGACY_SPECS } };
 const specsOf = (extra: Partial<SystemSpecs> = {}): SystemSpecs => ({ ...base.specs, ...extra });
 const projectOf = (specs: Partial<SystemSpecs> = {}, financials: Partial<FinancialParams> = {}): ProjectSimulation =>
   ({ ...base, specs: specsOf(specs), financials: { ...base.financials, ...financials } });
@@ -75,26 +76,26 @@ const equipment = (type: 'panel' | 'inverter' | 'battery', displayName: string, 
   const battery = equipment('battery', 'B', [sp('b1', 'Bat', 1800)]);
   const patch = bestSupplierPricingPatch(specs, { panel, inverter, battery });
   assert.equal(patch.autoSupplierPricing, true, 'activa el modo automático');
-  assert.equal(patch.panelUnitPriceUSD, 95, 'elige el precio más bajo');
-  assert.equal(patch.selectedSupplierInfo?.panel?.supplierName, 'Barato', 'ante empate gana el primero');
-  assert.equal(patch.selectedSupplierInfo?.panel?.supplierPriceId, 'p2');
-  assert.equal(patch.inverterUnitPriceUSD, 1400);
-  assert.equal(patch.batteryUnitPriceUSD, undefined, 'sin batería no se toca su precio');
-  assert.equal(patch.selectedSupplierInfo?.battery, undefined);
+  assert.equal(patch.panels?.[0].unitPriceUSD, 95, 'elige el precio más bajo');
+  assert.equal(patch.panels?.[0].selectedSupplierInfo?.supplierName, 'Barato', 'ante empate gana el primero');
+  assert.equal(patch.panels?.[0].selectedSupplierInfo?.supplierPriceId, 'p2');
+  assert.equal(patch.inverters?.[0].unitPriceUSD, 1400);
+  assert.equal(patch.batteries, undefined, 'sin batería no se toca su grupo');
+  assert.equal('selectedSupplierInfo' in patch, false, 'el proveedor vive en el grupo');
 
   const withBattery = bestSupplierPricingPatch({ ...specs, hasBattery: true }, { panel, inverter, battery });
-  assert.equal(withBattery.batteryUnitPriceUSD, 1800);
-  assert.equal(withBattery.selectedSupplierInfo?.battery?.supplierName, 'Bat');
+  assert.equal(withBattery.batteries?.[0].unitPriceUSD, 1800);
+  assert.equal(withBattery.batteries?.[0].selectedSupplierInfo?.supplierName, 'Bat');
 
   const keeps = bestSupplierPricingPatch(
-    { ...specs, selectedSupplierInfo: { battery: { supplierName: 'Previo', priceUSD: 1, supplierPriceId: 'x' } } },
+    { ...specs, hasBattery: true, batteries: [{ id: 'b', brandModel: 'B', capacityKWh: 5, count: 1, selectedSupplierInfo: { supplierName: 'Previo', priceUSD: 1, supplierPriceId: 'x' } }] },
     { panel }
   );
-  assert.equal(keeps.selectedSupplierInfo?.battery?.supplierName, 'Previo', 'conserva el proveedor de lo que no se sincroniza');
-  assert.equal(keeps.inverterUnitPriceUSD, undefined);
+  assert.equal(keeps.batteries, undefined, 'conserva el proveedor de lo que no se sincroniza');
+  assert.equal(keeps.inverters, undefined);
 
   const none = bestSupplierPricingPatch(specs, { panel: equipment('panel', 'P', []) });
-  assert.equal(none.panelUnitPriceUSD, undefined, 'sin proveedores no cambia el precio');
+  assert.equal(none.panels, undefined, 'sin proveedores no cambia el precio');
   assert.equal(none.autoSupplierPricing, true);
 
   // El botón aparece solo si hay proveedores y refleja el modo automático.
@@ -119,11 +120,11 @@ const equipment = (type: 'panel' | 'inverter' | 'battery', displayName: string, 
   const specs = specsOf({ autoSupplierPricing: true, panels: undefined, inverters: undefined, hasBattery: false });
   const panel = manualUnitPricePatch(specs, 'panel', 0, 99);
   assert.equal(panel.autoSupplierPricing, false);
-  assert.equal(panel.panelUnitPriceUSD, 99);
-  assert.equal(panel.panels, undefined, 'con un solo modelo no se crea la lista');
+  assert.equal(panel.panels?.[0].unitPriceUSD, 99, 'el precio se escribe en el grupo');
+  assert.equal('panelUnitPriceUSD' in panel, false, 'sin precio plano (espejo)');
   const inverter = manualUnitPricePatch(specs, 'inverter', 0, 1500);
   assert.equal(inverter.autoSupplierPricing, false);
-  assert.equal(inverter.inverterUnitPriceUSD, 1500);
+  assert.equal(inverter.inverters?.[0].unitPriceUSD, 1500);
 
   const multi = specsOf({
     panels: [
@@ -134,16 +135,14 @@ const equipment = (type: 'panel' | 'inverter' | 'battery', displayName: string, 
   const second = manualUnitPricePatch(multi, 'panel', 1, 130);
   assert.equal(second.panels?.[1].unitPriceUSD, 130);
   assert.equal(second.panels?.[0].unitPriceUSD, 100);
-  assert.equal(second.panelUnitPriceUSD, undefined, 'solo el primer modelo escribe el precio plano');
   assert.equal(second.autoSupplierPricing, false);
 
   const bat = manualUnitPricePatch(specsOf({ hasBattery: true, batteries: undefined }), 'battery', 0, 2100);
-  assert.equal(bat.batteryUnitPriceUSD, 2100);
+  assert.equal(bat.batteries?.[0].unitPriceUSD, 2100);
   assert.equal(bat.autoSupplierPricing, false);
 
-  assert.equal(displayedUnitPrice(50, 60, 'panel'), 50);
-  assert.equal(displayedUnitPrice(undefined, 60, 'panel'), 60);
-  assert.equal(displayedUnitPrice(undefined, undefined, 'inverter'), 2300);
+  assert.equal(displayedUnitPrice(50, 'panel'), 50);
+  assert.equal(displayedUnitPrice(undefined, 'inverter'), 2300);
 
   const html = render(h(PricingParamsSection, { project: projectOf({ pricingMode: 'cost_matrix', installationUnitPriceUSD: 185 }), summary: summaryOf(projectOf()), updateSpecs: noop }));
   assert.match(html, /id="pd-cost-installation"[^>]*value="185"|value="185"[^>]*id="pd-cost-installation"/);
@@ -168,11 +167,11 @@ const equipment = (type: 'panel' | 'inverter' | 'battery', displayName: string, 
   const row = findProps(tree, (props) => props.id === 'pd-cost-panel-0')[0];
   row.onChange(99);
   assert.equal(calls[0].autoSupplierPricing, false, 'editar a mano apaga el modo automático');
-  assert.equal(calls[0].panelUnitPriceUSD, 99);
+  assert.equal(calls[0].panels?.[0].unitPriceUSD, 99);
   findProps(tree, (props) => props.suppliersLabel === '2 prov.')[0].onOpenSuppliers();
   assert.equal(calls[1].panelBrandModel, 'PANEL-T', 'N prov. abre el modal del equipo');
   findProps(tree, (props) => props.pressed !== undefined)[0].onClick();
-  assert.equal(calls[2].panelUnitPriceUSD, 90, '«Mejor proveedor» aplica el precio más bajo');
+  assert.equal(calls[2].panels?.[0].unitPriceUSD, 90, '«Mejor proveedor» aplica el precio más bajo');
   assert.equal(calls[2].autoSupplierPricing, true);
   findProps(tree, (props) => props.id === 'pd-cost-installation')[0].onChange(185);
   assert.deepEqual(calls[3], { installationUnitPriceUSD: 185 }, 'mano de obra no toca el modo automático');

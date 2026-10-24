@@ -1,3 +1,4 @@
+import { readEquipment } from '../../../../shared/equipment';
 import React from 'react';
 import { resolveProjectEquipment, supplierQuotesItem } from '../../../utils/equipmentMatchingUtils';
 import { ProjectSimulation, FinancialSummaryResult, SystemSpecs } from '../../../types';
@@ -39,19 +40,22 @@ export const PricingParamsSection: React.FC<PricingParamsSectionProps> = ({ proj
     useShallow((s) => ({ equipmentCatalog: s.equipmentCatalog, openSupplierPriceModal: s.openSupplierPriceModal }))
   );
   const specs = project.specs;
-  const info = specs.selectedSupplierInfo;
+  // Modelo principal de cada tipo y su proveedor: salen del primer grupo (shared/equipment), no de campos sueltos.
+  const { panels, inverters, batteries } = readEquipment(specs);
+  const [panel, inverter, battery] = [panels[0], inverters[0], batteries[0]];
+  const info = { panel: panel?.selectedSupplierInfo, inverter: inverter?.selectedSupplierInfo, battery: battery?.selectedSupplierInfo };
 
-  const selectedPanel = resolveProjectEquipment(equipmentCatalog, 'panel', specs.panelBrandModel, specs.panelPowerW, info?.panel?.supplierPriceId);
-  const selectedInverter = resolveProjectEquipment(equipmentCatalog, 'inverter', specs.inverterBrandModel, specs.inverterPowerKW, info?.inverter?.supplierPriceId);
-  const selectedBattery = resolveProjectEquipment(equipmentCatalog, 'battery', specs.batteryBrandModel, specs.batteryCapacityKWh, info?.battery?.supplierPriceId);
+  const selectedPanel = resolveProjectEquipment(equipmentCatalog, 'panel', panel?.brandModel, panel?.powerW, info.panel?.supplierPriceId);
+  const selectedInverter = resolveProjectEquipment(equipmentCatalog, 'inverter', inverter?.brandModel, inverter?.powerKW, info.inverter?.supplierPriceId);
+  const selectedBattery = resolveProjectEquipment(equipmentCatalog, 'battery', battery?.brandModel, battery?.capacityKWh, info.battery?.supplierPriceId);
 
   // La limpieza escribe en el proyecto: vive aquí (siempre montada), no en una vista que dependa del modo.
   useSupplierCleanup({
     specs,
     equipmentCatalog,
-    panelSupplierMatches: supplierQuotesItem(selectedPanel, info?.panel),
-    inverterSupplierMatches: supplierQuotesItem(selectedInverter, info?.inverter),
-    batterySupplierMatches: supplierQuotesItem(selectedBattery, info?.battery),
+    panelSupplierMatches: supplierQuotesItem(selectedPanel, info.panel),
+    inverterSupplierMatches: supplierQuotesItem(selectedInverter, info.inverter),
+    batterySupplierMatches: supplierQuotesItem(selectedBattery, info.battery),
     updateSpecs,
   });
 

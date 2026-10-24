@@ -7,9 +7,10 @@ import type { Equipment, EquipmentSpecs } from './types.js';
 
 export { DEFAULT_UNIT_PRICE_USD, LEGACY_MIRROR_FIELDS, deriveLegacyGroup } from './legacy.js';
 export { editEquipment } from './edit.js';
+export { applyLegacyEquipmentPatch } from './legacyPatch.js';
 export { migrateLegacySpecs } from './migrate.js';
-export { EQUIPMENT_FALLBACK_NAME, describeEquipment, equipmentTotals, mainEquipmentGroup, type EquipmentTotals } from './summary.js';
-export { EQUIPMENT_KINDS, type BatteryItemSpec, type Equipment, type EquipmentEdit, type EquipmentSpecs, type EquipmentGroups, type EquipmentKind, type InverterItemSpec, type PanelItemSpec } from './types.js';
+export { EQUIPMENT_FALLBACK_NAME, describeEquipment, describePanelConfiguration, uniformPanelWatts, equipmentTotals, mainEquipmentGroup, type EquipmentTotals } from './summary.js';
+export { EQUIPMENT_KINDS, LIST_KEY, type BatteryItemSpec, type Equipment, type EquipmentEdit, type EquipmentSpecs, type EquipmentGroups, type EquipmentKind, type InverterItemSpec, type PanelItemSpec } from './types.js';
 
 /**
  * Grupos normalizados. Con grupos guardados se devuelven tal cual; sin ellos se derivan de los campos

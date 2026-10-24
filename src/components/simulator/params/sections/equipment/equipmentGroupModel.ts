@@ -2,7 +2,7 @@ import type { BatteryItemSpec, InverterItemSpec, PanelItemSpec, SystemSpecs } fr
 import type { SolarEquipmentItem } from '../../../../../types/equipment';
 import { catalogPanelGroupPatch } from '../../../../../utils/catalogGroupPatch';
 import { editEquipmentGroup, resolveGroupCatalogItem, selectCatalogEquipment, type EquipmentKind } from '../../../../../utils/equipmentGroups';
-import { getProjectBatteries, getProjectInverters, getProjectPanels } from '../../../../../utils/equipmentSpecsUtils';
+import { readEquipment } from '../../../../../../shared/equipment';
 import { buildCatalogSelectionUpdate } from '../../logic/catalogSelection';
 import { MANUAL_BRAND_PLACEHOLDER, resolveBatteryDodPct, resolveBatteryEfficiencyPct } from '../../logic/dockDefaults';
 
@@ -73,23 +73,16 @@ export interface GroupModelView {
 }
 
 function itemsOf(specs: SystemSpecs, kind: EquipmentKind): Array<GroupItem[EquipmentKind]> {
-  return kind === 'panel' ? getProjectPanels(specs) : kind === 'inverter' ? getProjectInverters(specs) : getProjectBatteries(specs);
+  return readEquipment(specs)[LIST_KEY[kind]];
 }
 
-const LEGACY_BRAND: Record<EquipmentKind, 'panelBrandModel' | 'inverterBrandModel' | 'batteryBrandModel'> = {
-  panel: 'panelBrandModel',
-  inverter: 'inverterBrandModel',
-  battery: 'batteryBrandModel',
-};
 const LIST_KEY = { panel: 'panels', inverter: 'inverters', battery: 'batteries' } as const;
 
 export function groupViews(specs: SystemSpecs, kind: EquipmentKind): GroupModelView[] {
   const field = KIND_CONFIG[kind].magnitudeField;
-  const listed = (specs[LIST_KEY[kind]] ?? []).length > 0;
   return itemsOf(specs, kind).map((item, index) => ({
     key: item.id || String(index),
-    // Un proyecto sin lista conserva su campo heredado vacío (marcador «Buscar o seleccionar…»).
-    brandModel: !listed && index === 0 ? specs[LEGACY_BRAND[kind]] ?? '' : item.brandModel,
+    brandModel: item.brandModel,
     magnitude: (item as unknown as Record<MagnitudeField, number>)[field],
     count: item.count,
   }));
@@ -184,7 +177,7 @@ export interface GroupActions<K extends EquipmentKind> {
 
 /**
  * Acciones de un grupo de equipos. Todo cambio de lista y de cantidad pasa por `editEquipmentGroup`
- * (o `selectCatalogEquipment`, que lo usa) para que la lista y el espejo heredado no se desincronicen.
+ * (o `selectCatalogEquipment`, que lo usa) (el espejo heredado nunca se escribe).
  */
 export function createGroupActions<K extends EquipmentKind>(
   kind: K,

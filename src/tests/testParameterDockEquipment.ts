@@ -1,3 +1,4 @@
+import { LEGACY_MIRROR_FIELDS } from '../../shared/equipment';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import React from 'react';
@@ -102,13 +103,13 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
   assert.deepEqual(state.calls[0], editEquipmentGroup(before, kind, { type: 'update', index: 0, patch: { count: 7 } }), `${kind}: cantidad por editEquipmentGroup`);
   const list = state.specs[kind === 'panel' ? 'panels' : kind === 'inverter' ? 'inverters' : 'batteries']!;
   assert.equal(list[0].count, 7);
-  const mirror = { panel: 'panelCount', inverter: 'inverterCount', battery: 'batteryCount' }[kind] as 'panelCount' | 'inverterCount' | 'batteryCount';
-  assert.equal(state.specs[mirror], 7, `${kind}: el espejo sigue a la lista`);
+  const listKey = kind === 'panel' ? 'panels' : kind === 'inverter' ? 'inverters' : 'batteries';
+  assert.equal(LEGACY_MIRROR_FIELDS.some((field) => field in state.specs), false, `${kind}: la edición no deja espejo`);
   actions(kind).setBrand(0, 'Otro');
-  assert.equal(list.length >= 1 && state.specs[`${kind}BrandModel` as 'panelBrandModel'], 'Otro');
+  assert.equal(state.specs[listKey]![0].brandModel, 'Otro');
   actions(kind).setMagnitude(0, 12.5);
-  const magnitude = { panel: 'panelPowerW', inverter: 'inverterPowerKW', battery: 'batteryCapacityKWh' }[kind] as 'panelPowerW';
-  assert.equal(state.specs[magnitude], 12.5);
+  const magnitude = { panel: 'powerW', inverter: 'powerKW', battery: 'capacityKWh' }[kind] as 'powerW';
+  assert.equal((state.specs[listKey]![0] as unknown as Record<string, number>)[magnitude], 12.5);
 }
 
 // --- Regresión: cantidad de baterías en modo Manual ya no deja la lista vieja ---
@@ -116,12 +117,12 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
   const { state, actions } = harness(multi());
   actions('battery').setCount(0, 9);
   assert.equal(state.specs.batteries?.[0].count, 9, 'batteries[0].count se actualiza');
-  assert.equal(state.specs.batteryCount, 9);
-  assert.ok(!('batteryCount' in state.calls[0]) || state.calls[0].batteries !== undefined, 'el parche lleva la lista, no solo el campo heredado');
+  assert.equal('batteryCount' in state.specs, false);
+  assert.ok(state.calls[0].batteries !== undefined, 'el parche lleva la lista');
   // Proyecto heredado sin lista: también migra por editEquipmentGroup
   const legacy = harness({ hasBattery: true, batteryBrandModel: 'Bat', batteryCapacityKWh: 5, batteryCount: 2 });
   legacy.actions('battery').setCount(0, 3);
-  assert.equal(legacy.state.specs.batteryCount, 3);
+  assert.equal('batteryCount' in legacy.state.specs, false);
   assert.equal(legacy.state.specs.batteries?.[0].count, 3);
   assert.deepEqual(legacy.state.calls[0].batteries?.map(b => b.count), [3]);
 }
@@ -132,7 +133,7 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
   const before = state.specs;
   actions('panel').select(0, catalog[0]);
   assert.deepEqual(state.calls[0], buildCatalogSelectionUpdate(before, 'panel', catalog[0]), 'principal: buildCatalogSelectionUpdate');
-  assert.equal(state.calls[0].selectedSupplierInfo?.panel?.supplierName, 'Alfa', 'conserva la info de proveedor');
+  assert.equal(state.calls[0].panels?.[0].selectedSupplierInfo?.supplierName, 'Alfa', 'conserva la info de proveedor');
 
   const second = harness(multi());
   const base = second.state.specs;
@@ -144,7 +145,7 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
   assert.equal(second.state.specs.panels?.[0].brandModel, 'Panel A 550', 'el principal no cambia');
 
   second.actions('inverter').select(0, catalog[3]);
-  assert.equal(second.state.specs.inverterBrandModel, 'Inversor 5');
+  assert.equal(second.state.specs.inverters?.[0].brandModel, 'Inversor 5');
   assert.equal(second.state.specs.inverters?.[0].powerKW, 5);
 }
 // --- Vista del grupo y formatos ---
@@ -152,7 +153,7 @@ for (const kind of ['panel', 'inverter', 'battery'] as const) {
   const views = groupViews(multi() as SystemSpecs, 'panel');
   assert.deepEqual(views.map(v => [v.brandModel, v.magnitude, v.count]), [['Panel A 550', 550, 10], ['Panel B 600', 600, 4]]);
   const legacy = groupViews({ panelPowerW: 500, panelCount: 3 } as SystemSpecs, 'panel');
-  assert.equal(legacy[0].brandModel, '', 'sin nombre heredado queda el marcador');
+  assert.equal(legacy[0].brandModel, 'Módulo Canadian Solar TOPBiHiKu6 620W', 'sin nombre heredado: el nombre de reserva de la matriz de costos');
   assert.equal(legacy[0].count, 3);
   assert.deepEqual(groupViews({ hasBattery: false } as SystemSpecs, 'battery'), []);
   assert.equal(formatKW(8), '8.0');

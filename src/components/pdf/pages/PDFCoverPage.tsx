@@ -1,4 +1,5 @@
 import React from 'react';
+import { describePanelConfiguration, equipmentTotals, readEquipment, uniformPanelWatts } from '../../../../shared/equipment';
 import { cleanClientName } from '../../../../shared/proposalPresentation';
 import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import { PDFColorTheme } from '../../../constants/pdfThemes';
@@ -37,7 +38,11 @@ export const PDFCoverPage: React.FC<PDFCoverPageProps> = ({
   const rawClientName = project.client.name || 'Centro Médico Hispánico';
   const clientName = cleanClientName(rawClientName).toUpperCase();
   const clientLocation = project.client.province || project.client.location || 'Santo Domingo / Distrito Nacional';
-  const panelModelText = `${project.specs.panelCount} Módulos Tier-1 (${project.specs.panelPowerW}W)`;
+  const coverEquipment = readEquipment(project.specs);
+  const uniformWatts = uniformPanelWatts(coverEquipment);
+  const panelModelText = uniformWatts !== undefined
+    ? `${equipmentTotals(coverEquipment).panelCount} Módulos Tier-1 (${uniformWatts}W)`
+    : `Módulos Tier-1 (${describePanelConfiguration(coverEquipment)})`;
 
   return (
     <EnsureDocumentEditor project={project} summary={summary} currentDateStr={currentDateStr}>

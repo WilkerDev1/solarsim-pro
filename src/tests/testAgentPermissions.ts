@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { useSimulationStore } from '../store/useSimulationStore';
-import { BENCHMARK_PROJECT } from '../engine/referenceCase';
+import { BENCHMARK_LEGACY_SPECS, BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../data/defaultEquipmentCatalog';
 import { DEFAULT_AGENT_POLICY, normalizeAgentPolicy } from '../store/slices/agentSlice';
 import { executeAgentTool, executeForAssistant } from '../features/agentTools/registry';
@@ -180,7 +180,8 @@ assert.equal((await executeAgentTool({ name: 'propose_project_update', args: { i
 // 17. Undo on a 2.6.0 proposal (no group arrays) restores the original equipment without keeping new group data.
 reset();
 const legacyProject = store.getState().getActiveProject();
-store.getState().updateProjectById(legacyProject.id, () => ({ specs: { ...legacyProject.specs, panels: undefined, inverters: undefined, batteries: undefined } }));
+// Una propuesta 2.6.0 sin grupos solo existe en el formato heredado (espejo): se instala directo en el estado, no por una edición (que migra).
+store.setState({ projects: store.getState().projects.map((p) => (p.id === legacyProject.id ? { ...p, specs: { ...BENCHMARK_LEGACY_SPECS } } : p)) });
 const legacyBefore = store.getState().getActiveProject().specs;
 assert.equal(legacyBefore.panels, undefined);
 const altPanel = store.getState().equipmentCatalog.filter((e) => e.type === 'panel').at(-1)!;
