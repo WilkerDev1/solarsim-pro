@@ -30,6 +30,8 @@ El asistente general usa function calling de Gemini con las declaraciones genera
 | `draft` | crear, duplicar o editar propuestas, aplicar el borrador del asistente de propuestas | Se aplica al momento, con actividad y **Deshacer** |
 | `guarded` | catálogo, precios, estado técnico, decisión y reportes comerciales, papelera | Pide confirmación. Opcional: **bypass** («Aplicar sin preguntar»), explícito y por origen |
 
+Las ediciones de contacto de `set_document_text` aplican las mismas reglas que la interfaz (`applyDocumentClientEdit`, [ADR 0004](adr/0004-edicion-de-proyecto.md)): reconciliación con el catálogo y autocálculo de paneles. `propose_project_update` aplica el borrador con la tubería de IA (`applyExtractedInvoice`), que normaliza equipos con `normalizeProjectEquipment`, la misma normalización que una edición. Ninguna herramienta de lectura escribe la propuesta.
+
 Una edición de propuesta que toque precios (margen, mano de obra, costos unitarios, grupos de equipos con precio, extras o descuentos) se trata como `guarded` completa, aunque la herramienta sea de borrador.
 
 - La política es **por dispositivo** y distingue dos orígenes: asistentes de la app y agentes externos. Se configura en Ajustes → **Agentes e IA**.
@@ -62,7 +64,7 @@ Toda propuesta creada o editada por agentes cotiza en modo **Simple (Catálogo I
 | `apply_proposal_draft` | draft | Solo el asistente de propuestas |
 | `get_agent_action_status` | read | Espera hasta 20 s la decisión de una acción pendiente |
 | `list_document_texts` | read | Textos editables del PDF por clave (p. ej. `quotation.warranty.panel`, `client.phone`), con sección, personalización y plantilla |
-| `set_document_text`, `reset_document_text` | draft | Cualquier propuesta por id. Mismas reglas que el editor en línea (saneo, formato, placeholders, espejo en los datos del cliente) |
+| `set_document_text`, `reset_document_text` | draft | Cualquier propuesta por id. Mismas reglas que el editor en línea (saneo, formato, placeholders). El contacto, teléfono y correo del cliente se reflejan en `client` mediante `applyDocumentClientEdit` (misma edición `client` que el dock; deshacer incluye `specs` si la edición las corrigió) |
 | `set_document_layout` | draft | Secciones ocultas, tema y cabecera/pie |
 | `save_document_text_to_company_template` | guarded | Solo textos de plantilla y con la propuesta abierta |
 | `list_proposal_attachments`, `sync_catalog_datasheets`, `set_attachment_enabled` | read / draft | Fichas del catálogo con la misma política que la vista PDF |
@@ -79,6 +81,6 @@ Texto, archivos adjuntos y resultados de herramientas se envían a Google Gemini
 
 ## Verificación
 
-- Suites: `testAgentDocumentTools`, `testAgentAttachmentTools`, `testAgentClientTools`, `testMcpBridgeHost`, `testMcpConnectionPanel`, `electron/mcp/tests/*`, `testAgentToolSchemas`, `testAgentPermissions`, `testAgentProposalTools`, `testCatalogAudit`, `testAgentCards`, `testChatMarkdown`, `testChatFiles`, `testProposalAssistantApply`, `testAutomatedPricingPolicy` y `testAppAssistant`.
+- Suites: `testAgentDocumentTools`, `testAgentAttachmentTools`, `testAgentClientTools`, `testMcpBridgeHost`, `testMcpConnectionPanel`, `electron/mcp/tests/*`, `testAgentToolSchemas`, `testAgentPermissions`, `testAgentProposalTools`, `testProjectEdit`, `testCatalogAudit`, `testAgentCards`, `testChatMarkdown`, `testChatFiles`, `testProposalAssistantApply`, `testAutomatedPricingPolicy` y `testAppAssistant`.
 - Todas usan transporte sintético; ninguna escribe en producción ni llama a Gemini real.
 - La fixture `scripts/qa/fixtures/appAssistant.html` cubre consultas, auditoría, cambio aplicado con deshacer y confirmación.

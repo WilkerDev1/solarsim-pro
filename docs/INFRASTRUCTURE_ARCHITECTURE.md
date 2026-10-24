@@ -85,7 +85,7 @@ En el CT (usuario `agente`):
 
 `npm run verify:compatibility` es solo un sondeo de salud y rechazo anónimo. Su salida 1 con `WARN` por contratos autenticados no ejercidos es deliberada: no autoriza un despliegue ni demuestra una caída. Los contratos de escritura se ensayan en staging (ver [QA.md](QA.md)).
 
-### Versión 2.7.1: migración 006 y versión mínima de cliente
+### Versión 2.7.1 (historial): migración 006 y versión mínima de cliente
 
 La 2.7.1 elimina el espejo heredado de los equipos (ADR 0001, oleada 4). `package.json` (raíz, `server/` y `workers/share-viewer/`) debe decir `2.7.1` antes de construir: el cliente y el Worker se identifican con esa versión y la API de la 2.7.1 rechaza todo lo anterior, así que un build de `beta` que aún diga `2.7.0` no puede hablar con ella (`npm run release:bump -- 2.7.1`, ver [Mantenimiento y releases](MAINTENANCE_AND_UPDATES.md)). Precondición: la release debe incluir las oleadas 2 y 3 del plan (lectores del renderer y escritor `equipmentGroups.ts` que usan `shared/equipment` y no escriben el espejo); la 006 solo borra el espejo una vez, y si un cliente aún lo lee o lo reescribe, las vistas muestran valores vacíos o el espejo reaparece. Orden obligatorio:
 
@@ -104,6 +104,17 @@ La 2.7.1 elimina el espejo heredado de los equipos (ADR 0001, oleada 4). `packag
 Rollback: la imagen API anterior es compatible con los datos migrados (nunca leyó `specs`, salvo para calcular `system_capacity_kwp`, que calcularía en 0 para propuestas solo con grupos hasta volver a la 2.7.1). La 006 no se revierte con DDL; si hay que deshacerla, restaurar el checkpoint en una base nueva (sección siguiente).
 
 Criterios para abortar: health o base fallidos, migración fallida, permisos incorrectos, pérdida no explicada de contenido o conteos, clientes antiguos todavía escribiendo, firmas ausentes o fallo de instalación.
+
+### Versión 2.7.2: mantenimiento sin migración
+
+La 2.7.2 (banco de baterías, supuestos y edición de proyecto: ADR 0002 a 0004) no cambia datos ni contrato de la API: el servidor solo cambia su número de versión. No hay migración (el ensayo debe terminar en `"migrations":[1,2,3,4,5,6]` con los mismos conteos) y `MIN_CLIENT_VERSION` sigue en `2.7.1`, así que los clientes 2.7.1 y 2.7.2 sincronizan con la API 2.7.2. `package.json` (raíz, `server/` y `workers/share-viewer/`) debe decir `2.7.2` antes de construir. Orden:
+
+1. **Checkpoint** (paso 1) y **ensayo de restauración** (paso 2) con la imagen candidata: siguen siendo obligatorios aunque no haya migración.
+2. **Worker 2.7.2** (paso 6): toma vigencia, retención y tasa de cambio de `shared/assumptions.ts`. Es compatible con la API 2.7.1 y con la 2.7.2.
+3. **API 2.7.2** (paso 4): recrear solo `api`; no se aplica ninguna migración nueva. Verificar (paso 5) que `/api/health` informa `2.7.2`.
+4. **Publicar la release de escritorio 2.7.2** firmada. No hay que avisar al equipo ni esperar actualizaciones: nadie queda sin sincronizar.
+
+Rollback: la imagen API anterior es compatible (mismos datos y migraciones). La sección anterior (2.7.1) se conserva como historial de la migración 006 y de la versión mínima.
 
 ## Rollback de la API
 

@@ -4,7 +4,7 @@ Alcance: este documento describe el **modelo físico opcional** (`calculationMod
 
 ## 1. Motivación
 
-Con medición neta, la retención configurada (`gridExportFeePct`, 25% por defecto) se aplica solo a la energía exportada. Un kWh autoconsumido vale el 100% de la tarifa; uno exportado se acredita al 75%. Por eso el modelo físico separa la energía consumida en sitio (directa o vía batería) de la que sale a la red.
+Con medición neta, la retención configurada (`gridExportFeePct`, 25% por defecto; un 0 explícito se respeta) se aplica solo a la energía exportada. Un kWh autoconsumido vale el 100% de la tarifa; uno exportado se acredita al 75%. Por eso el modelo físico separa la energía consumida en sitio (directa o vía batería) de la que sale a la red.
 
 ## 2. Algoritmo mensual
 
@@ -25,7 +25,7 @@ $R_{diurno}$ (ventana 8:00–17:00) se toma de `daytimeLoadRatio`, si no de `day
 
 $$P_{diario} = \frac{E_m}{D_m} = P_{dc} \times \text{HSP}_m \times (1 - L_{sys})$$
 
-$L_{sys}$ = `systemLosses`; si falta, 14% en modo detallado y 25% en modo simple.
+$L_{sys}$ = `systemLosses` (`resolveSystemLosses`, `shared/assumptions.ts`; 0 es válido); si falta o es inválido, 14% en modo detallado y 25% en modo simple.
 
 $$E_{directo} = \min(P_{diario}, L_{dia}), \qquad E_{excedente} = \max(0, P_{diario} - E_{directo})$$
 
@@ -33,7 +33,7 @@ $$E_{directo} = \min(P_{diario}, L_{dia}), \qquad E_{excedente} = \max(0, P_{dia
 
 $$E_{bat,util} = C_{nominal} \times \frac{\text{DoD}}{100} \times \frac{\eta}{100}$$
 
-con el DOD y la eficiencia de cada grupo de baterías (`dodPct` y `efficiencyPct`; 90 y 90 si faltan en este motor). $C_{nominal}$ es la suma de capacidad × cantidad de los grupos de baterías. Solo aplica con `hasBattery` y capacidad positiva.
+con el DOD y la eficiencia de cada grupo de baterías (`dodPct` y `efficiencyPct`; 90 y 90 si faltan o están fuera de 1–100). $C_{nominal}$ es la suma de capacidad × cantidad de los grupos de baterías. El motor la toma de `batteryBank(readEquipment(specs))` (`shared/equipment/battery.ts`, [ADR 0002](adr/0002-banco-de-baterias.md)), el mismo módulo que usan el resumen financiero, el PDF y la vista previa del dock; la energía útil del despacho no se redondea. Solo aplica con «Sí batería» y capacidad positiva: un banco de 0 kWh equivale a sin almacenamiento y no cicla.
 
 En régimen diario estacionario la batería solo puede recargar lo que descargó la noche anterior:
 

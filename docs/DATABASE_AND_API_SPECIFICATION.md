@@ -60,7 +60,7 @@ La migración aditiva 005 incorpora `clients` (PK `(organization_id, id)`, versi
 
 ## Versión mínima de cliente
 
-Cada cliente se identifica con `X-SolarSim-Client: <nombre>/<versión>` (`desktop/2.7.1`, `share-viewer/2.7.1`); la versión sale de `package.json` en la compilación. El servidor MCP local no llama a la API: sus herramientas pasan por el renderer, que se presenta como `desktop`. Un middleware (`server/src/clientVersionGate.ts`, registrado después de CORS) rechaza **toda ruta `/api/*` de datos** cuando el encabezado falta, está malformado (solo se acepta `nombre/semver`) o su versión es menor que `MIN_CLIENT_VERSION`:
+Cada cliente se identifica con `X-SolarSim-Client: <nombre>/<versión>` (por ejemplo `desktop/2.7.2`, `share-viewer/2.7.2`); la versión sale de `package.json` en la compilación. El servidor MCP local no llama a la API: sus herramientas pasan por el renderer, que se presenta como `desktop`. Un middleware (`server/src/clientVersionGate.ts`, registrado después de CORS) rechaza **toda ruta `/api/*` de datos** cuando el encabezado falta, está malformado (solo se acepta `nombre/semver`) o su versión es menor que `MIN_CLIENT_VERSION`:
 
 ```json
 HTTP 426 Upgrade Required
