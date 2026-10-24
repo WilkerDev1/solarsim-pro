@@ -1,4 +1,4 @@
-import { SystemSpecs, ProjectSimulation } from '../types';
+import { LegacyProjectSpecs, SystemSpecs, ProjectSimulation } from '../types';
 import {
   getProjectPanels,
   getProjectInverters,
@@ -26,7 +26,7 @@ console.log('=====================================================\n');
 // User scenario: 4 inverters total (2 of 10 kW and 2 of 5 kW)
 // --------------------------------------------------------------------------
 console.log('--- TEST 1: Multi-Inverter (2x 10kW + 2x 5kW = 30kW AC) ---');
-const multiInverterSpecs: SystemSpecs = {
+const multiInverterSpecs: LegacyProjectSpecs = {
   ...BENCHMARK_LEGACY_SPECS,
   inverterCount: 2,
   inverterPowerKW: 10,
@@ -78,7 +78,7 @@ console.log(' ✅ PASS: Multi-inverter power (30kW), count (4), and formatting v
 // Scenario: 20 panels of 620W + 10 panels of 550W = 17.9 kWp DC
 // --------------------------------------------------------------------------
 console.log('--- TEST 2: Multi-Panel (20x 620W + 10x 550W = 17.9 kWp DC) ---');
-const multiPanelSpecs: SystemSpecs = {
+const multiPanelSpecs: LegacyProjectSpecs = {
   ...multiInverterSpecs,
   panelCount: 20,
   panelPowerW: 620,
@@ -134,7 +134,7 @@ console.log(' ✅ PASS: Multi-panel capacity (17.9 kWp), count (30), and solar p
 // Scenario: 1x 16.08 kWh + 2x 5.12 kWh = 26.32 kWh
 // --------------------------------------------------------------------------
 console.log('--- TEST 3: Multi-Battery BESS (1x 16.08kWh + 2x 5.12kWh = 26.32 kWh) ---');
-const multiBatterySpecs: SystemSpecs = {
+const multiBatterySpecs: LegacyProjectSpecs = {
   ...multiPanelSpecs,
   hasBattery: true,
   batteryCount: 1,
@@ -295,7 +295,7 @@ if (BENCHMARK_LEGACY_SPECS.hasBattery && (benchBatteries.length !== 1 || benchBa
 }
 
 const benchDCCapacity = calculateTotalDCCapacityKWp(BENCHMARK_LEGACY_SPECS);
-const expectedBenchDC = (BENCHMARK_LEGACY_SPECS.panelCount * BENCHMARK_LEGACY_SPECS.panelPowerW) / 1000;
+const expectedBenchDC = (BENCHMARK_LEGACY_SPECS.panelCount! * BENCHMARK_LEGACY_SPECS.panelPowerW!) / 1000;
 if (benchDCCapacity !== expectedBenchDC) {
   throw new Error(`❌ Benchmark DC capacity mismatch: expected ${expectedBenchDC}, got ${benchDCCapacity}`);
 }

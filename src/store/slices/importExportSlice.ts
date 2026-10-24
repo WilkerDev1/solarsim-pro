@@ -3,7 +3,7 @@ import { createProjectId } from '../../utils/projectId';
 import { commercialCopy } from '../../../shared/proposalCommercial';
 import { projectMutationMetadata } from '../sync/projectMutation';
 import { SimulationSlice, ImportExportSlice } from '../types';
-import { ProjectSimulation, SystemSpecs } from '../../types';
+import { LegacyProjectSpecs, ProjectSimulation } from '../../types';
 import { BENCHMARK_LEGACY_SPECS, BENCHMARK_PROJECT } from '../../engine/referenceCase';
 import { migrateLegacySpecs } from '../../../shared/equipment';
 import { generateNextProjectSequence, generateDuplicateProjectIdentifiers } from '../initialData';
@@ -12,7 +12,7 @@ import { generateNextProjectSequence, generateDuplicateProjectIdentifiers } from
  * Espejo escalar de DOD/eficiencia de un proyecto importado. Con grupos, sale del grupo principal (sin dato propio: DOD del motor
  * y eficiencia vacía, nunca el 80 % del caso de referencia ni un escalar obsoleto); sin grupos, del escalar del archivo.
  */
-function importedBatteryMirror(specs: Partial<SystemSpecs> | undefined): Pick<SystemSpecs, 'batteryDOD' | 'batteryEfficiencyPct'> {
+function importedBatteryMirror(specs: Partial<LegacyProjectSpecs> | undefined): Pick<LegacyProjectSpecs, 'batteryDOD' | 'batteryEfficiencyPct'> {
   const primary = specs?.batteries?.[0];
   if (specs?.batteries?.length) {
     const efficiency = primary?.efficiencyPct;
@@ -23,6 +23,8 @@ function importedBatteryMirror(specs: Partial<SystemSpecs> | undefined): Pick<Sy
   }
   return { batteryDOD: resolveBatteryDodPct(specs?.batteryDOD), batteryEfficiencyPct: specs?.batteryEfficiencyPct };
 }
+
+const positive = (value: unknown): number | undefined => (typeof value === 'number' && value > 0 ? value : undefined);
 
 export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set, get) => ({
   pendingImportConflict: null,
@@ -135,7 +137,7 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
           quoteNumber: raw.client?.quoteNumber || 'C-0001',
         },
         // Un archivo heredado (espejo) o nuevo (grupos) queda solo con grupos; la migración no cambia los resultados.
-        specs: migrateLegacySpecs({
+        specs: migrateLegacySpecs<LegacyProjectSpecs>({
           ...BENCHMARK_LEGACY_SPECS,
           ...(raw.specs || {}),
           // El 80 % del caso de referencia no es un default: sin DOD válido, el del proyecto es el del motor.
@@ -144,8 +146,9 @@ export const createImportExportSlice: SimulationSlice<ImportExportSlice> = (set,
           // El $/W y $/kWp del caso de referencia no son un precio del proyecto importado.
           pricePerWattUSD: resolvePricePerWattUSD(raw.specs, raw.financials),
           pricePerKWpUSD: raw.specs?.pricePerKWpUSD,
-          panelCount: typeof raw.specs?.panelCount === 'number' && raw.specs.panelCount > 0 ? raw.specs.panelCount : 10,
-          panelPowerW: typeof raw.specs?.panelPowerW === 'number' && raw.specs.panelPowerW > 0 ? raw.specs.panelPowerW : 620,
+          // Un archivo sin grupos trae el espejo; sin cantidad o potencia válidas, el proyecto parte de 10 × 620 W.
+          panelCount: positive((raw.specs as LegacyProjectSpecs | undefined)?.panelCount) ?? 10,
+          panelPowerW: positive((raw.specs as LegacyProjectSpecs | undefined)?.panelPowerW) ?? 620,
         }),
         rates: {
           ...BENCHMARK_PROJECT.rates,

@@ -66,6 +66,7 @@ export function parseSharePayload(value: unknown): ShareProposalPayload {
   const rates = requireRecord(project.rates, 'rates');
   const financials = requireRecord(project.financials, 'financials');
   textFields(client, ['name','projectId','quoteNumber','province','location','address','contactPhone','solarSourceMode','coordinates','distributor','tariffCode'], 1000);
+  // Los nombres del espejo se validan porque un cliente 2.6.x/2.7.0 aún puede publicar en el formato viejo (ADR 0001, retiro de la lectura heredada).
   textFields(specs, ['panelBrandModel','inverterBrandModel','batteryBrandModel','installationServicesDesc']);
   textFields(rates, ['distributor','tariffCode']);
   for (const record of [client, specs, rates]) {

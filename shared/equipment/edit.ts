@@ -1,5 +1,5 @@
 import { migrateLegacySpecs } from './migrate.js';
-import { LIST_KEY, type EquipmentEdit, type EquipmentGroups, type EquipmentKind, type EquipmentSpecs } from './types.js';
+import { LIST_KEY, type EquipmentEdit, type EquipmentGroups, type EquipmentKind, type LegacySystemSpecs } from './types.js';
 
 /**
  * Aplica una edición de grupo y devuelve las specs completas (no un parche). Nunca escribe el espejo heredado
@@ -9,7 +9,7 @@ import { LIST_KEY, type EquipmentEdit, type EquipmentGroups, type EquipmentKind,
  * Una edición inválida (índice fuera de rango, quitar el último grupo) no cambia nada y devuelve el mismo
  * objeto `specs`. No muta la entrada.
  */
-export function editEquipment<K extends EquipmentKind, S extends EquipmentSpecs>(specs: S, kind: K, edit: EquipmentEdit<K>): S {
+export function editEquipment<K extends EquipmentKind, S extends LegacySystemSpecs>(specs: S, kind: K, edit: EquipmentEdit<K>): S {
   const migrated = migrateLegacySpecs(specs);
   const groups = [...((migrated[LIST_KEY[kind]] as EquipmentGroups[K][] | undefined) ?? [])];
   if (edit.type === 'add') groups.push(edit.item);

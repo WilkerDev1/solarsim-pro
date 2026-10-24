@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { isAdminRole, isReaderRole, isWriterRole, canWrite, canAdminister, normalizeRole } from '../../shared/permissions';
+import { legacyPatch } from './legacyFixtures';
 import { useSimulationStore as store } from '../store/useSimulationStore';
 
 // 1. Role predicates. VIEWER is the legacy client alias of LECTOR.
@@ -22,7 +23,7 @@ const id = store.getState().activeProjectId;
 store.getState().moveToTrash(id);
 store.setState({ activeProjectId: id });
 const before = structuredClone(store.getState().projects.find((p) => p.id === id));
-store.getState().updateSpecs({ panelCount: 99 });
+store.getState().updateSpecs(legacyPatch({ panelCount: 99 }));
 store.getState().updateClient({ name: 'Cambiado' });
 store.getState().updateRates({ energyCostPerKWh: 0.5 });
 store.getState().updateFinancials({ discountRatePct: 3 });
@@ -31,7 +32,7 @@ store.getState().updateDocumentCustomization({ companySlogan: 'x' });
 assert.deepEqual(store.getState().projects.find((p) => p.id === id), before, 'Edits to a trashed proposal are ignored');
 store.getState().restoreProject(id);
 store.setState({ activeProjectId: id });
-store.getState().updateSpecs({ panelCount: 12 });
+store.getState().updateSpecs(legacyPatch({ panelCount: 12 }));
 assert.equal(store.getState().projects.find((p) => p.id === id)?.specs.panels?.[0].count, 12, 'Restored proposals are editable again');
 
 // 3. Role checks live in shared/permissions.ts, not scattered through the app.

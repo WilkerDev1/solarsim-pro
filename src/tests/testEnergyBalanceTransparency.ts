@@ -1,6 +1,6 @@
 import { calculateMonthlySolarProduction as calculateMonthlySolarProductionBase } from '../engine/solarEngine';
 import { calculateFinancialSummary as calculateFinancialSummaryBase } from '../engine/financeEngine';
-import { SystemSpecs, UtilityRates, FinancialParams } from '../types';
+import { LegacyProjectSpecs, UtilityRates, FinancialParams } from '../types';
 
 // These audited fixtures exercise the physical model explicitly; legacy is covered separately.
 function calculateMonthlySolarProduction(...args: Parameters<typeof calculateMonthlySolarProductionBase>) {
@@ -33,7 +33,7 @@ function assert(condition: boolean, message: string) {
 // --- TEST 1: User's Exact Case (41.58 kWp, 60,130.3 kWh, $0.151/kWh, 25% SIE-007) ---
 console.log('\n--- TEST 1: Exact Case Audit (41.58 kWp, 60,130.3 kWh) ---');
 
-const userSpecs: SystemSpecs = {
+const userSpecs: LegacyProjectSpecs = {
   isDetailed: false,
   panelPowerW: 630,
   panelCount: 66, // 41.58 kWp
@@ -136,7 +136,7 @@ assert(zeroRetainedKWh === 0, 'En InyecciÃ³n Cero, no se cobra peaje ni retenciÃ
 // --- TEST 3: Dynamic Battery Storage (BESS) Impact ---
 console.log('\n--- TEST 3: Dynamic BESS Battery Storage Physics ---');
 
-const batterySpecs: SystemSpecs = {
+const batterySpecs: LegacyProjectSpecs = {
   ...userSpecs,
   hasBattery: true,
   batteryCapacityKWh: 16.08,
@@ -173,17 +173,17 @@ assert(batteryTotalSavingsUSD > totalSavingsUSD, 'El ahorro monetario aumenta co
 console.log('\n--- TEST 4: Configurable Self-Consumption Presets ---');
 
 // Residential profile: 50%
-const resSpecs: SystemSpecs = { ...userSpecs, daytimeSelfConsumptionRatio: 50 };
+const resSpecs: LegacyProjectSpecs = { ...userSpecs, daytimeSelfConsumptionRatio: 50 };
 const resMonthly = calculateMonthlySolarProduction('Santo Domingo / Distrito Nacional', resSpecs, monthlyProdCons, 0.151, 25);
 const resSelf = resMonthly.reduce((s, m) => s + m.solarSelfConsumedKWh, 0);
 
 // Commercial profile: 75%
-const comSpecs: SystemSpecs = { ...userSpecs, daytimeSelfConsumptionRatio: 75 };
+const comSpecs: LegacyProjectSpecs = { ...userSpecs, daytimeSelfConsumptionRatio: 75 };
 const comMonthly = calculateMonthlySolarProduction('Santo Domingo / Distrito Nacional', comSpecs, monthlyProdCons, 0.151, 25);
 const comSelf = comMonthly.reduce((s, m) => s + m.solarSelfConsumedKWh, 0);
 
 // Industrial profile: 90%
-const indSpecs: SystemSpecs = { ...userSpecs, daytimeSelfConsumptionRatio: 90 };
+const indSpecs: LegacyProjectSpecs = { ...userSpecs, daytimeSelfConsumptionRatio: 90 };
 const indMonthly = calculateMonthlySolarProduction('Santo Domingo / Distrito Nacional', indSpecs, monthlyProdCons, 0.151, 25);
 const indSelf = indMonthly.reduce((s, m) => s + m.solarSelfConsumedKWh, 0);
 
@@ -213,7 +213,7 @@ assert(Math.abs(summary.year1SavingsUSD - totalSavingsUSD) < 1.0, 'year1SavingsU
 // --- TEST 6: User's Audited Case (853 kWh/mo, 8.19 kWp, 1x 5.12 kWh BESS, Residential 35%) ---
 console.log('\n--- TEST 6: Audited 853 kWh/mo + 8.19 kWp + 5.12 kWh BESS Case ---');
 
-const auditedSpecs: SystemSpecs = {
+const auditedSpecs: LegacyProjectSpecs = {
   isDetailed: false,
   panelPowerW: 630,
   panelCount: 13, // 8.19 kWp

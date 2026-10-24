@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { useSimulationStore } from '../store/useSimulationStore';
 import { BENCHMARK_LEGACY_SPECS, BENCHMARK_PROJECT } from '../engine/referenceCase';
+import type { LegacyProjectSpecs } from '../types';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../data/defaultEquipmentCatalog';
 import { DEFAULT_AGENT_POLICY, normalizeAgentPolicy } from '../store/slices/agentSlice';
 import { executeAgentTool, executeForAssistant } from '../features/agentTools/registry';
@@ -182,7 +183,7 @@ reset();
 const legacyProject = store.getState().getActiveProject();
 // Una propuesta 2.6.0 sin grupos solo existe en el formato heredado (espejo): se instala directo en el estado, no por una edición (que migra).
 store.setState({ projects: store.getState().projects.map((p) => (p.id === legacyProject.id ? { ...p, specs: { ...BENCHMARK_LEGACY_SPECS } } : p)) });
-const legacyBefore = store.getState().getActiveProject().specs;
+const legacyBefore: LegacyProjectSpecs = store.getState().getActiveProject().specs;
 assert.equal(legacyBefore.panels, undefined);
 const altPanel = store.getState().equipmentCatalog.filter((e) => e.type === 'panel').at(-1)!;
 const replace = await executeAgentTool({ name: 'propose_project_update', args: { id: legacyProject.id, edits: [{ section: 'specs', field: 'panels', valueJson: JSON.stringify([{ id: altPanel.id, count: 20, unitPriceUSD: 100 }]) }] } }, internal());
@@ -190,7 +191,7 @@ assert(replace.status === 'pending_confirmation', 'equipment groups carry prices
 assert.equal(store.getState().confirmAgentAction(replace.actionId).success, true);
 const replacedEntry = store.getState().agentActivity[0];
 assert.equal(store.getState().undoAgentActivity(replacedEntry.id).success, true);
-const restoredSpecs = store.getState().getActiveProject().specs;
+const restoredSpecs: LegacyProjectSpecs = store.getState().getActiveProject().specs;
 assert.equal(restoredSpecs.panelBrandModel, legacyBefore.panelBrandModel);
 assert.equal(restoredSpecs.panelCount, legacyBefore.panelCount);
 assert(!restoredSpecs.panels?.some((g) => g.id === altPanel.id), 'no replacement group survives the undo');

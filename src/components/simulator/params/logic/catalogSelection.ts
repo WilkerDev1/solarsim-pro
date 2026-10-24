@@ -1,4 +1,4 @@
-import type { SystemSpecs } from '../../../../types';
+import type { PanelItemSpec, SystemSpecs } from '../../../../types';
 import type { SolarEquipmentItem } from '../../../../types/equipment';
 import { catalogPanelGroupPatch } from '../../../../utils/catalogGroupPatch';
 import { selectCatalogEquipment, type EquipmentKind } from '../../../../utils/equipmentGroups';
@@ -7,7 +7,7 @@ import {
   DEFAULT_BATTERY_CAPACITY_KWH, DEFAULT_CATALOG_INVERTER_KW, DEFAULT_CATALOG_PANEL, resolveBatteryDodPct, resolveBatteryEfficiencyPct,
 } from './dockDefaults';
 
-type SupplierInfo = NonNullable<SystemSpecs['selectedSupplierInfo']>[EquipmentKind];
+type SupplierInfo = PanelItemSpec['selectedSupplierInfo'];
 
 /** System-level panel parameters and group-level fields a catalog selection writes, per equipment kind. */
 const SELECTION: Record<

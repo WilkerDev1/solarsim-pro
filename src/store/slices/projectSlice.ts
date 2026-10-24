@@ -2,7 +2,7 @@ import { createProjectId } from '../../utils/projectId';
 import { canEditCommercial } from '../../features/proposals/commercial';
 import { isProposalLink } from '../../../shared/proposalLinks';
 import { editEquipmentGroup, normalizeEquipmentEdit, normalizeSpecsChange, selectCatalogEquipment } from '../../utils/equipmentGroups';
-import { applyLegacyEquipmentPatch, editEquipment, readEquipment } from '../../../shared/equipment';
+import { editEquipment, readEquipment } from '../../../shared/equipment';
 import { commercialCopy, commercialState, isProposalCommercial } from '../../../shared/proposalCommercial';
 import { companyDocumentCustomization, reusableDocumentTemplate } from '../../utils/companyDocumentTemplate';
 import { DEFAULT_SIMULATION_SETTINGS } from '../defaultSimulationSettings';
@@ -37,6 +37,26 @@ function withRecommendedPanels(specs: SystemSpecs, client: ClientInfo, monthlyCo
   return readEquipment(specs).panels.length === 1
     ? editEquipment(specs, 'panel', { type: 'update', index: 0, patch: { count: rec.recommendedPanelCount } })
     : specs;
+}
+
+/** Specs of a new proposal: the reference case with the user's defaults written straight into the single group of each kind. */
+function newProjectSpecs(defs: SimulationStore['defaultSimulationSettings'] | undefined, directWattPrice: number): SystemSpecs {
+  let specs: SystemSpecs = {
+    ...BENCHMARK_PROJECT.specs,
+    // El $/W del caso de referencia (1.134971) no es un default: todo proyecto nuevo parte del ajuste.
+    pricePerWattUSD: directWattPrice,
+    pricePerKWpUSD: Math.round(directWattPrice * 1000 * 100) / 100,
+    isDetailed: false, // Simple (Catálogo IA): equipos del catálogo con precios de proveedor
+    pricingMode: defs?.defaultPricingMode === 'direct' ? 'direct_watt' : 'cost_matrix',
+    systemLosses: defs?.defaultSystemLosses !== undefined ? defs.defaultSystemLosses : DEFAULT_SYSTEM_LOSSES_PCT,
+    annualDegradation: defs?.defaultAnnualDegradation || 0.40,
+    autoCalculatePanels: defs?.defaultAutoCalculatePanels || false,
+    hasBattery: defs?.defaultHasBattery || false,
+  };
+  const referencePanelModel = readEquipment(BENCHMARK_PROJECT.specs).panels[0].brandModel;
+  specs = editEquipment(specs, 'panel', { type: 'update', index: 0, patch: { powerW: defs?.defaultPanelPowerW || 620, brandModel: defs?.defaultPanelModel || referencePanelModel } });
+  specs = editEquipment(specs, 'inverter', { type: 'update', index: 0, patch: { brandModel: defs?.defaultInverterModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)', powerKW: defs?.defaultInverterPowerKW || 8.0, count: 1 } });
+  return editEquipment(specs, 'battery', { type: 'update', index: 0, patch: { capacityKWh: defs?.defaultBatteryCapacityKWh || DEFAULT_BATTERY_CAPACITY_KWH, dodPct: defs?.defaultBatteryDOD || DEFAULT_BATTERY_DOD_PCT } });
 }
 
 /** Keeps equipment groups and their legacy mirror consistent whatever path changed the specs. */
@@ -249,25 +269,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
         quoteNumber: seq.quoteNumber,
         quoteValidityDays: defs?.defaultQuoteValidityDays || 7,
       },
-      specs: applyLegacyEquipmentPatch(BENCHMARK_PROJECT.specs, {
-        // El $/W del caso de referencia (1.134971) no es un default: todo proyecto nuevo parte del ajuste.
-        pricePerWattUSD: directWattPrice,
-        pricePerKWpUSD: Math.round(directWattPrice * 1000 * 100) / 100,
-        isDetailed: false, // Simple (Catálogo IA): equipos del catálogo con precios de proveedor
-        pricingMode: defs?.defaultPricingMode === 'direct' ? 'direct_watt' : 'cost_matrix',
-        systemLosses: defs?.defaultSystemLosses !== undefined ? defs.defaultSystemLosses : DEFAULT_SYSTEM_LOSSES_PCT,
-        annualDegradation: defs?.defaultAnnualDegradation || 0.40,
-        autoCalculatePanels: defs?.defaultAutoCalculatePanels || false,
-        hasBattery: defs?.defaultHasBattery || false,
-        // Los equipos por defecto entran al grupo único de cada tipo (el espejo heredado no se escribe).
-        panelPowerW: defs?.defaultPanelPowerW || 620,
-        panelBrandModel: defs?.defaultPanelModel || readEquipment(BENCHMARK_PROJECT.specs).panels[0].brandModel,
-        inverterBrandModel: defs?.defaultInverterModel || 'Inversor Lux Power LXP-LB-US 8K (8.0Kw)',
-        inverterPowerKW: defs?.defaultInverterPowerKW || 8.0,
-        inverterCount: 1,
-        batteryCapacityKWh: defs?.defaultBatteryCapacityKWh || DEFAULT_BATTERY_CAPACITY_KWH,
-        batteryDOD: defs?.defaultBatteryDOD || DEFAULT_BATTERY_DOD_PCT,
-      }),
+      specs: newProjectSpecs(defs, directWattPrice),
       rates: {
         ...BENCHMARK_PROJECT.rates,
         targetCoveragePct: defs?.defaultTargetCoveragePct || DEFAULT_TARGET_COVERAGE_PCT,
@@ -586,7 +588,7 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
     const before = readEquipment(p.specs);
     const after = readEquipment(specs);
     // Editing the first panel group's quantity (dock, assistant) is a manual quantity: it turns auto-calculation off.
-    const panelCountEdited = specsPartial.panelCount !== undefined || (specsPartial.panels !== undefined && after.panels[0]?.count !== before.panels[0]?.count);
+    const panelCountEdited = after.panels[0]?.count !== before.panels[0]?.count;
     const shouldAutoCalc = specsPartial.autoCalculatePanels !== undefined
       ? specsPartial.autoCalculatePanels
       : (p.specs.autoCalculatePanels && !panelCountEdited);

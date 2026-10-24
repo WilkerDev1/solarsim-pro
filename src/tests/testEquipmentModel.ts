@@ -6,15 +6,15 @@ import { calculateTotalBatteryCapacityKWh, calculateTotalDCCapacityKWp, calculat
 import {
   DEFAULT_UNIT_PRICE_USD, LEGACY_MIRROR_FIELDS, describeEquipment, editEquipment, equipmentTotals, migrateLegacySpecs, readEquipment, type EquipmentSpecs,
 } from '../../shared/equipment';
-import type { InverterItemSpec, PanelItemSpec, SystemSpecs } from '../types';
+import type { InverterItemSpec, PanelItemSpec, LegacyProjectSpecs } from '../types';
 
 // Fixture heredada (solo espejo): el módulo sigue leyéndola y migrándola.
 const base = BENCHMARK_LEGACY_SPECS;
 const mirrorKeys = (specs: object) => LEGACY_MIRROR_FIELDS.filter((key) => key in specs);
-const noMirror = (specs: SystemSpecs): SystemSpecs => {
+const noMirror = (specs: LegacyProjectSpecs): LegacyProjectSpecs => {
   const copy: Record<string, unknown> = { ...specs };
   for (const key of LEGACY_MIRROR_FIELDS) delete copy[key];
-  return copy as unknown as SystemSpecs;
+  return copy as unknown as LegacyProjectSpecs;
 };
 const panel = (id: string, powerW: number, count: number, extra: Partial<PanelItemSpec> = {}): PanelItemSpec => ({ id, brandModel: `Panel ${id}`, powerW, count, unitPriceUSD: 100, ...extra });
 const inverter = (id: string, powerKW: number, count: number): InverterItemSpec => ({ id, brandModel: `Inv ${id}`, powerKW, count, unitPriceUSD: 1000 });
@@ -29,25 +29,25 @@ const inverter = (id: string, powerKW: number, count: number): InverterItemSpec 
   assert.equal(legacy.panels[0].count, 38);
   assert.equal(legacy.panels[0].unitPriceUSD, 103.32);
 
-  const sparse = { ...base, panelUnitPriceUSD: undefined, inverterUnitPriceUSD: undefined, batteryUnitPriceUSD: undefined } as unknown as SystemSpecs;
+  const sparse = { ...base, panelUnitPriceUSD: undefined, inverterUnitPriceUSD: undefined, batteryUnitPriceUSD: undefined } as unknown as LegacyProjectSpecs;
   const defaults = readEquipment(sparse);
   assert.equal(defaults.panels[0].unitPriceUSD, DEFAULT_UNIT_PRICE_USD.panel, 'legacy without price uses the cost-matrix default');
   assert.equal(defaults.inverters[0].unitPriceUSD, DEFAULT_UNIT_PRICE_USD.inverter);
   assert.equal(defaults.batteries[0].unitPriceUSD, DEFAULT_UNIT_PRICE_USD.battery);
 
-  const groups = { ...noMirror(base), panels: [panel('a', 600, 10), panel('b', 700, 5)], inverters: [inverter('i', 10, 2)], batteries: [{ id: 'b1', brandModel: 'Bat', capacityKWh: 10, count: 2 }] } as SystemSpecs;
+  const groups = { ...noMirror(base), panels: [panel('a', 600, 10), panel('b', 700, 5)], inverters: [inverter('i', 10, 2)], batteries: [{ id: 'b1', brandModel: 'Bat', capacityKWh: 10, count: 2 }] } as LegacyProjectSpecs;
   const fromGroups = readEquipment(groups);
   assert.equal(fromGroups.panels, groups.panels, 'groups only: returned as saved');
   assert.equal(fromGroups.panels.length, 2);
   assert.equal(fromGroups.batteries.length, 1);
 
-  const mixed = { ...base, panels: [panel('a', 600, 10)] } as SystemSpecs;
+  const mixed = { ...base, panels: [panel('a', 600, 10)] } as LegacyProjectSpecs;
   const m = readEquipment(mixed);
   assert.equal(m.panels[0].id, 'a', 'mixed: saved groups win over mirror fields');
   assert.equal(m.panels[0].count, 10);
   assert.equal(m.inverters[0].count, 2, 'mixed: kinds without groups derive from the mirror');
 
-  const noBattery = readEquipment({ ...base, hasBattery: false } as SystemSpecs);
+  const noBattery = readEquipment({ ...base, hasBattery: false } as LegacyProjectSpecs);
   assert.deepEqual(noBattery.batteries, [], 'hasBattery false: no batteries even with leftover battery fields');
   const noBatteryGroups = readEquipment({ ...groups, hasBattery: false });
   assert.deepEqual(noBatteryGroups.batteries, [], 'hasBattery false hides saved battery groups, like the engine');
@@ -55,13 +55,13 @@ const inverter = (id: string, powerKW: number, count: number): InverterItemSpec 
 
 // 2. migrateLegacySpecs: groups built, mirror removed, idempotent, no data loss.
 {
-  const fixtures: Record<string, SystemSpecs> = {
+  const fixtures: Record<string, LegacyProjectSpecs> = {
     benchmark: base,
     noBattery: { ...base, hasBattery: false, batteryCount: 0 },
-    sparse: { ...base, panelUnitPriceUSD: undefined, inverterUnitPriceUSD: undefined, batteryUnitPriceUSD: undefined } as unknown as SystemSpecs,
+    sparse: { ...base, panelUnitPriceUSD: undefined, inverterUnitPriceUSD: undefined, batteryUnitPriceUSD: undefined } as unknown as LegacyProjectSpecs,
     supplier: { ...base, selectedSupplierInfo: { panel: { supplierName: 'Dist', priceUSD: 95, supplierPriceId: 'sp1' }, battery: { supplierName: 'Dist B', priceUSD: 1800 } } },
     multi: { ...base, panels: [panel('a', 600, 10), panel('b', 700, 5)] },
-    groupsOnly: { ...noMirror(base), panels: [panel('a', 600, 10)], inverters: [inverter('i', 10, 1)] } as SystemSpecs,
+    groupsOnly: { ...noMirror(base), panels: [panel('a', 600, 10)], inverters: [inverter('i', 10, 1)] } as LegacyProjectSpecs,
   };
   for (const [name, specs] of Object.entries(fixtures)) {
     const once = migrateLegacySpecs(specs);
@@ -76,9 +76,9 @@ const inverter = (id: string, powerKW: number, count: number): InverterItemSpec 
   const noBattery = migrateLegacySpecs(fixtures.noBattery);
   assert.equal(noBattery.batteries?.length, 1, 'hasBattery false: leftover battery data is kept in a group');
   assert.deepEqual(readEquipment(noBattery).batteries, [], 'and stays hidden while hasBattery is false');
-  assert.equal(migrateLegacySpecs({ ...noMirror(base), hasBattery: false } as SystemSpecs).batteries, undefined, 'no battery data, no battery group');
+  assert.equal(migrateLegacySpecs({ ...noMirror(base), hasBattery: false } as LegacyProjectSpecs).batteries, undefined, 'no battery data, no battery group');
 
-  const dormant = migrateLegacySpecs({ ...noMirror(base), hasBattery: false, batteryDOD: 70, batteryEfficiencyPct: 88 } as SystemSpecs);
+  const dormant = migrateLegacySpecs({ ...noMirror(base), hasBattery: false, batteryDOD: 70, batteryEfficiencyPct: 88 } as LegacyProjectSpecs);
   assert.deepEqual([dormant.batteries?.[0].dodPct, dormant.batteries?.[0].efficiencyPct], [70, 88], 'hasBattery false: a customized DOD/efficiency alone keeps the battery group');
 
   // Migración invariante: con grupos guardados el espejo solo se borra; nada se traslada a los grupos.
@@ -118,7 +118,7 @@ const inverter = (id: string, powerKW: number, count: number): InverterItemSpec 
   assert.equal(supplier.batteries![0].dodPct, 85);
   assert.ok(!('selectedSupplierInfo' in supplier), 'supplier lives in the group only');
   assert.equal(supplier.batteries![0].selectedSupplierInfo?.supplierName, 'S');
-  const addBattery = editEquipment({ ...noMirror(base), hasBattery: true } as SystemSpecs, 'battery', { type: 'add', item: { id: 'x', brandModel: 'X', capacityKWh: 5, count: 1 } });
+  const addBattery = editEquipment({ ...noMirror(base), hasBattery: true } as LegacyProjectSpecs, 'battery', { type: 'add', item: { id: 'x', brandModel: 'X', capacityKWh: 5, count: 1 } });
   assert.equal(addBattery.batteries!.length, 2, 'a project without battery groups gets the default one materialized before the add');
   const original = JSON.stringify(base);
   editEquipment(base, 'panel', { type: 'update', index: 0, patch: { count: 1 } });
@@ -153,7 +153,7 @@ const inverter = (id: string, powerKW: number, count: number): InverterItemSpec 
   const matrix = calculateCostMatrixSummary(base, t.capacityKWp);
   assert.equal(t.equipmentCostUSD, matrix.equipmentCostUSD, 'cost equals the cost matrix equipment cost');
   assert.equal(calculateCostMatrixSummary(migrateLegacySpecs(base), t.capacityKWp).equipmentCostUSD, t.equipmentCostUSD, 'migrating keeps the cost');
-  const multi = { ...base, panels: [panel('a', 600, 10), panel('b', 700, 5)], inverters: [inverter('i', 10, 2), inverter('j', 5, 1)] } as SystemSpecs;
+  const multi = { ...base, panels: [panel('a', 600, 10), panel('b', 700, 5)], inverters: [inverter('i', 10, 2), inverter('j', 5, 1)] } as LegacyProjectSpecs;
   const mt = equipmentTotals(readEquipment(multi));
   assert.equal(mt.panelCount, 15);
   assert.equal(mt.capacityKWp, calculateTotalDCCapacityKWp(multi));
@@ -161,17 +161,17 @@ const inverter = (id: string, powerKW: number, count: number): InverterItemSpec 
   assert.equal(mt.inverterCount, 3);
   assert.deepEqual(mt.modelCount, { panel: 2, inverter: 2, battery: 1 });
   assert.equal(mt.equipmentCostUSD, calculateCostMatrixSummary(multi, mt.capacityKWp).equipmentCostUSD);
-  const none = equipmentTotals(readEquipment({ ...base, hasBattery: false } as SystemSpecs));
+  const none = equipmentTotals(readEquipment({ ...base, hasBattery: false } as LegacyProjectSpecs));
   assert.equal(none.batteryNominalKWh, 0);
   assert.equal(none.batteryCount, 0);
 }
 
 // 6. Migración invariante: ningún resultado visible cambia (matriz de costos, motor financiero y energía).
 {
-  const fixtures: Record<string, SystemSpecs> = {
+  const fixtures: Record<string, LegacyProjectSpecs> = {
     reference: base,
-    legacyOnly: { ...base, panelUnitPriceUSD: undefined, inverterUnitPriceUSD: undefined, batteryUnitPriceUSD: undefined, panelWeightKilos: undefined } as unknown as SystemSpecs,
-    groupsOnly: { ...noMirror(base), panels: [panel('a', 600, 10), panel('b', 700, 5)], inverters: [inverter('i', 10, 2)], batteries: [{ id: 'b1', brandModel: 'Bat', capacityKWh: 10, count: 2, unitPriceUSD: 900 }] } as SystemSpecs,
+    legacyOnly: { ...base, panelUnitPriceUSD: undefined, inverterUnitPriceUSD: undefined, batteryUnitPriceUSD: undefined, panelWeightKilos: undefined } as unknown as LegacyProjectSpecs,
+    groupsOnly: { ...noMirror(base), panels: [panel('a', 600, 10), panel('b', 700, 5)], inverters: [inverter('i', 10, 2)], batteries: [{ id: 'b1', brandModel: 'Bat', capacityKWh: 10, count: 2, unitPriceUSD: 900 }] } as LegacyProjectSpecs,
     mixedGroupWithoutPrice: { ...base, panels: [panel('a', 600, 10, { unitPriceUSD: undefined })], selectedSupplierInfo: { panel: { supplierName: 'Dist', priceUSD: 95 } } },
     multiGroup: { ...base, panels: [panel('a', 600, 10), panel('b', 700, 5)], inverters: [inverter('i', 10, 2), inverter('j', 5, 1)], batteries: [{ id: 'b1', brandModel: 'Bat', capacityKWh: 5, count: 4, dodPct: 80 }, { id: 'b2', brandModel: 'Bat2', capacityKWh: 16, count: 1, efficiencyPct: 95 }] },
     batteryOffWithLeftovers: { ...base, hasBattery: false, batteryCount: 2, batteryDOD: 70 },
@@ -187,10 +187,10 @@ const inverter = (id: string, powerKW: number, count: number): InverterItemSpec 
     assert.deepEqual(calculateCostMatrixSummary(migrated, kwp), calculateCostMatrixSummary(specs, kwp), `${name}: cost matrix`);
     assert.equal(calculateTotalDCCapacityKWp(migrated), kwp, `${name}: kWp`);
     for (const mode of modes) {
-      const run = (s: SystemSpecs) => calculateFinancialSummary(BENCHMARK_PROJECT.client.province, s, BENCHMARK_PROJECT.rates, BENCHMARK_PROJECT.financials, BENCHMARK_PROJECT.monthlyConsumption, undefined, mode);
+      const run = (s: LegacyProjectSpecs) => calculateFinancialSummary(BENCHMARK_PROJECT.client.province, s, BENCHMARK_PROJECT.rates, BENCHMARK_PROJECT.financials, BENCHMARK_PROJECT.monthlyConsumption, undefined, mode);
       assert.deepEqual(run(migrated), run(specs), `${name}/${mode}: financial summary (price, cost, energy, indicators)`);
     }
-    const produce = (s: SystemSpecs) => calculateMonthlySolarProduction(BENCHMARK_PROJECT.client.province, s, BENCHMARK_PROJECT.monthlyConsumption, BENCHMARK_PROJECT.rates.energyCostPerKWh, BENCHMARK_PROJECT.rates.gridExportFeePct);
+    const produce = (s: LegacyProjectSpecs) => calculateMonthlySolarProduction(BENCHMARK_PROJECT.client.province, s, BENCHMARK_PROJECT.monthlyConsumption, BENCHMARK_PROJECT.rates.energyCostPerKWh, BENCHMARK_PROJECT.rates.gridExportFeePct);
     assert.deepEqual(produce(migrated), produce(specs), `${name}: monthly production`);
   }
 }
