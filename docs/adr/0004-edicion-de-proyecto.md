@@ -35,6 +35,7 @@ Las reglas para aplicar un cambio a una propuesta estaban repartidas en `project
 - Abrir una propuesta ya no corrige la potencia del modelo principal ni suelta proveedores huérfanos: no hay escrituras, sincronización ni entradas de deshacer al mirar. Esas correcciones ocurren en la siguiente edición real.
 - Una potencia corregida por el catálogo recalcula la cantidad de paneles (con autocálculo) en cualquier tipo de edición, y un `customMonthlyHSP` nuevo del cliente también recalcula (antes solo la provincia).
 - Con el catálogo vacío no se sueltan proveedores huérfanos (antes, al montar el dock sin catálogo cargado, se soltaban).
+- **Catálogo vacío = sin cargar.** El store no tiene un estado de carga aparte: igual que la regla de anexos (AGENTS.md, «Equipos»), un catálogo vacío se trata como no cargado. Mientras esté vacío, `applyProjectEdit` no reconcilia potencias, no suelta proveedores huérfanos y, al cambiar el modelo principal, conserva el proveedor elegido. Si una organización tuviera de verdad el catálogo vacío, el proveedor anterior se quedaría en el grupo hasta que haya catálogo o el usuario lo cambie; no altera el precio unitario guardado. Separar «cargando» de «vacío» sería un cambio del catálogo (candidato #3), no de esta edición.
 - Una importación con baterías habilitadas y cantidad no positiva queda con cantidad 1, como cualquier edición.
 - Un consumo mensual negativo existente en otros meses se lleva a 0 al editar un mes (antes solo se limitaba el mes editado).
 
