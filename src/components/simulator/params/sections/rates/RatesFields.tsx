@@ -101,7 +101,7 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
             matches ? (
               <FieldAction title="Tarifa oficial aplicada" onClick={() => updateRates({ energyCostPerKWh: reference })}>Oficial</FieldAction>
             ) : (
-              <WarnChip title={`Aplicar la tarifa oficial de referencia ($${referenceText}/kWh) según la resolución vigente`} onClick={() => updateRates({ energyCostPerKWh: reference })}>
+              <WarnChip title={`Aplicar la tarifa oficial de referencia ($${referenceText}/kWh) según la resolución vigente`} aria-label={`Aplicar la tarifa oficial de referencia, $${referenceText} por kWh`} onClick={() => updateRates({ energyCostPerKWh: reference })}>
                 {referenceText}
               </WarnChip>
             )

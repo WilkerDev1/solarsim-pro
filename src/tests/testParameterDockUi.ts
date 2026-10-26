@@ -7,6 +7,7 @@ import {
   StackedField, StatStrip, Stepper, SubHeader, SubHeaderIconButton, SubHeaderTextButton, ToggleGroup, WarnChip,
 } from '../components/simulator/params/ui';
 
+import { fieldDisplayValue } from '../components/simulator/params/ui/Field';
 import { commitStepperDraft } from '../components/simulator/params/ui/Stepper';
 import { nextRadioIndex } from '../components/simulator/params/ui/ToggleGroup';
 
@@ -100,7 +101,13 @@ const render = (node: React.ReactElement) => renderToStaticMarkup(node);
   assert.match(slot, /text-pd-warn-text/);
   assert.match(slot, /<input[^>]*min-w-\[7ch\]/, 'con un chip a la derecha el número conserva su ancho');
   assert.doesNotMatch(prefixed, /min-w-\[7ch\]/, 'sin ranura derecha el campo no reserva ancho');
-  assert.match(readFileSync('src/components/simulator/params/ui/Field.tsx', 'utf8'), /value=\{draft \?\? value\}/, 'al escribir se muestra el borrador, no el valor normalizado (vacío → 0)');
+  assert.doesNotMatch(render(h(Field, { id: 'g', value: '1', onChange: noop, right: false })), /min-w-\[7ch\]/, 'una ranura vacía no reserva ancho');
+  assert.equal(fieldDisplayValue(null, 0.22, true), 0.22, 'sin teclear se ve el valor guardado');
+  assert.equal(fieldDisplayValue('', 0, true), '', 'borrar no reinserta el 0');
+  assert.equal(fieldDisplayValue('0.', 0, true), '0.', 'el punto decimal a medio escribir se conserva');
+  assert.equal(fieldDisplayValue('0.185', 0.185, true), '0.185');
+  assert.equal(fieldDisplayValue('0.185', 0.22, true), 0.22, 'deshacer o el chip con el foco puesto muestran el valor nuevo');
+  assert.equal(fieldDisplayValue('8095551234', '809-555-1234', false), '809-555-1234', 'el formato en vivo del padre sigue mandando');
   const action = render(h(Field, { id: 'f', value: '22/10/2026', onChange: noop, right: h(FieldAction, { onClick: noop }, 'Hoy') }));
   assert.match(action, /text-pd-accent/);
   assert.match(action, />Hoy</);
