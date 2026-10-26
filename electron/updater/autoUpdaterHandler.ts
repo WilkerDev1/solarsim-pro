@@ -11,7 +11,12 @@ import { getMainWindow } from '../window/windowManager';
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = process.platform !== 'linux';
 
+/** Último estado enviado: una búsqueda no debe pisar una descarga o instalación en curso. */
+let lastUpdateState: string = 'idle';
+const BUSY_UPDATE_STATES = new Set(['downloading', 'downloaded', 'installing']);
+
 function sendUpdateStatus(statusPayload: any) {
+  if (typeof statusPayload?.state === 'string') lastUpdateState = statusPayload.state;
   const mainWindow = getMainWindow();
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('update-status', statusPayload);
@@ -131,6 +136,8 @@ export function registerAutoUpdater() {
   });
 
   ipcMain.handle('check-for-updates', async () => {
+    // Una búsqueda (automática o manual) durante una descarga borraría su progreso del aviso y del modal.
+    if (BUSY_UPDATE_STATES.has(lastUpdateState)) return { success: true, message: 'Actualización en curso.' };
     try {
       sendUpdateStatus({ state: 'checking' });
 

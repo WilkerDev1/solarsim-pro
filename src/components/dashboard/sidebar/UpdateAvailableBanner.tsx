@@ -20,7 +20,8 @@ export function updateBannerModel(info: UpdateInfo, dismissedVersion: string | n
   const version = info.version ? `v${info.version}` : 'Nueva versión';
   if (info.state === 'available') {
     if (info.version && info.version === dismissedVersion) return null;
-    return { kind: 'available', title: 'Actualización disponible', detail: `${version} lista para descargar`, action: 'Ver novedades', dismissible: true };
+    // Sin versión no hay con qué recordar el «ocultar»: la X no se ofrece.
+    return { kind: 'available', title: 'Actualización disponible', detail: `${version} lista para descargar`, action: 'Ver novedades', dismissible: Boolean(info.version) };
   }
   if (info.state === 'downloading') {
     const progressPct = Math.max(0, Math.min(100, Math.round(info.progressPct ?? 0)));
@@ -50,7 +51,7 @@ export const UpdateBannerView: React.FC<UpdateBannerViewProps> = ({ model, onOpe
   return (
     <div className="relative">
       {model.kind !== 'downloading' && (
-        <span aria-hidden="true" className="pointer-events-none absolute -inset-0.5 rounded-[14px] bg-gradient-to-r from-emerald-400 via-sky-400 to-emerald-400 opacity-60 blur-[6px] motion-safe:animate-pulse" />
+        <span aria-hidden="true" className="pointer-events-none absolute -inset-0.5 rounded-[14px] bg-gradient-to-r from-emerald-400 via-sky-400 to-emerald-400 opacity-50 blur-[6px]" />
       )}
       <button
         type="button"
@@ -71,7 +72,7 @@ export const UpdateBannerView: React.FC<UpdateBannerViewProps> = ({ model, onOpe
             </span>
           )}
         </span>
-        <span className="flex h-6 w-6 flex-none items-center justify-center self-end rounded-md bg-white/15" title={model.action}>
+        <span className="flex h-6 w-6 flex-none items-center justify-center self-end rounded-md bg-white/15">
           <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
         </span>
       </button>
@@ -81,7 +82,7 @@ export const UpdateBannerView: React.FC<UpdateBannerViewProps> = ({ model, onOpe
           onClick={event => { event.stopPropagation(); onDismiss(); }}
           aria-label="Ocultar el aviso hasta la próxima versión"
           title="Ocultar hasta la próxima versión"
-          className="absolute right-1 top-1 flex h-5 w-5 cursor-pointer items-center justify-center rounded-md border-0 bg-transparent p-0 text-white/70 hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white"
+          className="absolute right-0.5 top-0.5 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md border-0 bg-transparent p-0 text-white/70 hover:bg-white/15 hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-white"
         >
           <X className="h-3 w-3" aria-hidden="true" />
         </button>

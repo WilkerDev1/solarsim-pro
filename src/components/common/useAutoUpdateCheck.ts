@@ -19,7 +19,11 @@ export function useAutoUpdateCheck(): void {
     const check = () => {
       if (!shouldAutoCheckForUpdates(useSimulationStore.getState().updateInfo.state)) return;
       // El resultado llega por el canal update-status que escucha UpdateModal; un fallo solo deja el estado en «error».
-      api.checkForUpdates().catch(() => {});
+      try {
+        api.checkForUpdates().catch(() => {});
+      } catch {
+        // Un preload antiguo o incompleto no debe romper el temporizador.
+      }
     };
     const first = window.setTimeout(check, FIRST_UPDATE_CHECK_DELAY_MS);
     const every = window.setInterval(check, UPDATE_CHECK_INTERVAL_MS);
