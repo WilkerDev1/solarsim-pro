@@ -119,7 +119,7 @@ const renderRates = (project: ProjectSimulation, extra: Record<string, unknown> 
   assert.match(html, /<button[^>]*id="pd-rates-distributor"[^>]*>[\s\S]*?EDESUR[\s\S]*?<\/button>/, 'distribuidora seleccionada en el disparador');
   assert.doesNotMatch(html, /<option/, 'sin opciones nativas');
   assert.match(html, /id="pd-rates-tariff"/);
-  assert.match(html, /Oficial \$0\.\d{3}/, 'chip de precio oficial cuando el precio difiere');
+  assert.match(html, /title="Aplicar la tarifa oficial de referencia \(\$0\.\d{3}\/kWh\)[^"]*"[^>]*>0\.\d{3}</, 'chip con la tarifa oficial cuando el precio difiere');
   assert.match(html, /id="pd-rates-coverage"[^>]*value="95"/, 'cobertura por defecto 95');
   assert.doesNotMatch(html, /pd-rates-daytime/, 'sin proyección no hay perfil de carga');
 }
@@ -151,7 +151,7 @@ const renderRates = (project: ProjectSimulation, extra: Record<string, unknown> 
   assert.ok(isMatchingReference(ref + 0.0004, ref));
   assert.ok(!isMatchingReference(ref + 0.01, ref));
   const matching = renderRates(makeProject({ rates: { energyCostPerKWh: ref } }));
-  assert.doesNotMatch(matching, /Oficial \$/, 'sin chip de advertencia cuando coincide');
+  assert.doesNotMatch(matching, /Aplicar la tarifa oficial de referencia/, 'sin chip de advertencia cuando coincide');
   assert.match(matching, />Oficial</);
 }
 

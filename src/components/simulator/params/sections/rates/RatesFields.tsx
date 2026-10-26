@@ -65,7 +65,7 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
     tariffOptions.push({ value: rates.tariffCode, label: rates.tariffCode });
   }
 
-  const referenceText = `Oficial $${reference.toFixed(3)}`;
+  const referenceText = reference.toFixed(3);
   const exportTip = zeroExport
     ? 'Inyección cero activa: el sistema no vuelca excedentes a la red pública, por lo que no aplica retención ni cargo por uso de red.'
     : `Medición neta (${getTariffDisplayName(distributor, rates.tariffCode || '')}): retención del ${assumptions.gridExportFeePct}% por derecho de uso de red bajo la Res. SIE-007-2026-REG sobre los kWh excedentes exportados a la red de ${distributor}.`;
@@ -101,7 +101,7 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
             matches ? (
               <FieldAction title="Tarifa oficial aplicada" onClick={() => updateRates({ energyCostPerKWh: reference })}>Oficial</FieldAction>
             ) : (
-              <WarnChip title="Aplicar la tarifa de referencia calculada según la resolución oficial" onClick={() => updateRates({ energyCostPerKWh: reference })}>
+              <WarnChip title={`Aplicar la tarifa oficial de referencia ($${referenceText}/kWh) según la resolución vigente`} onClick={() => updateRates({ energyCostPerKWh: reference })}>
                 {referenceText}
               </WarnChip>
             )

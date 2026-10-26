@@ -17,25 +17,36 @@ export interface FieldProps extends Omit<React.InputHTMLAttributes<HTMLInputElem
 
 const unit = 'whitespace-nowrap text-xs text-pd-muted';
 
-export const Field: React.FC<FieldProps> = ({ value, onChange, prefix, suffix, mono, locked, right, disabled, className, ...input }) => (
-  <div className={cx(fieldShell, locked && 'border-dashed border-pd-field-ro-border bg-pd-field-ro')}>
-    {prefix && <span className={unit}>{prefix}</span>}
-    <input
-      {...input}
-      value={value}
-      onChange={event => onChange(event.target.value)}
-      disabled={disabled || locked}
-      className={cx(
-        bareInput,
-        'disabled:text-pd-strong disabled:opacity-100 disabled:[-webkit-text-fill-color:var(--pd-strong)]',
-        mono && 'font-mono',
-        className,
-      )}
-    />
-    {suffix && <span className={unit}>{suffix}</span>}
-    {right}
-  </div>
-);
+/**
+ * Mientras el campo tiene el foco se muestra lo que se escribe, aunque el valor guardado lo normalice
+ * (vacío → 0): así se puede borrar y teclear un precio sin que reaparezca el 0 delante. Al salir se ve el valor guardado.
+ */
+export const Field: React.FC<FieldProps> = ({ value, onChange, prefix, suffix, mono, locked, right, disabled, className, onFocus, onBlur, ...input }) => {
+  const [draft, setDraft] = React.useState<string | null>(null);
+  return (
+    <div className={cx(fieldShell, locked && 'border-dashed border-pd-field-ro-border bg-pd-field-ro')}>
+      {prefix && <span className={unit}>{prefix}</span>}
+      <input
+        {...input}
+        value={draft ?? value}
+        onFocus={event => { setDraft(String(value)); onFocus?.(event); }}
+        onBlur={event => { setDraft(null); onBlur?.(event); }}
+        onChange={event => { setDraft(event.target.value); onChange(event.target.value); }}
+        disabled={disabled || locked}
+        className={cx(
+          bareInput,
+          // Un chip a la derecha no puede dejar el número sin espacio.
+          right != null && 'min-w-[7ch]',
+          'disabled:text-pd-strong disabled:opacity-100 disabled:[-webkit-text-fill-color:var(--pd-strong)]',
+          mono && 'font-mono',
+          className,
+        )}
+      />
+      {suffix && <span className={unit}>{suffix}</span>}
+      {right}
+    </div>
+  );
+};
 
 /** Chip ámbar para un valor distinto al oficial; al pulsarlo se aplica el oficial. */
 export const WarnChip: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement>> = ({ className, children, ...button }) => (
