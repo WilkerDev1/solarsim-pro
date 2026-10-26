@@ -17,25 +17,48 @@ export interface FieldProps extends Omit<React.InputHTMLAttributes<HTMLInputElem
 
 const unit = 'whitespace-nowrap text-xs text-pd-muted';
 
-export const Field: React.FC<FieldProps> = ({ value, onChange, prefix, suffix, mono, locked, right, disabled, className, ...input }) => (
-  <div className={cx(fieldShell, locked && 'border-dashed border-pd-field-ro-border bg-pd-field-ro')}>
-    {prefix && <span className={unit}>{prefix}</span>}
-    <input
-      {...input}
-      value={value}
-      onChange={event => onChange(event.target.value)}
-      disabled={disabled || locked}
-      className={cx(
-        bareInput,
-        'disabled:text-pd-strong disabled:opacity-100 disabled:[-webkit-text-fill-color:var(--pd-strong)]',
-        mono && 'font-mono',
-        className,
-      )}
-    />
-    {suffix && <span className={unit}>{suffix}</span>}
-    {right}
-  </div>
-);
+/**
+ * Lo que muestra el campo: el texto tecleado mientras sea otra forma de escribir el valor guardado
+ * («» o «0.» para 0 en un campo numérico); si el valor cambia por otra vía (deshacer, chip, formato), se ve el valor.
+ */
+export function fieldDisplayValue(draft: string | null, value: string | number, numeric: boolean): string | number {
+  if (draft === null || draft === String(value)) return draft ?? value;
+  // Solo se conserva una escritura a medias (vacío, «0.», «0.10»); «05» confirmado se ve como 5.
+  const unfinished = draft === '' || /\.\d*$/.test(draft);
+  return numeric && unfinished && (parseFloat(draft) || 0) === Number(value) ? draft : value;
+}
+
+/** Al borrar un precio no reaparece el 0 delante: el texto tecleado se conserva hasta salir del campo. */
+export const Field: React.FC<FieldProps> = ({ value, onChange, prefix, suffix, mono, locked, right, disabled, className, onBlur, onKeyDown, ...input }) => {
+  const [draft, setDraft] = React.useState<string | null>(null);
+  // Deshabilitar el campo con el foco puesto no dispara blur: el borrador no debe sobrevivir.
+  React.useEffect(() => { if (disabled || locked) setDraft(null); }, [disabled, locked]);
+  const shown = fieldDisplayValue(draft, value, input.type === 'number');
+  // Si el valor cambió por otra vía, el borrador se descarta: no reaparece si el valor vuelve a coincidir.
+  if (draft !== null && shown !== draft) setDraft(null);
+  return (
+    <div className={cx(fieldShell, locked && 'border-dashed border-pd-field-ro-border bg-pd-field-ro')}>
+      {prefix && <span className={unit}>{prefix}</span>}
+      <input
+        {...input}
+        value={shown}
+        onBlur={event => { setDraft(null); onBlur?.(event); }}
+        // Enter confirma sin salir del campo: desde ahí se ve el valor guardado.
+        onKeyDown={event => { if (event.key === 'Enter') setDraft(null); onKeyDown?.(event); }}
+        onChange={event => { setDraft(event.target.value); onChange(event.target.value); }}
+        disabled={disabled || locked}
+        className={cx(
+          bareInput,
+          'disabled:text-pd-strong disabled:opacity-100 disabled:[-webkit-text-fill-color:var(--pd-strong)]',
+          mono && 'font-mono',
+          className,
+        )}
+      />
+      {suffix && <span className={unit}>{suffix}</span>}
+      {right}
+    </div>
+  );
+};
 
 /** Chip ámbar para un valor distinto al oficial; al pulsarlo se aplica el oficial. */
 export const WarnChip: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement>> = ({ className, children, ...button }) => (

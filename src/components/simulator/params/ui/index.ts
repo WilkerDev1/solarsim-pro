@@ -6,6 +6,8 @@ export { StackedField } from './StackedField';
 export type { StackedFieldProps } from './StackedField';
 export { Field, FieldAction, WarnChip } from './Field';
 export type { FieldProps } from './Field';
+export { FieldMenu } from './FieldMenu';
+export type { FieldMenuItem, FieldMenuProps } from './FieldMenu';
 export { CommitNumberField } from './CommitNumberField';
 export type { CommitNumberFieldProps } from './CommitNumberField';
 export { SelectField } from './SelectField';

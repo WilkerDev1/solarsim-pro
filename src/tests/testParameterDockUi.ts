@@ -7,6 +7,8 @@ import {
   StackedField, StatStrip, Stepper, SubHeader, SubHeaderIconButton, SubHeaderTextButton, ToggleGroup, WarnChip,
 } from '../components/simulator/params/ui';
 
+import { fieldDisplayValue } from '../components/simulator/params/ui/Field';
+import { FieldMenu, fieldMenuKey } from '../components/simulator/params/ui/FieldMenu';
 import { commitStepperDraft } from '../components/simulator/params/ui/Stepper';
 import { nextRadioIndex } from '../components/simulator/params/ui/ToggleGroup';
 
@@ -98,6 +100,14 @@ const render = (node: React.ReactElement) => renderToStaticMarkup(node);
   assert.match(slot, /<button[^>]*title="Aplicar tarifa oficial \$0.217"[^>]*>0.217<\/button>/);
   assert.match(slot, /bg-pd-warn-bg/);
   assert.match(slot, /text-pd-warn-text/);
+  assert.equal(fieldDisplayValue(null, 0.22, true), 0.22, 'sin teclear se ve el valor guardado');
+  assert.equal(fieldDisplayValue('', 0, true), '', 'borrar no reinserta el 0');
+  assert.equal(fieldDisplayValue('0.', 0, true), '0.', 'el punto decimal a medio escribir se conserva');
+  assert.equal(fieldDisplayValue('0.185', 0.185, true), '0.185');
+  assert.equal(fieldDisplayValue('0.185', 0.22, true), 0.22, 'deshacer o el chip con el foco puesto muestran el valor nuevo');
+  assert.equal(fieldDisplayValue('0.10', 0.1, true), '0.10', 'un cero decimal a medio escribir se conserva');
+  assert.equal(fieldDisplayValue('05', 5, true), 5, 'un número ya confirmado se ve normalizado');
+  assert.equal(fieldDisplayValue('8095551234', '809-555-1234', false), '809-555-1234', 'el formato en vivo del padre sigue mandando');
   const action = render(h(Field, { id: 'f', value: '22/10/2026', onChange: noop, right: h(FieldAction, { onClick: noop }, 'Hoy') }));
   assert.match(action, /text-pd-accent/);
   assert.match(action, />Hoy</);
@@ -155,6 +165,19 @@ const render = (node: React.ReactElement) => renderToStaticMarkup(node);
   assert.equal(commitStepperDraft('abc', 12, 10, 50), 12);
   assert.equal(commitStepperDraft('2', 12, 10, 50), 10, 'se limita solo al confirmar');
   assert.equal(commitStepperDraft('99', 12, 10, 50), 50);
+  assert.deepEqual(fieldMenuKey(false, 'ArrowDown', -1, 2), { type: 'open', focus: 0 });
+  assert.deepEqual(fieldMenuKey(false, 'ArrowUp', -1, 2), { type: 'open', focus: 1 }, 'flecha arriba abre en el último');
+  assert.equal(fieldMenuKey(false, 'Enter', -1, 2), null, 'Enter y Espacio los resuelve el botón nativo');
+  assert.deepEqual(fieldMenuKey(true, 'ArrowDown', 0, 2), { type: 'focus', index: 1 });
+  assert.deepEqual(fieldMenuKey(true, 'End', 0, 3), { type: 'focus', index: 2 });
+  assert.deepEqual(fieldMenuKey(true, 'Escape', 0, 2), { type: 'close' });
+  assert.equal(fieldMenuKey(true, ' ', 0, 2), null);
+  assert.equal(fieldMenuKey(false, 'ArrowUp', -1, 0), null, 'sin ítems no se abre un panel vacío');
+  const menu = render(h(FieldMenu, { ariaLabel: 'Opciones', attention: true, items: [{ label: 'Aplicar', onSelect: noop }] }));
+  assert.match(menu, /<button[^>]*aria-haspopup="menu"[^>]*aria-expanded="false"[^>]*aria-label="Opciones"/);
+  assert.doesNotMatch(menu, /aria-activedescendant/, 'el foco entra en los ítems: sin activedescendant en un botón');
+  assert.match(menu, /bg-pd-warn-text/, 'punto ámbar con atención');
+  assert.doesNotMatch(render(h(FieldMenu, { ariaLabel: 'Opciones', items: [] })), /bg-pd-warn-text/);
   assert.equal(nextRadioIndex(0, 'ArrowRight', 3), 1);
   assert.equal(nextRadioIndex(2, 'ArrowDown', 3), 0, 'da la vuelta');
   assert.equal(nextRadioIndex(0, 'ArrowLeft', 3), 2);
