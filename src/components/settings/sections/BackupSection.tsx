@@ -127,7 +127,7 @@ export const BackupSection: React.FC = () => {
 
         {/* Versión & Sistema */}
         <div className="pt-4 border-t border-slate-100 dark:border-[#27272a] flex flex-wrap items-center justify-between text-xs text-slate-400 dark:text-zinc-500">
-          <span>SolarSim Pro v2.7.2 • Motor Financiero Auditado Ley 57-07</span>
+          <span>SolarSim Pro v2.7.3 • Motor Financiero Auditado Ley 57-07</span>
           <span>Arquitectura Zustand Slices + PostgreSQL Sync</span>
         </div>
       </div>
