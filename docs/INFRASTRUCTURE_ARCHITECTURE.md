@@ -118,6 +118,10 @@ La 2.7.2 (banco de baterías, supuestos y edición de proyecto: ADR 0002 a 0004)
 
 Rollback: la imagen API anterior es compatible (mismos datos y migraciones). La sección anterior (2.7.1) se conserva como historial de la migración 006 y de la versión mínima.
 
+### Versión 2.7.3: corrección del dock y actualización de dependencias
+
+Igual que la 2.7.2: sin migración ni cambio de contrato, `MIN_CLIENT_VERSION` sigue en `2.7.1` y los clientes 2.7.1 o posteriores sincronizan con la API 2.7.3. Cambia el dock (precio kWh, #107) y se actualizan dependencias dentro de sus rangos compatibles (Electron 44.9, hono, wrangler; sin cambios mayores). Al construir la API, usar `--pull` para tomar la última imagen `node:24-alpine` (Node 24 LTS). Mismo orden que la 2.7.2: checkpoint y ensayo, Worker, API y release firmada. Además se actualiza la imagen de `cloudflared-tunnel` (recrear solo ese contenedor y comprobar que `/api/health` vuelve a responder por el dominio público).
+
 ## Rollback de la API
 
 1. Detener escritores nuevos y coordinar clientes. Guardar un dump posterior que contenga las escrituras recientes.
