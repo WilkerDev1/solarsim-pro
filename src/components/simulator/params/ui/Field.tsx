@@ -23,12 +23,16 @@ const unit = 'whitespace-nowrap text-xs text-pd-muted';
  */
 export function fieldDisplayValue(draft: string | null, value: string | number, numeric: boolean): string | number {
   if (draft === null || draft === String(value)) return draft ?? value;
-  return numeric && (parseFloat(draft) || 0) === Number(value) ? draft : value;
+  // Solo se conserva una escritura a medias (vacío, «0.», «0.10»); «05» confirmado se ve como 5.
+  const unfinished = draft === '' || /\.\d*$/.test(draft);
+  return numeric && unfinished && (parseFloat(draft) || 0) === Number(value) ? draft : value;
 }
 
 /** Al borrar un precio no reaparece el 0 delante: el texto tecleado se conserva hasta salir del campo. */
 export const Field: React.FC<FieldProps> = ({ value, onChange, prefix, suffix, mono, locked, right, disabled, className, onBlur, ...input }) => {
   const [draft, setDraft] = React.useState<string | null>(null);
+  // Deshabilitar el campo con el foco puesto no dispara blur: el borrador no debe sobrevivir.
+  React.useEffect(() => { if (disabled || locked) setDraft(null); }, [disabled, locked]);
   return (
     <div className={cx(fieldShell, locked && 'border-dashed border-pd-field-ro-border bg-pd-field-ro')}>
       {prefix && <span className={unit}>{prefix}</span>}
@@ -41,7 +45,7 @@ export const Field: React.FC<FieldProps> = ({ value, onChange, prefix, suffix, m
         className={cx(
           bareInput,
           // Un chip a la derecha no puede dejar el número sin espacio.
-          !!right && 'min-w-[7ch]',
+          !!right && 'min-w-[8ch]',
           'disabled:text-pd-strong disabled:opacity-100 disabled:[-webkit-text-fill-color:var(--pd-strong)]',
           mono && 'font-mono',
           className,
