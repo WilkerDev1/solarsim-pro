@@ -60,13 +60,21 @@ export const FieldMenu: React.FC<FieldMenuProps> = ({ ariaLabel, items, attentio
   };
 
   const onKeyDown = (event: React.KeyboardEvent) => {
+    // Enter mantenido: el primer pulso abre y enfoca un ítem; las repeticiones no deben aplicarlo.
+    if (event.repeat && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault();
+      return;
+    }
     const current = itemRefs.current.findIndex(item => item === document.activeElement);
     const action = fieldMenuKey(open, event.key, current, items.length);
     if (!action) {
-      if (event.key === 'Tab') closeMenu();
+      // El panel vive al final del body: Tab debe seguir desde la flecha, no desde el portal.
+      if (event.key === 'Tab' && open) closeMenu(true);
       return;
     }
     event.preventDefault();
+    // Los eventos del portal suben por el árbol de React: Escape no debe cerrar también el dock.
+    event.stopPropagation();
     if (action.type === 'open') openMenu(action.focus);
     else if (action.type === 'close') closeMenu(true);
     else setFocusIndex(action.index);
@@ -107,16 +115,20 @@ export const FieldMenu: React.FC<FieldMenuProps> = ({ ariaLabel, items, attentio
         role="menu"
         aria-label={ariaLabel}
         onKeyDown={onKeyDown}
+        tabIndex={-1}
         onBlur={event => {
           const next = event.relatedTarget as Node | null;
+          // Cambiar de ventana no cierra el menú; el relleno del panel es enfocable (tabIndex -1).
+          if (!document.hasFocus()) return;
           if (!panelRef.current?.contains(next) && next !== triggerRef.current) closeMenu();
         }}
         style={{ top: place.top, bottom: place.bottom, left: place.left, minWidth: place.minWidth, maxHeight: place.maxHeight }}
-        className="pd-select-panel fixed z-[1100] w-max max-w-[min(20rem,calc(100vw-1rem))] overflow-y-auto overscroll-contain rounded-lg border border-pd-border bg-pd-panel p-1 shadow-lg"
+        className="pd-select-panel fixed outline-none z-[1100] w-max max-w-[min(20rem,calc(100vw-1rem))] overflow-y-auto overscroll-contain rounded-lg border border-pd-border bg-pd-panel p-1 shadow-lg"
       >
         {items.map((item, index) => (
           <button
-            key={item.label}
+            // Clave estable: la etiqueta cambia al aplicar y remontar el botón haría perder el foco.
+            key={index}
             ref={element => { itemRefs.current[index] = element; }}
             type="button"
             role="menuitem"
