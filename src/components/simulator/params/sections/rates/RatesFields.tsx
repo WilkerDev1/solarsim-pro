@@ -2,7 +2,7 @@ import React from 'react';
 import { getTariffDisplayName } from '../../../../../../shared/proposalPresentation';
 import type { ProjectSimulation, SystemSpecs, UtilityRates } from '../../../../../types';
 import { getDistributorTariffOptions, type UtilityDistributor } from '../../../../../types/tariffs';
-import { Field, FieldAction, InfoTip, ParamRow, SelectField, ToggleGroup, WarnChip } from '../../ui';
+import { Field, FieldMenu, InfoTip, ParamRow, SelectField, ToggleGroup } from '../../ui';
 import { resolveAssumptions } from '../../../../../../shared/assumptions';
 import { SelfConsumptionPanel } from './SelfConsumptionPanel';
 import {
@@ -65,7 +65,7 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
     tariffOptions.push({ value: rates.tariffCode, label: rates.tariffCode });
   }
 
-  const referenceText = `Oficial $${reference.toFixed(3)}`;
+  const referenceText = reference.toFixed(3);
   const exportTip = zeroExport
     ? 'Inyección cero activa: el sistema no vuelca excedentes a la red pública, por lo que no aplica retención ni cargo por uso de red.'
     : `Medición neta (${getTariffDisplayName(distributor, rates.tariffCode || '')}): retención del ${assumptions.gridExportFeePct}% por derecho de uso de red bajo la Res. SIE-007-2026-REG sobre los kWh excedentes exportados a la red de ${distributor}.`;
@@ -98,13 +98,16 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
           value={rates.energyCostPerKWh}
           onChange={value => updateRates({ energyCostPerKWh: parseNumber(value) })}
           right={
-            matches ? (
-              <FieldAction title="Tarifa oficial aplicada" onClick={() => updateRates({ energyCostPerKWh: reference })}>Oficial</FieldAction>
-            ) : (
-              <WarnChip title="Aplicar la tarifa de referencia calculada según la resolución oficial" onClick={() => updateRates({ energyCostPerKWh: reference })}>
-                {referenceText}
-              </WarnChip>
-            )
+            <FieldMenu
+              ariaLabel={matches ? 'Opciones de tarifa: tarifa oficial aplicada' : `Opciones de tarifa: el precio difiere de la oficial ($${referenceText}/kWh)`}
+              attention={!matches}
+              items={[{
+                label: matches ? 'Tarifa oficial aplicada' : 'Aplicar tarifa oficial',
+                hint: `$${referenceText}`,
+                checked: matches,
+                onSelect: () => updateRates({ energyCostPerKWh: reference }),
+              }]}
+            />
           }
         />
       </ParamRow>
