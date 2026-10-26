@@ -119,7 +119,8 @@ const renderRates = (project: ProjectSimulation, extra: Record<string, unknown> 
   assert.match(html, /<button[^>]*id="pd-rates-distributor"[^>]*>[\s\S]*?EDESUR[\s\S]*?<\/button>/, 'distribuidora seleccionada en el disparador');
   assert.doesNotMatch(html, /<option/, 'sin opciones nativas');
   assert.match(html, /id="pd-rates-tariff"/);
-  assert.match(html, /title="Aplicar la tarifa oficial de referencia \(\$0\.\d{3}\/kWh\)[^"]*"[^>]*>Of\. 0\.\d{3}</, 'chip con la tarifa oficial cuando el precio difiere');
+  assert.match(html, /aria-haspopup="menu"[^>]*aria-label="Opciones de tarifa: el precio difiere de la oficial \(\$0\.\d{3}\/kWh\)"/, 'menú de tarifa oficial cuando el precio difiere');
+  assert.match(html, /bg-pd-warn-text/, 'punto ámbar en la flecha cuando el precio difiere');
   assert.match(html, /id="pd-rates-coverage"[^>]*value="95"/, 'cobertura por defecto 95');
   assert.doesNotMatch(html, /pd-rates-daytime/, 'sin proyección no hay perfil de carga');
 }
@@ -151,8 +152,8 @@ const renderRates = (project: ProjectSimulation, extra: Record<string, unknown> 
   assert.ok(isMatchingReference(ref + 0.0004, ref));
   assert.ok(!isMatchingReference(ref + 0.01, ref));
   const matching = renderRates(makeProject({ rates: { energyCostPerKWh: ref } }));
-  assert.doesNotMatch(matching, /Aplicar la tarifa oficial de referencia/, 'sin chip de advertencia cuando coincide');
-  assert.match(matching, />Oficial</);
+  assert.doesNotMatch(matching, /difiere de la oficial|bg-pd-warn-text/, 'sin aviso cuando coincide');
+  assert.match(matching, /aria-label="Opciones de tarifa: tarifa oficial aplicada"/);
 }
 
 // --- Tarifas: recálculo al cambiar distribuidora o tarifa ---

@@ -29,7 +29,7 @@ export function fieldDisplayValue(draft: string | null, value: string | number, 
 }
 
 /** Al borrar un precio no reaparece el 0 delante: el texto tecleado se conserva hasta salir del campo. */
-export const Field: React.FC<FieldProps> = ({ value, onChange, prefix, suffix, mono, locked, right, disabled, className, onBlur, ...input }) => {
+export const Field: React.FC<FieldProps> = ({ value, onChange, prefix, suffix, mono, locked, right, disabled, className, onBlur, onKeyDown, ...input }) => {
   const [draft, setDraft] = React.useState<string | null>(null);
   // Deshabilitar el campo con el foco puesto no dispara blur: el borrador no debe sobrevivir.
   React.useEffect(() => { if (disabled || locked) setDraft(null); }, [disabled, locked]);
@@ -40,6 +40,8 @@ export const Field: React.FC<FieldProps> = ({ value, onChange, prefix, suffix, m
         {...input}
         value={fieldDisplayValue(draft, value, input.type === 'number')}
         onBlur={event => { setDraft(null); onBlur?.(event); }}
+        // Enter confirma sin salir del campo: desde ahí se ve el valor guardado.
+        onKeyDown={event => { if (event.key === 'Enter') setDraft(null); onKeyDown?.(event); }}
         onChange={event => { setDraft(event.target.value); onChange(event.target.value); }}
         disabled={disabled || locked}
         className={cx(

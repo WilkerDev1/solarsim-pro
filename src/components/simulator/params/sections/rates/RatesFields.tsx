@@ -2,7 +2,7 @@ import React from 'react';
 import { getTariffDisplayName } from '../../../../../../shared/proposalPresentation';
 import type { ProjectSimulation, SystemSpecs, UtilityRates } from '../../../../../types';
 import { getDistributorTariffOptions, type UtilityDistributor } from '../../../../../types/tariffs';
-import { Field, FieldAction, InfoTip, ParamRow, SelectField, ToggleGroup, WarnChip } from '../../ui';
+import { Field, FieldMenu, InfoTip, ParamRow, SelectField, ToggleGroup } from '../../ui';
 import { resolveAssumptions } from '../../../../../../shared/assumptions';
 import { SelfConsumptionPanel } from './SelfConsumptionPanel';
 import {
@@ -98,13 +98,16 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
           value={rates.energyCostPerKWh}
           onChange={value => updateRates({ energyCostPerKWh: parseNumber(value) })}
           right={
-            matches ? (
-              <FieldAction title="Tarifa oficial aplicada" onClick={() => updateRates({ energyCostPerKWh: reference })}>Oficial</FieldAction>
-            ) : (
-              <WarnChip title={`Aplicar la tarifa oficial de referencia ($${referenceText}/kWh) según la resolución vigente`} aria-label={`Aplicar la tarifa oficial de referencia, $${referenceText} por kWh`} onClick={() => updateRates({ energyCostPerKWh: reference })}>
-                Of. {referenceText}
-              </WarnChip>
-            )
+            <FieldMenu
+              ariaLabel={matches ? 'Opciones de tarifa: tarifa oficial aplicada' : `Opciones de tarifa: el precio difiere de la oficial ($${referenceText}/kWh)`}
+              attention={!matches}
+              items={[{
+                label: matches ? 'Tarifa oficial aplicada' : 'Aplicar tarifa oficial',
+                hint: `$${referenceText}`,
+                checked: matches,
+                onSelect: () => updateRates({ energyCostPerKWh: reference }),
+              }]}
+            />
           }
         />
       </ParamRow>
