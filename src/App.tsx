@@ -20,6 +20,7 @@ import { ConflictResolutionModal } from './components/common/ConflictResolutionM
 import { NewProjectModal } from './components/common/NewProjectModal';
 import { UpdateModal } from './components/common/UpdateModal';
 import { ClientOutdatedNotice } from './components/common/ClientOutdatedNotice';
+import { useAutoUpdateCheck } from './components/common/useAutoUpdateCheck';
 const AIInvoiceScannerModal = lazy(() => import('./components/common/ai-invoice/AIInvoiceScannerModal').then((module) => ({ default: module.AIInvoiceScannerModal })));
 const AIDatasheetScannerModal = lazy(() => import('./components/common/AIDatasheetScannerModal').then((module) => ({ default: module.AIDatasheetScannerModal })));
 import { ImportConflictModal } from './components/common/ImportConflictModal';
@@ -38,6 +39,7 @@ export const App: React.FC = () => {
   const { sessionGeneration, workspaceScope, activeView, setActiveView, sidebarTheme, syncSettings, syncProjectsWithServer, isTrashActive, isSettingsModalOpen, activeConflict, loadOrganizationFeaturePolicy } = useSimulationStore(useShallow((s) => ({ sessionGeneration: s.sessionGeneration, workspaceScope: s.workspaceScope, activeView: s.activeView, setActiveView: s.setActiveView, sidebarTheme: s.sidebarTheme, syncSettings: s.syncSettings, syncProjectsWithServer: s.syncProjectsWithServer, isTrashActive: s.isTrashActive, isSettingsModalOpen: s.isSettingsModalOpen, activeConflict: s.activeConflict, loadOrganizationFeaturePolicy: s.loadOrganizationFeaturePolicy })));
   const settingsOwner = draftOwnerKey(workspaceScope, syncSettings, true);
   const isDark = sidebarTheme === 'dark';
+  useAutoUpdateCheck();
 
   // 🔄 Ciclo de Vida Global de Sincronización Automática en Segundo Plano (Heartbeat & Focus)
   useEffect(() => {
