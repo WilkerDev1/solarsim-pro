@@ -49,6 +49,7 @@ useSimulationStore.setState({ updateInfo: { state: 'idle' } });
 
 // El proceso principal no deja que una búsqueda pise una descarga en curso.
 const handler = readFileSync('electron/updater/autoUpdaterHandler.ts', 'utf8');
-assert.match(handler, /ipcMain\.handle\('check-for-updates', async \(\) => \{\s*\/\/[^\n]*\n\s*if \(BUSY_UPDATE_STATES\.has\(lastUpdateState\)\)/, 'la guarda va antes de emitir «checking»');
+assert.match(handler, /ipcMain\.handle\('check-for-updates', async \(\) => \{(\s*\/\/[^\n]*\n)+\s*if \(BUSY_UPDATE_STATES\.has\(lastUpdateStatus\.state\)\)/, 'la guarda va antes de emitir «checking»');
+assert.match(handler, /Error downloading update[\s\S]{0,300}sendUpdateStatus\(\{ state: 'error'/, 'una descarga fallida libera la guarda');
 
 console.log('Update banner: avisa disponible, descarga y lista; se oculta por versión; la comprobación automática no pisa una actualización.');

@@ -12,11 +12,15 @@ autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = process.platform !== 'linux';
 
 /** Último estado enviado: una búsqueda no debe pisar una descarga o instalación en curso. */
-let lastUpdateState: string = 'idle';
+let lastUpdateStatus: any = { state: 'idle' };
+let lastKnownVersion: string | undefined;
 const BUSY_UPDATE_STATES = new Set(['downloading', 'downloaded', 'installing']);
 
 function sendUpdateStatus(statusPayload: any) {
-  if (typeof statusPayload?.state === 'string') lastUpdateState = statusPayload.state;
+  if (typeof statusPayload?.version === 'string') lastKnownVersion = statusPayload.version;
+  // El progreso no trae versión: se completa con la encontrada para que el aviso diga cuál se descarga.
+  if (BUSY_UPDATE_STATES.has(statusPayload?.state) && !statusPayload.version && lastKnownVersion) statusPayload = { ...statusPayload, version: lastKnownVersion };
+  if (typeof statusPayload?.state === 'string') lastUpdateStatus = statusPayload;
   const mainWindow = getMainWindow();
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('update-status', statusPayload);
@@ -137,7 +141,11 @@ export function registerAutoUpdater() {
 
   ipcMain.handle('check-for-updates', async () => {
     // Una búsqueda (automática o manual) durante una descarga borraría su progreso del aviso y del modal.
-    if (BUSY_UPDATE_STATES.has(lastUpdateState)) return { success: true, message: 'Actualización en curso.' };
+    // En su lugar se reenvía el último estado: si la interfaz se recargó, vuelve a ver la descarga o el «lista para instalar».
+    if (BUSY_UPDATE_STATES.has(lastUpdateStatus.state)) {
+      sendUpdateStatus(lastUpdateStatus);
+      return { success: true, message: 'Actualización en curso.' };
+    }
     try {
       sendUpdateStatus({ state: 'checking' });
 
@@ -186,6 +194,8 @@ export function registerAutoUpdater() {
       return { success: true };
     } catch (err: any) {
       console.error('Error downloading update:', err);
+      // electron-updater no siempre emite «error»: sin esto el estado quedaría en «downloading» y bloquearía las búsquedas.
+      sendUpdateStatus({ state: 'error', error: err?.message || 'No se pudo descargar la actualización.' });
       return { success: false, error: err?.message };
     }
   });
