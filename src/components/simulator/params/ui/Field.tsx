@@ -33,12 +33,15 @@ export const Field: React.FC<FieldProps> = ({ value, onChange, prefix, suffix, m
   const [draft, setDraft] = React.useState<string | null>(null);
   // Deshabilitar el campo con el foco puesto no dispara blur: el borrador no debe sobrevivir.
   React.useEffect(() => { if (disabled || locked) setDraft(null); }, [disabled, locked]);
+  const shown = fieldDisplayValue(draft, value, input.type === 'number');
+  // Si el valor cambió por otra vía, el borrador se descarta: no reaparece si el valor vuelve a coincidir.
+  if (draft !== null && shown !== draft) setDraft(null);
   return (
     <div className={cx(fieldShell, locked && 'border-dashed border-pd-field-ro-border bg-pd-field-ro')}>
       {prefix && <span className={unit}>{prefix}</span>}
       <input
         {...input}
-        value={fieldDisplayValue(draft, value, input.type === 'number')}
+        value={shown}
         onBlur={event => { setDraft(null); onBlur?.(event); }}
         // Enter confirma sin salir del campo: desde ahí se ve el valor guardado.
         onKeyDown={event => { if (event.key === 'Enter') setDraft(null); onKeyDown?.(event); }}
@@ -46,8 +49,6 @@ export const Field: React.FC<FieldProps> = ({ value, onChange, prefix, suffix, m
         disabled={disabled || locked}
         className={cx(
           bareInput,
-          // Un chip a la derecha no puede dejar el número sin espacio.
-          !!right && 'min-w-[8ch]',
           'disabled:text-pd-strong disabled:opacity-100 disabled:[-webkit-text-fill-color:var(--pd-strong)]',
           mono && 'font-mono',
           className,
