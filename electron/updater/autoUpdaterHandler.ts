@@ -17,7 +17,8 @@ let lastKnownVersion: string | undefined;
 const BUSY_UPDATE_STATES = new Set(['downloading', 'downloaded', 'installing']);
 
 function sendUpdateStatus(statusPayload: any) {
-  if (typeof statusPayload?.version === 'string') lastKnownVersion = statusPayload.version;
+  // Solo una versión encontrada o descargada: «not-available» trae la instalada, no la que se descargaría.
+  if ((statusPayload?.state === 'available' || statusPayload?.state === 'downloaded') && typeof statusPayload.version === 'string') lastKnownVersion = statusPayload.version;
   // El progreso no trae versión: se completa con la encontrada para que el aviso diga cuál se descarga.
   if (BUSY_UPDATE_STATES.has(statusPayload?.state) && !statusPayload.version && lastKnownVersion) statusPayload = { ...statusPayload, version: lastKnownVersion };
   if (typeof statusPayload?.state === 'string') lastUpdateStatus = statusPayload;
@@ -214,6 +215,7 @@ export function registerAutoUpdater() {
       }
       const installedVersion = app.getVersion();
       assertNewerReleaseVersion(version, installedVersion);
+      lastKnownVersion = version;
       sendUpdateStatus({ state: 'downloading', progressPct: 0, transferredBytes: 0, totalBytes: 0 });
       await installVerifiedLinuxPackage(packageType, version, installedVersion, (transferred, total) => {
         sendUpdateStatus({
