@@ -172,6 +172,7 @@ const render = (node: React.ReactElement) => renderToStaticMarkup(node);
   assert.deepEqual(fieldMenuKey(true, 'End', 0, 3), { type: 'focus', index: 2 });
   assert.deepEqual(fieldMenuKey(true, 'Escape', 0, 2), { type: 'close' });
   assert.equal(fieldMenuKey(true, ' ', 0, 2), null);
+  assert.equal(fieldMenuKey(false, 'ArrowUp', -1, 0), null, 'sin ítems no se abre un panel vacío');
   const menu = render(h(FieldMenu, { ariaLabel: 'Opciones', attention: true, items: [{ label: 'Aplicar', onSelect: noop }] }));
   assert.match(menu, /<button[^>]*aria-haspopup="menu"[^>]*aria-expanded="false"[^>]*aria-label="Opciones"/);
   assert.doesNotMatch(menu, /aria-activedescendant/, 'el foco entra en los ítems: sin activedescendant en un botón');

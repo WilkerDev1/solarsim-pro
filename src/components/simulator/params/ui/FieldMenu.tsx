@@ -24,6 +24,7 @@ export type FieldMenuKeyAction = { type: 'open'; focus: number } | { type: 'clos
 
 /** Teclado del botón de menú (WAI-ARIA menu button): flechas abren y recorren, Escape cierra; Enter y Espacio los resuelve el botón nativo. */
 export function fieldMenuKey(open: boolean, key: string, focused: number, count: number): FieldMenuKeyAction {
+  if (count <= 0) return null;
   if (!open) return key === 'ArrowDown' ? { type: 'open', focus: 0 } : key === 'ArrowUp' ? { type: 'open', focus: count - 1 } : null;
   if (key === 'Escape') return { type: 'close' };
   if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(key)) return { type: 'focus', index: moveActiveIndex(focused, key, count) };
