@@ -4,6 +4,7 @@ import { ShieldCheck, CheckCircle2, Check } from 'lucide-react';
 import { getProjectPanels, getProjectInverters, getProjectBatteries } from '../../../utils/equipmentSpecsUtils';
 import { MANUAL_BRAND_PLACEHOLDER, QUOTATION_PANEL_BRAND_FALLBACK, SAMPLE_PHONE_MARKER, SAMPLE_QUOTE_NUMBER, resolveSaleMarginMultiplier } from '../../../../shared/projectDefaults';
 import { resolveAssumptions } from '../../../../shared/assumptions';
+import { visibleQuotationItems } from '../../../../shared/quotationItems';
 import { formatProposalDate } from '../../../utils/formatDateUtils';
 
 interface QuotationEquipmentsTabProps {
@@ -164,7 +165,7 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
                     <td className="px-3 py-2 text-center font-bold">1</td>
                     <td className="px-3 py-2 text-center text-slate-500 font-normal">UD</td>
                   </tr>
-                  {(project.financials.customItems || []).map((cItem, cIdx) => (
+                  {visibleQuotationItems(project.financials.customItems).map((cItem, cIdx) => (
                     <tr
                       key={cItem.id || cIdx}
                       className={cIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}

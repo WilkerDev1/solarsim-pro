@@ -1,6 +1,7 @@
 import type { ExtractedInvoiceData } from '../../../../types/aiInvoice';
 import type { FinancialSummaryResult } from '../../../../types';
 import type { AIProposalCommercial } from '../../../../../shared/aiProposalCommercial';
+import { isItemHiddenInQuotation } from '../../../../../shared/quotationItems';
 import { appliesItemMargin, isItemItbisExonerated } from '../../../../../shared/financialRules';
 interface Props{draft:ExtractedInvoiceData;financial?:FinancialSummaryResult;update:(patch:Partial<ExtractedInvoiceData>)=>void}
 export function ProposalCommercialReview({draft,financial,update}:Props){
@@ -30,6 +31,7 @@ export function ProposalCommercialReview({draft,financial,update}:Props){
       <label>Costo unitario USD<input type="number" min="0" step="0.01" value={item.unitPriceUSD ?? ''} onChange={e=>change({customItems:items.map((r,j)=>i===j?{...r,unitPriceUSD:Number(e.target.value)}:r)})}/></label>
       <label className="proposal-check"><input type="checkbox" checked={appliesItemMargin(item)} onChange={e=>change({customItems:items.map((r,j)=>i===j?{...r,applyMargin:e.target.checked}:r)})}/>Aplicar utilidad</label>
       <label className="proposal-check"><input type="checkbox" checked={isItemItbisExonerated(item)} onChange={e=>change({customItems:items.map((r,j)=>i===j?{...r,exonerateITBIS:e.target.checked}:r)})}/>Exonerar ITBIS</label>
+      <label className="proposal-check"><input type="checkbox" checked={isItemHiddenInQuotation(item)} onChange={e=>change({customItems:items.map((r,j)=>i===j?{...r,hideInQuotation:e.target.checked}:r)})}/>Oculto en factura</label>
       <button type="button" onClick={()=>change({customItems:items.filter((_,j)=>i!==j)})}>Quitar ítem</button>
     </div>)}
     <button type="button" onClick={()=>change({customItems:[...items,{id:crypto.randomUUID(),description:'',quantity:1,unit:'UD',unitPriceUSD:0,applyMargin:true,exonerateITBIS:false}]})}>Añadir ítem adicional</button>

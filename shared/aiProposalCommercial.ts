@@ -1,4 +1,5 @@
 import type { CustomQuotationItem, CustomQuotationDiscount } from '../src/types';
+import { preserveHiddenInQuotation } from './quotationItems';
 export interface AIProposalCommercial {
   priceBasis?: 'purchase' | 'sale' | 'unknown';
   sourceTotals?: { subtotalUSD?: number; taxUSD?: number; totalCostUSD?: number; saleUSD?: number };
@@ -16,7 +17,7 @@ export const COMMERCIAL_SCHEMA = {type:'OBJECT',description:'Condiciones comerci
   priceBasis:{type:'STRING',nullable:true,enum:['purchase','sale','unknown'],description:'Costos proyectos/costo unitario = purchase. Precio de venta = sale. Precios ambiguos = unknown: pregunta antes de tratarlos como compra.'},
   sourceTotals:{type:'OBJECT',properties:{subtotalUSD:{type:'NUMBER'},taxUSD:{type:'NUMBER'},totalCostUSD:{type:'NUMBER'},saleUSD:{type:'NUMBER'}},description:'Totales leídos de la hoja en USD, sólo conciliación; no son extras ni reemplazan cálculo fiscal.'},
   pricingMode:{type:'STRING',enum:['cost_matrix'],description:'Las propuestas automáticas siempre usan la matriz de costos con precios del catálogo.'},markupPct:{type:'NUMBER',nullable:true,description:'Recargo sobre costo solicitado; 40 significa40%. null cuando se utiliza margen sobre venta.'},marginOnSalePct:{type:'NUMBER',nullable:true,description:'Margen sobre venta solicitado. null cuando se utiliza recargo sobre costo.'},installationUnitPriceUSD:{type:'NUMBER',nullable:true,description:'Mano de obra USD/kWp. null si se pide un importe total.'},installationTotalUSD:{type:'NUMBER',nullable:true,description:'Mano de obra total USD del proyecto, por ejemplo500. null si se usa USD/kWp.'},directPriceSurplusTarget:{type:'STRING',enum:['margin','labor']},pricePerWattUSD:{type:'NUMBER'},
-  customItems:{type:'ARRAY',items:{type:'OBJECT',properties:{id:{type:'STRING'},description:{type:'STRING'},quantity:{type:'NUMBER'},unit:{type:'STRING'},unitPriceUSD:{type:'NUMBER'},exonerateITBIS:{type:'BOOLEAN'},applyMargin:{type:'BOOLEAN'}},required:['description','quantity','unitPriceUSD','exonerateITBIS','applyMargin']}},
+  customItems:{type:'ARRAY',items:{type:'OBJECT',properties:{id:{type:'STRING'},description:{type:'STRING'},quantity:{type:'NUMBER'},unit:{type:'STRING'},unitPriceUSD:{type:'NUMBER'},exonerateITBIS:{type:'BOOLEAN'},applyMargin:{type:'BOOLEAN'},hideInQuotation:{type:'BOOLEAN',description:'true = se cobra pero no se lista en la factura. Conserva el valor de la fila anterior; no lo cambies sin petición expresa.'}},required:['description','quantity','unitPriceUSD','exonerateITBIS','applyMargin']}},
   customDiscounts:{type:'ARRAY',items:{type:'OBJECT',properties:{id:{type:'STRING'},description:{type:'STRING'},type:{type:'STRING',enum:['fixed','percentage']},value:{type:'NUMBER'},target:{type:'STRING',enum:['general','equipment']}},required:['description','type','value','target']}},
 },required:['priceBasis','markupPct','marginOnSalePct','installationUnitPriceUSD','installationTotalUSD','customItems','customDiscounts']};
 /** Omission retains context, explicit [] clears lists; invalid financial data blocks application. */
@@ -46,18 +47,21 @@ export function normalizeCommercial(raw: any, base: AIProposalCommercial | undef
     if(value[key]===undefined)continue;
     if(!Array.isArray(value[key])||value[key].length>100){(out as any)[key]=value[key];issue(`invalid_${key}`,'Revisa la lista comercial (máximo 100 filas).');continue;}
     const ids=new Set<string>();
-    (out as any)[key]=value[key].map((row:any,i:number)=>{
+    const rows=value[key].map((row:any,i:number)=>{
       const id=typeof row?.id==='string'&&row.id.trim()?row.id:`ai-${key}-${i}`;
       if(ids.has(id))issue(`duplicate_${key}`,'Hay filas comerciales con identificadores repetidos.'); ids.add(id);
       if(typeof row?.description!=='string'||!row.description.trim())issue(`invalid_${key}_description`,'Cada fila comercial necesita una descripción.');
       const n=(v:any)=>typeof v==='number'&&Number.isFinite(v)&&v>=0;
       if(key==='customItems'){
         if(!n(row?.quantity)||row.quantity<=0||!n(row?.unitPriceUSD)||typeof row?.exonerateITBIS!=='boolean'||typeof row?.applyMargin!=='boolean')issue('invalid_extra','Completa cantidad, costo y tratamiento de margen/ITBIS del extra.');
-        return {id,description:row?.description,quantity:row?.quantity,unit:row?.unit||'UD',unitPriceUSD:row?.unitPriceUSD,exonerateITBIS:row?.exonerateITBIS,applyMargin:row?.applyMargin};
+        if(row?.hideInQuotation!==undefined&&typeof row.hideInQuotation!=='boolean')issue('invalid_extra','Completa cantidad, costo y tratamiento de margen/ITBIS del extra.');
+        return {id,description:row?.description,quantity:row?.quantity,unit:row?.unit||'UD',unitPriceUSD:row?.unitPriceUSD,exonerateITBIS:row?.exonerateITBIS,applyMargin:row?.applyMargin,...(typeof row?.hideInQuotation==='boolean'?{hideInQuotation:row.hideInQuotation}:{})};
       }
       if(!['fixed','percentage'].includes(row?.type)||!n(row?.value)||(row.type==='percentage'&&row.value>100)||!['general','equipment'].includes(row?.target))issue('invalid_discount','Revisa importe, tipo y destino del descuento.');
       return {id,description:row?.description,type:row?.type,value:row?.value,target:row?.target};
     });
+    // Una lista reescrita sin decidir sobre «oculto en factura» no vuelve visible un extra que ya estaba oculto.
+    (out as any)[key]=key==='customItems'?preserveHiddenInQuotation(rows,base?.customItems):rows;
   }
   return out;
 }
