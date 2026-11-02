@@ -27,6 +27,20 @@ export interface ProjectRow {
   deleted_by: string | null;
   system_capacity_kwp: number;
 }
+const ISO_DATE_TIME =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/;
+const MIN_CREATED_AT_MS = Date.UTC(2000, 0, 1);
+/**
+ * Creation date a client reports for a project the server has not seen yet (it was drafted offline).
+ * Only a strict ISO instant from 2000 onwards counts; anything else returns null and the server clock is used.
+ * The INSERT caps it at the server clock, so a future date can never be stored.
+ */
+export function clientCreatedAt(value: unknown): string | null {
+  if (typeof value !== "string" || !ISO_DATE_TIME.test(value)) return null;
+  const ms = Date.parse(value);
+  if (!Number.isFinite(ms) || ms < MIN_CREATED_AT_MS) return null;
+  return new Date(ms).toISOString();
+}
 export function canonicalProject(row: ProjectRow) {
   return {
     ...row.data_json,
@@ -238,7 +252,7 @@ export async function saveProject(
         ],
       )
     : await client.query<ProjectRow>(
-        `INSERT INTO projects (id,organization_id,created_by_id,created_by_name,created_by_email,last_modified_by_id,last_modified_by_name,client_name,project_code,system_capacity_kwp,version,data_json,is_deleted,deleted_at,deleted_by,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$3,$4,$6,$7,$8,$9,$10,$11,$12,$13,clock_timestamp(),clock_timestamp()) RETURNING *`,
+        `INSERT INTO projects (id,organization_id,created_by_id,created_by_name,created_by_email,last_modified_by_id,last_modified_by_name,client_name,project_code,system_capacity_kwp,version,data_json,is_deleted,deleted_at,deleted_by,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$3,$4,$6,$7,$8,$9,$10,$11,$12,$13,LEAST($14::timestamptz,clock_timestamp()),clock_timestamp()) RETURNING *`,
         [
           input.id,
           user.organizationId,
@@ -253,6 +267,8 @@ export async function saveProject(
           deleted,
           deletedAt,
           deleted ? user.name : null,
+          // Creation only: updates never touch created_at. LEAST ignores NULL, so no valid value means the server clock.
+          clientCreatedAt(input.createdAt),
         ],
       );
   if (!result.rows.length)

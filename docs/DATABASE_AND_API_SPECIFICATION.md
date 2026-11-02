@@ -24,7 +24,7 @@ JWT_SECRET y DB_PASSWORD son obligatorios, privados y sin fallback conocido. PAT
 | POST /api/auth/accept-invitation | Aceptación de invitación y asignación de rol contextual. |
 | GET/POST/PATCH/DELETE /api/users | Administración de miembros del tenant actual (no usar ruta legacy). |
 | POST /api/sync/pull | `{lastSyncTimestamp?}`; devuelve proyectos completos, deletedIds y watermark SQL textual. No convertir cursor a Date ni truncar microsegundos. |
-| POST /api/sync/push | `{projects}` con baseVersion. Nuevo=0; existente=última versión confirmada. `system_capacity_kwp` se calcula con `equipmentTotals(readEquipment(specs))` (grupos `specs.panels`; las propuestas heredadas derivan el grupo del espejo). |
+| POST /api/sync/push | `{projects}` con baseVersion. Nuevo=0; existente=última versión confirmada. `system_capacity_kwp` se calcula con `equipmentTotals(readEquipment(specs))` (grupos `specs.panels`; las propuestas heredadas derivan el grupo del espejo). `createdAt` solo se acepta al crear: un ISO válido desde 2000 se conserva (tope: reloj del servidor, para propuestas redactadas sin conexión); si falta o es inválido se usa el reloj del servidor, y las actualizaciones nunca lo cambian. |
 | DELETE /api/projects/:id | `?baseVersion=N`, eliminación suave CAS. |
 | POST /api/projects/:id/restore | `?baseVersion=N`, restauración de papelera CAS. |
 | DELETE /api/projects/:id?permanent=true | baseVersion obligatorio; solo un proyecto en papelera. Tombstone durable. |

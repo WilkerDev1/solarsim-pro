@@ -1990,3 +1990,84 @@ test("first commercial decision preserves an inactive legacy author without perm
   });
   assert.equal(reassignment.body.results[0].reason, "invalid_commercial_owner");
 });
+
+test("a project created offline keeps its client creation date; later edits and bad dates never move it", async () => {
+  const offlineCreatedAt = "2026-03-14T10:00:00.000Z";
+  const before = Date.now();
+  const pushed = (
+    await request("POST", "/api/sync/push", editor, {
+      projects: [
+        { ...project("created-at-offline"), createdAt: offlineCreatedAt },
+      ],
+    })
+  ).body.results[0];
+  assert.equal(pushed.status, "created");
+  assert.equal(pushed.project.createdAt, offlineCreatedAt);
+  assert.ok(
+    Date.parse(pushed.project.updatedAt) >= before,
+    "updatedAt is the sync time",
+  );
+  const pulled = (
+    await request("POST", "/api/sync/pull", editor, {})
+  ).body.projects.find((p: any) => p.id === "created-at-offline");
+  assert.equal(pulled.createdAt, offlineCreatedAt);
+
+  // An edit (even one that carries a different createdAt) keeps the stored creation date.
+  const edited = (
+    await request("POST", "/api/sync/push", editor, {
+      projects: [
+        {
+          ...pushed.project,
+          baseVersion: pushed.project.version,
+          createdAt: "2026-06-01T00:00:00.000Z",
+          client: { name: "Editada", projectId: "SP-TEST" },
+        },
+      ],
+    })
+  ).body.results[0];
+  assert.equal(edited.status, "updated");
+  assert.equal(edited.project.createdAt, offlineCreatedAt);
+  assert.ok(
+    Date.parse(edited.project.updatedAt) > Date.parse(offlineCreatedAt),
+  );
+
+  // A creation date in the future is capped at the server clock.
+  const future = (
+    await request("POST", "/api/sync/push", editor, {
+      projects: [
+        {
+          ...project("created-at-future"),
+          createdAt: "2999-01-01T00:00:00.000Z",
+        },
+      ],
+    })
+  ).body.results[0];
+  assert.ok(Date.parse(future.project.createdAt) <= Date.now());
+  assert.ok(Date.parse(future.project.createdAt) >= before);
+
+  // Missing, malformed or non-ISO values fall back to the server clock.
+  const invalid = [
+    undefined,
+    null,
+    "",
+    "basura",
+    12345,
+    "2026",
+    "2026-13-45T00:00:00Z",
+    {},
+  ];
+  for (const [index, createdAt] of invalid.entries()) {
+    const id = `created-at-invalid-${index}`;
+    const result = (
+      await request("POST", "/api/sync/push", editor, {
+        projects: [{ ...project(id), createdAt }],
+      })
+    ).body.results[0];
+    assert.equal(result.status, "created", id);
+    const created = Date.parse(result.project.createdAt);
+    assert.ok(
+      created >= before && created <= Date.now(),
+      `${id}: ${result.project.createdAt}`,
+    );
+  }
+});
