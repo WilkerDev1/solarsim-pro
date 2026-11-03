@@ -2054,6 +2054,8 @@ test("a project created offline keeps its client creation date; later edits and 
     12345,
     "2026",
     "2026-13-45T00:00:00Z",
+    "2026-02-30T00:00:00Z",
+    "2026-01-01T24:30:00Z",
     {},
   ];
   for (const [index, createdAt] of invalid.entries()) {

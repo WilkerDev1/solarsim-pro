@@ -28,7 +28,7 @@ export interface ProjectRow {
   system_capacity_kwp: number;
 }
 const ISO_DATE_TIME =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/;
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(\.\d{1,9})?(Z|[+-](\d{2}):(\d{2}))$/;
 const MIN_CREATED_AT_MS = Date.UTC(2000, 0, 1);
 /**
  * Creation date a client reports for a project the server has not seen yet (it was drafted offline).
@@ -36,7 +36,24 @@ const MIN_CREATED_AT_MS = Date.UTC(2000, 0, 1);
  * The INSERT caps it at the server clock, so a future date can never be stored.
  */
 export function clientCreatedAt(value: unknown): string | null {
-  if (typeof value !== "string" || !ISO_DATE_TIME.test(value)) return null;
+  if (typeof value !== "string") return null;
+  const parts = ISO_DATE_TIME.exec(value);
+  if (!parts) return null;
+  const [year, month, day, hour, minute, second] = parts
+    .slice(1, 7)
+    .map(Number);
+  // Date.parse rolls impossible dates over (2026-02-30 → March 2), so check the calendar first.
+  const calendar = new Date(Date.UTC(year, month - 1, day));
+  if (
+    calendar.getUTCMonth() !== month - 1 ||
+    calendar.getUTCDate() !== day ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59 ||
+    (parts[9] !== undefined &&
+      (Number(parts[9]) > 23 || Number(parts[10]) > 59))
+  )
+    return null;
   const ms = Date.parse(value);
   if (!Number.isFinite(ms) || ms < MIN_CREATED_AT_MS) return null;
   return new Date(ms).toISOString();
