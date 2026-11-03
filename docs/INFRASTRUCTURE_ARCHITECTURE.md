@@ -49,7 +49,7 @@ En el CT (con el usuario de servicio indicado en el archivo privado):
    docker save <imagen en ejecución> | gzip > "$D/<imagen>.tar.gz"
    ```
 
-2. **Ensayo de restauración.** Desde la raíz de un checkout de la revisión a desplegar, con Docker local: `$S 'cat <checkpoint>/solarsim_prod.dump' | python3 scripts/qa/restoreBackupRehearsal.py`. El script guarda el dump completo (datos de producción) en una carpeta privada de `TMPDIR` (0700, archivo 0600) y la borra al terminar; si se interrumpe a la fuerza puede quedar `solarsim-logical-qa-*/input.dump`. Ejecutarlo solo en una máquina de confianza con disco cifrado y comprobar después que no quedan restos. Debe listar las migraciones de esa revisión (incluidas las nuevas: con la 006 la salida termina en `"migrations":[1,2,3,4,5,6]`). El script recibe el dump por stdin, lo restaura en PostgreSQL 16 sin red (`--network none`) con socket Unix privado, ejecuta `server/tests/backupRehearsal.ts` (migraciones del repositorio dos veces, conteos iguales, huellas iguales del contenido de cada propuesta salvo `specs`, `equipmentTotals` iguales antes y después, ningún proyecto con el espejo heredado, cero huérfanos) y `pg_amcheck --heapallindexed --parent-check`; al terminar elimina contenedor y temporales. No monta ni modifica la base de producción.
+2. **Ensayo de restauración.** Desde la raíz de un checkout de la revisión a desplegar, con Docker local: `$S 'cat <checkpoint>/solarsim_prod.dump' | python3 scripts/qa/restoreBackupRehearsal.py`. El script guarda el dump completo (datos de producción) en una carpeta privada de `TMPDIR` (0700, archivo 0600) y la borra al terminar; si se interrumpe a la fuerza puede quedar `solarsim-logical-qa-*/input.dump`. Ejecutarlo solo en una máquina de confianza con disco cifrado y comprobar después que no quedan restos. Debe listar las migraciones de esa revisión (incluidas las nuevas: con la 007 la salida termina en `"migrations":[1,2,3,4,5,6,7]`). El script recibe el dump por stdin, lo restaura en PostgreSQL 16 sin red (`--network none`, 1 GB de memoria con los datos en tmpfs) con socket Unix privado, ejecuta `server/tests/backupRehearsal.ts` (migraciones del repositorio dos veces, conteos iguales, huellas iguales del contenido de cada propuesta salvo `specs`, `equipmentTotals` iguales antes y después, ningún proyecto con el espejo heredado, cero huérfanos) y `pg_amcheck --heapallindexed --parent-check`; al terminar elimina contenedor y temporales. No monta ni modifica la base de producción.
 3. **Compatibilidad de clientes.** La API exige `baseVersion` (CAS), publicación autenticada y, desde la 2.7.1, `X-SolarSim-Client` con versión ≥ `MIN_CLIENT_VERSION` (426 en caso contrario; ver más abajo). Los clientes 2.6.0 y 2.7.0 dejan de sincronizar: coordinar la versión de escritorio y del Worker, avisar al equipo y exportar el trabajo pendiente de quienes vayan a cambiar.
 4. **Construir y reemplazar solo la API.** La imagen se etiqueta `solarsim-api-api:<versión>-<sha corto>` para poder volver a ella. PostgreSQL, Caddy y el túnel no se recrean.
 
@@ -121,6 +121,19 @@ Rollback: la imagen API anterior es compatible (mismos datos y migraciones). La 
 ### Versión 2.7.3: corrección del dock y actualización de dependencias
 
 Igual que la 2.7.2: sin migración ni cambio de contrato, `MIN_CLIENT_VERSION` sigue en `2.7.1` y los clientes 2.7.1 o posteriores sincronizan con la API 2.7.3. Cambia el dock (precio kWh, #107) y se actualizan dependencias dentro de sus rangos compatibles (Electron 44.9, hono, wrangler; sin cambios mayores). Al construir la API, usar `--pull` para tomar la última imagen `node:24-alpine` (Node 24 LTS). Mismo orden que la 2.7.2: checkpoint y ensayo, Worker, API y release firmada. Además se actualiza la imagen de `cloudflared-tunnel` (recrear solo ese contenedor y comprobar que `/api/health` vuelve a responder por el dominio público). Antes de recrearlo, anotar la imagen en uso (`docker inspect cloudflared-tunnel --format '{{.Config.Image}} {{.Image}}'`): el rollback es volver a esa imagen y recrear solo `cloudflared-tunnel`. La 2.7.3 incluye también el README nuevo (#105) y la salida de las direcciones de producción de los archivos versionados (#106).
+
+### Versión 2.7.4: ítems ocultos en la factura y fecha de creación
+
+Incluye la **migración 007** (`project_created_at`). En las propuestas sincronizadas antes de esta versión, baja `created_at` al `data_json.createdAt` del cliente si ese valor es anterior; la regla de validez está en `shared/proposalDates.ts`. Nunca mueve una fecha hacia adelante y no cambia `version`. En las filas que corrige mueve `updated_at`, así que solo esas vuelven a descargarse en los clientes; no hay conflictos CAS. `MIN_CLIENT_VERSION` sigue en `2.7.1`.
+
+El orden es el mismo que en la 2.7.3:
+
+1. Checkpoint y ensayo de restauración. El ensayo debe terminar en `[1..7]`.
+2. Worker. El visor oculta los ítems marcados con «Oculto en factura». Sin el Worker nuevo, los enlaces compartidos siguen listándolos.
+3. API.
+4. Release firmada.
+
+Rollback: la imagen 2.7.3 es compatible con la migración 007. La migración solo cambia `created_at`/`updated_at` y no añade tablas ni columnas.
 
 ## Rollback de la API
 
