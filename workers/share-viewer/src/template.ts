@@ -1,6 +1,7 @@
 import { StoredProposal } from './types';
 import { cleanClientName, getTariffDisplayName } from '../../../shared/proposalPresentation';
 import { customItemsTaxBreakdown, LEY5707_CREDIT_RATE } from '../../../shared/financialRules';
+import { visibleQuotationItems } from '../../../shared/quotationItems';
 import { resolveAssumption, resolveAssumptions } from '../../../shared/assumptions';
 import { ELECTSUN_LOGO_COLOR_BASE64 } from '../../../shared/electsunLogoColor';
 import { escapeHtml, formatInlineMarkdown, formatMarkdown, safeLogoUrl, scriptJson } from './escaping';
@@ -666,7 +667,7 @@ ${ENERGY_FLOW_CSS}
               <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">1</td>
               <td class="px-2 sm:px-4 py-2 text-center text-slate-500 font-normal">UD</td>
             </tr>
-            ${(Array.isArray(financials.customItems) ? financials.customItems : []).map((cItem: any, idx: number) => {
+            ${visibleQuotationItems(financials.customItems as any[]).map((cItem: any, idx: number) => {
               const isEven = (idx + (hasBattery ? 1 : 0)) % 2 === 0;
               return `
             <tr class="${isEven ? 'bg-white' : 'bg-sky-50/30'}">

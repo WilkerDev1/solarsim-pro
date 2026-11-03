@@ -128,6 +128,8 @@ $$\text{Venta mano de obra} = (\text{Instalación} + \text{ITBIS instalación}) 
 
 **Ítems adicionales:** llevan $M_{venta}$ salvo `applyMargin === false`, tanto en la matriz de costos como en el total de precio directo y en el desglose de ITBIS (`appliesItemMargin` en `shared/financialRules.ts`). El ITBIS de un ítem se calcula sobre su precio de venta (`customItemsTaxBreakdown`); la exoneración la decide `isItemItbisExonerated` (`exonerateITBIS`, o el campo heredado `applyITBIS`, exonerado por defecto). El visor web usa las mismas funciones para enlaces antiguos sin `customItemsNonExoneratedITBISUSD`.
 
+**Ítems ocultos en la factura:** `hideInQuotation: true` (ausente = visible) cobra el ítem con todas las reglas anteriores, pero `visibleQuotationItems` (`shared/quotationItems.ts`) lo excluye de las filas de «EQUIPOS Y MATERIALES» en el PDF, la vista de cotización y el visor web. Es solo presentación: el motor no lo lee y SUB-TOTAL, ITBIS, Ley 57-07 y precio por watt no cambian. Las ediciones de la IA y de los agentes que reescriben la lista completa conservan el flag por `id` (`preserveHiddenInQuotation`) salvo que envíen `false`.
+
 ### 4.2 Ley 57-07
 
 **ITBIS exonerado** (si `applyITBISExemption`):

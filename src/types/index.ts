@@ -144,6 +144,7 @@ export interface CustomQuotationItem {
   exonerateITBIS: boolean; // true = Exonerar ITBIS (18%) por Ley 57-07 | false = Cobrar ITBIS (18%) en la cotización final
   applyMargin?: boolean;   // true = Aplica margen comercial del proyecto (ej. 1.40x) | false = Costo directo pass-through (sin margen)
   applyITBIS?: boolean;    // Backwards compatibility alias
+  hideInQuotation?: boolean; // true = se cobra y suma en todos los importes, pero no se lista como fila en el desglose de la factura (ausente = visible)
 }
 
 export interface CustomQuotationDiscount {
