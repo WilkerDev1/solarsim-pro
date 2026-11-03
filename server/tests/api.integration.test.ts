@@ -2048,7 +2048,7 @@ test("a project created offline keeps its client creation date; later edits and 
   const dateOnly = (
     await request("POST", "/api/sync/push", editor, {
       projects: [
-        { ...project("created-at-date-only"), createdAt: "2026-03-14" },
+        { ...project("created-at-date-only"), createdAt: " 2026-03-14 " },
       ],
     })
   ).body.results[0];

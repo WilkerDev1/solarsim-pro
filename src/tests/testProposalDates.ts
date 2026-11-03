@@ -37,6 +37,7 @@ const dates = (createdAt: unknown, updatedAt: unknown) => ({ createdAt, updatedA
     assert.equal(projectDateSummary(dates(CREATED, missing), 'short'), 'Creada 12/10/2026');
   }
   assert.deepEqual(projectDateStamps(dates(undefined, 'basura')), []);
+  assert.deepEqual(projectDateStamps(dates('2026-1-5', CREATED)).map((s) => s.kind), ['updated'], 'solo fechas AAAA-MM-DD, como exige la API');
   assert.deepEqual(projectDateStamps(dates(' 2026-02-30', CREATED)).map((s) => s.kind), ['updated'], 'el espacio inicial no salta la validación del calendario');
   assert.equal(projectDateStamps(dates('2026-10-12', undefined))[0].text, new Date(2026, 9, 12).toLocaleDateString('es-DO'), 'una fecha sin hora es ese día local, no medianoche UTC');
   assert.deepEqual(projectDateStamps(dates('2026-02-30T00:00:00Z', CREATED)).map((s) => s.kind), ['updated'], 'una fecha imposible en el calendario no se muestra');

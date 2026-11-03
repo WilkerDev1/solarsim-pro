@@ -35,8 +35,9 @@ const MIN_CREATED_AT_MS = Date.UTC(2000, 0, 1);
  * Only a strict ISO instant from 2000 onwards counts; anything else returns null and the server clock is used.
  * The INSERT caps it at the server clock, so a future date can never be stored.
  */
-export function clientCreatedAt(value: unknown): string | null {
-  if (typeof value !== "string") return null;
+export function clientCreatedAt(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const value = raw.trim();
   // A date-only value (imported JSON) is that calendar day; noon UTC keeps the same day in any nearby time zone.
   const parts = ISO_DATE_TIME.exec(
     /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00Z` : value,
