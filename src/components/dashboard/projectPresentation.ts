@@ -1,4 +1,5 @@
 import { ProjectSimulation } from '../../types';
+import { canonicalProposalDate } from '../../../shared/proposalDates';
 
 export function projectType(project: ProjectSimulation): string {
   if (project.rates.isZeroExport) return 'Inyección cero';
@@ -33,22 +34,10 @@ export function projectDateLabel(kind: ProjectDateKind, labels: ProjectDateLabel
   return DATE_LABELS[labels][kind];
 }
 
-/** `Date` normaliza fechas imposibles (2026-02-30 → 2 de marzo); se rechazan antes de mostrarlas. */
-function isCalendarDate(value: string): boolean {
-  const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
-  if (!ymd) return false;
-  const [year, month, day] = ymd.slice(1).map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
-}
-
+/** Misma regla que la API (shared/proposalDates.ts): lo que la API no aceptaría tampoco se muestra. */
 function stamp(kind: ProjectDateKind, raw: unknown): ProjectDateStamp | null {
-  const value = typeof raw === 'string' ? raw.trim() : '';
-  if (!value || !isCalendarDate(value)) return null;
-  // "2026-10-12" sin hora es ese día local; `new Date` lo leería como medianoche UTC (el día anterior en RD).
-  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  const date = dateOnly ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3])) : new Date(value);
-  return Number.isNaN(date.getTime()) ? null : { kind, iso: value, text: date.toLocaleDateString('es-DO') };
+  const iso = canonicalProposalDate(raw);
+  return iso ? { kind, iso, text: new Date(iso).toLocaleDateString('es-DO') } : null;
 }
 
 /** Creación y última actualización de una propuesta, en ese orden; omite la que falte o no sea una fecha válida. */
