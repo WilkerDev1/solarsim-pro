@@ -42,10 +42,11 @@ function isCalendarDate(value: string): boolean {
   return date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }
 
-function stamp(kind: ProjectDateKind, value: unknown): ProjectDateStamp | null {
-  if (typeof value !== 'string' || !value.trim() || !isCalendarDate(value)) return null;
+function stamp(kind: ProjectDateKind, raw: unknown): ProjectDateStamp | null {
+  const value = typeof raw === 'string' ? raw.trim() : '';
+  if (!value || !isCalendarDate(value)) return null;
   // "2026-10-12" sin hora es ese día local; `new Date` lo leería como medianoche UTC (el día anterior en RD).
-  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   const date = dateOnly ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3])) : new Date(value);
   return Number.isNaN(date.getTime()) ? null : { kind, iso: value, text: date.toLocaleDateString('es-DO') };
 }

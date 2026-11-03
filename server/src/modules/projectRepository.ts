@@ -37,7 +37,10 @@ const MIN_CREATED_AT_MS = Date.UTC(2000, 0, 1);
  */
 export function clientCreatedAt(value: unknown): string | null {
   if (typeof value !== "string") return null;
-  const parts = ISO_DATE_TIME.exec(value);
+  // A date-only value (imported JSON) is that calendar day; noon UTC keeps the same day in any nearby time zone.
+  const parts = ISO_DATE_TIME.exec(
+    /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00Z` : value,
+  );
   if (!parts) return null;
   const [year, month, day, hour, minute, second] = parts
     .slice(1, 7)
@@ -54,7 +57,7 @@ export function clientCreatedAt(value: unknown): string | null {
       (Number(parts[9]) > 23 || Number(parts[10]) > 59))
   )
     return null;
-  const ms = Date.parse(value);
+  const ms = Date.parse(parts[0]);
   if (!Number.isFinite(ms) || ms < MIN_CREATED_AT_MS) return null;
   return new Date(ms).toISOString();
 }

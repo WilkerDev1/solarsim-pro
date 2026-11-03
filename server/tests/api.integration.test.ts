@@ -2044,6 +2044,16 @@ test("a project created offline keeps its client creation date; later edits and 
     `fork createdAt ${forked.project.createdAt}`,
   );
 
+  // A date-only value (imported JSON) keeps its calendar day: stored at noon UTC.
+  const dateOnly = (
+    await request("POST", "/api/sync/push", editor, {
+      projects: [
+        { ...project("created-at-date-only"), createdAt: "2026-03-14" },
+      ],
+    })
+  ).body.results[0];
+  assert.equal(dateOnly.project.createdAt, "2026-03-14T12:00:00.000Z");
+
   // A creation date in the future is capped at the server clock.
   const future = (
     await request("POST", "/api/sync/push", editor, {
