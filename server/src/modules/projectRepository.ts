@@ -204,7 +204,9 @@ export async function saveProject(
     commercial,
     proposalLink: input.proposalLink ?? existing?.data_json.proposalLink,
     // The creation date is fixed at INSERT; an update never stores another one in the document.
-    ...(existing ? { createdAt: existing.created_at.toISOString() } : {}),
+    ...(existing?.created_at
+      ? { createdAt: existing.created_at.toISOString() }
+      : {}),
     id: input.id,
     organizationId: user.organizationId,
     version,
