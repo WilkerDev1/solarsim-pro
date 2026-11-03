@@ -37,6 +37,7 @@ const dates = (createdAt: unknown, updatedAt: unknown) => ({ createdAt, updatedA
     assert.equal(projectDateSummary(dates(CREATED, missing), 'short'), 'Creada 12/10/2026');
   }
   assert.deepEqual(projectDateStamps(dates(undefined, 'basura')), []);
+  assert.deepEqual(projectDateStamps(dates('2026-02-30T00:00:00Z', CREATED)).map((s) => s.kind), ['updated'], 'una fecha imposible en el calendario no se muestra');
   assert.equal(projectDateSummary(dates(undefined, 'basura')), 'Sin fecha');
   for (const text of [projectDateSummary(dates('x', 'y')), projectDateSummary(dates(CREATED, 'Invalid Date'))]) assert.ok(!/Invalid/i.test(text), text);
 }

@@ -312,6 +312,8 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
           const project = await saveProject(client, user, {
             ...input,
             id,
+            // A fork is a new proposal, so it takes the server clock rather than the original's creation date.
+            createdAt: undefined,
             forceNewVersion: false,
             commercial: commercialCopy(input, user),
             proposalLink: { parentId: input.id },

@@ -33,8 +33,17 @@ export function projectDateLabel(kind: ProjectDateKind, labels: ProjectDateLabel
   return DATE_LABELS[labels][kind];
 }
 
+/** `Date` normaliza fechas imposibles (2026-02-30 → 2 de marzo); se rechazan antes de mostrarlas. */
+function isCalendarDate(value: string): boolean {
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!ymd) return true;
+  const [year, month, day] = ymd.slice(1).map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
 function stamp(kind: ProjectDateKind, value: unknown): ProjectDateStamp | null {
-  if (typeof value !== 'string' || !value.trim()) return null;
+  if (typeof value !== 'string' || !value.trim() || !isCalendarDate(value)) return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : { kind, iso: value, text: date.toLocaleDateString('es-DO') };
 }

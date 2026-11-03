@@ -2031,6 +2031,19 @@ test("a project created offline keeps its client creation date; later edits and 
     Date.parse(edited.project.updatedAt) > Date.parse(offlineCreatedAt),
   );
 
+  // A fork is a new proposal: it is created now, not when the original was.
+  const forkedBefore = Date.now();
+  const forked = (
+    await request("POST", "/api/sync/push", editor, {
+      projects: [{ ...edited.project, forceNewVersion: true }],
+    })
+  ).body.results[0];
+  assert.equal(forked.status, "forked");
+  assert.ok(
+    Date.parse(forked.project.createdAt) >= forkedBefore,
+    `fork createdAt ${forked.project.createdAt}`,
+  );
+
   // A creation date in the future is capped at the server clock.
   const future = (
     await request("POST", "/api/sync/push", editor, {
