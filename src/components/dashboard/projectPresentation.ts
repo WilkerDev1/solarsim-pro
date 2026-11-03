@@ -36,8 +36,13 @@ export function projectDateLabel(kind: ProjectDateKind, labels: ProjectDateLabel
 
 /** Misma regla que la API (shared/proposalDates.ts): lo que la API no aceptaría tampoco se muestra. */
 function stamp(kind: ProjectDateKind, raw: unknown): ProjectDateStamp | null {
-  const iso = canonicalProposalDate(raw);
-  return iso ? { kind, iso, text: new Date(iso).toLocaleDateString('es-DO') } : null;
+  const canonical = canonicalProposalDate(raw);
+  if (!canonical) return null;
+  // Como el INSERT de la API, una creación futura se topa en el reloj actual.
+  const iso = kind === 'created' && Date.parse(canonical) > Date.now() ? new Date().toISOString() : canonical;
+  // Un día sin hora (12:00Z) se formatea en UTC para que sea ese día en cualquier zona.
+  const dateOnly = typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.trim());
+  return { kind, iso, text: new Date(iso).toLocaleDateString('es-DO', dateOnly ? { timeZone: 'UTC' } : undefined) };
 }
 
 /** Creación y última actualización de una propuesta, en ese orden; omite la que falte o no sea una fecha válida. */

@@ -5,6 +5,7 @@ import { featurePolicyAndTombstones } from "./002_feature_policy_and_tombstones.
 import { companyManagement } from "./003_company_management.js";
 import { clients } from "./005_clients.js";
 import { equipmentGroups } from "./006_equipment_groups.js";
+import { projectCreatedAtBackfill } from "./007_project_created_at.js";
 /** Additive, recorded migrations, guarded by a cross-process transaction lock. */
 export async function migrateDatabase(pool: Pool): Promise<void> {
   const client = await pool.connect();
@@ -34,6 +35,11 @@ export async function migrateDatabase(pool: Pool): Promise<void> {
       { version: 4, name: "shared_resources", run: sharedResources },
       { version: 5, name: "clients", run: clients },
       { version: 6, name: "equipment_groups", run: equipmentGroups },
+      {
+        version: 7,
+        name: "project_created_at",
+        run: projectCreatedAtBackfill,
+      },
     ]) {
       if (applied.has(migration.version)) continue;
       await migration.run(client);

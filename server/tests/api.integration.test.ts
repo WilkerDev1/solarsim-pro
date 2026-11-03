@@ -6,6 +6,7 @@ import jwt from "jsonwebtoken";
 import { createApp } from "../src/app.js";
 import { asClient } from "./helpers/clientHeader.js";
 import { migrateDatabase } from "../src/database/migrations.js";
+import { projectCreatedAtBackfill } from "../src/database/007_project_created_at.js";
 import { readConfig } from "../src/config.js";
 import {
   startEphemeralPostgres,
@@ -2095,4 +2096,46 @@ test("a project created offline keeps its client creation date; later edits and 
       `${id}: ${result.project.createdAt}`,
     );
   }
+});
+
+test("migration 007 backfills created_at from the client creation date of rows synced before it", async () => {
+  const ids = ["backfill-earlier", "backfill-later", "backfill-invalid"];
+  for (const id of ids)
+    await request("POST", "/api/sync/push", editor, {
+      projects: [project(id)],
+    });
+  const synced = new Date("2026-10-20T15:00:00.000Z");
+  const set = (id: string, createdAt: unknown) =>
+    pool.query(
+      `UPDATE projects SET created_at=$2, data_json = jsonb_set(data_json, '{createdAt}', $3::jsonb) WHERE id=$1`,
+      [id, synced, JSON.stringify(createdAt)],
+    );
+  await set("backfill-earlier", "2026-09-01T10:00:00.000Z");
+  await set("backfill-later", "2026-10-25T10:00:00.000Z");
+  await set("backfill-invalid", "2026-02-30T10:00:00Z");
+  const before = await pool.query(
+    "SELECT id, updated_at, version FROM projects WHERE id = ANY($1) ORDER BY id",
+    [ids],
+  );
+  const client = await pool.connect();
+  try {
+    await projectCreatedAtBackfill(client);
+  } finally {
+    client.release();
+  }
+  const after = await pool.query(
+    "SELECT id, created_at, updated_at, version FROM projects WHERE id = ANY($1) ORDER BY id",
+    [ids],
+  );
+  const created = Object.fromEntries(
+    after.rows.map((r) => [r.id, r.created_at.toISOString()]),
+  );
+  assert.equal(created["backfill-earlier"], "2026-09-01T10:00:00.000Z");
+  assert.equal(created["backfill-later"], synced.toISOString(), "never later");
+  assert.equal(created["backfill-invalid"], synced.toISOString());
+  assert.deepEqual(
+    after.rows.map((r) => [r.id, r.updated_at.toISOString(), r.version]),
+    before.rows.map((r) => [r.id, r.updated_at.toISOString(), r.version]),
+    "content-only: version and updated_at untouched",
+  );
 });
