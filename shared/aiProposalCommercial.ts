@@ -47,8 +47,14 @@ export function normalizeCommercial(raw: any, base: AIProposalCommercial | undef
     if(value[key]===undefined)continue;
     if(!Array.isArray(value[key])||value[key].length>100){(out as any)[key]=value[key];issue(`invalid_${key}`,'Revisa la lista comercial (máximo 100 filas).');continue;}
     const ids=new Set<string>();
+    // Una fila sin id recupera el del extra anterior con la misma descripción (si es única), para no perder su «oculto en factura».
+    const descKey=(d:unknown)=>typeof d==='string'?d.trim().toLowerCase():'';
+    const priorByDesc=new Map<string,string|null>();
+    if(key==='customItems')for(const prior of base?.customItems||[]){const k=descKey(prior.description);if(k&&prior.id)priorByDesc.set(k,priorByDesc.has(k)?null:prior.id);}
+    const sentIds=new Set(value[key].map((row:any)=>row?.id).filter((v:unknown)=>typeof v==='string'));
     const rows=value[key].map((row:any,i:number)=>{
-      const id=typeof row?.id==='string'&&row.id.trim()?row.id:`ai-${key}-${i}`;
+      const recovered=priorByDesc.get(descKey(row?.description));
+      const id=typeof row?.id==='string'&&row.id.trim()?row.id:recovered&&!sentIds.has(recovered)&&!ids.has(recovered)?recovered:`ai-${key}-${i}`;
       if(ids.has(id))issue(`duplicate_${key}`,'Hay filas comerciales con identificadores repetidos.'); ids.add(id);
       if(typeof row?.description!=='string'||!row.description.trim())issue(`invalid_${key}_description`,'Cada fila comercial necesita una descripción.');
       const n=(v:any)=>typeof v==='number'&&Number.isFinite(v)&&v>=0;
