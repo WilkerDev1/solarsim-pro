@@ -15,6 +15,7 @@ import {
   calculateTotalInverterPowerKW,
 } from "../../utils/equipmentSpecsUtils";
 import { projectSyncLabel } from "../dashboard/projectPresentation";
+import { ProposalDates } from "../dashboard/ProposalDates";
 import { ProposalHistory } from "./components/ProposalHistory";
 import { ProposalEnergyOverview } from "./components/ProposalEnergyOverview";
 import "./project-summary.css";
@@ -102,8 +103,9 @@ export const ProjectHubView = () => {
               "Sin ubicación"}
             <span>·</span>
             {projectSyncLabel(project)}
-            <span>·</span>Actualizada{" "}
-            {new Date(project.updatedAt).toLocaleDateString("es-DO")}
+            <span>·</span>
+            <ProposalDates project={project} />
+
           </p>
         </div>
         <div className="summary-actions">

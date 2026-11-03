@@ -18,11 +18,8 @@ import {
   calculateTotalPanelCount,
 } from "../../utils/equipmentSpecsUtils";
 import { ProjectActionsMenu } from "./ProjectActionsMenu";
-import {
-  projectType,
-  projectDate,
-  projectSyncLabel,
-} from "./projectPresentation";
+import { projectType, projectSyncLabel } from "./projectPresentation";
+import { ProposalDates } from "./ProposalDates";
 
 export function ProjectDocumentList({
   projects,
@@ -126,7 +123,7 @@ function ProjectDocumentRow({ project }: { project: ProjectSimulation }) {
             </p>
             <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400 xl:hidden">
               {project.rates.distributor} · {projectType(project)} ·{" "}
-              {projectDate(project)}
+              <ProposalDates project={project} labels="short" />
             </p>
           </div>
         </div>
@@ -144,7 +141,7 @@ function ProjectDocumentRow({ project }: { project: ProjectSimulation }) {
         </p>
       </td>
       <td className="hidden whitespace-nowrap px-4 py-3.5 xl:table-cell text-xs text-slate-600 dark:text-zinc-300">
-        {projectDate(project)}
+        <ProposalDates project={project} layout="stacked" labels="short" />
         <p
           className="mt-1 max-w-40 truncate text-slate-500 dark:text-zinc-400"
           title={project.authorName}

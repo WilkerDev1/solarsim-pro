@@ -18,11 +18,8 @@ import {
 } from "../../utils/equipmentSpecsUtils";
 import { ProjectActionsMenu } from "./ProjectActionsMenu";
 import { ProposalClientBadge } from "../clients/ProposalClientLink";
-import {
-  projectDate,
-  projectSyncLabel,
-  projectType,
-} from "./projectPresentation";
+import { projectSyncLabel, projectType } from "./projectPresentation";
+import { ProposalDates } from "./ProposalDates";
 
 export const ProjectCard: React.FC<{ project: ProjectSimulation }> = ({
   project,
@@ -132,9 +129,11 @@ export const ProjectCard: React.FC<{ project: ProjectSimulation }> = ({
         </span>
       </div>
       <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 dark:border-zinc-800">
-        <time className="text-xs text-slate-500 dark:text-zinc-400">
-          {projectDate(project)}
-        </time>
+        <ProposalDates
+          project={project}
+          layout="stacked"
+          className="text-xs leading-snug text-slate-500 dark:text-zinc-400"
+        />
         <button
           type="button"
           onClick={() => setActiveProject(project.id, "project-hub")}

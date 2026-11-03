@@ -8,7 +8,7 @@ import { useSimulationStore } from '../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
 import type { ClientRecord } from '../../types/client';
 import { DOCUMENT_STATUS_LABELS, clientProposals, summarizeClient } from '../../utils/clientSummary';
-import { projectDate } from '../dashboard/projectPresentation';
+import { projectDateStamps, type ProjectDateKind } from '../dashboard/projectPresentation';
 import { confirmAction } from '../common/confirmAction';
 import { canEditCommercial } from '../../features/proposals/commercial';
 import { ClientForm } from './ClientForm';
@@ -107,7 +107,7 @@ export function ClientDetailPanel({ client, readOnly }: { client: ClientRecord; 
           <div className="cl-table-wrap">
             <table>
               <thead>
-                <tr><th>Propuesta</th><th>Documento</th><th>Decisión</th><th>Actualizada</th><th><span className="sr-only">Acciones</span></th></tr>
+                <tr><th>Propuesta</th><th>Documento</th><th>Decisión</th><th>Creada</th><th>Actualizada</th><th><span className="sr-only">Acciones</span></th></tr>
               </thead>
               <tbody>
                 {linked.map((project) => {
@@ -120,7 +120,8 @@ export function ClientDetailPanel({ client, readOnly }: { client: ClientRecord; 
                       </td>
                       <td><span className="cl-chip">{DOCUMENT_STATUS_LABELS[project.status] ?? project.status}</span></td>
                       <td><span className="cl-chip" data-decision={decision}>{PROPOSAL_DECISIONS[decision]}</span></td>
-                      <td>{projectDate(project)}</td>
+                      <td style={{ whiteSpace: 'nowrap' }}><DateCell project={project} kind="created" /></td>
+                      <td style={{ whiteSpace: 'nowrap' }}><DateCell project={project} kind="updated" /></td>
                       <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <button type="button" onClick={() => setActiveProject(project.id, 'project-hub')} aria-label={`Abrir ${project.client.name || 'propuesta'}`}>
                           <ArrowUpRight className="h-4 w-4" aria-hidden="true" />Abrir
@@ -154,4 +155,10 @@ export function ClientDetailPanel({ client, readOnly }: { client: ClientRecord; 
       />
     </div>
   );
+}
+
+/** Fecha de la propuesta en la tabla; sin `<time>` cuando falta o es inválida. */
+function DateCell({ project, kind }: { project: Parameters<typeof projectDateStamps>[0]; kind: ProjectDateKind }) {
+  const stamp = projectDateStamps(project).find((s) => s.kind === kind);
+  return stamp ? <time dateTime={stamp.iso}>{stamp.text}</time> : <>—</>;
 }

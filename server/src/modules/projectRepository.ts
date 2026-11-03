@@ -4,6 +4,7 @@ import {
   type ProposalCommercial,
   type ProposalCommercialReport,
 } from "../../../shared/proposalCommercial.js";
+import { canonicalProposalDate } from "../../../shared/proposalDates.js";
 import {
   equipmentTotals,
   readEquipment,
@@ -27,6 +28,12 @@ export interface ProjectRow {
   deleted_by: string | null;
   system_capacity_kwp: number;
 }
+/**
+ * Creation date a client reports for a project the server has not seen yet (it was drafted offline).
+ * Same rule the app uses to display it (shared/proposalDates.ts); null means the server clock is used.
+ * The INSERT caps it at the server clock, so a future date can never be stored.
+ */
+export const clientCreatedAt = canonicalProposalDate;
 export function canonicalProject(row: ProjectRow) {
   return {
     ...row.data_json,
@@ -196,6 +203,10 @@ export async function saveProject(
     ...input,
     commercial,
     proposalLink: input.proposalLink ?? existing?.data_json.proposalLink,
+    // The creation date is fixed at INSERT; an update never stores another one in the document.
+    ...(existing?.created_at
+      ? { createdAt: existing.created_at.toISOString() }
+      : {}),
     id: input.id,
     organizationId: user.organizationId,
     version,
@@ -238,7 +249,7 @@ export async function saveProject(
         ],
       )
     : await client.query<ProjectRow>(
-        `INSERT INTO projects (id,organization_id,created_by_id,created_by_name,created_by_email,last_modified_by_id,last_modified_by_name,client_name,project_code,system_capacity_kwp,version,data_json,is_deleted,deleted_at,deleted_by,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$3,$4,$6,$7,$8,$9,$10,$11,$12,$13,clock_timestamp(),clock_timestamp()) RETURNING *`,
+        `INSERT INTO projects (id,organization_id,created_by_id,created_by_name,created_by_email,last_modified_by_id,last_modified_by_name,client_name,project_code,system_capacity_kwp,version,data_json,is_deleted,deleted_at,deleted_by,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$3,$4,$6,$7,$8,$9,$10,$11,$12,$13,LEAST($14::timestamptz,clock_timestamp()),clock_timestamp()) RETURNING *`,
         [
           input.id,
           user.organizationId,
@@ -253,6 +264,8 @@ export async function saveProject(
           deleted,
           deletedAt,
           deleted ? user.name : null,
+          // Creation only: updates never touch created_at. LEAST ignores NULL, so no valid value means the server clock.
+          clientCreatedAt(input.createdAt),
         ],
       );
   if (!result.rows.length)
