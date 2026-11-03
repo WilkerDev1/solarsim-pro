@@ -2028,6 +2028,16 @@ test("a project created offline keeps its client creation date; later edits and 
   ).body.results[0];
   assert.equal(edited.status, "updated");
   assert.equal(edited.project.createdAt, offlineCreatedAt);
+  assert.equal(
+    (
+      await pool.query(
+        "SELECT data_json->>'createdAt' AS c FROM projects WHERE id=$1",
+        ["created-at-offline"],
+      )
+    ).rows[0].c,
+    offlineCreatedAt,
+    "an update never stores a different createdAt in the document",
+  );
   assert.ok(
     Date.parse(edited.project.updatedAt) > Date.parse(offlineCreatedAt),
   );
@@ -2133,9 +2143,19 @@ test("migration 007 backfills created_at from the client creation date of rows s
   assert.equal(created["backfill-earlier"], "2026-09-01T10:00:00.000Z");
   assert.equal(created["backfill-later"], synced.toISOString(), "never later");
   assert.equal(created["backfill-invalid"], synced.toISOString());
+  const prior = Object.fromEntries(before.rows.map((r) => [r.id, r]));
+  for (const row of after.rows) {
+    assert.equal(row.version, prior[row.id].version, `${row.id}: version kept`);
+    const moved = row.updated_at.getTime() > prior[row.id].updated_at.getTime();
+    assert.equal(
+      moved,
+      row.id === "backfill-earlier",
+      `${row.id}: only corrected rows re-enter the pull delta`,
+    );
+  }
   assert.deepEqual(
-    after.rows.map((r) => [r.id, r.updated_at.toISOString(), r.version]),
-    before.rows.map((r) => [r.id, r.updated_at.toISOString(), r.version]),
-    "content-only: version and updated_at untouched",
+    after.rows.map((r) => r.version),
+    before.rows.map((r) => r.version),
+    "no CAS conflicts",
   );
 });
