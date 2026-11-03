@@ -1,7 +1,8 @@
 import React from 'react';
-import { Plus } from 'lucide-react';
+import { EyeOff, Plus } from 'lucide-react';
 import { Field, ItemCard, SubHeader, SubHeaderIconButton } from '../../ui';
 import type { CustomQuotationItem } from '../../../../../types';
+import { isItemHiddenInQuotation } from '../../../../../../shared/quotationItems';
 import type { QuotationAdjustments } from '../../logic/quotationAdjustments';
 import { usd } from '../pricing/format';
 import { NumberField } from '../pricing/NumberField';
@@ -17,7 +18,7 @@ interface ItemsListProps {
   onRemove: (id: string) => void;
 }
 
-/** Ítems extra de la cotización, cada uno como ItemCard, con subtotal e ITBIS cobrado y exonerado. */
+/** Ítems extra de la cotización, cada uno como ItemCard, con subtotal e ITBIS cobrado y exonerado. «Oculto en factura» los cobra sin listarlos en el documento. */
 export const ItemsList: React.FC<ItemsListProps> = ({ items, marginMultiplier, totals, onAdd, onUpdate, onRemove }) => (
   <>
     <SubHeader
@@ -31,6 +32,7 @@ export const ItemsList: React.FC<ItemsListProps> = ({ items, marginMultiplier, t
         {items.map((item, index) => {
           const itbis = itemItbisNote(item);
           const margin = itemWithMarginUSD(item, marginMultiplier);
+          const hidden = isItemHiddenInQuotation(item);
           const key = item.id || String(index);
           return (
             <ItemCard
@@ -74,7 +76,16 @@ export const ItemsList: React.FC<ItemsListProps> = ({ items, marginMultiplier, t
                 <TagToggle pressed={margin.withMargin} onChange={(applyMargin) => onUpdate(item.id, { applyMargin })}>
                   Con margen
                 </TagToggle>
+                <TagToggle pressed={hidden} onChange={(hideInQuotation) => onUpdate(item.id, { hideInQuotation })}>
+                  Oculto en factura
+                </TagToggle>
               </div>
+              {hidden && (
+                <p className="m-0 flex items-center gap-1 text-[11px] text-pd-muted">
+                  <EyeOff size={12} strokeWidth={2} aria-hidden="true" />
+                  No se lista en el documento; se cobra igual.
+                </p>
+              )}
               <div className="flex items-baseline justify-between gap-2 font-mono text-[11px] text-pd-muted">
                 <span>{itbis.exonerated ? `ITBIS −$${usd(itbis.amountUSD)}` : `ITBIS +$${usd(itbis.amountUSD)}`}</span>
                 <span>{margin.withMargin ? `Con margen $${usd(margin.amountUSD)}` : `Costo directo $${usd(margin.amountUSD)}`}</span>

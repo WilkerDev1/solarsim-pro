@@ -106,7 +106,11 @@ export function parseSharePayload(value: unknown): ShareProposalPayload {
   }
   if (financials.customItems !== undefined) {
     if (!Array.isArray(financials.customItems)) throw new RequestValidationError('Los ítems no son válidos.');
-    for (const item of financials.customItems) textFields(requireRecord(item, 'customItems'), ['description','unit'], 1000);
+    for (const item of financials.customItems) {
+      const row = requireRecord(item, 'customItems');
+      textFields(row, ['description','unit'], 1000);
+      if (row.hideInQuotation !== undefined && typeof row.hideInQuotation !== 'boolean') throw new RequestValidationError('hideInQuotation debe ser booleano.');
+    }
   }
   if (financials.customDiscounts !== undefined) {
     if (!Array.isArray(financials.customDiscounts)) throw new RequestValidationError('Los descuentos no son válidos.');

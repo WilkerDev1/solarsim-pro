@@ -10,8 +10,8 @@ const render = (item: Record<string, unknown>) => renderToStaticMarkup(React.cre
 }));
 const checks = (html: string) => [...html.matchAll(/<label class="proposal-check"><input type="checkbox"( checked="")?/g)].map(m => Boolean(m[1]));
 
-assert.deepEqual(checks(render({})), [true, true], 'Unset flags render as margin on and ITBIS exempt');
-assert.deepEqual(checks(render({ applyMargin: false, exonerateITBIS: false })), [false, false]);
-assert.deepEqual(checks(render({ applyMargin: true, exonerateITBIS: true })), [true, true]);
-assert.deepEqual(checks(render({ applyITBIS: false })), [true, false], 'Legacy applyITBIS=false means ITBIS is charged');
+assert.deepEqual(checks(render({})), [true, true, false], 'Unset flags render as margin on, ITBIS exempt and listed in the invoice');
+assert.deepEqual(checks(render({ applyMargin: false, exonerateITBIS: false })), [false, false, false]);
+assert.deepEqual(checks(render({ applyMargin: true, exonerateITBIS: true })), [true, true, false]);
+assert.deepEqual(checks(render({ applyITBIS: false })), [true, false, false], 'Legacy applyITBIS=false means ITBIS is charged');
 console.log('Proposal commercial review mirrors engine defaults for margin and ITBIS.');

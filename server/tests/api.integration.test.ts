@@ -6,6 +6,7 @@ import jwt from "jsonwebtoken";
 import { createApp } from "../src/app.js";
 import { asClient } from "./helpers/clientHeader.js";
 import { migrateDatabase } from "../src/database/migrations.js";
+import { projectCreatedAtBackfill } from "../src/database/007_project_created_at.js";
 import { readConfig } from "../src/config.js";
 import {
   startEphemeralPostgres,
@@ -1989,4 +1990,172 @@ test("first commercial decision preserves an inactive legacy author without perm
     projects: [{ ...changed.body.results[0].project, commercial: decision }],
   });
   assert.equal(reassignment.body.results[0].reason, "invalid_commercial_owner");
+});
+
+test("a project created offline keeps its client creation date; later edits and bad dates never move it", async () => {
+  const offlineCreatedAt = "2026-03-14T10:00:00.000Z";
+  const before = Date.now();
+  const pushed = (
+    await request("POST", "/api/sync/push", editor, {
+      projects: [
+        { ...project("created-at-offline"), createdAt: offlineCreatedAt },
+      ],
+    })
+  ).body.results[0];
+  assert.equal(pushed.status, "created");
+  assert.equal(pushed.project.createdAt, offlineCreatedAt);
+  assert.ok(
+    Date.parse(pushed.project.updatedAt) >= before,
+    "updatedAt is the sync time",
+  );
+  const pulled = (
+    await request("POST", "/api/sync/pull", editor, {})
+  ).body.projects.find((p: any) => p.id === "created-at-offline");
+  assert.equal(pulled.createdAt, offlineCreatedAt);
+
+  // An edit (even one that carries a different createdAt) keeps the stored creation date.
+  const edited = (
+    await request("POST", "/api/sync/push", editor, {
+      projects: [
+        {
+          ...pushed.project,
+          baseVersion: pushed.project.version,
+          createdAt: "2026-06-01T00:00:00.000Z",
+          client: { name: "Editada", projectId: "SP-TEST" },
+        },
+      ],
+    })
+  ).body.results[0];
+  assert.equal(edited.status, "updated");
+  assert.equal(edited.project.createdAt, offlineCreatedAt);
+  assert.equal(
+    (
+      await pool.query(
+        "SELECT data_json->>'createdAt' AS c FROM projects WHERE id=$1",
+        ["created-at-offline"],
+      )
+    ).rows[0].c,
+    offlineCreatedAt,
+    "an update never stores a different createdAt in the document",
+  );
+  assert.ok(
+    Date.parse(edited.project.updatedAt) > Date.parse(offlineCreatedAt),
+  );
+
+  // A fork is a new proposal: it is created now, not when the original was.
+  const forkedBefore = Date.now();
+  const forked = (
+    await request("POST", "/api/sync/push", editor, {
+      projects: [{ ...edited.project, forceNewVersion: true }],
+    })
+  ).body.results[0];
+  assert.equal(forked.status, "forked");
+  assert.ok(
+    Date.parse(forked.project.createdAt) >= forkedBefore,
+    `fork createdAt ${forked.project.createdAt}`,
+  );
+
+  // A date-only value (imported JSON) keeps its calendar day: stored at noon UTC.
+  const dateOnly = (
+    await request("POST", "/api/sync/push", editor, {
+      projects: [
+        { ...project("created-at-date-only"), createdAt: " 2026-03-14 " },
+      ],
+    })
+  ).body.results[0];
+  assert.equal(dateOnly.project.createdAt, "2026-03-14T12:00:00.000Z");
+
+  // A creation date in the future is capped at the server clock.
+  const future = (
+    await request("POST", "/api/sync/push", editor, {
+      projects: [
+        {
+          ...project("created-at-future"),
+          createdAt: "2999-01-01T00:00:00.000Z",
+        },
+      ],
+    })
+  ).body.results[0];
+  assert.ok(Date.parse(future.project.createdAt) <= Date.now());
+  assert.ok(Date.parse(future.project.createdAt) >= before);
+
+  // Missing, malformed or non-ISO values fall back to the server clock.
+  const invalid = [
+    undefined,
+    null,
+    "",
+    "basura",
+    12345,
+    "2026",
+    "2026-13-45T00:00:00Z",
+    "2026-02-30T00:00:00Z",
+    "2026-01-01T24:30:00Z",
+    {},
+  ];
+  for (const [index, createdAt] of invalid.entries()) {
+    const id = `created-at-invalid-${index}`;
+    const result = (
+      await request("POST", "/api/sync/push", editor, {
+        projects: [{ ...project(id), createdAt }],
+      })
+    ).body.results[0];
+    assert.equal(result.status, "created", id);
+    const created = Date.parse(result.project.createdAt);
+    assert.ok(
+      created >= before && created <= Date.now(),
+      `${id}: ${result.project.createdAt}`,
+    );
+  }
+});
+
+test("migration 007 backfills created_at from the client creation date of rows synced before it", async () => {
+  const ids = ["backfill-earlier", "backfill-later", "backfill-invalid"];
+  for (const id of ids)
+    await request("POST", "/api/sync/push", editor, {
+      projects: [project(id)],
+    });
+  const synced = new Date("2026-10-20T15:00:00.000Z");
+  const set = (id: string, createdAt: unknown) =>
+    pool.query(
+      `UPDATE projects SET created_at=$2, data_json = jsonb_set(data_json, '{createdAt}', $3::jsonb) WHERE id=$1`,
+      [id, synced, JSON.stringify(createdAt)],
+    );
+  await set("backfill-earlier", "2026-09-01T10:00:00.000Z");
+  await set("backfill-later", "2026-10-25T10:00:00.000Z");
+  await set("backfill-invalid", "2026-02-30T10:00:00Z");
+  const before = await pool.query(
+    "SELECT id, updated_at, version FROM projects WHERE id = ANY($1) ORDER BY id",
+    [ids],
+  );
+  const client = await pool.connect();
+  try {
+    await projectCreatedAtBackfill(client);
+  } finally {
+    client.release();
+  }
+  const after = await pool.query(
+    "SELECT id, created_at, updated_at, version FROM projects WHERE id = ANY($1) ORDER BY id",
+    [ids],
+  );
+  const created = Object.fromEntries(
+    after.rows.map((r) => [r.id, r.created_at.toISOString()]),
+  );
+  assert.equal(created["backfill-earlier"], "2026-09-01T10:00:00.000Z");
+  assert.equal(created["backfill-later"], synced.toISOString(), "never later");
+  assert.equal(created["backfill-invalid"], synced.toISOString());
+  const prior = Object.fromEntries(before.rows.map((r) => [r.id, r]));
+  for (const row of after.rows) {
+    assert.equal(row.version, prior[row.id].version, `${row.id}: version kept`);
+    const moved = row.updated_at.getTime() > prior[row.id].updated_at.getTime();
+    assert.equal(
+      moved,
+      row.id === "backfill-earlier",
+      `${row.id}: only corrected rows re-enter the pull delta`,
+    );
+  }
+  assert.deepEqual(
+    after.rows.map((r) => r.version),
+    before.rows.map((r) => r.version),
+    "no CAS conflicts",
+  );
 });

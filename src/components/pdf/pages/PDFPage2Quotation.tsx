@@ -1,5 +1,6 @@
 import { PDFPageShell } from '../PDFPageShell';
 import { getTariffDisplayName } from '../../../../shared/proposalPresentation';
+import { visibleQuotationItems } from '../../../../shared/quotationItems';
 import React from 'react';
 import { ShieldCheck, CheckCircle2, Check } from 'lucide-react';
 import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
@@ -41,7 +42,8 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
   pageNum,
   totalPages,
 }) => {
-  const customItems = project.financials.customItems || [];
+  // Los ítems ocultos se cobran en los importes pero no se listan como fila.
+  const customItems = visibleQuotationItems(project.financials.customItems);
 
   return (
     <PDFPageShell

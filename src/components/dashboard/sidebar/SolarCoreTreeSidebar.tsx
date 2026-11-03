@@ -25,6 +25,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { CreateFolderModal } from './CreateFolderModal';
+import { UpdateAvailableBanner } from './UpdateAvailableBanner';
 import { ProjectFolder } from '../../../types';
 import { hiddenFolderIdSet, isProjectInFolderView } from '../../../utils/folderVisibility';
 import electsunEmblem from '../../../assets/electsun-emblem-transparent.png';
@@ -613,6 +614,7 @@ export const SolarCoreTreeSidebar: React.FC = () => {
 
       {/* 👤 Área Inferior: Invitar Miembros & Perfil de Usuario / Modo Offline */}
       <div className="p-4 border-t border-slate-100 dark:border-[#222734] flex flex-col gap-3 shrink-0">
+        <UpdateAvailableBanner />
         {currentUser ? (
           <>
             {/* Botón Invitar Teammates */}

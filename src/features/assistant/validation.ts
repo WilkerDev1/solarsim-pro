@@ -247,6 +247,8 @@ export function validateAssistantEdits(
             typeof row.exonerateITBIS !== 'boolean' ||
             (row.applyMargin !== undefined &&
               typeof row.applyMargin !== 'boolean') ||
+            (row.hideInQuotation !== undefined &&
+              typeof row.hideInQuotation !== 'boolean') ||
             Object.keys(row).some(
               (k) =>
                 ![
@@ -257,6 +259,7 @@ export function validateAssistantEdits(
                   'unitPriceUSD',
                   'exonerateITBIS',
                   'applyMargin',
+                  'hideInQuotation',
                 ].includes(k)
             )
           )

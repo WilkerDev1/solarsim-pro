@@ -11,6 +11,8 @@ import {
 import { buildAITariffContext } from '../../utils/aiTariffContext';
 import { readEquipment, type EquipmentKind } from '../../../shared/equipment';
 import { editableAssistantFields, validateAssistantEdits } from './validation';
+import { preserveHiddenInQuotation } from '../../../shared/quotationItems';
+import type { CustomQuotationItem } from '../../types';
 import { touchesPricingEdits } from './pricingFields';
 import { AUTOMATED_PRICING } from '../../../shared/automatedProposalPolicy';
 import type {
@@ -233,6 +235,13 @@ export function executeAssistantTool(
     if (kind === 'project' && (target as any).syncStatus === 'conflict')
       throw new Error('Resuelve primero el conflicto de esta propuesta.');
     const edits = validateAssistantEdits(args.edits, kind);
+    // Una lista completa de ítems extra sin «hideInQuotation» no vuelve visible un ítem que ya estaba oculto en la factura.
+    if (kind === 'project') {
+      const previous = (target as { financials?: { customItems?: CustomQuotationItem[] } }).financials?.customItems;
+      for (const edit of edits)
+        if (edit.section === 'financials' && edit.field === 'customItems')
+          edit.value = preserveHiddenInQuotation(edit.value as CustomQuotationItem[], previous);
+    }
     // Agent edits that affect pricing leave the proposal in catalog mode with the cost matrix. Unrelated edits
     // (e.g. system losses) never switch the mode: that change is guarded and needs its own confirmation.
     if (kind === 'project' && touchesPricingEdits(edits)) {
