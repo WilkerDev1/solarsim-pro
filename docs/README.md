@@ -26,7 +26,7 @@ Documentos canónicos y vigentes. No se mantienen documentos fechados: el histor
 
 - [Verificación y QA](QA.md): pruebas automatizadas y guardas de arquitectura, ensayos de staging y matriz manual.
 - [Mantenimiento y releases](MAINTENANCE_AND_UPDATES.md): ramas, gates, versión mínima de cliente, publicación firmada y actualizaciones.
-- [Infraestructura y despliegue](INFRASTRUCTURE_ARCHITECTURE.md): topología, despliegue protegido de la API, rollback, recuperación de respaldos y rotación de secretos.
+- [Infraestructura y despliegue](INFRASTRUCTURE_ARCHITECTURE.md): topología, despliegue protegido de la API, rollback, recuperación de respaldos, rotación de secretos, respaldo diario con aviso de caída y conmutación a naski.
 
 ## Producto y diseño
 
