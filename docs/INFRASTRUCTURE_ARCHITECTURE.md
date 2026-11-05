@@ -146,6 +146,41 @@ Rollback: la imagen 2.7.3 es compatible con la migración 007. La migración sol
 
 `npx tsx scripts/qa/prepareRotationSecrets.ts /ruta/absoluta/privada/nueva` genera `JWT_SECRET` y `DB_PASSWORD` candidatos en un directorio nuevo 0700 (archivo 0600) fuera del checkout, sin imprimirlos ni conectar a servicios. Rotar `JWT_SECRET` invalida todas las sesiones. Cambiar `DB_PASSWORD` en el `.env` **no cambia** la contraseña de una base existente: aplicar `ALTER ROLE` (o `\password`) y actualizar todos los consumidores antes de recrear la API. `server/tests/containerSmoke.ts` (en CI) ensaya esta rotación en contenedores propios.
 
+## Respaldo y conmutación en naski
+
+`naski` (servidor personal, siempre encendido, en Tailscale) guarda una copia diaria de la base y vigila la API. Si `pve01` o el CT100 caen, permite publicar propuestas y sincronizar con una API temporal hasta que vuelva el CT100. Los scripts están en `scripts/ops/failover/`; la configuración, las direcciones y el canal de avisos viven en `~/solarsim-backup/config.env` de naski y en el archivo privado de acceso (no se versionan).
+
+| Pieza | Dónde | Qué hace |
+|---|---|---|
+| `pve01-solarsim-dump.sh` | `/usr/local/sbin/solarsim-dump` en pve01 | Comando forzado de la clave de naski en `authorized_keys` (`restrict`, `from=` la IP Tailscale de naski): solo vuelca `solarsim_prod` por stdout. La clave no abre shell ni ejecuta otra cosa. |
+| `naski-backup.sh` | cron de naski, 03:30 (después del vzdump de las 02:30) | Vuelca la base por SSH, exige tamaño razonable y `pg_restore --list` legible, guarda `dumps/solarsim_prod-<UTC>.dump` (0600) y conserva 7 días. Avisa si falla. |
+| `naski-monitor.sh` | cron de naski, cada 2 min | Consulta `/api/health` y exige `"database":"connected"`. Avisa tras 2 fallos seguidos, una sola vez, y avisa al recuperarse. Avisa una vez al día si el último respaldo tiene más de 36 h. |
+| `naski-notify.sh` | invocado por los anteriores | Envía el aviso por `NOTIFY_BACKEND` (`ntfy`, `telegram` o `none`). Los mensajes solo informan del estado del servicio: nunca incluyen datos de clientes. |
+| `docker-compose.failover.yml`, `Caddyfile.failover`, `failover-up.sh`, `failover-down.sh` | `~/solarsim-backup/failover/` | Receta de conmutación. |
+
+Límites: naski vigila a través de la misma red doméstica. Si se cae Internet o la electricidad, el aviso tampoco sale; el aviso cubre fallos de pve01, del CT100, del túnel o de la API, no un corte total. El dump contiene datos de producción (clientes, hashes de contraseña): naski debe mantener disco cifrado o acceso restringido y los permisos 0600/0700 de la carpeta. Los secretos (`.env` de la API y token del túnel) **no** se guardan en naski: se extraen del vzdump cuando hacen falta.
+
+### Conmutar a naski (CT100 inaccesible)
+
+1. Confirmar que el CT100 no sirve: `curl -i <API pública>/api/health` devuelve 530/1033 (sin conector del túnel) o no responde. Si responde 200, no conmutar.
+2. Obtener los secretos del último vzdump (carpeta `pve-backups/latest/dump/` del vault local): `zstd -dc vzdump-lxc-100-*.tar.zst | tar -x -C <dir 0700> ./home/agente/servicios/solarsim-api/.env ./home/agente/servicios/cloudflared/.env`. Copiar el primero como `api.env` y el segundo como `tunnel.env` a `~/solarsim-backup/failover/` de naski (0600) y borrar la copia local al terminar. El `JWT_SECRET` original mantiene válidas las sesiones.
+3. Construir la imagen de la API desde un checkout de la versión en producción (`docker build -f server/Dockerfile -t solarsim-api:<versión>-failover .` en la raíz; el build en naski no es viable por memoria) y cargarla: `docker save … | gzip | ssh naski 'gunzip | docker load'`. Usar la **misma versión o una posterior** a la que opera el CT100: el dump está al día con las migraciones de esa versión.
+4. En naski: `cd ~/solarsim-backup/failover && ./failover-up.sh solarsim-api:<versión>-failover --tunnel`. Restaura el último dump en un PostgreSQL 16 nuevo, levanta API y Caddy y, solo si la URL pública no responde, enciende `cloudflared` con el túnel de producción. Aborta con código 2, sin crear nada, si el CT100 responde.
+5. Comprobar `/api/health` por el dominio público y publicar una propuesta de prueba. El Worker del visor y su KV no cambian.
+
+Los datos tienen la antigüedad del último respaldo (hasta ~24 h): lo creado en el CT100 después se perderá o habrá que recuperarlo del vzdump. El túnel de naski sirve también el dominio corporativo con 404 (solo enruta la API).
+
+### Volver al CT100 y reconciliar
+
+1. **Apagar naski antes de arrancar el CT100**: `./failover-down.sh` (quita túnel, API y Caddy y **conserva** el volumen `solarsim-backup_pgdata` con lo escrito durante la conmutación). El `cloudflared` del CT100 se registra solo al arrancar; con los dos activos, Cloudflare reparte el tráfico y los datos se separan.
+2. Arrancar pve01/CT100 y comprobar que el CT tiene IPv4 y que `/api/health` responde por el dominio público (versión esperada, `database: connected`).
+3. Reconciliar: abrir el volumen en un PostgreSQL temporal sin red y listar `projects` con `updated_at` o `created_at` posteriores al instante del dump **descontando las filas que solo cambiaron por una migración nueva al arrancar la API** (mismo `updated_at` para muchas filas). Para cada proyecto nuevo, importar en el CT100 el proyecto, su `project_version_history` y sus `team_notifications` en una sola transacción (`COPY … FROM stdin` con `ON_ERROR_STOP`), después de un dump de seguridad del CT100 y comprobando que el código de proyecto no exista ya. Verificar con un hash del `data_json` en ambos lados.
+4. Solo entonces borrar el volumen (`docker volume rm solarsim-backup_pgdata`) y los archivos con secretos de `~/solarsim-backup/failover/`.
+
+### Red de pve01 y del CT100
+
+`pve01` usa IP fija en `vmbr0`, y el CT100 también (`pct set 100 -net0 …,ip=<IP>/24,gw=<puerta>`, `-nameserver`): al arrancar con el puerto del switch aún sin reenviar, el DHCP no responde, `dhclient` se rinde y el CT queda sin IPv4, con el túnel inalcanzable (error 1033 en Cloudflare). La IP fija evita esa dependencia. Debe estar fuera del rango DHCP del router o reservada para el equipo. Si la red cambia (otra subred, puerta o DNS), hay que actualizar a mano `pve01` y los CT con IP fija. Valores exactos en el archivo privado. Si un CT llega a arrancar sin IPv4: `pct exec <id> -- dhclient -4 eth0` o fijar la IP.
+
 ## Proxy Caddy
 
 El `Caddyfile` vive en la carpeta de servicio de Caddy en el CT (referencia en `infra/services/caddy/`). Tras editarlo, validar con `docker exec caddy-proxy caddy validate --config /etc/caddy/Caddyfile` y recargar sin cortar conexiones con `docker exec caddy-proxy caddy reload --config /etc/caddy/Caddyfile`.

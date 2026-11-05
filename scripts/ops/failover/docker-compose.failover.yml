@@ -1,0 +1,52 @@
+# API de respaldo temporal en naski (nombre de proyecto fijo: solarsim-backup).
+# Usar siempre con: docker compose --env-file api.env -f docker-compose.failover.yml ...
+# Los nombres de contenedor coinciden con los que espera el tunel remoto (caddy-proxy:80).
+name: solarsim-backup
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: solarsim-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [solarsim_net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  api:
+    image: ${API_IMAGE:?API_IMAGE no definido}
+    container_name: solarsim-api
+    restart: unless-stopped
+    env_file: api.env
+    environment:
+      PORT: 3000
+      DB_HOST: solarsim-db
+      DB_PORT: 5432
+    depends_on:
+      db: {condition: service_healthy}
+    networks: [solarsim_net]
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy-proxy
+    restart: unless-stopped
+    volumes:
+      - ./Caddyfile.failover:/etc/caddy/Caddyfile:ro
+    networks: [solarsim_net]
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-tunnel
+    restart: "no"
+    profiles: [tunnel]
+    command: tunnel --no-autoupdate run
+    env_file: tunnel.env
+    networks: [solarsim_net]
+volumes:
+  pgdata:
+networks:
+  solarsim_net:
