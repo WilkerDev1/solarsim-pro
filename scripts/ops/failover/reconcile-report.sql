@@ -1,6 +1,7 @@
 -- Informe de reconciliacion (solo lectura). Ejecutar contra la base escrita durante la conmutacion (volumen de naski)
 -- y contra la del CT100, con el instante del dump como corte:
---   psql -v since="'2026-11-05 07:07:14+00'" -f reconcile-report.sql
+--   psql -v since='2026-11-05 07:07:14+00' -f reconcile-report.sql
+-- Este informe usa marcas de tiempo y NO ve filas borradas con DELETE: complementarlo con reconcile-fingerprint.sql.
 -- OJO: una migracion nueva toca updated_at de muchas filas a la vez al arrancar la API; esas filas NO son cambios de usuarios.
 \echo === migraciones aplicadas
 select version, applied_at from schema_migrations order by version desc limit 3;

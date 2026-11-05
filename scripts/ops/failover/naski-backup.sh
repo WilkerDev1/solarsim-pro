@@ -11,7 +11,8 @@ fail() { "$DIR/bin/naski-notify.sh" "Respaldo SolarSim fallido" "$1" high || tru
 ssh -i "$SSH_KEY" -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 "root@$PVE_HOST" > "$TMP" 2>"$DIR/state/backup.err" \
   || fail "no se pudo volcar la base desde pve01 (¿pve01/CT100 caídos?)"
 [ "$(stat -c %s "$TMP")" -gt 1000000 ] || fail "el volcado es sospechosamente pequeño"
-RES="$("$DIR/bin/naski-verify-dump.sh" "$TMP" 2>&1)" || fail "el volcado no pasa la restauración de prueba: $RES"
+# El detalle de PostgreSQL puede incluir fragmentos de datos: queda en un archivo local (0600) y nunca va en el aviso.
+RES="$("$DIR/bin/naski-verify-dump.sh" "$TMP" 2>"$DIR/state/verify.err")" || fail "el volcado no pasa la restauración de prueba (detalle en state/verify.err de naski)"
 mv "$TMP" "$OUT/solarsim_prod-$TS.dump"
 find "$OUT" -maxdepth 1 -name 'solarsim_prod-*.dump' -mtime +"${KEEP_DAYS:-7}" -delete
 date -u +%FT%TZ > "$DIR/state/last_backup_ok"
