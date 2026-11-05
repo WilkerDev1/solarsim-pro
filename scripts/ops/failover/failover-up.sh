@@ -11,9 +11,7 @@ export API_IMAGE="${1:?uso: failover-up.sh <imagen-api> [--tunnel]}"
 if [ "${2:-}" = "--tunnel" ]; then
   [ -f tunnel.env ] || { echo "falta tunnel.env" >&2; exit 1; }
   . ../config.env
-  if curl -fsS -m 10 "$HEALTH_URL" >/dev/null 2>&1; then
-    echo "ABORTADO: $HEALTH_URL responde; el CT100 sigue activo. No se enciende nada." >&2; exit 2
-  fi
+  ../bin/tunnel-guard.sh "$HEALTH_URL" || exit 2
 fi
 DUMP="$(ls -1t ../dumps/solarsim_prod-*.dump | head -n1)"; echo "dump: $DUMP"
 C="docker compose --env-file api.env -f docker-compose.failover.yml"
