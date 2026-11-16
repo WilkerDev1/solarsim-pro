@@ -16,6 +16,7 @@ npm test                  # every src/tests/test*.ts + updater test, each in its
 npm test -- <filter>      # run matching suites only (same test environment)
 npm --prefix server test  # node:test; integration tests start a throwaway Docker Postgres
 npm --prefix workers/share-viewer test
+npm --prefix mcp-remote test   # remote MCP service (docs/MCP_REMOTE.md)
 npm run context:pack      # repomix snapshot; rerun when structure changes
 ```
 
@@ -28,6 +29,7 @@ React views ─▶ Zustand slices ─▶ pure engines (src/engine)
      │               └─▶ services (HTTP) ─▶ Hono API (server/) ─▶ PostgreSQL
      └─▶ preload IPC ─▶ electron/ (AI calls, window/print, updater)
 services ─▶ Worker (workers/share-viewer) ─▶ KV
+remote AI ─▶ mcp-remote (own CT, stateless) ─▶ Hono API (agent tokens ssm_…)
 shared/  = portable TS contracts used by client, API and Worker
 ```
 

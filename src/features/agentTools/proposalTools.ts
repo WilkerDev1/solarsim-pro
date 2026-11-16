@@ -185,7 +185,8 @@ const applyProposalDraft: NativeHandler = (args) => {
     plan: {
       title: createNew ? `Crear propuesta para ${preview.project.client.name}` : `Actualizar ${preview.project.client.name}`,
       targetType: 'project',
-      changes: [{ label: 'Cliente', value: preview.project.client.name }, { label: 'Modalidad', value: 'Simple (Catálogo IA) · matriz de costos' }],
+      changes: [{ label: 'Cliente', value: preview.project.client.name }, { label: 'Modalidad', value: 'Simple (Catálogo IA) · matriz de costos' },
+        ...(draft.documentTexts || []).map((t) => ({ label: t.label, value: t.text === null ? '(predeterminado)' : t.text.slice(0, 200) }))],
       execute() {
         const s = store();
         const previous = createNew ? undefined : s.projects.find((p) => p.id === s.activeProjectId);

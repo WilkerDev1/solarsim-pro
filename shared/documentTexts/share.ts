@@ -33,12 +33,19 @@ export const VIEWER_TEXT_KEYS: readonly string[] = [
 export const docTextKey = (key: string) => `${DOC_TEXT_PREFIX}${key}`;
 export const isDocTextKey = (value: string) => /^doc:[A-Za-z][A-Za-z0-9]*(\.[A-Za-z0-9]+)+$/.test(value) && value.length <= 80;
 
-/** Entradas `doc:<clave>` para publicar: solo los textos personalizados que el visor muestra. */
+/**
+ * Textos que se publican aunque no estén personalizados. La nota regulatoria por defecto cambió con el tipo
+ * de tarifa: el enlace nuevo lleva la vigente y el visor usa la edición `legacy` para los que no la traen,
+ * así los enlaces ya publicados se siguen viendo igual.
+ */
+const ALWAYS_PUBLISHED_TEXT_KEYS: ReadonlySet<string> = new Set(['projectDescription.regulatoryNote']);
+
+/** Entradas `doc:<clave>` para publicar: los textos personalizados que el visor muestra y la nota regulatoria. */
 export function publishedDocumentTexts(source: DocumentTextSource, ctx: DocumentTextContext): Record<string, string> {
   const published: Record<string, string> = {};
   for (const key of VIEWER_TEXT_KEYS) {
     const resolved = resolveDocumentText(key, source, ctx);
-    if (resolved.isCustomized && resolved.text.trim()) published[docTextKey(key)] = resolved.text;
+    if ((resolved.isCustomized || ALWAYS_PUBLISHED_TEXT_KEYS.has(key)) && resolved.text.trim()) published[docTextKey(key)] = resolved.text;
   }
   return published;
 }

@@ -1,3 +1,5 @@
+import { normalizeTariffCode } from '../../shared/tariffRules';
+
 export type UtilityDistributor = 'EDEESTE' | 'EDESUR' | 'EDENORTE' | 'CEPM';
 
 export type TariffCode =
@@ -24,6 +26,12 @@ export interface TariffBlock {
   rateDOP: number; // e.g. 6.17, 8.71, 13.04
 }
 
+export interface FixedChargeTier {
+  minKWh: number;
+  maxKWh: number | null;
+  chargeDOP: number;
+}
+
 export interface UtilityTariffDetails {
   code: TariffCode;
   /** Provenance for rows retained when a document updates only part of the matrix. */
@@ -36,12 +44,17 @@ export interface UtilityTariffDetails {
   baseEnergyRateUSD?: number;
   // Tiered blocks (primarily for BTS1 residential)
   blocks?: TariffBlock[];
-  // Fixed monthly customer charge
+  // Fixed monthly customer charge (BTS1: the usual tier, consumption of 101 kWh or more)
   fixedChargeDOP: number;
   fixedChargeUSD?: number;
-  // Power demand charges (for BTD, MTD1, MTD2, RBT-2, ESTRBT-2)
+  /** Cargo fijo por rango de consumo mensual (BTS-1: 0–100 y ≥101 kWh); `maxKWh: null` es el rango abierto. Opcional. */
+  fixedChargeTiersDOP?: FixedChargeTier[];
+  // Power demand charges (for BTD, MTD1, MTD2, RBT-2, ESTRBT-2; for BTH/MTH the peak-hours charge)
   demandChargePerKWDOP?: number;
   demandChargePerKWUSD?: number;
+  /** Potencia en horas de punta (HP) y fuera de punta (HFP) de BTH y MTH. Opcional; `demandChargePerKWDOP` sigue siendo el de punta. */
+  peakDemandChargePerKWDOP?: number;
+  offPeakDemandChargePerKWDOP?: number;
   // Time-of-use rates (for MTD2, BTH)
   peakEnergyRateDOP?: number;
   offPeakEnergyRateDOP?: number;
@@ -149,6 +162,7 @@ export function mapTariffCodeOnDistributorChange(
   currentCode: string
 ): string {
   if (oldDistributor === newDistributor) return currentCode;
+  currentCode = normalizeTariffCode(currentCode);
 
   // De EDE a CEPM
   if (newDistributor === 'CEPM') {

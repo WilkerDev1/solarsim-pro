@@ -8,6 +8,7 @@
 - Módulos nuevos: `testBatteryBankModule` y `testBatteryBankDefaults` (banco de baterías, [ADR 0002](adr/0002-banco-de-baterias.md)); `testResolvedAssumptions`, `testAssumptionsFactory` y `testDockEffectiveAssumptions` (supuestos, [ADR 0003](adr/0003-supuestos-resueltos.md)); `testProjectEdit` (la misma matriz de escenarios contra el store y contra `applyProjectEdit`, [ADR 0004](adr/0004-edicion-de-proyecto.md)); `testClientVersion` y `testClientVersionGate` (versión mínima de cliente).
 - API: `npm --prefix server test` (node:test). Las integraciones (`server/tests/*.test.ts`) arrancan PostgreSQL en un contenedor Docker desechable.
 - Worker: `npm --prefix workers/share-viewer test`, con KV y autorización simulados.
+- MCP remoto: `npm --prefix mcp-remote test` (protocolo con API sintética y extremo a extremo con PostgreSQL efímero y el SDK oficial de MCP) y `npx tsx mcp-remote/tests/containerSmoke.ts` con las imágenes construidas.
 - `server/tests/containerSmoke.ts`: construye su propia imagen/contenedores y ensaya proceso sin root, health con base, CAS y rotación de secretos.
 
 La lista completa de gates está en [MAINTENANCE_AND_UPDATES.md](MAINTENANCE_AND_UPDATES.md#gates). Una build correcta no equivale a instalación probada en cada sistema operativo.

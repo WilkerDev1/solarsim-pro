@@ -1,5 +1,5 @@
 // IPC contract between Electron main (local MCP server) and the renderer that executes agent tools.
-import type { AgentToolCall, AgentToolDefinition, AgentToolOutcome } from './types';
+import type { AgentToolCall, AgentToolDefinition, AgentToolOutcome } from './types.js';
 
 export interface McpInvokeMessage {
   requestId: string;

@@ -235,6 +235,8 @@ export function renderProposalPage(stored: StoredProposal): string {
   // Textos del documento: publicado (`doc:`) → campo heredado de enlaces antiguos → texto compartido por defecto.
   const textContext = createDocumentTextContext({
     clientName, quoteValidityDays, distributor, tariffCode: rawTariffCode, isZeroExport, gridExportFeePct: exportFee, hasBattery,
+    // Los enlaces nuevos traen su nota regulatoria publicada (`doc:`); sin ella, el texto que mostraban antes.
+    regulatoryNoteEdition: 'legacy',
     hasBatteryStorage: hasBattery, companyName,
     // Misma cadena que la app (documentTextContext): persona de contacto → empresa → nombre del cliente.
     clientContactPerson: client.contactPerson || client.company || clientName || '', clientPhone, clientEmail: custom.clientEmail || client.contactEmail || '',
