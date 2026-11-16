@@ -17,6 +17,7 @@ import {
   currentDistributor,
   currentTariffCode,
   isMatchingReference,
+  planApplyReference,
   planDistributorChange,
   planTariffChange,
   referenceRate,
@@ -130,7 +131,7 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
                 label: matches ? 'Tarifa oficial aplicada' : 'Aplicar tarifa oficial',
                 hint: `$${referenceText}`,
                 checked: matches,
-                onSelect: () => updateRates({ energyCostPerKWh: reference }),
+                onSelect: () => updateRates(planApplyReference(context)),
               }]}
             />
           }

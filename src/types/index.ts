@@ -1,4 +1,5 @@
 import type { NetMeteringRegime } from '../../shared/netMetering';
+import type { BillingTariff, EnergyRateSource } from '../../shared/tariffBilling';
 import type { ExtractedInvoiceData, GeminiModelInfo } from './aiInvoice';
 import type { LegacyEquipmentFields } from '../../shared/equipment';
 import type { GridConnectionMode } from '../../shared/gridConnection';
@@ -149,6 +150,15 @@ export interface UtilityRates {
   netMeteringRegime?: NetMeteringRegime;
   /** Cargo por uso de la red SIE-007-2026 en RD$/kWh inyectado (editable). Ausente o no válido = el de fábrica de la distribuidora. */
   gridUseChargeDOPPerKWh?: number;
+  /**
+   * De dónde salió `energyCostPerKWh` (`shared/tariffBilling.ts`): `reference` (tarifa de la matriz), `invoice` (factura)
+   * o `manual` (tecleado). Ausente = escalar, como antes de la fase 3. Lo escribe `applyProjectEdit` y la siembra.
+   */
+  energyRateSource?: EnergyRateSource;
+  /** Fila de la tarifa (bloques y cargo fijo) guardada al fijar el precio de referencia; con ella se factura en SIE-007-2026. */
+  billingTariff?: BillingTariff;
+  /** Precio de liquidación del crédito anual sobrante (RD$/kWh). Ausente = el de fábrica (no confirmado, 0). */
+  annualCreditSettlementDOPPerKWh?: number;
 }
 
 export interface CustomQuotationItem {
@@ -266,6 +276,27 @@ export interface MonthlyEnergyResult {
   originalBillUSD: number;
   /** Cargo por uso de la red SIE-007-2026 del mes (USD). Solo en el régimen `sie007_2026`; ausente en el anterior. */
   gridUseChargeUSD?: number;
+  /**
+   * Desglose de la factura con sistema cuando el ahorro se valora por bloques (`energyValuationMethod: 'block_billing'`);
+   * ausente con el precio escalar. Entonces `originalBillUSD`/`netBillUSD` son las facturas sin y con sistema (con cargo
+   * fijo) y `savingsUSD = originalBillUSD − netBillUSD + creditSettlementUSD`.
+   */
+  tariffBill?: MonthlyTariffBill;
+}
+
+export interface MonthlyTariffBill {
+  /** Energía retirada de la red (kWh). */
+  withdrawnKWh: number;
+  /** Consumo neto facturado (kWh). */
+  netBilledKWh: number;
+  creditInKWh: number;
+  creditAppliedKWh: number;
+  creditCarriedKWh: number;
+  energyChargeUSD: number;
+  fixedChargeUSD: number;
+  /** Solo diciembre: remanente de crédito liquidado al cierre del año (kWh y USD). */
+  creditSettlementKWh?: number;
+  creditSettlementUSD?: number;
 }
 
 export interface CashFlowYear {
@@ -298,6 +329,9 @@ export interface FinancialSummaryResult {
   ley5707CreditUSD: number;
   netInvestmentUSD: number;
   year1SavingsUSD: number;
+  /** Solo con facturación por bloques: crédito que sobra al cierre del año y su liquidación (incluida en `year1SavingsUSD`). */
+  annualCreditSettlementKWh?: number;
+  annualCreditSettlementUSD?: number;
   total25YearSavingsUSD: number;
   paybackYears: number;
   irrPct: number;

@@ -15,11 +15,13 @@
  * - La resolución ocurre al leer; no hay migración de datos.
  *
  * Régimen de medición neta y cargo por uso de la red: sus reglas viven en `shared/netMetering.ts`; aquí se exponen
- * en los supuestos efectivos (un dato que falta resuelve al régimen anterior, `legacy_retention`).
+ * en los supuestos efectivos (un dato que falta resuelve al régimen anterior, `legacy_retention`). Igual el método de
+ * valoración del ahorro (factura por bloques o precio escalar) y el precio de liquidación anual (`shared/tariffBilling.ts`).
  *
  * TypeScript puro, sin dependencias fuera de `shared/` (lo compilan el cliente, el servidor con NodeNext y el Worker).
  */
 import { resolveNetMetering, type NetMeteringRegime } from './netMetering.js';
+import { resolveAnnualCreditSettlementDOPPerKWh, resolveEnergyValuationMethod, type EnergyValuationMethod } from './tariffBilling.js';
 
 // ── Valores por defecto ──
 /** Tasa RD$ por US$. */
@@ -130,6 +132,10 @@ export interface AssumptionsProjectInput {
     isZeroExport?: boolean | null;
     netMeteringRegime?: unknown;
     gridUseChargeDOPPerKWh?: Maybe;
+    gridConnection?: unknown;
+    energyRateSource?: unknown;
+    billingTariff?: unknown;
+    annualCreditSettlementDOPPerKWh?: unknown;
   } | null;
   financials?: {
     discountRatePct?: Maybe;
@@ -160,6 +166,10 @@ export interface ResolvedAssumptions {
   gridUseChargeDOPPerKWh: number;
   /** Cargo que se cobra (RD$/kWh): 0 fuera de `sie007_2026`, en tarifas con potencia y con inyección cero. */
   appliedGridUseChargeDOPPerKWh: number;
+  /** Cómo se valora el ahorro: factura por bloques (SIE-007, precio de referencia y fila guardada) o precio escalar. */
+  energyValuationMethod: EnergyValuationMethod;
+  /** Precio de liquidación del crédito anual sobrante (RD$/kWh); de fábrica 0 (no confirmado). */
+  annualCreditSettlementDOPPerKWh: number;
 }
 
 /**
@@ -206,6 +216,8 @@ export function resolveAssumptions(project: AssumptionsProjectInput | null | und
     netMeteringRegime: netMetering.regime,
     gridUseChargeDOPPerKWh: netMetering.gridUseChargeDOPPerKWh,
     appliedGridUseChargeDOPPerKWh: netMetering.appliedGridUseChargeDOPPerKWh,
+    energyValuationMethod: resolveEnergyValuationMethod(rates),
+    annualCreditSettlementDOPPerKWh: resolveAnnualCreditSettlementDOPPerKWh(rates),
   };
 }
 
