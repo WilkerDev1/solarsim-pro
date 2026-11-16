@@ -10,7 +10,8 @@ import {
 } from '../../shared/tariffBilling';
 import { DEFAULT_RD_TARIFF_MATRIX, getReferenceEnergyRateUSD, referenceBillingTariff } from '../data/rdTariffs';
 import { applyProjectEdit } from '../domain/projectEdit';
-import { planApplyReference, planDistributorChange, planTariffChange, type ChangeContext } from '../components/simulator/params/sections/rates/ratesLogic';
+import { isReferenceApplied, planApplyReference, planDistributorChange, planTariffChange, type ChangeContext } from '../components/simulator/params/sections/rates/ratesLogic';
+import { calculateMonthlySolarProduction } from '../engine/solarEngine';
 import { useSimulationStore as store } from '../store/useSimulationStore';
 import { createAIProposalBase, prepareProposalDraftProject } from '../utils/proposalDraftProject';
 import { normalizeProposalDraft } from '../../shared/aiProposal';
@@ -92,6 +93,10 @@ assert.deepEqual(year.months.map((m) => m.creditInKWh), [0, 300, 100, 100, 100, 
 assert.equal(year.settlement.creditKWh, 300);
 close(year.settlement.amountDOP, 1500, 'remanente × precio de liquidación');
 assert.equal(calculateBillingYear(edesurBts1, months, { gridUseChargeDOPPerKWh: 0 }).settlement.amountDOP, 0, 'sin precio: valor de fábrica');
+close(year.billsDOP, year.months.reduce((t, m) => t + m.totalDOP, 0), 'billsDOP: suma bruta de las doce facturas');
+close(year.netCostDOP, year.billsDOP - 1500, 'netCostDOP: facturas − liquidación');
+assert.throws(() => calculateBillingYear(edesurBts1, months.slice(0, 11)), RangeError, 'un año son doce meses');
+assert.throws(() => calculateBillingYear(edesurBts1, [...months, months[0]]), RangeError, 'el crédito no cruza de año');
 assert.equal(FACTORY_ANNUAL_CREDIT_SETTLEMENT.dopPerKWh, 0, 'precio CNE no confirmado: valor conservador');
 assert.equal(FACTORY_ANNUAL_CREDIT_SETTLEMENT.confirmed, false);
 assert.match(FACTORY_ANNUAL_CREDIT_SETTLEMENT.source, /19\.2/);
@@ -275,6 +280,99 @@ const invoiceDraft = normalizeProposalDraft({ ...rawDraft, energyCostPerKWhDOP: 
 const aiInvoice = prepareProposalDraftProject(draftBase, invoiceDraft, DEFAULT_RD_TARIFF_MATRIX, { isNew: true });
 assert.equal(aiInvoice.rates.energyRateSource, 'invoice');
 assert.equal(resolveAssumptions(aiInvoice).energyValuationMethod, 'flat_rate');
+
+// 10. Revisión (segunda tanda).
+// 10.1 Procedencia inválida o null junto con un precio nuevo: cuenta como ausente y el precio tecleado es manual.
+for (const bad of [null, 'nuevo', 7]) {
+  const edited = reconcileEnergyRateSource({ energyCostPerKWh: 0.2, energyRateSource: 'reference' }, { energyCostPerKWh: 0.3, energyRateSource: bad as never }, { energyCostPerKWh: 0.3, energyRateSource: bad });
+  assert.equal(edited.energyRateSource, 'manual', `procedencia ${String(bad)} con precio nuevo`);
+  const untouched = reconcileEnergyRateSource({ energyCostPerKWh: 0.2, energyRateSource: 'reference' }, { energyCostPerKWh: 0.2, energyRateSource: bad as never }, { energyRateSource: bad });
+  assert.equal(untouched.energyRateSource, 'reference', `procedencia ${String(bad)} sin precio: se conserva la anterior`);
+}
+// 10.3 Sin redondeo prematuro: umbrales de 701 kWh y del cargo fijo, y conservación del crédito.
+close(bill(700.96).energyChargeDOP, 7225 + 0.96 * 13.09, '700.96 kWh: escalonado (no llega a 701)');
+close(bill(700.4).energyChargeDOP, 7225 + 0.4 * 13.09, '700.4 kWh: escalonado');
+close(bill(701).energyChargeDOP, 701 * 13.09, '701 kWh: todo al 4.º rango');
+const netTier = (net: number) => calculateMonthlyBill({ tariff: edesurBts1, withdrawnKWh: net, fixedChargeTierBasis: 'net' }).fixedChargeDOP;
+close(netTier(100.04), 128.59, 'neto 100.04 kWh: rango ≥101 (pasa de 100)');
+close(netTier(100), 42.1, 'neto 100 kWh: rango 0–100');
+close(netTier(101), 128.59, 'neto 101 kWh: rango ≥101');
+close(calculateMonthlyBill({ tariff: edesurBts1, withdrawnKWh: 800.96, injectedKWh: 100 }).energyChargeDOP, 7225 + 0.96 * 13.09, 'neto 700.96 tras netear: escalonado');
+{
+  const fractional = Array.from({ length: 12 }, (_, i) => ({ withdrawnKWh: 150.37 + i * 13.11, injectedKWh: i % 3 === 0 ? 240.29 : 101.07 }));
+  const y = calculateBillingYear(edesurBts1, fractional);
+  let credit = 0;
+  y.months.forEach((m, i) => {
+    assert.ok(Math.abs(m.creditInKWh - credit) < 1e-9, `mes ${i}: entra el crédito arrastrado sin redondear`);
+    const surplus = Math.max(0, m.injectedKWh - m.withdrawnKWh);
+    assert.ok(Math.abs(m.creditCarriedKWh - (m.creditInKWh - m.creditAppliedKWh + surplus)) < 1e-9, `mes ${i}: crédito conservado`);
+    assert.ok(Math.abs(m.netKWh - Math.max(0, m.withdrawnKWh - m.injectedKWh - m.creditInKWh)) < 1e-9, `mes ${i}: neto sin redondear`);
+    credit = m.creditCarriedKWh;
+  });
+  const totalIn = fractional.reduce((t, m) => t + m.injectedKWh, 0);
+  const used = y.months.reduce((t, m) => t + Math.min(m.withdrawnKWh, m.injectedKWh) + m.creditAppliedKWh, 0);
+  assert.ok(Math.abs(totalIn - used - y.settlement.creditKWh) < 1e-6, 'lo inyectado = lo neteado + el remanente liquidado');
+}
+// 10.4 Meses con ahorro negativo (consumo 0 o inyección alta): la suma anual y las métricas siguen siendo finitas.
+for (const mode of MODES) {
+  const zeroMonths = calculateProjectFinancialSummary(project(blockRates(), [0, 0, 0, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000], { panelCount: 9 }), mode);
+  assert.ok(zeroMonths.monthlyBreakdown.slice(0, 3).every((m) => m.savingsUSD < 0), `${mode}: sin consumo, el cargo fijo y el de red dan ahorro negativo`);
+  assert.equal(zeroMonths.year1SavingsUSD, r2(zeroMonths.monthlyBreakdown.reduce((t, m) => t + m.savingsUSD, 0)), 'la suma anual incluye los meses negativos');
+  for (const key of ['year1SavingsUSD', 'paybackYears', 'irrPct', 'npvUSD', 'roi25YrPct', 'total25YearSavingsUSD'] as const) assert.ok(Number.isFinite(zeroMonths[key]), `${mode} ${key} finito`);
+  const idle = calculateProjectFinancialSummary(project(blockRates(), 0, { panelCount: 9 }), mode);
+  assert.ok(idle.year1SavingsUSD <= 0, 'sin consumo en todo el año: ahorro ≤ 0');
+  for (const key of ['year1SavingsUSD', 'paybackYears', 'irrPct', 'npvUSD', 'roi25YrPct'] as const) assert.ok(Number.isFinite(idle[key]), `${mode} sin consumo: ${key} finito`);
+}
+// 10.5 Distribuidora con el mismo criterio que el código; contigüidad impresa inclusiva; energía a precio 0 no es una fila válida.
+assert.equal(resolveEnergyValuationMethod(blockRates({ distributor: ' edesur ' as never })), 'block_billing', 'distribuidora en minúsculas o con espacios');
+assert.equal(isValidBillingTariff({ ...edesurBts1, energyBlocks: [{ fromKWh: 0, toKWh: 200, rateDOP: 6 }, { fromKWh: 200, toKWh: null, rateDOP: 8 }] }), false, 'solo límites impresos inclusivos (200 → 201)');
+assert.equal(isValidBillingTariff({ ...edesurBts1, energyBlocks: [{ fromKWh: 0, toKWh: 200, rateDOP: 6 }, { fromKWh: 250, toKWh: null, rateDOP: 8 }] }), false, 'hueco entre tramos');
+assert.equal(isValidBillingTariff({ ...edesurBts1, energyBlocks: [{ fromKWh: 0, toKWh: null, rateDOP: 0 }] }), false, 'energía a 0 RD$: dato faltante, no una tarifa');
+assert.equal(isValidBillingTariff({ ...edesurBts1, fixedChargeTiers: [{ fromKWh: 0, toKWh: 100, chargeDOP: 0 }, { fromKWh: 101, toKWh: null, chargeDOP: 128.59 }] }), true, 'cargo fijo 0 en un rango: válido');
+// 10.6 Los supuestos tipados leen distribuidora, código y conexión solo desde rates.
+assert.equal(resolveAssumptions({ rates: { ...blockRates(), gridConnection: 'off_grid', isZeroExport: true } }).energyValuationMethod, 'flat_rate', 'aislado detectado desde rates');
+assert.equal(resolveAssumptions({ rates: { ...blockRates(), gridConnection: 'zero_export', isZeroExport: true } }).energyValuationMethod, 'block_billing');
+// 10.8 Borrador de IA: precio explícito manda con su procedencia; sin precio sobre una propuesta existente no toca nada salvo cambio de tarifa.
+{
+  const templateManual = { ...draftBase, rates: { ...draftBase.rates, energyCostPerKWh: 0.5, energyRateSource: 'manual' as const } };
+  const fresh = prepareProposalDraftProject(templateManual, refDraft, DEFAULT_RD_TARIFF_MATRIX, { isNew: true });
+  assert.equal(fresh.rates.energyRateSource, 'reference', '(a) nuevo: no hereda ni compara con la plantilla');
+  const freshNoPrice = prepareProposalDraftProject(templateManual, { ...refDraft, tariffCode: 'XYZ', energyRateSource: undefined }, DEFAULT_RD_TARIFF_MATRIX, { isNew: true });
+  assert.equal(freshNoPrice.rates.energyRateSource, undefined, '(a) nuevo sin precio ni referencia: sin procedencia heredada');
+  const mixedDraft = { ...refDraft, energyCostPerKWhDOP: 20 };
+  const mixed = prepareProposalDraftProject(draftBase, mixedDraft, DEFAULT_RD_TARIFF_MATRIX, { isNew: true });
+  assert.equal(mixed.rates.energyRateSource, 'reference', '(b) referencia');
+  assert.equal(mixed.rates.energyCostPerKWh, getReferenceEnergyRateUSD(DEFAULT_RD_TARIFF_MATRIX, 'EDESUR', 'BTS1', 1000, 60), '(b) con referencia, el escalar es el de la referencia (coherente con la fila)');
+  const existingManual = { ...project({ netMeteringRegime: 'sie007_2026', energyRateSource: 'manual', energyCostPerKWh: 0.31 }), monthlyConsumption: Array(12).fill(1000) };
+  const noPriceDraft = { ...invoiceDraft, energyCostPerKWhDOP: undefined, energyCostPerKWhUSD: undefined, energyRateSource: undefined };
+  const kept = prepareProposalDraftProject(existingManual, noPriceDraft, DEFAULT_RD_TARIFF_MATRIX, { isNew: false });
+  assert.deepEqual([kept.rates.energyCostPerKWh, kept.rates.energyRateSource], [0.31, 'manual'], '(c) sin precio y misma tarifa: no se toca');
+  const switched = prepareProposalDraftProject(existingManual, { ...noPriceDraft, tariffCode: 'BTS2' }, DEFAULT_RD_TARIFF_MATRIX, { isNew: false });
+  assert.equal(switched.rates.energyRateSource, 'reference', '(c) sin precio con cambio de tarifa: referencia de la nueva');
+  assert.equal(switched.rates.billingTariff?.tariffCode, 'BTS2');
+  const usdDraft = { ...noPriceDraft, energyCostPerKWhUSD: 0.27 };
+  assert.equal(prepareProposalDraftProject(existingManual, usdDraft, DEFAULT_RD_TARIFF_MATRIX, { isNew: false }).rates.energyRateSource, 'manual', 'precio en USD sin procedencia: manual');
+  assert.equal(prepareProposalDraftProject(existingManual, invoiceDraft, DEFAULT_RD_TARIFF_MATRIX, { isNew: false }).rates.energyRateSource, 'invoice', 'precio de factura');
+}
+// 10.9 Propuesta nueva sin matriz cargada: respaldo de la matriz de fábrica.
+store.setState({ projects: [], tariffMatrix: undefined } as never);
+store.getState().createNewProject({ name: 'Sin matriz', distributor: 'EDENORTE', tariffCode: 'BTS1' } as never);
+assert.deepEqual(store.getState().projects[0].rates.billingTariff, referenceBillingTariff(DEFAULT_RD_TARIFF_MATRIX, 'EDENORTE', 'BTS1'), 'respaldo de fábrica');
+assert.equal(store.getState().projects[0].rates.energyRateSource, 'reference');
+store.setState({ tariffMatrix: DEFAULT_RD_TARIFF_MATRIX } as never);
+// 10.10 Dock: «Tarifa oficial aplicada» sale de la procedencia en SIE-007, no de la igualdad numérica.
+const refPrice = getReferenceEnergyRateUSD(DEFAULT_RD_TARIFF_MATRIX, 'EDESUR', 'BTS1', 1000, 60);
+assert.equal(isReferenceApplied({ ...blockRates(), energyCostPerKWh: 0.111 }, refPrice), true, 'referencia activa aunque cambie el consumo medio');
+assert.equal(isReferenceApplied({ ...blockRates({ energyRateSource: 'manual' }), energyCostPerKWh: refPrice }, refPrice), false, 'manual que coincide por casualidad: no aplicada');
+assert.equal(isReferenceApplied({ ...blockRates({ billingTariff: undefined }), energyCostPerKWh: refPrice }, refPrice), false, 'sin fila: no aplicada');
+assert.equal(isReferenceApplied({ distributor: 'EDESUR', tariffCode: 'BTS1', energyCostPerKWh: refPrice }, refPrice), true, 'régimen anterior: igualdad numérica, como antes');
+assert.equal(isReferenceApplied({ distributor: 'EDESUR', tariffCode: 'BTS1', energyCostPerKWh: 0.3 }, refPrice), false);
+// 10.11 Tasa no válida: nunca 1:1; se usa la tasa por defecto compartida.
+{
+  const p = project(blockRates());
+  const run = (dopPerUSD: number) => calculateMonthlySolarProduction(p.client.province, p.specs, p.monthlyConsumption, 0.218, 25, undefined, 'BTS1', 'grid_export', 'legacy', { usdPerKWh: 3.78 / 60 }, { tariff: edesurBts1, dopPerUSD, gridUseChargeDOPPerKWh: 3.78, settlementDOPPerKWh: 0 });
+  assert.deepEqual(run(Number.NaN), run(60), 'tasa NaN → 60 (DEFAULT_DOP_RATE), no 1');
+}
 
 // 9. Ejemplo del informe: EDESUR BTS-1, 1,000 kWh/mes, sistema que cubre ~100 %.
 const coverage100 = (rates: Partial<UtilityRates>) => calculateProjectFinancialSummary(project(rates, 1000, { panelCount: 12 }), 'legacy');
