@@ -4,6 +4,7 @@ import {
   AGENT_GRANT_LIMITS,
   AGENT_TOKEN_PREFIX,
   AGENT_TOOL_HEADER,
+  isAgentBearerToken,
   matchAgentRoute,
   safeAgentLabel,
   scopeAllows,
@@ -11,16 +12,21 @@ import {
   type AgentActivityEntry,
   type AgentIdentity,
 } from "../../../../shared/agentAccess.js";
+import {
+  resolveClientIp,
+  socketAddress,
+  type ClientIpConfig,
+} from "../../../../shared/clientIp.js";
 import { FixedWindowLimiter } from "../../../../shared/fixedWindowLimiter.js";
-import { isAdminRole } from "../../../../shared/permissions.js";
+import { isAdminRole, isWriterRole } from "../../../../shared/permissions.js";
 import type { AgentAccessConfig } from "../../config.js";
 import type { AuthUser, Dependencies } from "../../dependencies.js";
+import { lockCurrentMembership } from "../../membership.js";
 import { readObjectBody } from "../../request.js";
 import {
   authenticateAgentToken,
   createGrant,
   grantSummary,
-  hashSecret,
   newSecret,
   purgeExpired,
   revokeGrant,
@@ -43,8 +49,19 @@ export function registerAgentGate(
   app: Hono,
   pool: Dependencies["pool"],
   config: AgentAccessConfig,
+  clientIp: ClientIpConfig,
 ) {
-  const limiter = new FixedWindowLimiter(240, 60000);
+  // Per grant, counted only after the token is authenticated (random tokens cannot fill it).
+  const perGrant = new FixedWindowLimiter(240, 60000);
+  // Failed `ssm_` bearers per client IP: checked before any database lookup.
+  const failures = new FixedWindowLimiter(30, 600000);
+  const tooMany = (c: Context, limiter: FixedWindowLimiter, key: string) => {
+    c.header("Retry-After", String(limiter.retryAfter(key)));
+    return c.json(
+      { error: "Demasiadas solicitudes del agente", code: "rate_limited" },
+      429,
+    );
+  };
   app.use("/api/*", async (c, next) => {
     const header = c.req.header("Authorization");
     if (!isAgentBearer(header)) return next();
@@ -59,18 +76,23 @@ export function registerAgentGate(
         },
         403,
       );
+    const ip = resolveClientIp(
+      socketAddress(c.env),
+      (name) => c.req.header(name),
+      clientIp,
+    );
+    if (failures.exceeded(ip)) return tooMany(c, failures, ip);
     const secret = header!.slice(7);
-    const key = hashSecret(secret);
-    if (!limiter.take(key)) {
-      c.header("Retry-After", String(limiter.retryAfter(key)));
-      return c.json(
-        { error: "Demasiadas solicitudes del agente", code: "rate_limited" },
-        429,
-      );
-    }
-    const user = await authenticateAgentToken(pool, secret, config.mcpUrl);
-    if (!user?.agent)
+    // Malformed tokens never reach the database.
+    const user = isAgentBearerToken(secret)
+      ? await authenticateAgentToken(pool, secret, config.mcpUrl)
+      : null;
+    if (!user?.agent) {
+      failures.take(ip);
       return c.json({ error: "Token de agente inválido o revocado" }, 401);
+    }
+    if (!perGrant.take(user.agent.grantId))
+      return tooMany(c, perGrant, user.agent.grantId);
     if (!scopeAllows(user.agent.scope, route.scope))
       return c.json(
         {
@@ -172,14 +194,25 @@ export function registerAgentAccessRoutes(
         },
         400,
       );
-    if (scope === "write" && user.role === "LECTOR")
-      return c.json(
-        { error: "Tu rol solo permite tokens de solo lectura" },
-        403,
-      );
+    const readOnly = () =>
+      c.json({ error: "Tu rol solo permite tokens de solo lectura" }, 403);
+    if (scope === "write" && !isWriterRole(user.role)) return readOnly();
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
+      // Current membership, role and auth_version, held until commit like every other mutation: a demotion
+      // or password change that lands while this request waits cannot be bypassed.
+      const denied = await lockCurrentMembership(
+        client,
+        user,
+        scope === "write",
+      );
+      if (denied) {
+        await client.query("ROLLBACK");
+        return denied === 403
+          ? readOnly()
+          : c.json({ error: "La sesión o los permisos cambiaron" }, 401);
+      }
       // Serializes creations per user so the active-token cap cannot be raced.
       await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
         `solarsim-agent-grants:${user.id}`,

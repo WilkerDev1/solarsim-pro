@@ -402,8 +402,14 @@ test("token de escritura: clientes y enlaces con CAS; papelera de solo lectura; 
     editor.token,
   );
   assert.equal(trashed.status, 200);
-  const p2 = (await asAgent("GET", "/api/projects/agent-p2", token)).body
+  // Agents do not see the trash; the desktop session still does.
+  assert.equal(
+    (await asAgent("GET", "/api/projects/agent-p2", token)).status,
+    404,
+  );
+  const p2 = (await request("GET", "/api/projects/agent-p2", editor.token)).body
     .project;
+  assert.equal(p2.isDeleted, true);
   assert.equal(
     (
       await asAgent("PUT", "/api/projects/agent-p2/client-link", token, {
@@ -604,31 +610,62 @@ const pkce = () => {
     challenge: createHash("sha256").update(verifier).digest("base64url"),
   };
 };
-const form = (fields: Record<string, string>) => ({
+const form = (
+  fields: Record<string, string>,
+  headers: Record<string, string> = {},
+) => ({
   method: "POST",
-  headers: { "Content-Type": "application/x-www-form-urlencoded" },
+  headers: {
+    "Content-Type": "application/x-www-form-urlencoded",
+    ...headers,
+  },
   body: new URLSearchParams(fields).toString(),
 });
+/** Loads the consent page like a browser: returns its anti-CSRF hidden field and cookie. */
+async function consentPage(query: Record<string, string>) {
+  const page = await app.request(
+    `/oauth/authorize?${new URLSearchParams(query)}`,
+  );
+  const html = await page.text();
+  const cookie = page.headers.get("set-cookie") ?? "";
+  return {
+    page,
+    html,
+    cookie: cookie.split(";")[0],
+    csrf: /name="csrf" value="([^"]+)"/.exec(html)?.[1] ?? "",
+  };
+}
 async function authorize(
   clientId: string,
   redirect: string,
   challenge: string,
   fields: Record<string, string>,
   scope = "solarsim:read solarsim:write",
+  options: { browser?: boolean; headers?: Record<string, string> } = {},
 ) {
+  const query = {
+    client_id: clientId,
+    redirect_uri: redirect,
+    response_type: "code",
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+    state: "st-1",
+    scope,
+    resource: MCP_URL,
+  };
+  const session =
+    options.browser === false
+      ? { csrf: "", cookie: "" }
+      : await consentPage(query);
   return app.request(
     "/oauth/authorize",
-    form({
-      client_id: clientId,
-      redirect_uri: redirect,
-      response_type: "code",
-      code_challenge: challenge,
-      code_challenge_method: "S256",
-      state: "st-1",
-      scope,
-      resource: MCP_URL,
-      ...fields,
-    }),
+    form(
+      { ...query, csrf: session.csrf, ...fields },
+      {
+        ...(session.cookie ? { Cookie: session.cookie } : {}),
+        ...options.headers,
+      },
+    ),
   );
 }
 const token = (fields: Record<string, string>) =>
@@ -870,11 +907,16 @@ test("OAuth: loopback con puerto variable (Claude Code) y organización a elegir
     decision: "allow",
     email: "agent-admin@example.test",
     password: "isolated-password",
+    grant_scope: "write",
   });
   assert.equal(pick.status, 200);
   const html = await pick.text();
   assert.ok(html.includes("Segunda empresa"));
   assert.ok(!html.includes("isolated-password"));
+  assert.ok(
+    html.includes('value="write" checked'),
+    "the scope chosen in step 1 is kept",
+  );
   const ticket = /name="ticket" value="([^"]+)"/.exec(html)![1];
   const forged = await authorize(reg.body.client_id, redirect, challenge, {
     decision: "allow",
@@ -886,6 +928,7 @@ test("OAuth: loopback con puerto variable (Claude Code) y organización a elegir
     decision: "allow",
     ticket,
     organization_id: admin.organizationId,
+    grant_scope: "write",
   });
   assert.equal(ok.status, 302);
   const location = new URL(ok.headers.get("location")!);
@@ -898,4 +941,391 @@ test("OAuth: loopback con puerto variable (Claude Code) y organización a elegir
     code_verifier: verifier,
   });
   assert.equal(issued.status, 200);
+  assert.equal(
+    ((await issued.json()) as any).scope,
+    "solarsim:read solarsim:write",
+  );
+});
+
+/** Fresh app (fresh in-memory limiters) on the same database. */
+const freshApp = (clientIp?: {
+  trustedProxies: string[];
+  header?: "cf-connecting-ip" | "x-forwarded-for";
+}) =>
+  createApp({
+    pool,
+    jwtSecret: secret,
+    logging: false,
+    agentAccess: { enabled: true, mcpUrl: MCP_URL, oauth: { issuer: ISSUER } },
+    ...(clientIp ? { clientIp } : {}),
+  });
+const socket = (remoteAddress: string) => ({
+  incoming: { socket: { remoteAddress } },
+});
+async function registerClient(
+  target: { request: typeof app.request } = app,
+  redirect = "https://claude.ai/api/mcp/auth_callback",
+) {
+  const response = await target.request("/oauth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ redirect_uris: [redirect], client_name: "csrf" }),
+  });
+  return ((await response.json()) as any).client_id as string;
+}
+
+test("OAuth: CSRF de inicio de sesión y cabeceras de la página", async () => {
+  const clientId = await registerClient();
+  const redirect = "https://claude.ai/api/mcp/auth_callback";
+  const { challenge } = pkce();
+  const query = {
+    client_id: clientId,
+    redirect_uri: redirect,
+    response_type: "code",
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+    scope: "solarsim:read",
+  };
+  const first = await consentPage(query);
+  const cookie = first.page.headers.get("set-cookie")!;
+  for (const attribute of [
+    "HttpOnly",
+    "Secure",
+    "SameSite=Lax",
+    "Path=/oauth/authorize",
+  ])
+    assert.ok(cookie.includes(attribute), attribute);
+  assert.match(
+    first.page.headers.get("content-security-policy")!,
+    /frame-ancestors 'none'/,
+  );
+  assert.match(
+    first.page.headers.get("content-security-policy")!,
+    /default-src 'none'/,
+  );
+  assert.equal(first.page.headers.get("x-frame-options"), "DENY");
+  assert.equal(first.page.headers.get("x-content-type-options"), "nosniff");
+  const creds = {
+    decision: "allow",
+    email: "agent-editor@example.test",
+    password: "isolated-password",
+  };
+  // Cross-site auto-submit: no cookie (SameSite=Lax) and/or no field.
+  const forgedNoCookie = await authorize(
+    clientId,
+    redirect,
+    challenge,
+    creds,
+    "solarsim:read",
+    { browser: false },
+  );
+  assert.equal(forgedNoCookie.status, 403);
+  assert.equal(forgedNoCookie.headers.get("location"), null);
+  const second = await consentPage(query);
+  const mixed = await app.request(
+    "/oauth/authorize",
+    form({ ...query, ...creds, csrf: second.csrf }, { Cookie: first.cookie }),
+  );
+  assert.equal(mixed.status, 403, "field and cookie from different pages");
+  const empty = await app.request(
+    "/oauth/authorize",
+    form(
+      { ...query, ...creds, csrf: "" },
+      { Cookie: `${first.cookie.split("=")[0]}=` },
+    ),
+  );
+  assert.equal(empty.status, 403);
+  const ok = await app.request(
+    "/oauth/authorize",
+    form({ ...query, ...creds, csrf: first.csrf }, { Cookie: first.cookie }),
+  );
+  assert.equal(ok.status, 302);
+});
+
+test("OAuth: cuerpos raros, tamaño, nosniff, redirecciones y sin versión de cliente", async () => {
+  const boundary = "----x";
+  const multipart = await app.request("/oauth/authorize", {
+    method: "POST",
+    headers: { "Content-Type": `multipart/form-data; boundary=${boundary}` },
+    body: `--${boundary}\r\nContent-Disposition: form-data; name="client_id"; filename="a.txt"\r\nContent-Type: text/plain\r\n\r\nx\r\n--${boundary}--\r\n`,
+  });
+  assert.equal(multipart.status, 400, "a file field is ignored, never a 500");
+  const repeated = await app.request("/oauth/authorize", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: "client_id=a&client_id=b",
+  });
+  assert.equal(repeated.status, 400);
+  const tokenRepeated = await app.request("/oauth/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: "grant_type=refresh_token&grant_type=authorization_code&client_id=x",
+  });
+  assert.equal(tokenRepeated.status, 400);
+  const huge = await app.request("/oauth/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `grant_type=refresh_token&pad=${"x".repeat(20000)}`,
+  });
+  assert.equal(huge.status, 413);
+  for (const response of [
+    huge,
+    tokenRepeated,
+    await app.request("/.well-known/oauth-authorization-server"),
+  ])
+    assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  assert.ok(
+    !redirectMatches(
+      ["http://localhost/callback"],
+      "http://localhost:4000/callback#frag",
+    ),
+  );
+  assert.ok(
+    !redirectMatches(
+      ["http://localhost/callback"],
+      "http://user:pw@localhost:4000/callback",
+    ),
+  );
+  assert.ok(
+    !redirectMatches(["https://claude.ai/cb"], "https://claude.ai/cb#x"),
+  );
+  // OAuth pages sit outside /api: no X-SolarSim-Client needed (browsers and connectors never send it).
+  const raw = freshApp();
+  assert.equal(
+    (await raw.request("/.well-known/oauth-authorization-server")).status,
+    200,
+  );
+  const reg = await raw.request("/oauth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      redirect_uris: ["https://claude.ai/api/mcp/auth_callback"],
+    }),
+  });
+  assert.equal(reg.status, 201);
+  const page = await raw.request(
+    `/oauth/authorize?${new URLSearchParams({ client_id: ((await reg.json()) as any).client_id, redirect_uri: "https://claude.ai/api/mcp/auth_callback", response_type: "code", code_challenge: pkce().challenge, code_challenge_method: "S256" })}`,
+  );
+  assert.equal(page.status, 200);
+  // …while data routes do require it, also with an agent token (see «token de lectura»).
+});
+
+test("IP del cliente: cabeceras falsas no eluden los límites; proxies de confianza sí cuentan", async () => {
+  const target = freshApp();
+  const clientId = await registerClient(target);
+  const redirect = "https://claude.ai/api/mcp/auth_callback";
+  const { challenge } = pkce();
+  const query = {
+    client_id: clientId,
+    redirect_uri: redirect,
+    response_type: "code",
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+  };
+  const attempt = async (
+    on: ReturnType<typeof createApp>,
+    q: Record<string, string>,
+    i: number,
+    env: unknown,
+    headers: Record<string, string> = {},
+  ) => {
+    const page = await on.request(
+      `/oauth/authorize?${new URLSearchParams(q)}`,
+      {},
+      env as any,
+    );
+    const html = await page.text();
+    const csrf = /name="csrf" value="([^"]+)"/.exec(html)![1];
+    const cookie = page.headers.get("set-cookie")!.split(";")[0];
+    return on.request(
+      "/oauth/authorize",
+      form(
+        {
+          ...q,
+          csrf,
+          decision: "allow",
+          email: `nobody-${i}-${Math.random()}@example.test`,
+          password: "wrong",
+        },
+        { Cookie: cookie, ...headers },
+      ),
+      env as any,
+    );
+  };
+  const statuses: number[] = [];
+  for (let i = 0; i < 21; i++)
+    statuses.push(
+      (
+        await attempt(target, query, i, socket("203.0.113.9"), {
+          "CF-Connecting-IP": `198.51.100.${i}`,
+          "X-Forwarded-For": `192.0.2.${i}`,
+        })
+      ).status,
+    );
+  assert.deepEqual(statuses.slice(0, 20), Array(20).fill(401));
+  assert.equal(
+    statuses[20],
+    429,
+    "rotating proxy headers from an untrusted peer share the socket's bucket",
+  );
+  const limited = await attempt(target, query, 99, socket("203.0.113.9"));
+  const retry = Number(limited.headers.get("retry-after"));
+  assert.ok(
+    retry > 0 && retry <= 600,
+    "Retry-After comes from the limiter that rejected",
+  );
+  const proxied = freshApp({
+    trustedProxies: ["172.18.0.0/16"],
+    header: "cf-connecting-ip",
+  });
+  const proxiedQuery = { ...query, client_id: await registerClient(proxied) };
+  for (let i = 0; i < 25; i++)
+    assert.equal(
+      (
+        await attempt(proxied, proxiedQuery, i, socket("172.18.0.3"), {
+          "CF-Connecting-IP": `198.51.100.${i}`,
+        })
+      ).status,
+      401,
+      "each real client has its own bucket behind the trusted proxy",
+    );
+});
+
+test("puerta de agentes: formato antes de la base, fallos por IP y límite por acceso", async () => {
+  const target = asClient(freshApp());
+  const ask = (bearer: string, env?: unknown) =>
+    target.request(
+      "/api/agent-access/whoami",
+      {
+        headers: {
+          Authorization: `Bearer ${bearer}`,
+          "X-SolarSim-Client": AGENT,
+        },
+      },
+      env as any,
+    );
+  // Count token lookups by spying on the shared pool.
+  const original = pool.query.bind(pool);
+  let lookups = 0;
+  (pool as any).query = (...args: any[]) => {
+    if (typeof args[0] === "string" && args[0].includes("agent_tokens"))
+      lookups++;
+    return (original as any)(...args);
+  };
+  try {
+    for (let i = 0; i < 30; i++)
+      assert.equal(
+        (await ask(`ssm_pat_bad${i}`, socket("203.0.113.20"))).status,
+        401,
+      );
+    assert.equal(lookups, 0, "malformed tokens never query agent_tokens");
+    assert.equal(
+      (await ask(`ssm_pat_${"A".repeat(43)}`, socket("203.0.113.20"))).status,
+      429,
+    );
+    assert.equal(lookups, 0, "after 30 failures, 429 before any lookup");
+    await ask(`ssm_pat_${"C".repeat(43)}`, socket("203.0.113.24"));
+    assert.ok(lookups > 0, "the spy does see real lookups");
+  } finally {
+    (pool as any).query = original;
+  }
+  assert.equal(
+    (await ask(`ssm_pat_${"B".repeat(43)}`, socket("203.0.113.23"))).status,
+    401,
+    "a well-formed unknown token is looked up and fails",
+  );
+  const valid = (await createToken(editor, "read")).body.token;
+  assert.equal(
+    (await ask(valid, socket("203.0.113.20"))).status,
+    429,
+    "the IP stays blocked during its window",
+  );
+  assert.equal(
+    (await ask(valid, socket("203.0.113.21"))).status,
+    200,
+    "other IPs are unaffected",
+  );
+  const statuses: number[] = [];
+  for (let i = 0; i < 240; i++)
+    statuses.push((await ask(valid, socket("203.0.113.22"))).status);
+  assert.equal(
+    statuses.filter((s) => s === 200).length,
+    239,
+    "240 per grant and minute, counted after authentication",
+  );
+  assert.equal(statuses[239], 429);
+  const other = (await createToken(editor, "read")).body.token;
+  assert.equal(
+    (await ask(other, socket("203.0.113.22"))).status,
+    200,
+    "another grant has its own quota",
+  );
+});
+
+test("crear token: la membresía y el rol se revalidan dentro de la transacción", async () => {
+  const racer = await provision("EDITOR", "agent-racer");
+  const lock = await pool.connect();
+  try {
+    await lock.query("BEGIN");
+    await lock.query("SELECT id FROM organizations WHERE id=$1 FOR UPDATE", [
+      racer.organizationId,
+    ]);
+    const pending = createToken(racer, "write", "carrera");
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    await lock.query("UPDATE users SET role='LECTOR' WHERE id=$1", [racer.id]);
+    await lock.query(
+      "UPDATE organization_memberships SET role='LECTOR' WHERE user_id=$1",
+      [racer.id],
+    );
+    await lock.query("COMMIT");
+    const result = await pending;
+    assert.equal(result.status, 403, "demoted while waiting: no write token");
+  } finally {
+    lock.release();
+  }
+  const grants = await pool.query(
+    "SELECT count(*)::int AS n FROM agent_grants WHERE user_id=$1",
+    [racer.id],
+  );
+  assert.equal(grants.rows[0].n, 0);
+  assert.equal(
+    (await createToken(racer, "read")).status,
+    201,
+    "a read token is still allowed",
+  );
+});
+
+test("aislamiento: un agente no enlaza ni pisa clientes de otra organización", async () => {
+  const foreign = await request(
+    "PUT",
+    "/api/clients/client-foreign",
+    other.token,
+    { name: "Cliente ajeno", baseVersion: 0 },
+  );
+  assert.equal(foreign.status, 200);
+  const { token } = (await createToken(editor, "write")).body;
+  const project = (await asAgent("GET", "/api/projects/agent-p1", token)).body
+    .project;
+  const link = await asAgent(
+    "PUT",
+    "/api/projects/agent-p1/client-link",
+    token,
+    { clientId: "client-foreign", baseVersion: project.version },
+  );
+  assert.equal(link.status, 404);
+  const same = await asAgent("PUT", "/api/clients/client-foreign", token, {
+    name: "Mío",
+    baseVersion: 0,
+  });
+  assert.equal(same.status, 200, "same id, own organization: a separate row");
+  const theirs = await request("GET", "/api/clients", other.token);
+  assert.equal(
+    theirs.body.clients.find((c: any) => c.id === "client-foreign").name,
+    "Cliente ajeno",
+  );
+  const stale = await asAgent("PUT", "/api/clients/client-foreign", token, {
+    name: "Otra vez",
+    baseVersion: 0,
+  });
+  assert.equal(stale.status, 409, "CAS");
 });

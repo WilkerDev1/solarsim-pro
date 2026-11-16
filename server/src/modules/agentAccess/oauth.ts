@@ -1,7 +1,13 @@
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import {
+  createHash,
+  randomBytes,
+  randomUUID,
+  timingSafeEqual,
+} from "node:crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { Context, Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import {
   formatOAuthScope,
   OAUTH_SCOPES,
@@ -9,7 +15,13 @@ import {
   safeAgentLabel,
   type AgentScope,
 } from "../../../../shared/agentAccess.js";
+import {
+  resolveClientIp,
+  socketAddress,
+  type ClientIpConfig,
+} from "../../../../shared/clientIp.js";
 import { FixedWindowLimiter } from "../../../../shared/fixedWindowLimiter.js";
+import { isWriterRole } from "../../../../shared/permissions.js";
 import type { AgentAccessConfig } from "../../config.js";
 import type { AuthUser, Dependencies } from "../../dependencies.js";
 import { resolveMembership } from "../../membership.js";
@@ -31,6 +43,9 @@ import {
 const CODE_SECONDS = 120;
 const TICKET_SECONDS = 300;
 const MAX_REDIRECTS = 5;
+/** OAuth bodies are tiny (forms, registration metadata): 16 KiB is generous. */
+const MAX_OAUTH_BODY = 16 * 1024;
+const CSRF_COOKIE = "solarsim_oauth_csrf";
 const isLoopbackHost = (host: string) =>
   host === "127.0.0.1" || host === "localhost" || host === "[::1]";
 const escapeHtml = (value: unknown) =>
@@ -65,13 +80,15 @@ export function redirectMatches(
   registered: string[],
   candidate: string,
 ): boolean {
-  if (registered.includes(candidate)) return true;
   let url: URL;
   try {
     url = new URL(candidate);
   } catch {
     return false;
   }
+  // Never a fragment or credentials, whatever was registered.
+  if (url.hash || url.username || url.password) return false;
+  if (registered.includes(candidate)) return true;
   if (url.protocol !== "http:" || !isLoopbackHost(url.hostname)) return false;
   return registered.some((uri) => {
     const r = new URL(uri);
@@ -102,13 +119,33 @@ const pkceOk = (verifier: unknown, challenge: string) =>
   /^[A-Za-z0-9\-._~]{43,128}$/.test(verifier) &&
   createHash("sha256").update(verifier).digest("base64url") === challenge;
 
-function clientIp(c: Context): string {
-  // Behind Cloudflare + Caddy (docs/INFRASTRUCTURE_ARCHITECTURE.md); without them every caller shares one bucket.
-  return (
-    c.req.header("CF-Connecting-IP") ??
-    c.req.header("X-Forwarded-For")?.split(",")[0]?.trim() ??
-    "local"
-  );
+/** Same-length constant-time comparison of two strings. */
+function sameSecret(a: string, b: string): boolean {
+  const x = Buffer.from(a, "utf8"),
+    y = Buffer.from(b, "utf8");
+  return x.length === y.length && x.length > 0 && timingSafeEqual(x, y);
+}
+const readCookie = (c: Context, name: string) =>
+  (c.req.header("Cookie") ?? "")
+    .split(";")
+    .map((part) => part.trim().split("="))
+    .find(([key]) => key === name)?.[1];
+
+/** Only `application/x-www-form-urlencoded` and JSON; strings only (files and repeated fields are dropped). */
+async function readForm(c: Context): Promise<Record<string, string>> {
+  const type = (c.req.header("Content-Type") ?? "").toLowerCase();
+  let body: Record<string, unknown> = {};
+  try {
+    if (type.startsWith("application/json")) body = (await c.req.json()) ?? {};
+    else if (type.startsWith("application/x-www-form-urlencoded"))
+      body = await c.req.parseBody({ all: true });
+  } catch {
+    body = {};
+  }
+  if (!body || typeof body !== "object" || Array.isArray(body)) return {};
+  return Object.fromEntries(
+    Object.entries(body).filter(([, v]) => typeof v === "string"),
+  ) as Record<string, string>;
 }
 
 interface AuthorizeParams {
@@ -124,8 +161,34 @@ export function registerOAuthRoutes(
   app: Hono,
   { pool, jwtSecret }: Dependencies,
   config: AgentAccessConfig,
+  clientIpConfig: ClientIpConfig = { trustedProxies: [] },
 ): void {
   if (!config.enabled || !config.oauth || !config.mcpUrl) return;
+  const clientIp = (c: Context) =>
+    resolveClientIp(
+      socketAddress(c.env),
+      (name) => c.req.header(name),
+      clientIpConfig,
+    );
+  for (const path of ["/oauth/*", "/.well-known/oauth-authorization-server"])
+    app.use(path, async (c, next) => {
+      await next();
+      c.header("X-Content-Type-Options", "nosniff");
+    });
+  app.use(
+    "/oauth/*",
+    bodyLimit({
+      maxSize: MAX_OAUTH_BODY,
+      onError: (c) =>
+        c.json(
+          {
+            error: "invalid_request",
+            error_description: "Cuerpo demasiado grande",
+          },
+          413,
+        ),
+    }),
+  );
   const issuer = config.oauth.issuer;
   const resource = config.mcpUrl;
   const ticketKey = createHash("sha256")
@@ -155,7 +218,9 @@ export function registerOAuthRoutes(
   );
 
   app.post("/oauth/register", async (c) => {
-    if (!registrations.take(clientIp(c)))
+    const ip = clientIp(c);
+    if (!registrations.take(ip)) {
+      c.header("Retry-After", String(registrations.retryAfter(ip)));
       return c.json(
         {
           error: "invalid_client_metadata",
@@ -163,6 +228,7 @@ export function registerOAuthRoutes(
         },
         429,
       );
+    }
     let body: Record<string, any>;
     try {
       body = await c.req.json();
@@ -274,6 +340,16 @@ export function registerOAuthRoutes(
     };
   }
 
+  /** New anti-CSRF token bound to this browser (cookie scoped to the authorization endpoint). */
+  const issueCsrf = (c: Context) => {
+    const token = randomBytes(32).toString("base64url");
+    c.header(
+      "Set-Cookie",
+      `${CSRF_COOKIE}=${token}; Path=/oauth/authorize; HttpOnly; Secure; SameSite=Lax; Max-Age=1800`,
+    );
+    return token;
+  };
+
   const securityHeaders = (c: Context, redirectUri?: string) => {
     let target = "";
     try {
@@ -286,6 +362,7 @@ export function registerOAuthRoutes(
       `default-src 'none'; style-src 'unsafe-inline'; form-action 'self'${target}; frame-ancestors 'none'; base-uri 'none'`,
     );
     c.header("X-Frame-Options", "DENY");
+    c.header("X-Content-Type-Options", "nosniff");
     c.header("Referrer-Policy", "no-referrer");
     c.header("Cache-Control", "no-store");
   };
@@ -298,10 +375,14 @@ export function registerOAuthRoutes(
   function consentForm(
     p: AuthorizeParams,
     options: {
+      /** Anti-CSRF token, also set in the browser's cookie. */
+      csrf: string;
       error?: string;
       organizations?: { id: string; name: string }[];
       ticket?: string;
       email?: string;
+      /** Scope chosen in a previous step (kept across the organization picker). */
+      scope?: AgentScope;
     },
   ) {
     const host = new URL(p.redirectUri).host;
@@ -316,6 +397,7 @@ export function registerOAuthRoutes(
       scope: formatOAuthScope(p.requested),
       resource,
       ticket: options.ticket,
+      csrf: options.csrf,
     })
       .filter(([, v]) => v !== undefined)
       .map(
@@ -332,16 +414,17 @@ export function registerOAuthRoutes(
           .join("")}</select>`
       : `<label for="email">Correo de SolarSim</label><input id="email" type="email" name="email" autocomplete="username" required value="${escapeHtml(options.email ?? "")}">
 <label for="password">Contraseña</label><input id="password" type="password" name="password" autocomplete="current-password" required>`;
+    const wantsWrite = p.requested === "write" && options.scope === "write";
     const write =
       p.requested === "write"
-        ? `<label><input type="radio" name="grant_scope" value="write"> Consultar y editar clientes y enlaces de propuestas (según tu rol)</label>`
+        ? `<label><input type="radio" name="grant_scope" value="write"${wantsWrite ? " checked" : ""}> Consultar y editar clientes y enlaces de propuestas (según tu rol)</label>`
         : "";
     return page(`<h1>Conectar «${escapeHtml(p.clientName)}» con SolarSim Pro</h1>
 <p>La aplicación volverá a <strong>${escapeHtml(host)}</strong> al terminar.</p>
 ${loopback ? `<p class="warn">La dirección de retorno es de este equipo (loopback). Autoriza solo si acabas de iniciar la conexión desde un programa tuyo.</p>` : ""}
 ${options.error ? `<p class="err" role="alert">${escapeHtml(options.error)}</p>` : ""}
 <form method="post" action="/oauth/authorize">${hidden}
-<div class="scope"><p>Acceso que concedes:</p><label><input type="radio" name="grant_scope" value="read" checked> Solo consultar propuestas, clientes, catálogo y tarifas</label>${write}</div>
+<div class="scope"><p>Acceso que concedes:</p><label><input type="radio" name="grant_scope" value="read"${wantsWrite ? "" : " checked"}> Solo consultar propuestas, clientes, catálogo y tarifas</label>${write}</div>
 ${credentials}
 <p>Las acciones que requieren confirmación en SolarSim (precios, estados, papelera, borrados) no están disponibles por esta vía. Puedes revocar el acceso en Ajustes → Agentes e IA.</p>
 <div class="row"><button class="primary" type="submit" name="decision" value="allow">Autorizar</button><button type="submit" name="decision" value="deny" formnovalidate>Cancelar</button></div>
@@ -360,7 +443,7 @@ ${credentials}
         ),
         400,
       );
-    return c.html(consentForm(checked.value, {}));
+    return c.html(consentForm(checked.value, { csrf: issueCsrf(c) }));
   });
 
   /** Active organizations the account can enter, primary first. */
@@ -387,10 +470,7 @@ ${credentials}
   }
 
   app.post("/oauth/authorize", async (c) => {
-    const form = (await c.req.parseBody()) as Record<
-      string,
-      string | undefined
-    >;
+    const form: Record<string, string | undefined> = await readForm(c);
     const checked = await readAuthorize(form);
     if (!checked.ok && "redirect" in checked)
       return c.redirect(checked.redirect, 302);
@@ -403,6 +483,19 @@ ${credentials}
         400,
       );
     const p = checked.value;
+    // Login CSRF: the form must come from a page this browser loaded (cookie + hidden field), before anything
+    // else, so nobody can make a victim connect an assistant to someone else's account.
+    const cookie = readCookie(c, CSRF_COOKIE);
+    if (!cookie || !sameSecret(cookie, form.csrf ?? ""))
+      return c.html(
+        consentForm(p, {
+          csrf: issueCsrf(c),
+          error:
+            "El formulario caducó o no se abrió en este navegador. Revisa los datos y vuelve a autorizar.",
+        }),
+        403,
+      );
+    const csrf = cookie;
     const back = (error: string, code: string) => {
       const url = new URL(p.redirectUri);
       url.searchParams.set("error", code);
@@ -425,6 +518,7 @@ ${credentials}
       } catch {
         return c.html(
           consentForm(p, {
+            csrf,
             error: "La sesión de autorización caducó; vuelve a iniciar sesión.",
           }),
           400,
@@ -433,10 +527,20 @@ ${credentials}
     } else {
       const email = (form.email ?? "").trim().toLowerCase();
       const password = form.password ?? "";
-      if (!signInsByIp.take(clientIp(c)) || !signInsByEmail.take(email)) {
-        c.header("Retry-After", "600");
+      const ip = clientIp(c);
+      const limited = !signInsByIp.take(ip)
+        ? { limiter: signInsByIp, key: ip }
+        : !signInsByEmail.take(email)
+          ? { limiter: signInsByEmail, key: email }
+          : null;
+      if (limited) {
+        c.header(
+          "Retry-After",
+          String(limited.limiter.retryAfter(limited.key)),
+        );
         return c.html(
           consentForm(p, {
+            csrf,
             error: "Demasiados intentos. Espera unos minutos.",
             email,
           }),
@@ -458,7 +562,7 @@ ${credentials}
       );
       if (!row || !valid || !row.is_active)
         return c.html(
-          consentForm(p, { error: "Credenciales inválidas.", email }),
+          consentForm(p, { csrf, error: "Credenciales inválidas.", email }),
           401,
         );
       signInsByEmail.reset(email);
@@ -469,6 +573,7 @@ ${credentials}
     if (!organizations.length)
       return c.html(
         consentForm(p, {
+          csrf,
           error: "No tienes acceso activo a una organización.",
         }),
         403,
@@ -483,14 +588,21 @@ ${credentials}
         audience: `solarsim-oauth:${p.clientId}`,
         expiresIn: TICKET_SECONDS,
       });
-      return c.html(consentForm(p, { organizations, ticket }));
+      return c.html(
+        consentForm(p, {
+          csrf,
+          organizations,
+          ticket,
+          scope: form.grant_scope === "write" ? "write" : "read",
+        }),
+      );
     }
     const user = chosen.user;
     // The account's role caps the grant: a LECTOR can never authorize writes.
     const scope: AgentScope =
       form.grant_scope === "write" &&
       p.requested === "write" &&
-      user.role !== "LECTOR"
+      isWriterRole(user.role)
         ? "write"
         : "read";
     const code = randomBytes(32).toString("base64url");
@@ -540,19 +652,6 @@ ${credentials}
     c.header("Cache-Control", "no-store");
     return c.json({ error, error_description: description }, status);
   };
-  async function readForm(c: Context): Promise<Record<string, string>> {
-    const type = c.req.header("Content-Type") ?? "";
-    if (type.includes("application/json")) {
-      const body = await c.req.json().catch(() => ({}));
-      return Object.fromEntries(
-        Object.entries(body ?? {}).filter(([, v]) => typeof v === "string"),
-      ) as Record<string, string>;
-    }
-    const body = await c.req.parseBody();
-    return Object.fromEntries(
-      Object.entries(body).filter(([, v]) => typeof v === "string"),
-    ) as Record<string, string>;
-  }
 
   app.post("/oauth/token", async (c) => {
     const form = await readForm(c);

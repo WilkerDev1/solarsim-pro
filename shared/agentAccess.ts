@@ -15,6 +15,9 @@ export const OAUTH_SCOPES: Record<AgentScope, string> = { read: 'solarsim:read',
 
 export const AGENT_TOKEN_PREFIX = 'ssm_';
 export const AGENT_TOKEN_PREFIXES = { pat: 'ssm_pat_', access: 'ssm_at_', refresh: 'ssm_rt_' } as const;
+/** Forma exacta de un token que se presenta como bearer (personal o de acceso OAuth): prefijo + 32 bytes base64url. */
+const BEARER_TOKEN = /^ssm_(pat|at)_[A-Za-z0-9_-]{43}$/;
+export const isAgentBearerToken = (value: unknown): value is string => typeof value === 'string' && BEARER_TOKEN.test(value);
 
 /** Herramienta MCP que originó la petición, para el registro de actividad (la ruta real se registra siempre). */
 export const AGENT_TOOL_HEADER = 'X-SolarSim-Agent-Tool';

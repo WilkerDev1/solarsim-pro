@@ -564,7 +564,9 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
         [c.req.param("id"), user.organizationId],
       )
     ).rows[0];
-    if (!row) return c.json({ error: "Proyecto no encontrado" }, 404);
+    // Agents see what the search lists: the trash is out of their reach. Desktop sessions still get it.
+    if (!row || (user.agent && row.is_deleted))
+      return c.json({ error: "Proyecto no encontrado" }, 404);
     return c.json({ success: true, project: canonicalProject(row) });
   });
   /**

@@ -1,4 +1,9 @@
 import {
+  parseClientIpHeader,
+  parseTrustedProxies,
+  type ClientIpConfig,
+} from "../../shared/clientIp.js";
+import {
   DEFAULT_MIN_CLIENT_VERSION,
   isStableSemver,
 } from "../../shared/clientVersion.js";
@@ -64,6 +69,8 @@ export interface ServerConfig {
   jwtSecret: string;
   minClientVersion: string;
   agentAccess: AgentAccessConfig;
+  /** Client IP for rate limits: socket only unless TRUSTED_PROXIES and CLIENT_IP_HEADER are set. */
+  clientIp: ClientIpConfig;
   port: number;
   database: {
     host: string;
@@ -104,6 +111,10 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     jwtSecret: env.JWT_SECRET,
     minClientVersion: parseMinClientVersion(env.MIN_CLIENT_VERSION),
     agentAccess: parseAgentAccessConfig(env),
+    clientIp: {
+      trustedProxies: parseTrustedProxies(env.TRUSTED_PROXIES),
+      header: parseClientIpHeader(env.CLIENT_IP_HEADER),
+    },
     port,
     database: {
       host: env.DB_HOST ?? "solarsim-db",

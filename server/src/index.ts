@@ -13,6 +13,7 @@ try {
       jwtSecret: config.jwtSecret,
       minClientVersion: config.minClientVersion,
       agentAccess: config.agentAccess,
+      clientIp: config.clientIp,
     }).fetch,
     port: config.port,
     hostname: "0.0.0.0",

@@ -1,8 +1,12 @@
 /**
  * Limitador de tasa en memoria por ventana fija. TypeScript puro, reloj inyectable. Vive en un solo proceso:
  * con varias réplicas, el límite efectivo se multiplica (ver docs/MCP_REMOTE.md).
+ *
+ * Con el mapa lleno se desaloja la clave más antigua: llenarlo con claves inventadas nunca bloquea a los demás
+ * (como mucho, devuelve su cupo a la clave desalojada).
  */
 export class FixedWindowLimiter {
+  /** Orden de inserción = orden de inicio de ventana (una ventana nueva se reinserta al final). */
   private readonly hits = new Map<string, { count: number; resetAt: number }>();
 
   constructor(
@@ -12,24 +16,32 @@ export class FixedWindowLimiter {
     private readonly now: () => number = Date.now,
   ) {}
 
+  private current(key: string) {
+    const entry = this.hits.get(key);
+    return entry && entry.resetAt > this.now() ? entry : undefined;
+  }
+
   /** Cuenta un intento; `false` si la clave superó el límite en la ventana actual. */
   take(key: string): boolean {
-    const now = this.now();
-    let entry = this.hits.get(key);
-    if (!entry || entry.resetAt <= now) {
-      if (!entry && this.hits.size >= this.maxKeys) this.sweep(now);
-      // Still full after sweeping: fail closed rather than grow without bound.
-      if (!entry && this.hits.size >= this.maxKeys) return false;
-      entry = { count: 0, resetAt: now + this.windowMs };
+    let entry = this.current(key);
+    if (!entry) {
+      this.hits.delete(key);
+      while (this.hits.size >= this.maxKeys) this.hits.delete(this.hits.keys().next().value as string);
+      entry = { count: 0, resetAt: this.now() + this.windowMs };
       this.hits.set(key, entry);
     }
     entry.count += 1;
     return entry.count <= this.limit;
   }
 
+  /** ¿Ya superó el límite? Sin contar un intento (para limitar solo los fallos). */
+  exceeded(key: string): boolean {
+    return (this.current(key)?.count ?? 0) >= this.limit;
+  }
+
   /** Segundos hasta que la clave vuelva a tener cupo (para `Retry-After`). */
   retryAfter(key: string): number {
-    const entry = this.hits.get(key);
+    const entry = this.current(key);
     return entry ? Math.max(1, Math.ceil((entry.resetAt - this.now()) / 1000)) : 1;
   }
 
@@ -37,7 +49,7 @@ export class FixedWindowLimiter {
     this.hits.delete(key);
   }
 
-  private sweep(now: number) {
-    for (const [key, entry] of this.hits) if (entry.resetAt <= now) this.hits.delete(key);
+  get size(): number {
+    return this.hits.size;
   }
 }
