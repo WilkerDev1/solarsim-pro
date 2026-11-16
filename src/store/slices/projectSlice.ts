@@ -52,8 +52,8 @@ function newProjectSpecs(defs: SimulationStore['defaultSimulationSettings'] | un
 
 /** Precio de referencia, procedencia y fila de facturación con que nace una propuesta nueva. */
 function newProposalReferenceRates(activeMatrix: Parameters<typeof getReferenceEnergyRateUSD>[0] | undefined, distributor: string, tariffCode: string, monthlyConsumption: readonly number[], dopPerUSD: number) {
-  // Matriz aún sin cargar: la de fábrica, la misma que usa el dock como respaldo (`referenceRate`).
-  const matrix = activeMatrix || DEFAULT_RD_TARIFF_MATRIX;
+  // Matriz aún sin cargar o sin pliegos (`{}` o `schedules` vacío): la de fábrica, la misma que usa el dock como respaldo.
+  const matrix = activeMatrix?.schedules && Object.keys(activeMatrix.schedules).length > 0 ? activeMatrix : DEFAULT_RD_TARIFF_MATRIX;
   const billingTariff = referenceBillingTariff(matrix, distributor, tariffCode);
   if (!billingTariff) return {};
   const average = monthlyConsumption.length ? monthlyConsumption.reduce((a, b) => a + b, 0) / monthlyConsumption.length : 0;

@@ -58,9 +58,10 @@ const finiteNonNegative = (value: unknown): value is number => typeof value === 
 const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 
 /**
- * Tramos con límites impresos inclusivos, como en las resoluciones y en `averageBlockEnergyRateDOP`: el primero desde 0,
- * cada uno empieza en el final del anterior + 1 (0–200, 201–300…) y el último es abierto. Un tramo cubre
- * (fin del anterior, su fin]: 100.5 kWh ya cae en el rango «101–…» (`fixedChargeDOP`). Un precio de energía 0 no es una
+ * Tramos contiguos desde 0 con el último abierto, con la misma convención que `averageBlockEnergyRateDOP`: cada uno empieza
+ * en el final del anterior + 1 (límites impresos, 0–200, 201–300…) o en el mismo final (límites compartidos, 0–200,
+ * 200–300…, que acepta el escáner de resoluciones). En ambos, un tramo cubre (fin del anterior, su fin]: 100.5 kWh ya cae
+ * en el rango siguiente (`fixedChargeDOP`). Un precio de energía 0 no es una
  * tarifa sino un dato que falta (`requirePositive`); un cargo fijo 0 sí es válido.
  */
 function validRanges(ranges: unknown, priceKey: 'rateDOP' | 'chargeDOP', requirePositive: boolean): boolean {
@@ -72,7 +73,8 @@ function validRanges(ranges: unknown, priceKey: 'rateDOP' | 'chargeDOP', require
     if (requirePositive && !((range[priceKey] as number) > 0)) return false;
     const last = i === ranges.length - 1;
     if (last ? range.toKWh !== null : !finiteNonNegative(range.toKWh)) return false;
-    if (range.fromKWh !== previousTo + 1 && !(i === 0 && range.fromKWh === 0)) return false;
+    const contiguous = i === 0 ? range.fromKWh === 0 : range.fromKWh === previousTo + 1 || range.fromKWh === previousTo;
+    if (!contiguous) return false;
     if (!last && (range.toKWh as number) <= range.fromKWh) return false;
     previousTo = last ? Infinity : (range.toKWh as number);
   }
