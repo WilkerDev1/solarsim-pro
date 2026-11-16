@@ -22,7 +22,7 @@ Clic derecho o gesto de dos dedos abre el menú contextual; Shift+F10 ofrece el 
 
 ## Resultados
 
-Inicio filtra los cuatro estados y muestra resultados por responsable dentro de la búsqueda/carpeta/tipo/miembro seleccionados. El resumen por responsable excluye pruebas y papelera. La tasa es aprobadas / (aprobadas + rechazadas); las pendientes no se incluyen en el denominador. El monto es la suma del precio cotizado actual en USD de propuestas aprobadas. Es un indicador de cartera, no una contabilidad de ingresos cobrados ni un histórico de comisiones. Variantes creadas como documentos independientes se cuentan como propuestas independientes. Sin responsable explícito se usa el autor histórico; una asignación vacía explícita se agrupa como Sin responsable.
+Inicio filtra los cuatro estados desde un selector de la barra superior (con contador por opción), resume los conteos en una línea secundaria y muestra resultados por responsable bajo demanda, dentro de la búsqueda/carpeta/tipo/miembro seleccionados. Los conteos no aplican el propio filtro de decisión. El resumen por responsable excluye pruebas y papelera. La tasa es aprobadas / (aprobadas + rechazadas); las pendientes no se incluyen en el denominador. El monto es la suma del precio cotizado actual en USD de propuestas aprobadas. Es un indicador de cartera, no una contabilidad de ingresos cobrados ni un histórico de comisiones. Variantes creadas como documentos independientes se cuentan como propuestas independientes. Sin responsable explícito se usa el autor histórico; una asignación vacía explícita se agrupa como Sin responsable.
 
 ## API y compatibilidad
 

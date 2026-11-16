@@ -351,7 +351,7 @@ El selector rápido compartido entre tarjeta y lista cambia sólo la decisión; 
 
 **The Decisión independiente Rule.** Estado comercial, estado documental y sincronización se muestran por separado. Guardar un reporte confirma el equipo local y anuncia envío posterior al sincronizar; no presenta esa operación como confirmación del servidor. Las cifras aprobadas describen cotizaciones actuales y conservan esa aclaración junto a los resultados.
 
-Inicio ofrece filtros con estado presionado, etiqueta y contador. Resultados por responsable se abre mediante un detalle desplegable y usa tabla compacta de números tabulares con scroll horizontal. Su texto aclara el ámbito de búsqueda/carpeta, la exclusión de pruebas y papelera y el denominador de aprobación. Las propuestas de prueba conservan contador/filtro, pero no entran en la comparación comercial.
+Inicio filtra la decisión comercial con un selector compacto en la barra superior, junto al buscador y con el mismo borde, altura y fondo; cada opción muestra su contador y el estado activo usa el verde de selección. Bajo la barra, una línea secundaria de (11px) resume en espera, aprobadas, rechazadas y de prueba; «Por responsable» abre bajo demanda un panel flotante (Escape o clic fuera lo cierran y el foco vuelve al botón) con tabla compacta de números tabulares y scroll horizontal. El popover «Filtros» ya no repite el estado. Su texto aclara el ámbito de búsqueda/carpeta, la exclusión de pruebas y papelera y el denominador de aprobación. Las propuestas de prueba conservan contador/filtro, pero no entran en la comparación comercial.
 
 ### Historial local y límites de evidencia
 
