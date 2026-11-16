@@ -53,7 +53,7 @@ export interface EnergyBlock {
  * Tarifas en las que, según la Resolución SIE-121-2026-TF (art. 4.d), con un consumo del mes de 701 kWh
  * o mayor todos los kWh se facturan al precio del cuarto rango (no escalonado).
  */
-const ALL_UNITS_AT_LAST_BLOCK = new Set<string>([]);
+const ALL_UNITS_AT_LAST_BLOCK = new Set(['BTS1', 'BTS2']);
 
 /**
  * Precio medio de energía (RD$/kWh) de un consumo mensual con tarifa por bloques. Los tramos se aplican

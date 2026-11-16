@@ -217,9 +217,9 @@ assert.equal(zeroNote.split('\n\n')[3], 'Al operar con limitador antivertido (in
 const REFERENCE_RATES = {
   edesurBts1_150: 0.101,
   edesurBts1_250: 0.109,
-  edesurBts1_1000: 0.186,
-  edenorteBts1_1000: 0.196,
-  edeesteBts2_900: 0.203,
+  edesurBts1_1000: 0.218, // 1c: desde 701 kWh, todo a 13.09 (art. 4.d)
+  edenorteBts1_1000: 0.234, // 1c: todo a 14.04
+  edeesteBts2_900: 0.227, // 1c: BTS-2 también, todo a 13.59
   edesurBtd: 0.15,
   cepmRbt1: 0.382,
   cepmRbt2: 0.233,
