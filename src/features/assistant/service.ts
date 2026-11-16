@@ -4,7 +4,7 @@ import {
   type GeminiTransport,
 } from '../../../shared/geminiTransport';
 import { toGeminiFunctionDeclarations } from '../../../shared/agentTools/jsonSchema';
-import { assistantSystemPrompt } from '../../../shared/agentTools/rules';
+import { ASSISTANT_SYSTEM_PROMPT, assistantTurnContext } from '../../../shared/agentTools/rules';
 import { listAgentTools } from '../agentTools/registry';
 import { chatFileParts, type ChatFile } from './chatFiles';
 import type {
@@ -49,6 +49,13 @@ export async function runAssistant(
     );
   }
 }
+/**
+ * Inicio de la ventana de historial: al menos los últimos 12 mensajes, pero el inicio avanza de 6 en 6 para que
+ * turnos seguidos compartan el mismo prefijo (caché implícita); como mucho 17 mensajes.
+ */
+export function historyWindowStart(length: number): number {
+  return length <= 12 ? 0 : Math.floor((length - 12) / 6) * 6;
+}
 /** Tool calls executed per round; extra calls in the same turn are answered with an error so the model can re-ask. */
 const MAX_CALLS_PER_ROUND = 4;
 const functionResponse = (call: any, response: Record<string, unknown>) => ({
@@ -62,15 +69,20 @@ async function runAssistantLoop(
   const cards: AssistantCard[] = [];
   const agentCards: NonNullable<AssistantMessage['agentCards']> = [];
   const actions: AssistantAction[] = [];
+  // Prefijo cacheable: instrucción y herramientas fijas, luego el historial; el contexto variable cierra el turno.
   const contents: any[] = options.history
-    .slice(-12)
+    .slice(historyWindowStart(options.history.length))
     .map((m) => ({
       role: m.role === 'user' ? 'user' : 'model',
       parts: [{ text: m.text.slice(0, 6000) }],
     }));
   contents.push({
     role: 'user',
-    parts: [{ text: options.prompt.slice(0, 12000) }, ...chatFileParts(options.files || [])],
+    parts: [
+      { text: options.prompt.slice(0, 12000) },
+      ...chatFileParts(options.files || []),
+      { text: assistantTurnContext(options.activeProjectId, options.activeView) },
+    ],
   });
   const tools = [
     { functionDeclarations: toGeminiFunctionDeclarations(listAgentTools('app-assistant')) },
@@ -80,7 +92,7 @@ async function runAssistantLoop(
       systemInstruction: {
         parts: [
           {
-            text: assistantSystemPrompt(options.activeProjectId, options.activeView),
+            text: ASSISTANT_SYSTEM_PROMPT,
           },
         ],
       },

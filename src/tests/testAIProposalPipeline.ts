@@ -1,6 +1,6 @@
 import {batteryBank,readEquipment} from '../../shared/equipment';
 import assert from 'node:assert/strict';
-import { normalizeProposalDraft, buildProposalRequest, robustParseJson } from '../../shared/aiProposal';
+import { normalizeProposalDraft, buildProposalRequest, robustParseJson, draftForPrompt } from '../../shared/aiProposal';
 import { requestGeminiJson, GeminiRequestError, geminiResponseText, type GeminiTransport } from '../../shared/geminiTransport';
 import { processExtractedInvoice } from '../utils/aiProposalNormalization';
 import { parseProposalWithAI } from '../services/geminiInvoiceService';
@@ -74,14 +74,15 @@ assert.throws(()=>geminiResponseText({candidates:[{finishReason:'MAX_TOKENS',con
 assert.equal(geminiResponseText({candidates:[{finishReason:'STOP',content:{parts:[{text:'thinking',thought:true},{text:'{'},{text:'}'}]}}]}),'{}');
 const request=buildProposalRequest({projectRequirementsText:'Cliente prueba',equipmentCatalog:catalog,apiKey:'must-not-appear',files:[{fileBase64:'YQ==',mimeType:'image/png',fileName:'factura.png'}],context});
 assert(!JSON.stringify(request).includes('must-not-appear'));
-assert.equal(request.contents[0].parts.length,3);
+assert.equal(request.contents[0].parts.length,5,'catálogo, proyecto, adjunto (rótulo y datos) y la ronda');
 const currentDraftContext={...context,currentDraft:normalized};
 const longConversation=['A'.repeat(12000),'Nueva instrucción: '+ 'B'.repeat(11920)+' ULTIMA_CORRECCION_NO_BATERIAS'].join('\n\nCorrección del usuario:\n').slice(-24000);
 const longRequest=buildProposalRequest({projectRequirementsText:longConversation,equipmentCatalog:catalog,context:currentDraftContext});
-const sentConversation=JSON.parse(longRequest.contents[0].parts[0].text);
+const sentConversation=JSON.parse(longRequest.contents[0].parts.at(-1)!.text!);
 assert(sentConversation.requirements.endsWith('ULTIMA_CORRECCION_NO_BATERIAS'),'text budget prioritizes the latest user correction, never the oldest history');
 assert.equal(sentConversation.requirements.length,16000);
-assert.deepEqual(sentConversation.context.currentDraft,JSON.parse(JSON.stringify(normalized)),'budget only truncates textual history, preserving the full current draft');
+assert.deepEqual(sentConversation.currentDraft,JSON.parse(JSON.stringify(draftForPrompt(normalized))),'budget only truncates textual history, preserving every schema key of the current draft');
+assert.equal(sentConversation.currentDraft.panels.length,normalized.panels!.length);
 
 assert.throws(()=>buildProposalRequest({projectRequirementsText:'Texto',files:[{fileBase64:'YQ==',mimeType:'application/x-msdownload',fileName:'bad.exe'}]}),/Formato/);
 let calls=0;
