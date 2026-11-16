@@ -7,6 +7,7 @@ import { confirmAction } from '../../common/confirmAction';
 import { DEFAULT_GRID_EXPORT_FEE_PCT } from '../../../../shared/assumptions';
 import { canAdminister } from '../../../../shared/permissions';
 import { DEFAULT_RD_TARIFF_MATRIX } from '../../../data/rdTariffs';
+import { UNVERIFIED_ESTIMATE_LABEL, factoryChargeRows } from '../../simulator/params/sections/rates/tariffPresentation';
 import { factoryTariffUpdateNotice } from '../../../data/factoryTariffMatrixVersions';
 
 interface TariffPreferencesPanelProps {
@@ -127,7 +128,7 @@ export const TariffPreferencesPanel: React.FC<TariffPreferencesPanelProps> = ({ 
                 />
               </label>
               <label className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200/60 dark:border-[#27272a] hover:bg-slate-50 dark:hover:bg-[#222226] cursor-pointer">
-                <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Retención Oficial 25% Excedentes (SIE-007)</span>
+                <span className="text-xs font-semibold text-slate-700 dark:text-zinc-300">Retención 25% Excedentes (régimen anterior)</span>
                 <input
                   type="checkbox"
                   checked={defs.defaultApplySieRetention}
@@ -135,6 +136,16 @@ export const TariffPreferencesPanel: React.FC<TariffPreferencesPanelProps> = ({ 
                   className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
                 />
               </label>
+              {/* Régimen vigente de las propuestas nuevas: cargo por uso de la red de fábrica (no es un ajuste editable aquí). */}
+              <div data-grid-use-charge-defaults className="rounded-xl border border-amber-200/70 bg-amber-50/60 p-2.5 text-[11px] leading-snug text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+                <p className="m-0 font-semibold">Las propuestas nuevas nacen en el régimen SIE-007-2026: se acredita todo lo inyectado y se cobra un cargo por uso de la red en RD$/kWh inyectado (solo tarifas de un solo precio). La retención de arriba solo aplica al régimen anterior.</p>
+                <ul className="m-0 mt-1 list-none p-0">
+                  {factoryChargeRows().map((row) => (
+                    <li key={row.distributor}>{row.distributor}: RD${row.dopPerKWh.toFixed(2)}/kWh ({row.resolutionCode}, {row.period})</li>
+                  ))}
+                </ul>
+                <p className="m-0 mt-1">{UNVERIFIED_ESTIMATE_LABEL}. Se edita en cada propuesta (Tarifas y distribuidora).</p>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -345,7 +356,7 @@ export const TariffPreferencesPanel: React.FC<TariffPreferencesPanelProps> = ({ 
                     <th className="p-3">
                       {tariffCurrencyMode === 'USD' ? 'Demanda ($ USD/kW-mes)' : 'Demanda (RD$/kW-mes)'}
                     </th>
-                    <th className="p-3">Retención %</th>
+                    <th className="p-3" title="Solo aplica a propuestas del régimen anterior (retención %)">Retención % (anterior)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-[#222226] text-slate-700 dark:text-zinc-300">

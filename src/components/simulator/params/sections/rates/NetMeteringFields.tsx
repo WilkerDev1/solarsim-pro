@@ -61,37 +61,41 @@ export const NetMeteringFields: React.FC<NetMeteringFieldsProps> = ({ rates, ass
       )}
       {regime === 'sie007_2026' ? (
         <>
-          <ParamRow label="Cargo uso de red" htmlFor="pd-rates-grid-charge">
-            <Field
-              id="pd-rates-grid-charge"
-              type="number"
-              step="0.01"
-              prefix="RD$"
-              suffix="/kWh"
-              mono
-              min={0}
-              max={MAX_GRID_USE_CHARGE_DOP_PER_KWH}
-              disabled={!applies}
-              value={applies ? charge : 0}
-              onChange={(value) => {
-                // Vacío o a medio escribir («», «.»): no se guarda nada; al salir del campo se ve el valor guardado.
-                const charge = parseGridUseChargeInput(value);
-                if (charge !== undefined) updateRates({ gridUseChargeDOPPerKWh: charge });
-              }}
-              right={applies ? (
-                <FieldMenu
-                  ariaLabel={isFactory ? 'Opciones del cargo: valor de fábrica aplicado' : `Opciones del cargo: difiere del de fábrica (RD$${factory.dopPerKWh.toFixed(2)}/kWh)`}
-                  attention={!isFactory}
-                  items={[{
-                    label: isFactory ? 'Valor de fábrica aplicado' : 'Aplicar valor de fábrica',
-                    hint: `RD$${factory.dopPerKWh.toFixed(2)}`,
-                    checked: isFactory,
-                    onSelect: () => updateRates({ gridUseChargeDOPPerKWh: factory.dopPerKWh }),
-                  }]}
-                />
-              ) : <InfoTip text={chargeTip} />}
-            />
-          </ParamRow>
+          {applies ? (
+            <ParamRow label="Cargo uso de red" htmlFor="pd-rates-grid-charge">
+              <Field
+                id="pd-rates-grid-charge"
+                type="number"
+                step="0.01"
+                prefix="RD$"
+                suffix="/kWh"
+                mono
+                min={0}
+                max={MAX_GRID_USE_CHARGE_DOP_PER_KWH}
+                value={charge}
+                onChange={(value) => {
+                  // Vacío o a medio escribir («», «.»): no se guarda nada; al salir del campo se ve el valor guardado.
+                  const parsed = parseGridUseChargeInput(value);
+                  if (parsed !== undefined) updateRates({ gridUseChargeDOPPerKWh: parsed });
+                }}
+                right={(
+                  <FieldMenu
+                    ariaLabel={isFactory ? 'Opciones del cargo: valor de fábrica aplicado' : `Opciones del cargo: difiere del de fábrica (RD$${factory.dopPerKWh.toFixed(2)}/kWh)`}
+                    attention={!isFactory}
+                    items={[{
+                      label: isFactory ? 'Valor de fábrica aplicado' : 'Aplicar valor de fábrica',
+                      hint: `RD$${factory.dopPerKWh.toFixed(2)}`,
+                      checked: isFactory,
+                      onSelect: () => updateRates({ gridUseChargeDOPPerKWh: factory.dopPerKWh }),
+                    }]}
+                  />
+                )}
+              />
+            </ParamRow>
+          ) : (
+            // Inyección cero o tarifa con potencia: no hay cargo, así que no se muestra un campo (ni un 0 editable).
+            <p role="note" data-grid-use-charge="not-applicable" className="m-0 text-xs text-pd-muted">{chargeTip}</p>
+          )}
           {applies && !chargeRoundsToZero(charge) && (
             <p role="note" className="m-0 flex items-start gap-1.5 rounded bg-pd-warn-bg px-2 py-1.5 text-[11px] font-medium leading-snug text-pd-warn-text">
               <span>{GRID_USE_CHARGE_ESTIMATE_NOTICE} {factory.resolutionCode}, {factory.period}.</span>
