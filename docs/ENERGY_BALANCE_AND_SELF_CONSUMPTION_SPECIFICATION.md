@@ -4,7 +4,7 @@ Alcance: este documento describe el **modelo físico opcional** (`calculationMod
 
 ## 1. Motivación
 
-Con medición neta en el régimen anterior (`legacy_retention`), la retención configurada (`gridExportFeePct`, 25% por defecto; un 0 explícito se respeta) se aplica solo a la energía exportada: un kWh autoconsumido vale el 100% de la tarifa; uno exportado se acredita al 75%. En el régimen SIE-007-2026 (`sie007_2026`, el de las propuestas nuevas) lo exportado se acredita al 100% y se descuenta un cargo en RD$ por kWh inyectado, solo en tarifas de un solo precio ([especificación financiera](FINANCIAL_ENGINE_SPECIFICATION.md)). Por eso el modelo físico separa la energía consumida en sitio (directa o vía batería) de la que sale a la red.
+Con medición neta en el régimen anterior (`legacy_retention`), la retención configurada (`gridExportFeePct`, 25% por defecto; un 0 explícito se respeta) se aplica solo a la energía exportada: un kWh autoconsumido vale el 100% de la tarifa; uno exportado se acredita al 75%. En el régimen SIE-007-2026 (`sie007_2026`, el de las propuestas nuevas) lo exportado se acredita al 100% y se descuenta un cargo en RD$ por kWh inyectado, solo en tarifas de un solo precio ([especificación financiera](FINANCIAL_ENGINE_SPECIFICATION.md)). En ese régimen, con el precio de referencia de la tarifa, el dinero sale de la factura por bloques: el balance aporta la energía retirada ($C_m - E_{auto,m}$) y la inyectada de cada mes, y la factura las netea kWh contra kWh con arrastre del crédito (§1.3.0 de la especificación financiera); el balance energético no cambia. Por eso el modelo físico separa la energía consumida en sitio (directa o vía batería) de la que sale a la red.
 
 ## 2. Algoritmo mensual
 

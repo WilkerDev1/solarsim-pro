@@ -339,6 +339,9 @@ assert.deepEqual(validateAssistantEdits([{ section: 'rates', field: 'generatorCo
   assert.ok(cleared.data.summary.monthlyBreakdown.every((m: any) => m.originalBillUSD === null && m.netBillUSD === null), 'sin facturas');
   assert.ok(cleared.data.summary.netInvestmentUSD > 0, 'la inversión sigue');
   assert.ok(cleared.data.energy.every((m: any) => m.savingsUSD === null) && cleared.data.summary.monthlyBreakdown.every((m: any) => m.savingsUSD === null));
+  // Fase 3: los campos en dinero de la facturación por bloques también se vacían (aunque el aislado no la use).
+  assert.equal(cleared.data.summary.annualCreditSettlementUSD, null, 'sin liquidación anual');
+  assert.ok([...cleared.data.energy, ...cleared.data.summary.monthlyBreakdown].every((m: any) => m.tariffBill === null && m.gridUseChargeUSD === null), 'sin desglose de factura ni cargo');
   assert.equal((await set([['generatorCostPerKWh', 25]])).status, 'applied', 'costo alto aceptado');
   assert.equal((await set([['supplyAlternative', 'no_comparison']])).status, 'applied');
   assert.equal(rates().supplyAlternative, 'no_comparison');

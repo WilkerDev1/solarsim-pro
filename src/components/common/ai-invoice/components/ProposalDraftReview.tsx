@@ -11,7 +11,7 @@ import type { SolarEquipmentItem } from '../../../../types/equipment';
 import type { GlobalTariffMatrix } from '../../../../types/tariffs';
 import { RD_PROVINCES } from '../../../../data/rdProvinces';
 import { getTariffSource, resolveAITariffSelection, tariffSourceFieldLabel } from '../../../../utils/aiTariffContext';
-import { describeIssues, firstPendingTarget, focusReviewAnchor, issuesAt, pendingByTab, REVIEW_TABS, reviewAnchor, rowControlFor, worstTier, type IssueTarget, type ReviewIssueView, type ReviewTab } from '../reviewIssues';
+import { buildIssueModel, confirmRequestedRow, focusReviewAnchor, requestedRowAlert, issueModelFromViews, issuesAt, REVIEW_TABS, reviewAnchor, rowControlFor, worstTier, type IssueTarget, type ReviewIssueModel, type ReviewIssueView, type ReviewTab } from '../reviewIssues';
 import { Field, IssueNotes } from './ReviewFlags';
 import type { PreviewEquipment } from '../commercialRows';
 
@@ -27,6 +27,8 @@ interface Props {
   issues?: readonly AIProposalIssue[];
   /** Avisos ya clasificados por el contenedor (evita derivarlos dos veces); tiene prioridad sobre `issues`. */
   issueViews?: readonly ReviewIssueView[];
+  /** Modelo de avisos del contenedor (el mismo del chat y del pie); tiene prioridad sobre `issueViews` e `issues`. */
+  issueModel?: ReviewIssueModel;
   /** Pestaña controlada desde el contenedor para que el chat pueda llevar a un campo. */
   tab?: ReviewTab;
   onTabChange?: (tab: ReviewTab) => void;
@@ -34,17 +36,15 @@ interface Props {
 const usd=(n:number)=>n.toLocaleString('es-DO',{style:'currency',currency:'USD'});
 const plural=(n:number,one:string,many:string)=>`${n.toLocaleString('es-DO')} ${n===1?one:many}`;
 
-export function ProposalDraftReview({draft,catalog,matrix,context,preview,production,update,issues=[],issueViews,tab:controlledTab,onTabChange}:Props) {
+export function ProposalDraftReview({draft,catalog,matrix,context,preview,production,update,issues=[],issueViews,issueModel,tab:controlledTab,onTabChange}:Props) {
   const [ownTab,setOwnTab]=useState<ReviewTab>('consumption');
   const tab=controlledTab ?? ownTab;
   const setTab=(next:ReviewTab)=>{setOwnTab(next);onTabChange?.(next);};
-  const views=issueViews ?? describeIssues(issues,draft);
-  const pending=pendingByTab(views);
-  const blocking=views.filter(v=>v.tier==='blocking').length;
-  const toReview=views.filter(v=>v.tier!=='info').length;
+  const model=issueModel ?? (issueViews ? issueModelFromViews(issueViews) : buildIssueModel(issues,draft));
+  const {views,byTab:pending,firstPending}=model;
+  const {blocking,pending:toReview}=model.counts;
   const at=(anchor:string)=>issuesAt(views,anchor);
   const go=(target:IssueTarget)=>{if(target.tab)setTab(target.tab);requestAnimationFrame(()=>focusReviewAnchor(target.anchor));};
-  const firstPending=firstPendingTarget(views);
   const tariff = resolveAITariffSelection(matrix,draft.distributor,draft.tariffCode);
   const source = tariff ? getTariffSource(matrix,tariff) : null;
   const setRate = (value:string) => {
@@ -70,7 +70,7 @@ export function ProposalDraftReview({draft,catalog,matrix,context,preview,produc
     <div className="proposal-review-band">
       <div className="proposal-review-tabs" role="tablist" aria-label="Secciones del borrador">{REVIEW_TABS.map(({key,label,short})=>{
         const count=pending[key];
-        const tier=worstTier(views.filter(v=>v.tier!=='info'&&v.target?.tab===key));
+        const tier=model.tabTier[key];
         const Icon=tier==='blocking'?AlertOctagon:AlertTriangle;
         return <button type="button" key={key} role="tab" tabIndex={tab===key?0:-1} onKeyDown={e=>{const keys=REVIEW_TABS.map(t=>t.key);let index=keys.indexOf(tab);if(e.key==='ArrowRight')index=(index+1)%4;else if(e.key==='ArrowLeft')index=(index+3)%4;else if(e.key==='Home')index=0;else if(e.key==='End')index=3;else return;e.preventDefault();setTab(keys[index]);document.getElementById(`proposal-label-${keys[index]}`)?.focus();}} aria-selected={tab===key} aria-controls={`proposal-tab-${key}`} id={`proposal-label-${key}`} onClick={()=>setTab(key)}>
           <span className="proposal-tab-long">{label}</span><span className="proposal-tab-short" aria-hidden="true">{short}</span>
@@ -128,12 +128,18 @@ export function ProposalDraftReview({draft,catalog,matrix,context,preview,produc
           {rows.map((row,i)=>{
             const anchor=reviewAnchor.row(group.key,i);
             const rowIssues=at(anchor);
-            const rowTier=worstTier(rowIssues) ?? (row.requestedModel?'confirm':undefined);
+            // Solo un aviso del emparejador pide confirmar; el del modelo y el de la potencia/capacidad se distinguen.
+            const requested=requestedRowAlert(rowIssues);
+            const asked=row as {requestedPowerW?:number;requestedPowerKW?:number;requestedCapacityKWh?:number};
+            const requestedMagnitude=group.type==='panel'?asked.requestedPowerW:group.type==='inverter'?asked.requestedPowerKW:asked.requestedCapacityKWh;
+            const rowTier=worstTier(rowIssues);
             const selected=options.find(e=>e.id===row.id);
             const notesId=rowIssues.length?`${anchor}-issues`:undefined;
             const invalid=(control:'model'|'count'|'price')=>rowIssues.some(v=>v.tier==='blocking'&&rowControlFor(v.code)===control)?true:undefined;
             const select=`${anchor}-model`;
-            const requestedNotes=rowIssues.filter(v=>!/^requested_/.test(v.code)||!row.requestedModel);
+            const requestedNotes=rowIssues.filter(v=>v!==requested.model&&v!==requested.magnitude);
+            const requestedTitle=[requested.model&&(/_ambiguous$/.test(requested.model.code)?'lo solicitado coincide con más de un modelo':/_partial$/.test(requested.model.code)?'lo solicitado solo coincide en parte con el modelo':'la IA no pudo confirmar el modelo'),
+              requested.magnitude&&`la ${group.type==='battery'?'capacidad':'potencia'} no coincide con la solicitada`].filter(Boolean).join(' y ');
             const total=row.unitPriceUSD!==undefined&&Number.isFinite(row.count)?row.unitPriceUSD*row.count:undefined;
             return <div className="proposal-equipment-row" key={`${group.key}-${i}`} id={anchor} tabIndex={-1} data-flag={rowTier}>
             <label className="proposal-eq-model">Modelo<select id={select} value={row.id} aria-describedby={notesId} aria-invalid={invalid('model')} onChange={e=>change(i,e.target.value,row.count)}>{!options.some(e=>e.id===row.id)&&<option value={row.id}>Modelo no disponible</option>}{options.map(e=><option key={e.id} value={e.id}>{e.displayName || e.modelSeries} · {group.value(e)} {group.unit}</option>)}</select></label>
@@ -145,9 +151,9 @@ export function ProposalDraftReview({draft,catalog,matrix,context,preview,produc
               <span className="proposal-origin" data-missing={row.unitPriceUSD===undefined || undefined}>{row.unitPriceUSD===undefined?<><AlertTriangle size={12} aria-hidden/>Falta costo</>:row.priceSource==='manual'?'Costo particular de esta cotización':'Oferta del inventario'}</span>
               {row.priceSource==='manual'&&<button type="button" className="proposal-tertiary" onClick={()=>update({[group.key]:rows.map((r,j)=>j===i?{...r,unitPriceUSD:undefined,priceSource:'supplier'}:r)})}><PackageOpen size={13} aria-hidden/>Usar oferta del inventario</button>}
             </div>
-            {(row.requestedModel || rowIssues.length>0) && <div className="proposal-row-alert" data-tier={rowTier} id={notesId}>
-              {row.requestedModel && <><p className="proposal-row-alert-title">{rowTier==='blocking'?<AlertOctagon size={14} aria-hidden/>:<AlertTriangle size={14} aria-hidden/>}<strong>{rowTier==='blocking'?'Bloquea:':'Confirmar:'}</strong> la IA no pudo confirmar el modelo.</p><dl className="proposal-compare"><div><dt>La IA pidió</dt><dd>{row.requestedModel}</dd></div><div><dt>Seleccionado</dt><dd>{selected?.displayName || row.brandModel || 'Sin modelo'}</dd></div></dl>
-                <div className="proposal-row-alert-actions"><button type="button" className="proposal-confirm" onClick={()=>update({[group.key]:rows.map((item,j)=>j===i?{...item,requestedModel:undefined}:item)})}>Confirmar este modelo</button><button type="button" className="proposal-tertiary" onClick={()=>document.getElementById(select)?.focus()}>Cambiar modelo</button></div></>}
+            {rowIssues.length>0 && <div className="proposal-row-alert" data-tier={rowTier} id={notesId}>
+              {requestedTitle && <><p className="proposal-row-alert-title">{rowTier==='blocking'?<AlertOctagon size={14} aria-hidden/>:<AlertTriangle size={14} aria-hidden/>}<strong>{rowTier==='blocking'?'Bloquea:':'Confirmar:'}</strong> {requestedTitle}.</p>{[requested.model,requested.magnitude].filter(Boolean).map(v=><p className="proposal-note" key={v!.code}>{v!.message}</p>)}<dl className="proposal-compare"><div><dt>La IA pidió</dt><dd>{[requested.model&&row.requestedModel,requested.magnitude&&requestedMagnitude!==undefined&&`${requestedMagnitude} ${group.type==='panel'?'W':group.type==='inverter'?'kW':'kWh'}`].filter(Boolean).join(' · ') || row.requestedModel}</dd></div><div><dt>Seleccionado</dt><dd>{selected?.displayName || row.brandModel || 'Sin modelo'}</dd></div></dl>
+                <div className="proposal-row-alert-actions"><button type="button" className="proposal-confirm" onClick={()=>update({[group.key]:rows.map((item,j)=>j===i?confirmRequestedRow(item,requested):item)})}>Confirmar este modelo</button><button type="button" className="proposal-tertiary" onClick={()=>document.getElementById(select)?.focus()}>Cambiar modelo</button></div></>}
               <IssueNotes issues={requestedNotes}/>
             </div>}
           </div>;})}

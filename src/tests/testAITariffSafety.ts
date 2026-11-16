@@ -8,6 +8,7 @@ import { hydrateSimulationStore } from '../store/persistence/hydrateSimulationSt
 import { serializeSimulationStore } from '../store/persistence/serializeSimulationStore';
 import { useSimulationStore } from '../store/useSimulationStore';
 import { SyncService } from '../services/syncService';
+import { GeminiRequestError, type GeminiTransport } from '../../shared/geminiTransport';
 
 const document = {
   resolutionCode: 'QA-PLIEGO-2026', effectiveDate: '2026-10-01', publishedBy: 'Entidad QA',
@@ -52,21 +53,19 @@ assert(context.warnings.some((warning) => warning.includes('SIE-147-2026-TF') &&
 assert.equal(context.schedules.find((schedule) => schedule.distributor === 'CEPM')?.tariffs.length, 4, 'No duplicate legacy codes in the AI reference');
 assert.equal(JSON.stringify(context), JSON.stringify(buildAITariffContext(rehydrated, new Date('2026-10-07T00:00:00Z'))));
 
-const originalFetch = globalThis.fetch;
+// Transporte sintético inyectado (nunca se parchea fetch): credenciales en cabecera y un único intento ante 401.
 let calls = 0;
-globalThis.fetch = (async (input: any, init: RequestInit) => {
+const unauthorized: GeminiTransport = async (url, _body, headers) => {
   calls++;
-  assert(!String(input).includes('key='));
-  assert.equal((init.headers as Record<string, string>)['x-goog-api-key'], 'synthetic-test-key');
-  return new Response(JSON.stringify({ error: { message: 'Invalid credentials' } }), { status: 401 });
-}) as typeof fetch;
-try {
-  await assert.rejects(GeminiTariffService.extractTariffMatrixFromDocument({ fileBase64: 'QA==', mimeType: 'application/pdf', apiKey: 'synthetic-test-key' }), /Invalid credentials/);
-  assert.equal(calls, 1, 'Never cascade requests on invalid authentication');
-  globalThis.fetch = (async () => new Response(JSON.stringify({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(document) }] } }] }), { status: 200 })) as typeof fetch;
-  const parsed = await GeminiTariffService.extractTariffMatrixFromDocument({ fileBase64: 'QA==', mimeType: 'application/pdf', apiKey: 'synthetic-test-key', currentMatrix: current });
-  assert.equal(parsed.schedules.CEPM.tariffs['RBT-1'].baseEnergyRateDOP, 24.1);
-} finally { globalThis.fetch = originalFetch; }
+  assert(!url.includes('key='));
+  assert.equal(headers['x-goog-api-key'], 'synthetic-test-key');
+  throw new GeminiRequestError('Invalid credentials', 401);
+};
+await assert.rejects(GeminiTariffService.extractTariffMatrixFromDocument({ fileBase64: 'QA==', mimeType: 'application/pdf', apiKey: 'synthetic-test-key', transport: unauthorized }), /Invalid credentials/);
+assert.equal(calls, 1, 'Never cascade requests on invalid authentication');
+const answered: GeminiTransport = async () => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify(document) }] } }] });
+const parsed = await GeminiTariffService.extractTariffMatrixFromDocument({ fileBase64: 'QA==', mimeType: 'application/pdf', apiKey: 'synthetic-test-key', currentMatrix: current, transport: answered });
+assert.equal(parsed.schedules.CEPM.tariffs['RBT-1'].baseEnergyRateDOP, 24.1);
 
 let state: any = { sessionGeneration: 1, syncSettings: { authToken: 'synthetic-token', serverUrl: 'https://example.invalid', currentUser: { organizationId: 'qa' } } };
 const set = (update: any) => { state = { ...state, ...(typeof update === 'function' ? update(state) : update) }; };

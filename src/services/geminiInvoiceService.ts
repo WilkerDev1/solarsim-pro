@@ -1,8 +1,8 @@
 import type { ExtractedInvoiceData, GeminiModelInfo } from '../types/aiInvoice';
 import type { AIProposalPayload } from '../../shared/aiProposal';
 import { buildProposalRequest } from '../../shared/aiProposal';
-import { DEFAULT_GEMINI_MODEL, GEMINI_API_BASE, requestGeminiJson, geminiResponseText, type GeminiTransport } from '../../shared/geminiTransport';
-import { processExtractedInvoice } from '../utils/aiProposalNormalization';
+import { DEFAULT_GEMINI_MODEL, GEMINI_API_BASE, requestGeminiStructured, type GeminiTransport } from '../../shared/geminiTransport';
+import { processExtractedInvoiceData, PROPOSAL_INVALID_JSON } from '../utils/aiProposalNormalization';
 
 // Presets are documented endpoints (https://ai.google.dev/gemini-api/docs/models); quotas depend on the account, not this list.
 export const DEFAULT_POPULAR_MODELS: GeminiModelInfo[] = [
@@ -34,7 +34,7 @@ export const PROPOSAL_REQUEST_POLICY={thinkingLevel:'medium',timeoutMs:120000} a
 /** Same prompt, transport policy and deterministic grounding in browser and Electron (which injects its HTTPS transport). */
 export async function parseProposalWithAI(payload:ParseProposalOptions, signal?:AbortSignal, transport?:GeminiTransport):Promise<ExtractedInvoiceData> {
   payload.onProgress?.('Analizando documentos y requisitos con el catálogo actual…');
-  const result=await requestGeminiJson({apiKey:payload.apiKey,model:payload.model,body:buildProposalRequest(payload),signal:signal || payload.signal,...PROPOSAL_REQUEST_POLICY},transport);
+  const result=await requestGeminiStructured({apiKey:payload.apiKey,model:payload.model,body:buildProposalRequest(payload),signal:signal || payload.signal,invalidMessage:PROPOSAL_INVALID_JSON,...PROPOSAL_REQUEST_POLICY},transport);
   payload.onProgress?.('Validando equipos, cantidades y datos del suministro…');
-  return processExtractedInvoice(geminiResponseText(result.response),payload,result);
+  return processExtractedInvoiceData(result.data,payload,result);
 }

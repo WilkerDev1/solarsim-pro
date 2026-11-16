@@ -53,8 +53,8 @@ const discussion=processExtractedInvoice(JSON.stringify({responseKind:'discussio
 assert.equal(discussion.responseKind,'discussion');
 assert.equal(discussion.assistantMessage,'¿Estos importes son costos de compra o venta?');
 const request=buildProposalRequest({projectRequirementsText:'Baja sólo el precio Huawei.',equipmentCatalog:catalog,context:{...context,currentDraft:normalized,conversation:[{role:'user',text:'Son costos de compra.'},{role:'assistant',text:'Conservo el recargo del35%.'}]}});
-assert(request.contents[0].parts[0].text.includes('Son costos de compra.'));
-assert(request.contents[0].parts[0].text.includes('currentDraft'));
+assert(request.contents[0].parts.at(-1)!.text!.includes('Son costos de compra.'));
+assert(request.contents[0].parts.at(-1)!.text!.includes('currentDraft'));
 assert.equal(calculateProjectFinancialSummary(project,'legacy').costMatrix.listPorcentajeVentaUSD,78407.42);
 console.log('Conversation, generic model names, document costs/FX, theoretical provenance and tariff reference passed.');
 

@@ -5,6 +5,7 @@ import { getProvinceHSP } from '../data/rdProvinces';
 import { calculateTotalDCCapacityKWp } from '../utils/equipmentSpecsUtils';
 import { batteryBank, readEquipment } from '../../shared/equipment';
 import { exportsToGrid, isGridConnectionMode, type GridConnectionMode } from '../../shared/gridConnection';
+import { calculateBillingYear, calculateMonthlyBill, type BillingTariff } from '../../shared/tariffBilling';
 
 /**
  * Cargo por uso de la red del régimen SIE-007-2026 (`shared/netMetering.ts`): con él, la medición neta acredita el 100 %
@@ -13,6 +14,22 @@ import { exportsToGrid, isGridConnectionMode, type GridConnectionMode } from '..
 export interface GridUseChargeInput {
   /** Cargo aplicado en USD por kWh inyectado (0 en tarifas con potencia o con inyección cero). */
   usdPerKWh: number;
+}
+
+/**
+ * Facturación por bloques del régimen SIE-007-2026 (`shared/tariffBilling.ts`): el ahorro de cada mes es la factura sin
+ * sistema menos la factura con sistema (bloques, cargo fijo, neteo con arrastre del crédito y cargo por uso de la red),
+ * y el crédito que sobra al cierre del año se liquida en diciembre. Solo cambia la valoración en dinero: la energía
+ * (autoconsumo, inyección) sale del mismo modelo.
+ */
+export interface BlockBillingInput {
+  tariff: BillingTariff;
+  /** RD$ por US$ con que se convierten las facturas. */
+  dopPerUSD: number;
+  /** Cargo por uso de la red que se cobra (RD$/kWh inyectado); 0 si no aplica. */
+  gridUseChargeDOPPerKWh: number;
+  /** Precio de liquidación del crédito anual sobrante (RD$/kWh). */
+  settlementDOPPerKWh: number;
 }
 
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
@@ -146,7 +163,8 @@ export function calculateMonthlySolarProduction(
   /** Tipo de conexión (`resolveGridConnection`); un booleano es el `isZeroExport` heredado (true = inyección cero). */
   gridConnection?: GridConnectionMode | boolean,
   calculationMode: EnergyCalculationMode = 'legacy',
-  gridUseCharge?: GridUseChargeInput
+  gridUseCharge?: GridUseChargeInput,
+  blockBilling?: BlockBillingInput
 ): MonthlyEnergyResult[] {
   // Misma lectura que resolveGridConnection: un valor desconocido no es inyección cero; `true` es el isZeroExport heredado.
   const connection: GridConnectionMode = isGridConnectionMode(gridConnection) ? gridConnection : gridConnection === true ? 'zero_export' : 'grid_export';
@@ -304,5 +322,47 @@ export function calculateMonthlySolarProduction(
     });
   }
 
-  return results;
+  // Sistema aislado: sin factura de la distribuidora (se valora contra su alternativa de suministro).
+  return blockBilling && !isOffGrid ? withBlockBilling(results, blockBilling) : results;
+}
+
+const usd2 = (dop: number, dopPerUSD: number) => Math.round((dop / dopPerUSD) * 100) / 100;
+const kWh1 = (kWh: number) => Math.round(kWh * 10) / 10;
+
+/** Revalora el balance energético con las facturas por bloques (sin y con sistema) del año. */
+function withBlockBilling(results: MonthlyEnergyResult[], billing: BlockBillingInput): MonthlyEnergyResult[] {
+  // Tasa no válida: la por defecto compartida (ADR 0003), nunca 1:1.
+  const fx = resolveAssumption('dopExchangeRate', billing.dopPerUSD);
+  const year = calculateBillingYear(
+    billing.tariff,
+    // Sin redondeo: solo se limpia el ruido de coma flotante de la resta (los dos términos ya vienen a 0.1 kWh).
+    results.map((m) => ({ withdrawnKWh: Math.max(0, Math.round((m.consumptionKWh - m.solarSelfConsumedKWh) * 1e9) / 1e9), injectedKWh: m.gridExportedKWh })),
+    { gridUseChargeDOPPerKWh: billing.gridUseChargeDOPPerKWh, settlementDOPPerKWh: billing.settlementDOPPerKWh },
+  );
+  const settlementUSD = usd2(year.settlement.amountDOP, fx);
+  return results.map((m, i) => {
+    const withSystem = year.months[i];
+    const originalBillUSD = usd2(calculateMonthlyBill({ tariff: billing.tariff, withdrawnKWh: m.consumptionKWh }).totalDOP, fx);
+    const netBillUSD = usd2(withSystem.totalDOP, fx);
+    const isClosingMonth = i === results.length - 1;
+    const settlement = isClosingMonth ? { creditSettlementKWh: kWh1(year.settlement.creditKWh), creditSettlementUSD: settlementUSD } : {};
+    return {
+      ...m,
+      originalBillUSD,
+      netBillUSD,
+      savingsUSD: Math.round((originalBillUSD - netBillUSD + (isClosingMonth ? settlementUSD : 0)) * 100) / 100,
+      gridUseChargeUSD: usd2(withSystem.gridUseChargeDOP, fx),
+      // Se redondea solo al presentar (0.1 kWh); el cálculo y el arrastre van sin redondear.
+      tariffBill: {
+        withdrawnKWh: kWh1(withSystem.withdrawnKWh),
+        netBilledKWh: kWh1(withSystem.netKWh),
+        creditInKWh: kWh1(withSystem.creditInKWh),
+        creditAppliedKWh: kWh1(withSystem.creditAppliedKWh),
+        creditCarriedKWh: kWh1(withSystem.creditCarriedKWh),
+        energyChargeUSD: usd2(withSystem.energyChargeDOP, fx),
+        fixedChargeUSD: usd2(withSystem.fixedChargeDOP, fx),
+        ...settlement,
+      },
+    };
+  });
 }

@@ -4,6 +4,7 @@ import { calculateProjectFinancialSummary } from '../../../src/engine/financeEng
 import { parseSharePayload, RequestValidationError } from '../src/validation';
 import { renderProposalPage } from '../src/template';
 import { FACTORY_GRID_USE_CHARGES, publishedNetMeteringRates } from '../../../shared/netMetering';
+import { DEFAULT_RD_TARIFF_MATRIX, referenceBillingTariff } from '../../../src/data/rdTariffs';
 
 /**
  * Régimen de medición neta en el visor (fase 2): campo opcional en `rates` y en el `calculationSnapshot`.
@@ -86,5 +87,21 @@ try {
 // 7. (I) Régimen solo en el snapshot (sin campo en rates): visor coherente con ese régimen, también en los supuestos.
 const snapshotOnly = renderProposalPage(stored({ distributor: 'EDENORTE', tariffCode: 'BTS1', gridExportFeePct: 25 }, { mode: 'legacy', capturedAt: '2026-11-16T12:00:00.000Z', organizationId: 'o', policyVersion: 1, netMeteringRegime: 'sie007_2026' }));
 assert.ok(snapshotOnly.includes('RD$4.02 por kWh inyectado'), 'régimen del snapshot y cargo de fábrica de su distribuidora');
+
+// 8. (Fase 3) Facturación por bloques: el enlace publica la fila de la tarifa, la procedencia del precio y el desglose
+// mensual de la factura (solo números en el resumen); el visor no recalcula. Un snapshot anterior sin esos campos
+// se sigue aceptando y se ve igual que antes.
+const blockBilling = { netMeteringRegime: 'sie007_2026', gridUseChargeDOPPerKWh: 3.78, energyRateSource: 'reference', billingTariff: referenceBillingTariff(DEFAULT_RD_TARIFF_MATRIX, 'EDESUR', 'BTS1') };
+const blockPayload = payload(blockBilling, { netMeteringRegime: 'sie007_2026' });
+assert.ok(blockPayload.summary.monthlyBreakdown.every((m: any) => m.tariffBill && typeof m.tariffBill.netBilledKWh === 'number'), 'desglose de la factura en cada mes');
+assert.equal(typeof blockPayload.summary.annualCreditSettlementUSD, 'number');
+assert.doesNotThrow(() => parseSharePayload(blockPayload), 'enlace con facturación por bloques');
+const blockStored = stored(blockBilling, { mode: 'legacy', capturedAt: '2026-11-16T12:00:00.000Z', organizationId: 'o', policyVersion: 1, netMeteringRegime: 'sie007_2026' });
+blockStored.summary = { ...blockStored.summary, annualCreditSettlementKWh: 0, annualCreditSettlementUSD: 0 };
+const blockHtml = renderProposalPage(blockStored);
+const { energyRateSource: _source, billingTariff: _tariff, ...phase2Rates } = blockBilling;
+assert.equal(blockHtml, renderProposalPage(stored(phase2Rates, blockStored.calculationSnapshot)), 'los campos nuevos no cambian lo que muestra el visor: cifras guardadas, sin recalcular');
+const previousSnapshot = renderProposalPage(stored({ distributor: 'EDENORTE', tariffCode: 'BTS1', gridExportFeePct: 25, netMeteringRegime: 'sie007_2026', gridUseChargeDOPPerKWh: 4.02 }, { mode: 'legacy', capturedAt: '2026-11-16T12:00:00.000Z', organizationId: 'o', policyVersion: 1, netMeteringRegime: 'sie007_2026' }));
+assert.equal(previousSnapshot, sieHtml, 'snapshot de la fase 2 (sin campos de la fase 3): mismo HTML');
 
 console.log('Visor: régimen de medición neta opcional, enlaces antiguos intactos y valores desconocidos rechazados.');

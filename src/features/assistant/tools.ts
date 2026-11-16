@@ -1,7 +1,7 @@
 import { isWriterRole } from '../../../shared/permissions';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { draftOwnerKey } from '../../utils/draftOwnerKey';
-import { calculateProjectFinancialSummary, engineGridUseCharge } from '../../engine/financeEngine';
+import { calculateProjectFinancialSummary, engineBlockBilling, engineGridUseCharge } from '../../engine/financeEngine';
 import { resolveAssumptions } from '../../../shared/assumptions';
 import { calculateMonthlySolarProduction } from '../../engine/solarEngine';
 import { effectiveFeatureSettings } from '../application/featurePolicy';
@@ -14,6 +14,8 @@ import { readEquipment, type EquipmentKind } from '../../../shared/equipment';
 import { editableAssistantFields, validateAssistantEdits } from './validation';
 import { preserveHiddenInQuotation } from '../../../shared/quotationItems';
 import type { CustomQuotationItem } from '../../types';
+import type { SolarEquipmentItem } from '../../types/equipment';
+import { searchEquipmentByRequest } from '../../../shared/equipmentMatch';
 import { touchesPricingEdits } from './pricingFields';
 import { AUTOMATED_PRICING } from '../../../shared/automatedProposalPolicy';
 import { resolveGridConnection } from '../../../shared/gridConnection';
@@ -127,19 +129,24 @@ export function executeAssistantTool(
     )
       throw new Error('Filtro de disponibilidad inválido.');
     const query = normalize(args.query);
-    const found = visibleAssistantEquipment()
+    const available = (e: SolarEquipmentItem) =>
+      !args.unavailableOnly ||
+      !e.supplierPrices?.some((p) => p.stockStatus === 'in_stock');
+    const visible = visibleAssistantEquipment();
+    let found = visible
       .filter(
         (e) =>
           normalize(`${e.brand} ${e.displayName} ${e.modelSeries}`).includes(
             query
-          ) &&
-          (!args.unavailableOnly ||
-            !e.supplierPrices?.some((p) => p.stockStatus === 'in_stock'))
+          ) && available(e)
       )
       .slice(0, 12);
+    // Sin coincidencia literal («batería WeCo 16 kWh»), el emparejador compartido busca por marca, modelo y especificación.
+    const fits = found.length || !query ? [] : searchEquipmentByRequest(String(args.query), visible.filter(available));
+    if (fits.length) found = fits.map((fit) => fit.item);
     return {
       data: {
-        equipment: found.map((e) => ({
+        equipment: found.map((e, i) => ({
           id: e.id,
           type: e.type,
           name: e.displayName,
@@ -148,6 +155,7 @@ export function executeAssistantTool(
           stockNote: !e.supplierPrices?.length
             ? 'Sin ofertas; disponibilidad desconocida'
             : undefined,
+          ...(fits[i] ? { match: fits[i].kind, matchReason: fits[i].reason } : {}),
         })),
         limit: 12,
       },
@@ -181,7 +189,8 @@ export function executeAssistantTool(
     const comparable = hasSavingsComparison(basis);
     const withoutMoney = <T extends object>(row: T, fields: string[]): T =>
       comparable ? row : { ...row, ...Object.fromEntries(fields.map((field) => [field, null])) };
-    const monthlyMoney = ['savingsUSD', 'originalBillUSD', 'netBillUSD'];
+    // `withoutMoney` es superficial: el desglose anidado de la factura (`tariffBill`, con importes) se vacía entero.
+    const monthlyMoney = ['savingsUSD', 'originalBillUSD', 'netBillUSD', 'gridUseChargeUSD', 'tariffBill'];
     const summary = calculateProjectFinancialSummary(p, mode);
     return {
       data: {
@@ -209,10 +218,12 @@ export function executeAssistantTool(
           p.rates.tariffCode,
           resolveGridConnection(p.rates),
           mode,
-          engineGridUseCharge(resolveAssumptions(p), resolveGridConnection(p.rates))
+          engineGridUseCharge(resolveAssumptions(p), resolveGridConnection(p.rates)),
+          // Misma valoración que el resumen: factura por bloques cuando la propuesta la usa (SIE-007-2026).
+          engineBlockBilling(resolveAssumptions(p), p.rates)
         ).map((month) => withoutMoney(month, monthlyMoney)),
         summary: comparable ? summary : {
-          ...withoutMoney(summary, ['year1SavingsUSD', 'total25YearSavingsUSD', 'paybackYears', 'irrPct', 'npvUSD', 'roi25YrPct']),
+          ...withoutMoney(summary, ['year1SavingsUSD', 'total25YearSavingsUSD', 'paybackYears', 'irrPct', 'npvUSD', 'roi25YrPct', 'annualCreditSettlementUSD']),
           monthlyBreakdown: summary.monthlyBreakdown.map((month) => withoutMoney(month, monthlyMoney)),
         },
         savings: {
