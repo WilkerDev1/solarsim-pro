@@ -26,7 +26,6 @@ export interface AssistantRunOptions {
   /** Files attached to this prompt only; history keeps text. */
   files?: ChatFile[];
 }
-/** Small bounded tool loop. Tool results are data, never instructions or executable HTML. */
 /** Raised when the conversation fails after some changes were already applied, so the UI can still show them. */
 export class AssistantRunError extends Error {
   constructor(message: string, readonly applied: { activityId: string; title: string }[]) {
@@ -48,6 +47,12 @@ export async function runAssistant(
     );
   }
 }
+/** Tool calls executed per round; extra calls in the same turn are answered with an error so the model can re-ask. */
+const MAX_CALLS_PER_ROUND = 4;
+const functionResponse = (call: any, response: Record<string, unknown>) => ({
+  functionResponse: { ...(typeof call.id === 'string' ? { id: call.id } : {}), name: call.name, response },
+});
+/** Small bounded tool loop. Tool results are data, never instructions or executable HTML. */
 async function runAssistantLoop(
   options: AssistantRunOptions,
   applied: { activityId: string; title: string }[]
@@ -81,7 +86,8 @@ async function runAssistantLoop(
       tools,
       toolConfig:
         round === 3 ? { functionCallingConfig: { mode: 'NONE' } } : undefined,
-      generationConfig: { temperature: 0.2, maxOutputTokens: 4096 },
+      // Thinking tokens share this budget on Gemini 4: a 4,096 cap truncated tool-heavy turns.
+      generationConfig: { temperature: 0.2, maxOutputTokens: 8192 },
     };
     const result = await requestGeminiJson(
       {
@@ -114,49 +120,31 @@ async function runAssistantLoop(
         ...(applied.length ? { applied } : {}),
         ...(agentCards.length ? { agentCards: agentCards.slice(0, 6) } : {}),
       };
-    if (calls.length > 4)
-      throw new Error(
-        'El asistente solicitó demasiadas herramientas. Divide la pregunta.'
-      );
+    // The model turn goes back unchanged: Gemini 3/4 require its thought signatures on the next request.
     contents.push({ role: 'model', parts });
-    const responses = await Promise.all(calls.map(async (call: any) => {
+    // Sequential on purpose: tool calls may mutate the proposal, and the activity/undo order must match the model's order.
+    const responses: any[] = [];
+    for (const [index, call] of calls.entries()) {
+      if (index >= MAX_CALLS_PER_ROUND) {
+        responses.push(functionResponse(call, { error: 'Límite de cuatro herramientas por turno: vuelve a pedir esta consulta en el siguiente turno.' }));
+        continue;
+      }
       try {
+        // Size limits are enforced by the agent registry before anything is applied.
         const result = await options.execute({ name: call.name, args: { ...call.args } });
-        if (JSON.stringify(result.data).length > 64000)
-          throw new Error(
-            'Resultado demasiado grande. Consulta un equipo o una propuesta específica.'
-          );
         if (result.cards) cards.push(...result.cards);
         if (result.agentCards) agentCards.push(...result.agentCards);
         if (result.activityId)
           applied.push({ activityId: result.activityId, title: String(call.args?.title || 'Cambio aplicado').slice(0, 150) });
         if (result.action) {
-          if (actions.length >= 3)
-            throw new Error('Máximo tres cambios por mensaje.');
+          if (actions.length >= 3) throw new Error('Máximo tres cambios por mensaje.');
           actions.push(result.action);
         }
-        return {
-          functionResponse: {
-            ...(typeof call.id === 'string' ? { id: call.id } : {}),
-            name: call.name,
-            response: { result: result.data },
-          },
-        };
+        responses.push(functionResponse(call, { result: result.data }));
       } catch (error) {
-        return {
-          functionResponse: {
-            ...(typeof call.id === 'string' ? { id: call.id } : {}),
-            name: call.name,
-            response: {
-              error:
-                error instanceof Error
-                  ? error.message
-                  : 'Herramienta no disponible.',
-            },
-          },
-        };
+        responses.push(functionResponse(call, { error: error instanceof Error ? error.message : 'Herramienta no disponible.' }));
       }
-    }));
+    }
     contents.push({ role: 'user', parts: responses });
   }
   throw new Error(
