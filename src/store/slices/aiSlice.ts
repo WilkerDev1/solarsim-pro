@@ -71,11 +71,14 @@ export function buildProjectFromDraft(state:SimulationStore,input:ExtractedInvoi
 
 /**
  * Each install saved the factory default as if it were a choice, so a stored former default only survives when the user
- * picked it explicitly (`geminiModelChosenByUser`); otherwise it follows the current default.
+ * picked it explicitly (`geminiModelChosenByUser`); otherwise it follows the current default. Any other stored model was
+ * never a factory default, so it is an explicit choice and is marked as such.
  */
-export function migrateStoredGeminiModel(model:string|undefined,chosenByUser:boolean|undefined):string {
-  if(!model?.trim()) return DEFAULT_GEMINI_MODEL;
-  return !chosenByUser && INHERITED_DEFAULT_GEMINI_MODELS.includes(model) ? DEFAULT_GEMINI_MODEL : model;
+export function migrateStoredGeminiModel(model:string|undefined,chosenByUser:boolean|undefined):{geminiModel:string;geminiModelChosenByUser:boolean} {
+  const stored=model?.trim() || '';
+  if(!stored || stored===DEFAULT_GEMINI_MODEL || (!chosenByUser && INHERITED_DEFAULT_GEMINI_MODELS.includes(stored)))
+    return {geminiModel:DEFAULT_GEMINI_MODEL,geminiModelChosenByUser:false};
+  return {geminiModel:stored,geminiModelChosenByUser:true};
 }
 
 export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({

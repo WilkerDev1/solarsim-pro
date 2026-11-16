@@ -21,11 +21,15 @@ slice.setGeminiModel('');assert.equal(state.geminiModel,DEFAULT_GEMINI_MODEL);
 assert.equal(serializeSimulationStore({geminiModel:'gemini-3.6-flash',geminiModelChosenByUser:true} as any).geminiModelChosenByUser,true);
 
 // El predeterminado de fábrica se guardaba con cada instalación: solo una elección explícita lo conserva.
-for (const inherited of ['gemini-3.8-flash','gemini-3.7-flash','gemini-3.5-flash-lite','gemini-2.0-flash','',undefined])
-  assert.equal(migrateStoredGeminiModel(inherited,undefined),DEFAULT_GEMINI_MODEL,`${inherited} was an inherited default`);
-assert.equal(migrateStoredGeminiModel('gemini-3.8-flash',true),'gemini-3.8-flash','explicit choice is respected');
-assert.equal(migrateStoredGeminiModel('gemini-3.6-flash',undefined),'gemini-3.6-flash','never a factory default, so it was chosen');
-assert.equal(migrateStoredGeminiModel('custom-account-model',false),'custom-account-model');
+const migrated=(model:string|undefined,chosen:boolean|undefined)=>migrateStoredGeminiModel(model,chosen);
+for (const inherited of ['gemini-3.8-flash','gemini-3.7-flash','gemini-3.5-flash-lite','gemini-2.0-flash',' gemini-3.8-flash '])
+  assert.deepEqual(migrated(inherited,undefined),{geminiModel:DEFAULT_GEMINI_MODEL,geminiModelChosenByUser:false},`${inherited} was an inherited default`);
+assert.deepEqual(migrated('gemini-3.8-flash',true),{geminiModel:'gemini-3.8-flash',geminiModelChosenByUser:true},'explicit choice is respected');
+// A model that was never a factory default was chosen: the flag must say so, or a future migration could overwrite it.
+assert.deepEqual(migrated('gemini-2.5-pro',undefined),{geminiModel:'gemini-2.5-pro',geminiModelChosenByUser:true});
+assert.deepEqual(migrated('  custom-account-model ',false),{geminiModel:'custom-account-model',geminiModelChosenByUser:true},'trimmed');
+for (const empty of ['','   ',undefined]) assert.deepEqual(migrated(empty,true),{geminiModel:DEFAULT_GEMINI_MODEL,geminiModelChosenByUser:false},'empty follows the default');
+assert.deepEqual(migrated(DEFAULT_GEMINI_MODEL,true),{geminiModel:DEFAULT_GEMINI_MODEL,geminiModelChosenByUser:false});
 
 const mapped=mapGeminiModels({models:[{name:'models/gemini-real-flash',supportedGenerationMethods:['generateContent']},{name:'models/gemini-tts',supportedGenerationMethods:['generateContent']},{name:'models/gemini-embedding',supportedGenerationMethods:['embedContent']}]});
 assert.deepEqual(mapped.map(m=>m.id),['gemini-real-flash']);

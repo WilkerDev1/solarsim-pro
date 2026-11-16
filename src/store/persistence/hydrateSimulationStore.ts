@@ -217,8 +217,7 @@ export function hydrateSimulationStore(state: SimulationStore | undefined): void
     state.agentPolicy = normalizeAgentPolicy(state.agentPolicy);
     if (!Array.isArray(state.agentActivity)) state.agentActivity = [];
     state.pendingAgentActions = [];
-    state.geminiModel = migrateStoredGeminiModel(state.geminiModel, state.geminiModelChosenByUser);
-    state.geminiModelChosenByUser = Boolean(state.geminiModelChosenByUser);
+    Object.assign(state, migrateStoredGeminiModel(state.geminiModel, state.geminiModelChosenByUser));
     if (state.defaultSimulationSettings) state.defaultSimulationSettings = migrateDefaultSimulationSettings(state.defaultSimulationSettings);
     for (const workspace of Object.values(state.organizationWorkspaces || {})) {
       if (workspace?.defaultSimulationSettings) workspace.defaultSimulationSettings = migrateDefaultSimulationSettings(workspace.defaultSimulationSettings);
