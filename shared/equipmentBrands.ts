@@ -46,6 +46,19 @@ export const KNOWN_SOLAR_BRANDS: Record<string, string> = {
   'solark': 'Sol-Ark',
 };
 
+/** Valores de marca que no identifican a ningún fabricante («Fabricante», «Desconocido», «General»…). */
+const GENERIC_BRANDS = new Set(['fabricante', 'desconocido', 'desconocida', 'general', 'generico', 'generica', 'na', 'nd', 'otro', 'otros', 'otra', 'varios', 'sinmarca', 'nomarca', 'unknown', 'generic']);
+export function isGenericBrand(brand?: string | null): boolean {
+  const key = (brand || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+  return !key || GENERIC_BRANDS.has(key);
+}
+
+/** Palabras descriptivas que encabezan nombres de equipos y nunca son una marca. */
+const DESCRIPTOR_WORDS = new Set(['modulo', 'modulos', 'panel', 'paneles', 'inversor', 'inversores', 'microinversor', 'microinversores', 'bateria', 'baterias',
+  'hibrido', 'hibrida', 'hibridos', 'trifasico', 'trifasica', 'monofasico', 'monofasica', 'bifasico', 'split', 'phase', 'fase', 'string', 'ongrid', 'offgrid',
+  'on-grid', 'off-grid', 'solar', 'solares', 'litio', 'lithium', 'lifepo4', 'de', 'del', 'para', 'con', 'bifacial', 'mono', 'monocristalino', 'policristalino',
+  'red', 'aislado', 'almacenamiento', 'sistema', 'kit', 'equipo', 'china', 'chino', 'generico', 'generica', 'nuevo', 'nueva', 'alta', 'baja', 'tension', 'voltaje']);
+
 /**
  * Normaliza un string de marca a su forma canónica si es conocida,
  * o limpia capitalización y espacios respetando el nombre original.
@@ -53,7 +66,7 @@ export const KNOWN_SOLAR_BRANDS: Record<string, string> = {
 export function normalizeBrandName(rawBrand?: string | null): string {
   if (!rawBrand) return '';
   const trimmed = rawBrand.trim();
-  if (!trimmed || trimmed.toLowerCase() === 'fabricante' || trimmed.toLowerCase() === 'desconocido') {
+  if (!trimmed || isGenericBrand(trimmed)) {
     return '';
   }
 
@@ -78,6 +91,7 @@ export function normalizeBrandName(rawBrand?: string | null): string {
  */
 export function inferBrandFromText(displayName = '', modelSeries = ''): string {
   const combined = `${displayName} ${modelSeries}`.toLowerCase();
+  const word = (pattern: string) => new RegExp(`(^|[^a-z0-9])${pattern}([^a-z0-9]|$)`).test(combined);
 
   // Búsqueda por prioridades
   if (combined.includes('canadian solar') || combined.includes('canadian') || combined.includes('cs6.1') || combined.includes('topbiliku')) {
@@ -86,7 +100,8 @@ export function inferBrandFromText(displayName = '', modelSeries = ''): string {
   if (combined.includes('luxpowertek') || combined.includes('luxpower') || combined.includes('lxp-lb') || combined.includes('lxp')) {
     return 'LuxpowerTek';
   }
-  if (combined.includes('hinaess') || combined.includes('powergem') || combined.includes('hina')) {
+  // «hina» como palabra: «China» no es HinaESS.
+  if (combined.includes('hinaess') || combined.includes('powergem') || word('hina')) {
     return 'HinaESS';
   }
   if (combined.includes('weco') || combined.includes('we-co') || combined.includes('16k0-lv')) {
@@ -143,16 +158,19 @@ export function inferBrandFromText(displayName = '', modelSeries = ''): string {
   if (combined.includes('sol-ark') || combined.includes('solark')) {
     return 'Sol-Ark';
   }
+  if (combined.includes('fronius')) return 'Fronius';
+  if (word('sma') || combined.includes('sunny boy') || combined.includes('sunny tripower')) return 'SMA';
+  if (combined.includes('hoymiles')) return 'Hoymiles';
+  if (combined.includes('goodwe')) return 'GoodWe';
+  if (combined.includes('solaredge')) return 'SolarEdge';
 
   // Si no coincide con marcas conocidas, intentar extraer la primera palabra significativa
-  const cleanDisplay = displayName
-    .replace(/^m[oó]dulos?\s+/i, '')
-    .replace(/^inversor(?:es)?\s+/i, '')
-    .replace(/^bater[íi]as?\s+/i, '')
-    .trim();
-
-  const firstWord = cleanDisplay.split(/\s+/)[0];
-  if (firstWord && firstWord.length > 2 && !/^\d+/.test(firstWord)) {
+  // (sin descriptores como «Híbrido», «Microinversor» o «Trifásico», ni códigos con cifras).
+  const firstWord = displayName.trim().split(/\s+/).find((w) => {
+    const key = w.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9-]/g, '');
+    return key && !DESCRIPTOR_WORDS.has(key) && !DESCRIPTOR_WORDS.has(key.replace(/-/g, ''));
+  });
+  if (firstWord && firstWord.length > 2 && !/\d/.test(firstWord) && !isGenericBrand(firstWord)) {
     return normalizeBrandName(firstWord);
   }
 

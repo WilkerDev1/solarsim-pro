@@ -33,12 +33,18 @@ export function findCatalogMatchForVariant(
   const magnitude = Number(type === "panel" ? variant.powerW : type === "inverter" ? variant.powerKW : variant.capacityKWh) || undefined;
   if (!magnitude) return null;
   let best: CatalogMatchResult | null = null;
+  let bestDelta = Infinity;
   for (const item of catalog) {
     const fit = fitEquipment({ type, brand, model: variant.modelCode, magnitude, capacityAh: Number(variant.capacityAh) || undefined }, item);
     // Sin marca conocida en ambos lados, el modelo tiene que aportar la identidad.
     if (!fit.fits || (!fit.brandMatch && !fit.modelMatch)) continue;
     const score = fit.modelMatch === "exact" ? 0.95 : fit.modelMatch === "compatible" || fit.ahMatch ? 0.9 : 0.85;
-    if (!best || score > best.score) best = { matchedItem: item, score, reason: fit.reason };
+    // Misma puntuación: gana la potencia/capacidad más cercana (620 W antes que 622 W).
+    const delta = fit.magnitudeDelta ?? Infinity;
+    if (!best || score > best.score || (score === best.score && delta < bestDelta)) {
+      best = { matchedItem: item, score, reason: fit.reason };
+      bestDelta = delta;
+    }
   }
   return best;
 }

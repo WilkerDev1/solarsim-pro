@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { matchEquipment, fitEquipment, magnitudesMatch } from '../../shared/equipmentMatch';
 import { normalizeProposalDraft, requestedModelMatches } from '../../shared/aiProposal';
 import { findCatalogMatchForVariant } from '../utils/equipmentMatchingUtils';
+import { inferBrandFromText } from '../../shared/equipmentBrands';
 import type { SolarEquipmentItem } from '../types/equipment';
 
 const row = (id: string, type: SolarEquipmentItem['type'], brand: string, displayName: string, modelSeries: string, extra: Partial<SolarEquipmentItem>): SolarEquipmentItem =>
@@ -110,5 +111,87 @@ assert(scanned!.score >= 0.95);
 const byCapacity = findCatalogMatchForVariant({ id: 'v', modelCode: '', displayName: 'WeCo 16 kWh', capacityKWh: 16 }, 'battery', 'WeCo', catalog);
 assert.equal(byCapacity?.matchedItem.id, 'bat-weco');
 assert(byCapacity!.score < 0.95, 'por especificación no se actualiza sin revisar');
+
+// --- Revisión: fronteras de código, unidades pegadas a códigos, coincidencias parciales, marcas y desempates. ---
+{
+  // 1. Un código de modelo solo es exacto con fronteras alfanuméricas: «5K» no está en «15K» ni es «5K Pro».
+  const scannedFive = { id: 'v', modelCode: '5K', displayName: 'Inversor WeCo 5K', powerKW: 5 };
+  const onlyPro = findCatalogMatchForVariant(scannedFive, 'inverter', 'WeCo', [inv5Pro]);
+  assert(!onlyPro || onlyPro.score < 0.95, `5K frente a 5K Pro no actualiza sin revisión (${onlyPro?.score})`);
+  assert.equal(findCatalogMatchForVariant({ ...scannedFive, displayName: 'x' }, 'inverter', 'WeCo', [inv5Pro, inv5])?.matchedItem.id, 'inv-5k');
+  assert.equal(findCatalogMatchForVariant({ id: 'v', modelCode: '5K Pro', displayName: 'x', powerKW: 5 }, 'inverter', 'WeCo', [inv5, inv5Pro])?.matchedItem.id, 'inv-5k-pro');
+  assert.equal(fitEquipment({ type: 'inverter', brand: 'WeCo', model: '5K' }, inv15).modelMatch, undefined, '5K no está dentro de 15K');
+  assert.equal(fitEquipment({ type: 'inverter', brand: 'WeCo', model: '15K' }, inv5).modelMatch, undefined, '15K no contiene 5K como modelo');
+  assert.equal(fitEquipment({ type: 'inverter', brand: 'WeCo', model: '5K' }, inv5Pro).modelMatch, 'compatible');
+  assert.equal(fitEquipment({ type: 'inverter', brand: 'WeCo', model: '5K' }, inv5).modelMatch, 'exact');
+  assert.equal(fitEquipment({ type: 'inverter', text: 'WeCo SUN-15K' }, inv5).fits, false);
+  // Un código del texto cuyo token está pegado a otro dígito no cubre el nombre del equipo.
+  assert.notEqual(fitEquipment({ type: 'inverter', text: 'WeCo X15K-A' }, inv5).kind, 'exact');
+
+  // 2. Unidades solo con frontera: «CS6W-550MB» es un código, no 6 W.
+  const real = [
+    row('cs6w', 'panel', 'Canadian Solar', 'Canadian Solar CS6W-550MB (550W)', 'CS6W-550MB', { powerW: 550 }),
+    row('jam72', 'panel', 'JA Solar', 'Módulos JA Solar JAM72S30-550/MR (550W)', 'JAM72S30-550/MR', { powerW: 550 }),
+    row('lr5', 'panel', 'LONGi', 'LONGi LR5-72HPH-550M', 'LR5-72HPH-550M', { powerW: 550 }),
+    row('deye', 'inverter', 'Deye', 'Inversor Deye SUN-10K-SG04LP3', 'SUN-10K-SG04LP3', { powerKW: 10 }),
+    row('pylon', 'battery', 'Pylontech', 'Batería Pylontech US5000 100AH', 'US5000-100AH', { capacityKWh: 4.8, capacityAh: 100 }),
+  ];
+  for (const [text, id] of [['Canadian Solar CS6W-550MB', 'cs6w'], ['JA Solar JAM72S30-550/MR', 'jam72'], ['LONGi LR5-72HPH-550M 550W', 'lr5'],
+    ['Deye SUN-10K-SG04LP3', 'deye'], ['Pylontech US5000-100AH', 'pylon'], ['CS6W-550MB', 'cs6w']] as const) {
+    const type = real.find(r => r.id === id)!.type;
+    const result = matchEquipment({ type, text }, real);
+    assert.equal(result.item?.id, id, `${text}: ${result.reason}`);
+    assert.equal(result.kind, 'exact', `${text} es el modelo exacto: ${result.reason}`);
+  }
+  // Una unidad pegada a una palabra sí se lee («Solar630W», «HinaESS15kW»), pero no a un código.
+  assert(fitEquipment({ type: 'panel', text: 'JA Solar630W' }, panel630).fits);
+  assert(!fitEquipment({ type: 'battery', text: 'HinaESS15kW' }, hina).fits);
+
+  // 3. Coincidencia parcial (sin especificación ni nombre completo) es un resultado propio, no «por especificación».
+  const onlyProCatalog = [inv5Pro];
+  const partial = matchEquipment({ type: 'inverter', text: 'WeCo 5K' }, onlyProCatalog);
+  assert.equal(partial.kind, 'partial', partial.reason);
+  const huawei = row('hw', 'inverter', 'Huawei', 'Huawei SUN2000-10KTL', 'SUN2000-10KTL', { powerKW: 10 });
+  assert.equal(matchEquipment({ type: 'inverter', text: 'Huawei' }, [huawei]).kind, 'partial');
+  const partialDraft = normalizeProposalDraft({
+    clientName: 'Cliente', distributor: 'EDESUR', tariffCode: 'BTS1', monthlyConsumptionKWh: Array(12).fill(500), consumptionSource: 'observed',
+    panels: [{ equipmentId: 'p-ja-630', quantity: 10 }], inverters: [{ equipmentId: 'inv-5k-pro', quantity: 1, requestedModel: 'WeCo 5K' }], batteries: [],
+  }, [panel630, inv5Pro], {});
+  const partialIssue = partialDraft.validationIssues?.find(i => i.code === 'requested_inverter_model_partial');
+  assert.equal(partialIssue?.severity, 'warning', JSON.stringify(partialDraft.validationIssues));
+
+  // 5. Marcas: genéricas no descartan, alias en ambos lados, inferencia sin adjetivos ni «China».
+  const cs = real[0];
+  assert(fitEquipment({ type: 'panel', brand: 'Fabricante', magnitude: 550 }, cs).fits, '«Fabricante» es marca desconocida');
+  assert(fitEquipment({ type: 'panel', brand: 'Desconocido', magnitude: 550 }, cs).fits);
+  assert(fitEquipment({ type: 'panel', text: 'CanadianSolar 550W' }, cs).fits);
+  assert(fitEquipment({ type: 'panel', text: 'Canadian-Solar 550W' }, cs).fits);
+  const victron = row('vic', 'inverter', 'Victron', 'Victron MultiPlus-II 5000', 'MultiPlus-II', { powerKW: 5 });
+  assert(fitEquipment({ type: 'inverter', text: 'Victron Energy 5 kW' }, victron).fits, 'Victron ↔ Victron Energy');
+  assert(fitEquipment({ type: 'inverter', brand: 'Victron Energy', magnitude: 5 }, victron).fits);
+  assert(fitEquipment({ type: 'battery', text: 'Hina 16 kWh' }, hina).fits, 'Hina ↔ HinaESS');
+  assert(fitEquipment({ type: 'inverter', text: 'Lux 10 kW' }, lux10).fits, 'Lux ↔ LuxpowerTek');
+  assert(fitEquipment({ type: 'inverter', brand: 'Lux', magnitude: 10 }, lux10).fits);
+  const inferred = (displayName: string) => inferBrandFromText(displayName, '');
+  assert.equal(inferred('Inversor Fronius Primo 5.0'), 'Fronius');
+  assert.equal(inferred('Inversor Híbrido Fronius Symo'), 'Fronius');
+  assert.equal(inferred('Inversor SMA Sunny Boy 5.0'), 'SMA');
+  assert.equal(inferred('Microinversor Hoymiles HM-800'), 'Hoymiles');
+  assert.equal(inferred('Inversor GoodWe GW5K-DT'), 'GoodWe');
+  assert.equal(inferred('Inversor SolarEdge SE5000H'), 'SolarEdge');
+  assert.equal(inferred('Inversor Híbrido 10K'), 'General', 'un adjetivo no es una marca');
+  assert.equal(inferred('Inversor Trifásico 20K'), 'General');
+  assert.equal(inferred('Batería China 5kWh'), 'General', '«China» no es HinaESS');
+  assert.equal(inferred('Batería Hina 5kWh'), 'HinaESS');
+  // Un equipo con marca genérica y nombre sin marca no se empareja por una marca inventada.
+  const generic = row('gen', 'inverter', 'Fabricante', 'Inversor Híbrido 10K', '10K', { powerKW: 10 });
+  assert.equal(fitEquipment({ type: 'inverter', text: 'Híbrido 10 kW' }, generic).brandMatch, undefined);
+
+  // 6. Mismo nivel de coincidencia: gana la potencia más cercana.
+  const t622 = row('t622', 'panel', 'Trina Solar', 'Trina Vertex 622W', 'Vertex 622', { powerW: 622 });
+  const t620 = row('t620', 'panel', 'Trina Solar', 'Trina Vertex 620W', 'Vertex 620', { powerW: 620 });
+  assert.equal(findCatalogMatchForVariant({ id: 'v', modelCode: '', displayName: 'x', powerW: 620 }, 'panel', 'Trina', [t622, t620])?.matchedItem.id, 't620');
+  assert.equal(findCatalogMatchForVariant({ id: 'v', modelCode: '', displayName: 'x', powerW: 621.5 }, 'panel', 'Trina', [t620, t622])?.matchedItem.id, 't622');
+}
 
 console.log('Equipment matcher passed.');

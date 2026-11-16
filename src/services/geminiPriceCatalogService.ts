@@ -329,7 +329,8 @@ Extrae todos los modelos de paneles, inversores y baterías con sus precios unit
               { type: eqType, text: raw.extractedModelName, brand: typeof raw.brand === "string" ? raw.brand : undefined },
               currentCatalog,
             );
-      const local = suggested?.item;
+      // Solo una coincidencia exacta o por especificación se sugiere; la parcial (solo marca o parte del nombre) no.
+      const local = suggested && (suggested.kind === "exact" || suggested.kind === "spec") ? suggested.item : undefined;
       const matched = exact || target || local;
       const matchedId = matched?.id;
       const matchedName = matched?.displayName;

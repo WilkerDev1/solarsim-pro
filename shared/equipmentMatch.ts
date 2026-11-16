@@ -1,5 +1,5 @@
 import type { EquipmentType, SolarEquipmentItem } from '../src/types/equipment';
-import { KNOWN_SOLAR_BRANDS, areBrandsMatching, inferBrandFromText } from './equipmentBrands';
+import { KNOWN_SOLAR_BRANDS, areBrandsMatching, inferBrandFromText, isGenericBrand, normalizeBrandName } from './equipmentBrands';
 
 /**
  * Emparejador único entre lo que se pide en texto libre o en campos sueltos («batería WeCo 16 kWh», «inversor híbrido
@@ -9,7 +9,7 @@ import { KNOWN_SOLAR_BRANDS, areBrandsMatching, inferBrandFromText } from './equ
  * listas de precios y la búsqueda del asistente; ninguno debe comparar marcas, modelos o magnitudes por su cuenta.
  */
 export type EquipmentFitKind = 'exact' | 'spec' | 'partial' | 'none';
-export type EquipmentMatchKind = 'exact' | 'spec' | 'ambiguous' | 'none';
+export type EquipmentMatchKind = 'exact' | 'spec' | 'partial' | 'ambiguous' | 'none';
 
 export interface EquipmentRequest {
   type: EquipmentType;
@@ -40,7 +40,7 @@ export interface EquipmentFit {
 
 export interface EquipmentMatch {
   kind: EquipmentMatchKind;
-  /** Equipo elegido cuando la coincidencia es única (exacta o por especificación). */
+  /** Equipo elegido cuando la coincidencia es única (exacta, por especificación o parcial: esta última siempre pide confirmación). */
   item?: SolarEquipmentItem;
   /** Equipos que encajan, del mejor al peor (en `ambiguous`, los empatados). */
   candidates: EquipmentFit[];
@@ -71,60 +71,73 @@ export function magnitudesMatch(type: EquipmentType, requested: number, catalog:
 
 const formatNumber = (n: number) => String(Number(n.toFixed(3)));
 const canonical = (text: string) => text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
-  .replace(/lux\s*power(?!tek)/g, 'luxpowertek').replace(/\bcanadian(?!\s*solar)/g, 'canadian solar').replace(/watts?|vatios?/g, 'w');
+  .replace(/lux[\s-]*power(?!tek)/g, 'luxpowertek').replace(/\bcanadian(?![\s-]*solar)/g, 'canadian solar').replace(/watts?|vatios?/g, 'w');
+const UNIT_WORDS = '(?:kwh|kwp|kw|wp|w|ah)';
+/** Número con unidad solo con frontera delante: «550 W», «0.63kWp», «-100AH»; nunca dentro de un código («CS6W-550MB»). */
+const UNITS = new RegExp(`(?<![a-z0-9.,])(\\d+(?:[.,]\\d+)?)\\s*(${UNIT_WORDS.slice(3, -1)})\\b`, 'g');
+/** Una palabra pegada a una cifra con unidad («Solar630W», «HinaESS15kW») se separa; un código corto («CS6W») no. */
+const GLUED_UNIT = new RegExp(`([a-z]{4,})(?=\\d+(?:[.,]\\d+)?\\s*${UNIT_WORDS}\\b)`, 'g');
+const forParsing = (text: string) => canonical(text).replace(GLUED_UNIT, '$1 ');
 const compact = (text: string) => canonical(text).replace(/[^a-z0-9]/g, '');
-const UNITS = /([0-9]+(?:[.,][0-9]+)?)\s*(kwh|kwp|kw|wp|w|ah)\b/g;
 const WARRANTY = /\(?\s*\d+\s*(?:anos?\s*(?:de\s*)?garantia)\)?/g;
 const QUANTITY = /\b\d+\s*x\s+|\s+x\s*\d+\b/g;
 const words = (text: string) => text.split(/[^a-z0-9]+/).filter(Boolean);
 
-/** Marca efectiva de un equipo: la guardada salvo genérica («Fabricante», vacía), entonces la inferida del nombre. */
+/** Marca efectiva de un equipo: la guardada salvo genérica («Fabricante», vacía), entonces la inferida del nombre; siempre en su forma canónica. */
 export function effectiveBrand(item: Pick<SolarEquipmentItem, 'brand' | 'displayName' | 'modelSeries'>): string | undefined {
   const stored = item.brand?.trim();
-  if (stored && stored.toLowerCase() !== 'fabricante') return stored;
+  if (stored && !isGenericBrand(stored)) return normalizeBrandName(stored);
   const inferred = inferBrandFromText(item.displayName, item.modelSeries);
-  return inferred && inferred !== 'General' ? inferred : undefined;
+  return inferred && !isGenericBrand(inferred) ? inferred : undefined;
 }
 
-interface ParsedText { tokens: string[]; codes: string[]; magnitudes: { value: number; unit: string }[] }
+interface ParsedText { tokens: string[]; codes: string[][]; magnitudes: { value: number; unit: string }[] }
 function parseText(text: string): ParsedText {
-  let value = canonical(text).replace(WARRANTY, ' ').replace(QUANTITY, ' ');
+  let value = forParsing(text).replace(WARRANTY, ' ').replace(QUANTITY, ' ');
   const magnitudes = [...value.matchAll(UNITS)].map(m => ({ value: Number(m[1].replace(',', '.')), unit: m[2] }));
   value = value.replace(UNITS, ' ');
-  const codes = (value.match(/\b[a-z][a-z0-9]*(?:[-.][a-z0-9]+)+\b/g) || []).map(code => code.replace(/[^a-z0-9]/g, ''));
+  const codes = (value.match(/\b[a-z][a-z0-9]*(?:[-./][a-z0-9]+)+\b/g) || []).map(words);
   return { tokens: words(value).filter(t => !STOPWORDS.has(t)), codes, magnitudes };
 }
 
-/** Busca un fragmento sin que un número quede pegado a otro dígito («5k» no está dentro de «15k»). */
-function containsFragment(haystack: string, fragment: string): boolean {
-  for (let index = haystack.indexOf(fragment); index >= 0; index = haystack.indexOf(fragment, index + 1)) {
-    const before = haystack[index - 1], after = haystack[index + fragment.length];
-    if (/^\d/.test(fragment) && before && /\d/.test(before)) continue;
-    if (/\d$/.test(fragment) && after && /\d/.test(after)) continue;
-    return true;
-  }
-  return false;
-}
-
-interface ItemIndex { tokens: Set<string>; haystack: string; required: string[]; brand?: string }
+interface ItemIndex { tokens: Set<string>; sequence: string[]; required: string[]; series: string[]; brand?: string }
 function indexItem(item: SolarEquipmentItem): ItemIndex {
   const brand = effectiveBrand(item);
-  const names = canonical(`${item.modelSeries || ''} ${item.displayName || ''}`).replace(UNITS, ' ');
-  const brandWords = new Set([...words(canonical(`${brand || ''} ${item.brand || ''}`)), compact(brand || '')]);
-  const tokens = new Set(words(canonical(`${brand || ''} ${item.brand || ''} ${item.modelSeries || ''} ${item.displayName || ''}`)));
+  const brandText = `${brand || ''} ${item.brand || ''}`;
+  const brandWords = new Set([...words(canonical(brandText)), compact(brand || ''), compact(item.brand || '')]);
+  const names = forParsing(`${item.modelSeries || ''} ${item.displayName || ''}`).replace(UNITS, ' ');
+  // Secuencia ordenada de palabras (marca, serie y nombre) para casar fragmentos pegados sin cruzar fronteras.
+  const sequence = words(forParsing(`${brandText} ${item.modelSeries || ''} ${item.displayName || ''}`));
   return {
-    tokens,
-    haystack: compact(`${brand || ''} ${item.brand || ''} ${item.modelSeries || ''} ${item.displayName || ''}`),
+    tokens: new Set(sequence),
+    sequence,
     // Palabras que distinguen el modelo; los números sueltos cortos («8», «16») no lo identifican.
     required: [...new Set(words(names).filter(t => !STOPWORDS.has(t) && !brandWords.has(t) && (!/^\d+$/.test(t) || t.length >= 3)))],
+    series: words(forParsing(item.modelSeries || '')).filter(t => !STOPWORDS.has(t)),
     brand,
   };
 }
-function hasToken(index: ItemIndex, token: string): boolean {
-  if (index.tokens.has(token) || containsFragment(index.haystack, token)) return true;
-  const alias = KNOWN_SOLAR_BRANDS[token];
-  return !!alias && containsFragment(index.haystack, compact(alias));
+/** Palabras del equipo que forman `fragment` juntando palabras consecutivas completas («canadiansolar», «jam66d45630lb»); nunca media palabra. */
+function wordsForming(sequence: readonly string[], fragment: string): string[] | undefined {
+  for (let i = 0; i < sequence.length; i++) {
+    let joined = '';
+    for (let j = i; j < sequence.length && joined.length < fragment.length; j++) {
+      joined += sequence[j];
+      if (joined === fragment) return sequence.slice(i, j + 1);
+    }
+  }
+  return undefined;
 }
+/** Palabras del equipo que cubren la palabra pedida, o nada si no aparece (con alias de marca: Hina → HinaESS). */
+function matchToken(index: ItemIndex, token: string): string[] | undefined {
+  if (index.tokens.has(token)) return [token];
+  const joined = wordsForming(index.sequence, token);
+  if (joined) return joined;
+  const alias = KNOWN_SOLAR_BRANDS[token];
+  if (alias) return wordsForming(index.sequence, compact(alias)) ?? (index.tokens.has(compact(alias)) ? [compact(alias)] : undefined);
+  return undefined;
+}
+const subset = (a: readonly string[], b: ReadonlySet<string>) => a.length > 0 && a.every(t => b.has(t));
 
 /** ¿Encaja este equipo con lo pedido? Respuesta explicable; no mira el resto del catálogo (eso es `matchEquipment`). */
 export function fitEquipment(request: EquipmentRequest, item: SolarEquipmentItem): EquipmentFit {
@@ -136,7 +149,7 @@ export function fitEquipment(request: EquipmentRequest, item: SolarEquipmentItem
 
   // Marca declarada aparte: con ambas conocidas, deben coincidir (con alias: Luxpower ↔ LuxpowerTek).
   let brandMatch: boolean | undefined;
-  if (request.brand?.trim() && index.brand) {
+  if (request.brand?.trim() && !isGenericBrand(request.brand) && index.brand) {
     brandMatch = areBrandsMatching(request.brand, index.brand);
     if (!brandMatch) return no(`La marca ${request.brand.trim()} no es ${index.brand} (${item.displayName}).`, { brandMatch });
   }
@@ -168,25 +181,29 @@ export function fitEquipment(request: EquipmentRequest, item: SolarEquipmentItem
     if (!magnitudesMatch(request.type, requested, magnitude)) return no(`Se pidió ${formatNumber(requested)} ${unit} y ${item.displayName} tiene ${formatNumber(magnitude)} ${unit}.`, { magnitudeDelta });
   }
 
-  // Palabras del texto: todas deben aparecer en el equipo (marca, serie o nombre).
-  const missing = parsed.tokens.find(token => !hasToken(index, token));
-  if (missing) return no(`«${missing}» no aparece en ${item.displayName}.`, { magnitudeDelta });
-  const code = parsed.codes.find(c => !containsFragment(index.haystack, c));
-  if (code) return no(`El código «${code}» no aparece en ${item.displayName}.`, { magnitudeDelta });
-
-  // Código de modelo declarado aparte: exacto, compatible (uno contiene al otro) o ninguno (no excluye).
-  let modelMatch: EquipmentFit['modelMatch'];
-  const model = compact(request.model || '');
-  if (model) {
-    const series = compact(item.modelSeries || '');
-    const display = compact(item.displayName || '');
-    if (model === series || display.includes(model)) modelMatch = 'exact';
-    else if (series && (series.includes(model) || model.includes(series))) modelMatch = 'compatible';
+  // Palabras del texto: todas deben aparecer en el equipo (marca, serie o nombre) como palabras completas.
+  const covered = new Set<string>();
+  for (const token of parsed.tokens) {
+    const found = matchToken(index, token);
+    if (!found) return no(`«${token}» no aparece en ${item.displayName}.`, { magnitudeDelta });
+    found.forEach(t => covered.add(t));
   }
-  if (!model && !parsed.tokens.length && requested === undefined && brandMatch === undefined) return no('La solicitud no indica marca, modelo ni especificación.');
+  const code = parsed.codes.find(c => !wordsForming(index.sequence, c.join('')) && !c.every(t => index.tokens.has(t)));
+  if (code) return no(`El código «${code.join('-')}» no aparece en ${item.displayName}.`, { magnitudeDelta });
 
-  const requestTokens = new Set([...parsed.tokens, ...parsed.codes]);
-  const namesCovered = parsed.tokens.length > 0 && index.required.length > 0 && index.required.every(t => requestTokens.has(t) || parsed.codes.some(c => c.includes(t)));
+  // Código de modelo declarado aparte, por palabras completas: exacto (mismas palabras que la serie o el modelo),
+  // compatible (uno contiene al otro: «5K» en «5K Pro») o ninguno («5K» frente a «15K»). No excluye.
+  let modelMatch: EquipmentFit['modelMatch'];
+  const modelWords = words(forParsing(request.model || '')).filter(t => !STOPWORDS.has(t));
+  if (modelWords.length) {
+    const asked = new Set(modelWords);
+    const same = (other: readonly string[]) => other.length > 0 && subset(other, asked) && subset(modelWords, new Set(other));
+    if (same(index.series) || same(index.required)) modelMatch = 'exact';
+    else if (subset(modelWords, new Set(index.required)) || subset(index.series, asked)) modelMatch = 'compatible';
+  }
+  if (!modelWords.length && !parsed.tokens.length && requested === undefined && brandMatch === undefined) return no('La solicitud no indica marca, modelo ni especificación.');
+
+  const namesCovered = parsed.tokens.length > 0 && index.required.length > 0 && index.required.every(t => covered.has(t));
   const shown = magnitude !== undefined ? ` (${formatNumber(magnitude)} ${unit})` : '';
   const base = { item, fits: true, magnitudeDelta, brandMatch, modelMatch, ahMatch } as const;
   if (namesCovered || modelMatch === 'exact') return { ...base, kind: 'exact', reason: `Modelo exacto: ${item.displayName}${shown}.` };
@@ -207,7 +224,9 @@ export function matchEquipment(request: EquipmentRequest, catalog: readonly Sola
     const names = tier.slice(0, 5).map(fit => fit.item.displayName).join(', ');
     return { kind: 'ambiguous', candidates: tier, reason: `«${asked}» coincide con ${tier.length} modelos: ${names}. Indica cuál.` };
   }
-  return { kind: fits[0].kind === 'exact' ? 'exact' : 'spec', item: fits[0].item, candidates: fits, reason: fits[0].reason };
+  // Parcial (marca o parte del nombre, sin especificación): resultado propio que siempre pide confirmación.
+  const kind = fits[0].kind === 'exact' ? 'exact' : fits[0].kind === 'spec' ? 'spec' : 'partial';
+  return { kind, item: fits[0].item, candidates: fits, reason: fits[0].reason };
 }
 
 /** Búsqueda libre en el catálogo (asistente): los equipos que encajan con el texto, del mejor al peor; el tipo sale del texto si lo nombra. */

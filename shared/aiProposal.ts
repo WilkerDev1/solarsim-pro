@@ -186,7 +186,7 @@ export function normalizeProposalDraft(rawDraft: unknown, catalog: SolarEquipmen
         if (match.kind==='ambiguous' && match.candidates.some(c=>c.item.id===item.id)) {
           const others=match.candidates.filter(c=>c.item.id!==item.id).slice(0,4).map(c=>c.item.displayName).join(', ');
           issue(`requested_${type}_model_ambiguous`,`${item.displayName} es uno de varios modelos que coinciden con lo solicitado (${requestedModel}); también ${others}. Confirma el modelo.`,'warning');
-        }
+        } else if (fit.kind==='partial') issue(`requested_${type}_model_partial`,`${item.displayName} coincide con lo solicitado (${requestedModel}) solo por marca o parte del nombre, sin modelo ni ${type==='battery'?'capacidad':'potencia'} que lo confirme. Confirma el modelo.`,'warning');
       }
       const requestedMagnitude=num(row[type==='panel'?'requestedPowerW':type==='inverter'?'requestedPowerKW':'requestedCapacityKWh']);
       const magnitudeMismatch=requestedMagnitude!==undefined && !magnitudesMatch(type,requestedMagnitude,magnitude);
