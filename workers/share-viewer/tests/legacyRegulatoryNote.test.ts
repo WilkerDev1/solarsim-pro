@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { renderProposalPage } from '../src/template';
 import { formatMarkdown } from '../src/escaping';
+import { createDocumentTextContext, regulatoryNoteDefault } from '../../../shared/documentTexts';
 
 /**
  * Enlaces ya publicados (sin `doc:projectDescription.regulatoryNote`): la nota regulatoria que el visor
@@ -51,5 +52,13 @@ assert.ok(cepm.includes('consumo tomado de la red de CEPM'));
 assert.ok(cepm.includes('equivalente al 25% del valor de la energía excedente exportada'));
 // Una nota publicada (personalizada) gana siempre.
 assert.ok(renderProposalPage({ ...stored({ distributor: 'EDESUR', tariffCode: 'BTD' }), project: { ...stored({ distributor: 'EDESUR', tariffCode: 'BTD' }).project, customization: { 'doc:projectDescription.regulatoryNote': 'Nota propia.' } } }).includes('Nota propia.'));
+
+// Un enlace nuevo trae la nota vigente publicada (la app la publica siempre): BTD sin cargo por uso de red.
+const currentBtdNote = regulatoryNoteDefault(createDocumentTextContext({ distributor: 'EDESUR', tariffCode: 'BTD', gridExportFeePct: 25, isZeroExport: false, hasBattery: false }));
+const fresh = stored({ distributor: 'EDESUR', tariffCode: 'BTD', gridExportFeePct: 25 });
+fresh.project.customization = { 'doc:projectDescription.regulatoryNote': currentBtdNote };
+const freshHtml = renderProposalPage(fresh);
+assert.ok(freshHtml.includes('no aplica el cargo por derecho de uso de la red'));
+assert.ok(!freshHtml.includes('equivalente al 25% del valor de la energía excedente exportada'));
 
 console.log('Visor: los enlaces antiguos conservan la nota regulatoria que mostraban.');

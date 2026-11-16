@@ -1,5 +1,6 @@
 import { getTariffDisplayName } from '../proposalPresentation';
 import type { DocumentTextContext } from './context';
+import { tariffChargeKind } from '../tariffRules';
 import { resolveDynamicProjectSummaryParagraph1, resolveDynamicProjectSummaryParagraph2 } from './projectSummary';
 
 const kwh = (value: number) => value.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -19,8 +20,23 @@ export function regulatoryNoteDefault(ctx: DocumentTextContext): string {
   const p3 = 'Los ahorros indicados son estimados y pueden variar según los hábitos de consumo, el perfil de carga y las condiciones reales de operación del sistema.';
   const p4 = ctx.isZeroExport
     ? `Al operar con limitador antivertido (inyección cero)${ctx.hasBattery ? ' y almacenamiento en baterías de litio' : ''}, la totalidad de la energía solar se aprovecha internamente, por lo que el proyecto no genera cargos por derecho de uso de la red bajo la normativa vigente.`
-    : `Para la tarifa ${tariffDisplayName}, el análisis económico considera el cargo por derecho de uso de la red, equivalente al ${exportFee}% del valor de la energía excedente exportada, conforme al régimen de Medición Neta y la normativa vigente (Resolución SIE-007-2026-REG). Por esta razón, el sistema se diseña para maximizar el autoconsumo y optimizar la inyección de energía, obteniendo así el mayor retorno de inversión posible.${ctx.hasBattery ? '' : ' Cuando resulte conveniente, se recomendará la incorporación de baterías de litio para incrementar el aprovechamiento directo de la energía generada.'}`;
+    : gridUseChargeParagraph(ctx, distributor, tariff, tariffDisplayName, exportFee);
   return [p1, p2, p3, p4].join('\n\n');
+}
+
+/**
+ * Párrafo del cargo por uso de la red. El Reglamento SIE-007-2026-REG solo lo cobra a las tarifas de un solo
+ * precio por kWh (BTS-1, BTS-2, RBT-1); en las que tienen cargo de potencia (BTD, BTH, MTD, MTH, RBT-2) se
+ * dice que no aplica y se declara el criterio que usa hoy el cálculo (la retención no cambia hasta la fase 3).
+ * Tarifas sin clasificar y la edición `legacy` (enlaces ya publicados) conservan el texto anterior.
+ */
+function gridUseChargeParagraph(ctx: DocumentTextContext, distributor: string, tariff: string, tariffDisplayName: string, exportFee: number): string {
+  const batteryHint = ctx.hasBattery ? '' : ' Cuando resulte conveniente, se recomendará la incorporación de baterías de litio para incrementar el aprovechamiento directo de la energía generada.';
+  if (ctx.regulatoryNoteEdition !== 'legacy' && tariffChargeKind(distributor, tariff) === 'demand') {
+    const criterion = exportFee > 0 ? ` Como criterio conservador, el análisis económico descuenta un ${exportFee}% de la energía excedente exportada.` : '';
+    return `Para la tarifa ${tariffDisplayName}, que incluye cargo por potencia, no aplica el cargo por derecho de uso de la red: el Reglamento de Generación Distribuida (Resolución SIE-007-2026-REG) lo reserva a las tarifas de un solo precio por kWh.${criterion} El sistema se diseña para maximizar el autoconsumo y optimizar la inyección de energía, obteniendo así el mayor retorno de inversión posible.${batteryHint}`;
+  }
+  return `Para la tarifa ${tariffDisplayName}, el análisis económico considera el cargo por derecho de uso de la red, equivalente al ${exportFee}% del valor de la energía excedente exportada, conforme al régimen de Medición Neta y la normativa vigente (Resolución SIE-007-2026-REG). Por esta razón, el sistema se diseña para maximizar el autoconsumo y optimizar la inyección de energía, obteniendo así el mayor retorno de inversión posible.${batteryHint}`;
 }
 
 export function projectSummaryParagraph1Default(ctx: DocumentTextContext): string {

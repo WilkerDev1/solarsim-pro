@@ -206,10 +206,12 @@ const bts1Note = note('EDENORTE', 'BTS1');
 const chargeParagraph = (tariffName: string) => `Para la tarifa ${tariffName}, el análisis económico considera el cargo por derecho de uso de la red, equivalente al 25% del valor de la energía excedente exportada, conforme al régimen de Medición Neta y la normativa vigente (Resolución SIE-007-2026-REG). Por esta razón, el sistema se diseña para maximizar el autoconsumo y optimizar la inyección de energía, obteniendo así el mayor retorno de inversión posible. Cuando resulte conveniente, se recomendará la incorporación de baterías de litio para incrementar el aprovechamiento directo de la energía generada.`;
 assert.equal(bts1Note.split('\n\n')[3], chargeParagraph('BTS1 (Residencial Monómica)'));
 assert.ok(bts1Note.startsWith('La energía generada mensualmente se descontará del consumo tomado de la red de la distribuidora eléctrica (EDES).'));
-// Hoy la misma frase del cargo aparece también en tarifas con cargo de potencia (BTD): la fase 1 la condiciona.
+// Fase 1d: en tarifas con cargo de potencia (BTD) la nota ya no atribuye el cargo por uso de red; la edición
+// `legacy` (enlaces publicados antes) conserva la frase anterior.
 const btdNote = note('EDESUR', 'BTD');
 assert.equal(btdNote.split('\n\n').length, 4);
-assert.ok(btdNote.split('\n\n')[3].includes('equivalente al 25% del valor de la energía excedente exportada'), btdNote);
+assert.ok(!btdNote.includes('equivalente al 25% del valor de la energía excedente exportada'), btdNote);
+assert.ok(note('EDESUR', 'BTD', { regulatoryNoteEdition: 'legacy' }).split('\n\n')[3].includes('equivalente al 25% del valor de la energía excedente exportada'));
 const zeroNote = note('EDEESTE', 'BTS2', { isZeroExport: true, hasBattery: true });
 assert.equal(zeroNote.split('\n\n')[3], 'Al operar con limitador antivertido (inyección cero) y almacenamiento en baterías de litio, la totalidad de la energía solar se aprovecha internamente, por lo que el proyecto no genera cargos por derecho de uso de la red bajo la normativa vigente.');
 
