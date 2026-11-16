@@ -1,5 +1,5 @@
 // Minimal JSON Schema subset validator and Gemini adapter for agent tool inputs. Pure, no dependencies.
-import type { AgentToolDefinition, JsonSchema } from './types';
+import type { AgentToolDefinition, JsonSchema } from './types.js';
 
 const typeOf = (value: unknown): string =>
   value === null ? 'null' : Array.isArray(value) ? 'array' : Number.isInteger(value) ? 'integer' : typeof value;
