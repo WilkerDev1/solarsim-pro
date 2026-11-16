@@ -124,6 +124,40 @@ assert.equal(bodies.length, 2);
   assert.deepEqual((await requestGeminiStructured(base, transport)).data, { ok: true });
 }
 
+// 9. Revisión del plazo: nunca se llama con el plazo vencido, el margen es proporcional y el plazo se valida.
+{
+  const json = (text: string) => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text }] } }] });
+  // Plazo corto (10 s) y primer fallo rápido: el reintento cabe.
+  let clock = 0;
+  const timeouts: number[] = [];
+  const fast: GeminiTransport = async (_u, _b, _h, timeoutMs) => { timeouts.push(timeoutMs); clock += 50; return json(timeouts.length === 1 ? 'no-json' : '{"ok":true}'); };
+  const short = await requestGeminiStructured({ ...base, timeoutMs: 10_000, now: () => clock }, fast);
+  assert.equal(short.attempts, 2, 'con 10 s y un fallo a los 50 ms se reintenta');
+  assert.deepEqual(timeouts, [10_000, 9_950]);
+  // Lo mismo con el fallo transitorio que reintenta requestGeminiJson.
+  clock = 0; timeouts.length = 0;
+  const transient: GeminiTransport = async (_u, _b, _h, timeoutMs) => {
+    timeouts.push(timeoutMs); clock += 50;
+    if (timeouts.length === 1) throw Object.assign(new Error('503'), { statusCode: 503 });
+    return json('{"ok":true}');
+  };
+  assert.equal((await requestGeminiStructured({ ...base, timeoutMs: 10_000, now: () => clock }, transient)).data.ok, true);
+  assert.equal(timeouts.length, 2);
+  // Plazo vencido: no se llama al transporte con 1 ms; se informa el tiempo agotado.
+  clock = 0; timeouts.length = 0;
+  const late: GeminiTransport = async (_u, _b, _h, timeoutMs) => { timeouts.push(timeoutMs); clock += 20_000; throw Object.assign(new Error('503'), { statusCode: 503 }); };
+  await assert.rejects(requestGeminiStructured({ ...base, timeoutMs: 10_000, now: () => clock }, late), /503|tardó/);
+  assert.deepEqual(timeouts, [10_000], 'sin plazo restante no hay segunda llamada');
+  assert(!timeouts.some(t => t < 1000), 'nunca una llamada con un plazo de milisegundos');
+  // Plazo no finito o no positivo: se usa el predeterminado (60 s), nunca NaN ni 0 en el transporte.
+  for (const timeoutMs of [NaN, Infinity, 0, -5]) {
+    timeouts.length = 0; clock = 0;
+    replies.push('{"ok":true}');
+    await requestGeminiStructured({ ...base, timeoutMs, now: () => clock }, async (url, body, headers, t) => { timeouts.push(t); return transport(url, body, headers, t); });
+    assert.deepEqual(timeouts, [60_000], `timeoutMs=${timeoutMs}`);
+  }
+}
+
 // 7. Ningún servicio arma su propia variante: las peticiones estructuradas pasan por requestGeminiStructured.
 for (const file of readdirSync('src/services').filter((name) => /^gemini.*Service\.ts$/.test(name))) {
   const source = readFileSync(`src/services/${file}`, 'utf8');

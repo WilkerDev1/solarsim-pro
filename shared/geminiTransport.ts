@@ -51,8 +51,12 @@ export function geminiGenerationConfig(model: string, config: Record<string, unk
 /** Synchronous output ceiling used by the single MAX_TOKENS recovery. */
 const outputCeiling = (model: string) => /^gemini-4[.-]/.test(model) ? 65536 : 32768;
 const TRANSIENT = [408, 500, 502, 503, 504];
-/** Margen mínimo para intentar otra llamada dentro de un plazo global: la cuarta parte del plazo, al menos 15 s. */
-const retryMargin = (totalMs: number) => Math.max(15000, totalMs * 0.25);
+/** Margen para intentar otra llamada dentro de un plazo global: la cuarta parte del plazo (proporcional, también con plazos cortos). */
+const retryMargin = (totalMs: number) => totalMs * 0.25;
+const DEFAULT_TIMEOUT_MS = 60000;
+/** Plazo válido: finito y positivo; si no, el predeterminado (nunca NaN, 0 ni infinito en el transporte). */
+const validTimeout = (ms?: number) => typeof ms === 'number' && Number.isFinite(ms) && ms > 0 ? ms : DEFAULT_TIMEOUT_MS;
+const expired = () => new GeminiRequestError('Google Gemini tardó demasiado. Reintenta la solicitud.', 408);
 const TRUNCATED = 'Gemini agotó el límite de respuesta. Reduce los adjuntos o divide las instrucciones. Tu borrador anterior se conserva; no se aplicaron datos parciales.';
 
 /**
@@ -68,7 +72,7 @@ export async function requestGeminiJson(
   transport: GeminiTransport = webGeminiTransport,
 ): Promise<{ response: any; modelUsed: string; requestedModel: string; modelWarning?: string }> {
   const now = options.now ?? Date.now;
-  const perAttempt = options.timeoutMs ?? 60000;
+  const perAttempt = validTimeout(options.timeoutMs);
   const remaining = () => options.deadline === undefined ? perAttempt : Math.min(perAttempt, options.deadline - now());
   const canRetry = () => options.deadline === undefined || remaining() >= retryMargin(perAttempt);
   if (!options.apiKey?.trim()) throw new Error('Configura una API Key de Google Gemini en Ajustes.');
@@ -78,13 +82,15 @@ export async function requestGeminiJson(
   let model = requestedModel;
   let maxOutputTokens: number | undefined = original?.generationConfig?.maxOutputTokens;
   let warning: string | undefined;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; ; attempt++) {
     if (options.signal?.aborted) throw options.signal.reason || new Error('Solicitud cancelada.');
+    // Con el plazo global vencido no se abre otra petición (antes salía con 1 ms y fallaba sin llegar a enviarse).
+    if (remaining() <= 0) throw expired();
     const generationConfig = geminiGenerationConfig(model, { ...original?.generationConfig, ...(maxOutputTokens ? { maxOutputTokens } : {}) }, options.thinkingLevel);
     let response: any;
     try {
       response = await transport(`${GEMINI_API_BASE}/models/${model}:generateContent`, { ...original, generationConfig },
-        { 'Content-Type': 'application/json', 'x-goog-api-key': options.apiKey.trim() }, Math.max(1, remaining()), options.signal);
+        { 'Content-Type': 'application/json', 'x-goog-api-key': options.apiKey.trim() }, remaining(), options.signal);
     } catch (error: any) {
       if (options.signal?.aborted || attempt || !canRetry()) throw error;
       if (TRANSIENT.includes(error?.statusCode)) {
@@ -105,7 +111,6 @@ export async function requestGeminiJson(
     }
     return { response, modelUsed: model, requestedModel, modelWarning: warning };
   }
-  throw new Error('No se recibió una respuesta de Gemini.');
 }
 export function geminiResponseText(response: any): string {
   const candidate = response?.candidates?.[0];
@@ -165,9 +170,9 @@ export async function requestGeminiStructured<T extends Record<string, any> = Re
   const retries = Number.isFinite(options.invalidJsonRetries) ? Math.min(1, Math.max(0, Math.floor(options.invalidJsonRetries!))) : options.invalidJsonRetries === undefined ? 1 : 0;
   const allowed = 1 + retries;
   const now = options.now ?? Date.now;
-  const total = options.timeoutMs ?? 60000;
+  const total = validTimeout(options.timeoutMs);
   const deadline = now() + total;
-  for (let attempt = 1; attempt <= allowed; attempt++) {
+  for (let attempt = 1; ; attempt++) {
     // requestGeminiJson reintenta otros fallos (modelo caído, truncado) dentro del mismo plazo global, nunca el JSON inválido.
     const result = await requestGeminiJson({ apiKey: options.apiKey, model: options.model, body, signal: options.signal, timeoutMs: total, deadline, now, thinkingLevel: options.thinkingLevel }, transport);
     try {
@@ -179,5 +184,4 @@ export async function requestGeminiStructured<T extends Record<string, any> = Re
       if (!(error instanceof GeminiInvalidJsonError) || attempt >= allowed || options.signal?.aborted || deadline - now() < retryMargin(total)) throw error;
     }
   }
-  throw new Error(options.invalidMessage);
 }
