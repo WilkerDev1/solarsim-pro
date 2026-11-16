@@ -202,3 +202,150 @@
 .proposal-document-text-reset{display:inline-flex;align-items:center;gap:6px;color:var(--pw-muted);font-style:italic}
 .proposal-document-text .proposal-row-alert{margin:0;font-size:12.5px;line-height:1.5}
 .proposal-document-text .proposal-row-alert svg{vertical-align:-2px}
+
+/* ── Ronda 2: contraste de campos, un solo peso de color por zona, franja pegajosa y pie compacto ───────
+   Contrastes verificados (WCAG 2.2): borde de campo #7a8799/#fff 3.65:1 y #6f7885 sobre #1c1f23 3.70:1
+   (sobre el campo hundido #141619, 4.06:1). Insignias: #fff/#ad2435 6.82:1, #fff/#7a4b00 7.41:1,
+   #401e25/#ff9aaa 7.31:1, #3a2d12/#ffd88a 9.87:1; anillo del color del panel para separarlas del relleno verde
+   de la pestaña activa (#fff/#067451 5.79:1). Acción principal: #fff/#087b58 5.27:1 en ambos temas (el
+   #0b8a63 oscuro anterior daba 4.35:1). Principal bloqueado: #065a40/#d6ede5 6.72:1 con borde #087b58 (5.27:1
+   sobre el panel); oscuro #c9f5e5/#123d30 10.18:1 con borde #6be0b5. */
+.proposal-workspace{--pw-field-border:#7a8799;--pw-field-bg:var(--pw-panel);--pw-badge-block-bg:#ad2435;--pw-badge-block-text:#fff;--pw-badge-warn-bg:#7a4b00;--pw-badge-warn-text:#fff;--pw-primary-soft-bg:#d6ede5;--pw-primary-soft-text:#065a40;--pw-primary-soft-border:#087b58;--band-h:56px}
+.proposal-workspace.proposal-dark{--pw-field-border:#6f7885;--pw-field-bg:var(--pw-bg);--pw-badge-block-bg:#ff9aaa;--pw-badge-block-text:#401e25;--pw-badge-warn-bg:#ffd88a;--pw-badge-warn-text:#3a2d12;--pw-primary-soft-bg:#123d30;--pw-primary-soft-text:#c9f5e5;--pw-primary-soft-border:#6be0b5;--pw-action:#087b58;--pw-action-hover:#066344}
+
+/* R1 — campos con contorno de componente; en oscuro, hundidos. */
+.proposal-draft-panel :is(input:not([type=checkbox]),select,textarea){border-color:var(--pw-field-border);background:var(--pw-field-bg)}
+.proposal-draft-panel input[type=checkbox]{accent-color:var(--pw-action)}
+.proposal-dark .proposal-draft-panel input[type=checkbox]{color-scheme:dark}
+.proposal-body .proposal-draft-panel button.proposal-ghost{border-color:var(--pw-field-border)}
+.proposal-body .proposal-draft-panel button.proposal-tertiary{background:transparent;border-color:transparent;color:var(--pw-muted);font-weight:550;padding:4px 8px;min-height:28px}
+.proposal-body .proposal-draft-panel button.proposal-tertiary:hover:not(:disabled){background:var(--pw-bg);color:var(--pw-text);text-decoration:underline;text-underline-offset:3px}
+.proposal-body .proposal-draft-panel button.proposal-reset:hover:not(:disabled),.proposal-body .proposal-draft-panel button.proposal-reset:focus-visible{color:var(--pw-error)}
+.proposal-reset-confirm{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600}
+.proposal-body .proposal-draft-panel .proposal-reset-confirm button{min-height:32px;padding:4px 10px}
+
+/* R3 — el color fuerte sólo en el campo/fila donde se actúa: los «por confirmar» sin halo. */
+.proposal-body [data-flag=confirm]>label>:is(input,select,textarea){box-shadow:none}
+
+/* R4 — insignias de pestaña sólidas, con icono y anillo; pestaña sin pendientes con check. */
+.proposal-review-tabs .proposal-count{display:inline-flex;align-items:center;gap:3px;padding:0 6px 0 5px;box-shadow:0 0 0 2px var(--pw-panel);border:0!important}
+.proposal-review-tabs .proposal-count[data-tier=blocking]{background:var(--pw-badge-block-bg);color:var(--pw-badge-block-text)}
+.proposal-review-tabs .proposal-count[data-tier=confirm]{background:var(--pw-badge-warn-bg);color:var(--pw-badge-warn-text)}
+.proposal-tab-ok{color:var(--pw-green)}
+.proposal-review-tabs button[aria-selected=true] .proposal-tab-ok{color:var(--pw-panel)}
+.proposal-tab-short{display:none}
+
+/* R5 — una franja pegajosa: pestañas en una fila + total + pendientes. */
+.proposal-review-band{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:12px;min-height:52px;padding:8px 0;background:var(--pw-panel);border-bottom:2px solid var(--pw-border)}
+.proposal-review-band .proposal-review-tabs{position:static;flex:1 1 auto;min-width:0;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:2px;border:0;background:transparent}
+.proposal-body .proposal-review-band .proposal-review-tabs button{white-space:nowrap;flex-shrink:0;padding:6px 12px;min-height:34px}
+.proposal-band-meta{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.proposal-band-total{display:flex;flex-direction:column;align-items:flex-end;line-height:1.15;font-variant-numeric:tabular-nums}
+.proposal-band-total small{font-size:11px;font-weight:600}
+.proposal-band-total strong{font-size:15px;font-weight:700}
+.proposal-band-total[data-missing] strong{color:var(--pw-muted)}
+.proposal-body .proposal-band-status{min-height:34px;padding:5px 10px;gap:6px;border-radius:999px;background:var(--pw-bg);border:1px solid var(--pw-field-border);color:var(--pw-text);font-weight:650;white-space:nowrap}
+.proposal-body .proposal-band-status:disabled{opacity:1;cursor:default}
+.proposal-band-status[data-tier=blocking] svg:first-child{color:var(--pw-error)}
+.proposal-band-status[data-tier=confirm] svg:first-child{color:var(--pw-warn-text)}
+.proposal-band-status[data-tier=ok] svg:first-child{color:var(--pw-green)}
+.proposal-draft-scroll{scroll-padding-top:calc(var(--band-h) + 8px);scroll-padding-bottom:24px}
+.proposal-field,.proposal-equipment-row,.proposal-equipment-group,.proposal-commercial-block,.proposal-months-block,.proposal-document-texts{scroll-margin-top:calc(var(--band-h) + 12px)}
+
+/* R6 — resumen compacto y pie de una fila. */
+.proposal-summary{margin:14px 0 6px}
+.proposal-summary-item{padding:10px 12px}
+.proposal-summary-item strong{font-size:16px}
+.proposal-summary-price strong{font-size:18px}
+.proposal-summary-item strong[data-missing]{color:var(--pw-muted)}
+.proposal-body .proposal-apply{grid-template-columns:minmax(0,1fr) auto;gap:8px 16px;padding:10px 24px;box-shadow:none}
+.proposal-dark .proposal-apply{box-shadow:none}
+.proposal-body .proposal-apply-check>label{padding:2px 0;border:0;background:transparent;font-size:13.5px}
+.proposal-body .proposal-apply-check>label[data-checked]{background:transparent}
+.proposal-body .proposal-apply-check>label small{display:inline;margin-left:4px}
+.proposal-body .proposal-apply-check>label:has(input:disabled){opacity:1;color:var(--pw-muted)}
+.proposal-apply-check{gap:2px}
+.proposal-apply .proposal-apply-status{font-size:12.5px;font-weight:550;color:var(--pw-text)}
+.proposal-apply-status[data-tier] svg{flex-shrink:0}
+.proposal-apply-status[data-tier=blocking]{color:var(--pw-text)}.proposal-apply-status[data-tier=blocking] svg{color:var(--pw-error)}
+.proposal-apply-status[data-tier=confirm]{color:var(--pw-text)}.proposal-apply-status[data-tier=confirm] svg{color:var(--pw-warn-text)}
+.proposal-apply-status[data-tier=ok]{color:var(--pw-text)}.proposal-apply-status[data-tier=ok] svg{color:var(--pw-green)}
+.proposal-body .proposal-apply .proposal-primary{min-height:42px;padding:8px 18px;font-size:14.5px;gap:8px}
+/* R2 — el principal bloqueado sigue siendo principal (contorno verde + relleno suave) y guía al bloqueo. */
+.proposal-body .proposal-draft-panel button.proposal-primary[aria-disabled=true]{background:var(--pw-primary-soft-bg);border:2px solid var(--pw-primary-soft-border);color:var(--pw-primary-soft-text);opacity:1;cursor:pointer}
+.proposal-body .proposal-draft-panel button.proposal-primary[aria-disabled=true]:hover{filter:brightness(.97)}
+
+/* R7 — filas de equipo compactas en cuadrícula, con comparación «La IA pidió / Seleccionado». */
+.proposal-review .proposal-equipment-row{grid-template-columns:minmax(0,1fr) 84px 116px minmax(92px,auto) 36px;grid-template-areas:"model count price total trash" "meta meta meta meta meta" "alert alert alert alert alert";gap:6px 10px;padding:12px;align-items:end}
+.proposal-eq-model{grid-area:model}.proposal-eq-count{grid-area:count}.proposal-eq-price{grid-area:price}.proposal-eq-total{grid-area:total}
+.proposal-review .proposal-equipment-row>.proposal-icon-button{grid-area:trash;min-height:40px}
+.proposal-eq-meta{grid-area:meta;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:22px}
+.proposal-review .proposal-equipment-row>.proposal-row-alert{grid-area:alert}
+.proposal-eq-total{display:flex;flex-direction:column;align-items:flex-end;gap:7px;padding-bottom:9px;font-variant-numeric:tabular-nums}
+.proposal-eq-total span{font-size:13px;font-weight:550;color:var(--pw-text)}
+.proposal-eq-total strong{font-size:15px;font-weight:650}
+.proposal-eq-total[data-missing] strong{color:var(--pw-muted)}
+.proposal-eq-price input,.proposal-eq-count input{text-align:right;font-variant-numeric:tabular-nums}
+.proposal-origin{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:550;color:var(--pw-muted);padding:1px 8px;border-radius:999px;background:var(--pw-raised)}
+.proposal-origin[data-missing]{background:var(--pw-warn-bg);color:var(--pw-warn-text)}
+.proposal-row-alert-title{display:flex;align-items:center;gap:6px;font-size:13px}
+.proposal-compare{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;margin:0;font-size:13px;color:var(--pw-text)}
+.proposal-compare>div{display:contents}
+.proposal-compare dt{color:var(--pw-muted);font-weight:550}
+.proposal-compare dd{margin:0;font-weight:650;overflow-wrap:anywhere}
+.proposal-row-alert-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.proposal-body .proposal-row-alert-actions button{min-height:32px;padding:5px 12px}
+.proposal-row-alert .proposal-field-issues li{color:inherit}
+
+/* R9 — tabla de costos: guion discreto, una señal por fila, subtotal provisional, cabecera pegajosa. */
+.proposal-table-wrap{overflow:visible}
+.proposal-price-table thead th{position:sticky;top:var(--band-h);z-index:2}
+.proposal-dash{color:var(--pw-muted)}
+.proposal-price-table .proposal-pending{margin-left:6px;font-size:11px;padding:1px 7px;vertical-align:1px}
+.proposal-price-table tfoot th[data-provisional]{color:var(--pw-warn-text)}
+.proposal-cost-mode{display:grid;gap:4px;padding:10px 12px;border:1px solid var(--pw-border);border-radius:8px;background:var(--pw-bg)}
+.proposal-cost-mode span{font-size:12px;font-weight:600;color:var(--pw-muted)}
+.proposal-cost-mode strong{font-size:13px;font-weight:600;line-height:1.45}
+.proposal-total-main[data-missing] dd{color:var(--pw-muted)}
+
+/* R12 — esqueleto visible con la estructura real. */
+.proposal-skeleton{width:min(760px,100%);display:grid;gap:14px;padding:0 24px}
+.proposal-skeleton-label{font-size:13px;font-weight:600;color:var(--pw-muted)}
+.proposal-skeleton i{height:44px;border-radius:10px;background:linear-gradient(90deg,#e6eaef,#d3d9e0,#e6eaef);background-size:200% 100%;animation:proposal-shimmer 1.4s ease-in-out infinite}
+.proposal-dark .proposal-skeleton i{background:linear-gradient(90deg,#2a2f36,#3b414a,#2a2f36);background-size:200% 100%}
+.proposal-skeleton-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.proposal-skeleton-summary i{height:64px}
+.proposal-skeleton-tabs{display:flex;gap:8px}
+.proposal-skeleton-tabs i{height:32px;width:110px;border-radius:999px}
+.proposal-empty:has(.proposal-skeleton){margin:24px 0 auto;max-width:none;width:100%;padding:0}
+
+@container review (max-width:900px){
+  .proposal-summary-item small{display:none}
+}
+@container review (max-width:760px){
+  .proposal-tab-long{display:none}.proposal-tab-short{display:inline}
+  .proposal-band-total small{display:none}
+}
+@container review (max-width:620px){
+  .proposal-review .proposal-equipment-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 36px}
+  .proposal-review .proposal-equipment-row{grid-template-areas:"model model trash" "count price price" "total total total" "meta meta meta" "alert alert alert"}
+  .proposal-eq-total{flex-direction:row;justify-content:space-between;width:100%;padding-bottom:0}
+  .proposal-band-total{display:none}
+  .proposal-band-word{display:none}
+  .proposal-body .proposal-review-band .proposal-review-tabs button{padding:5px 7px;gap:4px;font-size:12.5px}
+  .proposal-review-band{gap:6px}
+  .proposal-summary{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+  .proposal-summary-item{padding:8px 10px}
+  .proposal-summary-item>span{font-size:11px}
+  .proposal-summary-item strong,.proposal-summary-price strong{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .proposal-body .proposal-apply{grid-template-columns:minmax(0,1fr) auto;padding:8px 16px}
+  .proposal-body .proposal-apply .proposal-primary{min-width:0;padding:8px 14px}
+  .proposal-body .proposal-apply-check>label small{display:none}
+  .proposal-skeleton-summary{grid-template-columns:repeat(2,1fr)}
+}
+@container review (max-width:460px){
+  .proposal-body .proposal-apply{grid-template-columns:1fr}
+}
+.proposal-document-text .proposal-row-alert{display:block}
+.proposal-skeleton .proposal-skeleton-summary i{height:64px}
+.proposal-skeleton .proposal-skeleton-tabs i{height:32px}

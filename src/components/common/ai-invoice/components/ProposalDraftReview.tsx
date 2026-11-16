@@ -5,7 +5,7 @@ import { ProposalDocumentTextsReview } from './ProposalDocumentTextsReview';
 import type { AIProposalContext, AIProposalIssue } from '../../../../../shared/aiProposal';
 import { resolveAssumption } from '../../../../../shared/assumptions';
 import type { FinancialSummaryResult } from '../../../../types';
-import { AlertTriangle, CheckCircle2, Plus, Trash2 } from 'lucide-react';
+import { AlertOctagon, AlertTriangle, ArrowRight, CheckCircle2, PackageOpen, Plus, Trash2 } from 'lucide-react';
 import type { ExtractedInvoiceData } from '../../../../types/aiInvoice';
 import type { SolarEquipmentItem } from '../../../../types/equipment';
 import type { GlobalTariffMatrix } from '../../../../types/tariffs';
@@ -64,19 +64,29 @@ export function ProposalDraftReview({draft,catalog,matrix,context,preview,produc
       <div className="proposal-summary-item"><span>Cliente</span><strong data-missing={!draft.clientName || undefined}>{draft.clientName || 'Sin nombre'}</strong><small>{[draft.province,draft.distributor&&`${draft.distributor}${draft.tariffCode?` · ${draft.tariffCode}`:''}`].filter(Boolean).join(' · ') || 'Ubicación y tarifa pendientes'}</small></div>
       <div className="proposal-summary-item"><span>Potencia DC</span><strong>{(draft.recommendedCapacityKWp || 0).toLocaleString('es-DO',{minimumFractionDigits:2,maximumFractionDigits:2})} kWp</strong><small>{plural(draft.recommendedPanelCount || units('panels'),'módulo','módulos')}</small></div>
       <div className="proposal-summary-item"><span>Equipos</span><strong>{plural(units('inverters'),'inversor','inversores')}</strong><small>{units('batteries')?plural(units('batteries'),'batería','baterías'):'Sin almacenamiento'}</small></div>
-      <div className="proposal-summary-item proposal-summary-price"><span>Total a pagar{incompletePrices&&contract!==undefined?' · provisional':''}</span><strong data-missing={contract===undefined || undefined}>{contract===undefined?'Pendiente':usd(contract)}</strong><small>{contract===undefined?'Se calcula al resolver precios y bloqueos':incompletePrices?'Faltan costos de equipos':'Calculado con el motor financiero'}</small></div>
-      <button type="button" className="proposal-summary-status" data-tier={blocking?'blocking':toReview?'confirm':'ok'} disabled={!firstPending} onClick={()=>firstPending&&go(firstPending)}>
-        {toReview?<AlertTriangle size={18} aria-hidden/>:<CheckCircle2 size={18} aria-hidden/>}
-        <span><strong>{toReview?`${toReview} por revisar`:'Sin pendientes'}</strong><small>{blocking?`${plural(blocking,'bloquea','bloquean')} la creación`:toReview?'Confirma antes de crear':'Revisa y confirma abajo'}</small></span>
-      </button>
+      <div className="proposal-summary-item proposal-summary-price"><span>Total a pagar{incompletePrices&&contract!==undefined?' · provisional':''}</span><strong data-missing={contract===undefined || undefined}>{contract===undefined?'—':usd(contract)}</strong><small>{contract===undefined?'Al resolver precios y bloqueos':incompletePrices?'Faltan costos de equipos':'Motor financiero'}</small></div>
     </div>
-    <div className="proposal-review-tabs" role="tablist" aria-label="Secciones del borrador">{REVIEW_TABS.map(({key,label})=>{
-      const count=pending[key];
-      const tier=worstTier(views.filter(v=>v.tier!=='info'&&v.target?.tab===key));
-      return <button type="button" key={key} role="tab" tabIndex={tab===key?0:-1} onKeyDown={e=>{const keys=REVIEW_TABS.map(t=>t.key);let index=keys.indexOf(tab);if(e.key==='ArrowRight')index=(index+1)%4;else if(e.key==='ArrowLeft')index=(index+3)%4;else if(e.key==='Home')index=0;else if(e.key==='End')index=3;else return;e.preventDefault();setTab(keys[index]);document.getElementById(`proposal-label-${keys[index]}`)?.focus();}} aria-selected={tab===key} aria-controls={`proposal-tab-${key}`} id={`proposal-label-${key}`} onClick={()=>setTab(key)}>
-        {label}{count>0&&<><span className="proposal-count" data-tier={tier} aria-hidden>{count}</span><span className="sr-only"> ({count} pendientes)</span></>}
-      </button>;
-    })}</div>
+    {/* Franja pegajosa única: pestañas en una fila + total + pendientes, para no perder el estado al bajar. */}
+    <div className="proposal-review-band">
+      <div className="proposal-review-tabs" role="tablist" aria-label="Secciones del borrador">{REVIEW_TABS.map(({key,label,short})=>{
+        const count=pending[key];
+        const tier=worstTier(views.filter(v=>v.tier!=='info'&&v.target?.tab===key));
+        const Icon=tier==='blocking'?AlertOctagon:AlertTriangle;
+        return <button type="button" key={key} role="tab" tabIndex={tab===key?0:-1} onKeyDown={e=>{const keys=REVIEW_TABS.map(t=>t.key);let index=keys.indexOf(tab);if(e.key==='ArrowRight')index=(index+1)%4;else if(e.key==='ArrowLeft')index=(index+3)%4;else if(e.key==='Home')index=0;else if(e.key==='End')index=3;else return;e.preventDefault();setTab(keys[index]);document.getElementById(`proposal-label-${keys[index]}`)?.focus();}} aria-selected={tab===key} aria-controls={`proposal-tab-${key}`} id={`proposal-label-${key}`} onClick={()=>setTab(key)}>
+          <span className="proposal-tab-long">{label}</span><span className="proposal-tab-short" aria-hidden="true">{short}</span>
+          {count>0?<><span className="proposal-count" data-tier={tier} aria-hidden><Icon size={11} strokeWidth={2.5}/>{count>9?'9+':count}</span><span className="sr-only"> ({count} pendientes)</span></>
+            :<><CheckCircle2 size={14} className="proposal-tab-ok" aria-hidden/><span className="sr-only"> (sin pendientes)</span></>}
+        </button>;
+      })}</div>
+      <div className="proposal-band-meta">
+        <span className="proposal-band-total" data-missing={contract===undefined || undefined}><small>Total</small><strong>{contract===undefined?'—':usd(contract)}</strong></span>
+        <button type="button" className="proposal-band-status" data-tier={blocking?'blocking':toReview?'confirm':'ok'} disabled={!firstPending} onClick={()=>firstPending&&go(firstPending)}>
+          {blocking?<AlertOctagon size={15} aria-hidden/>:toReview?<AlertTriangle size={15} aria-hidden/>:<CheckCircle2 size={15} aria-hidden/>}
+          <span>{toReview?<>{toReview}<span className="proposal-band-word"> por revisar</span></>:'Sin pendientes'}</span>{firstPending&&<ArrowRight size={14} aria-hidden/>}
+          {blocking>0&&<span className="sr-only"> · {plural(blocking,'bloquea','bloquean')} la creación</span>}
+        </button>
+      </div>
+    </div>
     {!!draft.unresolvedRequests?.length && <section className="proposal-unresolved" id={reviewAnchor.unresolved} tabIndex={-1}><h3>Solicitudes pendientes</h3><ul>{draft.unresolvedRequests.map((request,i)=><li key={i}>{request}</li>)}</ul><p className="proposal-note">Corrige el borrador o pide una alternativa al asistente. Marca como resuelto únicamente cuando hayas seleccionado una solución.</p><button type="button" className="proposal-confirm" onClick={()=>update({unresolvedRequests:[]})}>Confirmar que resolví estas solicitudes</button></section>}
     <ProposalDocumentTextsReview draft={draft} update={update} issues={at(reviewAnchor.documentTexts)}/>
     <div role="tabpanel" id="proposal-tab-client" aria-labelledby="proposal-label-client" hidden={tab!=='client'}><section>
@@ -97,8 +107,7 @@ export function ProposalDraftReview({draft,catalog,matrix,context,preview,produc
     </div><div role="tabpanel" id="proposal-tab-consumption" aria-labelledby="proposal-label-consumption" hidden={tab!=='consumption'}><ProposalConsumptionReview draft={draft} context={context} production={production} update={update} issues={views}/></div>
     <div role="tabpanel" id="proposal-tab-equipment" aria-labelledby="proposal-label-equipment" hidden={tab!=='equipment'}>
     <section id={reviewAnchor.field('equipment')} tabIndex={-1}>
-      <h3>Equipos del catálogo</h3>
-      <p className="proposal-note">Puedes combinar modelos. Las especificaciones vienen del inventario. Puedes cambiar el modelo o su costo para esta cotización; la IA no crea equipos.</p>
+      <h3 title="Puedes combinar modelos. Las especificaciones vienen del inventario; la IA no crea equipos.">Equipos del catálogo</h3>
       <IssueNotes issues={at(reviewAnchor.field('equipment'))}/>
       {groups.map(group => {
         const rows = draft[group.key] || [];
@@ -123,16 +132,24 @@ export function ProposalDraftReview({draft,catalog,matrix,context,preview,produc
             const selected=options.find(e=>e.id===row.id);
             const notesId=rowIssues.length?`${anchor}-issues`:undefined;
             const invalid=(control:'model'|'count'|'price')=>rowIssues.some(v=>v.tier==='blocking'&&rowControlFor(v.code)===control)?true:undefined;
+            const select=`${anchor}-model`;
+            const requestedNotes=rowIssues.filter(v=>!/^requested_/.test(v.code)||!row.requestedModel);
+            const total=row.unitPriceUSD!==undefined&&Number.isFinite(row.count)?row.unitPriceUSD*row.count:undefined;
             return <div className="proposal-equipment-row" key={`${group.key}-${i}`} id={anchor} tabIndex={-1} data-flag={rowTier}>
-            <label>Modelo<select value={row.id} aria-describedby={notesId} aria-invalid={invalid('model')} onChange={e=>change(i,e.target.value,row.count)}>{!options.some(e=>e.id===row.id)&&<option value={row.id}>Modelo no disponible</option>}{options.map(e=><option key={e.id} value={e.id}>{e.displayName || e.modelSeries} · {group.value(e)} {group.unit}</option>)}</select></label>
-            <label>Unidades<input type="number" min="1" max="100000" step="1" value={Number.isFinite(row.count)?row.count:''} aria-describedby={notesId} aria-invalid={invalid('count')} onChange={e=>change(i,row.id,Number(e.target.value))}/></label>
-            <button type="button" className="proposal-icon-button" aria-label={`Quitar ${row.brandModel || group.label}`} onClick={()=>{const next=rows.filter((_,j)=>i!==j);update({[group.key]:next,...(group.type==='battery'?{hasBattery:next.length>0}:{})});}}><Trash2 size={17}/></button>
-            {(row.requestedModel || rowIssues.length>0) && <div className="proposal-row-alert" data-tier={rowTier}>
-              <IssueNotes issues={rowIssues} id={notesId}/>
-              {row.requestedModel && <div className="proposal-row-alert-body"><p>La IA no pudo confirmar el modelo. Solicitado: <strong>{row.requestedModel}</strong> · En el borrador: <strong>{selected?.displayName || row.brandModel || 'sin modelo'}</strong>.</p><button type="button" className="proposal-confirm" onClick={()=>update({[group.key]:rows.map((item,j)=>j===i?{...item,requestedModel:undefined}:item)})}>Confirmar el modelo seleccionado</button></div>}
+            <label className="proposal-eq-model">Modelo<select id={select} value={row.id} aria-describedby={notesId} aria-invalid={invalid('model')} onChange={e=>change(i,e.target.value,row.count)}>{!options.some(e=>e.id===row.id)&&<option value={row.id}>Modelo no disponible</option>}{options.map(e=><option key={e.id} value={e.id}>{e.displayName || e.modelSeries} · {group.value(e)} {group.unit}</option>)}</select></label>
+            <label className="proposal-eq-count">Unidades<input type="number" min="1" max="100000" step="1" value={Number.isFinite(row.count)?row.count:''} aria-describedby={notesId} aria-invalid={invalid('count')} onChange={e=>change(i,row.id,Number(e.target.value))}/></label>
+            <label className="proposal-eq-price">Costo unit. USD<input type="number" min="0" step="0.01" value={row.unitPriceUSD ?? ''} aria-describedby={notesId} aria-invalid={invalid('price')} onChange={e=>update({[group.key]:rows.map((r,j)=>j===i?{...r,unitPriceUSD:e.target.value===''?undefined:Number(e.target.value),priceSource:'manual'}:r)})}/></label>
+            <div className="proposal-eq-total" data-missing={total===undefined || undefined}><span>Total</span><strong>{total===undefined?'—':usd(total)}</strong></div>
+            <button type="button" className="proposal-icon-button" aria-label={`Quitar ${row.brandModel || group.label}`} onClick={()=>{const next=rows.filter((_,j)=>i!==j);update({[group.key]:next,...(group.type==='battery'?{hasBattery:next.length>0}:{})});}}><Trash2 size={16}/></button>
+            <div className="proposal-eq-meta">
+              <span className="proposal-origin" data-missing={row.unitPriceUSD===undefined || undefined}>{row.unitPriceUSD===undefined?<><AlertTriangle size={12} aria-hidden/>Falta costo</>:row.priceSource==='manual'?'Costo particular de esta cotización':'Oferta del inventario'}</span>
+              {row.priceSource==='manual'&&<button type="button" className="proposal-tertiary" onClick={()=>update({[group.key]:rows.map((r,j)=>j===i?{...r,unitPriceUSD:undefined,priceSource:'supplier'}:r)})}><PackageOpen size={13} aria-hidden/>Usar oferta del inventario</button>}
+            </div>
+            {(row.requestedModel || rowIssues.length>0) && <div className="proposal-row-alert" data-tier={rowTier} id={notesId}>
+              {row.requestedModel && <><p className="proposal-row-alert-title">{rowTier==='blocking'?<AlertOctagon size={14} aria-hidden/>:<AlertTriangle size={14} aria-hidden/>}<strong>{rowTier==='blocking'?'Bloquea:':'Confirmar:'}</strong> la IA no pudo confirmar el modelo.</p><dl className="proposal-compare"><div><dt>La IA pidió</dt><dd>{row.requestedModel}</dd></div><div><dt>Seleccionado</dt><dd>{selected?.displayName || row.brandModel || 'Sin modelo'}</dd></div></dl>
+                <div className="proposal-row-alert-actions"><button type="button" className="proposal-confirm" onClick={()=>update({[group.key]:rows.map((item,j)=>j===i?{...item,requestedModel:undefined}:item)})}>Confirmar este modelo</button><button type="button" className="proposal-tertiary" onClick={()=>document.getElementById(select)?.focus()}>Cambiar modelo</button></div></>}
+              <IssueNotes issues={requestedNotes}/>
             </div>}
-            <div className="proposal-row-price"><label>Costo unitario (USD) · {row.priceSource==='manual'?'particular de esta cotización':'proveedor del inventario'}<input type="number" min="0" step="0.01" value={row.unitPriceUSD ?? ''} aria-describedby={notesId} aria-invalid={invalid('price')} onChange={e=>update({[group.key]:rows.map((r,j)=>j===i?{...r,unitPriceUSD:e.target.value===''?undefined:Number(e.target.value),priceSource:'manual'}:r)})}/></label><button type="button" className="proposal-ghost" onClick={()=>update({[group.key]:rows.map((r,j)=>j===i?{...r,unitPriceUSD:undefined,priceSource:'supplier'}:r)})}>Usar oferta del inventario</button></div>
-            <p className="proposal-row-total" data-missing={row.unitPriceUSD === undefined || undefined}>{row.unitPriceUSD === undefined ? <><AlertTriangle size={14} aria-hidden/>Sin precio de proveedor · revisar cotización</> : <><span>{usd(row.unitPriceUSD)} / unidad</span><strong>{usd(row.unitPriceUSD*(row.count||0))}</strong></>}</p>
           </div>;})}
         </div>;
       })}

@@ -63,7 +63,9 @@ assert.equal((digest.match(/<details/g) || []).length, 3, 'one collapsible group
 assert.match(digest, /<details[^>]*open=""[^>]*data-tier="blocking"|<details[^>]*data-tier="blocking"[^>]*open=""/, 'blockers start expanded');
 assert.doesNotMatch(digest, /<details[^>]*data-tier="info"[^>]*open=""/, 'informative notes start collapsed');
 assert.match(digest, /Bloquean la creación[\s\S]*?4/);
-assert.equal((digest.match(/aria-label="Ir a /g) || []).length, views.filter(v => v.target).length, 'every linked issue is a button');
+// Deliberate (round 2): each group shows its first three rows and «Ver N más»; every visible linked row is a button.
+const shownLinked = (['blocking', 'confirm', 'info'] as const).reduce((sum, tier) => sum + groups[tier].slice(0, 3).filter(v => v.target).length, 0);
+assert.equal((digest.match(/aria-label="Ir a /g) || []).length, shownLinked, 'every visible linked issue is a button');
 
 // 5. Review: summary with pending count, tab counters and inline flags with text (not only color).
 const review = renderToStaticMarkup(React.createElement(ProposalDraftReview, {
@@ -71,7 +73,7 @@ const review = renderToStaticMarkup(React.createElement(ProposalDraftReview, {
   catalog: [], matrix: { schedules: {} } as never, context: { province: 'Santiago' } as never, preview: null, production: null,
   update: () => {}, issues: [...issues] as never,
 }));
-assert.match(review, /8 puntos? por revisar|8 por revisar/, 'summary counts blocking + to confirm');
+assert.match(review, /8(<[^>]+>)? por revisar/, 'summary counts blocking + to confirm');
 assert.match(review, /id="proposal-label-equipment"[^>]*>[\s\S]*?4[\s\S]*?pendientes/, 'equipment tab shows its pending count');
 assert.match(review, /id="proposal-field-clientName"[^>]*data-flag="blocking"/, 'client field flagged inline');
 assert.match(review, /Bloquea:[^<]*<\/strong>|Bloquea:/, 'flag is explained with text');
@@ -136,6 +138,6 @@ assert.match(review, /aria-invalid="true"/);
     draft: { ...(draft as object), distributor: 'EDENORTE', tariffCode: 'BTS-1' } as never, catalog: [], matrix: { schedules: {} } as never, context: { province: 'Santiago' } as never, preview: null, production: null,
     update: () => {}, issueViews: views,
   }));
-  assert.match(html, /8 por revisar/);
+  assert.match(html, /8(<[^>]+>)? por revisar/);
 }
 console.log('PASS: review issues are tiered, linked to fields, counted per tab and flagged inline.');

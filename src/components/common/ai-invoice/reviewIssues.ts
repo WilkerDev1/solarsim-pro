@@ -12,11 +12,11 @@ export type EquipmentKey = 'panels' | 'inverters' | 'batteries';
 export interface IssueTarget { tab?: ReviewTab; anchor: string; label: string }
 export interface ReviewIssueView extends AIProposalIssue { tier: IssueTier; target?: IssueTarget }
 
-export const REVIEW_TABS: readonly { key: ReviewTab; label: string }[] = [
-  { key: 'consumption', label: 'Consumo y diseño' },
-  { key: 'equipment', label: 'Equipos' },
-  { key: 'commercial', label: 'Cotización' },
-  { key: 'client', label: 'Cliente y tarifa' },
+export const REVIEW_TABS: readonly { key: ReviewTab; label: string; short: string }[] = [
+  { key: 'consumption', label: 'Consumo y diseño', short: 'Consumo' },
+  { key: 'equipment', label: 'Equipos', short: 'Equipos' },
+  { key: 'commercial', label: 'Cotización', short: 'Cotización' },
+  { key: 'client', label: 'Cliente y tarifa', short: 'Cliente' },
 ];
 
 export const reviewAnchor = {
