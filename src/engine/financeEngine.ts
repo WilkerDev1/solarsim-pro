@@ -3,7 +3,8 @@ import { resolveAnnualDegradation, resolveAssumptions, type ResolvedAssumptions 
 import { DEFAULT_PRICE_PER_WATT_USD, resolvePricePerWattUSD, resolveSaleMarginMultiplier } from '../../shared/projectDefaults';
 import { ITBIS_RATE, LEY5707_CREDIT_RATE, appliesItemMargin, customItemsTaxBreakdown, isItemItbisExonerated } from '../../shared/financialRules';
 import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem, CustomQuotationItem, CustomQuotationDiscount, ProjectSimulation } from '../types';
-import { calculateDCCapacityKWp, calculateMonthlySolarProduction, type GridUseChargeInput } from './solarEngine';
+import { calculateDCCapacityKWp, calculateMonthlySolarProduction, type BlockBillingInput, type GridUseChargeInput } from './solarEngine';
+import { proposalBillingTariff, type TariffBillingRatesInput } from '../../shared/tariffBilling';
 import {
   getProjectPanels,
   getProjectInverters,
@@ -561,12 +562,18 @@ export function calculateFinancialSummary(
     rates.tariffCode,
     gridConnection,
     calculationMode,
-    engineGridUseCharge(assumptions, gridConnection)
+    engineGridUseCharge(assumptions, gridConnection),
+    engineBlockBilling(assumptions, rates)
   );
 
   const annualConsumptionKWh = monthlyResults.reduce((sum, m) => sum + m.consumptionKWh, 0);
   const annualProductionKWh = monthlyResults.reduce((sum, m) => sum + m.productionKWh, 0);
   const year1SavingsUSD = monthlyResults.reduce((sum, m) => sum + m.savingsUSD, 0);
+  // Facturación por bloques: el crédito que sobra al cierre del año (ya sumado en diciembre).
+  const closingBill = monthlyResults[monthlyResults.length - 1]?.tariffBill;
+  const settlementFields = closingBill
+    ? { annualCreditSettlementKWh: closingBill.creditSettlementKWh ?? 0, annualCreditSettlementUSD: closingBill.creditSettlementUSD ?? 0 }
+    : {};
   const energyCoveragePct = annualConsumptionKWh > 0
     ? Math.round((annualProductionKWh / annualConsumptionKWh) * 1000) / 10
     : 0;
@@ -684,6 +691,7 @@ export function calculateFinancialSummary(
     ley5707CreditUSD,
     netInvestmentUSD,
     year1SavingsUSD: Math.round(year1SavingsUSD * 100) / 100,
+    ...settlementFields,
     total25YearSavingsUSD,
     paybackYears,
     irrPct,
@@ -721,6 +729,20 @@ export function engineGridUseCharge(
 ): GridUseChargeInput | undefined {
   return assumptions.netMeteringRegime === 'sie007_2026' && gridConnection !== 'off_grid'
     ? { usdPerKWh: assumptions.appliedGridUseChargeDOPPerKWh / assumptions.dopExchangeRate }
+    : undefined;
+}
+
+/**
+ * Facturación por bloques que recibe el motor de energía: solo cuando los supuestos efectivos la eligen
+ * (`energyValuationMethod`, regla de `shared/tariffBilling.ts`); si no, el ahorro se valora con el precio escalar.
+ */
+export function engineBlockBilling(
+  assumptions: Pick<ResolvedAssumptions, 'energyValuationMethod' | 'appliedGridUseChargeDOPPerKWh' | 'dopExchangeRate' | 'annualCreditSettlementDOPPerKWh'>,
+  rates: TariffBillingRatesInput,
+): BlockBillingInput | undefined {
+  const tariff = assumptions.energyValuationMethod === 'block_billing' ? proposalBillingTariff(rates) : undefined;
+  return tariff
+    ? { tariff, dopPerUSD: assumptions.dopExchangeRate, gridUseChargeDOPPerKWh: assumptions.appliedGridUseChargeDOPPerKWh, settlementDOPPerKWh: assumptions.annualCreditSettlementDOPPerKWh }
     : undefined;
 }
 

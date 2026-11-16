@@ -1,5 +1,6 @@
 import { DistributorTariffSchedule, GlobalTariffMatrix, UtilityDistributor, UtilityTariffDetails } from '../types/tariffs';
 import { averageBlockEnergyRateDOP, tariffMatrixKey } from '../../shared/tariffRules';
+import { billingTariffFromRow, type BillingTariff } from '../../shared/tariffBilling';
 
 /**
  * Matriz de tarifas de FÁBRICA: solo es la referencia que se propone al crear o escanear una propuesta.
@@ -255,6 +256,18 @@ export const DEFAULT_RD_TARIFF_MATRIX: GlobalTariffMatrix = {
     CEPM: CEPM_SCHEDULE,
   },
 };
+
+/**
+ * Fila de facturación (bloques, cargo fijo o cargo fijo por rango) de la tarifa exacta de una distribuidora en la matriz
+ * activa, para guardarla en la propuesta junto con el precio de referencia (`shared/tariffBilling.ts`). A diferencia de
+ * `getReferenceEnergyRateUSD`, sin fila exacta no hay sustituto: `undefined` (la propuesta se valora con el escalar).
+ */
+export function referenceBillingTariff(matrix: GlobalTariffMatrix | null | undefined, distributor: UtilityDistributor | string, tariffCode: string): BillingTariff | undefined {
+  const schedule = matrix?.schedules?.[distributor as UtilityDistributor];
+  if (!schedule) return undefined;
+  const row = schedule.tariffs[tariffMatrixKey(distributor, tariffCode)];
+  return billingTariffFromRow(distributor, row, { resolutionCode: matrix?.resolutionCode, effectiveDate: matrix?.effectiveDate });
+}
 
 /**
  * Calcula el costo unitario de referencia en USD/kWh a partir de la matriz tarifaria activa.

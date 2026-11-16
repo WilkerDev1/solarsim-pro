@@ -1,7 +1,7 @@
 import { isWriterRole } from '../../../shared/permissions';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { draftOwnerKey } from '../../utils/draftOwnerKey';
-import { calculateProjectFinancialSummary, engineGridUseCharge } from '../../engine/financeEngine';
+import { calculateProjectFinancialSummary, engineBlockBilling, engineGridUseCharge } from '../../engine/financeEngine';
 import { resolveAssumptions } from '../../../shared/assumptions';
 import { calculateMonthlySolarProduction } from '../../engine/solarEngine';
 import { effectiveFeatureSettings } from '../application/featurePolicy';
@@ -181,7 +181,8 @@ export function executeAssistantTool(
     const comparable = hasSavingsComparison(basis);
     const withoutMoney = <T extends object>(row: T, fields: string[]): T =>
       comparable ? row : { ...row, ...Object.fromEntries(fields.map((field) => [field, null])) };
-    const monthlyMoney = ['savingsUSD', 'originalBillUSD', 'netBillUSD'];
+    // `withoutMoney` es superficial: el desglose anidado de la factura (`tariffBill`, con importes) se vacía entero.
+    const monthlyMoney = ['savingsUSD', 'originalBillUSD', 'netBillUSD', 'gridUseChargeUSD', 'tariffBill'];
     const summary = calculateProjectFinancialSummary(p, mode);
     return {
       data: {
@@ -209,10 +210,12 @@ export function executeAssistantTool(
           p.rates.tariffCode,
           resolveGridConnection(p.rates),
           mode,
-          engineGridUseCharge(resolveAssumptions(p), resolveGridConnection(p.rates))
+          engineGridUseCharge(resolveAssumptions(p), resolveGridConnection(p.rates)),
+          // Misma valoración que el resumen: factura por bloques cuando la propuesta la usa (SIE-007-2026).
+          engineBlockBilling(resolveAssumptions(p), p.rates)
         ).map((month) => withoutMoney(month, monthlyMoney)),
         summary: comparable ? summary : {
-          ...withoutMoney(summary, ['year1SavingsUSD', 'total25YearSavingsUSD', 'paybackYears', 'irrPct', 'npvUSD', 'roi25YrPct']),
+          ...withoutMoney(summary, ['year1SavingsUSD', 'total25YearSavingsUSD', 'paybackYears', 'irrPct', 'npvUSD', 'roi25YrPct', 'annualCreditSettlementUSD']),
           monthlyBreakdown: summary.monthlyBreakdown.map((month) => withoutMoney(month, monthlyMoney)),
         },
         savings: {

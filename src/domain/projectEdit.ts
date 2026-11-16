@@ -3,6 +3,7 @@ import type { EquipmentSupplierPrice, SolarEquipmentItem } from '../types/equipm
 import { LIST_KEY, editEquipment, migrateLegacySpecs, readEquipment, type EquipmentKind } from '../../shared/equipment';
 import { resolveAssumption, resolveAssumptions } from '../../shared/assumptions';
 import { reconcileGridUseCharge } from '../../shared/netMetering';
+import { reconcileEnergyRateSource } from '../../shared/tariffBilling';
 import { resolveSystemLossesPct } from '../../shared/projectDefaults';
 import { calculateRecommendedPanelCount } from '../engine/solarEngine';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
@@ -28,6 +29,8 @@ import { normalizeSupplyAlternativePatch } from '../../shared/offGridSupply';
  *   guardan (`shared/offGridSupply.ts`); nada se escribe si el parche no los trae;
  * - cargo por uso de la red SIE-007-2026: pasar al régimen o cambiar de distribuidora siembra el cargo de fábrica,
  *   salvo que el usuario lo haya editado (un valor distinto del de fábrica de la distribuidora anterior);
+ * - procedencia del precio del kWh (`rates.energyRateSource`): un precio que cambia sin procedencia es `manual`
+ *   (y deja de facturarse por bloques); quien fija el de referencia la escribe junto con la fila (`shared/tariffBilling.ts`);
  * - reconciliación con el catálogo (potencia del modelo principal y proveedor huérfano), que corre en la siguiente
  *   edición real: mirar un proyecto nunca lo escribe.
  */
@@ -69,7 +72,7 @@ export function applyProjectEdit(project: ProjectSimulation, edit: ProjectEdit, 
       // Tipo de conexión: `gridConnection` e `isZeroExport` se escriben siempre juntos y coherentes; alternativa de
       // suministro saneada; cargo por uso de la red reconciliado (SIE-007-2026).
       const patch = normalizeGridConnectionPatch(project.rates, normalizeSupplyAlternativePatch(edit.patch));
-      const rates = reconcileGridUseCharge(project.rates, { ...project.rates, ...patch }, patch);
+      const rates = reconcileEnergyRateSource(project.rates, reconcileGridUseCharge(project.rates, { ...project.rates, ...patch }, patch), patch);
       next = resizeIfNeeded(project, { ...project, rates, specs: { ...reconcileWithCatalog(project.specs, project.specs, catalog) } }, edit.patch.targetCoveragePct !== undefined);
       break;
     }
