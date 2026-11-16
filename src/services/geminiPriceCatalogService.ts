@@ -8,8 +8,42 @@ import {
 
 import {
   requestGeminiJson,
-  geminiResponseText,
+  parseGeminiJson,
 } from "../../shared/geminiTransport";
+
+const NULLABLE_STRING = { type: "STRING", nullable: true } as const;
+/** Structured output for supplier price lists; prices and matches are re-validated locally. */
+export const PRICE_CATALOG_RESPONSE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    detectedSupplierName: { type: "STRING" },
+    matchedExistingSupplier: NULLABLE_STRING,
+    supplierMatchConfidence: { type: "NUMBER" },
+    documentDate: { type: "STRING" },
+    documentTitle: { type: "STRING" },
+    currencyDetected: { type: "STRING", enum: ["USD", "DOP"] },
+    items: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          extractedModelName: { type: "STRING" },
+          brand: { type: "STRING" },
+          equipmentType: { type: "STRING", enum: ["panel", "inverter", "battery"] },
+          originalCurrency: { type: "STRING", enum: ["USD", "DOP"] },
+          originalPrice: { type: "NUMBER" },
+          sku: { type: "STRING" },
+          notes: { type: "STRING" },
+          matchedEquipmentId: NULLABLE_STRING,
+          matchedDisplayName: NULLABLE_STRING,
+          matchConfidence: { type: "NUMBER" },
+        },
+        required: ["extractedModelName", "equipmentType", "originalCurrency", "originalPrice"],
+      },
+    },
+  },
+  required: ["detectedSupplierName", "currencyDetected", "items"],
+};
 
 const PRICE_CATALOG_SYSTEM_INSTRUCTION = `Eres un auditor comercial e ingeniero fotovoltaico de élite especializado en compras, cotizaciones y listas de precios de distribuidores de equipos solares (paneles fotovoltaicos, inversores y baterías BESS).
 
@@ -22,7 +56,7 @@ REGLAS DE EXTRACCIÓN Y COMPARACIÓN (MATCHING):
 
 2. DETECCIÓN DE MONEDA ("currencyDetected"):
    - Detecta si los precios están expresados en Dólares Estadounidenses ("USD") o Pesos Dominicanos ("DOP").
-   - Si están en DOP, indica "DOP" y convierte a "priceUSD" usando la tasa de cambio provista.
+   - Devuelve "originalPrice" y "originalCurrency" tal como figuran en el documento; la aplicación convierte DOP a USD con la tasa provista (no hagas la conversión).
 
 3. EXTRACCIÓN DE EQUIPOS Y PRECIOS:
    - Filtra exclusivamente equipos solares relevantes:
@@ -40,38 +74,12 @@ REGLAS DE EXTRACCIÓN Y COMPARACIÓN (MATCHING):
      * "matchedEquipmentId": ID del equipo en el catálogo.
      * "matchedDisplayName": displayName del equipo en el catálogo.
      * "matchConfidence": número entre 0.0 y 1.0 (ej: 0.95).
-     * "action": "update_price".
    - Si el equipo del documento NO existe en el catálogo de referencia actual:
      * "matchedEquipmentId": null.
      * "matchedDisplayName": null.
      * "matchConfidence": 0.0.
-     * "action": "create_new".
 
-RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO CON LA SIGUIENTE ESTRUCTURA (sin bloques de markdown ni texto extra):
-{
-  "detectedSupplierName": string,
-  "matchedExistingSupplier": string | null,
-  "supplierMatchConfidence": number,
-  "documentDate": string,
-  "documentTitle": string,
-  "currencyDetected": "USD" | "DOP",
-  "items": [
-    {
-      "extractedModelName": string,
-      "brand": string,
-      "equipmentType": "panel" | "inverter" | "battery",
-      "priceUSD": number,
-      "originalCurrency": "USD" | "DOP",
-      "originalPrice": number,
-      "sku": string,
-      "notes": string,
-      "matchedEquipmentId": string | null,
-      "matchedDisplayName": string | null,
-      "matchConfidence": number,
-      "action": "update_price" | "create_new" | "ignore"
-    }
-  ]
-}`;
+La respuesta se valida contra el esquema JSON de la solicitud.`;
 
 export interface ScanPriceCatalogOptions {
   fileBase64: string;
@@ -197,14 +205,14 @@ ${manualSupplierName ? `PROVEEDOR DECLARADO POR EL USUARIO: "${manualSupplierNam
 ${
   existingSuppliers.length > 0
     ? `PROVEEDORES YA REGISTRADOS EN LA BASE DE DATOS (Para identificar y cotejar coincidencias sin duplicar):
-${JSON.stringify(existingSuppliers, null, 2)}
+${JSON.stringify(existingSuppliers)}
 Si el documento corresponde a uno de estos distribuidores o a una variante/sucursal (ej: "Unitrade" vs "Unitrade Dominicana"), indica el nombre del documento en "detectedSupplierName", pero enlaza el proveedor exacto en "matchedExistingSupplier" con confianza (0.0 a 1.0).`
     : ""
 }
-TASA DE CAMBIO DE REFERENCIA: 1 USD = ${dopExchangeRate} DOP. (Si los precios están en DOP, conviértelos a USD dividiendo entre ${dopExchangeRate}).
+TASA DE CAMBIO DE REFERENCIA: 1 USD = ${dopExchangeRate} DOP. La aplicación convierte los precios en DOP; devuelve el precio original y su moneda.
 
 CATÁLOGO DE REFERENCIA EXISTENTE EN EL SISTEMA (Para comparar y vincular coincidencias de equipos):
-${JSON.stringify(referenceCatalogCondensed, null, 2)}
+${JSON.stringify(referenceCatalogCondensed)}
 
 Extrae todos los modelos de paneles, inversores y baterías con sus precios unitarios de compra, e identifica el proveedor cotejándolo con los ya registrados en la base de datos.`;
 
@@ -216,16 +224,11 @@ Extrae todos los modelos de paneles, inversores y baterías con sus precios unit
             {
               text: promptText,
             },
-            {
-              inline_data: {
-                mime_type: mimeType,
-                data: cleanBase64,
-              },
-            },
+            { inlineData: { mimeType, data: cleanBase64 } },
           ],
         },
       ],
-      system_instruction: {
+      systemInstruction: {
         parts: [
           {
             text: PRICE_CATALOG_SYSTEM_INSTRUCTION,
@@ -234,8 +237,8 @@ Extrae todos los modelos de paneles, inversores y baterías con sus precios unit
       },
       generationConfig: {
         temperature: 0.1,
-        topP: 0.95,
-        response_mime_type: "application/json",
+        responseMimeType: "application/json",
+        responseSchema: PRICE_CATALOG_RESPONSE_SCHEMA,
       },
     };
 
@@ -247,22 +250,11 @@ Extrae todos los modelos de paneles, inversores y baterías con sus precios unit
       signal: options.signal,
     });
     if (result.modelWarning) onProgress?.(result.modelWarning);
-    const rawText = geminiResponseText(result.response)
-      .replace(/^```(?:json)?\s*|\s*```$/g, "")
-      .trim();
-    let parsed: any;
-    try {
-      parsed = JSON.parse(rawText);
-    } catch (e: any) {
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        parsed = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error(
-          `No se pudo decodificar el formato JSON de la respuesta: ${e.message}`,
-        );
-      }
-    }
+    // Structured output: prose around the JSON or a truncated payload is rejected, never repaired.
+    const parsed: any = parseGeminiJson(
+      result.response,
+      "Gemini devolvió una lista incompleta o JSON inválido. No se aplicó ningún precio.",
+    );
 
     const supplierName =
       manualSupplierName?.trim() ||
