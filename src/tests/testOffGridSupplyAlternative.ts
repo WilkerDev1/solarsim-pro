@@ -22,6 +22,9 @@ import { RatesFields } from '../components/simulator/params/sections/rates/Rates
 import { FinancialReturnTab } from '../components/simulator/tabs/FinancialReturnTab';
 import { PDFExecutiveSummaryPage } from '../components/pdf/pages/PDFExecutiveSummaryPage';
 import { PDF_COLOR_THEMES } from '../constants/pdfThemes';
+import { PDFPage2Quotation } from '../components/pdf/pages/PDFPage2Quotation';
+import { EnergyAnalysisTab, energyTableLabels } from '../components/simulator/tabs/EnergyAnalysisTab';
+import { supplyPresentation } from '../../shared/offGridSupply';
 import type { ProjectSimulation, UtilityRates } from '../types';
 
 /**
@@ -63,6 +66,14 @@ assert.ok(/Falta/.test(generatorCostNotice(undefined)?.text ?? '') && /mayor que
 // Publicación: un costo inválido guardado se omite (el Worker usa el mismo predicado).
 assert.deepEqual(publishedSupplyFields({ supplyAlternative: 'generator', generatorCostPerKWh: 0 }), { supplyAlternative: 'generator' });
 assert.deepEqual(publishedSupplyFields({ supplyAlternative: 'generator', generatorCostPerKWh: 25 }), { supplyAlternative: 'generator', generatorCostPerKWh: 25 });
+// Una alternativa desconocida guardada (otra versión, importación) se omite: el Worker la rechazaría con 400.
+assert.deepEqual(publishedSupplyFields({ supplyAlternative: 'planta', generatorCostPerKWh: 0.4 }), { generatorCostPerKWh: 0.4 });
+// Presentación del suministro: la distribuidora solo se muestra con la tarifa (o con red).
+assert.deepEqual(supplyPresentation(island().rates), { kind: 'utility' });
+assert.deepEqual(supplyPresentation({ supplyAlternative: 'no_comparison' }), { kind: 'utility' }, 'con red no cambia');
+assert.deepEqual(supplyPresentation(island({ supplyAlternative: 'no_comparison' }).rates), { kind: 'no_grid' });
+assert.deepEqual(supplyPresentation(island({ supplyAlternative: 'generator', generatorCostPerKWh: 0.385 }).rates), { kind: 'generator', costPerKWh: 0.385 });
+assert.deepEqual(supplyPresentation(island({ supplyAlternative: 'generator' }).rates), { kind: 'generator', costPerKWh: null });
 
 // ── Motor: por defecto y sin campo = cifras de hoy ───────────────────────────────────────────
 const tariffIsland = summaryOf(island());
@@ -132,14 +143,21 @@ const edited = applyProjectEdit(island(), { kind: 'rates', patch: { supplyAltern
 assert.deepEqual([edited.rates.supplyAlternative, edited.rates.generatorCostPerKWh], ['generator', X]);
 assert.equal(applyProjectEdit(edited, { kind: 'rates', patch: { generatorCostPerKWh: undefined } }, ctx).rates.generatorCostPerKWh, undefined, 'vaciar el campo');
 assert.equal(applyProjectEdit(edited, { kind: 'rates', patch: { supplyAlternative: 'planta' as never } }, ctx).rates.supplyAlternative, 'generator', 'un valor desconocido no se guarda');
-// Un costo inválido nunca queda guardado: se guarda como «sin dato» (el dock pasa por «0.» al escribir).
-for (const bad of [0, -2, Number.NaN, Infinity, null, MAX_GENERATOR_COST_PER_KWH + 1]) {
+// Un número finito se guarda tal cual lo escribe el usuario (el dock no borra lo que se teclea: «0», «0.», 1500) y
+// el predicado decide al leer; lo que no es un número finito se guarda como «sin dato».
+for (const typed of [0, -2, MAX_GENERATOR_COST_PER_KWH + 500]) {
+  const after = applyProjectEdit(edited, { kind: 'rates', patch: { generatorCostPerKWh: typed } }, ctx);
+  assert.equal(after.rates.generatorCostPerKWh, typed, String(typed));
+  assert.equal(resolveSavingsBasis(after.rates), 'generator_missing_cost', `${typed}: no cuenta como costo`);
+  assert.deepEqual(summaryOf(after), summaryOf(island({ supplyAlternative: 'generator' })), `${typed}: mismas cifras que sin costo`);
+}
+for (const bad of [Number.NaN, Infinity, null, '0.4']) {
   const after = applyProjectEdit(edited, { kind: 'rates', patch: { generatorCostPerKWh: bad as number } }, ctx);
   assert.equal(after.rates.generatorCostPerKWh, undefined, String(bad));
-  assert.equal(resolveSavingsBasis(after.rates), 'generator_missing_cost', String(bad));
 }
 assert.equal(applyProjectEdit(edited, { kind: 'rates', patch: { generatorCostPerKWh: 25 } }, ctx).rates.generatorCostPerKWh, 25, 'alto pero válido');
 assert.deepEqual(normalizeSupplyAlternativePatch({ supplyAlternative: 'x', generatorCostPerKWh: Number.NaN, energyCostPerKWh: 0.2 }), { generatorCostPerKWh: undefined, energyCostPerKWh: 0.2 });
+assert.deepEqual(normalizeSupplyAlternativePatch({ generatorCostPerKWh: 0 }), { generatorCostPerKWh: 0 });
 const unrelated = applyProjectEdit(island(), { kind: 'rates', patch: { energyCostPerKWh: 0.3 } }, ctx);
 assert.equal('supplyAlternative' in unrelated.rates, false, 'una edición ajena no escribe la alternativa (mirar no escribe)');
 // Volver a conectar a la red conserva la elección (se ignora mientras haya red) sin cambiar las cifras.
@@ -213,11 +231,29 @@ const execHtml = (project: ProjectSimulation) => renderToStaticMarkup(React.crea
   const gen = execHtml(island({ supplyAlternative: 'generator', generatorCostPerKWh: X }));
   assert.ok(/data-savings-reference="generator"[\s\S]*?Costo kWh Generador[\s\S]*?RD\$ 23\.10[\s\S]*?US\$ 0\.385 \/ kWh/.test(gen), 'fila 3: costo del generador');
   assert.ok(!/Precio kWh Tarifa/.test(gen) && /Precio kWh Tarifa/.test(execHtml(island())));
-  assert.ok(/Precio kWh Tarifa/.test(execHtml(island({ supplyAlternative: 'no_comparison' }))), 'sin comparación: fila 3 sin cambios');
+  // Sin comparación: ni distribuidora ni tarifa; «Sin conexión a la red».
+  const noComparison = execHtml(island({ supplyAlternative: 'no_comparison' }));
+  assert.ok(/data-savings-reference="no_grid"[\s\S]*?Sin conexión a la red/.test(noComparison), 'fila 3: sin red');
+  assert.ok(!/Precio kWh Tarifa|Tarifa BTS2|RD\$ 13\.26/.test(noComparison), 'fila 3 sin tarifa');
+  assert.ok(!/EDE(?:ESTE|SUR|NORTE)/.test(noComparison) && !/EDE(?:ESTE|SUR|NORTE)/.test(missing), 'el cuadro resumen no nombra la distribuidora');
   // Sin baterías: texto editable del registro.
   const noBattery = island({ supplyAlternative: 'no_comparison' });
   noBattery.specs = { ...noBattery.specs, hasBattery: false, batteries: [] };
   assert.ok(/Sin baterías/.test(execHtml(noBattery)));
+}
+
+// ── Cotización del PDF: suministro en vez de distribuidora/tarifa ───────────────────────────
+{
+  const quotation = (project: ProjectSimulation) => renderToStaticMarkup(React.createElement(PDFPage2Quotation, { project, summary: summaryOf(project), activeTheme: theme, showHeadersFooters: true, currentDateStr: 'hoy', pageNum: 8, totalPages: 9 }));
+  const tariff = quotation(island());
+  assert.ok(/Distribuidor \/ Tarifa:/.test(tariff) && /EDE(?:ESTE|SUR|NORTE)/.test(tariff), `tarifa: igual que siempre ${tariff.slice(tariff.indexOf('data-supply') - 300, tariff.indexOf('data-supply') + 200)}`);
+  for (const project of [island({ supplyAlternative: 'no_comparison' }), island({ supplyAlternative: 'generator' })]) {
+    const html = quotation(project);
+    assert.ok(!/EDE(?:ESTE|SUR|NORTE)|Distribuidor \/ Tarifa:/.test(html), `${project.rates.supplyAlternative}: sin distribuidora`);
+    assert.ok(/Suministro:/.test(html));
+  }
+  assert.ok(/Sin conexión a la red/.test(quotation(island({ supplyAlternative: 'no_comparison' }))));
+  assert.ok(/Generador[\s\S]{0,80}US\$ 0\.385\/kWh/.test(quotation(island({ supplyAlternative: 'generator', generatorCostPerKWh: X }))));
 }
 
 // ── App: indicadores de ahorro con estado «sin comparación» ──────────────────────────────────
@@ -298,12 +334,40 @@ assert.deepEqual(validateAssistantEdits([{ section: 'rates', field: 'generatorCo
   assert.equal(cleared.data.savings.comparable, false);
   assert.ok(/Falta el costo/.test(cleared.data.savings.note));
   for (const field of ['year1SavingsUSD', 'total25YearSavingsUSD', 'paybackYears', 'irrPct', 'npvUSD', 'roi25YrPct']) assert.equal(cleared.data.summary[field], null, field);
+  assert.deepEqual(cleared.data.summary.cashFlow25Years, [], 'sin flujo de caja anual');
+  assert.ok(cleared.data.summary.monthlyBreakdown.every((m: any) => m.originalBillUSD === null && m.netBillUSD === null), 'sin facturas');
   assert.ok(cleared.data.summary.netInvestmentUSD > 0, 'la inversión sigue');
   assert.ok(cleared.data.energy.every((m: any) => m.savingsUSD === null) && cleared.data.summary.monthlyBreakdown.every((m: any) => m.savingsUSD === null));
   assert.equal((await set([['generatorCostPerKWh', 25]])).status, 'applied', 'costo alto aceptado');
   assert.equal((await set([['supplyAlternative', 'no_comparison']])).status, 'applied');
   assert.equal(rates().supplyAlternative, 'no_comparison');
   assert.equal((await read()).data.savings.basis, 'no_comparison');
+}
+
+// ── Dock: lo que se teclea no se borra y el aviso dice el motivo real ───────────────────────
+{
+  const dock = (cost: number) => renderToStaticMarkup(React.createElement(RatesFields, { project: applyProjectEdit(island({ supplyAlternative: 'generator' }), { kind: 'rates', patch: { generatorCostPerKWh: cost } }, ctx), projectionEnabled: false, updateRates: () => {} }));
+  assert.match(dock(0), /id="pd-rates-generator"[^>]*value="0"/, '«0» sigue en el campo');
+  assert.match(dock(0), /role="alert"[^>]*>[\s\S]*debe ser mayor que 0/);
+  assert.match(dock(1500), /id="pd-rates-generator"[^>]*value="1500"/, '1500 sigue en el campo');
+  assert.match(dock(1500), /role="alert"[^>]*>[\s\S]*tope técnico/);
+  assert.match(dock(0.35), /value="0.35"/);
+}
+
+// ── Análisis energético con autoconsumo visible y sin comparación ───────────────────────────
+// (el render en servidor usa el estado inicial del store, sin la proyección: se prueban los rótulos puros y el render.)
+{
+  for (const showSelf of [true, false]) {
+    const labels = energyTableLabels(false, showSelf);
+    assert.ok(!/AHORRO|Ahorro|Iny\. Neta/.test(JSON.stringify(labels)), `sin comparación (autoconsumo ${showSelf})`);
+    assert.equal(labels.showMoney, false, 'sin montos mensuales ni total en USD');
+    assert.equal(labels.savedColumnNote, null);
+  }
+  assert.deepEqual([energyTableLabels(true, true).savedColumn, energyTableLabels(true, true).showMoney, energyTableLabels(true, false).savedColumn], ['AHORRO FACTURABLE', true, 'AHORRO ENERG. (KWH)'], 'tarifa: igual que siempre');
+  const energyHtml = (project: ProjectSimulation) => renderToStaticMarkup(React.createElement(EnergyAnalysisTab, { project, summary: summaryOf(project), openAIInvoiceModal: () => {}, updateMonthlyConsumption: () => {} }));
+  const html = energyHtml(island({ supplyAlternative: 'no_comparison' }));
+  assert.ok(/ENERGÍA SERVIDA \(KWH\)/.test(html) && /Resumen Mensual de Energía Entregada/.test(html));
+  assert.ok(!/AHORRO|Ahorro|\$\d/.test(html), (html.match(/AHORRO|Ahorro|\$\d/) ?? [''])[0]);
 }
 
 console.log('Alternativa de suministro (aislado): lectura, motor, edición, documento, dock, pestaña y agentes.');

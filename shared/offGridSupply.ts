@@ -112,9 +112,11 @@ export function savingsValuationCostPerKWh(rates: SupplyAlternativeFields & { en
 }
 
 /**
- * Normaliza un parche de tarifas: una alternativa desconocida no se guarda, y un costo del generador que no cumple
- * `isValidGeneratorCost` (vacío, `null`, 0, negativo, NaN, Infinity, texto o mayor que el tope técnico) se guarda
- * como «sin dato» (`undefined`): así el dock puede pasar por «0.» al escribir y nunca queda guardado un costo inválido.
+ * Normaliza un parche de tarifas: una alternativa desconocida no se guarda. Un costo del generador que es un número
+ * finito se guarda tal cual lo escribe el usuario (aunque sea 0, negativo o pase del tope técnico): el dock no borra lo
+ * que se está tecleando («0» → «0.35», 1500) y su aviso dice el motivo real; `isValidGeneratorCost` decide al leer,
+ * así que un costo así nunca entra en el cálculo ni se publica. Lo que no es un número finito (vacío, `null`, NaN,
+ * Infinity, texto) se guarda como «sin dato» (`undefined`).
  */
 export function normalizeSupplyAlternativePatch<T extends SupplyAlternativeFields>(patch: T): T {
   let next = patch;
@@ -122,21 +124,49 @@ export function normalizeSupplyAlternativePatch<T extends SupplyAlternativeField
     next = { ...next };
     delete next.supplyAlternative;
   }
-  if ('generatorCostPerKWh' in patch && patch.generatorCostPerKWh !== undefined && !isValidGeneratorCost(patch.generatorCostPerKWh)) {
+  const cost = patch.generatorCostPerKWh;
+  if ('generatorCostPerKWh' in patch && cost !== undefined && !(typeof cost === 'number' && Number.isFinite(cost))) {
     next = { ...next, generatorCostPerKWh: undefined };
   }
   return next;
 }
 
 /**
- * Tarifas tal como se publican en un enlace: un costo del generador inválido (dato antiguo o importado) se omite,
- * de modo que el Worker no rechaza la publicación y el visor la lee como «generador sin costo» (sin comparación).
+ * Tarifas tal como se publican en un enlace: un costo del generador inválido o una alternativa desconocida (dato
+ * antiguo o importado) se omiten, de modo que el Worker no rechaza la publicación; el visor los lee como «generador
+ * sin costo» (sin comparación) o como tarifa, igual que la app.
  */
 export function publishedSupplyFields<T extends SupplyAlternativeFields>(rates: T): T {
-  if (rates.generatorCostPerKWh === undefined || isValidGeneratorCost(rates.generatorCostPerKWh)) return rates;
+  const badCost = rates.generatorCostPerKWh !== undefined && !isValidGeneratorCost(rates.generatorCostPerKWh);
+  const badAlternative = rates.supplyAlternative !== undefined && !isSupplyAlternative(rates.supplyAlternative);
+  if (!badCost && !badAlternative) return rates;
   const next = { ...rates };
-  delete next.generatorCostPerKWh;
+  if (badCost) delete next.generatorCostPerKWh;
+  if (badAlternative) delete next.supplyAlternative;
   return next;
+}
+
+/**
+ * Cómo se presenta el suministro actual del cliente (cuadro resumen, cotización, hub, tablero, visor). La distribuidora
+ * y su tarifa solo se muestran con `utility` (con red, o aislado comparado con la tarifa); con generador se muestra el
+ * costo de generación propia (o «pendiente»); «sin comparación» se rotula «Sin conexión a la red».
+ */
+export type SupplyPresentation = { kind: 'utility' } | { kind: 'generator'; costPerKWh: number | null } | { kind: 'no_grid' };
+export function supplyPresentation(rates: SupplyAlternativeFields | null | undefined): SupplyPresentation {
+  const alternative = resolveSupplyAlternative(rates);
+  if (alternative === 'generator') return { kind: 'generator', costPerKWh: resolveGeneratorCostPerKWh(rates) };
+  return alternative === 'no_comparison' ? { kind: 'no_grid' } : { kind: 'utility' };
+}
+
+/** Rótulo de la app (fuera del documento) para un sistema aislado sin comparación. */
+export const NO_GRID_SUPPLY_LABEL = 'Sin conexión a la red';
+
+/** Suministro en una línea para vistas de la app (hub, tablero, cotización): nunca nombra la distribuidora sin `utility`. */
+export function supplySummaryText(rates: SupplyAlternativeFields | null | undefined, utility: string): string {
+  const supply = supplyPresentation(rates);
+  if (supply.kind === 'utility') return utility;
+  if (supply.kind === 'no_grid') return NO_GRID_SUPPLY_LABEL;
+  return supply.costPerKWh === null ? 'Generador · costo pendiente' : `Generador · US$ ${supply.costPerKWh.toFixed(3)}/kWh`;
 }
 
 /** Aviso del estado incompleto (dock, pestañas y vista del documento). */

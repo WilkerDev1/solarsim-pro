@@ -1,4 +1,5 @@
 import React from 'react';
+import { supplyPresentation, supplySummaryText } from '../../../../shared/offGridSupply';
 import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import { ShieldCheck, CheckCircle2, Check } from 'lucide-react';
 import { getProjectPanels, getProjectInverters, getProjectBatteries } from '../../../utils/equipmentSpecsUtils';
@@ -119,7 +120,7 @@ export const QuotationEquipmentsTab: React.FC<QuotationEquipmentsTabProps> = ({
               </div>
               <div className="text-right">
                 <div><span className="font-bold text-slate-700">Consumo mensual estimado (kWh):</span> <span className="font-bold text-slate-900">{Math.round(summary.annualConsumptionKWh / 12).toLocaleString()}</span></div>
-                <div><span className="font-bold text-slate-700">EDES / Distribuidor:</span> <span className="font-bold text-emerald-800">{project.client.distributor || 'EDEESTE'}</span></div>
+                <div><span className="font-bold text-slate-700">{supplyPresentation(project.rates).kind === 'utility' ? 'EDES / Distribuidor:' : 'Suministro:'}</span> <span className="font-bold text-emerald-800">{supplySummaryText(project.rates, project.client.distributor || 'EDEESTE')}</span></div>
               </div>
             </div>
           </div>

@@ -26,6 +26,22 @@ interface EnergyAnalysisTabProps {
   updateSpecs?: (specs: Partial<SystemSpecs>) => void;
 }
 
+/**
+ * Rótulos y montos de la tabla mensual y la tarjeta de ahorro. Sin comparación (sistema aislado «sin comparación» o
+ * generador sin costo) no hay rótulos ni montos de ahorro, tampoco con el desglose de autoconsumo visible.
+ */
+export function energyTableLabels(comparable: boolean, showSelfConsumption: boolean) {
+  return {
+    heading: comparable ? 'Resumen Mensual de Energía & Balance de Ahorro' : 'Resumen Mensual de Energía Entregada',
+    savedColumn: !comparable ? 'ENERGÍA SERVIDA (KWH)' : showSelfConsumption ? 'AHORRO FACTURABLE' : 'AHORRO ENERG. (KWH)',
+    savedColumnNote: showSelfConsumption && comparable ? 'Autoconsumo + Iny. Neta' : null,
+    /** Montos en USD por mes y total anual (solo con el desglose de autoconsumo). */
+    showMoney: showSelfConsumption && comparable,
+    cardTitle: comparable ? 'AHORRO ENERGÉTICO ANUAL' : 'ENERGÍA SERVIDA ANUAL',
+    cardEnergyLabel: comparable ? 'Ahorro Anual Estimado' : 'Energía servida',
+  };
+}
+
 export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
   project,
   summary,
@@ -52,6 +68,7 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
   // Sistema aislado sin comparación (o generador sin costo): sin cifras de ahorro en USD, solo energía servida.
   const savingsBasis = resolveSavingsBasis(project.rates);
   const comparable = hasSavingsComparison(savingsBasis);
+  const labels = energyTableLabels(comparable, showSelfConsumption);
 
   const [isReplicated, setIsReplicated] = useState(false);
 
@@ -140,7 +157,7 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
         {/* Card 4: AHORRO ENERGÉTICO ANUAL */}
         <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-            {comparable ? 'AHORRO ENERGÉTICO ANUAL' : 'ENERGÍA SERVIDA ANUAL'}
+            {labels.cardTitle}
           </span>
           {comparable ? (
             <div className="flex items-baseline gap-1">
@@ -171,7 +188,7 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
               </>
             ) : (
               <span>
-                💡 {comparable ? 'Ahorro Anual Estimado' : 'Energía servida'}: <strong className="text-slate-800">{totalEffectiveSavedKWh.toFixed(1)} kWh</strong>
+                💡 {labels.cardEnergyLabel}: <strong className="text-slate-800">{totalEffectiveSavedKWh.toFixed(1)} kWh</strong>
               </span>
             )}
           </div>
@@ -266,7 +283,7 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
       {/* TABLA DE DETALLE MENSUAL EDITABLE CON INGENIERÍA TRANSPARENTE */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs shrink-0">
         <div className="bg-[#14532d] text-white px-4 py-2.5 font-bold text-xs uppercase tracking-wider flex justify-between items-center">
-          <span>{comparable ? 'Resumen Mensual de Energía & Balance de Ahorro' : 'Resumen Mensual de Energía Entregada'}</span>
+          <span>{labels.heading}</span>
           <button
             onClick={openAIInvoiceModal}
             className="bg-white/10 hover:bg-white/20 border border-white/30 text-amber-300 hover:text-amber-200 px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
@@ -293,11 +310,11 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
                 )}
                 <th className="py-2.5 px-3 text-right">
                   <span className="text-emerald-800 font-extrabold">
-                    {!comparable ? 'ENERGÍA SERVIDA (KWH)' : showSelfConsumption ? 'AHORRO FACTURABLE' : 'AHORRO ENERG. (KWH)'}
+                    {labels.savedColumn}
                   </span>
-                  {showSelfConsumption && comparable && (
+                  {labels.savedColumnNote && (
                     <span className="block text-[9.5px] font-normal text-emerald-600">
-                      Autoconsumo + Iny. Neta
+                      {labels.savedColumnNote}
                     </span>
                   )}
                 </th>
@@ -367,7 +384,7 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
                   )}
                   <td className="py-2 px-3 text-right font-bold text-emerald-800">
                     <span>{(row.effectiveSavedKWh ?? (row.solarSelfConsumedKWh + (row.netExportCreditKWh || 0))).toFixed(1)}</span>
-                    {showSelfConsumption && comparable && (
+                    {labels.showMoney && (
                       <span className="block text-[10px] text-emerald-600 font-semibold">${row.savingsUSD.toFixed(1)}</span>
                     )}
                   </td>
@@ -387,7 +404,7 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
                 )}
                 <td className="py-3 px-3 text-right font-extrabold text-emerald-900">
                   <span>{totalEffectiveSavedKWh.toFixed(1)} kWh</span>
-                  {showSelfConsumption && comparable && (
+                  {labels.showMoney && (
                     <span className="block text-[10.5px] text-emerald-700">${summary.year1SavingsUSD.toFixed(1)} USD</span>
                   )}
                 </td>

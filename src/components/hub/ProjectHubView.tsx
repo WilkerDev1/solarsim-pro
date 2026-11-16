@@ -5,7 +5,7 @@ import { useSimulationStore } from "../../store/useSimulationStore";
 import { useShallow } from 'zustand/react/shallow';
 import { useEnergyCalculationMode } from "../../features/application/useApplicationFeatures";
 import { calculateProjectFinancialSummary } from "../../engine/financeEngine";
-import { hasSavingsComparison, noSavingsNote, resolveGeneratorCostPerKWh, resolveSavingsBasis, resolveSupplyAlternative } from "../../../shared/offGridSupply";
+import { hasSavingsComparison, noSavingsNote, resolveSavingsBasis, supplyPresentation, supplySummaryText } from "../../../shared/offGridSupply";
 import { ProposalCommercialPanel } from "../../features/proposals/ProposalCommercialPanel";
 import { ProposalClientSection } from "../clients/ProposalClientLink";
 import {
@@ -249,16 +249,11 @@ export const ProjectHubView = () => {
                     ["Cliente", project.client.name],
                     ["Empresa", project.client.company || "No registrada"],
                     ["Provincia", project.client.province],
-                    // Aislado con generador: la base del ahorro es el costo de generación propia, no la tarifa.
-                    resolveSupplyAlternative(project.rates) === "generator"
-                      ? [
-                          "Suministro actual",
-                          `Generador · ${resolveGeneratorCostPerKWh(project.rates) === null ? "costo pendiente" : `US$ ${resolveGeneratorCostPerKWh(project.rates)!.toFixed(3)}/kWh`}`,
-                        ]
-                      : [
-                          "Distribuidora / tarifa",
-                          `${project.rates.distributor} · ${project.rates.tariffCode}`,
-                        ],
+                    // Aislado con generador o sin comparación: no se nombra la distribuidora ni su tarifa.
+                    [
+                      supplyPresentation(project.rates).kind === "utility" ? "Distribuidora / tarifa" : "Suministro actual",
+                      supplySummaryText(project.rates, `${project.rates.distributor} · ${project.rates.tariffCode}`),
+                    ],
                     [
                       "Autor de la propuesta",
                       project.authorName || "Sin autor",

@@ -1,6 +1,6 @@
 import { getTariffDisplayName } from '../proposalPresentation';
 import { resolveGridConnection } from '../gridConnection';
-import { hasSavingsComparison, resolveGeneratorCostPerKWh, resolveSavingsBasis } from '../offGridSupply';
+import { hasSavingsComparison, resolveGeneratorCostPerKWh, resolveSavingsBasis, supplyPresentation } from '../offGridSupply';
 import { FACTORY_TEXTS } from './factoryTexts';
 import type { DocumentTextContext } from './context';
 import { resolveDynamicProjectSummaryParagraph1, resolveDynamicProjectSummaryParagraph2 } from './projectSummary';
@@ -129,4 +129,16 @@ export function validityNoteDefault(ctx: DocumentTextContext): string {
 /** Teléfonos de ejemplo de versiones antiguas que nunca deben imprimirse. */
 export function isPlaceholderPhone(phone: string): boolean {
   return phone.includes('555-0199') || phone.includes('5550199') || phone === '+1 (809) 000-0000';
+}
+
+/**
+ * Texto que nombra la distribuidora o su tarifa como suministro: solo se usa con red o con un sistema aislado comparado
+ * con la tarifa. Con generador o «sin comparación» se usa la otra variante (no se nombra la distribuidora). Ambas son
+ * valores de fábrica conocidos.
+ */
+export function supplyAwareText(utility: string, other: string) {
+  return {
+    defaultText: (ctx: DocumentTextContext) => (supplyPresentation(ctx).kind === 'utility' ? utility : other),
+    knownFactoryValues: [utility, other] as readonly string[],
+  };
 }

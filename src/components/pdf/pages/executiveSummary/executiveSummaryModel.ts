@@ -1,7 +1,7 @@
 import type { FinancialSummaryResult, ProjectSimulation } from '../../../../types';
 import { resolveAssumptions } from '../../../../../shared/assumptions';
 import { resolveGridConnection } from '../../../../../shared/gridConnection';
-import { hasSavingsComparison, resolveGeneratorCostPerKWh, resolveSavingsBasis, resolveSupplyAlternative } from '../../../../../shared/offGridSupply';
+import { hasSavingsComparison, resolveGeneratorCostPerKWh, resolveSavingsBasis, supplyPresentation } from '../../../../../shared/offGridSupply';
 import {
   getProjectPanels,
   getProjectInverters,
@@ -103,11 +103,13 @@ export function executiveSummaryModel(project: ProjectSimulation, summary: Finan
   const annualUnservedKWh = Math.round(summary.annualUnservedKWh ?? 0);
   const autonomyHours = summary.batteryBackupAutonomyHours;
   // Generador: la fila 3 muestra el costo de generación propia (la base del ahorro), no la tarifa de la distribuidora.
-  const showsGeneratorCost = resolveSupplyAlternative(project.rates) === 'generator';
+  // Sin comparación: «Sin conexión a la red», sin distribuidora ni tarifa.
+  const supplyKind = supplyPresentation(project.rates).kind;
+  const showsGeneratorCost = supplyKind === 'generator';
   const generatorCostUSD = resolveGeneratorCostPerKWh(project.rates);
   const generatorCostDOP = generatorCostUSD === null ? null : generatorCostUSD * exchangeRate;
 
-  return { savingsBasis, hasComparison, showsGeneratorCost, generatorCostUSD, generatorCostDOP, annualServedKWh, annualUnservedKWh, autonomyHours, panels, primaryPanel, totalPanels, systemCapacityKWp, lossesPercent, performanceRatio, inverters, totalInverterPowerKW, invertersSummary, isZeroExport, isOffGrid, hasBattery, batteries, totalBatteryKWh, batteriesSummary, grossInvestmentUSD, totalBeforeLeyUSD, costPerWattUSD, exchangeRate, tariffUSD, tariffDOP, tariffCode, isLeyEligible, leyCreditUSD, equipmentPct, netInvestmentUSD, paybackYearsRaw, totalPaybackMonths, paybackYearsInt, paybackMonthsInt, paybackText, paybackPct, freePct, freeYears };
+  return { savingsBasis, hasComparison, supplyKind, showsGeneratorCost, generatorCostUSD, generatorCostDOP, annualServedKWh, annualUnservedKWh, autonomyHours, panels, primaryPanel, totalPanels, systemCapacityKWp, lossesPercent, performanceRatio, inverters, totalInverterPowerKW, invertersSummary, isZeroExport, isOffGrid, hasBattery, batteries, totalBatteryKWh, batteriesSummary, grossInvestmentUSD, totalBeforeLeyUSD, costPerWattUSD, exchangeRate, tariffUSD, tariffDOP, tariffCode, isLeyEligible, leyCreditUSD, equipmentPct, netInvestmentUSD, paybackYearsRaw, totalPaybackMonths, paybackYearsInt, paybackMonthsInt, paybackText, paybackPct, freePct, freeYears };
 }
 
 export type ExecutiveSummaryModel = ReturnType<typeof executiveSummaryModel>;

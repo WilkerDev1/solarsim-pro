@@ -1,5 +1,5 @@
 import type { DocumentTextDefinition, DocumentTextFormat, DocumentTextSection } from './registry';
-import { EXECUTIVE_FOOTNOTE_RIGHT_GRID, executiveFootnoteRightDefault, savingsAwareText } from './dynamicTexts';
+import { EXECUTIVE_FOOTNOTE_RIGHT_GRID, executiveFootnoteRightDefault, savingsAwareText, supplyAwareText } from './dynamicTexts';
 
 /**
  * Textos fijos de las páginas (títulos, etiquetas, tarjetas y notas). El valor por defecto es el
@@ -78,6 +78,10 @@ export const PAGE_TEXT_DEFINITIONS: DocumentTextDefinition[] = [
   // Sistema aislado con generador: la base del ahorro es el costo de generación propia, no la tarifa.
   text("executiveSummary", "executiveSummary.row3.generatorCost", "Costo kWh generador", "Costo kWh Generador"),
   text("executiveSummary", "executiveSummary.row3.generatorCostNote", "Costo del generador pendiente", "Costo pendiente de indicar"),
+  text("executiveSummary", "executiveSummary.row3.generatorCostMissing", "Costo del generador sin dato", "Sin dato"),
+  // Sistema aislado sin comparación: no se nombra la distribuidora ni su tarifa.
+  text("executiveSummary", "executiveSummary.row3.noGrid", "Suministro sin red", "Sin conexión a la red"),
+  text("executiveSummary", "executiveSummary.row3.noGridNote", "Suministro sin red (nota)", "Sistema aislado"),
   // Fila 06 sin baterías (sistema aislado sin comparación).
   text("executiveSummary", "executiveSummary.row6.noBattery", "Autonomía: sin baterías", "Sin baterías"),
   text("executiveSummary", "executiveSummary.row3.gross", "Inversión Bruta USD", "Inversión Bruta USD"),
@@ -148,7 +152,7 @@ export const PAGE_TEXT_DEFINITIONS: DocumentTextDefinition[] = [
   text("projectDescription", "projectDescription.metric.coverage", "Cobertura Solar", "Cobertura Solar"),
   text("projectDescription", "projectDescription.metric.production", "Generación Anual", "Generación Anual"),
   text("projectDescription", "projectDescription.metric.storage", "Almacenamiento BESS", "Almacenamiento BESS"),
-  text("projectDescription", "projectDescription.regulatoryHeading", "Marco Regulatorio y Condiciones de Operación…", "Marco Regulatorio y Condiciones de Operación (SIE / EDES)"),
+  { ...text("projectDescription", "projectDescription.regulatoryHeading", "Marco Regulatorio y Condiciones de Operación…", "Marco Regulatorio y Condiciones de Operación (SIE / EDES)"), ...supplyAwareText("Marco Regulatorio y Condiciones de Operación (SIE / EDES)", "Marco Regulatorio y Condiciones de Operación (SIE)") },
   // Análisis de energía
   text("energy", "energy.impactText", "Impacto ambiental ({co2} y {trees} se calculan)", "Reducción estimada de CO₂: **{co2} Toneladas/año**. Esto equivale a plantar aproximadamente **{trees} árboles** anuales.", { multiline: true }),
   { ...text("energy", "energy.table.savedBilled", "Ahorro Fact. (kWh)", "Ahorro Fact. (kWh)"), ...savingsAwareText("Ahorro Fact. (kWh)", "Energía Servida (kWh)") },
@@ -183,7 +187,10 @@ export const PAGE_TEXT_DEFINITIONS: DocumentTextDefinition[] = [
   text("quotation", "quotation.specsHeading", "ESPECIFICACIONES DEL SISTEMA", "ESPECIFICACIONES DEL SISTEMA"),
   text("quotation", "quotation.label.power", "Potencia (kW-dc):", "Potencia (kW-dc):"),
   text("quotation", "quotation.label.monthlyConsumption", "Consumo mensual estimado:", "Consumo mensual estimado:"),
-  text("quotation", "quotation.label.tariff", "Distribuidor / Tarifa:", "Distribuidor / Tarifa:"),
+  { ...text("quotation", "quotation.label.tariff", "Distribuidor / Tarifa:", "Distribuidor / Tarifa:"), ...supplyAwareText("Distribuidor / Tarifa:", "Suministro:") },
+  text("quotation", "quotation.supply.noGrid", "Suministro: sin red", "Sin conexión a la red"),
+  text("quotation", "quotation.supply.generator", "Suministro: generador", "Generador"),
+  text("quotation", "quotation.supply.generatorPending", "Suministro: costo pendiente", "costo pendiente"),
   text("quotation", "quotation.equipmentHeading", "EQUIPOS Y MATERIALES", "EQUIPOS Y MATERIALES"),
   text("quotation", "quotation.table.description", "DESCRIPCIÓN", "DESCRIPCIÓN"),
   text("quotation", "quotation.table.quantity", "CANT.", "CANT."),
