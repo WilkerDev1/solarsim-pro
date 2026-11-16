@@ -218,6 +218,18 @@ export function bumpVersion(newVersion: string) {
     console.log(`   ✓ server/src/app.ts (/api/health) -> ${newVersion}`);
   }
 
+  // 4b. mcp-remote: package.json and the version it presents to the API (X-SolarSim-Client: mcp-remote/<versión>)
+  const mcpPkgPath = path.join(rootDir, 'mcp-remote/package.json');
+  if (fs.existsSync(mcpPkgPath)) {
+    const mcpPkg = JSON.parse(fs.readFileSync(mcpPkgPath, 'utf-8'));
+    mcpPkg.version = newVersion;
+    fs.writeFileSync(mcpPkgPath, JSON.stringify(mcpPkg, null, 2) + '\n');
+    const mcpConfigPath = path.join(rootDir, 'mcp-remote/src/config.ts');
+    const content = fs.readFileSync(mcpConfigPath, 'utf-8');
+    fs.writeFileSync(mcpConfigPath, content.replace(/(SERVICE_VERSION\s*=\s*)(['"])[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?\2/, (_match, prefix, quote) => `${prefix}${quote}${newVersion}${quote}`));
+    console.log(`   ✓ mcp-remote -> ${newVersion}`);
+  }
+
   // 5. BackupSection.tsx
   const backupSectionPath = path.join(rootDir, 'src/components/settings/sections/BackupSection.tsx');
   if (fs.existsSync(backupSectionPath)) {
@@ -241,6 +253,7 @@ export function bumpVersion(newVersion: string) {
   execFileSync('npm', ['install', '--package-lock-only'], { cwd: rootDir, stdio: 'ignore' });
   execFileSync('npm', ['--prefix', 'server', 'install', '--package-lock-only'], { cwd: rootDir, stdio: 'ignore' });
   execFileSync('npm', ['--prefix', 'workers/share-viewer', 'install', '--package-lock-only'], { cwd: rootDir, stdio: 'ignore' });
+  if (fs.existsSync(mcpPkgPath)) execFileSync('npm', ['--prefix', 'mcp-remote', 'install', '--package-lock-only'], { cwd: rootDir, stdio: 'ignore' });
   console.log(`   ✓ Lockfiles sincronizados.`);
 }
 

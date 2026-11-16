@@ -30,9 +30,11 @@ jobs:
             package-lock.json
             server/package-lock.json
             workers/share-viewer/package-lock.json
+            mcp-remote/package-lock.json
       - run: npm ci
       - run: npm --prefix server ci
       - run: npm --prefix workers/share-viewer ci
+      - run: npm --prefix mcp-remote ci
       - run: node scripts/qa/validatePackager.mjs
       - run: node scripts/qa/devSmoke.mjs
       - run: npm run lint
@@ -46,5 +48,10 @@ jobs:
       - run: npm --prefix server run build
       - run: docker build -f server/Dockerfile -t solarsim-api:qa-modular .
       - run: npx tsx server/tests/containerSmoke.ts
+      - run: npm --prefix mcp-remote test
+      - run: npm --prefix mcp-remote run format:check
+      - run: npm --prefix mcp-remote run build
+      - run: docker build -f mcp-remote/Dockerfile -t solarsim-mcp-remote:qa .
+      - run: npx tsx mcp-remote/tests/containerSmoke.ts
       - run: npm --prefix workers/share-viewer test
       - run: npm --prefix workers/share-viewer run build

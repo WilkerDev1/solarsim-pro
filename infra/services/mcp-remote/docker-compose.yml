@@ -1,0 +1,28 @@
+# Referencia para el CT dedicado a servidores MCP (docs/INFRASTRUCTURE_ARCHITECTURE.md#servidor-mcp-remoto-ct-dedicado).
+# Sin credenciales de base de datos ni JWT_SECRET: el servicio solo conoce la dirección de la API.
+services:
+  mcp:
+    image: solarsim-mcp-remote:${MCP_IMAGE_TAG:?Set the image tag <version>-<sha>}
+    container_name: solarsim-mcp-remote
+    restart: unless-stopped
+    environment:
+      MCP_PUBLIC_URL: ${MCP_PUBLIC_URL:?Set the public MCP URL, e.g. https://mcp.example/mcp}
+      API_INTERNAL_URL: ${API_INTERNAL_URL:?Set the API address reachable from this CT}
+      OAUTH_ISSUER_URL: ${OAUTH_ISSUER_URL:-}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      CLIENT_IP_HEADER: ${CLIENT_IP_HEADER:-}
+    networks:
+      - mcp_net
+  cloudflared:
+    # Fijar una versión concreta al desplegar; túnel propio de este CT.
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-mcp
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN:?Set the tunnel token of the MCP CT}
+    networks:
+      - mcp_net
+
+networks:
+  mcp_net: {}
