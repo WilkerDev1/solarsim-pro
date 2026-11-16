@@ -32,6 +32,13 @@ export interface ExtractedInvoiceData {
   netMeteringRegime?: NetMeteringRegime;
   /** Cargo por uso de la red (RD$/kWh inyectado) indicado explícitamente. */
   gridUseChargeDOPPerKWh?: number;
+  /** Medición neta leída de la factura (solo si trae las líneas; nunca inventados). Informativos: no cambian el régimen ni el cálculo. */
+  energyWithdrawnKWh?: number;
+  energyInjectedKWh?: number;
+  /** Crédito de energía acumulado (kWh) que la factura declara para el mes siguiente. */
+  accumulatedCreditKWh?: number;
+  /** El suministro ya tiene generación distribuida (medición neta o inyección en la factura). */
+  hasDistributedGeneration?: boolean;
   /** Cambios a textos del documento (garantías, vigencia, condiciones…) validados contra el registro. */
   documentTexts?: DraftDocumentText[];
 

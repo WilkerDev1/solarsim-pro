@@ -1,6 +1,9 @@
 import {batteryBank,readEquipment} from '../../shared/equipment';
 import assert from 'node:assert/strict';
-import { normalizeProposalDraft, buildProposalRequest, robustParseJson, draftForPrompt } from '../../shared/aiProposal';
+import { normalizeProposalDraft, buildProposalRequest, robustParseJson, draftForPrompt, PROPOSAL_JSON_SCHEMA, PROPOSAL_SYSTEM_INSTRUCTION } from '../../shared/aiProposal';
+import { calculateMonthlyBill } from '../../shared/tariffBilling';
+import { DEFAULT_RD_TARIFF_MATRIX, referenceBillingTariff } from '../data/rdTariffs';
+import { prepareProposalDraftProject } from '../utils/proposalDraftProject';
 import { requestGeminiJson, GeminiRequestError, geminiResponseText, type GeminiTransport } from '../../shared/geminiTransport';
 import { processExtractedInvoice } from '../utils/aiProposalNormalization';
 import { parseProposalWithAI } from '../services/geminiInvoiceService';
@@ -141,4 +144,66 @@ const preserved=useSimulationStore.getState().projects;
 useSimulationStore.getState().applyExtractedInvoice(wrongType,true);assert.strictEqual(useSimulationStore.getState().projects,preserved,'invalid inference cannot commit a new project');
 useSimulationStore.setState({syncSettings:{...useSimulationStore.getState().syncSettings,authToken:null,currentUser:{id:'viewer',role:'VIEWER',organizationId:'fixture'} as any}});
 useSimulationStore.getState().applyExtractedInvoice(normalized,true);assert.strictEqual(useSimulationStore.getState().projects,preserved,'invalidated viewer role still cannot mutate organization');
+
+// Fase 5: medición neta en el escáner de facturas. Campos opcionales: ausentes si la factura no los trae, nunca inventados.
+{
+  const METERING_KEYS=['energyWithdrawnKWh','energyInjectedKWh','accumulatedCreditKWh','hasDistributedGeneration','netMeteringRegime','gridUseChargeDOPPerKWh'] as const;
+  // Caso real: factura EDESUR BTS1 de 373 kWh = cargo fijo 128.59 + 200×6.05 + 100×8.59 + 73×12.89, sin líneas de inyección.
+  const bts1=referenceBillingTariff(DEFAULT_RD_TARIFF_MATRIX,'EDESUR','BTS1')!;
+  assert.equal(calculateMonthlyBill({tariff:bts1,withdrawnKWh:373}).totalDOP.toFixed(2),'3138.56','la factura de referencia cuadra con la facturación por bloques');
+  assert.equal((128.59+200*6.05+100*8.59+73*12.89).toFixed(2),'3138.56');
+  const plainInvoice={clientName:'Cliente EDESUR',distributor:'EDESUR',tariffCode:'BTS1',monthlyConsumptionKWh:[373,null,null,null,null,null,null,null,null,null,null,null],consumptionSource:'estimated',
+    fixedChargeDOP:128.59,energyTiers:[{kwh:200,rateDOP:6.05},{kwh:100,rateDOP:8.59},{kwh:73,rateDOP:12.89}],currentBilledKWh:373,totalBilledAmountDOP:3138.56,
+    panels:[],inverters:[],batteries:[],confidenceScore:90};
+  const metered=(draft:object)=>METERING_KEYS.filter(key=>key in draft);
+  const plain=normalizeProposalDraft(plainInvoice,catalog,context);
+  assert.deepEqual(metered(plain),[],'una factura sin líneas de medición neta no rellena ningún campo');
+  assert.equal(plain.fixedChargeDOP,128.59);assert.equal(plain.currentBilledKWh,373);
+  assert.equal(plain.validationIssues?.some(issue=>issue.code==='existing_distributed_generation'),false);
+  // Nulos, ceros y falsos que el modelo rellena por costumbre tampoco cuentan como datos de la factura.
+  const filled=normalizeProposalDraft({...plainInvoice,energyWithdrawnKWh:null,energyInjectedKWh:0,accumulatedCreditKWh:0,hasDistributedGeneration:false,netMeteringRegime:null,gridUseChargeDOPPerKWh:null},catalog,context);
+  assert.deepEqual(metered(filled),[],'null, 0 y false por defecto quedan ausentes');
+  assert.deepEqual(metered(normalizeProposalDraft(plain,catalog,context)),[],'la normalización es idempotente sobre un borrador sin medición neta');
+  // Sobre una propuesta guardada sin el campo, esa factura no cambia el régimen; una propuesta nueva sigue naciendo en SIE-007.
+  const savedBase=structuredClone(useSimulationStore.getState().getActiveProject());
+  delete savedBase.rates.netMeteringRegime;delete savedBase.rates.gridUseChargeDOPPerKWh;
+  const kept=prepareProposalDraftProject(savedBase,filled,DEFAULT_RD_TARIFF_MATRIX,{isNew:false});
+  assert.equal(kept.rates.netMeteringRegime,undefined,'factura normal: el régimen guardado (anterior) no cambia');
+  assert.equal(kept.rates.gridUseChargeDOPPerKWh,undefined,'factura normal: no se siembra cargo por uso de la red en una propuesta anterior');
+  const created=prepareProposalDraftProject(savedBase,filled,DEFAULT_RD_TARIFF_MATRIX,{isNew:true});
+  assert.equal(created.rates.netMeteringRegime,'sie007_2026','una propuesta nueva sigue naciendo en SIE-007, no por la factura');
+
+  // Con líneas de medición neta: se conservan los valores válidos y avisan de la generación distribuida existente.
+  const withMetering=normalizeProposalDraft({...plainInvoice,energyWithdrawnKWh:450,energyInjectedKWh:120,accumulatedCreditKWh:30,hasDistributedGeneration:true,gridUseChargeDOPPerKWh:3.78,netMeteringRegime:'sie007_2026'},catalog,context);
+  assert.deepEqual([withMetering.energyWithdrawnKWh,withMetering.energyInjectedKWh,withMetering.accumulatedCreditKWh,withMetering.hasDistributedGeneration,withMetering.gridUseChargeDOPPerKWh,withMetering.netMeteringRegime],[450,120,30,true,3.78,'sie007_2026']);
+  const dgIssue=withMetering.validationIssues?.find(issue=>issue.code==='existing_distributed_generation');
+  assert.equal(dgIssue?.severity,'warning');const errorCodes=(draft:{validationIssues?:{code:string;severity:string}[]})=>draft.validationIssues?.filter(i=>i.severity==='error').map(i=>i.code);
+  assert.deepEqual(errorCodes(withMetering),errorCodes(plain),'los datos de medición neta no añaden errores que bloqueen el borrador');
+  assert.deepEqual(normalizeProposalDraft(withMetering,catalog,context).energyInjectedKWh,120,'idempotente con medición neta');
+  assert.equal(normalizeProposalDraft(withMetering,catalog,context).validationIssues?.filter(issue=>issue.code==='existing_distributed_generation').length,1,'el aviso no se duplica al renormalizar');
+  const drafted=prepareProposalDraftProject(savedBase,withMetering,DEFAULT_RD_TARIFF_MATRIX,{isNew:false});
+  assert.equal(drafted.rates.netMeteringRegime,'sie007_2026','el régimen solo cambia si la factura o el usuario lo indican explícitamente');
+  // Una inyección o un crédito positivos implican generación distribuida aunque el modelo no lo marque.
+  const implied=normalizeProposalDraft({...plainInvoice,energyInjectedKWh:80},catalog,context);
+  assert.equal(implied.hasDistributedGeneration,true);assert.equal(implied.energyInjectedKWh,80);
+  assert.equal(normalizeProposalDraft({...plainInvoice,accumulatedCreditKWh:15},catalog,context).hasDistributedGeneration,true);
+  // Valores inválidos: se descartan con aviso, nunca se corrigen ni se rellenan.
+  const invalid=normalizeProposalDraft({...plainInvoice,energyWithdrawnKWh:-5,energyInjectedKWh:'120',accumulatedCreditKWh:Number.NaN,hasDistributedGeneration:'sí',gridUseChargeDOPPerKWh:250,netMeteringRegime:'otro'},catalog,context);
+  assert.deepEqual(metered(invalid),[]);
+  assert(invalid.validationIssues?.some(issue=>issue.code==='invalid_metering_value'&&issue.severity==='warning'));
+  assert(invalid.validationIssues?.some(issue=>issue.code==='invalid_grid_use_charge'));assert(invalid.validationIssues?.some(issue=>issue.code==='invalid_net_metering_regime'));
+  assert.deepEqual(errorCodes(invalid),errorCodes(plain),'los valores inválidos solo avisan');
+
+  // Esquema e instrucción: campos opcionales (nullable, fuera de `required`) y regla de no inventar.
+  const properties=PROPOSAL_JSON_SCHEMA.properties as Record<string,{nullable?:boolean;type?:string}>;
+  for(const key of ['energyWithdrawnKWh','energyInjectedKWh','accumulatedCreditKWh','hasDistributedGeneration'])assert.equal(properties[key]?.nullable,true,`${key} es opcional`);
+  assert.equal(properties.hasDistributedGeneration.type,'BOOLEAN');
+  for(const key of [...METERING_KEYS])assert(!(PROPOSAL_JSON_SCHEMA.required as readonly string[]).includes(key),`${key} no es obligatorio`);
+  for(const key of ['energyWithdrawnKWh','energyInjectedKWh','accumulatedCreditKWh','hasDistributedGeneration','netMeteringRegime','gridUseChargeDOPPerKWh'])assert(PROPOSAL_SYSTEM_INSTRUCTION.includes(key),`la instrucción explica ${key}`);
+  assert.match(PROPOSAL_SYSTEM_INSTRUCTION,/nunca los inventes|no los inventes/i);
+  // El borrador vigente que viaja al modelo en la ronda siguiente conserva lo extraído.
+  const echoed=draftForPrompt(withMetering) as Record<string,unknown>;
+  assert.equal(echoed.energyInjectedKWh,120);assert.equal(echoed.hasDistributedGeneration,true);
+  assert.deepEqual(METERING_KEYS.filter(key=>key in (draftForPrompt(plain)??{})),[],'sin medición neta, nada viaja de vuelta');
+}
 console.log('AI proposal pipeline: exact multi-model grounding, real sizing, no invented consumption, transport budget and store commit guards passed.');
