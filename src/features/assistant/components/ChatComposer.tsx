@@ -85,11 +85,14 @@ export function ChatComposer(props: ComposerProps) {
           rows={1}
           value={props.value}
           maxLength={props.maxLength ?? 12000}
-          disabled={props.busy}
+          // Durante la respuesta el campo conserva el foco (readOnly) y el envío sigue bloqueado.
+          readOnly={props.busy}
+          aria-busy={props.busy || undefined}
           placeholder={props.placeholder}
           aria-describedby={hintId}
           onChange={(e) => props.onChange(e.target.value)}
           onKeyDown={(e) => {
+            if (e.key === 'Escape' && props.busy) { e.preventDefault(); e.stopPropagation(); props.onCancel(); return; }
             if (composerKeyAction({ key: e.key, shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, isComposing: e.nativeEvent.isComposing }) === 'send') {
               e.preventDefault();
               submit();
@@ -101,7 +104,10 @@ export function ChatComposer(props: ComposerProps) {
           <button type="button" className="chat-icon-button" aria-label="Adjuntar archivos" title="Adjuntar PDF o imagen" disabled={props.busy || props.attachDisabled} onClick={() => files.current?.click()}>
             <Paperclip size={18} />
           </button>
-          <span className="chat-composer-hint" id={hintId}>{!props.busy && !props.canSend && props.disabledReason ? props.disabledReason : 'Enter envía · Shift+Enter salta línea'}</span>
+          <span className="chat-composer-hint" id={hintId}>
+            {!props.busy && !props.canSend && props.disabledReason && <span className="sr-only">{props.disabledReason}</span>}
+            {props.busy ? <span className="chat-composer-hint-busy">Esc detiene</span> : props.value.trim() ? <span className="chat-composer-hint-keys">Enter envía · Shift+Enter salta línea</span> : null}
+          </span>
           {props.busy ? (
             <button type="button" className="chat-send chat-stop" aria-label="Detener" title="Detener" onClick={props.onCancel}>
               <Square size={14} fill="currentColor" />
@@ -146,17 +152,27 @@ export function ChatThinking({ label, detail, steps = [], elapsed }: { label: st
 }
 
 /** Estado vacío con sugerencias: pulsar una rellena el mensaje (no lo envía) para que se pueda ajustar. */
-export function ChatSuggestions({ title, description, items, onPick }: { title: string; description?: string; items: readonly string[]; onPick: (text: string) => void }) {
+export function ChatSuggestions({ title, description, items, onPick, action, notice }: {
+  title: string; description?: string; items: readonly string[]; onPick: (text: string) => void;
+  /** Acción real (p. ej. adjuntar factura) mostrada antes de las sugerencias de texto. */
+  action?: { label: string; icon?: React.ReactNode; onClick: () => void };
+  /** Sustituye a las sugerencias cuando falta configuración (sin clave). */
+  notice?: React.ReactNode;
+}) {
   return (
     <div className="chat-empty">
       <span className="chat-empty-mark" aria-hidden><Sparkles size={20} /></span>
       <h3>{title}</h3>
       {description && <p>{description}</p>}
-      <ul className="chat-suggestions" aria-label="Sugerencias">
-        {items.map((item) => (
-          <li key={item}><button type="button" onClick={() => onPick(item)}>{item}</button></li>
-        ))}
-      </ul>
+      {notice}
+      {(action || items.length > 0) && (
+        <ul className="chat-suggestions" aria-label="Sugerencias">
+          {action && <li><button type="button" className="chat-suggestion-action" onClick={action.onClick}>{action.icon}{action.label}</button></li>}
+          {items.map((item) => (
+            <li key={item}><button type="button" onClick={() => onPick(item)}>{item}</button></li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

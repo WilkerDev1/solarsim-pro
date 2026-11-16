@@ -14,7 +14,7 @@ import { assistantOwner } from '../tools';
 import { assistantProjectId, assistantVisibleIn } from '../assistantScope';
 import { ChatMessage } from './ChatMessage';
 import { ChatComposer, ChatSuggestions, ChatThinking, ScrollToLatest } from './ChatComposer';
-import { useElapsedSeconds, useStickToBottom } from '../chatUi';
+import { reusableUserText, useChatAnnouncement, useElapsedSeconds, useResend, useStickToBottom } from '../chatUi';
 import { AgentCardView } from '../cards/registry';
 import {
   AssistantActionCard,
@@ -45,6 +45,19 @@ function AssistantPanel({
   const scroll = useStickToBottom(log, [ai.messages, ai.busy, ai.steps.length, open]);
   const elapsed = useElapsedSeconds(ai.busy);
   const project = state.projects.find((p) => p.id === projectId);
+  // Un error que llega al terminar una consulta es un turno del hilo (con reintento); los de adjuntos van al compositor.
+  const wasBusy = useRef(false);
+  const [threadError, setThreadError] = useState('');
+  useEffect(() => {
+    if (wasBusy.current && !ai.busy && ai.error) setThreadError(ai.error);
+    if (ai.busy || !ai.error) setThreadError('');
+    wasBusy.current = ai.busy;
+  }, [ai.busy, ai.error]);
+  const resend = useResend(ai.prompt, ai.setPrompt, () => void ai.send(), ai.busy);
+  const lastUser = [...ai.messages].reverse().find((m) => m.role === 'user');
+  const retry = lastUser ? () => resend(reusableUserText(lastUser.text)) : undefined;
+  const lastAssistantIndex = ai.messages.map((m) => m.role).lastIndexOf('assistant');
+  const announcement = useChatAnnouncement(ai.busy, () => 'Respuesta lista.');
   useEffect(() => {
     if (open) input.current?.focus();
   }, [open]);
@@ -134,11 +147,14 @@ function AssistantPanel({
               <X size={18} />
             </button>
           </div>
+          <div className="chat-log-wrap">
           <div
             className="assistant-widget-log"
             ref={log}
             onScroll={scroll.onScroll}
             role="log"
+            aria-live="off"
+            tabIndex={0}
             aria-label="Conversación con SolarSim"
           >
             {!ai.messages.length && (
@@ -153,7 +169,10 @@ function AssistantPanel({
               />
             )}
             {ai.messages.map((m, i) => (
-              <ChatMessage key={i} role={m.role} text={m.text}>
+              <ChatMessage key={i} role={m.role} text={m.text}
+                onCopy={m.role === 'assistant' ? () => navigator.clipboard.writeText(m.text) : undefined}
+                onRetry={i === lastAssistantIndex && !ai.busy && !threadError ? retry : undefined}
+                onReuse={m.role === 'user' && !ai.busy ? () => { ai.setPrompt(reusableUserText(m.text)); requestAnimationFrame(() => input.current?.focus()); } : undefined}>
                 {m.cards?.map((card) => (
                   <AssistantResultCard
                     key={`${card.kind}:${card.id}`}
@@ -176,11 +195,17 @@ function AssistantPanel({
                 ))}
               </ChatMessage>
             ))}
+            {threadError && !ai.busy && (
+              <ChatMessage role="assistant" variant="error" text={threadError} onRetry={retry}
+                onOpenSettings={() => { ai.cancel(); state.openSettingsModal('ai'); }} />
+            )}
             {ai.busy && (
               <ChatThinking label="Consultando la aplicación…" steps={ai.steps} elapsed={elapsed} />
             )}
           </div>
           <ScrollToLatest visible={scroll.away} onClick={() => scroll.scrollToBottom()} />
+          </div>
+          <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{threadError && !ai.busy ? 'La respuesta no se completó.' : announcement}</p>
           <ChatComposer
             id="app-assistant-input"
             label="Mensaje al asistente"
@@ -198,7 +223,7 @@ function AssistantPanel({
             attachments={ai.files.map((f) => ({ key: f.id, name: f.name, onRemove: () => ai.removeFile(f.id) }))}
             notices={
               <>
-                {ai.error && <p role="alert" className="chat-notice" data-tone="error">{ai.error}</p>}
+                {ai.error && !threadError && <p role="alert" className="chat-notice" data-tone="error">{ai.error}</p>}
                 {ai.loadingFiles && <p role="status" className="chat-notice">Leyendo archivos adjuntos…</p>}
                 {!state.geminiApiKey && (
                   <div className="chat-notice">
