@@ -47,7 +47,7 @@ export function ProposalDecisionFilter({
         onChange={(e) => onChange(e.target.value)}
         aria-label="Filtrar por decisión comercial"
         title="Decisión comercial"
-        className={`w-full cursor-pointer appearance-none rounded-lg border py-2.5 pl-9 pr-9 text-xs font-bold shadow-2xs focus:border-emerald-500 focus:outline-hidden sm:w-auto ${
+        className={`w-full cursor-pointer appearance-none rounded-lg border py-2.5 pl-9 pr-9 text-xs font-bold shadow-2xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600 sm:w-auto ${
           active
             ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
             : "border-slate-200/90 bg-white text-slate-700 hover:bg-slate-50 dark:border-[#272f3e] dark:bg-[#181d27] dark:text-zinc-300 dark:hover:bg-[#202734]"

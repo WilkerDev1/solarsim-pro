@@ -11,13 +11,10 @@ import {
   Folder,
   FolderPlus,
   X,
-  Sparkles,
   FileText,
   Zap,
-  Clock,
   ArrowDownUp,
   User,
-  Check,
   RotateCcw,
   EyeOff,
   LayoutGrid,
@@ -27,10 +24,11 @@ import { ProposalFamilyCards } from '../../features/proposals/ProposalFamilyCard
 import { ProjectDocumentList } from './ProjectDocumentList';
 import { FoldersResumeGrid } from './FoldersResumeGrid';
 import { CreateFolderModal } from './sidebar/CreateFolderModal';
-import { calculateTotalDCCapacityKWp, calculateTotalPanelCount } from '../../utils/equipmentSpecsUtils';
+import { calculateTotalDCCapacityKWp } from '../../utils/equipmentSpecsUtils';
 import { hiddenFolderIdSet, isProjectInFolderView } from '../../utils/folderVisibility';
 
-export const DashboardView: React.FC = () => {
+/** `initialStatusFilter` solo fija la decisión comercial inicial (pruebas y fixtures); por defecto, todas. */
+export const DashboardView: React.FC<{ initialStatusFilter?: string }> = ({ initialStatusFilter = 'All' }) => {
   const {
     projects,
     searchQuery,
@@ -42,12 +40,10 @@ export const DashboardView: React.FC = () => {
     setActiveTeamMemberFilter,
     folders,
     syncSettings,
-    sidebarTheme,
     dashboardViewMode,
     setDashboardViewMode,
-  } = useSimulationStore(useShallow((s) => ({ projects: s.projects, searchQuery: s.searchQuery, setSearchQuery: s.setSearchQuery, openNewProjectModal: s.openNewProjectModal, activeFolderId: s.activeFolderId, setActiveFolderId: s.setActiveFolderId, activeTeamMemberFilter: s.activeTeamMemberFilter, setActiveTeamMemberFilter: s.setActiveTeamMemberFilter, folders: s.folders, syncSettings: s.syncSettings, sidebarTheme: s.sidebarTheme, dashboardViewMode: s.dashboardViewMode, setDashboardViewMode: s.setDashboardViewMode })));
+  } = useSimulationStore(useShallow((s) => ({ projects: s.projects, searchQuery: s.searchQuery, setSearchQuery: s.setSearchQuery, openNewProjectModal: s.openNewProjectModal, activeFolderId: s.activeFolderId, setActiveFolderId: s.setActiveFolderId, activeTeamMemberFilter: s.activeTeamMemberFilter, setActiveTeamMemberFilter: s.setActiveTeamMemberFilter, folders: s.folders, syncSettings: s.syncSettings, dashboardViewMode: s.dashboardViewMode, setDashboardViewMode: s.setDashboardViewMode })));
 
-  const isDark = sidebarTheme === 'dark';
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
   const filtersRef = useRef<HTMLDivElement>(null);
@@ -57,7 +53,7 @@ export const DashboardView: React.FC = () => {
   const [distributorFilter, setDistributorFilter] = useState<string>('All');
   const [projectTypeFilter, setProjectTypeFilter] = useState<'All' | 'hybrid' | 'injection' | 'zero_export'>('All');
   const [memberFilter, setMemberFilter] = useState<string>('All');
-  const [statusFilter, setStatusFilter] = useState<string>('All');
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter);
 
   // Close filter popover when clicking outside
   useEffect(() => {
@@ -248,7 +244,8 @@ export const DashboardView: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar cliente, código o provincia…"
+                placeholder="Buscar propuestas…"
+                title="Busca por cliente, empresa, código, cotización o provincia"
                 aria-label="Buscar propuestas"
                 className="placeholder:text-slate-500 dark:placeholder:text-zinc-400 w-full pl-10 pr-4 py-2.5 rounded-lg text-xs border border-slate-200/90 dark:border-[#272f3e] bg-white dark:bg-[#181d27] text-slate-900 dark:text-zinc-100 shadow-2xs focus:outline-hidden focus:border-emerald-500"
               />

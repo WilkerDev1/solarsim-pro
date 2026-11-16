@@ -77,9 +77,21 @@ try {
   // 4. El popover de Filtros ya no repite el filtro de estado.
   const source = readFileSync(path.join(process.cwd(), 'src/components/dashboard/DashboardView.tsx'), 'utf8');
   assert.ok(!source.includes('Estado de la Propuesta'), 'sin el bloque duplicado en Filtros');
+  assert.match(source.match(/const resetAllFilters = \(\) => \{[\s\S]*?\n  \};/)?.[0] ?? '', /setStatusFilter\('All'\)/, 'restablecer devuelve la decisión a Todas');
 
-  // 5. Al filtrar por decisión, los conteos siguen sobre el conjunto completo.
-  // (El estado es local del componente; se comprueba que el desglose no se pierde.)
+  // 5. Con una decisión elegida, la vista se filtra pero los contadores del selector y la
+  // línea de resultados siguen sobre el conjunto previo al filtro de decisión.
+  const filteredHtml = renderToStaticMarkup(React.createElement(DashboardView, { initialStatusFilter: 'approved' }));
+  const filteredSelect = filteredHtml.match(/<select[^>]*aria-label="Filtrar por decisión comercial"[^>]*>([\s\S]*?)<\/select>/);
+  assert.ok(filteredSelect);
+  assert.deepEqual([...filteredSelect![1].matchAll(/<option[^>]*>([^<]*)<\/option>/g)].map((m) => m[1]), options, 'mismos contadores con filtro activo');
+  assert.match(filteredSelect![1], /<option value="approved" selected="">/, 'la opción elegida queda seleccionada');
+  const filteredLine = filteredHtml.match(/<p[^>]*data-commercial-results[^>]*>([\s\S]*?)<\/p>/);
+  assert.equal(filteredLine?.[1], line![1], 'misma línea de resultados con filtro activo');
+  assert.ok(/\b2 propuestas\b/.test(filteredHtml.replace(/<!-- -->/g, '')), 'la vista sí se filtra a las aprobadas');
+  assert.ok(filteredHtml.replace(/<!-- -->/g, '').includes('Estado: Aprobada'), 'el aviso de filtros activos incluye la decisión');
+
+  // 6. El desglose por responsable conserva textos y tasas.
   const { sellers } = salesPerformance(projects as any, () => 1000);
   const table = renderToStaticMarkup(React.createElement(SellerResultsTable, { sellers }));
   assert.ok(table.includes('Excluye pruebas y papelera'), 'conserva el ámbito explicado');
