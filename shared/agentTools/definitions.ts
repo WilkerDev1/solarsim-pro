@@ -251,12 +251,12 @@ export const AGENT_TOOL_DEFINITIONS: readonly AgentToolDefinition[] = [
   },
   {
     name: 'get_tariffs', title: 'Consultar tarifas', kind: 'read', category: 'reference', surfaces: [...ALL],
-    description: 'Consulta las referencias de tarifa y su procedencia, y los cargos por uso de la red SIE-007-2026 de fábrica (RD$/kWh inyectado) por distribuidora.',
+    description: 'Consulta las referencias de tarifa y su procedencia (bloques y cargo fijo, también por rango de consumo en BTS1) y el cargo por uso de la red SIE-007-2026 (RD$/kWh inyectado) por distribuidora, con su origen: leído de una resolución o de fábrica.',
     inputSchema: object({}),
   },
   {
     name: 'propose_project_update', title: 'Editar propuesta', kind: 'draft', category: 'proposals', card: 'pending-action', surfaces: [...ALL],
-    description: 'Prepara cambios en la propuesta abierta. Grupos panels/inverters/batteries requieren [{id del catálogo,count,unitPriceUSD confirmado}]; no inventes precios. customItems/customDiscounts son listas completas con ids y descripción; en customItems conserva hideInQuotation (cobrado pero oculto en la factura) tal como lo devuelve get_project. rates.gridConnection: "grid_export" | "zero_export" | "off_grid". Solo con off_grid, rates.supplyAlternative fija contra qué se compara el ahorro: "utility_tariff" (tarifa, por defecto), "generator" (requiere rates.generatorCostPerKWh en USD/kWh, > 0; pregúntalo, no lo inventes; null lo borra) o "no_comparison" (sin ahorro, payback ni TIR/VAN).',
+    description: 'Prepara cambios en la propuesta abierta. Grupos panels/inverters/batteries requieren [{id del catálogo,count,unitPriceUSD confirmado}]; no inventes precios. customItems/customDiscounts son listas completas con ids y descripción; en customItems conserva hideInQuotation (cobrado pero oculto en la factura) tal como lo devuelve get_project. rates.gridConnection: "grid_export" | "zero_export" | "off_grid". Solo con off_grid, rates.supplyAlternative fija contra qué se compara el ahorro: "utility_tariff" (tarifa, por defecto), "generator" (requiere rates.generatorCostPerKWh en USD/kWh, > 0; pregúntalo, no lo inventes; null lo borra) o "no_comparison" (sin ahorro, payback ni TIR/VAN). rates.netMeteringRegime: "sie007_2026" (cargo por kWh inyectado) o "legacy_retention" (retención % anterior); cámbialo solo si el usuario lo pide. rates.gridUseChargeDOPPerKWh: cargo por uso de la red en RD$/kWh inyectado (0 a '+MAX_GRID_USE_CHARGE_DOP_PER_KWH+'), solo en sie007_2026; toma el valor de get_tariffs o del usuario, no lo inventes.',
     inputSchema: object({
       id: id('ID de la propuesta abierta.'),
       title: { type: 'string', maxLength: 150, description: 'Resumen breve del cambio.' },
