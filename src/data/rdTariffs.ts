@@ -4,8 +4,9 @@ import { billingTariffFromRow, type BillingTariff } from '../../shared/tariffBil
 
 /**
  * Matriz de tarifas de FÁBRICA: solo es la referencia que se propone al crear o escanear una propuesta.
- * Las propuestas guardan su propia tarifa escalar y la matriz de cada usuario u organización (local o en
- * el servidor) no se reemplaza con esta; solo la usan instalaciones nuevas o «Restablecer».
+ * Las propuestas guardan su propia tarifa escalar. Una matriz guardada que es exactamente una de fábrica anterior
+ * pasa a esta al hidratar o descargar (`factoryTariffMatrixVersions.ts`); una personalizada no se reemplaza.
+ * Al cambiar esta matriz, registra la huella de la anterior en `RETIRED_FACTORY_TARIFF_MATRICES`.
  *
  * EDE: cuadro de las TARIFAS DE TRANSICIÓN A APLICAR del trimestre octubre–diciembre 2026 de la Resolución
  * SIE-121-2026-TF (art. 2, cuadro de la pág. 9; el art. 1 lo repite en la pág. 8). RD$, RD$/kWh y RD$/kW.

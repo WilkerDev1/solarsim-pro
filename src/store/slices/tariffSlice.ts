@@ -3,11 +3,20 @@ import { DEFAULT_RD_TARIFF_MATRIX } from '../../data/rdTariffs';
 import { SimulationSlice } from '../types';
 import { normalizeStoredTariffMatrix } from '../../utils/tariffExtraction';
 import { SyncService } from '../../services/syncService';
+import { classifyTariffMatrix } from '../../data/factoryTariffMatrixVersions';
+
+/** La matriz que guarda la organización en el servidor es una de fábrica anterior sin tocar (no se persiste). */
+export interface OrganizationTariffOutdated {
+  resolutionCode: string;
+  effectiveDate: string;
+}
 
 export interface TariffSlice {
   tariffMatrix: GlobalTariffMatrix;
   tariffSyncStatus: 'idle' | 'syncing' | 'synced' | 'error';
   tariffSyncError: string | null;
+  /** Última descarga: la organización guarda una matriz de fábrica anterior; el cliente calcula con la vigente. */
+  organizationTariffOutdated: OrganizationTariffOutdated | null;
 
   updateTariffMatrixHeader: (
     updates: Partial<Pick<GlobalTariffMatrix, 'resolutionCode' | 'effectiveDate' | 'publishedBy' | 'notes'>>
@@ -27,6 +36,7 @@ export const createTariffSlice: SimulationSlice<TariffSlice> = (set, get) => ({
   tariffMatrix: DEFAULT_RD_TARIFF_MATRIX,
   tariffSyncStatus: 'idle',
   tariffSyncError: null,
+  organizationTariffOutdated: null,
 
   updateTariffMatrixHeader: (updates) => {
     set((state) => ({
@@ -112,10 +122,10 @@ export const createTariffSlice: SimulationSlice<TariffSlice> = (set, get) => ({
       }
 
       if (get().tariffMatrix !== tariffMatrix) {
-        set({ tariffSyncStatus: 'idle', tariffSyncError: null });
+        set({ tariffSyncStatus: 'idle', tariffSyncError: null, organizationTariffOutdated: null });
         return { success: true, message: 'Se guardó el pliego enviado. Hay cambios locales posteriores pendientes de sincronizar.' };
       }
-      set({ tariffSyncStatus: 'synced', tariffSyncError: null });
+      set({ tariffSyncStatus: 'synced', tariffSyncError: null, organizationTariffOutdated: null });
       return { success: true, message: 'Pliego tarifario sincronizado en la nube' };
     } catch (err: any) {
       if (!isCurrent()) return { success: false, message: 'La sesión cambió durante la consulta.' };
@@ -148,15 +158,26 @@ export const createTariffSlice: SimulationSlice<TariffSlice> = (set, get) => ({
         set({ tariffSyncStatus: 'idle', tariffSyncError: null });
         return { success: false, message: 'El pliego cambió localmente durante la descarga. Reintenta para revisar la versión de la nube.' };
       }
+      if (res.matrix && classifyTariffMatrix(res.matrix) === 'retired_factory') {
+        // La organización guarda una matriz de fábrica anterior sin tocar: se calcula con la vigente y no se escribe
+        // en el servidor; Ajustes → Tarifas ofrece subirla con una acción explícita.
+        const outdated = { resolutionCode: res.matrix.resolutionCode, effectiveDate: res.matrix.effectiveDate };
+        set({ tariffMatrix: DEFAULT_RD_TARIFF_MATRIX, tariffSyncStatus: 'synced', tariffSyncError: null, organizationTariffOutdated: outdated });
+        return {
+          success: true,
+          message: `La organización guarda el pliego de fábrica anterior (${outdated.resolutionCode}). Se usa el vigente (${DEFAULT_RD_TARIFF_MATRIX.resolutionCode}); súbelo a la nube para actualizar el de la organización.`,
+        };
+      }
       if (res.matrix) {
         set({
           tariffMatrix: normalizeStoredTariffMatrix(res.matrix),
           tariffSyncStatus: 'synced',
           tariffSyncError: null,
+          organizationTariffOutdated: null,
         });
         return { success: true, message: 'Pliego tarifario actualizado desde la nube' };
       } else {
-        set({ tariffMatrix: DEFAULT_RD_TARIFF_MATRIX, tariffSyncStatus: 'synced', tariffSyncError: null });
+        set({ tariffMatrix: DEFAULT_RD_TARIFF_MATRIX, tariffSyncStatus: 'synced', tariffSyncError: null, organizationTariffOutdated: null });
         return { success: true, message: 'La nube no tiene un pliego personalizado. Se usa el pliego base de referencia; confirma su vigencia.' };
       }
     } catch (err: any) {

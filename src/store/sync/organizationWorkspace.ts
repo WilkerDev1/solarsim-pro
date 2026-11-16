@@ -362,6 +362,7 @@ export function changeWorkspace(
     isTrashActive: false,
     tariffSyncStatus: "idle",
     tariffSyncError: null,
+    organizationTariffOutdated: null,
     featurePolicyRequest: null,
     isShareModalOpen: false,
     isAIInvoiceModalOpen: false,
