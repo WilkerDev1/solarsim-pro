@@ -2,7 +2,7 @@
 
 ## Pruebas automatizadas
 
-`npm test` ejecuta cada `src/tests/test*.ts`, la prueba del updater (`electron/updater/tests/updaterIntegrity.test.ts`) y las de `electron/mcp/tests/*.test.ts`, cada una en su propio proceso, mediante `scripts/test.ts`. Para una sola suite: `npm test -- <filtro>`. El runner siempre carga `scripts/testEnvironment.ts`, que sustituye `fetch` por uno que falla: una prueba que necesite HTTP debe inyectar un transporte sintético. Ninguna prueba escribe en servidores reales ni usa secretos de producción.
+`npm test` ejecuta cada `src/tests/test*.ts`, la prueba del updater (`electron/updater/tests/updaterIntegrity.test.ts`) y las de `electron/mcp/tests/*.test.ts`, cada una en su propio proceso, mediante `scripts/test.ts`. Para una sola suite: `npm test -- <filtro>`; para una de n partes disjuntas (lo usa CI): `npm test -- --shard=i/n`. El runner siempre carga `scripts/testEnvironment.ts`, que sustituye `fetch` por uno que falla: una prueba que necesite HTTP debe inyectar un transporte sintético. Ninguna prueba escribe en servidores reales ni usa secretos de producción.
 
 - Guardas por búsqueda de texto (fallan ante una regresión de arquitectura, no de comportamiento): `testNoEquipmentMirrorAccess` (nadie lee el espejo heredado fuera de `shared/equipment`, la hidratación y la importación), `testNoBatteryFormulaCopies` (la conversión `dodPct / 100` o `eficiencia / 100` solo vive en `shared/equipment/battery.ts`), `testNoAssumptionDefaultLiterals` (ningún literal de supuesto como `|| 3.5` fuera de `shared/assumptions.ts`) y `testNoProjectEditRulesOutsideModule` (reglas de edición solo en `src/domain/projectEdit.ts`; ningún `useEffect` del simulador escribe el proyecto). Son heurísticas con excepciones justificadas en cada prueba.
 - Módulos nuevos: `testBatteryBankModule` y `testBatteryBankDefaults` (banco de baterías, [ADR 0002](adr/0002-banco-de-baterias.md)); `testResolvedAssumptions`, `testAssumptionsFactory` y `testDockEffectiveAssumptions` (supuestos, [ADR 0003](adr/0003-supuestos-resueltos.md)); `testProjectEdit` (la misma matriz de escenarios contra el store y contra `applyProjectEdit`, [ADR 0004](adr/0004-edicion-de-proyecto.md)); `testClientVersion` y `testClientVersionGate` (versión mínima de cliente).
@@ -11,6 +11,28 @@
 - `server/tests/containerSmoke.ts`: construye su propia imagen/contenedores y ensaya proceso sin root, health con base, CAS y rotación de secretos.
 
 La lista completa de gates está en [MAINTENANCE_AND_UPDATES.md](MAINTENANCE_AND_UPDATES.md#gates). Una build correcta no equivale a instalación probada en cada sistema operativo.
+
+## Integración continua
+
+| Workflow | Cuándo | Qué hace | ¿Bloquea? |
+| --- | --- | --- | --- |
+| `verify.yml` | Todo PR, push a `beta`/`main` y `workflow_call` desde `release.yml` | Gates de AGENTS.md en trabajos paralelos; `gates` agrega el resultado | Sí: `gates` es el único check requerido |
+| `release.yml` | Tag `vX.Y.Z` o manual | Llama a `verify.yml`, empaqueta y crea la release borrador ([releases](MAINTENANCE_AND_UPDATES.md#publicar-una-versión-de-escritorio)) | — |
+| `claude-review.yml` | PR hacia `beta`/`main` (no borradores) | Revisión consultiva con Claude ([abajo](#revisión-con-claude)) | No |
+| `claude.yml` | Comentario con `@claude` del propietario o colaboradores | Claude bajo demanda en el issue o PR | No |
+| `audit.yml` | Lunes, manual y PR que cambian un `package-lock.json` | `npm audit --audit-level=high` en raíz, `server/` y visor | No (informativo) |
+
+Trabajos de `verify.yml` (en paralelo tras `changes`):
+
+- `client`: `npm ci`, `validatePackager`, `devSmoke`, `lint`, `testPrepareSecrets`, `scripts/qa/tests`, `build` y `build:electron`.
+- `client-tests (1..3/3)`: `npm test -- --shard=i/3`; cada parte instala solo la raíz.
+- `server`: `format:check`, `build`, pruebas con PostgreSQL en Docker, imagen y `containerSmoke`. Si falla, sube como artefacto (7 días) `docker ps -a`, los logs de los contenedores de prueba (datos sintéticos) y los logs de npm.
+- `viewer`: pruebas y build del Worker.
+- `gates`: falla si algún trabajo falló o se canceló.
+
+Reglas: un PR que solo toca Markdown o `docs/` omite builds y pruebas y `gates` informa éxito (por eso el check requerido es el agregador y no los trabajos sueltos); push, tags y `workflow_call` verifican siempre todo. Solo se cancelan ejecuciones obsoletas de un mismo PR. Acciones fijadas por SHA con la versión en comentario y permisos mínimos; Dependabot (`.github/dependabot.yml`) propone cada semana las acciones y cada mes npm (menores agrupadas, mayores en PR propios) contra `beta`. La imagen Docker no usa caché de buildx: hoy tarda unos 10 s y no compensa. Referencia antes del reparto: el job único tardaba 5–6 min, de los que `npm test` eran ~3,5.
+
+`audit.yml` no sustituye un `npm audit` actual antes de afirmar algo sobre vulnerabilidades (AGENTS.md); en un repositorio público GitHub desactiva los workflows programados tras 60 días sin actividad.
 
 ## Ensayos fuera de `npm test`
 
@@ -36,3 +58,67 @@ Las capturas de QA se guardan localmente en `docs/qa/` (ignorado por Git) y cont
 - Publicación: snapshot de modo/versión; HTML hostil no ejecuta scripts; crédito fiscal desactivado permanece en cero; un enlace antiguo conserva su presentación.
 
 Los resultados de una ejecución concreta se registran en el PR o commit correspondiente, no en documentos fechados.
+
+## Revisión de PR
+
+Qué se revisa está en [REVIEW.md](../REVIEW.md) (lo usan el revisor automático, las revisiones locales y la manual). Flujo:
+
+1. Una sesión de Claude Code abre el PR hacia `beta` con la [plantilla](../.github/pull_request_template.md): qué cambia, qué prueba se escribió primero, contratos tocados, gates y evidencia (la evidencia vive en el PR, no en documentos).
+2. CI ejecuta `verify.yml` (`gates`) y `claude-review.yml` deja comentarios en línea y un resumen.
+3. La sesión que abrió el PR (con Auto-fix) atiende los hallazgos: los **Importantes** se corrigen con un commit nuevo o se responden justificando por qué no aplican; los demás, a criterio. Un push nuevo vuelve a revisarse (salvo `CLAUDE_REVIEW_ON_PUSH=false`).
+4. Se fusiona a `beta` solo con `gates` en verde, los hallazgos importantes resueltos y el cambio verificado en su rama. Si se activa auto-merge, hacerlo cuando la revisión de Claude ya haya terminado: no es un check requerido y el merge no la espera.
+5. El PR de release `beta`→`main` no se revisa con Claude (sus cambios ya se revisaron uno a uno); pasa `gates` y el procedimiento de [releases](MAINTENANCE_AND_UPDATES.md#publicar-una-versión-de-escritorio).
+
+En local: `/revisar-pr <número>` en Claude Code muestra la misma revisión en la terminal sin publicar nada (`--comment` publica en el PR).
+
+No hay `CODEOWNERS`: con un único mantenedor solo pediría revisión a quien ya abre los PR, y exigir su aprobación bloquearía los PR propios (GitHub no permite aprobar un PR propio).
+
+### Protección de ramas (la configura el mantenedor)
+
+En *Settings → Rules → Rulesets*, crear:
+
+- **`beta`** (rama de desarrollo): exigir PR antes de fusionar con 0 aprobaciones; exigir el check `gates` (sin «branches up to date», para no relanzar CI en PR apilados); bloquear force push y borrado. Sin historial lineal (se usan merge commits).
+- **`main`** (releases): lo mismo que `beta` y además «branches up to date» y permitir bypass solo al administrador para hotfixes de emergencia.
+- **Tags `v*`**: bloquear actualización y borrado (un tag de release no se reutiliza).
+
+En *Settings → Actions → General*: «Require approval for all external contributors» para PR de forks, permisos del `GITHUB_TOKEN` en solo lectura por defecto y sin permitir que Actions cree o apruebe PR. En *Settings → Advanced Security*: alertas y actualizaciones de seguridad de Dependabot, y escaneo de secretos con protección de push.
+
+Cuando el revisor de Claude lleve un tiempo sin falsos positivos molestos, se puede decidir exigir el check `claude-review` (solo garantiza que la revisión terminó; no bloquea por hallazgos).
+
+## Revisión con Claude
+
+`claude-review.yml` ejecuta [claude-code-action](https://github.com/anthropics/claude-code-action) (v1, fijada por SHA) en cada PR hacia `beta`/`main`: abierto, reabierto, marcado listo y cada push. Omite borradores, forks (GitHub no les da secretos), bots y el PR de release desde `beta`. Un push nuevo cancela la revisión en curso del mismo PR.
+
+- **Qué hace**: invoca la skill del repositorio [`revisar-pr`](../.claude/skills/revisar-pr/SKILL.md), que lee `AGENTS.md` y `REVIEW.md` **de la rama base** (un PR no puede cambiar sus propias reglas de revisión), lee el diff y el código cercano, verifica cada hallazgo y publica comentarios en línea más un resumen que se actualiza en cada push. Los comentarios los firma la GitHub App de Claude.
+- **Qué no puede hacer**: lista cerrada de herramientas en modo `default` (leer, `gh pr view/diff/comment`, `git show/log/diff/fetch` y el comentario en línea); no edita, no ejecuta código del PR, no empuja, no aprueba ni bloquea. El `GITHUB_TOKEN` del trabajo es de solo lectura; no se usa `pull_request_target`.
+- **Consultiva**: no es un check requerido. Bloquear por la opinión de un modelo daría falsos bloqueos y dependería de cuota o de la API; `gates` sigue siendo la única puerta.
+- **Configuración opcional** (variables del repositorio): `CLAUDE_REVIEW_MODEL` (por defecto `claude-opus-5-5`; `claude-sonnet-5-5` cuesta aproximadamente la mitad), `CLAUDE_REVIEW_MAX_TURNS` (40), `CLAUDE_REVIEW_ON_PUSH=false` para revisar solo al abrir o marcar listo; para `claude.yml`, `CLAUDE_MODEL` y `CLAUDE_MAX_TURNS`.
+- **`@claude` bajo demanda** (`claude.yml`): una mención en un comentario o revisión de issue/PR del propietario o un colaborador lanza Claude en modo interactivo (responde en el hilo y puede empujar commits a la rama del PR o a una rama nueva; nunca abre ni fusiona PR). Útil para preguntas o arreglos pequeños sin abrir sesión local; consume la misma credencial.
+
+### Autenticación: suscripción o créditos de API
+
+El workflow usa `CLAUDE_CODE_OAUTH_TOKEN` si existe y, si no, `ANTHROPIC_API_KEY`. Si no hay ninguno, la revisión se omite con un aviso (no falla).
+
+| | Suscripción (`CLAUDE_CODE_OAUTH_TOKEN`) | Créditos de API (`ANTHROPIC_API_KEY`) |
+| --- | --- | --- |
+| Requisito | Plan Pro, Max, Ultra, Team o Enterprise; token de `claude setup-token` | Clave de la [Claude Console](https://platform.claude.com) |
+| Coste por revisión | Sin cargo adicional: consume los límites de uso del plan | Por tokens, a precio de lista |
+| Límites | Los mismos límites (ventanas de 5 h y semanales) que tus sesiones de Claude Code: revisiones y sesiones compiten | Límites de la organización de la Console; se puede fijar un tope de gasto |
+| Caducidad | Un año; renovarlo antes con `claude setup-token` | No caduca; revocable en la Console |
+| Condiciones | Ligado a tu cuenta; la documentación lo ofrece para CI de tus propios repositorios. Uso «ordinario e individual»: no compartirlo ni usarlo para servir a terceros | Uso comercial normal; recomendado si el volumen crece o se comparte con otras personas |
+
+Coste orientativo con clave de API (estimación a confirmar con el paso «Coste y turnos» del resumen de cada ejecución, que muestra el importe a precio de lista incluso con suscripción): una revisión de un PR mediano con `claude-opus-5-5` (4 $/20 $ por millón de tokens de entrada/salida, 0,20 $ la lectura de caché) ronda 1–3 USD, y hasta ~5 USD en PR grandes; con `claude-sonnet-5-5` (2 $/10 $), aproximadamente la mitad. Con revisión en cada push, un mes como los recientes (decenas de pushes a PR) puede sumar varias decenas de USD con Opus; `CLAUDE_REVIEW_ON_PUSH=false` lo reduce a una revisión por PR. Los minutos de Actions son gratuitos en este repositorio público.
+
+La revisión gestionada «Claude Code Review» (sin workflow, en la infraestructura de Anthropic) existe solo para planes Team y Enterprise y se factura aparte por créditos de uso; con un plan individual, la opción es este workflow.
+
+### Pasos manuales (una vez)
+
+1. **Instalar la GitHub App de Claude** solo en este repositorio: <https://github.com/apps/claude> → *Configure* → *Only select repositories* → `solarsim-pro`. (Alternativa: `/install-github-app` en Claude Code y elegir *Skip for now* tras instalar la app, porque los workflows ya están en el repositorio.)
+2. **Crear el secreto** (uno de los dos):
+   - Suscripción: en tu equipo, `claude setup-token`, autorizar en el navegador y copiar el token; después `gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo WilkerDev1/solarsim-pro` y pegarlo cuando lo pida (no pasarlo como argumento para que no quede en el historial de la shell).
+   - API: crear una clave en la Console (mejor en un workspace con límite de gasto) y `gh secret set ANTHROPIC_API_KEY --repo WilkerDev1/solarsim-pro`.
+   - Se pueden crear ambos: se usa el de suscripción; borrarlo hace que se use la clave de API.
+3. Opcional: `gh variable set CLAUDE_REVIEW_MODEL --body claude-sonnet-5-5` o `gh variable set CLAUDE_REVIEW_ON_PUSH --body false`.
+4. Fusionar en `beta` el PR que añade estos archivos: la skill debe existir en la rama base, así que la primera revisión llega en el siguiente PR hacia `beta` (y hacia `main` tras la próxima release).
+5. Aplicar la [protección de ramas](#protección-de-ramas-la-configura-el-mantenedor) con `gates` como check requerido (después de que `verify.yml` haya corrido al menos una vez con el nombre nuevo).
+6. Anotar la renovación anual del token. Si se filtra, generar otro, sustituir el secreto y revocar el anterior desde la cuenta de Claude.
