@@ -19,7 +19,7 @@
  *
  * TypeScript puro, sin dependencias fuera de `shared/` (lo compilan el cliente, el servidor con NodeNext y el Worker).
  */
-import { resolveNetMetering, type NetMeteringRegime } from './netMetering';
+import { resolveNetMetering, type NetMeteringRegime } from './netMetering.js';
 
 // ── Valores por defecto ──
 /** Tasa RD$ por US$. */

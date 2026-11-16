@@ -52,6 +52,9 @@ function sie007GridUseChargeParagraph(ctx: DocumentTextContext, distributor: str
   }
   const factory = factoryGridUseCharge(distributor);
   const charge = isValidGridUseCharge(ctx.gridUseChargeDOPPerKWh) ? ctx.gridUseChargeDOPPerKWh : factory.dopPerKWh;
+  if (charge === 0) {
+    return `Para la tarifa ${tariffDisplayName}, el análisis económico no considera cargo por derecho de uso de la red sobre la energía inyectada, aunque el Reglamento de Generación Distribuida (Resolución SIE-007-2026-REG, art. 19.1.e) lo prevé para las tarifas de un solo precio. El sistema se diseña para maximizar el autoconsumo y optimizar la inyección de energía, obteniendo así el mayor retorno de inversión posible.${batteryHint}`;
+  }
   const source = charge === factory.dopPerKWh ? ` (Resolución ${factory.resolutionCode}, ${factory.period})` : '';
   return `Para la tarifa ${tariffDisplayName}, el análisis económico considera el cargo por derecho de uso de la red que el Reglamento de Generación Distribuida (Resolución SIE-007-2026-REG, art. 19.1.e) aplica a las tarifas de un solo precio: RD$${charge.toFixed(2)} por kWh inyectado a la red${source}. Es un valor estimado, no verificado con facturas de la distribuidora, que la SIE revisa periódicamente. Por esta razón, el sistema se diseña para maximizar el autoconsumo y optimizar la inyección de energía, obteniendo así el mayor retorno de inversión posible.${batteryHint}`;
 }

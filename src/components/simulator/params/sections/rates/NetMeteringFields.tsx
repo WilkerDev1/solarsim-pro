@@ -3,6 +3,8 @@ import type { UtilityRates } from '../../../../../types';
 import type { ResolvedAssumptions } from '../../../../../../shared/assumptions';
 import {
   GRID_USE_CHARGE_ESTIMATE_NOTICE,
+  MAX_GRID_USE_CHARGE_DOP_PER_KWH,
+  clampGridUseCharge,
   NET_METERING_REGIMES,
   NET_METERING_REGIME_LABELS,
   factoryGridUseCharge,
@@ -66,9 +68,11 @@ export const NetMeteringFields: React.FC<NetMeteringFieldsProps> = ({ rates, ass
               prefix="RD$"
               suffix="/kWh"
               mono
+              min={0}
+              max={MAX_GRID_USE_CHARGE_DOP_PER_KWH}
               disabled={!applies}
               value={applies ? charge : 0}
-              onChange={(value) => updateRates({ gridUseChargeDOPPerKWh: parseNumber(value) })}
+              onChange={(value) => updateRates({ gridUseChargeDOPPerKWh: clampGridUseCharge(parseNumber(value)) ?? 0 })}
               right={applies ? (
                 <FieldMenu
                   ariaLabel={isFactory ? 'Opciones del cargo: valor de fábrica aplicado' : `Opciones del cargo: difiere del de fábrica (RD$${factory.dopPerKWh.toFixed(2)}/kWh)`}
@@ -83,7 +87,7 @@ export const NetMeteringFields: React.FC<NetMeteringFieldsProps> = ({ rates, ass
               ) : <InfoTip text={chargeTip} />}
             />
           </ParamRow>
-          {applies && (
+          {applies && charge > 0 && (
             <p role="note" className="m-0 flex items-start gap-1.5 rounded bg-pd-warn-bg px-2 py-1.5 text-[11px] font-medium leading-snug text-pd-warn-text">
               <span>{GRID_USE_CHARGE_ESTIMATE_NOTICE} {factory.resolutionCode}, {factory.period}.</span>
               <InfoTip text={chargeTip} />

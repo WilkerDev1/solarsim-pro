@@ -11,7 +11,7 @@
  * Lectura (ADR 0003): un dato que falta o no es válido se resuelve aquí, al leer; nunca se repara al hidratar.
  * TypeScript puro, sin dependencias fuera de `shared/` (lo compilan el cliente y el Worker).
  */
-import { tariffChargeKind } from './tariffRules';
+import { tariffChargeKind } from './tariffRules.js';
 
 export const NET_METERING_REGIMES = ['legacy_retention', 'sie007_2026'] as const;
 export type NetMeteringRegime = (typeof NET_METERING_REGIMES)[number];
@@ -113,6 +113,48 @@ export function resolveNetMetering(rates: NetMeteringRatesInput | null | undefin
     gridUseChargeDOPPerKWh: charge,
     appliedGridUseChargeDOPPerKWh: regime === 'sie007_2026' && gridUseChargeApplies(rates) ? charge : 0,
   };
+}
+
+/** Acota un cargo editado al rango válido; `undefined` si no es un número finito (se descarta). */
+export function clampGridUseCharge(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  return Math.min(MAX_GRID_USE_CHARGE_DOP_PER_KWH, Math.max(0, value));
+}
+
+/**
+ * Cargo por uso de la red tras un cambio de tarifas (edición del dock o de agentes y borrador de IA sobre una propuesta).
+ * Regla única, pura:
+ * 1. Un cargo en el propio cambio manda, acotado a 0–100; si no es un número finito se descarta (queda el anterior).
+ * 2. Al cambiar de distribuidora, un cargo guardado igual al de fábrica de la anterior (no editado a mano) pasa al de la
+ *    nueva, en cualquier régimen: así volver después a SIE-007 no arrastra el de la distribuidora anterior.
+ * 3. En `sie007_2026`, sin cargo válido guardado se siembra el de fábrica. El régimen anterior no gana el campo.
+ */
+export function reconcileGridUseCharge<R extends NetMeteringRatesInput>(before: R, after: R, change: Partial<NetMeteringRatesInput>): R {
+  let next = after;
+  if (change.gridUseChargeDOPPerKWh !== undefined) {
+    const clamped = clampGridUseCharge(change.gridUseChargeDOPPerKWh);
+    if (clamped !== undefined) return { ...next, gridUseChargeDOPPerKWh: clamped };
+    next = { ...next, gridUseChargeDOPPerKWh: before.gridUseChargeDOPPerKWh };
+  }
+  const stored = next.gridUseChargeDOPPerKWh;
+  const distributorChanged = change.distributor !== undefined && change.distributor !== before.distributor;
+  if (distributorChanged && isValidGridUseCharge(stored) && stored === factoryGridUseCharge(before.distributor).dopPerKWh) {
+    next = { ...next, gridUseChargeDOPPerKWh: factoryGridUseCharge(next.distributor).dopPerKWh };
+  }
+  if (resolveNetMeteringRegime(next.netMeteringRegime) === 'sie007_2026' && !isValidGridUseCharge(next.gridUseChargeDOPPerKWh)) {
+    next = { ...next, gridUseChargeDOPPerKWh: factoryGridUseCharge(next.distributor).dopPerKWh };
+  }
+  return next;
+}
+
+/**
+ * Tarifas tal como se publican en un enlace: en `sie007_2026` se materializan el régimen y el cargo efectivo, para que
+ * un cambio futuro del valor de fábrica no cambie un enlace ya publicado. El régimen anterior se publica sin campos
+ * nuevos (igual que antes).
+ */
+export function publishedNetMeteringRates<R extends NetMeteringRatesInput>(rates: R): R {
+  if (resolveNetMeteringRegime(rates.netMeteringRegime) !== 'sie007_2026') return rates;
+  return { ...rates, netMeteringRegime: 'sie007_2026', gridUseChargeDOPPerKWh: resolveGridUseChargeDOPPerKWh(rates) };
 }
 
 /** Campos con los que nace una propuesta nueva en el régimen vigente (cargo de fábrica de su distribuidora). */

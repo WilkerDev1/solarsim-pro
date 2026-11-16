@@ -9,7 +9,7 @@ import { resolveSystemLossesPct, DEFAULT_BATTERY_DOD_PCT, DEFAULT_BATTERY_EFFICI
 import { assumptionFields, resolveAssumption, resolveAssumptions } from '../../shared/assumptions';
 import { DEFAULT_TARGET_MARGIN_PCT } from '../store/defaultSimulationSettings';
 import { enforceAutomatedPricing } from '../../shared/automatedProposalPolicy';
-import { newProposalNetMeteringFields } from '../../shared/netMetering';
+import { NEW_PROPOSAL_NET_METERING_REGIME, reconcileGridUseCharge } from '../../shared/netMetering';
 import { editEquipment, readEquipment, type EquipmentKind } from '../../shared/equipment';
 import { migrateLegacySpecs } from '../../shared/equipment';
 import { detachedCatalogIdentity, withoutInheritedPanelDegradation } from './equipmentGroups';
@@ -87,15 +87,15 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
     const tariff=resolveAITariffSelection(tariffMatrix,data.distributor,data.tariffCode);
     const reference=tariff?getReferenceEnergyRateUSD(tariffMatrix,data.distributor,tariff.code,data.averageMonthlyKWh,fx):undefined;
     const energy=data.energyCostPerKWhDOP!==undefined?data.energyCostPerKWhDOP/fx:data.energyCostPerKWhUSD ?? reference;
-    const rates={...base.rates,usdExchangeRate:fx,targetCoveragePct:coverage,distributor:data.distributor,tariffCode:tariff?.code || data.tariffCode,
+    const draftRates={...base.rates,usdExchangeRate:fx,targetCoveragePct:coverage,distributor:data.distributor,tariffCode:tariff?.code || data.tariffCode,
       ...(energy!==undefined?{energyCostPerKWh:energy}:createNewProject?{energyCostPerKWh:0}:{}),
       ...(tariff?{gridExportFeePct:tariff.netMeteringRetentionPct}:{}),
-      // Régimen de medición neta: el borrador nuevo nace en SIE-007-2026 con el cargo de fábrica de su distribuidora;
-      // sobre una propuesta existente solo cambia si el borrador lo indica explícitamente.
-      ...(createNewProject?newProposalNetMeteringFields(data.distributor):{}),
-      ...(data.netMeteringRegime?{netMeteringRegime:data.netMeteringRegime}:{}),
-      ...(data.gridUseChargeDOPPerKWh!==undefined?{gridUseChargeDOPPerKWh:data.gridUseChargeDOPPerKWh}:{}),
+      // Régimen de medición neta: el borrador nuevo nace en SIE-007-2026 salvo que indique otro; sobre una propuesta
+      // existente solo cambia si el borrador lo indica explícitamente.
+      ...(data.netMeteringRegime?{netMeteringRegime:data.netMeteringRegime}:createNewProject?{netMeteringRegime:NEW_PROPOSAL_NET_METERING_REGIME}:{}),
     };
+    // Cargo por uso de la red: la misma regla que la edición (cargo explícito, cambio de distribuidora, siembra en SIE-007).
+    const rates=reconcileGridUseCharge(base.rates,draftRates,{distributor:data.distributor,gridUseChargeDOPPerKWh:data.gridUseChargeDOPPerKWh});
   return {...base,specs:enforceAutomatedPricing(specs),rates,client:{...base.client,province},monthlyConsumption:[...data.monthlyConsumptionKWh],financials:{...base.financials,...(data.commercial?.pricePerWattUSD!==undefined?{pricePerWattUSD:data.commercial.pricePerWattUSD}:{}),...(data.commercial?.customItems!==undefined?{customItems:structuredClone(data.commercial.customItems)}:{}),...(data.commercial?.customDiscounts!==undefined?{customDiscounts:structuredClone(data.commercial.customDiscounts)}:{})}};
 }
 
