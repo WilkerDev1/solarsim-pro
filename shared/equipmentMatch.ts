@@ -70,8 +70,14 @@ export function magnitudesMatch(type: EquipmentType, requested: number, catalog:
 }
 
 const formatNumber = (n: number) => String(Number(n.toFixed(3)));
-const canonical = (text: string) => text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
-  .replace(/lux[\s-]*power(?!tek)/g, 'luxpowertek').replace(/\bcanadian(?![\s-]*solar)/g, 'canadian solar').replace(/watts?|vatios?/g, 'w');
+/** Alias de marca escritos con guion o espacio («We-Co», «Sol Ark») a su forma compacta, igual en pedido y equipo. */
+const SPLIT_BRAND_ALIASES = Object.keys(KNOWN_SOLAR_BRANDS).filter(k => k.includes('-'))
+  .map(k => [new RegExp(`\\b${k.split('-').join('[\\s-]?')}\\b`, 'g'), k.replace(/-/g, '')] as const);
+const canonical = (text: string) => SPLIT_BRAND_ALIASES.reduce((value, [pattern, compactAlias]) => value.replace(pattern, compactAlias),
+  text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''))
+  .replace(/\blux[\s-]*power(?:[\s-]*tek)?\b/g, 'luxpowertek').replace(/\bcanadian(?![\s-]*solar)/g, 'canadian solar')
+  // Unidad escrita en palabras, solo como palabra completa («kilowatts» → kw; «Growatt» queda intacta).
+  .replace(/\bkilo(?:watts?|vatios?)\b/g, 'kw').replace(/\b(?:watts?|vatios?)\b/g, 'w');
 /** Unidades de potencia/capacidad que se leen como magnitud (de la más larga a la más corta); todas las regex salen de aquí. */
 const UNIT_LIST = ['kwh', 'kwp', 'kw', 'wp', 'w', 'ah'] as const;
 const UNIT_ALT = UNIT_LIST.join('|');
@@ -109,28 +115,38 @@ export function effectiveBrand(item: Pick<SolarEquipmentItem, 'brand' | 'display
 
 interface ParsedText { tokens: string[]; magnitudes: { value: number; unit: string }[] }
 function parseText(text: string): ParsedText {
-  const value = forParsing(text).replace(WARRANTY, ' ').replace(QUANTITY, ' ');
+  // La tensión nominal («48V») no distingue el modelo: se quita igual que en el equipo.
+  const value = forParsing(text).replace(WARRANTY, ' ').replace(QUANTITY, ' ').replace(VOLTAGE, ' ');
   const magnitudes = [...value.matchAll(UNITS)].map(m => ({ value: Number(m[1].replace(',', '.')), unit: m[2] }));
   return { tokens: modelTokens(value.replace(UNITS, ' ')), magnitudes };
 }
 
-interface ItemIndex { tokens: Set<string>; sequence: string[]; required: string[]; series: string[]; brandWords: Set<string>; brand?: string }
+const ahInName = (text: string) => {
+  const found = [...forParsing(text).matchAll(UNITS)].find(m => m[2] === 'ah');
+  return found ? Number(found[1].replace(',', '.')) : undefined;
+};
+interface ItemIndex { tokens: Set<string>; sequence: string[]; required: string[]; series: string[]; brandWords: Set<string>; brand?: string; capacityAh?: number }
 function indexItem(item: SolarEquipmentItem): ItemIndex {
   const brand = effectiveBrand(item);
   const brandText = `${brand || ''} ${item.brand || ''}`;
   // Las palabras de la marca (también compuesta: «JinkoSolar», «Sol-Ark», «Lux Power») nunca hacen falta para el modelo.
   const brandWords = new Set([...modelTokens(brandText), compact(brand || ''), compact(item.brand || '')]);
   const strip = (text: string) => forParsing(text).replace(UNITS, ' ').replace(VOLTAGE, ' ');
+  const displayWords = modelTokens(strip(item.displayName || '')).filter(t => !brandWords.has(t));
+  const seriesWords = modelTokens(strip(item.modelSeries || '')).filter(t => !brandWords.has(t));
   // Secuencia ordenada (marca, serie y nombre, con las cifras de sus magnitudes) para casar fragmentos pegados sin cruzar fronteras.
   const sequence = modelTokens(`${brandText} ${item.modelSeries || ''} ${item.displayName || ''}`, true);
   return {
     tokens: new Set(sequence),
     sequence,
     // Palabras que distinguen el modelo (serie y nombre, sin magnitudes ni marca), números cortos incluidos («Powerwall 2»).
-    required: [...new Set(modelTokens(strip(`${item.modelSeries || ''} ${item.displayName || ''}`)).filter(t => !brandWords.has(t)))],
-    series: modelTokens(strip(item.modelSeries || '')).filter(t => !brandWords.has(t)),
+    // Las del nombre; la serie solo cuando el nombre no trae ninguna (una serie «de marketing» como FusionSolar no se exige).
+    required: [...new Set(displayWords.length ? displayWords : seriesWords)],
+    series: seriesWords,
     brandWords,
     brand,
+    // Ah del campo o, si falta, del nombre («B4850 50Ah»).
+    capacityAh: item.capacityAh || ahInName(`${item.modelSeries || ''} ${item.displayName || ''}`),
   };
 }
 /** Palabras del equipo que forman `fragment` juntando palabras consecutivas completas («canadiansolar», «jam66d45630lb»); nunca media palabra. */
@@ -175,9 +191,9 @@ export function fitEquipment(request: EquipmentRequest, item: SolarEquipmentItem
   let ahMatch: boolean | undefined;
   for (const m of parsed.magnitudes) {
     if (request.type === 'battery' && m.unit === 'ah') {
-      if (item.capacityAh) {
-        ahMatch = Math.abs(m.value - item.capacityAh) <= Math.max(5, item.capacityAh * 0.03);
-        if (!ahMatch) return no(`Se pidió ${formatNumber(m.value)} Ah y ${item.displayName} tiene ${formatNumber(item.capacityAh)} Ah.`);
+      if (index.capacityAh) {
+        ahMatch = Math.abs(m.value - index.capacityAh) <= Math.max(5, index.capacityAh * 0.03);
+        if (!ahMatch) return no(`Se pidió ${formatNumber(m.value)} Ah y ${item.displayName} tiene ${formatNumber(index.capacityAh)} Ah.`);
       }
       continue;
     }
@@ -188,7 +204,7 @@ export function fitEquipment(request: EquipmentRequest, item: SolarEquipmentItem
     if (requested !== undefined && !magnitudesMatch(request.type, value, requested)) return no(`La solicitud indica dos valores distintos (${formatNumber(value)} y ${formatNumber(requested)} ${unit}).`);
     requested = value;
   }
-  if (request.type === 'battery' && request.capacityAh && item.capacityAh) ahMatch = Math.abs(request.capacityAh - item.capacityAh) <= Math.max(5, item.capacityAh * 0.03);
+  if (request.type === 'battery' && request.capacityAh && index.capacityAh) ahMatch = Math.abs(request.capacityAh - index.capacityAh) <= Math.max(5, index.capacityAh * 0.03);
   const magnitude = equipmentMagnitude(item);
   let magnitudeDelta: number | undefined;
   if (requested !== undefined) {
@@ -209,32 +225,43 @@ export function fitEquipment(request: EquipmentRequest, item: SolarEquipmentItem
   // exacto si cubre todas las palabras que distinguen al equipo y no trae otras que el equipo no tiene («5K» frente a
   // «5K Pro» es compatible; «Powerwall 2» frente a «Powerwall 3», nada). No excluye.
   let modelMatch: EquipmentFit['modelMatch'];
-  const modelWords = modelTokens(forParsing(request.model || '').replace(UNITS, ' ')).filter(t => !index.brandWords.has(t));
+  // Misma lectura que el texto: sin unidades ni tensión, y las palabras pegadas («5K3Pro») cubren las del equipo que las forman.
+  const modelWords = modelTokens(forParsing(request.model || '').replace(UNITS, ' ').replace(VOLTAGE, ' ')).filter(t => !index.brandWords.has(t));
   if (modelWords.length) {
-    const asked = new Set(modelWords);
-    const known = modelWords.every(t => matchToken(index, t));
+    const asked = new Set<string>();
+    let known = true;
+    for (const word of modelWords) {
+      const found = matchToken(index, word);
+      if (found) found.forEach(t => asked.add(t)); else { known = false; asked.add(word); }
+    }
     if (known && subset(index.required, asked)) modelMatch = 'exact';
-    else if (subset(modelWords, new Set(index.required)) || subset(index.series, asked)) modelMatch = 'compatible';
+    else if (subset([...asked], new Set(index.required)) || subset(index.series, asked)) modelMatch = 'compatible';
+    // Un modelo que el equipo no tiene, sin marca ni especificación que lo respalden, no basta para encajar.
+    else if (!modelWords.some(t => matchToken(index, t)) && requested === undefined && !brandMatch && !ahMatch && !parsed.tokens.length)
+      return no(`El modelo ${request.model} no aparece en ${item.displayName}.`, { magnitudeDelta });
   }
-  if (!modelWords.length && !parsed.tokens.length && requested === undefined && brandMatch === undefined) return no('La solicitud no indica marca, modelo ni especificación.');
+  if (!modelWords.length && !parsed.tokens.length && requested === undefined && brandMatch === undefined && !ahMatch) return no('La solicitud no indica marca, modelo ni especificación.');
 
   const namesCovered = parsed.tokens.length > 0 && index.required.length > 0 && index.required.every(t => covered.has(t));
   const shown = magnitude !== undefined ? ` (${formatNumber(magnitude)} ${unit})` : '';
   const base = { item, fits: true, magnitudeDelta, brandMatch, modelMatch, ahMatch } as const;
   if (namesCovered || modelMatch === 'exact') return { ...base, kind: 'exact', reason: `Modelo exacto: ${item.displayName}${shown}.` };
+  if (requested === undefined && ahMatch) return { ...base, kind: 'spec', reason: `Coincide por especificación: ${formatNumber(index.capacityAh!)} Ah → ${item.displayName}${shown}.` };
   if (requested !== undefined) return { ...base, kind: 'spec', reason: `Coincide por especificación: ${index.brand ? `${index.brand}, ` : ''}${formatNumber(requested)} ${unit} → ${item.displayName}${shown}.` };
   return { ...base, kind: 'partial', reason: `Coincide por marca y nombre, sin ${request.type === 'battery' ? 'capacidad' : 'potencia'} que confirmar: ${item.displayName}${shown}.` };
 }
 
 const RANK: Record<EquipmentFitKind, number> = { exact: 0, spec: 1, partial: 2, none: 3 };
+/** Dentro del mismo nivel, gana el modelo exacto y después el compatible con el código pedido. */
+const modelRank = (fit: EquipmentFit) => fit.modelMatch === 'exact' ? 0 : fit.modelMatch === 'compatible' ? 1 : 2;
+const byBest = (a: EquipmentFit, b: EquipmentFit) => RANK[a.kind] - RANK[b.kind] || modelRank(a) - modelRank(b) || (a.magnitudeDelta ?? 0) - (b.magnitudeDelta ?? 0);
 
 /** El equipo del catálogo que corresponde a lo pedido: único exacto, único por especificación, ambiguo o ninguno, con el porqué. */
 export function matchEquipment(request: EquipmentRequest, catalog: readonly SolarEquipmentItem[]): EquipmentMatch {
-  const fits = catalog.filter(item => item.type === request.type).map(item => fitEquipment(request, item)).filter(fit => fit.fits)
-    .sort((a, b) => RANK[a.kind] - RANK[b.kind] || (a.magnitudeDelta ?? 0) - (b.magnitudeDelta ?? 0));
+  const fits = catalog.filter(item => item.type === request.type).map(item => fitEquipment(request, item)).filter(fit => fit.fits).sort(byBest);
   const asked = request.text?.trim() || [request.brand, request.model, request.magnitude !== undefined ? `${formatNumber(request.magnitude)} ${UNIT[request.type]}` : ''].filter(Boolean).join(' ');
   if (!fits.length) return { kind: 'none', candidates: [], reason: `Ningún ${NOUN[request.type]} del catálogo coincide con «${asked}».` };
-  const tier = fits.filter(fit => fit.kind === fits[0].kind);
+  const tier = fits.filter(fit => fit.kind === fits[0].kind && modelRank(fit) === modelRank(fits[0]));
   if (tier.length > 1) {
     const names = tier.slice(0, 5).map(fit => fit.item.displayName).join(', ');
     return { kind: 'ambiguous', candidates: tier, reason: `«${asked}» coincide con ${tier.length} modelos: ${names}. Indica cuál.` };

@@ -57,7 +57,7 @@ export function isGenericBrand(brand?: string | null): boolean {
 const DESCRIPTOR_WORDS = new Set(['modulo', 'modulos', 'panel', 'paneles', 'inversor', 'inversores', 'microinversor', 'microinversores', 'bateria', 'baterias',
   'hibrido', 'hibrida', 'hibridos', 'trifasico', 'trifasica', 'monofasico', 'monofasica', 'bifasico', 'split', 'phase', 'fase', 'string', 'ongrid', 'offgrid',
   'on-grid', 'off-grid', 'solar', 'solares', 'litio', 'lithium', 'lifepo4', 'de', 'del', 'para', 'con', 'bifacial', 'mono', 'monocristalino', 'policristalino',
-  'red', 'aislado', 'almacenamiento', 'sistema', 'kit', 'equipo', 'china', 'chino', 'generico', 'generica', 'nuevo', 'nueva', 'alta', 'baja', 'tension', 'voltaje']);
+  'iron', 'phosphate', 'fosfato', 'hierro', 'lfp', 'ion', 'li-ion', 'liion', 'red', 'aislado', 'almacenamiento', 'sistema', 'kit', 'equipo', 'china', 'chino', 'generico', 'generica', 'nuevo', 'nueva', 'alta', 'baja', 'tension', 'voltaje']);
 
 /**
  * Normaliza un string de marca a su forma canónica si es conocida,
@@ -97,7 +97,7 @@ export function inferBrandFromText(displayName = '', modelSeries = ''): string {
   if (combined.includes('canadian solar') || combined.includes('canadian') || combined.includes('cs6.1') || combined.includes('topbiliku')) {
     return 'Canadian Solar';
   }
-  if (combined.includes('luxpowertek') || combined.includes('luxpower') || combined.includes('lxp-lb') || combined.includes('lxp')) {
+  if (combined.includes('luxpowertek') || combined.includes('luxpower') || combined.includes('lxp-lb') || word('lxp')) {
     return 'LuxpowerTek';
   }
   // «hina» como palabra: «China» no es HinaESS.
@@ -128,7 +128,7 @@ export function inferBrandFromText(displayName = '', modelSeries = ''): string {
   if (combined.includes('deye')) {
     return 'Deye';
   }
-  if (combined.includes('growatt') || combined.includes('min 5000') || combined.includes('sph')) {
+  if (combined.includes('growatt') || combined.includes('min 5000') || word('sph\\d*')) {
     return 'Growatt';
   }
   if (combined.includes('sungrow')) {
@@ -140,7 +140,7 @@ export function inferBrandFromText(displayName = '', modelSeries = ''): string {
   if (combined.includes('dyness') || combined.includes('powerbox')) {
     return 'Dyness';
   }
-  if (combined.includes('pylontech') || combined.includes('us5000') || combined.includes('force')) {
+  if (combined.includes('pylontech') || combined.includes('us5000') || word('force(?:-?[hl]\\d+)?')) {
     return 'Pylontech';
   }
   if (combined.includes('felicity') || combined.includes('felicitysolar')) {
@@ -178,6 +178,9 @@ export function inferBrandFromText(displayName = '', modelSeries = ''): string {
   return 'General';
 }
 
+/** Palabras que acompañan a muchas marcas y no identifican a ninguna por sí solas. */
+const BRAND_GENERIC_WORDS = new Set(['solar', 'energy', 'energia', 'power', 'tech', 'technology', 'group', 'new', 'electric', 'electrical', 'co', 'ltd', 'inc', 'sa', 'srl']);
+
 /**
  * Comprueba si dos nombres de marcas representan el mismo fabricante,
  * admitiendo alias, eliminación de espacios y normalización fonética.
@@ -198,12 +201,11 @@ export function areBrandsMatching(brandA?: string | null, brandB?: string | null
     return true;
   }
 
-  // Contención directa si tiene al menos 3 caracteres
-  if (cleanA.length >= 3 && cleanB.length >= 3) {
-    if (cleanA.includes(cleanB) || cleanB.includes(cleanA)) {
-      return true;
-    }
-  }
-
-  return false;
+  // Palabras completas, no subcadenas («Ion» no es «Orion», «Sol» no es «Solis»): una marca puede ser la otra sin
+  // sus palabras genéricas («Canadian» ↔ «Canadian Solar», «Victron» ↔ «Victron Energy»), pero «Solar» sola no es ninguna.
+  const brandWords = (raw: string, canonical: string) => new Set(`${raw} ${canonical}`.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w && !BRAND_GENERIC_WORDS.has(w)));
+  const wordsA = brandWords(brandA, normA);
+  const wordsB = brandWords(brandB, normB);
+  const within = (a: Set<string>, b: Set<string>) => a.size > 0 && [...a].every((w) => b.has(w));
+  return within(wordsA, wordsB) || within(wordsB, wordsA);
 }

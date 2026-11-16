@@ -148,5 +148,62 @@ for (const [name, brand] of [
   if (got !== brand) failures.push(`marca de «${name}»: esperado ${brand}, obtenido ${got}`);
 }
 
+// --- Revisión final: marcas por subcadena, Ah, tensión, «watts», alias con guion, series de marketing, modelo pegado y desempate. ---
+const R = {
+  orion: eq('inverter', 'Orion', 'Inversor Orion 5kW', '', 5),
+  solis: eq('inverter', 'Solis', 'Inversor Solis S6-GR1P5K 5kW', 'S6-GR1P5K', 5),
+  canadian: eq('panel', 'Canadian Solar', 'Canadian Solar CS6W-550MB 550W', 'CS6W-550MB', 550),
+  generic: eq('battery', 'Fabricante', 'Batería Lithium Iron Phosphate 5kWh', '', 5),
+  dyness50: eq('battery', 'Dyness', 'Batería Dyness B4850 50Ah 2.4kWh', '', 2.4),
+  ah100: eq('battery', 'Pylontech', 'Batería Pylontech US2000C', 'US2000C', 2.4, { capacityAh: 100 }),
+  weco16: eq('battery', 'WeCo', 'Batería WeCo 16K0-LV 16 kWh', '16K0-LV', 16),
+  growatt: eq('inverter', 'Growatt', 'Inversor Growatt MIN 6000TL-X 6 kilowatts', '', 6),
+  lux10: eq('inverter', 'LuxpowerTek', 'Inversor LuxpowerTek LXP 10kW', '', 10),
+  weco5k3: eq('battery', 'WeCo', 'Batería WeCo 5K3 Pro 5.3 kWh', '', 5.3),
+  fusion: eq('inverter', 'Huawei', 'Huawei SUN2000-10KTL-M1 10kW', 'FusionSolar', 10),
+  jam: eq('panel', 'JA Solar', 'JA Solar JAM72S30-550/MR 550W', 'JAM72S30', 550),
+  deepblue: eq('panel', 'JA Solar', 'JA Solar DeepBlue 3.0 550W', '', 550),
+};
+const rkey = (item?: SolarEquipmentItem) => Object.entries(R).find(([, v]) => v === item)?.[0];
+const review: [label: string, got: string, want: string][] = [];
+const expectMatch = (label: string, request: Parameters<typeof matchEquipment>[0], items: SolarEquipmentItem[], kind: EquipmentMatchKind, id?: keyof typeof R) => {
+  const result = matchEquipment(request, items);
+  review.push([label, `${result.kind} ${rkey(result.item) ?? '-'}`, `${kind} ${id ?? '-'}`]);
+};
+// 1. Marcas: subcadenas de 3+ letras no son la misma marca.
+expectMatch('marca Ion vs Orion', { type: 'inverter', brand: 'Ion', magnitude: 5 }, [R.orion], 'none');
+expectMatch('marca Sol vs Solis', { type: 'inverter', brand: 'Sol', magnitude: 5 }, [R.solis], 'none');
+expectMatch('marca Solar vs Canadian Solar', { type: 'panel', brand: 'Solar', magnitude: 550 }, [R.canadian], 'none');
+expectMatch('marca Solis vs Solis', { type: 'inverter', brand: 'SOLIS', magnitude: 5 }, [R.solis], 'spec', 'solis');
+expectMatch('marca Canadian vs Canadian Solar', { type: 'panel', brand: 'Canadian', magnitude: 550 }, [R.canadian], 'spec', 'canadian');
+// 2. Inferencia con palabra completa: «phosphate» no es Growatt (sph) ni «Lithium Iron» Ion Energy.
+review.push(['marca de «Lithium Iron Phosphate»', inferBrandFromText(R.generic.displayName, ''), 'General']);
+review.push(['marca de «Pylontech Force H2»', inferBrandFromText('Batería Force H2 7.1kWh', ''), 'Pylontech']);
+// 3. Amperios-hora: leídos del nombre si falta el campo; «100Ah» solo es especificación válida.
+expectMatch('Dyness 100Ah vs 50Ah', { type: 'battery', text: 'Dyness B4850 100Ah 2.4kWh' }, [R.dyness50], 'none');
+expectMatch('Dyness 50Ah', { type: 'battery', text: 'Dyness B4850 50Ah 2.4kWh' }, [R.dyness50], 'exact', 'dyness50');
+expectMatch('solo 100Ah', { type: 'battery', text: 'Batería 100Ah' }, [R.ah100], 'spec', 'ah100');
+expectMatch('solo 50Ah vs 100Ah', { type: 'battery', text: 'Batería 50Ah' }, [R.ah100], 'none');
+// 4. Tensión en el pedido (texto y modelo).
+expectMatch('WeCo 48V en el pedido', { type: 'battery', text: 'Batería WeCo 16K0-LV 48V 16 kWh' }, [R.weco16], 'exact', 'weco16');
+expectMatch('WeCo 48V en el modelo', { type: 'battery', brand: 'WeCo', model: '16K0-LV 48V', magnitude: 16 }, [R.weco16], 'exact', 'weco16');
+// 5. «kilowatts», «Growatt» y «Lux Power Tek».
+expectMatch('6 kilowatts', { type: 'inverter', text: 'Growatt MIN 6000TL-X 6 kilowatts' }, [R.growatt], 'exact', 'growatt');
+expectMatch('Growatt sin «grow»', { type: 'inverter', text: 'Growatt MIN 6000TL-X' }, [R.growatt], 'exact', 'growatt');
+expectMatch('Lux Power Tek', { type: 'inverter', text: 'Lux Power Tek LXP 10kW' }, [R.lux10], 'exact', 'lux10');
+// 6. Alias con guion.
+expectMatch('We-Co', { type: 'battery', text: 'We-Co 5K3 Pro 5.3 kWh' }, [R.weco5k3], 'exact', 'weco5k3');
+// 7. Serie de marketing que no está en el nombre.
+expectMatch('serie FusionSolar', { type: 'inverter', text: 'Huawei SUN2000-10KTL-M1 10kW' }, [R.fusion], 'exact', 'fusion');
+// 8. Modelo pegado en `model` igual que en `text`.
+expectMatch('model 5K3Pro', { type: 'battery', brand: 'WeCo', model: '5K3Pro', magnitude: 5.3 }, [R.weco5k3], 'exact', 'weco5k3');
+expectMatch('text 5K3Pro', { type: 'battery', text: 'WeCo 5K3Pro 5.3 kWh' }, [R.weco5k3], 'exact', 'weco5k3');
+// 9. Desempate por modelo compatible.
+// El código es la serie de JAM72S30-550/MR, no su nombre completo: gana como compatible (por especificación), no exacto.
+expectMatch('JAM72S30 550', { type: 'panel', brand: 'JA Solar', model: 'JAM72S30', magnitude: 550 }, [R.jam, R.deepblue], 'spec', 'jam');
+expectMatch('JAM72S30 sin magnitud', { type: 'panel', model: 'JAM72S30' }, [R.deepblue, R.jam], 'partial', 'jam');
+expectMatch('JAM72S30-550/MR', { type: 'panel', brand: 'JA Solar', model: 'JAM72S30-550/MR', magnitude: 550 }, [R.deepblue, R.jam], 'exact', 'jam');
+for (const [label, got, want] of review) if (got !== want) failures.push(`${label}: esperado ${want}, obtenido ${got}`);
+
 assert.equal(failures.length, 0, `\n${failures.join('\n')}`);
-console.log(`Equipment matcher case table: ${table.length + pairs.length + checks.length + 6} real cases passed.`);
+console.log(`Equipment matcher case table: ${table.length + pairs.length + checks.length + 6 + review.length} real cases passed.`);
