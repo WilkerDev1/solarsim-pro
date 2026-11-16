@@ -64,6 +64,8 @@ const CONDITIONAL = new Set([
   'company.email', 'company.rnc', 'quotation.issuerRncLabel', 'client.email', // filas opcionales: se imprimen si tienen valor
   'quotation.label.email',
   'projectDescription.engineeringScope', // solo se edita (y se inserta en el párrafo 2)
+  // Fila 06 de un sistema aislado sin comparación de ahorro (en vez del payback; ver testOffGridSupplyAlternative).
+  'executiveSummary.row6.energyTitle', 'executiveSummary.row6.served', 'executiveSummary.row6.unserved', 'executiveSummary.row6.autonomy',
 ]);
 const missing = DOCUMENT_TEXT_DEFINITIONS.map((d) => d.key).filter((key) => !rendered.has(key) && !CONDITIONAL.has(key));
 assert.deepEqual(missing, [], `Textos del registro sin lugar en la hoja:\n${missing.join('\n')}`);

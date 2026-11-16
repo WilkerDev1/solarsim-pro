@@ -5,6 +5,7 @@ import { useSimulationStore } from "../../store/useSimulationStore";
 import { useShallow } from 'zustand/react/shallow';
 import { useEnergyCalculationMode } from "../../features/application/useApplicationFeatures";
 import { calculateProjectFinancialSummary } from "../../engine/financeEngine";
+import { hasSavingsComparison, noSavingsNote, resolveSavingsBasis } from "../../../shared/offGridSupply";
 import { ProposalCommercialPanel } from "../../features/proposals/ProposalCommercialPanel";
 import { ProposalClientSection } from "../clients/ProposalClientLink";
 import {
@@ -47,6 +48,11 @@ export const ProjectHubView = () => {
   const [section, setSection] = useState<"overview" | "finance" | "history">(
     "overview",
   );
+  // Sistema aislado sin comparación (o generador sin costo): estado explícito en vez de ceros.
+  const savingsBasis = resolveSavingsBasis(project?.rates);
+  const comparable = hasSavingsComparison(savingsBasis);
+  const noSavingsLabel = savingsBasis === "generator_missing_cost" ? "Falta costo del generador" : "Sin comparación";
+
   if (!project || !summary)
     return (
       <div className="project-summary summary-empty">
@@ -149,14 +155,16 @@ export const ProjectHubView = () => {
         </div>
         <div>
           <span>Ahorro estimado · año 1</span>
-          <strong>
-            {money(summary.year1SavingsUSD)} <small>USD</small>
+          <strong data-savings-state={comparable ? undefined : savingsBasis} title={comparable ? undefined : noSavingsNote(savingsBasis)}>
+            {comparable ? <>{money(summary.year1SavingsUSD)} <small>USD</small></> : noSavingsLabel}
           </strong>
         </div>
         <div>
           <span>Retorno simple estimado</span>
           <strong>
-            {Number.isFinite(summary.paybackYears) && summary.paybackYears > 0
+            {!comparable
+              ? noSavingsLabel
+              : Number.isFinite(summary.paybackYears) && summary.paybackYears > 0
               ? `${summary.paybackYears.toFixed(1)} años`
               : "No alcanzado"}
           </strong>
@@ -308,7 +316,7 @@ export const ProjectHubView = () => {
                   <h2>Rentabilidad proyectada</h2>
                 </header>
                 <dl className="summary-facts">
-                  {[
+                  {(comparable ? [
                     ["TIR", `${summary.irrPct.toFixed(1)}%`],
                     ["VAN", `${money(summary.npvUSD)} USD`],
                     ["ROI a 25 años", `${summary.roi25YrPct.toFixed(1)}%`],
@@ -316,7 +324,9 @@ export const ProjectHubView = () => {
                       "Ahorro acumulado a 25 años",
                       `${money(summary.total25YearSavingsUSD)} USD`,
                     ],
-                  ].map(([label, value]) => (
+                  ] : [
+                    ["TIR, VAN y ROI", noSavingsLabel],
+                  ]).map(([label, value]) => (
                     <div key={label}>
                       <dt>{label}</dt>
                       <dd>{value}</dd>

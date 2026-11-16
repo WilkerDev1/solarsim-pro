@@ -1,6 +1,7 @@
 import type { ExtractedInvoiceData, GeminiModelInfo } from './aiInvoice';
 import type { LegacyEquipmentFields } from '../../shared/equipment';
 import type { GridConnectionMode } from '../../shared/gridConnection';
+import type { SupplyAlternative } from '../../shared/offGridSupply';
 
 export interface ClientInfo {
   nic?: string;
@@ -135,6 +136,10 @@ export interface UtilityRates {
   isZeroExport?: boolean;       // Inyección Cero / Antivertido (Zero-Export). Se mantiene coherente con `gridConnection` (true = no exporta)
   /** Tipo de conexión con la red (`shared/gridConnection.ts`); se lee siempre con `resolveGridConnection`. Ausente = se deriva de `isZeroExport`. */
   gridConnection?: GridConnectionMode;
+  /** Solo sistemas aislados: con qué se compara el ahorro (`shared/offGridSupply.ts`); se lee con `resolveSupplyAlternative`. Ausente = tarifa de distribuidora. */
+  supplyAlternative?: SupplyAlternative;
+  /** Costo por kWh del generador (USD/kWh) cuando `supplyAlternative` es `generator`; sin default (`resolveGeneratorCostPerKWh`). */
+  generatorCostPerKWh?: number;
   annualEnergyInflationPct: number; // e.g. 3.5%
 }
 

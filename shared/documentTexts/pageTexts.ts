@@ -1,5 +1,5 @@
 import type { DocumentTextDefinition, DocumentTextFormat, DocumentTextSection } from './registry';
-import { EXECUTIVE_FOOTNOTE_RIGHT_GRID, executiveFootnoteRightDefault } from './dynamicTexts';
+import { EXECUTIVE_FOOTNOTE_RIGHT_GRID, executiveFootnoteRightDefault, savingsAwareText } from './dynamicTexts';
 
 /**
  * Textos fijos de las páginas (títulos, etiquetas, tarjetas y notas). El valor por defecto es el
@@ -47,7 +47,8 @@ export const PAGE_TEXT_DEFINITIONS: DocumentTextDefinition[] = [
   text("tableOfContents", "toc.footnote", "* Todas las secciones técnicas y proyecciones…", "* Todas las secciones técnicas y proyecciones financieras están calculadas bajo normativa dominicana **(Ley 57-07 y SIE)**.", { multiline: true }),
   text("tableOfContents", "toc.totalPages", "Total de páginas ({total})", "Total: {total} Páginas", { format: "plain" }),
   // Cuadro resumen ejecutivo
-  text("executiveSummary", "executiveSummary.heading", "Cuadro Resumen de Inversión y Retorno", "Cuadro Resumen de Inversión y Retorno"),
+  // Sin comparación de ahorro (sistema aislado) no se habla de retorno.
+  { ...text("executiveSummary", "executiveSummary.heading", "Cuadro Resumen de Inversión y Retorno", "Cuadro Resumen de Inversión y Retorno"), ...savingsAwareText("Cuadro Resumen de Inversión y Retorno", "Cuadro Resumen de Inversión y Energía") },
   text("executiveSummary", "executiveSummary.subheading", "Pipeline ejecutivo del dimensionamiento fotov…", "Pipeline ejecutivo del dimensionamiento fotovoltaico, balance económico y marco de la Ley 57-07."),
   text("executiveSummary", "executiveSummary.footnote", "* Estimación calculada conforme al marco regu…", "* Estimación calculada conforme al marco regulatorio dominicano, Resolución SIE-007 y Ley 57-07."),
   // Dinámico según el tipo de conexión: un sistema aislado no opera bajo medición neta.
@@ -84,6 +85,11 @@ export const PAGE_TEXT_DEFINITIONS: DocumentTextDefinition[] = [
   text("executiveSummary", "executiveSummary.row4.creditNote", "Deducción directa ISR (40%)", "Deducción directa ISR (40%)"),
   text("executiveSummary", "executiveSummary.row5.title", "DIFERENCIA (INVERSIÓN NETA)", "DIFERENCIA (INVERSIÓN NETA)"),
   text("executiveSummary", "executiveSummary.row6.title", "RETORNO DE INVERSIÓN", "RETORNO DE INVERSIÓN"),
+  // Fila 06 sin comparación de ahorro (sistema aislado): energía entregada, no servida y autonomía.
+  text("executiveSummary", "executiveSummary.row6.energyTitle", "ENERGÍA ENTREGADA Y AUTONOMÍA", "ENERGÍA ENTREGADA Y AUTONOMÍA"),
+  text("executiveSummary", "executiveSummary.row6.served", "Energía entregada", "Energía entregada"),
+  text("executiveSummary", "executiveSummary.row6.unserved", "Energía no servida", "Energía no servida"),
+  text("executiveSummary", "executiveSummary.row6.autonomy", "Autonomía de baterías", "Autonomía de baterías"),
   text("executiveSummary", "executiveSummary.row6.lifespan", "Vida útil ({freeYears} = años libres)", "Vida útil garantizada: **25 años** ({freeYears}+ años de ganancia neta)"),
   // Quiénes somos
   text("aboutUs", "aboutUs.service1.items", "Servicio 1: lista", "- Levantamiento técnico\n- Planos y diseño de ingeniería\n- Puesta en marcha certificada\n- Inducción al usuario", { multiline: true }),
@@ -140,13 +146,13 @@ export const PAGE_TEXT_DEFINITIONS: DocumentTextDefinition[] = [
   text("projectDescription", "projectDescription.regulatoryHeading", "Marco Regulatorio y Condiciones de Operación…", "Marco Regulatorio y Condiciones de Operación (SIE / EDES)"),
   // Análisis de energía
   text("energy", "energy.impactText", "Impacto ambiental ({co2} y {trees} se calculan)", "Reducción estimada de CO₂: **{co2} Toneladas/año**. Esto equivale a plantar aproximadamente **{trees} árboles** anuales.", { multiline: true }),
-  text("energy", "energy.table.savedBilled", "Ahorro Fact. (kWh)", "Ahorro Fact. (kWh)"),
-  text("energy", "energy.table.savedEnergy", "Ahorro Energ. (kWh)", "Ahorro Energ. (kWh)"),
+  { ...text("energy", "energy.table.savedBilled", "Ahorro Fact. (kWh)", "Ahorro Fact. (kWh)"), ...savingsAwareText("Ahorro Fact. (kWh)", "Energía Servida (kWh)") },
+  { ...text("energy", "energy.table.savedEnergy", "Ahorro Energ. (kWh)", "Ahorro Energ. (kWh)"), ...savingsAwareText("Ahorro Energ. (kWh)", "Energía Servida (kWh)") },
   text("energy", "energy.chartHeading", "Evolución Mensual de Energía", "Evolución Mensual de Energía"),
   text("energy", "energy.legend.consumption", "Consumo (kWh)", "Consumo (kWh)"),
   text("energy", "energy.legend.production", "Producción Solar (kWh)", "Producción Solar (kWh)"),
   text("energy", "energy.legend.selfConsumption", "Autoconsumo en Sitio", "Autoconsumo en Sitio"),
-  text("energy", "energy.tableHeading", "Resumen Mensual de Energía & Balance de Ahorro", "Resumen Mensual de Energía & Balance de Ahorro"),
+  { ...text("energy", "energy.tableHeading", "Resumen Mensual de Energía & Balance de Ahorro", "Resumen Mensual de Energía & Balance de Ahorro"), ...savingsAwareText("Resumen Mensual de Energía & Balance de Ahorro", "Resumen Mensual de Energía Entregada") },
   text("energy", "energy.table.month", "Mes", "Mes"),
   text("energy", "energy.table.production", "Producción (kWh)", "Producción (kWh)"),
   text("energy", "energy.table.selfConsumption", "Autoconsumo (kWh)", "Autoconsumo (kWh)"),

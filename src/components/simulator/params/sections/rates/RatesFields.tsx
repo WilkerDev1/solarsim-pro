@@ -5,6 +5,11 @@ import { getDistributorTariffOptions, type UtilityDistributor } from '../../../.
 import { Field, FieldMenu, InfoTip, ParamRow, SelectField } from '../../ui';
 import { resolveAssumptions } from '../../../../../../shared/assumptions';
 import { gridConnectionFields, isGridConnectionMode, resolveGridConnection, type GridConnectionMode } from '../../../../../../shared/gridConnection';
+import {
+  GENERATOR_MISSING_COST_NOTE, NO_COMPARISON_NOTE, SUPPLY_ALTERNATIVE_LABELS, SUPPLY_ALTERNATIVES, isSupplyAlternative,
+  resolveSavingsBasis, storedSupplyAlternative,
+} from '../../../../../../shared/offGridSupply';
+import { AlertTriangle } from 'lucide-react';
 import { SelfConsumptionPanel } from './SelfConsumptionPanel';
 import {
   averageMonthlyConsumption,
@@ -36,7 +41,14 @@ const CONNECTION_OPTIONS: { value: GridConnectionMode; label: string }[] = [
   { value: 'off_grid', label: 'Aislado (modo isla)' },
 ];
 
+const SUPPLY_OPTIONS = SUPPLY_ALTERNATIVES.map(value => ({ value, label: SUPPLY_ALTERNATIVE_LABELS[value] }));
+
 const parseNumber = (raw: string) => parseFloat(raw) || 0;
+/** Costo del generador: vacío (o no numérico) se guarda como «sin dato»; no hay valor por defecto. */
+const parseOptionalNumber = (raw: string): number | undefined => {
+  const value = parseFloat(raw);
+  return raw.trim() === '' || !Number.isFinite(value) ? undefined : value;
+};
 
 export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix, projectionEnabled, updateRates, updateSpecs }) => {
   const { rates } = project;
@@ -58,6 +70,9 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
   const connection = resolveGridConnection(rates);
   const offGrid = connection === 'off_grid';
   const zeroExport = connection !== 'grid_export';
+  // Alternativa de suministro (solo aislado): con qué se compara el ahorro.
+  const supply = storedSupplyAlternative(rates);
+  const savingsBasis = resolveSavingsBasis(rates);
 
   const apply = (plan: TariffChangePlan) => {
     updateRates(plan.rates);
@@ -94,7 +109,7 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
           onChange={value => apply(planTariffChange(context, value))}
         />
       </ParamRow>
-      <ParamRow label={offGrid ? 'Costo evitado kWh' : 'Precio kWh'} htmlFor="pd-rates-kwh">
+      <ParamRow label={offGrid && supply === 'utility_tariff' ? 'Costo evitado kWh' : 'Precio kWh'} htmlFor="pd-rates-kwh">
         <Field
           id="pd-rates-kwh"
           type="number"
@@ -136,6 +151,43 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
           onChange={value => { if (isGridConnectionMode(value)) updateRates(gridConnectionFields(value)); }}
         />
       </ParamRow>
+      {offGrid && (
+        <ParamRow label="Alternativa de suministro" htmlFor="pd-rates-supply">
+          <SelectField
+            id="pd-rates-supply"
+            value={supply}
+            options={SUPPLY_OPTIONS}
+            onChange={value => { if (isSupplyAlternative(value)) updateRates({ supplyAlternative: value }); }}
+          />
+        </ParamRow>
+      )}
+      {offGrid && supply === 'generator' && (
+        <ParamRow label="Costo generador kWh" htmlFor="pd-rates-generator">
+          <Field
+            id="pd-rates-generator"
+            type="number"
+            step="0.001"
+            min="0"
+            prefix="$"
+            mono
+            placeholder="Indicar"
+            value={rates.generatorCostPerKWh ?? ''}
+            aria-invalid={savingsBasis === 'generator_missing_cost' || undefined}
+            aria-describedby={savingsBasis === 'generator_missing_cost' ? 'pd-rates-generator-notice' : undefined}
+            onChange={value => updateRates({ generatorCostPerKWh: parseOptionalNumber(value) })}
+            right={<InfoTip text="Costo por kWh de la planta eléctrica que usa hoy el cliente (combustible, mantenimiento…), en la misma moneda que el precio del kWh. El ahorro valora la energía servida a este costo." />}
+          />
+        </ParamRow>
+      )}
+      {offGrid && savingsBasis === 'generator_missing_cost' && (
+        <div id="pd-rates-generator-notice" role="alert" className="flex items-start gap-2 rounded-md border border-pd-negative px-2.5 py-2 text-xs text-pd-negative">
+          <AlertTriangle size={14} aria-hidden="true" className="mt-0.5 flex-none" />
+          <span className="min-w-0 flex-1">{GENERATOR_MISSING_COST_NOTE}</span>
+        </div>
+      )}
+      {offGrid && savingsBasis === 'no_comparison' && (
+        <p role="note" className="m-0 rounded-md border border-pd-field-ro-border px-2.5 py-2 text-xs text-pd-muted">{NO_COMPARISON_NOTE}</p>
+      )}
       <ParamRow label="Cargo exportación" htmlFor="pd-rates-export">
         <Field
           id="pd-rates-export"

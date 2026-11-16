@@ -16,6 +16,7 @@ import type { CustomQuotationItem } from '../../types';
 import { touchesPricingEdits } from './pricingFields';
 import { AUTOMATED_PRICING } from '../../../shared/automatedProposalPolicy';
 import { resolveGridConnection } from '../../../shared/gridConnection';
+import { savingsValuationCostPerKWh } from '../../../shared/offGridSupply';
 import type {
   AssistantAction,
   AssistantToolCall,
@@ -190,7 +191,8 @@ export function executeAssistantTool(
           p.client.province,
           p.specs,
           p.monthlyConsumption,
-          p.rates.energyCostPerKWh,
+          // Mismo costo con el que el resumen valora el ahorro (aislado: tarifa, generador o sin comparación).
+          savingsValuationCostPerKWh(p.rates),
           p.rates.gridExportFeePct,
           p.client.customMonthlyHSP,
           p.rates.tariffCode,

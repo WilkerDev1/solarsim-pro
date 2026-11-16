@@ -1,5 +1,6 @@
 import type { AssistantEdit, AssistantSection } from './types';
 import { GRID_CONNECTION_MODES } from '../../../shared/gridConnection';
+import { MAX_GENERATOR_COST_PER_KWH, SUPPLY_ALTERNATIVES } from '../../../shared/offGridSupply';
 // Explicit surface: no ids, roles, authorship, remote endpoints, assets or arbitrary store writes.
 const fields: Record<AssistantSection, string[]> = {
   client: [
@@ -68,6 +69,8 @@ const fields: Record<AssistantSection, string[]> = {
     'gridExportFeePct',
     'isZeroExport',
     'gridConnection',
+    'supplyAlternative',
+    'generatorCostPerKWh',
     'annualEnergyInflationPct',
   ],
   financials: [
@@ -132,6 +135,7 @@ const textFields = new Set([
   ...fields.client.filter((f) => f !== 'quoteValidityDays'),
   'pricingMode',
   'gridConnection',
+  'supplyAlternative',
   'installationServicesDesc',
   'directPriceSurplusTarget',
   'loadProfilePreset',
@@ -153,6 +157,7 @@ const enums: Record<string, string[]> = {
   loadProfilePreset: ['residential', 'commercial', 'industrial', 'custom'],
   currency: ['USD', 'DOP'],
   gridConnection: [...GRID_CONNECTION_MODES],
+  supplyAlternative: [...SUPPLY_ALTERNATIVES],
 };
 const percentages = new Set([
   'systemLosses',
@@ -319,6 +324,9 @@ export function validateAssistantEdits(
         (field === 'tempCoeff' ? value < -10 || value > 10 : value < 0)
       )
         throw new Error(`${field} requiere un número válido.`);
+      // Costo del generador (sistema aislado): sin default, así que un 0 no es un dato válido.
+      if (field === 'generatorCostPerKWh' && (value <= 0 || value > MAX_GENERATOR_COST_PER_KWH))
+        throw new Error(`generatorCostPerKWh debe ser mayor que 0 y no superar ${MAX_GENERATOR_COST_PER_KWH} USD/kWh.`);
       if (percentages.has(field) && value > 100)
         throw new Error(`${field} no puede superar 100%.`);
       if (

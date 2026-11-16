@@ -1,5 +1,6 @@
 import { getTariffDisplayName } from '../proposalPresentation';
 import { resolveGridConnection } from '../gridConnection';
+import { hasSavingsComparison, resolveGeneratorCostPerKWh, resolveSavingsBasis } from '../offGridSupply';
 import { FACTORY_TEXTS } from './factoryTexts';
 import type { DocumentTextContext } from './context';
 import { resolveDynamicProjectSummaryParagraph1, resolveDynamicProjectSummaryParagraph2 } from './projectSummary';
@@ -26,15 +27,53 @@ export function regulatoryNoteDefault(ctx: DocumentTextContext): string {
   return [p1, p2, p3, p4].join('\n\n');
 }
 
-/** Sistema aislado (modo isla): sin medición neta, sin inyección y sin cargos de la distribuidora. */
+/**
+ * Sistema aislado (modo isla): sin medición neta, sin inyección y sin cargos de la distribuidora. La redacción del
+ * ahorro depende de la alternativa de suministro (`shared/offGridSupply.ts`): tarifa (texto de siempre), generador
+ * (se compara con el costo de generación propia indicado) o sin comparación (no se habla de ahorro).
+ */
 function offGridRegulatoryNote(ctx: DocumentTextContext): string {
   const storage = ctx.hasBatteryStorage ? ' y el banco de baterías' : '';
+  const basis = resolveSavingsBasis(ctx);
+  const uncovered = `El consumo que no cubran la producción solar${ctx.hasBatteryStorage ? ' ni las baterías' : ''} deberá atenderse con una fuente de respaldo (por ejemplo, una planta eléctrica) o gestionando las cargas${ctx.hasBatteryStorage ? '' : '; sin baterías, el sistema solo abastece consumos durante las horas de sol'}.`;
+  const p1 = `El sistema fotovoltaico operará aislado de la red eléctrica (modo isla), sin acometida ni contrato con la distribuidora: la producción solar${storage} abastecerá${storage ? 'n' : ''} directamente los consumos del inmueble y no habrá intercambio de energía con la red de distribución.`;
+  const p2 = 'La presente propuesta se basa en criterios técnicos y en el historial de consumo del cliente. Al no conectarse a la red, no le aplican los cargos ni las compensaciones de la distribuidora.';
+  if (!hasSavingsComparison(basis)) {
+    return [
+      p1,
+      p2,
+      'Esta propuesta no incluye una comparación económica con un suministro actual: presenta la inversión, la energía que entregará el sistema, la energía no servida estimada y la autonomía de las baterías. Las cifras de energía son estimadas y pueden variar según los hábitos de consumo, el perfil de carga y las condiciones reales de operación del sistema.',
+      uncovered,
+    ].join('\n\n');
+  }
+  const p3 = 'Los ahorros indicados son estimados y pueden variar según los hábitos de consumo, el perfil de carga y las condiciones reales de operación del sistema.';
+  if (basis === 'generator') {
+    const cost = (resolveGeneratorCostPerKWh(ctx) as number).toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+    return [
+      p1,
+      p2,
+      p3,
+      `El ahorro estimado compara la energía que abastece el sistema con el costo de generación propia indicado por el cliente (planta eléctrica), de US$ ${cost} por kWh. ${uncovered}`,
+    ].join('\n\n');
+  }
   return [
-    `El sistema fotovoltaico operará aislado de la red eléctrica (modo isla), sin acometida ni contrato con la distribuidora: la producción solar${storage} abastecerá${storage ? 'n' : ''} directamente los consumos del inmueble y no habrá intercambio de energía con la red de distribución.`,
-    'La presente propuesta se basa en criterios técnicos y en el historial de consumo del cliente. Al no conectarse a la red, no le aplican los cargos ni las compensaciones de la distribuidora.',
-    'Los ahorros indicados son estimados y pueden variar según los hábitos de consumo, el perfil de carga y las condiciones reales de operación del sistema.',
-    `El ahorro estimado valora únicamente la energía que abastece el sistema, al costo de referencia por kWh de esta propuesta. El consumo que no cubran la producción solar${ctx.hasBatteryStorage ? ' ni las baterías' : ''} deberá atenderse con una fuente de respaldo (por ejemplo, una planta eléctrica) o gestionando las cargas${ctx.hasBatteryStorage ? '' : '; sin baterías, el sistema solo abastece consumos durante las horas de sol'}.`,
+    p1,
+    p2,
+    p3,
+    `El ahorro estimado valora únicamente la energía que abastece el sistema, al costo de referencia por kWh de esta propuesta. ${uncovered}`,
   ].join('\n\n');
+}
+
+/**
+ * Texto que solo cambia cuando no hay comparación de ahorro (sistema aislado «sin comparación» o generador sin
+ * costo). El texto de siempre queda como valor de fábrica conocido: una propuesta que lo guardó no cuenta como
+ * personalizada y toma la variante que corresponda.
+ */
+export function savingsAwareText(standard: string, withoutComparison: string) {
+  return {
+    defaultText: (ctx: DocumentTextContext) => (hasSavingsComparison(resolveSavingsBasis(ctx)) ? standard : withoutComparison),
+    knownFactoryValues: [standard] as readonly string[],
+  };
 }
 
 /** Servicios gestionados: un sistema aislado no tramita medición neta ni interconexión con la distribuidora. */

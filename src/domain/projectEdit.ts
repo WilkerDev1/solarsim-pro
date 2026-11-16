@@ -9,6 +9,7 @@ import { editEquipmentGroup, normalizeEquipmentEdit, normalizeSpecsChange, selec
 import { normalizeEnabledBatteries } from '../utils/batteryState';
 import { supplierQuotesItem } from '../utils/equipmentMatchingUtils';
 import { normalizeGridConnectionPatch } from '../../shared/gridConnection';
+import { normalizeSupplyAlternativePatch } from '../../shared/offGridSupply';
 
 /**
  * Edición de proyecto (ADR 0004): la única regla para aplicar un cambio de specs, tarifas, cliente, consumo o
@@ -22,6 +23,8 @@ import { normalizeGridConnectionPatch } from '../../shared/gridConnection';
  * - el proveedor del modelo principal se suelta si el modelo nuevo no lo cotiza;
  * - sobrescrituras financieras manuales: solo sobreviven en el caso de referencia auditado;
  * - tipo de conexión con la red: `gridConnection` e `isZeroExport` siempre coherentes (`shared/gridConnection.ts`);
+ * - alternativa de suministro de un sistema aislado: un valor desconocido o un costo de generador no numérico no se
+ *   guardan (`shared/offGridSupply.ts`); nada se escribe si el parche no los trae;
  * - reconciliación con el catálogo (potencia del modelo principal y proveedor huérfano), que corre en la siguiente
  *   edición real: mirar un proyecto nunca lo escribe.
  */
@@ -61,7 +64,7 @@ export function applyProjectEdit(project: ProjectSimulation, edit: ProjectEdit, 
       break;
     case 'rates': {
       // Tipo de conexión: `gridConnection` e `isZeroExport` se escriben siempre juntos y coherentes.
-      const rates = { ...project.rates, ...normalizeGridConnectionPatch(project.rates, edit.patch) };
+      const rates = { ...project.rates, ...normalizeGridConnectionPatch(project.rates, normalizeSupplyAlternativePatch(edit.patch)) };
       next = resizeIfNeeded(project, { ...project, rates, specs: { ...reconcileWithCatalog(project.specs, project.specs, catalog) } }, edit.patch.targetCoveragePct !== undefined);
       break;
     }

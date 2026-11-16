@@ -1,4 +1,5 @@
 import { GRID_CONNECTION_LABELS, isGridConnectionMode } from '../../../shared/gridConnection';
+import { SUPPLY_ALTERNATIVE_LABELS, isSupplyAlternative } from '../../../shared/offGridSupply';
 const labels: Record<string, string> = {
   name: 'Nombre del cliente',
   company: 'Empresa del cliente',
@@ -55,6 +56,8 @@ const labels: Record<string, string> = {
   gridExportFeePct: 'Retención de excedentes (%)',
   isZeroExport: 'Inyección cero',
   gridConnection: 'Conexión a la red',
+  supplyAlternative: 'Alternativa de suministro (aislado)',
+  generatorCostPerKWh: 'Costo del generador (USD/kWh)',
   annualEnergyInflationPct: 'Inflación de energía anual (%)',
   applyLey5707: 'Crédito fiscal Ley 57-07',
   applyITBISExemption: 'Exoneración de ITBIS',
@@ -94,5 +97,6 @@ export function assistantValueLabel(value: unknown) {
   if (value === 'cost_matrix') return 'Matriz de costos';
   if (value === 'direct_watt') return 'Precio directo';
   if (isGridConnectionMode(value)) return GRID_CONNECTION_LABELS[value];
+  if (isSupplyAlternative(value)) return SUPPLY_ALTERNATIVE_LABELS[value];
   return typeof value === 'string' ? value : JSON.stringify(value);
 }

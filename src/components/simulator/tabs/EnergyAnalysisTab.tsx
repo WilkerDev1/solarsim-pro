@@ -14,6 +14,7 @@ import {
 } from 'recharts';
 import { Sparkles, ArrowDownToLine, Copy, Check, Eye, EyeOff } from 'lucide-react';
 import { offGridUnservedNote } from '../../../utils/offGridNotes';
+import { hasSavingsComparison, noSavingsNote, resolveSavingsBasis } from '../../../../shared/offGridSupply';
 
 interface EnergyAnalysisTabProps {
   project: ProjectSimulation;
@@ -48,6 +49,9 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
     0
   );
   const avgCoveragePct = summary?.energyCoveragePct || 0;
+  // Sistema aislado sin comparación (o generador sin costo): sin cifras de ahorro en USD, solo energía servida.
+  const savingsBasis = resolveSavingsBasis(project.rates);
+  const comparable = hasSavingsComparison(savingsBasis);
 
   const [isReplicated, setIsReplicated] = useState(false);
 
@@ -136,14 +140,24 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
         {/* Card 4: AHORRO ENERGÉTICO ANUAL */}
         <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-            AHORRO ENERGÉTICO ANUAL
+            {comparable ? 'AHORRO ENERGÉTICO ANUAL' : 'ENERGÍA SERVIDA ANUAL'}
           </span>
-          <div className="flex items-baseline gap-1">
-            <span className="text-xl font-bold text-emerald-700">
-              ${summary.year1SavingsUSD.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
-            </span>
-            <span className="text-xs text-slate-500 font-semibold">USD</span>
-          </div>
+          {comparable ? (
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-bold text-emerald-700">
+                ${summary.year1SavingsUSD.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+              </span>
+              <span className="text-xs text-slate-500 font-semibold">USD</span>
+            </div>
+          ) : (
+            <div className="flex items-baseline gap-1" data-savings-state={savingsBasis} title={noSavingsNote(savingsBasis)}>
+              <span className="text-xl font-bold text-slate-900">{Math.round(totalSelfConsumedKWh).toLocaleString()}</span>
+              <span className="text-xs text-slate-500 font-semibold">kWh</span>
+              <span className="text-[10px] font-bold text-amber-700 ml-1">
+                {savingsBasis === 'generator_missing_cost' ? 'Falta costo generador' : 'Sin comparación'}
+              </span>
+            </div>
+          )}
           <div className="text-[10px] text-slate-600 font-medium mt-1 leading-tight flex flex-col gap-0.5">
             {showSelfConsumption ? (
               <>
@@ -353,7 +367,7 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
                   )}
                   <td className="py-2 px-3 text-right font-bold text-emerald-800">
                     <span>{(row.effectiveSavedKWh ?? (row.solarSelfConsumedKWh + (row.netExportCreditKWh || 0))).toFixed(1)}</span>
-                    {showSelfConsumption && (
+                    {showSelfConsumption && comparable && (
                       <span className="block text-[10px] text-emerald-600 font-semibold">${row.savingsUSD.toFixed(1)}</span>
                     )}
                   </td>
@@ -373,7 +387,7 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
                 )}
                 <td className="py-3 px-3 text-right font-extrabold text-emerald-900">
                   <span>{totalEffectiveSavedKWh.toFixed(1)} kWh</span>
-                  {showSelfConsumption && (
+                  {showSelfConsumption && comparable && (
                     <span className="block text-[10.5px] text-emerald-700">${summary.year1SavingsUSD.toFixed(1)} USD</span>
                   )}
                 </td>

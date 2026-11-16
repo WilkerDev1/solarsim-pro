@@ -5,6 +5,7 @@ import {
   projectSummaryParagraph1Default,
   projectSummaryParagraph2Default,
   regulatoryNoteDefault,
+  savingsAwareText,
   servicesIncludedDefault,
   syncProjectSummaryParagraph1,
   syncProjectSummaryParagraph2,
@@ -193,6 +194,17 @@ const DEFINITIONS: DocumentTextDefinition[] = [
   },
 ];
 
+/** Variantes del cuadro resumen sin comparación de ahorro (sistema aislado): no se habla de retorno ni payback. */
+const WITHOUT_SAVINGS_COMPARISON: Partial<Record<string, string>> = {
+  'page.executiveSummary.title': 'CUADRO RESUMEN DE INVERSIÓN Y ENERGÍA',
+  'toc.executiveSummary.title': 'Cuadro Resumen de Inversión y Energía',
+  'toc.executiveSummary.subtitle': 'Pipeline Técnico, Beneficio Ley 57-07 y Energía Entregada',
+};
+const sectionText = (definition: DocumentTextDefinition): DocumentTextDefinition => {
+  const variant = WITHOUT_SAVINGS_COMPARISON[definition.key];
+  return variant ? { ...definition, ...savingsAwareText(definition.defaultText as string, variant) } : definition;
+};
+
 /** Título de cada página (cinta de cabecera) y entradas del índice: una sola fuente de nombres. */
 const SECTION_TEXT_DEFINITIONS: DocumentTextDefinition[] = DOCUMENT_SECTION_IDS.flatMap((id) => {
   const meta = DOCUMENT_SECTIONS[id];
@@ -205,7 +217,7 @@ const SECTION_TEXT_DEFINITIONS: DocumentTextDefinition[] = DOCUMENT_SECTION_IDS.
       { ...base, key: `toc.${id}.subtitle`, label: `Índice (subtítulo): ${meta.label}`, defaultText: meta.toc.subtitle },
     );
   }
-  return defs;
+  return defs.map(sectionText);
 });
 
 DEFINITIONS.push(...SECTION_TEXT_DEFINITIONS, ...PAGE_TEXT_DEFINITIONS);
