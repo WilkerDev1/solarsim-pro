@@ -1,19 +1,26 @@
 // Pure model behind the proposal's energy-flow diagram. Every number is an approximate visual guide
 // derived from the proposal's headline figures (never a simulation result), so it works for old links too.
 
+import type { GridConnectionMode } from '../../../shared/gridConnection';
+
 // The proposal does not record whether the inverter can form an island, so backup is stated as a condition.
 const BACKUP_NOTE = 'El respaldo durante un apagón requiere un inversor híbrido con salida de respaldo (backup) y cubre las cargas conectadas a esa salida.';
+const OFF_GRID_NOTE = 'Sistema aislado: no hay red de respaldo. Cuando el sol y la batería no alcanzan, la carga queda sin servir salvo que exista un respaldo externo (por ejemplo, una planta eléctrica).';
+const OFF_GRID_NO_BATTERY_NOTE = 'Un sistema aislado sin baterías solo abastece consumos mientras hay sol, necesita un inversor capaz de operar sin red (off-grid) y su potencia varía con las nubes. Para cubrir la noche se requieren baterías o un respaldo externo.';
 
-export type EnergyFlowMode = 'day' | 'batteryFull' | 'night' | 'outage' | 'outageDay' | 'outageNight';
+export type EnergyFlowMode = 'day' | 'batteryFull' | 'night' | 'outage' | 'outageDay' | 'outageNight' | 'depleted';
 export type FlowColor = 'o' | 'g' | 'b'; // solar (orange), battery (green), grid (blue)
 export type FlowSpeed = 's1' | 's2' | 's3';
 export type PillTone = 'green' | 'indigo' | 'amber';
-export type BatteryState = 'charging' | 'discharging' | 'idle' | 'full';
-export type GridState = 'export' | 'import' | 'idle' | 'disconnected';
+export type BatteryState = 'charging' | 'discharging' | 'idle' | 'full' | 'empty';
+/** `disconnected`: apagón temporal de una red que existe; `none`: sistema aislado, sin acometida. */
+export type GridState = 'export' | 'import' | 'idle' | 'disconnected' | 'none';
 
 export interface EnergyFlowScenarioInput {
   hybrid: boolean;
   isZeroExport: boolean;
+  /** Tipo de conexión (`resolveGridConnection`); ausente = se deriva de `isZeroExport` (enlaces antiguos). */
+  gridConnection?: GridConnectionMode;
   systemCapacityKWp: number;
   annualConsumptionKWh: number;
   totalBESSKWh: number;
@@ -91,7 +98,7 @@ const OFF: Omit<FlowLine, 'color'> = { active: false, speed: 's3', thin: false, 
 const join = (items: string[]) => (items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} y ${items[items.length - 1]}`);
 
 /** Spanish copy built from the modeled flows, so the text never claims a flow the diagram does not draw. */
-function describeFlows(prefix: string, f: Flows, trimmedForZeroExport: boolean): string {
+function describeFlows(prefix: string, f: Flows, trimmedForZeroExport: boolean, trimmedOffGrid = false): string {
   const helpers = [f.batteryHouse > 0 ? 'la batería' : '', f.gridHouse > 0 ? 'la red' : ''].filter(Boolean);
   const verb = (plural: string, singular: string) => (helpers.length > 1 ? plural : singular);
   let text = f.solarHouse > 0
@@ -100,6 +107,7 @@ function describeFlows(prefix: string, f: Flows, trimmedForZeroExport: boolean):
   if (f.solarBattery > 0) text += f.exported > 0 ? ', el excedente carga la batería y una parte se inyecta a la red' : ' y el excedente carga la batería';
   else if (f.exported > 0) text += ' y el excedente se inyecta a la red';
   if (trimmedForZeroExport) text += '; con inyección cero el sistema ajusta su producción y no inyecta a la red';
+  if (trimmedOffGrid) text += '; sin red, el sistema recorta la producción que no puede usar';
   return `${prefix}${text}.`;
 }
 
@@ -144,11 +152,13 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
   const make = (mode: EnergyFlowMode, f: Flows, o: {
     label: string; title: string; description: string; note?: string; pill: ModeScenario['pill'];
     night: boolean; gridConnected: boolean; inverterState: ModeScenario['inverterState']; batteryFull?: boolean;
+    batteryEmpty?: boolean; noGrid?: boolean;
   }): ModeScenario => {
     const house = f.solarHouse + f.batteryHouse + f.gridHouse;
     const batteryState: BatteryState | undefined = !hybrid ? undefined : o.batteryFull && f.batteryHouse <= 0 ? 'full'
+      : o.batteryEmpty && f.batteryHouse <= 0 && f.solarBattery <= 0 ? 'empty'
       : f.batteryHouse > 0 ? 'discharging' : f.solarBattery > 0 ? 'charging' : 'idle';
-    const gridState: GridState = !o.gridConnected ? 'disconnected'
+    const gridState: GridState = o.noGrid ? 'none' : !o.gridConnected ? 'disconnected'
       : f.exported > 0 ? 'export' : f.gridHouse > 0 ? 'import' : 'idle';
     return {
       mode, label: o.label, title: o.title, description: o.description, note: o.note, pill: o.pill,
@@ -158,6 +168,10 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
       lines: buildLines(f, hybrid, o.gridConnected),
     };
   };
+
+  const capped = (f: Flows, wanted: number) => (wanted - (f.solarHouse + f.batteryHouse) > 0.05
+    ? ' La potencia disponible es limitada, por lo que conviene priorizar los equipos esenciales.' : '');
+  if (input.gridConnection === 'off_grid') return offGridScenarios();
 
   const day = solveDay(load.day, potential, batteryLimit, inverter, { zeroExport: isZeroExport, gridConnected: true, gridImport: !hybrid });
   const night = solveNight(load.night, batteryLimit, !hybrid, inverter);
@@ -191,8 +205,6 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
   const full = solveDay(load.day, potential, batteryLimit, inverter, { zeroExport: isZeroExport, gridConnected: true, gridImport: false }, 0);
   const island = solveDay(load.day, potential, batteryLimit, inverter, { zeroExport: true, gridConnected: false, gridImport: false });
   const islandNight = solveNight(load.night, batteryLimit, false, inverter);
-  const capped = (f: Flows, wanted: number) => (wanted - (f.solarHouse + f.batteryHouse) > 0.05
-    ? ' La potencia disponible es limitada, por lo que conviene priorizar los equipos esenciales.' : '');
   return [
     make('day', day, {
       label: 'De día', title: 'De día', night: false, gridConnected: true, inverterState: 'on',
@@ -222,4 +234,57 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
       pill: { text: 'Modo isla', tone: 'amber' },
     }),
   ];
+
+  /**
+   * Sistema aislado («modo isla» permanente): sin acometida, nunca importa ni exporta. El excedente se recorta y lo
+   * que no cubren el sol ni la batería queda sin servir; la red se dibuja como «sin conexión».
+   */
+  function offGridScenarios(): ModeScenario[] {
+    const island = { zeroExport: true, gridConnected: false, gridImport: false };
+    const base = { gridConnected: false, noGrid: true } as const;
+    const trimmed = (f: Flows) => potential - f.production > 0.05;
+    const day = solveDay(load.day, potential, batteryLimit, inverter, island);
+    if (!hybrid) {
+      return [
+        make('day', day, {
+          ...base, label: 'De día', title: 'De día', night: false, inverterState: day.production > 0 ? 'on' : 'off',
+          description: describeFlows('De día, ', day, false, trimmed(day)) + capped(day, load.day),
+          note: OFF_GRID_NO_BATTERY_NOTE,
+          pill: { text: 'Modo isla', tone: 'green' },
+        }),
+        make('night', solveNight(load.night, 0, false, inverter), {
+          ...base, label: 'De noche', title: 'De noche', night: true, inverterState: 'off',
+          description: 'De noche no hay producción solar y, sin baterías ni red, el sistema no puede abastecer la casa: la carga queda sin servir salvo que exista un respaldo externo.',
+          note: OFF_GRID_NOTE,
+          pill: { text: 'Carga sin servir', tone: 'amber' },
+        }),
+      ];
+    }
+    const full = solveDay(load.day, potential, batteryLimit, inverter, island, 0);
+    const night = solveNight(load.night, batteryLimit, false, inverter);
+    const depleted = solveNight(load.night, 0, false, inverter);
+    return [
+      make('day', day, {
+        ...base, label: 'De día', title: 'De día', night: false, inverterState: 'on',
+        description: describeFlows('De día, ', day, false, trimmed(day)) + capped(day, load.day),
+        pill: { text: day.solarBattery > 0 ? 'Cargando batería' : day.batteryHouse > 0 ? 'Batería apoyando' : 'Modo isla', tone: 'green' },
+      }),
+      make('batteryFull', full, {
+        ...base, label: 'Batería llena', title: 'Batería llena', night: false, inverterState: 'on', batteryFull: true,
+        description: describeFlows('Cuando la batería está llena, ', full, false, trimmed(full)) + capped(full, load.day),
+        pill: { text: 'Batería llena', tone: 'green' },
+      }),
+      make('night', night, {
+        ...base, label: 'De noche', title: 'De noche', night: true, inverterState: 'on',
+        description: describeFlows('De noche, sin producción solar, ', night, false) + capped(night, load.night),
+        pill: { text: 'Batería descargando', tone: 'indigo' },
+      }),
+      make('depleted', depleted, {
+        ...base, label: 'Batería agotada', title: 'Batería agotada', night: true, inverterState: 'standby', batteryEmpty: true,
+        description: 'De noche, con la batería agotada y sin red, la casa se queda sin energía hasta que vuelva el sol: la carga queda sin servir salvo que exista un respaldo externo.',
+        note: OFF_GRID_NOTE,
+        pill: { text: 'Carga sin servir', tone: 'amber' },
+      }),
+    ];
+  }
 }

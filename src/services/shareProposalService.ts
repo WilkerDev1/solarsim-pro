@@ -10,6 +10,7 @@ import { effectiveFeatureSettings } from '../features/application/featurePolicy'
 import { calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { publishedDocumentTexts } from '../../shared/documentTexts';
 import { buildDocumentTextContext } from '../utils/documentTextContext';
+import { gridConnectionFields, resolveGridConnection } from '../../shared/gridConnection';
 
 export interface ShareResult {
   success: boolean;
@@ -226,7 +227,8 @@ export class ShareProposalService {
         updatedAt: project.updatedAt,
         client: project.client,
         specs: project.specs,
-        rates: project.rates,
+        // El enlace lleva el tipo de conexión explícito y coherente con `isZeroExport` (un Worker anterior solo lee este último).
+        rates: { ...project.rates, ...gridConnectionFields(resolveGridConnection(project.rates)) },
         financials: project.financials,
         monthlyConsumption: project.monthlyConsumption,
         customization: {

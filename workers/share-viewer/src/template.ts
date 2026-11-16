@@ -8,6 +8,7 @@ import { escapeHtml, formatInlineMarkdown, formatMarkdown, safeLogoUrl, scriptJs
 import { createDocumentTextContext, docTextKey, interpolate, viewerText } from '../../../shared/documentTexts';
 import { ENERGY_FLOW_CSS, renderEnergyFlowSection } from './energyFlow';
 import { isBuiltInFeatureAvailable } from '../../../shared/applicationFeatures';
+import { resolveGridConnection } from '../../../shared/gridConnection';
 import { EQUIPMENT_FALLBACK_NAME, equipmentTotals, readEquipment } from '../../../shared/equipment';
 import { mainModelPhrase } from '../../../shared/documentTexts/equipmentPhrases';
 
@@ -55,6 +56,16 @@ export function renderExpiredPage(companyName = 'electsun', companyPhone = '+1 (
 </html>`;
 }
 
+/** Sistema aislado: el déficit es energía no servida (el snapshot nuevo trae `annualUnservedKWh`). */
+function offGridEnergyNote(annualUnservedKWh: unknown, annualConsumptionKWh: number): string {
+  const unserved = Number(annualUnservedKWh);
+  const lead = 'Sistema aislado (modo isla): no hay conexión con la red, así que no se importa ni se exporta energía y el excedente se recorta.';
+  if (!Number.isFinite(unserved) || unserved < 0) return `${lead} El consumo que no cubran el sol y las baterías requiere un respaldo externo (por ejemplo, una planta eléctrica).`;
+  if (unserved === 0) return `${lead} La producción solar y las baterías cubren el consumo estimado.`;
+  const share = annualConsumptionKWh > 0 ? ` (${(Math.round((unserved / annualConsumptionKWh) * 1000) / 10).toLocaleString('en-US')}% del consumo)` : '';
+  return `${lead} Se estima que <strong>${Math.round(unserved).toLocaleString('en-US')} kWh/año</strong>${share} no los cubren el sol ni las baterías: esa energía queda sin servir o la cubre un respaldo externo (por ejemplo, una planta eléctrica).`;
+}
+
 export function renderProposalPage(stored: StoredProposal): string {
   const { project, summary, expiresAt } = stored;
   const client = project.client || {};
@@ -92,7 +103,10 @@ export function renderProposalPage(stored: StoredProposal): string {
   const rawTariffCode = rates.tariffCode || client.tariffCode || (distributor === 'CEPM' ? 'RBT-1' : 'BTS2');
   const tariffDisplayName = getTariffDisplayName(distributor, rawTariffCode);
   const isCEPM = distributor === 'CEPM';
-  const isZeroExport = !!rates.isZeroExport;
+  // Enlaces anteriores solo traen `isZeroExport`; los nuevos, además, `gridConnection` (aislado = modo isla).
+  const gridConnection = resolveGridConnection(rates);
+  const isZeroExport = gridConnection !== 'grid_export';
+  const isOffGrid = gridConnection === 'off_grid';
   const exportFee = assumptions.gridExportFeePct;
 
   // Equipos solo por `shared/equipment`: un enlace antiguo (solo espejo) y uno nuevo (solo grupos) dan lo mismo.
@@ -230,7 +244,7 @@ export function renderProposalPage(stored: StoredProposal): string {
 
   // Textos del documento: publicado (`doc:`) → campo heredado de enlaces antiguos → texto compartido por defecto.
   const textContext = createDocumentTextContext({
-    clientName, quoteValidityDays, distributor, tariffCode: rawTariffCode, isZeroExport, gridExportFeePct: exportFee, hasBattery,
+    clientName, quoteValidityDays, distributor, tariffCode: rawTariffCode, isZeroExport, gridConnection, gridExportFeePct: exportFee, hasBattery,
     hasBatteryStorage: hasBattery, companyName,
     // Misma cadena que la app (documentTextContext): persona de contacto → empresa → nombre del cliente.
     clientContactPerson: client.contactPerson || client.company || clientName || '', clientPhone, clientEmail: custom.clientEmail || client.contactEmail || '',
@@ -468,7 +482,7 @@ ${ENERGY_FLOW_CSS}
     </header>
 
     <!-- FLUJO ENERGÉTICO ANIMADO (guía visual aproximada) -->
-    ${isBuiltInFeatureAvailable('proposalEnergyFlowDiagram') ? renderEnergyFlowSection({ hybrid: hasBattery && totalBESSKWh > 0, isZeroExport, systemCapacityKWp: Number(systemCapacityKWp), annualConsumptionKWh, totalBESSKWh, inverterPowerKW: rawInverters.reduce((sum: number, inv: any) => sum + (Number(inv.powerKW) || 0) * (Number(inv.count) || 1), 0) }) : ''}
+    ${isBuiltInFeatureAvailable('proposalEnergyFlowDiagram') ? renderEnergyFlowSection({ hybrid: hasBattery && totalBESSKWh > 0, isZeroExport, gridConnection, systemCapacityKWp: Number(systemCapacityKWp), annualConsumptionKWh, totalBESSKWh, inverterPowerKW: rawInverters.reduce((sum: number, inv: any) => sum + (Number(inv.powerKW) || 0) * (Number(inv.count) || 1), 0) }) : ''}
 
     <!-- 2. RESUMEN EJECUTIVO DE LA SOLUCIÓN PROPUESTA -->
     <section class="bg-white border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">
@@ -553,7 +567,8 @@ ${ENERGY_FLOW_CSS}
         <canvas id="energyChart"></canvas>
       </div>
 
-      ${showSelfConsumption ? `<p class="text-xs text-slate-600" data-energy-mode="self_consumption">Autoconsumo anual en sitio: <strong>${Math.round(annualSelfConsumption).toLocaleString()} kWh</strong>${hasBattery ? `; aporte nocturno de baterías: <strong>${Math.round(annualBatteryContribution).toLocaleString()} kWh</strong>` : ''}. La inyección se presenta como crédito neto después de retención.</p>` : ''}
+      ${showSelfConsumption ? `<p class="text-xs text-slate-600" data-energy-mode="self_consumption">Autoconsumo anual en sitio: <strong>${Math.round(annualSelfConsumption).toLocaleString()} kWh</strong>${hasBattery ? `; aporte nocturno de baterías: <strong>${Math.round(annualBatteryContribution).toLocaleString()} kWh</strong>` : ''}. ${isOffGrid ? 'Sin red, el excedente se recorta.' : 'La inyección se presenta como crédito neto después de retención.'}</p>` : ''}
+      ${isOffGrid ? `<p class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2" data-grid-connection="off_grid">${offGridEnergyNote(summary?.annualUnservedKWh, annualConsumptionKWh)}</p>` : ''}
       <!-- Full 12-Month Table with Mobile Horizontal Scroll -->
       <div class="space-y-1.5">
         <div class="sm:hidden flex items-center justify-between text-[10px] text-slate-400 font-medium px-1">

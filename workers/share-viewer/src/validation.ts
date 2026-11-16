@@ -1,6 +1,7 @@
 import type { ShareProposalPayload } from './types';
 import { DOC_TEXT_PREFIX, getDocumentTextDefinition, isDocTextKey } from '../../../shared/documentTexts';
 import { LEGACY_MIRROR_NUMBER_FIELDS, LEGACY_MIRROR_TEXT_FIELDS } from '../../../shared/equipment';
+import { isGridConnectionMode } from '../../../shared/gridConnection';
 export const MAX_SHARE_BYTES = 2 * 1024 * 1024;
 export class RequestValidationError extends Error {
   constructor(message: string, public readonly status: 400 | 413 = 400) { super(message); }
@@ -78,6 +79,7 @@ export function parseSharePayload(value: unknown): ShareProposalPayload {
   for (const [record, fields] of [[specs, ['hasBattery','showSelfConsumptionBreakdown']], [rates, ['isZeroExport']], [financials, ['applyITBISExemption','applyLey5707']]] as const) {
     for (const field of fields) if (record[field] !== undefined && typeof record[field] !== 'boolean') throw new RequestValidationError(`${field} debe ser booleano.`);
   }
+  if (rates.gridConnection !== undefined && !isGridConnectionMode(rates.gridConnection)) throw new RequestValidationError('El tipo de conexión no es válido.');
   const custom = project.customization === undefined ? {} : requireRecord(project.customization, 'customization');
   let publishedTexts = 0;
   for (const [key, item] of Object.entries(custom)) {
