@@ -2,7 +2,7 @@ import type { ShareProposalPayload } from './types';
 import { DOC_TEXT_PREFIX, getDocumentTextDefinition, isDocTextKey } from '../../../shared/documentTexts';
 import { LEGACY_MIRROR_NUMBER_FIELDS, LEGACY_MIRROR_TEXT_FIELDS } from '../../../shared/equipment';
 import { isGridConnectionMode } from '../../../shared/gridConnection';
-import { isSupplyAlternative } from '../../../shared/offGridSupply';
+import { GENERATOR_COST_RULE_MESSAGE, isSupplyAlternative, isValidGeneratorCost } from '../../../shared/offGridSupply';
 export const MAX_SHARE_BYTES = 2 * 1024 * 1024;
 export class RequestValidationError extends Error {
   constructor(message: string, public readonly status: 400 | 413 = 400) { super(message); }
@@ -83,7 +83,9 @@ export function parseSharePayload(value: unknown): ShareProposalPayload {
   if (rates.gridConnection !== undefined && !isGridConnectionMode(rates.gridConnection)) throw new RequestValidationError('El tipo de conexión no es válido.');
   // Alternativa de suministro (sistema aislado): opcional; un valor desconocido se rechaza (la lectura lo toleraría).
   if (rates.supplyAlternative !== undefined && !isSupplyAlternative(rates.supplyAlternative)) throw new RequestValidationError('La alternativa de suministro no es válida.');
-  if (rates.generatorCostPerKWh !== undefined && (typeof rates.generatorCostPerKWh !== 'number' || !Number.isFinite(rates.generatorCostPerKWh) || rates.generatorCostPerKWh < 0)) throw new RequestValidationError('El costo del generador debe ser un número positivo.');
+  // Mismo predicado que la app: el escritorio solo publica un costo válido y omite uno ausente o inválido; «generador»
+  // sin costo se publica y se muestra como «sin comparación».
+  if (rates.generatorCostPerKWh !== undefined && !isValidGeneratorCost(rates.generatorCostPerKWh)) throw new RequestValidationError(GENERATOR_COST_RULE_MESSAGE);
   const custom = project.customization === undefined ? {} : requireRecord(project.customization, 'customization');
   let publishedTexts = 0;
   for (const [key, item] of Object.entries(custom)) {

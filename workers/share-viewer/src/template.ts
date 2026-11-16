@@ -9,7 +9,7 @@ import { createDocumentTextContext, docTextKey, interpolate, viewerText } from '
 import { ENERGY_FLOW_CSS, renderEnergyFlowSection } from './energyFlow';
 import { isBuiltInFeatureAvailable } from '../../../shared/applicationFeatures';
 import { resolveGridConnection } from '../../../shared/gridConnection';
-import { hasSavingsComparison, resolveGeneratorCostPerKWh, resolveSavingsBasis, storedSupplyAlternative, type SavingsBasis } from '../../../shared/offGridSupply';
+import { hasSavingsComparison, resolveGeneratorCostPerKWh, resolveSavingsBasis, resolveSupplyAlternative, storedSupplyAlternative, type SavingsBasis } from '../../../shared/offGridSupply';
 import { EQUIPMENT_FALLBACK_NAME, equipmentTotals, readEquipment } from '../../../shared/equipment';
 import { mainModelPhrase } from '../../../shared/documentTexts/equipmentPhrases';
 
@@ -149,6 +149,9 @@ export function renderProposalPage(stored: StoredProposal): string {
   // Sistema aislado: alternativa de suministro. Enlaces sin el campo (o con red) se ven igual que siempre.
   const savingsBasis = resolveSavingsBasis(rates);
   const showSavings = hasSavingsComparison(savingsBasis);
+  // Con generador, la base del ahorro (cabecera y flujo de caja) es el costo de generación propia, no la tarifa.
+  const supplyAlternative = resolveSupplyAlternative(rates);
+  const generatorCost = resolveGeneratorCostPerKWh(rates);
   const exportFee = assumptions.gridExportFeePct;
 
   // Equipos solo por `shared/equipment`: un enlace antiguo (solo espejo) y uno nuevo (solo grupos) dan lo mismo.
@@ -518,7 +521,9 @@ ${ENERGY_FLOW_CSS}
           <div class="text-[10.5px] sm:text-[11px] font-black uppercase text-orange-600 tracking-wider flex items-center justify-start md:justify-end gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span> Detalles de la Cotización</div>
           <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">N° Cotización:</span> <span class="font-mono font-bold text-slate-950">${escapeHtml(quoteNumber)}</span></div>
           <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">ID Proyecto:</span> <span class="font-mono font-bold text-slate-950">${escapeHtml(projectId)}</span></div>
-          <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">Distribuidora / Tarifa:</span> <span class="font-bold text-sky-900">${escapeHtml(distributor)} • ${escapeHtml(tariffDisplayName)}</span></div>
+          ${supplyAlternative === 'generator'
+            ? `<div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1" data-savings-reference="generator"><span class="font-bold text-slate-500">Suministro actual:</span> <span class="font-bold text-sky-900">Generador • ${generatorCost === null ? 'costo pendiente' : `US$ ${generatorCost.toFixed(3)}/kWh`}</span></div>`
+            : `<div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">Distribuidora / Tarifa:</span> <span class="font-bold text-sky-900">${escapeHtml(distributor)} • ${escapeHtml(tariffDisplayName)}</span></div>`}
           <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">Fecha de Emisión:</span> <span class="font-semibold text-slate-800">${new Date().toLocaleDateString('es-DO', { day: '2-digit', month: 'long', year: 'numeric' })}</span></div>
         </div>
       </div>
@@ -949,7 +954,7 @@ ${ENERGY_FLOW_CSS}
           <span class="w-2.5 h-2.5 rounded-xs bg-orange-500 shrink-0"></span>
           5. Flujo de Caja y Beneficios Acumulados a 25 Años
         </h2>
-        <p class="text-[11px] sm:text-xs text-slate-500 font-medium">Proyección contable completa considerando degradación de paneles e inflación tarifaria</p>
+        <p class="text-[11px] sm:text-xs text-slate-500 font-medium">Proyección contable completa considerando degradación de paneles e ${supplyAlternative === 'generator' ? 'inflación del costo de generación propia' : 'inflación tarifaria'}</p>
       </div>
 
       <!-- 25 Years Table with Mobile Horizontal Scroll -->
