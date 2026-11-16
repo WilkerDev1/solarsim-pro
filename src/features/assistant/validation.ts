@@ -357,7 +357,8 @@ export function validateAssistantEdits(
         throw new Error('El factor de venta debe ser al menos 1.');
     }
     // Código de tarifa en la forma de la matriz (BTS-1 → BTS1): mismo normalizador que la IA y el dock.
-    if (field === 'tariffCode' && typeof value === 'string') {
+    if (field === 'tariffCode') {
+      if (typeof value !== 'string') throw new Error('El código de tarifa no es válido.');
       const code = normalizeTariffCode(value);
       if (!code) throw new Error('El código de tarifa no es válido.');
       return { section, field, value: code };
