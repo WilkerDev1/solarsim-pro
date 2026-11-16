@@ -2,13 +2,10 @@ import assert from 'node:assert/strict';
 import { validateAssistantEdits } from '../features/assistant/validation';
 import { DEFAULT_RD_TARIFF_MATRIX, getReferenceEnergyRateUSD } from '../data/rdTariffs';
 import { buildAITariffContext, resolveAITariffSelection } from '../utils/aiTariffContext';
-import { normalizeStoredTariffMatrix } from '../utils/tariffExtraction';
 import { normalizeProposalDraft } from '../../shared/aiProposal';
-import { averageBlockEnergyRateDOP, normalizeTariffCode, tariffChargeKind } from '../../shared/tariffRules';
+import { normalizeTariffCode, tariffChargeKind } from '../../shared/tariffRules';
 import { getTariffDisplayName } from '../../shared/proposalPresentation';
-import { mapTariffCodeOnDistributorChange, type GlobalTariffMatrix } from '../types/tariffs';
-import { createDocumentTextContext } from '../../shared/documentTexts/context';
-import { publishedDocumentTexts, regulatoryNoteDefault, resolveDocumentText, viewerText, docTextKey } from '../../shared/documentTexts';
+import { mapTariffCodeOnDistributorChange } from '../types/tariffs';
 
 /** Fase 1 del plan tarifario. */
 
@@ -18,6 +15,12 @@ for (const [raw, expected] of [
   ['RBT1', 'RBT-1'], ['rbt 2', 'RBT-2'], ['ESTRBT2', 'ESTRBT-2'], ['RMT1', 'RMT-1'], ['RBT-1', 'RBT-1'], ['', ''],
 ] as const) assert.equal(normalizeTariffCode(raw), expected, `normalizeTariffCode(${JSON.stringify(raw)})`);
 assert.equal(normalizeTariffCode(undefined), '');
+
+// Tipo de cargo: un solo precio, con cargo de potencia o sin clasificar.
+for (const [d, code] of [['EDESUR', 'BTS1'], ['EDESUR', 'BTS-2'], ['CEPM', 'RBT-1'], ['CEPM', 'BTS1'], ['CEPM', 'BTS-2']] as const) assert.equal(tariffChargeKind(d, code), 'single_price', `${d}/${code}`);
+for (const [d, code] of [['EDESUR', 'BTD'], ['EDESUR', 'BTH'], ['EDESUR', 'MTD1'], ['EDESUR', 'MTH'], ['CEPM', 'RBT-2'], ['CEPM', 'BTD']] as const) assert.equal(tariffChargeKind(d, code), 'demand', `${d}/${code}`);
+assert.equal(tariffChargeKind('CEPM', 'RMT-1'), 'unknown');
+assert.equal(tariffChargeKind('EDESUR', ''), 'unknown');
 
 assert.equal(resolveAITariffSelection(DEFAULT_RD_TARIFF_MATRIX, 'EDENORTE', 'BTS-1')?.code, 'BTS1');
 assert.equal(resolveAITariffSelection(DEFAULT_RD_TARIFF_MATRIX, 'EDESUR', 'MTD-1')?.code, 'MTD1');
@@ -30,6 +33,7 @@ assert.equal(getTariffDisplayName('EDENORTE', 'BTS-1'), getTariffDisplayName('ED
 assert.equal(getTariffDisplayName('CEPM', 'RBT1'), 'RBT-1 (Baja Tensión Regular)');
 assert.equal(mapTariffCodeOnDistributorChange('EDESUR', 'CEPM', 'BTS-1'), 'RBT-1');
 assert.equal(validateAssistantEdits([{ section: 'rates', field: 'tariffCode', value: 'bts-1' }], 'project')[0].value, 'BTS1', 'El asistente guarda el código canónico');
+for (const bad of ['---', '   ', '']) assert.throws(() => validateAssistantEdits([{ section: 'rates', field: 'tariffCode', value: bad }], 'project'), /código de tarifa/i, `tariffCode ${JSON.stringify(bad)} se rechaza`);
 assert.equal(mapTariffCodeOnDistributorChange('CEPM', 'EDESUR', 'RBT2'), 'BTD');
 
 // El aviso falso «La tarifa BTS-1 de EDENORTE no se pudo confirmar» desaparece y se usa la referencia por bloques.

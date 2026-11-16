@@ -57,12 +57,14 @@ const ALL_UNITS_AT_LAST_BLOCK = new Set(['BTS1', 'BTS2']);
 
 /**
  * Precio medio de energía (RD$/kWh) de un consumo mensual con tarifa por bloques. Los tramos se aplican
- * escalonados; en BTS-1 y BTS-2, si el consumo supera el inicio del último tramo (701 kWh), todo el
- * consumo va al precio de ese tramo. Devuelve `undefined` sin consumo positivo o con un precio no finito.
+ * escalonados; en BTS-1 y BTS-2, con un consumo de 701 kWh o mayor (inicio del último tramo), todo el
+ * consumo va al precio de ese tramo. Devuelve `undefined` sin consumo positivo, con un precio o unos
+ * límites de tramo no finitos, o si el resultado no es finito.
  */
 export function averageBlockEnergyRateDOP(blocks: readonly EnergyBlock[], monthlyKWh: number, tariffCode?: unknown): number | undefined {
   if (!blocks.length || !(monthlyKWh > 0) || !Number.isFinite(monthlyKWh)) return undefined;
   if (blocks.some((block) => typeof block.rateDOP !== 'number' || !Number.isFinite(block.rateDOP))) return undefined;
+  if (blocks.some((block) => !Number.isFinite(block.fromKWh) || (block.toKWh !== null && !Number.isFinite(block.toKWh)))) return undefined;
   let remaining = monthlyKWh;
   let total = 0;
   let previousMax = 0;
@@ -74,7 +76,7 @@ export function averageBlockEnergyRateDOP(blocks: readonly EnergyBlock[], monthl
     previousMax = block.toKWh === null ? Infinity : block.toKWh;
   }
   const last = blocks[blocks.length - 1];
-  if (ALL_UNITS_AT_LAST_BLOCK.has(normalizeTariffCode(tariffCode)) && last.toKWh === null && blocks.length > 1 && monthlyKWh > lowerBounds[lowerBounds.length - 1]) {
+  if (ALL_UNITS_AT_LAST_BLOCK.has(normalizeTariffCode(tariffCode)) && last.toKWh === null && blocks.length > 1 && monthlyKWh >= last.fromKWh) {
     return last.rateDOP;
   }
   for (let i = 0; i < blocks.length && remaining > 0; i++) {
@@ -84,5 +86,7 @@ export function averageBlockEnergyRateDOP(blocks: readonly EnergyBlock[], monthl
     total += amount * block.rateDOP;
     remaining -= amount;
   }
-  return remaining > 0 ? undefined : total / monthlyKWh;
+  if (remaining > 0) return undefined;
+  const average = total / monthlyKWh;
+  return Number.isFinite(average) ? average : undefined;
 }

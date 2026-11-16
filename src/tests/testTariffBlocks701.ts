@@ -1,13 +1,8 @@
 import assert from 'node:assert/strict';
 import { DEFAULT_RD_TARIFF_MATRIX, getReferenceEnergyRateUSD } from '../data/rdTariffs';
-import { buildAITariffContext, resolveAITariffSelection } from '../utils/aiTariffContext';
-import { normalizeStoredTariffMatrix } from '../utils/tariffExtraction';
+import { buildAITariffContext } from '../utils/aiTariffContext';
 import { normalizeProposalDraft } from '../../shared/aiProposal';
-import { averageBlockEnergyRateDOP, normalizeTariffCode, tariffChargeKind } from '../../shared/tariffRules';
-import { getTariffDisplayName } from '../../shared/proposalPresentation';
-import { mapTariffCodeOnDistributorChange, type GlobalTariffMatrix } from '../types/tariffs';
-import { createDocumentTextContext } from '../../shared/documentTexts/context';
-import { publishedDocumentTexts, regulatoryNoteDefault, resolveDocumentText, viewerText, docTextKey } from '../../shared/documentTexts';
+import { averageBlockEnergyRateDOP } from '../../shared/tariffRules';
 
 /** Fase 1 del plan tarifario. */
 
@@ -29,6 +24,16 @@ assert.equal(averageBlockEnergyRateDOP(blocks, 1000, 'BTS1'), 13);
 assert.equal(averageBlockEnergyRateDOP(blocks, 1000, 'BTS-2'), 13);
 assert.equal(averageBlockEnergyRateDOP(blocks, 1000, 'VMT1'), (200 * 6 + 100 * 8 + 400 * 12 + 300 * 13) / 1000, 'Otras tarifas por bloques siguen escalonadas');
 assert.equal(averageBlockEnergyRateDOP(blocks, 0, 'BTS1'), undefined);
+// 701 kWh o mayor: el tramo 700–701 sigue escalonado y 701 exacto va todo al 4.º rango.
+assert.equal(averageBlockEnergyRateDOP(blocks, 700.4, 'BTS1'), (200 * 6 + 100 * 8 + 400 * 12 + 0.4 * 13) / 700.4, '700.4 kWh sigue escalonado');
+assert.equal(averageBlockEnergyRateDOP(blocks, 700, 'BTS1'), (200 * 6 + 100 * 8 + 400 * 12) / 700);
+assert.equal(averageBlockEnergyRateDOP(blocks, 701, 'BTS1'), 13, '701 kWh: todo al 4.º rango');
+assert.equal(averageBlockEnergyRateDOP(blocks, 701.2, 'BTS1'), 13);
+// Bloques malformados: nunca NaN.
+assert.equal(averageBlockEnergyRateDOP([{ fromKWh: 0, toKWh: undefined as never, rateDOP: 6 }], 100, 'BTS1'), undefined, 'toKWh indefinido');
+assert.equal(averageBlockEnergyRateDOP([{ fromKWh: 0, toKWh: Number.NaN, rateDOP: 6 }], 100, 'BTS1'), undefined, 'toKWh NaN');
+assert.equal(averageBlockEnergyRateDOP([{ fromKWh: Number.NaN, toKWh: null, rateDOP: 6 }], 100, 'BTS1'), undefined, 'fromKWh NaN');
+assert.equal(averageBlockEnergyRateDOP([{ fromKWh: undefined as never, toKWh: 200, rateDOP: 6 }, { fromKWh: 201, toKWh: null, rateDOP: 8 }], 100), undefined, 'fromKWh indefinido');
 assert.equal(averageBlockEnergyRateDOP([{ fromKWh: 0, toKWh: null, rateDOP: Number.NaN }], 100, 'BTS1'), undefined);
 const highDraft = normalizeProposalDraft({ clientName: 'Cliente', distributor: 'EDESUR', tariffCode: 'BTS1', monthlyConsumptionKWh: Array(12).fill(1000), panels: [], inverters: [] }, [], aiContext as never) as any;
 assert.equal(highDraft.energyCostPerKWhDOP, 13.09, 'El borrador de IA usa la misma regla');

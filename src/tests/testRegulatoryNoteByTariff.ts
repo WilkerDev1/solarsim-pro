@@ -1,11 +1,5 @@
 import assert from 'node:assert/strict';
-import { DEFAULT_RD_TARIFF_MATRIX, getReferenceEnergyRateUSD } from '../data/rdTariffs';
-import { buildAITariffContext, resolveAITariffSelection } from '../utils/aiTariffContext';
-import { normalizeStoredTariffMatrix } from '../utils/tariffExtraction';
-import { normalizeProposalDraft } from '../../shared/aiProposal';
-import { averageBlockEnergyRateDOP, normalizeTariffCode, tariffChargeKind } from '../../shared/tariffRules';
-import { getTariffDisplayName } from '../../shared/proposalPresentation';
-import { mapTariffCodeOnDistributorChange, type GlobalTariffMatrix } from '../types/tariffs';
+import { tariffChargeKind } from '../../shared/tariffRules';
 import { createDocumentTextContext } from '../../shared/documentTexts/context';
 import { publishedDocumentTexts, regulatoryNoteDefault, resolveDocumentText, viewerText, docTextKey } from '../../shared/documentTexts';
 

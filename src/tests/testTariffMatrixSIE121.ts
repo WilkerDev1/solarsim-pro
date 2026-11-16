@@ -1,16 +1,11 @@
 import assert from 'node:assert/strict';
-import { DEFAULT_RD_TARIFF_MATRIX, getReferenceEnergyRateUSD } from '../data/rdTariffs';
-import { buildAITariffContext, resolveAITariffSelection } from '../utils/aiTariffContext';
+import { DEFAULT_RD_TARIFF_MATRIX } from '../data/rdTariffs';
+import { buildAITariffContext } from '../utils/aiTariffContext';
 import { normalizeStoredTariffMatrix } from '../utils/tariffExtraction';
 import { hydrateSimulationStore } from '../store/persistence/hydrateSimulationStore';
 import { serializeSimulationStore } from '../store/persistence/serializeSimulationStore';
 import { useSimulationStore } from '../store/useSimulationStore';
-import { normalizeProposalDraft } from '../../shared/aiProposal';
-import { averageBlockEnergyRateDOP, normalizeTariffCode, tariffChargeKind } from '../../shared/tariffRules';
-import { getTariffDisplayName } from '../../shared/proposalPresentation';
-import { mapTariffCodeOnDistributorChange, type GlobalTariffMatrix } from '../types/tariffs';
-import { createDocumentTextContext } from '../../shared/documentTexts/context';
-import { publishedDocumentTexts, regulatoryNoteDefault, resolveDocumentText, viewerText, docTextKey } from '../../shared/documentTexts';
+import type { GlobalTariffMatrix } from '../types/tariffs';
 
 /** Fase 1 del plan tarifario. */
 
@@ -113,7 +108,7 @@ assert.equal(restored.resolutionCode, 'SIE-176-2025-TF');
 assert.equal(restored.schedules.EDESUR.tariffs.BTS1.baseEnergyRateDOP, 11.85);
 assert.equal(restored.schedules.EDESUR.tariffs.BTS1.blocks![1].rateDOP, 13.26);
 const durable: any = JSON.parse(JSON.stringify(serializeSimulationStore({ ...useSimulationStore.getState(), projects: [], tariffMatrix: oldStored })));
-hydrateSimulationStore(durable);
+hydrateSimulationStore(durable); // muta el estado recibido (no devuelve uno nuevo)
 assert.equal(durable.tariffMatrix.resolutionCode, 'SIE-176-2025-TF', 'Al abrir la app, la matriz guardada no se sustituye por la de fábrica');
 assert.equal(durable.tariffMatrix.schedules.EDENORTE.tariffs.BTS1.baseEnergyRateDOP, 11.85);
 // La matriz de fábrica sobrevive a JSON (tramos abiertos) sin perder los campos nuevos.
