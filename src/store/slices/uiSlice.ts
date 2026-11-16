@@ -1,12 +1,8 @@
 import { SimulationSlice, UISlice } from '../types';
-import { isDeviceFeatureDefaultEnabled } from '../../../shared/applicationFeatures';
 
 export const createUISlice: SimulationSlice<UISlice> = (set) => ({
   appAssistantEnabled: false,
   setAppAssistantEnabled: (enabled) => set({ appAssistantEnabled: enabled === true }),
-  // Función de este equipo (`shared/applicationFeatures.ts`), visible por defecto.
-  netMeteringRegimeSelectorEnabled: isDeviceFeatureDefaultEnabled('netMeteringRegimeSelector'),
-  setNetMeteringRegimeSelectorEnabled: (enabled) => set({ netMeteringRegimeSelectorEnabled: enabled === true }),
   isNewProjectModalOpen: false,
   isUpdateModalOpen: false,
   isAIInvoiceModalOpen: false,

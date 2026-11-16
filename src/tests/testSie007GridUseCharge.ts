@@ -17,7 +17,9 @@ import { AGENT_TOOL_DEFINITIONS } from '../../shared/agentTools/definitions';
 import { normalizeProposalDraft } from '../../shared/aiProposal';
 import { createAIProposalBase, prepareProposalDraftProject } from '../utils/proposalDraftProject';
 import { DEFAULT_RD_TARIFF_MATRIX } from '../data/rdTariffs';
-import { APPLICATION_FEATURES, DEVICE_APPLICATION_FEATURES } from '../../shared/applicationFeatures';
+import { APPLICATION_FEATURES, DEFAULT_FEATURE_SETTINGS, DEVICE_APPLICATION_FEATURES, isCompatibleFeatureSettings, isFeatureSettings, netMeteringRegimeSelectorVisible, normalizeFeatureSettings } from '../../shared/applicationFeatures';
+import { effectiveFeatureSettings } from '../features/application/featurePolicy';
+import { featureScope } from '../../shared/applicationFeatures';
 import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
 import type { LegacyProjectSpecs, ProjectSimulation, UtilityRates } from '../types';
 
@@ -148,7 +150,7 @@ assert.equal(switched.rates.gridUseChargeDOPPerKWh, 3.78, 'pasar a SIE-007 siemb
 const original = store.getState();
 try {
   store.setState({ projects: [], activeProjectId: '', defaultSimulationSettings: { ...DEFAULT_SIMULATION_SETTINGS } });
-  store.getState().createNewProject({ name: 'Nueva', distributor: 'EDESUR', tariffCode: 'BTS1' } as never);
+  store.getState().createNewProject({ name: 'Nueva', company: 'Cliente', province: 'Santiago', distributor: 'EDESUR', tariffCode: 'BTS1' });
   const created = store.getState().projects[0];
   assert.equal(created.rates.netMeteringRegime, 'sie007_2026', 'propuesta nueva: régimen SIE-007');
   assert.equal(created.rates.gridUseChargeDOPPerKWh, 3.78, 'propuesta nueva: cargo de fábrica de su distribuidora');
@@ -201,9 +203,74 @@ assert.ok(btdSieNote.includes('no aplica el cargo por derecho de uso de la red')
 const legacyNote = regulatoryNoteDefault(createDocumentTextContext({ distributor: 'EDESUR', tariffCode: 'BTS1', gridExportFeePct: 25 }));
 assert.ok(legacyNote.includes('equivalente al 25% del valor de la energía excedente exportada'));
 
-// 14. Selector de régimen: función de este equipo, visible por defecto; no toca la política de la organización.
-const selector = DEVICE_APPLICATION_FEATURES.find((f) => f.id === 'netMeteringRegimeSelector');
-assert.ok(selector && selector.defaultEnabled === true && selector.available);
-assert.ok(!APPLICATION_FEATURES.some((f) => (f.id as string) === 'netMeteringRegimeSelector'));
+// 14. Selector de régimen: política de la organización (local sin sesión), visible por defecto; ya no es del equipo.
+const selector = APPLICATION_FEATURES.find((f) => f.id === 'netMeteringRegimeSelector');
+assert.ok(selector && selector.defaultEnabled === true && selector.available && selector.stage === 'beta');
+assert.ok(!DEVICE_APPLICATION_FEATURES.some((f) => (f.id as string) === 'netMeteringRegimeSelector'));
+assert.deepEqual(DEFAULT_FEATURE_SETTINGS, { selfConsumptionProjection: false, netMeteringRegimeSelector: true });
+// Política de una sola clave (API o cliente anteriores): se lee y el selector queda visible.
+assert.deepEqual(normalizeFeatureSettings({ selfConsumptionProjection: true }), { selfConsumptionProjection: true, netMeteringRegimeSelector: true });
+assert.equal(isCompatibleFeatureSettings({ selfConsumptionProjection: false }), true);
+assert.equal(isCompatibleFeatureSettings({ selfConsumptionProjection: false, netMeteringRegimeSelector: false }), true);
+assert.equal(isCompatibleFeatureSettings({ selfConsumptionProjection: false, other: true }), false);
+// Al guardar solo vale la forma completa: un cliente anterior no puede sobrescribir la clave nueva.
+assert.equal(isFeatureSettings({ selfConsumptionProjection: true }), false);
+assert.equal(isFeatureSettings({ selfConsumptionProjection: true, netMeteringRegimeSelector: false }), true);
+assert.equal(netMeteringRegimeSelectorVisible(DEFAULT_FEATURE_SETTINGS), true);
+assert.equal(netMeteringRegimeSelectorVisible({ selfConsumptionProjection: false, netMeteringRegimeSelector: false }), false);
+{
+  const snapshot = store.getState();
+  try {
+    // Sin sesión: preferencia local (por defecto visible).
+    store.setState({ syncSettings: { ...snapshot.syncSettings, currentUser: null, authToken: null }, localFeatureSettings: { ...DEFAULT_FEATURE_SETTINGS } });
+    assert.equal(netMeteringRegimeSelectorVisible(effectiveFeatureSettings(store.getState())), true);
+    // Con sesión y sin política consultada: valor por defecto (visible).
+    const user = { id: 'u', name: 'QA', email: 'qa@example.invalid', role: 'ADMIN' as const, organizationId: 'org-x' };
+    store.setState({ syncSettings: { ...snapshot.syncSettings, serverUrl: 'https://qa.example.invalid', authToken: 't', currentUser: user }, organizationFeaturePolicies: {} });
+    assert.equal(netMeteringRegimeSelectorVisible(effectiveFeatureSettings(store.getState())), true);
+    // La política de la organización manda.
+    store.setState({ organizationFeaturePolicies: { [featureScope('https://qa.example.invalid', 'org-x')]: { organizationId: 'org-x', version: 3, settings: { selfConsumptionProjection: false, netMeteringRegimeSelector: false } } } });
+    assert.equal(netMeteringRegimeSelectorVisible(effectiveFeatureSettings(store.getState())), false);
+  } finally {
+    store.setState(snapshot, true);
+  }
+}
+
+// 15. (B) Borrador de IA: un nuevo en `legacy_retention` no gana cargo; sobre una propuesta SIE-007 existente, cambiar
+// de distribuidora lleva el cargo de fábrica al de la nueva (misma regla que la edición).
+const legacyDraft = normalizeProposalDraft({ clientName: 'IA', distributor: 'EDENORTE', tariffCode: 'BTS1', monthlyConsumptionKWh: Array(12).fill(300), consumptionSource: 'observed', netMeteringRegime: 'legacy_retention', panels: [], inverters: [], batteries: [] }, []);
+const aiLegacyNew = prepareProposalDraftProject(draftBase, legacyDraft, DEFAULT_RD_TARIFF_MATRIX, { isNew: true });
+assert.equal(aiLegacyNew.rates.netMeteringRegime, 'legacy_retention');
+assert.equal(aiLegacyNew.rates.gridUseChargeDOPPerKWh, undefined, 'régimen anterior explícito: sin cargo sembrado');
+const sieExisting = project({ distributor: 'EDESUR', netMeteringRegime: 'sie007_2026', gridUseChargeDOPPerKWh: 3.78 });
+assert.equal(prepareProposalDraftProject(sieExisting, draft, DEFAULT_RD_TARIFF_MATRIX, { isNew: false }).rates.gridUseChargeDOPPerKWh, 4.02, 'EDESUR → EDENORTE: cargo de fábrica de la nueva');
+assert.equal(prepareProposalDraftProject({ ...sieExisting, rates: { ...sieExisting.rates, gridUseChargeDOPPerKWh: 3.3 } }, draft, DEFAULT_RD_TARIFF_MATRIX, { isNew: false }).rates.gridUseChargeDOPPerKWh, 3.3, 'cargo editado se conserva');
+
+// 16. (C, F) Edición: un cargo no numérico se descarta; fuera de rango se acota a 0–100.
+const sieEdit = project({ distributor: 'EDESUR', netMeteringRegime: 'sie007_2026', gridUseChargeDOPPerKWh: 3.5 });
+assert.equal(applyProjectEdit(sieEdit, { kind: 'rates', patch: { gridUseChargeDOPPerKWh: -2 } }, ctx).rates.gridUseChargeDOPPerKWh, 0);
+assert.equal(applyProjectEdit(sieEdit, { kind: 'rates', patch: { gridUseChargeDOPPerKWh: 500 } }, ctx).rates.gridUseChargeDOPPerKWh, 100);
+assert.equal(applyProjectEdit(sieEdit, { kind: 'rates', patch: { gridUseChargeDOPPerKWh: NaN } }, ctx).rates.gridUseChargeDOPPerKWh, 3.5, 'NaN se descarta');
+assert.equal(applyProjectEdit(sieEdit, { kind: 'rates', patch: { gridUseChargeDOPPerKWh: '4' as never } }, ctx).rates.gridUseChargeDOPPerKWh, 3.5, 'texto se descarta');
+// SIE-007 (EDESUR, fábrica) → anterior → cambio a EDENORTE → SIE-007: el cargo es el de EDENORTE, no el de EDESUR.
+let chain = applyProjectEdit(project({ distributor: 'EDESUR', netMeteringRegime: 'sie007_2026', gridUseChargeDOPPerKWh: 3.78 }), { kind: 'rates', patch: { netMeteringRegime: 'legacy_retention' } }, ctx);
+chain = applyProjectEdit(chain, { kind: 'rates', patch: { distributor: 'EDENORTE' } }, ctx);
+chain = applyProjectEdit(chain, { kind: 'rates', patch: { netMeteringRegime: 'sie007_2026' } }, ctx);
+assert.equal(chain.rates.gridUseChargeDOPPerKWh, 4.02);
+// Cambiar la distribuidora impresa del cliente (client.distributor) no toca el cargo: el cálculo lee rates.distributor.
+assert.equal(applyProjectEdit(sieEdit, { kind: 'client', patch: { distributor: 'EDENORTE' } }, ctx).rates.gridUseChargeDOPPerKWh, 3.5);
+
+// 17. (E) Nota SIE-007 con inyección cero o con cargo 0: sin «RD$0.00 por kWh… estimado».
+const zeroExportNote = regulatoryNoteDefault(createDocumentTextContext({ distributor: 'EDESUR', tariffCode: 'BTS1', isZeroExport: true, netMeteringRegime: 'sie007_2026', gridUseChargeDOPPerKWh: 3.78 })).split('\n\n')[3];
+assert.ok(zeroExportNote.includes('inyección cero') && !zeroExportNote.includes('por kWh inyectado'), zeroExportNote);
+const zeroChargeNote = regulatoryNoteDefault(createDocumentTextContext({ distributor: 'EDESUR', tariffCode: 'BTS1', netMeteringRegime: 'sie007_2026', gridUseChargeDOPPerKWh: 0 })).split('\n\n')[3];
+assert.ok(!zeroChargeNote.includes('RD$0.00') && !zeroChargeNote.includes('estimado'), zeroChargeNote);
+assert.ok(zeroChargeNote.includes('no considera'), zeroChargeNote);
+
+// 18. (K) Las herramientas de catálogo no pueden editar el régimen ni el cargo.
+assert.throws(() => validateAssistantEdits([{ section: 'equipment', field: 'netMeteringRegime', value: 'sie007_2026' }], 'equipment'));
+assert.throws(() => validateAssistantEdits([{ section: 'equipment', field: 'gridUseChargeDOPPerKWh', value: 3 }], 'equipment'));
+assert.throws(() => validateAssistantEdits([{ section: 'rates', field: 'netMeteringRegime', value: 'sie007_2026' }], 'equipment'));
+assert.throws(() => validateAssistantEdits([{ section: 'client', field: 'netMeteringRegime', value: 'sie007_2026' }], 'project'));
 
 console.log('SIE-007-2026: régimen por propuesta, cargo por kWh inyectado en tarifas de un precio y régimen anterior intacto.');

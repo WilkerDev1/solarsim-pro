@@ -15,7 +15,7 @@ JWT_SECRET y DB_PASSWORD son obligatorios, privados y sin fallback conocido. PAT
 | GET /api/health | Consulta BD y devuelve 503 si no está disponible. Abierta: no exige versión de cliente. |
 | POST /api/auth/login, register, refresh | Credenciales o token según ruta; sin log de secretos. |
 | GET /api/auth/me | Usuario actual; estado/rol desde BD. |
-| GET/PATCH /api/organization/features | GET autenticado; PATCH ADMIN con `{settings,baseVersion}`. Política `{organizationId,version,settings}`. 409 si cambió. |
+| GET/PATCH /api/organization/features | GET autenticado; PATCH ADMIN con `{settings,baseVersion}`. Política `{organizationId,version,settings}` con `settings = {selfConsumptionProjection, netMeteringRegimeSelector}` (booleanos). GET completa la clave que falte con su valor por defecto; PATCH exige la forma completa (400 con una sola clave o claves desconocidas). 409 si cambió. |
 | POST /api/auth/share-authorization | Introspección JWT para publicación, rol escritor y política actual. |
 | GET/POST /api/organizations | Listado y creación de organizaciones; creador obtiene ADMIN. |
 | POST /api/auth/switch-organization | Cambio de tenant activo para el usuario actual. |

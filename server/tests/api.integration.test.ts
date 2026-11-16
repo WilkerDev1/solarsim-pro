@@ -189,11 +189,18 @@ test("expired access never authorizes mutation; explicit refresh has a bounded 3
 });
 test("feature policy defaults legacy, readers can view, ADMIN saves with CAS and tenant isolation", async () => {
   const initial = await request("GET", "/api/organization/features", reader);
-  assert.deepEqual(initial.body.settings, { selfConsumptionProjection: false });
+  // Sin guardar nunca: la columna trae una sola clave y la lectura completa el selector de régimen (visible por defecto).
+  assert.deepEqual(initial.body.settings, {
+    selfConsumptionProjection: false,
+    netMeteringRegimeSelector: true,
+  });
   assert.equal(
     (
       await request("PATCH", "/api/organization/features", editor, {
-        settings: { selfConsumptionProjection: true },
+        settings: {
+          selfConsumptionProjection: true,
+          netMeteringRegimeSelector: false,
+        },
         baseVersion: 1,
       })
     ).status,
@@ -202,25 +209,61 @@ test("feature policy defaults legacy, readers can view, ADMIN saves with CAS and
   assert.equal(
     (
       await request("PATCH", "/api/organization/features", admin, {
-        settings: { selfConsumptionProjection: "yes" },
+        settings: {
+          selfConsumptionProjection: "yes",
+          netMeteringRegimeSelector: true,
+        },
         baseVersion: 1,
       })
     ).status,
     400,
   );
+  // Un cliente anterior (una sola clave) o una clave desconocida no puede sobrescribir la política: 400 y sin cambios.
+  for (const settings of [
+    { selfConsumptionProjection: true },
+    {
+      selfConsumptionProjection: true,
+      netMeteringRegimeSelector: true,
+      unknownFeature: true,
+    },
+    { selfConsumptionProjection: true, netMeteringRegimeSelector: "no" },
+  ])
+    assert.equal(
+      (
+        await request("PATCH", "/api/organization/features", admin, {
+          settings,
+          baseVersion: 1,
+        })
+      ).status,
+      400,
+    );
+  assert.equal(
+    (await request("GET", "/api/organization/features", reader)).body.version,
+    1,
+  );
   assert.equal(
     (
       await request("PATCH", "/api/organization/features", admin, {
-        settings: { selfConsumptionProjection: true },
+        settings: {
+          selfConsumptionProjection: true,
+          netMeteringRegimeSelector: false,
+        },
         baseVersion: 1,
       })
     ).body.version,
     2,
   );
+  assert.deepEqual(
+    (await request("GET", "/api/organization/features", reader)).body.settings,
+    { selfConsumptionProjection: true, netMeteringRegimeSelector: false },
+  );
   assert.equal(
     (
       await request("PATCH", "/api/organization/features", admin, {
-        settings: { selfConsumptionProjection: false },
+        settings: {
+          selfConsumptionProjection: false,
+          netMeteringRegimeSelector: true,
+        },
         baseVersion: 1,
       })
     ).status,
@@ -234,7 +277,10 @@ test("feature policy defaults legacy, readers can view, ADMIN saves with CAS and
   const share = await request("POST", "/api/auth/share-authorization", admin);
   assert.deepEqual(share.body.featurePolicy, {
     version: 2,
-    settings: { selfConsumptionProjection: true },
+    settings: {
+      selfConsumptionProjection: true,
+      netMeteringRegimeSelector: false,
+    },
   });
   assert.equal(
     (await request("POST", "/api/auth/share-authorization", reader)).status,

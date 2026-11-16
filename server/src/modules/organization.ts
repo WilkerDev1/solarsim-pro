@@ -6,6 +6,7 @@ import {
   isFeatureSettings,
   normalizeFeatureSettings,
 } from "../../../shared/applicationFeatures.js";
+import { isAdminRole } from "../../../shared/permissions.js";
 export function registerOrganizationRoutes(
   app: Hono,
   deps: Dependencies,
@@ -27,12 +28,14 @@ export function registerOrganizationRoutes(
   app.patch("/api/organization/features", async (c) => {
     const user = await deps.authenticate(c);
     if (!user) return c.json({ error: "No autorizado" }, 401);
-    if (user.role !== "ADMIN")
+    if (!isAdminRole(user.role))
       return c.json(
         { error: "Solo ADMIN puede configurar las funciones" },
         403,
       );
     const body = await readObjectBody(c);
+    // Solo la forma completa de esta versión (todas las claves, booleanas): un cliente anterior que envía una sola
+    // clave recibe 400 y no puede borrar la configuración que no conoce.
     if (
       !isFeatureSettings(body.settings) ||
       !Number.isSafeInteger(body.baseVersion) ||

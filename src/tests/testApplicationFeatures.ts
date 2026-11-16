@@ -43,19 +43,19 @@ const initial = useSimulationStore.getState();
 const originalFetch = globalThis.fetch;
 try {
   useSimulationStore.setState({ syncSettings: { ...initial.syncSettings, currentUser: null, authToken: null }, localFeatureSettings: DEFAULT_FEATURE_SETTINGS });
-  initial.setLocalFeatureSettings({ selfConsumptionProjection: true });
+  initial.setLocalFeatureSettings({ selfConsumptionProjection: true, netMeteringRegimeSelector: true });
   assert.equal(energyCalculationMode(effectiveFeatureSettings(useSimulationStore.getState())), 'self_consumption');
   const user = { id: 'test-user', name: 'Synthetic reviewer', email: 'qa@example.invalid', role: 'EDITOR' as const, organizationId: 'organization-a' };
   const serverUrl = 'https://qa.example.invalid';
   const scope = featureScope(serverUrl, user.organizationId);
   useSimulationStore.setState({ syncSettings: { ...initial.syncSettings, serverUrl, authToken: 'synthetic', currentUser: user }, organizationFeaturePolicies: {
-    [scope]: { organizationId: user.organizationId, version: 2, settings: { selfConsumptionProjection: false } },
+    [scope]: { organizationId: user.organizationId, version: 2, settings: { selfConsumptionProjection: false, netMeteringRegimeSelector: true } },
   } });
   assert.equal(energyCalculationMode(effectiveFeatureSettings(useSimulationStore.getState())), 'legacy');
-  initial.setLocalFeatureSettings({ selfConsumptionProjection: false });
+  initial.setLocalFeatureSettings({ selfConsumptionProjection: false, netMeteringRegimeSelector: true });
   assert.equal(useSimulationStore.getState().localFeatureSettings.selfConsumptionProjection, true, 'Logged-in user cannot change a local preference used by another context');
   globalThis.fetch = async () => { throw new Error('Unexpected transport use'); };
-  await initial.saveOrganizationFeaturePolicy({ selfConsumptionProjection: true });
+  await initial.saveOrganizationFeaturePolicy({ selfConsumptionProjection: true, netMeteringRegimeSelector: true });
   assert.equal(useSimulationStore.getState().organizationFeaturePolicies[scope].settings.selfConsumptionProjection, false);
   assert.equal(useSimulationStore.getState().featurePolicyRequest?.status, 'error');
   useSimulationStore.setState({ syncSettings: { ...useSimulationStore.getState().syncSettings, currentUser: { ...user, organizationId: 'organization-b' } } });

@@ -1,15 +1,13 @@
 import { isAdminRole } from '../../../../shared/permissions';
 import React, { useEffect } from 'react';
 import { LockKeyhole, RefreshCw } from 'lucide-react';
-import { BUILT_IN_APPLICATION_FEATURES, APPLICATION_FEATURES, DEVICE_APPLICATION_FEATURES, featureScope } from '../../../../shared/applicationFeatures';
-
-const REGIME_SELECTOR = DEVICE_APPLICATION_FEATURES.find((feature) => feature.id === 'netMeteringRegimeSelector')!;
+import { BUILT_IN_APPLICATION_FEATURES, APPLICATION_FEATURES, featureScope } from '../../../../shared/applicationFeatures';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
 import { effectiveFeatureSettings } from '../../../features/application/featurePolicy';
 
 export function ApplicationFeaturesSection() {
-  const state = useSimulationStore(useShallow((s) => ({ syncSettings: s.syncSettings, organizationFeaturePolicies: s.organizationFeaturePolicies, featurePolicyRequest: s.featurePolicyRequest, localFeatureSettings: s.localFeatureSettings, loadOrganizationFeaturePolicy: s.loadOrganizationFeaturePolicy, appAssistantEnabled: s.appAssistantEnabled, setAppAssistantEnabled: s.setAppAssistantEnabled, netMeteringRegimeSelectorEnabled: s.netMeteringRegimeSelectorEnabled, setNetMeteringRegimeSelectorEnabled: s.setNetMeteringRegimeSelectorEnabled, saveOrganizationFeaturePolicy: s.saveOrganizationFeaturePolicy, setLocalFeatureSettings: s.setLocalFeatureSettings })));
+  const state = useSimulationStore(useShallow((s) => ({ syncSettings: s.syncSettings, organizationFeaturePolicies: s.organizationFeaturePolicies, featurePolicyRequest: s.featurePolicyRequest, localFeatureSettings: s.localFeatureSettings, loadOrganizationFeaturePolicy: s.loadOrganizationFeaturePolicy, appAssistantEnabled: s.appAssistantEnabled, setAppAssistantEnabled: s.setAppAssistantEnabled, saveOrganizationFeaturePolicy: s.saveOrganizationFeaturePolicy, setLocalFeatureSettings: s.setLocalFeatureSettings })));
   const user = state.syncSettings.currentUser;
   const scope = user ? featureScope(state.syncSettings.serverUrl, user.organizationId) : null;
   const policy = scope ? state.organizationFeaturePolicies[scope] : undefined;
@@ -42,20 +40,13 @@ export function ApplicationFeaturesSection() {
       </div>
       <button type="button" role="switch" aria-checked={state.appAssistantEnabled} aria-labelledby="feature-title-app-assistant" aria-describedby="feature-description-app-assistant" onClick={()=>state.setAppAssistantEnabled(!state.appAssistantEnabled)} className={`mt-1 flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition-colors ${state.appAssistantEnabled?'bg-emerald-700':'bg-slate-300 ring-1 ring-slate-500 dark:bg-zinc-600 dark:ring-zinc-400'}`}><span className={`h-5 w-5 rounded-full bg-white transition-transform ${state.appAssistantEnabled?'translate-x-5':''}`}/></button>
     </div>
-    <div className="flex items-start justify-between gap-6 rounded-xl border border-slate-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-      <div className="max-w-2xl"><div className="flex flex-wrap items-center gap-2"><h4 id="feature-title-net-metering-regime" className="text-sm font-semibold text-slate-900 dark:text-white">{REGIME_SELECTOR.title}</h4><span className="rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">Beta</span></div>
-        <p id="feature-description-net-metering-regime" className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-zinc-400">{REGIME_SELECTOR.description}</p>
-        <p className="mt-3 text-xs text-slate-500 dark:text-zinc-400">Preferencia de este equipo, activada por defecto. Las propuestas nuevas nacen en SIE-007-2026; las guardadas conservan su régimen.</p>
-      </div>
-      <button type="button" role="switch" aria-checked={state.netMeteringRegimeSelectorEnabled} aria-labelledby="feature-title-net-metering-regime" aria-describedby="feature-description-net-metering-regime" onClick={()=>state.setNetMeteringRegimeSelectorEnabled(!state.netMeteringRegimeSelectorEnabled)} className={`mt-1 flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition-colors ${state.netMeteringRegimeSelectorEnabled?'bg-emerald-700':'bg-slate-300 ring-1 ring-slate-500 dark:bg-zinc-600 dark:ring-zinc-400'}`}><span className={`h-5 w-5 rounded-full bg-white transition-transform ${state.netMeteringRegimeSelectorEnabled?'translate-x-5':''}`}/></button>
-    </div>
     {BUILT_IN_APPLICATION_FEATURES.map(feature=><div key={feature.id} className="rounded-xl border border-slate-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><h4 className="text-sm font-semibold text-slate-900 dark:text-white">{feature.title} <span className="ml-2 text-xs font-normal text-emerald-700 dark:text-emerald-300">Estable · Siempre disponible</span></h4><p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">{feature.description}</p></div>)}
     <div className="divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-900">
       {APPLICATION_FEATURES.map((feature) => <div key={feature.id} className="flex items-start justify-between gap-6 p-5">
         <div className="max-w-2xl">
           <div className="flex flex-wrap items-center gap-2"><h4 id={`feature-title-${feature.id}`} className="text-sm font-semibold text-slate-900 dark:text-white">{feature.title}</h4><span className="rounded-md bg-amber-50 px-2 py-1 text-[11px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">{({ stable: 'Estable', beta: 'Beta', experimental: 'Experimental' })[feature.stage]}</span></div>
           <p id={`feature-description-${feature.id}`} className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-zinc-400">{feature.description}</p>
-          <p className="mt-3 text-xs text-slate-500 dark:text-zinc-400">Desactivada: cálculo clásico de autoconsumo (75% sin baterías, 90% con baterías), sin perfil diurno en los parámetros.</p>
+          <p className="mt-3 text-xs text-slate-500 dark:text-zinc-400">{feature.disabledNote}{feature.available ? '' : ' No disponible en esta versión.'}</p>
         </div>
         <button type="button" role="switch" aria-checked={settings[feature.id]} aria-labelledby={`feature-title-${feature.id}`} aria-describedby={`feature-description-${feature.id}`} disabled={!canEdit || !feature.available}
           onClick={() => {

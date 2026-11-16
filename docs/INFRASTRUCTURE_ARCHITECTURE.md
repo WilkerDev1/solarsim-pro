@@ -135,6 +135,19 @@ El orden es el mismo que en la 2.7.3:
 
 Rollback: la imagen 2.7.3 es compatible con la migración 007. La migración solo cambia `created_at`/`updated_at` y no añade tablas ni columnas.
 
+### Próxima versión (2.7.5 o la que la incluya): régimen SIE-007-2026 y política de funciones con dos claves
+
+Cambia el **contrato** de `/api/organization/features`: la política de la organización pasa de una clave (`selfConsumptionProjection`) a dos (`selfConsumptionProjection`, `netMeteringRegimeSelector`). Sin migración: la columna `feature_settings` no cambia y la lectura completa la clave que falta con su valor por defecto (`netMeteringRegimeSelector: true`). Al guardar (PATCH, solo ADMIN, `isAdminRole` de `shared/permissions.ts`, CAS con `baseVersion`) la API exige la forma completa (`isFeatureSettings`): un cliente 2.7.4 o anterior, que envía una sola clave, recibe 400 y no puede borrar la clave nueva. Un cliente 2.7.4 que recibe dos claves rechaza la respuesta («configuración de funciones inválida») y conserva la última política confirmada: por eso esta versión **sube `MIN_CLIENT_VERSION` a la versión de cliente que la incluya** (actualización obligatoria para sincronizar). Al preparar la release: subir `package.json` (raíz, `server/`, `workers/share-viewer/`) y `DEFAULT_MIN_CLIENT_VERSION` (`shared/clientVersion.ts`) a esa versión, y poner el mismo valor en `MIN_CLIENT_VERSION` del `.env` del CT. No se subió antes porque el cliente de desarrollo (2.7.4) quedaría bloqueado por su propia API.
+
+Orden:
+
+1. Checkpoint y ensayo de restauración. Sin migración nueva: el ensayo termina en `[1..7]`.
+2. **Worker** de la nueva versión. Es inofensivo con la API anterior (ignora la clave nueva) y, con la versión mínima activa, el Worker anterior recibiría 426 al pedir autorización.
+3. **Release de escritorio** firmada. Con la API anterior funciona: lee la política de una clave y muestra el selector (por defecto). Hasta el paso 4, un ADMIN no puede guardar funciones (la API anterior responde 400 a la forma de dos claves): avisar o hacer los pasos 3 y 4 seguidos.
+4. **API** de la nueva versión con `MIN_CLIENT_VERSION` = esa versión. Desde aquí los clientes 2.7.4 o anteriores reciben 426 y deben actualizar; siguen guardando en el equipo. Avisar al equipo antes.
+
+Rollback: la imagen 2.7.4 es compatible con los datos (lee `feature_settings` de dos claves con `normalizeFeatureSettings` de una clave e ignora la otra) y, al bajar `MIN_CLIENT_VERSION` a 2.7.1, los clientes 2.7.4 vuelven a sincronizar. Una política guardada con dos claves sigue siendo válida al volver a subir.
+
 ## Rollback de la API
 
 1. Detener escritores nuevos y coordinar clientes. Guardar un dump posterior que contenga las escrituras recientes.
