@@ -1,3 +1,4 @@
+import { resolveNetMeteringRegime } from '../../shared/netMetering';
 import { equipmentTotals, readEquipment } from '../../shared/equipment';
 import { isWriterRole } from '../../shared/permissions';
 import { webHeaderLogo } from '../utils/documentLogo';
@@ -218,7 +219,8 @@ export class ShareProposalService {
       // One immutable publication captures both the confirmed policy and its financial result.
       // The caller's preview may have been calculated before settings changed.
       summary = calculateProjectFinancialSummary(project, mode);
-      const calculationSnapshot = { mode, organizationId: session.currentUser.organizationId, policyVersion: policy.version, capturedAt: new Date().toISOString() };
+      // El régimen de medición neta queda en el snapshot (el visor lo usa si el enlace no trae la nota publicada).
+      const calculationSnapshot = { mode, organizationId: session.currentUser.organizationId, policyVersion: policy.version, capturedAt: new Date().toISOString(), netMeteringRegime: resolveNetMeteringRegime(project.rates?.netMeteringRegime) };
       // Remove large unnecessary base64 or temporary buffers from project payload if needed
       const projectPayload = {
         id: project.id,
