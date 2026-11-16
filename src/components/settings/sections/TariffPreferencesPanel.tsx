@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
 import { Receipt, ChevronDown, ChevronUp, Check, Sparkles, Cloud, RefreshCw, Zap, Coins, DollarSign, AlertTriangle } from 'lucide-react';
@@ -37,6 +37,10 @@ export const TariffPreferencesPanel: React.FC<TariffPreferencesPanelProps> = ({ 
   const [replacedMatrix, setReplacedMatrix] = useState<{ matrix: GlobalTariffMatrix; scope: string } | null>(null);
   const factoryNotice = factoryTariffUpdateNotice(tariffMatrix);
   const canUndoFactoryUpdate = !!replacedMatrix && replacedMatrix.scope === workspaceScope && tariffMatrix === DEFAULT_RD_TARIFF_MATRIX;
+  // «Deshacer» deja de ofrecerse en cuanto la matriz o el espacio cambian por otra vía: un «Restablecer» posterior no debe revivirlo.
+  useEffect(() => {
+    if (replacedMatrix && (replacedMatrix.scope !== workspaceScope || tariffMatrix !== DEFAULT_RD_TARIFF_MATRIX)) setReplacedMatrix(null);
+  }, [replacedMatrix, workspaceScope, tariffMatrix]);
 
   const handleAdoptFactoryTariffs = async () => {
     if (!factoryNotice) return;
@@ -191,7 +195,7 @@ export const TariffPreferencesPanel: React.FC<TariffPreferencesPanelProps> = ({ 
             </div>
           )}
 
-          {organizationTariffOutdated && (
+          {organizationTariffOutdated && tariffMatrix === DEFAULT_RD_TARIFF_MATRIX && (
             <div role="status" className="rounded-2xl p-4 border border-amber-300/70 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/30 flex flex-col md:flex-row md:items-center justify-between gap-3">
               <div className="flex items-start gap-2.5">
                 <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
