@@ -19,6 +19,7 @@ Documentos canónicos y vigentes. No se mantienen documentos fechados: el histor
 - [Subsistema IA](AI_SCANNERS_SPECIFICATION.md) y [tarifas en el flujo IA](AI_TARIFF_CONTEXT.md).
 - [Agentes y herramientas de IA](AGENT_TOOLS.md): registro común, permisos, actividad y deshacer, precios automáticos.
 - [Servidor MCP local](MCP_LOCAL.md): conexión de Claude Code y Codex, token, guardas y modelo de amenazas.
+- [Servidor MCP remoto](MCP_REMOTE.md): servicio `mcp-remote` sobre la API para ChatGPT, Claude.ai y agentes en la nube; tokens personales, OAuth 2.1, herramientas, amenazas y despliegue en el CT dedicado.
 - [Visor de propuestas (Worker)](../workers/share-viewer/README.md).
 - Reglas de exportación PDF: [.agents/rules/html2canvas_pdf_export_rules.md](../.agents/rules/html2canvas_pdf_export_rules.md).
 

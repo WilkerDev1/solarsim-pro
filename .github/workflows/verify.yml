@@ -152,6 +152,36 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  mcp:
+    name: mcp (servicio MCP remoto, imagen Docker, smoke)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+            mcp-remote/package-lock.json
+      # Las pruebas de extremo a extremo levantan la API real: necesitan las dependencias de la raíz y de server/.
+      - run: npm ci
+      - run: npm --prefix server ci
+      - run: npm --prefix mcp-remote ci
+      - run: npm --prefix mcp-remote run format:check
+      - run: npm --prefix mcp-remote run build
+      - run: npm --prefix mcp-remote test
+      - run: docker build -f server/Dockerfile -t solarsim-api:qa-modular .
+      - run: docker build -f mcp-remote/Dockerfile -t solarsim-mcp-remote:qa .
+      - run: npx tsx mcp-remote/tests/containerSmoke.ts
+
   viewer:
     name: viewer (Worker)
     needs: changes
@@ -179,7 +209,7 @@ jobs:
   gates:
     # Check requerido en la protección de ramas: falla si algún trabajo falló o se canceló.
     name: gates
-    needs: [changes, client, client-tests, server, viewer]
+    needs: [changes, client, client-tests, server, mcp, viewer]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

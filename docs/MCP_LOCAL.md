@@ -77,9 +77,9 @@ Si el puerto 47321 está ocupado, el panel lo indica; el puerto se cambia en `mc
 
 Fuera de alcance: acceso desde otros equipos (el servidor no escucha en la red) y protección frente a malware con el mismo usuario del sistema operativo.
 
-## MCP remoto (esbozo, no implementado)
+## MCP remoto
 
-Un `/mcp` en la API Hono con OAuth 2.1 + PKCE y metadatos RFC 9728/8414 permitiría conectar ChatGPT y clientes web. Requeriría la migración 006 (`oauth_*`, `agent_actions`, `agent_activity`), ejecutores en servidor con CAS y que las acciones `guarded` se confirmen desde la app. No se despliega sin solicitud explícita.
+Para proveedores que no corren en este equipo (ChatGPT, Claude.ai, agentes en la nube) existe un servicio aparte, `mcp-remote`, que trabaja sobre los datos sincronizados en la API con tokens de agente u OAuth 2.1, sin depender de la app abierta: ver [MCP_REMOTE.md](MCP_REMOTE.md).
 
 ## Verificación
 

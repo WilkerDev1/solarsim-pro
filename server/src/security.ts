@@ -3,11 +3,14 @@ import type { Context } from "hono";
 import type { Pool } from "pg";
 import type { AuthUser } from "./dependencies.js";
 import { resolveMembership } from "./membership.js";
+import { agentUserFor, isAgentBearer } from "./modules/agentAccess/routes.js";
 export { normalizeRole } from "./membership.js";
 export function createAuthenticator(pool: Pool, secret: string) {
   return async function authenticate(c: Context): Promise<AuthUser | null> {
     const header = c.req.header("Authorization");
     if (!header?.startsWith("Bearer ")) return null;
+    // Agent tokens were already resolved (route allowlist, scope, current membership) by the agent gate.
+    if (isAgentBearer(header)) return agentUserFor(c);
     let payload: jwt.JwtPayload;
     try {
       const verified = jwt.verify(header.slice(7), secret, {

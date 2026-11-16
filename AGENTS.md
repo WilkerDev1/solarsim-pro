@@ -8,6 +8,7 @@ Guía canónica para agentes y desarrolladores. Producto y módulos: [README.md]
 - **Funciones nuevas** se registran en `shared/applicationFeatures.ts` (default, etapa, visibilidad, disponibilidad) y se leen con el selector efectivo. Con sesión, la política de la organización (ADMIN mediante PATCH con `baseVersion`) prevalece sobre la preferencia local.
 - **Agentes de IA**: toda capacidad para asistentes o agentes externos se declara en `shared/agentTools/definitions.ts` y se ejecuta con `executeAgentTool` (`src/features/agentTools/registry.ts`). Tipos `read`/`draft`/`guarded`: `guarded` requiere confirmación humana salvo el modo bypass explícito (`guarded: 'allow'`; las herramientas sin deshacer siguen confirmándose); las propuestas automáticas usan `AUTOMATED_PRICING`. Ver [docs/AGENT_TOOLS.md](docs/AGENT_TOOLS.md).
 - **API** (`server/`): toda mutación usa CAS con `baseVersion` (409 en conflicto) y comprueba los permisos actuales en la base de datos, no solo los claims del JWT. Roles: ADMIN, EDITOR y LECTOR (`VIEWER` se acepta como alias y se normaliza a LECTOR). Migraciones numeradas en `server/src/database/` (la 006 quita el espejo de equipos de todos los proyectos). Las rutas de datos exigen `X-SolarSim-Client: <nombre>/<versión>` ≥ `MIN_CLIENT_VERSION` (426 `client_outdated`); un cliente nuevo debe enviarlo ([API](docs/DATABASE_AND_API_SPECIFICATION.md#versión-mínima-de-cliente)).
+- **MCP remoto** ([docs/MCP_REMOTE.md](docs/MCP_REMOTE.md)): servicio aparte `mcp-remote/` (sin estado, sin credenciales de base ni `JWT_SECRET`) que reenvía tokens de agente `ssm_…` a la API. La API solo los acepta en `AGENT_ROUTES` (`shared/agentAccess.ts`), nunca en `/api/auth/*`; alcance `read` = LECTOR; las herramientas `guarded` no se exponen en remoto. Desactivado salvo `MCP_REMOTE_ENABLED=true`; OAuth 2.1 con `MCP_OAUTH_ENABLED=true`.
 - **Registro público** crea siempre una organización nueva con su usuario ADMIN; nunca une a Electsun ni a otra organización existente. Las propuestas locales no se asignan automáticamente a una organización al iniciar sesión.
 - **Clientes** ([docs/CLIENTS.md](docs/CLIENTS.md)): `clientId` en la propuesta es un enlace opcional, independiente de los datos impresos (`project.client`); enlazar o borrar un cliente nunca reescribe el documento. Validación en `shared/clients.ts`; escrituras con CAS y borrado lógico que desenlaza. Los clientes locales tampoco se asignan automáticamente a una organización.
 - **Pruebas**: ninguna escribe en producción. `scripts/testEnvironment.ts` hace fallar `fetch`; las suites inyectan transporte sintético. Las integraciones de API usan PostgreSQL efímero en Docker.
@@ -45,6 +46,11 @@ docker build -f server/Dockerfile -t solarsim-api:qa-modular .
 npx tsx server/tests/containerSmoke.ts
 npm --prefix workers/share-viewer test
 npm --prefix workers/share-viewer run build
+npm --prefix mcp-remote test           # incluye la prueba de extremo a extremo con PostgreSQL efímero
+npm --prefix mcp-remote run format:check
+npm --prefix mcp-remote run build
+docker build -f mcp-remote/Dockerfile -t solarsim-mcp-remote:qa .
+npx tsx mcp-remote/tests/containerSmoke.ts
 ```
 
 CI también ejecuta `node scripts/qa/validatePackager.mjs`, `node scripts/qa/devSmoke.mjs`, `node scripts/qa/testPrepareSecrets.mjs` y `npx tsx --test scripts/qa/tests/*.test.ts`; un PR que solo cambia Markdown o `docs/` omite builds y pruebas. Escribir la prueba antes del cambio (en refactors, una prueba de caracterización que fije el comportamiento actual). Si cambia la estructura del repositorio, ejecutar `npm run context:pack`. No afirmar ausencia de vulnerabilidades sin un `npm audit` actual.
