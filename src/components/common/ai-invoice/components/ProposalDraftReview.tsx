@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ProposalConsumptionReview } from './ProposalConsumptionReview';
 import { ProposalCommercialReview } from './ProposalCommercialReview';
+import { ProposalDocumentTextsReview } from './ProposalDocumentTextsReview';
 import type { AIProposalContext, AIProposalIssue } from '../../../../../shared/aiProposal';
 import { resolveAssumption } from '../../../../../shared/assumptions';
 import type { FinancialSummaryResult } from '../../../../types';
@@ -74,6 +75,7 @@ export function ProposalDraftReview({draft,catalog,matrix,context,preview,produc
       </button>;
     })}</div>
     {!!draft.unresolvedRequests?.length && <section className="proposal-unresolved" id={reviewAnchor.unresolved} tabIndex={-1}><h3>Solicitudes pendientes</h3><ul>{draft.unresolvedRequests.map((request,i)=><li key={i}>{request}</li>)}</ul><p className="proposal-note">Corrige el borrador o pide una alternativa al asistente. Marca como resuelto únicamente cuando hayas seleccionado una solución.</p><button type="button" className="proposal-confirm" onClick={()=>update({unresolvedRequests:[]})}>Confirmar que resolví estas solicitudes</button></section>}
+    <ProposalDocumentTextsReview draft={draft} update={update}/>
     <div role="tabpanel" id="proposal-tab-client" aria-labelledby="proposal-label-client" hidden={tab!=='client'}><section>
       <h3>Cliente y suministro</h3>
       <div className="proposal-fields">

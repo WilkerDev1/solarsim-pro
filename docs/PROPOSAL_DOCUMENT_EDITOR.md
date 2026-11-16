@@ -31,6 +31,7 @@ Todo es puro y no importa la interfaz:
 - `documentTextPatch(key, valor, source, ctx)`, `documentTextResetPatch(key, source)` y `documentTextsPatch({ clave: valor | null })` → parche de `customization` y `client`; `applyDocumentTextPatch` lo aplica.
 - En el store: `setDocumentTexts({ clave: valor | null })` (registra deshacer, respeta la papelera, los lectores y los conflictos; enruta el espejo de `client` por `applyDocumentClientEdit`) y `saveDocumentTextsToCompanyTemplate(claves | 'all')`.
 - `setDocumentLayout(parche)` para secciones visibles, tema y cabecera/pie.
+- Borrador de IA (`shared/documentTexts/aiDraft.ts`): `aiDocumentTextCatalog` (contexto mínimo clave/etiqueta/valor para el modelo), `normalizeDraftDocumentTexts` (validación contra el registro) y `draftDocumentTextValues` (valores para `documentTextsPatch`). No se exporta desde el índice: el Worker no lo necesita. Ver [AGENT_TOOLS.md](AGENT_TOOLS.md#textos-del-documento-frente-a-datos-del-proyecto).
 
 ## Plantillas de empresa
 
@@ -79,4 +80,4 @@ El Worker solo acepta strings en `customization` (`workers/share-viewer/src/vali
 
 ## Pruebas
 
-`testDocumentTextRegistry` (caracterización de los 26 puntos de 2.6.x, resolución, escritura y plantillas), `testRichText`, `testDocumentEditorStore`, `testDocumentTextCoverage`, `testPDFLayoutPersistence`, `testProposalPdfExport`, `testShareDocumentTexts`, `testProjectEdit` (contacto del cliente desde el documento) y, en el Worker, `documentTexts.test.ts`. El fixture `scripts/qa/fixtures/documentEditor.html` (`?trash=1`, `?role=lector`, `?legacy=1`) permite revisar la edición a mano.
+`testAIDocumentTexts` (la IA fija textos por el chat y por el borrador), `testDocumentTextRegistry` (caracterización de los 26 puntos de 2.6.x, resolución, escritura y plantillas), `testRichText`, `testDocumentEditorStore`, `testDocumentTextCoverage`, `testPDFLayoutPersistence`, `testProposalPdfExport`, `testShareDocumentTexts`, `testProjectEdit` (contacto del cliente desde el documento) y, en el Worker, `documentTexts.test.ts`. El fixture `scripts/qa/fixtures/documentEditor.html` (`?trash=1`, `?role=lector`, `?legacy=1`) permite revisar la edición a mano.

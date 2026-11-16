@@ -1,0 +1,52 @@
+import { applyDocumentTextPatch, documentTextsPatch } from '../../shared/documentTexts';
+import { aiDocumentTextCatalog, draftDocumentTextValues, type AIDocumentTextEntry, type DraftDocumentText } from '../../shared/documentTexts/aiDraft';
+import { energyCalculationMode } from '../../shared/applicationFeatures';
+import { effectiveFeatureSettings, type FeaturePolicyState } from '../features/application/featurePolicy';
+import { applyDocumentClientEdit } from '../domain/projectEdit';
+import { buildDocumentTextContext, documentTextContextFor } from './documentTextContext';
+import { formatProposalDate } from './formatDateUtils';
+import { calculateProjectFinancialSummary } from '../engine/financeEngine';
+import { companyDocumentCustomization } from './companyDocumentTemplate';
+import { createAIProposalBase } from './proposalDraftProject';
+import { BENCHMARK_PROJECT } from '../engine/referenceCase';
+import type { SimulationStore } from '../store/types';
+import type { CompanyProfile, ProjectSimulation } from '../types';
+import type { SolarEquipmentItem } from '../types/equipment';
+
+type DraftTextState = FeaturePolicyState & { companies: CompanyProfile[]; equipmentCatalog: SolarEquipmentItem[] };
+
+/**
+ * Aplica los textos del documento de un borrador de IA con los mismos escritores que el editor y
+ * `set_document_text`: `documentTextsPatch` (registro, saneo, «igual al predeterminado = restablecer»)
+ * y `applyDocumentClientEdit` para los espejos del cliente (ADR 0004).
+ */
+export function withDraftDocumentTexts(state: DraftTextState, project: ProjectSimulation, texts: readonly DraftDocumentText[] | undefined): ProjectSimulation {
+  if (!texts?.length) return project;
+  // Contexto del proyecto ya construido, con su propio resumen (no el de la propuesta abierta antes del borrador).
+  const ctx = buildDocumentTextContext(project, calculateProjectFinancialSummary(project, energyCalculationMode(effectiveFeatureSettings(state))), {
+    currentDateStr: formatProposalDate(project.client?.quoteDate || project.customization?.quoteDate),
+    company: state.companies.find((company) => company.id === project.companyProfileId),
+  });
+  const next = applyDocumentTextPatch({ customization: project.customization || {}, client: project.client }, documentTextsPatch(draftDocumentTextValues(texts), project, ctx));
+  return {
+    ...project,
+    ...applyDocumentClientEdit(project, { customization: next.customization as ProjectSimulation['customization'], client: next.client as ProjectSimulation['client'] }, { equipmentCatalog: state.equipmentCatalog }),
+  };
+}
+
+/**
+ * Contexto mínimo para el borrador (clave, etiqueta, valor actual): de la propuesta abierta o, para
+ * una nueva, de la plantilla de la empresa activa sobre la base del asistente.
+ */
+export function draftDocumentTextCatalog(state: SimulationStore, target: ProjectSimulation | undefined, province: string): AIDocumentTextEntry[] {
+  const mode = energyCalculationMode(effectiveFeatureSettings(state));
+  if (target) return aiDocumentTextCatalog(target, documentTextContextFor(state, target, mode));
+  const company = state.getActiveCompany();
+  const base: ProjectSimulation = {
+    ...createAIProposalBase(BENCHMARK_PROJECT, state.defaultSimulationSettings, province),
+    companyProfileId: state.activeCompanyId,
+    customization: companyDocumentCustomization(company, state.defaultDocumentCustomization, state.documentTemplatesByCompany),
+  };
+  // Los textos que dependen del proyecto se envían sin valor: los del caso de referencia no son del cliente.
+  return aiDocumentTextCatalog(base, documentTextContextFor({ ...state, activeProjectId: '' }, base, mode), { newProposal: true });
+}

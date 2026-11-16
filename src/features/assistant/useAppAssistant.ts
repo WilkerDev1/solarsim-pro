@@ -83,6 +83,7 @@ export function useAppAssistant(
         prompt: text,
         history: messages,
         activeProjectId: projectId,
+        activeView: s.activeView,
         transport,
         files: attached,
         signal: abort.signal,

@@ -76,6 +76,8 @@ El recargo sobre costo y el margen sobre venta son alternativas excluyentes. Lo 
 
 `src/utils/proposalDraftProject.ts` es el adaptador puro compartido por vista previa y aplicación del store. Utiliza los motores vigentes, sin replicar fórmulas financieras. Una propuesta nueva limpia overrides de costo y beneficios fiscales del benchmark. Validar varias veces nunca hace desaparecer errores ni costos inválidos; grupos repetidos con costos contradictorios requieren unificar precios. El resumen señala costos pendientes y la gráfica energética sigue disponible cuando sólo faltan condiciones comerciales. Una edición invalida la confirmación anterior.
 
+Las condiciones que el PDF imprime como texto (garantías, vigencia, nota legal, servicios, alcance) viajan en `documentTexts` del borrador, se revisan en «Textos del documento» y se aplican con los escritores del registro de textos ([AGENT_TOOLS.md](AGENT_TOOLS.md#textos-del-documento-frente-a-datos-del-proyecto)).
+
 ## Conversación y documentos de costos
 
 El esquema distingue `discussion` (respuesta/pregunta sin reemplazar borrador) de `draft` (crear/refinar). La respuesta conversacional acompaña el contexto de ambos roles y el borrador normalizado; la solicitud envía los últimos veinte mensajes acotados y las instrucciones actuales. Los datos pendientes se presentan en el chat lateral, actualizados al editar. Se conserva la confirmación humana antes de crear/actualizar y no se pierde trabajo cuando el store rechaza aplicar.

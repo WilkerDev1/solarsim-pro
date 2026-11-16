@@ -15,6 +15,7 @@ import { normalizeProposalDraft, AIProposalContext } from '../../../../../shared
 import { resolveAssumption, resolveAssumptions } from '../../../../../shared/assumptions';
 import { buildAITariffContext } from '../../../../utils/aiTariffContext';
 import { useEnergyCalculationMode } from '../../../../features/application/useApplicationFeatures';
+import { draftDocumentTextCatalog } from '../../../../utils/draftDocumentTexts';
 import { aiWorkspaceKey, proposalFileType, readProposalFile, PROPOSAL_FILES_LIMIT } from '../workspace';
 
 export interface ProposalMessage { role: 'user' | 'assistant'; text: string; files?: string[]; kind?: 'error' }
@@ -109,7 +110,7 @@ export function useAIInvoiceScanner() {
       const payload = { apiKey:geminiApiKey, model:geminiModel, files:attachments,
         projectRequirementsText:prompt.trim() || 'Analiza los documentos adjuntos conservando los acuerdos del borrador.',
         equipmentCatalog, dopExchangeRate: extractedData?.dopExchangeRate ?? resolveAssumption('dopExchangeRate', target?.specs.dopExchangeRate, target?.rates.usdExchangeRate),
-        context: { ...context, reviewNotes:attentionIssues.map(i=>i.message),conversation:[...messages.filter(m=>!m.kind),userMessage].slice(-20).map(m=>({role:m.role,text:m.text.slice(-1800)})), currentDraft: validatedDraft || undefined, currentClient: target?.client },
+        context: { ...context, documentTexts: draftDocumentTextCatalog(useSimulationStore.getState(), target, context.province || ''), reviewNotes:attentionIssues.map(i=>i.message),conversation:[...messages.filter(m=>!m.kind),userMessage].slice(-20).map(m=>({role:m.role,text:m.text.slice(-1800)})), currentDraft: validatedDraft || undefined, currentClient: target?.client },
       };
       let result: ExtractedInvoiceData;
       if (window.electronAPI?.parseInvoiceWithAI) {
