@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { AGENT_TOOL_DEFINITIONS, findAgentTool } from '../../shared/agentTools/definitions';
 import { toGeminiFunctionDeclarations, toGeminiSchema, validateJsonSchema } from '../../shared/agentTools/jsonSchema';
 import { AGENT_RULES_ES } from '../../shared/agentTools/rules';
-import { executeAgentTool, getPendingAgentAction, listAgentTools } from '../features/agentTools/registry';
+import { executeAgentTool, executeForAssistant, getPendingAgentAction, listAgentTools } from '../features/agentTools/registry';
+import { runAssistant } from '../features/assistant/service';
 import { assistantOwner } from '../features/assistant/tools';
 import { useSimulationStore } from '../store/useSimulationStore';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
@@ -75,5 +76,29 @@ assert.equal(getPendingAgentAction(pending.actionId)?.edits[0].value, 90);
 assert.notEqual(useSimulationStore.getState().getActiveProject().rates.targetCoveragePct, 90, 'planning never mutates');
 const stale = await executeAgentTool({ name: 'search_projects', args: {} }, { ...ctx, owner: 'other-owner' });
 assert(stale.status === 'error' && /sesión cambió/.test(stale.message));
+
+// 5. The 64 KB cap is uniform in the registry: read results (assistant and native handlers) never reach the model whole.
+const huge = 'X'.repeat(3000);
+const bloated = { ...structuredClone(DEFAULT_EQUIPMENT_CATALOG[0]), id: 'bloated', displayName: 'Bloated QA',
+  supplierPrices: Array.from({ length: 50 }, (_, i) => ({ id: `o${i}`, supplierName: `${huge}${i}`, priceUSD: 1, updatedAt: '2026-01-01' })) };
+useSimulationStore.setState({ equipmentCatalog: [...structuredClone(DEFAULT_EQUIPMENT_CATALOG), bloated as any] });
+useSimulationStore.getState().setAgentPolicy({ internal: { read: 'allow', draft: 'confirm', guarded: 'confirm' } });
+const bigRead = await executeAgentTool({ name: 'search_equipment', args: { query: 'Bloated QA' } }, ctx);
+assert(bigRead.status === 'error' && bigRead.code === 'result_too_large', 'assistant read tools are capped');
+const bigNative = await executeAgentTool({ name: 'list_supplier_offers', args: { equipmentId: 'bloated' } }, ctx);
+assert(bigNative.status === 'error' && bigNative.code === 'result_too_large', 'native read tools are capped');
+const sentBodies: string[] = [];
+await runAssistant({
+  apiKey: 'synthetic', model: 'gemini-4-hydrogen', prompt: 'Ofertas', history: [], signal: new AbortController().signal,
+  execute: (call) => executeForAssistant(call, ctx),
+  transport: async (_url, body) => {
+    sentBodies.push(JSON.stringify(body));
+    return sentBodies.length === 1
+      ? { candidates: [{ finishReason: 'STOP', content: { parts: [{ functionCall: { name: 'list_supplier_offers', args: { equipmentId: 'bloated' } } }] } }] }
+      : { candidates: [{ finishReason: 'STOP', content: { parts: [{ text: 'Filtra más.' }] } }] };
+  },
+});
+assert(!sentBodies[1].includes(huge), 'an oversized result is answered with an error, never appended to contents');
+assert.match(sentBodies[1], /demasiado grande/);
 
 console.log('PASS: agent tool definitions, JSON Schema subset, Gemini adapter and registry outcomes.');
