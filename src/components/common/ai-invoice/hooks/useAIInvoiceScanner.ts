@@ -133,7 +133,8 @@ export function useAIInvoiceScanner() {
     if(!validatedDraft || validatedDraft.monthlyConsumptionKWh.length!==12 || !validatedDraft.panels?.length || validatedDraft.panels.some(g=>!g.id||!Number.isFinite(g.powerW)||g.powerW<=0||!Number.isInteger(g.count)||g.count<=0))return null;
     const base=target || createAIProposalBase(BENCHMARK_PROJECT,defaults,validatedDraft.province || context.province || '');
     const project=prepareProposalDraftProject(base,{...validatedDraft,commercial:{}},tariffMatrix,{isNew:!target,defaultBatteryDOD:defaults.defaultBatteryDOD,catalog:equipmentCatalog});
-    return calculateMonthlySolarProduction(project.client.province,project.specs,project.monthlyConsumption,project.rates.energyCostPerKWh,project.rates.gridExportFeePct,project.client.customMonthlyHSP,project.rates.tariffCode,project.rates.isZeroExport,mode,engineGridUseCharge(resolveAssumptions(project))).map(m=>m.productionKWh);
+    const assumptions=resolveAssumptions(project); // ADR 0003: retención y cargo efectivos
+    return calculateMonthlySolarProduction(project.client.province,project.specs,project.monthlyConsumption,project.rates.energyCostPerKWh,assumptions.gridExportFeePct,project.client.customMonthlyHSP,project.rates.tariffCode,project.rates.isZeroExport,mode,engineGridUseCharge(assumptions)).map(m=>m.productionKWh);
   },[validatedDraft,target,defaults,tariffMatrix,mode,context.province,equipmentCatalog]);
   const draftPreview=useMemo(()=>{
     if(!validatedDraft || validatedDraft.validationIssues?.some(i=>i.severity==='error' && /extra|discount|customItems|customDiscounts|commercial|markup|margin|installation|pricing|surplus|price|count|spec|source_totals|exchange/.test(i.code)))return null;

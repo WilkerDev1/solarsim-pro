@@ -4,7 +4,8 @@ import type { ResolvedAssumptions } from '../../../../../../shared/assumptions';
 import {
   GRID_USE_CHARGE_ESTIMATE_NOTICE,
   MAX_GRID_USE_CHARGE_DOP_PER_KWH,
-  clampGridUseCharge,
+  chargeRoundsToZero,
+  parseGridUseChargeInput,
   NET_METERING_REGIMES,
   NET_METERING_REGIME_LABELS,
   factoryGridUseCharge,
@@ -72,7 +73,11 @@ export const NetMeteringFields: React.FC<NetMeteringFieldsProps> = ({ rates, ass
               max={MAX_GRID_USE_CHARGE_DOP_PER_KWH}
               disabled={!applies}
               value={applies ? charge : 0}
-              onChange={(value) => updateRates({ gridUseChargeDOPPerKWh: clampGridUseCharge(parseNumber(value)) ?? 0 })}
+              onChange={(value) => {
+                // Vacío o a medio escribir («», «.»): no se guarda nada; al salir del campo se ve el valor guardado.
+                const charge = parseGridUseChargeInput(value);
+                if (charge !== undefined) updateRates({ gridUseChargeDOPPerKWh: charge });
+              }}
               right={applies ? (
                 <FieldMenu
                   ariaLabel={isFactory ? 'Opciones del cargo: valor de fábrica aplicado' : `Opciones del cargo: difiere del de fábrica (RD$${factory.dopPerKWh.toFixed(2)}/kWh)`}
@@ -87,7 +92,7 @@ export const NetMeteringFields: React.FC<NetMeteringFieldsProps> = ({ rates, ass
               ) : <InfoTip text={chargeTip} />}
             />
           </ParamRow>
-          {applies && charge > 0 && (
+          {applies && !chargeRoundsToZero(charge) && (
             <p role="note" className="m-0 flex items-start gap-1.5 rounded bg-pd-warn-bg px-2 py-1.5 text-[11px] font-medium leading-snug text-pd-warn-text">
               <span>{GRID_USE_CHARGE_ESTIMATE_NOTICE} {factory.resolutionCode}, {factory.period}.</span>
               <InfoTip text={chargeTip} />

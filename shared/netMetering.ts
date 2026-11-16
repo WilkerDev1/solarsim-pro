@@ -115,6 +115,17 @@ export function resolveNetMetering(rates: NetMeteringRatesInput | null | undefin
   };
 }
 
+/** Texto del campo del dock → cargo acotado; `undefined` si aún no es un número (vacío, «.», «-»): no se guarda. */
+export function parseGridUseChargeInput(text: string): number | undefined {
+  const trimmed = text.trim();
+  return trimmed === '' ? undefined : clampGridUseCharge(Number(trimmed));
+}
+
+/** ¿El cargo se imprime como RD$0.00? Por debajo de medio centavo cuenta como sin cargo en la nota y en el dock. */
+export function chargeRoundsToZero(dopPerKWh: number): boolean {
+  return !(Math.round(dopPerKWh * 100) > 0);
+}
+
 /** Acota un cargo editado al rango válido; `undefined` si no es un número finito (se descarta). */
 export function clampGridUseCharge(value: unknown): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
@@ -124,25 +135,30 @@ export function clampGridUseCharge(value: unknown): number | undefined {
 /**
  * Cargo por uso de la red tras un cambio de tarifas (edición del dock o de agentes y borrador de IA sobre una propuesta).
  * Regla única, pura:
+ * 0. Un `gridUseChargeDOPPerKWh: undefined` en el cambio es «sin cambio» (no hay contrato de borrado).
  * 1. Un cargo en el propio cambio manda, acotado a 0–100; si no es un número finito se descarta (queda el anterior).
  * 2. Al cambiar de distribuidora, un cargo guardado igual al de fábrica de la anterior (no editado a mano) pasa al de la
  *    nueva, en cualquier régimen: así volver después a SIE-007 no arrastra el de la distribuidora anterior.
- * 3. En `sie007_2026`, sin cargo válido guardado se siembra el de fábrica. El régimen anterior no gana el campo.
+ * 3. En `sie007_2026`, sin cargo válido guardado se siembra el de fábrica.
+ * 4. El régimen anterior no gana el campo: si antes no existía, queda sin él (aunque el cambio traiga un cargo).
  */
 export function reconcileGridUseCharge<R extends NetMeteringRatesInput>(before: R, after: R, change: Partial<NetMeteringRatesInput>): R {
-  let next = after;
-  if (change.gridUseChargeDOPPerKWh !== undefined) {
-    const clamped = clampGridUseCharge(change.gridUseChargeDOPPerKWh);
-    if (clamped !== undefined) return { ...next, gridUseChargeDOPPerKWh: clamped };
-    next = { ...next, gridUseChargeDOPPerKWh: before.gridUseChargeDOPPerKWh };
-  }
+  const withCharge = (rates: R, charge: number | null | undefined): R => {
+    const { gridUseChargeDOPPerKWh: _drop, ...rest } = rates;
+    return (charge === undefined ? rest : { ...rest, gridUseChargeDOPPerKWh: charge }) as R;
+  };
+  let next = withCharge(after, before.gridUseChargeDOPPerKWh);
+  const legacyWithoutField = resolveNetMeteringRegime(next.netMeteringRegime) !== 'sie007_2026' && before.gridUseChargeDOPPerKWh === undefined;
+  if (legacyWithoutField) return next;
+  const explicit = clampGridUseCharge(change.gridUseChargeDOPPerKWh);
+  if (explicit !== undefined) return withCharge(next, explicit);
   const stored = next.gridUseChargeDOPPerKWh;
   const distributorChanged = change.distributor !== undefined && change.distributor !== before.distributor;
   if (distributorChanged && isValidGridUseCharge(stored) && stored === factoryGridUseCharge(before.distributor).dopPerKWh) {
-    next = { ...next, gridUseChargeDOPPerKWh: factoryGridUseCharge(next.distributor).dopPerKWh };
+    next = withCharge(next, factoryGridUseCharge(next.distributor).dopPerKWh);
   }
   if (resolveNetMeteringRegime(next.netMeteringRegime) === 'sie007_2026' && !isValidGridUseCharge(next.gridUseChargeDOPPerKWh)) {
-    next = { ...next, gridUseChargeDOPPerKWh: factoryGridUseCharge(next.distributor).dopPerKWh };
+    next = withCharge(next, factoryGridUseCharge(next.distributor).dopPerKWh);
   }
   return next;
 }

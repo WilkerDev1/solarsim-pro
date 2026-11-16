@@ -5,7 +5,7 @@ import { migrateLegacySpecs } from '../../shared/equipment';
 import { resolveAssumptions } from '../../shared/assumptions';
 import {
   FACTORY_GRID_USE_CHARGES, NEW_PROPOSAL_NET_METERING_REGIME, SAVED_PROPOSAL_NET_METERING_REGIME, gridUseChargeApplies,
-  resolveNetMetering, resolveNetMeteringRegime,
+  chargeRoundsToZero, parseGridUseChargeInput, resolveNetMetering, resolveNetMeteringRegime,
 } from '../../shared/netMetering';
 import { regulatoryNoteDefault } from '../../shared/documentTexts';
 import { createDocumentTextContext } from '../../shared/documentTexts/context';
@@ -260,12 +260,38 @@ assert.equal(chain.rates.gridUseChargeDOPPerKWh, 4.02);
 // Cambiar la distribuidora impresa del cliente (client.distributor) no toca el cargo: el cálculo lee rates.distributor.
 assert.equal(applyProjectEdit(sieEdit, { kind: 'client', patch: { distributor: 'EDENORTE' } }, ctx).rates.gridUseChargeDOPPerKWh, 3.5);
 
+// 16b. El régimen anterior no gana el campo (ni con un cargo en el mismo cambio) salvo que ya existiera.
+const legacyNoField = applyProjectEdit(project({ distributor: 'EDESUR' }), { kind: 'rates', patch: { netMeteringRegime: 'legacy_retention', gridUseChargeDOPPerKWh: 5 } }, ctx);
+assert.equal('gridUseChargeDOPPerKWh' in legacyNoField.rates && legacyNoField.rates.gridUseChargeDOPPerKWh !== undefined, false, 'régimen anterior sin campo: no lo gana');
+assert.equal(applyProjectEdit(project({ distributor: 'EDESUR', gridUseChargeDOPPerKWh: 3 }), { kind: 'rates', patch: { gridUseChargeDOPPerKWh: 5 } }, ctx).rates.gridUseChargeDOPPerKWh, 5, 'régimen anterior con campo existente: se edita');
+// Un borrador nuevo en el régimen anterior no hereda el cargo de la plantilla base.
+const baseWithCharge = { ...draftBase, rates: { ...draftBase.rates, gridUseChargeDOPPerKWh: 3.3 } };
+assert.equal(prepareProposalDraftProject(baseWithCharge, legacyDraft, DEFAULT_RD_TARIFF_MATRIX, { isNew: true }).rates.gridUseChargeDOPPerKWh, undefined, 'borrador nuevo anterior: sin cargo heredado');
+assert.equal(prepareProposalDraftProject(baseWithCharge, draft, DEFAULT_RD_TARIFF_MATRIX, { isNew: true }).rates.gridUseChargeDOPPerKWh, 4.02, 'borrador nuevo SIE-007: cargo de fábrica, no el de la plantilla');
+// 16c. Un `gridUseChargeDOPPerKWh: undefined` explícito es «sin cambio»: no borra un cargo manual ni lo resiembra.
+const manual = project({ distributor: 'EDESUR', netMeteringRegime: 'sie007_2026', gridUseChargeDOPPerKWh: 3.3 });
+assert.equal(applyProjectEdit(manual, { kind: 'rates', patch: { distributor: 'EDENORTE', gridUseChargeDOPPerKWh: undefined } }, ctx).rates.gridUseChargeDOPPerKWh, 3.3);
+assert.equal(applyProjectEdit(manual, { kind: 'rates', patch: { targetCoveragePct: 90, gridUseChargeDOPPerKWh: undefined } }, ctx).rates.gridUseChargeDOPPerKWh, 3.3);
+
 // 17. (E) Nota SIE-007 con inyección cero o con cargo 0: sin «RD$0.00 por kWh… estimado».
 const zeroExportNote = regulatoryNoteDefault(createDocumentTextContext({ distributor: 'EDESUR', tariffCode: 'BTS1', isZeroExport: true, netMeteringRegime: 'sie007_2026', gridUseChargeDOPPerKWh: 3.78 })).split('\n\n')[3];
 assert.ok(zeroExportNote.includes('inyección cero') && !zeroExportNote.includes('por kWh inyectado'), zeroExportNote);
 const zeroChargeNote = regulatoryNoteDefault(createDocumentTextContext({ distributor: 'EDESUR', tariffCode: 'BTS1', netMeteringRegime: 'sie007_2026', gridUseChargeDOPPerKWh: 0 })).split('\n\n')[3];
 assert.ok(!zeroChargeNote.includes('RD$0.00') && !zeroChargeNote.includes('estimado'), zeroChargeNote);
 assert.ok(zeroChargeNote.includes('no considera'), zeroChargeNote);
+
+// 17b. Un cargo positivo que redondea a 0.00 se trata como 0 (mismo umbral en la nota y en el dock).
+const tinyNote = regulatoryNoteDefault(createDocumentTextContext({ distributor: 'EDESUR', tariffCode: 'BTS1', netMeteringRegime: 'sie007_2026', gridUseChargeDOPPerKWh: 0.004 })).split('\n\n')[3];
+assert.ok(!tinyNote.includes('RD$0.00') && tinyNote.includes('no considera'), tinyNote);
+assert.equal(chargeRoundsToZero(0.004), true);
+assert.equal(chargeRoundsToZero(0.005), false);
+assert.equal(chargeRoundsToZero(0), true);
+// (9) Texto del campo del dock: vacío o a medio escribir no se guarda (no se convierte en 0 en silencio).
+for (const text of ['', ' ', '.', '-', 'abc']) assert.equal(parseGridUseChargeInput(text), undefined, JSON.stringify(text));
+assert.equal(parseGridUseChargeInput('3.'), 3);
+assert.equal(parseGridUseChargeInput('0'), 0);
+assert.equal(parseGridUseChargeInput('-4'), 0);
+assert.equal(parseGridUseChargeInput('250'), 100);
 
 // 18. (K) Las herramientas de catálogo no pueden editar el régimen ni el cargo.
 assert.throws(() => validateAssistantEdits([{ section: 'equipment', field: 'netMeteringRegime', value: 'sie007_2026' }], 'equipment'));

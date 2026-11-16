@@ -95,7 +95,11 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
       ...(data.netMeteringRegime?{netMeteringRegime:data.netMeteringRegime}:createNewProject?{netMeteringRegime:NEW_PROPOSAL_NET_METERING_REGIME}:{}),
     };
     // Cargo por uso de la red: la misma regla que la edición (cargo explícito, cambio de distribuidora, siembra en SIE-007).
-    const rates=reconcileGridUseCharge(base.rates,draftRates,{distributor:data.distributor,gridUseChargeDOPPerKWh:data.gridUseChargeDOPPerKWh});
+    // Un borrador nuevo no hereda el cargo de la plantilla base: parte sin él.
+    const {gridUseChargeDOPPerKWh:_templateCharge,...templateRates}=base.rates;
+    const before=createNewProject?templateRates as typeof base.rates:base.rates;
+    const {gridUseChargeDOPPerKWh:_draftCharge,...draftRatesWithoutCharge}=draftRates;
+    const rates=reconcileGridUseCharge(before,createNewProject?draftRatesWithoutCharge as typeof draftRates:draftRates,{distributor:data.distributor,gridUseChargeDOPPerKWh:data.gridUseChargeDOPPerKWh});
   return {...base,specs:enforceAutomatedPricing(specs),rates,client:{...base.client,province},monthlyConsumption:[...data.monthlyConsumptionKWh],financials:{...base.financials,...(data.commercial?.pricePerWattUSD!==undefined?{pricePerWattUSD:data.commercial.pricePerWattUSD}:{}),...(data.commercial?.customItems!==undefined?{customItems:structuredClone(data.commercial.customItems)}:{}),...(data.commercial?.customDiscounts!==undefined?{customDiscounts:structuredClone(data.commercial.customDiscounts)}:{})}};
 }
 

@@ -1,7 +1,7 @@
 import { getTariffDisplayName } from '../proposalPresentation';
 import type { DocumentTextContext } from './context';
 import { tariffChargeKind } from '../tariffRules';
-import { factoryGridUseCharge, isValidGridUseCharge, resolveNetMeteringRegime } from '../netMetering';
+import { chargeRoundsToZero, factoryGridUseCharge, isValidGridUseCharge, resolveNetMeteringRegime } from '../netMetering';
 import { resolveDynamicProjectSummaryParagraph1, resolveDynamicProjectSummaryParagraph2 } from './projectSummary';
 
 const kwh = (value: number) => value.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -52,7 +52,7 @@ function sie007GridUseChargeParagraph(ctx: DocumentTextContext, distributor: str
   }
   const factory = factoryGridUseCharge(distributor);
   const charge = isValidGridUseCharge(ctx.gridUseChargeDOPPerKWh) ? ctx.gridUseChargeDOPPerKWh : factory.dopPerKWh;
-  if (charge === 0) {
+  if (chargeRoundsToZero(charge)) {
     return `Para la tarifa ${tariffDisplayName}, el análisis económico no considera cargo por derecho de uso de la red sobre la energía inyectada, aunque el Reglamento de Generación Distribuida (Resolución SIE-007-2026-REG, art. 19.1.e) lo prevé para las tarifas de un solo precio. El sistema se diseña para maximizar el autoconsumo y optimizar la inyección de energía, obteniendo así el mayor retorno de inversión posible.${batteryHint}`;
   }
   const source = charge === factory.dopPerKWh ? ` (Resolución ${factory.resolutionCode}, ${factory.period})` : '';
