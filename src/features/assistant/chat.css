@@ -664,3 +664,8 @@ label.assistant-icon { cursor: pointer; }
   .chat-dots i { opacity: 0.8; }
   .chat-composer-box, .proposal-digest-chevron { transition: none; }
 }
+
+/* Vista del documento: la barra de edición fija ocupa ~64–136px desde arriba (cabecera 64 + padding 32 + barra);
+   el panel deja ese margen para no taparla. */
+.assistant-widget-below-toolbar .assistant-widget-panel,
+.assistant-widget-below-toolbar .assistant-widget-panel.assistant-expanded { height: min(620px, calc(100dvh - 180px)); min-height: 300px; }

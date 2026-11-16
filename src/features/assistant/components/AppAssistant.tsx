@@ -29,9 +29,12 @@ const GLOBAL_SUGGESTIONS = ['Muestra mis propuestas más recientes', 'Busca bate
 function AssistantPanel({
   projectId,
   transport,
+  belowToolbar,
 }: {
   projectId?: string;
   transport?: GeminiTransport;
+  /** En la vista del documento el panel se limita en alto para no tapar la barra de edición fija. */
+  belowToolbar?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -59,7 +62,7 @@ function AssistantPanel({
   if (blocked) return null;
   return (
     // data-pdf-chrome: en la vista del documento el chat nunca se imprime ni se exporta.
-    <div className="assistant-widget" data-pdf-chrome="">
+    <div className={`assistant-widget${belowToolbar ? ' assistant-widget-below-toolbar' : ''}`} data-pdf-chrome="">
       {!open ? (
         <button
           className="assistant-fab"
@@ -233,6 +236,7 @@ export function AppAssistant({
     <AssistantPanel
       key={`${assistantOwner()}|${projectId || 'global'}`}
       projectId={projectId}
+      belowToolbar={state.activeView === 'pdf-preview'}
       transport={transport}
     />
   );

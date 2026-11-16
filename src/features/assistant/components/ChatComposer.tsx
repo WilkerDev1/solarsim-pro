@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, Check, FileText, Paperclip, Sparkles, Square, X } from 'lucide-react';
-import { composerKeyAction, useAutoGrow } from '../chatUi';
+import { composerDropEffect, composerKeyAction, leavesContainer, shouldRefocusComposer, useAutoGrow } from '../chatUi';
 
 export interface ComposerAttachment { key: string; name: string; onRemove: () => void }
 
@@ -35,11 +35,15 @@ export function ChatComposer(props: ComposerProps) {
   const files = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   useAutoGrow(input, props.value);
-  // El campo se deshabilita durante la respuesta; al terminar, el foco vuelve a él si no quedó en otro control.
+  // Al terminar una respuesta (busy: true → false) el foco vuelve al campo si no quedó en otro control.
+  // El montaje no enfoca: de eso se ocupa quien abre el panel.
+  const wasBusy = useRef(props.busy);
   useEffect(() => {
-    if (props.busy) return;
+    const previous = wasBusy.current;
+    wasBusy.current = props.busy;
+    if (!shouldRefocusComposer(previous, props.busy)) return;
     const active = document.activeElement;
-    if (!active || active === document.body) input.current?.focus({ preventScroll: true });
+    if (!active || active === document.body || active === input.current) input.current?.focus({ preventScroll: true });
   }, [props.busy, input]);
   const hintId = `${props.id}-hint`;
   const submit = () => { if (props.canSend && !props.busy) props.onSubmit(); };
@@ -47,9 +51,19 @@ export function ChatComposer(props: ComposerProps) {
     <form
       className="chat-composer"
       onSubmit={(e) => { e.preventDefault(); submit(); }}
-      onDragOver={(e) => { if (props.busy || props.attachDisabled) return; e.preventDefault(); setDragging(true); }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={(e) => { e.preventDefault(); setDragging(false); if (!props.busy && !props.attachDisabled && e.dataTransfer.files.length) props.onPickFiles(Array.from(e.dataTransfer.files)); }}
+      // Siempre se consume arrastrar/soltar: en Electron un archivo soltado sin preventDefault navega la ventana.
+      onDragOver={(e) => {
+        e.preventDefault();
+        const effect = composerDropEffect({ busy: props.busy, attachDisabled: props.attachDisabled });
+        e.dataTransfer.dropEffect = effect;
+        setDragging(effect === 'copy');
+      }}
+      onDragLeave={(e) => { if (leavesContainer(e.currentTarget, e.relatedTarget as Node | null)) setDragging(false); }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragging(false);
+        if (composerDropEffect({ busy: props.busy, attachDisabled: props.attachDisabled }) === 'copy' && e.dataTransfer.files.length) props.onPickFiles(Array.from(e.dataTransfer.files));
+      }}
     >
       {props.notices}
       <div className="chat-composer-box" data-dragging={dragging || undefined} data-busy={props.busy || undefined}>
@@ -113,7 +127,7 @@ export function ChatThinking({ label, detail, steps = [], elapsed }: { label: st
         <p className="chat-thinking-label">
           <span className="chat-dots" aria-hidden><i /><i /><i /></span>
           {label}
-          {elapsed !== undefined && elapsed >= 3 && <span className="chat-thinking-time"> · {elapsed} s</span>}
+          {elapsed !== undefined && elapsed >= 3 && <span className="chat-thinking-time" aria-hidden="true"> · {elapsed} s</span>}
         </p>
         {steps.length > 0 && (
           <ol className="chat-steps" aria-label="Pasos">
