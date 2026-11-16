@@ -291,6 +291,9 @@ test("token de lectura: consulta y nunca escribe ni obtiene sesión", async () =
   assert.equal((await asAgent("GET", "/api/clients", token)).status, 200);
   assert.equal((await asAgent("GET", "/api/equipment", token)).status, 200);
   assert.equal((await asAgent("GET", "/api/tariffs", token)).status, 200);
+  const me = await asAgent("GET", "/api/agent-access/whoami", token);
+  assert.equal(me.body.scope, "read");
+  assert.equal(me.body.role, "LECTOR", "a read grant acts as LECTOR");
   const write = await asAgent("PUT", "/api/clients/client-x", token, {
     name: "X",
     baseVersion: 0,
@@ -349,6 +352,23 @@ test("token de escritura: clientes y enlaces con CAS; papelera de solo lectura; 
   );
   assert.equal(link.status, 200);
   assert.equal(link.body.project.clientId, "client-agent-1");
+  const byClient = await asAgent(
+    "GET",
+    "/api/projects?clientId=client-agent-1",
+    token,
+  );
+  assert.deepEqual(
+    byClient.body.projects.map((p: any) => p.id),
+    ["agent-p1"],
+  );
+  const who = await asAgent("GET", "/api/agent-access/whoami", token);
+  assert.equal(who.body.scope, "write");
+  assert.equal(who.body.role, "EDITOR");
+  assert.equal(
+    (await request("GET", "/api/agent-access/whoami", editor.token)).status,
+    401,
+    "whoami is for agent tokens only",
+  );
   assert.equal(link.body.project.client.name, "Ferretería Solar");
   const again = await asAgent(
     "PUT",

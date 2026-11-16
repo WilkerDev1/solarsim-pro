@@ -531,11 +531,13 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
       50,
     );
     const pattern = `%${query.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
+    const clientId = (c.req.query("clientId") ?? "").slice(0, 64);
     const rows = await pool.query<ProjectRow>(
       `SELECT * FROM projects WHERE organization_id=$1 AND is_deleted=FALSE
        AND ($2='' OR client_name ILIKE $3 OR project_code ILIKE $3 OR COALESCE(data_json->'client'->>'province','') ILIKE $3)
+       AND ($5='' OR data_json->>'clientId'=$5)
        ORDER BY updated_at DESC, id LIMIT $4`,
-      [user.organizationId, query, pattern, limit],
+      [user.organizationId, query, pattern, limit, clientId],
     );
     return c.json({
       success: true,

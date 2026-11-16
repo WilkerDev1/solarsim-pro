@@ -1,5 +1,5 @@
 // Contract shared by the in-app assistants and the local MCP bridge. Pure TypeScript: no app or Node imports.
-import type { AgentCard, AgentCardType } from '../agentCards';
+import type { AgentCard, AgentCardType } from '../agentCards.js';
 
 /**
  * - `read`: consulta sin efectos.

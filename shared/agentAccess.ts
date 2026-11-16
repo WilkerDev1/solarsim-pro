@@ -42,6 +42,15 @@ export interface AgentAccessStatus {
   mcpUrl?: string;
 }
 
+/** Identidad de un token de agente (`GET /api/agent-access/whoami`): valida el token y fija las herramientas visibles. */
+export interface AgentIdentity {
+  scope: AgentScope;
+  /** Rol efectivo: LECTOR si el alcance es `read`. */
+  role: 'ADMIN' | 'EDITOR' | 'LECTOR';
+  userName: string;
+  organizationName?: string;
+}
+
 export interface AgentActivityEntry {
   id: string;
   userName: string;
@@ -66,6 +75,7 @@ export interface AgentRoute {
  * organización, publique, borre o envíe a papelera. Las escrituras son las de las herramientas `draft` remotas.
  */
 export const AGENT_ROUTES: readonly AgentRoute[] = [
+  { method: 'GET', path: '/api/agent-access/whoami', scope: 'read' },
   { method: 'GET', path: '/api/projects', scope: 'read' },
   { method: 'GET', path: '/api/projects/:id', scope: 'read' },
   { method: 'GET', path: '/api/clients', scope: 'read' },

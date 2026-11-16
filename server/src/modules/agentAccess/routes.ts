@@ -9,6 +9,7 @@ import {
   scopeAllows,
   type AgentAccessStatus,
   type AgentActivityEntry,
+  type AgentIdentity,
 } from "../../../../shared/agentAccess.js";
 import { FixedWindowLimiter } from "../../../../shared/fixedWindowLimiter.js";
 import { isAdminRole } from "../../../../shared/permissions.js";
@@ -126,6 +127,18 @@ export function registerAgentAccessRoutes(
       ...(config.enabled ? { mcpUrl: config.mcpUrl } : {}),
     };
     return c.json({ success: true, ...status });
+  });
+  /** Only for agent tokens: lets the MCP service validate a bearer and pick the tools it may list. */
+  app.get("/api/agent-access/whoami", async (c) => {
+    const user = await authenticate(c);
+    if (!user?.agent) return c.json({ error: "No autorizado" }, 401);
+    const identity: AgentIdentity = {
+      scope: user.agent.scope,
+      role: user.role,
+      userName: user.name,
+      organizationName: user.organizationName,
+    };
+    return c.json({ success: true, ...identity });
   });
   app.get("/api/agent-access/grants", async (c) => {
     const user = await sessionUser(c);
