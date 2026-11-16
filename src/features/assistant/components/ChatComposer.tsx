@@ -26,6 +26,8 @@ interface ComposerProps {
   footer?: React.ReactNode;
   /** Avisos sobre el compositor (errores, ajustes pendientes). */
   notices?: React.ReactNode;
+  /** Recibe una función que abre el selector de archivos (para acciones fuera del compositor, como «Adjuntar factura»). */
+  pickerRef?: React.MutableRefObject<(() => void) | null>;
 }
 
 /** Compositor tipo chat: fichas de adjuntos dentro, área que crece, adjuntar como icono y enviar circular. */
@@ -35,6 +37,12 @@ export function ChatComposer(props: ComposerProps) {
   const files = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   useAutoGrow(input, props.value);
+  const { pickerRef } = props;
+  useEffect(() => {
+    if (!pickerRef) return;
+    pickerRef.current = () => { if (!props.busy && !props.attachDisabled) files.current?.click(); };
+    return () => { pickerRef.current = null; };
+  }, [pickerRef, props.busy, props.attachDisabled]);
   // Al terminar una respuesta (busy: true → false) el foco vuelve al campo si no quedó en otro control.
   // El montaje no enfoca: de eso se ocupa quien abre el panel.
   const wasBusy = useRef(props.busy);

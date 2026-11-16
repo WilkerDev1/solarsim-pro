@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { composerKeyAction, toolStepLabel, createStickController, fitTextarea, composerDropEffect, leavesContainer, shouldRefocusComposer } from '../features/assistant/chatUi';
+import { offsetWithin, resendStep, composerKeyAction, toolStepLabel, createStickController, fitTextarea, composerDropEffect, leavesContainer, shouldRefocusComposer } from '../features/assistant/chatUi';
 import { ChatComposer, ChatThinking, ChatSuggestions } from '../features/assistant/components/ChatComposer';
 import { ChatMessage } from '../features/assistant/components/ChatMessage';
 
@@ -22,7 +22,7 @@ assert.match(empty, /aria-label="Adjuntar archivos"/);
 const sendTag = (html: string) => html.match(/<button[^>]*aria-label="Enviar mensaje"[^>]*>/)?.[0] || '';
 assert.match(sendTag(empty), /type="submit"/);
 assert.match(sendTag(empty), /\sdisabled=""/, 'send disabled without text, whatever the attribute order');
-assert.match(empty, /Escribe un mensaje o adjunta un archivo\./, 'disabled reason is visible text, not only a dimmed button');
+assert.match(empty, /Escribe un mensaje o adjunta un archivo\./, 'disabled reason is exposed as text (screen-reader only), not only a dimmed button');
 const withFiles = renderToStaticMarkup(React.createElement(ChatComposer, { ...base, value: 'Hola', busy: false, canSend: true, attachments: [{ key: 'a', name: 'factura.pdf', onRemove() {} }] }));
 assert.match(withFiles, /factura\.pdf/);
 assert.match(withFiles, /Enter envía · Shift\+Enter salta línea/, 'keyboard hint when sending is possible');
@@ -73,6 +73,33 @@ assert.match(timed, /<span[^>]*aria-hidden="true"[^>]*>[^<]*12 s<\/span>|<span[^
   end.beginProgrammatic(0);
   end.endProgrammatic();
   assert.equal(end.onScroll(m(700), 50), true, 'scrollend releases the guard');
+}
+
+// 6b. A tall reply anchored by its start leaves the controller unstuck: the next dependency change must not drag the view down.
+{
+  const m = (top: number) => ({ scrollTop: top, scrollHeight: 4000, clientHeight: 500 });
+  const c = createStickController();
+  c.beginProgrammatic(0, false);
+  assert.equal(c.stuck, false, 'anchoring at the start is not following the bottom');
+  assert.equal(c.onScroll(m(1200), 50), null, 'the programmatic scroll event is still ignored');
+  assert.equal(c.stuck, false);
+  assert.equal(c.onScroll(m(3500), 5000), false, 'reaching the bottom later re-anchors');
+  assert.equal(c.stuck, true);
+}
+
+// 6c. Position inside the scroller does not depend on offsetParent.
+{
+  const box = (top: number, scrollTop = 0) => ({ getBoundingClientRect: () => ({ top }), scrollTop });
+  assert.equal(offsetWithin(box(100, 300), box(450)), 650, 'viewport distance plus the scroll already consumed');
+  assert.equal(offsetWithin(box(100, 0), box(100)), 0);
+}
+
+// 6d. Retry steps: send when the field shows the text, drop when it was transformed or edited, wait while busy.
+{
+  assert.equal(resendStep(null, 'x', false), 'wait');
+  assert.equal(resendStep('hola', 'hola', false), 'send');
+  assert.equal(resendStep('hola', 'Hola.', false), 'drop', 'a transformed prompt is never sent on its own later');
+  assert.equal(resendStep('hola', 'hola', true), 'wait');
 }
 
 // 7. Textarea fit: height and overflow come from one helper (also used on panel resize).

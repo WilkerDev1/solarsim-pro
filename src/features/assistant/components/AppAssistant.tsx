@@ -49,15 +49,16 @@ function AssistantPanel({
   const wasBusy = useRef(false);
   const [threadError, setThreadError] = useState('');
   useEffect(() => {
-    if (wasBusy.current && !ai.busy && ai.error) setThreadError(ai.error);
+    // El error más reciente manda: uno nuevo fuera de una consulta (adjunto rechazado) sustituye al turno de error anterior.
     if (ai.busy || !ai.error) setThreadError('');
+    else setThreadError(wasBusy.current ? ai.error : '');
     wasBusy.current = ai.busy;
   }, [ai.busy, ai.error]);
   const resend = useResend(ai.prompt, ai.setPrompt, () => void ai.send(), ai.busy);
   const lastUser = [...ai.messages].reverse().find((m) => m.role === 'user');
   const retry = lastUser ? () => resend(reusableUserText(lastUser.text)) : undefined;
   const lastAssistantIndex = ai.messages.map((m) => m.role).lastIndexOf('assistant');
-  const announcement = useChatAnnouncement(ai.busy, () => 'Respuesta lista.');
+  const announcement = useChatAnnouncement(ai.busy, () => ai.messages[ai.messages.length - 1]?.role === 'user' && !ai.error ? 'Respuesta detenida.' : 'Respuesta lista.');
   useEffect(() => {
     if (open) input.current?.focus();
   }, [open]);

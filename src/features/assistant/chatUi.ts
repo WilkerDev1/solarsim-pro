@@ -75,6 +75,11 @@ export function replyScrollTarget(turnHeight: number, viewportHeight: number): '
   return turnHeight > viewportHeight - 24 ? 'start' : 'end';
 }
 
+/** Posición de `child` dentro del contenido desplazable de `scroller`, sin depender de cuál sea su `offsetParent`. */
+export function offsetWithin(scroller: { getBoundingClientRect(): { top: number }; scrollTop: number }, child: { getBoundingClientRect(): { top: number } }): number {
+  return child.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+}
+
 export interface ScrollMetrics { scrollTop: number; scrollHeight: number; clientHeight: number }
 /** Respaldo si el navegador no emite `scrollend` tras un desplazamiento suave. */
 const PROGRAMMATIC_SCROLL_MS = 700;
@@ -91,7 +96,8 @@ export function createStickController() {
   let guardUntil = -1;
   return {
     get stuck() { return stuck; },
-    beginProgrammatic(now: number) { guardUntil = now + PROGRAMMATIC_SCROLL_MS; stuck = true; },
+    /** `stick: false` ancla por el inicio de una respuesta alta: el desplazamiento es programático pero la vista no sigue al final. */
+    beginProgrammatic(now: number, stick = true) { guardUntil = now + PROGRAMMATIC_SCROLL_MS; stuck = stick; },
     endProgrammatic() { guardUntil = -1; },
     userIntent() { guardUntil = -1; },
     onScroll(m: ScrollMetrics, now: number): boolean | null {
@@ -129,16 +135,22 @@ export function useStickToBottom(ref: RefObject<HTMLElement>, deps: unknown[]) {
     setAway(false);
   }, [ref]);
   // Rueda, toque, teclado o puntero durante la animación devuelven el control al usuario; scrollend la cierra.
+  // El elemento puede montarse después (panel cerrado al inicio): se comprueba en cada render y sólo se reengancha si cambió.
+  const attached = useRef<{ el: HTMLElement; detach: () => void } | null>(null);
   useEffect(() => {
     const el = ref.current;
+    if (attached.current?.el === el) return;
+    attached.current?.detach();
+    attached.current = null;
     if (!el) return;
     const intent = () => controller.current.userIntent();
     const end = () => controller.current.endProgrammatic();
     const events = ['wheel', 'touchstart', 'keydown', 'pointerdown'] as const;
     events.forEach((name) => el.addEventListener(name, intent, { passive: true }));
     el.addEventListener('scrollend', end);
-    return () => { events.forEach((name) => el.removeEventListener(name, intent)); el.removeEventListener('scrollend', end); };
-  }, [ref]);
+    attached.current = { el, detach: () => { events.forEach((name) => el.removeEventListener(name, intent)); el.removeEventListener('scrollend', end); } };
+  });
+  useEffect(() => () => { attached.current?.detach(); attached.current = null; }, []);
   // Una respuesta nueva más alta que la vista se ancla por su inicio (lo que explica qué pasó); el resto sigue al final.
   const replies = useRef(-1);
   useEffect(() => {
@@ -150,8 +162,9 @@ export function useStickToBottom(ref: RefObject<HTMLElement>, deps: unknown[]) {
     if (!el || !controller.current.stuck) return;
     const last = turns?.[count - 1];
     if (isNewReply && last && replyScrollTarget(last.offsetHeight, el.clientHeight) === 'start') {
-      controller.current.beginProgrammatic(Date.now());
-      el.scrollTo({ top: Math.max(0, last.offsetTop - 12), behavior: 'auto' });
+      // Desanclado a propósito: el siguiente cambio (p. ej. busy → false) no debe arrastrar la vista al final.
+      controller.current.beginProgrammatic(Date.now(), false);
+      el.scrollTo({ top: Math.max(0, offsetWithin(el, last) - 12), behavior: 'auto' });
       setAway(true);
       return;
     }
@@ -161,22 +174,30 @@ export function useStickToBottom(ref: RefObject<HTMLElement>, deps: unknown[]) {
   return { onScroll, away, scrollToBottom, controller };
 }
 
+/** Paso del reintento: enviar cuando el campo ya refleja el texto; descartar si cambió (transformado o editado). */
+export function resendStep(pending: string | null, prompt: string, busy: boolean): 'send' | 'drop' | 'wait' {
+  if (pending === null || busy) return 'wait';
+  return prompt === pending ? 'send' : 'drop';
+}
+
 /**
  * Reintentar con el envío existente: pone el texto en el compositor y, cuando el estado ya lo refleja,
- * llama al mismo `send` que el botón Enviar (sin lógica de servicio nueva).
+ * llama al mismo `send` que el botón Enviar (sin lógica de servicio nueva). Si el campo no queda con ese
+ * texto (lo transformó `setPrompt` o la persona lo editó) el reintento se descarta: nunca se envía solo después.
  */
 export function useResend(prompt: string, setPrompt: (text: string) => void, send: () => void, busy: boolean) {
-  const pending = useRef<string | null>(null);
+  const [pending, setPending] = useState<string | null>(null);
   useEffect(() => {
-    if (pending.current === null || busy || prompt !== pending.current) return;
-    pending.current = null;
-    send();
+    const step = resendStep(pending, prompt, busy);
+    if (step === 'wait') return;
+    setPending(null);
+    if (step === 'send') send();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prompt, busy]);
+  }, [pending, prompt, busy]);
   return (text: string) => {
     if (busy) return;
     if (prompt === text) { send(); return; }
-    pending.current = text;
+    setPending(text);
     setPrompt(text);
   };
 }
