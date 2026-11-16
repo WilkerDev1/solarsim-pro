@@ -29,6 +29,20 @@ Los logotipos personalizados admiten imágenes PNG, JPEG, WebP o GIF en base64 y
 
 Los textos editados en el documento viajan como cadenas `doc:<clave>` dentro de `customization` (solo claves del registro `shared/documentTexts`, hasta 10 000 caracteres). El visor prefiere `doc:<clave>`, luego el campo heredado y por último el texto por defecto compartido, así que los enlaces anteriores siguen renderizándose igual. Ver [docs/PROPOSAL_DOCUMENT_EDITOR.md](../../docs/PROPOSAL_DOCUMENT_EDITOR.md).
 
+## Tema claro y oscuro
+
+`theme.ts` es la única fuente de colores de la propuesta web: cada token tiene valor claro y oscuro. La paleta de Tailwind que usa la plantilla (`slate`, `sky`, `orange`, `amber`, `emerald`, `red`, `rose`, `blue`) se reasigna a variables CSS mediante `tailwind.config`, así que cualquier clase (`text-sky-700`, `bg-orange-50/70`) sigue el tema sin variantes `dark:`. Superficies y cabeceras de tabla usan roles propios (`bg-page`, `bg-surface`, `bg-zebra`, `bg-head`, `text-on-head`, `bg-tile`); no se escriben colores sueltos (`bg-white`, `bg-[#…]`, hex en CSS, SVG o gráficos). Los gráficos leen `--chart-*` y se repintan al cambiar de tema o al imprimir; el diagrama de flujo usa `--ef-*` mediante `PALETTE`, `FLOW_HEX` y sus clases, por lo que un nodo nuevo hereda el tema. Los logotipos nunca se invierten: en oscuro van sobre una placa blanca, porque el encabezado web se prepara sobre fondo blanco.
+
+El tema sigue `prefers-color-scheme`; un botón discreto de la cabecera alterna automático, claro y oscuro y guarda la elección en `localStorage` (con `try/catch`; sin JavaScript no aparece). Un script en `<head>` aplica la elección antes de pintar. La impresión sale siempre en claro. `tests/darkTheme.test.ts` fija los esquemas declarados, la ausencia de colores fijos, el contraste AA del tema oscuro y el conmutador.
+
+Señales para que los navegadores que oscurecen páginas a la fuerza respeten el tema propio:
+
+- `<meta name="color-scheme" content="light dark">`: Chromium (Chrome Android, Edge, Opera, Brave) no aplica su oscurecido automático si la página declara tema oscuro y lo está usando. Mientras se ve el tema claro, `:root` declara `color-scheme: only light`, la exclusión documentada de [Auto Dark Theme](https://developer.chrome.com/blog/auto-dark-theme).
+- Samsung Internet admite `prefers-color-scheme` y la meta `color-scheme` desde 13.2 ([blog de Samsung](https://developer.samsung.com/internet/blog/en/2020/12/15/dark-mode-in-samsung-internet)), pero según su [foro de desarrolladores](https://forum.developer.samsung.com/t/websites-dark-mode-gets-overridden-by-samsung-internets-dark-mode/22937) solo la respeta con la opción «Usar el tema oscuro del sitio web» (Labs) activada.
+- `<meta name="darkreader-lock">` desactiva Dark Reader en la página ([CONTRIBUTING de Dark Reader](https://github.com/darkreader/darkreader/blob/main/CONTRIBUTING.md)).
+
+Limitación conocida: con el flag de escritorio de Chromium `WebContentsForceDark` y el sistema en claro, el navegador oscurece igualmente el tema claro (ignora `only light`); el lector puede elegir el tema oscuro con el conmutador.
+
 ## Verificación local
 
 Desde la raíz del repositorio:
