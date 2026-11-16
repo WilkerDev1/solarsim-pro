@@ -20,7 +20,7 @@ Las dos interfaces internas se mantienen separadas, pero comparten herramientas,
 | Estado | `src/store/slices/agentSlice.ts` | Política por dispositivo, actividad por espacio (máx. 300) y acciones pendientes en memoria (10 min) |
 | Tarjetas | `shared/agentCards.ts`, `src/features/assistant/cards/` | Datos puros por tipo (auditoría y cliente con vista interactiva); React en la app y MCP Apps para hosts externos ([MCP_LOCAL.md](MCP_LOCAL.md#tarjetas-mcp-apps)) |
 
-El asistente general usa function calling de Gemini con las declaraciones generadas desde las definiciones. Admite 4 rondas, 4 herramientas por ronda y 12 mensajes de historial. El chat interpreta un subconjunto seguro de markdown (`chatMarkdown.ts`), nunca HTML ni enlaces. Acepta hasta tres PDF o imágenes de 8 MB, validados por firma, que solo se envían con el mensaje actual.
+El asistente general usa function calling de Gemini con las declaraciones generadas desde las definiciones. Admite 4 rondas, 4 herramientas por ronda y 12 mensajes de historial. Las llamadas de una ronda se ejecutan en orden, una a una (el orden de actividad y deshacer coincide con el del modelo); si el modelo pide más de cuatro, las sobrantes reciben un error para pedirlas en la ronda siguiente, sin abortar la conversación. El turno del modelo se devuelve intacto en la siguiente petición, con sus firmas de razonamiento. El chat interpreta un subconjunto seguro de markdown (`chatMarkdown.ts`), nunca HTML ni enlaces. Acepta hasta tres PDF o imágenes de 8 MB, validados por firma, que solo se envían con el mensaje actual.
 
 ## Permisos
 
@@ -81,6 +81,6 @@ Texto, archivos adjuntos y resultados de herramientas se envían a Google Gemini
 
 ## Verificación
 
-- Suites: `testAgentDocumentTools`, `testAgentAttachmentTools`, `testAgentClientTools`, `testMcpBridgeHost`, `testMcpConnectionPanel`, `electron/mcp/tests/*`, `testAgentToolSchemas`, `testAgentPermissions`, `testAgentProposalTools`, `testProjectEdit`, `testCatalogAudit`, `testAgentCards`, `testChatMarkdown`, `testChatFiles`, `testProposalAssistantApply`, `testAutomatedPricingPolicy` y `testAppAssistant`.
+- Suites: `testAgentDocumentTools`, `testAgentAttachmentTools`, `testAgentClientTools`, `testMcpBridgeHost`, `testMcpConnectionPanel`, `electron/mcp/tests/*`, `testAgentToolSchemas`, `testAgentPermissions`, `testAgentProposalTools`, `testProjectEdit`, `testCatalogAudit`, `testAgentCards`, `testChatMarkdown`, `testChatFiles`, `testProposalAssistantApply`, `testAutomatedPricingPolicy`, `testAppAssistant` y `testAssistantToolRound`.
 - Todas usan transporte sintético; ninguna escribe en producción ni llama a Gemini real.
 - La fixture `scripts/qa/fixtures/appAssistant.html` cubre consultas, auditoría, cambio aplicado con deshacer y confirmación.
