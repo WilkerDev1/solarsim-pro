@@ -32,11 +32,11 @@ Guía canónica para agentes y desarrolladores. Producto y módulos: [README.md]
 
 ## Gates antes de dar un trabajo por terminado
 
-Los mismos de `.github/workflows/verify.yml`:
+Los mismos de `.github/workflows/verify.yml`, que los reparte en trabajos paralelos; el check requerido es `gates` ([CI](docs/QA.md#integración-continua)):
 
 ```bash
 npm run lint
-npm test                      # una suite: npm test -- <filtro>
+npm test                      # una suite: npm test -- <filtro>; CI: npm test -- --shard=i/3
 npm run build
 npm run build:electron
 npm --prefix server test
@@ -53,8 +53,8 @@ docker build -f mcp-remote/Dockerfile -t solarsim-mcp-remote:qa .
 npx tsx mcp-remote/tests/containerSmoke.ts
 ```
 
-CI también ejecuta `node scripts/qa/validatePackager.mjs`, `node scripts/qa/devSmoke.mjs`, `node scripts/qa/testPrepareSecrets.mjs` y `npx tsx --test scripts/qa/tests/*.test.ts`. Escribir la prueba antes del cambio (en refactors, una prueba de caracterización que fije el comportamiento actual). Si cambia la estructura del repositorio, ejecutar `npm run context:pack`. No afirmar ausencia de vulnerabilidades sin un `npm audit` actual.
+CI también ejecuta `node scripts/qa/validatePackager.mjs`, `node scripts/qa/devSmoke.mjs`, `node scripts/qa/testPrepareSecrets.mjs` y `npx tsx --test scripts/qa/tests/*.test.ts`; un PR que solo cambia Markdown o `docs/` omite builds y pruebas. Escribir la prueba antes del cambio (en refactors, una prueba de caracterización que fije el comportamiento actual). Si cambia la estructura del repositorio, ejecutar `npm run context:pack`. No afirmar ausencia de vulnerabilidades sin un `npm audit` actual.
 
 ## Flujo de trabajo
 
-`beta` es desarrollo; `main` recibe releases estables (merge de `beta` y hotfixes). Conventional Commits (`feat(scope): ...`). Releases: [docs/MAINTENANCE_AND_UPDATES.md](docs/MAINTENANCE_AND_UPDATES.md). Documentación y textos de UI en español; no crear documentos fechados ni bitácoras: la evidencia va en el PR o commit.
+`beta` es desarrollo; `main` recibe releases estables (merge de `beta` y hotfixes). Conventional Commits (`feat(scope): ...`). Los PR siguen la plantilla de `.github/` y se revisan según [REVIEW.md](REVIEW.md) (revisor automático consultivo con Claude; proceso en [docs/QA.md](docs/QA.md#revisión-de-pr)). Releases: [docs/MAINTENANCE_AND_UPDATES.md](docs/MAINTENANCE_AND_UPDATES.md). Documentación y textos de UI en español; no crear documentos fechados ni bitácoras: la evidencia va en el PR o commit.

@@ -32,7 +32,7 @@ npm --prefix workers/share-viewer run build
 
 Si cambia la estructura del repositorio, regenerar el snapshot con `npm run context:pack` (se mantiene fuera de Git). Las pruebas de cliente bloquean `fetch` real; ninguna prueba escribe en `solarsim.electsun.net` ni en `app-server`. Detalle en [QA.md](QA.md).
 
-`verify.yml` se ejecuta en PRs y en pushes a `beta`/`main`; no empaqueta sistemas operativos.
+`verify.yml` se ejecuta en PRs y en pushes a `beta`/`main`; no empaqueta sistemas operativos. Reparte estos pasos en trabajos paralelos (cliente, pruebas de cliente en tres partes con `npm test -- --shard=i/3`, API con Docker y visor) y los agrega en el check `gates`; detalle en [QA.md](QA.md#integración-continua). `audit.yml` ejecuta `npm audit` cada semana como aviso, no como garantía.
 
 ## Publicar una versión de escritorio
 
