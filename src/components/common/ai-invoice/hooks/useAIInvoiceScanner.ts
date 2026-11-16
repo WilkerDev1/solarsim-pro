@@ -74,7 +74,12 @@ export function useAIInvoiceScanner() {
   };
   useEffect(() => { reset(); }, [workspace]);
   useEffect(() => {
-    if (scope !== previousScope.current) { previousScope.current = scope; reset(); setErrorMsg('Cambió el destino. Prepara otro borrador antes de aplicar.'); }
+    if (scope !== previousScope.current) {
+      // El aviso solo tiene sentido si se descarta trabajo: sin borrador ni conversación, cambiar de propuesta o de sesión no pierde nada.
+      const hadWork = extractedData !== null || messages.length > 0;
+      previousScope.current = scope; reset();
+      if (hadWork) setErrorMsg('Cambió el destino. Prepara otro borrador antes de aplicar.');
+    }
   }, [scope]);
   useEffect(() => {
     const urls = files.map(f => f.url);
