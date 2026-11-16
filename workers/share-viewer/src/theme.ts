@@ -133,18 +133,20 @@ function declarations(mode: 0 | 1): string {
  * Mientras se muestra el tema claro, `only light` impide que el oscurecido forzado de Chromium
  * (que puede informar `prefers-color-scheme: light`) destroce la página; con preferencia oscura
  * o elección manual, el esquema usado es `dark` y se ve el tema oscuro propio.
+ * Las reglas oscuras viven solo en `@media screen`: la impresión sale en claro por CSS aunque
+ * `beforeprint` no llegue a dispararse.
  */
 export const THEME_CSS = `
     :root { color-scheme: only light; ${declarations(0)} }
     :root[data-theme="light"] { color-scheme: only light; }
-    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; ${declarations(1)} } }
-    :root[data-theme="dark"] { color-scheme: dark; ${declarations(1)} }
+    @media screen and (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; ${declarations(1)} } }
+    @media screen { :root[data-theme="dark"] { color-scheme: dark; ${declarations(1)} } }
     :root[data-print], :root[data-print][data-theme] { color-scheme: only light; ${declarations(0)} }
     @media print { :root, :root[data-theme] { color-scheme: only light; ${declarations(0)} } }
     html, body { background-color: rgb(var(--c-page)); }
     .pv-logo-plate { display: inline-flex; align-items: center; }
-    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pv-logo-plate { background: var(--logo-plate); padding: 6px 12px; border-radius: 14px; } }
-    :root[data-theme="dark"] .pv-logo-plate { background: var(--logo-plate); padding: 6px 12px; border-radius: 14px; }
+    @media screen and (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pv-logo-plate { background: var(--logo-plate); padding: 6px 12px; border-radius: 14px; } }
+    @media screen { :root[data-theme="dark"] .pv-logo-plate { background: var(--logo-plate); padding: 6px 12px; border-radius: 14px; } }
     @media print { .pv-logo-plate { background: none !important; padding: 0 !important; } }
     .pv-theme-btn [data-theme-icon] { display: none; }
     :root:not([data-theme]) .pv-theme-btn [data-theme-icon="auto"],

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { renderExpiredPage, renderProposalPage } from '../src/template';
 import { ENERGY_FLOW_CSS } from '../src/energyFlow';
+import { createShareViewer } from '../src/index';
 import { PALETTE_TOKENS, ROLE_TOKENS, THEME_CSS, THEME_INIT_SCRIPT, THEME_STORAGE_KEY, THEME_TOGGLE_SCRIPT, VARIABLE_TOKENS } from '../src/theme';
 import type { StoredProposal } from '../src/types';
 
@@ -29,9 +30,29 @@ assert.ok(head.includes('<meta name="darkreader-lock">'), 'Dark Reader lock');
 // While light is shown the root opts out of forced darkening; dark preference or choice switches to the page's own dark.
 assert.ok(/:root \{ color-scheme: only light;/.test(head), ':root color-scheme while light');
 assert.ok(/:root:not\(\[data-theme="light"\]\) \{ color-scheme: dark;/.test(head) && /:root\[data-theme="dark"\] \{ color-scheme: dark;/.test(head), 'dark scheme in use when dark');
-assert.ok(head.includes('@media (prefers-color-scheme: dark)') && head.includes(':root[data-theme="dark"]'), 'automatic and manual dark');
+assert.ok(head.includes('@media screen and (prefers-color-scheme: dark)') && head.includes(':root[data-theme="dark"]'), 'automatic and manual dark');
 assert.ok(/:root\[data-theme="light"\] \{ color-scheme: only light; \}/.test(head), 'manual light opts out of Auto Dark Theme');
 assert.ok(/@media print \{ :root, :root\[data-theme\] \{ color-scheme: only light;/.test(head), 'printing always uses the light theme');
+// Printing must come out light by CSS alone (beforeprint may never fire): every rule that switches to the
+// dark values (or the dark logo plate) has to live inside an `@media screen …` block, never print.
+const enclosingAtRules = (css: string, index: number): string[] => {
+  const stack: string[] = [];
+  let start = 0;
+  for (let i = 0; i < index; i++) {
+    if (css[i] === '{') { stack.push(css.slice(start, i).trim()); start = i + 1; }
+    else if (css[i] === '}') { stack.pop(); start = i + 1; }
+    else if (css[i] === ';') start = i + 1;
+  }
+  return stack.filter((s) => s.startsWith('@'));
+};
+const darkMarker = `--c-page: ${[11, 18, 32].join(' ')};`;
+const darkUses = [...THEME_CSS.matchAll(new RegExp(darkMarker.replace(/[-]/g, '\\-'), 'g'))].map((m) => m.index ?? 0);
+const plateUses = [...THEME_CSS.matchAll(/background: var\(--logo-plate\)/g)].map((m) => m.index ?? 0);
+assert.ok(darkUses.length >= 2 && plateUses.length >= 2, 'automatic and manual dark rules found');
+for (const at of [...darkUses, ...plateUses]) {
+  const media = enclosingAtRules(THEME_CSS, at);
+  assert.ok(media.some((m) => /^@media screen\b/.test(m)), `dark rule limited to screen, found in: ${JSON.stringify(media)}`);
+}
 // The stored choice is applied in <head>, before Tailwind and before the body paints.
 assert.ok(head.indexOf(THEME_INIT_SCRIPT) > 0 && head.indexOf(THEME_INIT_SCRIPT) < head.indexOf('cdn.tailwindcss.com'), 'no flash of the wrong theme');
 assert.ok(head.includes('tailwind.config') && head.includes('rgb(var(--tw-sky-700) / <alpha-value>)'), 'Tailwind palette reads the theme variables');
@@ -99,6 +120,18 @@ legacy.summary = undefined;
 delete (legacy as Partial<StoredProposal>).calculationSnapshot;
 const legacyHtml = renderProposalPage(legacy);
 assert.ok(legacyHtml.includes('<meta name="color-scheme" content="light dark">') && legacyHtml.includes('data-energy-flow='));
+
+// 6b. The inline <head> scripts (theme start-up, tailwind.config) must not be blocked by a Content-Security-Policy.
+void (async () => {
+const kv = new Map<string, string>([['proposal:tema1234', JSON.stringify({ ...proposal(), expiresAt: '2099-01-01T00:00:00.000Z' })]]);
+const viewerResponse = await createShareViewer(async () => { throw new Error('sin red'); }).request('https://test.local/p/tema1234', {}, { PROPOSALS_KV: { get: async (k: string) => kv.get(k) ?? null } } as never);
+assert.equal(viewerResponse.status, 200);
+const csp = viewerResponse.headers.get('Content-Security-Policy');
+if (csp) {
+  const scriptSrc = csp.split(';').map((d) => d.trim()).find((d) => d.startsWith('script-src')) ?? csp.split(';').map((d) => d.trim()).find((d) => d.startsWith('default-src')) ?? '';
+  assert.ok(scriptSrc.includes("'unsafe-inline'") || /'(sha256|sha384|sha512)-/.test(scriptSrc), `CSP must allow the inline theme scripts: ${csp}`);
+}
+})().catch((error) => { console.error(error); process.exit(1); });
 
 // 7. The manual switch: hidden without JavaScript, cycles auto → light → dark → auto and survives a blocked localStorage.
 assert.ok(/<button[^>]*data-theme-toggle[^>]*hidden/.test(body) && /data-theme-toggle[^>]*class="[^"]*no-print/.test(body), 'switch hidden without JS and when printing');

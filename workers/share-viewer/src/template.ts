@@ -1127,8 +1127,18 @@ ${ENERGY_FLOW_CSS}
         if (scheme.addEventListener) scheme.addEventListener('change', repaintCharts);
       }
       // El papel siempre en claro: los lienzos se repintan con el tema claro mientras se imprime.
-      window.addEventListener('beforeprint', function () { document.documentElement.setAttribute('data-print', ''); repaintCharts(); });
-      window.addEventListener('afterprint', function () { document.documentElement.removeAttribute('data-print'); repaintCharts(); });
+      // La página ya sale en claro por CSS; esto solo afecta a los lienzos, que CSS no puede repintar.
+      function printing(on) {
+        if (on === document.documentElement.hasAttribute('data-print')) return;
+        if (on) document.documentElement.setAttribute('data-print', ''); else document.documentElement.removeAttribute('data-print');
+        repaintCharts();
+      }
+      window.addEventListener('beforeprint', function () { printing(true); });
+      window.addEventListener('afterprint', function () { printing(false); });
+      if (window.matchMedia) {
+        const printMedia = window.matchMedia('print');
+        if (printMedia.addEventListener) printMedia.addEventListener('change', function (e) { printing(e.matches); });
+      }
     });
   </script>
 </body>

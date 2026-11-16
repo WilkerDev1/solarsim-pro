@@ -41,6 +41,8 @@ Señales para que los navegadores que oscurecen páginas a la fuerza respeten el
 - Samsung Internet admite `prefers-color-scheme` y la meta `color-scheme` desde 13.2 ([blog de Samsung](https://developer.samsung.com/internet/blog/en/2020/12/15/dark-mode-in-samsung-internet)), pero según su [foro de desarrolladores](https://forum.developer.samsung.com/t/websites-dark-mode-gets-overridden-by-samsung-internets-dark-mode/22937) solo la respeta con la opción «Usar el tema oscuro del sitio web» (Labs) activada.
 - `<meta name="darkreader-lock">` desactiva Dark Reader en la página ([CONTRIBUTING de Dark Reader](https://github.com/darkreader/darkreader/blob/main/CONTRIBUTING.md)).
 
+Limitación conocida: con el flag de escritorio de Chromium `WebContentsForceDark` y el sistema en claro, el navegador oscurece igualmente el tema claro (ignora `only light`); el lector puede elegir el tema oscuro con el conmutador.
+
 ## Verificación local
 
 Desde la raíz del repositorio:
