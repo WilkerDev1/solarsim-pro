@@ -52,7 +52,7 @@ const NOUN: Record<EquipmentType, string> = { panel: 'panel', inverter: 'inverso
 /** Palabras genéricas que no identifican un modelo. */
 const STOPWORDS = new Set(['panel', 'paneles', 'modulo', 'modulos', 'module', 'inversor', 'inversores', 'inverter', 'bateria', 'baterias', 'battery',
   'solar', 'de', 'del', 'la', 'el', 'los', 'las', 'con', 'para', 'y', 'un', 'una', 'hibrido', 'hibrida', 'hibridos', 'hybrid', 'litio', 'lithium',
-  'lifepo4', 'modelo', 'marca', 'unidad', 'unidades', 'w', 'wp', 'kw', 'kwh', 'kwp', 'ah']);
+  'lifepo4', 'modelo', 'marca', 'unidad', 'unidades', 'w', 'wp', 'kw', 'kwh', 'kwp', 'ah', 'k', 'v', 'vdc', 'vac']);
 
 export const equipmentMagnitude = (item: Pick<SolarEquipmentItem, 'type' | 'powerW' | 'powerKW' | 'capacityKWh'>): number | undefined => {
   const value = item.type === 'panel' ? item.powerW : item.type === 'inverter' ? item.powerKW : item.capacityKWh;
@@ -72,16 +72,32 @@ export function magnitudesMatch(type: EquipmentType, requested: number, catalog:
 const formatNumber = (n: number) => String(Number(n.toFixed(3)));
 const canonical = (text: string) => text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
   .replace(/lux[\s-]*power(?!tek)/g, 'luxpowertek').replace(/\bcanadian(?![\s-]*solar)/g, 'canadian solar').replace(/watts?|vatios?/g, 'w');
-const UNIT_WORDS = '(?:kwh|kwp|kw|wp|w|ah)';
+/** Unidades de potencia/capacidad que se leen como magnitud (de la más larga a la más corta); todas las regex salen de aquí. */
+const UNIT_LIST = ['kwh', 'kwp', 'kw', 'wp', 'w', 'ah'] as const;
+const UNIT_ALT = UNIT_LIST.join('|');
+const NUMBER = '\\d+(?:[.,]\\d+)?';
 /** Número con unidad solo con frontera delante: «550 W», «0.63kWp», «-100AH»; nunca dentro de un código («CS6W-550MB»). */
-const UNITS = new RegExp(`(?<![a-z0-9.,])(\\d+(?:[.,]\\d+)?)\\s*(${UNIT_WORDS.slice(3, -1)})\\b`, 'g');
+const UNITS = new RegExp(`(?<![a-z0-9.,])(${NUMBER})\\s*(${UNIT_ALT})\\b`, 'g');
 /** Una palabra pegada a una cifra con unidad («Solar630W», «HinaESS15kW») se separa; un código corto («CS6W») no. */
-const GLUED_UNIT = new RegExp(`([a-z]{4,})(?=\\d+(?:[.,]\\d+)?\\s*${UNIT_WORDS}\\b)`, 'g');
+const GLUED_UNIT = new RegExp(`([a-z]{4,})(?=${NUMBER}\\s*(?:${UNIT_ALT})\\b)`, 'g');
+/** Tensión nominal en el nombre («48 vdc»): dato del equipo, no palabra que distinga el modelo. */
+const VOLTAGE = new RegExp(`(?<![a-z0-9.,])${NUMBER}\\s*v(?:dc|ac)?\\b`, 'g');
+/** Cifra con sufijo de unidad dentro de un código («8K» en «SUN-8K», «12KW», «16kWh»): se indexa la cifra («5» no es «15»). */
+const NUMBER_WITH_UNIT = /^(\d+(?:_\d+)?)(?:kwh|kwp|kw|wp|w|ah|k|v|vdc|vac)$/;
 const forParsing = (text: string) => canonical(text).replace(GLUED_UNIT, '$1 ');
 const compact = (text: string) => canonical(text).replace(/[^a-z0-9]/g, '');
 const WARRANTY = /\(?\s*\d+\s*(?:anos?\s*(?:de\s*)?garantia)\)?/g;
 const QUANTITY = /\b\d+\s*x\s+|\s+x\s*\d+\b/g;
 const words = (text: string) => text.split(/[^a-z0-9]+/).filter(Boolean);
+/**
+ * Misma normalización a ambos lados (pedido y equipo): minúsculas sin acentos, decimales como una palabra («5.0» → «5_0»),
+ * cifra separada de su unidad («550W» → «550», «8K» → «8») y sin palabras genéricas. Los números cortos se conservan.
+ */
+function modelTokens(text: string, keepGeneric = false): string[] {
+  const all = forParsing(text).replace(/(\d)[.,](\d)/g, '$1_$2').split(/[^a-z0-9_]+/).filter(Boolean)
+    .map(t => NUMBER_WITH_UNIT.exec(t)?.[1] ?? t);
+  return keepGeneric ? all : all.filter(t => !STOPWORDS.has(t));
+}
 
 /** Marca efectiva de un equipo: la guardada salvo genérica («Fabricante», vacía), entonces la inferida del nombre; siempre en su forma canónica. */
 export function effectiveBrand(item: Pick<SolarEquipmentItem, 'brand' | 'displayName' | 'modelSeries'>): string | undefined {
@@ -91,29 +107,29 @@ export function effectiveBrand(item: Pick<SolarEquipmentItem, 'brand' | 'display
   return inferred && !isGenericBrand(inferred) ? inferred : undefined;
 }
 
-interface ParsedText { tokens: string[]; codes: string[][]; magnitudes: { value: number; unit: string }[] }
+interface ParsedText { tokens: string[]; magnitudes: { value: number; unit: string }[] }
 function parseText(text: string): ParsedText {
-  let value = forParsing(text).replace(WARRANTY, ' ').replace(QUANTITY, ' ');
+  const value = forParsing(text).replace(WARRANTY, ' ').replace(QUANTITY, ' ');
   const magnitudes = [...value.matchAll(UNITS)].map(m => ({ value: Number(m[1].replace(',', '.')), unit: m[2] }));
-  value = value.replace(UNITS, ' ');
-  const codes = (value.match(/\b[a-z][a-z0-9]*(?:[-./][a-z0-9]+)+\b/g) || []).map(words);
-  return { tokens: words(value).filter(t => !STOPWORDS.has(t)), codes, magnitudes };
+  return { tokens: modelTokens(value.replace(UNITS, ' ')), magnitudes };
 }
 
-interface ItemIndex { tokens: Set<string>; sequence: string[]; required: string[]; series: string[]; brand?: string }
+interface ItemIndex { tokens: Set<string>; sequence: string[]; required: string[]; series: string[]; brandWords: Set<string>; brand?: string }
 function indexItem(item: SolarEquipmentItem): ItemIndex {
   const brand = effectiveBrand(item);
   const brandText = `${brand || ''} ${item.brand || ''}`;
-  const brandWords = new Set([...words(canonical(brandText)), compact(brand || ''), compact(item.brand || '')]);
-  const names = forParsing(`${item.modelSeries || ''} ${item.displayName || ''}`).replace(UNITS, ' ');
-  // Secuencia ordenada de palabras (marca, serie y nombre) para casar fragmentos pegados sin cruzar fronteras.
-  const sequence = words(forParsing(`${brandText} ${item.modelSeries || ''} ${item.displayName || ''}`));
+  // Las palabras de la marca (también compuesta: «JinkoSolar», «Sol-Ark», «Lux Power») nunca hacen falta para el modelo.
+  const brandWords = new Set([...modelTokens(brandText), compact(brand || ''), compact(item.brand || '')]);
+  const strip = (text: string) => forParsing(text).replace(UNITS, ' ').replace(VOLTAGE, ' ');
+  // Secuencia ordenada (marca, serie y nombre, con las cifras de sus magnitudes) para casar fragmentos pegados sin cruzar fronteras.
+  const sequence = modelTokens(`${brandText} ${item.modelSeries || ''} ${item.displayName || ''}`, true);
   return {
     tokens: new Set(sequence),
     sequence,
-    // Palabras que distinguen el modelo; los números sueltos cortos («8», «16») no lo identifican.
-    required: [...new Set(words(names).filter(t => !STOPWORDS.has(t) && !brandWords.has(t) && (!/^\d+$/.test(t) || t.length >= 3)))],
-    series: words(forParsing(item.modelSeries || '')).filter(t => !STOPWORDS.has(t)),
+    // Palabras que distinguen el modelo (serie y nombre, sin magnitudes ni marca), números cortos incluidos («Powerwall 2»).
+    required: [...new Set(modelTokens(strip(`${item.modelSeries || ''} ${item.displayName || ''}`)).filter(t => !brandWords.has(t)))],
+    series: modelTokens(strip(item.modelSeries || '')).filter(t => !brandWords.has(t)),
+    brandWords,
     brand,
   };
 }
@@ -145,7 +161,7 @@ export function fitEquipment(request: EquipmentRequest, item: SolarEquipmentItem
   const unit = UNIT[request.type];
   if (item.type !== request.type) return no(`${item.displayName} no es un ${NOUN[request.type]}.`);
   const index = indexItem(item);
-  const parsed = request.text ? parseText(request.text) : { tokens: [], codes: [], magnitudes: [] };
+  const parsed = request.text ? parseText(request.text) : { tokens: [], magnitudes: [] };
 
   // Marca declarada aparte: con ambas conocidas, deben coincidir (con alias: Luxpower ↔ LuxpowerTek).
   let brandMatch: boolean | undefined;
@@ -188,17 +204,16 @@ export function fitEquipment(request: EquipmentRequest, item: SolarEquipmentItem
     if (!found) return no(`«${token}» no aparece en ${item.displayName}.`, { magnitudeDelta });
     found.forEach(t => covered.add(t));
   }
-  const code = parsed.codes.find(c => !wordsForming(index.sequence, c.join('')) && !c.every(t => index.tokens.has(t)));
-  if (code) return no(`El código «${code.join('-')}» no aparece en ${item.displayName}.`, { magnitudeDelta });
 
-  // Código de modelo declarado aparte, por palabras completas: exacto (mismas palabras que la serie o el modelo),
-  // compatible (uno contiene al otro: «5K» en «5K Pro») o ninguno («5K» frente a «15K»). No excluye.
+  // Código de modelo declarado aparte (ficha técnica), por palabras completas y con la misma normalización:
+  // exacto si cubre todas las palabras que distinguen al equipo y no trae otras que el equipo no tiene («5K» frente a
+  // «5K Pro» es compatible; «Powerwall 2» frente a «Powerwall 3», nada). No excluye.
   let modelMatch: EquipmentFit['modelMatch'];
-  const modelWords = words(forParsing(request.model || '')).filter(t => !STOPWORDS.has(t));
+  const modelWords = modelTokens(forParsing(request.model || '').replace(UNITS, ' ')).filter(t => !index.brandWords.has(t));
   if (modelWords.length) {
     const asked = new Set(modelWords);
-    const same = (other: readonly string[]) => other.length > 0 && subset(other, asked) && subset(modelWords, new Set(other));
-    if (same(index.series) || same(index.required)) modelMatch = 'exact';
+    const known = modelWords.every(t => matchToken(index, t));
+    if (known && subset(index.required, asked)) modelMatch = 'exact';
     else if (subset(modelWords, new Set(index.required)) || subset(index.series, asked)) modelMatch = 'compatible';
   }
   if (!modelWords.length && !parsed.tokens.length && requested === undefined && brandMatch === undefined) return no('La solicitud no indica marca, modelo ni especificación.');

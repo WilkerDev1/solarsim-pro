@@ -166,12 +166,13 @@ export function inferBrandFromText(displayName = '', modelSeries = ''): string {
 
   // Si no coincide con marcas conocidas, intentar extraer la primera palabra significativa
   // (sin descriptores como «Híbrido», «Microinversor» o «Trifásico», ni códigos con cifras).
+  // Todos los filtros van dentro de la búsqueda: cifras y unidades («550W», «10kW») se saltan, no la detienen.
   const firstWord = displayName.trim().split(/\s+/).find((w) => {
     const key = w.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9-]/g, '');
-    return key && !DESCRIPTOR_WORDS.has(key) && !DESCRIPTOR_WORDS.has(key.replace(/-/g, ''));
+    return key.length > 2 && !/\d/.test(key) && !DESCRIPTOR_WORDS.has(key) && !DESCRIPTOR_WORDS.has(key.replace(/-/g, '')) && !isGenericBrand(key);
   });
-  if (firstWord && firstWord.length > 2 && !/\d/.test(firstWord) && !isGenericBrand(firstWord)) {
-    return normalizeBrandName(firstWord);
+  if (firstWord) {
+    return normalizeBrandName(firstWord.replace(/[^\p{L}\p{N}-]/gu, ''));
   }
 
   return 'General';
