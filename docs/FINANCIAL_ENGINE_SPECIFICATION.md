@@ -36,7 +36,9 @@ $$E_{auto,m} = \min\left(C_m,\ E_m \times k\right), \quad k = \begin{cases} 0.90
 
 $$E_{exp,m} = \begin{cases} 0 & \text{inyección cero} \\ \max(0,\ E_m - E_{auto,m}) & \text{medición neta} \end{cases}$$
 
-En ambos modos, la retención (`gridExportFeePct`, 25 si falta; un 0 explícito se respeta; 0 en inyección cero) se aplica solo a la energía exportada:
+El cálculo del excedente depende del **régimen de medición neta** de la propuesta (`rates.netMeteringRegime`, reglas en `shared/netMetering.ts`). Ambos regímenes valen en los dos modos (legacy y proyección física) y no cambian $E_{auto,m}$ ni $E_{exp,m}$.
+
+**Régimen anterior, `legacy_retention`** (toda propuesta guardada, importada, del historial o publicada sin el campo; sus cifras no cambian): la retención (`gridExportFeePct`, 25 si falta; un 0 explícito se respeta; 0 en inyección cero) se aplica solo a la energía exportada:
 
 $$E_{net\_credit,m} = E_{exp,m} \times \left(1 - \frac{F_{grid}}{100}\right)$$
 
@@ -44,7 +46,19 @@ $$E_{saved,m} = E_{auto,m} + E_{net\_credit,m}, \qquad S_m = E_{saved,m} \times 
 
 $T_{kWh}$ es `energyCostPerKWh` del proyecto: una tarifa plana guardada en la propuesta. El motor no lee la matriz de tarifas; la matriz solo sugiere esa tarifa al crear o escanear (tarifa de referencia, ver [Tarifas en el flujo IA](AI_TARIFF_CONTEXT.md)). La referencia de BTS-1 y BTS-2 es el precio medio por bloques del consumo mensual promedio; desde 701 kWh es el precio del cuarto bloque para todo el consumo (Resolución SIE-121-2026-TF, art. 4.d). Cambiar la matriz o esa regla no altera propuestas guardadas: `src/tests/testNetMeteringRegime.ts` fija las cifras actuales de BTS-1, BTD, inyección cero y batería en ambos modos.
 
-La retención es hoy un porcentaje uniforme para todas las tarifas. El Reglamento SIE-007-2026-REG solo cobra el cargo por uso de la red a las tarifas de un solo precio (BTS-1, BTS-2, RBT-1); la nota regulatoria del documento ya lo distingue, pero el cálculo todavía no (fase 3 del plan tarifario).
+En este régimen la retención es un porcentaje uniforme para todas las tarifas, también las que tienen cargo de potencia.
+
+**Régimen SIE-007-2026, `sie007_2026`** (con el que nacen las propuestas nuevas: simulador, borrador de IA y `create_proposal`): la medición neta acredita el 100 % de lo inyectado y el Reglamento SIE-007-2026-REG (art. 19.1.e) cobra un cargo por uso de la red por kWh inyectado, solo a las tarifas de un solo precio:
+
+$$E_{net\_credit,m} = E_{exp,m}, \qquad G_m = E_{exp,m} \times \frac{c_{red}}{FX}, \qquad S_m = (E_{auto,m} + E_{exp,m}) \times T_{kWh} - G_m$$
+
+- $c_{red}$ es `rates.gridUseChargeDOPPerKWh` (RD$/kWh inyectado, editable por propuesta, 0 explícito se respeta, rango 0–100). Si falta o no es válido, el de fábrica de la distribuidora: EDESUR 3.78, EDENORTE 4.02, EDEESTE 3.88 (Res. SIE-121-2026-TF, art. 9, octubre–diciembre 2026, calculados sobre la tarifa sin subsidio) y CEPM 5.73 (Res. SIE-147-2026-TF, art. 2, septiembre 2026). Una distribuidora desconocida usa 4.02 (el mayor de las EDE). Las propuestas nuevas guardan el de fábrica al nacer; cambiar de distribuidora con `applyProjectEdit` lo pasa al de la nueva salvo que se haya editado a mano.
+- $c_{red} = 0$ en tarifas con cargo de potencia (`tariffChargeKind` = `demand`: BTD, BTH, MTD-1, MTD-2, MTH, RBT-2, ESTRBT-2) y en inyección cero. Una tarifa sin clasificar (`unknown`) **sí** paga el cargo: es la estimación conservadora (ahorro a la baja) hasta clasificarla.
+- $FX$ es la tasa efectiva de la propuesta (`resolveAssumptions(...).dopExchangeRate`). El desglose mensual lleva `gridUseChargeUSD` solo en este régimen; en el anterior el campo no aparece.
+- $E_{exp,m}$ es la energía inyectada del modelo: en legacy, $E_m - E_{auto,m}$; en la proyección física, el excedente diario que no carga la batería. Con batería en la proyección física baja la inyección y, con ella, el cargo.
+- El cargo es una **estimación no verificada con facturas**; el dock, la revisión y la nota regulatoria lo dicen. La factura por bloques, el cargo fijo por rangos y la liquidación anual del excedente al precio CNE quedan para fases siguientes: $T_{kWh}$ sigue siendo la tarifa plana de la propuesta.
+
+`resolveAssumptions` expone `netMeteringRegime`, `gridUseChargeDOPPerKWh` y `appliedGridUseChargeDOPPerKWh` (0 cuando el cargo no aplica). `src/tests/testSie007GridUseCharge.ts` fija el régimen nuevo; `testNetMeteringRegime.ts` sigue fijando el anterior sin cambios.
 
 ### 1.4 Factura y cobertura
 
