@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildProposalRequest, normalizeProposalDraft, type AIProposalContext } from '../../shared/aiProposal';
+import { buildProposalRequest, draftForPrompt, normalizeProposalDraft, type AIProposalContext } from '../../shared/aiProposal';
 import { DEFAULT_EQUIPMENT_CATALOG } from '../data/defaultEquipmentCatalog';
 import { buildAITariffContext } from '../utils/aiTariffContext';
 import { useSimulationStore } from '../store/useSimulationStore';
@@ -93,6 +93,31 @@ assert(stableBytes / total > 0.8, 'con el catálogo de fábrica, más del 80 % d
   assert.equal(sent.commercial.markupPct, 35);
   assert.equal(sent.commercial.customItems[0].hideInQuotation, true);
   assert.deepEqual(sent.documentTexts.map((t: any) => [t.key, t.text]), [[docKey, '12 años']]);
+}
+
+// --- draftForPrompt: un nombre en blanco no se inventa como pedido y una fila resuelta no pasa por «sin equipo». ---
+{
+  const panelId = catalog.find(e => e.type === 'panel')!.id;
+  const ids = new Set(catalog.map(e => e.id));
+  const draft = { panels: [
+    { id: panelId, brandModel: 'Panel del catálogo', count: 4 },            // resuelta sin catalogItemId
+    { id: 'desconocido', brandModel: '   ', count: 1 },                      // sin equipo y nombre en blanco
+    { id: 'desconocido-2', brandModel: '', count: 1 },
+    { id: 'desconocido-3', brandModel: 'Panel Trina 700 W', count: 2 },      // sin equipo: conserva lo pedido
+  ] };
+  const sent = draftForPrompt(draft, ids)!.panels as Record<string, unknown>[];
+  assert.equal(sent[0].requestedModel, undefined, 'una fila con id del catálogo no se reenvía como pedido sin equipo');
+  assert.equal('requestedModel' in sent[1], false, 'un nombre en blanco no se copia');
+  assert.equal('requestedModel' in sent[2], false);
+  assert.equal(sent[3].requestedModel, 'Panel Trina 700 W');
+  // Sin catálogo a mano, el criterio es catalogItemId o un id con equipo.
+  const noCatalog = draftForPrompt({ panels: [{ id: panelId, catalogItemId: panelId, brandModel: 'X', count: 1 }] })!.panels as Record<string, unknown>[];
+  assert.equal(noCatalog[0].requestedModel, undefined);
+  // buildProposalRequest pasa el catálogo de la petición.
+  const request = buildProposalRequest({ projectRequirementsText: 'Sigue', equipmentCatalog: catalog, context: { ...base, currentDraft: draft } });
+  const viaRequest = JSON.parse(request.contents[0].parts.at(-1)!.text!).currentDraft.panels;
+  assert.equal(viaRequest[0].requestedModel, undefined);
+  assert.equal(viaRequest[3].requestedModel, 'Panel Trina 700 W');
 }
 
 // --- Asistente: instrucción y herramientas estables; la propuesta activa y la vista viajan al final del turno. ---

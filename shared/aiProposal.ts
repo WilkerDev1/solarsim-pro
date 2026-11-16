@@ -97,7 +97,8 @@ function priceFor(item: SolarEquipmentItem) {
 const VARIABLE_CONTEXT_KEYS = new Set(['conversation', 'currentDraft', 'reviewNotes', 'tariffReference']);
 const GROUP_KEYS = Object.keys(groupSchema.items.properties);
 /** El borrador vigente con solo las claves del esquema (lo calculado lo añade la app): sin avisos, espejos ni datos de proveedor. */
-export function draftForPrompt(draft: unknown): Record<string, unknown> | undefined {
+/** `catalogIds`: ids del catálogo de la petición; una fila con uno de ellos está resuelta aunque no traiga `catalogItemId`. */
+export function draftForPrompt(draft: unknown, catalogIds?: ReadonlySet<string>): Record<string, unknown> | undefined {
   if (!draft || typeof draft !== 'object') return undefined;
   const source = draft as Record<string, any>;
   const out: Record<string, unknown> = {};
@@ -108,7 +109,10 @@ export function draftForPrompt(draft: unknown): Record<string, unknown> | undefi
         const row: Record<string, unknown> = { equipmentId: group?.equipmentId ?? group?.id, quantity: group?.quantity ?? group?.count };
         for (const field of GROUP_KEYS) if (!(field in row) && group?.[field] !== undefined) row[field] = group[field];
         // Un grupo sin equipo del catálogo guarda lo pedido en brandModel (la normalización no lo deja en requestedModel).
-        if (row.requestedModel === undefined && !group?.catalogItemId && typeof group?.brandModel === 'string' && group.brandModel !== 'Modelo pendiente') row.requestedModel = group.brandModel;
+        const id = group?.catalogItemId ?? group?.id ?? group?.equipmentId;
+        const resolved = !!group?.catalogItemId || (!!catalogIds && typeof id === 'string' && catalogIds.has(id));
+        const asked = typeof group?.brandModel === 'string' ? group.brandModel.trim() : '';
+        if (row.requestedModel === undefined && !resolved && asked && asked !== 'Modelo pendiente') row.requestedModel = asked;
         return row;
       }) : source[key];
     } else out[key] = source[key];
@@ -147,7 +151,7 @@ export function buildProposalRequest(payload: AIProposalPayload) {
   }
   if (!files.length && !payload.projectRequirementsText?.trim()) throw new Error('Escribe requisitos o adjunta una factura.');
   parts.push({text: JSON.stringify({ requirements:payload.projectRequirementsText?.slice(-16000) || '', includeBattery:payload.includeBattery, exchangeRate:payload.dopExchangeRate,
-    conversation:context.conversation, reviewNotes:context.reviewNotes, currentDraft:draftForPrompt(context.currentDraft) })});
+    conversation:context.conversation, reviewNotes:context.reviewNotes, currentDraft:draftForPrompt(context.currentDraft,new Set(catalog.map(item=>item.id))) })});
   return { systemInstruction:{parts:[{text:PROPOSAL_SYSTEM_INSTRUCTION}]},contents:[{role:'user',parts}],
     generationConfig:{temperature:0.1,maxOutputTokens:16384,responseMimeType:'application/json',responseSchema:PROPOSAL_JSON_SCHEMA} };
 }
