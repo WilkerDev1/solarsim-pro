@@ -34,7 +34,7 @@ Antes de guardar se valida todo el lote: marca, modelo, nombre, potencia/capacid
 
 ## Listas de precios
 
-`geminiPriceCatalogService.ts` entrega una extracción revisable. La conversión DOP/USD se recalcula localmente desde el precio original y la tasa indicada. Se rechazan moneda desconocida y precios no positivos/no finitos. Una coincidencia exacta y única por nombre local prevalece sobre un ID incorrecto sugerido por Gemini; el resto de inferencias requiere selección humana. El ID sugerido debe existir y tener el tipo de equipo correcto.
+`geminiPriceCatalogService.ts` entrega una extracción revisable. El modelo devuelve precio y moneda originales sin convertir (el prompt no incluye la tasa); la conversión DOP/USD se recalcula localmente con la tasa indicada. Una lista con precios en otra moneda (`OTHER` con su código ISO, p. ej. EUR) se rechaza entera nombrando esos ítems, en vez de convertirla con la tasa USD/DOP. Se rechazan también moneda desconocida, precios no positivos/no finitos y documentos de más de 20 MiB antes de llamar al modelo. La acción de cada fila (actualizar o crear) se deriva en local de la coincidencia verificada; el modelo no la decide. Una coincidencia exacta y única por nombre local prevalece sobre un ID incorrecto sugerido por Gemini; el resto de inferencias requiere selección humana. El ID sugerido debe existir y tener el tipo de equipo correcto.
 
 Los proveedores se cotejan por nombre exacto, eliminación de ciertos sufijos y coincidencias de texto. No hay un algoritmo de Levenshtein/Dice ni ponderaciones numéricas de marca/modelo/potencia en este servicio; las antiguas descripciones de esos algoritmos no representaban el código.
 

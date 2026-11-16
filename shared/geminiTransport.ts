@@ -6,6 +6,10 @@ export const DEFAULT_GEMINI_MODEL = 'gemini-4-hydrogen';
 export const FALLBACK_GEMINI_MODEL = 'gemini-3.8-flash';
 /** Predeterminados de fábrica anteriores; se guardaban con cada instalación aunque nadie los eligiera. */
 export const INHERITED_DEFAULT_GEMINI_MODELS: readonly string[] = ['gemini-2.0-flash', 'gemini-3.5-flash-lite', 'gemini-3.7-flash', 'gemini-3.8-flash'];
+/** Documento inline por solicitud de escáner: 20 MiB, comparado sobre su longitud en base64 (con relleno). */
+export const MAX_INLINE_FILE_BYTES = 20 * 1024 * 1024;
+export const base64LengthFor = (bytes: number) => Math.ceil(bytes / 3) * 4;
+export const MAX_INLINE_FILE_BASE64 = base64LengthFor(MAX_INLINE_FILE_BYTES);
 /** Niveles válidos en Gemini 4 y 3.8 (`minimal` se rechaza en ambos). */
 export type GeminiThinkingLevel = 'low' | 'medium' | 'high';
 export type GeminiTransport = (url: string, body: unknown, headers: Record<string, string>, timeoutMs: number, signal?: AbortSignal) => Promise<any>;

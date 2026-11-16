@@ -1,7 +1,9 @@
 import { ExtractedDatasheetData } from "../types/equipment";
 import {
+  MAX_INLINE_FILE_BASE64,
   requestGeminiJson,
   parseGeminiJson,
+  type GeminiTransport,
 } from "../../shared/geminiTransport";
 import { normalizeDatasheetResponse } from "../utils/datasheetImport";
 
@@ -95,7 +97,6 @@ export const DATASHEET_RESPONSE_SCHEMA = {
   },
   required: ["equipmentType", "brand", "variants"],
 };
-const MAX_FILE_BASE64 = Math.ceil((20 * 1024 * 1024 * 4) / 3);
 
 export async function parseDatasheetWithGemini(
   fileBase64: string,
@@ -105,6 +106,7 @@ export async function parseDatasheetWithGemini(
   customModel?: string,
   onProgress?: (status: string) => void,
   signal?: AbortSignal,
+  transport?: GeminiTransport,
 ): Promise<ExtractedDatasheetData> {
   const apiKey =
     customApiKey?.trim() ||
@@ -118,7 +120,7 @@ export async function parseDatasheetWithGemini(
   const cleanBase64 = fileBase64.includes("base64,")
     ? fileBase64.split("base64,")[1]
     : fileBase64;
-  if (!cleanBase64 || cleanBase64.length > MAX_FILE_BASE64)
+  if (!cleanBase64 || cleanBase64.length > MAX_INLINE_FILE_BASE64)
     throw new Error("La ficha técnica está vacía o supera 20 MB.");
   onProgress?.("Analizando variantes y especificaciones de la ficha…");
   const result = await requestGeminiJson({
@@ -146,7 +148,7 @@ export async function parseDatasheetWithGemini(
         responseSchema: DATASHEET_RESPONSE_SCHEMA,
       },
     },
-  });
+  }, transport);
   if (result.modelWarning) onProgress?.(result.modelWarning);
   const parsed = parseGeminiJson(
     result.response,
