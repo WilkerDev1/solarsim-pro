@@ -25,27 +25,37 @@ export const reviewAnchor = {
   row: (key: EquipmentKey, index: number) => `proposal-row-${key}-${index}`,
   commercial: (part: 'conditions' | 'costs' | 'extras' | 'discounts' | 'reconciliation' | 'totals') => `proposal-commercial-${part}`,
   unresolved: 'proposal-unresolved',
+  documentTexts: 'proposal-document-texts',
 };
 
 const GROUP_LABEL: Record<EquipmentKey, string> = { panels: 'Paneles', inverters: 'Inversores', batteries: 'Baterías' };
 const TYPE_KEY: Record<string, EquipmentKey> = { panel: 'panels', inverter: 'inverters', battery: 'batteries' };
 /** Avisos que no piden una decisión: describen de dónde salió un dato o una referencia externa. */
-const INFORMATIVE = /^(context_consumption|theoretical_consumption|automated_pricing_forced|document_\w+_difference)$/;
+const INFORMATIVE = /^(context_consumption|theoretical_consumption|automated_pricing_forced|document_\w+_difference|too_many_document_texts|unknown_document_text|document_text_is_draft_field|invalid_document_text)$/;
 
 export function issueTier(issue: Pick<AIProposalIssue, 'code' | 'severity'>): IssueTier {
   if (issue.severity === 'error') return 'blocking';
   return INFORMATIVE.test(issue.code) ? 'info' : 'confirm';
 }
 
+/** Índice de la fila cuyo texto aparece en el mensaje; con nombres solapados («WeCo 5K» / «WeCo 5K Pro») gana el más largo. */
+function longestMention(message: string, rows: readonly { text?: string; index: number }[]): number {
+  let best = -1, length = 0;
+  for (const { text, index } of rows) if (text && text.length > length && message.includes(text)) { best = index; length = text.length; }
+  return best;
+}
+
 function equipmentTarget(issue: AIProposalIssue, key: EquipmentKey, draft?: ExtractedInvoiceData): IssueTarget {
-  const rows = draft?.[key] || [];
-  const named = (row: { brandModel?: string }) => !!row.brandModel && issue.message.includes(row.brandModel);
+  const rows = (draft?.[key] || []).map((row, index) => ({ row, index }));
   let index = -1;
   if (/requested_/.test(issue.code)) {
-    index = rows.findIndex(row => row.requestedModel && named(row));
-    if (index < 0) index = rows.findIndex(row => row.requestedModel);
+    const requested = rows.filter(({ row }) => row.requestedModel);
+    // El mensaje cita el modelo solicitado entre paréntesis: es lo que mejor distingue la fila.
+    index = longestMention(issue.message, requested.map(({ row, index }) => ({ text: row.requestedModel, index })));
+    if (index < 0) index = longestMention(issue.message, requested.map(({ row, index }) => ({ text: row.brandModel, index })));
+    if (index < 0 && requested.length === 1) index = requested[0].index;
   } else if (/_(price|count|spec)$/.test(issue.code)) {
-    index = rows.findIndex(named);
+    index = longestMention(issue.message, rows.map(({ row, index }) => ({ text: row.brandModel, index })));
   }
   return { tab: 'equipment', anchor: index >= 0 ? reviewAnchor.row(key, index) : reviewAnchor.group(key), label: GROUP_LABEL[key] };
 }
@@ -55,6 +65,7 @@ export function issueTarget(issue: AIProposalIssue, draft?: ExtractedInvoiceData
   const client = (name: string, label: string): IssueTarget => ({ tab: 'client', anchor: reviewAnchor.field(name), label });
   const commercial = (part: Parameters<typeof reviewAnchor.commercial>[0], label: string): IssueTarget => ({ tab: 'commercial', anchor: reviewAnchor.commercial(part), label });
   if (code === 'unresolved_request') return { anchor: reviewAnchor.unresolved, label: 'Solicitudes pendientes' };
+  if (/document_text/.test(code)) return { anchor: reviewAnchor.documentTexts, label: 'Textos del documento' };
   if (code === 'missing_client') return client('clientName', 'Nombre del cliente');
   if (code === 'missing_distributor') return client('distributor', 'Distribuidora');
   if (code === 'missing_tariff' || code === 'unknown_tariff') return client('tariffCode', 'Tarifa');
@@ -92,6 +103,16 @@ export function pendingByTab(views: readonly ReviewIssueView[]): Record<ReviewTa
 
 export function issuesAt(views: readonly ReviewIssueView[], anchor: string): ReviewIssueView[] {
   return views.filter(v => v.target?.anchor === anchor);
+}
+
+/** Destino del botón del resumen: el primer bloqueo con campo; si no hay, el primer punto por confirmar. */
+export function firstPendingTarget(views: readonly ReviewIssueView[]): IssueTarget | undefined {
+  return (views.find(v => v.tier === 'blocking' && v.target) ?? views.find(v => v.tier === 'confirm' && v.target))?.target;
+}
+
+/** Qué control de una fila de equipo es responsable del aviso (para `aria-invalid`). */
+export function rowControlFor(code: string): 'model' | 'count' | 'price' {
+  return /_count$/.test(code) ? 'count' : /_price$|conflicting_group_prices/.test(code) ? 'price' : 'model';
 }
 
 /** El tono más grave de una lista, para colorear un campo o una pestaña (siempre acompañado de texto). */

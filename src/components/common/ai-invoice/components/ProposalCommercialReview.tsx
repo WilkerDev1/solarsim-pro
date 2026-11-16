@@ -6,18 +6,19 @@ import { appliesItemMargin, isItemItbisExonerated } from '../../../../../shared/
 import { Plus, Trash2 } from 'lucide-react';
 import { issuesAt, reviewAnchor, worstTier, type ReviewIssueView } from '../reviewIssues';
 import { IssueNotes } from './ReviewFlags';
-interface Props{draft:ExtractedInvoiceData;financial?:FinancialSummaryResult;update:(patch:Partial<ExtractedInvoiceData>)=>void;issues?:readonly ReviewIssueView[]}
+import { equipmentCostRows, type PreviewEquipment } from '../commercialRows';
+interface Props{draft:ExtractedInvoiceData;financial?:FinancialSummaryResult;update:(patch:Partial<ExtractedInvoiceData>)=>void;issues?:readonly ReviewIssueView[];equipment?:PreviewEquipment}
 const Pending=()=> <span className="proposal-pending">Pendiente</span>;
-export function ProposalCommercialReview({draft,financial,update,issues=[]}:Props){
+export function ProposalCommercialReview({draft,financial,update,issues=[],equipment}:Props){
   const c=draft.commercial || {};
   const items=Array.isArray(c.customItems)?c.customItems:[];
   const discounts=Array.isArray(c.customDiscounts)?c.customDiscounts:[];
   const change=(patch:Partial<AIProposalCommercial>)=>update({commercial:{...c,...patch},targetMarginPct:undefined});
   const usd=(n:number)=>n.toLocaleString('es-DO',{style:'currency',currency:'USD'});
   const incomplete=[...(draft.panels || []),...(draft.inverters || []),...(draft.batteries || [])].some(g=>g.unitPriceUSD===undefined);
-  const rows=(['panels','inverters','batteries'] as const).flatMap(key=>(draft[key] || []).map((row,i)=>({key,row,i})));
-  const equipmentTotal=rows.reduce((sum,{row})=>sum+(row.unitPriceUSD===undefined?0:row.unitPriceUSD*row.count),0);
-  const itbisTotal=financial?rows.reduce((sum,{row},index)=>sum+(row.unitPriceUSD===undefined?0:financial.costMatrix.items[index]?.itbisUSD || 0),0):undefined;
+  const rows=equipmentCostRows(draft,financial,equipment);
+  const equipmentTotal=rows.reduce((sum,r)=>sum+(r.totalUSD ?? 0),0);
+  const itbisTotal=rows.length&&rows.every(r=>r.totalUSD===undefined||r.itbisUSD!==undefined)?rows.reduce((sum,r)=>sum+(r.itbisUSD ?? 0),0):undefined;
   const section=(part:Parameters<typeof reviewAnchor.commercial>[0])=>{const list=issuesAt(issues,reviewAnchor.commercial(part));return {id:reviewAnchor.commercial(part),tabIndex:-1,'data-flag':worstTier(list),list};};
   const conditions=section('conditions'),extras=section('extras'),discountsAnchor=section('discounts'),reconciliation=section('reconciliation');
   return <section><h3>Condiciones de esta cotización</h3><p className="proposal-note">Costos de compra en USD. Estas ediciones afectan únicamente la propuesta; no cambian ofertas del inventario. También puedes pedir estos cambios al chat.</p>
@@ -27,8 +28,8 @@ export function ProposalCommercialReview({draft,financial,update,issues=[]}:Prop
       <label>Cambio del documento (RD$ por USD)<input type="number" min="1" step="0.01" value={draft.dopExchangeRate ?? ''} onChange={e=>update({dopExchangeRate:Number(e.target.value)})}/></label>
     </div>
     <h4 className="proposal-commercial-heading">Costos detallados de componentes · USD</h4>
-    <div className="proposal-table-wrap" id={reviewAnchor.commercial('costs')} tabIndex={-1}><table className="proposal-price-table"><thead><tr><th>Componente</th><th className="num">Cantidad</th><th className="num">Unitario USD</th><th className="num">Total USD</th><th className="num">ITBIS USD</th></tr></thead><tbody>{rows.map(({key,row,i},index)=><tr key={`${key}-${i}`} data-missing={row.unitPriceUSD===undefined || undefined}><td>{row.brandModel}<small>{row.priceSource==='manual'?'Costo particular del borrador':'Oferta del inventario'}</small></td><td className="num"><input aria-label={`Cantidad ${row.brandModel}`} type="number" min="1" step="1" value={row.count} onChange={e=>update({[key]:(draft[key] || []).map((r,j)=>i===j?{...r,count:Number(e.target.value)}:r)})}/></td><td className="num"><input aria-label={`Costo USD ${row.brandModel}`} type="number" min="0" step="0.01" value={row.unitPriceUSD ?? ''} onChange={e=>update({[key]:(draft[key] || []).map((r,j)=>i===j?{...r,unitPriceUSD:e.target.value===''?undefined:Number(e.target.value),priceSource:'manual'}:r)})}/></td><td className="num">{row.unitPriceUSD===undefined?<Pending/>:usd(row.unitPriceUSD*row.count)}</td><td className="num">{row.unitPriceUSD===undefined?<Pending/>:financial?usd(financial.costMatrix.items[index]?.itbisUSD || 0):<Pending/>}</td></tr>)}</tbody>
-      {rows.length>0&&<tfoot><tr><th scope="row" colSpan={3}>{incomplete?'Total de equipos con precio · faltan costos':'Total de equipos'}</th><td className="num">{usd(equipmentTotal)}</td><td className="num">{itbisTotal===undefined?<Pending/>:usd(itbisTotal)}</td></tr></tfoot>}
+    <div className="proposal-table-wrap" id={reviewAnchor.commercial('costs')} tabIndex={-1}><table className="proposal-price-table"><thead><tr><th>Componente</th><th className="num">Cantidad</th><th className="num">Unitario USD</th><th className="num">Total USD</th><th className="num">ITBIS USD</th></tr></thead><tbody>{rows.map(({key,row,i,totalUSD,itbisUSD})=><tr key={`${key}-${i}`} data-missing={totalUSD===undefined || undefined}><td>{row.brandModel}<small>{row.priceSource==='manual'?'Costo particular del borrador':'Oferta del inventario'}</small></td><td className="num"><input aria-label={`Cantidad ${row.brandModel}`} type="number" min="1" step="1" value={Number.isFinite(row.count)?row.count:''} onChange={e=>update({[key]:(draft[key] || []).map((r,j)=>i===j?{...r,count:Number(e.target.value)}:r)})}/></td><td className="num"><input aria-label={`Costo USD ${row.brandModel}`} type="number" min="0" step="0.01" value={row.unitPriceUSD ?? ''} onChange={e=>update({[key]:(draft[key] || []).map((r,j)=>i===j?{...r,unitPriceUSD:e.target.value===''?undefined:Number(e.target.value),priceSource:'manual'}:r)})}/></td><td className="num">{totalUSD===undefined?<Pending/>:usd(totalUSD)}</td><td className="num">{itbisUSD===undefined?<Pending/>:usd(itbisUSD)}</td></tr>)}</tbody>
+      {rows.length>0&&<tfoot><tr><th scope="row" colSpan={3}>{incomplete||rows.some(r=>r.totalUSD===undefined)?'Total de equipos con precio · faltan costos':'Total de equipos'}</th><td className="num">{usd(equipmentTotal)}</td><td className="num">{itbisTotal===undefined?<Pending/>:usd(itbisTotal)}</td></tr></tfoot>}
     </table></div>
     <div className="proposal-commercial-block" id={conditions.id} tabIndex={-1} data-flag={conditions['data-flag']}>
     <IssueNotes issues={conditions.list}/>

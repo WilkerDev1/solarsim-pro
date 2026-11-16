@@ -81,7 +81,7 @@ export const AIInvoiceScannerModal: React.FC = () => {
           <div className="proposal-draft-heading"><h3>Revisión del borrador{ai.useCurrentProject&&ai.activeProject?<small> · sobre {ai.activeProject.client.projectId}</small>:null}</h3><button type="button" className="proposal-ghost" onClick={ai.reset} disabled={ai.isProcessing || (!ai.extractedData&&!ai.messages.length)}><RotateCcw size={15}/>Empezar de nuevo</button></div>
           {ai.extractedData ? <>
             <div className="proposal-draft-scroll">
-              <fieldset disabled={ai.isProcessing} className="proposal-review-fieldset"><ProposalDraftReview draft={ai.extractedData} catalog={ai.equipmentCatalog} matrix={ai.tariffMatrix} context={ai.context} preview={ai.draftPreview} production={ai.draftEnergy} update={ai.updateDraft} issues={ai.attentionIssues} tab={tab} onTabChange={setTab}/></fieldset>
+              <fieldset disabled={ai.isProcessing} className="proposal-review-fieldset"><ProposalDraftReview draft={ai.extractedData} catalog={ai.equipmentCatalog} matrix={ai.tariffMatrix} context={ai.context} preview={ai.draftPreview} production={ai.draftEnergy} update={ai.updateDraft} issueViews={issueViews} tab={tab} onTabChange={setTab}/></fieldset>
             </div>
             <footer className="proposal-apply" aria-label="Paso final">
               <div className="proposal-apply-check">

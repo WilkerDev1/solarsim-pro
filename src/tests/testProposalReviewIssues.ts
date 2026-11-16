@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describeIssues, groupIssues, pendingByTab, reviewAnchor, issueTier } from '../components/common/ai-invoice/reviewIssues';
+import { describeIssues, groupIssues, pendingByTab, reviewAnchor, issueTier, firstPendingTarget } from '../components/common/ai-invoice/reviewIssues';
 import { ReviewIssueDigest } from '../components/common/ai-invoice/components/ReviewIssueDigest';
 import { ProposalDraftReview } from '../components/common/ai-invoice/components/ProposalDraftReview';
 
@@ -76,4 +76,66 @@ assert.match(review, /id="proposal-label-equipment"[^>]*>[\s\S]*?4[\s\S]*?pendie
 assert.match(review, /id="proposal-field-clientName"[^>]*data-flag="blocking"/, 'client field flagged inline');
 assert.match(review, /Bloquea:[^<]*<\/strong>|Bloquea:/, 'flag is explained with text');
 assert.match(review, /aria-invalid="true"/);
+// 6. Overlapping model names: the longest match wins; requested_* also uses the requested model.
+{
+  const overlap = { inverters: [
+    { id: 'a', brandModel: 'WeCo 5K', powerKW: 5, count: 1 },
+    { id: 'b', brandModel: 'WeCo 5K Pro', powerKW: 5, count: 1 },
+  ] } as never;
+  const [price] = describeIssues([{ code: 'missing_inverter_price', severity: 'warning', message: 'WeCo 5K Pro no tiene oferta disponible.' }], overlap);
+  assert.equal(price.target?.anchor, reviewAnchor.row('inverters', 1), 'prefix model does not steal the issue');
+  const requested = { inverters: [
+    { id: 'a', brandModel: 'WeCo 5K', powerKW: 5, count: 1, requestedModel: 'Growatt 5000' },
+    { id: 'b', brandModel: 'WeCo 5K Pro', powerKW: 5, count: 1, requestedModel: 'Deye 5K' },
+  ] } as never;
+  const [mismatch] = describeIssues([{ code: 'requested_inverter_model_mismatch', severity: 'error', message: 'WeCo 5K no coincide con el modelo solicitado (Deye 5K).' }], requested);
+  assert.equal(mismatch.target?.anchor, reviewAnchor.row('inverters', 1), 'requested model disambiguates');
+}
+
+// 7. The summary button goes to the first blocker even when a "to confirm" issue comes first.
+{
+  const ordered = describeIssues([
+    { code: 'pv_overload', severity: 'warning', message: 'x' },
+    { code: 'missing_client', severity: 'error', message: 'y' },
+  ], draft);
+  assert.equal(firstPendingTarget(ordered)?.anchor, reviewAnchor.field('clientName'));
+  assert.equal(firstPendingTarget(describeIssues([{ code: 'pv_overload', severity: 'warning', message: 'x' }], draft))?.anchor, reviewAnchor.group('inverters'));
+  assert.equal(firstPendingTarget(describeIssues([{ code: 'context_consumption', severity: 'warning', message: 'x' }], draft)), undefined, 'informative notes are not pending');
+}
+
+// 8. Document texts: issues link to the block; partial reading needs confirmation and counts in the summary.
+{
+  const texts = describeIssues([
+    { code: 'document_text_seen_partially', severity: 'warning', message: 'La IA solo vio el inicio de: Nota legal.' },
+    { code: 'unknown_document_text', severity: 'warning', message: 'El documento no tiene el texto «x».' },
+  ], draft);
+  assert.equal(texts[0].target?.anchor, reviewAnchor.documentTexts);
+  assert.equal(texts[0].tier, 'confirm');
+  assert.equal(texts[1].tier, 'info', 'ignored keys are informative');
+}
+
+// 9. Row controls point at their row warning; aria-invalid only when the blocker is theirs.
+{
+  const html = renderToStaticMarkup(React.createElement(ProposalDraftReview, {
+    draft: { ...(draft as object), distributor: 'EDENORTE', tariffCode: 'BTS-1', province: 'Santiago' } as never,
+    catalog: [], matrix: { schedules: {} } as never, context: { province: 'Santiago' } as never, preview: null, production: null,
+    update: () => {}, issues: [...issues] as never,
+  }));
+  const row = reviewAnchor.row('batteries', 1);
+  const controls = html.match(new RegExp(`<[^>]*aria-describedby="${row}-issues"[^>]*>`, 'g')) || [];
+  assert(controls.length >= 3, 'model, units and cost describe the row warning');
+  assert(controls.every((tag) => /aria-invalid="true"/.test(tag)) || controls.filter((tag) => /aria-invalid="true"/.test(tag)).length >= 1);
+  assert.match(html, new RegExp(`id="${row}-issues"`));
+  const otherRow = html.match(new RegExp(`<[^>]*aria-describedby="${reviewAnchor.row('panels', 0)}-issues"`));
+  assert.equal(otherRow, null, 'rows without warnings stay clean');
+}
+
+// 10. Views can be passed already derived (no second describeIssues pass needed by the container).
+{
+  const html = renderToStaticMarkup(React.createElement(ProposalDraftReview, {
+    draft: { ...(draft as object), distributor: 'EDENORTE', tariffCode: 'BTS-1' } as never, catalog: [], matrix: { schedules: {} } as never, context: { province: 'Santiago' } as never, preview: null, production: null,
+    update: () => {}, issueViews: views,
+  }));
+  assert.match(html, /8 por revisar/);
+}
 console.log('PASS: review issues are tiered, linked to fields, counted per tab and flagged inline.');
