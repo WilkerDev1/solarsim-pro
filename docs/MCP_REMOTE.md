@@ -51,7 +51,7 @@ Reglas comunes, aplicadas por la API en cada petición:
 | Herramienta | Tipo | Notas en remoto |
 | --- | --- | --- |
 | `search_projects` | read | Datos sincronizados; excluye la papelera; máximo 12 |
-| `get_project` | read | `id` obligatorio (no hay «propuesta abierta»). Devuelve datos guardados y equipos normalizados; **no ejecuta el motor** (producción, ahorro, retorno se ven en la app) |
+| `get_project` | read | `id` obligatorio (no hay «propuesta abierta»); la papelera no es visible para agentes (404, igual que en la búsqueda). Devuelve datos guardados y equipos normalizados; **no ejecuta el motor** (producción, ahorro, retorno se ven en la app) |
 | `search_equipment`, `get_equipment`, `list_supplier_offers` | read | Catálogo de la organización y equipos de referencia |
 | `get_tariffs` | read | Matriz propia de la organización o `null` (pliego oficial integrado en la app) |
 | `search_clients`, `get_client` | read | `get_client` resume hasta 50 propuestas enlazadas |
@@ -73,26 +73,37 @@ Los resultados mantienen la envoltura del registro (`structuredContent` = `{stat
 - `instructions` = `AGENT_RULES_ES` más el aviso de que las acciones confirmadas no están disponibles.
 - Sin token, o con uno inválido: `401` con `WWW-Authenticate: Bearer resource_metadata="<origen>/.well-known/oauth-protected-resource/mcp", scope="solarsim:read solarsim:write"` (sin `resource_metadata` si OAuth está apagado). Claude exige ese `401` para iniciar sesión.
 - La etiqueta del cliente (`clientInfo.name` del `initialize`) se recuerda por token en memoria solo para la actividad; no autoriza nada.
+- `Host` debe ser el host de `MCP_PUBLIC_URL` (o uno de `MCP_ALLOWED_HOSTS`): 403 en otro caso, salvo `/health`. Cloudflare Tunnel conserva el `Host` público.
+- Los identificadores que van en una ruta de la API se validan (`pathId`: nunca vacío, `.`, `..`, `/` ni `\`); `arguments` que no sea un objeto es `invalid_input`.
 
 ## Modelo de amenazas
 
 | Amenaza | Mitigación |
 | --- | --- |
-| Token robado | Hash SHA-256 en la base; caducidad obligatoria; revocación inmediata en la app; audiencia ligada al endpoint; refresco rotativo con detección de reuso; `auth_version` |
+| Token robado | Hash SHA-256 en la base; formato exacto (`ssm_pat_`/`ssm_at_` + 43 caracteres) comprobado antes de consultar la base; caducidad obligatoria; revocación inmediata en la app; audiencia ligada al endpoint; refresco rotativo con detección de reuso; `auth_version` |
 | Agente que se excede | Lista cerrada de rutas en la API, alcance ∩ rol actual, `guarded` fuera, CAS, papelera de solo lectura, límites de 12/20/50 resultados y 64 KB |
 | Escalada a sesión de escritorio | `/api/auth/*` fuera de la lista: un token de agente nunca obtiene un JWT; las rutas de gestión exigen sesión de escritorio |
 | Compromiso del CT del MCP | El servicio no tiene base de datos, `JWT_SECRET` ni secretos propios; solo ve tokens en tránsito, ya acotados. Contenedor sin root |
 | Phishing de consentimiento / redirección abierta | Redirecciones registradas: solo `https` o loopback `http` (puerto libre, RFC 8252); coincidencia exacta; un `redirect_uri` desconocido se muestra como error, nunca se sigue; el host de retorno se muestra en grande y se avisa si es loopback; `iss` en la respuesta |
-| Clickjacking / inyección en la página de consentimiento | CSP `default-src 'none'`, `frame-ancestors 'none'`, `X-Frame-Options: DENY`, todo texto escapado, sin JavaScript |
-| Fuerza bruta de contraseñas por la página OAuth | 20 intentos/10 min por IP y 8/15 min por correo; mismo coste bcrypt exista o no la cuenta |
+| CSRF de inicio de sesión (conectar el asistente de la víctima a la cuenta del atacante) | Token aleatorio en cookie `HttpOnly; Secure; SameSite=Lax; Path=/oauth/authorize` y en un campo oculto, comparados en tiempo constante antes de leer credenciales; un envío entre sitios no lleva la cookie |
+| Clickjacking / inyección en la página de consentimiento | CSP `default-src 'none'; form-action 'self' <origen de retorno>; frame-ancestors 'none'; base-uri 'none'`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, todo texto escapado, sin JavaScript. Solo `application/x-www-form-urlencoded` o JSON, cuerpos ≤ 16 KiB, campos repetidos o archivos se descartan |
+| Fuerza bruta de contraseñas por la página OAuth | 20 intentos/10 min por IP y 8/15 min por correo, `Retry-After` del límite que rechazó; mismo coste bcrypt exista o no la cuenta. La IP es la del socket salvo detrás de un proxy de confianza configurado (ver [IP del cliente](#ip-del-cliente)): rotar `CF-Connecting-IP` o `X-Forwarded-For` no da cupo nuevo |
 | Registro dinámico abusivo | 20 registros/h por IP; los clientes sin uso en 7 días se purgan; solo clientes públicos |
 | Interceptación del código | PKCE S256 obligatorio; código de un solo uso, 120 s, ligado a cliente y `redirect_uri` |
-| Páginas web contra `/mcp` (DNS rebinding, CSRF) | `Origin` rechazado salvo `MCP_ALLOWED_ORIGINS`; solo cabecera `Authorization` (nunca tokens en la URL) |
-| Ráfagas | 300 req/min por IP y 120 req/min por token en el servicio; 240 req/min por token en la API; cuerpo ≤ 256 KB |
+| Páginas web contra `/mcp` (DNS rebinding, CSRF) | `Host` canónico obligatorio; `Origin` rechazado salvo `MCP_ALLOWED_ORIGINS`; solo cabecera `Authorization` (nunca tokens en la URL) |
+| Ráfagas y tokens inventados | Servicio: 300 req/min por IP, 120 req/min por token, 30 bearer rechazados/10 min por IP (antes de llamar a la API), cuerpo ≤ 256 KB leído por trozos. API: 30 bearer `ssm_` rechazados/10 min por IP antes de consultar la base y 240 req/min por acceso **después** de autenticar. Con el mapa lleno los limitadores desalojan la clave más antigua: llenarlos no bloquea a nadie |
 | Inyección de instrucciones en datos | `AGENT_RULES_ES`; esquemas estrictos; las escrituras posibles son acotadas y reversibles a mano |
 | Servicio desactualizado frente a la API | Envía `X-SolarSim-Client: mcp-remote/<versión>`; si la API sube `MIN_CLIENT_VERSION`, responde `426` y el agente recibe `service_outdated` |
 
-Límites conocidos: los limitadores de tasa son por proceso (con varias réplicas se multiplican); la IP se toma de `CF-Connecting-IP`/`X-Forwarded-For`, válida solo detrás de Cloudflare; la identidad de un token se reutiliza 30 s para `initialize`/`tools/list` (cada `tools/call` vuelve a pasar por la API, así que una revocación corta las herramientas al instante).
+Riesgos aceptados:
+
+- Los limitadores son por proceso (con varias réplicas se multiplican).
+- Tras revocar un token, el servicio puede seguir respondiendo `initialize`, `ping` y `tools/list` con él durante **10 s** como máximo (caché de identidad). No expone datos: cada `tools/call` pasa por la API, que ya lo rechaza.
+- Todas las peticiones de agentes llegan a la API desde el servicio MCP. Si la API no lo trata como proxy de confianza, un atacante con muchas IP puede agotar el límite de 30 fallos de la API para la dirección del servicio y dejar sin MCP remoto a todos durante 10 min (la app de escritorio no se ve afectada). El servicio ya frena por IP real antes de reenviar y manda `X-Forwarded-For: <IP del cliente>`; para que la API lo use, ver [IP del cliente](#ip-del-cliente).
+
+## IP del cliente
+
+Los límites por IP usan la dirección del socket (`shared/clientIp.ts`). Las cabeceras de proxy se ignoran salvo que el socket pertenezca a `TRUSTED_PROXIES` (IP o CIDR, coma; vacío por defecto) y `CLIENT_IP_HEADER` diga cuál leer: `cf-connecting-ip` (valor único de Cloudflare) o `x-forwarded-for` (de derecha a izquierda, saltando proxies de confianza). Sin configurar, detrás de Caddy o del túnel todas las peticiones comparten la IP del proxy: los límites siguen funcionando, pero son globales. Valores recomendados en [INFRASTRUCTURE_ARCHITECTURE.md](INFRASTRUCTURE_ARCHITECTURE.md#servidor-mcp-remoto-ct-dedicado).
 
 ## Conectar proveedores
 
@@ -116,6 +127,7 @@ API (`server/`, contenedor de la API):
 | `MCP_REMOTE_URL` | URL canónica del endpoint MCP, p. ej. `https://mcp.solarsim.electsun.net/mcp`. Debe coincidir con `MCP_PUBLIC_URL` del servicio |
 | `MCP_OAUTH_ENABLED` | `true` para el servidor de autorización (necesario para ChatGPT y Claude.ai) |
 | `API_PUBLIC_URL` | Emisor OAuth: origen público de la API, sin ruta, p. ej. `https://solarsim.electsun.net` |
+| `TRUSTED_PROXIES`, `CLIENT_IP_HEADER` | Ver [IP del cliente](#ip-del-cliente); vacíos por defecto |
 
 Servicio (`mcp-remote/`):
 
@@ -127,6 +139,8 @@ Servicio (`mcp-remote/`):
 | `PORT`, `HOST` | `8787`, `0.0.0.0` por defecto |
 | `MCP_ALLOWED_ORIGINS` | Orígenes de navegador permitidos (coma), vacío por defecto |
 | `MCP_MAX_BODY_BYTES` | 262144 por defecto |
+| `MCP_ALLOWED_HOSTS` | `Host` adicionales aceptados en `/mcp` (coma); por defecto solo el de `MCP_PUBLIC_URL` |
+| `TRUSTED_PROXIES`, `CLIENT_IP_HEADER` | Ver [IP del cliente](#ip-del-cliente); detrás de Cloudflare Tunnel: la red Docker del CT y `cf-connecting-ip` |
 
 Una configuración inválida detiene el arranque. `GET /health` responde sin tocar la API; `GET /health?deep=1` comprueba `API_INTERNAL_URL/api/health`. `SIGTERM` termina las peticiones en curso y sale con código 0.
 
@@ -145,7 +159,8 @@ Procedimiento en [INFRASTRUCTURE_ARCHITECTURE.md](INFRASTRUCTURE_ARCHITECTURE.md
 
 ## Verificación
 
-- `server/tests/agentAccess.test.ts`: configuración, desactivado por defecto, tokens personales, lista de rutas, alcance y rol, CAS y papelera, actividad, revocación, `auth_version`, audiencia, límite por persona, OAuth (metadatos, registro, consentimiento, PKCE, `iss`, rotación, reuso, revocación, loopback, varias organizaciones).
+- `server/tests/agentAccess.test.ts`: configuración, desactivado por defecto, tokens personales, lista de rutas, alcance y rol, CAS y papelera, actividad, revocación, `auth_version`, audiencia, límite por persona, OAuth (metadatos, registro, consentimiento, PKCE, `iss`, rotación, reuso, revocación, loopback, varias organizaciones que conservan el alcance elegido), CSRF de inicio de sesión, cuerpos raros y tamaño, `nosniff`, IP falsificada y proxies de confianza, formato del token antes de la base, fallos por IP y límite por acceso, carrera de degradación al crear un token y aislamiento entre organizaciones.
+- `src/tests/testAgentAccessShared.ts`: limitador (desalojo), IP del cliente y lista de rutas; `src/tests/testPermissions.ts` vigila también `server/src` y `mcp-remote/src` (las comprobaciones de rol en línea heredadas de la API quedan congeladas por archivo).
 - `mcp-remote/tests/protocol.test.ts`: transporte, 401 con metadatos, Origin, tamaños, versiones, herramientas por alcance, `guarded`, errores de la API, tasa y salud (API sintética).
 - `mcp-remote/tests/endToEnd.test.ts`: API real con PostgreSQL efímero + servicio + cliente del SDK oficial de MCP, y flujo OAuth completo.
 - `mcp-remote/tests/containerSmoke.ts`: imágenes empaquetadas de API y servicio en una red Docker aislada (configuración inválida, sin secretos en el contenedor, salud profunda, herramienta real, apagado con código 0).

@@ -37,10 +37,10 @@ JWT_SECRET y DB_PASSWORD son obligatorios, privados y sin fallback conocido. PAT
 | PUT /api/clients/:id | Escritores; `{...cliente, baseVersion}` CAS (0 = crear). 409 con `client` actual o `null` si está borrado. |
 | DELETE /api/clients/:id | `?baseVersion=N`; borrado lógico que quita `clientId` de las propuestas y sube su versión. |
 | GET /api/projects | `?query=&clientId=&limit=` (máx. 50): resumen de propuestas fuera de la papelera, sin el documento completo. También lectores. |
-| GET /api/projects/:id | Propuesta canónica del tenant (incluida la papelera, con `isDeleted`); 404 si es ajena. |
+| GET /api/projects/:id | Propuesta canónica del tenant; con sesión de escritorio incluye la papelera (`isDeleted`), con token de agente una propuesta en papelera responde 404. 404 si es ajena. |
 | PUT /api/projects/:id/client-link | Escritores; `{clientId: string \| null, baseVersion}` CAS. Solo cambia el enlace; el cliente debe existir y no estar borrado (404); 409 si la versión cambió o la propuesta está en la papelera. |
 | GET /api/agent-access/status | Sesión de escritorio: `{enabled, oauthEnabled, mcpUrl?}` del [MCP remoto](MCP_REMOTE.md). |
-| GET/POST/DELETE /api/agent-access/grants | Sesión de escritorio: accesos propios; POST `{name, scope:'read'\|'write', expiresInDays:30\|90\|365}` devuelve el token una sola vez (LECTOR solo `read`; 20 activos máx.). DELETE revoca (propio o, siendo ADMIN, de su organización); terminal e idempotente, sin baseVersion. 404 `agent_access_disabled` si está apagado. |
+| GET/POST/DELETE /api/agent-access/grants | Sesión de escritorio: accesos propios; POST `{name, scope:'read'\|'write', expiresInDays:30\|90\|365}` devuelve el token una sola vez (LECTOR solo `read`; 20 activos máx.). Revalida membresía, rol y `auth_version` dentro de la transacción (`lockCurrentMembership`). DELETE revoca (propio o, siendo ADMIN, de su organización); terminal e idempotente, sin baseVersion. 404 `agent_access_disabled` si está apagado. |
 | GET /api/agent-access/activity | Actividad de los propios agentes; ADMIN con `?scope=organization` ve la de toda la organización (200 últimas, retención 180 días). |
 | GET /api/agent-access/whoami | Solo tokens de agente: `{scope, role, userName, organizationName}`. |
 | /.well-known/oauth-authorization-server, POST /oauth/register, GET/POST /oauth/authorize, POST /oauth/token, POST /oauth/revoke | Servidor de autorización OAuth 2.1 del MCP remoto, solo con `MCP_OAUTH_ENABLED`. Fuera de `/api`: no exigen versión de cliente. |
