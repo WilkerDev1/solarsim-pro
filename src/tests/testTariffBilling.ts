@@ -325,7 +325,11 @@ for (const mode of MODES) {
 }
 // 10.5 Distribuidora con el mismo criterio que el código; contigüidad impresa inclusiva; energía a precio 0 no es una fila válida.
 assert.equal(resolveEnergyValuationMethod(blockRates({ distributor: ' edesur ' as never })), 'block_billing', 'distribuidora en minúsculas o con espacios');
-assert.equal(isValidBillingTariff({ ...edesurBts1, energyBlocks: [{ fromKWh: 0, toKWh: 200, rateDOP: 6 }, { fromKWh: 200, toKWh: null, rateDOP: 8 }] }), false, 'solo límites impresos inclusivos (200 → 201)');
+// Tercera tanda: también límites compartidos (0–200, 200–…), que acepta el escáner de resoluciones y `averageBlockEnergyRateDOP`.
+const sharedLimits = { ...edesurBts1, energyBlocks: [{ fromKWh: 0, toKWh: 200, rateDOP: 6.05 }, { fromKWh: 200, toKWh: 300, rateDOP: 8.59 }, { fromKWh: 300, toKWh: 700, rateDOP: 12.89 }, { fromKWh: 700, toKWh: null, rateDOP: 13.09 }], fixedChargeTiers: [{ fromKWh: 0, toKWh: 100, chargeDOP: 42.1 }, { fromKWh: 100, toKWh: null, chargeDOP: 128.59 }] };
+assert.equal(isValidBillingTariff(sharedLimits), true, 'límites compartidos: fila válida, no cae al escalar');
+close(calculateMonthlyBill({ tariff: sharedLimits, withdrawnKWh: 250 }).totalDOP, 1639.5 + 128.59, 'límites compartidos: mismo importe que los impresos');
+close(fixedChargeDOP(sharedLimits, 100), 42.1, 'límites compartidos: 100 kWh en el primer rango');
 assert.equal(isValidBillingTariff({ ...edesurBts1, energyBlocks: [{ fromKWh: 0, toKWh: 200, rateDOP: 6 }, { fromKWh: 250, toKWh: null, rateDOP: 8 }] }), false, 'hueco entre tramos');
 assert.equal(isValidBillingTariff({ ...edesurBts1, energyBlocks: [{ fromKWh: 0, toKWh: null, rateDOP: 0 }] }), false, 'energía a 0 RD$: dato faltante, no una tarifa');
 assert.equal(isValidBillingTariff({ ...edesurBts1, fixedChargeTiers: [{ fromKWh: 0, toKWh: 100, chargeDOP: 0 }, { fromKWh: 101, toKWh: null, chargeDOP: 128.59 }] }), true, 'cargo fijo 0 en un rango: válido');
@@ -373,6 +377,37 @@ assert.equal(isReferenceApplied({ distributor: 'EDESUR', tariffCode: 'BTS1', ene
   const run = (dopPerUSD: number) => calculateMonthlySolarProduction(p.client.province, p.specs, p.monthlyConsumption, 0.218, 25, undefined, 'BTS1', 'grid_export', 'legacy', { usdPerKWh: 3.78 / 60 }, { tariff: edesurBts1, dopPerUSD, gridUseChargeDOPPerKWh: 3.78, settlementDOPPerKWh: 0 });
   assert.deepEqual(run(Number.NaN), run(60), 'tasa NaN → 60 (DEFAULT_DOP_RATE), no 1');
 }
+
+// 11. Revisión (tercera tanda).
+{
+  const existing = (rates: Partial<UtilityRates>) => ({ ...project({ netMeteringRegime: 'sie007_2026', ...rates }), monthlyConsumption: Array(12).fill(1000) });
+  const noPrice = { ...invoiceDraft, energyCostPerKWhDOP: undefined, energyCostPerKWhUSD: undefined, energyRateSource: undefined };
+  // 11.1 Misma tarifa escrita de otra forma (distribuidora en minúsculas, código con guion): no se pisa el precio manual.
+  const manual = existing({ energyRateSource: 'manual', energyCostPerKWh: 0.31 });
+  const spelled = prepareProposalDraftProject(manual, { ...noPrice, distributor: 'edesur' as never, tariffCode: 'BTS-1' }, DEFAULT_RD_TARIFF_MATRIX, { isNew: false });
+  assert.deepEqual([spelled.rates.energyCostPerKWh, spelled.rates.energyRateSource], [0.31, 'manual'], 'misma tarifa normalizada: sin cambio');
+  const hyphen = prepareProposalDraftProject(manual, { ...noPrice, distributor: 'EDESUR', tariffCode: 'BTS-1' }, DEFAULT_RD_TARIFF_MATRIX, { isNew: false });
+  assert.deepEqual([hyphen.rates.energyCostPerKWh, hyphen.rates.energyRateSource], [0.31, 'manual'], 'BTS-1 resuelto a BTS1: misma tarifa, sin cambio');
+  // 11.2a De referencia a precio explícito: la fila se limpia.
+  const referenced = existing(blockRates());
+  const toInvoice = prepareProposalDraftProject(referenced, invoiceDraft, DEFAULT_RD_TARIFF_MATRIX, { isNew: false });
+  assert.equal(toInvoice.rates.energyRateSource, 'invoice');
+  assert.equal(toInvoice.rates.billingTariff, undefined, 'precio de factura: sin fila de referencia pegada');
+  // 11.2b Cambio a una tarifa que no está en la matriz, sin precio: el escalar queda como dato sin procedencia ni fila.
+  const unknown = prepareProposalDraftProject(referenced, { ...noPrice, tariffCode: 'XYZ' }, DEFAULT_RD_TARIFF_MATRIX, { isNew: false });
+  assert.equal(unknown.rates.energyCostPerKWh, referenced.rates.energyCostPerKWh, 'el escalar se conserva');
+  assert.equal(unknown.rates.energyRateSource, undefined, 'sin procedencia');
+  assert.equal(unknown.rates.billingTariff, undefined, 'sin la fila de la tarifa anterior');
+  assert.equal(resolveAssumptions(unknown).energyValuationMethod, 'flat_rate');
+}
+// 11.3 Matriz activa vacía (sin pliegos): respaldo de fábrica también.
+store.setState({ projects: [], tariffMatrix: {} } as never);
+store.getState().createNewProject({ name: 'Matriz vacía', distributor: 'EDESUR', tariffCode: 'BTS1' } as never);
+assert.deepEqual(store.getState().projects[0].rates.billingTariff, edesurBts1, 'matriz {}: respaldo de fábrica');
+store.setState({ projects: [], tariffMatrix: { ...DEFAULT_RD_TARIFF_MATRIX, schedules: {} } } as never);
+store.getState().createNewProject({ name: 'Sin pliegos', distributor: 'EDESUR', tariffCode: 'BTS1' } as never);
+assert.deepEqual(store.getState().projects[0].rates.billingTariff, edesurBts1, 'schedules vacío: respaldo de fábrica');
+store.setState({ tariffMatrix: DEFAULT_RD_TARIFF_MATRIX } as never);
 
 // 9. Ejemplo del informe: EDESUR BTS-1, 1,000 kWh/mes, sistema que cubre ~100 %.
 const coverage100 = (rates: Partial<UtilityRates>) => calculateProjectFinancialSummary(project(rates, 1000, { panelCount: 12 }), 'legacy');
