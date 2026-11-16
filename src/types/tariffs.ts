@@ -1,3 +1,5 @@
+import { normalizeTariffCode } from '../../shared/tariffRules';
+
 export type UtilityDistributor = 'EDEESTE' | 'EDESUR' | 'EDENORTE' | 'CEPM';
 
 export type TariffCode =
@@ -149,6 +151,7 @@ export function mapTariffCodeOnDistributorChange(
   currentCode: string
 ): string {
   if (oldDistributor === newDistributor) return currentCode;
+  currentCode = normalizeTariffCode(currentCode);
 
   // De EDE a CEPM
   if (newDistributor === 'CEPM') {

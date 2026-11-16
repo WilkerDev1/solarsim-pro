@@ -1,4 +1,5 @@
 import { resolveAssumption } from './assumptions';
+import { averageBlockEnergyRateDOP, tariffMatrixKey } from './tariffRules';
 import { COMMERCIAL_SCHEMA, normalizeCommercial, commercialMarkup, type AIProposalCommercial } from './aiProposalCommercial';
 import type { SolarEquipmentItem, EquipmentType } from '../src/types/equipment';
 import type { ExtractedInvoiceData } from '../src/types/aiInvoice';
@@ -193,7 +194,8 @@ export function normalizeProposalDraft(rawDraft: unknown, catalog: SolarEquipmen
   if (!clientName) issue('missing_client','Indica el nombre del cliente.');
   const distributor=(str(raw.distributor)||context.distributor||'').toUpperCase();
   if (!['EDEESTE','EDESUR','EDENORTE','CEPM'].includes(distributor)) issue('missing_distributor','Selecciona una distribuidora válida.');
-  const tariffCode=(str(raw.tariffCode)||context.tariffCode||'').toUpperCase();
+  // Código canónico de la matriz (BTS-1 → BTS1; en CEPM, RBT1 → RBT-1 y alias de las EDE).
+  const tariffCode=tariffMatrixKey(distributor,str(raw.tariffCode)||context.tariffCode||'');
   if (!tariffCode) issue('missing_tariff','Selecciona el código tarifario del suministro.');
   const schedules = (context.tariffReference as any)?.schedules;
   const tariff = Array.isArray(schedules) ? schedules.find((s:any)=>s.distributor===distributor)?.tariffs?.find((t:any)=>t.code===tariffCode) : undefined;
@@ -214,7 +216,7 @@ export function normalizeProposalDraft(rawDraft: unknown, catalog: SolarEquipmen
   if(rateDOP===undefined&&(raw.energyRateSource==='reference'||num(raw.energyCostPerKWhUSD)===undefined)&&tariff){
     const monthly=consumption.reduce((sum,n)=>sum+n,0)/12;
     if(tariff.currency==='USD'&&num(tariff.energyRate)!==undefined)rateDOP=tariff.energyRate*exchange;
-    else if(Array.isArray(tariff.blocksDOP)&&monthly>0){let remaining=monthly,total=0,previousMax=0;for(const block of tariff.blocksDOP){if(!remaining)break;const lower=block.fromKWh>0&&block.fromKWh===previousMax+1?previousMax:block.fromKWh;const size=block.toKWh===null?Infinity:Math.max(0,block.toKWh-lower);const amount=Math.min(remaining,size);if(num(block.rateDOP)===undefined){total=NaN;break;}total+=amount*block.rateDOP;remaining-=amount;previousMax=block.toKWh;}if(remaining===0&&Number.isFinite(total))rateDOP=total/monthly;}
+    else if(Array.isArray(tariff.blocksDOP)&&monthly>0)rateDOP=averageBlockEnergyRateDOP(tariff.blocksDOP,monthly,tariffCode);
     else rateDOP=num(tariff.energyRate);
     referenceRate=rateDOP!==undefined;
   }

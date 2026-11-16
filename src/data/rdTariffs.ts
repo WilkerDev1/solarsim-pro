@@ -1,4 +1,5 @@
-import { GlobalTariffMatrix, UtilityDistributor, TariffCode, UtilityTariffDetails } from '../types/tariffs';
+import { GlobalTariffMatrix, UtilityDistributor, UtilityTariffDetails } from '../types/tariffs';
+import { averageBlockEnergyRateDOP, tariffMatrixKey } from '../../shared/tariffRules';
 
 export const DEFAULT_RD_TARIFF_MATRIX: GlobalTariffMatrix = {
   resolutionCode: 'SIE-176-2025-TF',
@@ -381,8 +382,8 @@ export function getReferenceEnergyRateUSD(
   const distKey = (distributor as UtilityDistributor) || 'EDESUR';
   const sched = matrix.schedules[distKey] || matrix.schedules.EDESUR;
 
-  // Si no existe la tarifa exacta, buscar por clave directa o alias
-  const canonical = distKey === 'CEPM' ? ({BTS1:'RBT-1',BTS2:'RBT-1',BTD:'RBT-2',MTD1:'RMT-1',MTD2:'RMT-1'} as Record<string,string>)[tariffCode] || tariffCode : tariffCode;
+  // Código normalizado (BTS-1 → BTS1, RBT1 → RBT-1) y, en CEPM, alias de las EDE.
+  const canonical = tariffMatrixKey(distKey, tariffCode);
   let tariff: UtilityTariffDetails | undefined = sched.tariffs[canonical];
 
   if (!tariff) {
@@ -400,27 +401,17 @@ export function getReferenceEnergyRateUSD(
     return Math.round(tariff.baseEnergyRateUSD * 1000) / 1000;
   }
 
-  // Si tiene bloques escalonados (ej. BTS1) y se provee consumo mensual
+  // Bloques (BTS-1, BTS-2): escalonados y, desde 701 kWh, todo al 4.º rango (SIE-121-2026-TF, art. 4.d).
   if (tariff.blocks && tariff.blocks.length > 0 && monthlyKWh > 0) {
-    let remaining = monthlyKWh;
-    let totalDOP = 0;
-    let previousMax = 0;
-
-    for (const block of tariff.blocks) {
-      if (remaining <= 0) break;
-      const lower = block.minKWh > 0 && block.minKWh === previousMax + 1
-        ? previousMax
-        : block.minKWh;
-      const blockSize = block.maxKWh === Infinity ? Infinity : Math.max(0, block.maxKWh - lower);
-      const consumedInBlock = Math.min(remaining, blockSize);
-      totalDOP += consumedInBlock * block.rateDOP;
-      remaining -= consumedInBlock;
-      previousMax = block.maxKWh;
+    const effectiveDOPPerKWh = averageBlockEnergyRateDOP(
+      tariff.blocks.map((block) => ({ fromKWh: block.minKWh, toKWh: Number.isFinite(block.maxKWh) ? block.maxKWh : null, rateDOP: block.rateDOP })),
+      monthlyKWh,
+      canonical,
+    );
+    if (effectiveDOPPerKWh !== undefined) {
+      const rateUSD = effectiveDOPPerKWh / (usdExchangeRate > 0 ? usdExchangeRate : 60.0);
+      return Math.round(rateUSD * 1000) / 1000;
     }
-
-    const effectiveDOPPerKWh = totalDOP / monthlyKWh;
-    const rateUSD = effectiveDOPPerKWh / (usdExchangeRate > 0 ? usdExchangeRate : 60.0);
-    return Math.round(rateUSD * 1000) / 1000;
   }
 
   // Tarifa monómica plana (ej. RBT-1 en CEPM = 22.90 DOP)

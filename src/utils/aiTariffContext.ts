@@ -1,4 +1,5 @@
 import { GlobalTariffMatrix, UtilityDistributor, UtilityTariffDetails } from '../types/tariffs';
+import { tariffMatrixKey } from '../../shared/tariffRules';
 
 export const TARIFF_DISTRIBUTORS: UtilityDistributor[] = ['EDEESTE', 'EDESUR', 'EDENORTE', 'CEPM'];
 
@@ -60,9 +61,8 @@ export function buildAITariffContext(matrix: GlobalTariffMatrix, now = new Date(
 /** Unknown distributor/code returns null: callers must request confirmation, never silently choose BTS2. */
 export function resolveAITariffSelection(matrix: GlobalTariffMatrix, distributor: string, code: string): UtilityTariffDetails | null {
   if (!TARIFF_DISTRIBUTORS.includes(distributor as UtilityDistributor)) return null;
-  const normalized = code.toUpperCase().trim();
-  const canonical = distributor === 'CEPM' ? ({ BTS1: 'RBT-1', BTS2: 'RBT-1', BTD: 'RBT-2', MTD1: 'RMT-1', MTD2: 'RMT-1' } as Record<string, string>)[normalized] || normalized : normalized;
-  return matrix.schedules[distributor as UtilityDistributor]?.tariffs[canonical] || null;
+  // BTS-1, «bts 1» y BTS1 son la misma fila; en CEPM los códigos de las EDE se resuelven a su alias.
+  return matrix.schedules[distributor as UtilityDistributor]?.tariffs[tariffMatrixKey(distributor, code)] || null;
 }
 
 export function tariffSourceFieldLabel(field: string): string {

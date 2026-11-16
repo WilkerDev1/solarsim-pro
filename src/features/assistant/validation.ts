@@ -1,3 +1,4 @@
+import { normalizeTariffCode } from '../../../shared/tariffRules';
 import type { AssistantEdit, AssistantSection } from './types';
 // Explicit surface: no ids, roles, authorship, remote endpoints, assets or arbitrary store writes.
 const fields: Record<AssistantSection, string[]> = {
@@ -348,6 +349,8 @@ export function validateAssistantEdits(
       if (field === 'saleMarginMultiplier' && value < 1)
         throw new Error('El factor de venta debe ser al menos 1.');
     }
+    // Código de tarifa en la forma de la matriz (BTS-1 → BTS1): mismo normalizador que la IA y el dock.
+    if (field === 'tariffCode' && typeof value === 'string') return { section, field, value: normalizeTariffCode(value) };
     return { section, field, value };
   });
 }
