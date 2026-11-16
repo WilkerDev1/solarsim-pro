@@ -213,15 +213,16 @@ assert.ok(btdNote.split('\n\n')[3].includes('equivalente al 25% del valor de la 
 const zeroNote = note('EDEESTE', 'BTS2', { isZeroExport: true, hasBattery: true });
 assert.equal(zeroNote.split('\n\n')[3], 'Al operar con limitador antivertido (inyección cero) y almacenamiento en baterías de litio, la totalidad de la energía solar se aprovecha internamente, por lo que el proyecto no genera cargos por derecho de uso de la red bajo la normativa vigente.');
 
+// Fase 1b: EDESUR y EDENORTE con sus propios valores (SIE-121-2026-TF); EDEESTE no cambia; CEPM RBT-2 según SIE-147-2026-TF.
 const REFERENCE_RATES = {
-  edesurBts1_150: 0.103,
-  edesurBts1_250: 0.111,
-  edesurBts1_1000: 0.188,
-  edenorteBts1_1000: 0.188,
+  edesurBts1_150: 0.101,
+  edesurBts1_250: 0.109,
+  edesurBts1_1000: 0.186,
+  edenorteBts1_1000: 0.196,
   edeesteBts2_900: 0.203,
-  edesurBtd: 0.151,
+  edesurBtd: 0.15,
   cepmRbt1: 0.382,
-  cepmRbt2: 0.235,
+  cepmRbt2: 0.233,
 };
 // 7. Tarifa de referencia de fábrica que se propone al crear o escanear (USD/kWh a 60 RD$/USD).
 // No entra en propuestas guardadas; la fase 1 la corrige (pliego vigente y regla de 701 kWh).

@@ -19,6 +19,13 @@ export function getTariffSource(matrix: GlobalTariffMatrix, tariff: UtilityTarif
   };
 }
 
+/** Periodo de vigencia de los pliegos conocidos: pasado el último día, el contexto IA pide confirmar tarifas. */
+const KNOWN_TARIFF_PERIODS: Record<string, { end: string; label: string }> = {
+  'SIE-176-2025-TF': { end: '2026-03-31', label: 'enero-marzo 2026' },
+  'SIE-121-2026-TF': { end: '2026-12-31', label: 'octubre-diciembre 2026' },
+  'SIE-147-2026-TF': { end: '2026-09-30', label: 'septiembre 2026 (CEPM)' },
+};
+
 /** Compact, deterministic reference. These rows are application data, never a prompt to infer new rates. */
 export function buildAITariffContext(matrix: GlobalTariffMatrix, now = new Date()) {
   const warnings: string[] = [
@@ -29,8 +36,9 @@ export function buildAITariffContext(matrix: GlobalTariffMatrix, now = new Date(
     distributor,
     tariffs: Object.entries(matrix.schedules[distributor]?.tariffs || {}).filter(([key, tariff]) => key === tariff.code || !matrix.schedules[distributor].tariffs[tariff.code]).map(([, tariff]) => tariff).sort((a, b) => a.code.localeCompare(b.code)).map((tariff) => {
       const source = getTariffSource(matrix, tariff);
-      if (source.resolutionCode === 'SIE-176-2025-TF' && now.toISOString().slice(0, 10) > '2026-03-31' && distributor !== 'CEPM') {
-        const warning = 'El pliego base SIE-176-2025-TF corresponde a enero-marzo 2026; confirmar tarifas para el período solicitado.';
+      const period = KNOWN_TARIFF_PERIODS[source.resolutionCode];
+      if (period && now.toISOString().slice(0, 10) > period.end) {
+        const warning = `El pliego base ${source.resolutionCode} corresponde a ${period.label}; confirmar tarifas para el período solicitado.`;
         if (!warnings.includes(warning)) warnings.push(warning);
       }
       if (source.effectiveDate > now.toISOString().slice(0, 10)) {
