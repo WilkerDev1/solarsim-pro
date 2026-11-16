@@ -86,6 +86,13 @@ assert.match(reviewHtml, /Textos del documento/);
 assert.match(reviewHtml, /Garantía de paneles/);
 assert.match(reviewHtml, /12 Años de Garantía de Producto/);
 assert.equal(renderToStaticMarkup(createElement(ProposalDocumentTextsReview, { draft: { ...draft, documentTexts: [] }, update: () => {} })), '');
+{
+  // Sin textos pero con avisos el destino del enlace del resumen existe y muestra los avisos.
+  const html = renderToStaticMarkup(createElement(ProposalDocumentTextsReview, { draft: { ...draft, documentTexts: [] }, update: () => {}, issues: [{ code: 'unknown_document_text', severity: 'warning', tier: 'info', message: 'El documento no tiene el texto «x».' }] as never }));
+  assert.match(html, /id="proposal-document-texts"/);
+  assert.match(html, /El documento no tiene el texto/);
+  assert.doesNotMatch(html, /0 cambios/);
+}
 // Para una propuesta nueva el contexto sale de la plantilla de la empresa activa.
 assert(draftDocumentTextCatalog(store.getState(), undefined, 'Santiago').some((t) => t.key === 'quotation.warranty.inverter'));
 
