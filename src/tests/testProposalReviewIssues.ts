@@ -126,7 +126,10 @@ assert.match(review, /aria-invalid="true"/);
   const row = reviewAnchor.row('batteries', 1);
   const controls = html.match(new RegExp(`<[^>]*aria-describedby="${row}-issues"[^>]*>`, 'g')) || [];
   assert(controls.length >= 3, 'model, units and cost describe the row warning');
-  assert(controls.every((tag) => /aria-invalid="true"/.test(tag)) || controls.filter((tag) => /aria-invalid="true"/.test(tag)).length >= 1);
+  // El bloqueo es del modelo solicitado: sólo el selector de modelo lleva aria-invalid.
+  const invalid = controls.filter((tag) => /aria-invalid="true"/.test(tag));
+  assert.equal(invalid.length, 1, 'exactly one control is marked invalid');
+  assert(invalid[0].startsWith('<select'), 'the model select carries the blocker');
   assert.match(html, new RegExp(`id="${row}-issues"`));
   const otherRow = html.match(new RegExp(`<[^>]*aria-describedby="${reviewAnchor.row('panels', 0)}-issues"`));
   assert.equal(otherRow, null, 'rows without warnings stay clean');

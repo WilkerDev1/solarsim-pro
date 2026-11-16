@@ -35,6 +35,8 @@ export function useAIInvoiceScanner() {
   const [useCurrentProject, setUseCurrentProject] = useState(false);
   const [reviewConfirmed, setReviewConfirmed] = useState(false);
   const [draftScope, setDraftScope] = useState('');
+  // Cuenta los borradores generados: lo usa la revisión para reiniciar el progreso de avisos.
+  const [draftGeneration, setDraftGeneration] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sequence = useRef(0);
   const controller = useRef<AbortController>();
@@ -123,7 +125,7 @@ export function useAIInvoiceScanner() {
       } else result = await parseProposalWithAI(payload, controller.current.signal);
       if (!isCurrent()) return;
       if (result.province) result.province = getProvinceHSP(result.province).name;
-      if(result.responseKind!=='discussion'){setExtractedData(result);setDraftScope(scope);}
+      if(result.responseKind!=='discussion'){setExtractedData(result);setDraftScope(scope);setDraftGeneration(n=>n+1);}
       setPrompt('');
       setMessages(previous => [...previous,{role:'assistant',text:result.assistantMessage || result.aiReasoningSummary || 'Preparé un borrador. Revisemos los datos antes de aplicarlo.'}]);
     } catch (error) { if (isCurrent()) {const text=(error as Error).message || 'No se pudo analizar la entrada. Reintenta.';setErrorMsg(text);setMessages(previous=>[...previous,{role:'assistant',kind:'error',text}]);} }
@@ -164,7 +166,7 @@ export function useAIInvoiceScanner() {
     isProcessing, cancel, reset, prompt, setPrompt, messages, errorMsg, processSmartProposal,
     extractedData:validatedDraft, draftPreview, draftEnergy, updateDraft, equipmentCatalog, tariffMatrix, context, useCurrentProject,
     setUseCurrentProject:(value:boolean)=>{cancel();setUseCurrentProject(value);setExtractedData(null);setReviewConfirmed(false);setMessages([]);},
-    reviewConfirmed, setReviewConfirmed, blockingIssues, attentionIssues, canApply,
+    draftGeneration, reviewConfirmed, setReviewConfirmed, blockingIssues, attentionIssues, canApply,
     handleApplyAsNew:()=>apply(true), handleApplyToActive:()=>apply(false),
   };
 }

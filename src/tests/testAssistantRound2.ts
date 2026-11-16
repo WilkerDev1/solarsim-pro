@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { primaryAction, ProposalApplyBar } from '../components/common/ai-invoice/components/ProposalApplyBar';
-import { ReviewIssueDigest, digestProgress } from '../components/common/ai-invoice/components/ReviewIssueDigest';
+import { ReviewIssueDigest, digestProgress, nextPeak } from '../components/common/ai-invoice/components/ReviewIssueDigest';
 import { describeIssues } from '../components/common/ai-invoice/reviewIssues';
 import { ChatMessage } from '../features/assistant/components/ChatMessage';
 import { ChatComposer } from '../features/assistant/components/ChatComposer';
@@ -14,6 +14,7 @@ import { reusableUserText, isMissingKeyError, replyScrollTarget } from '../featu
   assert.deepEqual(primaryAction({ blocking: 1, reviewConfirmed: true, canApply: true }), { mode: 'resolve', label: 'Resolver 1 bloqueo', blocked: true }, 'blockers win even if canApply were stale');
   assert.deepEqual(primaryAction({ blocking: 0, reviewConfirmed: false, canApply: false }), { mode: 'confirm', label: 'Crear propuesta nueva', blocked: true });
   assert.deepEqual(primaryAction({ blocking: 0, reviewConfirmed: true, canApply: false }), { mode: 'confirm', label: 'Crear propuesta nueva', blocked: true }, 'canApply is the last guard');
+  assert.deepEqual(primaryAction({ blocking: 0, reviewConfirmed: true, canApply: false, busy: true }), { mode: 'wait', label: 'Procesando…', blocked: true }, 'busy never points at the disabled checkbox');
   assert.deepEqual(primaryAction({ blocking: 0, reviewConfirmed: true, canApply: true }), { mode: 'apply', label: 'Crear propuesta nueva', blocked: false });
 
   let created = 0, updated = 0, resolved = 0, focusedCheck = 0;
@@ -60,6 +61,9 @@ import { reusableUserText, isMissingKeyError, replyScrollTarget } from '../featu
   assert.doesNotMatch(html, /<details[^>]*data-tier="confirm"[^>]*open=""/, '«por confirmar» closed while blockers remain');
   assert.deepEqual(digestProgress(8, 6), { resolved: 2, total: 8 });
   assert.deepEqual(digestProgress(3, 6), { resolved: 0, total: 6 }, 'peak never below current');
+  assert.equal(nextPeak(8, 6, false), 8);
+  assert.equal(nextPeak(8, 0, false), 0, 'no warnings clears the peak');
+  assert.equal(nextPeak(8, 3, true), 3, 'a replaced draft starts its own peak');
 }
 
 // C1/C2. Message actions; the error turn offers a way out.

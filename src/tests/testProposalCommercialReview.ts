@@ -38,4 +38,10 @@ assert.deepEqual(checks(render({ applyITBIS: false })), [true, false, false], 'L
   const html = renderToStaticMarkup(React.createElement(ProposalCommercialReview, { draft: bad, update: () => {} }));
   assert(!html.includes('NaN'), 'no NaN in the table');
 }
+{
+  // Una fila sin id nunca empareja con un grupo sin id (undefined === undefined).
+  const noId = { panels: [{ powerW: 600, count: 1, unitPriceUSD: 10 }] } as never;
+  const rows = equipmentCostRows(noId, { costMatrix: { items: [{ itbisUSD: 99 }] } } as never, { panels: [{}] } as never);
+  assert.equal(rows[0].itbisUSD, undefined);
+}
 console.log('Proposal commercial review mirrors engine defaults for margin and ITBIS and pairs matrix rows by id.');

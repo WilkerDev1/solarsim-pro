@@ -16,11 +16,18 @@ export function digestProgress(peak: number, current: number) {
   return { resolved: total - current, total };
 }
 
-/** Máximo de avisos vistos desde que apareció el borrador (vuelve a cero al quedar sin avisos). */
-export function useDigestPeak(current: number) {
-  const peak = useRef(current);
-  useEffect(() => { peak.current = current === 0 ? 0 : Math.max(peak.current, current); }, [current]);
-  return Math.max(peak.current, current);
+/** Pico siguiente: crece con los avisos, vuelve a cero sin avisos y arranca de nuevo con un borrador nuevo. */
+export function nextPeak(previous: number, current: number, newDraft: boolean): number {
+  if (current === 0) return 0;
+  return newDraft ? current : Math.max(previous, current);
+}
+
+/** Máximo de avisos vistos desde que apareció el borrador (se reinicia sin avisos o cuando `draftKey` cambia: borrador nuevo). */
+export function useDigestPeak(current: number, draftKey?: number) {
+  const peak = useRef({ key: draftKey, value: current });
+  if (peak.current.key !== draftKey) peak.current = { key: draftKey, value: nextPeak(0, current, true) };
+  useEffect(() => { peak.current.value = nextPeak(peak.current.value, current, false); }, [current]);
+  return Math.max(peak.current.value, current);
 }
 
 /** Avisos del borrador en el chat: cabecera con resumen, grupos plegables y filas compactas con destino. */

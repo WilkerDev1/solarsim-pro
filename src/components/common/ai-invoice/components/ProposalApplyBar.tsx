@@ -1,14 +1,15 @@
 import { AlertOctagon, ArrowRight, CheckCircle2, ShieldCheck } from 'lucide-react';
 
-export interface PrimaryState { blocking: number; reviewConfirmed: boolean; canApply: boolean }
-export interface PrimaryAction { mode: 'resolve' | 'confirm' | 'apply'; label: string; blocked: boolean }
+export interface PrimaryState { blocking: number; reviewConfirmed: boolean; canApply: boolean; /** Procesando: la casilla está deshabilitada, así que no hay nada que guiar. */ busy?: boolean }
+export interface PrimaryAction { mode: 'resolve' | 'confirm' | 'apply' | 'wait'; label: string; blocked: boolean }
 
 /**
  * Qué hace el botón principal del pie. Sigue viéndose principal: con bloqueos lleva al primero,
  * sin la casilla lleva a la casilla y sólo con `canApply` (la misma guarda del hook) crea la propuesta.
  */
-export function primaryAction({ blocking, reviewConfirmed, canApply }: PrimaryState): PrimaryAction {
+export function primaryAction({ blocking, reviewConfirmed, canApply, busy }: PrimaryState): PrimaryAction {
   if (blocking > 0) return { mode: 'resolve', label: `Resolver ${blocking} ${blocking === 1 ? 'bloqueo' : 'bloqueos'}`, blocked: true };
+  if (busy) return { mode: 'wait', label: 'Procesando…', blocked: true };
   if (!reviewConfirmed || !canApply) return { mode: 'confirm', label: 'Crear propuesta nueva', blocked: true };
   return { mode: 'apply', label: 'Crear propuesta nueva', blocked: false };
 }
@@ -43,7 +44,7 @@ export function ProposalApplyBar(props: Props) {
       <p id="proposal-apply-status" className="proposal-apply-status" data-tier={tier} aria-live="polite"><Icon size={14} aria-hidden />{status}</p>
     </div>
     <div className="proposal-actions">
-      {props.updateLabel && props.onUpdate && <button type="button" disabled={!props.canApply} onClick={props.onUpdate}>{props.updateLabel}</button>}
+      {props.updateLabel && props.onUpdate && <button type="button" disabled={props.busy || !props.canApply} onClick={props.onUpdate}>{props.updateLabel}</button>}
       <button type="button" className="proposal-primary" data-mode={action.mode} aria-disabled={action.blocked || undefined} aria-describedby="proposal-apply-status"
         onClick={() => ProposalApplyBar.activate(primaryAction(props), props)}>
         {action.label}{action.mode === 'resolve' && <ArrowRight size={16} aria-hidden />}
@@ -56,5 +57,5 @@ export function ProposalApplyBar(props: Props) {
 ProposalApplyBar.activate = (action: PrimaryAction, handlers: Handlers) => {
   if (action.mode === 'resolve') handlers.onResolve();
   else if (action.mode === 'confirm') handlers.onFocusCheck();
-  else handlers.onCreate();
+  else if (action.mode === 'apply') handlers.onCreate();
 };

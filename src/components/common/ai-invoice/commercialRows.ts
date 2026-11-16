@@ -27,7 +27,7 @@ export function equipmentCostRows(draft: ExtractedInvoiceData, financial?: Finan
     const count = Number(row.count);
     const priced = row.unitPriceUSD !== undefined && Number.isFinite(row.unitPriceUSD) && Number.isFinite(count);
     const group = groups?.[k][i];
-    const sameGroup = !!group && (group.id === row.id || (!!group.catalogItemId && group.catalogItemId === row.id));
+    const sameGroup = !!group && !!row.id && (group.id === row.id || (!!group.catalogItemId && group.catalogItemId === row.id));
     const matrixRow = sameGroup && offsets ? items[offsets[k] + i] : undefined;
     return {
       key, row, i,

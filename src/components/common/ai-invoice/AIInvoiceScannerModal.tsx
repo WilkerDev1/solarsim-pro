@@ -9,7 +9,7 @@ import './proposal-workspace.css';
 import { useResizablePanel } from '../../../features/assistant/useResizablePanel';
 import { ChatMessage } from '../../../features/assistant/components/ChatMessage';
 import { ChatComposer, ChatSuggestions, ChatThinking, ScrollToLatest } from '../../../features/assistant/components/ChatComposer';
-import { useChatAnnouncement, useElapsedSeconds, useResend, useStickToBottom } from '../../../features/assistant/chatUi';
+import { reusableUserText, useChatAnnouncement, useElapsedSeconds, useResend, useStickToBottom } from '../../../features/assistant/chatUi';
 import '../../../features/assistant/chat.css';
 import { PrimaryIconDock } from '../../layout/PrimaryIconDock';
 
@@ -22,31 +22,35 @@ export const AIInvoiceScannerModal: React.FC = () => {
   const ai = useAIInvoiceScanner();
   const resize = useResizablePanel();
   const [confirmUpdate, setConfirmUpdate] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
   const [tab, setTab] = useState<ReviewTab>('consumption');
   const dialog = useRef<HTMLDivElement>(null);
   const conversation = useRef<HTMLDivElement>(null);
   const promptInput = useRef<HTMLTextAreaElement>(null);
+  const openPicker = useRef<(() => void) | null>(null);
   const scroll = useStickToBottom(conversation, [ai.messages, ai.isProcessing, ai.attentionIssues.length]);
   const elapsed = useElapsedSeconds(ai.isProcessing);
   const issueViews = useMemo(() => describeIssues(ai.attentionIssues, ai.extractedData || undefined), [ai.attentionIssues, ai.extractedData]);
   useEffect(() => {
-    if (!ai.isAIInvoiceModalOpen) {setConfirmUpdate(false); return;}
+    if (!ai.isAIInvoiceModalOpen) {setConfirmUpdate(false);setConfirmReset(false); return;}
     const previous = document.activeElement as HTMLElement | null;
     promptInput.current?.focus();
     return () => { previous?.isConnected && previous.focus(); };
   }, [ai.isAIInvoiceModalOpen]);
   useEffect(() => {setConfirmUpdate(false);}, [ai.useCurrentProject,ai.activeProject?.id]);
+  // Procesar o cambiar de destino invalida la confirmación de descartar: nunca queda abierta sobre un borrador distinto.
+  useEffect(() => {if(ai.isProcessing)setConfirmReset(false);}, [ai.isProcessing]);
+  useEffect(() => {setConfirmReset(false);}, [ai.useCurrentProject,ai.activeProject?.id]);
   const pendingCount = issueViews.filter(v => v.tier !== 'info').length;
-  const peak = useDigestPeak(issueViews.length);
-  const [confirmReset, setConfirmReset] = useState(false);
+  const peak = useDigestPeak(issueViews.length, ai.draftGeneration);
   const resend = useResend(ai.prompt, ai.setPrompt, () => void ai.processSmartProposal(), ai.isProcessing);
   const lastMessage = ai.messages[ai.messages.length - 1];
-  const announcement = useChatAnnouncement(ai.isProcessing, () => lastMessage?.kind === 'error' ? 'La respuesta no se completó.' : `Respuesta lista${pendingCount ? `: ${pendingCount} ${pendingCount === 1 ? 'punto pendiente' : 'puntos pendientes'}` : ''}.`);
+  const announcement = useChatAnnouncement(ai.isProcessing, () => lastMessage?.kind === 'error' ? 'La respuesta no se completó.' : lastMessage?.role === 'user' ? 'Respuesta detenida.' : `Respuesta lista${pendingCount ? `: ${pendingCount} ${pendingCount === 1 ? 'punto pendiente' : 'puntos pendientes'}` : ''}.`);
   if (!ai.isAIInvoiceModalOpen) return null;
   const go = (target: IssueTarget) => { if (target.tab) setTab(target.tab); requestAnimationFrame(() => focusReviewAnchor(target.anchor)); };
   const lastUser = [...ai.messages].reverse().find(m => m.role === 'user');
   const lastAssistantIndex = ai.messages.map(m => m.role).lastIndexOf('assistant');
-  const retry = lastUser ? () => resend(lastUser.text) : undefined;
+  const retry = lastUser ? () => resend(reusableUserText(lastUser.text)) : undefined;
   // El error del análisis ya es un turno del hilo; el aviso del compositor queda para errores de adjuntos.
   const composerError = ai.errorMsg && !(lastMessage?.kind === 'error' && lastMessage.text === ai.errorMsg) ? ai.errorMsg : null;
   const digest = !!issueViews.length && <ReviewIssueDigest issues={issueViews} peak={peak} onNavigate={issue=>{if(issue.target)go(issue.target);}}/>;
@@ -77,13 +81,13 @@ export const AIInvoiceScannerModal: React.FC = () => {
           <div className="chat-log-wrap">
             <div className="proposal-chat-scroll" ref={conversation} onScroll={scroll.onScroll} role="log" aria-live="off" aria-label="Conversación del borrador" tabIndex={0}>
               {!ai.messages.length && <ChatSuggestions title="¿Qué necesitas cotizar?" description="Describe el proyecto o adjunta una factura. Prepararé un borrador con equipos del inventario y tarifas vigentes para que lo revises." items={ai.geminiApiKey ? SUGGESTIONS : []}
-                action={ai.geminiApiKey ? {label:'Adjuntar factura (PDF o foto)',icon:<Paperclip size={15} aria-hidden/>,onClick:()=>document.querySelector<HTMLButtonElement>('.proposal-conversation .chat-icon-button')?.click()} : undefined}
+                action={ai.geminiApiKey ? {label:'Adjuntar factura (PDF o foto)',icon:<Paperclip size={15} aria-hidden/>,onClick:()=>openPicker.current?.()} : undefined}
                 notice={!ai.geminiApiKey ? <div className="chat-notice">Configura Gemini para analizar documentos.<button type="button" onClick={ai.openAISettings}><Settings size={14} aria-hidden/>Abrir ajustes de IA</button></div> : undefined}
                 onPick={text=>{ai.setPrompt(text);requestAnimationFrame(()=>promptInput.current?.focus());}}/>}
               {ai.messages.map((message,i)=><ChatMessage role={message.role} text={message.text} files={message.files} variant={message.kind} key={i}
                 onCopy={message.role==='assistant'&&!message.kind?()=>navigator.clipboard.writeText(message.text):undefined}
                 onRetry={i===lastAssistantIndex&&!ai.isProcessing?retry:undefined}
-                onReuse={message.role==='user'&&!ai.isProcessing?()=>{ai.setPrompt(message.text);requestAnimationFrame(()=>promptInput.current?.focus());}:undefined}
+                onReuse={message.role==='user'&&!ai.isProcessing?()=>{ai.setPrompt(reusableUserText(message.text));requestAnimationFrame(()=>promptInput.current?.focus());}:undefined}
                 onOpenSettings={ai.openAISettings}>
                 {i===lastAssistantIndex&&!ai.isProcessing?digest:null}
               </ChatMessage>)}
@@ -93,7 +97,7 @@ export const AIInvoiceScannerModal: React.FC = () => {
             <ScrollToLatest visible={scroll.away} onClick={()=>scroll.scrollToBottom()}/>
           </div>
           <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{announcement}</p>
-          <ChatComposer id="proposal-prompt" label="Mensaje al asistente" inputRef={promptInput} value={ai.prompt} onChange={ai.setPrompt}
+          <ChatComposer id="proposal-prompt" pickerRef={openPicker} label="Mensaje al asistente" inputRef={promptInput} value={ai.prompt} onChange={ai.setPrompt}
             onSubmit={()=>void ai.processSmartProposal()} onCancel={ai.cancel} onPickFiles={ai.addFiles} busy={ai.isProcessing} canSend={canSend}
             disabledReason={disabledReason} placeholder="Describe la propuesta…" accept=".pdf,.png,.jpg,.jpeg,.webp"
             attachments={ai.files.map((file,i)=>({key:`${file.name}-${i}`,name:file.name,onRemove:()=>ai.removeFile(i)}))}
@@ -102,7 +106,7 @@ export const AIInvoiceScannerModal: React.FC = () => {
             footer={<details className="proposal-note-details"><summary>Archivos y privacidad</summary><p>Hasta 4 archivos · 8 MB por archivo · 14 MB en total · PDF, PNG, JPG, WebP. Puedes arrastrarlos al cuadro. Texto y documentos se envían a Google Gemini al analizar.</p></details>}/>
         </div>
         <div className="proposal-draft-panel" aria-busy={ai.isProcessing}>
-          <div className="proposal-draft-heading"><h3>Revisión del borrador{ai.useCurrentProject&&ai.activeProject?<small> · sobre {ai.activeProject.client.projectId}</small>:null}</h3>{confirmReset ? <div className="proposal-reset-confirm" role="group" aria-label="Confirmar empezar de nuevo"><span>¿Descartar el borrador?</span><button type="button" className="proposal-ghost proposal-danger" autoFocus onClick={()=>{setConfirmReset(false);ai.reset();}}>Descartar</button><button type="button" className="proposal-tertiary" onClick={()=>setConfirmReset(false)}>Cancelar</button></div>
+          <div className="proposal-draft-heading"><h3>Revisión del borrador{ai.useCurrentProject&&ai.activeProject?<small> · sobre {ai.activeProject.client.projectId}</small>:null}</h3>{confirmReset ? <div className="proposal-reset-confirm" role="group" aria-label="Confirmar empezar de nuevo"><span>¿Descartar el borrador?</span><button type="button" className="proposal-ghost proposal-danger" autoFocus disabled={ai.isProcessing} onClick={()=>{setConfirmReset(false);ai.reset();}}>Descartar</button><button type="button" className="proposal-tertiary" onClick={()=>setConfirmReset(false)}>Cancelar</button></div>
             : <button type="button" className="proposal-tertiary proposal-reset" onClick={()=>ai.extractedData?setConfirmReset(true):ai.reset()} disabled={ai.isProcessing || (!ai.extractedData&&!ai.messages.length)}><RotateCcw size={15}/>Empezar de nuevo</button>}</div>
           {ai.extractedData ? <>
             <div className="proposal-draft-scroll">

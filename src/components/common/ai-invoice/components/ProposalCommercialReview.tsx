@@ -16,8 +16,8 @@ export function ProposalCommercialReview({draft,financial,update,issues=[],equip
   const discounts=Array.isArray(c.customDiscounts)?c.customDiscounts:[];
   const change=(patch:Partial<AIProposalCommercial>)=>update({commercial:{...c,...patch},targetMarginPct:undefined});
   const usd=(n:number)=>n.toLocaleString('es-DO',{style:'currency',currency:'USD'});
-  const incomplete=[...(draft.panels || []),...(draft.inverters || []),...(draft.batteries || [])].some(g=>g.unitPriceUSD===undefined);
   const rows=equipmentCostRows(draft,financial,equipment);
+  const incomplete=rows.some(r=>r.totalUSD===undefined);
   const equipmentTotal=rows.reduce((sum,r)=>sum+(r.totalUSD ?? 0),0);
   const itbisTotal=rows.length&&rows.every(r=>r.totalUSD===undefined||r.itbisUSD!==undefined)?rows.reduce((sum,r)=>sum+(r.itbisUSD ?? 0),0):undefined;
   const section=(part:Parameters<typeof reviewAnchor.commercial>[0])=>{const list=issuesAt(issues,reviewAnchor.commercial(part));return {id:reviewAnchor.commercial(part),tabIndex:-1,'data-flag':worstTier(list),list};};
@@ -31,7 +31,7 @@ export function ProposalCommercialReview({draft,financial,update,issues=[],equip
     </div>
     <h4 className="proposal-commercial-heading">Costos detallados de componentes · USD</h4>
     <div className="proposal-table-wrap" id={reviewAnchor.commercial('costs')} tabIndex={-1}><table className="proposal-price-table"><thead><tr><th>Componente</th><th className="num">Cantidad</th><th className="num">Unitario USD</th><th className="num">Total USD</th><th className="num">ITBIS USD</th></tr></thead><tbody>{rows.map(({key,row,i,totalUSD,itbisUSD})=><tr key={`${key}-${i}`} data-missing={totalUSD===undefined || undefined}><td>{row.brandModel}{totalUSD===undefined&&<span className="proposal-pending">Falta costo</span>}<small>{row.priceSource==='manual'?'Costo particular del borrador':'Oferta del inventario'}</small></td><td className="num"><input aria-label={`Cantidad ${row.brandModel}`} type="number" min="1" step="1" value={Number.isFinite(row.count)?row.count:''} onChange={e=>update({[key]:(draft[key] || []).map((r,j)=>i===j?{...r,count:Number(e.target.value)}:r)})}/></td><td className="num"><input aria-label={`Costo USD ${row.brandModel}`} type="number" min="0" step="0.01" value={row.unitPriceUSD ?? ''} onChange={e=>update({[key]:(draft[key] || []).map((r,j)=>i===j?{...r,unitPriceUSD:e.target.value===''?undefined:Number(e.target.value),priceSource:'manual'}:r)})}/></td><td className="num">{totalUSD===undefined?<Pending/>:usd(totalUSD)}</td><td className="num">{itbisUSD===undefined?<Pending/>:usd(itbisUSD)}</td></tr>)}</tbody>
-      {rows.length>0&&<tfoot><tr><th scope="row" colSpan={3} data-provisional={incomplete||rows.some(r=>r.totalUSD===undefined)||undefined}>{incomplete||rows.some(r=>r.totalUSD===undefined)?'Subtotal provisional · faltan costos':'Total de equipos'}</th><td className="num">{usd(equipmentTotal)}</td><td className="num">{itbisTotal===undefined?<Pending/>:usd(itbisTotal)}</td></tr></tfoot>}
+      {rows.length>0&&<tfoot><tr><th scope="row" colSpan={3} data-provisional={incomplete||undefined}>{incomplete?'Subtotal provisional · faltan costos':'Total de equipos'}</th><td className="num">{usd(equipmentTotal)}</td><td className="num">{itbisTotal===undefined?<Pending/>:usd(itbisTotal)}</td></tr></tfoot>}
     </table></div>
     <div className="proposal-commercial-block" id={conditions.id} tabIndex={-1} data-flag={conditions['data-flag']}>
     <IssueNotes issues={conditions.list}/>

@@ -84,7 +84,7 @@
 .proposal-field-issues li[data-tier=confirm]{background:var(--pw-warn-bg);color:var(--pw-warn-text);border-color:var(--pw-warn-border)}
 .proposal-field-issues li[data-tier=info]{background:var(--pw-info-bg);color:var(--pw-info-text);border-color:var(--pw-info-border)}
 .proposal-field-issues strong{font-weight:700}
-.proposal-body [data-flag=blocking]>label>:is(input,select,textarea),.proposal-body :is(input,select,textarea)[aria-invalid=true]{border-color:var(--pw-error);box-shadow:0 0 0 1px var(--pw-error)}
+.proposal-body :not(.proposal-equipment-row)[data-flag=blocking]>label>:is(input,select,textarea),.proposal-body :is(input,select,textarea)[aria-invalid=true]{border-color:var(--pw-error);box-shadow:0 0 0 1px var(--pw-error)}
 .proposal-body [data-flag=confirm]>label>:is(input,select,textarea){border-color:var(--pw-warn-border);box-shadow:0 0 0 1px var(--pw-warn-border)}
 .proposal-months-block{display:grid;gap:10px;scroll-margin:96px}
 .proposal-months label[data-missing] input{border-style:dashed;border-color:var(--pw-warn-border);background:var(--pw-warn-bg)}
@@ -118,6 +118,7 @@
 
 /* Cotización: totales destacados y números tabulares */
 .proposal-commercial-summary{margin:18px 0 8px!important;border:1px solid var(--pw-border);background:var(--pw-bg)}
+.proposal-commercial-summary>.proposal-totals:first-child{margin-top:0}
 .proposal-commercial-summary h4{font-size:13px;color:var(--pw-muted);font-weight:600}
 .proposal-commercial-summary .proposal-totals{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:12px!important;align-items:end}
 .proposal-totals dd{font-variant-numeric:tabular-nums}

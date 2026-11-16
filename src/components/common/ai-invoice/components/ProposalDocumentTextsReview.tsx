@@ -8,15 +8,16 @@ import { IssueNotes } from './ReviewFlags';
 /** Cambios a textos del PDF propuestos por la IA: se revisan (y se pueden quitar) antes de aplicar el borrador. */
 export function ProposalDocumentTextsReview({ draft, update, issues = [] }: { draft: ExtractedInvoiceData; update: (patch: Partial<ExtractedInvoiceData>) => void; issues?: readonly ReviewIssueView[] }) {
   const texts = draft.documentTexts || [];
-  if (!texts.length) return null;
+  // Sin textos pero con avisos (p. ej. una clave desconocida) la sección existe: es el destino del enlace del resumen.
+  if (!texts.length && !issues.length) return null;
   // La lectura parcial se marca en su propia ficha; el resto de avisos del bloque va arriba.
   const blockIssues = issues.filter((issue) => issue.code !== 'document_text_seen_partially');
   const partial = texts.filter((t) => t.partial).length;
   return <section className="proposal-document-texts" id={reviewAnchor.documentTexts} tabIndex={-1} aria-label="Textos del documento"
     data-flag={worstTier(issues) ?? (partial ? 'confirm' : undefined)}>
     <header className="proposal-document-texts-heading">
-      <h3><FileText size={17} aria-hidden />Textos del documento<span className="proposal-group-count">{texts.length === 1 ? '1 cambio' : `${texts.length} cambios`}{partial ? ` · ${partial} por confirmar` : ''}</span></h3>
-      <p className="proposal-note">Se escriben en el PDF al aplicar el borrador; se deshacen junto con él.</p>
+      <h3><FileText size={17} aria-hidden />Textos del documento{texts.length > 0 && <span className="proposal-group-count">{texts.length === 1 ? '1 cambio' : `${texts.length} cambios`}{partial ? ` · ${partial} por confirmar` : ''}</span>}</h3>
+      {texts.length > 0 && <p className="proposal-note">Se escriben en el PDF al aplicar el borrador; se deshacen junto con él.</p>}
     </header>
     <IssueNotes issues={blockIssues} />
     <ul className="proposal-document-text-list">{texts.map((t) => {
