@@ -15,7 +15,7 @@ export const AGENT_RULES_ES = [
 
 export function assistantSystemPrompt(activeProjectId?: string, activeView?: string): string {
   const where = activeView === 'pdf-preview' && activeProjectId
-    ? ' El usuario está en el documento PDF de esa propuesta (modo edición): «el documento», «la propuesta» o «aquí» se refieren a ella; sus textos se editan con las herramientas de documento.'
+    ? ' El usuario está viendo el documento PDF de esa propuesta: «el documento», «la propuesta» o «aquí» se refieren a ella; sus textos se editan con las herramientas de documento.'
     : '';
   return `${AGENT_RULES_ES} Propuesta activa: ${activeProjectId || 'ninguna'}.${where} Puedes buscar otras propuestas sin abrirlas; propose_project_update solo edita la abierta y los textos del documento se editan por id. Responde breve y conversacional.`;
 }

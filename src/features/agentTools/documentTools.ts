@@ -20,7 +20,9 @@ const contextFor = (project: ProjectSimulation) => {
 /** Writes document texts on any proposal by id (not only the open one), with the same rules as the inline editor. */
 function textsPlan(proposalId: string, values: Record<string, string | null>, title: string) {
   const project = requireEditableProject(proposalId);
-  for (const key of Object.keys(values)) if (!getDocumentTextDefinition(key)) throw new Error(`Texto del documento desconocido: ${key}. Usa list_document_texts.`);
+  // Todo o nada: una clave desconocida rechaza el lote entero y lo dice.
+  const unknown = Object.keys(values).filter((key) => !getDocumentTextDefinition(key));
+  if (unknown.length) throw new Error(`Textos del documento desconocidos: ${unknown.join(', ')}. No se aplicó ningún cambio; consulta las claves con list_document_texts.`);
   documentTextsPatch(values, project, contextFor(project)); // validates before queueing
   return {
     data: { status: 'ready' },

@@ -3,7 +3,9 @@ import { aiDocumentTextCatalog, draftDocumentTextValues, type AIDocumentTextEntr
 import { energyCalculationMode } from '../../shared/applicationFeatures';
 import { effectiveFeatureSettings, type FeaturePolicyState } from '../features/application/featurePolicy';
 import { applyDocumentClientEdit } from '../domain/projectEdit';
-import { documentTextContextFor } from './documentTextContext';
+import { buildDocumentTextContext, documentTextContextFor } from './documentTextContext';
+import { formatProposalDate } from './formatDateUtils';
+import { calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { companyDocumentCustomization } from './companyDocumentTemplate';
 import { createAIProposalBase } from './proposalDraftProject';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
@@ -20,9 +22,11 @@ type DraftTextState = FeaturePolicyState & { companies: CompanyProfile[]; equipm
  */
 export function withDraftDocumentTexts(state: DraftTextState, project: ProjectSimulation, texts: readonly DraftDocumentText[] | undefined): ProjectSimulation {
   if (!texts?.length) return project;
-  // Contexto del proyecto ya construido (no del abierto antes del borrador): sin atajo por propuesta activa.
-  const ctx = documentTextContextFor({ companies: state.companies, activeProjectId: '', getFinancialSummary: () => { throw new Error('unreachable'); } },
-    project, energyCalculationMode(effectiveFeatureSettings(state)));
+  // Contexto del proyecto ya construido, con su propio resumen (no el de la propuesta abierta antes del borrador).
+  const ctx = buildDocumentTextContext(project, calculateProjectFinancialSummary(project, energyCalculationMode(effectiveFeatureSettings(state))), {
+    currentDateStr: formatProposalDate(project.client?.quoteDate || project.customization?.quoteDate),
+    company: state.companies.find((company) => company.id === project.companyProfileId),
+  });
   const next = applyDocumentTextPatch({ customization: project.customization || {}, client: project.client }, documentTextsPatch(draftDocumentTextValues(texts), project, ctx));
   return {
     ...project,
@@ -43,5 +47,6 @@ export function draftDocumentTextCatalog(state: SimulationStore, target: Project
     companyProfileId: state.activeCompanyId,
     customization: companyDocumentCustomization(company, state.defaultDocumentCustomization, state.documentTemplatesByCompany),
   };
-  return aiDocumentTextCatalog(base, documentTextContextFor({ ...state, activeProjectId: '' }, base, mode));
+  // Los textos que dependen del proyecto se envían sin valor: los del caso de referencia no son del cliente.
+  return aiDocumentTextCatalog(base, documentTextContextFor({ ...state, activeProjectId: '' }, base, mode), { newProposal: true });
 }

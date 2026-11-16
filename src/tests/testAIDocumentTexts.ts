@@ -95,6 +95,44 @@ assert.equal(revised.documentTexts?.length, 5);
 assert.equal(normalizeProposalDraft({ ...raw, documentTexts: [] }, catalog, { ...context, currentDraft: draft }).documentTexts?.length, 0);
 assert.deepEqual(normalizeProposalDraft(draft, catalog, context).documentTexts, draft.documentTexts, 'idempotente');
 
+// 3b. Vigencia estricta: entero de 1 a 365, opcionalmente seguido de «día(s)»; el resto se rechaza.
+const validity = (text: string) => normalizeProposalDraft({ ...raw, documentTexts: [{ key: 'quote.validityDays', text }] }, catalog, context);
+for (const [text, days] of [['15', '15'], ['15 días', '15'], ['1 día', '1'], ['30 dias', '30']] as const) assert.equal(validity(text).documentTexts?.[0]?.text, days, text);
+for (const text of ['-15', '1 día (antes 2)', '15 días laborables', '0', '400', 'quince', '1.5']) {
+  const rejected = validity(text);
+  assert.equal(rejected.documentTexts?.length, 0, text);
+  assert(rejected.validationIssues?.some((i) => i.code === 'invalid_document_text'), text);
+}
+
+// 3c. Textos completos al modelo dentro de un presupuesto; si uno se recorta, el borrador lo avisa en la fila.
+const longNote = 'Términos y condiciones. '.repeat(100).trim(); // > tope por texto
+const longProject = { ...open, customization: { ...open.customization, validityNote: longNote } };
+const fullCatalog = aiDocumentTextCatalog(longProject, documentTextContextFor(store.getState(), longProject, 'legacy'));
+const regulatory = fullCatalog.find((t) => t.key === 'projectDescription.regulatoryNote')!;
+assert(regulatory.text!.length > 800 && !regulatory.truncated, 'la nota regulatoria de fábrica viaja completa');
+const cut = fullCatalog.find((t) => t.key === 'quotation.validityNote')!;
+assert.equal(cut.truncated, true);
+assert(cut.text!.length < longNote.length);
+assert(JSON.stringify(fullCatalog).length < 16000, 'presupuesto total acotado');
+const partial = processExtractedInvoice(JSON.stringify({ ...raw, documentTexts: [{ key: 'quotation.validityNote', text: 'Nuevo término.' }, { key: 'quotation.warranty.panel', text: '12 años' }] }),
+  { equipmentCatalog: catalog, context: { ...context, documentTexts: fullCatalog } });
+assert.equal(partial.documentTexts?.find((t) => t.key === 'quotation.validityNote')?.partial, true);
+assert.equal(partial.documentTexts?.find((t) => t.key === 'quotation.warranty.panel')?.partial, undefined);
+assert(partial.validationIssues?.some((i) => i.code === 'document_text_seen_partially' && i.severity === 'warning'));
+assert.equal(normalizeProposalDraft(partial, catalog, context).documentTexts?.find((t) => t.key === 'quotation.validityNote')?.partial, true, 'el aviso sobrevive a la revisión');
+assert.match(renderToStaticMarkup(createElement(ProposalDocumentTextsReview, { draft: partial, update: () => {} })), /solo vio el inicio de este texto/);
+
+// 3d. Propuesta nueva: los textos que dependen del proyecto no muestran cifras del caso de referencia.
+const newCatalog = draftDocumentTextCatalog(store.getState(), undefined, 'Santiago');
+for (const key of ['projectDescription.paragraph1', 'projectDescription.paragraph2', 'projectDescription.subtitle', 'projectDescription.regulatoryNote', 'quotation.validityNote', 'client.contact', 'quote.validityDays']) {
+  const entry = newCatalog.find((t) => t.key === key)!;
+  assert.equal(entry.text, undefined, key);
+  assert.equal(entry.dynamic, true, key);
+}
+assert(!JSON.stringify(newCatalog).includes(BENCHMARK_PROJECT.client.name), 'sin datos del caso de referencia');
+assert.equal(newCatalog.find((t) => t.key === 'quotation.warranty.panel')?.text, '25 Años de Producción Lineal');
+assert.match(PROPOSAL_SYSTEM_INSTRUCTION, /dynamic/);
+
 // 4. Crear una propuesta nueva: los textos llegan al documento por el escritor del registro.
 const ctx = () => ({ source: 'proposal-assistant' as const, owner: assistantOwner() });
 const created = await executeAgentTool({ name: 'apply_proposal_draft', args: { draft: draft as unknown as Record<string, unknown>, createNew: true } }, ctx());
@@ -127,7 +165,8 @@ assert(assistantVisibleIn('pdf-preview'), 'el asistente está disponible en la v
 assert.equal(assistantProjectId('pdf-preview', open.id), open.id, 'y conoce la propuesta abierta');
 assert.equal(assistantProjectId('dashboard', open.id), undefined);
 assert.match(AGENT_RULES_ES, /set_document_text/, 'las reglas distinguen textos del documento de datos del proyecto');
-assert.match(assistantSystemPrompt(open.id, 'pdf-preview'), /documento/i);
+assert.match(assistantSystemPrompt(open.id, 'pdf-preview'), /viendo el documento PDF/);
+assert.doesNotMatch(assistantSystemPrompt(open.id, 'pdf-preview'), /modo edición/, 'la vista también tiene modo lectura');
 
 // 7. Descubrir claves con un filtro de texto (contexto mínimo) y fijar varias en una sola acción con deshacer.
 const listed = await executeAgentTool({ name: 'list_document_texts', args: { proposalId: open.id, query: 'garantia' } }, { source: 'app-assistant', owner: assistantOwner() });
@@ -135,6 +174,25 @@ assert(listed.status === 'ok');
 const keys = (listed.data as { texts: { key: string }[] }).texts.map((t) => t.key);
 for (const key of Object.keys(WARRANTIES)) assert(keys.includes(key), key);
 assert(keys.length <= 12, `filtro acotado: ${keys.join(', ')}`);
+
+// 7b. Lotes: null restablece, [] es un error claro y una clave desconocida rechaza el lote entero (nada a medias).
+const chat = () => ({ source: 'app-assistant' as const, owner: assistantOwner() });
+assert((await executeAgentTool({ name: 'set_document_texts', args: { proposalId: open.id, texts: [{ key: 'quotation.warranty.panel', text: 'Temporal' }] } }, chat())).status === 'applied');
+const resetBatch = await executeAgentTool({ name: 'set_document_texts', args: { proposalId: open.id, texts: [{ key: 'quotation.warranty.panel', text: null }] } }, chat());
+assert(resetBatch.status === 'applied', JSON.stringify(resetBatch));
+assert.equal(textOf(byId(open.id), 'quotation.warranty.panel'), '25 Años de Producción Lineal');
+const empty = await executeAgentTool({ name: 'set_document_texts', args: { proposalId: open.id, texts: [] } }, chat());
+assert(empty.status === 'error' && /al menos un texto/.test(empty.message), JSON.stringify(empty));
+const before = JSON.stringify(byId(open.id));
+const mixed = await executeAgentTool({ name: 'set_document_texts', args: { proposalId: open.id, texts: [
+  { key: 'quotation.warranty.panel', text: '40 años' }, { key: 'quotation.noExiste', text: 'x' }, { key: 'otra.clave', text: 'y' },
+] } }, chat());
+assert(mixed.status === 'error', JSON.stringify(mixed));
+assert.match(mixed.message, /quotation\.noExiste/);
+assert.match(mixed.message, /otra\.clave/);
+assert.match(mixed.message, /no se aplicó ningún/i);
+assert.equal(JSON.stringify(byId(open.id)), before, 'el lote no se aplica a medias');
+store.setState({ agentActivity: [] });
 
 const seen: string[] = [];
 const transport: GeminiTransport = async (_url, body: any) => {
@@ -154,7 +212,7 @@ const reply = await runAssistant({
   execute: (call) => executeForAssistant(call, { source: 'app-assistant', owner: assistantOwner() }),
 });
 assert.match(seen[0], new RegExp(open.id), 'el modelo sabe qué propuesta está abierta');
-assert.match(seen[0], /documento/i, 'y que el usuario está en el documento');
+assert.match(seen[0], /viendo el documento PDF/, 'y que el usuario está en el documento');
 assert.equal(reply.applied?.length, 1, 'un solo cambio aplicado con deshacer');
 for (const [key, text] of Object.entries(WARRANTIES)) assert.equal(textOf(byId(open.id), key), text, key);
 assert.equal(store.getState().undoAgentActivity(reply.applied![0].activityId).success, true);
