@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { useSimulationStore } from '../../../../store/useSimulationStore';
+import { subjectHeadline } from '../../../../features/agentTools/documentTextLog';
 
 const SOURCE_LABEL = { 'app-assistant': 'Asistente general', 'proposal-assistant': 'Asistente de propuestas', mcp: 'Agente externo' } as const;
 
@@ -33,7 +34,7 @@ export const AgentActivityPanel: React.FC = () => {
               <div className="min-w-0">
                 <p className="text-sm font-medium text-slate-900 dark:text-white">{entry.title}</p>
                 <p className="mt-1 text-xs text-slate-500 dark:text-zinc-400">
-                  {SOURCE_LABEL[entry.source]}{entry.clientLabel ? ` · ${entry.clientLabel}` : ''} · {new Date(entry.at).toLocaleString('es-DO')} · {entry.targetType === 'equipment' ? 'Catálogo' : 'Propuesta'}
+                  {SOURCE_LABEL[entry.source]}{entry.clientLabel ? ` · ${entry.clientLabel}` : ''} · {new Date(entry.at).toLocaleString('es-DO')} · {entry.targetType === 'equipment' ? 'Catálogo' : entry.subject ? subjectHeadline(entry.subject) : 'Propuesta'}
                 </p>
                 <p className="mt-1 text-xs text-slate-600 dark:text-zinc-300">{entry.changes.slice(0, 4).map((c) => `${c.label}: ${c.value}`).join(' · ')}</p>
                 {errors[entry.id] && <p role="alert" className="mt-1 text-xs text-rose-700 dark:text-rose-300">{errors[entry.id]}</p>}

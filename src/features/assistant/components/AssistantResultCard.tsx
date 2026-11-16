@@ -5,6 +5,7 @@ import { EquipmentImagePreview } from '../../../components/common/equipment/Equi
 import { fetchEquipmentAsset } from '../../../services/equipmentAssetService';
 import { assistantFieldLabel, assistantValueLabel } from '../labels';
 import type { AssistantAction, AssistantCard } from '../types';
+import { subjectHeadline } from '../../agentTools/documentTextLog';
 import {
   assistantOwner,
   visibleAssistantProjects,
@@ -234,7 +235,13 @@ export function AssistantAppliedCard({ activityId, title }: { activityId: string
   return (
     <div className="assistant-result">
       <div className="assistant-result-content">
-        <h3>{title}</h3>
+        <h3>{entry.subject ? entry.title : title}</h3>
+        {entry.subject && (
+          <p className="assistant-subject" data-outside={entry.subject.outsideOpen || undefined}>
+            {entry.subject.outsideOpen && <span aria-hidden="true">⚠ </span>}
+            <strong>{subjectHeadline(entry.subject)}</strong>
+          </p>
+        )}
         <dl className="assistant-changes">
           {entry.changes.map((c, i) => (
             <div key={`${c.label}-${i}`}>

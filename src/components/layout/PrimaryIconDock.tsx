@@ -18,6 +18,8 @@ import {
   Users,
 } from "lucide-react";
 
+import { aiMenuStackClass } from "./aiMenuStack";
+
 interface PrimaryIconDockProps {
   beforeNavigate?: () => void;
   assistantActive?: boolean;
@@ -89,7 +91,7 @@ export const PrimaryIconDock: React.FC<PrimaryIconDockProps> = ({
 
   return (
     <aside
-      className="w-16 h-full bg-slate-900 border-r border-slate-800 flex flex-col items-center justify-between py-4 shrink-0 z-40 select-none relative"
+      className={`w-16 h-full bg-slate-900 border-r border-slate-800 flex flex-col items-center justify-between py-4 shrink-0 ${aiMenuStackClass(isAIMenuOpen)} select-none relative`}
       aria-label="Barra de Navegación Principal"
       onKeyDown={(event) => {
         if (event.key === "Escape" && isAIMenuOpen) {

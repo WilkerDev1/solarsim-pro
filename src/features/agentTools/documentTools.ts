@@ -1,5 +1,5 @@
 import {
-  applyDocumentTextPatch, documentTextsPatch, getDocumentTextDefinition, isDocumentSectionId, listDocumentTexts,
+  applyDocumentTextPatch, documentTextsPatch, getDocumentTextDefinition, isDocumentSectionId, listDocumentTexts, resolveDocumentText,
 } from '../../../shared/documentTexts';
 import { energyCalculationMode } from '../../../shared/applicationFeatures';
 import { PDF_COLOR_THEMES } from '../../constants/pdfThemes';
@@ -9,6 +9,7 @@ import type { ProjectSimulation } from '../../types';
 import { applyDocumentClientEdit } from '../../domain/projectEdit';
 import { withSectionVisible, type DocumentLayout } from '../../../shared/documentLayout';
 import type { DocumentSectionId } from '../../../shared/documentTexts';
+import { proposalSubject, subjectHeadline, textChangeRows } from './documentTextLog';
 import { findVisibleProject, fingerprint, pickFields, requireEditableProject, store, type NativeHandler } from './nativeTools';
 
 const TEXT_FIELDS = ['customization', 'client'] as const;
@@ -17,18 +18,33 @@ const contextFor = (project: ProjectSimulation) => {
   return documentTextContextFor(s, project, energyCalculationMode(effectiveFeatureSettings(s)));
 };
 
+/** Antes → después de cada texto con su etiqueta legible; `after` es el proyecto ya editado (o simulado al preparar). */
+function textRows(values: Record<string, string | null>, before: ProjectSimulation, after: ProjectSimulation) {
+  const ctxBefore = contextFor(before);
+  const ctxAfter = contextFor(after);
+  return textChangeRows(Object.entries(values).map(([key, value]) => ({
+    label: getDocumentTextDefinition(key)!.label,
+    before: resolveDocumentText(key, before, ctxBefore).text,
+    after: resolveDocumentText(key, after, ctxAfter).text,
+    reset: value === null,
+  })));
+}
+
 /** Writes document texts on any proposal by id (not only the open one), with the same rules as the inline editor. */
 function textsPlan(proposalId: string, values: Record<string, string | null>, title: string) {
   const project = requireEditableProject(proposalId);
   // Todo o nada: una clave desconocida rechaza el lote entero y lo dice.
   const unknown = Object.keys(values).filter((key) => !getDocumentTextDefinition(key));
   if (unknown.length) throw new Error(`Textos del documento desconocidos: ${unknown.join(', ')}. No se aplicó ningún cambio; consulta las claves con list_document_texts.`);
-  documentTextsPatch(values, project, contextFor(project)); // validates before queueing
+  const patch = documentTextsPatch(values, project, contextFor(project)); // validates before queueing
+  const subject = proposalSubject(project, store().activeProjectId);
+  const simulated = { ...project, ...applyDocumentTextPatch({ customization: project.customization || {}, client: project.client }, patch) } as ProjectSimulation;
   return {
     data: { status: 'ready' },
     plan: {
       title, targetType: 'project' as const,
-      changes: Object.entries(values).map(([key, value]) => ({ label: getDocumentTextDefinition(key)!.label, value: value === null ? '(predeterminado)' : value.slice(0, 200) })),
+      impact: subject.outsideOpen ? `${subjectHeadline(subject)}. No es la propuesta abierta.` : `Cambiará la propuesta abierta: ${subject.label}.`,
+      changes: textRows(values, project, simulated),
       execute() {
         const current = requireEditableProject(proposalId);
         const ok = store().updateProjectById(current.id, (p) => {
@@ -40,7 +56,13 @@ function textsPlan(proposalId: string, values: Record<string, string | null>, ti
         const after = store().projects.find((p) => p.id === current.id)!;
         // Si la edición del cliente corrigió las specs, deshacer también las devuelve.
         const fields = after.specs !== current.specs ? [...TEXT_FIELDS, 'specs'] : [...TEXT_FIELDS];
-        return { targetId: current.id, undo: { before: pickFields(current, fields), fields, afterFingerprint: fingerprint(pickFields(after, fields)) } };
+        return {
+          targetId: current.id,
+          // La propuesta abierta se mide al aplicar: una confirmación tardía puede ocurrir con otra abierta.
+          subject: proposalSubject(current, store().activeProjectId),
+          changes: textRows(values, current, after),
+          undo: { before: pickFields(current, fields), fields, afterFingerprint: fingerprint(pickFields(after, fields)) },
+        };
       },
     },
   };

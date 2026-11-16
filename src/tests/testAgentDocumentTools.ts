@@ -40,6 +40,16 @@ const relisted = await executeAgentTool({ name: 'list_document_texts', args: { p
 assert.equal((relisted as any).data.texts.find((t: any) => t.key === 'quotation.warranty.panel').text, '30 años de **producción lineal**');
 assert.equal(store.getState().activeProjectId, active.id, 'editing another proposal does not switch the active one');
 
+// 2b. Transparencia: el registro nombra la propuesta, el texto (etiqueta legible) y antes → después; marca «otra propuesta».
+const entry = store.getState().agentActivity.find((x) => x.id === (warranty as any).activityId)!;
+assert.deepEqual(entry.subject, { proposalId: other.id, label: `${other.client.projectId} · ${other.client.name}`, outsideOpen: true });
+assert.equal(entry.changes.length, 1);
+assert.equal(entry.changes[0].label, 'Garantía de paneles');
+assert(entry.changes[0].value.includes('→') && entry.changes[0].value.includes('«30 años de **producción lineal**»'), entry.changes[0].value);
+const own = await executeAgentTool({ name: 'set_document_text', args: { proposalId: active.id, key: 'quotation.warranty.panel', text: '12 años' } }, ctx());
+assert(own.status === 'applied');
+assert.equal(store.getState().agentActivity.find((x) => x.id === (own as any).activityId)!.subject?.outsideOpen, false, 'la propuesta abierta no se marca como otra');
+
 // 3. The client phone is mirrored into the printed client data.
 const phone = await executeAgentTool({ name: 'set_document_text', args: { proposalId: other.id, key: 'client.phone', text: '809-555-7777' } }, ctx());
 assert(phone.status === 'applied');

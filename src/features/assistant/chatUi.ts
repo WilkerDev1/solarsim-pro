@@ -226,3 +226,6 @@ export function useElapsedSeconds(active: boolean) {
   }, [active]);
   return seconds;
 }
+
+/** Texto del compositor tras un envío fallido antes de salir: vuelve el enviado, salvo que la persona ya haya escrito otra cosa. */
+export const restoreComposerText = (current: string, sent: string): string => (current.trim() ? current : sent);

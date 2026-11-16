@@ -16,6 +16,7 @@ import { ChatMessage } from './ChatMessage';
 import { ChatComposer, ChatSuggestions, ChatThinking, ScrollToLatest } from './ChatComposer';
 import { reusableUserText, useChatAnnouncement, useElapsedSeconds, useResend, useStickToBottom } from '../chatUi';
 import { AgentCardView } from '../cards/registry';
+import { announceAppliedChanges } from '../../agentTools/documentTextLog';
 import {
   AssistantActionCard,
   AssistantAppliedCard,
@@ -60,6 +61,14 @@ function AssistantPanel({
   const retry = retryText ? () => resend(retryText) : undefined;
   const lastAssistantIndex = ai.messages.map((m) => m.role).lastIndexOf('assistant');
   const announcement = useChatAnnouncement(ai.busy, () => ai.error ? 'La respuesta no se completó.' : ai.messages[ai.messages.length - 1]?.role === 'user' ? 'Respuesta detenida.' : 'Respuesta lista.');
+  // Cambios de textos aplicados por el asistente: se anuncian (propuesta, texto, antes → después), sobre todo si no es la abierta.
+  const [changeAnnouncement, setChangeAnnouncement] = useState('');
+  useEffect(() => {
+    const last = ai.messages[ai.messages.length - 1];
+    if (last?.role !== 'assistant' || !last.applied?.length) return;
+    const entries = useSimulationStore.getState().agentActivity.filter((a) => last.applied!.some((x) => x.activityId === a.id));
+    setChangeAnnouncement(announceAppliedChanges(entries));
+  }, [ai.messages]);
   useEffect(() => {
     if (open) input.current?.focus();
   }, [open]);
@@ -207,6 +216,7 @@ function AssistantPanel({
           </div>
           <ScrollToLatest visible={scroll.away} onClick={() => scroll.scrollToBottom()} />
           </div>
+          <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{changeAnnouncement}</p>
           <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{threadError && !ai.busy ? 'La respuesta no se completó.' : announcement}</p>
           <ChatComposer
             id="app-assistant-input"
