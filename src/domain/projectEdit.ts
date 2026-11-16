@@ -2,6 +2,7 @@ import type { ClientInfo, FinancialParams, LegacyProjectSpecs, ProjectSimulation
 import type { EquipmentSupplierPrice, SolarEquipmentItem } from '../types/equipment';
 import { LIST_KEY, editEquipment, migrateLegacySpecs, readEquipment, type EquipmentKind } from '../../shared/equipment';
 import { resolveAssumption, resolveAssumptions } from '../../shared/assumptions';
+import { factoryGridUseCharge, isValidGridUseCharge, resolveNetMeteringRegime } from '../../shared/netMetering';
 import { resolveSystemLossesPct } from '../../shared/projectDefaults';
 import { calculateRecommendedPanelCount } from '../engine/solarEngine';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
@@ -20,6 +21,8 @@ import { supplierQuotesItem } from '../utils/equipmentMatchingUtils';
  * - una cantidad manual del grupo principal de paneles apaga el autodimensionado;
  * - el proveedor del modelo principal se suelta si el modelo nuevo no lo cotiza;
  * - sobrescrituras financieras manuales: solo sobreviven en el caso de referencia auditado;
+ * - cargo por uso de la red SIE-007-2026: pasar al régimen o cambiar de distribuidora siembra el cargo de fábrica,
+ *   salvo que el usuario lo haya editado (un valor distinto del de fábrica de la distribuidora anterior);
  * - reconciliación con el catálogo (potencia del modelo principal y proveedor huérfano), que corre en la siguiente
  *   edición real: mirar un proyecto nunca lo escribe.
  */
@@ -46,6 +49,21 @@ const KINDS = ['panel', 'inverter', 'battery'] as const;
 type PrimaryKind = (typeof KINDS)[number];
 const sameJson = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
+/**
+ * Cargo por uso de la red tras una edición de tarifas. Solo en el régimen `sie007_2026` (el anterior no gana campos):
+ * sin cargo válido guardado se siembra el de fábrica; al cambiar de distribuidora, un cargo igual al de fábrica de la
+ * anterior (no editado a mano) pasa al de la nueva. Un cargo incluido en el propio parche manda siempre.
+ */
+function withGridUseCharge(before: UtilityRates, after: UtilityRates, patch: Partial<UtilityRates>): UtilityRates {
+  if (resolveNetMeteringRegime(after.netMeteringRegime) !== 'sie007_2026' || patch.gridUseChargeDOPPerKWh !== undefined) return after;
+  const stored = after.gridUseChargeDOPPerKWh;
+  const distributorChanged = patch.distributor !== undefined && patch.distributor !== before.distributor;
+  if (!isValidGridUseCharge(stored) || (distributorChanged && stored === factoryGridUseCharge(before.distributor).dopPerKWh)) {
+    return { ...after, gridUseChargeDOPPerKWh: factoryGridUseCharge(after.distributor).dopPerKWh };
+  }
+  return after;
+}
+
 /** Aplica una edición y devuelve el proyecto editado. No muta la entrada ni sella la mutación (eso es del store). */
 export function applyProjectEdit(project: ProjectSimulation, edit: ProjectEdit, ctx: ProjectEditContext): ProjectSimulation {
   const catalog = ctx.equipmentCatalog;
@@ -58,7 +76,7 @@ export function applyProjectEdit(project: ProjectSimulation, edit: ProjectEdit, 
       next = editSpecs(project, supplierPricePatch(project, edit, catalog), catalog);
       break;
     case 'rates': {
-      const rates = { ...project.rates, ...edit.patch };
+      const rates = withGridUseCharge(project.rates, { ...project.rates, ...edit.patch }, edit.patch);
       next = resizeIfNeeded(project, { ...project, rates, specs: { ...reconcileWithCatalog(project.specs, project.specs, catalog) } }, edit.patch.targetCoveragePct !== undefined);
       break;
     }

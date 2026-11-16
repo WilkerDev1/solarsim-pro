@@ -53,6 +53,8 @@ const labels: Record<string, string> = {
   usdExchangeRate: 'Cambio DOP por USD',
   gridExportFeePct: 'Retención de excedentes (%)',
   isZeroExport: 'Inyección cero',
+  netMeteringRegime: 'Régimen de medición neta',
+  gridUseChargeDOPPerKWh: 'Cargo por uso de la red (RD$/kWh inyectado)',
   annualEnergyInflationPct: 'Inflación de energía anual (%)',
   applyLey5707: 'Crédito fiscal Ley 57-07',
   applyITBISExemption: 'Exoneración de ITBIS',

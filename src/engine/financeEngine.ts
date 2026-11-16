@@ -1,9 +1,9 @@
 import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
-import { resolveAnnualDegradation, resolveAssumptions } from '../../shared/assumptions';
+import { resolveAnnualDegradation, resolveAssumptions, type ResolvedAssumptions } from '../../shared/assumptions';
 import { DEFAULT_PRICE_PER_WATT_USD, resolvePricePerWattUSD, resolveSaleMarginMultiplier } from '../../shared/projectDefaults';
 import { ITBIS_RATE, LEY5707_CREDIT_RATE, appliesItemMargin, customItemsTaxBreakdown, isItemItbisExonerated } from '../../shared/financialRules';
 import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem, CustomQuotationItem, CustomQuotationDiscount, ProjectSimulation } from '../types';
-import { calculateDCCapacityKWp, calculateMonthlySolarProduction } from './solarEngine';
+import { calculateDCCapacityKWp, calculateMonthlySolarProduction, type GridUseChargeInput } from './solarEngine';
 import {
   getProjectPanels,
   getProjectInverters,
@@ -553,7 +553,8 @@ export function calculateFinancialSummary(
     customMonthlyHSP,
     rates.tariffCode,
     rates.isZeroExport,
-    calculationMode
+    calculationMode,
+    engineGridUseCharge(assumptions)
   );
 
   const annualConsumptionKWh = monthlyResults.reduce((sum, m) => sum + m.consumptionKWh, 0);
@@ -692,6 +693,16 @@ export function calculateFinancialSummary(
     equipmentDiscountUSD,
     customDiscountsList: customDiscounts,
   };
+}
+
+/**
+ * Cargo por uso de la red que recibe el motor de energía: solo en el régimen SIE-007-2026, convertido a USD con la
+ * tasa efectiva de la propuesta. En el régimen anterior no hay cargo (rige la retención %).
+ */
+export function engineGridUseCharge(assumptions: Pick<ResolvedAssumptions, 'netMeteringRegime' | 'appliedGridUseChargeDOPPerKWh' | 'dopExchangeRate'>): GridUseChargeInput | undefined {
+  return assumptions.netMeteringRegime === 'sie007_2026'
+    ? { usdPerKWh: assumptions.appliedGridUseChargeDOPPerKWh / assumptions.dopExchangeRate }
+    : undefined;
 }
 
 /**

@@ -1,3 +1,4 @@
+import type { NetMeteringRegime } from '../../shared/netMetering';
 import type { AIProposalCommercial } from '../../shared/aiProposalCommercial';
 import type { PanelItemSpec, InverterItemSpec, BatteryItemSpec } from './index';
 import type { AIProposalIssue } from '../../shared/aiProposal';
@@ -26,6 +27,10 @@ export interface ExtractedInvoiceData {
   observedMonthlyConsumptionKWh?: (number | null)[];
   consumptionSource?: 'observed' | 'estimated' | 'context' | 'theoretical';
   energyRateSource?: 'invoice' | 'reference' | 'manual';
+  /** Régimen de medición neta indicado explícitamente (`shared/netMetering.ts`); sin él, el borrador nuevo nace en `sie007_2026`. */
+  netMeteringRegime?: NetMeteringRegime;
+  /** Cargo por uso de la red (RD$/kWh inyectado) indicado explícitamente. */
+  gridUseChargeDOPPerKWh?: number;
 
   // Client & Company Identity
   clientName: string;

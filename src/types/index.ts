@@ -1,3 +1,4 @@
+import type { NetMeteringRegime } from '../../shared/netMetering';
 import type { ExtractedInvoiceData, GeminiModelInfo } from './aiInvoice';
 import type { LegacyEquipmentFields } from '../../shared/equipment';
 
@@ -133,6 +134,13 @@ export interface UtilityRates {
   gridExportFeePct: number;     // SIE-007-2026-REG fee (e.g. 25%)
   isZeroExport?: boolean;       // Inyección Cero / Antivertido (Zero-Export)
   annualEnergyInflationPct: number; // e.g. 3.5%
+  /**
+   * Régimen de medición neta (`shared/netMetering.ts`). Ausente = `legacy_retention` (retención % de lo exportado):
+   * así quedan las propuestas guardadas antes de la fase 2. Las nuevas nacen en `sie007_2026`.
+   */
+  netMeteringRegime?: NetMeteringRegime;
+  /** Cargo por uso de la red SIE-007-2026 en RD$/kWh inyectado (editable). Ausente o no válido = el de fábrica de la distribuidora. */
+  gridUseChargeDOPPerKWh?: number;
 }
 
 export interface CustomQuotationItem {
@@ -247,6 +255,8 @@ export interface MonthlyEnergyResult {
   savingsUSD: number;
   netBillUSD: number;
   originalBillUSD: number;
+  /** Cargo por uso de la red SIE-007-2026 del mes (USD). Solo en el régimen `sie007_2026`; ausente en el anterior. */
+  gridUseChargeUSD?: number;
 }
 
 export interface CashFlowYear {

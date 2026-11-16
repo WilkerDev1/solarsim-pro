@@ -1,3 +1,4 @@
+import { newProposalNetMeteringFields } from '../../../shared/netMetering';
 import { createProjectId } from '../../utils/projectId';
 import { canEditCommercial } from '../../features/proposals/commercial';
 import { isProposalLink } from '../../../shared/proposalLinks';
@@ -245,6 +246,8 @@ export const createProjectSlice: SimulationSlice<ProjectSlice> = (set, get) => {
         tariffCode,
         currency: defs?.currency || 'USD',
         annualEnergyInflationPct: assumptions.rates.annualEnergyInflationPct,
+        // Las propuestas nuevas nacen en el régimen SIE-007-2026 con el cargo de fábrica de su distribuidora.
+        ...newProposalNetMeteringFields(distributor),
       },
       financials: {
         applyLey5707: defs?.applyLey5707 !== undefined ? defs.applyLey5707 : true,

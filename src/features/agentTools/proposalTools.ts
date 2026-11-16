@@ -1,3 +1,4 @@
+import { isNetMeteringRegime, isValidGridUseCharge } from '../../../shared/netMetering';
 import { PROPOSAL_DECISIONS, commercialState, type ProposalDecision } from '../../../shared/proposalCommercial';
 import { buildProjectFromDraft } from '../../store/slices/aiSlice';
 import type { ExtractedInvoiceData, ProjectSimulation } from '../../types';
@@ -26,6 +27,9 @@ function createDraft(args: Record<string, any>): ExtractedInvoiceData {
     distributor: args.distributor, tariffCode: args.tariffCode, targetCoveragePct: args.targetCoveragePct,
     ...(Array.isArray(args.monthlyConsumptionKWh) && args.monthlyConsumptionKWh.length === 12 ? { observedMonthlyConsumptionKWh: args.monthlyConsumptionKWh } : {}),
     averageMonthlyKWh: args.averageMonthlyKWh,
+    // Sin régimen explícito, la propuesta nueva nace en SIE-007-2026 (prepareProposalDraftProject).
+    ...(isNetMeteringRegime(args.netMeteringRegime) ? { netMeteringRegime: args.netMeteringRegime } : {}),
+    ...(isValidGridUseCharge(args.gridUseChargeDOPPerKWh) ? { gridUseChargeDOPPerKWh: args.gridUseChargeDOPPerKWh } : {}),
     panels: catalogGroups(args.panels, 'panel'), inverters: catalogGroups(args.inverters, 'inverter'), batteries, hasBattery: batteries.length > 0,
     commercial: { priceBasis: 'purchase', markupPct: args.marginPct ?? null, marginOnSalePct: null, installationUnitPriceUSD: args.installationUnitPriceUSD ?? null,
       installationTotalUSD: null, customItems: [], customDiscounts: [] },

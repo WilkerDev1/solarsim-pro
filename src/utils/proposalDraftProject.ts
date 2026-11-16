@@ -9,6 +9,7 @@ import { resolveSystemLossesPct, DEFAULT_BATTERY_DOD_PCT, DEFAULT_BATTERY_EFFICI
 import { assumptionFields, resolveAssumption, resolveAssumptions } from '../../shared/assumptions';
 import { DEFAULT_TARGET_MARGIN_PCT } from '../store/defaultSimulationSettings';
 import { enforceAutomatedPricing } from '../../shared/automatedProposalPolicy';
+import { newProposalNetMeteringFields } from '../../shared/netMetering';
 import { editEquipment, readEquipment, type EquipmentKind } from '../../shared/equipment';
 import { migrateLegacySpecs } from '../../shared/equipment';
 import { detachedCatalogIdentity, withoutInheritedPanelDegradation } from './equipmentGroups';
@@ -89,6 +90,11 @@ export function prepareProposalDraftProject(base:ProjectSimulation,data:Extracte
     const rates={...base.rates,usdExchangeRate:fx,targetCoveragePct:coverage,distributor:data.distributor,tariffCode:tariff?.code || data.tariffCode,
       ...(energy!==undefined?{energyCostPerKWh:energy}:createNewProject?{energyCostPerKWh:0}:{}),
       ...(tariff?{gridExportFeePct:tariff.netMeteringRetentionPct}:{}),
+      // Régimen de medición neta: el borrador nuevo nace en SIE-007-2026 con el cargo de fábrica de su distribuidora;
+      // sobre una propuesta existente solo cambia si el borrador lo indica explícitamente.
+      ...(createNewProject?newProposalNetMeteringFields(data.distributor):{}),
+      ...(data.netMeteringRegime?{netMeteringRegime:data.netMeteringRegime}:{}),
+      ...(data.gridUseChargeDOPPerKWh!==undefined?{gridUseChargeDOPPerKWh:data.gridUseChargeDOPPerKWh}:{}),
     };
   return {...base,specs:enforceAutomatedPricing(specs),rates,client:{...base.client,province},monthlyConsumption:[...data.monthlyConsumptionKWh],financials:{...base.financials,...(data.commercial?.pricePerWattUSD!==undefined?{pricePerWattUSD:data.commercial.pricePerWattUSD}:{}),...(data.commercial?.customItems!==undefined?{customItems:structuredClone(data.commercial.customItems)}:{}),...(data.commercial?.customDiscounts!==undefined?{customDiscounts:structuredClone(data.commercial.customDiscounts)}:{})}};
 }

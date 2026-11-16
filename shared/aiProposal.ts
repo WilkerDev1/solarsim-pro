@@ -1,5 +1,6 @@
 import { resolveAssumption } from './assumptions';
 import { averageBlockEnergyRateDOP, tariffMatrixKey } from './tariffRules';
+import { NET_METERING_REGIMES, isNetMeteringRegime, isValidGridUseCharge } from './netMetering';
 import { COMMERCIAL_SCHEMA, normalizeCommercial, commercialMarkup, type AIProposalCommercial } from './aiProposalCommercial';
 import type { SolarEquipmentItem, EquipmentType } from '../src/types/equipment';
 import type { ExtractedInvoiceData } from '../src/types/aiInvoice';
@@ -58,6 +59,8 @@ export const PROPOSAL_JSON_SCHEMA = {
     monthlyConsumptionKWh:{type:'ARRAY',items:{type:'NUMBER',nullable:true}},
     panels:groupSchema,inverters:groupSchema,batteries:groupSchema,hasBattery:{type:'BOOLEAN'},
     unresolvedRequests:{type:'ARRAY',items:{type:'STRING'}},
+    netMeteringRegime:{type:'STRING',nullable:true,enum:[...NET_METERING_REGIMES],description:'Régimen de medición neta solo si el usuario lo pide: sie007_2026 (cargo por kWh inyectado, el de las propuestas nuevas) o legacy_retention (retención % anterior). null si no lo indica.'},
+    gridUseChargeDOPPerKWh:{type:'NUMBER',nullable:true,description:'Cargo por uso de la red en RD$ por kWh inyectado solo si el usuario o el documento lo indican explícitamente; null si no.'},
     energyTiers:{type:'ARRAY',items:{type:'OBJECT',properties:{kwh:{type:'NUMBER'},rateDOP:{type:'NUMBER'}},required:['kwh','rateDOP']}},
   }, required:['responseKind','assistantMessage','dopExchangeRate','clientName','monthlyConsumptionKWh','consumptionSource','distributor','tariffCode','energyCostPerKWhDOP','panels','inverters','batteries','commercial','confidenceScore'],
 };
@@ -256,6 +259,15 @@ export function normalizeProposalDraft(rawDraft: unknown, catalog: SolarEquipmen
   };
   for (const key of stringFields) { if (['clientName','distributor','tariffCode'].includes(key)) continue; if(str(raw[key])) result[key==='notes'?'aiNotes':key]=str(raw[key])!.slice(0, ['notes','aiReasoningSummary','specialTechnicalNotes'].includes(key)?350:500); }
   for (const key of numberFields) if (!['energyCostPerKWhDOP','averageMonthlyKWh','confidenceScore','targetCoveragePct','targetMarginPct'].includes(key) && num(raw[key])!==undefined) result[key]=num(raw[key]);
+  // Régimen de medición neta y cargo por uso de la red: solo valores válidos; el resto se ignora con aviso.
+  if (raw.netMeteringRegime!==undefined && raw.netMeteringRegime!==null) {
+    if (isNetMeteringRegime(raw.netMeteringRegime)) result.netMeteringRegime=raw.netMeteringRegime;
+    else issue('invalid_net_metering_regime','El régimen de medición neta indicado no es válido; se usa el de la propuesta.','warning');
+  }
+  if (raw.gridUseChargeDOPPerKWh!==undefined && raw.gridUseChargeDOPPerKWh!==null) {
+    if (isValidGridUseCharge(raw.gridUseChargeDOPPerKWh)) result.gridUseChargeDOPPerKWh=raw.gridUseChargeDOPPerKWh;
+    else issue('invalid_grid_use_charge','El cargo por uso de la red indicado no es válido; se usa el de fábrica de la distribuidora.','warning');
+  }
   if (Array.isArray(raw.energyTiers) && raw.energyTiers.every((tier:any)=>num(tier.kwh)!==undefined && num(tier.rateDOP)!==undefined)) result.energyTiers=raw.energyTiers;
   if (str(raw.aiNotes)) result.aiNotes=str(raw.aiNotes)!.slice(0,350);
   // An empty edited note is an explicit removal, distinct from a missing extraction field.

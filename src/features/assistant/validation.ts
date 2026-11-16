@@ -1,4 +1,5 @@
 import { normalizeTariffCode } from '../../../shared/tariffRules';
+import { MAX_GRID_USE_CHARGE_DOP_PER_KWH, NET_METERING_REGIMES, isValidGridUseCharge } from '../../../shared/netMetering';
 import type { AssistantEdit, AssistantSection } from './types';
 // Explicit surface: no ids, roles, authorship, remote endpoints, assets or arbitrary store writes.
 const fields: Record<AssistantSection, string[]> = {
@@ -68,6 +69,8 @@ const fields: Record<AssistantSection, string[]> = {
     'gridExportFeePct',
     'isZeroExport',
     'annualEnergyInflationPct',
+    'netMeteringRegime',
+    'gridUseChargeDOPPerKWh',
   ],
   financials: [
     'customItems',
@@ -134,6 +137,7 @@ const textFields = new Set([
   'directPriceSurplusTarget',
   'loadProfilePreset',
   'currency',
+  'netMeteringRegime',
   'brand',
   'modelSeries',
   'displayName',
@@ -150,6 +154,7 @@ const enums: Record<string, string[]> = {
   directPriceSurplusTarget: ['margin', 'labor'],
   loadProfilePreset: ['residential', 'commercial', 'industrial', 'custom'],
   currency: ['USD', 'DOP'],
+  netMeteringRegime: [...NET_METERING_REGIMES],
 };
 const percentages = new Set([
   'systemLosses',
@@ -346,6 +351,8 @@ export function validateAssistantEdits(
         value <= 0
       )
         throw new Error('La capacidad nominal debe ser mayor que cero.');
+      if (field === 'gridUseChargeDOPPerKWh' && !isValidGridUseCharge(value))
+        throw new Error(`El cargo por uso de la red debe estar entre 0 y ${MAX_GRID_USE_CHARGE_DOP_PER_KWH} RD$/kWh.`);
       if (field === 'saleMarginMultiplier' && value < 1)
         throw new Error('El factor de venta debe ser al menos 1.');
     }

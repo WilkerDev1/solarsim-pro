@@ -1,7 +1,8 @@
 import { isWriterRole } from '../../../shared/permissions';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { draftOwnerKey } from '../../utils/draftOwnerKey';
-import { calculateProjectFinancialSummary } from '../../engine/financeEngine';
+import { calculateProjectFinancialSummary, engineGridUseCharge } from '../../engine/financeEngine';
+import { resolveAssumptions } from '../../../shared/assumptions';
 import { calculateMonthlySolarProduction } from '../../engine/solarEngine';
 import { effectiveFeatureSettings } from '../application/featurePolicy';
 import {
@@ -194,7 +195,8 @@ export function executeAssistantTool(
           p.client.customMonthlyHSP,
           p.rates.tariffCode,
           p.rates.isZeroExport,
-          mode
+          mode,
+          engineGridUseCharge(resolveAssumptions(p))
         ),
         summary: calculateProjectFinancialSummary(p, mode),
       },
