@@ -8,7 +8,16 @@ import { bodyLimit } from "hono/body-limit";
 import { HTTPException } from "hono/http-exception";
 import type { Pool } from "pg";
 import { CLIENT_HEADER } from "../../shared/clientVersion.js";
-import { assertJwtSecret, parseMinClientVersion } from "./config.js";
+import {
+  assertJwtSecret,
+  parseMinClientVersion,
+  type AgentAccessConfig,
+} from "./config.js";
+import {
+  registerAgentAccessRoutes,
+  registerAgentGate,
+} from "./modules/agentAccess/routes.js";
+import { registerOAuthRoutes } from "./modules/agentAccess/oauth.js";
 import { registerClientVersionGate } from "./clientVersionGate.js";
 import { createAuthenticator } from "./security.js";
 import { registerAuthRoutes } from "./modules/auth.js";
@@ -26,9 +35,12 @@ export function createApp(options: {
   logging?: boolean;
   /** Lowest accepted client (MIN_CLIENT_VERSION); defaults to the shared 2.7.1 floor. */
   minClientVersion?: string;
+  /** Remote agent access (docs/MCP_REMOTE.md); disabled by default. */
+  agentAccess?: AgentAccessConfig;
 }) {
   assertJwtSecret(options.jwtSecret);
   const minClientVersion = parseMinClientVersion(options.minClientVersion);
+  const agentAccess = options.agentAccess ?? { enabled: false };
   const app = new Hono();
   const deps = {
     ...options,
@@ -53,6 +65,7 @@ export function createApp(options: {
       onError: (c) => c.json({ error: "La solicitud excede 20 MiB" }, 413),
     }),
   );
+  registerAgentGate(app, options.pool, agentAccess);
   app.onError((error, c) => {
     if (error instanceof HTTPException)
       return c.json({ error: error.message }, error.status);
@@ -88,5 +101,7 @@ export function createApp(options: {
   registerTariffsRoutes(app, deps);
   registerNotificationsRoutes(app, deps);
   registerOrganizationRoutes(app, deps);
+  registerAgentAccessRoutes(app, deps, agentAccess);
+  registerOAuthRoutes(app, deps, agentAccess);
   return app;
 }

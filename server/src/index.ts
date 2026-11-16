@@ -12,6 +12,7 @@ try {
       pool,
       jwtSecret: config.jwtSecret,
       minClientVersion: config.minClientVersion,
+      agentAccess: config.agentAccess,
     }).fetch,
     port: config.port,
     hostname: "0.0.0.0",

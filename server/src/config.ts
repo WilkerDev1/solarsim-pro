@@ -2,9 +2,68 @@ import {
   DEFAULT_MIN_CLIENT_VERSION,
   isStableSemver,
 } from "../../shared/clientVersion.js";
+/** Remote agent access (docs/MCP_REMOTE.md). Disabled unless MCP_REMOTE_ENABLED=true. */
+export interface AgentAccessConfig {
+  enabled: boolean;
+  /** Canonical URL of the remote MCP endpoint (RFC 8707 resource): the audience of every agent token. */
+  mcpUrl?: string;
+  /** OAuth 2.1 authorization server on this API (MCP_OAUTH_ENABLED=true); `issuer` is API_PUBLIC_URL. */
+  oauth?: { issuer: string };
+}
+const isLoopback = (host: string) =>
+  host === "127.0.0.1" || host === "localhost" || host === "[::1]";
+function publicUrl(name: string, value: unknown, originOnly: boolean): string {
+  let url: URL;
+  try {
+    url = new URL(String(value ?? ""));
+  } catch {
+    throw new Error(`${name} must be an absolute URL.`);
+  }
+  if (
+    !(
+      url.protocol === "https:" ||
+      (url.protocol === "http:" && isLoopback(url.hostname))
+    ) ||
+    url.search ||
+    url.hash ||
+    url.username ||
+    url.password ||
+    (originOnly && url.pathname !== "/")
+  )
+    throw new Error(
+      `${name} must be an https URL${originOnly ? " without a path" : ""}, query or fragment (http only on loopback).`,
+    );
+  return originOnly
+    ? url.origin
+    : `${url.origin}${url.pathname.replace(/\/+$/, "")}`;
+}
+const flag = (value: unknown) => value === "true" || value === "1";
+/** A misconfiguration fails at startup; disabled means no agent route, token or OAuth endpoint exists at all. */
+export function parseAgentAccessConfig(
+  env: NodeJS.ProcessEnv = process.env,
+): AgentAccessConfig {
+  if (!flag(env.MCP_REMOTE_ENABLED)) {
+    if (flag(env.MCP_OAUTH_ENABLED))
+      throw new Error("MCP_OAUTH_ENABLED requires MCP_REMOTE_ENABLED=true.");
+    return { enabled: false };
+  }
+  const mcpUrl = publicUrl("MCP_REMOTE_URL", env.MCP_REMOTE_URL, false);
+  return {
+    enabled: true,
+    mcpUrl,
+    ...(flag(env.MCP_OAUTH_ENABLED)
+      ? {
+          oauth: {
+            issuer: publicUrl("API_PUBLIC_URL", env.API_PUBLIC_URL, true),
+          },
+        }
+      : {}),
+  };
+}
 export interface ServerConfig {
   jwtSecret: string;
   minClientVersion: string;
+  agentAccess: AgentAccessConfig;
   port: number;
   database: {
     host: string;
@@ -44,6 +103,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   return {
     jwtSecret: env.JWT_SECRET,
     minClientVersion: parseMinClientVersion(env.MIN_CLIENT_VERSION),
+    agentAccess: parseAgentAccessConfig(env),
     port,
     database: {
       host: env.DB_HOST ?? "solarsim-db",

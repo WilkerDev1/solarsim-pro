@@ -5,6 +5,7 @@ import {
   reportContent,
 } from "../../../shared/proposalCommercial.js";
 import { migrateLegacySpecs } from "../../../shared/equipment/index.js";
+import { isWriterRole } from "../../../shared/permissions.js";
 import { resolveMembership } from "../membership.js";
 import { lockCurrentMembership } from "../membership.js";
 import { readObjectBody } from "../request.js";
@@ -513,6 +514,125 @@ export function registerProjectsRoutes(app: Hono, deps: Dependencies): void {
         deletedCount: deletedIds.length,
         deletedIds,
       });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  });
+  /** Compact search without the full pull (agents and future lightweight clients). Trash is excluded. */
+  app.get("/api/projects", async (c) => {
+    const user = await authenticate(c);
+    if (!user) return c.json({ error: "No autorizado" }, 401);
+    const query = (c.req.query("query") ?? "").trim().slice(0, 200);
+    const limit = Math.min(
+      Math.max(Number.parseInt(c.req.query("limit") ?? "12", 10) || 12, 1),
+      50,
+    );
+    const pattern = `%${query.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
+    const rows = await pool.query<ProjectRow>(
+      `SELECT * FROM projects WHERE organization_id=$1 AND is_deleted=FALSE
+       AND ($2='' OR client_name ILIKE $3 OR project_code ILIKE $3 OR COALESCE(data_json->'client'->>'province','') ILIKE $3)
+       ORDER BY updated_at DESC, id LIMIT $4`,
+      [user.organizationId, query, pattern, limit],
+    );
+    return c.json({
+      success: true,
+      projects: rows.rows.map((r) => ({
+        id: r.id,
+        name: r.data_json.client?.name ?? "Cliente",
+        code: r.data_json.client?.projectId ?? "",
+        province: r.data_json.client?.province ?? "",
+        status: r.data_json.status ?? null,
+        decision: r.data_json.commercial?.status ?? null,
+        clientId: r.data_json.clientId ?? null,
+        version: r.version,
+        updatedAt: r.updated_at.toISOString(),
+      })),
+      limit,
+    });
+  });
+  app.get("/api/projects/:id", async (c) => {
+    const user = await authenticate(c);
+    if (!user) return c.json({ error: "No autorizado" }, 401);
+    const row = (
+      await pool.query<ProjectRow>(
+        "SELECT * FROM projects WHERE id=$1 AND organization_id=$2",
+        [c.req.param("id"), user.organizationId],
+      )
+    ).rows[0];
+    if (!row) return c.json({ error: "Proyecto no encontrado" }, 404);
+    return c.json({ success: true, project: canonicalProject(row) });
+  });
+  /**
+   * Links (clientId string) or unlinks (null) a directory client with CAS on `baseVersion`. Only the link
+   * changes: the printed client data stays. Proposals in the trash are read-only. Unlike push, the client
+   * must already exist on the server (offline-created clients are a desktop concern).
+   */
+  app.put("/api/projects/:id/client-link", async (c) => {
+    const user = await authenticate(c);
+    if (!user) return c.json({ error: "No autorizado" }, 401);
+    if (!isWriterRole(user.role))
+      return c.json({ error: "Permisos insuficientes" }, 403);
+    const body = await readObjectBody(c);
+    const clientId = body.clientId;
+    if (
+      (clientId !== null &&
+        (typeof clientId !== "string" || !clientId || clientId.length > 64)) ||
+      !Number.isSafeInteger(body.baseVersion) ||
+      body.baseVersion < 1
+    )
+      return c.json({ error: "clientId o baseVersion inválidos" }, 400);
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await lockOrganization(client, user.organizationId);
+      const denied = await lockCurrentMembership(client, user, true);
+      if (denied) {
+        await client.query("ROLLBACK");
+        return c.json({ error: "La sesión o los permisos cambiaron" }, denied);
+      }
+      const row = (
+        await client.query<ProjectRow>(
+          "SELECT * FROM projects WHERE id=$1 AND organization_id=$2 FOR UPDATE",
+          [c.req.param("id"), user.organizationId],
+        )
+      ).rows[0];
+      if (!row) {
+        await client.query("ROLLBACK");
+        return c.json({ error: "Proyecto no encontrado" }, 404);
+      }
+      if (row.is_deleted || body.baseVersion !== row.version) {
+        await client.query("ROLLBACK");
+        return c.json(
+          {
+            error: row.is_deleted
+              ? "La propuesta está en la papelera"
+              : "La propuesta cambió. Consulta la versión actual.",
+            serverVersion: row.version,
+          },
+          409,
+        );
+      }
+      if (clientId !== null) {
+        const linked = (
+          await client.query(
+            "SELECT 1 FROM clients WHERE organization_id=$1 AND id=$2 AND deleted_at IS NULL",
+            [user.organizationId, clientId],
+          )
+        ).rows[0];
+        if (!linked) {
+          await client.query("ROLLBACK");
+          return c.json({ error: "Cliente no encontrado" }, 404);
+        }
+      }
+      const data: Record<string, any> = { ...row.data_json, id: row.id };
+      if (clientId === null) delete data.clientId;
+      else data.clientId = clientId;
+      const project = await saveProject(client, user, data, row);
+      await client.query("COMMIT");
+      return c.json({ success: true, project, version: project.version });
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
