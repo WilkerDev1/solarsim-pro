@@ -2,6 +2,7 @@ import type { ShareProposalPayload } from './types';
 import { DOC_TEXT_PREFIX, getDocumentTextDefinition, isDocTextKey } from '../../../shared/documentTexts';
 import { LEGACY_MIRROR_NUMBER_FIELDS, LEGACY_MIRROR_TEXT_FIELDS } from '../../../shared/equipment';
 import { isGridConnectionMode } from '../../../shared/gridConnection';
+import { isSupplyAlternative } from '../../../shared/offGridSupply';
 export const MAX_SHARE_BYTES = 2 * 1024 * 1024;
 export class RequestValidationError extends Error {
   constructor(message: string, public readonly status: 400 | 413 = 400) { super(message); }
@@ -80,6 +81,9 @@ export function parseSharePayload(value: unknown): ShareProposalPayload {
     for (const field of fields) if (record[field] !== undefined && typeof record[field] !== 'boolean') throw new RequestValidationError(`${field} debe ser booleano.`);
   }
   if (rates.gridConnection !== undefined && !isGridConnectionMode(rates.gridConnection)) throw new RequestValidationError('El tipo de conexión no es válido.');
+  // Alternativa de suministro (sistema aislado): opcional; un valor desconocido se rechaza (la lectura lo toleraría).
+  if (rates.supplyAlternative !== undefined && !isSupplyAlternative(rates.supplyAlternative)) throw new RequestValidationError('La alternativa de suministro no es válida.');
+  if (rates.generatorCostPerKWh !== undefined && (typeof rates.generatorCostPerKWh !== 'number' || !Number.isFinite(rates.generatorCostPerKWh) || rates.generatorCostPerKWh < 0)) throw new RequestValidationError('El costo del generador debe ser un número positivo.');
   const custom = project.customization === undefined ? {} : requireRecord(project.customization, 'customization');
   let publishedTexts = 0;
   for (const [key, item] of Object.entries(custom)) {
