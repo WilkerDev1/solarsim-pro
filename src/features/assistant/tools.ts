@@ -204,7 +204,7 @@ export function executeAssistantTool(
           p.monthlyConsumption,
           // Mismo costo con el que el resumen valora el ahorro (aislado: tarifa, generador o sin comparación).
           savingsValuationCostPerKWh(p.rates),
-          p.rates.gridExportFeePct,
+          resolveAssumptions(p).gridExportFeePct,
           p.client.customMonthlyHSP,
           p.rates.tariffCode,
           resolveGridConnection(p.rates),
