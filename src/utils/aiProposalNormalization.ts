@@ -3,10 +3,13 @@ import type { ExtractedInvoiceData as ExtractedInvoiceResult } from '../types/ai
 import { normalizeProposalDraft, robustParseJson } from '../../shared/aiProposal';
 import { resolveAssumption } from '../../shared/assumptions';
 import { calculateRecommendedPanelCount, getMonthlySolarProductionFactors } from '../engine/solarEngine';
-export { robustParseJson } from '../../shared/aiProposal';
+export { robustParseJson, PROPOSAL_INVALID_JSON } from '../../shared/aiProposal';
 /** Exact normalized brand comparisons; no prefix matching across unrelated brands. */
 export function processExtractedInvoice(rawText:string,payload:AIInvoicePayload,modelInfo?:{modelUsed?:string;requestedModel?:string;modelWarning?:string}):ExtractedInvoiceResult {
-  const raw=robustParseJson(rawText);
+  return processExtractedInvoiceData(robustParseJson(rawText),payload,modelInfo);
+}
+/** Normaliza el objeto ya parseado (lo devuelve `requestGeminiStructured`). */
+export function processExtractedInvoiceData(raw:Record<string,any>,payload:AIInvoicePayload,modelInfo?:{modelUsed?:string;requestedModel?:string;modelWarning?:string}):ExtractedInvoiceResult {
   const context={...payload.context};
   context.province=raw.province || context.province;
   if(context.province) context.annualSpecificYieldKWhPerKWp=calculateRecommendedPanelCount(context.province,Array(12).fill(0),620,context.targetCoveragePct,context.systemLosses,context.customMonthlyHSP).annualSpecificYieldKWhPerKWp;

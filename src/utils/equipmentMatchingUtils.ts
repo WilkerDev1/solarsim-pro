@@ -3,7 +3,7 @@ import {
   SolarEquipmentItem,
   EquipmentType,
 } from "../types/equipment";
-import { areBrandsMatching, inferBrandFromText } from "./equipmentBrandUtils";
+import { fitEquipment } from "../../shared/equipmentMatch";
 
 export interface CatalogMatchResult {
   matchedItem: SolarEquipmentItem;
@@ -12,8 +12,11 @@ export interface CatalogMatchResult {
 }
 
 /**
- * Compara una variante extraída de ficha técnica o cotización contra el catálogo de equipos
- * y determina la mejor coincidencia inteligente.
+ * Compara una variante extraída de ficha técnica o cotización contra el catálogo de equipos con el emparejador
+ * compartido (`shared/equipmentMatch`): misma marca (con alias e inferida si el catálogo la tenía genérica),
+ * misma potencia/capacidad con la tolerancia común y modelo compatible. La puntuación conserva su escala:
+ * 1 nombre idéntico, 0.95 especificación + modelo exacto, 0.9 especificación + modelo compatible (o Ah en baterías),
+ * 0.85 solo especificación. Solo desde 0.95 la ficha actualiza el equipo sin revisión.
  */
 export function findCatalogMatchForVariant(
   variant: ExtractedEquipmentVariant,
@@ -21,164 +24,29 @@ export function findCatalogMatchForVariant(
   brand: string,
   catalog: SolarEquipmentItem[],
 ): CatalogMatchResult | null {
-  const normModel = (variant.modelCode || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
   const normDisplay = (variant.displayName || "").toLowerCase().trim();
+  const identical = normDisplay
+    ? catalog.find((item) => item.type === type && (item.displayName || "").toLowerCase().trim() === normDisplay)
+    : undefined;
+  if (identical) return { matchedItem: identical, score: 1.0, reason: "Nombre de modelo idéntico ya existente en el catálogo" };
 
-  let bestMatch: SolarEquipmentItem | null = null;
-  let bestScore = 0;
-  let bestReason = "";
-
+  const magnitude = Number(type === "panel" ? variant.powerW : type === "inverter" ? variant.powerKW : variant.capacityKWh) || undefined;
+  if (!magnitude) return null;
+  let best: CatalogMatchResult | null = null;
+  let bestDelta = Infinity;
   for (const item of catalog) {
-    if (item.type !== type) continue;
-
-    const itemModel = (item.modelSeries || "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, "");
-    const itemDisplay = (item.displayName || "").toLowerCase().trim();
-
-    // Comprobación de coincidencia exacta por nombre display
-    if (normDisplay && itemDisplay === normDisplay) {
-      return {
-        matchedItem: item,
-        score: 1.0,
-        reason: "Nombre de modelo idéntico ya existente en el catálogo",
-      };
-    }
-
-    // 1. Verificación de marca e inferencia si el catálogo legacy no la tenía
-    const effectiveItemBrand =
-      item.brand &&
-      item.brand.toLowerCase() !== "fabricante" &&
-      item.brand.trim() !== ""
-        ? item.brand
-        : inferBrandFromText(item.displayName, item.modelSeries);
-
-    const brandMatches = areBrandsMatching(brand, effectiveItemBrand);
-
-    // Si la marca no coincide directamente pero el modelo/nombre coincide fuertemente
-    const modelMatchesDirectly = Boolean(
-      normModel &&
-      itemModel &&
-      (normModel.includes(itemModel) || itemModel.includes(normModel)),
-    );
-    const displayMatchesDirectly = Boolean(
-      normModel && itemDisplay.replace(/[^a-z0-9]/g, "").includes(normModel),
-    );
-
-    if (brand && effectiveItemBrand && !brandMatches) continue;
-    if (!brandMatches && !modelMatchesDirectly && !displayMatchesDirectly) {
-      continue;
-    }
-
-    const brandLabel = effectiveItemBrand || brand;
-
-    // 2. Coincidencias técnicas según tipo de equipo
-    if (type === "battery") {
-      const vCap = Number(variant.capacityKWh) || 0;
-      const iCap = Number(item.capacityKWh) || 0;
-      const vAh = Number(variant.capacityAh) || 0;
-      const iAh = Number(item.capacityAh) || 0;
-
-      const capMatch = vCap > 0 && iCap > 0 && Math.abs(vCap - iCap) <= 0.3;
-      const ahMatch = vAh > 0 && iAh > 0 && Math.abs(vAh - iAh) <= 15;
-      const modelMatch = Boolean(
-        normModel &&
-        itemModel &&
-        (normModel.includes(itemModel) || itemModel.includes(normModel)),
-      );
-
-      if (capMatch && (modelMatch || ahMatch)) {
-        const score =
-          normModel === itemModel ||
-          itemDisplay.replace(/[^a-z0-9]/g, "").includes(normModel)
-            ? 0.95
-            : 0.9;
-        if (score > bestScore) {
-          bestScore = score;
-          bestMatch = item;
-          bestReason = `Misma marca (${brandLabel}), capacidad (${iCap} kWh) y modelo compatible`;
-        }
-      } else if (capMatch) {
-        const score = 0.85;
-        if (score > bestScore) {
-          bestScore = score;
-          bestMatch = item;
-          bestReason = `Misma marca (${brandLabel}) y capacidad nominal (${iCap} kWh)`;
-        }
-      }
-    } else if (type === "panel") {
-      const vPower = Number(variant.powerW) || 0;
-      const iPower = Number(item.powerW) || 0;
-      const powerMatch =
-        vPower > 0 && iPower > 0 && Math.abs(vPower - iPower) <= 3;
-      const modelMatch = Boolean(
-        normModel &&
-        itemModel &&
-        (normModel.includes(itemModel) || itemModel.includes(normModel)),
-      );
-
-      if (powerMatch && modelMatch) {
-        const score =
-          normModel === itemModel ||
-          itemDisplay.replace(/[^a-z0-9]/g, "").includes(normModel)
-            ? 0.95
-            : 0.9;
-        if (score > bestScore) {
-          bestScore = score;
-          bestMatch = item;
-          bestReason = `Misma marca (${brandLabel}), potencia (${iPower}W) y serie de modelo`;
-        }
-      } else if (powerMatch) {
-        const score = 0.85;
-        if (score > bestScore) {
-          bestScore = score;
-          bestMatch = item;
-          bestReason = `Misma marca (${brandLabel}) y potencia nominal (${iPower}W)`;
-        }
-      }
-    } else if (type === "inverter") {
-      const vKW = Number(variant.powerKW) || 0;
-      const iKW = Number(item.powerKW) || 0;
-      const kwMatch = vKW > 0 && iKW > 0 && Math.abs(vKW - iKW) <= 0.25;
-      const modelMatch = Boolean(
-        normModel &&
-        itemModel &&
-        (normModel.includes(itemModel) || itemModel.includes(normModel)),
-      );
-
-      if (kwMatch && modelMatch) {
-        const score =
-          normModel === itemModel ||
-          itemDisplay.replace(/[^a-z0-9]/g, "").includes(normModel)
-            ? 0.95
-            : 0.9;
-        if (score > bestScore) {
-          bestScore = score;
-          bestMatch = item;
-          bestReason = `Misma marca (${brandLabel}), potencia AC (${iKW} kW) y modelo`;
-        }
-      } else if (kwMatch) {
-        const score = 0.85;
-        if (score > bestScore) {
-          bestScore = score;
-          bestMatch = item;
-          bestReason = `Misma marca (${brandLabel}) y potencia AC (${iKW} kW)`;
-        }
-      }
+    const fit = fitEquipment({ type, brand, model: variant.modelCode, magnitude, capacityAh: Number(variant.capacityAh) || undefined }, item);
+    // Sin marca conocida en ambos lados, el modelo tiene que aportar la identidad.
+    if (!fit.fits || (!fit.brandMatch && !fit.modelMatch)) continue;
+    const score = fit.modelMatch === "exact" ? 0.95 : fit.modelMatch === "compatible" || fit.ahMatch ? 0.9 : 0.85;
+    // Misma puntuación: gana la potencia/capacidad más cercana (620 W antes que 622 W).
+    const delta = fit.magnitudeDelta ?? Infinity;
+    if (!best || score > best.score || (score === best.score && delta < bestDelta)) {
+      best = { matchedItem: item, score, reason: fit.reason };
+      bestDelta = delta;
     }
   }
-
-  if (bestMatch && bestScore >= 0.75) {
-    return {
-      matchedItem: bestMatch,
-      score: bestScore,
-      reason: bestReason,
-    };
-  }
-
-  return null;
+  return best;
 }
 
 /** Catalog item behind a project's equipment: exact name, assigned offer, normalized name, HinaESS alias, spec tolerance, then the first of its type. */

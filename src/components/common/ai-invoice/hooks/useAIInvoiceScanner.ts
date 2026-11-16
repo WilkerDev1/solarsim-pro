@@ -17,6 +17,7 @@ import { buildAITariffContext } from '../../../../utils/aiTariffContext';
 import { useEnergyCalculationMode } from '../../../../features/application/useApplicationFeatures';
 import { draftDocumentTextCatalog } from '../../../../utils/draftDocumentTexts';
 import { aiWorkspaceKey, proposalFileType, readProposalFile, PROPOSAL_FILES_LIMIT } from '../workspace';
+import { blocksPreview, buildIssueModel } from '../reviewIssues';
 
 export interface ProposalMessage { role: 'user' | 'assistant'; text: string; files?: string[]; kind?: 'error' }
 export function useAIInvoiceScanner() {
@@ -145,17 +146,19 @@ export function useAIInvoiceScanner() {
     return calculateMonthlySolarProduction(project.client.province,project.specs,project.monthlyConsumption,project.rates.energyCostPerKWh,assumptions.gridExportFeePct,project.client.customMonthlyHSP,project.rates.tariffCode,project.rates.isZeroExport,mode,engineGridUseCharge(assumptions)).map(m=>m.productionKWh);
   },[validatedDraft,target,defaults,tariffMatrix,mode,context.province,equipmentCatalog]);
   const draftPreview=useMemo(()=>{
-    if(!validatedDraft || validatedDraft.validationIssues?.some(i=>i.severity==='error' && /extra|discount|customItems|customDiscounts|commercial|markup|margin|installation|pricing|surplus|price|count|spec|source_totals|exchange/.test(i.code)))return null;
+    if(!validatedDraft || blocksPreview(validatedDraft.validationIssues || []))return null;
     const base=target || createAIProposalBase(BENCHMARK_PROJECT,defaults,validatedDraft.province || context.province || '');
     const project=prepareProposalDraftProject(base,validatedDraft,tariffMatrix,{isNew:!target,defaultBatteryDOD:defaults.defaultBatteryDOD,catalog:equipmentCatalog});
     const financial=calculateProjectFinancialSummary({...project,monthlyConsumption:project.monthlyConsumption.length===12?project.monthlyConsumption:Array(12).fill(0)},mode);
     return {project,financial};
   },[validatedDraft,target,defaults,tariffMatrix,mode,context.province,equipmentCatalog]);
-  const attentionIssues=[...(validatedDraft?.validationIssues || []),...(validatedDraft&&draftPreview?proposalReconciliationIssues(validatedDraft,draftPreview.financial):[])];
+  const attentionIssues=useMemo(()=>[...(validatedDraft?.validationIssues || []),...(validatedDraft&&draftPreview?proposalReconciliationIssues(validatedDraft,draftPreview.financial):[])],[validatedDraft,draftPreview]);
+  // Modelo único de avisos: lo consumen la revisión, el resumen del chat y el pie (reviewIssues.ts).
+  const issueModel=useMemo(()=>buildIssueModel(attentionIssues,validatedDraft || undefined),[attentionIssues,validatedDraft]);
   const reviewSnapshot = JSON.stringify(validatedDraft);
   useEffect(() => { setReviewConfirmed(false); }, [reviewSnapshot]);
-  const blockingIssues = validatedDraft?.validationIssues?.filter(issue => issue.severity === 'error') || [];
-  const canApply = !!validatedDraft && !blockingIssues.length && reviewConfirmed && draftScope === scope && !isProcessing;
+  const blockingIssues = issueModel.byTier.blocking;
+  const canApply = !!validatedDraft && !issueModel.blocksCreation && reviewConfirmed && draftScope === scope && !isProcessing;
   // Applies through the shared agent registry: same permissions, activity log, undo and pricing policy as every agent.
   const apply = async (createNew: boolean) => {
     const current = useSimulationStore.getState();
@@ -172,7 +175,7 @@ export function useAIInvoiceScanner() {
     isProcessing, cancel, reset, prompt, setPrompt, messages, errorMsg, processSmartProposal,
     extractedData:validatedDraft, draftPreview, draftEnergy, updateDraft, equipmentCatalog, tariffMatrix, context, useCurrentProject,
     setUseCurrentProject:(value:boolean)=>{cancel();setUseCurrentProject(value);setExtractedData(null);setReviewConfirmed(false);setMessages([]);},
-    draftGeneration, reviewConfirmed, setReviewConfirmed, blockingIssues, attentionIssues, canApply,
+    draftGeneration, reviewConfirmed, setReviewConfirmed, blockingIssues, attentionIssues, issueModel, canApply,
     handleApplyAsNew:()=>apply(true), handleApplyToActive:()=>apply(false),
   };
 }

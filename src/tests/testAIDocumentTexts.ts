@@ -8,7 +8,7 @@ import { DEFAULT_AGENT_POLICY } from '../store/slices/agentSlice';
 import { buildProposalRequest, normalizeProposalDraft, PROPOSAL_JSON_SCHEMA, PROPOSAL_SYSTEM_INSTRUCTION } from '../../shared/aiProposal';
 import { aiDocumentTextCatalog, AI_DRAFT_DOCUMENT_TEXT_KEYS } from '../../shared/documentTexts/aiDraft';
 import { resolveDocumentText } from '../../shared/documentTexts';
-import { AGENT_RULES_ES, assistantSystemPrompt } from '../../shared/agentTools/rules';
+import { AGENT_RULES_ES, assistantTurnContext } from '../../shared/agentTools/rules';
 import { processExtractedInvoice } from '../utils/aiProposalNormalization';
 import { buildAITariffContext } from '../utils/aiTariffContext';
 import { documentTextContextFor } from '../utils/documentTextContext';
@@ -56,7 +56,7 @@ assert(JSON.stringify(catalogForAI).length < 8000, `contexto acotado (${JSON.str
 assert(PROPOSAL_JSON_SCHEMA.properties.documentTexts, 'el esquema de respuesta admite textos del documento');
 assert.match(PROPOSAL_SYSTEM_INSTRUCTION, /documentTexts/);
 const request = buildProposalRequest({ projectRequirementsText: 'Garantía de 12 años en paneles', equipmentCatalog: catalog, context: { documentTexts: catalogForAI } });
-assert(request.contents[0].parts[0].text.includes('quotation.warranty.panel'));
+assert(request.contents[0].parts[1].text.includes('quotation.warranty.panel'), 'los textos del documento van en el contexto estable del proyecto');
 
 // 2. La respuesta con garantías concretas llega normalizada al borrador (y se descartan claves inválidas con aviso).
 const tariffReference = buildAITariffContext(store.getState().tariffMatrix);
@@ -172,8 +172,8 @@ assert(assistantVisibleIn('pdf-preview'), 'el asistente está disponible en la v
 assert.equal(assistantProjectId('pdf-preview', open.id), open.id, 'y conoce la propuesta abierta');
 assert.equal(assistantProjectId('dashboard', open.id), undefined);
 assert.match(AGENT_RULES_ES, /set_document_text/, 'las reglas distinguen textos del documento de datos del proyecto');
-assert.match(assistantSystemPrompt(open.id, 'pdf-preview'), /viendo el documento PDF/);
-assert.doesNotMatch(assistantSystemPrompt(open.id, 'pdf-preview'), /modo edición/, 'la vista también tiene modo lectura');
+assert.match(assistantTurnContext(open.id, 'pdf-preview'), /viendo el documento PDF/);
+assert.doesNotMatch(assistantTurnContext(open.id, 'pdf-preview'), /modo edición/, 'la vista también tiene modo lectura');
 
 // 7. Descubrir claves con un filtro de texto (contexto mínimo) y fijar varias en una sola acción con deshacer.
 const listed = await executeAgentTool({ name: 'list_document_texts', args: { proposalId: open.id, query: 'garantia' } }, { source: 'app-assistant', owner: assistantOwner() });
@@ -203,7 +203,9 @@ store.setState({ agentActivity: [] });
 
 const seen: string[] = [];
 const transport: GeminiTransport = async (_url, body: any) => {
-  seen.push(body.systemInstruction.parts[0].text);
+  // La propuesta activa y la vista cierran el turno del usuario (la instrucción de sistema es estable).
+  const turn = [...body.contents].reverse().find((c: any) => c.role === 'user' && c.parts.at(-1)?.text);
+  seen.push(turn.parts.at(-1).text);
   const last = body.contents.at(-1).parts[0];
   if (!last.functionResponse) {
     return { candidates: [{ finishReason: 'STOP', content: { role: 'model', parts: [{ functionCall: { name: 'set_document_texts', args: {

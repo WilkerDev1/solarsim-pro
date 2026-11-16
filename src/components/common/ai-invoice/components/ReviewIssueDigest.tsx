@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AlertOctagon, AlertTriangle, ArrowRight, ChevronDown, Info } from 'lucide-react';
-import { groupIssues, TIER_COPY, type IssueTier, type ReviewIssueView } from '../reviewIssues';
+import { issueModelFromViews, TIER_COPY, type IssueTier, type ReviewIssueModel, type ReviewIssueView } from '../reviewIssues';
 
 const ICONS: Record<IssueTier, typeof Info> = { blocking: AlertOctagon, confirm: AlertTriangle, info: Info };
 const VISIBLE = 3;
@@ -31,10 +31,10 @@ export function useDigestPeak(current: number, draftKey?: number) {
 }
 
 /** Avisos del borrador en el chat: cabecera con resumen, grupos plegables y filas compactas con destino. */
-export function ReviewIssueDigest({ issues, onNavigate, peak }: { issues: readonly ReviewIssueView[]; onNavigate: (issue: ReviewIssueView) => void; peak?: number }) {
-  const groups = groupIssues(issues);
+export function ReviewIssueDigest({ model, issues, onNavigate, peak }: { /** Modelo del contenedor; sin él se deriva de `issues`. */ model?: ReviewIssueModel; issues?: readonly ReviewIssueView[]; onNavigate: (issue: ReviewIssueView) => void; peak?: number }) {
+  const { byTier: groups, views } = model ?? issueModelFromViews(issues || []);
   const [expanded, setExpanded] = useState<Partial<Record<IssueTier, boolean>>>({});
-  const { resolved, total } = digestProgress(peak ?? issues.length, issues.length);
+  const { resolved, total } = digestProgress(peak ?? views.length, views.length);
   return <section className="proposal-digest" aria-labelledby="proposal-digest-title" aria-live="off">
     <header>
       <h3 id="proposal-digest-title">Revisemos estos detalles</h3>

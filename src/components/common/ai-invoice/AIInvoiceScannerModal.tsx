@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { FileText, RotateCcw, Settings, Paperclip } from 'lucide-react';
 import { useAIInvoiceScanner } from './hooks/useAIInvoiceScanner';
 import { ProposalDraftReview } from './components/ProposalDraftReview';
 import { ReviewIssueDigest, useDigestPeak } from './components/ReviewIssueDigest';
 import { ProposalApplyBar } from './components/ProposalApplyBar';
-import { describeIssues, firstPendingTarget, focusReviewAnchor, type IssueTarget, type ReviewTab } from './reviewIssues';
+import { applyBarCounts, focusReviewAnchor, type IssueTarget, type ReviewTab } from './reviewIssues';
 import './proposal-workspace.css';
 import { useResizablePanel } from '../../../features/assistant/useResizablePanel';
 import { ChatMessage } from '../../../features/assistant/components/ChatMessage';
@@ -30,7 +30,8 @@ export const AIInvoiceScannerModal: React.FC = () => {
   const openPicker = useRef<(() => void) | null>(null);
   const scroll = useStickToBottom(conversation, [ai.messages, ai.isProcessing, ai.attentionIssues.length]);
   const elapsed = useElapsedSeconds(ai.isProcessing);
-  const issueViews = useMemo(() => describeIssues(ai.attentionIssues, ai.extractedData || undefined), [ai.attentionIssues, ai.extractedData]);
+  const issueModel = ai.issueModel;
+  const issueViews = issueModel.views;
   useEffect(() => {
     if (!ai.isAIInvoiceModalOpen) {setConfirmUpdate(false);setConfirmReset(false); return;}
     const previous = document.activeElement as HTMLElement | null;
@@ -41,7 +42,7 @@ export const AIInvoiceScannerModal: React.FC = () => {
   // Procesar o cambiar de destino invalida la confirmación de descartar: nunca queda abierta sobre un borrador distinto.
   useEffect(() => {if(ai.isProcessing)setConfirmReset(false);}, [ai.isProcessing]);
   useEffect(() => {setConfirmReset(false);}, [ai.useCurrentProject,ai.activeProject?.id]);
-  const pendingCount = issueViews.filter(v => v.tier !== 'info').length;
+  const pendingCount = issueModel.counts.pending;
   const peak = useDigestPeak(issueViews.length, ai.draftGeneration);
   const resend = useResend(ai.prompt, ai.setPrompt, () => void ai.processSmartProposal(), ai.isProcessing);
   const lastMessage = ai.messages[ai.messages.length - 1];
@@ -54,9 +55,8 @@ export const AIInvoiceScannerModal: React.FC = () => {
   const retry = retryText ? () => resend(retryText) : undefined;
   // El error del análisis ya es un turno del hilo; el aviso del compositor queda para errores de adjuntos.
   const composerError = ai.errorMsg && !(lastMessage?.kind === 'error' && lastMessage.text === ai.errorMsg) ? ai.errorMsg : null;
-  const digest = !!issueViews.length && <ReviewIssueDigest issues={issueViews} peak={peak} onNavigate={issue=>{if(issue.target)go(issue.target);}}/>;
-  const blocking = ai.blockingIssues.length;
-  const toConfirm = issueViews.filter(v => v.tier === 'confirm').length;
+  const digest = !!issueViews.length && <ReviewIssueDigest model={issueModel} peak={peak} onNavigate={issue=>{if(issue.target)go(issue.target);}}/>;
+  const { blocking, toConfirm } = applyBarCounts(issueModel);
   const canSend = !!ai.geminiApiKey && (!!ai.prompt.trim() || ai.files.length > 0);
   const disabledReason = !ai.geminiApiKey ? 'Configura Gemini para enviar.' : 'Escribe o adjunta un archivo.';
   return <div className="proposal-overlay">
@@ -111,12 +111,12 @@ export const AIInvoiceScannerModal: React.FC = () => {
             : <button type="button" className="proposal-tertiary proposal-reset" onClick={()=>ai.extractedData?setConfirmReset(true):ai.reset()} disabled={ai.isProcessing || (!ai.extractedData&&!ai.messages.length)}><RotateCcw size={15}/>Empezar de nuevo</button>}</div>
           {ai.extractedData ? <>
             <div className="proposal-draft-scroll">
-              <fieldset disabled={ai.isProcessing} className="proposal-review-fieldset"><ProposalDraftReview draft={ai.extractedData} catalog={ai.equipmentCatalog} matrix={ai.tariffMatrix} context={ai.context} preview={ai.draftPreview} production={ai.draftEnergy} update={ai.updateDraft} issueViews={issueViews} tab={tab} onTabChange={setTab}/></fieldset>
+              <fieldset disabled={ai.isProcessing} className="proposal-review-fieldset"><ProposalDraftReview draft={ai.extractedData} catalog={ai.equipmentCatalog} matrix={ai.tariffMatrix} context={ai.context} preview={ai.draftPreview} production={ai.draftEnergy} update={ai.updateDraft} issueModel={issueModel} tab={tab} onTabChange={setTab}/></fieldset>
             </div>
             {confirmUpdate ? <footer className="proposal-apply" aria-label="Paso final"><div className="proposal-update-confirm" role="alert"><p>Se reemplazarán cliente, consumo y equipos de <strong>{ai.activeProject?.client.projectId}</strong>. Las condiciones se recalcularán.</p><div className="proposal-actions"><button type="button" className="proposal-ghost" onClick={()=>setConfirmUpdate(false)}>Cancelar</button><button type="button" className="proposal-primary" disabled={!ai.canApply} onClick={()=>{ai.handleApplyToActive();setConfirmUpdate(false);}}>Confirmar actualización</button></div></div></footer>
             : <ProposalApplyBar blocking={blocking} toConfirm={toConfirm} reviewConfirmed={ai.reviewConfirmed} canApply={ai.canApply} busy={ai.isProcessing}
               onConfirmChange={ai.setReviewConfirmed}
-              onResolve={()=>{const target=firstPendingTarget(issueViews);if(target)go(target);}}
+              onResolve={()=>{const target=issueModel.firstPending;if(target)go(target);}}
               onFocusCheck={()=>document.getElementById('proposal-review-check')?.focus()}
               onCreate={()=>{if(ai.canApply)ai.handleApplyAsNew();}}
               updateLabel={ai.useCurrentProject&&ai.activeProject?`Actualizar ${ai.activeProject.client.projectId}`:undefined}

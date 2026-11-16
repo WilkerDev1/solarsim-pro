@@ -46,6 +46,20 @@ assert.equal(prices.items[1].priceUSD, 95.5, 'USD prices are never divided by th
 assert.equal(prices.items[1].matchedEquipmentId, undefined, 'an invented catalog id is not a match');
 assert.equal(prices.items[1].action, 'create_new');
 assert.equal(prices.items[1].selected, false, 'unmatched rows need a human decision');
+// Nombre distinto sin id de la IA: el emparejador compartido sugiere la WeCo 16 kWh, sin preseleccionarla.
+reply = JSON.stringify({ detectedSupplierName: 'Proveedor QA', currencyDetected: 'USD', items: [
+  { extractedModelName: 'Batería WeCo 16 kWh', brand: 'WeCo', equipmentType: 'battery', originalCurrency: 'USD', originalPrice: 2300 },
+  { extractedModelName: 'Batería WeCo 10 kWh', brand: 'WeCo', equipmentType: 'battery', originalCurrency: 'USD', originalPrice: 1500 },
+] });
+const suggested = await scanPrices();
+assert.equal(suggested.items[0].matchedEquipmentId, 'bat-weco');
+assert.equal(suggested.items[0].selected, false, 'a suggested match still needs a human decision');
+assert(suggested.items[0].matchConfidence < 1);
+assert.equal(suggested.items[1].matchedEquipmentId, undefined, 'a different capacity is not a match');
+reply = JSON.stringify({ detectedSupplierName: 'Proveedor QA', currencyDetected: 'DOP', items: [
+  { extractedModelName: 'Batería WeCo 16K0-LV (16.06kWh)', equipmentType: 'battery', originalCurrency: 'DOP', originalPrice: 60000 },
+] });
+await scanPrices();
 body = bodies.at(-1);
 assert.deepEqual(body.generationConfig.responseSchema, PRICE_CATALOG_RESPONSE_SCHEMA);
 assert(!('action' in (PRICE_CATALOG_RESPONSE_SCHEMA.properties.items.items.properties as Record<string, unknown>)), 'action is not requested from the model');

@@ -1,8 +1,7 @@
 import { ExtractedDatasheetData } from "../types/equipment";
 import {
   MAX_INLINE_FILE_BASE64,
-  requestGeminiJson,
-  parseGeminiJson,
+  requestGeminiStructured,
   type GeminiTransport,
 } from "../../shared/geminiTransport";
 import { normalizeDatasheetResponse } from "../utils/datasheetImport";
@@ -123,10 +122,12 @@ export async function parseDatasheetWithGemini(
   if (!cleanBase64 || cleanBase64.length > MAX_INLINE_FILE_BASE64)
     throw new Error("La ficha técnica está vacía o supera 20 MB.");
   onProgress?.("Analizando variantes y especificaciones de la ficha…");
-  const result = await requestGeminiJson({
+  const result = await requestGeminiStructured({
     apiKey: apiKey || "",
     model: customModel,
     signal,
+    invalidMessage:
+      "Gemini devolvió datos incompletos o JSON inválido. No se aplicó ningún cambio.",
     body: {
       contents: [
         {
@@ -144,15 +145,10 @@ export async function parseDatasheetWithGemini(
       },
       generationConfig: {
         temperature: 0.1,
-        responseMimeType: "application/json",
         responseSchema: DATASHEET_RESPONSE_SCHEMA,
       },
     },
   }, transport);
   if (result.modelWarning) onProgress?.(result.modelWarning);
-  const parsed = parseGeminiJson(
-    result.response,
-    "Gemini devolvió datos incompletos o JSON inválido. No se aplicó ningún cambio.",
-  );
-  return normalizeDatasheetResponse(parsed);
+  return normalizeDatasheetResponse(result.data);
 }

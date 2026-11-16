@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describeIssues, groupIssues, pendingByTab, reviewAnchor, issueTier, firstPendingTarget } from '../components/common/ai-invoice/reviewIssues';
+import { describeIssues, groupIssues, pendingByTab, reviewAnchor, issueTier, firstPendingTarget, buildIssueModel, blocksPreview, applyBarCounts, requestedRowAlert, confirmRequestedRow } from '../components/common/ai-invoice/reviewIssues';
+import { proposalReconciliationIssues } from '../utils/proposalDraftProject';
+import { ProposalApplyBar } from '../components/common/ai-invoice/components/ProposalApplyBar';
 import { ReviewIssueDigest } from '../components/common/ai-invoice/components/ReviewIssueDigest';
 import { ProposalDraftReview } from '../components/common/ai-invoice/components/ProposalDraftReview';
 
@@ -142,5 +144,110 @@ assert.match(review, /aria-invalid="true"/);
     update: () => {}, issueViews: views,
   }));
   assert.match(html, /8(<[^>]+>)? por revisar/);
+}
+
+// 11. One issue model, computed once: severity, destination and group, consumed by review, chat digest and footer.
+{
+  const model = buildIssueModel([...issues], draft);
+  assert.deepEqual(model.counts, { blocking: 4, confirm: 4, info: 2, pending: 8 });
+  assert.equal(model.blocksCreation, true, 'any error blocks creation (same rule as canApply)');
+  assert.deepEqual(model.byTab, pendingByTab(views));
+  assert.equal(model.firstPending?.anchor, reviewAnchor.row('batteries', 1), 'first blocker with a destination');
+  assert.equal(model.tabTier.equipment, 'blocking');
+  assert.equal(model.tabTier.consumption, undefined, 'informative notes do not color a tab');
+  const group = (code: string) => model.views.find(v => v.code === code)!.group;
+  assert.equal(group('requested_battery_model_mismatch'), 'equipment');
+  assert.equal(group('unknown_tariff'), 'client');
+  assert.equal(group('unresolved_request'), 'requests');
+  assert.equal(group('something_new'), 'general');
+  assert.equal(buildIssueModel([{ code: 'document_text_seen_partially', severity: 'warning', message: 'x' }]).views[0].group, 'document');
+  assert.deepEqual(model.byTier.blocking.map(v => v.code), groupIssues(views).blocking.map(v => v.code));
+  const empty = buildIssueModel([], draft);
+  assert.equal(empty.blocksCreation, false);
+  assert.equal(empty.firstPending, undefined);
+  // Warnings never block (document reconciliation is always a warning).
+  assert.equal(buildIssueModel([{ code: 'document_totalCostUSD_difference', severity: 'warning', message: 'x' }]).blocksCreation, false);
+  // The preview is skipped only for errors in figures it would compute with (same codes as before).
+  assert.equal(blocksPreview([{ code: 'missing_client', severity: 'error', message: '' }]), false);
+  assert.equal(blocksPreview([{ code: 'invalid_panel_count', severity: 'error', message: '' }]), true);
+  assert.equal(blocksPreview([{ code: 'missing_panel_price', severity: 'warning', message: '' }]), false);
+  assert.equal(blocksPreview([{ code: 'invalid_exchange', severity: 'error', message: '' }]), true);
+  // Digest and review accept the model as is and show the same counts.
+  const digestHtml = renderToStaticMarkup(React.createElement(ReviewIssueDigest, { model, onNavigate: () => {} }));
+  assert.match(digestHtml, /4 bloquean/);
+  assert.match(digestHtml, /4 por confirmar/);
+  const reviewHtml = renderToStaticMarkup(React.createElement(ProposalDraftReview, {
+    draft: { ...(draft as object), distributor: 'EDENORTE', tariffCode: 'BTS-1' } as never, catalog: [], matrix: { schedules: {} } as never, context: { province: 'Santiago' } as never, preview: null, production: null,
+    update: () => {}, issueModel: model,
+  }));
+  assert.match(reviewHtml, /8(<[^>]+>)? por revisar/);
+  // The footer reads the same counts.
+  const footer = renderToStaticMarkup(React.createElement(ProposalApplyBar, { ...applyBarCounts(model), reviewConfirmed: false, canApply: false, busy: false, onConfirmChange() {}, onResolve() {}, onCreate() {}, onFocusCheck() {} }));
+  assert.match(footer, /4 bloqueos impiden/);
+  assert.match(footer, /Resolver 4 bloqueos/);
+}
+// 12. Model and power/capacity requests are different issues; confirming a row resolves exactly what it shows.
+{
+  const row = { id: 'b1', brandModel: 'Batería WeCo 16K0-LV (16.06kWh)', capacityKWh: 16.06, count: 2, requestedModel: 'Batería WeCo 16K0-LV', requestedCapacityKWh: 10 };
+  const capacityOnly = describeIssues([{ code: 'requested_battery_mismatch', severity: 'error', message: 'Batería WeCo 16K0-LV (16.06kWh) no coincide con la potencia/capacidad solicitada (10).' }], { batteries: [row] } as never);
+  const alert = requestedRowAlert(capacityOnly);
+  assert.equal(alert.model, undefined, 'a capacity mismatch is not a model issue');
+  assert.equal(alert.magnitude?.code, 'requested_battery_mismatch');
+  const confirmed = confirmRequestedRow(row, alert);
+  assert.equal(confirmed.requestedCapacityKWh, undefined, 'confirming clears the capacity request it shows');
+  assert.equal(confirmed.requestedModel, 'Batería WeCo 16K0-LV', 'and leaves the model request, which had no issue');
+  const both = requestedRowAlert(describeIssues([
+    { code: 'requested_battery_model_mismatch', severity: 'error', message: 'Batería WeCo 16K0-LV (16.06kWh) no coincide con el modelo solicitado (Batería WeCo 16K0-LV).' },
+    { code: 'requested_battery_mismatch', severity: 'error', message: 'Batería WeCo 16K0-LV (16.06kWh) no coincide con la potencia/capacidad solicitada (10).' },
+  ], { batteries: [row] } as never));
+  const cleared = confirmRequestedRow(row, both);
+  assert.equal(cleared.requestedModel, undefined);
+  assert.equal(cleared.requestedCapacityKWh, undefined);
+  for (const code of ['requested_inverter_model_ambiguous', 'requested_inverter_model_partial', 'requested_inverter_model_mismatch'])
+    assert.equal(requestedRowAlert(describeIssues([{ code, severity: 'warning', message: 'x' }])).model?.code, code);
+  // Render: a capacity mismatch says so, with what was asked, and is not described as an unconfirmed model.
+  const html = renderToStaticMarkup(React.createElement(ProposalDraftReview, {
+    draft: { ...(draft as object), batteries: [row], distributor: 'EDENORTE', tariffCode: 'BTS-1' } as never, catalog: [], matrix: { schedules: {} } as never, context: {} as never, preview: null, production: null,
+    update: () => {}, issueViews: capacityOnly,
+  }));
+  assert.match(html, /capacidad no coincide con la solicitada/);
+  assert.doesNotMatch(html, /no pudo confirmar el modelo/);
+  assert.match(html, /10 kWh/);
+  // A row with a requested model and no issue shows no alert.
+  const quiet = renderToStaticMarkup(React.createElement(ProposalDraftReview, {
+    draft: { ...(draft as object), batteries: [row], distributor: 'EDENORTE', tariffCode: 'BTS-1' } as never, catalog: [], matrix: { schedules: {} } as never, context: {} as never, preview: null, production: null,
+    update: () => {}, issueViews: [],
+  }));
+  assert.doesNotMatch(quiet, /proposal-row-alert/);
+}
+// 13. canApply equivalence: the model's blocksCreation over validation + reconciliation gives the same answer as the previous
+//     rule (any validation issue with severity 'error'), for every combination of a varied pool.
+{
+  const pool = [
+    { code: 'missing_client', severity: 'error', message: 'a' },
+    { code: 'context_consumption', severity: 'error', message: 'b' },
+    { code: 'context_consumption', severity: 'warning', message: 'c' },
+    { code: 'requested_battery_model_partial', severity: 'warning', message: 'd' },
+    { code: 'document_text_seen_partially', severity: 'warning', message: 'e' },
+    { code: 'invalid_panel_count', severity: 'error', message: 'f' },
+    { code: 'something_new', severity: undefined as never, message: 'g' },
+  ] as const;
+  const financial = { costMatrix: { precioNetoUSD: 100, itbisUSD: 18, totalNetoUSD: 118, listPorcentajeVentaUSD: 150 } } as never;
+  const reconciliations = [
+    proposalReconciliationIssues({ commercial: {} } as never, financial),
+    proposalReconciliationIssues({ commercial: { sourceTotals: { subtotalUSD: 1, taxUSD: 2, totalCostUSD: 3, saleUSD: 4 } } } as never, financial),
+  ];
+  assert.equal(reconciliations[1].length, 4);
+  let cases = 0;
+  for (let mask = 0; mask < 1 << pool.length; mask++) {
+    const validation = pool.filter((_, i) => mask & (1 << i));
+    for (const reconciliation of reconciliations) {
+      const before = !validation.some((issue) => issue.severity === 'error');
+      const after = !buildIssueModel([...validation, ...reconciliation] as never).blocksCreation;
+      assert.equal(after, before, `mask ${mask}`);
+      cases++;
+    }
+  }
+  assert.equal(cases, 256);
 }
 console.log('PASS: review issues are tiered, linked to fields, counted per tab and flagged inline.');

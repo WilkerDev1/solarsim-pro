@@ -7,6 +7,7 @@ import { findCatalogMatchForVariant } from "../utils/equipmentMatchingUtils";
 import { useSimulationStore } from "../store/useSimulationStore";
 import { GeminiPriceCatalogService } from "../services/geminiPriceCatalogService";
 import type { SolarEquipmentItem } from "../types/equipment";
+import type { GeminiTransport } from "../../shared/geminiTransport";
 
 async function main() {
   const old: SolarEquipmentItem = {
@@ -186,17 +187,13 @@ async function main() {
     /ya existe/,
   );
 
-  const originalFetch = globalThis.fetch;
+  // Transporte sintético inyectado: nunca se parchea fetch.
   let calls = 0;
-  globalThis.fetch = async (input, init) => {
+  const transport: GeminiTransport = async (url, _body, headers) => {
     calls++;
-    assert.ok(!String(input).includes("?key="));
-    assert.equal(
-      new Headers(init?.headers).get("x-goog-api-key"),
-      "synthetic-key",
-    );
-    return new Response(
-      JSON.stringify({
+    assert.ok(!url.includes("?key="));
+    assert.equal(headers["x-goog-api-key"], "synthetic-key");
+    return {
         candidates: [
           {
             finishReason: "STOP",
@@ -225,12 +222,11 @@ async function main() {
             },
           },
         ],
-      }),
-      { status: 200, headers: { "Content-Type": "application/json" } },
-    );
+    };
   };
-  try {
+  {
     const prices = await GeminiPriceCatalogService.scanAndMatchPriceCatalog({
+      transport,
       fileBase64: "YQ==",
       mimeType: "application/pdf",
       fileName: "QA.pdf",
@@ -251,8 +247,6 @@ async function main() {
     );
     assert.equal(prices.matchedExistingSupplier, null);
     assert.equal(calls, 1, "One request per valid response");
-  } finally {
-    globalThis.fetch = originalFetch;
   }
   console.log(
     "PASS: datasheet rename/ID/offers preservation, unknown fields, validation, batch collision and price normalization",
