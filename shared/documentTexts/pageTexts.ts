@@ -75,6 +75,9 @@ export const PAGE_TEXT_DEFINITIONS: DocumentTextDefinition[] = [
   text("executiveSummary", "executiveSummary.row3.exchangeRate", "Tasa RD$ / USD", "Tasa RD$ / USD"),
   text("executiveSummary", "executiveSummary.row3.exchangeRateNote", "Tasa de cambio ref.", "Tasa de cambio ref."),
   text("executiveSummary", "executiveSummary.row3.tariff", "Precio kWh Tarifa", "Precio kWh Tarifa"),
+  // Facturación por bloques (SIE-007-2026): no hay precio escalar; se muestra el precio medio de la factura.
+  text("executiveSummary", "executiveSummary.row3.tariffAverage", "Precio medio kWh (bloques)", "Precio medio kWh"),
+  text("executiveSummary", "executiveSummary.row3.tariffBlocksNote", "Precio por bloques (nota)", "Según bloques tarifarios"),
   // Sistema aislado con generador: la base del ahorro es el costo de generación propia, no la tarifa.
   text("executiveSummary", "executiveSummary.row3.generatorCost", "Costo kWh generador", "Costo kWh Generador"),
   text("executiveSummary", "executiveSummary.row3.generatorCostNote", "Costo del generador pendiente", "Costo pendiente de indicar"),
