@@ -11,7 +11,7 @@ import type { SolarEquipmentItem } from '../../../../types/equipment';
 import type { GlobalTariffMatrix } from '../../../../types/tariffs';
 import { RD_PROVINCES } from '../../../../data/rdProvinces';
 import { getTariffSource, resolveAITariffSelection, tariffSourceFieldLabel } from '../../../../utils/aiTariffContext';
-import { describeIssues, firstPendingTarget, focusReviewAnchor, issuesAt, pendingByTab, REVIEW_TABS, reviewAnchor, rowControlFor, worstTier, type IssueTarget, type ReviewIssueView, type ReviewTab } from '../reviewIssues';
+import { buildIssueModel, focusReviewAnchor, issueModelFromViews, issuesAt, REVIEW_TABS, reviewAnchor, rowControlFor, worstTier, type IssueTarget, type ReviewIssueModel, type ReviewIssueView, type ReviewTab } from '../reviewIssues';
 import { Field, IssueNotes } from './ReviewFlags';
 import type { PreviewEquipment } from '../commercialRows';
 
@@ -27,6 +27,8 @@ interface Props {
   issues?: readonly AIProposalIssue[];
   /** Avisos ya clasificados por el contenedor (evita derivarlos dos veces); tiene prioridad sobre `issues`. */
   issueViews?: readonly ReviewIssueView[];
+  /** Modelo de avisos del contenedor (el mismo del chat y del pie); tiene prioridad sobre `issueViews` e `issues`. */
+  issueModel?: ReviewIssueModel;
   /** Pestaña controlada desde el contenedor para que el chat pueda llevar a un campo. */
   tab?: ReviewTab;
   onTabChange?: (tab: ReviewTab) => void;
@@ -34,17 +36,15 @@ interface Props {
 const usd=(n:number)=>n.toLocaleString('es-DO',{style:'currency',currency:'USD'});
 const plural=(n:number,one:string,many:string)=>`${n.toLocaleString('es-DO')} ${n===1?one:many}`;
 
-export function ProposalDraftReview({draft,catalog,matrix,context,preview,production,update,issues=[],issueViews,tab:controlledTab,onTabChange}:Props) {
+export function ProposalDraftReview({draft,catalog,matrix,context,preview,production,update,issues=[],issueViews,issueModel,tab:controlledTab,onTabChange}:Props) {
   const [ownTab,setOwnTab]=useState<ReviewTab>('consumption');
   const tab=controlledTab ?? ownTab;
   const setTab=(next:ReviewTab)=>{setOwnTab(next);onTabChange?.(next);};
-  const views=issueViews ?? describeIssues(issues,draft);
-  const pending=pendingByTab(views);
-  const blocking=views.filter(v=>v.tier==='blocking').length;
-  const toReview=views.filter(v=>v.tier!=='info').length;
+  const model=issueModel ?? (issueViews ? issueModelFromViews(issueViews) : buildIssueModel(issues,draft));
+  const {views,byTab:pending,firstPending}=model;
+  const {blocking,pending:toReview}=model.counts;
   const at=(anchor:string)=>issuesAt(views,anchor);
   const go=(target:IssueTarget)=>{if(target.tab)setTab(target.tab);requestAnimationFrame(()=>focusReviewAnchor(target.anchor));};
-  const firstPending=firstPendingTarget(views);
   const tariff = resolveAITariffSelection(matrix,draft.distributor,draft.tariffCode);
   const source = tariff ? getTariffSource(matrix,tariff) : null;
   const setRate = (value:string) => {
@@ -70,7 +70,7 @@ export function ProposalDraftReview({draft,catalog,matrix,context,preview,produc
     <div className="proposal-review-band">
       <div className="proposal-review-tabs" role="tablist" aria-label="Secciones del borrador">{REVIEW_TABS.map(({key,label,short})=>{
         const count=pending[key];
-        const tier=worstTier(views.filter(v=>v.tier!=='info'&&v.target?.tab===key));
+        const tier=model.tabTier[key];
         const Icon=tier==='blocking'?AlertOctagon:AlertTriangle;
         return <button type="button" key={key} role="tab" tabIndex={tab===key?0:-1} onKeyDown={e=>{const keys=REVIEW_TABS.map(t=>t.key);let index=keys.indexOf(tab);if(e.key==='ArrowRight')index=(index+1)%4;else if(e.key==='ArrowLeft')index=(index+3)%4;else if(e.key==='Home')index=0;else if(e.key==='End')index=3;else return;e.preventDefault();setTab(keys[index]);document.getElementById(`proposal-label-${keys[index]}`)?.focus();}} aria-selected={tab===key} aria-controls={`proposal-tab-${key}`} id={`proposal-label-${key}`} onClick={()=>setTab(key)}>
           <span className="proposal-tab-long">{label}</span><span className="proposal-tab-short" aria-hidden="true">{short}</span>

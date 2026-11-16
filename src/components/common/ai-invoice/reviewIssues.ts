@@ -2,15 +2,32 @@ import type { AIProposalIssue } from '../../../../shared/aiProposal';
 import type { ExtractedInvoiceData } from '../../../types/aiInvoice';
 
 /**
- * Capa de presentación de los avisos del borrador. La validación sólo expone código, gravedad y mensaje;
- * aquí se derivan el grupo visible (bloquea / confirmar / informativo) y el campo de la revisión al que
- * apunta cada aviso. No cambia la validación ni decide si se puede aplicar: eso sigue en el hook.
+ * Modelo único de los avisos del borrador. La validación sólo expone código, gravedad y mensaje; aquí se
+ * derivan, una sola vez (`buildIssueModel`, en el hook), la severidad visible (bloquea / por confirmar /
+ * informativo), el destino (campo o fila de la revisión) y el grupo. Lo consumen la revisión, el resumen del
+ * chat (`ReviewIssueDigest`) y el pie (`ProposalApplyBar`). `blocksCreation` es la misma regla que `canApply`:
+ * cualquier aviso con gravedad `error` impide crear la propuesta.
  */
 export type IssueTier = 'blocking' | 'confirm' | 'info';
 export type ReviewTab = 'consumption' | 'equipment' | 'commercial' | 'client';
 export type EquipmentKey = 'panels' | 'inverters' | 'batteries';
+/** Sección a la que pertenece un aviso: una pestaña, los textos del documento, las solicitudes pendientes o general (sin destino). */
+export type IssueGroup = ReviewTab | 'document' | 'requests' | 'general';
 export interface IssueTarget { tab?: ReviewTab; anchor: string; label: string }
-export interface ReviewIssueView extends AIProposalIssue { tier: IssueTier; target?: IssueTarget }
+export interface ReviewIssueView extends AIProposalIssue { tier: IssueTier; target?: IssueTarget; group: IssueGroup }
+export interface ReviewIssueModel {
+  views: ReviewIssueView[];
+  byTier: Record<IssueTier, ReviewIssueView[]>;
+  counts: { blocking: number; confirm: number; info: number; /** Bloqueos + por confirmar. */ pending: number };
+  /** Pendientes (no informativos) por pestaña. */
+  byTab: Record<ReviewTab, number>;
+  /** El tono más grave de cada pestaña entre sus pendientes. */
+  tabTier: Record<ReviewTab, IssueTier | undefined>;
+  /** Primer destino al que llevar: el primer bloqueo con campo o, si no hay, el primer punto por confirmar. */
+  firstPending?: IssueTarget;
+  /** Igual que la guarda de `canApply`: hay avisos con gravedad `error`. */
+  blocksCreation: boolean;
+}
 
 export const REVIEW_TABS: readonly { key: ReviewTab; label: string; short: string }[] = [
   { key: 'consumption', label: 'Consumo y diseño', short: 'Consumo' },
@@ -86,8 +103,45 @@ export function issueTarget(issue: AIProposalIssue, draft?: ExtractedInvoiceData
   return undefined;
 }
 
+function issueGroup(target: IssueTarget | undefined): IssueGroup {
+  if (target?.tab) return target.tab;
+  if (target?.anchor === reviewAnchor.documentTexts) return 'document';
+  if (target?.anchor === reviewAnchor.unresolved) return 'requests';
+  return 'general';
+}
+
 export function describeIssues(issues: readonly AIProposalIssue[], draft?: ExtractedInvoiceData): ReviewIssueView[] {
-  return issues.map(issue => ({ ...issue, tier: issueTier(issue), target: issueTarget(issue, draft) }));
+  return issues.map(issue => {
+    const target = issueTarget(issue, draft);
+    return { ...issue, tier: issueTier(issue), target, group: issueGroup(target) };
+  });
+}
+
+/** Modelo a partir de avisos ya descritos (p. ej. los que recibe un componente suelto). */
+export function issueModelFromViews(views: readonly ReviewIssueView[]): ReviewIssueModel {
+  const byTier = groupIssues(views);
+  const tabTier = Object.fromEntries(REVIEW_TABS.map(({ key }) => [key, worstTier(views.filter(v => v.tier !== 'info' && v.target?.tab === key))])) as Record<ReviewTab, IssueTier | undefined>;
+  return {
+    views: [...views], byTier, tabTier,
+    counts: { blocking: byTier.blocking.length, confirm: byTier.confirm.length, info: byTier.info.length, pending: byTier.blocking.length + byTier.confirm.length },
+    byTab: pendingByTab(views), firstPending: firstPendingTarget(views), blocksCreation: byTier.blocking.length > 0,
+  };
+}
+
+/** Se calcula una vez por borrador: avisos de validación + conciliación con el motor. */
+export function buildIssueModel(issues: readonly AIProposalIssue[], draft?: ExtractedInvoiceData): ReviewIssueModel {
+  return issueModelFromViews(describeIssues(issues, draft));
+}
+
+/** Lo que el pie necesita del modelo. */
+export function applyBarCounts(model: ReviewIssueModel): { blocking: number; toConfirm: number } {
+  return { blocking: model.counts.blocking, toConfirm: model.counts.confirm };
+}
+
+/** Errores en cifras con las que el motor calcularía la vista previa (equipos, precios, condiciones, cambio): sin vista previa. */
+const PREVIEW_BLOCKING = /extra|discount|customItems|customDiscounts|commercial|markup|margin|installation|pricing|surplus|price|count|spec|source_totals|exchange/;
+export function blocksPreview(issues: readonly AIProposalIssue[]): boolean {
+  return issues.some(issue => issue.severity === 'error' && PREVIEW_BLOCKING.test(issue.code));
 }
 
 export function groupIssues(views: readonly ReviewIssueView[]): Record<IssueTier, ReviewIssueView[]> {

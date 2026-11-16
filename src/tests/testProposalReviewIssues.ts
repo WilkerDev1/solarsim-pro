@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describeIssues, groupIssues, pendingByTab, reviewAnchor, issueTier, firstPendingTarget } from '../components/common/ai-invoice/reviewIssues';
+import { describeIssues, groupIssues, pendingByTab, reviewAnchor, issueTier, firstPendingTarget, buildIssueModel, blocksPreview, applyBarCounts } from '../components/common/ai-invoice/reviewIssues';
+import { ProposalApplyBar } from '../components/common/ai-invoice/components/ProposalApplyBar';
 import { ReviewIssueDigest } from '../components/common/ai-invoice/components/ReviewIssueDigest';
 import { ProposalDraftReview } from '../components/common/ai-invoice/components/ProposalDraftReview';
 
@@ -142,5 +143,46 @@ assert.match(review, /aria-invalid="true"/);
     update: () => {}, issueViews: views,
   }));
   assert.match(html, /8(<[^>]+>)? por revisar/);
+}
+
+// 11. One issue model, computed once: severity, destination and group, consumed by review, chat digest and footer.
+{
+  const model = buildIssueModel([...issues], draft);
+  assert.deepEqual(model.counts, { blocking: 4, confirm: 4, info: 2, pending: 8 });
+  assert.equal(model.blocksCreation, true, 'any error blocks creation (same rule as canApply)');
+  assert.deepEqual(model.byTab, pendingByTab(views));
+  assert.equal(model.firstPending?.anchor, reviewAnchor.row('batteries', 1), 'first blocker with a destination');
+  assert.equal(model.tabTier.equipment, 'blocking');
+  assert.equal(model.tabTier.consumption, undefined, 'informative notes do not color a tab');
+  const group = (code: string) => model.views.find(v => v.code === code)!.group;
+  assert.equal(group('requested_battery_model_mismatch'), 'equipment');
+  assert.equal(group('unknown_tariff'), 'client');
+  assert.equal(group('unresolved_request'), 'requests');
+  assert.equal(group('something_new'), 'general');
+  assert.equal(buildIssueModel([{ code: 'document_text_seen_partially', severity: 'warning', message: 'x' }]).views[0].group, 'document');
+  assert.deepEqual(model.byTier.blocking.map(v => v.code), groupIssues(views).blocking.map(v => v.code));
+  const empty = buildIssueModel([], draft);
+  assert.equal(empty.blocksCreation, false);
+  assert.equal(empty.firstPending, undefined);
+  // Warnings never block (document reconciliation is always a warning).
+  assert.equal(buildIssueModel([{ code: 'document_totalCostUSD_difference', severity: 'warning', message: 'x' }]).blocksCreation, false);
+  // The preview is skipped only for errors in figures it would compute with (same codes as before).
+  assert.equal(blocksPreview([{ code: 'missing_client', severity: 'error', message: '' }]), false);
+  assert.equal(blocksPreview([{ code: 'invalid_panel_count', severity: 'error', message: '' }]), true);
+  assert.equal(blocksPreview([{ code: 'missing_panel_price', severity: 'warning', message: '' }]), false);
+  assert.equal(blocksPreview([{ code: 'invalid_exchange', severity: 'error', message: '' }]), true);
+  // Digest and review accept the model as is and show the same counts.
+  const digestHtml = renderToStaticMarkup(React.createElement(ReviewIssueDigest, { model, onNavigate: () => {} }));
+  assert.match(digestHtml, /4 bloquean/);
+  assert.match(digestHtml, /4 por confirmar/);
+  const reviewHtml = renderToStaticMarkup(React.createElement(ProposalDraftReview, {
+    draft: { ...(draft as object), distributor: 'EDENORTE', tariffCode: 'BTS-1' } as never, catalog: [], matrix: { schedules: {} } as never, context: { province: 'Santiago' } as never, preview: null, production: null,
+    update: () => {}, issueModel: model,
+  }));
+  assert.match(reviewHtml, /8(<[^>]+>)? por revisar/);
+  // The footer reads the same counts.
+  const footer = renderToStaticMarkup(React.createElement(ProposalApplyBar, { ...applyBarCounts(model), reviewConfirmed: false, canApply: false, busy: false, onConfirmChange() {}, onResolve() {}, onCreate() {}, onFocusCheck() {} }));
+  assert.match(footer, /4 bloqueos impiden/);
+  assert.match(footer, /Resolver 4 bloqueos/);
 }
 console.log('PASS: review issues are tiered, linked to fields, counted per tab and flagged inline.');
