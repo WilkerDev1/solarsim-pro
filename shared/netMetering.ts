@@ -118,7 +118,8 @@ export function resolveNetMetering(rates: NetMeteringRatesInput | null | undefin
 /** Texto del campo del dock → cargo acotado; `undefined` si aún no es un número (vacío, «.», «-»): no se guarda. */
 export function parseGridUseChargeInput(text: string): number | undefined {
   const trimmed = text.trim();
-  return trimmed === '' ? undefined : clampGridUseCharge(Number(trimmed));
+  // Coma decimal («3,78») como en el resto de campos numéricos.
+  return trimmed === '' ? undefined : clampGridUseCharge(Number(trimmed.replace(',', '.')));
 }
 
 /** ¿El cargo se imprime como RD$0.00? Por debajo de medio centavo cuenta como sin cargo en la nota y en el dock. */
@@ -145,10 +146,10 @@ export function clampGridUseCharge(value: unknown): number | undefined {
 export function reconcileGridUseCharge<R extends NetMeteringRatesInput>(before: R, after: R, change: Partial<NetMeteringRatesInput>): R {
   const withCharge = (rates: R, charge: number | null | undefined): R => {
     const { gridUseChargeDOPPerKWh: _drop, ...rest } = rates;
-    return (charge === undefined ? rest : { ...rest, gridUseChargeDOPPerKWh: charge }) as R;
+    return (charge == null ? rest : { ...rest, gridUseChargeDOPPerKWh: charge }) as R;
   };
   let next = withCharge(after, before.gridUseChargeDOPPerKWh);
-  const legacyWithoutField = resolveNetMeteringRegime(next.netMeteringRegime) !== 'sie007_2026' && before.gridUseChargeDOPPerKWh === undefined;
+  const legacyWithoutField = resolveNetMeteringRegime(next.netMeteringRegime) !== 'sie007_2026' && before.gridUseChargeDOPPerKWh == null;
   if (legacyWithoutField) return next;
   const explicit = clampGridUseCharge(change.gridUseChargeDOPPerKWh);
   if (explicit !== undefined) return withCharge(next, explicit);
