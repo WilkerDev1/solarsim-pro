@@ -2,6 +2,7 @@ import type { ClientInfo, FinancialParams, LegacyProjectSpecs, ProjectSimulation
 import type { EquipmentSupplierPrice, SolarEquipmentItem } from '../types/equipment';
 import { LIST_KEY, editEquipment, migrateLegacySpecs, readEquipment, type EquipmentKind } from '../../shared/equipment';
 import { resolveAssumption, resolveAssumptions } from '../../shared/assumptions';
+import { reconcileGridUseCharge } from '../../shared/netMetering';
 import { resolveSystemLossesPct } from '../../shared/projectDefaults';
 import { calculateRecommendedPanelCount } from '../engine/solarEngine';
 import { BENCHMARK_PROJECT } from '../engine/referenceCase';
@@ -20,6 +21,8 @@ import { supplierQuotesItem } from '../utils/equipmentMatchingUtils';
  * - una cantidad manual del grupo principal de paneles apaga el autodimensionado;
  * - el proveedor del modelo principal se suelta si el modelo nuevo no lo cotiza;
  * - sobrescrituras financieras manuales: solo sobreviven en el caso de referencia auditado;
+ * - cargo por uso de la red SIE-007-2026: pasar al régimen o cambiar de distribuidora siembra el cargo de fábrica,
+ *   salvo que el usuario lo haya editado (un valor distinto del de fábrica de la distribuidora anterior);
  * - reconciliación con el catálogo (potencia del modelo principal y proveedor huérfano), que corre en la siguiente
  *   edición real: mirar un proyecto nunca lo escribe.
  */
@@ -58,7 +61,7 @@ export function applyProjectEdit(project: ProjectSimulation, edit: ProjectEdit, 
       next = editSpecs(project, supplierPricePatch(project, edit, catalog), catalog);
       break;
     case 'rates': {
-      const rates = { ...project.rates, ...edit.patch };
+      const rates = reconcileGridUseCharge(project.rates, { ...project.rates, ...edit.patch }, edit.patch);
       next = resizeIfNeeded(project, { ...project, rates, specs: { ...reconcileWithCatalog(project.specs, project.specs, catalog) } }, edit.patch.targetCoveragePct !== undefined);
       break;
     }

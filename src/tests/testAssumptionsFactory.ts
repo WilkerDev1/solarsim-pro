@@ -43,6 +43,8 @@ try {
     dopExchangeRate: 60, systemLossesPct: 25, annualEnergyInflationPct: DEFAULT_ENERGY_INFLATION_PCT, discountRatePct: DEFAULT_DISCOUNT_RATE_PCT,
     projectLifespanYears: DEFAULT_PROJECT_LIFESPAN_YEARS, targetCoveragePct: 95, gridExportFeePct: 25, quoteValidityDays: DEFAULT_QUOTE_VALIDITY_DAYS,
     annualDegradationPct: DEFAULT_ANNUAL_DEGRADATION_PCT, batteryReplacementYear: 10, pricePerWattUSD: 1.13, saleMarginMultiplier: 1.25, installationUsdPerKwp: 170, co2FactorKgPerKWh: 0.481,
+    // Sin dato: régimen anterior; el cargo de fábrica de una distribuidora desconocida es el mayor de las EDE (no se aplica).
+    netMeteringRegime: 'legacy_retention', gridUseChargeDOPPerKWh: 4.02, appliedGridUseChargeDOPPerKWh: 0,
   });
   assert.equal(resolveAssumptions({ specs: { isDetailed: true } }).systemLossesPct, DEFAULT_DETAILED_SYSTEM_LOSSES_PCT, 'modo detallado sin pérdidas: 14');
   assert.equal(resolveAssumptions({ specs: { isDetailed: true, systemLosses: 0 } }).systemLossesPct, 0, 'pérdidas 0 explícitas se respetan');
@@ -60,10 +62,15 @@ try {
   store.getState().createNewProject({ name: 'Nuevo de fábrica' });
   const created = store.getState().projects[0];
   const imported = importMinimal({ client: { name: 'Importado vacío' }, specs: {}, rates: {} });
-  assert.deepEqual(resolveAssumptions(imported), resolveAssumptions(created), 'nuevo ≡ importado vacío');
-  assert.deepEqual(resolveAssumptions(created), { ...empty, annualEnergyInflationPct: 3.5 }, 'y ambos son las constantes compartidas');
+  // Excepción deliberada (fase 2 tarifaria): el régimen de medición neta. Lo nuevo nace en SIE-007-2026; lo importado
+  // sin el campo es del régimen anterior. Todo lo demás coincide campo por campo.
+  const withoutRegime = ({ netMeteringRegime, gridUseChargeDOPPerKWh, appliedGridUseChargeDOPPerKWh, ...rest }: ReturnType<typeof resolveAssumptions>) => rest;
+  assert.equal(resolveAssumptions(created).netMeteringRegime, 'sie007_2026', 'nuevo: régimen SIE-007-2026');
+  assert.equal(resolveAssumptions(imported).netMeteringRegime, 'legacy_retention', 'importado sin el campo: régimen anterior');
+  assert.deepEqual(withoutRegime(resolveAssumptions(imported)), withoutRegime(resolveAssumptions(created)), 'nuevo ≡ importado vacío (salvo el régimen)');
+  assert.deepEqual(withoutRegime(resolveAssumptions(created)), withoutRegime({ ...empty, annualEnergyInflationPct: 3.5 }), 'y ambos son las constantes compartidas');
   // También sin objetos anidados vacíos: el archivo más pequeño que acepta la importación.
-  assert.deepEqual(resolveAssumptions(importMinimal({ client: { name: 'Mínimo' }, specs: { isDetailed: false }, rates: { distributor: 'EDESUR' }, financials: {} })), resolveAssumptions(created));
+  assert.deepEqual(withoutRegime(resolveAssumptions(importMinimal({ client: { name: 'Mínimo' }, specs: { isDetailed: false }, rates: { distributor: 'EDESUR' }, financials: {} }))), withoutRegime(resolveAssumptions(created)));
 
   // 4. Un archivo guardado conserva lo suyo: 0 explícitos se respetan, el resto de lo que falta toma la constante (no los ajustes).
   store.setState({ projects: [], defaultSimulationSettings: { ...DEFAULT_SIMULATION_SETTINGS, discountRatePct: 30, annualEnergyTariffEscalationPct: 9 } });

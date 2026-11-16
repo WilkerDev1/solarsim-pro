@@ -1,5 +1,6 @@
 import { GlobalTariffMatrix, UtilityDistributor, UtilityTariffDetails } from '../types/tariffs';
 import { tariffMatrixKey } from '../../shared/tariffRules';
+import { factoryGridUseCharge } from '../../shared/netMetering';
 
 export const TARIFF_DISTRIBUTORS: UtilityDistributor[] = ['EDEESTE', 'EDESUR', 'EDENORTE', 'CEPM'];
 
@@ -63,7 +64,10 @@ export function buildAITariffContext(matrix: GlobalTariffMatrix, now = new Date(
       };
     }),
   }));
-  return { resolutionCode: matrix.resolutionCode, effectiveDate: matrix.effectiveDate, schedules, warnings };
+  // Cargo por uso de la red SIE-007-2026 de fábrica (RD$/kWh inyectado), con su procedencia: vive con los supuestos
+  // (`shared/netMetering.ts`), no en la matriz de la organización. Solo tarifas de un solo precio.
+  const gridUseCharges = TARIFF_DISTRIBUTORS.map((distributor) => ({ distributor, ...factoryGridUseCharge(distributor), appliesTo: 'tarifas de un solo precio (BTS-1, BTS-2, RBT-1); 0 con potencia o inyección cero' }));
+  return { resolutionCode: matrix.resolutionCode, effectiveDate: matrix.effectiveDate, schedules, gridUseCharges, warnings };
 }
 
 /** Unknown distributor/code returns null: callers must request confirmation, never silently choose BTS2. */

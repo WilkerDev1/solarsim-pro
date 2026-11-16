@@ -3,6 +3,7 @@ import { cleanClientName, getTariffDisplayName } from '../../../shared/proposalP
 import { customItemsTaxBreakdown, LEY5707_CREDIT_RATE } from '../../../shared/financialRules';
 import { visibleQuotationItems } from '../../../shared/quotationItems';
 import { resolveAssumption, resolveAssumptions } from '../../../shared/assumptions';
+import { resolveNetMeteringRegime } from '../../../shared/netMetering';
 import { ELECTSUN_LOGO_COLOR_BASE64 } from '../../../shared/electsunLogoColor';
 import { escapeHtml, formatInlineMarkdown, formatMarkdown, safeLogoUrl, scriptJson } from './escaping';
 import { createDocumentTextContext, docTextKey, interpolate, viewerText } from '../../../shared/documentTexts';
@@ -63,7 +64,11 @@ export function renderProposalPage(stored: StoredProposal): string {
   const { project, summary, expiresAt } = stored;
   const client = project.client || {};
   const specs = project.specs || {};
-  const rates = project.rates || {};
+  // Régimen de medición neta del enlace: el de las tarifas publicadas; si falta, el del snapshot; si falta, el anterior.
+  // Se usa el mismo en los supuestos, la nota y los textos (un enlace antiguo no trae ninguno: régimen anterior).
+  const publishedRates = project.rates || {};
+  const netMeteringRegime = resolveNetMeteringRegime(publishedRates.netMeteringRegime ?? stored.calculationSnapshot?.netMeteringRegime);
+  const rates = { ...publishedRates, netMeteringRegime };
   const financials = project.financials || {};
   const custom = project.customization || {};
 
@@ -88,7 +93,7 @@ export function renderProposalPage(stored: StoredProposal): string {
   const projectId = client.projectId || 'SP-2026-001';
   const quoteNumber = client.quoteNumber || 'C-0001';
   // ADR 0003: los mismos supuestos efectivos que la aplicación; la vigencia guardada en el enlace va antes del default.
-  const assumptions = resolveAssumptions(project);
+  const assumptions = resolveAssumptions({ ...project, rates });
   const quoteValidityDays = resolveAssumption('quoteValidityDays', client.quoteValidityDays, stored.validityDays);
   const province = client.province || client.location || 'Santo Domingo';
   const clientAddress = client.address || `${province}, República Dominicana`;
@@ -98,6 +103,7 @@ export function renderProposalPage(stored: StoredProposal): string {
   const isCEPM = distributor === 'CEPM';
   const isZeroExport = !!rates.isZeroExport;
   const exportFee = assumptions.gridExportFeePct;
+  const gridUseChargeApplied = assumptions.appliedGridUseChargeDOPPerKWh > 0;
 
   // Equipos solo por `shared/equipment`: un enlace antiguo (solo espejo) y uno nuevo (solo grupos) dan lo mismo.
   const equipment = readEquipment(specs);
@@ -235,6 +241,8 @@ export function renderProposalPage(stored: StoredProposal): string {
   // Textos del documento: publicado (`doc:`) → campo heredado de enlaces antiguos → texto compartido por defecto.
   const textContext = createDocumentTextContext({
     clientName, quoteValidityDays, distributor, tariffCode: rawTariffCode, isZeroExport, gridExportFeePct: exportFee, hasBattery,
+    // Régimen del enlace (rates o snapshot); sin él, el anterior y su nota de siempre.
+    netMeteringRegime, gridUseChargeDOPPerKWh: assumptions.gridUseChargeDOPPerKWh,
     // Los enlaces nuevos traen su nota regulatoria publicada (`doc:`); sin ella, el texto que mostraban antes.
     regulatoryNoteEdition: 'legacy',
     hasBatteryStorage: hasBattery, companyName,
@@ -555,7 +563,7 @@ ${ENERGY_FLOW_CSS}
         <canvas id="energyChart"></canvas>
       </div>
 
-      ${showSelfConsumption ? `<p class="text-xs text-slate-600" data-energy-mode="self_consumption">Autoconsumo anual en sitio: <strong>${Math.round(annualSelfConsumption).toLocaleString()} kWh</strong>${hasBattery ? `; aporte nocturno de baterías: <strong>${Math.round(annualBatteryContribution).toLocaleString()} kWh</strong>` : ''}. La inyección se presenta como crédito neto después de retención.</p>` : ''}
+      ${showSelfConsumption ? `<p class="text-xs text-slate-600" data-energy-mode="self_consumption">Autoconsumo anual en sitio: <strong>${Math.round(annualSelfConsumption).toLocaleString()} kWh</strong>${hasBattery ? `; aporte nocturno de baterías: <strong>${Math.round(annualBatteryContribution).toLocaleString()} kWh</strong>` : ''}. ${netMeteringRegime === 'sie007_2026' ? (gridUseChargeApplied ? 'La inyección se acredita completa; el cargo por uso de la red se descuenta del ahorro.' : 'La inyección se acredita completa.') : 'La inyección se presenta como crédito neto después de retención.'}</p>` : ''}
       <!-- Full 12-Month Table with Mobile Horizontal Scroll -->
       <div class="space-y-1.5">
         <div class="sm:hidden flex items-center justify-between text-[10px] text-slate-400 font-medium px-1">

@@ -256,7 +256,10 @@ test("Staging E2E: completo ciclo de confirmación de política, publicación we
       },
       body: JSON.stringify({
         baseVersion: currentPolicy.version,
-        settings: { selfConsumptionProjection: true },
+        settings: {
+          selfConsumptionProjection: true,
+          netMeteringRegimeSelector: true,
+        },
       }),
     });
     assert.equal(policyPatch.status, 200);

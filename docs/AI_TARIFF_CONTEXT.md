@@ -15,6 +15,12 @@ Una fecha de inicio no prueba que el pliego siga vigente. `buildAITariffContext`
 
 `averageBlockEnergyRateDOP` calcula el precio medio de un consumo mensual con tarifa por bloques. Aplica los bloques escalonados, salvo en BTS-1 y BTS-2 con consumo de 701 kWh o más: ahí todos los kWh van al precio del cuarto bloque (SIE-121-2026-TF, art. 4.d, pág. 11). La usan la tarifa de referencia del dock y el borrador de IA. Solo cambia la tarifa que se propone; el motor y las propuestas guardadas siguen con su tarifa plana.
 
+### Cargo por uso de la red (SIE-007-2026)
+
+El cargo de fábrica en RD$/kWh inyectado vive con los supuestos, no en la matriz de la organización: `FACTORY_GRID_USE_CHARGES` en `shared/netMetering.ts`, con resolución y periodo (EDESUR 3.78, EDENORTE 4.02 y EDEESTE 3.88 de la SIE-121-2026-TF, art. 9; CEPM 5.73 de la SIE-147-2026-TF, art. 2; verificados en las tablas de las resoluciones). `buildAITariffContext` lo devuelve en `gridUseCharges` (también `get_tariffs`). Solo aplica a las tarifas de un solo precio (`tariffChargeKind`); 0 con potencia o inyección cero; las tarifas sin clasificar lo pagan (criterio conservador). Es un valor estimado, no verificado con facturas.
+
+El borrador de IA nuevo nace en el régimen `sie007_2026` con el cargo de fábrica de su distribuidora. El esquema (`PROPOSAL_JSON_SCHEMA`) admite `netMeteringRegime` (`legacy_retention` | `sie007_2026`) y `gridUseChargeDOPPerKWh` (0–100) solo si el usuario los indica; un valor no válido se ignora con aviso (`invalid_net_metering_regime`, `invalid_grid_use_charge`). Un borrador sobre una propuesta existente no cambia su régimen salvo que lo indique. Las herramientas de agentes los aceptan en `create_proposal` y en `propose_project_update` (sección `rates`, validados en `src/features/assistant/validation.ts`). El escáner de resoluciones todavía no extrae el cargo (fase siguiente).
+
 ## Propuestas y extracción
 
 `buildAITariffContext(matrix, now?)` entrega únicamente códigos, monedas, cargos, bloques y fuente, ordenados; omite descripciones extensas y aliases duplicados. `resolveAITariffSelection` acepta una fila disponible o devuelve `null`: una distribuidora o código desconocido no se convierte silenciosamente en BTS2. Los aliases CEPM históricos se resuelven explícitamente.

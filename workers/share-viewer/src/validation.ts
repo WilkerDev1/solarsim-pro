@@ -1,6 +1,7 @@
 import type { ShareProposalPayload } from './types';
 import { DOC_TEXT_PREFIX, getDocumentTextDefinition, isDocTextKey } from '../../../shared/documentTexts';
 import { LEGACY_MIRROR_NUMBER_FIELDS, LEGACY_MIRROR_TEXT_FIELDS } from '../../../shared/equipment';
+import { isNetMeteringRegime, isValidGridUseCharge, resolveNetMeteringRegime } from '../../../shared/netMetering';
 export const MAX_SHARE_BYTES = 2 * 1024 * 1024;
 export class RequestValidationError extends Error {
   constructor(message: string, public readonly status: 400 | 413 = 400) { super(message); }
@@ -78,6 +79,9 @@ export function parseSharePayload(value: unknown): ShareProposalPayload {
   for (const [record, fields] of [[specs, ['hasBattery','showSelfConsumptionBreakdown']], [rates, ['isZeroExport']], [financials, ['applyITBISExemption','applyLey5707']]] as const) {
     for (const field of fields) if (record[field] !== undefined && typeof record[field] !== 'boolean') throw new RequestValidationError(`${field} debe ser booleano.`);
   }
+  // Régimen de medición neta (fase 2): opcional; un enlace sin él es del régimen anterior. Valores desconocidos: 400.
+  if (rates.netMeteringRegime !== undefined && !isNetMeteringRegime(rates.netMeteringRegime)) throw new RequestValidationError('El régimen de medición neta no es válido.');
+  if (rates.gridUseChargeDOPPerKWh !== undefined && !isValidGridUseCharge(rates.gridUseChargeDOPPerKWh)) throw new RequestValidationError('El cargo por uso de la red no es válido.');
   const custom = project.customization === undefined ? {} : requireRecord(project.customization, 'customization');
   let publishedTexts = 0;
   for (const [key, item] of Object.entries(custom)) {
@@ -127,7 +131,7 @@ export function parseSharePayload(value: unknown): ShareProposalPayload {
   for (const month of summary.monthlyBreakdown) {
     const row = requireRecord(month, 'month');
     textFields(row, ['month'], 80);
-    for (const field of ['consumptionKWh','productionKWh','effectiveSavedKWh','solarSelfConsumedKWh','gridExportKWh','batteryContributionKWh','netExportCreditKWh']) {
+    for (const field of ['consumptionKWh','productionKWh','effectiveSavedKWh','solarSelfConsumedKWh','gridExportKWh','batteryContributionKWh','netExportCreditKWh','gridUseChargeUSD']) {
       if (row[field] !== undefined && (typeof row[field] !== 'number' || !Number.isFinite(row[field]) || (row[field] as number) < 0)) throw new RequestValidationError('Las métricas mensuales deben ser números positivos.');
     }
     if (typeof row.consumptionKWh !== 'number' || typeof row.productionKWh !== 'number') throw new RequestValidationError('Faltan las métricas de energía.');
@@ -141,6 +145,7 @@ export function parseSharePayload(value: unknown): ShareProposalPayload {
   if (snapshot.mode !== 'legacy' && snapshot.mode !== 'self_consumption') throw new RequestValidationError('El modo de cálculo no es válido.');
   if (typeof snapshot.capturedAt !== 'string' || !Number.isFinite(Date.parse(snapshot.capturedAt))) throw new RequestValidationError('La fecha de cálculo no es válida.');
   if (typeof snapshot.organizationId !== 'string' || snapshot.organizationId.length > 160) throw new RequestValidationError('La organización del cálculo no es válida.');
+  if (snapshot.netMeteringRegime !== undefined && (!isNetMeteringRegime(snapshot.netMeteringRegime) || snapshot.netMeteringRegime !== resolveNetMeteringRegime(rates.netMeteringRegime))) throw new RequestValidationError('El régimen de medición neta del cálculo no es válido.');
   if (!Number.isSafeInteger(snapshot.policyVersion) || (snapshot.policyVersion as number) < 0) throw new RequestValidationError('La versión de la política no es válida.');
   if (!Number.isInteger(body.validityDays) || (body.validityDays as number) < 1 || (body.validityDays as number) > 90) throw new RequestValidationError('La vigencia debe estar entre 1 y 90 días.');
   return value as ShareProposalPayload;

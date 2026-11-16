@@ -1,3 +1,4 @@
+import { GRID_USE_CHARGE_ESTIMATE_NOTICE } from '../../../../shared/netMetering';
 import { useSelfConsumptionProjection } from '../../../features/application/useApplicationFeatures';
 import React, { useState } from 'react';
 import { describePanelConfiguration, readEquipment } from '../../../../shared/equipment';
@@ -47,6 +48,8 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
     0
   );
   const avgCoveragePct = summary?.energyCoveragePct || 0;
+  // Régimen SIE-007-2026: cargo por uso de la red descontado del ahorro (estimado, no verificado con facturas).
+  const totalGridUseChargeUSD = (summary?.monthlyBreakdown || []).reduce((sum, m) => sum + (m.gridUseChargeUSD || 0), 0);
 
   const [isReplicated, setIsReplicated] = useState(false);
 
@@ -152,6 +155,11 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
             ) : (
               <span>
                 💡 Ahorro Anual Estimado: <strong className="text-slate-800">{totalEffectiveSavedKWh.toFixed(1)} kWh</strong>
+              </span>
+            )}
+            {totalGridUseChargeUSD > 0 && (
+              <span className="text-amber-700 text-[9.5px]" title={GRID_USE_CHARGE_ESTIMATE_NOTICE}>
+                Cargo uso de red: ${totalGridUseChargeUSD.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD/año (estimado, no verificado con facturas)
               </span>
             )}
           </div>

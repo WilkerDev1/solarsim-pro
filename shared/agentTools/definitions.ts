@@ -1,5 +1,6 @@
 // Single catalog of agent tools shared by the proposal assistant, the general assistant and the local MCP server.
 import type { AgentToolDefinition, JsonSchema } from './types.js';
+import { MAX_GRID_USE_CHARGE_DOP_PER_KWH, NET_METERING_REGIMES } from '../netMetering.js';
 
 const ALL = ['app-assistant', 'proposal-assistant', 'mcp'] as const;
 const id = (description: string): JsonSchema => ({ type: 'string', minLength: 1, maxLength: 128, description });
@@ -45,6 +46,8 @@ const PROPOSAL_AND_CATALOG_TOOLS: AgentToolDefinition[] = [
       batteries: groups('Grupos de baterías del catálogo (opcional).'),
       marginPct: { type: 'number', minimum: 0, maximum: 1000, description: 'Recargo sobre costo en %, p. ej. 28.' },
       installationUnitPriceUSD: { type: 'number', minimum: 0, maximum: 100000, description: 'Mano de obra USD/kWp.' },
+      netMeteringRegime: { type: 'string', enum: [...NET_METERING_REGIMES], description: 'Régimen de medición neta. Omítelo: las propuestas nuevas nacen en sie007_2026 (cargo por kWh inyectado); legacy_retention (retención % anterior) solo si el usuario lo pide.' },
+      gridUseChargeDOPPerKWh: { type: 'number', minimum: 0, maximum: MAX_GRID_USE_CHARGE_DOP_PER_KWH, description: 'Cargo por uso de la red en RD$/kWh inyectado. Omítelo para usar el de fábrica de la distribuidora (get_tariffs).' },
     }, ['clientName', 'distributor', 'tariffCode', 'panels', 'inverters']),
   },
   {
@@ -248,7 +251,7 @@ export const AGENT_TOOL_DEFINITIONS: readonly AgentToolDefinition[] = [
   },
   {
     name: 'get_tariffs', title: 'Consultar tarifas', kind: 'read', category: 'reference', surfaces: [...ALL],
-    description: 'Consulta las referencias de tarifa y su procedencia.',
+    description: 'Consulta las referencias de tarifa y su procedencia, y los cargos por uso de la red SIE-007-2026 de fábrica (RD$/kWh inyectado) por distribuidora.',
     inputSchema: object({}),
   },
   {

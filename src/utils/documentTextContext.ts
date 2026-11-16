@@ -65,6 +65,8 @@ export function buildDocumentTextContext(
     tariffCode: rates.tariffCode || '',
     isZeroExport: !!rates.isZeroExport,
     gridExportFeePct: assumptions.gridExportFeePct,
+    netMeteringRegime: assumptions.netMeteringRegime,
+    gridUseChargeDOPPerKWh: assumptions.gridUseChargeDOPPerKWh,
     hasBattery: !!specs.hasBattery,
     hasBatteryStorage: totals.batteryNominalKWh > 0,
     annualConsumptionKWh: summary.annualConsumptionKWh,
