@@ -58,7 +58,8 @@ export function renderExpiredPage(companyName = 'electsun', companyPhone = '+1 (
 
 /** Sistema aislado: el déficit es energía no servida (el snapshot nuevo trae `annualUnservedKWh`). */
 function offGridEnergyNote(annualUnservedKWh: unknown, annualConsumptionKWh: number): string {
-  const unserved = Number(annualUnservedKWh);
+  // Solo un número finito y no negativo: null, '', false o texto no son «0 kWh no servidos».
+  const unserved = typeof annualUnservedKWh === 'number' ? annualUnservedKWh : Number.NaN;
   const lead = 'Sistema aislado (modo isla): no hay conexión con la red, así que no se importa ni se exporta energía y el excedente se recorta.';
   if (!Number.isFinite(unserved) || unserved < 0) return `${lead} El consumo que no cubran el sol y las baterías requiere un respaldo externo (por ejemplo, una planta eléctrica).`;
   if (unserved === 0) return `${lead} La producción solar y las baterías cubren el consumo estimado.`;

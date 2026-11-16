@@ -54,6 +54,9 @@ export interface ModeScenario {
   houseKW: number;
   gridKW: number;
   batteryKW: number;
+  /** Solo sistemas aislados: demanda de la casa y la parte que no se sirve (sin red que la complete). */
+  demandKW?: number;
+  unservedKW?: number;
   lines: { sun: FlowLine; inverter: FlowLine; house: FlowLine; grid: FlowLine; battery?: FlowLine };
 }
 
@@ -152,7 +155,7 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
   const make = (mode: EnergyFlowMode, f: Flows, o: {
     label: string; title: string; description: string; note?: string; pill: ModeScenario['pill'];
     night: boolean; gridConnected: boolean; inverterState: ModeScenario['inverterState']; batteryFull?: boolean;
-    batteryEmpty?: boolean; noGrid?: boolean;
+    batteryEmpty?: boolean; noGrid?: boolean; demand?: number;
   }): ModeScenario => {
     const house = f.solarHouse + f.batteryHouse + f.gridHouse;
     const batteryState: BatteryState | undefined = !hybrid ? undefined : o.batteryFull && f.batteryHouse <= 0 ? 'full'
@@ -165,6 +168,7 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
       night: o.night, inverterState: o.inverterState, gridState, batteryState,
       productionKW: round1(f.production), houseKW: round1(house), gridKW: round1(f.exported + f.gridHouse),
       batteryKW: round1(f.solarBattery + f.batteryHouse),
+      ...(o.demand !== undefined ? { demandKW: round1(o.demand), unservedKW: round1(Math.max(0, o.demand - house)) } : {}),
       lines: buildLines(f, hybrid, o.gridConnected),
     };
   };
@@ -243,20 +247,23 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
     const island = { zeroExport: true, gridConnected: false, gridImport: false };
     const base = { gridConnected: false, noGrid: true } as const;
     const trimmed = (f: Flows) => potential - f.production > 0.05;
+    // Estado del inversor y píldoras salen de los flujos modelados, nunca fijos.
+    const inverterOf = (f: Flows, night: boolean): ModeScenario['inverterState'] => (f.production > 0 || f.batteryHouse > 0 ? 'on' : night ? 'standby' : 'off');
+    const unserved: ModeScenario['pill'] = { text: 'Carga sin servir', tone: 'amber' };
     const day = solveDay(load.day, potential, batteryLimit, inverter, island);
     if (!hybrid) {
       return [
         make('day', day, {
-          ...base, label: 'De día', title: 'De día', night: false, inverterState: day.production > 0 ? 'on' : 'off',
+          ...base, label: 'De día', title: 'De día', night: false, inverterState: inverterOf(day, false), demand: load.day,
           description: describeFlows('De día, ', day, false, trimmed(day)) + capped(day, load.day),
           note: OFF_GRID_NO_BATTERY_NOTE,
-          pill: { text: 'Modo isla', tone: 'green' },
+          pill: day.production > 0 ? { text: 'Modo isla', tone: 'green' } : unserved,
         }),
         make('night', solveNight(load.night, 0, false, inverter), {
-          ...base, label: 'De noche', title: 'De noche', night: true, inverterState: 'off',
+          ...base, label: 'De noche', title: 'De noche', night: true, inverterState: 'standby', demand: load.night,
           description: 'De noche no hay producción solar y, sin baterías ni red, el sistema no puede abastecer la casa: la carga queda sin servir salvo que exista un respaldo externo.',
           note: OFF_GRID_NOTE,
-          pill: { text: 'Carga sin servir', tone: 'amber' },
+          pill: unserved,
         }),
       ];
     }
@@ -265,25 +272,26 @@ export function energyFlowScenarios(input: EnergyFlowScenarioInput): ModeScenari
     const depleted = solveNight(load.night, 0, false, inverter);
     return [
       make('day', day, {
-        ...base, label: 'De día', title: 'De día', night: false, inverterState: 'on',
+        ...base, label: 'De día', title: 'De día', night: false, inverterState: inverterOf(day, false), demand: load.day,
         description: describeFlows('De día, ', day, false, trimmed(day)) + capped(day, load.day),
-        pill: { text: day.solarBattery > 0 ? 'Cargando batería' : day.batteryHouse > 0 ? 'Batería apoyando' : 'Modo isla', tone: 'green' },
+        pill: day.solarBattery > 0 ? { text: 'Cargando batería', tone: 'green' } : day.batteryHouse > 0 ? { text: 'Batería apoyando', tone: 'green' }
+          : day.production > 0 ? { text: 'Modo isla', tone: 'green' } : unserved,
       }),
       make('batteryFull', full, {
-        ...base, label: 'Batería llena', title: 'Batería llena', night: false, inverterState: 'on', batteryFull: true,
+        ...base, label: 'Batería llena', title: 'Batería llena', night: false, inverterState: inverterOf(full, false), batteryFull: true, demand: load.day,
         description: describeFlows('Cuando la batería está llena, ', full, false, trimmed(full)) + capped(full, load.day),
-        pill: { text: 'Batería llena', tone: 'green' },
+        pill: full.batteryHouse > 0 ? { text: 'Batería apoyando', tone: 'green' } : full.production > 0 ? { text: 'Batería llena', tone: 'green' } : unserved,
       }),
       make('night', night, {
-        ...base, label: 'De noche', title: 'De noche', night: true, inverterState: 'on',
+        ...base, label: 'De noche', title: 'De noche', night: true, inverterState: inverterOf(night, true), demand: load.night,
         description: describeFlows('De noche, sin producción solar, ', night, false) + capped(night, load.night),
-        pill: { text: 'Batería descargando', tone: 'indigo' },
+        pill: night.batteryHouse > 0 ? { text: 'Batería descargando', tone: 'indigo' } : unserved,
       }),
       make('depleted', depleted, {
-        ...base, label: 'Batería agotada', title: 'Batería agotada', night: true, inverterState: 'standby', batteryEmpty: true,
+        ...base, label: 'Batería agotada', title: 'Batería agotada', night: true, inverterState: inverterOf(depleted, true), batteryEmpty: true, demand: load.night,
         description: 'De noche, con la batería agotada y sin red, la casa se queda sin energía hasta que vuelva el sol: la carga queda sin servir salvo que exista un respaldo externo.',
         note: OFF_GRID_NOTE,
-        pill: { text: 'Carga sin servir', tone: 'amber' },
+        pill: unserved,
       }),
     ];
   }

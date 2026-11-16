@@ -4,7 +4,7 @@ import { SystemSpecs, MonthlyEnergyResult } from '../types';
 import { getProvinceHSP } from '../data/rdProvinces';
 import { calculateTotalDCCapacityKWp } from '../utils/equipmentSpecsUtils';
 import { batteryBank, readEquipment } from '../../shared/equipment';
-import { exportsToGrid, type GridConnectionMode } from '../../shared/gridConnection';
+import { exportsToGrid, isGridConnectionMode, type GridConnectionMode } from '../../shared/gridConnection';
 
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -138,7 +138,8 @@ export function calculateMonthlySolarProduction(
   gridConnection?: GridConnectionMode | boolean,
   calculationMode: EnergyCalculationMode = 'legacy'
 ): MonthlyEnergyResult[] {
-  const connection: GridConnectionMode = typeof gridConnection === 'string' ? gridConnection : gridConnection ? 'zero_export' : 'grid_export';
+  // Misma lectura que resolveGridConnection: un valor desconocido no es inyección cero; `true` es el isZeroExport heredado.
+  const connection: GridConnectionMode = isGridConnectionMode(gridConnection) ? gridConnection : gridConnection === true ? 'zero_export' : 'grid_export';
   // Inyección cero y sistema aislado no exportan: el excedente se recorta y no hay retención.
   const isZeroExport = !exportsToGrid(connection);
   const isOffGrid = connection === 'off_grid';

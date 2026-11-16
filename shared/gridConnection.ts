@@ -59,7 +59,15 @@ export function normalizeGridConnectionPatch<T extends GridConnectionFields>(cur
     delete rest.gridConnection;
     return normalizeGridConnectionPatch(current, rest);
   }
-  if (typeof patch.isZeroExport !== 'boolean') return patch;
+  if (typeof patch.isZeroExport !== 'boolean') {
+    // Lo guardado es contradictorio o desconocido (p. ej. una versión anterior cambió solo `isZeroExport`): una
+    // edición de tarifas lo deja coherente con lo que ya se lee (manda `isZeroExport`), así que el resultado no cambia.
+    // Sin `gridConnection` guardado no se escribe nada. Hidratar, importar o restaurar no escriben (mirar no escribe).
+    const stored = current?.gridConnection;
+    if (stored === undefined) return patch;
+    const effective = resolveGridConnection(current);
+    return stored === effective ? patch : ({ ...patch, ...gridConnectionFields(effective) } as T);
+  }
   const previous = resolveGridConnection(current);
   const mode: GridConnectionMode = !patch.isZeroExport ? 'grid_export' : previous === 'off_grid' ? 'off_grid' : 'zero_export';
   return { ...patch, ...gridConnectionFields(mode) } as T;

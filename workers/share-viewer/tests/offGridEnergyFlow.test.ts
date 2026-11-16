@@ -77,6 +77,32 @@ assert.equal(nbNight.houseKW, 0);
 assert.equal(nbNight.pill.text, 'Carga sin servir');
 assert.deepEqual(Object.values(nbNight.lines).filter((l) => l?.active), []);
 
+// Estado del inversor y píldoras salen de los flujos: sin producción ni descarga no hay inversor «encendido» ni
+// batería «descargando».
+const noPv = { ...island, systemCapacityKWp: 0 };
+assert.equal(pick(noPv, 'day').batteryState, 'discharging', 'sin paneles la batería cubre el día');
+assert.equal(pick(noPv, 'batteryFull').inverterState === 'on', pick(noPv, 'batteryFull').batteryState === 'discharging');
+for (const input of [island, small, heavy, islandNoBattery, noPv, { ...island, inverterPowerKW: 0.5 }]) {
+  for (const sc of energyFlowScenarios(input)) {
+    const flowing = sc.productionKW > 0 || sc.batteryState === 'discharging';
+    if (sc.inverterState === 'on') assert.ok(flowing, `${sc.mode}: inversor encendido sin flujo`);
+    if (flowing) assert.equal(sc.inverterState, 'on', `${sc.mode}: inversor ${sc.inverterState} con flujo`);
+    if (sc.pill.text === 'Batería descargando') assert.equal(sc.batteryState, 'discharging', sc.mode);
+    if (sc.pill.text === 'Cargando batería') assert.equal(sc.batteryState, 'charging', sc.mode);
+    // Balance (sin red): lo producido va a la casa o a la batería, y la demanda es casa + no servida.
+    const unserved = sc.unservedKW ?? -1;
+    assert.ok(unserved >= 0, `${sc.mode}: informa la carga no servida`);
+    if (sc.batteryState === 'charging') assert.ok(Math.abs(sc.productionKW - (sc.houseKW + sc.batteryKW)) <= 0.11, `${sc.mode}: producción = casa + batería`);
+    else {
+      const fromBattery = sc.batteryState === 'discharging' ? sc.batteryKW : 0;
+      assert.ok(Math.abs(sc.houseKW - (sc.productionKW + fromBattery)) <= 0.11, `${sc.mode}: casa = solar + batería`);
+    }
+    assert.ok(Math.abs((sc.demandKW ?? -1) - (sc.houseKW + unserved)) <= 0.11, `${sc.mode}: demanda = casa + no servida`);
+  }
+}
+assert.ok((pick(heavy, 'night').unservedKW ?? 0) > 2, 'la noche pesada deja carga sin servir');
+assert.equal(pick(island, 'depleted').unservedKW, pick(island, 'depleted').demandKW);
+
 // Enlaces anteriores: sin `gridConnection` nada cambia.
 assert.deepEqual(energyFlowScenarios({ ...island, gridConnection: undefined }).map((s) => s.mode), ['day', 'batteryFull', 'night', 'outageDay', 'outageNight']);
 
@@ -111,6 +137,10 @@ assert.ok(flow.includes('Batería · agotada') && flow.includes('Carga sin servi
 const fullAria = flow.match(/data-energy-flow-svg="full"[^>]*aria-label="([^"]*)"/)?.[1] ?? flow.match(/aria-label="([^"]*)"[^>]*data-energy-flow-svg="full"/)?.[1] ?? '';
 assert.ok(/Sistema híbrido aislado/.test(fullAria) && /Sin conexión a la red Aislado/.test(fullAria), fullAria);
 assert.ok(flow.includes('Situación 1 de 4'));
+// Cada panel describe los estados nuevos en el nombre accesible del dibujo.
+const panelAria = (mode: string) => flow.slice(flow.indexOf(`data-energy-mode-panel="${mode}"`)).match(/data-energy-flow-svg="full"[^>]*aria-label="([^"]*)"/)?.[1] ?? '';
+assert.ok(/batería agotada/.test(panelAria('depleted')) && /Batería · agotada Agotada/.test(panelAria('depleted')) && /Sin conexión a la red Aislado/.test(panelAria('depleted')), panelAria('depleted'));
+assert.ok(/Sin conexión a la red Aislado/.test(panelAria('night')) && /Batería · descargando/.test(panelAria('night')), panelAria('night'));
 // Balance de energía: la energía no servida se informa como tal, nunca como importación.
 assert.ok(/data-grid-connection="off_grid"[^>]*>[^<]*<strong>1,235 kWh\/año<\/strong>/.test(hybridHtml), 'nota de energía no servida');
 // Documento: el marco regulatorio no promete medición neta ni inyección.
@@ -122,6 +152,13 @@ const noBatteryHtml = renderProposalPage(proposal({ gridConnection: 'off_grid', 
 assert.ok(section(noBatteryHtml).includes('data-energy-flow="off-grid"') && section(noBatteryHtml).includes('Sistema aislado'));
 assert.ok(section(noBatteryHtml).includes('off-grid'), 'aviso del inversor sin red');
 assert.ok(noBatteryHtml.includes('data-grid-connection="off_grid"') && /respaldo externo/.test(noBatteryHtml), 'sin dato de energía no servida (enlace sin snapshot nuevo) se explica igual');
+// Un dato no numérico (null, '', false, texto) no se lee como «0 kWh no servidos».
+const unservedNote = (html: string) => html.match(/data-grid-connection="off_grid">([^<]*)/)?.[1] ?? '';
+for (const missing of [null, '', false, '0', Number.NaN, -5]) {
+  const note = unservedNote(renderProposalPage(proposal({ gridConnection: 'off_grid', isZeroExport: true }, battery, { annualUnservedKWh: missing })));
+  assert.ok(/respaldo externo/.test(note) && !/cubren el consumo estimado/.test(note), `${JSON.stringify(missing)}: ${note}`);
+}
+assert.ok(/cubren el consumo estimado/.test(unservedNote(renderProposalPage(proposal({ gridConnection: 'off_grid', isZeroExport: true }, battery, { annualUnservedKWh: 0 })))), 'un 0 real sí indica cobertura total');
 
 // Compatibilidad: un enlace con solo `isZeroExport` o con `gridConnection` desfasado no se lee como aislado.
 for (const rates of [{ isZeroExport: true }, { gridConnection: 'off_grid', isZeroExport: false }]) {
