@@ -6,6 +6,7 @@ export function parseShard(args: string[]): { shard: Shard | null; filters: stri
   const filters: string[] = [];
   for (const arg of args) {
     if (!arg.startsWith('--shard')) { filters.push(arg); continue; }
+    if (shard) throw new Error(`--shard repetido: ${arg} (solo se admite uno)`);
     const match = /^--shard=(\d+)\/(\d+)$/.exec(arg);
     const index = Number(match?.[1]);
     const total = Number(match?.[2]);

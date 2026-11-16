@@ -18,6 +18,11 @@ test('un --shard inválido falla en lugar de ejecutar un subconjunto silencioso'
   }
 });
 
+test('un segundo --shard falla en lugar de sobrescribir el primero', () => {
+  assert.throws(() => parseShard(['--shard=1/3', 'Sync', '--shard=2/3']), /shard/i);
+  assert.throws(() => parseShard(['--shard=1/3', '--shard=1/3']), /shard/i);
+});
+
 test('las particiones son disjuntas, cubren todas las suites y están equilibradas', () => {
   const total = 3;
   const parts = Array.from({ length: total }, (_, index) => selectShard(suites, { index: index + 1, total }));

@@ -1,7 +1,9 @@
 name: Claude (@claude)
 # Claude bajo demanda: responde a menciones `@claude` en issues, PR y revisiones.
 # Solo propietario, miembros y colaboradores; la acción vuelve a exigir acceso de escritura y rechaza bots.
+# Nunca corre sobre PR de forks: el trabajo tiene permisos de escritura y el secreto, y el código sería ajeno.
 # Puede empujar commits a la rama del PR o a una rama nueva (nunca abre ni fusiona PR por sí solo).
+# Riesgo residual (issues de terceros): docs/QA.md#revisión-con-claude.
 on:
   issue_comment:
     types: [created]
@@ -13,14 +15,17 @@ permissions:
   contents: read
 jobs:
   claude:
+    # Las revisiones traen el repositorio de cabecera; para issue_comment sobre un PR lo comprueba un paso.
     if: >-
       (github.event_name == 'issue_comment' &&
         contains(github.event.comment.body, '@claude') &&
         contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
       (github.event_name == 'pull_request_review_comment' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
         contains(github.event.comment.body, '@claude') &&
         contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
       (github.event_name == 'pull_request_review' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
         contains(github.event.review.body, '@claude') &&
         contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.review.author_association))
     runs-on: ubuntu-latest
@@ -36,8 +41,29 @@ jobs:
       id-token: write
       actions: read # leer el resultado de CI del PR
     steps:
+      - name: Rechazar PR de forks
+        id: origin
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          IS_PR_COMMENT: ${{ github.event_name == 'issue_comment' && github.event.issue.pull_request != null }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          if [ "$IS_PR_COMMENT" != "true" ]; then
+            echo "same=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          head=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.head.repo.full_name // ""')
+          if [ "$head" = "$REPO" ]; then
+            echo "same=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "same=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::@claude omitido: el PR viene de un fork (${head:-repositorio borrado})."
+          fi
+
       - name: Elegir credencial
         id: auth
+        if: steps.origin.outputs.same == 'true'
         shell: bash
         env:
           HAS_OAUTH: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
@@ -60,6 +86,8 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           anthropic_api_key: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN == '' && secrets.ANTHROPIC_API_KEY || '' }}
+          # Solo los comentarios del propietario llegan a Claude como contexto (menos texto de terceros).
+          include_comments_by_actor: ${{ github.repository_owner }}
           claude_args: >-
             --model ${{ vars.CLAUDE_MODEL || 'claude-opus-5-5' }}
             --max-turns ${{ vars.CLAUDE_MAX_TURNS || '40' }}
