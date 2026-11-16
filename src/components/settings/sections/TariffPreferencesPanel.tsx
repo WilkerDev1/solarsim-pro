@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
-import { Receipt, ChevronDown, ChevronUp, Check, Sparkles, Cloud, RefreshCw, Zap, Coins, DollarSign } from 'lucide-react';
-import { UtilityDistributor, getDistributorTariffOptions } from '../../../types/tariffs';
+import { Receipt, ChevronDown, ChevronUp, Check, Sparkles, Cloud, RefreshCw, Zap, Coins, DollarSign, AlertTriangle } from 'lucide-react';
+import { GlobalTariffMatrix, UtilityDistributor, getDistributorTariffOptions } from '../../../types/tariffs';
 import { confirmAction } from '../../common/confirmAction';
 import { DEFAULT_GRID_EXPORT_FEE_PCT } from '../../../../shared/assumptions';
+import { canAdminister } from '../../../../shared/permissions';
+import { DEFAULT_RD_TARIFF_MATRIX } from '../../../data/rdTariffs';
+import { factoryTariffUpdateNotice } from '../../../data/factoryTariffMatrixVersions';
 
 interface TariffPreferencesPanelProps {
   isOpen: boolean;
@@ -22,10 +25,48 @@ export const TariffPreferencesPanel: React.FC<TariffPreferencesPanelProps> = ({ 
     resetToDefaultTariffs,
     syncTariffsWithServer,
     fetchTariffsFromServer,
-  } = useSimulationStore(useShallow((s) => ({ defaultSimulationSettings: s.defaultSimulationSettings, updateDefaultSimulationSettings: s.updateDefaultSimulationSettings, tariffMatrix: s.tariffMatrix, updateDistributorTariff: s.updateDistributorTariff, resetToDefaultTariffs: s.resetToDefaultTariffs, syncTariffsWithServer: s.syncTariffsWithServer, fetchTariffsFromServer: s.fetchTariffsFromServer })));
+    setTariffMatrix,
+    organizationTariffOutdated,
+    currentUser,
+    workspaceScope,
+  } = useSimulationStore(useShallow((s) => ({ defaultSimulationSettings: s.defaultSimulationSettings, updateDefaultSimulationSettings: s.updateDefaultSimulationSettings, tariffMatrix: s.tariffMatrix, updateDistributorTariff: s.updateDistributorTariff, resetToDefaultTariffs: s.resetToDefaultTariffs, syncTariffsWithServer: s.syncTariffsWithServer, fetchTariffsFromServer: s.fetchTariffsFromServer, setTariffMatrix: s.setTariffMatrix, organizationTariffOutdated: s.organizationTariffOutdated, currentUser: s.syncSettings.currentUser, workspaceScope: s.workspaceScope })));
   const [prefDistributorTab, setPrefDistributorTab] = useState<UtilityDistributor>('EDEESTE');
   const [isSyncingTariffs, setIsSyncingTariffs] = useState(false);
   const [tariffCurrencyMode, setTariffCurrencyMode] = useState<'USD' | 'DOP'>('USD');
+  // Matriz personalizada sustituida por la de fábrica en este panel: «Deshacer» la recupera mientras no cambie nada más.
+  const [replacedMatrix, setReplacedMatrix] = useState<{ matrix: GlobalTariffMatrix; scope: string } | null>(null);
+  const factoryNotice = factoryTariffUpdateNotice(tariffMatrix);
+  const canUndoFactoryUpdate = !!replacedMatrix && replacedMatrix.scope === workspaceScope && tariffMatrix === DEFAULT_RD_TARIFF_MATRIX;
+
+  const handleAdoptFactoryTariffs = async () => {
+    if (!factoryNotice) return;
+    const confirmed = await confirmAction({
+      title: 'Actualizar al pliego de fábrica',
+      message: `Tu matriz (${factoryNotice.savedResolutionCode}) se sustituye por el pliego de fábrica ${factoryNotice.factoryResolutionCode}, vigente desde ${factoryNotice.factoryEffectiveDate}. Se pierden tus cambios en la matriz; las propuestas guardadas no cambian. Podrás deshacerlo mientras sigas en esta pantalla.`,
+      confirmLabel: 'Actualizar',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+    setReplacedMatrix({ matrix: tariffMatrix, scope: workspaceScope });
+    resetToDefaultTariffs();
+  };
+
+  const handleUndoFactoryUpdate = () => {
+    if (!canUndoFactoryUpdate || !replacedMatrix) return;
+    setTariffMatrix(replacedMatrix.matrix);
+    setReplacedMatrix(null);
+  };
+
+  const handleUpdateOrganizationTariffs = async () => {
+    if (!organizationTariffOutdated) return;
+    const confirmed = await confirmAction({
+      title: 'Actualizar el pliego de la organización',
+      message: `La organización guarda el pliego de fábrica anterior (${organizationTariffOutdated.resolutionCode}). Se sustituye en la nube por la matriz de este equipo (${tariffMatrix.resolutionCode}) para todos sus miembros. Las propuestas guardadas no cambian.`,
+      confirmLabel: 'Subir a la organización',
+    });
+    if (!confirmed) return;
+    await handleSyncTariffsCloud();
+  };
 
   const handleSyncTariffsCloud = async () => {
     setIsSyncingTariffs(true);
@@ -119,6 +160,58 @@ export const TariffPreferencesPanel: React.FC<TariffPreferencesPanelProps> = ({ 
               </div>
             </div>
           </div>
+
+          {factoryNotice && (
+            <div role="status" className="rounded-2xl p-4 border border-amber-300/70 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/30 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                <div className="text-xs text-amber-900 dark:text-amber-200">
+                  <p className="font-bold">Hay un pliego de fábrica más nuevo</p>
+                  <p className="mt-0.5">
+                    Tu matriz guardada es <span className="font-mono">{factoryNotice.savedResolutionCode}</span> (vigencia {factoryNotice.savedEffectiveDate}); la de fábrica es <span className="font-mono">{factoryNotice.factoryResolutionCode}</span> (vigencia {factoryNotice.factoryEffectiveDate}). Como tiene cambios propios, no se actualiza sola.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleAdoptFactoryTariffs}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-white shadow-2xs transition-all cursor-pointer shrink-0"
+              >
+                Actualizar al pliego de fábrica
+              </button>
+            </div>
+          )}
+
+          {canUndoFactoryUpdate && replacedMatrix && (
+            <div role="status" className="rounded-2xl p-3 border border-slate-200/80 dark:border-[#2b2b30] bg-slate-50 dark:bg-[#1f1f23] flex items-center justify-between gap-3 text-xs text-slate-700 dark:text-zinc-300">
+              <span>Se aplicó el pliego de fábrica {DEFAULT_RD_TARIFF_MATRIX.resolutionCode} en lugar de tu matriz {replacedMatrix.matrix.resolutionCode}.</span>
+              <button type="button" onClick={handleUndoFactoryUpdate} className="px-3 py-1.5 rounded-xl font-bold border border-slate-300 dark:border-[#3f3f46] hover:bg-slate-100 dark:hover:bg-[#27272a] cursor-pointer shrink-0">
+                Deshacer
+              </button>
+            </div>
+          )}
+
+          {organizationTariffOutdated && (
+            <div role="status" className="rounded-2xl p-4 border border-amber-300/70 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/30 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                <p className="text-xs text-amber-900 dark:text-amber-200">
+                  La organización guarda el pliego de fábrica anterior (<span className="font-mono">{organizationTariffOutdated.resolutionCode}</span>, vigencia {organizationTariffOutdated.effectiveDate}). En este equipo se calcula con el vigente (<span className="font-mono">{DEFAULT_RD_TARIFF_MATRIX.resolutionCode}</span>).
+                  {!canAdminister(currentUser) && ' Pide a un administrador que lo actualice.'}
+                </p>
+              </div>
+              {canAdminister(currentUser) && (
+                <button
+                  type="button"
+                  onClick={handleUpdateOrganizationTariffs}
+                  disabled={isSyncingTariffs}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-2xs transition-all cursor-pointer disabled:opacity-50 shrink-0"
+                >
+                  Actualizar el pliego de la organización
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Encabezado de Matriz Tarifaria Oficial */}
           <div className="bg-slate-50 dark:bg-[#1f1f23] rounded-2xl p-4 border border-slate-200/80 dark:border-[#2b2b30] flex flex-col md:flex-row md:items-center justify-between gap-4">
