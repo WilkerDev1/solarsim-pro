@@ -106,6 +106,15 @@ assert.deepEqual(hexIn(body.replace(/src="data:[^"]*"/g, '')), [], 'markup, diag
 assert.ok(!/\b(?:fill|stroke)="#/.test(body), 'SVG presentation attributes are not fixed colours');
 assert.ok(!/\[#[0-9a-fA-F]+\]/.test(html), 'no arbitrary Tailwind colours');
 assert.ok(!/\bbg-white\b/.test(body), 'surfaces use bg-surface');
+// Sistema aislado (diagrama propio y sección «Energía Entregada y Autonomía»): también sin colores fijos.
+for (const supplyAlternative of ['no_comparison', 'generator']) {
+  const island = renderProposalPage(proposal({ rates: { gridConnection: 'off_grid', isZeroExport: true, supplyAlternative } } as any));
+  const islandBody = island.slice(island.indexOf('<body'));
+  assert.ok(islandBody.includes('data-energy-flow="off-grid-hybrid"'), `${supplyAlternative}: diagrama aislado`);
+  if (supplyAlternative === 'no_comparison') assert.ok(islandBody.includes('data-savings-basis="no_comparison"'), 'sección de energía y autonomía');
+  assert.deepEqual(hexIn(islandBody.replace(/src="data:[^"]*"/g, '')), [], `${supplyAlternative}: markup aislado usa variables`);
+  assert.ok(!/\b(?:fill|stroke)="#/.test(islandBody) && !/\bbg-white\b/.test(islandBody), `${supplyAlternative}: sin colores fijos`);
+}
 assert.ok(body.includes("getPropertyValue('--chart-consumption')") || body.includes('--chart-consumption'), 'charts read the theme');
 
 // 5. Logos are never inverted: a light plate holds them in dark mode.

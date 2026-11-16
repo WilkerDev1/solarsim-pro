@@ -1,6 +1,8 @@
 import type { NetMeteringRegime } from '../../shared/netMetering';
 import type { ExtractedInvoiceData, GeminiModelInfo } from './aiInvoice';
 import type { LegacyEquipmentFields } from '../../shared/equipment';
+import type { GridConnectionMode } from '../../shared/gridConnection';
+import type { SupplyAlternative } from '../../shared/offGridSupply';
 
 export interface ClientInfo {
   nic?: string;
@@ -132,7 +134,13 @@ export interface UtilityRates {
   currency: 'USD' | 'DOP';
   usdExchangeRate: number;      // RD$ per USD e.g. 60.0
   gridExportFeePct: number;     // SIE-007-2026-REG fee (e.g. 25%)
-  isZeroExport?: boolean;       // Inyección Cero / Antivertido (Zero-Export)
+  isZeroExport?: boolean;       // Inyección Cero / Antivertido (Zero-Export). Se mantiene coherente con `gridConnection` (true = no exporta)
+  /** Tipo de conexión con la red (`shared/gridConnection.ts`); se lee siempre con `resolveGridConnection`. Ausente = se deriva de `isZeroExport`. */
+  gridConnection?: GridConnectionMode;
+  /** Solo sistemas aislados: con qué se compara el ahorro (`shared/offGridSupply.ts`); se lee con `resolveSupplyAlternative`. Ausente = tarifa de distribuidora. */
+  supplyAlternative?: SupplyAlternative;
+  /** Costo por kWh del generador (USD/kWh) cuando `supplyAlternative` es `generator`; sin default (`resolveGeneratorCostPerKWh`). */
+  generatorCostPerKWh?: number;
   annualEnergyInflationPct: number; // e.g. 3.5%
   /**
    * Régimen de medición neta (`shared/netMetering.ts`). Ausente = `legacy_retention` (retención % de lo exportado):
@@ -252,6 +260,7 @@ export interface MonthlyEnergyResult {
   retainedExportKWh: number;  // kWh retenidos por distribuidora (peaje SIE-007)
   effectiveSavedKWh: number;  // Total kWh ahorrados/reconocidos (solarSelfConsumedKWh + netExportCreditKWh)
   batteryContributionKWh?: number; // Aporte de baterías BESS al autoconsumo (kWh)
+  unservedKWh?: number; // Solo sistemas aislados: consumo que no cubren el sol ni la batería (energía no servida o respaldo externo)
   savingsUSD: number;
   netBillUSD: number;
   originalBillUSD: number;
@@ -295,6 +304,8 @@ export interface FinancialSummaryResult {
   npvUSD: number;
   roi25YrPct: number;
   co2AvoidedTonsPerYear: number;
+  /** Solo sistemas aislados (`off_grid`): energía anual no servida (kWh). */
+  annualUnservedKWh?: number;
   monthlyBreakdown: MonthlyEnergyResult[];
   cashFlow25Years: CashFlowYear[];
   costMatrix: CostMatrixSummary;

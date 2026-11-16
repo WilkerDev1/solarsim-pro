@@ -6,6 +6,8 @@ import { calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { formatProposalDate } from './formatDateUtils';
 import { mainModelPhrase } from '../../shared/documentTexts/equipmentPhrases';
 import { equipmentTotals, readEquipment } from '../../shared/equipment';
+import { resolveGridConnection } from '../../shared/gridConnection';
+import { resolveGeneratorCostPerKWh, storedSupplyAlternative } from '../../shared/offGridSupply';
 import { resolveAssumptions } from '../../shared/assumptions';
 
 type SummaryFields = Pick<FinancialSummaryResult, 'annualConsumptionKWh' | 'annualProductionKWh' | 'systemCapacityKWp' | 'energyCoveragePct'>;
@@ -64,6 +66,10 @@ export function buildDocumentTextContext(
     distributor: client.distributor || rates.distributor || 'EDES',
     tariffCode: rates.tariffCode || '',
     isZeroExport: !!rates.isZeroExport,
+    gridConnection: resolveGridConnection(rates),
+    // Se lee con resolveSavingsBasis(ctx): con red la alternativa se ignora.
+    supplyAlternative: storedSupplyAlternative(rates),
+    generatorCostPerKWh: resolveGeneratorCostPerKWh(rates) ?? undefined,
     gridExportFeePct: assumptions.gridExportFeePct,
     netMeteringRegime: assumptions.netMeteringRegime,
     gridUseChargeDOPPerKWh: assumptions.gridUseChargeDOPPerKWh,

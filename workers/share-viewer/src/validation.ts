@@ -1,6 +1,8 @@
 import type { ShareProposalPayload } from './types';
 import { DOC_TEXT_PREFIX, getDocumentTextDefinition, isDocTextKey } from '../../../shared/documentTexts';
 import { LEGACY_MIRROR_NUMBER_FIELDS, LEGACY_MIRROR_TEXT_FIELDS } from '../../../shared/equipment';
+import { isGridConnectionMode } from '../../../shared/gridConnection';
+import { GENERATOR_COST_RULE_MESSAGE, isSupplyAlternative, isValidGeneratorCost } from '../../../shared/offGridSupply';
 import { isNetMeteringRegime, isValidGridUseCharge, resolveNetMeteringRegime } from '../../../shared/netMetering';
 export const MAX_SHARE_BYTES = 2 * 1024 * 1024;
 export class RequestValidationError extends Error {
@@ -79,6 +81,12 @@ export function parseSharePayload(value: unknown): ShareProposalPayload {
   for (const [record, fields] of [[specs, ['hasBattery','showSelfConsumptionBreakdown']], [rates, ['isZeroExport']], [financials, ['applyITBISExemption','applyLey5707']]] as const) {
     for (const field of fields) if (record[field] !== undefined && typeof record[field] !== 'boolean') throw new RequestValidationError(`${field} debe ser booleano.`);
   }
+  if (rates.gridConnection !== undefined && !isGridConnectionMode(rates.gridConnection)) throw new RequestValidationError('El tipo de conexión no es válido.');
+  // Alternativa de suministro (sistema aislado): opcional; un valor desconocido se rechaza (la lectura lo toleraría).
+  if (rates.supplyAlternative !== undefined && !isSupplyAlternative(rates.supplyAlternative)) throw new RequestValidationError('La alternativa de suministro no es válida.');
+  // Mismo predicado que la app: el escritorio solo publica un costo válido y omite uno ausente o inválido; «generador»
+  // sin costo se publica y se muestra como «sin comparación».
+  if (rates.generatorCostPerKWh !== undefined && !isValidGeneratorCost(rates.generatorCostPerKWh)) throw new RequestValidationError(GENERATOR_COST_RULE_MESSAGE);
   // Régimen de medición neta (fase 2): opcional; un enlace sin él es del régimen anterior. Valores desconocidos: 400.
   if (rates.netMeteringRegime !== undefined && !isNetMeteringRegime(rates.netMeteringRegime)) throw new RequestValidationError('El régimen de medición neta no es válido.');
   if (rates.gridUseChargeDOPPerKWh !== undefined && !isValidGridUseCharge(rates.gridUseChargeDOPPerKWh)) throw new RequestValidationError('El cargo por uso de la red no es válido.');

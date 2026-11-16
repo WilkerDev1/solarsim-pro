@@ -1,6 +1,8 @@
 import { normalizeTariffCode } from '../../../shared/tariffRules';
 import { MAX_GRID_USE_CHARGE_DOP_PER_KWH, NET_METERING_REGIMES, isValidGridUseCharge } from '../../../shared/netMetering';
 import type { AssistantEdit, AssistantSection } from './types';
+import { GRID_CONNECTION_MODES } from '../../../shared/gridConnection';
+import { GENERATOR_COST_RULE_MESSAGE, isValidGeneratorCost, SUPPLY_ALTERNATIVES } from '../../../shared/offGridSupply';
 // Explicit surface: no ids, roles, authorship, remote endpoints, assets or arbitrary store writes.
 const fields: Record<AssistantSection, string[]> = {
   client: [
@@ -68,6 +70,9 @@ const fields: Record<AssistantSection, string[]> = {
     'usdExchangeRate',
     'gridExportFeePct',
     'isZeroExport',
+    'gridConnection',
+    'supplyAlternative',
+    'generatorCostPerKWh',
     'annualEnergyInflationPct',
     'netMeteringRegime',
     'gridUseChargeDOPPerKWh',
@@ -133,6 +138,8 @@ const booleanFields = new Set([
 const textFields = new Set([
   ...fields.client.filter((f) => f !== 'quoteValidityDays'),
   'pricingMode',
+  'gridConnection',
+  'supplyAlternative',
   'installationServicesDesc',
   'directPriceSurplusTarget',
   'loadProfilePreset',
@@ -154,6 +161,8 @@ const enums: Record<string, string[]> = {
   directPriceSurplusTarget: ['margin', 'labor'],
   loadProfilePreset: ['residential', 'commercial', 'industrial', 'custom'],
   currency: ['USD', 'DOP'],
+  gridConnection: [...GRID_CONNECTION_MODES],
+  supplyAlternative: [...SUPPLY_ALTERNATIVES],
   netMeteringRegime: [...NET_METERING_REGIMES],
 };
 const percentages = new Set([
@@ -298,6 +307,10 @@ export function validateAssistantEdits(
         )
       )
         throw new Error('Indica los doce consumos mensuales válidos.');
+    } else if (field === 'generatorCostPerKWh') {
+      // Costo del generador (sistema aislado): mismo predicado que motor, edición y Worker; `null` lo borra.
+      if (value !== null && !isValidGeneratorCost(value))
+        throw new Error(`generatorCostPerKWh: ${GENERATOR_COST_RULE_MESSAGE}`);
     } else if (booleanFields.has(field)) {
       if (typeof value !== 'boolean')
         throw new Error(`${field} requiere sí/no.`);
@@ -312,7 +325,7 @@ export function validateAssistantEdits(
       )
         throw new Error(`${field} requiere texto válido.`);
       if (enums[field] && !enums[field].includes(value))
-        throw new Error(`Valor no permitido para ${field}.`);
+        throw new Error(`Valor no permitido para ${field}: usa ${enums[field].join(", ")}.`);
     } else {
       if (
         typeof value !== 'number' ||

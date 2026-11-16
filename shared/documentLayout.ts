@@ -1,4 +1,5 @@
 import { DOCUMENT_SECTION_IDS, DOCUMENT_SECTIONS, isDocumentSectionId, type DocumentSectionId } from './documentTexts/sections';
+import { hasSavingsComparison, type SavingsBasis } from './offGridSupply';
 
 /** Diseño persistente del documento (`customization.layout`): visibilidad de secciones, tema y cabecera/pie. */
 export interface DocumentLayout {
@@ -21,6 +22,18 @@ export function resolveSectionVisibility(layout?: DocumentLayout | null): Sectio
   return Object.fromEntries(
     DOCUMENT_SECTION_IDS.map((id) => [id, shown.has(id) ? true : hidden.has(id) ? false : visibleByDefault(id)]),
   ) as SectionVisibility;
+}
+
+/** Secciones que solo existen para presentar el ahorro (payback, TIR/VAN, flujo de caja). */
+export const SAVINGS_SECTION_IDS: readonly DocumentSectionId[] = ['roi', 'cashFlow'];
+
+/**
+ * Visibilidad efectiva según la base del ahorro: sin comparación (o con el generador sin costo) las secciones de
+ * ahorro no se muestran, sin tocar lo guardado (mirar no escribe); al volver a una comparación reaparecen como estaban.
+ */
+export function savingsSectionsVisibility(visibility: SectionVisibility, basis: SavingsBasis): SectionVisibility {
+  if (hasSavingsComparison(basis)) return visibility;
+  return { ...visibility, ...Object.fromEntries(SAVINGS_SECTION_IDS.map((id) => [id, false])) };
 }
 
 /** Diseño con la visibilidad de una sección cambiada; solo guarda las diferencias con el valor por defecto. */

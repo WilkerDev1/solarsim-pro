@@ -22,7 +22,8 @@ import {
   LayoutDashboard,
 } from 'lucide-react';
 import { DOCUMENT_SECTION_IDS, DOCUMENT_SECTIONS, sectionLabel } from '../../../../shared/documentTexts/sections';
-import type { SectionVisibility } from '../../../../shared/documentLayout';
+import { SAVINGS_SECTION_IDS, type SectionVisibility } from '../../../../shared/documentLayout';
+import { hasSavingsComparison, noSavingsNote, resolveSavingsBasis } from '../../../../shared/offGridSupply';
 import { PDFExtraTocEditor } from './PDFExtraTocEditor';
 import { ProjectSimulation, DocumentCustomization, ExtraTOCItem } from '../../../types';
 
@@ -94,6 +95,10 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
       sectionOrder: [...DEFAULT_PDF_SECTION_ORDER],
     });
   };
+
+  // Sin comparación de ahorro, las páginas de retorno y flujo de caja no aplican: su casilla queda bloqueada.
+  const savingsBasis = resolveSavingsBasis(project?.rates);
+  const savingsLocked = (id: PDFSectionId) => !hasSavingsComparison(savingsBasis) && SAVINGS_SECTION_IDS.includes(id);
 
   const sectionConfigs = Object.fromEntries(
     DOCUMENT_SECTION_IDS.map((id) => [id, {
@@ -256,7 +261,9 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
                         )}
                       </div>
                       <span className="text-[10px] opacity-75 truncate block">
-                        {config.subtitle}
+                        {savingsLocked(sectionId)
+                          ? savingsBasis === 'generator_missing_cost' ? 'Falta el costo del generador' : 'Sin comparación: no aplica'
+                          : config.subtitle}
                       </span>
                     </div>
                   </div>
@@ -265,6 +272,8 @@ export const PDFSectionToggles: React.FC<PDFSectionTogglesProps> = ({
                   <input
                     type="checkbox"
                     checked={config.visible}
+                    disabled={savingsLocked(sectionId)}
+                    title={savingsLocked(sectionId) ? noSavingsNote(savingsBasis) : undefined}
                     onChange={(e) => config.toggle(e.target.checked)}
                     className={`w-4 h-4 rounded focus:ring-0 cursor-pointer shrink-0 ${
                       config.isConfidential ? 'text-amber-600' : 'text-emerald-600'

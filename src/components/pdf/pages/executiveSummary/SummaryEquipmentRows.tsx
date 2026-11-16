@@ -12,7 +12,7 @@ interface RowsProps {
 }
 
 export const SummaryEquipmentRows: React.FC<RowsProps> = ({ project, summary, activeTheme, model }) => {
-  const { panels, primaryPanel, totalPanels, systemCapacityKWp, performanceRatio, inverters, totalInverterPowerKW, isZeroExport, hasBattery, batteries, totalBatteryKWh } = model;
+  const { panels, primaryPanel, totalPanels, systemCapacityKWp, performanceRatio, inverters, totalInverterPowerKW, isZeroExport, isOffGrid, hasBattery, batteries, totalBatteryKWh } = model;
   return (
     <>
           {/* FILA 01: GENERADOR FOTOVOLTAICO */}
@@ -184,10 +184,10 @@ export const SummaryEquipmentRows: React.FC<RowsProps> = ({ project, summary, ac
                   </span>
                 </div>
                 <span className="text-sm font-black text-slate-900 font-mono block my-0.5 whitespace-nowrap">
-                  {isZeroExport ? 'Inyección Cero' : 'Bidireccional'}
+                  {isOffGrid ? 'Aislado' : isZeroExport ? 'Inyección Cero' : 'Bidireccional'}
                 </span>
                 <span className="text-[9.5px] text-slate-500 font-medium block leading-normal pb-0.5 whitespace-nowrap">
-                  {project.rates.distributor || 'Distribuidora'} • Norma SIE
+                  {isOffGrid ? 'Modo isla • Sin red' : `${project.rates.distributor || 'Distribuidora'} • Norma SIE`}
                 </span>
               </div>
 

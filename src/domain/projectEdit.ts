@@ -9,6 +9,8 @@ import { BENCHMARK_PROJECT } from '../engine/referenceCase';
 import { editEquipmentGroup, normalizeEquipmentEdit, normalizeSpecsChange, selectCatalogEquipment } from '../utils/equipmentGroups';
 import { normalizeEnabledBatteries } from '../utils/batteryState';
 import { supplierQuotesItem } from '../utils/equipmentMatchingUtils';
+import { normalizeGridConnectionPatch } from '../../shared/gridConnection';
+import { normalizeSupplyAlternativePatch } from '../../shared/offGridSupply';
 
 /**
  * Edición de proyecto (ADR 0004): la única regla para aplicar un cambio de specs, tarifas, cliente, consumo o
@@ -21,6 +23,9 @@ import { supplierQuotesItem } from '../utils/equipmentMatchingUtils';
  * - una cantidad manual del grupo principal de paneles apaga el autodimensionado;
  * - el proveedor del modelo principal se suelta si el modelo nuevo no lo cotiza;
  * - sobrescrituras financieras manuales: solo sobreviven en el caso de referencia auditado;
+ * - tipo de conexión con la red: `gridConnection` e `isZeroExport` siempre coherentes (`shared/gridConnection.ts`);
+ * - alternativa de suministro de un sistema aislado: un valor desconocido o un costo de generador no numérico no se
+ *   guardan (`shared/offGridSupply.ts`); nada se escribe si el parche no los trae;
  * - cargo por uso de la red SIE-007-2026: pasar al régimen o cambiar de distribuidora siembra el cargo de fábrica,
  *   salvo que el usuario lo haya editado (un valor distinto del de fábrica de la distribuidora anterior);
  * - reconciliación con el catálogo (potencia del modelo principal y proveedor huérfano), que corre en la siguiente
@@ -61,7 +66,10 @@ export function applyProjectEdit(project: ProjectSimulation, edit: ProjectEdit, 
       next = editSpecs(project, supplierPricePatch(project, edit, catalog), catalog);
       break;
     case 'rates': {
-      const rates = reconcileGridUseCharge(project.rates, { ...project.rates, ...edit.patch }, edit.patch);
+      // Tipo de conexión: `gridConnection` e `isZeroExport` se escriben siempre juntos y coherentes; alternativa de
+      // suministro saneada; cargo por uso de la red reconciliado (SIE-007-2026).
+      const patch = normalizeGridConnectionPatch(project.rates, normalizeSupplyAlternativePatch(edit.patch));
+      const rates = reconcileGridUseCharge(project.rates, { ...project.rates, ...patch }, patch);
       next = resizeIfNeeded(project, { ...project, rates, specs: { ...reconcileWithCatalog(project.specs, project.specs, catalog) } }, edit.patch.targetCoveragePct !== undefined);
       break;
     }

@@ -1,5 +1,6 @@
 import { PDFPageShell } from '../PDFPageShell';
 import { getTariffDisplayName } from '../../../../shared/proposalPresentation';
+import { supplyPresentation } from '../../../../shared/offGridSupply';
 import { visibleQuotationItems } from '../../../../shared/quotationItems';
 import React from 'react';
 import { ShieldCheck, CheckCircle2, Check } from 'lucide-react';
@@ -42,6 +43,7 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
   pageNum,
   totalPages,
 }) => {
+  const supply = supplyPresentation(project.rates);
   // Los ítems ocultos se cobran en los importes pero no se listan como fila.
   const customItems = visibleQuotationItems(project.financials.customItems);
 
@@ -140,8 +142,11 @@ export const PDFPage2Quotation: React.FC<PDFPage2QuotationProps> = ({
               </div>
               <div>
                 <span className="font-bold text-slate-700"><EditableText k="quotation.label.tariff" /></span>{' '}
-                <span className="font-bold" style={{ color: activeTheme.primary }}>
-                  {project.client.distributor || project.rates.distributor || 'EDES'} • {getTariffDisplayName(project.client.distributor || project.rates.distributor, project.rates.tariffCode)}
+                <span className="font-bold" style={{ color: activeTheme.primary }} data-supply={supply.kind}>
+                  {/* Sistema aislado con generador o sin comparación: no se nombra la distribuidora ni su tarifa. */}
+                  {supply.kind === 'no_grid' ? <EditableText k="quotation.supply.noGrid" />
+                    : supply.kind === 'generator' ? <><EditableText k="quotation.supply.generator" />{' • '}{supply.costPerKWh === null ? <EditableText k="quotation.supply.generatorPending" /> : `US$ ${supply.costPerKWh.toFixed(3)}/kWh`}</>
+                    : <>{project.client.distributor || project.rates.distributor || 'EDES'} • {getTariffDisplayName(project.client.distributor || project.rates.distributor, project.rates.tariffCode)}</>}
                 </span>
               </div>
             </div>

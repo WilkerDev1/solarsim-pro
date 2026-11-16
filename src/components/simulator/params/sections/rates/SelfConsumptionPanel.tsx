@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ProjectSimulation, SystemSpecs } from '../../../../../types';
 import { computeLoadProfilePreview } from '../../logic/loadProfilePreview';
+import { resolveGridConnection } from '../../../../../../shared/gridConnection';
 import { EnergyLegend, InfoTip, ParamRow, SelectField, StatStrip, SubHeader, ToggleGroup } from '../../ui';
 import type { EnergySegment } from '../../ui';
 import { activeLoadPreset, DAYTIME_MAX, DAYTIME_MIN, daytimeSliderChange, loadProfileChange } from './ratesLogic';
@@ -31,16 +32,18 @@ export const SelfConsumptionPanel: React.FC<SelfConsumptionPanelProps> = ({ proj
   const preview = computeLoadProfilePreview(project, tariffCode, avgMonthlyConsumption);
   const { hasBattery, currentDaytimeRatio, currentPreset, avgDailyCons, avgDailyProd, solarDirectPct, bessDischargePct, gridImportPct, totalSelfPct, totalSelfDaily } = preview;
   const showBreakdown = project.specs.showSelfConsumptionBreakdown !== false;
+  // Sin exportación (inyección cero o aislado) el excedente se recorta; sin red (aislado) el déficit no se importa: queda sin servir.
+  const connection = resolveGridConnection(project.rates);
   const write = (patch: Partial<SystemSpecs>) => updateSpecs?.(patch);
 
   const segments: EnergySegment[] = [
     { kind: 'solar', label: 'Solar', percent: Math.round(solarDirectPct) },
     ...(hasBattery ? [{ kind: 'bess' as const, label: 'Batería', percent: Math.round(bessDischargePct) }] : []),
-    { kind: 'grid', label: 'Red', percent: Math.round(gridImportPct) },
+    { kind: 'grid', label: connection === 'off_grid' ? 'No servida' : 'Red', percent: Math.round(gridImportPct) },
   ];
   const generationTip =
     `Consumo diurno (8am–5pm) frente a nocturno (5pm–8am). Producción FV ~${avgDailyProd.toFixed(1)} kWh/d: ` +
-    `${preview.genDirectPct}% directo${hasBattery ? `, ${preview.genBessPct}% batería` : ''}, ${preview.genExportPct}% inyección a la red.`;
+    `${preview.genDirectPct}% directo${hasBattery ? `, ${preview.genBessPct}% batería` : ''}, ${preview.genExportPct}% ${connection === 'grid_export' ? 'inyección a la red' : 'excedente recortado'}.`;
 
   return (
     <>

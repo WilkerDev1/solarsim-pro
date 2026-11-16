@@ -16,6 +16,10 @@ import { preserveHiddenInQuotation } from '../../../shared/quotationItems';
 import type { CustomQuotationItem } from '../../types';
 import { touchesPricingEdits } from './pricingFields';
 import { AUTOMATED_PRICING } from '../../../shared/automatedProposalPolicy';
+import { resolveGridConnection } from '../../../shared/gridConnection';
+import {
+  hasSavingsComparison, noSavingsNote, resolveGeneratorCostPerKWh, resolveSavingsBasis, resolveSupplyAlternative, savingsValuationCostPerKWh,
+} from '../../../shared/offGridSupply';
 import type {
   AssistantAction,
   AssistantToolCall,
@@ -171,6 +175,14 @@ export function executeAssistantTool(
     );
     if (!p) throw new Error('Propuesta no disponible en este espacio.');
     const mode = energyCalculationMode(effectiveFeatureSettings(s));
+    // Sistema aislado sin comparación (o generador sin costo): el motor deja el ahorro en 0; el agente recibe `null`
+    // y el estado, nunca ceros que parezcan cifras reales.
+    const basis = resolveSavingsBasis(p.rates);
+    const comparable = hasSavingsComparison(basis);
+    const withoutMoney = <T extends object>(row: T, fields: string[]): T =>
+      comparable ? row : { ...row, ...Object.fromEntries(fields.map((field) => [field, null])) };
+    const monthlyMoney = ['savingsUSD', 'originalBillUSD', 'netBillUSD'];
+    const summary = calculateProjectFinancialSummary(p, mode);
     return {
       data: {
         id: p.id,
@@ -190,15 +202,26 @@ export function executeAssistantTool(
           p.client.province,
           p.specs,
           p.monthlyConsumption,
-          p.rates.energyCostPerKWh,
-          p.rates.gridExportFeePct,
+          // Mismo costo con el que el resumen valora el ahorro (aislado: tarifa, generador o sin comparación).
+          savingsValuationCostPerKWh(p.rates),
+          resolveAssumptions(p).gridExportFeePct,
           p.client.customMonthlyHSP,
           p.rates.tariffCode,
-          p.rates.isZeroExport,
+          resolveGridConnection(p.rates),
           mode,
-          engineGridUseCharge(resolveAssumptions(p))
-        ),
-        summary: calculateProjectFinancialSummary(p, mode),
+          engineGridUseCharge(resolveAssumptions(p), resolveGridConnection(p.rates))
+        ).map((month) => withoutMoney(month, monthlyMoney)),
+        summary: comparable ? summary : {
+          ...withoutMoney(summary, ['year1SavingsUSD', 'total25YearSavingsUSD', 'paybackYears', 'irrPct', 'npvUSD', 'roi25YrPct']),
+          monthlyBreakdown: summary.monthlyBreakdown.map((month) => withoutMoney(month, monthlyMoney)),
+        },
+        savings: {
+          basis,
+          comparable,
+          supplyAlternative: resolveSupplyAlternative(p.rates),
+          generatorCostPerKWh: resolveGeneratorCostPerKWh(p.rates),
+          ...(comparable ? {} : { note: noSavingsNote(basis) }),
+        },
       },
       cards: [
         {

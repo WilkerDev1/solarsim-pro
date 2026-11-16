@@ -60,6 +60,33 @@ $$E_{net\_credit,m} = E_{exp,m}, \qquad G_m = E_{exp,m} \times \frac{c_{red}}{FX
 
 `resolveAssumptions` expone `netMeteringRegime`, `gridUseChargeDOPPerKWh` y `appliedGridUseChargeDOPPerKWh` (0 cuando el cargo no aplica). `src/tests/testSie007GridUseCharge.ts` fija el régimen nuevo; `testNetMeteringRegime.ts` sigue fijando el anterior sin cambios.
 
+### 1.3.1 Tipo de conexión con la red
+
+`rates.gridConnection` (`shared/gridConnection.ts`) es un solo concepto con tres valores; se lee siempre con `resolveGridConnection` y se escribe con `gridConnectionFields`, que guarda también `isZeroExport` coherente (verdadero si no exporta), de modo que una versión anterior que solo lee `isZeroExport` trata un sistema aislado como inyección cero. Una propuesta, importación, versión del historial o enlace publicado sin `gridConnection` se deriva de `isZeroExport`; un `gridConnection` que contradice `isZeroExport` (lo dejó una versión anterior al cambiar solo `isZeroExport`) se descarta.
+
+| Valor | Exporta | Importa de la red | Déficit |
+| --- | --- | --- | --- |
+| `grid_export` (medición neta) | sí, con retención | sí | factura de la distribuidora |
+| `zero_export` (inyección cero) | no: el excedente se recorta | sí | factura de la distribuidora |
+| `off_grid` (aislado, «modo isla») | no: el excedente se recorta | nunca | energía no servida (`unservedKWh`) |
+
+En `off_grid`, por mes, $E_{exp,m} = 0$, retención 0 y
+
+$$E_{no\_servida,m} = \max(0,\ C_m - E_{auto,m})$$
+
+En legacy, el factor $k$ supone que la red absorbe el desfase día/noche; sin red no puede servirse más que el balance físico (solar directo + ciclo de batería, sección 2 del documento de balance), así que en `off_grid` $E_{auto,m} = \min(\text{legacy},\ \text{físico})$. En la proyección física el autoconsumo es el mismo que en inyección cero. `calculateFinancialSummary` informa `annualUnservedKWh` solo en `off_grid`; `grid_export` y `zero_export` dan exactamente el mismo resultado que con el `isZeroExport` heredado.
+
+**Valoración del ahorro aislado: alternativa de suministro.** Solo se valora la energía servida, sin crédito por exportación ni cargos fijos evitados: $S_m = E_{auto,m} \times T_{val}$. `rates.supplyAlternative` (`shared/offGridSupply.ts`, junto a `gridConnection`) fija $T_{val}$ y solo cuenta con `off_grid`; con `grid_export` o `zero_export` se ignora por completo (las cifras son idénticas con o sin el campo). Se lee con `resolveSupplyAlternative`/`resolveSavingsBasis` (ausente o desconocido = tarifa; no se repara al hidratar ni al importar) y se escribe con `applyProjectEdit`, que descarta una alternativa desconocida guarda tal cual un costo que sea un número finito (el dock no borra lo que se teclea: «0», «0.35», 1500) y como «sin dato» (`undefined`) lo que no lo es; la validez se decide al leer con `isValidGeneratorCost`, de modo que un 0 o un valor fuera del tope nunca entra en el cálculo y el dock dice el motivo («debe ser mayor que 0», «tope técnico»). Ese predicado es el único para motor, edición, asistente/agentes, publicación y Worker: número finito > 0 y ≤ 1000 USD/kWh (`MAX_GENERATOR_COST_PER_KWH`, tope técnico solo contra valores absurdos). Por encima de 10 USD/kWh (`GENERATOR_COST_WARNING_PER_KWH`) el costo se usa tal cual y el dock solo advierte que confirme que está en USD por kWh.
+
+| `supplyAlternative` | Base (`resolveSavingsBasis`) | $T_{val}$ | Ahorro, flujo, payback, TIR, VAN, ROI |
+| --- | --- | --- | --- |
+| ausente / `utility_tariff` (por defecto) | `utility_tariff` | `energyCostPerKWh` (rotulado «Costo evitado kWh») | como hasta ahora |
+| `generator` con `generatorCostPerKWh` > 0 | `generator` | `generatorCostPerKWh` (USD/kWh, sin default) | calculados con ese costo |
+| `generator` sin costo válido (vacío, ≤ 0, no numérico o > 1000) | `generator_missing_cost` | 0 | ninguno: estado incompleto |
+| `no_comparison` | `no_comparison` | 0 | ninguno |
+
+Sin comparación (`no_comparison` o `generator_missing_cost`) el resumen deja `year1SavingsUSD`, `total25YearSavingsUSD`, `paybackYears`, `irrPct`, `npvUSD` y `roi25YrPct` en 0, `cashFlow25Years` vacío y `savingsUSD`/`originalBillUSD`/`netBillUSD` mensuales en 0; ningún consumidor muestra esos ceros: la interfaz, el PDF y el visor leen la base con `resolveSavingsBasis(rates)` y presentan el estado «sin comparación» (o el aviso de costo faltante). Inversión, energía servida, energía no servida y autonomía no cambian. **Generador sin costo:** no hay valor por defecto (el usuario no tiene una cifra de referencia) y nunca se cae en silencio a la tarifa: se trata como «sin comparación» con un aviso propio en el dock, la pestaña de retorno, Análisis energético, el hub y la vista del documento, para que el usuario complete el costo. El resumen no lleva un campo de texto con la base porque un Worker anterior rechaza métricas no numéricas. La alternativa no cambia el dimensionado, la energía servida ni la autonomía. **Aislado × régimen de medición neta:** sin inyección no hay retención ni cargo por uso de la red, sea cual sea `netMeteringRegime`: `gridUseChargeApplies` es falso con inyección cero y en `off_grid` (lee `resolveGridConnection`), `resolveNetMetering(...).appliedGridUseChargeDOPPerKWh` es 0 y `engineGridUseCharge` no pasa cargo al motor en `off_grid`, de modo que `sie007_2026` y `legacy_retention` dan exactamente las mismas cifras; el dock oculta régimen, retención y cargo, y la nota regulatoria del aislado no los menciona. No se modela el consumo de combustible de un respaldo, el dimensionamiento automático sigue usando la cobertura anual (no garantiza cubrir la noche sin red) y la autonomía de baterías sigue calculándose con la carga media de 24 h.
+
 ### 1.4 Factura y cobertura
 
 $$\text{Factura original}_m = C_m \times T_{kWh}, \qquad \text{Factura neta}_m = \max(0,\ \text{Factura original}_m - S_m)$$

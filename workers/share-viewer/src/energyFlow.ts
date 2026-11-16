@@ -33,17 +33,20 @@ function describeNodes(s: ModeScenario): NodeInfo[] {
     label: s.night ? 'Sin producción solar' : sunMuted ? 'Producción detenida' : 'Producción solar',
   }];
   if (s.batteryState) {
+    const empty = s.batteryState === 'empty';
     nodes.push({
-      key: 'battery', icon: 'battery', pal: PALETTE.battery, muted: s.batteryState === 'idle', value: s.batteryState === 'full' ? 'Llena' : kw(s.batteryKW),
-      label: `Batería · ${s.batteryState === 'charging' ? 'cargando' : s.batteryState === 'discharging' ? 'descargando' : s.batteryState === 'full' ? 'cargada' : 'en reposo'}`,
+      key: 'battery', icon: 'battery', pal: empty ? PALETTE.muted : PALETTE.battery, muted: s.batteryState === 'idle' || empty,
+      value: s.batteryState === 'full' ? 'Llena' : empty ? 'Agotada' : kw(s.batteryKW),
+      label: `Batería · ${s.batteryState === 'charging' ? 'cargando' : s.batteryState === 'discharging' ? 'descargando' : s.batteryState === 'full' ? 'cargada' : empty ? 'agotada' : 'en reposo'}`,
     });
   }
   const gridLabel = s.gridState === 'export' ? 'Excedente a la red'
     : s.gridState === 'import' ? (s.productionKW > 0 || s.batteryKW > 0 ? 'Complemento de red' : 'Consumo desde la red')
-      : s.gridState === 'disconnected' ? 'Desconectada' : 'Sin intercambio';
+      : s.gridState === 'disconnected' ? 'Desconectada' : s.gridState === 'none' ? 'Sin conexión a la red' : 'Sin intercambio';
+  const offline = s.gridState === 'disconnected' || s.gridState === 'none';
   nodes.push({
-    key: 'grid', icon: 'grid', pal: s.gridState === 'disconnected' ? PALETTE.muted : PALETTE.grid, muted: s.gridState === 'disconnected' || s.gridState === 'idle',
-    value: s.gridState === 'disconnected' ? 'Sin red' : kw(s.gridKW), label: gridLabel,
+    key: 'grid', icon: 'grid', pal: offline ? PALETTE.muted : PALETTE.grid, muted: offline || s.gridState === 'idle',
+    value: s.gridState === 'none' ? 'Aislado' : s.gridState === 'disconnected' ? 'Sin red' : kw(s.gridKW), label: gridLabel,
   });
   nodes.push({
     key: 'house', icon: 'home', pal: powered ? PALETTE.sun : PALETTE.muted, muted: !powered,
@@ -85,7 +88,7 @@ function modeSvg(s: ModeScenario, hybrid: boolean, compact: boolean, ariaLabel: 
   const batteryPart = hybrid && s.batteryState && lines.battery ? `
       ${lineEl(lines.battery.reverse ? `M${BATTERY_X + 38} 200H${invX - 38}` : `M${invX - 38} 200H${BATTERY_X + 38}`, lines.battery)}
       ${node(BATTERY_X, 200, info.battery.pal, 'battery')}${text(info.battery, BATTERY_X, 268, 288, ' text-anchor="middle"')}` : '';
-  const badge = s.gridState === 'disconnected'
+  const badge = s.gridState === 'disconnected' || s.gridState === 'none'
     ? `<circle cx="${mid}" cy="200" r="12" style="fill:var(--ef-badge-fill);stroke:var(--ef-badge-ring)" stroke-width="1.5"/><path d="M${mid - 5} 195l10 10M${mid + 5} 195l-10 10" style="stroke:var(--ef-badge-mark)" stroke-width="1.8" stroke-linecap="round"/>`
     : '';
   const gridPath = lines.grid.active && lines.grid.reverse ? `M${GRID_END} 200H${jx}` : `M${jx} 200H${GRID_END}`;
@@ -174,9 +177,13 @@ export const ENERGY_FLOW_TOGGLE_SCRIPT = `(function () {
 /** Animated energy-flow diagram with one panel per situation (day, night, outage), above section 1. */
 export function renderEnergyFlowSection(input: EnergyFlowScenarioInput): string {
   const { hybrid, isZeroExport } = input;
+  const offGrid = input.gridConnection === 'off_grid';
   const scenarios = energyFlowScenarios(input);
-  const system = hybrid ? 'Sistema híbrido' : (isZeroExport ? 'Sistema de autoconsumo' : 'Sistema de inyección');
-  const subtitle = hybrid ? 'con batería' : (isZeroExport ? 'inyección cero' : 'on-grid');
+  const system = offGrid ? (hybrid ? 'Sistema híbrido aislado' : 'Sistema aislado')
+    : hybrid ? 'Sistema híbrido' : (isZeroExport ? 'Sistema de autoconsumo' : 'Sistema de inyección');
+  const subtitle = offGrid ? (hybrid ? 'modo isla, sin conexión a la red' : 'sin baterías ni conexión a la red')
+    : hybrid ? 'con batería' : (isZeroExport ? 'inyección cero' : 'on-grid');
+  const kind = offGrid ? (hybrid ? 'off-grid-hybrid' : 'off-grid') : hybrid ? 'hybrid' : 'on-grid';
 
   const buttons = scenarios.map((s, i) => `<button type="button" data-energy-mode-button="${s.mode}" aria-pressed="${i === 0}" class="ef-btn px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-bold whitespace-nowrap text-slate-600 hover:text-slate-900 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1">${s.label}</button>`).join('\n          ');
   const panels = scenarios.map((s, i) => {
@@ -197,7 +204,7 @@ export function renderEnergyFlowSection(input: EnergyFlowScenarioInput): string 
     </div>`;
   }).join('\n    ');
 
-  return `<section data-energy-flow="${hybrid ? 'hybrid' : 'on-grid'}" class="ef-section bg-surface border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-3 sm:space-y-4">
+  return `<section data-energy-flow="${kind}" class="ef-section bg-surface border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-3 sm:space-y-4">
       <div class="space-y-1">
         <div class="text-[10.5px] sm:text-[11px] font-black uppercase text-sky-700 tracking-wider flex items-center gap-1.5">
           <span class="w-1.5 h-1.5 rounded-full bg-orange-500"></span> Flujo energético estimado

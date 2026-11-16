@@ -1,3 +1,4 @@
+import { supplyPresentation, supplySummaryText } from '../../../shared/offGridSupply';
 import {
   ProposalGroupControls,
   useProposalLinkDrop,
@@ -97,9 +98,9 @@ export const ProjectCard: React.FC<{ project: ProjectSimulation }> = ({
           </dd>
         </div>
         <div>
-          <dt className="text-slate-500 dark:text-zinc-400">Distribuidora</dt>
+          <dt className="text-slate-500 dark:text-zinc-400">{supplyPresentation(project.rates).kind === 'utility' ? 'Distribuidora' : 'Suministro'}</dt>
           <dd className="mt-1.5 font-medium text-slate-800 dark:text-zinc-200">
-            {project.rates.distributor}
+            {supplySummaryText(project.rates, project.rates.distributor)}
           </dd>
         </div>
         <div>
