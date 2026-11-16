@@ -4,7 +4,7 @@ SolarSim expone un único registro de herramientas para tres superficies:
 
 - el **Asistente de propuestas** (menú Sparkles), que crea o actualiza propuestas a partir de facturas;
 - el **Asistente general** (chat flotante en Inicio, Hub y Simulador), experimental y apagado por defecto en Funciones de la aplicación;
-- los **agentes externos** conectados por el [servidor MCP local](MCP_LOCAL.md).
+- los **agentes externos** conectados por el [servidor MCP local](MCP_LOCAL.md) o, sin la app abierta, por el [servidor MCP remoto](MCP_REMOTE.md) (subconjunto de lectura y borrador sobre los datos sincronizados; sin `guarded`).
 
 Las dos interfaces internas se mantienen separadas, pero comparten herramientas, reglas, permisos, registro de actividad y política de precios.
 

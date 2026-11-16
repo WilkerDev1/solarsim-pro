@@ -14,6 +14,11 @@ services:
       DB_NAME: ${DB_NAME:-solarsim_prod}
       JWT_SECRET: ${JWT_SECRET:?Set a private random JWT secret (32+ characters)}
       MIN_CLIENT_VERSION: ${MIN_CLIENT_VERSION:-2.7.1}
+      # MCP remoto (docs/MCP_REMOTE.md): apagado si MCP_REMOTE_ENABLED no es "true".
+      MCP_REMOTE_ENABLED: ${MCP_REMOTE_ENABLED:-false}
+      MCP_REMOTE_URL: ${MCP_REMOTE_URL:-}
+      MCP_OAUTH_ENABLED: ${MCP_OAUTH_ENABLED:-false}
+      API_PUBLIC_URL: ${API_PUBLIC_URL:-}
     networks:
       - solarsim_net
 
