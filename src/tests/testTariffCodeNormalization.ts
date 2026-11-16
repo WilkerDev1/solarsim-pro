@@ -33,7 +33,7 @@ assert.equal(getTariffDisplayName('EDENORTE', 'BTS-1'), getTariffDisplayName('ED
 assert.equal(getTariffDisplayName('CEPM', 'RBT1'), 'RBT-1 (Baja Tensión Regular)');
 assert.equal(mapTariffCodeOnDistributorChange('EDESUR', 'CEPM', 'BTS-1'), 'RBT-1');
 assert.equal(validateAssistantEdits([{ section: 'rates', field: 'tariffCode', value: 'bts-1' }], 'project')[0].value, 'BTS1', 'El asistente guarda el código canónico');
-for (const bad of ['---', '   ', '']) assert.throws(() => validateAssistantEdits([{ section: 'rates', field: 'tariffCode', value: bad }], 'project'), /código de tarifa/i, `tariffCode ${JSON.stringify(bad)} se rechaza`);
+for (const bad of ['---', '   ', '', null, 123] as unknown[]) assert.throws(() => validateAssistantEdits([{ section: 'rates', field: 'tariffCode', value: bad as string }], 'project'), /código de tarifa/i, `tariffCode ${JSON.stringify(bad)} se rechaza`);
 assert.equal(mapTariffCodeOnDistributorChange('CEPM', 'EDESUR', 'RBT2'), 'BTD');
 
 // El aviso falso «La tarifa BTS-1 de EDENORTE no se pudo confirmar» desaparece y se usa la referencia por bloques.

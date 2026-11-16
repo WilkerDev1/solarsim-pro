@@ -76,7 +76,7 @@ export function averageBlockEnergyRateDOP(blocks: readonly EnergyBlock[], monthl
     previousMax = block.toKWh === null ? Infinity : block.toKWh;
   }
   const last = blocks[blocks.length - 1];
-  if (ALL_UNITS_AT_LAST_BLOCK.has(normalizeTariffCode(tariffCode)) && last.toKWh === null && blocks.length > 1 && monthlyKWh >= last.fromKWh) {
+  if (ALL_UNITS_AT_LAST_BLOCK.has(normalizeTariffCode(tariffCode)) && last.toKWh === null && blocks.length > 1 && last.fromKWh > 0 && monthlyKWh >= last.fromKWh) {
     return last.rateDOP;
   }
   for (let i = 0; i < blocks.length && remaining > 0; i++) {
