@@ -82,10 +82,12 @@ export function requestedModelMatches(request: string, item: SolarEquipmentItem)
   return fitEquipment({ type: item.type, text: request }, item).fits;
 }
 
+/** Mensaje único ante un borrador que no es un objeto JSON válido (lo usan `robustParseJson` y `requestGeminiStructured`). */
+export const PROPOSAL_INVALID_JSON = 'La respuesta de IA está incompleta o no es JSON válido. No se repararán datos truncados automáticamente.';
 export function robustParseJson(raw: string): any {
   const clean = raw.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'');
   try { const parsed = JSON.parse(clean); if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error(); return parsed; }
-  catch { throw new Error('La respuesta de IA está incompleta o no es JSON válido. No se repararán datos truncados automáticamente.'); }
+  catch { throw new Error(PROPOSAL_INVALID_JSON); }
 }
 function priceFor(item: SolarEquipmentItem) {
   const offers = (item.supplierPrices || []).filter(p => num(p.priceUSD) !== undefined && p.priceUSD > 0 && p.stockStatus !== 'out_of_stock');

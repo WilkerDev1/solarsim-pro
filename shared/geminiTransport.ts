@@ -111,5 +111,54 @@ export function parseGeminiJson(response: any, invalidMessage: string): Record<s
     const parsed = JSON.parse(text);
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return parsed;
   } catch { /* fall through */ }
-  throw new Error(invalidMessage);
+  throw new GeminiInvalidJsonError(invalidMessage);
+}
+/** La respuesta llegó completa pero no es un objeto JSON válido: lo único que `requestGeminiStructured` reintenta. */
+export class GeminiInvalidJsonError extends Error {
+  constructor(message: string) { super(message); this.name = 'GeminiInvalidJsonError'; }
+}
+
+export interface GeminiStructuredOptions {
+  apiKey: string;
+  model?: string;
+  /** Petición de Gemini: instrucción, contenidos y configuración (el helper fija la salida JSON). */
+  body: { systemInstruction?: unknown; contents: unknown[]; generationConfig?: Record<string, unknown> };
+  signal?: AbortSignal;
+  timeoutMs?: number;
+  thinkingLevel?: GeminiThinkingLevel;
+  /** Mensaje si la respuesta no es un objeto JSON válido tras el reintento; debe decir que no se aplicó nada. */
+  invalidMessage: string;
+  /** Reintentos ante JSON inválido: 0 o 1 (por defecto 1; un valor mayor se limita a 1). */
+  invalidJsonRetries?: number;
+}
+
+/**
+ * Única vía para las peticiones con salida estructurada (borrador de propuesta, pliegos tarifarios, fichas técnicas,
+ * listas de precios): salida JSON con el esquema del llamador, límite del documento inline antes de facturar,
+ * transporte inyectable, modelo de respaldo y recuperación de truncado (`requestGeminiJson`) y un único reintento
+ * con la misma petición cuando el JSON llega inválido. Una respuesta reparada o parcial nunca se aplica.
+ */
+export async function requestGeminiStructured<T extends Record<string, any> = Record<string, any>>(
+  options: GeminiStructuredOptions,
+  transport: GeminiTransport = webGeminiTransport,
+): Promise<{ data: T; modelUsed: string; requestedModel: string; modelWarning?: string; attempts: number }> {
+  if (!options.apiKey?.trim()) throw new Error('Configura una API Key de Google Gemini en Ajustes.');
+  for (const content of options.body.contents as any[])
+    for (const part of content?.parts || [])
+      if (typeof part?.inlineData?.data === 'string' && part.inlineData.data.length > MAX_INLINE_FILE_BASE64)
+        throw new Error('El documento supera 20 MB. Reduce el tamaño antes de analizarlo.');
+  const body = { ...options.body, generationConfig: { ...options.body.generationConfig, responseMimeType: 'application/json' } };
+  const allowed = 1 + Math.min(1, Math.max(0, Math.floor(options.invalidJsonRetries ?? 1)));
+  let warning: string | undefined;
+  for (let attempt = 1; ; attempt++) {
+    const result = await requestGeminiJson({ apiKey: options.apiKey, model: options.model, body, signal: options.signal, timeoutMs: options.timeoutMs, thinkingLevel: options.thinkingLevel }, transport);
+    warning = result.modelWarning ?? warning;
+    try {
+      const data = parseGeminiJson(result.response, options.invalidMessage) as T;
+      return { data, modelUsed: result.modelUsed, requestedModel: result.requestedModel, modelWarning: warning, attempts: attempt };
+    } catch (error) {
+      // Solo el JSON inválido se reintenta; una respuesta incompleta (finishReason) o vacía se informa tal cual.
+      if (!(error instanceof GeminiInvalidJsonError) || attempt >= allowed || options.signal?.aborted) throw error;
+    }
+  }
 }

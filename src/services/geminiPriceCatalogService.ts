@@ -9,8 +9,7 @@ import {
 
 import {
   MAX_INLINE_FILE_BASE64,
-  requestGeminiJson,
-  parseGeminiJson,
+  requestGeminiStructured,
   type GeminiTransport,
 } from "../../shared/geminiTransport";
 
@@ -248,24 +247,22 @@ Extrae todos los modelos de paneles, inversores y baterías con sus precios unit
       },
       generationConfig: {
         temperature: 0.1,
-        responseMimeType: "application/json",
         responseSchema: PRICE_CATALOG_RESPONSE_SCHEMA,
       },
     };
 
     onProgress?.("Analizando precios y referencias del catálogo…");
-    const result = await requestGeminiJson({
+    // Structured output: prose around the JSON or a truncated payload is rejected (one bounded retry), never repaired.
+    const result = await requestGeminiStructured({
       apiKey,
       model: customModel,
       body: requestBody,
       signal: options.signal,
+      invalidMessage:
+        "Gemini devolvió una lista incompleta o JSON inválido. No se aplicó ningún precio.",
     }, options.transport);
     if (result.modelWarning) onProgress?.(result.modelWarning);
-    // Structured output: prose around the JSON or a truncated payload is rejected, never repaired.
-    const parsed: any = parseGeminiJson(
-      result.response,
-      "Gemini devolvió una lista incompleta o JSON inválido. No se aplicó ningún precio.",
-    );
+    const parsed: any = result.data;
 
     const supplierName =
       manualSupplierName?.trim() ||
