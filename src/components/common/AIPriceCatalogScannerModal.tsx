@@ -2,6 +2,7 @@ import { isWriterRole } from '../../../shared/permissions';
 import { PriceCatalogUploadStep } from "./PriceCatalogUploadStep";
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
+import { DEFAULT_GEMINI_MODEL } from "../../../shared/geminiTransport";
 import { useShallow } from 'zustand/react/shallow';
 import {
   GeminiPriceCatalogService,
@@ -401,7 +402,7 @@ export const AIPriceCatalogScannerModal: React.FC = () => {
                 Escáner Inteligente de Listas de Precios
                 <span className="text-[10.5px] px-2.5 py-0.5 rounded-full font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30 flex items-center gap-1.5">
                   <Cpu className="w-3 h-3" />
-                  <span>IA: {geminiModel || "gemini-3.7-flash"}</span>
+                  <span>IA: {geminiModel || DEFAULT_GEMINI_MODEL}</span>
                 </span>
               </h3>
               <p

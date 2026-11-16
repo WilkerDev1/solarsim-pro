@@ -11,7 +11,7 @@ import { generateNextProjectSequence } from '../initialData';
 import { calculateRecommendedPanelCount, getMonthlySolarProductionFactors } from '../../engine/solarEngine';
 import { normalizeProposalDraft } from '../../../shared/aiProposal';
 import { resolveAssumption, resolveAssumptions } from '../../../shared/assumptions';
-import { DEFAULT_GEMINI_MODEL } from '../../../shared/geminiTransport';
+import { DEFAULT_GEMINI_MODEL, INHERITED_DEFAULT_GEMINI_MODELS } from '../../../shared/geminiTransport';
 import { buildAITariffContext } from '../../utils/aiTariffContext';
 import { RD_PROVINCES, getProvinceHSP } from '../../data/rdProvinces';
 
@@ -69,10 +69,20 @@ export function buildProjectFromDraft(state:SimulationStore,input:ExtractedInvoi
     return {project:createNewProject?{...project,specs:normalizeIncomingSpecs(project.specs)}:normalizeProjectEquipment(current!,project),previous:createNewProject?undefined:current};
 }
 
+/**
+ * Each install saved the factory default as if it were a choice, so a stored former default only survives when the user
+ * picked it explicitly (`geminiModelChosenByUser`); otherwise it follows the current default.
+ */
+export function migrateStoredGeminiModel(model:string|undefined,chosenByUser:boolean|undefined):string {
+  if(!model?.trim()) return DEFAULT_GEMINI_MODEL;
+  return !chosenByUser && INHERITED_DEFAULT_GEMINI_MODELS.includes(model) ? DEFAULT_GEMINI_MODEL : model;
+}
+
 export const createAISlice: SimulationSlice<AISlice> = (set, get) => ({
-  geminiApiKey: '', geminiModel: DEFAULT_GEMINI_MODEL,
+  geminiApiKey: '', geminiModel: DEFAULT_GEMINI_MODEL, geminiModelChosenByUser: false,
   setGeminiApiKey: key=>set({geminiApiKey:key}),
-  setGeminiModel: model=>set({geminiModel:model || DEFAULT_GEMINI_MODEL}),
+  // Choosing the default means "follow the default": a later default change applies to this install too.
+  setGeminiModel: model=>{const geminiModel=model?.trim() || DEFAULT_GEMINI_MODEL;set({geminiModel,geminiModelChosenByUser:geminiModel!==DEFAULT_GEMINI_MODEL});},
   applyExtractedInvoice: (input,createNewProject=false)=>{
     const state=get();
     const built=buildProjectFromDraft(state,input,createNewProject);

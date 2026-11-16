@@ -1,11 +1,39 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { DEFAULT_POPULAR_MODELS, mapGeminiModels } from '../services/geminiInvoiceService';
-import { createAISlice } from '../store/slices/aiSlice';
+import { createAISlice, migrateStoredGeminiModel } from '../store/slices/aiSlice';
 import { DEFAULT_GEMINI_MODEL } from '../../shared/geminiTransport';
+import { serializeSimulationStore } from '../store/persistence/serializeSimulationStore';
+
+// Identificadores publicados en https://ai.google.dev/gemini-api/docs/models (noviembre de 2026).
+const DOCUMENTED = ['gemini-4-hydrogen', 'gemini-4-argon', 'gemini-4-carbon', 'gemini-3.8-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
 assert(!DEFAULT_POPULAR_MODELS.some(m=>m.id==='gemini-3.8-flash-high'),'unsupported endpoint is not a preset');
+assert(DEFAULT_POPULAR_MODELS.every(m=>DOCUMENTED.includes(m.id)),'presets are documented endpoints only');
+assert.equal(DEFAULT_POPULAR_MODELS[0].id,DEFAULT_GEMINI_MODEL,'the default model leads the presets');
 assert(DEFAULT_POPULAR_MODELS.every(m=>m.rateLimitNote===undefined),'do not advertise invented account quotas');
+
 let state:any={};const slice=createAISlice((update:any)=>{state={...state,...update};},()=>state,{} as any);
-assert.equal(slice.geminiModel,DEFAULT_GEMINI_MODEL);slice.setGeminiModel('custom-account-model');assert.equal(state.geminiModel,'custom-account-model');
+assert.equal(slice.geminiModel,DEFAULT_GEMINI_MODEL);
+assert.equal(slice.geminiModelChosenByUser,false);
+slice.setGeminiModel('custom-account-model');assert.equal(state.geminiModel,'custom-account-model');assert.equal(state.geminiModelChosenByUser,true);
+slice.setGeminiModel(DEFAULT_GEMINI_MODEL);assert.equal(state.geminiModelChosenByUser,false,'choosing the default follows future defaults');
+slice.setGeminiModel('');assert.equal(state.geminiModel,DEFAULT_GEMINI_MODEL);
+assert.equal(serializeSimulationStore({geminiModel:'gemini-3.6-flash',geminiModelChosenByUser:true} as any).geminiModelChosenByUser,true);
+
+// El predeterminado de fábrica se guardaba con cada instalación: solo una elección explícita lo conserva.
+for (const inherited of ['gemini-3.8-flash','gemini-3.7-flash','gemini-3.5-flash-lite','gemini-2.0-flash','',undefined])
+  assert.equal(migrateStoredGeminiModel(inherited,undefined),DEFAULT_GEMINI_MODEL,`${inherited} was an inherited default`);
+assert.equal(migrateStoredGeminiModel('gemini-3.8-flash',true),'gemini-3.8-flash','explicit choice is respected');
+assert.equal(migrateStoredGeminiModel('gemini-3.6-flash',undefined),'gemini-3.6-flash','never a factory default, so it was chosen');
+assert.equal(migrateStoredGeminiModel('custom-account-model',false),'custom-account-model');
+
 const mapped=mapGeminiModels({models:[{name:'models/gemini-real-flash',supportedGenerationMethods:['generateContent']},{name:'models/gemini-tts',supportedGenerationMethods:['generateContent']},{name:'models/gemini-embedding',supportedGenerationMethods:['embedContent']}]});
 assert.deepEqual(mapped.map(m=>m.id),['gemini-real-flash']);
-console.log('Gemini model discovery and explicit user selection passed. Transport retry budget is exercised by testAIProposalPipeline.');
+
+// Interfaz: la clave nunca viaja en la URL y no hay identificadores retirados escritos a mano.
+for (const file of ['src/components/settings/sections/IntegrationsSection.tsx','src/components/layout/PrimaryIconDock.tsx','src/components/common/AIPriceCatalogScannerModal.tsx']) {
+  const text=readFileSync(file,'utf8');
+  assert(!/[?&]key=/.test(text),`${file} must send the API key in x-goog-api-key`);
+  assert(!/['"]gemini-(?:2\.[05]|3\.[5-8])[a-z.-]*['"]/.test(text),`${file} must use DEFAULT_GEMINI_MODEL or the presets`);
+}
+console.log('Gemini model discovery, inherited-default migration and explicit user selection passed. Transport policy is exercised by testGeminiTransport.');

@@ -1,9 +1,7 @@
 import { ipcMain } from 'electron';
-import { buildProposalRequest } from '../../shared/aiProposal';
-import { requestGeminiJson, geminiResponseText, GEMINI_API_BASE } from '../../shared/geminiTransport';
+import { GEMINI_API_BASE } from '../../shared/geminiTransport';
 import { httpsPostJson, httpsGetJson } from './httpClient';
-import { mapGeminiModels } from '../../src/services/geminiInvoiceService';
-import { processExtractedInvoice } from '../../src/utils/aiProposalNormalization';
+import { mapGeminiModels, parseProposalWithAI } from '../../src/services/geminiInvoiceService';
 import type { AIProposalPayload } from '../../shared/aiProposal';
 export function registerAIInvoiceHandlers() {
   const requests=new Map<string,AbortController>();
@@ -26,9 +24,9 @@ export function registerAIInvoiceHandlers() {
     const destroy=()=>controller.abort(new Error('La ventana de análisis se cerró.'));
     event.sender.once('destroyed',destroy);
     try {
-      const result=await requestGeminiJson({apiKey:payload.apiKey || '',model:payload.model,body:buildProposalRequest(payload),signal:controller.signal},
+      const data=await parseProposalWithAI({...payload,apiKey:payload.apiKey || ''},controller.signal,
         (url,body,headers,timeout,signal)=>httpsPostJson(url,body,timeout,headers,signal));
-      return {success:true,data:processExtractedInvoice(geminiResponseText(result.response),payload,result)};
+      return {success:true,data};
     }catch(error:any){return {success:false,error:error.message || 'Error analizando la propuesta.'};}
     finally {requests.delete(key);event.sender.removeListener('destroyed',destroy);}
   });
