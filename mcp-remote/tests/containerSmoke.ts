@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { request as httpRequest } from "node:http";
 
 /**
  * Explicit smoke test of the packaged service, isolated from production and cleaned in finally.
@@ -39,16 +40,64 @@ async function waitFor(url: string, name: string) {
   console.error(docker("logs", "--tail", "20", name));
   assert.fail(`${name} did not become healthy`);
 }
-const rpc = (base: string, token: string | null, body: unknown) =>
-  fetch(`${base}/mcp`, {
-    method: "POST",
-    headers: {
+/** Plain node:http so the public Host can be sent to the published port (the service checks Host). */
+function call(
+  base: string,
+  method: string,
+  path: string,
+  headers: Record<string, string>,
+  body?: string,
+): Promise<{ status: number; json: () => Promise<any> }> {
+  const url = new URL(base);
+  return new Promise((resolve, reject) => {
+    const req = httpRequest(
+      {
+        host: url.hostname,
+        port: url.port,
+        method,
+        path,
+        headers: {
+          ...headers,
+          ...(body
+            ? { "Content-Length": String(Buffer.byteLength(body)) }
+            : {}),
+        },
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (c) => chunks.push(c));
+        res.on("end", () =>
+          resolve({
+            status: res.statusCode ?? 0,
+            json: async () =>
+              JSON.parse(Buffer.concat(chunks).toString("utf8")),
+          }),
+        );
+      },
+    );
+    req.on("error", reject);
+    req.end(body);
+  });
+}
+const PUBLIC_HOST = new URL(MCP_URL).host;
+const rpc = (
+  base: string,
+  token: string | null,
+  body: unknown,
+  host = PUBLIC_HOST,
+) =>
+  call(
+    base,
+    "POST",
+    "/mcp",
+    {
+      Host: host,
       "Content-Type": "application/json",
       Accept: "application/json, text/event-stream",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify(body),
-  });
+    JSON.stringify(body),
+  );
 
 try {
   // A bad configuration fails at startup with a non-zero exit, before listening.
@@ -169,7 +218,22 @@ try {
     params: {},
   });
   assert.equal(anonymous.status, 401);
-  assert.equal((await fetch(`${mcpBase}/mcp`)).status, 405);
+  assert.equal(
+    (await call(mcpBase, "GET", "/mcp", { Host: PUBLIC_HOST })).status,
+    405,
+  );
+  assert.equal(
+    (
+      await rpc(
+        mcpBase,
+        null,
+        { jsonrpc: "2.0", id: 1, method: "ping" },
+        "127.0.0.1",
+      )
+    ).status,
+    403,
+    "Host other than the public one is refused (DNS rebinding)",
+  );
 
   const registration = await fetch(`${apiBase}/api/auth/register`, {
     method: "POST",

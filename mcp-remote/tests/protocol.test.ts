@@ -13,6 +13,8 @@ const config: McpRemoteConfig = {
   apiUrl: "http://api.internal:3000",
   authorizationServer: "https://api.example.test",
   allowedOrigins: [],
+  allowedHosts: ["mcp.example.test"],
+  clientIp: { trustedProxies: [] },
   maxBodyBytes: 4096,
 };
 
@@ -497,4 +499,234 @@ test("salud: superficial sin API y profunda con API", async () => {
   });
   assert.equal((await app.request("http://x/health")).status, 200);
   assert.equal((await app.request("http://x/health?deep=1")).status, 503);
+});
+
+test("Host: solo el host público (DNS rebinding); la salud responde a cualquiera", async () => {
+  const app = createMcpApp({ config, fetch: fakeApi({}).fetchImpl });
+  const rebound = await rpc(
+    app,
+    { jsonrpc: "2.0", id: 1, method: "ping" },
+    { Host: "evil.example:8787" },
+  );
+  assert.equal(rebound.status, 403);
+  const internal = await rpc(
+    app,
+    { jsonrpc: "2.0", id: 1, method: "ping" },
+    { Host: "127.0.0.1:8787" },
+  );
+  assert.equal(
+    internal.status,
+    403,
+    "the internal address is not an MCP host unless listed",
+  );
+  assert.equal(
+    (
+      await rpc(
+        app,
+        { jsonrpc: "2.0", id: 1, method: "ping" },
+        { Host: "MCP.example.test" },
+      )
+    ).status,
+    200,
+  );
+  assert.equal((await app.request("http://127.0.0.1:8787/health")).status, 200);
+  assert.equal(
+    (
+      await app.request(
+        "https://evil.example/.well-known/oauth-protected-resource/mcp",
+      )
+    ).status,
+    403,
+  );
+  const listed = createMcpApp({
+    config: {
+      ...config,
+      allowedHosts: [...config.allowedHosts, "127.0.0.1:8787"],
+    },
+    fetch: fakeApi({}).fetchImpl,
+  });
+  assert.equal(
+    (
+      await rpc(
+        listed,
+        { jsonrpc: "2.0", id: 1, method: "ping" },
+        { Host: "127.0.0.1:8787" },
+      )
+    ).status,
+    200,
+  );
+});
+
+test("cuerpo por trozos: se corta al superar el límite sin leerlo entero", async () => {
+  const app = createMcpApp({ config, fetch: fakeApi({}).fetchImpl });
+  let pulled = 0;
+  const stream = new ReadableStream<Uint8Array>({
+    pull(controller) {
+      pulled++;
+      if (pulled > 1000) return controller.close();
+      controller.enqueue(new TextEncoder().encode("x".repeat(1024)));
+    },
+  });
+  const response = await app.request("https://mcp.example.test/mcp", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${PAT}`,
+    },
+    body: stream,
+    duplex: "half",
+  } as RequestInit);
+  assert.equal(response.status, 413);
+  assert.ok(pulled < 20, `stopped early (${pulled} chunks)`);
+});
+
+test("identificadores: '..', '.', '/' y '\\' nunca llegan a la API", async () => {
+  const { fetchImpl, seen } = fakeApi({});
+  const app = createMcpApp({ config, fetch: fetchImpl });
+  for (const [name, args] of [
+    ["get_project", { id: ".." }],
+    ["get_project", { id: "." }],
+    ["get_project", { id: "a/b" }],
+    ["link_proposal_to_client", { proposalId: "..\\x", clientId: "c1" }],
+  ] as const) {
+    const result = await rpc(app, call(1, name, args));
+    assert.equal(
+      result.body.result.structuredContent.code,
+      "invalid_input",
+      `${name} ${JSON.stringify(args)}`,
+    );
+  }
+  assert.ok(
+    seen.every((s) => s.url === "/api/agent-access/whoami"),
+    "only identity lookups reached the API",
+  );
+});
+
+test("roles: VIEWER, vacío o desconocido nunca escriben; arguments no objeto es invalid_input", async () => {
+  for (const role of ["VIEWER", "", "SUPERUSER"]) {
+    const app = createMcpApp({
+      config,
+      fetch: fakeApi({}, { scope: "write", role, userName: "X" }).fetchImpl,
+    });
+    const tools = (
+      await rpc(app, { jsonrpc: "2.0", id: 2, method: "tools/list" })
+    ).body.result.tools;
+    assert.ok(
+      tools.every((t: any) => t.annotations.readOnlyHint),
+      `role "${role}" only reads`,
+    );
+  }
+  const app = createMcpApp({ config, fetch: fakeApi({}).fetchImpl });
+  for (const args of ["texto", [1], 5, true]) {
+    const r = await rpc(app, call(1, "search_projects", args));
+    assert.equal(
+      r.body.result.structuredContent.code,
+      "invalid_input",
+      JSON.stringify(args),
+    );
+  }
+});
+
+test("esquemas estrictos: propiedades no declaradas, enum y longitudes", async () => {
+  const app = createMcpApp({ config, fetch: fakeApi({}).fetchImpl });
+  const cases: [string, Record<string, unknown>][] = [
+    ["search_clients", { query: "a", sql: "drop" }],
+    ["search_clients", { kind: "proveedor" }],
+    ["search_projects", { query: "x".repeat(201) }],
+    ["create_client", { name: "" }],
+    ["create_client", { name: "x".repeat(256) }],
+    ["update_client", { id: "c1", kind: "otro" }],
+    ["get_project", {}],
+  ];
+  for (const [name, args] of cases) {
+    const r = await rpc(app, call(1, name, args));
+    assert.equal(
+      r.body.result.structuredContent.code,
+      "invalid_input",
+      `${name} ${JSON.stringify(args).slice(0, 40)}`,
+    );
+  }
+});
+
+test("IP: tokens no válidos por IP antes de la API; cabeceras de proxy solo desde proxies de confianza", async () => {
+  const { fetchImpl, seen } = fakeApi({});
+  const app = createMcpApp({ config, fetch: fetchImpl });
+  const env = (remoteAddress: string) => ({
+    incoming: { socket: { remoteAddress } },
+  });
+  const send = (
+    token: string,
+    address: string,
+    headers: Record<string, string> = {},
+  ) =>
+    app.request(
+      "https://mcp.example.test/mcp",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          ...headers,
+        },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
+      },
+      env(address) as any,
+    );
+  for (let i = 0; i < 30; i++)
+    assert.equal(
+      (
+        await send(`ssm_pat_bad${i}`, "203.0.113.5", {
+          "CF-Connecting-IP": `198.51.100.${i}`,
+        })
+      ).status,
+      401,
+    );
+  const blocked = await send(PAT, "203.0.113.5");
+  assert.equal(
+    blocked.status,
+    429,
+    "spoofed headers from an untrusted peer do not help",
+  );
+  assert.ok(Number(blocked.headers.get("Retry-After")) > 0);
+  assert.equal((await send(PAT, "203.0.113.6")).status, 200);
+  assert.equal(
+    seen.filter((s) => s.url === "/api/agent-access/whoami").length,
+    1,
+    "malformed tokens never reached the API",
+  );
+  assert.equal(
+    seen[0].headers.get("X-Forwarded-For"),
+    "203.0.113.6",
+    "the end client's IP is forwarded",
+  );
+  const proxied = createMcpApp({
+    config: {
+      ...config,
+      clientIp: {
+        trustedProxies: ["172.20.0.0/16"],
+        header: "cf-connecting-ip",
+      },
+    },
+    fetch: fakeApi({}).fetchImpl,
+  });
+  for (let i = 0; i < 35; i++) {
+    const r = await proxied.request(
+      "https://mcp.example.test/mcp",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ssm_pat_bad${i}`,
+          "CF-Connecting-IP": `198.51.100.${i}`,
+        },
+        body: "{}",
+      },
+      env("172.20.0.2") as any,
+    );
+    assert.equal(
+      r.status,
+      401,
+      "behind a trusted proxy each real client has its own bucket",
+    );
+  }
 });

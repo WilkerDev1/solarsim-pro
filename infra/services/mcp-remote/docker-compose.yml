@@ -9,6 +9,8 @@ services:
       MCP_PUBLIC_URL: ${MCP_PUBLIC_URL:?Set the public MCP URL, e.g. https://mcp.example/mcp}
       API_INTERNAL_URL: ${API_INTERNAL_URL:?Set the API address reachable from this CT}
       OAUTH_ISSUER_URL: ${OAUTH_ISSUER_URL:-}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      CLIENT_IP_HEADER: ${CLIENT_IP_HEADER:-}
     networks:
       - mcp_net
   cloudflared:

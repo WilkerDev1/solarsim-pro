@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
 import { Hono, type Context } from "hono";
 import {
-  AGENT_TOKEN_PREFIXES,
+  isAgentBearerToken,
   OAUTH_SCOPES,
   safeAgentLabel,
   type AgentIdentity,
 } from "../../shared/agentAccess.js";
+import { resolveClientIp, socketAddress } from "../../shared/clientIp.js";
 import { FixedWindowLimiter } from "../../shared/fixedWindowLimiter.js";
 import { ApiClient, ApiError } from "./apiClient.js";
 import { SERVICE_VERSION, type McpRemoteConfig } from "./config.js";
@@ -21,6 +22,30 @@ export interface McpAppOptions {
   fetch?: typeof fetch;
   /** How long a validated token's identity is reused for initialize/tools/list (tool calls always hit the API). */
   identityTtlMs?: number;
+}
+
+/** Body larger than the limit (declared or streamed). */
+class TooLarge extends Error {}
+
+/** Reads the body in chunks and stops as soon as the limit is crossed (chunked requests included). */
+async function readLimited(request: Request, limit: number): Promise<string> {
+  const declared = Number(request.headers.get("Content-Length"));
+  if (Number.isFinite(declared) && declared > limit) throw new TooLarge();
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > limit) {
+      await reader.cancel().catch(() => undefined);
+      throw new TooLarge();
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString("utf8");
 }
 
 const json = (
@@ -48,11 +73,14 @@ export function createMcpApp(options: McpAppOptions) {
   const metadataUrl = `${new URL(config.publicUrl).origin}/.well-known/oauth-protected-resource${endpoint}`;
   const byIp = new FixedWindowLimiter(300, 60000);
   const byToken = new FixedWindowLimiter(120, 60000);
+  // Rejected bearers per client IP, before anything reaches the API.
+  const failures = new FixedWindowLimiter(30, 600000);
+  const allowedHosts = new Set(config.allowedHosts.map((h) => h.toLowerCase()));
   const identities = new Map<
     string,
     { identity: AgentIdentity; expires: number }
   >();
-  const ttl = options.identityTtlMs ?? 30000;
+  const ttl = options.identityTtlMs ?? 10000;
   const labels = new Map<string, string>();
   const app = new Hono();
 
@@ -75,9 +103,32 @@ export function createMcpApp(options: McpAppOptions) {
     );
   };
   const ip = (c: Context) =>
-    c.req.header("CF-Connecting-IP") ??
-    c.req.header("X-Forwarded-For")?.split(",")[0]?.trim() ??
-    "local";
+    resolveClientIp(
+      socketAddress(c.env),
+      (name) => c.req.header(name),
+      config.clientIp,
+    );
+  const rpcFailure = (
+    status: number,
+    message: string,
+    headers?: Record<string, string>,
+  ) =>
+    json(
+      { jsonrpc: "2.0", id: null, error: { code: -32000, message } },
+      status,
+      headers,
+    );
+
+  // DNS rebinding: everything except the health probe answers only to the public host (and listed extras).
+  // Behind Cloudflare Tunnel the original Host is preserved, so the public name arrives here.
+  app.use("*", async (c, next) => {
+    if (c.req.path === "/health") return next();
+    const host = (
+      c.req.header("Host") ?? new URL(c.req.url).host
+    ).toLowerCase();
+    if (!allowedHosts.has(host)) return rpcFailure(403, "Host no permitido.");
+    return next();
+  });
 
   app.get("/health", async (c) => {
     if (c.req.query("deep") !== "1")
@@ -152,6 +203,10 @@ export function createMcpApp(options: McpAppOptions) {
         403,
       );
     const address = ip(c);
+    if (failures.exceeded(address))
+      return rpcFailure(429, "Demasiados intentos con tokens no válidos.", {
+        "Retry-After": String(failures.retryAfter(address)),
+      });
     if (!byIp.take(address))
       return json(
         {
@@ -165,12 +220,12 @@ export function createMcpApp(options: McpAppOptions) {
     const header = c.req.header("Authorization") ?? "";
     const match = /^Bearer (\S+)$/.exec(header);
     const token = match?.[1] ?? "";
-    // Only SolarSim agent tokens are forwarded; anything else (a desktop JWT, another provider's token) stops here.
-    if (
-      !token.startsWith(AGENT_TOKEN_PREFIXES.pat) &&
-      !token.startsWith(AGENT_TOKEN_PREFIXES.access)
-    )
+    // Only well-formed SolarSim agent tokens are forwarded; anything else (a desktop JWT, another provider's
+    // token, garbage) stops here and counts as a failure for this IP. A missing header does not count.
+    if (!isAgentBearerToken(token)) {
+      if (header) failures.take(address);
       return challenge("Se requiere un token de agente de SolarSim");
+    }
     const key = createHash("sha256").update(token).digest("hex");
     if (!byToken.take(key))
       return json(
@@ -186,26 +241,14 @@ export function createMcpApp(options: McpAppOptions) {
         { "Retry-After": String(byToken.retryAfter(key)) },
       );
 
-    const declared = Number(c.req.header("Content-Length"));
-    if (Number.isFinite(declared) && declared > config.maxBodyBytes)
-      return json(
-        {
-          jsonrpc: "2.0",
-          id: null,
-          error: { code: -32000, message: "Solicitud demasiado grande." },
-        },
-        413,
-      );
-    const raw = await c.req.text();
-    if (Buffer.byteLength(raw, "utf8") > config.maxBodyBytes)
-      return json(
-        {
-          jsonrpc: "2.0",
-          id: null,
-          error: { code: -32000, message: "Solicitud demasiado grande." },
-        },
-        413,
-      );
+    let raw: string;
+    try {
+      raw = await readLimited(c.req.raw, config.maxBodyBytes);
+    } catch (error) {
+      if (error instanceof TooLarge)
+        return rpcFailure(413, "Solicitud demasiado grande.");
+      return rpcFailure(400, "No se pudo leer la solicitud.");
+    }
     let message: unknown;
     try {
       message = JSON.parse(raw);
@@ -244,6 +287,7 @@ export function createMcpApp(options: McpAppOptions) {
       undefined;
     const api = new ApiClient(config.apiUrl, token, fetchImpl, {
       client: label,
+      forwardedFor: address === "unknown" ? undefined : address,
     });
     let identity: AgentIdentity;
     try {
@@ -255,8 +299,10 @@ export function createMcpApp(options: McpAppOptions) {
         identities.set(key, { identity, expires: Date.now() + ttl });
       }
     } catch (error) {
-      if (error instanceof ApiError && error.status === 401)
+      if (error instanceof ApiError && error.status === 401) {
+        failures.take(address);
         return challenge("Token inválido, caducado o revocado");
+      }
       const status =
         error instanceof ApiError && error.status === 426 ? 503 : 502;
       return json(

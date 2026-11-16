@@ -73,7 +73,12 @@ export class ApiClient {
     private readonly baseUrl: string,
     private readonly token: string,
     private readonly fetchImpl: typeof fetch = fetch,
-    private readonly labels: { tool?: string; client?: string } = {},
+    private readonly labels: {
+      tool?: string;
+      client?: string;
+      /** End client's IP, for the API's per-IP limits when it trusts this service as a proxy. */
+      forwardedFor?: string;
+    } = {},
   ) {}
 
   withTool(tool: string): ApiClient {
@@ -101,6 +106,9 @@ export class ApiClient {
             : {}),
           ...(this.labels.client
             ? { [AGENT_CLIENT_HEADER]: this.labels.client }
+            : {}),
+          ...(this.labels.forwardedFor
+            ? { "X-Forwarded-For": this.labels.forwardedFor }
             : {}),
           ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
         },

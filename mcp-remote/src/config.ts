@@ -1,3 +1,8 @@
+import {
+  parseClientIpHeader,
+  parseTrustedProxies,
+  type ClientIpConfig,
+} from "../../shared/clientIp.js";
 /** Configuration by environment variables (docs/MCP_REMOTE.md#variables). A typo fails at startup. */
 export const SERVICE_VERSION = "2.7.4";
 
@@ -12,6 +17,10 @@ export interface McpRemoteConfig {
   authorizationServer?: string;
   /** Browser origins allowed to call /mcp. Native MCP clients send no Origin. */
   allowedOrigins: string[];
+  /** Host header values accepted on the MCP endpoint (DNS rebinding): the public host plus MCP_ALLOWED_HOSTS. */
+  allowedHosts: string[];
+  /** Client IP for rate limits: socket only unless TRUSTED_PROXIES and CLIENT_IP_HEADER are set. */
+  clientIp: ClientIpConfig;
   maxBodyBytes: number;
 }
 
@@ -85,6 +94,17 @@ export function readConfig(
       .map((o) => o.trim())
       .filter(Boolean)
       .map((o) => url("MCP_ALLOWED_ORIGINS", o, { originOnly: true })),
+    allowedHosts: [
+      new URL(publicUrl).host,
+      ...(env.MCP_ALLOWED_HOSTS ?? "")
+        .split(",")
+        .map((h) => h.trim().toLowerCase())
+        .filter(Boolean),
+    ],
+    clientIp: {
+      trustedProxies: parseTrustedProxies(env.TRUSTED_PROXIES),
+      header: parseClientIpHeader(env.CLIENT_IP_HEADER),
+    },
     maxBodyBytes,
   };
 }

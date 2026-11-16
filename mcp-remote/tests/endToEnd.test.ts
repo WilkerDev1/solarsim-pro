@@ -82,6 +82,8 @@ before(
       apiUrl: "http://api.internal:3000",
       authorizationServer: ISSUER,
       allowedOrigins: [],
+      allowedHosts: ["mcp.example.test"],
+      clientIp: { trustedProxies: [] },
       maxBodyBytes: 256 * 1024,
     };
     mcp = createMcpApp({ config, fetch: apiFetch, identityTtlMs: 0 });
@@ -286,7 +288,7 @@ test("OAuth de extremo a extremo: descubrimiento, registro, consentimiento y uso
   ).json();
   const verifier = randomBytes(32).toString("base64url");
   const challenge = createHash("sha256").update(verifier).digest("base64url");
-  const form = new URLSearchParams({
+  const query = {
     client_id: reg.client_id,
     redirect_uri: reg.redirect_uris[0],
     response_type: "code",
@@ -295,6 +297,16 @@ test("OAuth de extremo a extremo: descubrimiento, registro, consentimiento y uso
     state: "xyz",
     scope: "solarsim:read solarsim:write",
     resource: MCP_URL,
+  };
+  // The browser loads the consent page (anti-CSRF cookie + hidden field), then submits it.
+  const page = await api.request(
+    `${as.authorization_endpoint}?${new URLSearchParams(query)}`,
+  );
+  const csrf = /name="csrf" value="([^"]+)"/.exec(await page.text())![1];
+  const cookie = page.headers.get("set-cookie")!.split(";")[0];
+  const form = new URLSearchParams({
+    ...query,
+    csrf,
     decision: "allow",
     email: "e2e-editor@example.test",
     password: "isolated-password",
@@ -302,7 +314,10 @@ test("OAuth de extremo a extremo: descubrimiento, registro, consentimiento y uso
   });
   const consent = await api.request(as.authorization_endpoint, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Cookie: cookie,
+    },
     body: form.toString(),
   });
   const code = new URL(consent.headers.get("location")!).searchParams.get(

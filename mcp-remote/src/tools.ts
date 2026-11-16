@@ -12,6 +12,7 @@ import {
   type ClientKind,
 } from "../../shared/clients.js";
 import { readEquipment } from "../../shared/equipment/index.js";
+import { isWriterRole } from "../../shared/permissions.js";
 import { ApiError, type ApiClient } from "./apiClient.js";
 
 /** Same 64 KB cap as the in-app registry: agents must narrow the query instead of receiving huge payloads. */
@@ -46,6 +47,25 @@ const fail = (code: string, message: string): AgentToolOutcome => ({
   code,
   message,
 });
+
+/** An id that is about to be interpolated into an API path or query is not a usable id. */
+class InvalidId extends Error {}
+/**
+ * Path segment for an id: `encodeURIComponent` leaves "." and ".." untouched, which would make `/api/projects/..`
+ * resolve to `/api/`. Empty, ".", "..", and any "/" or "\" are rejected for every tool.
+ */
+export function pathId(value: unknown): string {
+  if (
+    typeof value !== "string" ||
+    !value ||
+    value.length > 128 ||
+    value === "." ||
+    value === ".." ||
+    /[/\\]/.test(value)
+  )
+    throw new InvalidId();
+  return encodeURIComponent(value);
+}
 
 /** Shared definition (same name, title, kind and schema) with remote-only adjustments where semantics differ. */
 function shared(
@@ -129,7 +149,7 @@ const TOOLS: RemoteTool[] = [
     run: async (args, api) => {
       const { project: p } = await api.request(
         "GET",
-        `/api/projects/${encodeURIComponent(args.id)}`,
+        `/api/projects/${pathId(args.id)}`,
       );
       return ok({
         id: p.id,
@@ -284,7 +304,7 @@ const TOOLS: RemoteTool[] = [
         );
       const { projects } = await api.request(
         "GET",
-        `/api/projects?limit=50&clientId=${encodeURIComponent(client.id)}`,
+        `/api/projects?limit=50&clientId=${pathId(client.id)}`,
       );
       const count = (key: string) =>
         projects.reduce(
@@ -344,7 +364,7 @@ const TOOLS: RemoteTool[] = [
       // CAS: the version read here; if someone edits in between, the API answers 409 and nothing is overwritten.
       const { client } = await api.request(
         "PUT",
-        `/api/clients/${encodeURIComponent(current.id)}`,
+        `/api/clients/${pathId(current.id)}`,
         {
           ...Object.fromEntries(CLIENT_FIELDS.map((k) => [k, current[k]])),
           ...updates,
@@ -360,11 +380,11 @@ const TOOLS: RemoteTool[] = [
     run: async (args, api) => {
       const { project } = await api.request(
         "GET",
-        `/api/projects/${encodeURIComponent(args.proposalId)}`,
+        `/api/projects/${pathId(args.proposalId)}`,
       );
       const result = await api.request(
         "PUT",
-        `/api/projects/${encodeURIComponent(project.id)}/client-link`,
+        `/api/projects/${pathId(project.id)}/client-link`,
         {
           clientId: args.clientId ?? null,
           baseVersion: project.version,
@@ -387,7 +407,8 @@ export function remoteTools(identity: {
   scope: AgentScope;
   role: string;
 }): RemoteTool[] {
-  const canWrite = identity.scope === "write" && identity.role !== "LECTOR";
+  // Shared permission rule; an unknown, empty or legacy role (VIEWER) never writes.
+  const canWrite = identity.scope === "write" && isWriterRole(identity.role);
   return TOOLS.filter((tool) => tool.scope === "read" || canWrite);
 }
 
@@ -420,10 +441,14 @@ export async function callRemoteTool(
         : "Herramienta desconocida.",
     );
   }
-  const input =
-    args && typeof args === "object" && !Array.isArray(args)
-      ? (args as Record<string, any>)
-      : {};
+  // `arguments` may be omitted (= {}), but anything other than an object is invalid input, not an empty call.
+  if (
+    args !== undefined &&
+    args !== null &&
+    (typeof args !== "object" || Array.isArray(args))
+  )
+    return fail("invalid_input", "arguments debe ser un objeto.");
+  const input = (args ?? {}) as Record<string, any>;
   const errors = validateJsonSchema(tool.definition.inputSchema, input);
   if (errors.length) return fail("invalid_input", errors.slice(0, 5).join(" "));
   try {
@@ -435,6 +460,8 @@ export async function callRemoteTool(
       );
     return outcome;
   } catch (error) {
+    if (error instanceof InvalidId)
+      return fail("invalid_input", "Identificador no válido.");
     if (error instanceof ApiError) {
       // Token problems are protocol-level (401 lets the client refresh or sign in again).
       if (error.status === 401) throw error;
