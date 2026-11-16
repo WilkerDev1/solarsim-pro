@@ -51,6 +51,8 @@ export function geminiGenerationConfig(model: string, config: Record<string, unk
 /** Synchronous output ceiling used by the single MAX_TOKENS recovery. */
 const outputCeiling = (model: string) => /^gemini-4[.-]/.test(model) ? 65536 : 32768;
 const TRANSIENT = [408, 500, 502, 503, 504];
+/** Margen mínimo para intentar otra llamada dentro de un plazo global: la cuarta parte del plazo, al menos 15 s. */
+const retryMargin = (totalMs: number) => Math.max(15000, totalMs * 0.25);
 const TRUNCATED = 'Gemini agotó el límite de respuesta. Reduce los adjuntos o divide las instrucciones. Tu borrador anterior se conserva; no se aplicaron datos parciales.';
 
 /**
@@ -58,9 +60,17 @@ const TRUNCATED = 'Gemini agotó el límite de respuesta. Reduce los adjuntos o 
  * response is retried once with a larger limit only when the request set a smaller one than the model ceiling.
  */
 export async function requestGeminiJson(
-  options: { apiKey: string; model?: string; body: unknown; signal?: AbortSignal; timeoutMs?: number; thinkingLevel?: GeminiThinkingLevel },
+  options: {
+    apiKey: string; model?: string; body: unknown; signal?: AbortSignal; timeoutMs?: number; thinkingLevel?: GeminiThinkingLevel;
+    /** Fin del plazo global (ms de `now`): cada intento dura como mucho lo que queda y el segundo se omite sin margen. */
+    deadline?: number; now?: () => number;
+  },
   transport: GeminiTransport = webGeminiTransport,
 ): Promise<{ response: any; modelUsed: string; requestedModel: string; modelWarning?: string }> {
+  const now = options.now ?? Date.now;
+  const perAttempt = options.timeoutMs ?? 60000;
+  const remaining = () => options.deadline === undefined ? perAttempt : Math.min(perAttempt, options.deadline - now());
+  const canRetry = () => options.deadline === undefined || remaining() >= retryMargin(perAttempt);
   if (!options.apiKey?.trim()) throw new Error('Configura una API Key de Google Gemini en Ajustes.');
   const requestedModel = options.model?.trim().replace(/^models\//, '') || DEFAULT_GEMINI_MODEL;
   if (!/^[a-zA-Z0-9._-]+$/.test(requestedModel)) throw new Error('El identificador del modelo Gemini no es válido.');
@@ -74,9 +84,9 @@ export async function requestGeminiJson(
     let response: any;
     try {
       response = await transport(`${GEMINI_API_BASE}/models/${model}:generateContent`, { ...original, generationConfig },
-        { 'Content-Type': 'application/json', 'x-goog-api-key': options.apiKey.trim() }, options.timeoutMs ?? 60000, options.signal);
+        { 'Content-Type': 'application/json', 'x-goog-api-key': options.apiKey.trim() }, Math.max(1, remaining()), options.signal);
     } catch (error: any) {
-      if (options.signal?.aborted || attempt) throw error;
+      if (options.signal?.aborted || attempt || !canRetry()) throw error;
       if (TRANSIENT.includes(error?.statusCode)) {
         model = requestedModel === DEFAULT_GEMINI_MODEL ? FALLBACK_GEMINI_MODEL : DEFAULT_GEMINI_MODEL;
         warning = `El modelo ${requestedModel} no respondió temporalmente. Se utilizó ${model}.`;
@@ -88,7 +98,7 @@ export async function requestGeminiJson(
     }
     if (response?.candidates?.[0]?.finishReason === 'MAX_TOKENS') {
       const larger = maxOutputTokens ? Math.min(outputCeiling(model), Math.max(16384, maxOutputTokens * 2)) : undefined;
-      if (attempt || !larger || larger <= maxOutputTokens!) throw new Error(TRUNCATED);
+      if (attempt || !larger || larger <= maxOutputTokens! || !canRetry()) throw new Error(TRUNCATED);
       maxOutputTokens = larger;
       warning = 'Se recuperó una respuesta truncada con un único intento adicional.';
       continue;
@@ -128,8 +138,10 @@ export interface GeminiStructuredOptions {
   thinkingLevel?: GeminiThinkingLevel;
   /** Mensaje si la respuesta no es un objeto JSON válido tras el reintento; debe decir que no se aplicó nada. */
   invalidMessage: string;
-  /** Reintentos ante JSON inválido: 0 o 1 (por defecto 1; un valor mayor se limita a 1). */
+  /** Reintentos ante JSON inválido: 0 o 1 (por defecto 1; un valor mayor se limita a 1 y uno no finito cuenta como 0). */
   invalidJsonRetries?: number;
+  /** Reloj inyectable (pruebas); el plazo global es `timeoutMs` (60 s por defecto) para todos los intentos. */
+  now?: () => number;
 }
 
 /**
@@ -143,22 +155,29 @@ export async function requestGeminiStructured<T extends Record<string, any> = Re
   transport: GeminiTransport = webGeminiTransport,
 ): Promise<{ data: T; modelUsed: string; requestedModel: string; modelWarning?: string; attempts: number }> {
   if (!options.apiKey?.trim()) throw new Error('Configura una API Key de Google Gemini en Ajustes.');
+  // El límite es la suma de los documentos de la petición, no cada uno por separado.
+  let inline = 0;
   for (const content of options.body.contents as any[])
     for (const part of content?.parts || [])
-      if (typeof part?.inlineData?.data === 'string' && part.inlineData.data.length > MAX_INLINE_FILE_BASE64)
-        throw new Error('El documento supera 20 MB. Reduce el tamaño antes de analizarlo.');
+      if (typeof part?.inlineData?.data === 'string') inline += part.inlineData.data.length;
+  if (inline > MAX_INLINE_FILE_BASE64) throw new Error('Los documentos superan 20 MB en total. Reduce el tamaño antes de analizarlos.');
   const body = { ...options.body, generationConfig: { ...options.body.generationConfig, responseMimeType: 'application/json' } };
-  const allowed = 1 + Math.min(1, Math.max(0, Math.floor(options.invalidJsonRetries ?? 1)));
-  let warning: string | undefined;
-  for (let attempt = 1; ; attempt++) {
-    const result = await requestGeminiJson({ apiKey: options.apiKey, model: options.model, body, signal: options.signal, timeoutMs: options.timeoutMs, thinkingLevel: options.thinkingLevel }, transport);
-    warning = result.modelWarning ?? warning;
+  const retries = Number.isFinite(options.invalidJsonRetries) ? Math.min(1, Math.max(0, Math.floor(options.invalidJsonRetries!))) : options.invalidJsonRetries === undefined ? 1 : 0;
+  const allowed = 1 + retries;
+  const now = options.now ?? Date.now;
+  const total = options.timeoutMs ?? 60000;
+  const deadline = now() + total;
+  for (let attempt = 1; attempt <= allowed; attempt++) {
+    // requestGeminiJson reintenta otros fallos (modelo caído, truncado) dentro del mismo plazo global, nunca el JSON inválido.
+    const result = await requestGeminiJson({ apiKey: options.apiKey, model: options.model, body, signal: options.signal, timeoutMs: total, deadline, now, thinkingLevel: options.thinkingLevel }, transport);
     try {
       const data = parseGeminiJson(result.response, options.invalidMessage) as T;
-      return { data, modelUsed: result.modelUsed, requestedModel: result.requestedModel, modelWarning: warning, attempts: attempt };
+      // El aviso es el del intento que respondió, no el de uno descartado.
+      return { data, modelUsed: result.modelUsed, requestedModel: result.requestedModel, modelWarning: result.modelWarning, attempts: attempt };
     } catch (error) {
-      // Solo el JSON inválido se reintenta; una respuesta incompleta (finishReason) o vacía se informa tal cual.
-      if (!(error instanceof GeminiInvalidJsonError) || attempt >= allowed || options.signal?.aborted) throw error;
+      // Solo el JSON inválido se reintenta, y solo si queda margen en el plazo global.
+      if (!(error instanceof GeminiInvalidJsonError) || attempt >= allowed || options.signal?.aborted || deadline - now() < retryMargin(total)) throw error;
     }
   }
+  throw new Error(options.invalidMessage);
 }
