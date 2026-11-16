@@ -31,6 +31,7 @@ Todo es puro y no importa la interfaz:
 - `documentTextPatch(key, valor, source, ctx)`, `documentTextResetPatch(key, source)` y `documentTextsPatch({ clave: valor | null })` → parche de `customization` y `client`; `applyDocumentTextPatch` lo aplica.
 - En el store: `setDocumentTexts({ clave: valor | null })` (registra deshacer, respeta la papelera, los lectores y los conflictos; enruta el espejo de `client` por `applyDocumentClientEdit`) y `saveDocumentTextsToCompanyTemplate(claves | 'all')`.
 - `setDocumentLayout(parche)` para secciones visibles, tema y cabecera/pie.
+- Borrador de IA (`shared/documentTexts/aiDraft.ts`): `aiDocumentTextCatalog` (contexto mínimo clave/etiqueta/valor para el modelo), `normalizeDraftDocumentTexts` (validación contra el registro) y `draftDocumentTextValues` (valores para `documentTextsPatch`). No se exporta desde el índice: el Worker no lo necesita. Ver [AGENT_TOOLS.md](AGENT_TOOLS.md#textos-del-documento-frente-a-datos-del-proyecto).
 
 ## Plantillas de empresa
 
@@ -68,7 +69,9 @@ Las reglas generales de maquetación están en [.agents/rules/html2canvas_pdf_ex
 
 ## Propuesta web (Worker)
 
-El Worker solo acepta strings en `customization` (`workers/share-viewer/src/validation.ts`). Al publicar, `publishedDocumentTexts` añade `doc:<clave>` con el texto ya resuelto de cada texto personalizado que el visor dibuja (`VIEWER_TEXT_KEYS`). El visor prefiere `doc:<clave>`, luego el campo heredado y por último el texto por defecto compartido (`viewerText`); los enlaces anteriores, sin claves `doc:`, se renderizan igual. La validación solo admite claves del registro, de tipo string, con tope de longitud y de cantidad.
+El Worker solo acepta strings en `customization` (`workers/share-viewer/src/validation.ts`). Al publicar, `publishedDocumentTexts` añade `doc:<clave>` con el texto ya resuelto de cada texto personalizado que el visor dibuja (`VIEWER_TEXT_KEYS`) y, siempre, de la nota regulatoria. El visor prefiere `doc:<clave>`, luego el campo heredado y por último el texto por defecto compartido (`viewerText`); los enlaces anteriores, sin claves `doc:`, se renderizan igual. Para la nota regulatoria el visor usa la edición `legacy` del texto por defecto (`regulatoryNoteEdition`), la que mostraban esos enlaces.
+
+**Nota regulatoria por tipo de tarifa.** `regulatoryNoteDefault` distingue la tarifa con `tariffChargeKind` (`shared/tariffRules.ts`). En tarifas de un solo precio (BTS-1, BTS-2, RBT-1) mantiene el párrafo del cargo por uso de la red. En tarifas con cargo de potencia (BTD, BTH, MTD, MTH, RBT-2, ESTRBT-2) dice que el Reglamento SIE-007-2026-REG no les aplica ese cargo y declara el porcentaje que el cálculo todavía descuenta. Las tarifas sin clasificar y la inyección cero no cambian. Un texto personalizado nunca se toca. La validación solo admite claves del registro, de tipo string, con tope de longitud y de cantidad.
 
 ## Cómo añadir un texto
 
@@ -79,4 +82,4 @@ El Worker solo acepta strings en `customization` (`workers/share-viewer/src/vali
 
 ## Pruebas
 
-`testDocumentTextRegistry` (caracterización de los 26 puntos de 2.6.x, resolución, escritura y plantillas), `testRichText`, `testDocumentEditorStore`, `testDocumentTextCoverage`, `testPDFLayoutPersistence`, `testProposalPdfExport`, `testShareDocumentTexts`, `testProjectEdit` (contacto del cliente desde el documento) y, en el Worker, `documentTexts.test.ts`. El fixture `scripts/qa/fixtures/documentEditor.html` (`?trash=1`, `?role=lector`, `?legacy=1`) permite revisar la edición a mano.
+`testAIDocumentTexts` (la IA fija textos por el chat y por el borrador), `testDocumentTextRegistry` (caracterización de los 26 puntos de 2.6.x, resolución, escritura y plantillas), `testRichText`, `testDocumentEditorStore`, `testDocumentTextCoverage`, `testPDFLayoutPersistence`, `testProposalPdfExport`, `testShareDocumentTexts`, `testProjectEdit` (contacto del cliente desde el documento) y, en el Worker, `documentTexts.test.ts`. El fixture `scripts/qa/fixtures/documentEditor.html` (`?trash=1`, `?role=lector`, `?legacy=1`) permite revisar la edición a mano.

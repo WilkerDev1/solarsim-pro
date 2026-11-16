@@ -3,6 +3,7 @@ import { isReaderRole } from '../../../shared/permissions';
 import { prepareProposalDraftProject, createAIProposalBase } from '../../utils/proposalDraftProject';
 import { normalizeIncomingSpecs, normalizeProjectEquipment } from '../../domain/projectEdit';
 import { companyDocumentCustomization } from '../../utils/companyDocumentTemplate';
+import { withDraftDocumentTexts } from '../../utils/draftDocumentTexts';
 import { projectMutationMetadata } from '../sync/projectMutation';
 import { SimulationSlice, AISlice, SimulationStore } from '../types';
 import type { ProjectSimulation, ExtractedInvoiceData } from '../../types';
@@ -66,7 +67,9 @@ export function buildProjectFromDraft(state:SimulationStore,input:ExtractedInvoi
       ...(createNewProject?{customization:{...companyDocumentCustomization(state.getActiveCompany(),state.defaultDocumentCustomization,state.documentTemplatesByCompany),contactName:data.clientName,clientPhone:data.phone,clientEmail:data.email}}:{}),
     };
     // ADR 0004 (d): el borrador entra con la misma normalización que una edición (existente) o que una importación (nueva); sin autodimensionar.
-    return {project:createNewProject?{...project,specs:normalizeIncomingSpecs(project.specs)}:normalizeProjectEquipment(current!,project),previous:createNewProject?undefined:current};
+    const normalized=createNewProject?{...project,specs:normalizeIncomingSpecs(project.specs)}:normalizeProjectEquipment(current!,project);
+    // Textos del documento del borrador (garantías, vigencia…): mismos escritores del registro que el editor.
+    return {project:withDraftDocumentTexts(state,normalized,isGrounded?data.documentTexts:undefined),previous:createNewProject?undefined:current};
 }
 
 /**

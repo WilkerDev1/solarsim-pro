@@ -1,3 +1,5 @@
+import { normalizeTariffCode } from './tariffRules';
+
 /** Display rules shared by the PDF, simulator and the share-viewer worker. */
 
 /** Removes duplicate/version suffixes such as "(Copia)" or "(V2)" from a client name. */
@@ -7,7 +9,8 @@ export function cleanClientName(name: string): string {
 
 /** Human label for a tariff code; CEPM uses its own RBT/RMT schedule. */
 export function getTariffDisplayName(distributor: string, tariffCode: string): string {
-  const code = (tariffCode || '').toUpperCase().trim();
+  // BTS-1, «bts 1» y BTS1 son el mismo código (normalizador compartido).
+  const code = normalizeTariffCode(tariffCode);
 
   if (distributor === 'CEPM') {
     if (code === 'RBT-1' || code === 'BTS1' || code === 'BTS2') return 'RBT-1 (Baja Tensión Regular)';

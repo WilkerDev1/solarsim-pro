@@ -20,6 +20,8 @@ export interface AssistantRunOptions {
   prompt: string;
   history: AssistantMessage[];
   activeProjectId?: string;
+  /** Vista actual: en 'pdf-preview' el usuario está en el documento (modo edición). */
+  activeView?: string;
   signal: AbortSignal;
   execute: (call: AssistantToolCall) => AssistantToolResult | Promise<AssistantToolResult>;
   transport?: GeminiTransport;
@@ -78,7 +80,7 @@ async function runAssistantLoop(
       systemInstruction: {
         parts: [
           {
-            text: assistantSystemPrompt(options.activeProjectId),
+            text: assistantSystemPrompt(options.activeProjectId, options.activeView),
           },
         ],
       },

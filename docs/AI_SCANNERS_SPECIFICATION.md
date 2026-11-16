@@ -46,7 +46,7 @@ Véase [Tarifas en el flujo IA](AI_TARIFF_CONTEXT.md). El contexto compacto incl
 
 La extracción de resoluciones es parcial y requiere revisión documental explícita. Conserva filas y cargos no extraídos con procedencia por campo; no convierte su conservación en evidencia de vigencia. JSON transforma el último límite infinito en `null`; hidratación/descarga lo restauran con validación. Los aliases CEPM apuntan a la fila canónica actual.
 
-La matriz base de las EDEs corresponde a enero-marzo de 2026 y no está certificada para octubre. CEPM tiene su propia fuente de referencia. La sincronización de tarifas todavía reemplaza la matriz por organización sin CAS: las protecciones contra carreras locales y sesiones antiguas no impiden que dos administradores distintos se sobrescriban. Corregir ese contrato requiere coordinar API y clientes.
+La matriz de fábrica de las EDE es la de octubre-diciembre de 2026 (SIE-121-2026-TF) y la de CEPM, la de septiembre de 2026 (SIE-147-2026-TF), con los cargos sin fuente marcados por campo. El código de tarifa se normaliza con `shared/tariffRules.ts` (BTS-1 → BTS1); ver [Tarifas en el flujo IA](AI_TARIFF_CONTEXT.md). La sincronización de tarifas todavía reemplaza la matriz por organización sin CAS: las protecciones contra carreras locales y sesiones antiguas no impiden que dos administradores distintos se sobrescriban. Corregir ese contrato requiere coordinar API y clientes.
 
 ## Transporte, cancelación y credenciales
 
@@ -77,6 +77,8 @@ Al aplicar se preservan provincia del contexto, referencias NIC/NIS/contrato y n
 El recargo sobre costo y el margen sobre venta son alternativas excluyentes. Lo mismo ocurre con mano de obra USD/kWp y costo total; el total se adapta a USD/kWp según potencia DC actual. Precio de venta directo USD/Wp debe ser positivo, mientras costo de compra, recargo y mano de obra admiten cero explícito. Extras tienen cantidad, unidad, costo y tratamiento de utilidad/ITBIS. Los descuentos distinguen importe o porcentaje y destino general o equipos/base DGII. Las listas completas conservan filas anteriores no modificadas; [] las elimina explícitamente. Cambios por chat prevalecen sobre defaults; el borrador revisado acompaña la solicitud posterior.
 
 `src/utils/proposalDraftProject.ts` es el adaptador puro compartido por vista previa y aplicación del store. Utiliza los motores vigentes, sin replicar fórmulas financieras. Una propuesta nueva limpia overrides de costo y beneficios fiscales del benchmark. Validar varias veces nunca hace desaparecer errores ni costos inválidos; grupos repetidos con costos contradictorios requieren unificar precios. El resumen señala costos pendientes y la gráfica energética sigue disponible cuando sólo faltan condiciones comerciales. Una edición invalida la confirmación anterior.
+
+Las condiciones que el PDF imprime como texto (garantías, vigencia, nota legal, servicios, alcance) viajan en `documentTexts` del borrador, se revisan en «Textos del documento» y se aplican con los escritores del registro de textos ([AGENT_TOOLS.md](AGENT_TOOLS.md#textos-del-documento-frente-a-datos-del-proyecto)).
 
 ## Conversación y documentos de costos
 

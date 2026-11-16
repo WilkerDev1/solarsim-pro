@@ -128,3 +128,23 @@ export function findDuplicateClients<T extends { id: string; name: string; taxId
   }
   return matches;
 }
+
+/** Search by name, tax id, phone or email; sorted by name ignoring case and accents. Shared by the app and the remote MCP. */
+export function filterClients<
+  T extends { id: string; kind: ClientKind; name: string; email: string; phone: string; taxId: string },
+>(clients: readonly T[], query: string, kind: ClientKind | "all"): T[] {
+  const text = clientNameKey(query);
+  const taxId = normalizeTaxId(query);
+  const digits = query.replace(/\D/g, "");
+  return clients
+    .filter((client) => kind === "all" || client.kind === kind)
+    .filter(
+      (client) =>
+        !query.trim() ||
+        (text && clientNameKey(`${client.name} ${client.email} ${client.phone}`).includes(text)) ||
+        (taxId && normalizeTaxId(client.taxId).includes(taxId)) ||
+        // Phones are stored formatted (809-555-1234): compare digits only, so 8095551234 and 5551234 match.
+        (digits && client.phone.replace(/\D/g, "").includes(digits)),
+    )
+    .sort((a, b) => clientNameKey(a.name).localeCompare(clientNameKey(b.name)) || a.id.localeCompare(b.id));
+}
