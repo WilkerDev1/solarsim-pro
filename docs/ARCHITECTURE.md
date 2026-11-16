@@ -32,6 +32,7 @@ flowchart LR
 - `electron/`: única frontera con módulos nativos y ejecución del SO, expuesta por el preload aislado.
 - `server/src/index.ts`: arranque. `app.ts`: composición inyectable (incluye la puerta de versión mínima de cliente, `clientVersionGate.ts`: 426 ante `X-SolarSim-Client` ausente u obsoleto). `modules/`: auth, usuarios, organización, proyectos, equipos, tarifas y notificaciones. `database/`: migraciones aditivas y acceso común.
 - `workers/share-viewer/`: validación, autorización de publicación, repositorio KV, escaping y presentación separados.
+- `mcp-remote/`: servidor MCP remoto sin estado; solo habla con la API por HTTP con el token del agente y reutiliza `shared/agentTools` ([MCP_REMOTE.md](MCP_REMOTE.md)).
 
 - PDF: `src/utils/pdfLayout.ts` decide orden de secciones, numeración e índice; `PDFPageShell` aporta marca de agua, cabecera y pie A4. El total de páginas de cada pie ("N de M") incluye los anexos listados en el índice.
 

@@ -1,5 +1,5 @@
 // Single catalog of agent tools shared by the proposal assistant, the general assistant and the local MCP server.
-import type { AgentToolDefinition, JsonSchema } from './types';
+import type { AgentToolDefinition, JsonSchema } from './types.js';
 
 const ALL = ['app-assistant', 'proposal-assistant', 'mcp'] as const;
 const id = (description: string): JsonSchema => ({ type: 'string', minLength: 1, maxLength: 128, description });
