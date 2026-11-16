@@ -1,6 +1,6 @@
 import type { AssistantEdit, AssistantSection } from './types';
 import { GRID_CONNECTION_MODES } from '../../../shared/gridConnection';
-import { MAX_GENERATOR_COST_PER_KWH, SUPPLY_ALTERNATIVES } from '../../../shared/offGridSupply';
+import { GENERATOR_COST_RULE_MESSAGE, isValidGeneratorCost, SUPPLY_ALTERNATIVES } from '../../../shared/offGridSupply';
 // Explicit surface: no ids, roles, authorship, remote endpoints, assets or arbitrary store writes.
 const fields: Record<AssistantSection, string[]> = {
   client: [
@@ -301,6 +301,10 @@ export function validateAssistantEdits(
         )
       )
         throw new Error('Indica los doce consumos mensuales válidos.');
+    } else if (field === 'generatorCostPerKWh') {
+      // Costo del generador (sistema aislado): mismo predicado que motor, edición y Worker; `null` lo borra.
+      if (value !== null && !isValidGeneratorCost(value))
+        throw new Error(`generatorCostPerKWh: ${GENERATOR_COST_RULE_MESSAGE}`);
     } else if (booleanFields.has(field)) {
       if (typeof value !== 'boolean')
         throw new Error(`${field} requiere sí/no.`);
@@ -324,9 +328,6 @@ export function validateAssistantEdits(
         (field === 'tempCoeff' ? value < -10 || value > 10 : value < 0)
       )
         throw new Error(`${field} requiere un número válido.`);
-      // Costo del generador (sistema aislado): sin default, así que un 0 no es un dato válido.
-      if (field === 'generatorCostPerKWh' && (value <= 0 || value > MAX_GENERATOR_COST_PER_KWH))
-        throw new Error(`generatorCostPerKWh debe ser mayor que 0 y no superar ${MAX_GENERATOR_COST_PER_KWH} USD/kWh.`);
       if (percentages.has(field) && value > 100)
         throw new Error(`${field} no puede superar 100%.`);
       if (

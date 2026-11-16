@@ -12,7 +12,7 @@ interface RowsProps {
 }
 
 export const SummaryInvestmentRows: React.FC<RowsProps> = ({ project, summary, activeTheme, model }) => {
-  const { grossInvestmentUSD, totalBeforeLeyUSD, costPerWattUSD, exchangeRate, tariffDOP, tariffCode, isLeyEligible, leyCreditUSD, equipmentPct, netInvestmentUSD } = model;
+  const { grossInvestmentUSD, totalBeforeLeyUSD, costPerWattUSD, exchangeRate, tariffDOP, tariffCode, showsGeneratorCost, generatorCostUSD, generatorCostDOP, isLeyEligible, leyCreditUSD, equipmentPct, netInvestmentUSD } = model;
   return (
     <>
           {/* FILA 03: INVERSIÓN BRUTA Y PARÁMETROS COMERCIALES (DARK CARD) */}
@@ -45,6 +45,17 @@ export const SummaryInvestmentRows: React.FC<RowsProps> = ({ project, summary, a
                 <span className="text-[10px] text-slate-400 block"><EditableText k="executiveSummary.row3.exchangeRateNote" /></span>
               </div>
 
+              {showsGeneratorCost ? (
+                <div className="bg-slate-800/90 p-2.5 border border-slate-700" data-savings-reference="generator">
+                  <span className="text-[10.5px] text-slate-400 font-medium block"><EditableText k="executiveSummary.row3.generatorCost" /></span>
+                  <span className="text-sm font-black text-white font-mono block mt-0.5">
+                    {generatorCostDOP === null ? 'Sin dato' : `RD$ ${generatorCostDOP.toFixed(2)}`}
+                  </span>
+                  <span className="text-[10px] text-emerald-400 block font-semibold">
+                    {generatorCostUSD === null ? <EditableText k="executiveSummary.row3.generatorCostNote" /> : `US$ ${generatorCostUSD.toFixed(3)} / kWh`}
+                  </span>
+                </div>
+              ) : (
               <div className="bg-slate-800/90 p-2.5 border border-slate-700">
                 <span className="text-[10.5px] text-slate-400 font-medium block"><EditableText k="executiveSummary.row3.tariff" /></span>
                 <span className="text-sm font-black text-white font-mono block mt-0.5">
@@ -52,6 +63,7 @@ export const SummaryInvestmentRows: React.FC<RowsProps> = ({ project, summary, a
                 </span>
                 <span className="text-[10px] text-emerald-400 block font-semibold">Tarifa {tariffCode}</span>
               </div>
+              )}
 
               <div className="bg-amber-500 p-2.5 border border-amber-400 flex flex-col justify-center text-slate-950">
                 <span className="text-[10.5px] text-amber-950 font-bold block"><EditableText k="executiveSummary.row3.gross" /></span>

@@ -6,7 +6,7 @@ import { Field, FieldMenu, InfoTip, ParamRow, SelectField } from '../../ui';
 import { resolveAssumptions } from '../../../../../../shared/assumptions';
 import { gridConnectionFields, isGridConnectionMode, resolveGridConnection, type GridConnectionMode } from '../../../../../../shared/gridConnection';
 import {
-  GENERATOR_MISSING_COST_NOTE, NO_COMPARISON_NOTE, SUPPLY_ALTERNATIVE_LABELS, SUPPLY_ALTERNATIVES, isSupplyAlternative,
+  generatorCostNotice, NO_COMPARISON_NOTE, SUPPLY_ALTERNATIVE_LABELS, SUPPLY_ALTERNATIVES, isSupplyAlternative,
   resolveSavingsBasis, storedSupplyAlternative,
 } from '../../../../../../shared/offGridSupply';
 import { AlertTriangle } from 'lucide-react';
@@ -73,6 +73,8 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
   // Alternativa de suministro (solo aislado): con qué se compara el ahorro.
   const supply = storedSupplyAlternative(rates);
   const savingsBasis = resolveSavingsBasis(rates);
+  // Aviso del costo del generador: falta, no es > 0, fuera del tope técnico (error) o inusualmente alto (advertencia).
+  const costNotice = offGrid && supply === 'generator' ? generatorCostNotice(rates.generatorCostPerKWh) : null;
 
   const apply = (plan: TariffChangePlan) => {
     updateRates(plan.rates);
@@ -172,17 +174,22 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
             mono
             placeholder="Indicar"
             value={rates.generatorCostPerKWh ?? ''}
-            aria-invalid={savingsBasis === 'generator_missing_cost' || undefined}
-            aria-describedby={savingsBasis === 'generator_missing_cost' ? 'pd-rates-generator-notice' : undefined}
+            aria-invalid={costNotice?.tone === 'error' || undefined}
+            aria-describedby={costNotice ? 'pd-rates-generator-notice' : undefined}
             onChange={value => updateRates({ generatorCostPerKWh: parseOptionalNumber(value) })}
             right={<InfoTip text="Costo por kWh de la planta eléctrica que usa hoy el cliente (combustible, mantenimiento…), en la misma moneda que el precio del kWh. El ahorro valora la energía servida a este costo." />}
           />
         </ParamRow>
       )}
-      {offGrid && savingsBasis === 'generator_missing_cost' && (
-        <div id="pd-rates-generator-notice" role="alert" className="flex items-start gap-2 rounded-md border border-pd-negative px-2.5 py-2 text-xs text-pd-negative">
+      {costNotice && (
+        <div
+          id="pd-rates-generator-notice"
+          role={costNotice.tone === 'error' ? 'alert' : 'status'}
+          data-notice-tone={costNotice.tone}
+          className={`flex items-start gap-2 rounded-md border px-2.5 py-2 text-xs ${costNotice.tone === 'error' ? 'border-pd-negative text-pd-negative' : 'border-pd-warn-text bg-pd-warn-bg text-pd-warn-text'}`}
+        >
           <AlertTriangle size={14} aria-hidden="true" className="mt-0.5 flex-none" />
-          <span className="min-w-0 flex-1">{GENERATOR_MISSING_COST_NOTE}</span>
+          <span className="min-w-0 flex-1">{costNotice.text}</span>
         </div>
       )}
       {offGrid && savingsBasis === 'no_comparison' && (

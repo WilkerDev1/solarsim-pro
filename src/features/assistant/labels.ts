@@ -98,5 +98,6 @@ export function assistantValueLabel(value: unknown) {
   if (value === 'direct_watt') return 'Precio directo';
   if (isGridConnectionMode(value)) return GRID_CONNECTION_LABELS[value];
   if (isSupplyAlternative(value)) return SUPPLY_ALTERNATIVE_LABELS[value];
+  if (value === null || value === undefined) return 'Sin dato';
   return typeof value === 'string' ? value : JSON.stringify(value);
 }

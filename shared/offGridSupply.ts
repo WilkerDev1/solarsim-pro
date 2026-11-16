@@ -27,8 +27,14 @@ export const SUPPLY_ALTERNATIVE_LABELS: Readonly<Record<SupplyAlternative, strin
   no_comparison: 'Sin comparación',
 };
 
-/** Tope de cordura del costo del generador (USD/kWh); un valor mayor es un error de captura. */
-export const MAX_GENERATOR_COST_PER_KWH = 10;
+/**
+ * Umbral de aviso del costo del generador (USD/kWh). No es un límite: un costo mayor se guarda y se usa en el
+ * cálculo; el dock solo advierte (p. ej., un costo capturado en RD$ en lugar de USD).
+ */
+export const GENERATOR_COST_WARNING_PER_KWH = 10;
+
+/** Tope técnico, solo contra valores absurdos (no es una regla de negocio): por encima el dato no es válido. */
+export const MAX_GENERATOR_COST_PER_KWH = 1000;
 
 /**
  * Base con la que se valora el ahorro.
@@ -46,8 +52,29 @@ export interface SupplyAlternativeFields extends GridConnectionFields {
 export const isSupplyAlternative = (value: unknown): value is SupplyAlternative =>
   typeof value === 'string' && (SUPPLY_ALTERNATIVES as readonly string[]).includes(value);
 
+/**
+ * Predicado único del costo del generador (motor, `applyProjectEdit`, asistente/agentes, publicación y Worker):
+ * número finito > 0 y no mayor que el tope técnico. Por encima del umbral de aviso sigue siendo válido.
+ */
 export const isValidGeneratorCost = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= MAX_GENERATOR_COST_PER_KWH;
+
+/** Problema de un costo guardado: falta, no es > 0, supera el tope técnico; o `null` si es válido. */
+export type GeneratorCostIssue = 'missing' | 'not_positive' | 'out_of_range';
+export function generatorCostIssue(value: unknown): GeneratorCostIssue | null {
+  if (isValidGeneratorCost(value)) return null;
+  if (value === undefined || value === null || value === '') return 'missing';
+  if (typeof value === 'number' && Number.isFinite(value) && value <= 0) return 'not_positive';
+  return 'out_of_range';
+}
+
+/** Costo válido pero inusualmente alto: advertencia no bloqueante. */
+export const isUnusuallyHighGeneratorCost = (value: unknown): boolean =>
+  isValidGeneratorCost(value) && value > GENERATOR_COST_WARNING_PER_KWH;
+
+/** Mensaje de validación del costo (asistente, agentes y Worker), coherente con `isValidGeneratorCost`. */
+export const GENERATOR_COST_RULE_MESSAGE =
+  `El costo del generador debe ser un número mayor que 0 USD/kWh (tope técnico de ${MAX_GENERATOR_COST_PER_KWH} USD/kWh, solo contra valores absurdos); si aún no se conoce, omítelo o déjalo vacío.`;
 
 /** Alternativa guardada (sin mirar la conexión): ausente o desconocida = tarifa de distribuidora. */
 export function storedSupplyAlternative(rates: SupplyAlternativeFields | null | undefined): SupplyAlternative {
@@ -85,8 +112,9 @@ export function savingsValuationCostPerKWh(rates: SupplyAlternativeFields & { en
 }
 
 /**
- * Normaliza un parche de tarifas: una alternativa desconocida no se guarda, y un costo del generador que no es un
- * número finito ≥ 0 tampoco (`undefined` sí se guarda: vaciar el campo). Un 0 se conserva y se lee como «falta».
+ * Normaliza un parche de tarifas: una alternativa desconocida no se guarda, y un costo del generador que no cumple
+ * `isValidGeneratorCost` (vacío, `null`, 0, negativo, NaN, Infinity, texto o mayor que el tope técnico) se guarda
+ * como «sin dato» (`undefined`): así el dock puede pasar por «0.» al escribir y nunca queda guardado un costo inválido.
  */
 export function normalizeSupplyAlternativePatch<T extends SupplyAlternativeFields>(patch: T): T {
   let next = patch;
@@ -94,17 +122,39 @@ export function normalizeSupplyAlternativePatch<T extends SupplyAlternativeField
     next = { ...next };
     delete next.supplyAlternative;
   }
-  const cost = patch.generatorCostPerKWh;
-  if ('generatorCostPerKWh' in patch && cost !== undefined && !(typeof cost === 'number' && Number.isFinite(cost) && cost >= 0)) {
-    next = { ...next };
-    delete next.generatorCostPerKWh;
+  if ('generatorCostPerKWh' in patch && patch.generatorCostPerKWh !== undefined && !isValidGeneratorCost(patch.generatorCostPerKWh)) {
+    next = { ...next, generatorCostPerKWh: undefined };
   }
+  return next;
+}
+
+/**
+ * Tarifas tal como se publican en un enlace: un costo del generador inválido (dato antiguo o importado) se omite,
+ * de modo que el Worker no rechaza la publicación y el visor la lee como «generador sin costo» (sin comparación).
+ */
+export function publishedSupplyFields<T extends SupplyAlternativeFields>(rates: T): T {
+  if (rates.generatorCostPerKWh === undefined || isValidGeneratorCost(rates.generatorCostPerKWh)) return rates;
+  const next = { ...rates };
+  delete next.generatorCostPerKWh;
   return next;
 }
 
 /** Aviso del estado incompleto (dock, pestañas y vista del documento). */
 export const GENERATOR_MISSING_COST_NOTE =
   'Falta el costo por kWh del generador: sin él no se calcula el ahorro, el payback ni la TIR/VAN. Indícalo en Tarifas (Alternativa de suministro → Generador).';
+
+/** Aviso del dock según el costo guardado (un dato importado o de otra versión puede ser 0 o estar fuera de rango). */
+export function generatorCostNotice(value: unknown): { tone: 'error' | 'warning'; text: string } | null {
+  switch (generatorCostIssue(value)) {
+    case 'missing': return { tone: 'error', text: GENERATOR_MISSING_COST_NOTE };
+    case 'not_positive': return { tone: 'error', text: 'El costo por kWh del generador debe ser mayor que 0: con este valor no se calcula el ahorro, el payback ni la TIR/VAN.' };
+    case 'out_of_range': return { tone: 'error', text: `El costo por kWh del generador no es válido (tope técnico de ${MAX_GENERATOR_COST_PER_KWH} USD/kWh): no se calcula el ahorro, el payback ni la TIR/VAN.` };
+    default:
+      return isUnusuallyHighGeneratorCost(value)
+        ? { tone: 'warning', text: `Costo inusualmente alto (más de ${GENERATOR_COST_WARNING_PER_KWH} USD/kWh): confirma que está en USD por kWh. Se usa tal cual en el cálculo.` }
+        : null;
+  }
+}
 
 /** Estado «sin comparación» (tarjetas e indicadores de ahorro). */
 export const NO_COMPARISON_NOTE =

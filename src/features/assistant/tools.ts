@@ -16,7 +16,9 @@ import type { CustomQuotationItem } from '../../types';
 import { touchesPricingEdits } from './pricingFields';
 import { AUTOMATED_PRICING } from '../../../shared/automatedProposalPolicy';
 import { resolveGridConnection } from '../../../shared/gridConnection';
-import { savingsValuationCostPerKWh } from '../../../shared/offGridSupply';
+import {
+  hasSavingsComparison, noSavingsNote, resolveGeneratorCostPerKWh, resolveSavingsBasis, resolveSupplyAlternative, savingsValuationCostPerKWh,
+} from '../../../shared/offGridSupply';
 import type {
   AssistantAction,
   AssistantToolCall,
@@ -172,6 +174,14 @@ export function executeAssistantTool(
     );
     if (!p) throw new Error('Propuesta no disponible en este espacio.');
     const mode = energyCalculationMode(effectiveFeatureSettings(s));
+    // Sistema aislado sin comparación (o generador sin costo): el motor deja el ahorro en 0; el agente recibe `null`
+    // y el estado, nunca ceros que parezcan cifras reales.
+    const basis = resolveSavingsBasis(p.rates);
+    const comparable = hasSavingsComparison(basis);
+    const withoutMoney = <T extends object>(row: T, fields: string[]): T =>
+      comparable ? row : { ...row, ...Object.fromEntries(fields.map((field) => [field, null])) };
+    const monthlyMoney = ['savingsUSD', 'originalBillUSD', 'netBillUSD'];
+    const summary = calculateProjectFinancialSummary(p, mode);
     return {
       data: {
         id: p.id,
@@ -198,8 +208,18 @@ export function executeAssistantTool(
           p.rates.tariffCode,
           resolveGridConnection(p.rates),
           mode
-        ),
-        summary: calculateProjectFinancialSummary(p, mode),
+        ).map((month) => withoutMoney(month, monthlyMoney)),
+        summary: comparable ? summary : {
+          ...withoutMoney(summary, ['year1SavingsUSD', 'total25YearSavingsUSD', 'paybackYears', 'irrPct', 'npvUSD', 'roi25YrPct']),
+          monthlyBreakdown: summary.monthlyBreakdown.map((month) => withoutMoney(month, monthlyMoney)),
+        },
+        savings: {
+          basis,
+          comparable,
+          supplyAlternative: resolveSupplyAlternative(p.rates),
+          generatorCostPerKWh: resolveGeneratorCostPerKWh(p.rates),
+          ...(comparable ? {} : { note: noSavingsNote(basis) }),
+        },
       },
       cards: [
         {

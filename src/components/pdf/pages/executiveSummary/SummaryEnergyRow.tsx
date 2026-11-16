@@ -42,7 +42,8 @@ export const SummaryEnergyRow: React.FC<SummaryEnergyRowProps> = ({ model }) => 
         <div>
           <span className="text-[10.5px] text-slate-500 font-bold block"><EditableText k="executiveSummary.row6.autonomy" /></span>
           <span className="text-lg font-black text-slate-900 font-mono block whitespace-nowrap">
-            {hasBattery ? `${autonomyHours.toLocaleString('en-US', { maximumFractionDigits: 1 })} h` : 'Sin baterías'}
+            {/* hasBattery del modelo = baterías activas con capacidad > 0 kWh. */}
+            {hasBattery ? `${autonomyHours.toLocaleString('en-US', { maximumFractionDigits: 1 })} h` : <EditableText k="executiveSummary.row6.noBattery" />}
           </span>
         </div>
       </div>

@@ -171,7 +171,7 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
               </>
             ) : (
               <span>
-                💡 Ahorro Anual Estimado: <strong className="text-slate-800">{totalEffectiveSavedKWh.toFixed(1)} kWh</strong>
+                💡 {comparable ? 'Ahorro Anual Estimado' : 'Energía servida'}: <strong className="text-slate-800">{totalEffectiveSavedKWh.toFixed(1)} kWh</strong>
               </span>
             )}
           </div>
@@ -266,7 +266,7 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
       {/* TABLA DE DETALLE MENSUAL EDITABLE CON INGENIERÍA TRANSPARENTE */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs shrink-0">
         <div className="bg-[#14532d] text-white px-4 py-2.5 font-bold text-xs uppercase tracking-wider flex justify-between items-center">
-          <span>Resumen Mensual de Energía & Balance de Ahorro</span>
+          <span>{comparable ? 'Resumen Mensual de Energía & Balance de Ahorro' : 'Resumen Mensual de Energía Entregada'}</span>
           <button
             onClick={openAIInvoiceModal}
             className="bg-white/10 hover:bg-white/20 border border-white/30 text-amber-300 hover:text-amber-200 px-2.5 py-1 rounded-lg text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
@@ -293,9 +293,9 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
                 )}
                 <th className="py-2.5 px-3 text-right">
                   <span className="text-emerald-800 font-extrabold">
-                    {showSelfConsumption ? 'AHORRO FACTURABLE' : 'AHORRO ENERG. (KWH)'}
+                    {!comparable ? 'ENERGÍA SERVIDA (KWH)' : showSelfConsumption ? 'AHORRO FACTURABLE' : 'AHORRO ENERG. (KWH)'}
                   </span>
-                  {showSelfConsumption && (
+                  {showSelfConsumption && comparable && (
                     <span className="block text-[9.5px] font-normal text-emerald-600">
                       Autoconsumo + Iny. Neta
                     </span>

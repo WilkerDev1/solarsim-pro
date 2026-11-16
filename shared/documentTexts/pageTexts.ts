@@ -75,6 +75,11 @@ export const PAGE_TEXT_DEFINITIONS: DocumentTextDefinition[] = [
   text("executiveSummary", "executiveSummary.row3.exchangeRate", "Tasa RD$ / USD", "Tasa RD$ / USD"),
   text("executiveSummary", "executiveSummary.row3.exchangeRateNote", "Tasa de cambio ref.", "Tasa de cambio ref."),
   text("executiveSummary", "executiveSummary.row3.tariff", "Precio kWh Tarifa", "Precio kWh Tarifa"),
+  // Sistema aislado con generador: la base del ahorro es el costo de generación propia, no la tarifa.
+  text("executiveSummary", "executiveSummary.row3.generatorCost", "Costo kWh generador", "Costo kWh Generador"),
+  text("executiveSummary", "executiveSummary.row3.generatorCostNote", "Costo del generador pendiente", "Costo pendiente de indicar"),
+  // Fila 06 sin baterías (sistema aislado sin comparación).
+  text("executiveSummary", "executiveSummary.row6.noBattery", "Autonomía: sin baterías", "Sin baterías"),
   text("executiveSummary", "executiveSummary.row3.gross", "Inversión Bruta USD", "Inversión Bruta USD"),
   text("executiveSummary", "executiveSummary.row4.title", "INCENTIVO FISCAL", "INCENTIVO FISCAL"),
   text("executiveSummary", "executiveSummary.row4.eligible", "Aplica a la Ley", "Aplica a la Ley"),

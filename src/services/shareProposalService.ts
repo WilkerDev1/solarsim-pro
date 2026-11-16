@@ -11,6 +11,7 @@ import { calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { publishedDocumentTexts } from '../../shared/documentTexts';
 import { buildDocumentTextContext } from '../utils/documentTextContext';
 import { gridConnectionFields, resolveGridConnection } from '../../shared/gridConnection';
+import { publishedSupplyFields } from '../../shared/offGridSupply';
 
 export interface ShareResult {
   success: boolean;
@@ -228,7 +229,8 @@ export class ShareProposalService {
         client: project.client,
         specs: project.specs,
         // El enlace lleva el tipo de conexión explícito y coherente con `isZeroExport` (un Worker anterior solo lee este último).
-        rates: { ...project.rates, ...gridConnectionFields(resolveGridConnection(project.rates)) },
+        // Alternativa de suministro: solo un costo de generador válido (mismo predicado que el Worker).
+        rates: publishedSupplyFields({ ...project.rates, ...gridConnectionFields(resolveGridConnection(project.rates)) }),
         financials: project.financials,
         monthlyConsumption: project.monthlyConsumption,
         customization: {

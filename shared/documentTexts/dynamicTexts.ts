@@ -66,13 +66,14 @@ function offGridRegulatoryNote(ctx: DocumentTextContext): string {
 
 /**
  * Texto que solo cambia cuando no hay comparación de ahorro (sistema aislado «sin comparación» o generador sin
- * costo). El texto de siempre queda como valor de fábrica conocido: una propuesta que lo guardó no cuenta como
- * personalizada y toma la variante que corresponda.
+ * costo). Las dos variantes quedan como valores de fábrica conocidos: una propuesta que guardó cualquiera de ellas
+ * no cuenta como personalizada y toma la que corresponda al modo actual.
  */
 export function savingsAwareText(standard: string, withoutComparison: string) {
   return {
     defaultText: (ctx: DocumentTextContext) => (hasSavingsComparison(resolveSavingsBasis(ctx)) ? standard : withoutComparison),
-    knownFactoryValues: [standard] as readonly string[],
+    // Ambas variantes son de fábrica: si una quedó guardada, sigue al modo actual en vez de quedar congelada.
+    knownFactoryValues: [standard, withoutComparison] as readonly string[],
   };
 }
 
