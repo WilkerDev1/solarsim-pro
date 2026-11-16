@@ -21,6 +21,7 @@ export const VIEWER_TEXT_KEYS: readonly string[] = [
   'projectDescription.subtitle',
   'projectDescription.paragraph1',
   'projectDescription.paragraph2',
+  'projectDescription.regulatoryHeading',
   'projectDescription.regulatoryNote',
   'quotation.warranty.panel',
   'quotation.warranty.inverter',
@@ -28,6 +29,9 @@ export const VIEWER_TEXT_KEYS: readonly string[] = [
   'quotation.warranty.workmanship',
   'quotation.servicesIncluded',
   'quotation.validityNote',
+  'quotation.supply.noGrid',
+  'quotation.supply.generator',
+  'quotation.supply.generatorPending',
 ];
 
 export const docTextKey = (key: string) => `${DOC_TEXT_PREFIX}${key}`;
