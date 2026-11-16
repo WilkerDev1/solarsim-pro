@@ -71,6 +71,8 @@ export function buildDocumentTextContext(
     supplyAlternative: storedSupplyAlternative(rates),
     generatorCostPerKWh: resolveGeneratorCostPerKWh(rates) ?? undefined,
     gridExportFeePct: assumptions.gridExportFeePct,
+    netMeteringRegime: assumptions.netMeteringRegime,
+    gridUseChargeDOPPerKWh: assumptions.gridUseChargeDOPPerKWh,
     hasBattery: !!specs.hasBattery,
     hasBatteryStorage: totals.batteryNominalKWh > 0,
     annualConsumptionKWh: summary.annualConsumptionKWh,

@@ -58,6 +58,8 @@ const labels: Record<string, string> = {
   gridConnection: 'Conexión a la red',
   supplyAlternative: 'Alternativa de suministro (aislado)',
   generatorCostPerKWh: 'Costo del generador (USD/kWh)',
+  netMeteringRegime: 'Régimen de medición neta',
+  gridUseChargeDOPPerKWh: 'Cargo por uso de la red (RD$/kWh inyectado)',
   annualEnergyInflationPct: 'Inflación de energía anual (%)',
   applyLey5707: 'Crédito fiscal Ley 57-07',
   applyITBISExemption: 'Exoneración de ITBIS',

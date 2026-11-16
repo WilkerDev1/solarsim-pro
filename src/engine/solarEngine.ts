@@ -6,6 +6,15 @@ import { calculateTotalDCCapacityKWp } from '../utils/equipmentSpecsUtils';
 import { batteryBank, readEquipment } from '../../shared/equipment';
 import { exportsToGrid, isGridConnectionMode, type GridConnectionMode } from '../../shared/gridConnection';
 
+/**
+ * Cargo por uso de la red del régimen SIE-007-2026 (`shared/netMetering.ts`): con él, la medición neta acredita el 100 %
+ * de lo inyectado y se descuenta `kWh inyectados × usdPerKWh` del ahorro. Sin él, el régimen anterior (retención %).
+ */
+export interface GridUseChargeInput {
+  /** Cargo aplicado en USD por kWh inyectado (0 en tarifas con potencia o con inyección cero). */
+  usdPerKWh: number;
+}
+
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
@@ -136,7 +145,8 @@ export function calculateMonthlySolarProduction(
   tariffCode?: string,
   /** Tipo de conexión (`resolveGridConnection`); un booleano es el `isZeroExport` heredado (true = inyección cero). */
   gridConnection?: GridConnectionMode | boolean,
-  calculationMode: EnergyCalculationMode = 'legacy'
+  calculationMode: EnergyCalculationMode = 'legacy',
+  gridUseCharge?: GridUseChargeInput
 ): MonthlyEnergyResult[] {
   // Misma lectura que resolveGridConnection: un valor desconocido no es inyección cero; `true` es el isZeroExport heredado.
   const connection: GridConnectionMode = isGridConnectionMode(gridConnection) ? gridConnection : gridConnection === true ? 'zero_export' : 'grid_export';
@@ -152,10 +162,11 @@ export function calculateMonthlySolarProduction(
 
   const generationFactors=getMonthlySolarProductionFactors(provinceName,systemLossesPct,customMonthlyHSP);
 
-  // SIE-007-2026-REG / Net Metering Regulations:
-  // - Grid export fee / retention (~25%) applies to all exported energy across all tariffs (BTS1, BTS2, BTD, MTD1, MTD2, etc.).
-  // - Zero-Export systems (antivertido) do not inject to grid, resulting in 0 exported kWh and 0 export fees.
-  const effectiveGridExportFeePct = !isZeroExport ? resolveAssumption('gridExportFeePct', gridExportFeePct) : 0;
+  // Régimen anterior (`legacy_retention`): retención % (~25 %) de toda la energía exportada, en cualquier tarifa.
+  // Régimen SIE-007-2026 (`gridUseCharge`): sin retención; cargo por kWh inyectado (ver abajo).
+  // Inyección cero (antivertido): no se exporta, sin retención ni cargo.
+  const usdPerInjectedKWh = gridUseCharge && Number.isFinite(gridUseCharge.usdPerKWh) && gridUseCharge.usdPerKWh > 0 && !isZeroExport ? gridUseCharge.usdPerKWh : 0;
+  const effectiveGridExportFeePct = !isZeroExport && !gridUseCharge ? resolveAssumption('gridExportFeePct', gridExportFeePct) : 0;
 
   // BESS battery specifications
   const bank = batteryBank(readEquipment(specs));
@@ -259,7 +270,11 @@ export function calculateMonthlySolarProduction(
 
     // Energy savings = (Self consumed in-situ + net export credit recognized) * energy cost
     const effectiveSavedKWh = Math.round((solarSelfConsumed + netExportCreditKWh) * 10) / 10;
-    const savingsUSD = Math.round(effectiveSavedKWh * energyCostPerKWh * 100) / 100;
+    // SIE-007-2026: el cargo por uso de la red se descuenta del ahorro (kWh inyectados × cargo).
+    const gridUseChargeUSD = Math.round(gridExported * usdPerInjectedKWh * 100) / 100;
+    const savingsUSD = gridUseCharge
+      ? Math.round((Math.round(effectiveSavedKWh * energyCostPerKWh * 100) / 100 - gridUseChargeUSD) * 100) / 100
+      : Math.round(effectiveSavedKWh * energyCostPerKWh * 100) / 100;
 
     // Sin acometida, el costo de referencia es el de la energía que el sistema evita (tarifa del proyecto) y el
     // «saldo» es el valor de la energía no servida, que deberá cubrir un respaldo externo.
@@ -285,6 +300,7 @@ export function calculateMonthlySolarProduction(
       netBillUSD,
       originalBillUSD,
       ...offGridFields,
+      ...(gridUseCharge ? { gridUseChargeUSD } : {}),
     });
   }
 

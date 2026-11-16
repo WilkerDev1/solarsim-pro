@@ -174,8 +174,8 @@ const renderRates = (rates: Partial<UtilityRates>) => renderToStaticMarkup(React
   const island = renderRates({ ...gridConnectionFields('off_grid'), gridExportFeePct: 18 });
   assert.match(island, /Aislado \(modo isla\)/);
   assert.match(island, />Costo evitado kWh</, 'sin red, el precio es el costo que el sistema evita');
-  assert.match(island, /id="pd-rates-export"[^>]*value="0"/);
-  assert.match(island, /id="pd-rates-export"[^>]*disabled=""/);
+  // Sin red no hay retención, régimen ni cargo por uso de red: los campos no se muestran (la nota lo explica).
+  assert.doesNotMatch(island, /pd-rates-export|pd-rates-regime|pd-rates-grid-charge/);
   assert.match(island, /energía no servida/, 'la nota explica el sistema aislado');
   assert.equal(exportFeeValue({ gridConnection: 'off_grid', isZeroExport: true, gridExportFeePct: 18 }), 0);
 }

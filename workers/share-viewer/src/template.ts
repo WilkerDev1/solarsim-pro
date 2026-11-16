@@ -3,6 +3,7 @@ import { cleanClientName, getTariffDisplayName } from '../../../shared/proposalP
 import { customItemsTaxBreakdown, LEY5707_CREDIT_RATE } from '../../../shared/financialRules';
 import { visibleQuotationItems } from '../../../shared/quotationItems';
 import { resolveAssumption, resolveAssumptions } from '../../../shared/assumptions';
+import { resolveNetMeteringRegime } from '../../../shared/netMetering';
 import { ELECTSUN_LOGO_COLOR_BASE64 } from '../../../shared/electsunLogoColor';
 import { escapeHtml, formatInlineMarkdown, formatMarkdown, safeLogoUrl, scriptJson } from './escaping';
 import { createDocumentTextContext, docTextKey, interpolate, viewerText } from '../../../shared/documentTexts';
@@ -12,6 +13,7 @@ import { resolveGridConnection } from '../../../shared/gridConnection';
 import { hasSavingsComparison, resolveGeneratorCostPerKWh, resolveSavingsBasis, resolveSupplyAlternative, storedSupplyAlternative, supplyPresentation, type SavingsBasis } from '../../../shared/offGridSupply';
 import { EQUIPMENT_FALLBACK_NAME, equipmentTotals, readEquipment } from '../../../shared/equipment';
 import { mainModelPhrase } from '../../../shared/documentTexts/equipmentPhrases';
+import { THEME_TOGGLE_BUTTON, THEME_TOGGLE_SCRIPT, tailwindThemeConfig, themeHead, themeStyle } from './theme';
 
 export function renderExpiredPage(companyName = 'electsun', companyPhone = '+1 (809) 378-6590'): string {
   return `<!DOCTYPE html>
@@ -20,18 +22,21 @@ export function renderExpiredPage(companyName = 'electsun', companyPhone = '+1 (
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Propuesta No Disponible | ${escapeHtml(companyName)}</title>
+  ${themeHead()}
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>${tailwindThemeConfig()}</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
   <style>
     body { font-family: 'Plus Jakarta Sans', sans-serif; }
   </style>
+  ${themeStyle()}
 </head>
-<body class="h-full flex items-center justify-center p-4 bg-[#f0f7fc]">
-  <div class="max-w-md w-full bg-white border border-sky-200 rounded-3xl p-8 text-center shadow-xl relative overflow-hidden">
+<body class="h-full flex items-center justify-center p-4 bg-page">
+  <div class="max-w-md w-full bg-surface border border-sky-200 rounded-3xl p-8 text-center shadow-xl relative overflow-hidden">
     <div class="mb-6 flex justify-center">
-      <img src="${ELECTSUN_LOGO_COLOR_BASE64}" alt="${escapeHtml(companyName)}" class="h-16 max-h-[68px] w-auto object-contain drop-shadow-sm" />
+      <span class="pv-logo-plate"><img src="${ELECTSUN_LOGO_COLOR_BASE64}" alt="${escapeHtml(companyName)}" class="h-16 max-h-[68px] w-auto object-contain drop-shadow-sm" /></span>
     </div>
     <div class="w-12 h-12 bg-orange-50 border border-orange-200 rounded-2xl flex items-center justify-center mx-auto mb-4 text-orange-500">
       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -88,7 +93,7 @@ function offGridEnergySection(input: {
     ? 'Esta propuesta no incluye todavía una comparación económica con la generación actual del cliente.'
     : 'El cliente no cuenta hoy con red ni planta eléctrica, así que esta propuesta no incluye una comparación económica con un suministro actual.';
   return `<!-- 5. ENERGÍA ENTREGADA Y AUTONOMÍA (sistema aislado sin comparación) -->
-    <section data-savings-basis="${input.basis}" class="bg-white border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">
+    <section data-savings-basis="${input.basis}" class="bg-surface border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">
       <div class="border-b border-slate-100 pb-3">
         <h2 class="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5 sm:gap-2">
           <span class="w-2.5 h-2.5 rounded-xs bg-sky-600 shrink-0"></span>
@@ -109,7 +114,11 @@ export function renderProposalPage(stored: StoredProposal): string {
   const { project, summary, expiresAt } = stored;
   const client = project.client || {};
   const specs = project.specs || {};
-  const rates = project.rates || {};
+  // Régimen de medición neta del enlace: el de las tarifas publicadas; si falta, el del snapshot; si falta, el anterior.
+  // Se usa el mismo en los supuestos, la nota y los textos (un enlace antiguo no trae ninguno: régimen anterior).
+  const publishedRates = project.rates || {};
+  const netMeteringRegime = resolveNetMeteringRegime(publishedRates.netMeteringRegime ?? stored.calculationSnapshot?.netMeteringRegime);
+  const rates = { ...publishedRates, netMeteringRegime };
   const financials = project.financials || {};
   const custom = project.customization || {};
 
@@ -134,7 +143,7 @@ export function renderProposalPage(stored: StoredProposal): string {
   const projectId = client.projectId || 'SP-2026-001';
   const quoteNumber = client.quoteNumber || 'C-0001';
   // ADR 0003: los mismos supuestos efectivos que la aplicación; la vigencia guardada en el enlace va antes del default.
-  const assumptions = resolveAssumptions(project);
+  const assumptions = resolveAssumptions({ ...project, rates });
   const quoteValidityDays = resolveAssumption('quoteValidityDays', client.quoteValidityDays, stored.validityDays);
   const province = client.province || client.location || 'Santo Domingo';
   const clientAddress = client.address || `${province}, República Dominicana`;
@@ -155,6 +164,7 @@ export function renderProposalPage(stored: StoredProposal): string {
   // Generador o «sin comparación»: la página no nombra la distribuidora ni su tarifa (enlaces con red o con tarifa, igual).
   const supplyKind = supplyPresentation(rates).kind;
   const exportFee = assumptions.gridExportFeePct;
+  const gridUseChargeApplied = assumptions.appliedGridUseChargeDOPPerKWh > 0;
 
   // Equipos solo por `shared/equipment`: un enlace antiguo (solo espejo) y uno nuevo (solo grupos) dan lo mismo.
   const equipment = readEquipment(specs);
@@ -293,6 +303,10 @@ export function renderProposalPage(stored: StoredProposal): string {
   const textContext = createDocumentTextContext({
     clientName, quoteValidityDays, distributor, tariffCode: rawTariffCode, isZeroExport, gridConnection, gridExportFeePct: exportFee, hasBattery,
     supplyAlternative: storedSupplyAlternative(rates), generatorCostPerKWh: resolveGeneratorCostPerKWh(rates) ?? undefined,
+    // Régimen del enlace (rates o snapshot); sin él, el anterior y su nota de siempre.
+    netMeteringRegime, gridUseChargeDOPPerKWh: assumptions.gridUseChargeDOPPerKWh,
+    // Los enlaces nuevos traen su nota regulatoria publicada (`doc:`); sin ella, el texto que mostraban antes.
+    regulatoryNoteEdition: 'legacy',
     hasBatteryStorage: hasBattery, companyName,
     // Misma cadena que la app (documentTextContext): persona de contacto → empresa → nombre del cliente.
     clientContactPerson: client.contactPerson || client.company || clientName || '', clientPhone, clientEmail: custom.clientEmail || client.contactEmail || '',
@@ -427,8 +441,11 @@ export function renderProposalPage(stored: StoredProposal): string {
   <title>Propuesta Solar ${escapeHtml(clientName)} | ${escapeHtml(companyName)}</title>
   <meta name="description" content="Propuesta técnica y económica oficial de energía solar fotovoltaica para ${escapeHtml(clientName)} por ${escapeHtml(companyName)}.">
   
+  <!-- Tema claro/oscuro: antes de Tailwind para no pintar el tema equivocado -->
+  ${themeHead()}
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>${tailwindThemeConfig()}</script>
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   
@@ -442,15 +459,6 @@ export function renderProposalPage(stored: StoredProposal): string {
     .font-mono { font-family: 'JetBrains Mono', monospace; }
 ${ENERGY_FLOW_CSS}
     
-    /* Electsun Corporate Color Accents */
-    :root {
-      --solar-orange: #ff7a00;
-      --solar-orange-dark: #ea580c;
-      --sky-blue: #0284c7;
-      --sky-blue-light: #38bdf8;
-      --sky-blue-bg: #f0f7fc;
-    }
-
     /* Mobile touch scrolling & custom slim scrollbars for responsive tables */
     .overflow-x-auto {
       -webkit-overflow-scrolling: touch;
@@ -459,32 +467,33 @@ ${ENERGY_FLOW_CSS}
       height: 5px;
     }
     .overflow-x-auto::-webkit-scrollbar-track {
-      background: #f1f5f9;
+      background: var(--scroll-track);
       border-radius: 4px;
     }
     .overflow-x-auto::-webkit-scrollbar-thumb {
-      background: #cbd5e1;
+      background: var(--scroll-thumb);
       border-radius: 4px;
     }
     .overflow-x-auto::-webkit-scrollbar-thumb:hover {
-      background: #94a3b8;
+      background: var(--scroll-thumb-hover);
     }
 
     @media print {
-      body { background-color: #ffffff !important; }
+      body { background-color: rgb(var(--c-surface)) !important; }
       .no-print { display: none !important; }
       .page-break { page-break-after: always; }
       .shadow-xl, .shadow-md, .shadow-sm { box-shadow: none !important; }
     }
   </style>
+  ${themeStyle()}
 </head>
-<body class="min-h-full flex flex-col pb-8 sm:pb-12 bg-[#f0f7fc] text-slate-800">
+<body class="min-h-full flex flex-col pb-8 sm:pb-12 bg-page text-slate-800">
 
   <!-- Document Master Container (Executive Dossier Layout) -->
   <div class="max-w-4xl mx-auto w-full px-3 sm:px-6 pt-4 sm:pt-6 space-y-4 sm:space-y-6">
 
     <!-- 1. OFFICIAL COMPANY HEADER & DOCUMENT BANNER -->
-    <header class="bg-white border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm relative overflow-hidden">
+    <header class="bg-surface border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm relative overflow-hidden">
       <!-- Decorative Brand Top Border Strip -->
       <div class="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-sky-500 via-orange-500 to-amber-400"></div>
 
@@ -492,7 +501,7 @@ ${ENERGY_FLOW_CSS}
         <!-- Company Identity & Official Logo -->
         <div class="flex items-center">
           ${logoBase64
-            ? `<img src="${escapeHtml(logoBase64)}" alt="${escapeHtml(companyName)}" class="h-12 sm:h-20 max-h-[58px] sm:max-h-[85px] w-auto max-w-[220px] sm:max-w-[320px] object-contain drop-shadow-sm" />`
+            ? `<span class="pv-logo-plate"><img src="${escapeHtml(logoBase64)}" alt="${escapeHtml(companyName)}" class="h-12 sm:h-20 max-h-[58px] sm:max-h-[85px] w-auto max-w-[220px] sm:max-w-[320px] object-contain drop-shadow-sm" /></span>`
             : `<span class="text-xl sm:text-2xl font-bold text-slate-900">${escapeHtml(companyName)}</span>`}
         </div>
 
@@ -505,6 +514,7 @@ ${ENERGY_FLOW_CSS}
           <button onclick="window.print()" class="no-print p-2 rounded-xl border border-sky-200 bg-sky-50/60 hover:bg-sky-100 text-sky-700 transition-all shadow-xs shrink-0 cursor-pointer" title="Imprimir o Guardar PDF">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
           </button>
+          ${THEME_TOGGLE_BUTTON}
         </div>
       </div>
 
@@ -537,7 +547,7 @@ ${ENERGY_FLOW_CSS}
     ${isBuiltInFeatureAvailable('proposalEnergyFlowDiagram') ? renderEnergyFlowSection({ hybrid: hasBattery && totalBESSKWh > 0, isZeroExport, gridConnection, systemCapacityKWp: Number(systemCapacityKWp), annualConsumptionKWh, totalBESSKWh, inverterPowerKW: rawInverters.reduce((sum: number, inv: any) => sum + (Number(inv.powerKW) || 0) * (Number(inv.count) || 1), 0) }) : ''}
 
     <!-- 2. RESUMEN EJECUTIVO DE LA SOLUCIÓN PROPUESTA -->
-    <section class="bg-white border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">
+    <section class="bg-surface border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">
       <div class="border-b border-slate-100 pb-3 flex items-center justify-between gap-2">
         <div>
           <h2 class="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5 sm:gap-2">
@@ -570,7 +580,7 @@ ${ENERGY_FLOW_CSS}
           </div>
         </div>
         <div class="bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex items-center gap-2.5 sm:gap-3.5 ${hasBattery && totalBESSKWh > 0 ? '' : 'col-span-2 sm:col-span-1'}">
-          <div class="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-slate-800 text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-sm sm:shadow-md shrink-0">☀️</div>
+          <div class="w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl bg-tile text-white flex items-center justify-center font-bold text-base sm:text-lg shadow-sm sm:shadow-md shrink-0">☀️</div>
           <div class="min-w-0">
             <span class="text-[9px] sm:text-[10px] uppercase font-bold text-slate-500 block truncate">Generación Anual</span>
             <span class="text-sm sm:text-base font-black font-mono text-slate-900 block truncate">${Math.round(annualProductionKWh).toLocaleString()} kWh</span>
@@ -598,7 +608,7 @@ ${ENERGY_FLOW_CSS}
     </section>
 
     <!-- 3. ANÁLISIS DE ENERGÍA Y BALANCE MENSUAL -->
-    <section class="bg-white border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">
+    <section class="bg-surface border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4 border-b border-slate-100 pb-3">
         <div>
           <h2 class="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5 sm:gap-2">
@@ -619,7 +629,7 @@ ${ENERGY_FLOW_CSS}
         <canvas id="energyChart"></canvas>
       </div>
 
-      ${showSelfConsumption ? `<p class="text-xs text-slate-600" data-energy-mode="self_consumption">Autoconsumo anual en sitio: <strong>${Math.round(annualSelfConsumption).toLocaleString()} kWh</strong>${hasBattery ? `; aporte nocturno de baterías: <strong>${Math.round(annualBatteryContribution).toLocaleString()} kWh</strong>` : ''}. ${isOffGrid ? 'Sin red, el excedente se recorta.' : 'La inyección se presenta como crédito neto después de retención.'}</p>` : ''}
+      ${showSelfConsumption ? `<p class="text-xs text-slate-600" data-energy-mode="self_consumption">Autoconsumo anual en sitio: <strong>${Math.round(annualSelfConsumption).toLocaleString()} kWh</strong>${hasBattery ? `; aporte nocturno de baterías: <strong>${Math.round(annualBatteryContribution).toLocaleString()} kWh</strong>` : ''}. ${isOffGrid ? 'Sin red, el excedente se recorta.' : netMeteringRegime === 'sie007_2026' ? (gridUseChargeApplied ? 'La inyección se acredita completa; el cargo por uso de la red se descuenta del ahorro.' : 'La inyección se acredita completa.') : 'La inyección se presenta como crédito neto después de retención.'}</p>` : ''}
       ${isOffGrid ? `<p class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2" data-grid-connection="off_grid">${offGridEnergyNote(summary?.annualUnservedKWh, annualConsumptionKWh)}</p>` : ''}
       <!-- Full 12-Month Table with Mobile Horizontal Scroll -->
       <div class="space-y-1.5">
@@ -632,9 +642,9 @@ ${ENERGY_FLOW_CSS}
         </div>
         <div class="border border-slate-200 rounded-xl sm:rounded-2xl overflow-x-auto text-xs shadow-xs">
           <table class="w-full text-left min-w-[640px] sm:min-w-full">
-            <thead class="bg-slate-900 text-white uppercase font-bold text-[9px] sm:text-[10px] whitespace-nowrap">
+            <thead class="bg-head text-on-head uppercase font-bold text-[9px] sm:text-[10px] whitespace-nowrap">
               <tr>
-                <th class="px-3 sm:px-4 py-2 sticky left-0 bg-slate-900 z-10">Mes</th>
+                <th class="px-3 sm:px-4 py-2 sticky left-0 bg-head z-10">Mes</th>
                 <th class="px-3 sm:px-4 py-2 text-right">Consumo (kWh)</th>
                 <th class="px-3 sm:px-4 py-2 text-right">Producción (kWh)</th>
                 ${showSelfConsumption ? '<th class="px-3 sm:px-4 py-2 text-right">Autoconsumo (kWh)</th><th class="px-3 sm:px-4 py-2 text-right">Inyección neta (kWh)</th>' : ''}
@@ -647,8 +657,8 @@ ${ENERGY_FLOW_CSS}
                 const rowCoverage = row.consumptionKWh > 0 ? ((row.productionKWh / row.consumptionKWh) * 100) : 0;
                 const effectiveSaved = row.effectiveSavedKWh ?? row.productionKWh;
                 return `
-                <tr class="${idx % 2 === 0 ? 'bg-sky-50/30' : 'bg-white'}">
-                  <td class="px-3 sm:px-4 py-1.5 font-bold text-slate-900 sticky left-0 ${idx % 2 === 0 ? 'bg-[#f5faff]' : 'bg-white'} z-10 border-r sm:border-r-0 border-slate-100">${escapeHtml(row.month)}</td>
+                <tr class="${idx % 2 === 0 ? 'bg-sky-50/30' : 'bg-surface'}">
+                  <td class="px-3 sm:px-4 py-1.5 font-bold text-slate-900 sticky left-0 ${idx % 2 === 0 ? 'bg-zebra' : 'bg-surface'} z-10 border-r sm:border-r-0 border-slate-100">${escapeHtml(row.month)}</td>
                   <td class="px-3 sm:px-4 py-1.5 text-right font-medium font-mono">${Math.round(row.consumptionKWh).toLocaleString()}</td>
                   <td class="px-3 sm:px-4 py-1.5 text-right font-medium font-mono">${Number(row.productionKWh).toFixed(1)}</td>
                   ${showSelfConsumption ? `<td class="px-3 sm:px-4 py-1.5 text-right font-mono text-blue-800">${Number(row.solarSelfConsumedKWh || 0).toFixed(1)}</td><td class="px-3 sm:px-4 py-1.5 text-right font-mono">${Number(row.netExportCreditKWh || 0).toFixed(1)}</td>` : ''}
@@ -688,7 +698,7 @@ ${ENERGY_FLOW_CSS}
     </section>
 
     <!-- 4. COTIZACIÓN DE SISTEMA FOTOVOLTAICO & LEY 57-07 -->
-    <section class="bg-white border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">
+    <section class="bg-surface border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">
       <div class="border-b border-slate-100 pb-3">
         <h2 class="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5 sm:gap-2">
           <span class="w-2.5 h-2.5 rounded-xs bg-orange-500 shrink-0"></span>
@@ -700,7 +710,7 @@ ${ENERGY_FLOW_CSS}
       <!-- Equipment Table -->
       <div class="border border-slate-200 rounded-xl sm:rounded-2xl overflow-hidden text-xs">
         <table class="w-full text-left">
-          <thead class="bg-slate-900 text-white uppercase font-bold text-[9px] sm:text-[10px]">
+          <thead class="bg-head text-on-head uppercase font-bold text-[9px] sm:text-[10px]">
             <tr>
               <th class="px-3 sm:px-4 py-2">Descripción del Equipo / Servicio</th>
               <th class="px-2 sm:px-4 py-2 text-center w-14 sm:w-24">Cant.</th>
@@ -709,21 +719,21 @@ ${ENERGY_FLOW_CSS}
           </thead>
           <tbody class="divide-y divide-slate-200 text-[10.5px] sm:text-[11px] font-semibold text-slate-800">
             ${rawPanels.map((p: any, idx: number) => `
-            <tr class="${idx % 2 === 0 ? 'bg-white' : 'bg-sky-50/30'}">
+            <tr class="${idx % 2 === 0 ? 'bg-surface' : 'bg-sky-50/30'}">
               <td class="px-3 sm:px-4 py-2 font-bold">${escapeHtml(p.brandModel || EQUIPMENT_FALLBACK_NAME.panel)}</td>
               <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${escapeHtml(p.count)}</td>
               <td class="px-2 sm:px-4 py-2 text-center text-slate-500 font-normal">UD</td>
             </tr>
             `).join('')}
             ${rawInverters.map((inv: any, idx: number) => `
-            <tr class="${idx % 2 === 0 ? 'bg-sky-50/30' : 'bg-white'}">
+            <tr class="${idx % 2 === 0 ? 'bg-sky-50/30' : 'bg-surface'}">
               <td class="px-3 sm:px-4 py-2 font-bold">${escapeHtml(inv.brandModel || EQUIPMENT_FALLBACK_NAME.inverter)}</td>
               <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${escapeHtml(inv.count)}</td>
               <td class="px-2 sm:px-4 py-2 text-center text-slate-500 font-normal">UD</td>
             </tr>
             `).join('')}
             ${hasBattery ? rawBatteries.map((bat: any, idx: number) => `
-            <tr class="${idx % 2 === 0 ? 'bg-white' : 'bg-sky-50/30'}">
+            <tr class="${idx % 2 === 0 ? 'bg-surface' : 'bg-sky-50/30'}">
               <td class="px-3 sm:px-4 py-2 font-bold">${escapeHtml((() => { const name = bat.brandModel || EQUIPMENT_FALLBACK_NAME.battery; return bat.capacityKWh > 0 && !name.toLowerCase().includes('kwh') ? `${name} (${bat.capacityKWh} kWh)` : name; })())}</td>
               <td class="px-2 sm:px-4 py-2 text-center font-mono font-bold">${escapeHtml(bat.count)}</td>
               <td class="px-2 sm:px-4 py-2 text-center text-slate-500 font-normal">UD</td>
@@ -737,7 +747,7 @@ ${ENERGY_FLOW_CSS}
             ${visibleQuotationItems(financials.customItems as any[]).map((cItem: any, idx: number) => {
               const isEven = (idx + (hasBattery ? 1 : 0)) % 2 === 0;
               return `
-            <tr class="${isEven ? 'bg-white' : 'bg-sky-50/30'}">
+            <tr class="${isEven ? 'bg-surface' : 'bg-sky-50/30'}">
               <td class="px-3 sm:px-4 py-2 font-medium">
                 <span class="font-bold text-slate-900">${escapeHtml(cItem.description || `Ítem Adicional #${idx + 1}`)}</span>
               </td>
@@ -774,7 +784,7 @@ ${ENERGY_FLOW_CSS}
             <span class="font-mono font-bold shrink-0 text-rose-600">- US$ ${totalDiscountUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
           ` : ''}
-          <div class="flex items-center justify-between gap-2 text-white bg-slate-900 px-3 py-1.5 rounded-xl font-bold">
+          <div class="flex items-center justify-between gap-2 text-on-head bg-head px-3 py-1.5 rounded-xl font-bold">
             <span class="text-[10.5px] sm:text-xs">TOTAL GENERAL (CON LEY 57-07):</span>
             <span class="font-mono font-black text-orange-400 text-xs sm:text-sm shrink-0">US$ ${grossInvestmentUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
           </div>
@@ -792,7 +802,7 @@ ${ENERGY_FLOW_CSS}
         </div>
         <div class="border border-slate-200 rounded-xl sm:rounded-2xl overflow-x-auto text-xs shadow-xs">
           <table class="w-full text-left min-w-[420px] sm:min-w-full">
-            <thead class="bg-slate-900 text-white uppercase font-bold text-[9px] sm:text-[10px] whitespace-nowrap">
+            <thead class="bg-head text-on-head uppercase font-bold text-[9px] sm:text-[10px] whitespace-nowrap">
               <tr>
                 <th class="px-3 sm:px-4 py-2">Concepto Tributario</th>
                 <th class="px-3 sm:px-4 py-2 text-right">Monto US$</th>
@@ -800,7 +810,7 @@ ${ENERGY_FLOW_CSS}
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-200 text-[10.5px] sm:text-[11px] font-semibold text-slate-800">
-              <tr class="bg-white font-bold">
+              <tr class="bg-surface font-bold">
                 <td class="px-3 sm:px-4 py-1.5">Inversión Elegible en Equipos Renovables</td>
                 <td class="px-3 sm:px-4 py-1.5 text-right font-mono font-bold whitespace-nowrap">US$ ${equipmentPortionUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td class="px-3 sm:px-4 py-1.5 text-right font-mono">100%</td>
@@ -810,7 +820,7 @@ ${ENERGY_FLOW_CSS}
                 <td class="px-3 sm:px-4 py-1.5 text-right font-mono text-sky-700 font-bold whitespace-nowrap">US$ ${(ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td class="px-3 sm:px-4 py-1.5 text-right font-mono text-sky-700">13.33%</td>
               </tr>
-              <tr class="bg-white">
+              <tr class="bg-surface">
                 <td class="px-3 sm:px-4 py-1.5">Crédito Fiscal ISR — Año 2 (DGII)</td>
                 <td class="px-3 sm:px-4 py-1.5 text-right font-mono text-sky-700 font-bold whitespace-nowrap">US$ ${(ley5707CreditUSD / 3).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td class="px-3 sm:px-4 py-1.5 text-right font-mono text-sky-700">13.33%</td>
@@ -861,7 +871,7 @@ ${ENERGY_FLOW_CSS}
     </section>
 
     ${showSavings ? `    <!-- 5. RETORNO DE INVERSIÓN (ROI, TIR & VAN) -->
-    <section class="bg-white border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">
+    <section class="bg-surface border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">
       <div class="border-b border-slate-100 pb-3">
         <h2 class="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5 sm:gap-2">
           <span class="w-2.5 h-2.5 rounded-xs bg-sky-600 shrink-0"></span>
@@ -905,7 +915,7 @@ ${ENERGY_FLOW_CSS}
         </div>
         <div class="border border-slate-200 rounded-xl sm:rounded-2xl overflow-hidden text-xs">
           <table class="w-full text-left">
-            <thead class="bg-slate-900 text-white uppercase font-bold text-[9px] sm:text-[10px]">
+            <thead class="bg-head text-on-head uppercase font-bold text-[9px] sm:text-[10px]">
               <tr>
                 <th class="px-2.5 sm:px-4 py-2">Hito Financiero</th>
                 <th class="px-2.5 sm:px-4 py-2 text-right">Ahorro Anual</th>
@@ -913,7 +923,7 @@ ${ENERGY_FLOW_CSS}
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-200 text-[10px] sm:text-[11px] font-semibold text-slate-800">
-              <tr class="bg-white">
+              <tr class="bg-surface">
                 <td class="px-2.5 sm:px-4 py-2 font-bold">Año 1 (Inicio)</td>
                 <td class="px-2.5 sm:px-4 py-2 text-right font-mono font-bold whitespace-nowrap">US$ ${Number(year1Obj.savingsUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td class="px-2.5 sm:px-4 py-2 text-right font-mono text-red-600 font-bold whitespace-nowrap">US$ ${Number(year1Obj.cumulativeCashFlowUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
@@ -925,7 +935,7 @@ ${ENERGY_FLOW_CSS}
                 <td class="px-2.5 sm:px-4 py-2 text-right font-mono font-black whitespace-nowrap">US$ ${Number(paybackYearObj.savingsUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td class="px-2.5 sm:px-4 py-2 text-right font-mono font-black text-sky-700 whitespace-nowrap">US$ ${Number(paybackYearObj.cumulativeCashFlowUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
               </tr>
-              <tr class="bg-white">
+              <tr class="bg-surface">
                 <td class="px-2.5 sm:px-4 py-2 font-bold">Año 10 (Consolidación)</td>
                 <td class="px-2.5 sm:px-4 py-2 text-right font-mono font-bold whitespace-nowrap">US$ ${Number(year10Obj.savingsUSD || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                 <td class="px-2.5 sm:px-4 py-2 text-right font-mono text-sky-700 font-bold whitespace-nowrap">US$ ${Number(year10Obj.cumulativeCashFlowUSD).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
@@ -952,7 +962,7 @@ ${ENERGY_FLOW_CSS}
     </section>
 
     <!-- 6. TABLA COMPLETA DE FLUJO DE CAJA (25 AÑOS) -->
-    <section class="bg-white border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">
+    <section class="bg-surface border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">
       <div class="border-b border-slate-100 pb-3">
         <h2 class="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5 sm:gap-2">
           <span class="w-2.5 h-2.5 rounded-xs bg-orange-500 shrink-0"></span>
@@ -972,9 +982,9 @@ ${ENERGY_FLOW_CSS}
         </div>
         <div class="border border-slate-200 rounded-xl sm:rounded-2xl overflow-x-auto text-xs shadow-xs">
           <table class="w-full text-left min-w-[650px]">
-            <thead class="bg-slate-900 text-white uppercase font-bold text-[8.5px] sm:text-[9px] whitespace-nowrap">
+            <thead class="bg-head text-on-head uppercase font-bold text-[8.5px] sm:text-[9px] whitespace-nowrap">
               <tr>
-                <th class="px-2.5 sm:px-3 py-2 text-center w-12 sticky left-0 bg-slate-900 z-10">Año</th>
+                <th class="px-2.5 sm:px-3 py-2 text-center w-12 sticky left-0 bg-head z-10">Año</th>
                 <th class="px-2.5 sm:px-3 py-2 text-right">Energía (kWh)</th>
                 <th class="px-2.5 sm:px-3 py-2 text-right">Ahorro Energía</th>
                 <th class="px-2.5 sm:px-3 py-2 text-right">Incentivo Ley 57-07</th>
@@ -1007,8 +1017,8 @@ ${ENERGY_FLOW_CSS}
                 const prod = Number(row.productionKWh || 0);
 
                 return `
-                <tr class="${isPayback ? 'bg-orange-100 text-orange-950 font-bold border-y-2 border-orange-300' : row.year % 2 === 0 ? 'bg-sky-50/30' : 'bg-white'}">
-                  <td class="px-2.5 sm:px-3 py-1 text-center font-bold font-mono sticky left-0 ${isPayback ? 'bg-orange-100' : row.year % 2 === 0 ? 'bg-[#f5faff]' : 'bg-white'} z-10 border-r sm:border-r-0 border-slate-100">${escapeHtml(row.year)} ${isPayback ? '⭐' : ''}</td>
+                <tr class="${isPayback ? 'bg-orange-100 text-orange-950 font-bold border-y-2 border-orange-300' : row.year % 2 === 0 ? 'bg-sky-50/30' : 'bg-surface'}">
+                  <td class="px-2.5 sm:px-3 py-1 text-center font-bold font-mono sticky left-0 ${isPayback ? 'bg-orange-100' : row.year % 2 === 0 ? 'bg-zebra' : 'bg-surface'} z-10 border-r sm:border-r-0 border-slate-100">${escapeHtml(row.year)} ${isPayback ? '⭐' : ''}</td>
                   <td class="px-2.5 sm:px-3 py-1 text-right font-mono font-medium">${Math.round(prod).toLocaleString()}</td>
                   <td class="px-2.5 sm:px-3 py-1 text-right font-mono font-medium">US$ ${savings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                   <td class="px-2.5 sm:px-3 py-1 text-right font-mono ${taxCredit > 0 ? 'text-sky-700 font-bold' : 'text-slate-400'}">${taxCredit > 0 ? 'US$ ' + taxCredit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '$0.00'}</td>
@@ -1038,13 +1048,17 @@ ${ENERGY_FLOW_CSS}
 
   <!-- Initialize Charts (Energy Balance & Cumulative ROI with Brand Colors) -->
   <script>
+    ${THEME_TOGGLE_SCRIPT}
     document.addEventListener('DOMContentLoaded', function () {
       const isMobile = window.innerWidth < 640;
+      // Colores de los gráficos: variables del tema (claro u oscuro), releídas al cambiar de tema o al imprimir.
+      const themeColor = function (name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); };
+      const charts = [];
 
       // 1. Energy Balance Bar Chart (Sky Blue for Consumption, Solar Orange for Generation)
       const energyCtx = document.getElementById('energyChart');
       if (energyCtx) {
-        new Chart(energyCtx, {
+        charts.push(new Chart(energyCtx, {
           type: 'bar',
           data: {
             labels: ${monthLabels},
@@ -1053,7 +1067,7 @@ ${ENERGY_FLOW_CSS}
                 type: 'bar',
                 label: 'Consumo (kWh)',
                 data: ${monthConsumption},
-                backgroundColor: '#0284c7', // Sky Blue
+                backgroundColor: themeColor('--chart-consumption'),
                 borderRadius: isMobile ? 3 : 4,
                 order: 1,
               },
@@ -1061,10 +1075,10 @@ ${ENERGY_FLOW_CSS}
                 type: 'bar',
                 label: 'Producción Solar (kWh)',
                 data: ${monthProduction},
-                backgroundColor: '#ff7a00', // Solar Orange
+                backgroundColor: themeColor('--chart-production'),
                 borderRadius: isMobile ? 3 : 4,
                 order: 2,
-              }${showSelfConsumption ? `, { type: 'line', label: 'Autoconsumo en sitio (kWh)', data: ${monthSelfConsumption}, borderColor: '#2563eb', backgroundColor: '#2563eb', tension: 0.2, pointRadius: 2, order: 0 }` : ''}
+              }${showSelfConsumption ? `, { type: 'line', label: 'Autoconsumo en sitio (kWh)', data: ${monthSelfConsumption}, borderColor: themeColor('--chart-self'), backgroundColor: themeColor('--chart-self'), tension: 0.2, pointRadius: 2, order: 0 }` : ''}
             ]
           },
           options: {
@@ -1074,7 +1088,7 @@ ${ENERGY_FLOW_CSS}
             plugins: {
               legend: { display: false },
               tooltip: {
-                backgroundColor: '#0f172a',
+                backgroundColor: themeColor('--chart-tooltip'),
                 padding: isMobile ? 8 : 10,
                 boxPadding: 4,
                 titleFont: { family: 'Plus Jakarta Sans', weight: 'bold', size: isMobile ? 11 : 12 },
@@ -1085,30 +1099,28 @@ ${ENERGY_FLOW_CSS}
               x: {
                 grid: { display: false },
                 ticks: {
-                  color: '#64748b',
+                  color: themeColor('--chart-tick'),
                   font: { family: 'Plus Jakarta Sans', size: isMobile ? 9 : 10, weight: 'bold' },
                   maxRotation: isMobile ? 45 : 0
                 }
               },
               y: {
-                grid: { color: '#e0f2fe' },
+                grid: { color: themeColor('--chart-grid') },
                 ticks: {
-                  color: '#64748b',
+                  color: themeColor('--chart-tick'),
                   font: { family: 'JetBrains Mono', size: isMobile ? 9 : 10 }
                 }
               }
             }
           }
-        });
+        }));
       }
 
       // 2. Cumulative ROI 25 Years Bar Chart (Rose for Recovery Years, Sky Blue for Net Profit)
       const cumCtx = document.getElementById('cumulativeChart');
       if (cumCtx) {
         const cumValues = ${cumulativeValues};
-        const cumColors = cumValues.map(v => v < 0 ? '#ef4444' : '#0284c7');
-
-        new Chart(cumCtx, {
+        charts.push(new Chart(cumCtx, {
           type: 'bar',
           data: {
             labels: ${cumulativeYears},
@@ -1116,7 +1128,7 @@ ${ENERGY_FLOW_CSS}
               {
                 label: 'Beneficio Acumulado (USD)',
                 data: cumValues,
-                backgroundColor: cumColors,
+                backgroundColor: cumColorsFor(cumValues),
                 borderRadius: isMobile ? 2 : 3,
               }
             ]
@@ -1127,7 +1139,7 @@ ${ENERGY_FLOW_CSS}
             plugins: {
               legend: { display: false },
               tooltip: {
-                backgroundColor: '#0f172a',
+                backgroundColor: themeColor('--chart-tooltip'),
                 padding: isMobile ? 8 : 10,
                 boxPadding: 4,
                 callbacks: {
@@ -1141,15 +1153,15 @@ ${ENERGY_FLOW_CSS}
               x: {
                 grid: { display: false },
                 ticks: {
-                  color: '#64748b',
+                  color: themeColor('--chart-tick'),
                   font: { family: 'Plus Jakarta Sans', size: isMobile ? 8 : 9 },
                   maxTicksLimit: isMobile ? 7 : 14
                 }
               },
               y: {
-                grid: { color: '#e0f2fe' },
+                grid: { color: themeColor('--chart-grid') },
                 ticks: {
-                  color: '#64748b',
+                  color: themeColor('--chart-tick'),
                   font: { family: 'JetBrains Mono', size: isMobile ? 9 : 10 },
                   callback: function(value) {
                     return '$' + (value / 1000).toFixed(0) + 'k';
@@ -1158,7 +1170,51 @@ ${ENERGY_FLOW_CSS}
               }
             }
           }
+        }));
+      }
+
+      function repaintCharts() {
+        const tick = themeColor('--chart-tick');
+        const grid = themeColor('--chart-grid');
+        const tooltip = themeColor('--chart-tooltip');
+        charts.forEach(function (chart) {
+          chart.options.scales.x.ticks.color = tick;
+          chart.options.scales.y.ticks.color = tick;
+          chart.options.scales.y.grid.color = grid;
+          chart.options.plugins.tooltip.backgroundColor = tooltip;
+          if (chart.canvas.id === 'energyChart') {
+            chart.data.datasets[0].backgroundColor = themeColor('--chart-consumption');
+            chart.data.datasets[1].backgroundColor = themeColor('--chart-production');
+            if (chart.data.datasets[2]) chart.data.datasets[2].borderColor = chart.data.datasets[2].backgroundColor = themeColor('--chart-self');
+          } else {
+            chart.data.datasets[0].backgroundColor = cumColorsFor(chart.data.datasets[0].data);
+          }
+          // El modo 'none' de Chart.js no refresca las opciones compartidas de las barras: actualización
+          // normal sin animación, para que el lienzo quede listo también al imprimir.
+          const animation = chart.options.animation;
+          chart.options.animation = false;
+          chart.update();
+          chart.options.animation = animation;
         });
+      }
+      function cumColorsFor(values) { return values.map(function (v) { return v < 0 ? themeColor('--chart-negative') : themeColor('--chart-positive'); }); }
+      document.addEventListener('pv-themechange', repaintCharts);
+      if (window.matchMedia) {
+        const scheme = window.matchMedia('(prefers-color-scheme: dark)');
+        if (scheme.addEventListener) scheme.addEventListener('change', repaintCharts);
+      }
+      // El papel siempre en claro: los lienzos se repintan con el tema claro mientras se imprime.
+      // La página ya sale en claro por CSS; esto solo afecta a los lienzos, que CSS no puede repintar.
+      function printing(on) {
+        if (on === document.documentElement.hasAttribute('data-print')) return;
+        if (on) document.documentElement.setAttribute('data-print', ''); else document.documentElement.removeAttribute('data-print');
+        repaintCharts();
+      }
+      window.addEventListener('beforeprint', function () { printing(true); });
+      window.addEventListener('afterprint', function () { printing(false); });
+      if (window.matchMedia) {
+        const printMedia = window.matchMedia('print');
+        if (printMedia.addEventListener) printMedia.addEventListener('change', function (e) { printing(e.matches); });
       }
     });
   </script>

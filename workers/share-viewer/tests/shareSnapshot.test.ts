@@ -40,7 +40,7 @@ async function main() {
     assert.ok(!String(init?.body).includes('cGRmLXdoaXRl'), 'PDF white logo is never published');
     assert.equal(body.project.commercial,undefined);
     assert.equal(body.project.proposalLink,undefined);
-    assert.deepEqual(body.calculationSnapshot, { mode: 'legacy', organizationId: 'mock-org', policyVersion: 4, capturedAt: body.calculationSnapshot.capturedAt });
+    assert.deepEqual(body.calculationSnapshot, { mode: 'legacy', organizationId: 'mock-org', policyVersion: 4, capturedAt: body.calculationSnapshot.capturedAt, netMeteringRegime: 'legacy_retention' });
     assert.deepEqual(body.summary, calculateProjectFinancialSummary(BENCHMARK_PROJECT, 'legacy'));
     return Response.json({ success: true, id: 'abcdef1234567890abcdef1234567890', shareUrl: 'https://propuesta.electsun.net/p/abcdef1234567890abcdef1234567890', validityDays: 7, expiresAt: new Date(Date.now() + 7 * 86400000).toISOString() });
   };

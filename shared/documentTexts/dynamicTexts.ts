@@ -3,27 +3,35 @@ import { resolveGridConnection } from '../gridConnection';
 import { hasSavingsComparison, resolveGeneratorCostPerKWh, resolveSavingsBasis, supplyPresentation } from '../offGridSupply';
 import { FACTORY_TEXTS } from './factoryTexts';
 import type { DocumentTextContext } from './context';
+import { tariffChargeKind } from '../tariffRules';
+import { chargeRoundsToZero, factoryGridUseCharge, isValidGridUseCharge, resolveNetMeteringRegime } from '../netMetering';
 import { resolveDynamicProjectSummaryParagraph1, resolveDynamicProjectSummaryParagraph2 } from './projectSummary';
 
 const kwh = (value: number) => value.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
-/** Nota regulatoria según tarifa, distribuidora, inyección cero, retención y baterías. */
+/**
+ * Nota regulatoria según tarifa, distribuidora, inyección cero, retención y baterías. Orden de decisión: sistema
+ * aislado (textos por alternativa de suministro, sin medición neta) → inyección cero → régimen SIE-007-2026 (cargo por
+ * kWh o «no aplica» en tarifas con potencia) → régimen anterior (retención) → edición `legacy` de enlaces antiguos.
+ */
 export function regulatoryNoteDefault(ctx: DocumentTextContext): string {
-  if (resolveGridConnection(ctx) === 'off_grid') return offGridRegulatoryNote(ctx);
+  const connection = resolveGridConnection(ctx);
+  if (connection === 'off_grid') return offGridRegulatoryNote(ctx);
+  const zeroExport = connection === 'zero_export';
   const distributor = ctx.distributor || 'EDES';
   const isCEPM = distributor === 'CEPM';
   const tariff = ctx.tariffCode || (isCEPM ? 'RBT-1' : 'BTS2');
   const tariffDisplayName = getTariffDisplayName(distributor, tariff);
   const exportFee = ctx.gridExportFeePct;
 
-  const p1 = ctx.isZeroExport
+  const p1 = zeroExport
     ? 'El sistema fotovoltaico operará bajo la modalidad de Inyección Cero (Zero-Export con limitador antivertido), suministrando energía prioritariamente a los consumos internos del inmueble y evitando cualquier inyección de excedentes hacia la red eléctrica de distribución.'
     : `La energía generada mensualmente se descontará del consumo tomado de la red de ${isCEPM ? 'CEPM' : 'la distribuidora eléctrica (EDES)'}. Cuando la producción supere el consumo, el excedente se acreditará como descuento en su factura eléctrica bajo el régimen de Medición Neta.`;
   const p2 = 'La presente propuesta ha sido elaborada conforme a la Resolución SIE-007-2026-REG y se basa en criterios técnicos y el historial de consumo del cliente.';
   const p3 = 'Los ahorros indicados son estimados y pueden variar según los hábitos de consumo, el perfil de carga y las condiciones reales de operación del sistema.';
-  const p4 = ctx.isZeroExport
+  const p4 = zeroExport
     ? `Al operar con limitador antivertido (inyección cero)${ctx.hasBattery ? ' y almacenamiento en baterías de litio' : ''}, la totalidad de la energía solar se aprovecha internamente, por lo que el proyecto no genera cargos por derecho de uso de la red bajo la normativa vigente.`
-    : `Para la tarifa ${tariffDisplayName}, el análisis económico considera el cargo por derecho de uso de la red, equivalente al ${exportFee}% del valor de la energía excedente exportada, conforme al régimen de Medición Neta y la normativa vigente (Resolución SIE-007-2026-REG). Por esta razón, el sistema se diseña para maximizar el autoconsumo y optimizar la inyección de energía, obteniendo así el mayor retorno de inversión posible.${ctx.hasBattery ? '' : ' Cuando resulte conveniente, se recomendará la incorporación de baterías de litio para incrementar el aprovechamiento directo de la energía generada.'}`;
+    : gridUseChargeParagraph(ctx, distributor, tariff, tariffDisplayName, exportFee);
   return [p1, p2, p3, p4].join('\n\n');
 }
 
@@ -88,6 +96,40 @@ export function servicesIncludedDefault(ctx: DocumentTextContext): string {
 export const EXECUTIVE_FOOTNOTE_RIGHT_GRID = 'Régimen de Medición Neta • Certificación CNE / SIE';
 export function executiveFootnoteRightDefault(ctx: DocumentTextContext): string {
   return resolveGridConnection(ctx) === 'off_grid' ? 'Sistema aislado (modo isla) • Sin conexión a la red' : EXECUTIVE_FOOTNOTE_RIGHT_GRID;
+}
+
+/**
+ * Párrafo del cargo por uso de la red. El Reglamento SIE-007-2026-REG solo lo cobra a las tarifas de un solo
+ * precio por kWh (BTS-1, BTS-2, RBT-1); en las que tienen cargo de potencia (BTD, BTH, MTD, MTH, RBT-2) se
+ * dice que no aplica y se declara el criterio que usa hoy el cálculo (la retención no cambia hasta la fase 3).
+ * Tarifas sin clasificar y la edición `legacy` (enlaces ya publicados) conservan el texto anterior.
+ */
+function gridUseChargeParagraph(ctx: DocumentTextContext, distributor: string, tariff: string, tariffDisplayName: string, exportFee: number): string {
+  const batteryHint = ctx.hasBattery ? '' : ' Cuando resulte conveniente, se recomendará la incorporación de baterías de litio para incrementar el aprovechamiento directo de la energía generada.';
+  if (resolveNetMeteringRegime(ctx.netMeteringRegime) === 'sie007_2026') return sie007GridUseChargeParagraph(ctx, distributor, tariff, tariffDisplayName, batteryHint);
+  if (ctx.regulatoryNoteEdition !== 'legacy' && tariffChargeKind(distributor, tariff) === 'demand') {
+    const criterion = exportFee > 0 ? ` Como criterio conservador, el análisis económico descuenta un ${exportFee}% de la energía excedente exportada.` : '';
+    return `Para la tarifa ${tariffDisplayName}, que incluye cargo por potencia, no aplica el cargo por derecho de uso de la red: el Reglamento de Generación Distribuida (Resolución SIE-007-2026-REG) lo reserva a las tarifas de un solo precio por kWh.${criterion} El sistema se diseña para maximizar el autoconsumo y optimizar la inyección de energía, obteniendo así el mayor retorno de inversión posible.${batteryHint}`;
+  }
+  return `Para la tarifa ${tariffDisplayName}, el análisis económico considera el cargo por derecho de uso de la red, equivalente al ${exportFee}% del valor de la energía excedente exportada, conforme al régimen de Medición Neta y la normativa vigente (Resolución SIE-007-2026-REG). Por esta razón, el sistema se diseña para maximizar el autoconsumo y optimizar la inyección de energía, obteniendo así el mayor retorno de inversión posible.${batteryHint}`;
+}
+
+/**
+ * Párrafo del cargo por uso de la red en el régimen SIE-007-2026: medición neta sin retención y cargo de RD$/kWh
+ * inyectado solo en las tarifas de un solo precio (art. 19.1.e). Se declara como estimado mientras no se haya
+ * contrastado con facturas. Función aparte para no mezclarla con el texto del régimen anterior.
+ */
+function sie007GridUseChargeParagraph(ctx: DocumentTextContext, distributor: string, tariff: string, tariffDisplayName: string, batteryHint: string): string {
+  if (tariffChargeKind(distributor, tariff) === 'demand') {
+    return `Para la tarifa ${tariffDisplayName}, que incluye cargo por potencia, no aplica el cargo por derecho de uso de la red: el Reglamento de Generación Distribuida (Resolución SIE-007-2026-REG) lo reserva a las tarifas de un solo precio por kWh. El sistema se diseña para maximizar el autoconsumo y optimizar la inyección de energía, obteniendo así el mayor retorno de inversión posible.${batteryHint}`;
+  }
+  const factory = factoryGridUseCharge(distributor);
+  const charge = isValidGridUseCharge(ctx.gridUseChargeDOPPerKWh) ? ctx.gridUseChargeDOPPerKWh : factory.dopPerKWh;
+  if (chargeRoundsToZero(charge)) {
+    return `Para la tarifa ${tariffDisplayName}, el análisis económico no considera cargo por derecho de uso de la red sobre la energía inyectada, aunque el Reglamento de Generación Distribuida (Resolución SIE-007-2026-REG, art. 19.1.e) lo prevé para las tarifas de un solo precio. El sistema se diseña para maximizar el autoconsumo y optimizar la inyección de energía, obteniendo así el mayor retorno de inversión posible.${batteryHint}`;
+  }
+  const source = charge === factory.dopPerKWh ? ` (Resolución ${factory.resolutionCode}, ${factory.period})` : '';
+  return `Para la tarifa ${tariffDisplayName}, el análisis económico considera el cargo por derecho de uso de la red que el Reglamento de Generación Distribuida (Resolución SIE-007-2026-REG, art. 19.1.e) aplica a las tarifas de un solo precio: RD$${charge.toFixed(2)} por kWh inyectado a la red${source}. Es un valor estimado, no verificado con facturas de la distribuidora, que la SIE revisa periódicamente. Por esta razón, el sistema se diseña para maximizar el autoconsumo y optimizar la inyección de energía, obteniendo así el mayor retorno de inversión posible.${batteryHint}`;
 }
 
 export function projectSummaryParagraph1Default(ctx: DocumentTextContext): string {

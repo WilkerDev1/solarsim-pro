@@ -1,7 +1,8 @@
 import { isWriterRole } from '../../../shared/permissions';
 import { useSimulationStore } from '../../store/useSimulationStore';
 import { draftOwnerKey } from '../../utils/draftOwnerKey';
-import { calculateProjectFinancialSummary } from '../../engine/financeEngine';
+import { calculateProjectFinancialSummary, engineGridUseCharge } from '../../engine/financeEngine';
+import { resolveAssumptions } from '../../../shared/assumptions';
 import { calculateMonthlySolarProduction } from '../../engine/solarEngine';
 import { effectiveFeatureSettings } from '../application/featurePolicy';
 import {
@@ -207,7 +208,8 @@ export function executeAssistantTool(
           p.client.customMonthlyHSP,
           p.rates.tariffCode,
           resolveGridConnection(p.rates),
-          mode
+          mode,
+          engineGridUseCharge(resolveAssumptions(p), resolveGridConnection(p.rates))
         ).map((month) => withoutMoney(month, monthlyMoney)),
         summary: comparable ? summary : {
           ...withoutMoney(summary, ['year1SavingsUSD', 'total25YearSavingsUSD', 'paybackYears', 'irrPct', 'npvUSD', 'roi25YrPct']),

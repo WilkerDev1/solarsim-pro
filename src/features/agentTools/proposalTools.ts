@@ -1,3 +1,4 @@
+import { isNetMeteringRegime, isValidGridUseCharge } from '../../../shared/netMetering';
 import { PROPOSAL_DECISIONS, commercialState, type ProposalDecision } from '../../../shared/proposalCommercial';
 import { buildProjectFromDraft } from '../../store/slices/aiSlice';
 import type { ExtractedInvoiceData, ProjectSimulation } from '../../types';
@@ -26,6 +27,9 @@ function createDraft(args: Record<string, any>): ExtractedInvoiceData {
     distributor: args.distributor, tariffCode: args.tariffCode, targetCoveragePct: args.targetCoveragePct,
     ...(Array.isArray(args.monthlyConsumptionKWh) && args.monthlyConsumptionKWh.length === 12 ? { observedMonthlyConsumptionKWh: args.monthlyConsumptionKWh } : {}),
     averageMonthlyKWh: args.averageMonthlyKWh,
+    // Sin régimen explícito, la propuesta nueva nace en SIE-007-2026 (prepareProposalDraftProject).
+    ...(isNetMeteringRegime(args.netMeteringRegime) ? { netMeteringRegime: args.netMeteringRegime } : {}),
+    ...(isValidGridUseCharge(args.gridUseChargeDOPPerKWh) ? { gridUseChargeDOPPerKWh: args.gridUseChargeDOPPerKWh } : {}),
     panels: catalogGroups(args.panels, 'panel'), inverters: catalogGroups(args.inverters, 'inverter'), batteries, hasBattery: batteries.length > 0,
     commercial: { priceBasis: 'purchase', markupPct: args.marginPct ?? null, marginOnSalePct: null, installationUnitPriceUSD: args.installationUnitPriceUSD ?? null,
       installationTotalUSD: null, customItems: [], customDiscounts: [] },
@@ -185,7 +189,8 @@ const applyProposalDraft: NativeHandler = (args) => {
     plan: {
       title: createNew ? `Crear propuesta para ${preview.project.client.name}` : `Actualizar ${preview.project.client.name}`,
       targetType: 'project',
-      changes: [{ label: 'Cliente', value: preview.project.client.name }, { label: 'Modalidad', value: 'Simple (Catálogo IA) · matriz de costos' }],
+      changes: [{ label: 'Cliente', value: preview.project.client.name }, { label: 'Modalidad', value: 'Simple (Catálogo IA) · matriz de costos' },
+        ...(draft.documentTexts || []).map((t) => ({ label: t.label, value: t.text === null ? '(predeterminado)' : t.text.slice(0, 200) }))],
       execute() {
         const s = store();
         const previous = createNew ? undefined : s.projects.find((p) => p.id === s.activeProjectId);

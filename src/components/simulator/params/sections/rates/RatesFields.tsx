@@ -11,11 +11,11 @@ import {
 } from '../../../../../../shared/offGridSupply';
 import { AlertTriangle } from 'lucide-react';
 import { SelfConsumptionPanel } from './SelfConsumptionPanel';
+import { NetMeteringFields } from './NetMeteringFields';
 import {
   averageMonthlyConsumption,
   currentDistributor,
   currentTariffCode,
-  exportFeeValue,
   isMatchingReference,
   planDistributorChange,
   planTariffChange,
@@ -32,6 +32,8 @@ export interface RatesFieldsProps {
   projectionEnabled: boolean;
   updateRates: (rates: Partial<UtilityRates>) => void;
   updateSpecs?: (specs: Partial<SystemSpecs>) => void;
+  /** Función de este equipo `netMeteringRegimeSelector` (visible por defecto). */
+  showRegimeSelector?: boolean;
 }
 
 const DISTRIBUTORS = ['EDEESTE', 'EDESUR', 'EDENORTE', 'CEPM'].map(value => ({ value, label: value }));
@@ -50,7 +52,7 @@ const parseOptionalNumber = (raw: string): number | undefined => {
   return raw.trim() === '' || !Number.isFinite(value) ? undefined : value;
 };
 
-export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix, projectionEnabled, updateRates, updateSpecs }) => {
+export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix, projectionEnabled, updateRates, updateSpecs, showRegimeSelector = true }) => {
   const { rates } = project;
   // El valor que se muestra es el que usa el cálculo: supuestos efectivos del proyecto completo (ADR 0003).
   const assumptions = resolveAssumptions(project);
@@ -153,6 +155,10 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
           onChange={value => { if (isGridConnectionMode(value)) updateRates(gridConnectionFields(value)); }}
         />
       </ParamRow>
+      {/* Sin red no hay campos de exportación (régimen, retención, cargo): la explicación va como nota. */}
+      {offGrid && (
+        <p role="note" data-grid-connection="off_grid" className="m-0 text-xs text-pd-muted">{exportTip}</p>
+      )}
       {offGrid && (
         <ParamRow label="Alternativa de suministro" htmlFor="pd-rates-supply">
           <SelectField
@@ -195,19 +201,10 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
       {offGrid && savingsBasis === 'no_comparison' && (
         <p role="note" className="m-0 rounded-md border border-pd-field-ro-border px-2.5 py-2 text-xs text-pd-muted">{NO_COMPARISON_NOTE}</p>
       )}
-      <ParamRow label="Cargo exportación" htmlFor="pd-rates-export">
-        <Field
-          id="pd-rates-export"
-          type="number"
-          step="1"
-          mono
-          suffix="%"
-          disabled={zeroExport}
-          value={exportFeeValue(rates, assumptions.gridExportFeePct)}
-          onChange={value => updateRates({ gridExportFeePct: parseNumber(value) })}
-          right={<InfoTip text={exportTip} />}
-        />
-      </ParamRow>
+      {/* Sistema aislado: sin inyección no hay régimen, retención ni cargo por uso de la red; no se muestran. */}
+      {!offGrid && (
+        <NetMeteringFields rates={rates} assumptions={assumptions} showRegimeSelector={showRegimeSelector} exportTip={exportTip} updateRates={updateRates} />
+      )}
       {projectionEnabled && (
         <SelfConsumptionPanel project={project} tariffCode={tariffCode} avgMonthlyConsumption={avgMonthlyConsumption} updateSpecs={updateSpecs} />
       )}

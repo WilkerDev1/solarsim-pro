@@ -119,4 +119,16 @@ for (const rates of [
 // El resumen sin comparación (flujo vacío, ceros) es publicable.
 assert.doesNotThrow(() => parseSharePayload(payload({ ...island, supplyAlternative: 'no_comparison' })));
 
+// ── Aislado × régimen SIE-007-2026: la publicación acepta la combinación y el visor no habla del cargo ─────────
+for (const alternative of [{}, { supplyAlternative: 'generator', generatorCostPerKWh: 0.385 }, { supplyAlternative: 'no_comparison' }]) {
+  const rates = { ...island, tariffCode: 'BTS1', ...alternative, netMeteringRegime: 'sie007_2026', gridUseChargeDOPPerKWh: 3.78 };
+  assert.doesNotThrow(() => parseSharePayload(payload(rates)), JSON.stringify(alternative));
+  for (const mode of ['legacy', 'self_consumption'] as const) {
+    const html = renderProposalPage(stored(rates, mode));
+    assert.ok(!/cargo por uso de la red se descuenta|RD\$3\.78/.test(html), `${mode} ${JSON.stringify(alternative)}: sin cargo por uso de red`);
+    assert.ok(html.includes('data-grid-connection="off_grid"'));
+  }
+}
+assert.throws(() => parseSharePayload(payload({ ...island, netMeteringRegime: 'otro' })), RequestValidationError);
+
 console.log('Sistema aislado: alternativa de suministro en la propuesta web y validación de la publicación.');

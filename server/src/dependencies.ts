@@ -8,6 +8,8 @@ export interface AuthUser {
   organizationId: string;
   organizationName?: string;
   authVersion?: number;
+  /** Present only for remote agent tokens (docs/MCP_REMOTE.md); a `read` grant arrives with role LECTOR. */
+  agent?: { grantId: string; scope: "read" | "write" };
 }
 export interface Dependencies {
   pool: Pool;

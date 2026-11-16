@@ -25,6 +25,7 @@ import { PDF_COLOR_THEMES } from '../constants/pdfThemes';
 import { PDFPage2Quotation } from '../components/pdf/pages/PDFPage2Quotation';
 import { EnergyAnalysisTab, energyTableLabels } from '../components/simulator/tabs/EnergyAnalysisTab';
 import { supplyPresentation } from '../../shared/offGridSupply';
+import { gridUseChargeApplies, resolveNetMetering } from '../../shared/netMetering';
 import type { ProjectSimulation, UtilityRates } from '../types';
 
 /**
@@ -368,6 +369,29 @@ assert.deepEqual(validateAssistantEdits([{ section: 'rates', field: 'generatorCo
   const html = energyHtml(island({ supplyAlternative: 'no_comparison' }));
   assert.ok(/ENERGÍA SERVIDA \(KWH\)/.test(html) && /Resumen Mensual de Energía Entregada/.test(html));
   assert.ok(!/AHORRO|Ahorro|\$\d/.test(html), (html.match(/AHORRO|Ahorro|\$\d/) ?? [''])[0]);
+}
+
+// ── Aislado × régimen de medición neta (SIE-007-2026) ───────────────────────────────────────
+{
+  const bts1 = { tariffCode: 'BTS1', distributor: 'EDESUR' as const };
+  for (const alternative of [{}, { supplyAlternative: 'generator', generatorCostPerKWh: X }, { supplyAlternative: 'no_comparison' }]) {
+    const legacyRates = island({ ...bts1, ...alternative, netMeteringRegime: 'legacy_retention' });
+    const sieRates = island({ ...bts1, ...alternative, netMeteringRegime: 'sie007_2026', gridUseChargeDOPPerKWh: 3.78 });
+    assert.equal(gridUseChargeApplies(sieRates.rates), false, 'sin inyección no hay cargo');
+    assert.equal(resolveNetMetering(sieRates.rates).appliedGridUseChargeDOPPerKWh, 0);
+    assert.deepEqual(summaryOf(sieRates), summaryOf(legacyRates), `${JSON.stringify(alternative)}: mismas cifras en ambos regímenes`);
+    assert.ok(summaryOf(sieRates).monthlyBreakdown.every((m) => !('gridUseChargeUSD' in m)), 'sin cargo por uso de red en el aislado');
+    const note = regulatoryNoteDefault(buildDocumentTextContext(sieRates, summaryOf(sieRates), { currentDateStr: 'hoy' }));
+    assert.ok(/modo isla/.test(note) && !/uso de la red|Medición Neta|RD\$/.test(note), note);
+    // Dock: en aislado no hay régimen, cargo por uso de red ni retención.
+    const dock = renderToStaticMarkup(React.createElement(RatesFields, { project: sieRates, projectionEnabled: false, updateRates: () => {} }));
+    assert.doesNotMatch(dock, /pd-rates-regime|pd-rates-grid-charge|pd-rates-export/);
+  }
+  // Con red, el cargo sigue aplicando en BTS1 (fase 2 intacta) y el dock lo muestra.
+  const grid = withRates({ ...bts1, netMeteringRegime: 'sie007_2026', gridUseChargeDOPPerKWh: 3.78, supplyAlternative: 'no_comparison' });
+  assert.equal(gridUseChargeApplies(grid.rates), true);
+  assert.match(renderToStaticMarkup(React.createElement(RatesFields, { project: grid, projectionEnabled: false, updateRates: () => {} })), /pd-rates-regime/);
+  assert.equal(gridUseChargeApplies(withRates({ ...bts1, ...gridConnectionFields('zero_export') }).rates), false, 'inyección cero');
 }
 
 console.log('Alternativa de suministro (aislado): lectura, motor, edición, documento, dock, pestaña y agentes.');

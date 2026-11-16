@@ -308,6 +308,7 @@ test("Comprehensive Migration 003 rehearsal: preserves all 8 business tables, co
     { version: 5, name: "clients" },
     { version: 6, name: "equipment_groups" },
     { version: 7, name: "project_created_at" },
+    { version: 8, name: "agent_access" },
   ]);
 
   // 4. Verify ZERO data loss: row counts of all 8 tables are strictly preserved

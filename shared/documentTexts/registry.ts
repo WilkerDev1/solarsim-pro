@@ -49,6 +49,8 @@ export interface DocumentTextDefinition {
   read?: (stored: string, ctx: DocumentTextContext, text: ResolveOther) => string;
   /** Un valor guardado cuenta como personalizado aunque se muestre igual que el predeterminado (fecha fija). */
   customWhenStored?: boolean;
+  /** El texto se calcula con datos del proyecto (cifras, equipos, cliente, tarifa, vigencia): la IA no ve su valor en una propuesta nueva. */
+  projectDependent?: boolean;
   /** Valores guardados que equivalen a «sin personalizar». */
   knownFactoryValues?: readonly string[];
 }
@@ -152,12 +154,12 @@ const DEFINITIONS: DocumentTextDefinition[] = [
 
   // 4. Descripción del proyecto.
   {
-    key: 'projectDescription.subtitle', section: 'projectDescription', label: 'Subtítulo del resumen técnico', format: 'rich', multiline: false, templatable: true, legacyField: 'projectSummarySubtitle', maxLength: SHORT,
+    key: 'projectDescription.subtitle', projectDependent: true, section: 'projectDescription', label: 'Subtítulo del resumen técnico', format: 'rich', multiline: false, templatable: true, legacyField: 'projectSummarySubtitle', maxLength: SHORT,
     placeholders: ['{clientName}'],
     defaultText: (ctx) => `Criterios de dimensionamiento técnico para ${ctx.clientName}`,
   },
   {
-    key: 'projectDescription.paragraph1', section: 'projectDescription', label: 'Párrafo 1 (consumo y producción)', format: 'rich', multiline: true, templatable: true, legacyField: 'customProjectSummaryParagraph1', maxLength: PARAGRAPH,
+    key: 'projectDescription.paragraph1', projectDependent: true, section: 'projectDescription', label: 'Párrafo 1 (consumo y producción)', format: 'rich', multiline: true, templatable: true, legacyField: 'customProjectSummaryParagraph1', maxLength: PARAGRAPH,
     placeholders: ['{clientName}', '{panelCount}', '{panelModel}', '{systemCapacityKWp}', '{annualProductionKWh}', '{annualConsumptionKWh}', '{energyCoveragePct}'],
     defaultText: (ctx) => projectSummaryParagraph1Default(ctx),
     read: (stored, ctx) => syncProjectSummaryParagraph1(stored, ctx),
@@ -168,13 +170,13 @@ const DEFINITIONS: DocumentTextDefinition[] = [
     read: (stored) => stored.trim(),
   },
   {
-    key: 'projectDescription.paragraph2', section: 'projectDescription', label: 'Párrafo 2 (equipos y alcance)', format: 'rich', multiline: true, templatable: true, legacyField: 'customProjectSummaryParagraph2', maxLength: PARAGRAPH,
+    key: 'projectDescription.paragraph2', projectDependent: true, section: 'projectDescription', label: 'Párrafo 2 (equipos y alcance)', format: 'rich', multiline: true, templatable: true, legacyField: 'customProjectSummaryParagraph2', maxLength: PARAGRAPH,
     placeholders: ['{inverterCount}', '{inverterModel}', '{batteryCount}', '{batteryModel}', '{scopeText}'],
     defaultText: (ctx, text) => projectSummaryParagraph2Default(ctx, text('projectDescription.engineeringScope')),
     read: (stored, ctx, text) => syncProjectSummaryParagraph2(stored, ctx, text('projectDescription.engineeringScope')),
   },
   {
-    key: 'projectDescription.regulatoryNote', section: 'projectDescription', label: 'Marco regulatorio SIE', format: 'rich', multiline: true, templatable: true, maxLength: NOTE, ...legacy('regulatoryNote'),
+    key: 'projectDescription.regulatoryNote', projectDependent: true, section: 'projectDescription', label: 'Marco regulatorio SIE', format: 'rich', multiline: true, templatable: true, maxLength: NOTE, ...legacy('regulatoryNote'),
     defaultText: (ctx) => regulatoryNoteDefault(ctx),
   },
 
@@ -188,7 +190,7 @@ const DEFINITIONS: DocumentTextDefinition[] = [
     defaultText: (ctx) => servicesIncludedDefault(ctx),
   },
   {
-    key: 'quotation.validityNote', section: 'quotation', label: 'Nota legal y términos', format: 'rich', multiline: false, templatable: true, maxLength: 600, ...legacy('validityNote'),
+    key: 'quotation.validityNote', projectDependent: true, section: 'quotation', label: 'Nota legal y términos', format: 'rich', multiline: false, templatable: true, maxLength: 600, ...legacy('validityNote'),
     placeholders: ['{validityDays}'],
     defaultText: (ctx) => validityNoteDefault(ctx),
   },

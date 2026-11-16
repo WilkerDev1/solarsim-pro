@@ -1,3 +1,5 @@
+import { normalizeTariffCode } from '../../../shared/tariffRules';
+import { MAX_GRID_USE_CHARGE_DOP_PER_KWH, NET_METERING_REGIMES, isValidGridUseCharge } from '../../../shared/netMetering';
 import type { AssistantEdit, AssistantSection } from './types';
 import { GRID_CONNECTION_MODES } from '../../../shared/gridConnection';
 import { GENERATOR_COST_RULE_MESSAGE, isValidGeneratorCost, SUPPLY_ALTERNATIVES } from '../../../shared/offGridSupply';
@@ -72,6 +74,8 @@ const fields: Record<AssistantSection, string[]> = {
     'supplyAlternative',
     'generatorCostPerKWh',
     'annualEnergyInflationPct',
+    'netMeteringRegime',
+    'gridUseChargeDOPPerKWh',
   ],
   financials: [
     'customItems',
@@ -140,6 +144,7 @@ const textFields = new Set([
   'directPriceSurplusTarget',
   'loadProfilePreset',
   'currency',
+  'netMeteringRegime',
   'brand',
   'modelSeries',
   'displayName',
@@ -158,6 +163,7 @@ const enums: Record<string, string[]> = {
   currency: ['USD', 'DOP'],
   gridConnection: [...GRID_CONNECTION_MODES],
   supplyAlternative: [...SUPPLY_ALTERNATIVES],
+  netMeteringRegime: [...NET_METERING_REGIMES],
 };
 const percentages = new Set([
   'systemLosses',
@@ -358,8 +364,17 @@ export function validateAssistantEdits(
         value <= 0
       )
         throw new Error('La capacidad nominal debe ser mayor que cero.');
+      if (field === 'gridUseChargeDOPPerKWh' && !isValidGridUseCharge(value))
+        throw new Error(`El cargo por uso de la red debe estar entre 0 y ${MAX_GRID_USE_CHARGE_DOP_PER_KWH} RD$/kWh.`);
       if (field === 'saleMarginMultiplier' && value < 1)
         throw new Error('El factor de venta debe ser al menos 1.');
+    }
+    // Código de tarifa en la forma de la matriz (BTS-1 → BTS1): mismo normalizador que la IA y el dock.
+    if (field === 'tariffCode') {
+      if (typeof value !== 'string') throw new Error('El código de tarifa no es válido.');
+      const code = normalizeTariffCode(value);
+      if (!code) throw new Error('El código de tarifa no es válido.');
+      return { section, field, value: code };
     }
     return { section, field, value };
   });

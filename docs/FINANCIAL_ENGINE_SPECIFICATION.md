@@ -36,13 +36,29 @@ $$E_{auto,m} = \min\left(C_m,\ E_m \times k\right), \quad k = \begin{cases} 0.90
 
 $$E_{exp,m} = \begin{cases} 0 & \text{inyección cero} \\ \max(0,\ E_m - E_{auto,m}) & \text{medición neta} \end{cases}$$
 
-En ambos modos, la retención (`gridExportFeePct`, 25 si falta; un 0 explícito se respeta; 0 en inyección cero) se aplica solo a la energía exportada:
+El cálculo del excedente depende del **régimen de medición neta** de la propuesta (`rates.netMeteringRegime`, reglas en `shared/netMetering.ts`). Ambos regímenes valen en los dos modos (legacy y proyección física) y no cambian $E_{auto,m}$ ni $E_{exp,m}$.
+
+**Régimen anterior, `legacy_retention`** (toda propuesta guardada, importada, del historial o publicada sin el campo; sus cifras no cambian): la retención (`gridExportFeePct`, 25 si falta; un 0 explícito se respeta; 0 en inyección cero) se aplica solo a la energía exportada:
 
 $$E_{net\_credit,m} = E_{exp,m} \times \left(1 - \frac{F_{grid}}{100}\right)$$
 
 $$E_{saved,m} = E_{auto,m} + E_{net\_credit,m}, \qquad S_m = E_{saved,m} \times T_{kWh}, \qquad S_{yr1} = \sum_{m} S_m$$
 
-$T_{kWh}$ es `energyCostPerKWh` del proyecto.
+$T_{kWh}$ es `energyCostPerKWh` del proyecto: una tarifa plana guardada en la propuesta. El motor no lee la matriz de tarifas; la matriz solo sugiere esa tarifa al crear o escanear (tarifa de referencia, ver [Tarifas en el flujo IA](AI_TARIFF_CONTEXT.md)). La referencia de BTS-1 y BTS-2 es el precio medio por bloques del consumo mensual promedio; desde 701 kWh es el precio del cuarto bloque para todo el consumo (Resolución SIE-121-2026-TF, art. 4.d). Cambiar la matriz o esa regla no altera propuestas guardadas: `src/tests/testNetMeteringRegime.ts` fija las cifras actuales de BTS-1, BTD, inyección cero y batería en ambos modos.
+
+En este régimen la retención es un porcentaje uniforme para todas las tarifas, también las que tienen cargo de potencia.
+
+**Régimen SIE-007-2026, `sie007_2026`** (con el que nacen las propuestas nuevas: simulador, borrador de IA y `create_proposal`): la medición neta acredita el 100 % de lo inyectado y el Reglamento SIE-007-2026-REG (art. 19.1.e) cobra un cargo por uso de la red por kWh inyectado, solo a las tarifas de un solo precio:
+
+$$E_{net\_credit,m} = E_{exp,m}, \qquad G_m = E_{exp,m} \times \frac{c_{red}}{FX}, \qquad S_m = (E_{auto,m} + E_{exp,m}) \times T_{kWh} - G_m$$
+
+- $c_{red}$ es `rates.gridUseChargeDOPPerKWh` (RD$/kWh inyectado, editable por propuesta, 0 explícito se respeta, rango 0–100). Si falta o no es válido, el de fábrica de la distribuidora: EDESUR 3.78, EDENORTE 4.02, EDEESTE 3.88 (Res. SIE-121-2026-TF, art. 9, octubre–diciembre 2026, calculados sobre la tarifa sin subsidio) y CEPM 5.73 (Res. SIE-147-2026-TF, art. 2, septiembre 2026). Una distribuidora desconocida usa 4.02 (el mayor de las EDE). Las propuestas nuevas guardan el de fábrica al nacer; cambiar de distribuidora con `applyProjectEdit` lo pasa al de la nueva salvo que se haya editado a mano.
+- $c_{red} = 0$ en tarifas con cargo de potencia (`tariffChargeKind` = `demand`: BTD, BTH, MTD-1, MTD-2, MTH, RBT-2, ESTRBT-2) y en inyección cero. Una tarifa sin clasificar (`unknown`) **sí** paga el cargo: es la estimación conservadora (ahorro a la baja) hasta clasificarla.
+- $FX$ es la tasa efectiva de la propuesta (`resolveAssumptions(...).dopExchangeRate`). El desglose mensual lleva `gridUseChargeUSD` solo en este régimen; en el anterior el campo no aparece.
+- $E_{exp,m}$ es la energía inyectada del modelo: en legacy, $E_m - E_{auto,m}$; en la proyección física, el excedente diario que no carga la batería. Con batería en la proyección física baja la inyección y, con ella, el cargo.
+- El cargo es una **estimación no verificada con facturas**; el dock, la revisión y la nota regulatoria lo dicen. La factura por bloques, el cargo fijo por rangos y la liquidación anual del excedente al precio CNE quedan para fases siguientes: $T_{kWh}$ sigue siendo la tarifa plana de la propuesta.
+
+`resolveAssumptions` expone `netMeteringRegime`, `gridUseChargeDOPPerKWh` y `appliedGridUseChargeDOPPerKWh` (0 cuando el cargo no aplica). `src/tests/testSie007GridUseCharge.ts` fija el régimen nuevo; `testNetMeteringRegime.ts` sigue fijando el anterior sin cambios.
 
 ### 1.3.1 Tipo de conexión con la red
 
@@ -69,7 +85,7 @@ En legacy, el factor $k$ supone que la red absorbe el desfase día/noche; sin re
 | `generator` sin costo válido (vacío, ≤ 0, no numérico o > 1000) | `generator_missing_cost` | 0 | ninguno: estado incompleto |
 | `no_comparison` | `no_comparison` | 0 | ninguno |
 
-Sin comparación (`no_comparison` o `generator_missing_cost`) el resumen deja `year1SavingsUSD`, `total25YearSavingsUSD`, `paybackYears`, `irrPct`, `npvUSD` y `roi25YrPct` en 0, `cashFlow25Years` vacío y `savingsUSD`/`originalBillUSD`/`netBillUSD` mensuales en 0; ningún consumidor muestra esos ceros: la interfaz, el PDF y el visor leen la base con `resolveSavingsBasis(rates)` y presentan el estado «sin comparación» (o el aviso de costo faltante). Inversión, energía servida, energía no servida y autonomía no cambian. **Generador sin costo:** no hay valor por defecto (el usuario no tiene una cifra de referencia) y nunca se cae en silencio a la tarifa: se trata como «sin comparación» con un aviso propio en el dock, la pestaña de retorno, Análisis energético, el hub y la vista del documento, para que el usuario complete el costo. El resumen no lleva un campo de texto con la base porque un Worker anterior rechaza métricas no numéricas. La alternativa no cambia el dimensionado, la energía servida ni la autonomía. No se modela el consumo de combustible de un respaldo, el dimensionamiento automático sigue usando la cobertura anual (no garantiza cubrir la noche sin red) y la autonomía de baterías sigue calculándose con la carga media de 24 h.
+Sin comparación (`no_comparison` o `generator_missing_cost`) el resumen deja `year1SavingsUSD`, `total25YearSavingsUSD`, `paybackYears`, `irrPct`, `npvUSD` y `roi25YrPct` en 0, `cashFlow25Years` vacío y `savingsUSD`/`originalBillUSD`/`netBillUSD` mensuales en 0; ningún consumidor muestra esos ceros: la interfaz, el PDF y el visor leen la base con `resolveSavingsBasis(rates)` y presentan el estado «sin comparación» (o el aviso de costo faltante). Inversión, energía servida, energía no servida y autonomía no cambian. **Generador sin costo:** no hay valor por defecto (el usuario no tiene una cifra de referencia) y nunca se cae en silencio a la tarifa: se trata como «sin comparación» con un aviso propio en el dock, la pestaña de retorno, Análisis energético, el hub y la vista del documento, para que el usuario complete el costo. El resumen no lleva un campo de texto con la base porque un Worker anterior rechaza métricas no numéricas. La alternativa no cambia el dimensionado, la energía servida ni la autonomía. **Aislado × régimen de medición neta:** sin inyección no hay retención ni cargo por uso de la red, sea cual sea `netMeteringRegime`: `gridUseChargeApplies` es falso con inyección cero y en `off_grid` (lee `resolveGridConnection`), `resolveNetMetering(...).appliedGridUseChargeDOPPerKWh` es 0 y `engineGridUseCharge` no pasa cargo al motor en `off_grid`, de modo que `sie007_2026` y `legacy_retention` dan exactamente las mismas cifras; el dock oculta régimen, retención y cargo, y la nota regulatoria del aislado no los menciona. No se modela el consumo de combustible de un respaldo, el dimensionamiento automático sigue usando la cobertura anual (no garantiza cubrir la noche sin red) y la autonomía de baterías sigue calculándose con la carga media de 24 h.
 
 ### 1.4 Factura y cobertura
 

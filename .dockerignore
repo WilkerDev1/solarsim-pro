@@ -7,3 +7,9 @@
 !server/src/**
 !shared
 !shared/**
+!mcp-remote
+!mcp-remote/package.json
+!mcp-remote/package-lock.json
+!mcp-remote/tsconfig.json
+!mcp-remote/src
+!mcp-remote/src/**

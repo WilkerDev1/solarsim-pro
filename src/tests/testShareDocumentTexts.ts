@@ -8,8 +8,9 @@ import type { LegacyProjectSpecs, ProjectSimulation } from '../types';
 const ctxFor = (project: ProjectSimulation) => buildDocumentTextContext(project, calculateProjectFinancialSummary(project), { currentDateStr: '21/10/2026' });
 const base: ProjectSimulation = { ...structuredClone(BENCHMARK_PROJECT), customization: {} };
 
-// A proposal with nothing customized publishes nothing: the Worker falls back to the shared defaults.
-assert.deepEqual(publishedDocumentTexts(base, ctxFor(base)), {});
+// A proposal with nothing customized publishes only the current regulatory note (the Worker shows the legacy
+// edition for links without it, so already-published links keep their note); everything else falls back to the shared defaults.
+assert.deepEqual(Object.keys(publishedDocumentTexts(base, ctxFor(base))), ['doc:projectDescription.regulatoryNote']);
 
 // Customized texts go out resolved, as strings under doc:<key>.
 const custom: ProjectSimulation = {
@@ -24,7 +25,7 @@ const custom: ProjectSimulation = {
   },
 };
 const published = publishedDocumentTexts(custom, ctxFor(custom));
-assert.deepEqual(Object.keys(published).sort(), ['doc:projectDescription.paragraph1', 'doc:quotation.servicesIncluded', 'doc:quotation.warranty.panel', 'doc:techIntro.whatIs']);
+assert.deepEqual(Object.keys(published).sort(), ['doc:projectDescription.paragraph1', 'doc:projectDescription.regulatoryNote', 'doc:quotation.servicesIncluded', 'doc:quotation.warranty.panel', 'doc:techIntro.whatIs']);
 assert.equal(published['doc:quotation.warranty.panel'], '30 años **lineales**');
 assert.ok(published['doc:projectDescription.paragraph1'].includes('CENTRO MEDICO HISPANICO'), 'Los marcadores se publican ya sustituidos');
 assert.ok(published['doc:projectDescription.paragraph1'].includes('38 Módulos'), 'Los números siguen la simulación');

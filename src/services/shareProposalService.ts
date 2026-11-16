@@ -1,3 +1,4 @@
+import { publishedNetMeteringRates, resolveNetMeteringRegime } from '../../shared/netMetering';
 import { equipmentTotals, readEquipment } from '../../shared/equipment';
 import { isWriterRole } from '../../shared/permissions';
 import { webHeaderLogo } from '../utils/documentLogo';
@@ -220,7 +221,8 @@ export class ShareProposalService {
       // One immutable publication captures both the confirmed policy and its financial result.
       // The caller's preview may have been calculated before settings changed.
       summary = calculateProjectFinancialSummary(project, mode);
-      const calculationSnapshot = { mode, organizationId: session.currentUser.organizationId, policyVersion: policy.version, capturedAt: new Date().toISOString() };
+      // El régimen de medición neta queda en el snapshot (el visor lo usa si el enlace no trae la nota publicada).
+      const calculationSnapshot = { mode, organizationId: session.currentUser.organizationId, policyVersion: policy.version, capturedAt: new Date().toISOString(), netMeteringRegime: resolveNetMeteringRegime(project.rates?.netMeteringRegime) };
       // Remove large unnecessary base64 or temporary buffers from project payload if needed
       const projectPayload = {
         id: project.id,
@@ -228,9 +230,10 @@ export class ShareProposalService {
         updatedAt: project.updatedAt,
         client: project.client,
         specs: project.specs,
-        // El enlace lleva el tipo de conexión explícito y coherente con `isZeroExport` (un Worker anterior solo lee este último).
-        // Alternativa de suministro: solo un costo de generador válido (mismo predicado que el Worker).
-        rates: publishedSupplyFields({ ...project.rates, ...gridConnectionFields(resolveGridConnection(project.rates)) }),
+        // El enlace lleva el tipo de conexión explícito y coherente con `isZeroExport` (un Worker anterior solo lee este último),
+        // el régimen y el cargo efectivo materializados (inmutabilidad del enlace) y la alternativa de suministro saneada
+        // (solo un costo de generador válido y una alternativa conocida: mismo predicado que el Worker).
+        rates: publishedSupplyFields(publishedNetMeteringRates({ ...project.rates, ...gridConnectionFields(resolveGridConnection(project.rates)) })),
         financials: project.financials,
         monthlyConsumption: project.monthlyConsumption,
         customization: {

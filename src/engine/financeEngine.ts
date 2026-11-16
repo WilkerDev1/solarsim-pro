@@ -1,9 +1,9 @@
 import type { EnergyCalculationMode } from '../../shared/applicationFeatures';
-import { resolveAnnualDegradation, resolveAssumptions } from '../../shared/assumptions';
+import { resolveAnnualDegradation, resolveAssumptions, type ResolvedAssumptions } from '../../shared/assumptions';
 import { DEFAULT_PRICE_PER_WATT_USD, resolvePricePerWattUSD, resolveSaleMarginMultiplier } from '../../shared/projectDefaults';
 import { ITBIS_RATE, LEY5707_CREDIT_RATE, appliesItemMargin, customItemsTaxBreakdown, isItemItbisExonerated } from '../../shared/financialRules';
 import { SystemSpecs, UtilityRates, FinancialParams, FinancialSummaryResult, CashFlowYear, CostMatrixSummary, CostMatrixItem, CustomQuotationItem, CustomQuotationDiscount, ProjectSimulation } from '../types';
-import { calculateDCCapacityKWp, calculateMonthlySolarProduction } from './solarEngine';
+import { calculateDCCapacityKWp, calculateMonthlySolarProduction, type GridUseChargeInput } from './solarEngine';
 import {
   getProjectPanels,
   getProjectInverters,
@@ -11,7 +11,7 @@ import {
   calculateTotalDCCapacityKWp,
 } from '../utils/equipmentSpecsUtils';
 import { batteryAutonomyHours, batteryBank, readEquipment } from '../../shared/equipment';
-import { resolveGridConnection } from '../../shared/gridConnection';
+import { resolveGridConnection, type GridConnectionMode } from '../../shared/gridConnection';
 import { hasSavingsComparison, resolveSavingsBasis, savingsValuationCostPerKWh } from '../../shared/offGridSupply';
 
 /**
@@ -560,7 +560,8 @@ export function calculateFinancialSummary(
     customMonthlyHSP,
     rates.tariffCode,
     gridConnection,
-    calculationMode
+    calculationMode,
+    engineGridUseCharge(assumptions, gridConnection)
   );
 
   const annualConsumptionKWh = monthlyResults.reduce((sum, m) => sum + m.consumptionKWh, 0);
@@ -707,6 +708,20 @@ export function calculateFinancialSummary(
     equipmentDiscountUSD,
     customDiscountsList: customDiscounts,
   };
+}
+
+/**
+ * Cargo por uso de la red que recibe el motor de energía: solo en el régimen SIE-007-2026, convertido a USD con la
+ * tasa efectiva de la propuesta. En el régimen anterior no hay cargo (rige la retención %).
+ */
+export function engineGridUseCharge(
+  assumptions: Pick<ResolvedAssumptions, 'netMeteringRegime' | 'appliedGridUseChargeDOPPerKWh' | 'dopExchangeRate'>,
+  /** Sistema aislado: sin red no hay inyección, retención ni cargo; el régimen no cambia nada (cifras iguales). */
+  gridConnection?: GridConnectionMode,
+): GridUseChargeInput | undefined {
+  return assumptions.netMeteringRegime === 'sie007_2026' && gridConnection !== 'off_grid'
+    ? { usdPerKWh: assumptions.appliedGridUseChargeDOPPerKWh / assumptions.dopExchangeRate }
+    : undefined;
 }
 
 /**

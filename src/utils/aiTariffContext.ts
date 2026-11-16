@@ -1,4 +1,6 @@
 import { GlobalTariffMatrix, UtilityDistributor, UtilityTariffDetails } from '../types/tariffs';
+import { tariffMatrixKey } from '../../shared/tariffRules';
+import { factoryGridUseCharge } from '../../shared/netMetering';
 
 export const TARIFF_DISTRIBUTORS: UtilityDistributor[] = ['EDEESTE', 'EDESUR', 'EDENORTE', 'CEPM'];
 
@@ -18,6 +20,13 @@ export function getTariffSource(matrix: GlobalTariffMatrix, tariff: UtilityTarif
   };
 }
 
+/** Periodo de vigencia de los pliegos conocidos: pasado el último día, el contexto IA pide confirmar tarifas. */
+const KNOWN_TARIFF_PERIODS: Record<string, { end: string; label: string }> = {
+  'SIE-176-2025-TF': { end: '2026-03-31', label: 'enero-marzo 2026' },
+  'SIE-121-2026-TF': { end: '2026-12-31', label: 'octubre-diciembre 2026' },
+  'SIE-147-2026-TF': { end: '2026-09-30', label: 'septiembre 2026 (CEPM)' },
+};
+
 /** Compact, deterministic reference. These rows are application data, never a prompt to infer new rates. */
 export function buildAITariffContext(matrix: GlobalTariffMatrix, now = new Date()) {
   const warnings: string[] = [
@@ -28,8 +37,9 @@ export function buildAITariffContext(matrix: GlobalTariffMatrix, now = new Date(
     distributor,
     tariffs: Object.entries(matrix.schedules[distributor]?.tariffs || {}).filter(([key, tariff]) => key === tariff.code || !matrix.schedules[distributor].tariffs[tariff.code]).map(([, tariff]) => tariff).sort((a, b) => a.code.localeCompare(b.code)).map((tariff) => {
       const source = getTariffSource(matrix, tariff);
-      if (source.resolutionCode === 'SIE-176-2025-TF' && now.toISOString().slice(0, 10) > '2026-03-31' && distributor !== 'CEPM') {
-        const warning = 'El pliego base SIE-176-2025-TF corresponde a enero-marzo 2026; confirmar tarifas para el período solicitado.';
+      const period = KNOWN_TARIFF_PERIODS[source.resolutionCode];
+      if (period && now.toISOString().slice(0, 10) > period.end) {
+        const warning = `El pliego base ${source.resolutionCode} corresponde a ${period.label}; confirmar tarifas para el período solicitado.`;
         if (!warnings.includes(warning)) warnings.push(warning);
       }
       if (source.effectiveDate > now.toISOString().slice(0, 10)) {
@@ -54,15 +64,17 @@ export function buildAITariffContext(matrix: GlobalTariffMatrix, now = new Date(
       };
     }),
   }));
-  return { resolutionCode: matrix.resolutionCode, effectiveDate: matrix.effectiveDate, schedules, warnings };
+  // Cargo por uso de la red SIE-007-2026 de fábrica (RD$/kWh inyectado), con su procedencia: vive con los supuestos
+  // (`shared/netMetering.ts`), no en la matriz de la organización. Solo tarifas de un solo precio.
+  const gridUseCharges = TARIFF_DISTRIBUTORS.map((distributor) => ({ distributor, ...factoryGridUseCharge(distributor), appliesTo: 'tarifas de un solo precio (BTS-1, BTS-2, RBT-1); 0 con potencia o inyección cero' }));
+  return { resolutionCode: matrix.resolutionCode, effectiveDate: matrix.effectiveDate, schedules, gridUseCharges, warnings };
 }
 
 /** Unknown distributor/code returns null: callers must request confirmation, never silently choose BTS2. */
 export function resolveAITariffSelection(matrix: GlobalTariffMatrix, distributor: string, code: string): UtilityTariffDetails | null {
   if (!TARIFF_DISTRIBUTORS.includes(distributor as UtilityDistributor)) return null;
-  const normalized = code.toUpperCase().trim();
-  const canonical = distributor === 'CEPM' ? ({ BTS1: 'RBT-1', BTS2: 'RBT-1', BTD: 'RBT-2', MTD1: 'RMT-1', MTD2: 'RMT-1' } as Record<string, string>)[normalized] || normalized : normalized;
-  return matrix.schedules[distributor as UtilityDistributor]?.tariffs[canonical] || null;
+  // BTS-1, «bts 1» y BTS1 son la misma fila; en CEPM los códigos de las EDE se resuelven a su alias.
+  return matrix.schedules[distributor as UtilityDistributor]?.tariffs[tariffMatrixKey(distributor, code)] || null;
 }
 
 export function tariffSourceFieldLabel(field: string): string {
