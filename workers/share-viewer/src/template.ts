@@ -9,7 +9,7 @@ import { createDocumentTextContext, docTextKey, interpolate, viewerText } from '
 import { ENERGY_FLOW_CSS, renderEnergyFlowSection } from './energyFlow';
 import { isBuiltInFeatureAvailable } from '../../../shared/applicationFeatures';
 import { resolveGridConnection } from '../../../shared/gridConnection';
-import { hasSavingsComparison, resolveGeneratorCostPerKWh, resolveSavingsBasis, resolveSupplyAlternative, storedSupplyAlternative, type SavingsBasis } from '../../../shared/offGridSupply';
+import { hasSavingsComparison, resolveGeneratorCostPerKWh, resolveSavingsBasis, resolveSupplyAlternative, storedSupplyAlternative, supplyPresentation, type SavingsBasis } from '../../../shared/offGridSupply';
 import { EQUIPMENT_FALLBACK_NAME, equipmentTotals, readEquipment } from '../../../shared/equipment';
 import { mainModelPhrase } from '../../../shared/documentTexts/equipmentPhrases';
 
@@ -152,6 +152,8 @@ export function renderProposalPage(stored: StoredProposal): string {
   // Con generador, la base del ahorro (cabecera y flujo de caja) es el costo de generación propia, no la tarifa.
   const supplyAlternative = resolveSupplyAlternative(rates);
   const generatorCost = resolveGeneratorCostPerKWh(rates);
+  // Generador o «sin comparación»: la página no nombra la distribuidora ni su tarifa (enlaces con red o con tarifa, igual).
+  const supplyKind = supplyPresentation(rates).kind;
   const exportFee = assumptions.gridExportFeePct;
 
   // Equipos solo por `shared/equipment`: un enlace antiguo (solo espejo) y uno nuevo (solo grupos) dan lo mismo.
@@ -521,7 +523,9 @@ ${ENERGY_FLOW_CSS}
           <div class="text-[10.5px] sm:text-[11px] font-black uppercase text-orange-600 tracking-wider flex items-center justify-start md:justify-end gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span> Detalles de la Cotización</div>
           <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">N° Cotización:</span> <span class="font-mono font-bold text-slate-950">${escapeHtml(quoteNumber)}</span></div>
           <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">ID Proyecto:</span> <span class="font-mono font-bold text-slate-950">${escapeHtml(projectId)}</span></div>
-          ${supplyAlternative === 'generator'
+          ${supplyKind === 'no_grid'
+            ? `<div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1" data-savings-reference="no_grid"><span class="font-bold text-slate-500">Suministro actual:</span> <span class="font-bold text-sky-900">${escapeHtml(docText('quotation.supply.noGrid'))}</span></div>`
+            : supplyKind === 'generator'
             ? `<div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1" data-savings-reference="generator"><span class="font-bold text-slate-500">Suministro actual:</span> <span class="font-bold text-sky-900">Generador • ${generatorCost === null ? 'costo pendiente' : `US$ ${generatorCost.toFixed(3)}/kWh`}</span></div>`
             : `<div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">Distribuidora / Tarifa:</span> <span class="font-bold text-sky-900">${escapeHtml(distributor)} • ${escapeHtml(tariffDisplayName)}</span></div>`}
           <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">Fecha de Emisión:</span> <span class="font-semibold text-slate-800">${new Date().toLocaleDateString('es-DO', { day: '2-digit', month: 'long', year: 'numeric' })}</span></div>
@@ -585,7 +589,7 @@ ${ENERGY_FLOW_CSS}
       <div class="rounded-xl sm:rounded-2xl border-2 border-orange-200 bg-orange-50/90 p-3.5 sm:p-4 space-y-2 text-xs text-orange-950">
         <div class="font-black uppercase tracking-wider text-[10.5px] sm:text-[11px] flex items-center gap-1.5 sm:gap-2 text-orange-900">
           <svg class="w-4 h-4 text-orange-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-          Marco Regulatorio y Condiciones de Operación (SIE / EDES)
+          ${supplyKind === 'utility' ? 'Marco Regulatorio y Condiciones de Operación (SIE / EDES)' : escapeHtml(docText('projectDescription.regulatoryHeading'))}
         </div>
         <div class="space-y-1.5 text-[11px] leading-relaxed text-left sm:text-justify">
           ${regParagraphs.map((p) => `<p>${formatMarkdown(p, 'font-bold text-orange-950')}</p>`).join('\n')}

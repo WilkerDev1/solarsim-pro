@@ -58,6 +58,10 @@ for (const [basis, rates] of [
   assert.ok(/const cumCtx = document\.getElementById\('cumulativeChart'\);\s*if \(cumCtx\)/.test(html));
   const regulatory = html.slice(html.indexOf('modo isla), sin acometida'), html.indexOf('modo isla), sin acometida') + 1400).split('</div>')[0];
   assert.ok(!/ahorr/i.test(regulatory), `${basis}: el marco regulatorio no habla de ahorro`);
+  // Opción C: ni distribuidora ni tarifa en ninguna parte de la página.
+  const visible = html.replace(/<script[\s\S]*?<\/script>/g, '');
+  assert.ok(!/EDE(?:ESTE|SUR|NORTE)|Distribuidora \/ Tarifa|SIE \/ EDES|BTS2|Tarifa BTS/.test(visible), `${basis}: ${(visible.match(/EDE(?:ESTE|SUR|NORTE)|Distribuidora \/ Tarifa|SIE \/ EDES|BTS2|Tarifa BTS/) ?? [''])[0]}`);
+  if (basis === 'no_comparison') assert.ok(/Suministro actual:[\s\S]{0,120}Sin conexión a la red/.test(html), 'cabecera: sin conexión a la red');
 }
 
 // ── Generador con costo: se compara con la generación propia ───────────────────────────────
