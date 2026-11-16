@@ -20,7 +20,7 @@ assert.equal(merged.schedules.EDESUR.tariffs.BTD.baseEnergyRateDOP, 10.5);
 assert.equal(merged.schedules.EDESUR.tariffs.BTD.fixedChargeDOP, 0);
 assert.equal(merged.schedules.EDESUR.tariffs.BTD.netMeteringRetentionPct, 0);
 assert.equal(merged.schedules.CEPM.tariffs['RBT-1'].baseEnergyRateDOP, 24.1, 'Keep the user matrix, never silently reset to factory values');
-assert.equal(merged.schedules.EDENORTE.tariffs.BTS1.source?.resolutionCode, 'SIE-176-2025-TF');
+assert.equal(merged.schedules.EDENORTE.tariffs.BTS1.source?.resolutionCode, 'SIE-121-2026-TF');
 assert.equal(merged.schedules.EDESUR.tariffs.BTD.source?.resolutionCode, 'QA-PLIEGO-2026');
 assert.equal(current.schedules.EDESUR.tariffs.BTD.source, undefined, 'Extraction must not mutate the current matrix');
 for (const invalid of [
@@ -48,7 +48,7 @@ assert.equal(resolveAITariffSelection(merged, 'EDESUR', 'UNKNOWN'), null);
 assert.equal(resolveAITariffSelection(merged, 'UNKNOWN', 'BTS1'), null);
 assert.equal(resolveAITariffSelection(merged, 'CEPM', 'BTS1')?.code, 'RBT-1');
 const context = buildAITariffContext(rehydrated, new Date('2026-10-07T00:00:00Z'));
-assert(context.warnings.some((warning) => warning.includes('enero-marzo')));
+assert(context.warnings.some((warning) => warning.includes('SIE-147-2026-TF') && warning.includes('septiembre 2026')), 'El pliego CEPM de septiembre pide confirmar vigencia en octubre');
 assert.equal(context.schedules.find((schedule) => schedule.distributor === 'CEPM')?.tariffs.length, 4, 'No duplicate legacy codes in the AI reference');
 assert.equal(JSON.stringify(context), JSON.stringify(buildAITariffContext(rehydrated, new Date('2026-10-07T00:00:00Z'))));
 
@@ -94,7 +94,7 @@ arbitraryBlocks.schedules.EDESUR.tariffs.BTS1.blocks=[{minKWh:0,maxKWh:100,rateD
 assert.equal(getReferenceEnergyRateUSD(arbitraryBlocks,'EDESUR','BTS1',200,1),7.5,'Inclusive printed blocks must have contiguous continuous billing widths');
 
 assert.equal(merged.schedules.EDESUR.tariffs.BTD.demandChargePerKWDOP,current.schedules.EDESUR.tariffs.BTD.demandChargePerKWDOP,'Partial row preserves unobserved demand charges');
-assert.equal(merged.schedules.EDESUR.tariffs.BTD.source?.fieldSources?.demandChargePerKWDOP.resolutionCode,'SIE-176-2025-TF');
+assert.equal(merged.schedules.EDESUR.tariffs.BTD.source?.fieldSources?.demandChargePerKWDOP.resolutionCode,'SIE-121-2026-TF');
 assert.equal(merged.schedules.EDESUR.tariffs.BTD.source?.fieldSources?.baseEnergyRateDOP.resolutionCode,'QA-PLIEGO-2026');
 const updatedCEPM=structuredClone(DEFAULT_RD_TARIFF_MATRIX);updatedCEPM.schedules.CEPM.tariffs['RBT-1'].baseEnergyRateDOP=30;
 assert.equal(getReferenceEnergyRateUSD(updatedCEPM,'CEPM','BTS1',900,60),.5,'Legacy aliases resolve current canonical schedule');

@@ -79,16 +79,16 @@ assert(Math.abs(rateCepmRbt1 - 0.382) < 0.005, 'RBT-1 debe equivaler a ~0.382 US
 
 const rateCepmRbt2 = getReferenceEnergyRateUSD(DEFAULT_RD_TARIFF_MATRIX, 'CEPM', 'RBT-2', 900, 60.0);
 console.log(`CEPM RBT-2 a 60 DOP/USD: $${rateCepmRbt2.toFixed(3)} USD/kWh`);
-assert(Math.abs(rateCepmRbt2 - 0.235) < 0.005, 'RBT-2 debe equivaler a ~0.235 USD/kWh (14.1278 DOP / 60)');
+assert(Math.abs(rateCepmRbt2 - 0.233) < 0.005, 'RBT-2 debe equivaler a ~0.233 USD/kWh (14.00 DOP / 60, SIE-147-2026-TF)');
 
 // 5. Retrocompatibilidad: CEPM con BTS1 en matriz
 const rateLegacyCepm = getReferenceEnergyRateUSD(DEFAULT_RD_TARIFF_MATRIX, 'CEPM', 'BTS1', 900, 60.0);
 assert(Math.abs(rateLegacyCepm - 0.382) < 0.005, 'CEPM con código legacy BTS1 debe resolver a tarifa de RBT-1');
 
-// 6. EDEESTE bajo Resolución SIE-176-2025-TF
+// 6. EDEESTE bajo Resolución SIE-121-2026-TF (octubre-diciembre 2026)
 assert(
-  DEFAULT_RD_TARIFF_MATRIX.resolutionCode === 'SIE-176-2025-TF',
-  'Resolución oficial es SIE-176-2025-TF'
+  DEFAULT_RD_TARIFF_MATRIX.resolutionCode === 'SIE-121-2026-TF',
+  'Resolución oficial es SIE-121-2026-TF'
 );
 const rateEdeesteBts2 = getReferenceEnergyRateUSD(DEFAULT_RD_TARIFF_MATRIX, 'EDEESTE', 'BTS2', 900, 60.0);
 console.log(`EDEESTE BTS2 a 60 DOP/USD: $${rateEdeesteBts2.toFixed(3)} USD/kWh`);

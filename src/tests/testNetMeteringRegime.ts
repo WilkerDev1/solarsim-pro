@@ -206,22 +206,25 @@ const bts1Note = note('EDENORTE', 'BTS1');
 const chargeParagraph = (tariffName: string) => `Para la tarifa ${tariffName}, el análisis económico considera el cargo por derecho de uso de la red, equivalente al 25% del valor de la energía excedente exportada, conforme al régimen de Medición Neta y la normativa vigente (Resolución SIE-007-2026-REG). Por esta razón, el sistema se diseña para maximizar el autoconsumo y optimizar la inyección de energía, obteniendo así el mayor retorno de inversión posible. Cuando resulte conveniente, se recomendará la incorporación de baterías de litio para incrementar el aprovechamiento directo de la energía generada.`;
 assert.equal(bts1Note.split('\n\n')[3], chargeParagraph('BTS1 (Residencial Monómica)'));
 assert.ok(bts1Note.startsWith('La energía generada mensualmente se descontará del consumo tomado de la red de la distribuidora eléctrica (EDES).'));
-// Hoy la misma frase del cargo aparece también en tarifas con cargo de potencia (BTD): la fase 1 la condiciona.
+// Fase 1d: en tarifas con cargo de potencia (BTD) la nota ya no atribuye el cargo por uso de red; la edición
+// `legacy` (enlaces publicados antes) conserva la frase anterior.
 const btdNote = note('EDESUR', 'BTD');
 assert.equal(btdNote.split('\n\n').length, 4);
-assert.ok(btdNote.split('\n\n')[3].includes('equivalente al 25% del valor de la energía excedente exportada'), btdNote);
+assert.ok(!btdNote.includes('equivalente al 25% del valor de la energía excedente exportada'), btdNote);
+assert.ok(note('EDESUR', 'BTD', { regulatoryNoteEdition: 'legacy' }).split('\n\n')[3].includes('equivalente al 25% del valor de la energía excedente exportada'));
 const zeroNote = note('EDEESTE', 'BTS2', { isZeroExport: true, hasBattery: true });
 assert.equal(zeroNote.split('\n\n')[3], 'Al operar con limitador antivertido (inyección cero) y almacenamiento en baterías de litio, la totalidad de la energía solar se aprovecha internamente, por lo que el proyecto no genera cargos por derecho de uso de la red bajo la normativa vigente.');
 
+// Fase 1b: EDESUR y EDENORTE con sus propios valores (SIE-121-2026-TF); EDEESTE no cambia; CEPM RBT-2 según SIE-147-2026-TF.
 const REFERENCE_RATES = {
-  edesurBts1_150: 0.103,
-  edesurBts1_250: 0.111,
-  edesurBts1_1000: 0.188,
-  edenorteBts1_1000: 0.188,
-  edeesteBts2_900: 0.203,
-  edesurBtd: 0.151,
+  edesurBts1_150: 0.101,
+  edesurBts1_250: 0.109,
+  edesurBts1_1000: 0.218, // 1c: desde 701 kWh, todo a 13.09 (art. 4.d)
+  edenorteBts1_1000: 0.234, // 1c: todo a 14.04
+  edeesteBts2_900: 0.227, // 1c: BTS-2 también, todo a 13.59
+  edesurBtd: 0.15,
   cepmRbt1: 0.382,
-  cepmRbt2: 0.235,
+  cepmRbt2: 0.233,
 };
 // 7. Tarifa de referencia de fábrica que se propone al crear o escanear (USD/kWh a 60 RD$/USD).
 // No entra en propuestas guardadas; la fase 1 la corrige (pliego vigente y regla de 701 kWh).

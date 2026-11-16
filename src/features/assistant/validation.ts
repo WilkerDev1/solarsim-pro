@@ -1,3 +1,4 @@
+import { normalizeTariffCode } from '../../../shared/tariffRules';
 import type { AssistantEdit, AssistantSection } from './types';
 // Explicit surface: no ids, roles, authorship, remote endpoints, assets or arbitrary store writes.
 const fields: Record<AssistantSection, string[]> = {
@@ -347,6 +348,13 @@ export function validateAssistantEdits(
         throw new Error('La capacidad nominal debe ser mayor que cero.');
       if (field === 'saleMarginMultiplier' && value < 1)
         throw new Error('El factor de venta debe ser al menos 1.');
+    }
+    // Código de tarifa en la forma de la matriz (BTS-1 → BTS1): mismo normalizador que la IA y el dock.
+    if (field === 'tariffCode') {
+      if (typeof value !== 'string') throw new Error('El código de tarifa no es válido.');
+      const code = normalizeTariffCode(value);
+      if (!code) throw new Error('El código de tarifa no es válido.');
+      return { section, field, value: code };
     }
     return { section, field, value };
   });

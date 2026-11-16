@@ -24,6 +24,11 @@ export interface DocumentTextContext {
   tariffCode: string;
   isZeroExport: boolean;
   gridExportFeePct: number;
+  /**
+   * 'legacy': nota regulatoria tal como la mostraban los enlaces publicados antes de distinguir el tipo de
+   * tarifa (el visor la usa cuando el enlace no trae la nota publicada). Ausente: texto vigente.
+   */
+  regulatoryNoteEdition?: 'legacy';
   hasBattery: boolean;
   /** Hay baterías con capacidad (> 0 kWh) en la propuesta. */
   hasBatteryStorage: boolean;

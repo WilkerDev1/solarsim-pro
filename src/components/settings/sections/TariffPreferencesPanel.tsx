@@ -301,7 +301,7 @@ export const TariffPreferencesPanel: React.FC<TariffPreferencesPanelProps> = ({ 
                                   <input
                                     type="number"
                                     step={0.01}
-                                    value={tariff.baseEnergyRateDOP || 0}
+                                    value={tariff.baseEnergyRateDOP || (tariff.currency === 'USD' ? Math.round(currentUSD * 60.0 * 100) / 100 : 0)}
                                     onChange={(e) => {
                                       const dopVal = parseFloat(e.target.value) || 0;
                                       const usdVal = Math.round((dopVal / 60.0) * 1000) / 1000;

@@ -42,7 +42,9 @@ $$E_{net\_credit,m} = E_{exp,m} \times \left(1 - \frac{F_{grid}}{100}\right)$$
 
 $$E_{saved,m} = E_{auto,m} + E_{net\_credit,m}, \qquad S_m = E_{saved,m} \times T_{kWh}, \qquad S_{yr1} = \sum_{m} S_m$$
 
-$T_{kWh}$ es `energyCostPerKWh` del proyecto.
+$T_{kWh}$ es `energyCostPerKWh` del proyecto: una tarifa plana guardada en la propuesta. El motor no lee la matriz de tarifas; la matriz solo sugiere esa tarifa al crear o escanear (tarifa de referencia, ver [Tarifas en el flujo IA](AI_TARIFF_CONTEXT.md)). La referencia de BTS-1 y BTS-2 es el precio medio por bloques del consumo mensual promedio; desde 701 kWh es el precio del cuarto bloque para todo el consumo (Resolución SIE-121-2026-TF, art. 4.d). Cambiar la matriz o esa regla no altera propuestas guardadas: `src/tests/testNetMeteringRegime.ts` fija las cifras actuales de BTS-1, BTD, inyección cero y batería en ambos modos.
+
+La retención es hoy un porcentaje uniforme para todas las tarifas. El Reglamento SIE-007-2026-REG solo cobra el cargo por uso de la red a las tarifas de un solo precio (BTS-1, BTS-2, RBT-1); la nota regulatoria del documento ya lo distingue, pero el cálculo todavía no (fase 3 del plan tarifario).
 
 ### 1.4 Factura y cobertura
 
