@@ -2,14 +2,14 @@ import React from 'react';
 import { getTariffDisplayName } from '../../../../../../shared/proposalPresentation';
 import type { ProjectSimulation, SystemSpecs, UtilityRates } from '../../../../../types';
 import { getDistributorTariffOptions, type UtilityDistributor } from '../../../../../types/tariffs';
-import { Field, FieldMenu, InfoTip, ParamRow, SelectField, ToggleGroup } from '../../ui';
+import { Field, FieldMenu, ParamRow, SelectField, ToggleGroup } from '../../ui';
 import { resolveAssumptions } from '../../../../../../shared/assumptions';
 import { SelfConsumptionPanel } from './SelfConsumptionPanel';
+import { NetMeteringFields } from './NetMeteringFields';
 import {
   averageMonthlyConsumption,
   currentDistributor,
   currentTariffCode,
-  exportFeeValue,
   isMatchingReference,
   planDistributorChange,
   planTariffChange,
@@ -26,6 +26,8 @@ export interface RatesFieldsProps {
   projectionEnabled: boolean;
   updateRates: (rates: Partial<UtilityRates>) => void;
   updateSpecs?: (specs: Partial<SystemSpecs>) => void;
+  /** Función de este equipo `netMeteringRegimeSelector` (visible por defecto). */
+  showRegimeSelector?: boolean;
 }
 
 const DISTRIBUTORS = ['EDEESTE', 'EDESUR', 'EDENORTE', 'CEPM'].map(value => ({ value, label: value }));
@@ -36,7 +38,7 @@ const YES_NO = [
 
 const parseNumber = (raw: string) => parseFloat(raw) || 0;
 
-export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix, projectionEnabled, updateRates, updateSpecs }) => {
+export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix, projectionEnabled, updateRates, updateSpecs, showRegimeSelector = true }) => {
   const { rates } = project;
   // El valor que se muestra es el que usa el cálculo: supuestos efectivos del proyecto completo (ADR 0003).
   const assumptions = resolveAssumptions(project);
@@ -125,19 +127,7 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
       <ParamRow label="Inyección cero" labelId="pd-rates-zero-label">
         <ToggleGroup ariaLabel="Inyección cero" options={YES_NO} value={zeroExport} onChange={value => updateRates({ isZeroExport: value })} />
       </ParamRow>
-      <ParamRow label="Cargo exportación" htmlFor="pd-rates-export">
-        <Field
-          id="pd-rates-export"
-          type="number"
-          step="1"
-          mono
-          suffix="%"
-          disabled={zeroExport}
-          value={exportFeeValue(rates, assumptions.gridExportFeePct)}
-          onChange={value => updateRates({ gridExportFeePct: parseNumber(value) })}
-          right={<InfoTip text={exportTip} />}
-        />
-      </ParamRow>
+      <NetMeteringFields rates={rates} assumptions={assumptions} showRegimeSelector={showRegimeSelector} exportTip={exportTip} updateRates={updateRates} />
       {projectionEnabled && (
         <SelfConsumptionPanel project={project} tariffCode={tariffCode} avgMonthlyConsumption={avgMonthlyConsumption} updateSpecs={updateSpecs} />
       )}

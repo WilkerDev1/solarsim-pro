@@ -15,7 +15,7 @@ interface RatesParamsSectionProps {
 /** Cuerpo de «Tarifas y distribuidora»: conecta el store con `RatesFields`. */
 export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({ project, updateRates, updateSpecs }) => {
   const projectionEnabled = useSelfConsumptionProjection();
-  const { tariffMatrix } = useSimulationStore(useShallow(state => ({ tariffMatrix: state.tariffMatrix })));
+  const { tariffMatrix, showRegimeSelector } = useSimulationStore(useShallow(state => ({ tariffMatrix: state.tariffMatrix, showRegimeSelector: state.netMeteringRegimeSelectorEnabled })));
   return (
     <RatesFields
       project={project}
@@ -23,6 +23,7 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({ project,
       projectionEnabled={projectionEnabled}
       updateRates={updateRates}
       updateSpecs={updateSpecs}
+      showRegimeSelector={showRegimeSelector}
     />
   );
 };

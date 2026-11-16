@@ -224,6 +224,9 @@ export interface AISlice {
 export interface UISlice {
   appAssistantEnabled: boolean;
   setAppAssistantEnabled: (enabled: boolean) => void;
+  /** Selector temporal de régimen de medición neta en el dock (función de este equipo, visible por defecto). */
+  netMeteringRegimeSelectorEnabled: boolean;
+  setNetMeteringRegimeSelectorEnabled: (enabled: boolean) => void;
   isNewProjectModalOpen: boolean;
   isUpdateModalOpen: boolean;
   isAIInvoiceModalOpen: boolean;

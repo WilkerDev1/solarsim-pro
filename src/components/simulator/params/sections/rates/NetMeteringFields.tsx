@@ -1,0 +1,110 @@
+import React from 'react';
+import type { UtilityRates } from '../../../../../types';
+import type { ResolvedAssumptions } from '../../../../../../shared/assumptions';
+import {
+  GRID_USE_CHARGE_ESTIMATE_NOTICE,
+  NET_METERING_REGIMES,
+  NET_METERING_REGIME_LABELS,
+  factoryGridUseCharge,
+  gridUseChargeApplies,
+  type NetMeteringRegime,
+} from '../../../../../../shared/netMetering';
+import { Field, FieldMenu, InfoTip, ParamRow, SelectField } from '../../ui';
+import { exportFeeValue } from './ratesLogic';
+
+export interface NetMeteringFieldsProps {
+  rates: UtilityRates;
+  /** Supuestos efectivos de la propuesta (régimen y cargo resueltos, ADR 0003). */
+  assumptions: Pick<ResolvedAssumptions, 'netMeteringRegime' | 'gridUseChargeDOPPerKWh' | 'gridExportFeePct'>;
+  /** Función de este equipo `netMeteringRegimeSelector`: muestra el selector temporal de régimen. */
+  showRegimeSelector: boolean;
+  /** Texto del InfoTip de la retención del régimen anterior. */
+  exportTip: string;
+  updateRates: (rates: Partial<UtilityRates>) => void;
+}
+
+const REGIME_OPTIONS = NET_METERING_REGIMES.map((value) => ({ value, label: NET_METERING_REGIME_LABELS[value] }));
+const parseNumber = (raw: string) => parseFloat(raw) || 0;
+
+/**
+ * Medición neta en el dock: selector temporal de régimen y, según el régimen, la retención % anterior o el cargo
+ * por uso de la red SIE-007-2026 en RD$/kWh inyectado (editable, con el valor de fábrica a un clic y el aviso de
+ * que es estimado). Componente aparte de `RatesFields` para que los cambios de tarifas queden localizados.
+ */
+export const NetMeteringFields: React.FC<NetMeteringFieldsProps> = ({ rates, assumptions, showRegimeSelector, exportTip, updateRates }) => {
+  const regime = assumptions.netMeteringRegime;
+  const zeroExport = !!rates.isZeroExport;
+  const factory = factoryGridUseCharge(rates.distributor);
+  const charge = assumptions.gridUseChargeDOPPerKWh;
+  const isFactory = Math.abs(charge - factory.dopPerKWh) < 0.005;
+  const applies = gridUseChargeApplies(rates);
+  const chargeTip = !applies
+    ? zeroExport
+      ? 'Inyección cero activa: no se inyecta energía a la red, por lo que no hay cargo por uso de red.'
+      : 'Tarifa con cargo de potencia: el Reglamento SIE-007-2026-REG reserva el cargo por uso de la red a las tarifas de un solo precio (BTS-1, BTS-2, RBT-1). No se cobra.'
+    : `Medición neta SIE-007-2026-REG (art. 19.1.e): se acredita todo lo inyectado y se cobra este cargo por cada kWh inyectado a la red. Valor de fábrica: RD$${factory.dopPerKWh.toFixed(2)} (Resolución ${factory.resolutionCode}, ${factory.period}).`;
+
+  return (
+    <>
+      {showRegimeSelector && (
+        <ParamRow label="Régimen" htmlFor="pd-rates-regime">
+          <SelectField
+            id="pd-rates-regime"
+            value={regime}
+            options={REGIME_OPTIONS}
+            onChange={(value) => updateRates({ netMeteringRegime: value as NetMeteringRegime })}
+          />
+        </ParamRow>
+      )}
+      {regime === 'sie007_2026' ? (
+        <>
+          <ParamRow label="Cargo uso de red" htmlFor="pd-rates-grid-charge">
+            <Field
+              id="pd-rates-grid-charge"
+              type="number"
+              step="0.01"
+              prefix="RD$"
+              suffix="/kWh"
+              mono
+              disabled={!applies}
+              value={applies ? charge : 0}
+              onChange={(value) => updateRates({ gridUseChargeDOPPerKWh: parseNumber(value) })}
+              right={applies ? (
+                <FieldMenu
+                  ariaLabel={isFactory ? 'Opciones del cargo: valor de fábrica aplicado' : `Opciones del cargo: difiere del de fábrica (RD$${factory.dopPerKWh.toFixed(2)}/kWh)`}
+                  attention={!isFactory}
+                  items={[{
+                    label: isFactory ? 'Valor de fábrica aplicado' : 'Aplicar valor de fábrica',
+                    hint: `RD$${factory.dopPerKWh.toFixed(2)}`,
+                    checked: isFactory,
+                    onSelect: () => updateRates({ gridUseChargeDOPPerKWh: factory.dopPerKWh }),
+                  }]}
+                />
+              ) : <InfoTip text={chargeTip} />}
+            />
+          </ParamRow>
+          {applies && (
+            <p role="note" className="m-0 flex items-start gap-1.5 rounded bg-pd-warn-bg px-2 py-1.5 text-[11px] font-medium leading-snug text-pd-warn-text">
+              <span>{GRID_USE_CHARGE_ESTIMATE_NOTICE} {factory.resolutionCode}, {factory.period}.</span>
+              <InfoTip text={chargeTip} />
+            </p>
+          )}
+        </>
+      ) : (
+        <ParamRow label="Cargo exportación" htmlFor="pd-rates-export">
+          <Field
+            id="pd-rates-export"
+            type="number"
+            step="1"
+            mono
+            suffix="%"
+            disabled={zeroExport}
+            value={exportFeeValue(rates, assumptions.gridExportFeePct)}
+            onChange={(value) => updateRates({ gridExportFeePct: parseNumber(value) })}
+            right={<InfoTip text={exportTip} />}
+          />
+        </ParamRow>
+      )}
+    </>
+  );
+};

@@ -59,6 +59,11 @@ export const DEVICE_APPLICATION_FEATURES = [{
   id: 'localMcpServer', title: 'Servidor MCP local',
   description: 'Permite que Claude Code, Codex u otros clientes MCP de este equipo usen las herramientas de agentes con los permisos de «Agentes externos».',
   stage: 'beta' as FeatureStage, available: true, defaultEnabled: false, scope: 'device' as const,
+}, {
+  id: 'netMeteringRegimeSelector', title: 'Selector de régimen de medición neta',
+  description: 'Muestra en los parámetros de tarifa un selector temporal para calcular una propuesta con la retención % anterior o con el cargo por kWh inyectado del Reglamento SIE-007-2026, para pruebas y casos especiales. Ocultarlo no cambia el régimen de ninguna propuesta.',
+  stage: 'beta' as FeatureStage, available: true, defaultEnabled: true, scope: 'device' as const,
 }] as const;
 export type DeviceFeatureId = (typeof DEVICE_APPLICATION_FEATURES)[number]['id'];
 export const isDeviceFeatureAvailable = (id: DeviceFeatureId): boolean => DEVICE_APPLICATION_FEATURES.some((f) => f.id === id && f.available);
+export const isDeviceFeatureDefaultEnabled = (id: DeviceFeatureId): boolean => DEVICE_APPLICATION_FEATURES.some((f) => f.id === id && f.available && f.defaultEnabled);

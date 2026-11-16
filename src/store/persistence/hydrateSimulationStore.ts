@@ -7,7 +7,7 @@ import { normalizeStoredTariffMatrix } from '../../utils/tariffExtraction';
 import { DEFAULT_RD_TARIFF_MATRIX } from '../../data/rdTariffs';
 import { normalizeBrandName, inferBrandFromText } from '../../utils/equipmentBrandUtils';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
-import { normalizeFeatureSettings, featureScope, isFeatureSettings } from '../../../shared/applicationFeatures';
+import { normalizeFeatureSettings, featureScope, isFeatureSettings, isDeviceFeatureDefaultEnabled } from '../../../shared/applicationFeatures';
 import { migrateDefaultSimulationSettings } from '../defaultSimulationSettings';
 import { normalizeAgentPolicy } from '../slices/agentSlice';
 import { migrateLegacySpecs } from '../../../shared/equipment';
@@ -132,6 +132,8 @@ export function hydrateSimulationStore(state: SimulationStore | undefined): void
   }
   if (state) {
     state.appAssistantEnabled = state.appAssistantEnabled === true;
+    // Sin preferencia guardada, el valor por defecto de la función (visible).
+    state.netMeteringRegimeSelectorEnabled = typeof state.netMeteringRegimeSelectorEnabled === 'boolean' ? state.netMeteringRegimeSelectorEnabled : isDeviceFeatureDefaultEnabled('netMeteringRegimeSelector');
     if (!state.equipmentCatalog || !Array.isArray(state.equipmentCatalog) || state.equipmentCatalog.length === 0) {
       state.equipmentCatalog = DEFAULT_EQUIPMENT_CATALOG.filter((equipment) => !(state.deletedEquipmentIds || []).includes(equipment.id));
     } else {
