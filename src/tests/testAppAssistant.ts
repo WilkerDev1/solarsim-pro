@@ -7,7 +7,7 @@ import {
   executeAssistantTool,
   applyAssistantAction,
 } from '../features/assistant/tools';
-import { validateAssistantEdits } from '../features/assistant/validation';
+import { AssistantEditsError, validateAssistantEdits } from '../features/assistant/validation';
 import { runAssistant } from '../features/assistant/service';
 import { featureScope } from '../../shared/applicationFeatures';
 import type { GeminiTransport } from '../../shared/geminiTransport';
@@ -97,6 +97,31 @@ assert.throws(
     ),
   /no permitido/
 );
+// Validates every edit and reports the whole set, so the model fixes everything in one round (all or nothing).
+{
+  const batch = [
+    { section: 'specs', field: 'systemLosses', value: 110 },
+    { section: 'rates', field: 'targetCoveragePct', value: 90 },
+    { section: 'specs', field: 'panelCount', value: 1.5 },
+    { section: 'client', field: 'organizationId', value: 'foreign' },
+  ];
+  let caught: unknown;
+  try { validateAssistantEdits(batch, 'project'); } catch (error) { caught = error; }
+  assert(caught instanceof AssistantEditsError, 'one error with every problem');
+  assert.deepEqual(caught.errors.map((e) => e.index), [0, 2, 3]);
+  assert.deepEqual(caught.errors.map((e) => e.field), ['specs.systemLosses', 'specs.panelCount', 'client.organizationId']);
+  assert.match(caught.message, /3 de 4 cambios/);
+  assert.match(caught.message, /100%/);
+  assert.match(caught.message, /entero/);
+  assert.match(caught.message, /no permitido/);
+  assert.match(caught.message, /ninguno/i, 'nothing is applied');
+  // The tool call fails as a whole: the valid coverage edit is not prepared either.
+  const before = JSON.stringify(state.getState().projects);
+  assert.throws(() => executeAssistantTool({ name: 'propose_project_update', args: { id: project.id, title: 'Lote', edits: batch } }, owner), /3 de 4 cambios/);
+  assert.equal(JSON.stringify(state.getState().projects), before);
+  // A single invalid edit keeps its plain message.
+  assert.throws(() => validateAssistantEdits([{ section: 'specs', field: 'systemLosses', value: 110 }], 'project'), (e: Error) => e instanceof AssistantEditsError && /^systemLosses no puede superar 100%\.$/.test(e.message));
+}
 assert.throws(
   () =>
     validateAssistantEdits(

@@ -174,6 +174,27 @@ const percentages = new Set([
   'discountRatePct',
 ]);
 export const editableAssistantFields = fields;
+export interface AssistantEditIssue {
+  /** Posición del cambio en la lista recibida (desde 0). */
+  index: number;
+  /** `sección.campo` cuando el cambio lo declara. */
+  field?: string;
+  message: string;
+}
+/** Todos los cambios inválidos de un lote: nada se aplica si hay alguno (todo o nada). */
+export class AssistantEditsError extends Error {
+  constructor(readonly errors: AssistantEditIssue[], total: number) {
+    super(
+      total === 1 && errors.length === 1
+        ? errors[0].message
+        : `${errors.length} de ${total} cambios no son válidos; no se aplicó ninguno. Corrige todos en el mismo intento:\n${errors
+            .map((e) => `- Cambio ${e.index + 1}${e.field ? ` (${e.field})` : ''}: ${e.message}`)
+            .join('\n')}`
+    );
+    this.name = 'AssistantEditsError';
+  }
+}
+/** Valida cada cambio y, si alguno falla, lanza `AssistantEditsError` con todos los errores (sin aplicar ninguno). */
 export function validateAssistantEdits(
   input: unknown,
   kind: 'project' | 'equipment'
@@ -181,7 +202,29 @@ export function validateAssistantEdits(
   if (!Array.isArray(input) || !input.length || input.length > 24)
     throw new Error('El cambio debe contener entre 1 y 24 campos.');
   const keys = new Set<string>();
-  return input.map((raw) => {
+  const errors: AssistantEditIssue[] = [];
+  const edits: AssistantEdit[] = [];
+  input.forEach((raw, index) => {
+    try {
+      edits.push(validateEdit(raw, kind, keys));
+    } catch (error) {
+      const { section, field } = (raw && typeof raw === 'object' ? raw : {}) as Partial<AssistantEdit>;
+      errors.push({
+        index,
+        ...(typeof section === 'string' && typeof field === 'string' ? { field: `${section}.${field}` } : {}),
+        message: error instanceof Error ? error.message : 'Cambio inválido.',
+      });
+    }
+  });
+  if (errors.length) throw new AssistantEditsError(errors, input.length);
+  return edits;
+}
+function validateEdit(
+  raw: unknown,
+  kind: 'project' | 'equipment',
+  keys: Set<string>
+): AssistantEdit {
+  {
     if (!raw || typeof raw !== 'object') throw new Error('Cambio inválido.');
     const { section, field, value } = raw as AssistantEdit;
     if (
@@ -364,5 +407,5 @@ export function validateAssistantEdits(
       return { section, field, value: code };
     }
     return { section, field, value };
-  });
+  }
 }
