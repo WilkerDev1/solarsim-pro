@@ -7,7 +7,6 @@ import { normalizeStoredTariffMatrix } from '../../utils/tariffExtraction';
 import { DEFAULT_RD_TARIFF_MATRIX } from '../../data/rdTariffs';
 import { normalizeBrandName, inferBrandFromText } from '../../utils/equipmentBrandUtils';
 import { DEFAULT_DOCUMENT_CUSTOMIZATION } from '../../constants/defaultDocumentCustomization';
-import { normalizeFeatureSettings, featureScope, isFeatureSettings } from '../../../shared/applicationFeatures';
 import { migrateDefaultSimulationSettings } from '../defaultSimulationSettings';
 import { normalizeAgentPolicy } from '../slices/agentSlice';
 import { migrateLegacySpecs } from '../../../shared/equipment';

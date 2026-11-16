@@ -8,6 +8,7 @@ import { asClient } from "./helpers/clientHeader.js";
 import { migrateDatabase } from "../src/database/migrations.js";
 import { projectCreatedAtBackfill } from "../src/database/007_project_created_at.js";
 import { readConfig } from "../src/config.js";
+import { FEATURE_POLICY_V2_CLIENT_VERSION } from "../../shared/clientVersion.js";
 import {
   startEphemeralPostgres,
   type EphemeralPostgres,
@@ -18,17 +19,23 @@ let database: EphemeralPostgres;
 let pool: pg.Pool;
 let app: ReturnType<typeof createApp>;
 let admin: any, other: any, editor: any, reader: any;
+/** Cliente que ya entiende la política de dos claves. */
+const NEW = {
+  "X-SolarSim-Client": `desktop/${FEATURE_POLICY_V2_CLIENT_VERSION}`,
+};
 async function request(
   method: string,
   path: string,
   user?: any,
   body?: unknown,
+  headers: Record<string, string> = {},
 ) {
   const response = await app.request(path, {
     method,
     headers: {
       ...(user ? { Authorization: `Bearer ${user.token}` } : {}),
       ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+      ...headers,
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
@@ -188,12 +195,53 @@ test("expired access never authorizes mutation; explicit refresh has a bounded 3
   );
 });
 test("feature policy defaults legacy, readers can view, ADMIN saves with CAS and tenant isolation", async () => {
+  // Lectura según la versión del cliente: los anteriores a la política de dos claves (aquí el 2.7.1 de las suites)
+  // reciben solo `selfConsumptionProjection`; los nuevos, las dos (la fila de una clave se completa con el default).
   const initial = await request("GET", "/api/organization/features", reader);
-  // Sin guardar nunca: la columna trae una sola clave y la lectura completa el selector de régimen (visible por defecto).
-  assert.deepEqual(initial.body.settings, {
-    selfConsumptionProjection: false,
-    netMeteringRegimeSelector: true,
-  });
+  assert.deepEqual(initial.body.settings, { selfConsumptionProjection: false });
+  assert.deepEqual(
+    (
+      await request("GET", "/api/organization/features", reader, undefined, {
+        "X-SolarSim-Client": "desktop/2.7.4",
+      })
+    ).body.settings,
+    { selfConsumptionProjection: false },
+    "2.7.4 valida exactamente una clave",
+  );
+  assert.deepEqual(
+    (await request("GET", "/api/organization/features", reader, undefined, NEW))
+      .body.settings,
+    { selfConsumptionProjection: false, netMeteringRegimeSelector: true },
+  );
+  // Un rol falso en el JWT no basta: el PATCH comprueba el rol actual en la base de datos.
+  for (const role of ["ADMIN", "VIEWER"]) {
+    const forged = {
+      token: jwt.sign(
+        { id: reader.id, organizationId: reader.organizationId, role },
+        secret,
+        { expiresIn: "1h" },
+      ),
+    };
+    assert.equal(
+      (
+        await request(
+          "PATCH",
+          "/api/organization/features",
+          forged,
+          {
+            settings: {
+              selfConsumptionProjection: true,
+              netMeteringRegimeSelector: false,
+            },
+            baseVersion: 1,
+          },
+          NEW,
+        )
+      ).status,
+      403,
+      `claim ${role} de un Lector`,
+    );
+  }
   assert.equal(
     (
       await request("PATCH", "/api/organization/features", editor, {
@@ -254,8 +302,14 @@ test("feature policy defaults legacy, readers can view, ADMIN saves with CAS and
     2,
   );
   assert.deepEqual(
-    (await request("GET", "/api/organization/features", reader)).body.settings,
+    (await request("GET", "/api/organization/features", reader, undefined, NEW))
+      .body.settings,
     { selfConsumptionProjection: true, netMeteringRegimeSelector: false },
+  );
+  // Un cliente anterior sigue viendo una sola clave aunque la fila ya tenga dos.
+  assert.deepEqual(
+    (await request("GET", "/api/organization/features", reader)).body.settings,
+    { selfConsumptionProjection: true },
   );
   assert.equal(
     (
@@ -274,8 +328,20 @@ test("feature policy defaults legacy, readers can view, ADMIN saves with CAS and
       .selfConsumptionProjection,
     false,
   );
+  // Autorización de publicación (la pide el Worker): misma lectura por versión.
   const share = await request("POST", "/api/auth/share-authorization", admin);
   assert.deepEqual(share.body.featurePolicy, {
+    version: 2,
+    settings: { selfConsumptionProjection: true },
+  });
+  const shareNew = await request(
+    "POST",
+    "/api/auth/share-authorization",
+    admin,
+    undefined,
+    { "X-SolarSim-Client": "share-viewer/2.7.5" },
+  );
+  assert.deepEqual(shareNew.body.featurePolicy, {
     version: 2,
     settings: {
       selfConsumptionProjection: true,

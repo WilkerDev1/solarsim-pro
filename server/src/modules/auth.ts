@@ -4,7 +4,8 @@ import type { Dependencies } from "../dependencies.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { resolveMembership } from "../membership.js";
-import { normalizeFeatureSettings } from "../../../shared/applicationFeatures.js";
+import { featureSettingsForClient } from "../../../shared/applicationFeatures.js";
+import { CLIENT_HEADER } from "../../../shared/clientVersion.js";
 
 export function registerAuthRoutes(app: Hono, deps: Dependencies): void {
   const { pool, authenticate, jwtSecret: JWT_SECRET } = deps;
@@ -202,7 +203,10 @@ export function registerAuthRoutes(app: Hono, deps: Dependencies): void {
       authors,
       featurePolicy: {
         version: policy.feature_policy_version,
-        settings: normalizeFeatureSettings(policy.feature_settings),
+        settings: featureSettingsForClient(
+          policy.feature_settings,
+          c.req.header(CLIENT_HEADER),
+        ),
       },
     });
   });
@@ -227,7 +231,10 @@ export function registerAuthRoutes(app: Hono, deps: Dependencies): void {
       organizationId: user.organizationId,
       featurePolicy: {
         version: policy.feature_policy_version,
-        settings: normalizeFeatureSettings(policy.feature_settings),
+        settings: featureSettingsForClient(
+          policy.feature_settings,
+          c.req.header(CLIENT_HEADER),
+        ),
       },
     });
   });

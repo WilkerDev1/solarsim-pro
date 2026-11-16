@@ -3,9 +3,10 @@ import { readObjectBody } from "../request.js";
 import type { Hono } from "hono";
 import type { Dependencies } from "../dependencies.js";
 import {
+  featureSettingsForClient,
   isFeatureSettings,
-  normalizeFeatureSettings,
 } from "../../../shared/applicationFeatures.js";
+import { CLIENT_HEADER } from "../../../shared/clientVersion.js";
 import { isAdminRole } from "../../../shared/permissions.js";
 export function registerOrganizationRoutes(
   app: Hono,
@@ -22,7 +23,11 @@ export function registerOrganizationRoutes(
     return c.json({
       organizationId: user.organizationId,
       version: row.feature_policy_version,
-      settings: normalizeFeatureSettings(row.feature_settings),
+      // Forma según la versión del cliente: los anteriores validan exactamente una clave.
+      settings: featureSettingsForClient(
+        row.feature_settings,
+        c.req.header(CLIENT_HEADER),
+      ),
     });
   });
   app.patch("/api/organization/features", async (c) => {
@@ -65,7 +70,10 @@ export function registerOrganizationRoutes(
       return c.json({
         organizationId: user.organizationId,
         version: result.rows[0].feature_policy_version,
-        settings: result.rows[0].feature_settings,
+        settings: featureSettingsForClient(
+          result.rows[0].feature_settings,
+          c.req.header(CLIENT_HEADER),
+        ),
       });
     } catch (error) {
       await client.query("ROLLBACK");

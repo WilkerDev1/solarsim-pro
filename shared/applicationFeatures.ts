@@ -1,4 +1,5 @@
 /** Pure capability contract shared by the desktop app and the organization API. */
+import { FEATURE_POLICY_V2_CLIENT_VERSION, isClientOutdated } from './clientVersion.js';
 export type FeatureStage = 'stable' | 'beta' | 'experimental';
 export type EnergyCalculationMode = 'legacy' | 'self_consumption';
 /**
@@ -59,6 +60,16 @@ export function isCompatibleFeatureSettings(value: unknown): boolean {
   const record = value as Record<string, unknown>;
   const keys = Object.keys(record);
   return typeof record.selfConsumptionProjection === 'boolean' && keys.every((key) => (FEATURE_KEYS as string[]).includes(key) && typeof record[key] === 'boolean');
+}
+/**
+ * Política tal como la lee un cliente según su versión (`X-SolarSim-Client`): anterior a
+ * `FEATURE_POLICY_V2_CLIENT_VERSION`, o sin encabezado válido, recibe solo `selfConsumptionProjection` (la forma que
+ * valida con «exactamente una clave»); desde esa versión, la forma completa. Sin encabezado se elige la forma antigua:
+ * es la que entiende cualquier cliente que no se identifica.
+ */
+export function featureSettingsForClient(stored: unknown, clientHeader: string | null | undefined): ApplicationFeatureSettings | Pick<ApplicationFeatureSettings, 'selfConsumptionProjection'> {
+  const settings = normalizeFeatureSettings(stored);
+  return isClientOutdated(clientHeader, FEATURE_POLICY_V2_CLIENT_VERSION) ? { selfConsumptionProjection: settings.selfConsumptionProjection } : settings;
 }
 /** ¿Se muestra el selector de régimen de medición neta? Función disponible y activada en la política efectiva. */
 export function netMeteringRegimeSelectorVisible(settings: ApplicationFeatureSettings): boolean {
