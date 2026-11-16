@@ -56,9 +56,10 @@ function AssistantPanel({
   }, [ai.busy, ai.error]);
   const resend = useResend(ai.prompt, ai.setPrompt, () => void ai.send(), ai.busy);
   const lastUser = [...ai.messages].reverse().find((m) => m.role === 'user');
-  const retry = lastUser ? () => resend(reusableUserText(lastUser.text)) : undefined;
+  const retryText = lastUser ? reusableUserText(lastUser.text) : '';
+  const retry = retryText ? () => resend(retryText) : undefined;
   const lastAssistantIndex = ai.messages.map((m) => m.role).lastIndexOf('assistant');
-  const announcement = useChatAnnouncement(ai.busy, () => ai.messages[ai.messages.length - 1]?.role === 'user' && !ai.error ? 'Respuesta detenida.' : 'Respuesta lista.');
+  const announcement = useChatAnnouncement(ai.busy, () => ai.error ? 'La respuesta no se completó.' : ai.messages[ai.messages.length - 1]?.role === 'user' ? 'Respuesta detenida.' : 'Respuesta lista.');
   useEffect(() => {
     if (open) input.current?.focus();
   }, [open]);

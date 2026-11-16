@@ -50,7 +50,8 @@ export const AIInvoiceScannerModal: React.FC = () => {
   const go = (target: IssueTarget) => { if (target.tab) setTab(target.tab); requestAnimationFrame(() => focusReviewAnchor(target.anchor)); };
   const lastUser = [...ai.messages].reverse().find(m => m.role === 'user');
   const lastAssistantIndex = ai.messages.map(m => m.role).lastIndexOf('assistant');
-  const retry = lastUser ? () => resend(reusableUserText(lastUser.text)) : undefined;
+  const retryText = lastUser ? reusableUserText(lastUser.text) : '';
+  const retry = retryText ? () => resend(retryText) : undefined;
   // El error del análisis ya es un turno del hilo; el aviso del compositor queda para errores de adjuntos.
   const composerError = ai.errorMsg && !(lastMessage?.kind === 'error' && lastMessage.text === ai.errorMsg) ? ai.errorMsg : null;
   const digest = !!issueViews.length && <ReviewIssueDigest issues={issueViews} peak={peak} onNavigate={issue=>{if(issue.target)go(issue.target);}}/>;
