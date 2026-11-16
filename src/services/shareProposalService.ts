@@ -1,4 +1,4 @@
-import { resolveNetMeteringRegime } from '../../shared/netMetering';
+import { publishedNetMeteringRates, resolveNetMeteringRegime } from '../../shared/netMetering';
 import { equipmentTotals, readEquipment } from '../../shared/equipment';
 import { isWriterRole } from '../../shared/permissions';
 import { webHeaderLogo } from '../utils/documentLogo';
@@ -228,7 +228,8 @@ export class ShareProposalService {
         updatedAt: project.updatedAt,
         client: project.client,
         specs: project.specs,
-        rates: project.rates,
+        // Régimen y cargo efectivo materializados (inmutabilidad del enlace).
+        rates: publishedNetMeteringRates(project.rates),
         financials: project.financials,
         monthlyConsumption: project.monthlyConsumption,
         customization: {

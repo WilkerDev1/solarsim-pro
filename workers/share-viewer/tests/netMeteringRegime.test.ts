@@ -3,6 +3,7 @@ import { BENCHMARK_PROJECT } from '../../../src/engine/referenceCase';
 import { calculateProjectFinancialSummary } from '../../../src/engine/financeEngine';
 import { parseSharePayload, RequestValidationError } from '../src/validation';
 import { renderProposalPage } from '../src/template';
+import { FACTORY_GRID_USE_CHARGES, publishedNetMeteringRates } from '../../../shared/netMetering';
 
 /**
  * Régimen de medición neta en el visor (fase 2): campo opcional en `rates` y en el `calculationSnapshot`.
@@ -57,5 +58,33 @@ assert.ok(!sieHtml.includes('equivalente al 25% del valor de la energía exceden
 const oldHtml = renderProposalPage(stored({ distributor: 'EDENORTE', tariffCode: 'BTS1', gridExportFeePct: 25 }));
 assert.ok(oldHtml.includes('equivalente al 25% del valor de la energía excedente exportada'), 'enlace antiguo: texto anterior');
 assert.ok(!oldHtml.includes('por kWh inyectado'));
+
+// 5. (G) Proyección de autoconsumo + SIE-007: la frase del cargo solo cuando aplica (BTS-1 sí; BTD e inyección cero no).
+const snapshotSC = { mode: 'self_consumption', capturedAt: '2026-11-16T12:00:00.000Z', organizationId: 'o', policyVersion: 1, netMeteringRegime: 'sie007_2026' };
+const discount = 'el cargo por uso de la red se descuenta del ahorro';
+const withBreakdown = (rates: Record<string, unknown>) => { const s = stored(rates, snapshotSC); s.project.specs.showSelfConsumptionBreakdown = true; return renderProposalPage(s); };
+assert.ok(withBreakdown({ distributor: 'EDESUR', tariffCode: 'BTS1', netMeteringRegime: 'sie007_2026', gridUseChargeDOPPerKWh: 3.78 }).includes(discount), 'BTS-1: se descuenta');
+const btdSC = withBreakdown({ distributor: 'EDESUR', tariffCode: 'BTD', netMeteringRegime: 'sie007_2026', gridUseChargeDOPPerKWh: 3.78 });
+assert.ok(btdSC.includes('data-energy-mode="self_consumption"') && !btdSC.includes(discount), 'BTD: sin cargo');
+assert.ok(!btdSC.includes('después de retención'), 'BTD en SIE-007: sin retención');
+assert.ok(!withBreakdown({ distributor: 'EDESUR', tariffCode: 'BTS1', isZeroExport: true, netMeteringRegime: 'sie007_2026', gridUseChargeDOPPerKWh: 3.78 }).includes(discount), 'inyección cero: sin cargo');
+
+// 6. (H) Inmutabilidad: al publicar se materializan el régimen y el cargo efectivo en las tarifas del enlace, así un
+// cambio futuro del valor de fábrica no cambia la nota de un enlace publicado.
+assert.deepEqual(publishedNetMeteringRates({ distributor: 'EDESUR', tariffCode: 'BTS1', netMeteringRegime: 'sie007_2026' }), { distributor: 'EDESUR', tariffCode: 'BTS1', netMeteringRegime: 'sie007_2026', gridUseChargeDOPPerKWh: 3.78 });
+assert.deepEqual(publishedNetMeteringRates({ distributor: 'EDESUR', tariffCode: 'BTS1' }), { distributor: 'EDESUR', tariffCode: 'BTS1' }, 'régimen anterior: sin campos nuevos');
+const published = stored(publishedNetMeteringRates({ distributor: 'EDESUR', tariffCode: 'BTS1', gridExportFeePct: 25, netMeteringRegime: 'sie007_2026' }));
+const factory = FACTORY_GRID_USE_CHARGES.EDESUR as { dopPerKWh: number };
+const originalCharge = factory.dopPerKWh;
+try {
+  factory.dopPerKWh = 9.99; // nuevo trimestre
+  assert.ok(renderProposalPage(published).includes('RD$3.78 por kWh inyectado'), 'el enlace conserva el cargo con el que se publicó');
+} finally {
+  factory.dopPerKWh = originalCharge;
+}
+
+// 7. (I) Régimen solo en el snapshot (sin campo en rates): visor coherente con ese régimen, también en los supuestos.
+const snapshotOnly = renderProposalPage(stored({ distributor: 'EDENORTE', tariffCode: 'BTS1', gridExportFeePct: 25 }, { mode: 'legacy', capturedAt: '2026-11-16T12:00:00.000Z', organizationId: 'o', policyVersion: 1, netMeteringRegime: 'sie007_2026' }));
+assert.ok(snapshotOnly.includes('RD$4.02 por kWh inyectado'), 'régimen del snapshot y cargo de fábrica de su distribuidora');
 
 console.log('Visor: régimen de medición neta opcional, enlaces antiguos intactos y valores desconocidos rechazados.');
