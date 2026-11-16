@@ -1,6 +1,7 @@
 import type { AIProposalCommercial } from '../../shared/aiProposalCommercial';
 import type { PanelItemSpec, InverterItemSpec, BatteryItemSpec } from './index';
 import type { AIProposalIssue } from '../../shared/aiProposal';
+import type { DraftDocumentText } from '../../shared/documentTexts/aiDraft';
 export interface InvoiceTierBlock {
   kwh: number;
   rateDOP: number;
@@ -26,6 +27,8 @@ export interface ExtractedInvoiceData {
   observedMonthlyConsumptionKWh?: (number | null)[];
   consumptionSource?: 'observed' | 'estimated' | 'context' | 'theoretical';
   energyRateSource?: 'invoice' | 'reference' | 'manual';
+  /** Cambios a textos del documento (garantías, vigencia, condiciones…) validados contra el registro. */
+  documentTexts?: DraftDocumentText[];
 
   // Client & Company Identity
   clientName: string;

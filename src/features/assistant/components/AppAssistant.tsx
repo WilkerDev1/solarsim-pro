@@ -14,6 +14,7 @@ import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppAssistant } from '../useAppAssistant';
 import { assistantOwner } from '../tools';
+import { assistantProjectId, assistantVisibleIn } from '../assistantScope';
 import { ChatMessage } from './ChatMessage';
 import { AgentCardView } from '../cards/registry';
 import {
@@ -59,7 +60,8 @@ function AssistantPanel({
   }, [blocked]);
   if (blocked) return null;
   return (
-    <div className="assistant-widget">
+    // data-pdf-chrome: en la vista del documento el chat nunca se imprime ni se exporta.
+    <div className="assistant-widget" data-pdf-chrome="">
       {!open ? (
         <button
           className="assistant-fab"
@@ -273,13 +275,8 @@ export function AppAssistant({
   transport,
 }: { transport?: GeminiTransport } = {}) {
   const state = useSimulationStore(useShallow((s) => ({ activeView: s.activeView, activeProjectId: s.activeProjectId, appAssistantEnabled: s.appAssistantEnabled })));
-  const projectId = ['simulator', 'project-hub'].includes(state.activeView)
-    ? state.activeProjectId
-    : undefined;
-  if (
-    !state.appAssistantEnabled ||
-    !['simulator', 'project-hub', 'dashboard'].includes(state.activeView)
-  )
+  const projectId = assistantProjectId(state.activeView, state.activeProjectId);
+  if (!state.appAssistantEnabled || !assistantVisibleIn(state.activeView))
     return null;
   return (
     <AssistantPanel
