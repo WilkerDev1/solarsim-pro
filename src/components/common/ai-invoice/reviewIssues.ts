@@ -164,6 +164,22 @@ export function firstPendingTarget(views: readonly ReviewIssueView[]): IssueTarg
   return (views.find(v => v.tier === 'blocking' && v.target) ?? views.find(v => v.tier === 'confirm' && v.target))?.target;
 }
 
+/** Avisos del emparejador sobre una fila: el del modelo pedido y el de la potencia/capacidad pedida son distintos. */
+export interface RequestedRowAlert { model?: ReviewIssueView; magnitude?: ReviewIssueView }
+const MODEL_REQUEST = /^requested_(?:panel|inverter|battery)_model_/;
+const MAGNITUDE_REQUEST = /^requested_(?:panel|inverter|battery)_mismatch$/;
+export function requestedRowAlert(rowIssues: readonly ReviewIssueView[]): RequestedRowAlert {
+  return { model: rowIssues.find(v => MODEL_REQUEST.test(v.code)), magnitude: rowIssues.find(v => MAGNITUDE_REQUEST.test(v.code)) };
+}
+/** «Confirmar este modelo»: acepta el equipo elegido y retira solo lo que la alerta muestra (modelo y/o potencia pedidos). */
+export function confirmRequestedRow<T extends { requestedModel?: string; requestedPowerW?: number; requestedPowerKW?: number; requestedCapacityKWh?: number }>(row: T, alert: RequestedRowAlert): T {
+  return {
+    ...row,
+    ...(alert.model ? { requestedModel: undefined } : {}),
+    ...(alert.magnitude ? { requestedPowerW: undefined, requestedPowerKW: undefined, requestedCapacityKWh: undefined } : {}),
+  };
+}
+
 /** Qué control de una fila de equipo es responsable del aviso (para `aria-invalid`). */
 export function rowControlFor(code: string): 'model' | 'count' | 'price' {
   return /_count$/.test(code) ? 'count' : /_price$|conflicting_group_prices/.test(code) ? 'price' : 'model';

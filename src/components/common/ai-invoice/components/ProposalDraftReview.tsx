@@ -11,7 +11,7 @@ import type { SolarEquipmentItem } from '../../../../types/equipment';
 import type { GlobalTariffMatrix } from '../../../../types/tariffs';
 import { RD_PROVINCES } from '../../../../data/rdProvinces';
 import { getTariffSource, resolveAITariffSelection, tariffSourceFieldLabel } from '../../../../utils/aiTariffContext';
-import { buildIssueModel, focusReviewAnchor, issueModelFromViews, issuesAt, REVIEW_TABS, reviewAnchor, rowControlFor, worstTier, type IssueTarget, type ReviewIssueModel, type ReviewIssueView, type ReviewTab } from '../reviewIssues';
+import { buildIssueModel, confirmRequestedRow, focusReviewAnchor, requestedRowAlert, issueModelFromViews, issuesAt, REVIEW_TABS, reviewAnchor, rowControlFor, worstTier, type IssueTarget, type ReviewIssueModel, type ReviewIssueView, type ReviewTab } from '../reviewIssues';
 import { Field, IssueNotes } from './ReviewFlags';
 import type { PreviewEquipment } from '../commercialRows';
 
@@ -128,14 +128,18 @@ export function ProposalDraftReview({draft,catalog,matrix,context,preview,produc
           {rows.map((row,i)=>{
             const anchor=reviewAnchor.row(group.key,i);
             const rowIssues=at(anchor);
-            // Solo un aviso del emparejador (requested_*) pide confirmar el modelo; una coincidencia por especificación no.
-            const requestedIssue=row.requestedModel?rowIssues.find(v=>/^requested_/.test(v.code)):undefined;
+            // Solo un aviso del emparejador pide confirmar; el del modelo y el de la potencia/capacidad se distinguen.
+            const requested=requestedRowAlert(rowIssues);
+            const asked=row as {requestedPowerW?:number;requestedPowerKW?:number;requestedCapacityKWh?:number};
+            const requestedMagnitude=group.type==='panel'?asked.requestedPowerW:group.type==='inverter'?asked.requestedPowerKW:asked.requestedCapacityKWh;
             const rowTier=worstTier(rowIssues);
             const selected=options.find(e=>e.id===row.id);
             const notesId=rowIssues.length?`${anchor}-issues`:undefined;
             const invalid=(control:'model'|'count'|'price')=>rowIssues.some(v=>v.tier==='blocking'&&rowControlFor(v.code)===control)?true:undefined;
             const select=`${anchor}-model`;
-            const requestedNotes=rowIssues.filter(v=>v!==requestedIssue);
+            const requestedNotes=rowIssues.filter(v=>v!==requested.model&&v!==requested.magnitude);
+            const requestedTitle=[requested.model&&(/_ambiguous$/.test(requested.model.code)?'lo solicitado coincide con más de un modelo':/_partial$/.test(requested.model.code)?'lo solicitado solo coincide en parte con el modelo':'la IA no pudo confirmar el modelo'),
+              requested.magnitude&&`la ${group.type==='battery'?'capacidad':'potencia'} no coincide con la solicitada`].filter(Boolean).join(' y ');
             const total=row.unitPriceUSD!==undefined&&Number.isFinite(row.count)?row.unitPriceUSD*row.count:undefined;
             return <div className="proposal-equipment-row" key={`${group.key}-${i}`} id={anchor} tabIndex={-1} data-flag={rowTier}>
             <label className="proposal-eq-model">Modelo<select id={select} value={row.id} aria-describedby={notesId} aria-invalid={invalid('model')} onChange={e=>change(i,e.target.value,row.count)}>{!options.some(e=>e.id===row.id)&&<option value={row.id}>Modelo no disponible</option>}{options.map(e=><option key={e.id} value={e.id}>{e.displayName || e.modelSeries} · {group.value(e)} {group.unit}</option>)}</select></label>
@@ -148,8 +152,8 @@ export function ProposalDraftReview({draft,catalog,matrix,context,preview,produc
               {row.priceSource==='manual'&&<button type="button" className="proposal-tertiary" onClick={()=>update({[group.key]:rows.map((r,j)=>j===i?{...r,unitPriceUSD:undefined,priceSource:'supplier'}:r)})}><PackageOpen size={13} aria-hidden/>Usar oferta del inventario</button>}
             </div>
             {rowIssues.length>0 && <div className="proposal-row-alert" data-tier={rowTier} id={notesId}>
-              {requestedIssue && <><p className="proposal-row-alert-title">{rowTier==='blocking'?<AlertOctagon size={14} aria-hidden/>:<AlertTriangle size={14} aria-hidden/>}<strong>{rowTier==='blocking'?'Bloquea:':'Confirmar:'}</strong> {/_ambiguous$/.test(requestedIssue.code)?'lo solicitado coincide con más de un modelo.':'la IA no pudo confirmar el modelo.'}</p><p className="proposal-note">{requestedIssue.message}</p><dl className="proposal-compare"><div><dt>La IA pidió</dt><dd>{row.requestedModel}</dd></div><div><dt>Seleccionado</dt><dd>{selected?.displayName || row.brandModel || 'Sin modelo'}</dd></div></dl>
-                <div className="proposal-row-alert-actions"><button type="button" className="proposal-confirm" onClick={()=>update({[group.key]:rows.map((item,j)=>j===i?{...item,requestedModel:undefined}:item)})}>Confirmar este modelo</button><button type="button" className="proposal-tertiary" onClick={()=>document.getElementById(select)?.focus()}>Cambiar modelo</button></div></>}
+              {requestedTitle && <><p className="proposal-row-alert-title">{rowTier==='blocking'?<AlertOctagon size={14} aria-hidden/>:<AlertTriangle size={14} aria-hidden/>}<strong>{rowTier==='blocking'?'Bloquea:':'Confirmar:'}</strong> {requestedTitle}.</p>{[requested.model,requested.magnitude].filter(Boolean).map(v=><p className="proposal-note" key={v!.code}>{v!.message}</p>)}<dl className="proposal-compare"><div><dt>La IA pidió</dt><dd>{[requested.model&&row.requestedModel,requested.magnitude&&requestedMagnitude!==undefined&&`${requestedMagnitude} ${group.type==='panel'?'W':group.type==='inverter'?'kW':'kWh'}`].filter(Boolean).join(' · ') || row.requestedModel}</dd></div><div><dt>Seleccionado</dt><dd>{selected?.displayName || row.brandModel || 'Sin modelo'}</dd></div></dl>
+                <div className="proposal-row-alert-actions"><button type="button" className="proposal-confirm" onClick={()=>update({[group.key]:rows.map((item,j)=>j===i?confirmRequestedRow(item,requested):item)})}>Confirmar este modelo</button><button type="button" className="proposal-tertiary" onClick={()=>document.getElementById(select)?.focus()}>Cambiar modelo</button></div></>}
               <IssueNotes issues={requestedNotes}/>
             </div>}
           </div>;})}

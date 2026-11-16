@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describeIssues, groupIssues, pendingByTab, reviewAnchor, issueTier, firstPendingTarget, buildIssueModel, blocksPreview, applyBarCounts } from '../components/common/ai-invoice/reviewIssues';
+import { describeIssues, groupIssues, pendingByTab, reviewAnchor, issueTier, firstPendingTarget, buildIssueModel, blocksPreview, applyBarCounts, requestedRowAlert, confirmRequestedRow } from '../components/common/ai-invoice/reviewIssues';
 import { ProposalApplyBar } from '../components/common/ai-invoice/components/ProposalApplyBar';
 import { ReviewIssueDigest } from '../components/common/ai-invoice/components/ReviewIssueDigest';
 import { ProposalDraftReview } from '../components/common/ai-invoice/components/ProposalDraftReview';
@@ -184,5 +184,39 @@ assert.match(review, /aria-invalid="true"/);
   const footer = renderToStaticMarkup(React.createElement(ProposalApplyBar, { ...applyBarCounts(model), reviewConfirmed: false, canApply: false, busy: false, onConfirmChange() {}, onResolve() {}, onCreate() {}, onFocusCheck() {} }));
   assert.match(footer, /4 bloqueos impiden/);
   assert.match(footer, /Resolver 4 bloqueos/);
+}
+// 12. Model and power/capacity requests are different issues; confirming a row resolves exactly what it shows.
+{
+  const row = { id: 'b1', brandModel: 'Batería WeCo 16K0-LV (16.06kWh)', capacityKWh: 16.06, count: 2, requestedModel: 'Batería WeCo 16K0-LV', requestedCapacityKWh: 10 };
+  const capacityOnly = describeIssues([{ code: 'requested_battery_mismatch', severity: 'error', message: 'Batería WeCo 16K0-LV (16.06kWh) no coincide con la potencia/capacidad solicitada (10).' }], { batteries: [row] } as never);
+  const alert = requestedRowAlert(capacityOnly);
+  assert.equal(alert.model, undefined, 'a capacity mismatch is not a model issue');
+  assert.equal(alert.magnitude?.code, 'requested_battery_mismatch');
+  const confirmed = confirmRequestedRow(row, alert);
+  assert.equal(confirmed.requestedCapacityKWh, undefined, 'confirming clears the capacity request it shows');
+  assert.equal(confirmed.requestedModel, 'Batería WeCo 16K0-LV', 'and leaves the model request, which had no issue');
+  const both = requestedRowAlert(describeIssues([
+    { code: 'requested_battery_model_mismatch', severity: 'error', message: 'Batería WeCo 16K0-LV (16.06kWh) no coincide con el modelo solicitado (Batería WeCo 16K0-LV).' },
+    { code: 'requested_battery_mismatch', severity: 'error', message: 'Batería WeCo 16K0-LV (16.06kWh) no coincide con la potencia/capacidad solicitada (10).' },
+  ], { batteries: [row] } as never));
+  const cleared = confirmRequestedRow(row, both);
+  assert.equal(cleared.requestedModel, undefined);
+  assert.equal(cleared.requestedCapacityKWh, undefined);
+  for (const code of ['requested_inverter_model_ambiguous', 'requested_inverter_model_partial', 'requested_inverter_model_mismatch'])
+    assert.equal(requestedRowAlert(describeIssues([{ code, severity: 'warning', message: 'x' }])).model?.code, code);
+  // Render: a capacity mismatch says so, with what was asked, and is not described as an unconfirmed model.
+  const html = renderToStaticMarkup(React.createElement(ProposalDraftReview, {
+    draft: { ...(draft as object), batteries: [row], distributor: 'EDENORTE', tariffCode: 'BTS-1' } as never, catalog: [], matrix: { schedules: {} } as never, context: {} as never, preview: null, production: null,
+    update: () => {}, issueViews: capacityOnly,
+  }));
+  assert.match(html, /capacidad no coincide con la solicitada/);
+  assert.doesNotMatch(html, /no pudo confirmar el modelo/);
+  assert.match(html, /10 kWh/);
+  // A row with a requested model and no issue shows no alert.
+  const quiet = renderToStaticMarkup(React.createElement(ProposalDraftReview, {
+    draft: { ...(draft as object), batteries: [row], distributor: 'EDENORTE', tariffCode: 'BTS-1' } as never, catalog: [], matrix: { schedules: {} } as never, context: {} as never, preview: null, production: null,
+    update: () => {}, issueViews: [],
+  }));
+  assert.doesNotMatch(quiet, /proposal-row-alert/);
 }
 console.log('PASS: review issues are tiered, linked to fields, counted per tab and flagged inline.');
