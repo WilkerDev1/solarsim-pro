@@ -68,6 +68,14 @@ export interface DistributorTariffSchedule {
   region: string;
   concessionType: 'INTERCONECTADO_SENI' | 'AISLADO_PRIVADO';
   tariffs: Record<string, UtilityTariffDetails>;
+  /**
+   * Cargo por uso de la red (SIE-007-2026-REG) en RD$/kWh inyectado leído de una resolución con el escáner. Opcional: sin él
+   * la referencia es la de fábrica (`FACTORY_GRID_USE_CHARGES`). Una propuesta guarda su propio cargo; este valor solo es
+   * referencia para el contexto de IA y la revisión.
+   */
+  gridUseChargeDOPPerKWh?: number;
+  /** Resolución de la que se leyó `gridUseChargeDOPPerKWh`. */
+  gridUseChargeSource?: { resolutionCode: string; effectiveDate: string; publishedBy: string };
 }
 
 export interface GlobalTariffMatrix {

@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
 import { GlobalTariffMatrix, UtilityDistributor } from '../../../types/tariffs';
-import { getTariffSource, tariffSourceFieldLabel } from '../../../utils/aiTariffContext';
+import { getTariffSource, gridUseChargeReference, tariffSourceFieldLabel } from '../../../utils/aiTariffContext';
 import { GeminiTariffService } from '../../../services/geminiTariffService';
 import {
   X,
@@ -126,7 +126,7 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
         signal: request.current.signal,
       });
 
-      if (isCurrent()) { setExtractedMatrix(matrix); setSelectedDistributorTab(Object.keys(matrix.schedules).find((dist) => Object.values(matrix.schedules[dist as UtilityDistributor].tariffs).some((tariff) => tariff.source?.resolutionCode === matrix.resolutionCode)) as UtilityDistributor || 'EDEESTE'); }
+      if (isCurrent()) { setExtractedMatrix(matrix); setSelectedDistributorTab(Object.keys(matrix.schedules).find((dist) => Object.values(matrix.schedules[dist as UtilityDistributor].tariffs).some((tariff) => tariff.source?.resolutionCode === matrix.resolutionCode) || matrix.schedules[dist as UtilityDistributor].gridUseChargeSource?.resolutionCode === matrix.resolutionCode) as UtilityDistributor || 'EDEESTE'); }
     } catch (err: any) {
       if (isCurrent()) setErrorMessage(err.message || 'Error al procesar el pliego tarifario con Gemini IA.');
     } finally {
@@ -378,6 +378,13 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                             {tariff.currency === 'USD'
                               ? `$${tariff.fixedChargeUSD?.toFixed(2) || '0.00'} USD`
                               : `RD$ ${tariff.fixedChargeDOP?.toFixed(2) || '0.00'}`}
+                            {tariff.fixedChargeTiersDOP && tariff.fixedChargeTiersDOP.length > 0 && (
+                              <ul className="mt-1 space-y-0.5 text-[10px] font-sans text-amber-600 dark:text-amber-400" aria-label="Cargo fijo por rango de consumo">
+                                {tariff.fixedChargeTiersDOP.map((tier) => (
+                                  <li key={tier.minKWh}>{tier.maxKWh === null ? `≥ ${tier.minKWh} kWh` : `${tier.minKWh}–${tier.maxKWh} kWh`}: RD$ {tier.chargeDOP.toFixed(2)}</li>
+                                ))}
+                              </ul>
+                            )}
                           </td>
                           <td className="p-3 font-mono">
                             {tariff.demandChargePerKWDOP
@@ -400,7 +407,26 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                 </div>
               )}
 
-              <label className="flex items-start gap-2 text-xs text-slate-700 dark:text-zinc-300"><input type="checkbox" checked={reviewConfirmed} onChange={(event) => setReviewConfirmed(event.target.checked)} />He contrastado cargos, moneda, bloques y fechas con el documento.</label>
+              {extractedMatrix.schedules[selectedDistributorTab] && (() => {
+                const charge = gridUseChargeReference(extractedMatrix, selectedDistributorTab);
+                const fromDocument = charge.origin === 'matrix' && extractedMatrix.schedules[selectedDistributorTab].gridUseChargeSource?.resolutionCode === extractedMatrix.resolutionCode;
+                return (
+                  <div className="rounded-xl border border-slate-200 dark:border-[#27272a] p-3 text-xs text-slate-700 dark:text-zinc-300" data-testid="grid-use-charge-review">
+                    <span className="font-semibold">Cargo por uso de la red (SIE-007-2026) · {selectedDistributorTab}: </span>
+                    <span className="font-mono">RD$ {charge.dopPerKWh.toFixed(2)}/kWh inyectado</span>
+                    <span className="block text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
+                      {fromDocument
+                        ? `Leído del documento (${charge.resolutionCode}). Contrástalo con la tabla de la resolución.`
+                        : charge.origin === 'matrix'
+                          ? `No figura en este documento; se conserva el leído de ${charge.resolutionCode}.`
+                          : `No figura en este documento; se mantiene el de fábrica (${charge.resolutionCode}, ${charge.period}).`}
+                      {' '}Solo aplica a tarifas de un solo precio; cada propuesta guarda su propio cargo.
+                    </span>
+                  </div>
+                );
+              })()}
+
+              <label className="flex items-start gap-2 text-xs text-slate-700 dark:text-zinc-300"><input type="checkbox" checked={reviewConfirmed} onChange={(event) => setReviewConfirmed(event.target.checked)} />He contrastado cargos, rangos de cargo fijo, cargo por uso de la red, moneda, bloques y fechas con el documento.</label>
               {/* Botones de Aplicación */}
               <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-[#27272a]">
                 <button
