@@ -1,6 +1,6 @@
 // Single catalog of agent tools shared by the proposal assistant, the general assistant and the local MCP server.
-import type { AgentToolDefinition, JsonSchema } from './types';
-import { MAX_GRID_USE_CHARGE_DOP_PER_KWH, NET_METERING_REGIMES } from '../netMetering';
+import type { AgentToolDefinition, JsonSchema } from './types.js';
+import { MAX_GRID_USE_CHARGE_DOP_PER_KWH, NET_METERING_REGIMES } from '../netMetering.js';
 
 const ALL = ['app-assistant', 'proposal-assistant', 'mcp'] as const;
 const id = (description: string): JsonSchema => ({ type: 'string', minLength: 1, maxLength: 128, description });
@@ -85,13 +85,27 @@ const PROPOSAL_AND_CATALOG_TOOLS: AgentToolDefinition[] = [
   },
   {
     name: 'list_document_texts', title: 'Consultar textos del documento', kind: 'read', category: 'documents', surfaces: [...ALL],
-    description: 'Lista los textos editables del PDF de una propuesta (clave, etiqueta, texto actual, si está personalizado y si admite plantilla). Filtra por sección: company, client, cover, aboutUs, benefits, techIntro, projectDescription, quotation, etc.',
-    inputSchema: object({ proposalId: id('ID de la propuesta.'), section: { type: 'string', maxLength: 40 } }, ['proposalId']),
+    description: 'Lista los textos editables del PDF de una propuesta (clave, etiqueta, texto actual, si está personalizado y si admite plantilla). Filtra por sección (company, client, cover, aboutUs, benefits, techIntro, projectDescription, quotation, etc.) y/o por query, que busca en clave, etiqueta y texto sin distinguir tildes (p. ej. "garantía", "validez", "servicios").',
+    inputSchema: object({
+      proposalId: id('ID de la propuesta.'), section: { type: 'string', maxLength: 40 },
+      query: { type: 'string', maxLength: 80, description: 'Palabras a buscar en clave, etiqueta o texto.' },
+    }, ['proposalId']),
   },
   {
     name: 'set_document_text', title: 'Editar texto del documento', kind: 'draft', category: 'documents', surfaces: [...ALL],
-    description: 'Cambia un texto del PDF por su clave (p. ej. quotation.warranty.panel, client.phone, aboutUs.intro). Admite **negrita**, *cursiva* y viñetas "- " en textos enriquecidos y placeholders como {clientName}. Consulta las claves con list_document_texts.',
+    description: 'Cambia un texto del PDF por su clave (p. ej. quotation.warranty.panel, quote.validityDays, client.phone, aboutUs.intro). Admite **negrita**, *cursiva* y viñetas "- " en textos enriquecidos y placeholders como {clientName}. Consulta las claves con list_document_texts.',
     inputSchema: object({ proposalId: id('ID de la propuesta.'), key: { type: 'string', minLength: 3, maxLength: 80 }, text: { type: 'string', maxLength: 8000 } }, ['proposalId', 'key', 'text']),
+  },
+  {
+    name: 'set_document_texts', title: 'Editar textos del documento', kind: 'draft', category: 'documents', surfaces: [...ALL],
+    description: 'Cambia varios textos del PDF en un solo cambio con un único deshacer (p. ej. las cuatro garantías quotation.warranty.panel|inverter|battery|workmanship). text null restablece el predeterminado. Mismas reglas que set_document_text.',
+    inputSchema: object({
+      proposalId: id('ID de la propuesta.'),
+      texts: {
+        type: 'array', maxItems: 40,
+        items: object({ key: { type: 'string', minLength: 3, maxLength: 80 }, text: { type: 'string', maxLength: 8000, nullable: true } }, ['key', 'text']),
+      },
+    }, ['proposalId', 'texts']),
   },
   {
     name: 'reset_document_text', title: 'Restablecer texto del documento', kind: 'draft', category: 'documents', surfaces: [...ALL],

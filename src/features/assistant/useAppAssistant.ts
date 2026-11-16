@@ -6,6 +6,7 @@ import { AssistantRunError, runAssistant } from './service';
 import { CHAT_FILE_LIMITS, forgetChatFiles, registerChatFile, type ChatFile } from './chatFiles';
 import type { GeminiTransport } from '../../../shared/geminiTransport';
 import type { AssistantMessage } from './types';
+import { toolStepLabel } from './chatUi';
 export function useAppAssistant(
   projectId?: string,
   transport?: GeminiTransport
@@ -15,6 +16,8 @@ export function useAppAssistant(
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [files, setFiles] = useState<ChatFile[]>([]);
+  // Progress shown while busy: one entry per tool the model calls (presentation only).
+  const [steps, setSteps] = useState<string[]>([]);
   const sessionFiles = useRef<string[]>([]);
   // Reads in flight: sending waits for them so documents always travel with the prompt they were selected for.
   const [loadingFiles, setLoadingFiles] = useState(0);
@@ -67,6 +70,7 @@ export function useAppAssistant(
     setMessages((previous) => [...previous, { role: 'user', text: label }]);
     setPrompt('');
     setBusy(true);
+    setSteps([]);
     setError('');
     const valid = () =>
       sequence.current === request &&
@@ -79,11 +83,13 @@ export function useAppAssistant(
         prompt: text,
         history: messages,
         activeProjectId: projectId,
+        activeView: s.activeView,
         transport,
         files: attached,
         signal: abort.signal,
         execute: (call) => {
           if (!valid()) throw new Error('Solicitud cancelada.');
+          setSteps((previous) => [...previous, toolStepLabel(call.name)]);
           return executeForAssistant(call, { source: 'app-assistant', owner, signal: abort.signal });
         },
       });
@@ -104,6 +110,7 @@ export function useAppAssistant(
     prompt,
     setPrompt,
     busy,
+    steps,
     error,
     send,
     cancel,

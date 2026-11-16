@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useSimulationStore } from "../../store/useSimulationStore";
+import { DEFAULT_GEMINI_MODEL } from "../../../shared/geminiTransport";
 import { useShallow } from 'zustand/react/shallow';
 import {
   Sun,
@@ -349,7 +350,7 @@ export const PrimaryIconDock: React.FC<PrimaryIconDockProps> = ({
                   <span className="text-[10px] text-slate-400 truncate max-w-[170px]">
                     Modelo:{" "}
                     <span className="text-zinc-300 font-mono">
-                      {geminiModel || "gemini-3.5-flash-lite"}
+                      {geminiModel || DEFAULT_GEMINI_MODEL}
                     </span>
                   </span>
                   <button

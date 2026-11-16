@@ -1,13 +1,13 @@
 import type { ExtractedInvoiceData, GeminiModelInfo } from '../types/aiInvoice';
 import type { AIProposalPayload } from '../../shared/aiProposal';
 import { buildProposalRequest } from '../../shared/aiProposal';
-import { GEMINI_API_BASE, requestGeminiJson, geminiResponseText } from '../../shared/geminiTransport';
+import { DEFAULT_GEMINI_MODEL, GEMINI_API_BASE, requestGeminiJson, geminiResponseText, type GeminiTransport } from '../../shared/geminiTransport';
 import { processExtractedInvoice } from '../utils/aiProposalNormalization';
 
-// Presets are documented endpoints; quotas depend on the account, not this list.
+// Presets are documented endpoints (https://ai.google.dev/gemini-api/docs/models); quotas depend on the account, not this list.
 export const DEFAULT_POPULAR_MODELS: GeminiModelInfo[] = [
-  { id:'gemini-3.8-flash',name:'Gemini 3.8 Flash',description:'Modelo Flash estable reciente.',isRecommended:true },
-  { id:'gemini-3.7-flash',name:'Gemini 3.7 Flash',description:'Multimodal y razonamiento general.',isRecommended:true },
+  { id:DEFAULT_GEMINI_MODEL,name:'Gemini 4 Hydrogen',description:'Modelo base: razonamiento ajustable, salida estructurada y PDF.',isRecommended:true },
+  { id:'gemini-3.8-flash',name:'Gemini 3.8 Flash',description:'Flash estable de la generación anterior.',isRecommended:true },
   { id:'gemini-3.6-flash',name:'Gemini 3.6 Flash',isRecommended:true },
   { id:'gemini-3.5-flash-lite',name:'Gemini 3.5 Flash-Lite',description:'Modelo de menor coste para extracción.',isRecommended:true },
 ];
@@ -29,10 +29,12 @@ export async function fetchAvailableGeminiModels(apiKey:string):Promise<{success
   finally {clearTimeout(timer);}
 }
 export type ParseProposalOptions=AIProposalPayload & {apiKey:string;onProgress?:(status:string)=>void;signal?:AbortSignal};
-/** Same prompt, transport policy and deterministic grounding in browser and Electron. */
-export async function parseProposalWithAI(payload:ParseProposalOptions, signal?:AbortSignal):Promise<ExtractedInvoiceData> {
+/** A proposal reasons over catalog, tariffs and commercial terms (more than an extraction) and may carry four documents. */
+export const PROPOSAL_REQUEST_POLICY={thinkingLevel:'medium',timeoutMs:120000} as const;
+/** Same prompt, transport policy and deterministic grounding in browser and Electron (which injects its HTTPS transport). */
+export async function parseProposalWithAI(payload:ParseProposalOptions, signal?:AbortSignal, transport?:GeminiTransport):Promise<ExtractedInvoiceData> {
   payload.onProgress?.('Analizando documentos y requisitos con el catálogo actual…');
-  const result=await requestGeminiJson({apiKey:payload.apiKey,model:payload.model,body:buildProposalRequest(payload),signal:signal || payload.signal});
+  const result=await requestGeminiJson({apiKey:payload.apiKey,model:payload.model,body:buildProposalRequest(payload),signal:signal || payload.signal,...PROPOSAL_REQUEST_POLICY},transport);
   payload.onProgress?.('Validando equipos, cantidades y datos del suministro…');
   return processExtractedInvoice(geminiResponseText(result.response),payload,result);
 }

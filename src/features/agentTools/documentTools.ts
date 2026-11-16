@@ -20,7 +20,9 @@ const contextFor = (project: ProjectSimulation) => {
 /** Writes document texts on any proposal by id (not only the open one), with the same rules as the inline editor. */
 function textsPlan(proposalId: string, values: Record<string, string | null>, title: string) {
   const project = requireEditableProject(proposalId);
-  for (const key of Object.keys(values)) if (!getDocumentTextDefinition(key)) throw new Error(`Texto del documento desconocido: ${key}. Usa list_document_texts.`);
+  // Todo o nada: una clave desconocida rechaza el lote entero y lo dice.
+  const unknown = Object.keys(values).filter((key) => !getDocumentTextDefinition(key));
+  if (unknown.length) throw new Error(`Textos del documento desconocidos: ${unknown.join(', ')}. No se aplicó ningún cambio; consulta las claves con list_document_texts.`);
   documentTextsPatch(values, project, contextFor(project)); // validates before queueing
   return {
     data: { status: 'ready' },
@@ -44,9 +46,19 @@ function textsPlan(proposalId: string, values: Record<string, string | null>, ti
   };
 }
 
+const fold = (value: string) => value.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+/** Every word of the query must appear in the key, label or text (accent-insensitive). */
+function matchesQuery(query: string | undefined, t: { key: string; label: string; text: string }) {
+  const words = fold(query || '').split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const haystack = fold(`${t.key} ${t.label} ${t.text}`);
+  return words.every((w) => haystack.includes(w));
+}
+
 const listTexts: NativeHandler = (args) => {
   const project = findVisibleProject(args.proposalId);
-  const texts = listDocumentTexts(project, contextFor(project), args.section ? { section: args.section } : {}).map((t) => ({
+  const texts = listDocumentTexts(project, contextFor(project), args.section ? { section: args.section } : {}).filter((t) => matchesQuery(args.query, t)).map((t) => ({
     // Full text: agents edit by replacing the whole value, so a truncated read would silently drop content.
     key: t.key, label: t.label, section: t.section, text: t.text, isCustomized: t.isCustomized, templatable: t.templatable, format: t.format,
   }));
@@ -55,6 +67,14 @@ const listTexts: NativeHandler = (args) => {
 
 const setText: NativeHandler = (args) =>
   textsPlan(args.proposalId, { [args.key]: String(args.text) }, `Texto «${getDocumentTextDefinition(args.key)?.label ?? args.key}»`);
+
+const setTexts: NativeHandler = (args) => {
+  const rows = args.texts as { key: string; text: string | null }[];
+  if (!rows.length) throw new Error('Indica al menos un texto.');
+  const values = Object.fromEntries(rows.map((r) => [r.key, r.text === null ? null : String(r.text)]));
+  const labels = Object.keys(values).map((k) => getDocumentTextDefinition(k)?.label ?? k);
+  return textsPlan(args.proposalId, values, labels.length === 1 ? `Texto «${labels[0]}»` : `Textos del documento: ${labels.join(', ')}`.slice(0, 150));
+};
 
 const resetText: NativeHandler = (args) =>
   textsPlan(args.proposalId, { [args.key]: null }, `Restablecer «${getDocumentTextDefinition(args.key)?.label ?? args.key}»`);
@@ -125,6 +145,7 @@ const saveToTemplate: NativeHandler = (args) => {
 export const DOCUMENT_TOOL_HANDLERS: Record<string, NativeHandler> = {
   list_document_texts: listTexts,
   set_document_text: setText,
+  set_document_texts: setTexts,
   reset_document_text: resetText,
   set_document_layout: setLayout,
   save_document_text_to_company_template: saveToTemplate,

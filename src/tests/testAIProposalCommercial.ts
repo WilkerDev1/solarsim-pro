@@ -53,7 +53,7 @@ const recovered=await requestGeminiJson({apiKey:'synthetic',model:'gemini-3.8-fl
  assert.equal(body.generationConfig.maxOutputTokens,calls===1?16384:32768);
  return {candidates:[{finishReason:calls===1?'MAX_TOKENS':'STOP',content:{parts:[{text:'{}'}]}}]};
 });assert.equal(calls,2);assert(recovered.modelWarning);
-calls=0;await assert.rejects(()=>requestGeminiJson({apiKey:'synthetic',body:{}},async()=>{calls++;return {candidates:[{finishReason:'MAX_TOKENS'}]};}),/Reduce/);assert.equal(calls,2);
+calls=0;await assert.rejects(()=>requestGeminiJson({apiKey:'synthetic',body:{generationConfig:{maxOutputTokens:8192}}},async()=>{calls++;return {candidates:[{finishReason:'MAX_TOKENS'}]};}),/Reduce/);assert.equal(calls,2);
 calls=0;await assert.rejects(()=>requestGeminiJson({apiKey:'synthetic',body:{}},async()=>{calls++;if(calls===1)throw new GeminiRequestError('transient',503);return {candidates:[{finishReason:'MAX_TOKENS'}]};}),/Reduce/);assert.equal(calls,2,'transient plus truncation cannot create third paid request');
 calls=0;await assert.rejects(()=>requestGeminiJson({apiKey:'synthetic',body:{}},async()=>{calls++;throw new GeminiRequestError('quota',429);}),/quota/);assert.equal(calls,1);
 await requestGeminiJson({apiKey:'synthetic',model:'gemini-2.5-flash',body:{}},async(_url,body:any)=>{assert.equal(body.generationConfig.thinkingConfig.thinkingBudget,1024);assert.equal(body.generationConfig.thinkingConfig.thinkingLevel,undefined);return {candidates:[{finishReason:'STOP'}]};});

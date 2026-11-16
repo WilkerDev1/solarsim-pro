@@ -11,13 +11,15 @@ const ICONS = {
 };
 type IconKey = keyof typeof ICONS;
 interface Palette { fill: string; ring: string; icon: string }
+// Colores como variables CSS (valores claro/oscuro en theme.ts): un nodo nuevo que use PALETTE hereda el tema.
+const tone = (name: string): Palette => ({ fill: `var(--ef-${name}-fill)`, ring: `var(--ef-${name}-ring)`, icon: `var(--ef-${name}-icon)` });
 const PALETTE: Record<'sun' | 'battery' | 'grid' | 'muted', Palette> = {
-  sun: { fill: '#fff4e8', ring: '#ffd2a6', icon: '#e86a00' },
-  battery: { fill: '#effaf2', ring: '#bfe8cb', icon: '#15803d' },
-  grid: { fill: '#eef7fd', ring: '#bfe1f6', icon: '#0369a1' },
-  muted: { fill: '#f1f5f9', ring: '#d5dbe5', icon: '#94a3b8' },
+  sun: tone('sun'),
+  battery: tone('battery'),
+  grid: tone('grid'),
+  muted: tone('muted'),
 };
-const FLOW_HEX: Record<FlowColor, string> = { o: '#ff7a00', g: '#16a34a', b: '#0284c7' };
+const FLOW_HEX: Record<FlowColor, string> = { o: 'var(--ef-flow-o)', g: 'var(--ef-flow-g)', b: 'var(--ef-flow-b)' };
 
 interface NodeInfo { key: 'sun' | 'battery' | 'grid' | 'house'; icon: IconKey; pal: Palette; value: string; label: string; muted: boolean }
 const kw = (v: number) => (v > 0 ? `≈${v.toFixed(1)} kW` : '0 kW');
@@ -61,7 +63,7 @@ function lineEl(d: string, line: FlowLine): string {
 }
 
 function node(cx: number, cy: number, pal: Palette, icon: IconKey, extra = ''): string {
-  return `<circle class="ef-node" cx="${cx}" cy="${cy}" r="38" fill="${pal.fill}" stroke="${pal.ring}"/>
+  return `<circle class="ef-node" cx="${cx}" cy="${cy}" r="38" style="fill:${pal.fill};stroke:${pal.ring}"/>
       <svg x="${cx - 18}" y="${cy - 18}" width="36" height="36" viewBox="0 0 24 24" style="color:${pal.icon}">${ICONS[icon]}${extra}</svg>`;
 }
 
@@ -76,7 +78,7 @@ function modeSvg(s: ModeScenario, hybrid: boolean, compact: boolean, ariaLabel: 
   const first = [lines.house, lines.inverter, lines.grid].find((l) => l.active);
   const sunNode = node(invX, 70, info.sun.pal, info.sun.icon);
   const stars = s.night
-    ? `<circle class="ef-tw" cx="${invX + 44}" cy="36" r="1.8" fill="#94a3b8"/><circle class="ef-tw ef-tw2" cx="${invX - 48}" cy="40" r="1.5" fill="#94a3b8"/><circle class="ef-tw ef-tw3" cx="${invX - 40}" cy="108" r="1.6" fill="#94a3b8"/>`
+    ? `<circle class="ef-tw" cx="${invX + 44}" cy="36" r="1.8"/><circle class="ef-tw ef-tw2" cx="${invX - 48}" cy="40" r="1.5"/><circle class="ef-tw ef-tw3" cx="${invX - 40}" cy="108" r="1.6"/>`
     : '';
   const dim = s.inverterState !== 'on';
   const cap = s.inverterState === 'on' ? 'INVERSOR' : s.inverterState === 'standby' ? 'INVERSOR · REPOSO' : 'INVERSOR · APAGADO';
@@ -84,7 +86,7 @@ function modeSvg(s: ModeScenario, hybrid: boolean, compact: boolean, ariaLabel: 
       ${lineEl(lines.battery.reverse ? `M${BATTERY_X + 38} 200H${invX - 38}` : `M${invX - 38} 200H${BATTERY_X + 38}`, lines.battery)}
       ${node(BATTERY_X, 200, info.battery.pal, 'battery')}${text(info.battery, BATTERY_X, 268, 288, ' text-anchor="middle"')}` : '';
   const badge = s.gridState === 'disconnected'
-    ? `<circle cx="${mid}" cy="200" r="12" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5"/><path d="M${mid - 5} 195l10 10M${mid + 5} 195l-10 10" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round"/>`
+    ? `<circle cx="${mid}" cy="200" r="12" style="fill:var(--ef-badge-fill);stroke:var(--ef-badge-ring)" stroke-width="1.5"/><path d="M${mid - 5} 195l10 10M${mid + 5} 195l-10 10" style="stroke:var(--ef-badge-mark)" stroke-width="1.8" stroke-linecap="round"/>`
     : '';
   const gridPath = lines.grid.active && lines.grid.reverse ? `M${GRID_END} 200H${jx}` : `M${jx} 200H${GRID_END}`;
   return `<svg data-energy-flow-svg="${compact ? 'compact' : 'full'}" viewBox="${compact ? (hybrid ? '24 24 512 352' : '104 24 432 352') : '0 0 560 380'}" class="${compact ? 'sm:hidden max-w-[420px]' : 'hidden sm:block max-w-[640px]'} mx-auto w-full h-auto" role="img" aria-label="${escapeHtml(ariaLabel)}">
@@ -92,11 +94,11 @@ function modeSvg(s: ModeScenario, hybrid: boolean, compact: boolean, ariaLabel: 
       ${lineEl(`M${invX + 38} 200H${jx}`, lines.inverter)}
       ${lineEl(`M${jx} 200V292`, lines.house)}
       ${lineEl(gridPath, lines.grid)}
-      ${first ? `<circle cx="${jx}" cy="200" r="5" fill="${FLOW_HEX[first.color]}"/>` : ''}
+      ${first ? `<circle cx="${jx}" cy="200" r="5" style="fill:${FLOW_HEX[first.color]}"/>` : ''}
       ${badge}
       ${sunNode}${stars}${text(info.sun, invX + 54, 66, 86, '')}
-      <rect class="ef-node" x="${invX - 36}" y="164" width="72" height="72" rx="18" fill="#f6f8fb" stroke="#d5dbe5"${dim ? ' opacity=".6"' : ''}/>
-      <svg x="${invX - 18}" y="182" width="36" height="36" viewBox="0 0 24 24" style="color:${dim ? '#94a3b8' : '#334155'}">${ICONS.inverter}</svg>
+      <rect class="ef-node" x="${invX - 36}" y="164" width="72" height="72" rx="18" style="fill:var(--ef-inverter-fill);stroke:var(--ef-inverter-ring)"${dim ? ' opacity=".6"' : ''}/>
+      <svg x="${invX - 18}" y="182" width="36" height="36" viewBox="0 0 24 24" style="color:${dim ? 'var(--ef-inverter-icon-off)' : 'var(--ef-inverter-icon)'}">${ICONS.inverter}</svg>
       ${compact ? '' : `<text class="ef-cap" x="${invX}" y="260" text-anchor="middle">${cap}</text>`}${batteryPart}
       ${node(GRID_X, 200, info.grid.pal, 'grid')}${text(info.grid, GRID_X, 128, 148, ' text-anchor="middle"')}
       ${node(jx, 330, info.house.pal, 'home')}${text(info.house, jx + 54, 326, 346, '')}
@@ -195,7 +197,7 @@ export function renderEnergyFlowSection(input: EnergyFlowScenarioInput): string 
     </div>`;
   }).join('\n    ');
 
-  return `<section data-energy-flow="${hybrid ? 'hybrid' : 'on-grid'}" class="ef-section bg-white border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-3 sm:space-y-4">
+  return `<section data-energy-flow="${hybrid ? 'hybrid' : 'on-grid'}" class="ef-section bg-surface border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-3 sm:space-y-4">
       <div class="space-y-1">
         <div class="text-[10.5px] sm:text-[11px] font-black uppercase text-sky-700 tracking-wider flex items-center gap-1.5">
           <span class="w-1.5 h-1.5 rounded-full bg-orange-500"></span> Flujo energético estimado
@@ -211,13 +213,13 @@ export function renderEnergyFlowSection(input: EnergyFlowScenarioInput): string 
       ${panels}
       </div>
       <div data-energy-mode-nav class="no-print flex items-center justify-between gap-3" hidden>
-        <button data-energy-mode-step="-1" type="button" aria-label="Situación anterior" class="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full border border-slate-200 bg-white text-slate-600 hover:text-orange-600 hover:border-orange-300 hover:bg-orange-50 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 disabled:opacity-40 disabled:cursor-default disabled:hover:text-slate-600 disabled:hover:border-slate-200 disabled:hover:bg-white" disabled><svg viewBox="0 0 24 24" class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <button data-energy-mode-step="-1" type="button" aria-label="Situación anterior" class="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full border border-slate-200 bg-surface text-slate-600 hover:text-orange-600 hover:border-orange-300 hover:bg-orange-50 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 disabled:opacity-40 disabled:cursor-default disabled:hover:text-slate-600 disabled:hover:border-slate-200 disabled:hover:bg-surface" disabled><svg viewBox="0 0 24 24" class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
         <div class="min-w-0 flex flex-col items-center gap-1.5 text-center">
           <div class="flex items-center gap-1.5" aria-hidden="true">${scenarios.map((_, i) => `<span data-energy-mode-dot="" class="ef-pos${i === 0 ? ' ef-pos-on' : ''}"></span>`).join('')}</div>
           <span data-energy-mode-counter aria-live="polite" class="text-[11px] sm:text-xs font-semibold text-slate-600">Situación 1 de ${scenarios.length}</span>
           <span class="sm:hidden text-[11px] text-slate-500">← Deslice para ver otras situaciones →</span>
         </div>
-        <button data-energy-mode-step="1" type="button" aria-label="Situación siguiente" class="ef-nudge shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full border border-slate-200 bg-white text-slate-600 hover:text-orange-600 hover:border-orange-300 hover:bg-orange-50 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 disabled:opacity-40 disabled:cursor-default disabled:hover:text-slate-600 disabled:hover:border-slate-200 disabled:hover:bg-white"><svg viewBox="0 0 24 24" class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+        <button data-energy-mode-step="1" type="button" aria-label="Situación siguiente" class="ef-nudge shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-full border border-slate-200 bg-surface text-slate-600 hover:text-orange-600 hover:border-orange-300 hover:bg-orange-50 cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 disabled:opacity-40 disabled:cursor-default disabled:hover:text-slate-600 disabled:hover:border-slate-200 disabled:hover:bg-surface"><svg viewBox="0 0 24 24" class="w-4 h-4" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
       </div>
       <script>${ENERGY_FLOW_TOGGLE_SCRIPT}</script>
     </section>`;
@@ -226,33 +228,33 @@ export function renderEnergyFlowSection(input: EnergyFlowScenarioInput): string 
 /** Shared stylesheet for the diagram; animation is CSS-only and stops under reduced motion. */
 export const ENERGY_FLOW_CSS = `
     .ef-ic { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-    .ef-track { fill: none; stroke: #e5e9f0; stroke-width: 4; stroke-linecap: round; }
-    .ef-idle { fill: none; stroke: #d5dbe5; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 1 9; }
+    .ef-track { fill: none; stroke: var(--ef-track); stroke-width: 4; stroke-linecap: round; }
+    .ef-idle { fill: none; stroke: var(--ef-idle); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 1 9; }
     .ef-flow { fill: none; stroke-linecap: round; stroke-width: 6; stroke-dasharray: 0 14; animation: ef-flow 1s linear infinite; }
-    .ef-o { stroke: #ff7a00; } .ef-g { stroke: #16a34a; } .ef-b { stroke: #0284c7; }
+    .ef-o { stroke: var(--ef-flow-o); } .ef-g { stroke: var(--ef-flow-g); } .ef-b { stroke: var(--ef-flow-b); }
     .ef-thin { stroke-width: 4; }
     .ef-s1 { animation-duration: .55s; } .ef-s2 { animation-duration: .8s; } .ef-s3 { animation-duration: 1.7s; }
     @keyframes ef-flow { to { stroke-dashoffset: -14; } }
     .ef-node { stroke-width: 1.5; }
-    .ef-v { font-size: 20px; font-weight: 700; fill: #0f172a; font-variant-numeric: tabular-nums; }
-    .ef-vm { font-size: 20px; font-weight: 700; fill: #64748b; font-variant-numeric: tabular-nums; }
-    .ef-l { font-size: 12.5px; font-weight: 500; fill: #5b6576; }
-    .ef-cap { font-size: 11px; font-weight: 600; fill: #5b6576; letter-spacing: .06em; }
-    .ef-tw { animation: ef-twinkle 2.8s ease-in-out infinite; }
+    .ef-v { font-size: 20px; font-weight: 700; fill: var(--ef-value); font-variant-numeric: tabular-nums; }
+    .ef-vm { font-size: 20px; font-weight: 700; fill: var(--ef-value-muted); font-variant-numeric: tabular-nums; }
+    .ef-l { font-size: 12.5px; font-weight: 500; fill: var(--ef-label); }
+    .ef-cap { font-size: 11px; font-weight: 600; fill: var(--ef-label); letter-spacing: .06em; }
+    .ef-tw { fill: var(--ef-star); animation: ef-twinkle 2.8s ease-in-out infinite; }
     .ef-tw2 { animation-delay: -1s; } .ef-tw3 { animation-delay: -1.9s; }
     @keyframes ef-twinkle { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
     .ef-dot { animation: ef-pulse 2s ease-in-out infinite; }
     @keyframes ef-pulse { 50% { opacity: .35; } }
     .ef-pill { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 6px 12px; }
-    .ef-tone-green { color: #15803d; background: #f0fdf4; }
-    .ef-tone-indigo { color: #4338ca; background: #eef2ff; }
-    .ef-tone-amber { color: #b45309; background: #fffbeb; }
-    .ef-btn[aria-pressed="true"] { background: #fff; color: #c2410c; box-shadow: 0 1px 2px rgba(15, 23, 42, .12); }
+    .ef-tone-green { color: var(--ef-pill-green); background: var(--ef-pill-green-bg); }
+    .ef-tone-indigo { color: var(--ef-pill-indigo); background: var(--ef-pill-indigo-bg); }
+    .ef-tone-amber { color: var(--ef-pill-amber); background: var(--ef-pill-amber-bg); }
+    .ef-btn[aria-pressed="true"] { background: var(--ef-btn-on); color: var(--ef-btn-on-text); box-shadow: 0 1px 2px rgb(var(--tw-slate-900) / .12); }
     .ef-panel { animation: ef-fade .25s ease-out; }
     @keyframes ef-fade { from { opacity: 0; } to { opacity: 1; } }
     .ef-swipe { touch-action: pan-y; }
-    .ef-pos { display: inline-block; width: 6px; height: 6px; border-radius: 999px; background: #cbd5e1; transition: width .2s ease, background-color .2s ease; }
-    .ef-pos-on { width: 18px; background: #f97316; }
+    .ef-pos { display: inline-block; width: 6px; height: 6px; border-radius: 999px; background: var(--ef-pos); transition: width .2s ease, background-color .2s ease; }
+    .ef-pos-on { width: 18px; background: var(--ef-pos-on); }
     .ef-nudge { animation: ef-nudge 1.2s ease-in-out 1.5s 3; }
     @keyframes ef-nudge { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(5px); } }
     .ef-from-right { animation: ef-in-right .28s ease-out; }

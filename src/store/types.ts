@@ -215,6 +215,8 @@ export interface ImportExportSlice {
 export interface AISlice {
   geminiApiKey: string;
   geminiModel: string;
+  /** false: the install follows DEFAULT_GEMINI_MODEL, including future default changes. */
+  geminiModelChosenByUser: boolean;
 
   setGeminiApiKey: (key: string) => void;
   setGeminiModel: (model: string) => void;

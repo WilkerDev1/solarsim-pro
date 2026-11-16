@@ -2,19 +2,19 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   MessageCircle,
   X,
-  Send,
-  Square,
   Maximize2,
   Minimize2,
   RotateCcw,
   Settings,
-  Paperclip,
 } from 'lucide-react';
 import { useSimulationStore } from '../../../store/useSimulationStore';
 import { useShallow } from 'zustand/react/shallow';
 import { useAppAssistant } from '../useAppAssistant';
 import { assistantOwner } from '../tools';
+import { assistantProjectId, assistantVisibleIn } from '../assistantScope';
 import { ChatMessage } from './ChatMessage';
+import { ChatComposer, ChatSuggestions, ChatThinking, ScrollToLatest } from './ChatComposer';
+import { reusableUserText, useChatAnnouncement, useElapsedSeconds, useResend, useStickToBottom } from '../chatUi';
 import { AgentCardView } from '../cards/registry';
 import {
   AssistantActionCard,
@@ -23,12 +23,18 @@ import {
 } from './AssistantResultCard';
 import '../chat.css';
 import type { GeminiTransport } from '../../../../shared/geminiTransport';
+
+const PROJECT_SUGGESTIONS = ['Resume esta propuesta y sus supuestos', '¿Por qué el ahorro del primer año es este?', 'Busca un inversor alternativo en el inventario'];
+const GLOBAL_SUGGESTIONS = ['Muestra mis propuestas más recientes', 'Busca baterías de litio en el inventario', '¿Qué propuestas siguen pendientes de decisión?'];
 function AssistantPanel({
   projectId,
   transport,
+  belowToolbar,
 }: {
   projectId?: string;
   transport?: GeminiTransport;
+  /** En la vista del documento el panel se limita en alto para no tapar la barra de edición fija. */
+  belowToolbar?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -36,16 +42,27 @@ function AssistantPanel({
   const state = useSimulationStore(useShallow((s) => ({ projects: s.projects, isSettingsModalOpen: s.isSettingsModalOpen, isAIInvoiceModalOpen: s.isAIInvoiceModalOpen, isAIDatasheetModalOpen: s.isAIDatasheetModalOpen, isAIPriceCatalogModalOpen: s.isAIPriceCatalogModalOpen, isNewProjectModalOpen: s.isNewProjectModalOpen, activeConflict: s.activeConflict, isTrashActive: s.isTrashActive, openSettingsModal: s.openSettingsModal, geminiApiKey: s.geminiApiKey })));
   const log = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
+  const scroll = useStickToBottom(log, [ai.messages, ai.busy, ai.steps.length, open]);
+  const elapsed = useElapsedSeconds(ai.busy);
   const project = state.projects.find((p) => p.id === projectId);
+  // Un error que llega al terminar una consulta es un turno del hilo (con reintento); los de adjuntos van al compositor.
+  const wasBusy = useRef(false);
+  const [threadError, setThreadError] = useState('');
+  useEffect(() => {
+    // El error más reciente manda: uno nuevo fuera de una consulta (adjunto rechazado) sustituye al turno de error anterior.
+    if (ai.busy || !ai.error) setThreadError('');
+    else setThreadError(wasBusy.current ? ai.error : '');
+    wasBusy.current = ai.busy;
+  }, [ai.busy, ai.error]);
+  const resend = useResend(ai.prompt, ai.setPrompt, () => void ai.send(), ai.busy);
+  const lastUser = [...ai.messages].reverse().find((m) => m.role === 'user');
+  const retryText = lastUser ? reusableUserText(lastUser.text) : '';
+  const retry = retryText ? () => resend(retryText) : undefined;
+  const lastAssistantIndex = ai.messages.map((m) => m.role).lastIndexOf('assistant');
+  const announcement = useChatAnnouncement(ai.busy, () => ai.error ? 'La respuesta no se completó.' : ai.messages[ai.messages.length - 1]?.role === 'user' ? 'Respuesta detenida.' : 'Respuesta lista.');
   useEffect(() => {
     if (open) input.current?.focus();
   }, [open]);
-  useEffect(() => {
-    log.current?.scrollTo({
-      top: log.current.scrollHeight,
-      behavior: 'smooth',
-    });
-  }, [ai.messages, ai.busy]);
   const blocked =
     state.isSettingsModalOpen ||
     state.isAIInvoiceModalOpen ||
@@ -59,7 +76,8 @@ function AssistantPanel({
   }, [blocked]);
   if (blocked) return null;
   return (
-    <div className="assistant-widget">
+    // data-pdf-chrome: en la vista del documento el chat nunca se imprime ni se exporta.
+    <div className={`assistant-widget${belowToolbar ? ' assistant-widget-below-toolbar' : ''}`} data-pdf-chrome="">
       {!open ? (
         <button
           className="assistant-fab"
@@ -93,6 +111,17 @@ function AssistantPanel({
             </h2>
             <button
               className="assistant-icon"
+              title="Configurar IA"
+              aria-label="Configurar IA"
+              onClick={() => {
+                ai.cancel();
+                state.openSettingsModal('ai');
+              }}
+            >
+              <Settings size={16} />
+            </button>
+            <button
+              className="assistant-icon"
               title="Nueva conversación"
               aria-label="Nueva conversación"
               disabled={ai.busy}
@@ -120,21 +149,32 @@ function AssistantPanel({
               <X size={18} />
             </button>
           </div>
+          <div className="chat-log-wrap">
           <div
             className="assistant-widget-log"
             ref={log}
+            onScroll={scroll.onScroll}
             role="log"
+            aria-live="off"
+            tabIndex={0}
             aria-label="Conversación con SolarSim"
           >
             {!ai.messages.length && (
-              <p className="assistant-widget-empty">
-                {project
-                  ? 'Pregunta sobre esta simulación o pide un cambio.'
-                  : 'Consulta tus propuestas o busca equipos del inventario.'}
-              </p>
+              <ChatSuggestions
+                title={project ? 'Pregunta sobre esta simulación' : '¿En qué te ayudo?'}
+                description={project ? 'Puedo explicar resultados o preparar cambios que revisas antes de aplicar.' : 'Consulta tus propuestas o busca equipos del inventario.'}
+                items={project ? PROJECT_SUGGESTIONS : GLOBAL_SUGGESTIONS}
+                onPick={(text) => {
+                  ai.setPrompt(text);
+                  requestAnimationFrame(() => input.current?.focus());
+                }}
+              />
             )}
             {ai.messages.map((m, i) => (
-              <ChatMessage key={i} role={m.role} text={m.text}>
+              <ChatMessage key={i} role={m.role} text={m.text}
+                onCopy={m.role === 'assistant' ? () => navigator.clipboard.writeText(m.text) : undefined}
+                onRetry={i === lastAssistantIndex && !ai.busy && !threadError ? retry : undefined}
+                onReuse={m.role === 'user' && !ai.busy ? () => { ai.setPrompt(reusableUserText(m.text)); requestAnimationFrame(() => input.current?.focus()); } : undefined}>
                 {m.cards?.map((card) => (
                   <AssistantResultCard
                     key={`${card.kind}:${card.id}`}
@@ -157,113 +197,56 @@ function AssistantPanel({
                 ))}
               </ChatMessage>
             ))}
+            {threadError && !ai.busy && (
+              <ChatMessage role="assistant" variant="error" text={threadError} onRetry={retry}
+                onOpenSettings={() => { ai.cancel(); state.openSettingsModal('ai'); }} />
+            )}
             {ai.busy && (
-              <p role="status" className="assistant-widget-status">
-                Consultando la aplicación…
-              </p>
+              <ChatThinking label="Consultando la aplicación…" steps={ai.steps} elapsed={elapsed} />
             )}
           </div>
-          <form
-            className="assistant-widget-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void ai.send();
-            }}
-          >
-            {ai.error && (
-              <p role="alert" className="assistant-widget-error">
-                {ai.error}
-              </p>
-            )}
-            {ai.loadingFiles && <p role="status" className="assistant-widget-status">Leyendo archivos adjuntos…</p>}
-            {ai.files.length > 0 && (
-              <ul className="assistant-file-chips" aria-label="Archivos adjuntos">
-                {ai.files.map((f) => (
-                  <li key={f.id}>
-                    <span>{f.name}</span>
-                    <button type="button" aria-label={`Quitar ${f.name}`} onClick={() => ai.removeFile(f.id)}><X size={12} /></button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <label className="sr-only" htmlFor="app-assistant-input">
-              Mensaje al asistente
-            </label>
-            <textarea
-              id="app-assistant-input"
-              ref={input}
-              value={ai.prompt}
-              onChange={(e) => ai.setPrompt(e.target.value)}
-              maxLength={12000}
-              placeholder="Pregunta o pide un cambio…"
-              disabled={ai.busy}
-              onKeyDown={(e) => {
-                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                  e.preventDefault();
-                  void ai.send();
-                }
-              }}
-            />
-            <div className="assistant-widget-actions">
-              <label className="assistant-icon" title="Adjuntar PDF o imagen" aria-label="Adjuntar PDF o imagen">
-                <Paperclip size={16} />
-                <input
-                  type="file"
-                  className="sr-only"
-                  accept="application/pdf,image/png,image/jpeg,image/webp"
-                  multiple
-                  disabled={ai.busy}
-                  onChange={(e) => {
-                    if (e.target.files) void ai.addFiles(e.target.files);
-                    e.target.value = '';
-                  }}
-                />
-              </label>
-              <button
-                type="button"
-                className="assistant-icon"
-                aria-label="Configurar IA"
-                title="Configurar IA"
-                onClick={() => {
-                  ai.cancel();
-                  state.openSettingsModal('ai');
-                }}
-              >
-                <Settings size={16} />
-              </button>
-              {ai.busy ? (
-                <button
-                  type="button"
-                  className="assistant-send"
-                  onClick={ai.cancel}
-                >
-                  <Square size={14} />
-                  Cancelar
-                </button>
-              ) : (
-                <button
-                  type="submit"
-                  className="assistant-send"
-                  disabled={!ai.prompt.trim() || !state.geminiApiKey || ai.loadingFiles}
-                >
-                  <Send size={14} />
-                  Enviar
-                </button>
-              )}
-            </div>
-            {!state.geminiApiKey && (
-              <p className="assistant-widget-empty">
-                Configura Gemini para conversar.
-              </p>
-            )}
-            <details className="proposal-note-details">
-              <summary>Contexto y privacidad</summary>Solo se consulta el
-              espacio actual. Texto, archivos adjuntos y resultados de las
-              herramientas se envían a Google Gemini. Los borradores se aplican
-              con opción de deshacer; catálogo, precios y estados piden confirmación
-              (Ajustes → Agentes e IA).
-            </details>
-          </form>
+          <ScrollToLatest visible={scroll.away} onClick={() => scroll.scrollToBottom()} />
+          </div>
+          <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{threadError && !ai.busy ? 'La respuesta no se completó.' : announcement}</p>
+          <ChatComposer
+            id="app-assistant-input"
+            label="Mensaje al asistente"
+            inputRef={input}
+            value={ai.prompt}
+            onChange={ai.setPrompt}
+            onSubmit={() => void ai.send()}
+            onCancel={ai.cancel}
+            onPickFiles={(files) => void ai.addFiles(files)}
+            busy={ai.busy}
+            canSend={!!ai.prompt.trim() && !!state.geminiApiKey && !ai.loadingFiles}
+            disabledReason={!state.geminiApiKey ? 'Configura Gemini para conversar.' : ai.loadingFiles ? 'Leyendo archivos adjuntos…' : 'Escribe un mensaje.'}
+            placeholder="Pregunta o pide un cambio…"
+            accept="application/pdf,image/png,image/jpeg,image/webp"
+            attachments={ai.files.map((f) => ({ key: f.id, name: f.name, onRemove: () => ai.removeFile(f.id) }))}
+            notices={
+              <>
+                {ai.error && !threadError && <p role="alert" className="chat-notice" data-tone="error">{ai.error}</p>}
+                {ai.loadingFiles && <p role="status" className="chat-notice">Leyendo archivos adjuntos…</p>}
+                {!state.geminiApiKey && (
+                  <div className="chat-notice">
+                    Configura Gemini para conversar.
+                    <button type="button" onClick={() => { ai.cancel(); state.openSettingsModal('ai'); }}>
+                      <Settings size={14} aria-hidden />Abrir ajustes de IA
+                    </button>
+                  </div>
+                )}
+              </>
+            }
+            footer={
+              <details className="proposal-note-details">
+                <summary>Contexto y privacidad</summary>Solo se consulta el
+                espacio actual. Texto, archivos adjuntos y resultados de las
+                herramientas se envían a Google Gemini. Los borradores se aplican
+                con opción de deshacer; catálogo, precios y estados piden confirmación
+                (Ajustes → Agentes e IA).
+              </details>
+            }
+          />
         </section>
       )}
     </div>
@@ -273,18 +256,14 @@ export function AppAssistant({
   transport,
 }: { transport?: GeminiTransport } = {}) {
   const state = useSimulationStore(useShallow((s) => ({ activeView: s.activeView, activeProjectId: s.activeProjectId, appAssistantEnabled: s.appAssistantEnabled })));
-  const projectId = ['simulator', 'project-hub'].includes(state.activeView)
-    ? state.activeProjectId
-    : undefined;
-  if (
-    !state.appAssistantEnabled ||
-    !['simulator', 'project-hub', 'dashboard'].includes(state.activeView)
-  )
+  const projectId = assistantProjectId(state.activeView, state.activeProjectId);
+  if (!state.appAssistantEnabled || !assistantVisibleIn(state.activeView))
     return null;
   return (
     <AssistantPanel
       key={`${assistantOwner()}|${projectId || 'global'}`}
       projectId={projectId}
+      belowToolbar={state.activeView === 'pdf-preview'}
       transport={transport}
     />
   );

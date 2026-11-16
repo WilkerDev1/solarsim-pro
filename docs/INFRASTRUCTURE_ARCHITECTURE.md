@@ -18,6 +18,7 @@ Las direcciones, usuarios y comandos SSH exactos no se publican en este reposito
 | `app-server` desde fuera | Por Tailscale, saltando por el nodo Proxmox (comando exacto en el archivo privado). |
 | Estado del CT | `pct status 100` en el nodo Proxmox. |
 | API pública | `https://solarsim.electsun.net` (Cloudflare → `cloudflared-tunnel` → `caddy-proxy` → `solarsim-api:3000`). Solo HTTP: no sirve para desplegar. |
+| Servidor MCP remoto (opcional) | CT dedicado a servidores MCP en `pve01`, con su propio túnel de Cloudflare; ver [Servidor MCP remoto](#servidor-mcp-remoto-ct-dedicado). |
 | Visor de propuestas | `https://propuesta.electsun.net/p/<id>` (Worker `solarsim-share-viewer`, KV `PROPOSALS_KV`). Se despliega con `wrangler` desde cualquier lugar con la cuenta de Cloudflare. |
 
 En el CT (con el usuario de servicio indicado en el archivo privado):
@@ -49,7 +50,7 @@ En el CT (con el usuario de servicio indicado en el archivo privado):
    docker save <imagen en ejecución> | gzip > "$D/<imagen>.tar.gz"
    ```
 
-2. **Ensayo de restauración.** Desde la raíz de un checkout de la revisión a desplegar, con Docker local: `$S 'cat <checkpoint>/solarsim_prod.dump' | python3 scripts/qa/restoreBackupRehearsal.py`. El script guarda el dump completo (datos de producción) en una carpeta privada de `TMPDIR` (0700, archivo 0600) y la borra al terminar; si se interrumpe a la fuerza puede quedar `solarsim-logical-qa-*/input.dump`. Ejecutarlo solo en una máquina de confianza con disco cifrado y comprobar después que no quedan restos. Debe listar las migraciones de esa revisión (incluidas las nuevas: con la 007 la salida termina en `"migrations":[1,2,3,4,5,6,7]`). El script recibe el dump por stdin, lo restaura en PostgreSQL 16 sin red (`--network none`, 1 GB de memoria con los datos en tmpfs) con socket Unix privado, ejecuta `server/tests/backupRehearsal.ts` (migraciones del repositorio dos veces, conteos iguales, huellas iguales del contenido de cada propuesta salvo `specs`, `equipmentTotals` iguales antes y después, ningún proyecto con el espejo heredado, cero huérfanos) y `pg_amcheck --heapallindexed --parent-check`; al terminar elimina contenedor y temporales. No monta ni modifica la base de producción.
+2. **Ensayo de restauración.** Desde la raíz de un checkout de la revisión a desplegar, con Docker local: `$S 'cat <checkpoint>/solarsim_prod.dump' | python3 scripts/qa/restoreBackupRehearsal.py`. El script guarda el dump completo (datos de producción) en una carpeta privada de `TMPDIR` (0700, archivo 0600) y la borra al terminar; si se interrumpe a la fuerza puede quedar `solarsim-logical-qa-*/input.dump`. Ejecutarlo solo en una máquina de confianza con disco cifrado y comprobar después que no quedan restos. Debe listar las migraciones de esa revisión (incluidas las nuevas: con la 008 la salida termina en `"migrations":[1,2,3,4,5,6,7,8]`). El script recibe el dump por stdin, lo restaura en PostgreSQL 16 sin red (`--network none`, 1 GB de memoria con los datos en tmpfs) con socket Unix privado, ejecuta `server/tests/backupRehearsal.ts` (migraciones del repositorio dos veces, conteos iguales, huellas iguales del contenido de cada propuesta salvo `specs`, `equipmentTotals` iguales antes y después, ningún proyecto con el espejo heredado, cero huérfanos) y `pg_amcheck --heapallindexed --parent-check`; al terminar elimina contenedor y temporales. No monta ni modifica la base de producción.
 3. **Compatibilidad de clientes.** La API exige `baseVersion` (CAS), publicación autenticada y, desde la 2.7.1, `X-SolarSim-Client` con versión ≥ `MIN_CLIENT_VERSION` (426 en caso contrario; ver más abajo). Los clientes 2.6.0 y 2.7.0 dejan de sincronizar: coordinar la versión de escritorio y del Worker, avisar al equipo y exportar el trabajo pendiente de quienes vayan a cambiar.
 4. **Construir y reemplazar solo la API.** La imagen se etiqueta `solarsim-api-api:<versión>-<sha corto>` para poder volver a ella. PostgreSQL, Caddy y el túnel no se recrean.
 
@@ -158,6 +159,50 @@ Rollback: la imagen 2.7.4 es compatible con los datos (normaliza `feature_settin
 2. Restaurar la composición anterior del checkpoint y recrear solo la API con `up -d --no-deps --no-build api`, usando una imagen anterior **compatible con las migraciones aplicadas** y con los secretos actuales. Una API que desconozca membresías secundarias o revocaciones (anterior a la migración 003) no es un rollback válido: podría conceder acceso indebido.
 3. Mantener la misma base, credenciales y volúmenes. No borrar tablas ni columnas, no restaurar el dump sobre la base viva y conservar las publicaciones existentes en KV.
 4. Si el rollback de aplicación no resuelve un fallo de datos, restaurar el respaldo en una base nueva, verificarla y reconciliar explícitamente las escrituras posteriores al checkpoint antes de cambiar el destino. Un snapshot anterior del CT no es un rollback seguro de datos que recibieron escrituras nuevas.
+
+## Servidor MCP remoto (CT dedicado)
+
+Arquitectura, variables y modelo de amenazas en [MCP_REMOTE.md](MCP_REMOTE.md). El servicio `mcp-remote` corre en un CT de `pve01` dedicado a servidores MCP, separado del CT100; es sin estado y **no** tiene credenciales de PostgreSQL ni `JWT_SECRET`: solo conoce la dirección de la API y reenvía el token del agente. Los nombres del CT, su IP y el hostname público definitivo se anotan en el archivo privado.
+
+**Requisitos del CT.** LXC sin privilegios con Docker (o Node 24 si se prefiere systemd), 1 vCPU, 512 MB de RAM y 2 GB de disco bastan; IP fija como el CT100 (ver [Red de pve01](#red-de-pve01-y-del-ct100)); salida HTTPS a Cloudflare para su propio túnel y acceso a la API (ver más abajo). Sin puertos publicados a Internet: solo el túnel.
+
+1. **API primero.** Desplegar la API de esta versión con el procedimiento habitual (checkpoint, ensayo; el ensayo debe terminar en `"migrations":[1,…,8]`: la 008 crea `agent_grants`, `agent_tokens`, `oauth_clients`, `oauth_codes` y `agent_activity`, aditiva). Con `MCP_REMOTE_ENABLED` ausente nada cambia para los clientes.
+2. **Ruta interna CT MCP → API.** Elegir una:
+   - *Recomendada al empezar:* `API_INTERNAL_URL=https://solarsim.electsun.net` (la URL pública). Cero cambios en el CT100 y TLS de extremo a extremo; añade la latencia del paso por Cloudflare.
+   - *Red interna:* un sitio extra en Caddy del CT100 que escuche en la IP de LAN (p. ej. `:8081`, publicado solo en esa IP) con `@mcp remote_ip <IP del CT MCP>` → `reverse_proxy solarsim-api:3000` y `respond 403` para el resto, más una regla del cortafuegos de Proxmox que solo permita ese puerto desde el CT MCP. Entonces `API_INTERNAL_URL=http://<IP LAN del CT100>:8081`. Los tokens viajan sin TLS por el puente de `pve01`: aceptable solo si esa red es de confianza (decisión del responsable).
+3. **Variables de la API.** Añadir al `.env` de `~/servicios/solarsim-api/` y a la composición: `MCP_REMOTE_ENABLED=true`, `MCP_REMOTE_URL=https://<host MCP>/mcp`; para ChatGPT/Claude.ai, además `MCP_OAUTH_ENABLED=true` y `API_PUBLIC_URL=https://solarsim.electsun.net`. Para que los límites por IP de la página de inicio de sesión sean por persona y no globales: `TRUSTED_PROXIES=<CIDR de solarsim_net>` (red Docker donde están Caddy y `cloudflared`) y `CLIENT_IP_HEADER=cf-connecting-ip`. Esto confía en que nadie llegue a Caddy sin pasar por Cloudflare: Caddy publica 80/443 en la LAN, así que un equipo de la LAN podría inventar esa cabecera (riesgo acotado a la oficina; cerrar esos puertos con el cortafuegos del CT lo elimina). Si el MCP entra por la ruta interna, añadir su IP a `TRUSTED_PROXIES` solo tiene efecto con `CLIENT_IP_HEADER=x-forwarded-for` y Caddy configurado con `trusted_proxies` para conservar esa cabecera; si no, la API verá la dirección del servicio (ver riesgos aceptados en MCP_REMOTE.md). Recrear solo `api`. Comprobar `GET /.well-known/oauth-authorization-server` en el dominio de la API (si OAuth está activo).
+4. **Imagen del servicio.** Desde la raíz de la revisión aprobada: `git archive <sha> mcp-remote shared | ssh <CT MCP> '… tar -x … && docker build -f mcp-remote/Dockerfile -t solarsim-mcp-remote:<versión>-<sha> .'` (o construir en local y `docker save | docker load`, como la API). En `~/servicios/solarsim-mcp-remote/docker-compose.yml`:
+
+   ```yaml
+   services:
+     mcp:
+       image: solarsim-mcp-remote:<versión>-<sha>
+       container_name: solarsim-mcp-remote
+       restart: unless-stopped
+       environment:
+         MCP_PUBLIC_URL: https://<host MCP>/mcp
+         API_INTERNAL_URL: ${API_INTERNAL_URL}
+         OAUTH_ISSUER_URL: https://solarsim.electsun.net   # omitir si solo hay tokens personales
+         TRUSTED_PROXIES: <subred de mcp_net, p. ej. 172.30.0.0/16>   # cloudflared llega por esta red
+         CLIENT_IP_HEADER: cf-connecting-ip
+       networks: [mcp_net]
+     cloudflared:
+       image: cloudflare/cloudflared:<versión fijada>
+       restart: unless-stopped
+       command: tunnel --no-autoupdate run
+       environment: [TUNNEL_TOKEN=${TUNNEL_TOKEN}]
+       networks: [mcp_net]
+   networks:
+     mcp_net: {}
+   ```
+
+   Sin systemd ni Docker: `npm ci --omit=dev && npm run build` en `mcp-remote/` y una unidad con `ExecStart=/usr/bin/node dist/mcp-remote/src/index.js`, `EnvironmentFile=` (0600), `User=` sin privilegios, `Restart=on-failure` y `KillSignal=SIGTERM`.
+5. **Publicación HTTPS.** Un túnel de Cloudflare **propio del CT MCP** (token en `.env` 0600 del CT) con el hostname público → `http://solarsim-mcp-remote:8787`. Así una caída de un CT no arrastra al otro. En Cloudflare: no poner Cloudflare Access delante de `/mcp`, `/.well-known/*` ni de `/oauth/*` del dominio de la API; desactivar desafíos de bots en esas rutas y permitir los rangos de salida de los proveedores (Anthropic `160.79.104.0/21`; los de OpenAI, según su documentación). Claude exige respuesta de descubrimiento y token en menos de 10 s.
+6. **Comprobación.** `https://<host MCP>/health` y `/health?deep=1` → 200; `POST /mcp` sin token → 401 con `resource_metadata`; el túnel debe conservar el `Host` público (sin `httpHostHeader` en la ruta del túnel), o el servicio responderá 403; desde Ajustes → Agentes e IA crear un token de solo lectura y conectar Claude Code (`claude mcp add …`), listar herramientas y buscar una propuesta; revisar la actividad remota; revocar el token y comprobar 401. Después, si se activa OAuth, añadir el conector en Claude.ai/ChatGPT con una cuenta de prueba.
+
+**Rollback.** El servicio no tiene estado: volver a la imagen anterior (`docker compose up -d` con la etiqueta previa) o pararlo (`docker compose down`, sin `-v`) corta el MCP remoto sin afectar a la API. Para desactivar todo el acceso de agentes, quitar `MCP_REMOTE_ENABLED` de la API y recrearla: los tokens dejan de valer al instante (las tablas de la 008 se conservan). Revocar en bloque sin desactivar: `UPDATE agent_grants SET revoked_at=clock_timestamp() WHERE revoked_at IS NULL` y `DELETE FROM agent_tokens`. Una API anterior a la 008 ignora esas tablas (rollback de la API válido).
+
+`mcp-remote/tests/containerSmoke.ts` ensaya la pila empaquetada (API + servicio + PostgreSQL efímeros en una red Docker aislada) antes de desplegar.
 
 ## Rotación de secretos
 

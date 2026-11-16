@@ -42,3 +42,7 @@ FORM: Extensión code-led Operate heredada; sin nueva identidad ni comp. Ancho i
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
 
 QA visual sintética completada tras reintento solicitado: divisor/teclado, flotante en tres vistas, switch, confirmación, temas y mínimos 1024×700. Finish reviewer independiente: `ship` a este alcance, sin fixes materiales. Capturas en docs/qa/global-assistant-2026-10-12; adjuntos PDF muestran primera página con PDF.js y descarga completa. No se amplía soporte móvil ni se afirma prueba Gemini/producción.
+
+## Rediseño de chat y revisión
+
+El chat de ambos asistentes comparte `ChatComposer` (caja única, adjuntos como fichas, enviar circular, Enter envía) y `ChatMessage` (burbuja de usuario, asistente con marca y markdown), con «pensando», pasos de herramienta, anclaje al final y estado vacío con sugerencias que rellenan el mensaje; esto sustituye la regla anterior «sin ejemplo» por petición explícita del usuario. «Revisemos estos detalles» agrupa avisos por gravedad (bloquean / por confirmar / informativos), plegables y con enlace al campo. La revisión añade resumen con pendientes, contadores por pestaña, avisos en línea con prefijo textual, fichas de equipo con estado y paso final destacado. Gravedad y campo se derivan en presentación (`reviewIssues.ts`); la validación no cambia. Hubo capturas sintéticas locales en ambos temas, 1280×720 y 1024×700, sin finish reviewer independiente.
