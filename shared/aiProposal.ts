@@ -5,6 +5,7 @@ import { COMMERCIAL_SCHEMA, normalizeCommercial, commercialMarkup, type AIPropos
 import type { SolarEquipmentItem, EquipmentType } from '../src/types/equipment';
 import type { ExtractedInvoiceData } from '../src/types/aiInvoice';
 import type { PanelItemSpec, InverterItemSpec, BatteryItemSpec } from '../src/types';
+import { fitEquipment, magnitudesMatch, matchEquipment } from './equipmentMatch';
 import { AI_DRAFT_DOCUMENT_TEXT_KEYS, normalizeDraftDocumentTexts, type AIDocumentTextEntry } from './documentTexts/aiDraft';
 
 export interface AIProposalFile { fileBase64: string; mimeType: string; fileName: string }
@@ -71,20 +72,9 @@ export const PROPOSAL_JSON_SCHEMA = {
 };
 const num = (v: unknown): number | undefined => typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined;
 const str = (v: unknown): string | undefined => typeof v === 'string' && v.trim() ? v.trim() : undefined;
-/** Compare the stated request as well as the catalog ID: matching watts alone is not a model match. */
+/** Compare the stated request as well as the catalog ID: matching watts alone is not a model match (same rule as `fitEquipment`). */
 export function requestedModelMatches(request: string, item: SolarEquipmentItem): boolean {
-  const canonical=(text:string)=>text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/lux\s*power(?!tek)/g,'luxpowertek').replace(/\bcanadian(?!\s*solar)/g,'canadian solar').replace(/watts?|vatios?/g,'w');
-  const magnitude=item.type==='panel'?item.powerW:item.type==='inverter'?item.powerKW:item.capacityKWh;
-  let requested=canonical(request);
-  const units=/([0-9]+(?:[.,][0-9]+)?)\s*(kwh|kwp|kw|wp|w)\b/g;
-  for(const match of requested.matchAll(units)){if((item.type==='battery'&&match[2]!=='kwh')||(item.type==='inverter'&&match[2]!=='kw')||(item.type==='panel'&&match[2]==='kwh'))return false;let n=Number(match[1].replace(',','.'));if(item.type==='panel'&&['kw','kwp'].includes(match[2]))n*=1000;if(!magnitude||Math.abs(n-magnitude)>Math.max(0.001,magnitude*0.001))return false;}
-  requested=requested.replace(units,' ').replace(/\(?\s*\d+\s*(anos?\s*(?:de\s*)?garantia)\)?/g,' ');
-  const compact=(text:string)=>canonical(text).replace(/[^a-z0-9]/g,'');
-  const haystack=compact(`${item.brand} ${item.modelSeries} ${item.displayName}`);
-  const codes=requested.match(/\b[a-z][a-z0-9]*(?:[-.][a-z0-9]+)+\b/g)||[];
-  for(const code of codes){const value=compact(code);const index=haystack.indexOf(value);if(index<0||(/\d$/.test(value)&&/\d/.test(haystack[index+value.length] || '')))return false;}
-  const tokens=requested.split(/[^a-z0-9]+/).filter(t=>t&&!['panel','paneles','modulo','modulos','inversor','inversores','bateria','baterias','solar','de','del','w','wp','kw','kwh','kwp'].includes(t));
-  return tokens.length>0&&tokens.every(t=>haystack.includes(t));
+  return fitEquipment({ type: item.type, text: request }, item).fits;
 }
 
 export function robustParseJson(raw: string): any {
@@ -147,10 +137,19 @@ export function normalizeProposalDraft(rawDraft: unknown, catalog: SolarEquipmen
       }
       if (count===undefined || !Number.isInteger(count) || count<=0 || count>100000) { issue(`invalid_${type}_count`,`${item.displayName}: indica una cantidad entera positiva.`); count=row.quantity ?? row.count; }
       const requestedModel=str(row.requestedModel);
-      const modelMismatch=Boolean(requestedModel && !requestedModelMatches(requestedModel,item));
-      if (modelMismatch) issue(`requested_${type}_model_mismatch`,`${item.displayName} no coincide con el modelo solicitado (${requestedModel}). Selecciona el modelo correcto o confirma explícitamente la alternativa.`);
+      // Un solo emparejador (shared/equipmentMatch): texto y magnitud con la misma tolerancia que la revisión y los escáneres.
+      const fit=requestedModel?fitEquipment({type,text:requestedModel},item):undefined;
+      const modelMismatch=Boolean(fit && !fit.fits);
+      if (modelMismatch) issue(`requested_${type}_model_mismatch`,`${item.displayName} no coincide con el modelo solicitado (${requestedModel}). ${fit!.reason} Selecciona el modelo correcto o confirma explícitamente la alternativa.`);
+      else if (fit && fit.kind!=='exact') {
+        const match=matchEquipment({type,text:requestedModel},catalog);
+        if (match.kind==='ambiguous' && match.candidates.some(c=>c.item.id===item.id)) {
+          const others=match.candidates.filter(c=>c.item.id!==item.id).slice(0,4).map(c=>c.item.displayName).join(', ');
+          issue(`requested_${type}_model_ambiguous`,`${item.displayName} es uno de varios modelos que coinciden con lo solicitado (${requestedModel}); también ${others}. Confirma el modelo.`,'warning');
+        }
+      }
       const requestedMagnitude=num(row[type==='panel'?'requestedPowerW':type==='inverter'?'requestedPowerKW':'requestedCapacityKWh']);
-      const magnitudeMismatch=requestedMagnitude!==undefined && Math.abs(requestedMagnitude-magnitude)>Math.max(0.01,magnitude*0.005);
+      const magnitudeMismatch=requestedMagnitude!==undefined && !magnitudesMatch(type,requestedMagnitude,magnitude);
       if (magnitudeMismatch) issue(`requested_${type}_mismatch`,`${item.displayName} no coincide con la potencia/capacidad solicitada (${requestedMagnitude}). Confirma la elección o selecciona el modelo correcto.`);
       const price = priceFor(item);
       const prior=(context.currentDraft as any)?.[key]?.find((g:any)=>(g.id || g.equipmentId)===item.id);
@@ -167,7 +166,7 @@ export function normalizeProposalDraft(rawDraft: unknown, catalog: SolarEquipmen
       if(result.some(group=>group.id===id && (group.unitPriceUSD!==effectivePrice || group.priceSource!==priceSource)))issue('conflicting_group_prices',`${item.displayName}: un mismo modelo tiene costos distintos. Unifica el costo de sus grupos.`);
       const existing = result.find(group=>group.id===id && group.count>0 && group.unitPriceUSD===effectivePrice && group.priceSource===priceSource
         && (!group.requestedModel || requestedModelMatches(group.requestedModel,item))
-        && (group[requestedKey]===undefined || Math.abs(group[requestedKey]-magnitude)<=Math.max(0.01,magnitude*0.005)));
+        && (group[requestedKey]===undefined || magnitudesMatch(type,group[requestedKey],magnitude)));
       if (existing && count!==undefined && count>0 && !modelMismatch && !magnitudeMismatch) {
         existing.count+=count!;
         if (existing.count>100000) issue(`invalid_${type}_count`,`${item.displayName}: la cantidad total excede 100.000 unidades.`);

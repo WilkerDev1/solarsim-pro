@@ -1,3 +1,4 @@
+import { matchEquipment } from "../../shared/equipmentMatch";
 import { DEFAULT_DOP_RATE } from "../../shared/assumptions";
 import {
   ExtractedPriceCatalogResult,
@@ -323,14 +324,25 @@ Extrae todos los modelos de paneles, inversores y baterías con sus precios unit
             raw.extractedModelName.trim().toLowerCase(),
       );
       const exact = exactMatches.length === 1 ? exactMatches[0] : undefined;
-      const matched = exact || target;
+      // Sin nombre idéntico ni id válido de la IA, el emparejador compartido sugiere un equipo único (nunca preseleccionado).
+      const suggested =
+        exact || target
+          ? undefined
+          : matchEquipment(
+              { type: eqType, text: raw.extractedModelName, brand: typeof raw.brand === "string" ? raw.brand : undefined },
+              currentCatalog,
+            );
+      const local = suggested?.item;
+      const matched = exact || target || local;
       const matchedId = matched?.id;
       const matchedName = matched?.displayName;
       const confidence = exact
         ? 1
-        : matched
+        : target
           ? Math.min(1, Math.max(0, Number(raw.matchConfidence) || 0))
-          : 0;
+          : local
+            ? suggested!.kind === "exact" ? 0.9 : 0.75
+            : 0;
 
       const currency = raw.originalCurrency || parsed.currencyDetected;
       if (!["USD", "DOP"].includes(currency))

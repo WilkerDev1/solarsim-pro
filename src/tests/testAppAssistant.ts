@@ -46,6 +46,14 @@ const read = executeAssistantTool(
   owner
 );
 assert.equal(read.cards?.[0].id, project.id);
+// Texto libre sin coincidencia literal: el emparejador compartido encuentra el equipo por marca y capacidad.
+const freeText = executeAssistantTool(
+  { name: 'search_equipment', args: { query: 'batería de litio HinaESS 16.1 kWh' } },
+  owner
+).data as { equipment: { id: string; match?: string; matchReason?: string }[] };
+assert.equal(freeText.equipment[0]?.id, 'eq-bat-hinaess-16k');
+assert.equal(freeText.equipment[0]?.match, 'spec');
+assert.match(freeText.equipment[0]?.matchReason || '', /16\.08 kWh/);
 const pending = executeAssistantTool(
   {
     name: 'propose_project_update',

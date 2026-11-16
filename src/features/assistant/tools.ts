@@ -14,6 +14,8 @@ import { readEquipment, type EquipmentKind } from '../../../shared/equipment';
 import { editableAssistantFields, validateAssistantEdits } from './validation';
 import { preserveHiddenInQuotation } from '../../../shared/quotationItems';
 import type { CustomQuotationItem } from '../../types';
+import type { SolarEquipmentItem } from '../../types/equipment';
+import { searchEquipmentByRequest } from '../../../shared/equipmentMatch';
 import { touchesPricingEdits } from './pricingFields';
 import { AUTOMATED_PRICING } from '../../../shared/automatedProposalPolicy';
 import type {
@@ -123,19 +125,24 @@ export function executeAssistantTool(
     )
       throw new Error('Filtro de disponibilidad inválido.');
     const query = normalize(args.query);
-    const found = visibleAssistantEquipment()
+    const available = (e: SolarEquipmentItem) =>
+      !args.unavailableOnly ||
+      !e.supplierPrices?.some((p) => p.stockStatus === 'in_stock');
+    const visible = visibleAssistantEquipment();
+    let found = visible
       .filter(
         (e) =>
           normalize(`${e.brand} ${e.displayName} ${e.modelSeries}`).includes(
             query
-          ) &&
-          (!args.unavailableOnly ||
-            !e.supplierPrices?.some((p) => p.stockStatus === 'in_stock'))
+          ) && available(e)
       )
       .slice(0, 12);
+    // Sin coincidencia literal («batería WeCo 16 kWh»), el emparejador compartido busca por marca, modelo y especificación.
+    const fits = found.length || !query ? [] : searchEquipmentByRequest(String(args.query), visible.filter(available));
+    if (fits.length) found = fits.map((fit) => fit.item);
     return {
       data: {
-        equipment: found.map((e) => ({
+        equipment: found.map((e, i) => ({
           id: e.id,
           type: e.type,
           name: e.displayName,
@@ -144,6 +151,7 @@ export function executeAssistantTool(
           stockNote: !e.supplierPrices?.length
             ? 'Sin ofertas; disponibilidad desconocida'
             : undefined,
+          ...(fits[i] ? { match: fits[i].kind, matchReason: fits[i].reason } : {}),
         })),
         limit: 12,
       },

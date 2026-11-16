@@ -128,12 +128,14 @@ export function ProposalDraftReview({draft,catalog,matrix,context,preview,produc
           {rows.map((row,i)=>{
             const anchor=reviewAnchor.row(group.key,i);
             const rowIssues=at(anchor);
-            const rowTier=worstTier(rowIssues) ?? (row.requestedModel?'confirm':undefined);
+            // Solo un aviso del emparejador (requested_*) pide confirmar el modelo; una coincidencia por especificación no.
+            const requestedIssue=row.requestedModel?rowIssues.find(v=>/^requested_/.test(v.code)):undefined;
+            const rowTier=worstTier(rowIssues);
             const selected=options.find(e=>e.id===row.id);
             const notesId=rowIssues.length?`${anchor}-issues`:undefined;
             const invalid=(control:'model'|'count'|'price')=>rowIssues.some(v=>v.tier==='blocking'&&rowControlFor(v.code)===control)?true:undefined;
             const select=`${anchor}-model`;
-            const requestedNotes=rowIssues.filter(v=>!/^requested_/.test(v.code)||!row.requestedModel);
+            const requestedNotes=rowIssues.filter(v=>v!==requestedIssue);
             const total=row.unitPriceUSD!==undefined&&Number.isFinite(row.count)?row.unitPriceUSD*row.count:undefined;
             return <div className="proposal-equipment-row" key={`${group.key}-${i}`} id={anchor} tabIndex={-1} data-flag={rowTier}>
             <label className="proposal-eq-model">Modelo<select id={select} value={row.id} aria-describedby={notesId} aria-invalid={invalid('model')} onChange={e=>change(i,e.target.value,row.count)}>{!options.some(e=>e.id===row.id)&&<option value={row.id}>Modelo no disponible</option>}{options.map(e=><option key={e.id} value={e.id}>{e.displayName || e.modelSeries} · {group.value(e)} {group.unit}</option>)}</select></label>
@@ -145,8 +147,8 @@ export function ProposalDraftReview({draft,catalog,matrix,context,preview,produc
               <span className="proposal-origin" data-missing={row.unitPriceUSD===undefined || undefined}>{row.unitPriceUSD===undefined?<><AlertTriangle size={12} aria-hidden/>Falta costo</>:row.priceSource==='manual'?'Costo particular de esta cotización':'Oferta del inventario'}</span>
               {row.priceSource==='manual'&&<button type="button" className="proposal-tertiary" onClick={()=>update({[group.key]:rows.map((r,j)=>j===i?{...r,unitPriceUSD:undefined,priceSource:'supplier'}:r)})}><PackageOpen size={13} aria-hidden/>Usar oferta del inventario</button>}
             </div>
-            {(row.requestedModel || rowIssues.length>0) && <div className="proposal-row-alert" data-tier={rowTier} id={notesId}>
-              {row.requestedModel && <><p className="proposal-row-alert-title">{rowTier==='blocking'?<AlertOctagon size={14} aria-hidden/>:<AlertTriangle size={14} aria-hidden/>}<strong>{rowTier==='blocking'?'Bloquea:':'Confirmar:'}</strong> la IA no pudo confirmar el modelo.</p><dl className="proposal-compare"><div><dt>La IA pidió</dt><dd>{row.requestedModel}</dd></div><div><dt>Seleccionado</dt><dd>{selected?.displayName || row.brandModel || 'Sin modelo'}</dd></div></dl>
+            {rowIssues.length>0 && <div className="proposal-row-alert" data-tier={rowTier} id={notesId}>
+              {requestedIssue && <><p className="proposal-row-alert-title">{rowTier==='blocking'?<AlertOctagon size={14} aria-hidden/>:<AlertTriangle size={14} aria-hidden/>}<strong>{rowTier==='blocking'?'Bloquea:':'Confirmar:'}</strong> {/_ambiguous$/.test(requestedIssue.code)?'lo solicitado coincide con más de un modelo.':'la IA no pudo confirmar el modelo.'}</p><p className="proposal-note">{requestedIssue.message}</p><dl className="proposal-compare"><div><dt>La IA pidió</dt><dd>{row.requestedModel}</dd></div><div><dt>Seleccionado</dt><dd>{selected?.displayName || row.brandModel || 'Sin modelo'}</dd></div></dl>
                 <div className="proposal-row-alert-actions"><button type="button" className="proposal-confirm" onClick={()=>update({[group.key]:rows.map((item,j)=>j===i?{...item,requestedModel:undefined}:item)})}>Confirmar este modelo</button><button type="button" className="proposal-tertiary" onClick={()=>document.getElementById(select)?.focus()}>Cambiar modelo</button></div></>}
               <IssueNotes issues={requestedNotes}/>
             </div>}
