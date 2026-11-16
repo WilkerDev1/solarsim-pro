@@ -53,6 +53,48 @@ const total = bytes([second.systemInstruction, second.contents]);
 console.log(`Borrador: prefijo estable ${utf8([first.systemInstruction, stableParts(first)])} B de ${utf8([second.systemInstruction, second.contents])} B (${Math.round(stableBytes / total * 100)} %).`);
 assert(stableBytes / total > 0.8, 'con el catálogo de fábrica, más del 80 % de la petición es cacheable');
 
+// --- Ronda múltiple: todo lo que el usuario edita en la revisión (o la normalización conserva) llega al modelo en la ronda siguiente. ---
+{
+  const panelId = catalog.find(e => e.type === 'panel')!.id;
+  const inverterId = catalog.find(e => e.type === 'inverter')!.id;
+  const batteryId = catalog.find(e => e.type === 'battery')!.id;
+  const docKey = 'quotation.warranty.panel';
+  const raw = {
+    clientName: 'Cliente original', distributor: 'EDENORTE', tariffCode: 'BTS1', monthlyConsumptionKWh: Array(12).fill(500), consumptionSource: 'observed',
+    panels: [{ equipmentId: panelId, quantity: 10 }], inverters: [{ equipmentId: inverterId, quantity: 1 }], batteries: [], commercial: {},
+  };
+  const round1 = normalizeProposalDraft(raw, catalog, base);
+  // Ediciones de la revisión (mismas claves que actualiza ProposalDraftReview / ProposalCommercialReview), luego se vuelve a normalizar como el hook.
+  const edited = normalizeProposalDraft({
+    ...round1, clientName: 'Cliente editado', address: 'Calle 1, Santiago', nic: '1234567', province: 'Santiago', distributor: 'EDESUR', tariffCode: 'BTS2',
+    energyCostPerKWhDOP: 13.5, energyRateSource: 'manual', dopExchangeRate: 62, monthlyConsumptionKWh: Array(12).fill(700), observedMonthlyConsumptionKWh: Array(12).fill(700),
+    consumptionSource: 'estimated', targetCoveragePct: 90, hasBattery: true, specialTechnicalNotes: 'Techo de zinc', unresolvedRequests: ['Confirmar fase'],
+    netMeteringRegime: 'legacy_retention', gridUseChargeDOPPerKWh: 2.5,
+    panels: [{ id: panelId, count: 14, unitPriceUSD: 99, priceSource: 'manual', requestedModel: 'Panel pedido 630 W' }],
+    inverters: [{ id: 'modelo-inexistente', count: 2, requestedModel: 'Inversor Deye 12 kW' }],
+    batteries: [{ id: batteryId, count: 3 }],
+    commercial: { markupPct: 35, customItems: [{ id: 'x1', description: 'Estructura', quantity: 1, unit: 'UD', unitPriceUSD: 400, exonerateITBIS: false, applyMargin: true, hideInQuotation: true }], customDiscounts: [] },
+    documentTexts: [{ key: docKey, text: '12 años' }],
+  }, catalog, base);
+  const request = buildProposalRequest({ projectRequirementsText: 'Sigue', equipmentCatalog: catalog, context: { ...base, currentDraft: edited } });
+  const sent = JSON.parse(request.contents[0].parts.at(-1)!.text!).currentDraft;
+  const expect: Record<string, unknown> = { clientName: 'Cliente editado', address: 'Calle 1, Santiago', nic: '1234567', province: 'Santiago', distributor: 'EDESUR', tariffCode: 'BTS2',
+    energyCostPerKWhDOP: 13.5, energyRateSource: 'manual', dopExchangeRate: 62, consumptionSource: 'estimated', targetCoveragePct: 90, hasBattery: true,
+    specialTechnicalNotes: 'Techo de zinc', netMeteringRegime: 'legacy_retention', gridUseChargeDOPPerKWh: 2.5 };
+  for (const [key, value] of Object.entries(expect)) assert.deepEqual(sent[key], value, key);
+  assert.deepEqual(sent.monthlyConsumptionKWh, Array(12).fill(700));
+  assert.deepEqual(sent.observedMonthlyConsumptionKWh, Array(12).fill(700));
+  assert(sent.unresolvedRequests.includes('Confirmar fase'));
+  assert.deepEqual(sent.panels[0], { equipmentId: panelId, quantity: 14, requestedModel: 'Panel pedido 630 W', unitPriceUSD: 99, priceSource: 'manual' });
+  assert.equal(sent.inverters[0].equipmentId, 'modelo-inexistente');
+  assert.equal(sent.inverters[0].quantity, 2);
+  assert.equal(sent.inverters[0].requestedModel, 'Inversor Deye 12 kW', 'un grupo sin equipo resuelto conserva lo pedido');
+  assert.equal(sent.batteries[0].quantity, 3);
+  assert.equal(sent.commercial.markupPct, 35);
+  assert.equal(sent.commercial.customItems[0].hideInQuotation, true);
+  assert.deepEqual(sent.documentTexts.map((t: any) => [t.key, t.text]), [[docKey, '12 años']]);
+}
+
 // --- Asistente: instrucción y herramientas estables; la propuesta activa y la vista viajan al final del turno. ---
 const bodies: any[] = [];
 const transport: GeminiTransport = async (_url, body) => {

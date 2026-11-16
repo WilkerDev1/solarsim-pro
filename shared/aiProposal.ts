@@ -107,6 +107,8 @@ export function draftForPrompt(draft: unknown): Record<string, unknown> | undefi
       out[key] = Array.isArray(source[key]) ? source[key].map((group: any) => {
         const row: Record<string, unknown> = { equipmentId: group?.equipmentId ?? group?.id, quantity: group?.quantity ?? group?.count };
         for (const field of GROUP_KEYS) if (!(field in row) && group?.[field] !== undefined) row[field] = group[field];
+        // Un grupo sin equipo del catálogo guarda lo pedido en brandModel (la normalización no lo deja en requestedModel).
+        if (row.requestedModel === undefined && !group?.catalogItemId && typeof group?.brandModel === 'string' && group.brandModel !== 'Modelo pendiente') row.requestedModel = group.brandModel;
         return row;
       }) : source[key];
     } else out[key] = source[key];

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describeIssues, groupIssues, pendingByTab, reviewAnchor, issueTier, firstPendingTarget, buildIssueModel, blocksPreview, applyBarCounts, requestedRowAlert, confirmRequestedRow } from '../components/common/ai-invoice/reviewIssues';
+import { proposalReconciliationIssues } from '../utils/proposalDraftProject';
 import { ProposalApplyBar } from '../components/common/ai-invoice/components/ProposalApplyBar';
 import { ReviewIssueDigest } from '../components/common/ai-invoice/components/ReviewIssueDigest';
 import { ProposalDraftReview } from '../components/common/ai-invoice/components/ProposalDraftReview';
@@ -218,5 +219,35 @@ assert.match(review, /aria-invalid="true"/);
     update: () => {}, issueViews: [],
   }));
   assert.doesNotMatch(quiet, /proposal-row-alert/);
+}
+// 13. canApply equivalence: the model's blocksCreation over validation + reconciliation gives the same answer as the previous
+//     rule (any validation issue with severity 'error'), for every combination of a varied pool.
+{
+  const pool = [
+    { code: 'missing_client', severity: 'error', message: 'a' },
+    { code: 'context_consumption', severity: 'error', message: 'b' },
+    { code: 'context_consumption', severity: 'warning', message: 'c' },
+    { code: 'requested_battery_model_partial', severity: 'warning', message: 'd' },
+    { code: 'document_text_seen_partially', severity: 'warning', message: 'e' },
+    { code: 'invalid_panel_count', severity: 'error', message: 'f' },
+    { code: 'something_new', severity: undefined as never, message: 'g' },
+  ] as const;
+  const financial = { costMatrix: { precioNetoUSD: 100, itbisUSD: 18, totalNetoUSD: 118, listPorcentajeVentaUSD: 150 } } as never;
+  const reconciliations = [
+    proposalReconciliationIssues({ commercial: {} } as never, financial),
+    proposalReconciliationIssues({ commercial: { sourceTotals: { subtotalUSD: 1, taxUSD: 2, totalCostUSD: 3, saleUSD: 4 } } } as never, financial),
+  ];
+  assert.equal(reconciliations[1].length, 4);
+  let cases = 0;
+  for (let mask = 0; mask < 1 << pool.length; mask++) {
+    const validation = pool.filter((_, i) => mask & (1 << i));
+    for (const reconciliation of reconciliations) {
+      const before = !validation.some((issue) => issue.severity === 'error');
+      const after = !buildIssueModel([...validation, ...reconciliation] as never).blocksCreation;
+      assert.equal(after, before, `mask ${mask}`);
+      cases++;
+    }
+  }
+  assert.equal(cases, 256);
 }
 console.log('PASS: review issues are tiered, linked to fields, counted per tab and flagged inline.');
