@@ -16,6 +16,7 @@ import { DocumentEditorToolbar } from './editor/DocumentEditorToolbar';
 import { useDocumentLayout } from './useDocumentLayout';
 import { flushPendingDesignEdits } from './controls/pendingDesignEdits';
 import { canEditDocument, type DocumentEditorMode } from './editor/documentEditorState';
+import { hasSavingsComparison, noSavingsNote, resolveSavingsBasis } from '../../../shared/offGridSupply';
 
 // Modular Page Components
 import { PDFSidebarControls } from './controls/PDFSidebarControls';
@@ -224,6 +225,17 @@ export const PDFProposalView: React.FC = () => {
               </button>
             </div>
           </div>
+        )}
+
+        {/* Sistema aislado sin comparación de ahorro: aviso fuera de la hoja (no entra en el PDF). */}
+        {!hasSavingsComparison(resolveSavingsBasis(project.rates)) && (
+          <p
+            role={resolveSavingsBasis(project.rates) === 'generator_missing_cost' ? 'alert' : 'note'}
+            data-savings-state={resolveSavingsBasis(project.rates)}
+            className="w-[850px] rounded-2xl border border-amber-400 bg-amber-50 px-5 py-3 text-xs text-amber-950 dark:bg-amber-950 dark:text-amber-100"
+          >
+            {noSavingsNote(resolveSavingsBasis(project.rates))} Las páginas de retorno y flujo de caja no se incluyen.
+          </p>
         )}
 
         <ProposalAnnexSync project={project} />

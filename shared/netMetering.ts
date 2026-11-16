@@ -12,6 +12,7 @@
  * TypeScript puro, sin dependencias fuera de `shared/` (lo compilan el cliente y el Worker).
  */
 import { tariffChargeKind } from './tariffRules.js';
+import { exportsToGrid, resolveGridConnection } from './gridConnection.js';
 
 export const NET_METERING_REGIMES = ['legacy_retention', 'sie007_2026'] as const;
 export type NetMeteringRegime = (typeof NET_METERING_REGIMES)[number];
@@ -77,6 +78,8 @@ export interface NetMeteringRatesInput {
   distributor?: string | null;
   tariffCode?: string | null;
   isZeroExport?: boolean | null;
+  /** Tipo de conexión (`shared/gridConnection.ts`): sin exportación (inyección cero o aislado) no hay cargo. */
+  gridConnection?: unknown;
   netMeteringRegime?: unknown;
   gridUseChargeDOPPerKWh?: number | null;
 }
@@ -87,12 +90,14 @@ export function resolveGridUseChargeDOPPerKWh(rates: NetMeteringRatesInput | nul
 }
 
 /**
- * ¿Aplica el cargo por uso de la red? Solo con inyección a la red y en tarifas de un solo precio (art. 19.1.e).
+ * ¿Aplica el cargo por uso de la red? Solo con inyección a la red (no en inyección cero ni en un sistema aislado) y en
+ * tarifas de un solo precio (art. 19.1.e).
  * Tarifas con cargo de potencia (BTD, BTH, MTD, MTH, RBT-2…): no. Tarifas sin clasificar (`unknown`): sí, por
  * criterio conservador (el ahorro se estima a la baja hasta clasificar la tarifa).
  */
 export function gridUseChargeApplies(rates: NetMeteringRatesInput | null | undefined): boolean {
-  if (rates?.isZeroExport) return false;
+  // Inyección cero y sistema aislado no inyectan: no hay cargo, sea cual sea el régimen.
+  if (!exportsToGrid(resolveGridConnection(rates))) return false;
   return tariffChargeKind(rates?.distributor ?? undefined, rates?.tariffCode ?? '') !== 'demand';
 }
 

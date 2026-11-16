@@ -9,6 +9,8 @@ import { escapeHtml, formatInlineMarkdown, formatMarkdown, safeLogoUrl, scriptJs
 import { createDocumentTextContext, docTextKey, interpolate, viewerText } from '../../../shared/documentTexts';
 import { ENERGY_FLOW_CSS, renderEnergyFlowSection } from './energyFlow';
 import { isBuiltInFeatureAvailable } from '../../../shared/applicationFeatures';
+import { resolveGridConnection } from '../../../shared/gridConnection';
+import { hasSavingsComparison, resolveGeneratorCostPerKWh, resolveSavingsBasis, resolveSupplyAlternative, storedSupplyAlternative, supplyPresentation, type SavingsBasis } from '../../../shared/offGridSupply';
 import { EQUIPMENT_FALLBACK_NAME, equipmentTotals, readEquipment } from '../../../shared/equipment';
 import { mainModelPhrase } from '../../../shared/documentTexts/equipmentPhrases';
 import { THEME_TOGGLE_BUTTON, THEME_TOGGLE_SCRIPT, tailwindThemeConfig, themeHead, themeStyle } from './theme';
@@ -60,6 +62,54 @@ export function renderExpiredPage(companyName = 'electsun', companyPhone = '+1 (
 </html>`;
 }
 
+/** Sistema aislado: el déficit es energía no servida (el snapshot nuevo trae `annualUnservedKWh`). */
+function offGridEnergyNote(annualUnservedKWh: unknown, annualConsumptionKWh: number): string {
+  // Solo un número finito y no negativo: null, '', false o texto no son «0 kWh no servidos».
+  const unserved = typeof annualUnservedKWh === 'number' ? annualUnservedKWh : Number.NaN;
+  const lead = 'Sistema aislado (modo isla): no hay conexión con la red, así que no se importa ni se exporta energía y el excedente se recorta.';
+  if (!Number.isFinite(unserved) || unserved < 0) return `${lead} El consumo que no cubran el sol y las baterías requiere un respaldo externo (por ejemplo, una planta eléctrica).`;
+  if (unserved === 0) return `${lead} La producción solar y las baterías cubren el consumo estimado.`;
+  const share = annualConsumptionKWh > 0 ? ` (${(Math.round((unserved / annualConsumptionKWh) * 1000) / 10).toLocaleString('en-US')}% del consumo)` : '';
+  return `${lead} Se estima que <strong>${Math.round(unserved).toLocaleString('en-US')} kWh/año</strong>${share} no los cubren el sol ni las baterías: esa energía queda sin servir o la cubre un respaldo externo (por ejemplo, una planta eléctrica).`;
+}
+
+const finiteNonNegative = (value: unknown): number | null => (typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null);
+
+/**
+ * Sistema aislado sin comparación de ahorro (o con el generador sin costo): en lugar de retorno y flujo de caja, se
+ * presentan inversión, energía entregada, energía no servida y autonomía. Nunca se muestran cifras de ahorro.
+ */
+function offGridEnergySection(input: {
+  basis: SavingsBasis; investmentUSD: number; servedKWh: number; unservedKWh: unknown; autonomyHours: unknown; hasStorage: boolean;
+}): string {
+  const unserved = finiteNonNegative(input.unservedKWh);
+  const autonomy = finiteNonNegative(input.autonomyHours);
+  const card = (label: string, value: string, tone: string) => `
+        <div class="${tone} border rounded-xl sm:rounded-2xl p-2.5 sm:p-3 text-center">
+          <p class="text-[9px] sm:text-[9.5px] uppercase font-bold text-slate-600 mb-0.5">${label}</p>
+          <p class="text-sm sm:text-base font-black font-mono text-slate-900">${value}</p>
+        </div>`;
+  const lead = input.basis === 'generator_missing_cost'
+    ? 'Esta propuesta no incluye todavía una comparación económica con la generación actual del cliente.'
+    : 'El cliente no cuenta hoy con red ni planta eléctrica, así que esta propuesta no incluye una comparación económica con un suministro actual.';
+  return `<!-- 5. ENERGÍA ENTREGADA Y AUTONOMÍA (sistema aislado sin comparación) -->
+    <section data-savings-basis="${input.basis}" class="bg-surface border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">
+      <div class="border-b border-slate-100 pb-3">
+        <h2 class="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5 sm:gap-2">
+          <span class="w-2.5 h-2.5 rounded-xs bg-sky-600 shrink-0"></span>
+          4. Energía Entregada y Autonomía
+        </h2>
+        <p class="text-[11px] sm:text-xs text-slate-500 font-medium">${lead} Se presentan la inversión, la energía que entregará el sistema, la energía no servida y la autonomía.</p>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+        ${card('Inversión', `US$ ${Math.round(input.investmentUSD).toLocaleString('en-US')}`, 'bg-orange-50/70 border-orange-200')}
+        ${card('Energía entregada', `${Math.round(input.servedKWh).toLocaleString('en-US')} kWh/año`, 'bg-sky-50/70 border-sky-200')}
+        ${card('Energía no servida', unserved === null ? 'Sin dato' : `${Math.round(unserved).toLocaleString('en-US')} kWh/año`, 'bg-amber-50/70 border-amber-200')}
+        ${card('Autonomía', !input.hasStorage ? 'Sin baterías' : autonomy === null ? 'Sin dato' : `${(Math.round(autonomy * 10) / 10).toLocaleString('en-US')} h`, 'bg-emerald-50/70 border-emerald-200')}
+      </div>
+    </section>`;
+}
+
 export function renderProposalPage(stored: StoredProposal): string {
   const { project, summary, expiresAt } = stored;
   const client = project.client || {};
@@ -101,7 +151,18 @@ export function renderProposalPage(stored: StoredProposal): string {
   const rawTariffCode = rates.tariffCode || client.tariffCode || (distributor === 'CEPM' ? 'RBT-1' : 'BTS2');
   const tariffDisplayName = getTariffDisplayName(distributor, rawTariffCode);
   const isCEPM = distributor === 'CEPM';
-  const isZeroExport = !!rates.isZeroExport;
+  // Enlaces anteriores solo traen `isZeroExport`; los nuevos, además, `gridConnection` (aislado = modo isla).
+  const gridConnection = resolveGridConnection(rates);
+  const isZeroExport = gridConnection !== 'grid_export';
+  const isOffGrid = gridConnection === 'off_grid';
+  // Sistema aislado: alternativa de suministro. Enlaces sin el campo (o con red) se ven igual que siempre.
+  const savingsBasis = resolveSavingsBasis(rates);
+  const showSavings = hasSavingsComparison(savingsBasis);
+  // Con generador, la base del ahorro (cabecera y flujo de caja) es el costo de generación propia, no la tarifa.
+  const supplyAlternative = resolveSupplyAlternative(rates);
+  const generatorCost = resolveGeneratorCostPerKWh(rates);
+  // Generador o «sin comparación»: la página no nombra la distribuidora ni su tarifa (enlaces con red o con tarifa, igual).
+  const supplyKind = supplyPresentation(rates).kind;
   const exportFee = assumptions.gridExportFeePct;
   const gridUseChargeApplied = assumptions.appliedGridUseChargeDOPPerKWh > 0;
 
@@ -240,7 +301,8 @@ export function renderProposalPage(stored: StoredProposal): string {
 
   // Textos del documento: publicado (`doc:`) → campo heredado de enlaces antiguos → texto compartido por defecto.
   const textContext = createDocumentTextContext({
-    clientName, quoteValidityDays, distributor, tariffCode: rawTariffCode, isZeroExport, gridExportFeePct: exportFee, hasBattery,
+    clientName, quoteValidityDays, distributor, tariffCode: rawTariffCode, isZeroExport, gridConnection, gridExportFeePct: exportFee, hasBattery,
+    supplyAlternative: storedSupplyAlternative(rates), generatorCostPerKWh: resolveGeneratorCostPerKWh(rates) ?? undefined,
     // Régimen del enlace (rates o snapshot); sin él, el anterior y su nota de siempre.
     netMeteringRegime, gridUseChargeDOPPerKWh: assumptions.gridUseChargeDOPPerKWh,
     // Los enlaces nuevos traen su nota regulatoria publicada (`doc:`); sin ella, el texto que mostraban antes.
@@ -471,14 +533,18 @@ ${ENERGY_FLOW_CSS}
           <div class="text-[10.5px] sm:text-[11px] font-black uppercase text-orange-600 tracking-wider flex items-center justify-start md:justify-end gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span> Detalles de la Cotización</div>
           <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">N° Cotización:</span> <span class="font-mono font-bold text-slate-950">${escapeHtml(quoteNumber)}</span></div>
           <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">ID Proyecto:</span> <span class="font-mono font-bold text-slate-950">${escapeHtml(projectId)}</span></div>
-          <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">Distribuidora / Tarifa:</span> <span class="font-bold text-sky-900">${escapeHtml(distributor)} • ${escapeHtml(tariffDisplayName)}</span></div>
+          ${supplyKind === 'no_grid'
+            ? `<div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1" data-savings-reference="no_grid"><span class="font-bold text-slate-500">Suministro actual:</span> <span class="font-bold text-sky-900">${escapeHtml(docText('quotation.supply.noGrid'))}</span></div>`
+            : supplyKind === 'generator'
+            ? `<div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1" data-savings-reference="generator"><span class="font-bold text-slate-500">Suministro actual:</span> <span class="font-bold text-sky-900">${escapeHtml(docText('quotation.supply.generator'))} • ${generatorCost === null ? escapeHtml(docText('quotation.supply.generatorPending')) : `US$ ${generatorCost.toFixed(3)}/kWh`}</span></div>`
+            : `<div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">Distribuidora / Tarifa:</span> <span class="font-bold text-sky-900">${escapeHtml(distributor)} • ${escapeHtml(tariffDisplayName)}</span></div>`}
           <div class="flex flex-wrap items-baseline justify-start md:justify-end gap-1"><span class="font-bold text-slate-500">Fecha de Emisión:</span> <span class="font-semibold text-slate-800">${new Date().toLocaleDateString('es-DO', { day: '2-digit', month: 'long', year: 'numeric' })}</span></div>
         </div>
       </div>
     </header>
 
     <!-- FLUJO ENERGÉTICO ANIMADO (guía visual aproximada) -->
-    ${isBuiltInFeatureAvailable('proposalEnergyFlowDiagram') ? renderEnergyFlowSection({ hybrid: hasBattery && totalBESSKWh > 0, isZeroExport, systemCapacityKWp: Number(systemCapacityKWp), annualConsumptionKWh, totalBESSKWh, inverterPowerKW: rawInverters.reduce((sum: number, inv: any) => sum + (Number(inv.powerKW) || 0) * (Number(inv.count) || 1), 0) }) : ''}
+    ${isBuiltInFeatureAvailable('proposalEnergyFlowDiagram') ? renderEnergyFlowSection({ hybrid: hasBattery && totalBESSKWh > 0, isZeroExport, gridConnection, systemCapacityKWp: Number(systemCapacityKWp), annualConsumptionKWh, totalBESSKWh, inverterPowerKW: rawInverters.reduce((sum: number, inv: any) => sum + (Number(inv.powerKW) || 0) * (Number(inv.count) || 1), 0) }) : ''}
 
     <!-- 2. RESUMEN EJECUTIVO DE LA SOLUCIÓN PROPUESTA -->
     <section class="bg-surface border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">
@@ -533,7 +599,7 @@ ${ENERGY_FLOW_CSS}
       <div class="rounded-xl sm:rounded-2xl border-2 border-orange-200 bg-orange-50/90 p-3.5 sm:p-4 space-y-2 text-xs text-orange-950">
         <div class="font-black uppercase tracking-wider text-[10.5px] sm:text-[11px] flex items-center gap-1.5 sm:gap-2 text-orange-900">
           <svg class="w-4 h-4 text-orange-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-          Marco Regulatorio y Condiciones de Operación (SIE / EDES)
+          ${escapeHtml(docText('projectDescription.regulatoryHeading'))}
         </div>
         <div class="space-y-1.5 text-[11px] leading-relaxed text-left sm:text-justify">
           ${regParagraphs.map((p) => `<p>${formatMarkdown(p, 'font-bold text-orange-950')}</p>`).join('\n')}
@@ -563,7 +629,8 @@ ${ENERGY_FLOW_CSS}
         <canvas id="energyChart"></canvas>
       </div>
 
-      ${showSelfConsumption ? `<p class="text-xs text-slate-600" data-energy-mode="self_consumption">Autoconsumo anual en sitio: <strong>${Math.round(annualSelfConsumption).toLocaleString()} kWh</strong>${hasBattery ? `; aporte nocturno de baterías: <strong>${Math.round(annualBatteryContribution).toLocaleString()} kWh</strong>` : ''}. ${netMeteringRegime === 'sie007_2026' ? (gridUseChargeApplied ? 'La inyección se acredita completa; el cargo por uso de la red se descuenta del ahorro.' : 'La inyección se acredita completa.') : 'La inyección se presenta como crédito neto después de retención.'}</p>` : ''}
+      ${showSelfConsumption ? `<p class="text-xs text-slate-600" data-energy-mode="self_consumption">Autoconsumo anual en sitio: <strong>${Math.round(annualSelfConsumption).toLocaleString()} kWh</strong>${hasBattery ? `; aporte nocturno de baterías: <strong>${Math.round(annualBatteryContribution).toLocaleString()} kWh</strong>` : ''}. ${isOffGrid ? 'Sin red, el excedente se recorta.' : isZeroExport ? 'Con inyección cero, el excedente no se inyecta a la red.' : netMeteringRegime === 'sie007_2026' ? (gridUseChargeApplied ? 'La inyección se acredita completa; el cargo por uso de la red se descuenta del ahorro.' : 'La inyección se acredita completa.') : 'La inyección se presenta como crédito neto después de retención.'}</p>` : ''}
+      ${isOffGrid ? `<p class="text-xs text-amber-800 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2" data-grid-connection="off_grid">${offGridEnergyNote(summary?.annualUnservedKWh, annualConsumptionKWh)}</p>` : ''}
       <!-- Full 12-Month Table with Mobile Horizontal Scroll -->
       <div class="space-y-1.5">
         <div class="sm:hidden flex items-center justify-between text-[10px] text-slate-400 font-medium px-1">
@@ -581,7 +648,7 @@ ${ENERGY_FLOW_CSS}
                 <th class="px-3 sm:px-4 py-2 text-right">Consumo (kWh)</th>
                 <th class="px-3 sm:px-4 py-2 text-right">Producción (kWh)</th>
                 ${showSelfConsumption ? '<th class="px-3 sm:px-4 py-2 text-right">Autoconsumo (kWh)</th><th class="px-3 sm:px-4 py-2 text-right">Inyección neta (kWh)</th>' : ''}
-                <th class="px-3 sm:px-4 py-2 text-right text-emerald-300">${showSelfConsumption ? 'Ahorro fact. (kWh)' : 'Ahorro Energ. (kWh)'}</th>
+                <th class="px-3 sm:px-4 py-2 text-right text-emerald-300">${!showSavings ? 'Energía servida (kWh)' : showSelfConsumption ? 'Ahorro fact. (kWh)' : 'Ahorro Energ. (kWh)'}</th>
                 <th class="px-3 sm:px-4 py-2 text-right">Cobertura</th>
               </tr>
             </thead>
@@ -803,7 +870,7 @@ ${ENERGY_FLOW_CSS}
       </div>
     </section>
 
-    <!-- 5. RETORNO DE INVERSIÓN (ROI, TIR & VAN) -->
+    ${showSavings ? `    <!-- 5. RETORNO DE INVERSIÓN (ROI, TIR & VAN) -->
     <section class="bg-surface border border-sky-100 rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xs sm:shadow-sm space-y-4 sm:space-y-6">
       <div class="border-b border-slate-100 pb-3">
         <h2 class="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5 sm:gap-2">
@@ -901,7 +968,7 @@ ${ENERGY_FLOW_CSS}
           <span class="w-2.5 h-2.5 rounded-xs bg-orange-500 shrink-0"></span>
           5. Flujo de Caja y Beneficios Acumulados a 25 Años
         </h2>
-        <p class="text-[11px] sm:text-xs text-slate-500 font-medium">Proyección contable completa considerando degradación de paneles e inflación tarifaria</p>
+        <p class="text-[11px] sm:text-xs text-slate-500 font-medium">Proyección contable completa considerando degradación de paneles e ${supplyAlternative === 'generator' ? 'inflación del costo de generación propia' : 'inflación tarifaria'}</p>
       </div>
 
       <!-- 25 Years Table with Mobile Horizontal Scroll -->
@@ -966,7 +1033,7 @@ ${ENERGY_FLOW_CSS}
           </table>
         </div>
       </div>
-    </section>
+    </section>` : offGridEnergySection({ basis: savingsBasis, investmentUSD: initialOutflowUSD, servedKWh: annualSelfConsumption, unservedKWh: summary?.annualUnservedKWh, autonomyHours: summary?.batteryBackupAutonomyHours, hasStorage: hasBattery && totalBESSKWh > 0 })}
 
     <!-- FOOTER OFFICIAL INFORMATION -->
     <footer class="text-center text-xs text-slate-500 space-y-1.5 pt-4 pb-6 sm:pb-8 border-t border-sky-200">

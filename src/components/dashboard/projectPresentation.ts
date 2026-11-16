@@ -1,8 +1,11 @@
 import { ProjectSimulation } from '../../types';
 import { canonicalProposalDate } from '../../../shared/proposalDates';
+import { resolveGridConnection } from '../../../shared/gridConnection';
 
 export function projectType(project: ProjectSimulation): string {
-  if (project.rates.isZeroExport) return 'Inyección cero';
+  const connection = resolveGridConnection(project.rates);
+  if (connection === 'off_grid') return project.specs.hasBattery ? 'Híbrido aislado' : 'Aislado';
+  if (connection === 'zero_export') return 'Inyección cero';
   return project.specs.hasBattery ? 'Híbrido' : 'Inyección';
 }
 

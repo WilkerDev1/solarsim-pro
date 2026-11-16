@@ -1,4 +1,6 @@
 import { DEFAULT_GRID_EXPORT_FEE_PCT, DEFAULT_QUOTE_VALIDITY_DAYS } from '../assumptions.js';
+import type { GridConnectionMode } from '../gridConnection.js';
+import type { SupplyAlternative } from '../offGridSupply.js';
 import type { NetMeteringRegime } from '../netMetering.js';
 
 /**
@@ -24,6 +26,12 @@ export interface DocumentTextContext {
   distributor: string;
   tariffCode: string;
   isZeroExport: boolean;
+  /** Tipo de conexión; se lee con `resolveGridConnection(ctx)` (ausente = se deriva de `isZeroExport`). */
+  gridConnection?: GridConnectionMode;
+  /** Sistema aislado: alternativa de suministro (`resolveSavingsBasis(ctx)`; ausente = tarifa de distribuidora). */
+  supplyAlternative?: SupplyAlternative;
+  /** Costo por kWh del generador (USD) cuando la alternativa es `generator`. */
+  generatorCostPerKWh?: number;
   gridExportFeePct: number;
   /**
    * 'legacy': nota regulatoria tal como la mostraban los enlaces publicados antes de distinguir el tipo de

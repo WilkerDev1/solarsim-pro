@@ -11,6 +11,8 @@ import { effectiveFeatureSettings } from '../features/application/featurePolicy'
 import { calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { publishedDocumentTexts } from '../../shared/documentTexts';
 import { buildDocumentTextContext } from '../utils/documentTextContext';
+import { gridConnectionFields, resolveGridConnection } from '../../shared/gridConnection';
+import { publishedSupplyFields } from '../../shared/offGridSupply';
 
 export interface ShareResult {
   success: boolean;
@@ -228,8 +230,10 @@ export class ShareProposalService {
         updatedAt: project.updatedAt,
         client: project.client,
         specs: project.specs,
-        // Régimen y cargo efectivo materializados (inmutabilidad del enlace).
-        rates: publishedNetMeteringRates(project.rates),
+        // El enlace lleva el tipo de conexión explícito y coherente con `isZeroExport` (un Worker anterior solo lee este último),
+        // el régimen y el cargo efectivo materializados (inmutabilidad del enlace) y la alternativa de suministro saneada
+        // (solo un costo de generador válido y una alternativa conocida: mismo predicado que el Worker).
+        rates: publishedSupplyFields(publishedNetMeteringRates({ ...project.rates, ...gridConnectionFields(resolveGridConnection(project.rates)) })),
         financials: project.financials,
         monthlyConsumption: project.monthlyConsumption,
         customization: {

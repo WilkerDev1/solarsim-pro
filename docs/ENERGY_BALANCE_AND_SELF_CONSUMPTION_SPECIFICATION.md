@@ -45,7 +45,7 @@ $$E_{auto,m} = \min\big(C_m,\ \min(E_m,\ (E_{directo} + E_{descarga}) \times D_m
 
 $$E_{exp,m} = \max(0, E_{excedente} - E_{carga}) \times D_m$$
 
-con la restricción $E_{auto,m} + E_{exp,m} \le E_m$ (si se supera, $E_{exp,m} = E_m - E_{auto,m}$). En inyección cero (`isZeroExport`), $E_{exp,m} = 0$ y la retención es 0.
+con la restricción $E_{auto,m} + E_{exp,m} \le E_m$ (si se supera, $E_{exp,m} = E_m - E_{auto,m}$). En inyección cero y en un sistema aislado (`resolveGridConnection(rates)` distinto de `grid_export`), $E_{exp,m} = 0$ y la retención es 0. En un sistema aislado (`off_grid`) el déficit no se importa: $E_{no\_servida,m} = \max(0, C_m - E_{auto,m})$ (`unservedKWh`); ver [tipo de conexión](FINANCIAL_ENGINE_SPECIFICATION.md#131-tipo-de-conexión-con-la-red).
 
 $$E_{net\_credit,m} = E_{exp,m} \times \left(1 - \frac{F_{grid}}{100}\right), \qquad E_{retenida,m} = E_{exp,m} - E_{net\_credit,m}$$
 

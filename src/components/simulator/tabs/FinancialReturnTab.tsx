@@ -1,6 +1,7 @@
 import React from 'react';
 import { ProjectSimulation, FinancialSummaryResult } from '../../../types';
 import { resolveAssumptions } from '../../../../shared/assumptions';
+import { hasSavingsComparison, noSavingsNote, resolveSavingsBasis } from '../../../../shared/offGridSupply';
 import {
   BarChart,
   Bar,
@@ -38,9 +39,26 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
     netCashFlow: Math.round(row.netCashFlowUSD || 0),
   }));
 
+  // Sistema aislado sin comparación (o generador sin costo): no hay ahorro que mostrar; nunca tarjetas en cero.
+  const savingsBasis = resolveSavingsBasis(project.rates);
+  const comparable = hasSavingsComparison(savingsBasis);
+
   return (
     <div className="space-y-6 shrink-0">
+      {!comparable && (
+        <div
+          role={savingsBasis === 'generator_missing_cost' ? 'alert' : 'note'}
+          data-savings-state={savingsBasis}
+          className="rounded-xl border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-100"
+        >
+          <span className="block text-[10px] font-bold uppercase tracking-wider mb-1">
+            {savingsBasis === 'generator_missing_cost' ? 'Ahorro incompleto' : 'Sin comparación'}
+          </span>
+          {noSavingsNote(savingsBasis)}
+        </div>
+      )}
       {/* Indicadores Financieros Principales */}
+      {comparable && (
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 shrink-0">
         <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-sm">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
@@ -104,10 +122,12 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
         </div>
       </div>
 
+      )}
+
       {/* TABLA 1: Inversión Inicial e Incentivos */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs shrink-0">
         <div className="bg-[#2d5f47] text-white px-4 py-3 font-bold text-xs uppercase tracking-wider">
-          Cálculo de Ahorro y Retorno de Inversión
+          {comparable ? 'Cálculo de Ahorro y Retorno de Inversión' : 'Inversión e Incentivos Fiscales'}
         </div>
         <table className="w-full text-left text-xs border-collapse">
           <thead className="bg-slate-100 font-bold text-slate-700 border-b border-slate-200">
@@ -157,6 +177,7 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
         </table>
       </div>
 
+      {comparable && (<>
       {/* TABLA 2: Resumen de Ahorro Anual y Retorno de Inversión */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs shrink-0">
         <div className="bg-[#2d5f47] text-white px-4 py-3 font-bold text-xs uppercase tracking-wider">
@@ -360,6 +381,7 @@ export const FinancialReturnTab: React.FC<FinancialReturnTabProps> = ({
           </tbody>
         </table>
       </div>
+      </>)}
     </div>
   );
 };
