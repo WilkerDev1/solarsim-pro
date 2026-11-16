@@ -1,4 +1,6 @@
 name: Verify modular contracts
+# Gates de AGENTS.md repartidos en trabajos paralelos. El único check requerido es `gates`,
+# que agrega el resultado de todos y también informa en los PR que solo cambian documentación.
 on:
   workflow_call:
     inputs:
@@ -12,39 +14,184 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: verify-${{ inputs.ref || github.event.pull_request.head.ref || github.ref_name }}
-  cancel-in-progress: true
+  # Un PR y el push de la misma rama no comparten grupo; solo se cancelan ejecuciones obsoletas de PR.
+  group: verify-${{ github.event_name }}-${{ inputs.ref || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+env:
+  CHECKOUT_REF: ${{ inputs.ref || github.ref }}
 jobs:
-  verify:
+  changes:
+    name: changes
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request'
         with:
-          ref: ${{ inputs.ref || github.ref }}
-      - uses: actions/setup-node@v4
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Clasificar cambios
+        id: classify
+        shell: bash
+        run: |
+          # Solo un PR puede omitir trabajos; push, tags y workflow_call verifican siempre todo.
+          if [ "$GITHUB_EVENT_NAME" != "pull_request" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # refs/pull/N/merge: HEAD^1 es la base y HEAD^2 la cabeza del PR.
+          git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/changed.txt"
+          echo "Archivos cambiados: $(wc -l < "$RUNNER_TEMP/changed.txt")"
+          # Documentación pura: Markdown o docs/. Ninguna prueba lee esos archivos (comentarios aparte).
+          if [ -s "$RUNNER_TEMP/changed.txt" ] && ! grep -vE '(\.md$|^docs/)' "$RUNNER_TEMP/changed.txt" | grep -q .; then
+            echo "code=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Solo documentación: se omiten builds y pruebas; \`gates\` informa éxito."
+          else
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  client:
+    name: client (lint, builds, QA de scripts)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            server/package-lock.json
-            workers/share-viewer/package-lock.json
+          cache-dependency-path: package-lock.json
       - run: npm ci
-      - run: npm --prefix server ci
-      - run: npm --prefix workers/share-viewer ci
       - run: node scripts/qa/validatePackager.mjs
       - run: node scripts/qa/devSmoke.mjs
       - run: npm run lint
-      - run: npm test
       - run: node scripts/qa/testPrepareSecrets.mjs
       - run: npx tsx --test scripts/qa/tests/*.test.ts
       - run: npm run build
       - run: npm run build:electron
-      - run: npm --prefix server test
+      - name: Guardar registros de npm si falla
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: npm-logs-client
+          path: ~/.npm/_logs/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  client-tests:
+    name: client-tests (${{ matrix.shard }}/3)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - run: npm test -- --shard=${{ matrix.shard }}/3
+
+  server:
+    name: server (API, imagen Docker, smoke)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm --prefix server ci
       - run: npm --prefix server run format:check
       - run: npm --prefix server run build
+      - run: npm --prefix server test
       - run: docker build -f server/Dockerfile -t solarsim-api:qa-modular .
-      - run: npx tsx server/tests/containerSmoke.ts
+      # Mismo smoke que `npx tsx server/tests/containerSmoke.ts`, con el tsx de server/ (sin instalar la raíz).
+      - run: server/node_modules/.bin/tsx server/tests/containerSmoke.ts
+      - name: Recoger diagnóstico de contenedores si falla
+        if: failure()
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/diagnostics"
+          docker ps -a > "$RUNNER_TEMP/diagnostics/docker-ps.txt" 2>&1 || true
+          for id in $(docker ps -aq); do
+            docker logs --tail 500 "$id" > "$RUNNER_TEMP/diagnostics/container-$id.log" 2>&1 || true
+          done
+          cp -r ~/.npm/_logs "$RUNNER_TEMP/diagnostics/npm-logs" 2>/dev/null || true
+      - name: Guardar diagnóstico si falla
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: diagnostics-server
+          path: ${{ runner.temp }}/diagnostics/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  viewer:
+    name: viewer (Worker)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: workers/share-viewer/package-lock.json
+      - run: npm --prefix workers/share-viewer ci
       - run: npm --prefix workers/share-viewer test
       - run: npm --prefix workers/share-viewer run build
+
+  gates:
+    # Check requerido en la protección de ramas: falla si algún trabajo falló o se canceló.
+    name: gates
+    needs: [changes, client, client-tests, server, viewer]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Agregar resultados
+        shell: bash
+        env:
+          CODE: ${{ needs.changes.outputs.code }}
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS" | node -e '
+            const needs = JSON.parse(require("fs").readFileSync(0, "utf8"));
+            const code = process.env.CODE === "true";
+            let failed = false;
+            for (const [job, { result }] of Object.entries(needs)) {
+              // Omitido solo es válido cuando `changes` decidió que el PR es de documentación.
+              const ok = result === "success" || (result === "skipped" && job !== "changes" && !code && needs.changes.result === "success");
+              console.log(`${ok ? "ok   " : "FALLO"} ${job}: ${result}`);
+              if (!ok) failed = true;
+            }
+            process.exit(failed ? 1 : 0);
+          '
