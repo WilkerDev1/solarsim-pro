@@ -11,6 +11,7 @@ import {
   calculateTotalDCCapacityKWp,
 } from '../utils/equipmentSpecsUtils';
 import { batteryAutonomyHours, batteryBank, readEquipment } from '../../shared/equipment';
+import { resolveGridConnection } from '../../shared/gridConnection';
 
 /**
  * Calculates internal cost matrix, sale price multiplier, and net profit matching Excel spreadsheet.
@@ -544,6 +545,7 @@ export function calculateFinancialSummary(
   const netInvestmentUSD = Math.round((contractPriceUSD - ley5707CreditUSD) * 100) / 100;
 
   // Monthly energy balance calculation dynamically based on location-specific solar radiation (HSP)
+  const gridConnection = resolveGridConnection(rates);
   const monthlyResults = calculateMonthlySolarProduction(
     provinceName,
     specs,
@@ -552,7 +554,7 @@ export function calculateFinancialSummary(
     assumptions.gridExportFeePct,
     customMonthlyHSP,
     rates.tariffCode,
-    rates.isZeroExport,
+    gridConnection,
     calculationMode
   );
 
@@ -677,6 +679,9 @@ export function calculateFinancialSummary(
     npvUSD,
     roi25YrPct,
     co2AvoidedTonsPerYear,
+    ...(gridConnection === 'off_grid'
+      ? { annualUnservedKWh: Math.round(monthlyResults.reduce((sum, m) => sum + (m.unservedKWh ?? 0), 0) * 10) / 10 }
+      : {}),
     monthlyBreakdown: monthlyResults,
     cashFlow25Years,
     costMatrix,

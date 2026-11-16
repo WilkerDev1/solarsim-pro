@@ -4,6 +4,7 @@ import type { ProjectSimulation, SystemSpecs, UtilityRates } from '../../../../.
 import { mapTariffCodeOnDistributorChange, type UtilityDistributor } from '../../../../../types/tariffs';
 import { detectLoadProfilePreset, type LoadProfilePreset } from '../../logic/loadProfilePreview';
 import { resolveAssumption } from '../../../../../../shared/assumptions';
+import { exportsToGrid, resolveGridConnection, type GridConnectionFields } from '../../../../../../shared/gridConnection';
 import { DEFAULT_MONTHLY_CONSUMPTION_KWH, resolveDopRate } from '../../logic/dockDefaults';
 
 type TariffMatrix = Parameters<typeof getReferenceEnergyRateUSD>[0];
@@ -78,9 +79,9 @@ export function planTariffChange(ctx: ChangeContext, newCode: string): TariffCha
   };
 }
 
-/** Valor del cargo de exportación que muestra el campo: 0 con inyección cero. */
-export const exportFeeValue = (rates: { isZeroExport?: boolean; gridExportFeePct?: number }, effectiveFeePct?: number): number =>
-  rates.isZeroExport ? 0 : (effectiveFeePct ?? resolveAssumption('gridExportFeePct', rates.gridExportFeePct));
+/** Valor del cargo de exportación que muestra el campo: 0 si el sistema no exporta (inyección cero o aislado). */
+export const exportFeeValue = (rates: GridConnectionFields & { gridExportFeePct?: number }, effectiveFeePct?: number): number =>
+  !exportsToGrid(resolveGridConnection(rates)) ? 0 : (effectiveFeePct ?? resolveAssumption('gridExportFeePct', rates.gridExportFeePct));
 
 /** Perfil de carga activo: el preset explícito manda (incluido «Manual»); solo sin preset se infiere del porcentaje (35/75/90). */
 export function activeLoadPreset(preset: string | undefined, daytimeRatio: number): LoadProfilePreset {

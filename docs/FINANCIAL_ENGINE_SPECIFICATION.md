@@ -44,6 +44,24 @@ $$E_{saved,m} = E_{auto,m} + E_{net\_credit,m}, \qquad S_m = E_{saved,m} \times 
 
 $T_{kWh}$ es `energyCostPerKWh` del proyecto.
 
+### 1.3.1 Tipo de conexión con la red
+
+`rates.gridConnection` (`shared/gridConnection.ts`) es un solo concepto con tres valores; se lee siempre con `resolveGridConnection` y se escribe con `gridConnectionFields`, que guarda también `isZeroExport` coherente (verdadero si no exporta), de modo que una versión anterior que solo lee `isZeroExport` trata un sistema aislado como inyección cero. Una propuesta, importación, versión del historial o enlace publicado sin `gridConnection` se deriva de `isZeroExport`; un `gridConnection` que contradice `isZeroExport` (lo dejó una versión anterior al cambiar solo `isZeroExport`) se descarta.
+
+| Valor | Exporta | Importa de la red | Déficit |
+| --- | --- | --- | --- |
+| `grid_export` (medición neta) | sí, con retención | sí | factura de la distribuidora |
+| `zero_export` (inyección cero) | no: el excedente se recorta | sí | factura de la distribuidora |
+| `off_grid` (aislado, «modo isla») | no: el excedente se recorta | nunca | energía no servida (`unservedKWh`) |
+
+En `off_grid`, por mes, $E_{exp,m} = 0$, retención 0 y
+
+$$E_{no\_servida,m} = \max(0,\ C_m - E_{auto,m})$$
+
+En legacy, el factor $k$ supone que la red absorbe el desfase día/noche; sin red no puede servirse más que el balance físico (solar directo + ciclo de batería, sección 2 del documento de balance), así que en `off_grid` $E_{auto,m} = \min(\text{legacy},\ \text{físico})$. En la proyección física el autoconsumo es el mismo que en inyección cero. `calculateFinancialSummary` informa `annualUnservedKWh` solo en `off_grid`; `grid_export` y `zero_export` dan exactamente el mismo resultado que con el `isZeroExport` heredado.
+
+**Valoración del ahorro aislado (decisión provisional, la más conservadora).** Solo se valora la energía servida, $S_m = E_{auto,m} \times T_{kWh}$, sin crédito por exportación ni cargos fijos evitados; $T_{kWh}$ se rotula «Costo evitado kWh» en el dock y el usuario puede poner la tarifa que la distribuidora cobraría o el costo por kWh de la alternativa (p. ej., una planta). La «factura neta» pasa a ser el valor de la energía no servida a ese costo. No se modela el consumo de combustible de un respaldo, el dimensionamiento automático sigue usando la cobertura anual (no garantiza cubrir la noche sin red) y la autonomía de baterías sigue calculándose con la carga media de 24 h. La referencia de valoración (tarifa de la distribuidora, generador o sin comparación) queda pendiente de producto.
+
 ### 1.4 Factura y cobertura
 
 $$\text{Factura original}_m = C_m \times T_{kWh}, \qquad \text{Factura neta}_m = \max(0,\ \text{Factura original}_m - S_m)$$

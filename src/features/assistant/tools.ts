@@ -15,6 +15,7 @@ import { preserveHiddenInQuotation } from '../../../shared/quotationItems';
 import type { CustomQuotationItem } from '../../types';
 import { touchesPricingEdits } from './pricingFields';
 import { AUTOMATED_PRICING } from '../../../shared/automatedProposalPolicy';
+import { resolveGridConnection } from '../../../shared/gridConnection';
 import type {
   AssistantAction,
   AssistantToolCall,
@@ -193,7 +194,7 @@ export function executeAssistantTool(
           p.rates.gridExportFeePct,
           p.client.customMonthlyHSP,
           p.rates.tariffCode,
-          p.rates.isZeroExport,
+          resolveGridConnection(p.rates),
           mode
         ),
         summary: calculateProjectFinancialSummary(p, mode),

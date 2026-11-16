@@ -29,6 +29,7 @@ import { FoldersResumeGrid } from './FoldersResumeGrid';
 import { CreateFolderModal } from './sidebar/CreateFolderModal';
 import { calculateTotalDCCapacityKWp, calculateTotalPanelCount } from '../../utils/equipmentSpecsUtils';
 import { hiddenFolderIdSet, isProjectInFolderView } from '../../utils/folderVisibility';
+import { resolveGridConnection } from '../../../shared/gridConnection';
 
 export const DashboardView: React.FC = () => {
   const {
@@ -55,7 +56,7 @@ export const DashboardView: React.FC = () => {
   // Filter States
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'power_desc' | 'power_asc'>('newest');
   const [distributorFilter, setDistributorFilter] = useState<string>('All');
-  const [projectTypeFilter, setProjectTypeFilter] = useState<'All' | 'hybrid' | 'injection' | 'zero_export'>('All');
+  const [projectTypeFilter, setProjectTypeFilter] = useState<'All' | 'hybrid' | 'injection' | 'zero_export' | 'off_grid'>('All');
   const [memberFilter, setMemberFilter] = useState<string>('All');
   const [statusFilter, setStatusFilter] = useState<string>('All');
 
@@ -149,9 +150,11 @@ export const DashboardView: React.FC = () => {
       if (projectTypeFilter === 'hybrid') {
         matchesType = !!project.specs.hasBattery;
       } else if (projectTypeFilter === 'zero_export') {
-        matchesType = !!project.rates.isZeroExport;
+        matchesType = resolveGridConnection(project.rates) === 'zero_export';
+      } else if (projectTypeFilter === 'off_grid') {
+        matchesType = resolveGridConnection(project.rates) === 'off_grid';
       } else if (projectTypeFilter === 'injection') {
-        matchesType = !project.specs.hasBattery && !project.rates.isZeroExport;
+        matchesType = !project.specs.hasBattery && resolveGridConnection(project.rates) === 'grid_export';
       }
 
       return matchesSearch && matchesFolder && matchesTeam && matchesDistributor && matchesType;
@@ -367,6 +370,7 @@ export const DashboardView: React.FC = () => {
                         { id: 'hybrid', label: 'Híbrido (Batería)' },
                         { id: 'injection', label: 'Inyección a Red' },
                         { id: 'zero_export', label: 'Inyección Cero' },
+                        { id: 'off_grid', label: 'Aislado (modo isla)' },
                       ].map((type) => (
                         <button
                           key={type.id}
@@ -517,6 +521,8 @@ export const DashboardView: React.FC = () => {
                     ? 'Híbrido'
                     : projectTypeFilter === 'zero_export'
                     ? 'Inyección Cero'
+                    : projectTypeFilter === 'off_grid'
+                    ? 'Aislado'
                     : 'Inyección'}
                 </span>
               )}

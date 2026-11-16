@@ -1,4 +1,5 @@
 import type { DocumentTextDefinition, DocumentTextFormat, DocumentTextSection } from './registry';
+import { EXECUTIVE_FOOTNOTE_RIGHT_GRID, executiveFootnoteRightDefault } from './dynamicTexts';
 
 /**
  * Textos fijos de las páginas (títulos, etiquetas, tarjetas y notas). El valor por defecto es el
@@ -49,7 +50,12 @@ export const PAGE_TEXT_DEFINITIONS: DocumentTextDefinition[] = [
   text("executiveSummary", "executiveSummary.heading", "Cuadro Resumen de Inversión y Retorno", "Cuadro Resumen de Inversión y Retorno"),
   text("executiveSummary", "executiveSummary.subheading", "Pipeline ejecutivo del dimensionamiento fotov…", "Pipeline ejecutivo del dimensionamiento fotovoltaico, balance económico y marco de la Ley 57-07."),
   text("executiveSummary", "executiveSummary.footnote", "* Estimación calculada conforme al marco regu…", "* Estimación calculada conforme al marco regulatorio dominicano, Resolución SIE-007 y Ley 57-07."),
-  text("executiveSummary", "executiveSummary.footnoteRight", "Régimen de Medición Neta • Certificación CNE…", "Régimen de Medición Neta • Certificación CNE / SIE"),
+  // Dinámico según el tipo de conexión: un sistema aislado no opera bajo medición neta.
+  {
+    ...text("executiveSummary", "executiveSummary.footnoteRight", "Régimen de Medición Neta • Certificación CNE…", EXECUTIVE_FOOTNOTE_RIGHT_GRID),
+    defaultText: (ctx) => executiveFootnoteRightDefault(ctx),
+    knownFactoryValues: [EXECUTIVE_FOOTNOTE_RIGHT_GRID],
+  },
   text("executiveSummary", "executiveSummary.row1.title", "CAPACIDAD Y MÓDULOS", "CAPACIDAD Y MÓDULOS"),
   text("executiveSummary", "executiveSummary.row1.panelPower", "Capacidad Panel", "Capacidad Panel"),
   text("executiveSummary", "executiveSummary.row1.panelCount", "Cantidad Paneles", "Cantidad Paneles"),

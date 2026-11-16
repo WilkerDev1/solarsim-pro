@@ -6,6 +6,7 @@ import { calculateProjectFinancialSummary } from '../engine/financeEngine';
 import { formatProposalDate } from './formatDateUtils';
 import { mainModelPhrase } from '../../shared/documentTexts/equipmentPhrases';
 import { equipmentTotals, readEquipment } from '../../shared/equipment';
+import { resolveGridConnection } from '../../shared/gridConnection';
 import { resolveAssumptions } from '../../shared/assumptions';
 
 type SummaryFields = Pick<FinancialSummaryResult, 'annualConsumptionKWh' | 'annualProductionKWh' | 'systemCapacityKWp' | 'energyCoveragePct'>;
@@ -64,6 +65,7 @@ export function buildDocumentTextContext(
     distributor: client.distributor || rates.distributor || 'EDES',
     tariffCode: rates.tariffCode || '',
     isZeroExport: !!rates.isZeroExport,
+    gridConnection: resolveGridConnection(rates),
     gridExportFeePct: assumptions.gridExportFeePct,
     hasBattery: !!specs.hasBattery,
     hasBatteryStorage: totals.batteryNominalKWh > 0,

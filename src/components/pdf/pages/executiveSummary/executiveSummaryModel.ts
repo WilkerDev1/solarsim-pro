@@ -1,5 +1,6 @@
 import type { FinancialSummaryResult, ProjectSimulation } from '../../../../types';
 import { resolveAssumptions } from '../../../../../shared/assumptions';
+import { resolveGridConnection } from '../../../../../shared/gridConnection';
 import {
   getProjectPanels,
   getProjectInverters,
@@ -51,7 +52,9 @@ export function executiveSummaryModel(project: ProjectSimulation, summary: Finan
   const inverters = getProjectInverters(project.specs);
   const totalInverterPowerKW = calculateTotalInverterPowerKW(project.specs);
   const invertersSummary = formatInvertersSummary(project.specs);
-  const isZeroExport = project.rates.isZeroExport || false;
+  const gridConnection = resolveGridConnection(project.rates);
+  const isZeroExport = gridConnection !== 'grid_export';
+  const isOffGrid = gridConnection === 'off_grid';
   const hasBattery = project.specs.hasBattery && calculateTotalBatteryCapacityKWh(project.specs) > 0;
   const batteries = getProjectBatteries(project.specs);
   const totalBatteryKWh = calculateTotalBatteryCapacityKWh(project.specs);
@@ -92,7 +95,7 @@ export function executiveSummaryModel(project: ProjectSimulation, summary: Finan
   const freePct = Math.max(0, 100 - paybackPct);
   const freeYears = Math.max(0, Math.round(25 - paybackYearsRaw));
 
-  return { panels, primaryPanel, totalPanels, systemCapacityKWp, lossesPercent, performanceRatio, inverters, totalInverterPowerKW, invertersSummary, isZeroExport, hasBattery, batteries, totalBatteryKWh, batteriesSummary, grossInvestmentUSD, totalBeforeLeyUSD, costPerWattUSD, exchangeRate, tariffUSD, tariffDOP, tariffCode, isLeyEligible, leyCreditUSD, equipmentPct, netInvestmentUSD, paybackYearsRaw, totalPaybackMonths, paybackYearsInt, paybackMonthsInt, paybackText, paybackPct, freePct, freeYears };
+  return { panels, primaryPanel, totalPanels, systemCapacityKWp, lossesPercent, performanceRatio, inverters, totalInverterPowerKW, invertersSummary, isZeroExport, isOffGrid, hasBattery, batteries, totalBatteryKWh, batteriesSummary, grossInvestmentUSD, totalBeforeLeyUSD, costPerWattUSD, exchangeRate, tariffUSD, tariffDOP, tariffCode, isLeyEligible, leyCreditUSD, equipmentPct, netInvestmentUSD, paybackYearsRaw, totalPaybackMonths, paybackYearsInt, paybackMonthsInt, paybackText, paybackPct, freePct, freeYears };
 }
 
 export type ExecutiveSummaryModel = ReturnType<typeof executiveSummaryModel>;

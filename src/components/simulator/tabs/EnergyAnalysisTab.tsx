@@ -13,6 +13,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { Sparkles, ArrowDownToLine, Copy, Check, Eye, EyeOff } from 'lucide-react';
+import { offGridUnservedNote } from '../../../utils/offGridNotes';
 
 interface EnergyAnalysisTabProps {
   project: ProjectSimulation;
@@ -84,6 +85,11 @@ export const EnergyAnalysisTab: React.FC<EnergyAnalysisTabProps> = ({
   return (
     <>
       {project.aiSource?.consumptionSource==='theoretical'&&<p role="note" className="rounded-lg border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-100">Consumo teórico temporal derivado de la producción del borrador original. Reemplázalo con datos reales antes de emitir; cambios posteriores del diseño requieren revisar esta referencia.</p>}
+      {summary?.annualUnservedKWh !== undefined && (
+        <p role="note" data-grid-connection="off_grid" className="rounded-lg border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:bg-amber-950 dark:text-amber-100">
+          {offGridUnservedNote(summary.annualUnservedKWh, summary.annualConsumptionKWh)}
+        </p>
+      )}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 shrink-0">
         {/* Card 1: CAPACIDAD INSTALADA */}
         <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-sm">

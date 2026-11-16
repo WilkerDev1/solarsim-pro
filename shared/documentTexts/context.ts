@@ -1,4 +1,5 @@
 import { DEFAULT_GRID_EXPORT_FEE_PCT, DEFAULT_QUOTE_VALIDITY_DAYS } from '../assumptions.js';
+import type { GridConnectionMode } from '../gridConnection.js';
 
 /**
  * Datos de la propuesta que necesitan los textos dinámicos (nombre del cliente, equipos, tarifa…).
@@ -23,6 +24,8 @@ export interface DocumentTextContext {
   distributor: string;
   tariffCode: string;
   isZeroExport: boolean;
+  /** Tipo de conexión; se lee con `resolveGridConnection(ctx)` (ausente = se deriva de `isZeroExport`). */
+  gridConnection?: GridConnectionMode;
   gridExportFeePct: number;
   hasBattery: boolean;
   /** Hay baterías con capacidad (> 0 kWh) en la propuesta. */

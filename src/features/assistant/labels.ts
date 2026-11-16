@@ -1,3 +1,4 @@
+import { GRID_CONNECTION_LABELS, isGridConnectionMode } from '../../../shared/gridConnection';
 const labels: Record<string, string> = {
   name: 'Nombre del cliente',
   company: 'Empresa del cliente',
@@ -53,6 +54,7 @@ const labels: Record<string, string> = {
   usdExchangeRate: 'Cambio DOP por USD',
   gridExportFeePct: 'Retención de excedentes (%)',
   isZeroExport: 'Inyección cero',
+  gridConnection: 'Conexión a la red',
   annualEnergyInflationPct: 'Inflación de energía anual (%)',
   applyLey5707: 'Crédito fiscal Ley 57-07',
   applyITBISExemption: 'Exoneración de ITBIS',
@@ -91,5 +93,6 @@ export function assistantValueLabel(value: unknown) {
   if (typeof value === 'boolean') return value ? 'Sí' : 'No';
   if (value === 'cost_matrix') return 'Matriz de costos';
   if (value === 'direct_watt') return 'Precio directo';
+  if (isGridConnectionMode(value)) return GRID_CONNECTION_LABELS[value];
   return typeof value === 'string' ? value : JSON.stringify(value);
 }

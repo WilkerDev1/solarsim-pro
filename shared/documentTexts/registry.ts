@@ -5,6 +5,7 @@ import {
   projectSummaryParagraph1Default,
   projectSummaryParagraph2Default,
   regulatoryNoteDefault,
+  servicesIncludedDefault,
   syncProjectSummaryParagraph1,
   syncProjectSummaryParagraph2,
   validityNoteDefault,
@@ -183,7 +184,7 @@ const DEFINITIONS: DocumentTextDefinition[] = [
   { key: 'quotation.warranty.workmanship', section: 'quotation', label: 'Garantía de mano de obra', format: 'rich', multiline: false, templatable: true, maxLength: SHORT, ...legacy('workmanshipWarrantyText'), defaultText: FACTORY_TEXTS.workmanshipWarrantyText },
   {
     key: 'quotation.servicesIncluded', section: 'quotation', label: 'Servicios gestionados', format: 'rich', multiline: true, templatable: true, maxLength: PARAGRAPH, ...legacy('servicesIncludedText'),
-    defaultText: FACTORY_TEXTS.servicesIncludedText,
+    defaultText: (ctx) => servicesIncludedDefault(ctx),
   },
   {
     key: 'quotation.validityNote', section: 'quotation', label: 'Nota legal y términos', format: 'rich', multiline: false, templatable: true, maxLength: 600, ...legacy('validityNote'),

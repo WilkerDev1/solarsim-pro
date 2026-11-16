@@ -2,8 +2,9 @@ import React from 'react';
 import { getTariffDisplayName } from '../../../../../../shared/proposalPresentation';
 import type { ProjectSimulation, SystemSpecs, UtilityRates } from '../../../../../types';
 import { getDistributorTariffOptions, type UtilityDistributor } from '../../../../../types/tariffs';
-import { Field, FieldMenu, InfoTip, ParamRow, SelectField, ToggleGroup } from '../../ui';
+import { Field, FieldMenu, InfoTip, ParamRow, SelectField } from '../../ui';
 import { resolveAssumptions } from '../../../../../../shared/assumptions';
+import { gridConnectionFields, isGridConnectionMode, resolveGridConnection, type GridConnectionMode } from '../../../../../../shared/gridConnection';
 import { SelfConsumptionPanel } from './SelfConsumptionPanel';
 import {
   averageMonthlyConsumption,
@@ -29,9 +30,10 @@ export interface RatesFieldsProps {
 }
 
 const DISTRIBUTORS = ['EDEESTE', 'EDESUR', 'EDENORTE', 'CEPM'].map(value => ({ value, label: value }));
-const YES_NO = [
-  { value: true, label: 'Sí' },
-  { value: false, label: 'No' },
+const CONNECTION_OPTIONS: { value: GridConnectionMode; label: string }[] = [
+  { value: 'grid_export', label: 'Red (medición neta)' },
+  { value: 'zero_export', label: 'Inyección cero' },
+  { value: 'off_grid', label: 'Aislado (modo isla)' },
 ];
 
 const parseNumber = (raw: string) => parseFloat(raw) || 0;
@@ -53,7 +55,9 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
   };
   const reference = referenceRate(context, distributor, tariffCode);
   const matches = isMatchingReference(rates.energyCostPerKWh, reference);
-  const zeroExport = !!rates.isZeroExport;
+  const connection = resolveGridConnection(rates);
+  const offGrid = connection === 'off_grid';
+  const zeroExport = connection !== 'grid_export';
 
   const apply = (plan: TariffChangePlan) => {
     updateRates(plan.rates);
@@ -66,7 +70,9 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
   }
 
   const referenceText = reference.toFixed(3);
-  const exportTip = zeroExport
+  const exportTip = offGrid
+    ? 'Sistema aislado (modo isla): sin acometida de la distribuidora. No exporta ni importa: el excedente se recorta y el consumo que no cubren el sol ni las baterías queda como energía no servida (o lo cubre un respaldo externo, p. ej. una planta). No aplica retención ni cargo por uso de red.'
+    : zeroExport
     ? 'Inyección cero activa: el sistema no vuelca excedentes a la red pública, por lo que no aplica retención ni cargo por uso de red.'
     : `Medición neta (${getTariffDisplayName(distributor, rates.tariffCode || '')}): retención del ${assumptions.gridExportFeePct}% por derecho de uso de red bajo la Res. SIE-007-2026-REG sobre los kWh excedentes exportados a la red de ${distributor}.`;
 
@@ -88,7 +94,7 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
           onChange={value => apply(planTariffChange(context, value))}
         />
       </ParamRow>
-      <ParamRow label="Precio kWh" htmlFor="pd-rates-kwh">
+      <ParamRow label={offGrid ? 'Costo evitado kWh' : 'Precio kWh'} htmlFor="pd-rates-kwh">
         <Field
           id="pd-rates-kwh"
           type="number"
@@ -122,8 +128,13 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
           onChange={value => updateRates({ targetCoveragePct: parseNumber(value) })}
         />
       </ParamRow>
-      <ParamRow label="Inyección cero" labelId="pd-rates-zero-label">
-        <ToggleGroup ariaLabel="Inyección cero" options={YES_NO} value={zeroExport} onChange={value => updateRates({ isZeroExport: value })} />
+      <ParamRow label="Conexión a la red" htmlFor="pd-rates-connection">
+        <SelectField
+          id="pd-rates-connection"
+          value={connection}
+          options={CONNECTION_OPTIONS}
+          onChange={value => { if (isGridConnectionMode(value)) updateRates(gridConnectionFields(value)); }}
+        />
       </ParamRow>
       <ParamRow label="Cargo exportación" htmlFor="pd-rates-export">
         <Field

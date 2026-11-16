@@ -4,6 +4,7 @@ import { SystemSpecs, MonthlyEnergyResult } from '../types';
 import { getProvinceHSP } from '../data/rdProvinces';
 import { calculateTotalDCCapacityKWp } from '../utils/equipmentSpecsUtils';
 import { batteryBank, readEquipment } from '../../shared/equipment';
+import { exportsToGrid, type GridConnectionMode } from '../../shared/gridConnection';
 
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -133,9 +134,14 @@ export function calculateMonthlySolarProduction(
   gridExportFeePct: number,
   customMonthlyHSP?: number[],
   tariffCode?: string,
-  isZeroExport?: boolean,
+  /** Tipo de conexión (`resolveGridConnection`); un booleano es el `isZeroExport` heredado (true = inyección cero). */
+  gridConnection?: GridConnectionMode | boolean,
   calculationMode: EnergyCalculationMode = 'legacy'
 ): MonthlyEnergyResult[] {
+  const connection: GridConnectionMode = typeof gridConnection === 'string' ? gridConnection : gridConnection ? 'zero_export' : 'grid_export';
+  // Inyección cero y sistema aislado no exportan: el excedente se recorta y no hay retención.
+  const isZeroExport = !exportsToGrid(connection);
+  const isOffGrid = connection === 'off_grid';
   const dcCapacityKWp = calculateTotalDCCapacityKWp(specs);
   const province = getProvinceHSP(provinceName);
 
@@ -222,8 +228,11 @@ export function calculateMonthlySolarProduction(
 
     // Monthly battery contribution to self-consumption
     // Disabled experimental parameters never influence the historical model.
+    const legacySelfConsumed = Math.min(consumption, Math.round(production * (specs.hasBattery ? 0.90 : 0.75) * 10) / 10);
+    // El factor clásico supone que la red absorbe el desfase día/noche. Sin red (aislado) no puede servirse más
+    // de lo que el balance físico permite (solar directo + ciclo de batería), así que se toma el menor de ambos.
     const solarSelfConsumed = calculationMode === 'legacy'
-      ? Math.min(consumption, Math.round(production * (specs.hasBattery ? 0.90 : 0.75) * 10) / 10)
+      ? (isOffGrid ? Math.min(legacySelfConsumed, physicalSelfConsumed) : legacySelfConsumed)
       : physicalSelfConsumed;
     const batteryContributionKWh = calculationMode === 'legacy' ? 0 : Math.round(bessDischargeDaily * days * 10) / 10;
 
@@ -251,8 +260,12 @@ export function calculateMonthlySolarProduction(
     const effectiveSavedKWh = Math.round((solarSelfConsumed + netExportCreditKWh) * 10) / 10;
     const savingsUSD = Math.round(effectiveSavedKWh * energyCostPerKWh * 100) / 100;
 
+    // Sin acometida, el costo de referencia es el de la energía que el sistema evita (tarifa del proyecto) y el
+    // «saldo» es el valor de la energía no servida, que deberá cubrir un respaldo externo.
     const originalBillUSD = Math.round(consumption * energyCostPerKWh * 100) / 100;
     const netBillUSD = Math.max(0, Math.round((originalBillUSD - savingsUSD) * 100) / 100);
+    // Sistema aislado: lo que ni el sol ni la batería cubren no se importa de la red; es energía no servida.
+    const offGridFields = isOffGrid ? { unservedKWh: Math.max(0, Math.round((consumption - solarSelfConsumed) * 10) / 10) } : {};
 
     results.push({
       month: MONTH_NAMES[i],
@@ -270,6 +283,7 @@ export function calculateMonthlySolarProduction(
       savingsUSD,
       netBillUSD,
       originalBillUSD,
+      ...offGridFields,
     });
   }
 

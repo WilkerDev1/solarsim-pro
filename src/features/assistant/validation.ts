@@ -1,4 +1,5 @@
 import type { AssistantEdit, AssistantSection } from './types';
+import { GRID_CONNECTION_MODES } from '../../../shared/gridConnection';
 // Explicit surface: no ids, roles, authorship, remote endpoints, assets or arbitrary store writes.
 const fields: Record<AssistantSection, string[]> = {
   client: [
@@ -66,6 +67,7 @@ const fields: Record<AssistantSection, string[]> = {
     'usdExchangeRate',
     'gridExportFeePct',
     'isZeroExport',
+    'gridConnection',
     'annualEnergyInflationPct',
   ],
   financials: [
@@ -129,6 +131,7 @@ const booleanFields = new Set([
 const textFields = new Set([
   ...fields.client.filter((f) => f !== 'quoteValidityDays'),
   'pricingMode',
+  'gridConnection',
   'installationServicesDesc',
   'directPriceSurplusTarget',
   'loadProfilePreset',
@@ -149,6 +152,7 @@ const enums: Record<string, string[]> = {
   directPriceSurplusTarget: ['margin', 'labor'],
   loadProfilePreset: ['residential', 'commercial', 'industrial', 'custom'],
   currency: ['USD', 'DOP'],
+  gridConnection: [...GRID_CONNECTION_MODES],
 };
 const percentages = new Set([
   'systemLosses',
@@ -306,7 +310,7 @@ export function validateAssistantEdits(
       )
         throw new Error(`${field} requiere texto válido.`);
       if (enums[field] && !enums[field].includes(value))
-        throw new Error(`Valor no permitido para ${field}.`);
+        throw new Error(`Valor no permitido para ${field}: usa ${enums[field].join(", ")}.`);
     } else {
       if (
         typeof value !== 'number' ||

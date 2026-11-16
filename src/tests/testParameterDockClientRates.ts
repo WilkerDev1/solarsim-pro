@@ -125,18 +125,17 @@ const renderRates = (project: ProjectSimulation, extra: Record<string, unknown> 
   assert.doesNotMatch(html, /pd-rates-daytime/, 'sin proyección no hay perfil de carga');
 }
 
-// --- Tarifas: Inyección cero Sí/No ---
+// --- Tarifas: conexión a la red (con exportación / inyección cero / aislado; ver testGridConnection) ---
 {
   const off = renderRates(makeProject({ rates: { isZeroExport: false, gridExportFeePct: 18 } }));
-  assert.match(off, /aria-label="Inyección cero"/);
-  assert.match(off, /aria-checked="false"[^>]*>Sí</);
-  assert.match(off, /aria-checked="true"[^>]*>No</);
+  assert.match(off, /<label for="pd-rates-connection"[^>]*>Conexión a la red</);
+  assert.match(off, /id="pd-rates-connection"[^>]*role="combobox"[\s\S]*?>Red \(medición neta\)</);
   assert.match(off, /id="pd-rates-export"[^>]*value="18"/);
   assert.doesNotMatch(off, /id="pd-rates-export"[^>]*disabled=""/);
   assert.match(off, /retención del 18%/, 'la nota de medición neta va en el InfoTip');
 
   const on = renderRates(makeProject({ rates: { isZeroExport: true, gridExportFeePct: 18 } }));
-  assert.match(on, /aria-checked="true"[^>]*>Sí</);
+  assert.match(on, /id="pd-rates-connection"[^>]*role="combobox"[\s\S]*?>Inyección cero</, 'una propuesta antigua con isZeroExport se lee como inyección cero');
   assert.match(on, /id="pd-rates-export"[^>]*value="0"/, 'cargo en 0 con inyección cero');
   assert.match(on, /id="pd-rates-export"[^>]*disabled=""/, 'cargo deshabilitado con inyección cero');
   assert.match(on, /Inyección cero activa/);
