@@ -1,29 +1,47 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { X, Paperclip, Send, FileText, RotateCcw, Square } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { FileText, RotateCcw, ShieldCheck, AlertOctagon, CheckCircle2, Settings } from 'lucide-react';
 import { useAIInvoiceScanner } from './hooks/useAIInvoiceScanner';
 import { ProposalDraftReview } from './components/ProposalDraftReview';
+import { ReviewIssueDigest } from './components/ReviewIssueDigest';
+import { describeIssues, focusReviewAnchor, type ReviewTab } from './reviewIssues';
 import './proposal-workspace.css';
 import { useResizablePanel } from '../../../features/assistant/useResizablePanel';
 import { ChatMessage } from '../../../features/assistant/components/ChatMessage';
+import { ChatComposer, ChatSuggestions, ChatThinking, ScrollToLatest } from '../../../features/assistant/components/ChatComposer';
+import { useElapsedSeconds, useStickToBottom } from '../../../features/assistant/chatUi';
 import '../../../features/assistant/chat.css';
 import { PrimaryIconDock } from '../../layout/PrimaryIconDock';
+
+const SUGGESTIONS = [
+  'Prepara una propuesta a partir de la factura adjunta',
+  'Sistema de 10 kWp con inversor híbrido y dos baterías para una residencia en Santiago',
+  'Cliente comercial en Santo Domingo, consumo promedio de 2.500 kWh al mes, sin baterías',
+];
 
 export const AIInvoiceScannerModal: React.FC = () => {
   const ai = useAIInvoiceScanner();
   const resize = useResizablePanel();
   const [confirmUpdate, setConfirmUpdate] = useState(false);
+  const [tab, setTab] = useState<ReviewTab>('consumption');
   const dialog = useRef<HTMLDivElement>(null);
   const conversation = useRef<HTMLDivElement>(null);
   const promptInput = useRef<HTMLTextAreaElement>(null);
+  const scroll = useStickToBottom(conversation, [ai.messages, ai.isProcessing, ai.attentionIssues.length]);
+  const elapsed = useElapsedSeconds(ai.isProcessing);
+  const issueViews = useMemo(() => describeIssues(ai.attentionIssues, ai.extractedData || undefined), [ai.attentionIssues, ai.extractedData]);
   useEffect(() => {
     if (!ai.isAIInvoiceModalOpen) {setConfirmUpdate(false); return;}
     const previous = document.activeElement as HTMLElement | null;
     promptInput.current?.focus();
     return () => { previous?.isConnected && previous.focus(); };
   }, [ai.isAIInvoiceModalOpen]);
-  useEffect(() => { conversation.current?.scrollTo({top:conversation.current.scrollHeight,behavior:'smooth'}); }, [ai.messages,ai.isProcessing,ai.attentionIssues.length]);
   useEffect(() => {setConfirmUpdate(false);}, [ai.useCurrentProject,ai.activeProject?.id]);
   if (!ai.isAIInvoiceModalOpen) return null;
+  const blocking = ai.blockingIssues.length;
+  const toConfirm = issueViews.filter(v => v.tier === 'confirm').length;
+  const canSend = !!ai.geminiApiKey && (!!ai.prompt.trim() || ai.files.length > 0);
+  const disabledReason = !ai.geminiApiKey ? 'Configura Gemini para enviar.' : 'Escribe o adjunta un archivo.';
+  const finalStatus = !ai.extractedData ? '' : blocking ? `Resuelve ${blocking} ${blocking === 1 ? 'bloqueo' : 'bloqueos'} para continuar.` : !ai.reviewConfirmed ? (toConfirm ? `Confirma la revisión (${toConfirm} ${toConfirm === 1 ? 'punto' : 'puntos'} por confirmar).` : 'Marca la revisión para continuar.') : 'Listo para crear la propuesta.';
   return <div className="proposal-overlay">
     <div ref={dialog} className={`proposal-workspace ${ai.isDark ? 'proposal-dark' : ''}`} role="dialog" aria-modal="true" aria-labelledby="proposal-assistant-title"
       onKeyDown={event=>{
@@ -40,39 +58,43 @@ export const AIInvoiceScannerModal: React.FC = () => {
       <div className="proposal-body" style={resize.width ? {'--pw-chat-width':`${resize.width}px`} as React.CSSProperties : undefined}>
         <div className="proposal-conversation">
           <div className="proposal-resize-handle" {...resize.separatorProps} />
-          {ai.activeProject && <label className="proposal-context-choice"><input type="checkbox" checked={ai.useCurrentProject} disabled={ai.isProcessing} onChange={e=>ai.setUseCurrentProject(e.target.checked)}/><span>Usar datos de {ai.activeProject.client.projectId}<small>Permite actualizar la propuesta abierta.</small></span></label>}
-          <div className="proposal-chat-scroll" ref={conversation} role="log" aria-label="Conversación del borrador">
-            {!ai.messages.length && <div className="proposal-welcome"><h3>¿Qué necesitas cotizar?</h3><p>Describe el proyecto o adjunta un documento.</p></div>}
-            {ai.messages.map((message,i)=><ChatMessage role={message.role} text={message.text} key={i}>{message.files?.length ? <small>{message.files.join(' · ')}</small>:null}</ChatMessage>)}
-            {!!ai.attentionIssues.length&&<article className="proposal-chat-attention" aria-label="Pendientes del borrador"><h3>Revisemos estos detalles</h3><p>Podemos corregirlos aquí o en el borrador. Los avisos se actualizan mientras editas.</p><ul>{ai.attentionIssues.map((issue,i)=><li key={`${issue.code}-${i}`} className={issue.severity==='error'?'proposal-chat-blocker':''}>{issue.message}</li>)}</ul></article>}
-            {ai.isProcessing && <div role="status" className="proposal-processing"><span className="proposal-working-dot"/>Analizando entrada y preparando el borrador…<p>Puedes cancelar. No se modifica ninguna propuesta durante el análisis.</p></div>}
+          <header className="proposal-chat-header">
+            <div><h3>Asistente de propuestas</h3><small>Prepara un borrador revisable · nada se guarda sin confirmar</small></div>
+            {ai.activeProject && <label className="proposal-context-choice"><input type="checkbox" checked={ai.useCurrentProject} disabled={ai.isProcessing} onChange={e=>ai.setUseCurrentProject(e.target.checked)}/><span>Usar datos de {ai.activeProject.client.projectId}<small>Permite actualizar la propuesta abierta.</small></span></label>}
+          </header>
+          <div className="proposal-chat-scroll" ref={conversation} onScroll={scroll.onScroll} role="log" aria-label="Conversación del borrador">
+            {!ai.messages.length && <ChatSuggestions title="¿Qué necesitas cotizar?" description="Describe el proyecto o adjunta una factura. Prepararé un borrador con equipos del inventario y tarifas vigentes para que lo revises." items={SUGGESTIONS} onPick={text=>{ai.setPrompt(text);requestAnimationFrame(()=>promptInput.current?.focus());}}/>}
+            {ai.messages.map((message,i)=><ChatMessage role={message.role} text={message.text} files={message.files} variant={message.kind} key={i}/>)}
+            {!!issueViews.length && <ReviewIssueDigest issues={issueViews} onNavigate={issue=>{if(!issue.target)return;if(issue.target.tab)setTab(issue.target.tab);const anchor=issue.target.anchor;requestAnimationFrame(()=>focusReviewAnchor(anchor));}}/>}
+            {ai.isProcessing && <ChatThinking label={ai.files.length?'Leyendo adjuntos y preparando el borrador…':'Analizando y preparando el borrador…'} detail="Puedes detenerlo. No se modifica ninguna propuesta durante el análisis." elapsed={elapsed}/>}
           </div>
-          <form className="proposal-composer" onSubmit={event=>{event.preventDefault();void ai.processSmartProposal();}}>
-            {ai.errorMsg && <div className="proposal-error" role="alert">{ai.errorMsg}</div>}
-            {!ai.geminiApiKey && <div className="proposal-notice">Configura Gemini para analizar documentos.<button type="button" onClick={ai.openAISettings}>Abrir ajustes de IA</button></div>}
-            <div className="proposal-attachments">{ai.files.map((file,i)=><div key={`${file.name}-${i}`}><FileText size={15}/><span title={file.name}>{file.name}</span><button type="button" aria-label={`Quitar ${file.name}`} disabled={ai.isProcessing} onClick={()=>ai.removeFile(i)}><X size={14}/></button></div>)}</div>
-            <label className="sr-only" htmlFor="proposal-prompt">Mensaje al asistente</label>
-            <textarea ref={promptInput} id="proposal-prompt" value={ai.prompt} disabled={ai.isProcessing} maxLength={12000} onChange={e=>ai.setPrompt(e.target.value)} placeholder="Describe la propuesta, pregunta o pide un cambio…" onKeyDown={e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();void ai.processSmartProposal();}}}/>
-            <input ref={ai.fileInputRef} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp" hidden onChange={e=>{ai.addFiles(Array.from(e.target.files || []));e.target.value='';}}/>
-            <div className="proposal-composer-actions"><button type="button" disabled={ai.isProcessing} onClick={()=>ai.fileInputRef.current?.click()}><Paperclip size={17}/>Adjuntar</button>
-              {ai.isProcessing ? <button key="cancel-analysis" type="button" onClick={event=>{event.preventDefault();ai.cancel();}}><Square size={15}/>Cancelar análisis</button>:<button key="prepare-draft" type="submit" className="proposal-primary" disabled={!ai.geminiApiKey||(!ai.prompt.trim()&&!ai.files.length)}><Send size={16}/>Enviar</button>}
-            </div><details className="proposal-note-details"><summary>Archivos y privacidad</summary><p>Hasta 4 archivos · 8 MB por archivo · 14 MB en total · PDF, PNG, JPG, WebP. Texto y documentos se envían a Google Gemini al analizar.</p></details>
-          </form>
+          <ScrollToLatest visible={scroll.away} onClick={()=>scroll.scrollToBottom()}/>
+          <ChatComposer id="proposal-prompt" label="Mensaje al asistente" inputRef={promptInput} value={ai.prompt} onChange={ai.setPrompt}
+            onSubmit={()=>void ai.processSmartProposal()} onCancel={ai.cancel} onPickFiles={ai.addFiles} busy={ai.isProcessing} canSend={canSend}
+            disabledReason={disabledReason} placeholder="Describe la propuesta, pregunta o pide un cambio…" accept=".pdf,.png,.jpg,.jpeg,.webp"
+            attachments={ai.files.map((file,i)=>({key:`${file.name}-${i}`,name:file.name,onRemove:()=>ai.removeFile(i)}))}
+            notices={<>{ai.errorMsg && <div className="chat-notice" data-tone="error" role="alert">{ai.errorMsg}</div>}
+              {!ai.geminiApiKey && <div className="chat-notice">Configura Gemini para analizar documentos.<button type="button" onClick={ai.openAISettings}><Settings size={14} aria-hidden/>Abrir ajustes de IA</button></div>}</>}
+            footer={<details className="proposal-note-details"><summary>Archivos y privacidad</summary><p>Hasta 4 archivos · 8 MB por archivo · 14 MB en total · PDF, PNG, JPG, WebP. Puedes arrastrarlos al cuadro. Texto y documentos se envían a Google Gemini al analizar.</p></details>}/>
         </div>
         <div className="proposal-draft-panel" aria-busy={ai.isProcessing}>
-          <div className="proposal-draft-heading"><h3>Revisión del borrador</h3><button type="button" onClick={ai.reset} disabled={ai.isProcessing || (!ai.extractedData&&!ai.messages.length)}><RotateCcw size={15}/>Empezar de nuevo</button></div>
+          <div className="proposal-draft-heading"><h3>Revisión del borrador{ai.useCurrentProject&&ai.activeProject?<small> · sobre {ai.activeProject.client.projectId}</small>:null}</h3><button type="button" className="proposal-ghost" onClick={ai.reset} disabled={ai.isProcessing || (!ai.extractedData&&!ai.messages.length)}><RotateCcw size={15}/>Empezar de nuevo</button></div>
           {ai.extractedData ? <>
             <div className="proposal-draft-scroll">
-
-              <fieldset disabled={ai.isProcessing} className="proposal-review-fieldset"><ProposalDraftReview draft={ai.extractedData} catalog={ai.equipmentCatalog} matrix={ai.tariffMatrix} context={ai.context} preview={ai.draftPreview} production={ai.draftEnergy} update={ai.updateDraft}/></fieldset>
+              <fieldset disabled={ai.isProcessing} className="proposal-review-fieldset"><ProposalDraftReview draft={ai.extractedData} catalog={ai.equipmentCatalog} matrix={ai.tariffMatrix} context={ai.context} preview={ai.draftPreview} production={ai.draftEnergy} update={ai.updateDraft} issues={ai.attentionIssues} tab={tab} onTabChange={setTab}/></fieldset>
             </div>
-            <footer className="proposal-apply"><label><input type="checkbox" checked={ai.reviewConfirmed} disabled={ai.isProcessing||ai.blockingIssues.length>0} onChange={e=>ai.setReviewConfirmed(e.target.checked)}/><span>Revisé los datos, equipos, precios y supuestos del borrador.</span></label>
-              {confirmUpdate ? <div className="proposal-update-confirm" role="alert"><p>Se reemplazarán cliente, consumo y equipos de <strong>{ai.activeProject?.client.projectId}</strong>. Las condiciones se recalcularán.</p><div className="proposal-actions"><button type="button" onClick={()=>setConfirmUpdate(false)}>Cancelar</button><button type="button" className="proposal-primary" disabled={!ai.canApply} onClick={()=>{ai.handleApplyToActive();setConfirmUpdate(false);}}>Confirmar actualización</button></div></div> : <div className="proposal-actions">
+            <footer className="proposal-apply" aria-label="Paso final">
+              <div className="proposal-apply-check">
+                <span className="proposal-step">Paso final</span>
+                <label data-checked={ai.reviewConfirmed || undefined}><input type="checkbox" checked={ai.reviewConfirmed} disabled={ai.isProcessing||blocking>0} aria-describedby="proposal-apply-status" onChange={e=>ai.setReviewConfirmed(e.target.checked)}/><span>Revisé los datos, equipos, precios y supuestos del borrador.</span></label>
+                <p id="proposal-apply-status" className="proposal-apply-status" data-tier={blocking?'blocking':ai.reviewConfirmed?'ok':'confirm'} aria-live="polite">{blocking?<AlertOctagon size={14} aria-hidden/>:ai.reviewConfirmed?<CheckCircle2 size={14} aria-hidden/>:<ShieldCheck size={14} aria-hidden/>}{finalStatus}</p>
+              </div>
+              {confirmUpdate ? <div className="proposal-update-confirm" role="alert"><p>Se reemplazarán cliente, consumo y equipos de <strong>{ai.activeProject?.client.projectId}</strong>. Las condiciones se recalcularán.</p><div className="proposal-actions"><button type="button" className="proposal-ghost" onClick={()=>setConfirmUpdate(false)}>Cancelar</button><button type="button" className="proposal-primary" disabled={!ai.canApply} onClick={()=>{ai.handleApplyToActive();setConfirmUpdate(false);}}>Confirmar actualización</button></div></div> : <div className="proposal-actions">
                 {ai.useCurrentProject&&ai.activeProject&&<button type="button" disabled={!ai.canApply} onClick={()=>setConfirmUpdate(true)}>Actualizar {ai.activeProject.client.projectId}</button>}
                 <button type="button" className="proposal-primary" disabled={!ai.canApply} onClick={ai.handleApplyAsNew}>Crear propuesta nueva</button>
               </div>}
             </footer>
-          </>:<div className="proposal-empty"><FileText size={32}/><h3>Tu propuesta empieza aquí</h3><p>El borrador mostrará cliente, consumo, tarifa y una lista editable de equipos. Nada se guarda hasta que revises y confirmes.</p><ol><li>Describe el proyecto o adjunta la factura.</li><li>Revisa datos y corrige lo que falte.</li><li>Crea una propuesta o actualiza la abierta.</li></ol></div>}
+          </>:<div className="proposal-empty">{ai.isProcessing?<div className="proposal-skeleton" role="status"><span className="sr-only">Preparando el borrador…</span><i/><i/><i/><i/></div>:<><FileText size={32}/><h3>Tu propuesta empieza aquí</h3><p>El borrador mostrará cliente, consumo, tarifa y una lista editable de equipos. Nada se guarda hasta que revises y confirmes.</p><ol><li>Describe el proyecto o adjunta la factura.</li><li>Revisa datos y corrige lo que falte.</li><li>Crea una propuesta o actualiza la abierta.</li></ol></>}</div>}
         </div>
       </div>
     </div>
