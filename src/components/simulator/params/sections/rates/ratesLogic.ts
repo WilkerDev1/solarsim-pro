@@ -1,4 +1,6 @@
 import { DEFAULT_RD_TARIFF_MATRIX, getReferenceEnergyRateUSD, referenceBillingTariff } from '../../../../../data/rdTariffs';
+import { proposalBillingTariff } from '../../../../../../shared/tariffBilling';
+import { resolveNetMeteringRegime } from '../../../../../../shared/netMetering';
 import { getRecommendedLoadProfile } from '../../../../../engine/solarEngine';
 import type { ProjectSimulation, SystemSpecs, UtilityRates } from '../../../../../types';
 import { mapTariffCodeOnDistributorChange, type UtilityDistributor } from '../../../../../types/tariffs';
@@ -51,6 +53,18 @@ export function referenceRatesPatch(input: ReferenceInput, distributor: UtilityD
     energyRateSource: 'reference',
     billingTariff: referenceBillingTariff(input.matrix || DEFAULT_RD_TARIFF_MATRIX, distributor, tariffCode),
   };
+}
+
+/**
+ * ¿Está aplicada la tarifa oficial? En SIE-007-2026 con red manda la procedencia (`reference` con su fila válida), que es
+ * lo que decide la factura por bloques: un precio tecleado que coincide por casualidad no cuenta, y la referencia sigue
+ * aplicada aunque cambien el consumo medio o la tasa. En el resto (régimen anterior, aislado), la igualdad numérica.
+ */
+export function isReferenceApplied(rates: Partial<UtilityRates>, reference: number): boolean {
+  if (resolveNetMeteringRegime(rates.netMeteringRegime) === 'sie007_2026' && resolveGridConnection(rates) !== 'off_grid') {
+    return rates.energyRateSource === 'reference' && proposalBillingTariff(rates) !== undefined;
+  }
+  return isMatchingReference(rates.energyCostPerKWh, reference);
 }
 
 export const isMatchingReference = (energyCostPerKWh: number | undefined, reference: number): boolean =>

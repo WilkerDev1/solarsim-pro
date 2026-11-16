@@ -16,7 +16,7 @@ import {
   averageMonthlyConsumption,
   currentDistributor,
   currentTariffCode,
-  isMatchingReference,
+  isReferenceApplied,
   planApplyReference,
   planDistributorChange,
   planTariffChange,
@@ -69,7 +69,7 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
     canWriteSpecs: !!updateSpecs,
   };
   const reference = referenceRate(context, distributor, tariffCode);
-  const matches = isMatchingReference(rates.energyCostPerKWh, reference);
+  const matches = isReferenceApplied(rates, reference);
   const connection = resolveGridConnection(rates);
   const offGrid = connection === 'off_grid';
   const zeroExport = connection !== 'grid_export';

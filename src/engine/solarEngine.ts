@@ -327,13 +327,16 @@ export function calculateMonthlySolarProduction(
 }
 
 const usd2 = (dop: number, dopPerUSD: number) => Math.round((dop / dopPerUSD) * 100) / 100;
+const kWh1 = (kWh: number) => Math.round(kWh * 10) / 10;
 
 /** Revalora el balance energético con las facturas por bloques (sin y con sistema) del año. */
 function withBlockBilling(results: MonthlyEnergyResult[], billing: BlockBillingInput): MonthlyEnergyResult[] {
-  const fx = billing.dopPerUSD > 0 && Number.isFinite(billing.dopPerUSD) ? billing.dopPerUSD : 1;
+  // Tasa no válida: la por defecto compartida (ADR 0003), nunca 1:1.
+  const fx = resolveAssumption('dopExchangeRate', billing.dopPerUSD);
   const year = calculateBillingYear(
     billing.tariff,
-    results.map((m) => ({ withdrawnKWh: Math.max(0, Math.round((m.consumptionKWh - m.solarSelfConsumedKWh) * 10) / 10), injectedKWh: m.gridExportedKWh })),
+    // Sin redondeo: solo se limpia el ruido de coma flotante de la resta (los dos términos ya vienen a 0.1 kWh).
+    results.map((m) => ({ withdrawnKWh: Math.max(0, Math.round((m.consumptionKWh - m.solarSelfConsumedKWh) * 1e9) / 1e9), injectedKWh: m.gridExportedKWh })),
     { gridUseChargeDOPPerKWh: billing.gridUseChargeDOPPerKWh, settlementDOPPerKWh: billing.settlementDOPPerKWh },
   );
   const settlementUSD = usd2(year.settlement.amountDOP, fx);
@@ -342,19 +345,20 @@ function withBlockBilling(results: MonthlyEnergyResult[], billing: BlockBillingI
     const originalBillUSD = usd2(calculateMonthlyBill({ tariff: billing.tariff, withdrawnKWh: m.consumptionKWh }).totalDOP, fx);
     const netBillUSD = usd2(withSystem.totalDOP, fx);
     const isClosingMonth = i === results.length - 1;
-    const settlement = isClosingMonth ? { creditSettlementKWh: year.settlement.creditKWh, creditSettlementUSD: settlementUSD } : {};
+    const settlement = isClosingMonth ? { creditSettlementKWh: kWh1(year.settlement.creditKWh), creditSettlementUSD: settlementUSD } : {};
     return {
       ...m,
       originalBillUSD,
       netBillUSD,
       savingsUSD: Math.round((originalBillUSD - netBillUSD + (isClosingMonth ? settlementUSD : 0)) * 100) / 100,
       gridUseChargeUSD: usd2(withSystem.gridUseChargeDOP, fx),
+      // Se redondea solo al presentar (0.1 kWh); el cálculo y el arrastre van sin redondear.
       tariffBill: {
-        withdrawnKWh: withSystem.withdrawnKWh,
-        netBilledKWh: withSystem.netKWh,
-        creditInKWh: withSystem.creditInKWh,
-        creditAppliedKWh: withSystem.creditAppliedKWh,
-        creditCarriedKWh: withSystem.creditCarriedKWh,
+        withdrawnKWh: kWh1(withSystem.withdrawnKWh),
+        netBilledKWh: kWh1(withSystem.netKWh),
+        creditInKWh: kWh1(withSystem.creditInKWh),
+        creditAppliedKWh: kWh1(withSystem.creditAppliedKWh),
+        creditCarriedKWh: kWh1(withSystem.creditCarriedKWh),
         energyChargeUSD: usd2(withSystem.energyChargeDOP, fx),
         fixedChargeUSD: usd2(withSystem.fixedChargeDOP, fx),
         ...settlement,

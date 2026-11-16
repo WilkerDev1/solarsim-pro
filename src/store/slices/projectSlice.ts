@@ -1,5 +1,5 @@
 import { newProposalNetMeteringFields } from '../../../shared/netMetering';
-import { getReferenceEnergyRateUSD, referenceBillingTariff } from '../../data/rdTariffs';
+import { DEFAULT_RD_TARIFF_MATRIX, getReferenceEnergyRateUSD, referenceBillingTariff } from '../../data/rdTariffs';
 import { createProjectId } from '../../utils/projectId';
 import { canEditCommercial } from '../../features/proposals/commercial';
 import { isProposalLink } from '../../../shared/proposalLinks';
@@ -51,9 +51,11 @@ function newProjectSpecs(defs: SimulationStore['defaultSimulationSettings'] | un
 }
 
 /** Precio de referencia, procedencia y fila de facturación con que nace una propuesta nueva. */
-function newProposalReferenceRates(matrix: Parameters<typeof getReferenceEnergyRateUSD>[0] | undefined, distributor: string, tariffCode: string, monthlyConsumption: readonly number[], dopPerUSD: number) {
-  const billingTariff = matrix ? referenceBillingTariff(matrix, distributor, tariffCode) : undefined;
-  if (!matrix || !billingTariff) return {};
+function newProposalReferenceRates(activeMatrix: Parameters<typeof getReferenceEnergyRateUSD>[0] | undefined, distributor: string, tariffCode: string, monthlyConsumption: readonly number[], dopPerUSD: number) {
+  // Matriz aún sin cargar: la de fábrica, la misma que usa el dock como respaldo (`referenceRate`).
+  const matrix = activeMatrix || DEFAULT_RD_TARIFF_MATRIX;
+  const billingTariff = referenceBillingTariff(matrix, distributor, tariffCode);
+  if (!billingTariff) return {};
   const average = monthlyConsumption.length ? monthlyConsumption.reduce((a, b) => a + b, 0) / monthlyConsumption.length : 0;
   return { energyCostPerKWh: getReferenceEnergyRateUSD(matrix, distributor, tariffCode, average, dopPerUSD), energyRateSource: 'reference' as const, billingTariff };
 }

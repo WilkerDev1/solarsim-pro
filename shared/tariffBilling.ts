@@ -57,16 +57,22 @@ export interface BillingTariff {
 const finiteNonNegative = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0;
 const isRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 
-/** Tramos contiguos desde 0, ascendentes y con el último abierto. */
-function validRanges(ranges: unknown, priceKey: 'rateDOP' | 'chargeDOP'): boolean {
+/**
+ * Tramos con límites impresos inclusivos, como en las resoluciones y en `averageBlockEnergyRateDOP`: el primero desde 0,
+ * cada uno empieza en el final del anterior + 1 (0–200, 201–300…) y el último es abierto. Un tramo cubre
+ * (fin del anterior, su fin]: 100.5 kWh ya cae en el rango «101–…» (`fixedChargeDOP`). Un precio de energía 0 no es una
+ * tarifa sino un dato que falta (`requirePositive`); un cargo fijo 0 sí es válido.
+ */
+function validRanges(ranges: unknown, priceKey: 'rateDOP' | 'chargeDOP', requirePositive: boolean): boolean {
   if (!Array.isArray(ranges) || ranges.length === 0) return false;
   let previousTo = -1;
   for (let i = 0; i < ranges.length; i++) {
     const range = ranges[i];
     if (!isRecord(range) || !finiteNonNegative(range[priceKey]) || !finiteNonNegative(range.fromKWh)) return false;
+    if (requirePositive && !((range[priceKey] as number) > 0)) return false;
     const last = i === ranges.length - 1;
     if (last ? range.toKWh !== null : !finiteNonNegative(range.toKWh)) return false;
-    if (i === 0 ? range.fromKWh !== 0 : range.fromKWh !== previousTo && range.fromKWh !== previousTo + 1) return false;
+    if (range.fromKWh !== previousTo + 1 && !(i === 0 && range.fromKWh === 0)) return false;
     if (!last && (range.toKWh as number) <= range.fromKWh) return false;
     previousTo = last ? Infinity : (range.toKWh as number);
   }
@@ -77,8 +83,8 @@ export function isValidBillingTariff(value: unknown): value is BillingTariff {
   if (!isRecord(value)) return false;
   if (typeof value.distributor !== 'string' || !value.distributor || typeof value.tariffCode !== 'string' || !value.tariffCode) return false;
   if (!finiteNonNegative(value.fixedChargeDOP)) return false;
-  if (value.fixedChargeTiers !== undefined && !validRanges(value.fixedChargeTiers, 'chargeDOP')) return false;
-  return validRanges(value.energyBlocks, 'rateDOP');
+  if (value.fixedChargeTiers !== undefined && !validRanges(value.fixedChargeTiers, 'chargeDOP', false)) return false;
+  return validRanges(value.energyBlocks, 'rateDOP', true);
 }
 
 /** Forma mínima de una fila de la matriz (`UtilityTariffDetails`) que se convierte en `BillingTariff`. */
@@ -166,7 +172,11 @@ export interface MonthlyBill {
 }
 
 const kWhOf = (value: unknown): number => (finiteNonNegative(value) ? value : 0);
-const round1 = (n: number) => Math.round(n * 10) / 10;
+/**
+ * Limpia solo el ruido de coma flotante (p. ej. 700.9999999999 → 701) sin redondear kWh reales: el cálculo y el arrastre
+ * del crédito van sin redondear y se redondea solo al presentar. Así 700.96 kWh no salta a «todo al 4.º rango».
+ */
+const clean = (n: number) => Math.round(n * 1e9) / 1e9;
 
 /** Factura de un mes con medición neta (SIE-007-2026-REG, art. 19). Sin inyección ni crédito es la factura sin sistema. */
 export function calculateMonthlyBill(input: MonthlyBillInput): MonthlyBill {
@@ -174,10 +184,10 @@ export function calculateMonthlyBill(input: MonthlyBillInput): MonthlyBill {
   const injectedKWh = kWhOf(input.injectedKWh);
   const creditInKWh = kWhOf(input.creditInKWh);
   const balance = withdrawnKWh - injectedKWh - creditInKWh;
-  const netKWh = balance > 0 ? round1(balance) : 0;
-  const creditCarriedKWh = balance < 0 ? round1(-balance) : 0;
+  const netKWh = balance > 0 ? clean(balance) : 0;
+  const creditCarriedKWh = balance < 0 ? clean(-balance) : 0;
   // El crédito anterior solo cubre lo que lo inyectado en el mes no alcanzó a cubrir.
-  const creditAppliedKWh = round1(Math.min(creditInKWh, Math.max(0, withdrawnKWh - injectedKWh)));
+  const creditAppliedKWh = clean(Math.min(creditInKWh, Math.max(0, withdrawnKWh - injectedKWh)));
   const energy = energyChargeDOP(input.tariff, netKWh);
   const tierKWh = (input.fixedChargeTierBasis ?? DEFAULT_FIXED_CHARGE_TIER_BASIS) === 'net' ? netKWh : withdrawnKWh;
   const fixed = fixedChargeDOP(input.tariff, tierKWh);
@@ -205,12 +215,20 @@ export interface BillingYearOptions {
 
 export interface BillingYear {
   months: MonthlyBill[];
+  /** Remanente de crédito al cierre del año y su pago por la distribuidora (un ingreso del cliente). */
   settlement: { creditKWh: number; priceDOPPerKWh: number; amountDOP: number };
-  totalDOP: number;
+  /** Suma bruta de las doce facturas (lo que se paga a la distribuidora), sin descontar la liquidación. */
+  billsDOP: number;
+  /** Costo neto del año para el cliente: `billsDOP − settlement.amountDOP`. */
+  netCostDOP: number;
 }
 
-/** Doce facturas (enero a diciembre) con el crédito arrastrado mes a mes y la liquidación del remanente al cierre (art. 19.2). */
+/**
+ * Doce facturas (enero a diciembre) con el crédito arrastrado mes a mes y la liquidación del remanente al cierre (art. 19.2).
+ * Exige exactamente doce meses: el crédito nunca cruza de un año a otro dentro de una llamada.
+ */
 export function calculateBillingYear(tariff: BillingTariff, months: ReadonlyArray<{ withdrawnKWh: number; injectedKWh: number }>, options: BillingYearOptions = {}): BillingYear {
+  if (months.length !== 12) throw new RangeError(`Un año de facturación tiene 12 meses (recibidos: ${months.length}).`);
   let credit = 0;
   const bills = months.map((month) => {
     const bill = calculateMonthlyBill({
@@ -225,11 +243,9 @@ export function calculateBillingYear(tariff: BillingTariff, months: ReadonlyArra
     return bill;
   });
   const priceDOPPerKWh = isValidSettlementPrice(options.settlementDOPPerKWh) ? options.settlementDOPPerKWh : FACTORY_ANNUAL_CREDIT_SETTLEMENT.dopPerKWh;
-  return {
-    months: bills,
-    settlement: { creditKWh: credit, priceDOPPerKWh, amountDOP: credit * priceDOPPerKWh },
-    totalDOP: bills.reduce((total, bill) => total + bill.totalDOP, 0),
-  };
+  const amountDOP = credit * priceDOPPerKWh;
+  const billsDOP = bills.reduce((total, bill) => total + bill.totalDOP, 0);
+  return { months: bills, settlement: { creditKWh: credit, priceDOPPerKWh, amountDOP }, billsDOP, netCostDOP: billsDOP - amountDOP };
 }
 
 // ── Liquidación anual del crédito ──
@@ -286,12 +302,15 @@ export interface TariffBillingRatesInput {
   annualCreditSettlementDOPPerKWh?: unknown;
 }
 
+/** Distribuidora con el mismo criterio que el código de tarifa: sin espacios y en mayúsculas («edesur » → EDESUR). */
+const normalizeDistributor = (value: unknown): string => (typeof value === 'string' ? value.trim().toUpperCase() : '');
+
 /** Fila de facturación guardada en la propuesta, si es válida y corresponde a su distribuidora y tarifa actuales. */
 export function proposalBillingTariff(rates: TariffBillingRatesInput | null | undefined): BillingTariff | undefined {
   const tariff = rates?.billingTariff;
   if (!isValidBillingTariff(tariff)) return undefined;
-  const distributor = typeof rates?.distributor === 'string' ? rates.distributor : '';
-  if (tariff.distributor !== distributor) return undefined;
+  const distributor = normalizeDistributor(rates?.distributor);
+  if (!distributor || normalizeDistributor(tariff.distributor) !== distributor) return undefined;
   return tariffMatrixKey(distributor, rates?.tariffCode ?? '') === tariffMatrixKey(distributor, tariff.tariffCode) ? tariff : undefined;
 }
 
@@ -313,8 +332,8 @@ export const ENERGY_VALUATION_METHOD_LABELS: Record<EnergyValuationMethod, strin
 
 /**
  * Procedencia del precio tras un cambio de tarifas (edición del dock, de agentes o borrador): regla pura de ADR 0004.
- * 1. Una procedencia en el propio cambio manda (la escribe quien fija el precio de referencia junto con la fila).
- *    Un valor desconocido no se guarda.
+ * 1. Una procedencia válida en el propio cambio manda (la escribe quien fija el precio de referencia junto con la fila).
+ *    Una inválida (o `null`) cuenta como ausente: no se guarda y queda la anterior, salvo que la regla 2 marque `manual`.
  * 2. Si cambia el precio sin procedencia, es un precio tecleado: `manual`.
  * 3. En otro caso no cambia. Cambiar de distribuidora o tarifa sin fila nueva deja la fila guardada sin efecto (no
  *    coincide), y la propuesta se valora con el escalar.
@@ -324,11 +343,13 @@ export function reconcileEnergyRateSource<R extends { energyCostPerKWh?: number;
   after: R,
   change: { energyCostPerKWh?: number; energyRateSource?: unknown },
 ): R {
+  if (isEnergyRateSource(change.energyRateSource)) return after;
+  let next = after;
   if (change.energyRateSource !== undefined) {
-    if (isEnergyRateSource(change.energyRateSource)) return after;
+    // Procedencia no válida: como si no viniera (se restaura la anterior).
     const { energyRateSource: _drop, ...rest } = after;
-    return (isEnergyRateSource(before.energyRateSource) ? { ...rest, energyRateSource: before.energyRateSource } : rest) as R;
+    next = (isEnergyRateSource(before.energyRateSource) ? { ...rest, energyRateSource: before.energyRateSource } : rest) as R;
   }
-  if (change.energyCostPerKWh !== undefined && change.energyCostPerKWh !== before.energyCostPerKWh) return { ...after, energyRateSource: 'manual' };
-  return after;
+  if (change.energyCostPerKWh !== undefined && change.energyCostPerKWh !== before.energyCostPerKWh) return { ...next, energyRateSource: 'manual' };
+  return next;
 }

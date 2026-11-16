@@ -181,7 +181,8 @@ export function executeAssistantTool(
     const comparable = hasSavingsComparison(basis);
     const withoutMoney = <T extends object>(row: T, fields: string[]): T =>
       comparable ? row : { ...row, ...Object.fromEntries(fields.map((field) => [field, null])) };
-    const monthlyMoney = ['savingsUSD', 'originalBillUSD', 'netBillUSD'];
+    // `withoutMoney` es superficial: el desglose anidado de la factura (`tariffBill`, con importes) se vacía entero.
+    const monthlyMoney = ['savingsUSD', 'originalBillUSD', 'netBillUSD', 'gridUseChargeUSD', 'tariffBill'];
     const summary = calculateProjectFinancialSummary(p, mode);
     return {
       data: {
@@ -214,7 +215,7 @@ export function executeAssistantTool(
           engineBlockBilling(resolveAssumptions(p), p.rates)
         ).map((month) => withoutMoney(month, monthlyMoney)),
         summary: comparable ? summary : {
-          ...withoutMoney(summary, ['year1SavingsUSD', 'total25YearSavingsUSD', 'paybackYears', 'irrPct', 'npvUSD', 'roi25YrPct']),
+          ...withoutMoney(summary, ['year1SavingsUSD', 'total25YearSavingsUSD', 'paybackYears', 'irrPct', 'npvUSD', 'roi25YrPct', 'annualCreditSettlementUSD']),
           monthlyBreakdown: summary.monthlyBreakdown.map((month) => withoutMoney(month, monthlyMoney)),
         },
         savings: {
