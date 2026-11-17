@@ -6,7 +6,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { GlobalTariffMatrix, UtilityDistributor } from '../../../types/tariffs';
 import { getTariffSource, gridUseChargeReference, tariffSourceFieldLabel } from '../../../utils/aiTariffContext';
 import { GeminiTariffService } from '../../../services/geminiTariffService';
-import { applyTariffScanReview, summarizeTariffScan, tariffScanRowKey, type TariffProvenanceDecision, type TariffScanReview } from '../../../utils/tariffExtraction';
+import { applyTariffScanReview, describeTariffSource, PENDING_TARIFF_SOURCE, summarizeTariffScan, tariffScanRowKey, type TariffProvenanceDecision, type TariffScanReview } from '../../../utils/tariffExtraction';
 import {
   X,
   Sparkles,
@@ -345,9 +345,9 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                   <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5" data-testid="tariff-scan-origin">
                     Origen: {review.origin.country ?? 'país no indicado'} · {review.origin.regulator ? `regulador ${review.origin.regulator}` : 'regulador no citado'} · {review.origin.currency ?? 'moneda por tarifa'}
                   </p>
-                  {typeof review.draft.notes === 'string' && review.draft.notes && (
+                  {review.notes && (
                     <p className="text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5 italic">
-                      {review.draft.notes}
+                      {review.notes}
                     </p>
                   )}
                 </div>
@@ -368,14 +368,14 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
               </div>
 
               {review.provenanceRequired && (
-                <fieldset className="rounded-xl border border-slate-200 dark:border-[#27272a] p-3 text-xs text-slate-700 dark:text-zinc-300 flex flex-col gap-2" data-testid="tariff-scan-provenance">
+                <fieldset className="rounded-xl border border-slate-200 dark:border-[#27272a] p-3 text-xs text-slate-700 dark:text-zinc-300 flex flex-col gap-2" data-testid="tariff-scan-provenance" aria-describedby="tariff-provenance-help">
                   <legend className="px-1 font-semibold">Procedencia del cuadro (obligatoria)</legend>
-                  <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                  <p id="tariff-provenance-help" className="text-[11px] text-slate-500 dark:text-zinc-400">
                     El documento no {review.document.resolutionCode ? 'indica una fecha de inicio válida' : 'cita la resolución'}. Indica la resolución que lo respalda o márcalo como cuadro de la distribuidora sin resolución citada. Nada se aplica hasta que lo confirmes.
                   </p>
                   <div className="flex flex-col gap-1.5">
                     <label className="flex items-center gap-2">
-                      <input type="radio" name="tariff-provenance" checked={provenanceKind === 'resolution'} onChange={() => editReview(setProvenanceKind)('resolution')} />
+                      <input type="radio" name="tariff-provenance" aria-describedby={review.suggestion ? 'tariff-provenance-suggestion' : undefined} checked={provenanceKind === 'resolution'} onChange={() => editReview(setProvenanceKind)('resolution')} />
                       <span>Resolución que lo respalda</span>
                     </label>
                     <div className="pl-6 flex flex-col sm:flex-row gap-2">
@@ -397,6 +397,7 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                         <input
                           id="tariff-provenance-date"
                           type="date"
+                          aria-describedby={review.suggestion ? 'tariff-provenance-suggestion' : undefined}
                           value={provenanceDate}
                           disabled={provenanceKind !== 'resolution'}
                           onChange={(event) => editReview(setProvenanceDate)(event.target.value)}
@@ -412,7 +413,7 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <label className="flex items-center gap-2">
-                      <input type="radio" name="tariff-provenance" checked={provenanceKind === 'distributor_table'} onChange={() => editReview(setProvenanceKind)('distributor_table')} />
+                      <input type="radio" name="tariff-provenance" aria-describedby="tariff-provenance-period-help" checked={provenanceKind === 'distributor_table'} onChange={() => editReview(setProvenanceKind)('distributor_table')} />
                       <span>Cuadro de la distribuidora sin resolución citada</span>
                     </label>
                     <div className="pl-6 flex flex-col gap-1">
@@ -420,11 +421,15 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                       <input
                         id="tariff-provenance-period"
                         type="month"
+                        aria-describedby="tariff-provenance-period-help"
                         value={provenancePeriod}
                         disabled={provenanceKind !== 'distributor_table'}
                         onChange={(event) => editReview(setProvenancePeriod)(event.target.value)}
                         className="w-full sm:w-48 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#121214] font-mono disabled:opacity-50"
                       />
+                      <p id="tariff-provenance-period-help" className="text-[11px] text-slate-500 dark:text-zinc-400">
+                        Se guarda como «Cuadro de la distribuidora sin resolución citada (AAAA-MM)», vigente desde el día 1 de ese mes.
+                      </p>
                     </div>
                   </div>
                 </fieldset>
@@ -526,7 +531,7 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                             </span>
                             {tariff.source?.fields && !tariff.source.fields.includes('netMeteringRetentionPct') && <span className="block text-[10px] mt-1">Política conservada; no extraída</span>}
                           </td>
-                          <td className="p-3 text-xs">{getTariffSource(tableMatrix, tariff).resolutionCode}<br />{getTariffSource(tableMatrix, tariff).effectiveDate}{getTariffSource(tableMatrix,tariff).fieldSources && <ul className="mt-2 space-y-1">{Object.entries(getTariffSource(tableMatrix,tariff).fieldSources!).map(([field,source])=><li key={field}>{tariffSourceFieldLabel(field)}: {source.resolutionCode} · {source.effectiveDate}</li>)}</ul>}</td>
+                          <td className="p-3 text-xs">{describeTariffSource(getTariffSource(tableMatrix, tariff))}{getTariffSource(tableMatrix,tariff).fieldSources && <ul className="mt-2 space-y-1">{Object.entries(getTariffSource(tableMatrix,tariff).fieldSources!).map(([field,source])=><li key={field}>{tariffSourceFieldLabel(field)}: {describeTariffSource(source)}</li>)}</ul>}</td>
                         </tr>
                         );
                       })}
@@ -544,7 +549,7 @@ export const AITariffResolutionModal: React.FC<AITariffResolutionModalProps> = (
                     <span className="font-mono">RD$ {charge.dopPerKWh.toFixed(2)}/kWh inyectado</span>
                     <span className="block text-[11px] text-slate-500 dark:text-zinc-400 mt-0.5">
                       {fromDocument
-                        ? `Leído del documento (${charge.resolutionCode}). Contrástalo con la tabla de la resolución.`
+                        ? `Leído del documento (${charge.resolutionCode === PENDING_TARIFF_SOURCE ? 'procedencia pendiente' : charge.resolutionCode}). Contrástalo con la tabla de la resolución.`
                         : charge.origin === 'matrix'
                           ? `No figura en este documento; se conserva el leído de ${charge.resolutionCode}.`
                           : `No figura en este documento; se mantiene el de fábrica (${charge.resolutionCode}, ${charge.period}).`}

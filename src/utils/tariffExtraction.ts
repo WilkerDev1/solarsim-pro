@@ -2,7 +2,7 @@ import { DEFAULT_GRID_EXPORT_FEE_PCT } from '../../shared/assumptions';
 import { isValidGridUseCharge, MAX_GRID_USE_CHARGE_DOP_PER_KWH } from '../../shared/netMetering';
 import { normalizeTariffCode, tariffMatrixKey } from '../../shared/tariffRules';
 import { FixedChargeTier, GlobalTariffMatrix, UtilityDistributor, UtilityTariffDetails } from '../types/tariffs';
-import { getTariffSource, gridUseChargeReference, knownTariffPeriod, TARIFF_DISTRIBUTORS } from './aiTariffContext';
+import { getTariffSource, gridUseChargeReference, knownTariffPeriod, TARIFF_DISTRIBUTORS, tariffSourceFieldLabel } from './aiTariffContext';
 
 const numericFields = ['baseEnergyRateDOP', 'baseEnergyRateUSD', 'fixedChargeDOP', 'fixedChargeUSD', 'demandChargePerKWDOP', 'demandChargePerKWUSD', 'peakEnergyRateDOP', 'offPeakEnergyRateDOP', 'netMeteringRetentionPct'] as const;
 const record = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -203,12 +203,41 @@ export interface TariffScanReview {
   priceChanges: boolean;
   /** Hay algo soportado que aplicar (tarifas existentes o cargo por uso de la red). */
   applicable: boolean;
+  /** Notas de la extracción con etiquetas legibles en vez de nombres internos de campos. */
+  notes: string | null;
 }
 
-const PENDING = 'Procedencia pendiente de revisión';
-const sameNumber = (a: unknown, b: unknown) => typeof a === 'number' && typeof b === 'number' && (a === b || Math.abs(a - b) < 1e-6);
-const sameRanges = (a: Array<{ minKWh: number; maxKWh: number | null }> | undefined, b: typeof a, rate: (item: any) => number) =>
-  !!a && !!b && a.length === b.length && a.every((item, index) => sameNumber(item.minKWh, b[index].minKWh) && (item.maxKWh ?? Infinity) === (b[index].maxKWh ?? Infinity) && sameNumber(rate(item), rate(b[index])));
+/** Procedencia provisional de la vista previa de la revisión (nunca se aplica; se muestra sin fecha). */
+export const PENDING_TARIFF_SOURCE = 'Procedencia pendiente de revisión';
+const PENDING = PENDING_TARIFF_SOURCE;
+const PENDING_DATE = '2000-01-01';
+
+/** Texto de una procedencia para la revisión: «resolución · fecha», o solo «Procedencia pendiente de revisión» (sin fecha centinela). */
+export function describeTariffSource(source: { resolutionCode: string; effectiveDate: string }): string {
+  return source.resolutionCode === PENDING_TARIFF_SOURCE ? PENDING_TARIFF_SOURCE : `${source.resolutionCode} · ${source.effectiveDate}`;
+}
+
+const NOTE_FIELD_LABELS: Record<string, string> = {
+  gridUseChargeDOPPerKWh: 'Cargo por uso de la red', peakDemandChargePerKWDOP: 'Potencia en punta', offPeakDemandChargePerKWDOP: 'Potencia fuera de punta',
+  resolutionCode: 'resolución', effectiveDate: 'fecha de inicio', publishedBy: 'emisor', minKWh: 'desde (kWh)', maxKWh: 'hasta (kWh)', rateDOP: 'precio (RD$/kWh)', chargeDOP: 'cargo (RD$)',
+};
+const NOTE_FIELDS = new RegExp(`\\b(${[...numericFields, 'blocks', 'fixedChargeTiersDOP', ...Object.keys(NOTE_FIELD_LABELS)].join('|')})\\b`, 'g');
+/** Las notas de la IA citan campos internos (`demandChargePerKWDOP`…): se muestran y se guardan con etiquetas legibles. */
+export function humanizeTariffNotes(text: string): string {
+  return text.replace(NOTE_FIELDS, (field) => NOTE_FIELD_LABELS[field] ?? tariffSourceFieldLabel(field));
+}
+
+/** Precios iguales salvo redondeo de la impresión (±0.005). */
+const PRICE_TOLERANCE = 0.005;
+const sameNumber = (a: unknown, b: unknown) => typeof a === 'number' && typeof b === 'number' && (a === b || Math.abs(a - b) <= PRICE_TOLERANCE + 1e-9);
+/** Límite superior de un tramo: null, 999999 e Infinity son el tramo abierto. */
+const upperBound = (value: number | null | undefined) => (value == null || value === 999999 ? Infinity : value);
+/**
+ * Tramos iguales: mismos límites superiores y precios (±0.005). Los límites inferiores no se comparan: ya validados contiguos,
+ * «201–300» y «200–300» son la misma convención (inclusiva o exclusiva), no un cambio.
+ */
+const sameRanges = (a: Array<{ maxKWh: number | null }> | undefined, b: typeof a, rate: (item: any) => number) =>
+  !!a && !!b && a.length === b.length && a.every((item, index) => upperBound(item.maxKWh) === upperBound(b[index].maxKWh) && sameNumber(rate(item), rate(b[index])));
 const RESOLUTION_IN_TEXT = /\b(SIE|CNE)-\d{1,4}-\d{4}(?:-[A-Z]{2,4})?\b/i;
 
 /** Clave de la fila de la matriz para un código escrito de cualquier forma (BTS-1, «bts 1», RBT1), o `null` si no existe. */
@@ -241,7 +270,11 @@ export function prepareTariffScanReview(raw: unknown, current: GlobalTariffMatri
         continue;
       }
       if (key in tariffs) throw new Error(`La tarifa ${distributor}/${key} aparece repetida en la extracción.`);
-      tariffs[key] = record(value) && 'code' in value ? { ...value, code: key } : value;
+      const row = record(value) && 'code' in value ? { ...value, code: key } : value;
+      // Con bloques, el precio plano de la matriz es el del último tramo (BTS1/BTS2: desde 701 kWh todo el consumo a ese precio);
+      // la IA a veces da el primer tramo o un promedio, que no es un cambio de precio ni debe sustituir la referencia.
+      const lastBlock = record(row) && row.currency === 'DOP' && Array.isArray(row.blocks) ? row.blocks[row.blocks.length - 1] : undefined;
+      tariffs[key] = record(lastBlock) && typeof lastBlock.rateDOP === 'number' ? { ...(row as Record<string, unknown>), baseEnergyRateDOP: lastBlock.rateDOP } : row;
     }
     schedules[distributor] = { ...schedule, tariffs };
   }
@@ -256,7 +289,7 @@ export function prepareTariffScanReview(raw: unknown, current: GlobalTariffMatri
   const applicable = supportedCount > 0 || hasCharges;
   // Valida lo soportado con una procedencia provisional que nunca se aplica.
   const preview = applicable
-    ? mergeExtractedTariffs({ ...draft, resolutionCode: document.resolutionCode ?? PENDING, effectiveDate: document.effectiveDate ?? '2000-01-01', publishedBy: document.publishedBy ?? PENDING }, current)
+    ? mergeExtractedTariffs({ ...draft, resolutionCode: document.resolutionCode ?? PENDING, effectiveDate: document.effectiveDate ?? PENDING_DATE, publishedBy: document.publishedBy ?? PENDING }, current)
     : current;
 
   const rows: TariffScanRow[] = [];
@@ -299,7 +332,7 @@ export function prepareTariffScanReview(raw: unknown, current: GlobalTariffMatri
   const defaultDecision: TariffProvenanceDecision = resolutionCode
     ? { kind: 'resolution', resolutionCode, effectiveDate: document.effectiveDate ?? '' }
     : { kind: 'distributor_table', period: document.effectiveDate?.slice(0, 7) ?? '' };
-  return { basis: current, preview, draft, origin, document, provenanceRequired: !document.resolutionCode || !document.effectiveDate, suggestion, defaultDecision, rows, gridUseCharges, priceChanges, applicable };
+  return { basis: current, preview, draft, origin, document, provenanceRequired: !document.resolutionCode || !document.effectiveDate, suggestion, defaultDecision, rows, gridUseCharges, priceChanges, applicable, notes: typeof source.notes === 'string' && source.notes.trim() ? humanizeTariffNotes(source.notes.slice(0, 2000)) : null };
 }
 
 /** Clave de una fila de la revisión: `DISTRIBUIDORA/CÓDIGO`. */
@@ -351,7 +384,7 @@ export function applyTariffScanReview(review: TariffScanReview, decision: Tariff
   }
   const unsupported = review.rows.filter((row) => row.status === 'unsupported').map(tariffScanRowKey);
   if (unsupported.length) declared.push(`Descartadas por no estar soportadas todavía por SolarSim: ${unsupported.join(', ')}.`);
-  const notes = [...declared, typeof review.draft.notes === 'string' ? review.draft.notes : ''].filter(Boolean).join('\n');
+  const notes = [...declared, review.notes ?? ''].filter(Boolean).join('\n');
   return mergeExtractedTariffs({ ...review.draft, resolutionCode, effectiveDate, publishedBy: review.document.publishedBy ?? 'Emisor no indicado en el documento', notes }, review.basis);
 }
 
