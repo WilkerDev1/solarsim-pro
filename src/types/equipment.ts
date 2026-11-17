@@ -27,6 +27,7 @@ export interface SolarEquipmentItem {
   powerKW?: number;              // Para inversores en Kilowatts (ej: 8.0)
   maxAcPowerKW?: number;         // Potencia máxima de salida AC (kW)
   maxPvPowerKW?: number;         // Potencia máxima del arreglo fotovoltaico DC (kW)
+  maxPvPowerSource?: 'estimated'; // Procedencia de maxPvPowerKW: ausente = publicado en la ficha o capturado a mano
   maxEfficiencyPct?: number;     // Eficiencia máxima % (ej: 97.5)
   mpptEfficiencyPct?: number;    // Eficiencia MPPT % (ej: 99.9)
   voltageMPPT?: string;          // Rango de voltaje MPPT (ej: "120-500V")
@@ -140,6 +141,11 @@ export interface ExtractedEquipmentVariant {
   voltageMPPT?: string;
   mpptCount?: number;
   batteryVoltageRange?: string;
+  // Datos de entrada DC para estimar la FV máxima cuando la ficha no la publica (no se guardan en el catálogo)
+  mpptMaxCurrentA?: number;
+  dcRatedVoltageV?: number;
+  maxPvPowerEstimateKW?: number;
+  maxPvPowerSource?: 'estimated';
 
   // Baterías
   capacityKWh?: number;

@@ -68,6 +68,7 @@ REGLAS DE EXTRACCIÓN CRÍTICAS:
    - Inversores: maxAcPowerKW es la potencia AC máxima publicada (ej. 8.8). Si la entrada FV máxima se da como porcentaje de la potencia nominal (ej. 200 % o 150 %), devuélvela en maxPvPowerPct (200, 150) sin calcularla; si se da en kW, usa maxPvPowerKW. mpptCount es el número de seguidores MPPT. batteryVoltageRange: rango de tensión de batería compatible si la ficha lo publica.
    - Identidad: "brand" es el fabricante; "modelSeries" es el nombre comercial de la serie/producto (ej. "Tiger Neo JKM625-650N-78HL4-BDV" o "XTS"), NUNCA el nombre del archivo ni un código de documento (ej. "F9-EN", "datasheet_v3"). "documentTitle" es el título del producto, tampoco el nombre del archivo.
    - CAMPOS ESPERADOS POR VARIANTE (revisa la ficha para cada uno; si realmente no está, devuelve null, nunca lo omitas): PANEL: powerW, efficiencyPct, voc, vmp, isc, imp (todos de la tabla STC, una columna por modelo; Isc e Imp están junto a Voc y Vmp). INVERSOR: powerKW, maxAcPowerKW ("Max. AC Output Power"), maxPvPowerKW o maxPvPowerPct ("Max. PV Input Power", a veces "200 %"). Estos seis campos son obligatorios en el esquema.
+   - INVERSOR sin FV máxima publicada: además extrae mpptCount, mpptMaxCurrentA (corriente máxima de entrada por MPPT) y dcRatedVoltageV (tensión nominal de entrada DC); la aplicación calcula una estimación opcional. No calcules ni inventes la FV máxima: déjala en null.
    - Un panel no tiene tensión de batería y un inversor no tiene Voc/Vmp/Isc/Imp: la tensión de batería de un inversor (ej. 51.2 V) va solo en batteryVoltageRange, nunca en vmp ni voltageV.
    - Si un dato no está en la ficha (garantías, tensión FV máxima, fase/tensión nominal), no lo incluyas: el esquema no tiene campos para ellos.
 
@@ -86,6 +87,8 @@ const SPEC_DESCRIPTIONS: Record<string, string> = {
   vmp: "PANEL: tensión en máxima potencia Vmp en V (tabla STC). SOLO paneles: nunca la tensión de batería de un inversor.",
   maxAcPowerKW: "INVERSOR: potencia AC máxima de salida en kW (fila 'Max. AC Output Power' / 'Max. AC Apparent Power', ej. 8.8). Puede diferir de la nominal. null si no es un inversor.",
   maxPvPowerKW: "INVERSOR: potencia FV máxima de entrada en kW (fila 'Max. PV Input Power' / 'Max. PV Power'), solo si la ficha la da en kW. Si la da en % de la potencia nominal, usa maxPvPowerPct y deja este en null.",
+  mpptMaxCurrentA: "INVERSOR: corriente máxima de entrada POR cada MPPT en A (fila 'Max. input current per MPPT' / 'Max. Input Current', ej. 32). Si la ficha da 'A/B' (dos entradas), usa el valor por MPPT. null si no aparece.",
+  dcRatedVoltageV: "INVERSOR: tensión nominal de entrada DC en V (fila 'Rated Voltage' / 'Rated DC input voltage' / 'Nominal input voltage', ej. 600). No es la tensión máxima de entrada ni el rango MPPT. null si no aparece.",
   maxPvPowerPct: "INVERSOR: potencia FV máxima de entrada como % de la potencia nominal AC (ej. 200 o 150 si la ficha dice '200% of rated power'). null si se dio en kW o no es un inversor.",
   tempCoeff: "PANEL: coeficiente de temperatura de Pmax en %/°C, negativo (ej. -0.29).",
   annualDegradation: "PANEL: degradación lineal anual en % (ej. 0.4).",
@@ -97,7 +100,7 @@ const NULLABLE_REQUIRED = ["efficiencyPct", "isc", "imp", "maxAcPowerKW", "maxPv
 const SPEC_PROPERTIES: Record<string, SpecProperty> = {
   ...Object.fromEntries(
     ["powerW", "powerKW", "efficiencyPct", "tempCoeff", "annualDegradation", "voc", "isc", "vmp", "imp",
-      "maxAcPowerKW", "maxPvPowerKW", "maxPvPowerPct", "maxEfficiencyPct", "mpptCount", "capacityKWh", "capacityAh", "voltageV",
+      "maxAcPowerKW", "maxPvPowerKW", "maxPvPowerPct", "mpptMaxCurrentA", "dcRatedVoltageV", "maxEfficiencyPct", "mpptCount", "capacityKWh", "capacityAh", "voltageV",
       "dodPct", "batteryEfficiencyPct", "cycles", "maxChargeCurrentA", "weightKg", "lengthMm", "widthMm", "heightMm"].map((key) => [
       key,
       {

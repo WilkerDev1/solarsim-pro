@@ -386,6 +386,7 @@ export const EquipmentEditorModal: React.FC<EquipmentEditorModalProps> = ({
                     className={`block text-[10px] font-semibold mb-1 text-slate-700 dark:text-zinc-300`}
                   >
                     Máx DC PV (kW)
+                    {editingItem.maxPvPowerSource === "estimated" && " · estimado"}
                   </label>
                   <input
                     type="number"
@@ -395,6 +396,7 @@ export const EquipmentEditorModal: React.FC<EquipmentEditorModalProps> = ({
                       setEditingItem({
                         ...editingItem,
                         maxPvPowerKW: parseFloat(e.target.value) || 0,
+                        maxPvPowerSource: undefined,
                       })
                     }
                     className={`w-full px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white border-slate-300 text-slate-800 dark:bg-[#1e1e28] dark:border-[#3f3f46] dark:text-zinc-100`}

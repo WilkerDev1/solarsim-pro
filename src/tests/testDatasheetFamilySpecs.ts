@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { parseDatasheetWithGemini, DATASHEET_RESPONSE_SCHEMA } from "../services/geminiDatasheetService";
-import { normalizeDatasheetResponse, planDatasheetImport, datasheetTitle } from "../utils/datasheetImport";
+import { normalizeDatasheetResponse, planDatasheetImport, datasheetTitle, estimateMaxPvPowerKW } from "../utils/datasheetImport";
 import type { GeminiTransport } from "../../shared/geminiTransport";
 
 // Fichas de familia con transporte sintético: cada variante recibe sus valores; los comunes se reparten.
@@ -223,5 +223,53 @@ for (const key of ["efficiencyPct", "isc", "imp", "maxAcPowerKW", "maxPvPowerKW"
   assert.equal(variantProps.properties[key].nullable, true);
 }
 assert(/Max\. AC Output Power|Max\. AC/i.test(variantProps.properties.maxAcPowerKW.description));
+
+// Estimación opcional de la FV máxima cuando la ficha no la publica (Solis S5-GC50K/60K).
+const solis = normalizeDatasheetResponse(fixture("datasheet-solis-s5-gc.json"));
+assert.equal(solis.variants[0].maxPvPowerKW, undefined, "nunca se aplica sola");
+assert.equal(solis.variants[0].maxPvPowerEstimateKW, 65, "min(5×32×600 = 96, 1.3×50 = 65)");
+assert.equal(solis.variants[1].maxPvPowerEstimateKW, 78, "min(6×32×600 = 115.2, 1.3×60 = 78)");
+assert.equal(solis.variants[0].maxAcPowerKW, 55);
+for (const v of solis.variants) {
+  assert.equal(v.maxEfficiencyPct, 98.7);
+  assert.equal(v.voltageMPPT, "180-1000V");
+  assert.equal(v.dimensions, "691 x 578 x 338 mm");
+  assert.equal(v.weightKg, 53.7);
+}
+assert(!solis.warnings?.some((w) => /FV máxima/.test(w)), "con estimación disponible no se pide el dato a mano");
+assert.equal(estimateMaxPvPowerKW({ powerKW: 50, mpptCount: 5, mpptMaxCurrentA: 32, dcRatedVoltageV: 600 }), 65);
+// Limitada por la corriente/tensión de entrada: 2×10 A×400 V = 8 kW < 1.3×10.
+assert.equal(estimateMaxPvPowerKW({ powerKW: 10, mpptCount: 2, mpptMaxCurrentA: 10, dcRatedVoltageV: 400 }), 8);
+for (const missing of ["powerKW", "mpptCount", "mpptMaxCurrentA", "dcRatedVoltageV"]) {
+  const input: any = { powerKW: 50, mpptCount: 5, mpptMaxCurrentA: 32, dcRatedVoltageV: 600 };
+  delete input[missing];
+  assert.equal(estimateMaxPvPowerKW(input), undefined, `sin ${missing} no hay estimación`);
+}
+// Si la ficha publica la FV máxima (kW o %), se usa y no se ofrece estimación.
+const published = normalizeDatasheetResponse({
+  equipmentType: "inverter", brand: "QA", modelSeries: "S",
+  variants: [
+    { modelCode: "KW", powerKW: 50, maxPvPowerKW: 75, mpptCount: 5, mpptMaxCurrentA: 32, dcRatedVoltageV: 600 },
+    { modelCode: "PCT", powerKW: 50, maxPvPowerPct: 150, mpptCount: 5, mpptMaxCurrentA: 32, dcRatedVoltageV: 600 },
+  ],
+});
+assert.equal(published.variants[0].maxPvPowerKW, 75);
+assert.equal(published.variants[1].maxPvPowerKW, 75);
+for (const v of published.variants) assert.equal(v.maxPvPowerEstimateKW, undefined);
+// Aceptar la estimación guarda el valor con su procedencia; un valor de la ficha la borra.
+const accepted = { ...solis.variants[0], maxPvPowerKW: 65, maxPvPowerSource: "estimated" as const, action: "create_new" as const };
+const estPlan = planDatasheetImport({ ...solis, variants: [accepted] }, []);
+assert.equal(estPlan.creates[0].item.maxPvPowerKW, 65);
+assert.equal(estPlan.creates[0].item.maxPvPowerSource, "estimated");
+assert.equal((estPlan.creates[0].item as any).maxPvPowerEstimateKW, undefined, "los datos auxiliares no llegan al catálogo");
+assert.equal((estPlan.creates[0].item as any).mpptMaxCurrentA, undefined);
+const rejected = planDatasheetImport({ ...solis, variants: [{ ...solis.variants[0], action: "create_new" as const }] }, []);
+assert.equal(rejected.creates[0].item.maxPvPowerKW, undefined);
+assert.equal(rejected.creates[0].item.maxPvPowerSource, undefined);
+const fromSheet = planDatasheetImport({ ...published, variants: [{ ...published.variants[0], action: "create_new" as const }] }, []);
+assert.equal(fromSheet.creates[0].item.maxPvPowerSource, undefined);
+// El esquema pide los datos de entrada DC.
+for (const key of ["mpptMaxCurrentA", "dcRatedVoltageV"])
+  assert(variantProps.properties[key]?.description, key);
 
 console.log("testDatasheetFamilySpecs: OK");

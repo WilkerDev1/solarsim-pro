@@ -98,6 +98,29 @@ function normalizeDimensionsText(text: string) {
   return formatDimensions(a, b, c);
 }
 
+/** Typical DC/AC ratio, deliberately conservative: a lower value only adds overload warnings, never hides them. */
+export const ESTIMATED_DC_AC_RATIO = 1.3;
+
+/**
+ * Optional estimate of an inverter's maximum PV power (kW) when the datasheet does not publish it:
+ * min(MPPT count × max current per MPPT × rated DC voltage, 1.3 × rated AC power), rounded to 0.1.
+ * Deterministic and local; any missing input means no estimate.
+ */
+export function estimateMaxPvPowerKW(input: {
+  powerKW?: number;
+  mpptCount?: number;
+  mpptMaxCurrentA?: number;
+  dcRatedVoltageV?: number;
+}): number | undefined {
+  const { powerKW, mpptCount, mpptMaxCurrentA, dcRatedVoltageV } = input;
+  const values = [powerKW, mpptCount, mpptMaxCurrentA, dcRatedVoltageV];
+  if (!values.every((n) => n !== undefined && Number.isFinite(n) && n > 0))
+    return undefined;
+  const byInput = (mpptCount! * mpptMaxCurrentA! * dcRatedVoltageV!) / 1000;
+  const byRatio = ESTIMATED_DC_AC_RATIO * powerKW!;
+  return Math.round(Math.min(byInput, byRatio) * 10) / 10;
+}
+
 function dimensionNumbers(text: unknown): [number, number, number] | null {
   if (typeof text !== "string") return null;
   const normalized = normalizeDimensionsText(text);
@@ -169,7 +192,11 @@ function missingFieldWarnings(
   const common: string[] = [];
   const perVariant = new Map<string, string[]>();
   for (const [key, label] of expectedFields[equipmentType] || []) {
-    const missing = variants.filter((v) => v[key] === undefined);
+    const missing = variants.filter(
+      (v) =>
+        v[key] === undefined &&
+        !(key === "maxPvPowerKW" && v.maxPvPowerEstimateKW !== undefined),
+    );
     if (!missing.length) continue;
     if (missing.length === variants.length) common.push(label);
     else
@@ -338,6 +365,24 @@ export function normalizeDatasheetResponse(
             `No se pudo calcular la FV máxima de ${label}: falta la potencia AC nominal.`,
           );
       }
+      if (equipmentType === "inverter") {
+        // Inputs for the optional estimate; they are not catalog fields.
+        for (const key of ["mpptMaxCurrentA", "dcRatedVoltageV"] as const) {
+          const n = readNumber(key);
+          if (n === undefined) continue;
+          if (n > 0) result[key] = n;
+          else discard(key, v[key]);
+        }
+        if (result.maxPvPowerKW === undefined) {
+          const estimate = estimateMaxPvPowerKW({
+            powerKW: result.powerKW,
+            mpptCount: result.mpptCount,
+            mpptMaxCurrentA: result.mpptMaxCurrentA,
+            dcRatedVoltageV: result.dcRatedVoltageV,
+          });
+          if (estimate !== undefined) result.maxPvPowerEstimateKW = estimate;
+        }
+      }
       if (
         equipmentType === "battery" &&
         result.capacityKWh === undefined &&
@@ -382,6 +427,10 @@ export function datasheetVariantPatch(
     if (variant[key] !== undefined) patch[key] = variant[key];
   for (const key of textFields)
     if (variant[key]?.trim()) patch[key] = variant[key];
+  // An accepted estimate is stored with its provenance; a published value clears an older mark.
+  if (variant.maxPvPowerKW !== undefined)
+    patch.maxPvPowerSource =
+      variant.maxPvPowerSource === "estimated" ? "estimated" : undefined;
   return patch;
 }
 

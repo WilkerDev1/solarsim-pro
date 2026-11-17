@@ -527,6 +527,12 @@ export const AIDatasheetScannerModal: React.FC = () => {
                         .map(([key, label]) => (
                           <label key={key} className="text-sm">
                             {label}
+                            {key === "maxPvPowerKW" &&
+                              v.maxPvPowerSource === "estimated" && (
+                                <strong className="ml-1 rounded bg-amber-100 px-1 text-xs text-amber-900">
+                                  estimado
+                                </strong>
+                              )}
                             <input
                               type="number"
                               step="any"
@@ -539,12 +545,49 @@ export const AIDatasheetScannerModal: React.FC = () => {
                                     event.target.value === ""
                                       ? undefined
                                       : Number(event.target.value),
+                                  // Typing a value replaces the estimate and its mark.
+                                  ...(key === "maxPvPowerKW"
+                                    ? { maxPvPowerSource: undefined }
+                                    : {}),
                                 })
                               }
                             />
                           </label>
                         ))}
                     </div>
+                    {data.equipmentType === "inverter" &&
+                      v.maxPvPowerEstimateKW !== undefined &&
+                      (v.maxPvPowerKW === undefined ||
+                        v.maxPvPowerSource === "estimated") && (
+                        <label className="ml-7 flex items-start gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            className="mt-1"
+                            checked={v.maxPvPowerSource === "estimated"}
+                            onChange={(event) =>
+                              edit(
+                                v.id,
+                                event.target.checked
+                                  ? {
+                                      maxPvPowerKW: v.maxPvPowerEstimateKW,
+                                      maxPvPowerSource: "estimated",
+                                    }
+                                  : {
+                                      maxPvPowerKW: undefined,
+                                      maxPvPowerSource: undefined,
+                                    },
+                              )
+                            }
+                          />
+                          <span>
+                            Usar estimación: {v.maxPvPowerEstimateKW} kW
+                            <small className="block opacity-75">
+                              Estimado a partir de MPPT, corriente y tensión de
+                              la ficha (la ficha no publica la FV máxima).
+                            </small>
+                          </span>
+                        </label>
+                      )}
                     <details className="ml-7 text-sm">
                       <summary className="cursor-pointer py-1 font-medium focus-visible:ring-2 focus-visible:ring-emerald-500">
                         Más especificaciones
