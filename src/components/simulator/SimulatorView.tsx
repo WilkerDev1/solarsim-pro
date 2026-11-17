@@ -221,44 +221,47 @@ export const SimulatorView: React.FC = () => {
         )}
 
         {/* Top Fixed View Selector Tabs */}
-        <div className="bg-white border-b border-slate-200 px-6 pt-3 pb-0 shrink-0 z-20 shadow-xs flex justify-between items-center">
-          <div className="flex gap-8">
+        <div className="bg-white border-b border-slate-200 px-4 lg:px-6 pt-3 pb-0 shrink-0 z-20 shadow-xs flex justify-between items-center gap-3">
+          <div className="flex gap-4 lg:gap-8 min-w-0 overflow-x-auto">
             <button
               onClick={() => setActiveMainTab('energia')}
-              className={`pb-3 text-sm font-bold transition-all relative cursor-pointer ${
+              className={`pb-3 text-sm font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
                 activeMainTab === 'energia'
                   ? 'text-emerald-800 font-extrabold border-b-2 border-emerald-700'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              Análisis de Energía
+              <span className="xl:hidden" title="Análisis de Energía">Energía</span>
+              <span className="hidden xl:inline">Análisis de Energía</span>
             </button>
 
             <button
               onClick={() => setActiveMainTab('cotizacion')}
-              className={`pb-3 text-sm font-bold transition-all relative cursor-pointer ${
+              className={`pb-3 text-sm font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
                 activeMainTab === 'cotizacion'
                   ? 'text-emerald-800 font-extrabold border-b-2 border-emerald-700'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              Cotización y Equipos
+              <span className="xl:hidden" title="Cotización y Equipos">Cotización</span>
+              <span className="hidden xl:inline">Cotización y Equipos</span>
             </button>
 
             <button
               onClick={() => setActiveMainTab('retorno')}
-              className={`pb-3 text-sm font-bold transition-all relative cursor-pointer ${
+              className={`pb-3 text-sm font-bold whitespace-nowrap shrink-0 transition-all relative cursor-pointer ${
                 activeMainTab === 'retorno'
                   ? 'text-emerald-800 font-extrabold border-b-2 border-emerald-700'
                   : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              Retorno de Inversión y Flujo 25 Años
+              <span className="xl:hidden" title="Retorno de Inversión y Flujo 25 Años">Retorno</span>
+              <span className="hidden xl:inline">Retorno de Inversión y Flujo 25 Años</span>
             </button>
           </div>
 
           {/* Right: Live Undo / Redo & Hub Jump */}
-          <div className="flex items-center gap-1.5 pb-2">
+          <div className="flex items-center gap-1.5 pb-2 shrink-0">
             <button
               type="button"
               onClick={undo}
@@ -267,7 +270,7 @@ export const SimulatorView: React.FC = () => {
               title="Deshacer último cambio (Ctrl+Z)"
             >
               <Undo2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Deshacer</span>
+              <span className="hidden xl:inline">Deshacer</span>
             </button>
 
             <button
@@ -278,7 +281,7 @@ export const SimulatorView: React.FC = () => {
               title="Rehacer cambio (Ctrl+Y)"
             >
               <Redo2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Rehacer</span>
+              <span className="hidden xl:inline">Rehacer</span>
             </button>
           </div>
         </div>

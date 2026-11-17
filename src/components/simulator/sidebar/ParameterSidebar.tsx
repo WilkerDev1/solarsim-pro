@@ -11,6 +11,7 @@ import { RatesParamsSection } from './RatesParamsSection';
 import { EquipmentParamsSection } from './EquipmentParamsSection';
 import { PricingParamsSection } from './PricingParamsSection';
 import { FinancialsParamsSection } from './FinancialsParamsSection';
+import { parameterSidebarCssWidth } from './sidebarWidth';
 
 interface ParameterSidebarProps {
   project: ProjectSimulation;
@@ -94,7 +95,7 @@ export const ParameterSidebar: React.FC<ParameterSidebarProps> = ({
     <>
       {/* Left Sidebar: Parameters */}
       <aside
-        style={{ width: `${Math.max(sidebarWidth || 380, 380)}px` }}
+        style={{ width: parameterSidebarCssWidth(sidebarWidth) }}
         className="flex flex-col shrink-0 h-full overflow-y-auto z-10 bg-pd-panel border-r border-pd-border shadow-sm transition-[background-color,border-color,color] duration-200"
       >
         <ParameterDockPanel

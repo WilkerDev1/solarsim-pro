@@ -196,7 +196,7 @@ export const PDFProposalView: React.FC = () => {
 
       {/* PDF Page Canvas */}
       <main
-        className={`flex-1 overflow-y-auto p-8 flex flex-col items-center gap-8 transition-colors bg-slate-300/80 dark:bg-[#0a0a0d]`}
+        className={`flex-1 min-w-0 overflow-auto p-4 lg:p-8 flex flex-col [align-items:safe_center] gap-8 transition-colors bg-slate-300/80 dark:bg-[#0a0a0d]`}
       >
         {/* Banner de Propuesta en Papelera (Modo Solo Lectura) */}
         {project.isDeleted && (
