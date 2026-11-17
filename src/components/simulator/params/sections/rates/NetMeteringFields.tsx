@@ -13,6 +13,8 @@ import {
 } from '../../../../../../shared/netMetering';
 import { CommitNumberField, Field, FieldMenu, InfoTip, ParamRow, SelectField } from '../../ui';
 import { exportFeeValue } from './ratesLogic';
+import { planSie007Upgrade } from '../../../../../domain/netMeteringUpgrade';
+import { Sie007UpgradeNotice } from './Sie007UpgradeNotice';
 
 export interface NetMeteringFieldsProps {
   rates: UtilityRates;
@@ -22,6 +24,8 @@ export interface NetMeteringFieldsProps {
   showRegimeSelector: boolean;
   /** Texto del InfoTip de la retención del régimen anterior. */
   exportTip: string;
+  /** Lo que escribiría «Aplicar tarifa oficial»: el aviso de actualización solo lo menciona, no lo aplica. */
+  officialReferencePatch?: Partial<UtilityRates>;
   updateRates: (rates: Partial<UtilityRates>) => void;
 }
 
@@ -33,13 +37,16 @@ const parseNumber = (raw: string) => parseFloat(raw) || 0;
  * por uso de la red SIE-007-2026 en RD$/kWh inyectado (editable, con el valor de fábrica a un clic y el aviso de
  * que es estimado). Componente aparte de `RatesFields` para que los cambios de tarifas queden localizados.
  */
-export const NetMeteringFields: React.FC<NetMeteringFieldsProps> = ({ rates, assumptions, showRegimeSelector, exportTip, updateRates }) => {
+export const NetMeteringFields: React.FC<NetMeteringFieldsProps> = ({ rates, assumptions, showRegimeSelector, exportTip, officialReferencePatch, updateRates }) => {
   const regime = assumptions.netMeteringRegime;
   const zeroExport = !!rates.isZeroExport;
   const factory = factoryGridUseCharge(rates.distributor);
   const charge = assumptions.gridUseChargeDOPPerKWh;
   const isFactory = Math.abs(charge - factory.dopPerKWh) < 0.005;
   const applies = gridUseChargeApplies(rates);
+  // Fase 7: actualizar una propuesta del régimen anterior. Si la organización oculta el selector, tampoco se ofrece:
+  // la política decide quién cambia el régimen en el dock, y sin selector no habría vuelta atrás al régimen anterior.
+  const upgrade = showRegimeSelector ? planSie007Upgrade(rates, officialReferencePatch) : null;
   const chargeTip = !applies
     ? zeroExport
       ? 'Inyección cero activa: no se inyecta energía a la red, por lo que no hay cargo por uso de red.'
@@ -58,6 +65,7 @@ export const NetMeteringFields: React.FC<NetMeteringFieldsProps> = ({ rates, ass
           />
         </ParamRow>
       )}
+      {upgrade && <Sie007UpgradeNotice plan={upgrade} updateRates={updateRates} />}
       {regime === 'sie007_2026' ? (
         <>
           {applies ? (

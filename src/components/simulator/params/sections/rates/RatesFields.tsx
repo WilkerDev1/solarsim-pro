@@ -208,7 +208,7 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
       )}
       {/* Sistema aislado: sin inyección no hay régimen, retención ni cargo por uso de la red; no se muestran. */}
       {!offGrid && (
-        <NetMeteringFields rates={rates} assumptions={assumptions} showRegimeSelector={showRegimeSelector} exportTip={exportTip} updateRates={updateRates} />
+        <NetMeteringFields rates={rates} assumptions={assumptions} showRegimeSelector={showRegimeSelector} exportTip={exportTip} officialReferencePatch={planApplyReference(context)} updateRates={updateRates} />
       )}
       {!offGrid && <TariffValuationPanel project={project} calculationMode={calculationMode} updateRates={updateRates} />}
       {projectionEnabled && (

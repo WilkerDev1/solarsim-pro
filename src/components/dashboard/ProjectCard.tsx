@@ -21,6 +21,7 @@ import { ProjectActionsMenu } from "./ProjectActionsMenu";
 import { ProposalClientBadge } from "../clients/ProposalClientLink";
 import { projectSyncLabel, projectType } from "./projectPresentation";
 import { ProposalDates } from "./ProposalDates";
+import { LegacyRegimeBadge } from "../../features/proposals/LegacyRegimeBadge";
 
 export const ProjectCard: React.FC<{ project: ProjectSimulation }> = ({
   project,
@@ -77,6 +78,7 @@ export const ProjectCard: React.FC<{ project: ProjectSimulation }> = ({
         </button>
       </h3>
       <ProposalClientBadge project={project} />
+      <LegacyRegimeBadge project={project} className="mt-2" />
       <p className="mt-2 flex items-start gap-1.5 text-xs text-slate-500 dark:text-zinc-400">
         <MapPin className="h-3.5 w-3.5 shrink-0" />
         {project.client.province || project.client.location || "Sin ubicación"}

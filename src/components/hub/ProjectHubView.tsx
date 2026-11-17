@@ -17,6 +17,7 @@ import {
 } from "../../utils/equipmentSpecsUtils";
 import { projectSyncLabel } from "../dashboard/projectPresentation";
 import { ProposalDates } from "../dashboard/ProposalDates";
+import { LegacyRegimeBadge } from "../../features/proposals/LegacyRegimeBadge";
 import { ProposalHistory } from "./components/ProposalHistory";
 import { ProposalEnergyOverview } from "./components/ProposalEnergyOverview";
 import "./project-summary.css";
@@ -101,6 +102,8 @@ export const ProjectHubView = () => {
           <div className="summary-title">
             <h1>{project.client.name || "Propuesta sin nombre"}</h1>
             <span>{project.client.projectId || "Sin código"}</span>
+            {/* Envuelta: `.summary-title > span` pisaría el color y el tamaño de la insignia. */}
+            <div><LegacyRegimeBadge project={project} /></div>
           </div>
           <p>
             <MapPin size={14} />
