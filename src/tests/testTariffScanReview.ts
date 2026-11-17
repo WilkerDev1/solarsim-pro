@@ -45,11 +45,13 @@ const edesurCuadro = {
   const summary = summarizeTariffScan(review);
   assert.match(summary, /[Ss]in cambios de precio/);
   assert.match(summary, /SIE-121-2026-TF/);
-  // Tarifa nueva: se muestra como nueva y no se aplica por defecto.
-  const fresh = review.rows.filter((row) => row.status === 'new');
-  assert.deepEqual(fresh.map((row) => `${row.distributor}/${row.code}`), ['EDESUR/BTS-VE']);
+  // Tarifa que SolarSim no soporta todavía: se muestra (informativa) y se descarta; nunca se incorpora.
+  const unsupported = review.rows.filter((row) => row.status === 'unsupported');
+  assert.deepEqual(unsupported.map((row) => `${row.distributor}/${row.code}`), ['EDESUR/BTS-VE']);
+  assert.equal(unsupported[0].name, 'BTS-VE (recarga de vehículos eléctricos)');
   assert.match(summary, /BTS-VE/);
-  assert.match(summary, /nueva/);
+  assert.match(summary, /no soportada todavía por SolarSim/);
+  assert.match(summary, /no se incorpora/);
 
   // Sin decidir procedencia (resolución vacía) no se aplica.
   assert.throws(() => applyTariffScanReview(review, { kind: 'resolution', resolutionCode: '  ', effectiveDate: '2026-11-01' }), /resolución/);
@@ -57,7 +59,7 @@ const edesurCuadro = {
   assert.throws(() => applyTariffScanReview(review, { kind: 'distributor_table', period: '' }), /vigencia/);
   assert.throws(() => applyTariffScanReview(review, { kind: 'distributor_table', period: '2026-13' }), /vigencia/);
 
-  // 2. Con resolución tecleada por el usuario: se aplica con esa procedencia; la tarifa nueva queda fuera salvo opt-in.
+  // 2. Con resolución tecleada por el usuario: se aplica con esa procedencia; la tarifa no soportada queda fuera.
   const applied = applyTariffScanReview(review, { kind: 'resolution', resolutionCode: 'SIE-121-2026-TF', effectiveDate: '2026-11-01' });
   assert.equal(applied.resolutionCode, 'SIE-121-2026-TF');
   assert.equal(applied.effectiveDate, '2026-11-01');
@@ -65,13 +67,11 @@ const edesurCuadro = {
   assert.equal(applied.schedules.EDESUR.tariffs.BTS1.source?.resolutionCode, 'SIE-121-2026-TF');
   assert.equal(applied.schedules.EDESUR.tariffs.BTS1.source?.effectiveDate, '2026-11-01');
   assert.equal(applied.schedules.EDESUR.tariffs.BTS1.baseEnergyRateDOP, 13.09);
-  assert.equal(applied.schedules.EDESUR.tariffs['BTS-VE'], undefined, 'la tarifa nueva no se aplica por defecto');
+  assert.equal(applied.schedules.EDESUR.tariffs['BTS-VE'], undefined, 'la tarifa no soportada no se incorpora');
+  assert.equal(applied.schedules.EDESUR.tariffs.BTSVE, undefined, 'tampoco con la clave normalizada');
+  assert.equal(applyTariffScanReview.length, 2, 'no hay opción para activar tarifas no soportadas');
   assert.match(applied.notes ?? '', /indicada por el usuario/, 'la procedencia tecleada queda declarada en las notas');
   assert.equal(DEFAULT_RD_TARIFF_MATRIX.schedules.EDESUR.tariffs['BTS-VE'], undefined, 'no muta la matriz de fábrica');
-
-  const optIn = applyTariffScanReview(review, { kind: 'resolution', resolutionCode: 'SIE-121-2026-TF', effectiveDate: '2026-11-01' }, ['EDESUR/BTS-VE']);
-  assert.equal(optIn.schedules.EDESUR.tariffs['BTS-VE'].baseEnergyRateDOP, 11.5, 'opt-in: se incorpora con la procedencia elegida');
-  assert.equal(optIn.schedules.EDESUR.tariffs['BTS-VE'].source?.resolutionCode, 'SIE-121-2026-TF');
 
   // 3. Marcado como cuadro de la distribuidora sin resolución citada, con vigencia mes/año obligatoria.
   const table = applyTariffScanReview(review, { kind: 'distributor_table', period: '2026-11' });
@@ -113,21 +113,39 @@ const edesurCuadro = {
   assert.match(review.suggestion!.reason, /periodo/);
 }
 
-// Solo tarifas nuevas sin activar: no hay nada que aplicar (mensaje claro, no el genérico).
+// Solo tarifas no soportadas: nada que aplicar, con mensaje claro (no el genérico). Una fila no soportada mal formada no
+// bloquea la revisión: se descarta sin validarse.
 {
-  const onlyNew = { ...edesurCuadro, schedules: { EDESUR: { tariffs: { 'BTS-VE': bvte } } } };
-  const review = prepareTariffScanReview(onlyNew, DEFAULT_RD_TARIFF_MATRIX);
-  assert.throws(() => applyTariffScanReview(review, { kind: 'distributor_table', period: '2026-11' }), /tarifas nuevas/);
-  assert.ok(applyTariffScanReview(review, { kind: 'distributor_table', period: '2026-11' }, ['EDESUR/BTS-VE']).schedules.EDESUR.tariffs['BTS-VE']);
+  const onlyUnsupported = { ...edesurCuadro, schedules: { EDESUR: { tariffs: { 'BTS-VE': bvte, 'BTS VE2': { code: 'BTS VE2', currency: 'DOP' } } } } };
+  const review = prepareTariffScanReview(onlyUnsupported, DEFAULT_RD_TARIFF_MATRIX);
+  assert.deepEqual(review.rows.map((row) => row.status), ['unsupported', 'unsupported']);
+  assert.throws(() => applyTariffScanReview(review, { kind: 'distributor_table', period: '2026-11' }), /no soportadas todavía por SolarSim/);
+  assert.match(summarizeTariffScan(review), /[Nn]ada que aplicar/);
 }
 
-// Códigos escritos con guion (BTS-1) se casan con la fila existente; no se crean filas duplicadas como «nuevas».
+// Códigos comparados siempre normalizados (BTS-1, «bts 2», CEPM RBT1): se casan con la fila existente, sin duplicados.
 {
-  const hyphen = { ...edesurCuadro, schedules: { EDESUR: { tariffs: { 'BTS-1': { ...edesurTariffs.BTS1, code: 'BTS-1' } } } } };
+  const hyphen = { ...edesurCuadro, schedules: { EDESUR: { tariffs: { 'BTS-1': { ...edesurTariffs.BTS1, code: 'BTS-1' }, 'bts 2': { ...edesurTariffs.BTS2, code: 'bts 2' } } } } };
   const review = prepareTariffScanReview(hyphen, DEFAULT_RD_TARIFF_MATRIX);
-  assert.deepEqual(review.rows.map((row) => [row.code, row.status]), [['BTS1', 'unchanged']]);
+  assert.deepEqual(review.rows.map((row) => [row.code, row.status]), [['BTS1', 'unchanged'], ['BTS2', 'unchanged']]);
   const applied = applyTariffScanReview(review, review.defaultDecision);
   assert.equal(applied.schedules.EDESUR.tariffs['BTS-1'], undefined);
+  assert.equal(applied.schedules.EDESUR.tariffs['bts 2'], undefined);
+  const cepm = prepareTariffScanReview({ ...edesurCuadro, schedules: { CEPM: { tariffs: { RBT1: { code: 'RBT1', currency: 'DOP', baseEnergyRateDOP: 22.9, fixedChargeDOP: DEFAULT_RD_TARIFF_MATRIX.schedules.CEPM.tariffs['RBT-1'].fixedChargeDOP } } } } }, DEFAULT_RD_TARIFF_MATRIX);
+  assert.deepEqual(cepm.rows.map((row) => [row.code, row.status]), [['RBT-1', 'unchanged']]);
+}
+
+// Sugerencia por coincidencia de valores: solo resoluciones reales, nunca marcadores internos de procedencia.
+{
+  const firstTable = applyTariffScanReview(prepareTariffScanReview({ ...edesurCuadro, effectiveDate: '2026-10-01' }, DEFAULT_RD_TARIFF_MATRIX), { kind: 'distributor_table', period: '2026-10' });
+  assert.match(firstTable.schedules.EDESUR.tariffs.BTS1.source!.resolutionCode, /sin resolución citada/);
+  const again = prepareTariffScanReview({ ...edesurCuadro, effectiveDate: null }, firstTable);
+  assert.equal(again.priceChanges, false);
+  assert.equal(again.suggestion, undefined, 'no prellena «Cuadro de EDESUR sin resolución citada (2026-10)»');
+  assert.deepEqual(again.defaultDecision, { kind: 'distributor_table', period: '' });
+  const marked = structuredClone(DEFAULT_RD_TARIFF_MATRIX);
+  for (const tariff of Object.values(marked.schedules.EDESUR.tariffs)) tariff.source = { resolutionCode: 'Catálogo anterior (no confirmado)', effectiveDate: '2026-01-01', publishedBy: 'X' };
+  assert.equal(prepareTariffScanReview({ ...edesurCuadro, schedules: { EDESUR: { tariffs: edesurTariffs } } }, marked).suggestion, undefined, 'no prellena «Catálogo anterior (no confirmado)»');
 }
 
 // Documento con resolución y fecha: no pide procedencia y se aplica con la del documento.
@@ -162,10 +180,25 @@ assert.throws(() => prepareTariffScanReview({ ...disguised, country: 'Argentina'
 assert.throws(() => prepareTariffScanReview({ ...disguised, country: null, regulator: null }, DEFAULT_RD_TARIFF_MATRIX), /T1-R1/, 'códigos no dominicanos');
 // Moneda del documento de otro país.
 assert.throws(() => prepareTariffScanReview({ ...edesurCuadro, currency: 'ARS' }, DEFAULT_RD_TARIFF_MATRIX), /ARS/);
-// Lo dominicano pasa: país por nombre, regulador SIE o CNE, o sin declarar.
-for (const ok of [{ country: 'República Dominicana', regulator: 'Superintendencia de Electricidad (SIE)' }, { country: 'DO', regulator: 'CNE' }, { country: null, regulator: null, currency: null }]) {
-  assert.doesNotThrow(() => assertDominicanTariffOrigin({ ...edesurCuadro, ...ok }));
+// Una cadena observada larga no cuenta como «no observada»: falla el origen.
+assert.throws(() => assertDominicanTariffOrigin({ ...edesurCuadro, currency: `Pesos Argentinos (ARS)${' '.repeat(30)}según cuadro tarifario vigente` }), /Pesos Argentinos/);
+assert.throws(() => assertDominicanTariffOrigin({ ...edesurCuadro, country: `Argentina ${'x'.repeat(150)}` }), /Argentina/);
+assert.throws(() => assertDominicanTariffOrigin({ ...edesurCuadro, regulator: `Ente Nacional Regulador del Gas y la Electricidad (ENReGE) ${'x'.repeat(250)}` }), /ENReGE/);
+// Regulador claramente extranjero rechaza aunque falte el país o sea RD.
+for (const foreign of ['ENRE', 'ENReGE', 'CREG', 'CRE', 'Comisión Reguladora de Energía (CRE)', 'OSINERGMIN']) {
+  assert.throws(() => assertDominicanTariffOrigin({ ...edesurCuadro, country: null, regulator: foreign }), originError, `regulador ${foreign}`);
 }
+assert.throws(() => assertDominicanTariffOrigin({ ...edesurCuadro, country: 'DO', regulator: 'ENRE' }), originError);
+// Lo dominicano pasa: país por nombre, regulador SIE o CNE, o sin declarar; y reguladores/emisores dominicanos distintos de SIE/CNE.
+for (const ok of [
+  { country: 'República Dominicana', regulator: 'Superintendencia de Electricidad (SIE)' }, { country: 'DO', regulator: 'CNE' }, { country: null, regulator: null, currency: null },
+  { country: 'DO', regulator: 'Ministerio de Energía y Minas' }, { country: null, regulator: 'EDESUR Dominicana' }, { country: 'República Dominicana', regulator: 'Dirección Comercial' },
+  { currency: 'RD$' }, { currency: 'Pesos dominicanos (DOP)' },
+]) {
+  assert.doesNotThrow(() => assertDominicanTariffOrigin({ ...edesurCuadro, ...ok }), JSON.stringify(ok));
+}
+// Con país de otro lugar, cualquier regulador rechaza.
+assert.throws(() => assertDominicanTariffOrigin({ ...edesurCuadro, country: 'AR', regulator: 'Dirección Comercial' }), originError);
 
 // Por el servicio: el prompt pide país, regulador y moneda observados; la respuesta argentina se rechaza por origen y la
 // dominicana sin resolución vuelve como revisión (no lanza).
@@ -186,6 +219,12 @@ for (const ok of [{ country: 'República Dominicana', regulator: 'Superintendenc
   // La ruta estricta (sin revisión) sigue exigiendo la resolución del documento.
   await assert.rejects(GeminiTariffService.extractTariffMatrixFromDocument({ ...base, transport: answer(edesurCuadro) }), /resolución/);
   await assert.rejects(GeminiTariffService.extractTariffMatrixFromDocument({ ...base, transport: answer(argentina) }), originError);
+  // …y el emisor: sin publishedBy rechaza como antes, aunque traiga resolución y fecha.
+  const cited = { ...edesurCuadro, resolutionCode: 'SIE-130-2026-TF' };
+  await assert.rejects(GeminiTariffService.extractTariffMatrixFromDocument({ ...base, transport: answer({ ...cited, publishedBy: null }) }), /entidad emisora/);
+  await assert.rejects(GeminiTariffService.extractTariffMatrixFromDocument({ ...base, transport: answer({ ...cited, publishedBy: '   ' }) }), /entidad emisora/);
+  const strict = await GeminiTariffService.extractTariffMatrixFromDocument({ ...base, transport: answer(cited) });
+  assert.equal(strict.schedules.EDESUR.tariffs['BTS-VE'], undefined);
 }
 
 console.log('PASS escáner de resoluciones: cuadro sin resolución, sin cambios, tarifas nuevas opt-in y rechazo por origen');
