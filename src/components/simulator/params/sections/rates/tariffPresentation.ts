@@ -15,6 +15,7 @@ import {
   proposalBillingTariff,
   resolveAnnualCreditSettlementDOPPerKWh,
   resolveEnergyValuationMethod,
+  tariffPricePresentation,
   type EnergyValuationMethod,
 } from '../../../../../../shared/tariffBilling';
 import type { EnergyCalculationMode } from '../../../../../../shared/applicationFeatures';
@@ -56,6 +57,34 @@ export function describeValuationMethod(rates: UtilityRates): ValuationMethodVie
   else if (!proposalBillingTariff(rates)) detail = 'La propuesta no guarda la fila de esta tarifa (código desconocido, tarifa en US$ o tarifa cambiada). «Aplicar tarifa oficial» la guarda.';
   else detail = 'Sin procedencia del precio guardada (propuesta anterior): se valora al precio por kWh.';
   return { method, label, detail };
+}
+
+/**
+ * Precio de energía que muestra el campo de la revisión del borrador: la referencia de la matriz (promedio por bloques del
+ * mes promedio, sin redondear) se presenta con 2 decimales; un precio de factura o tecleado, tal cual. Solo presentación:
+ * el escalar guardado conserva su precisión (como `referenceRatesPatch`).
+ */
+export function draftEnergyRateDisplayDOP(draft: { energyRateSource?: string; energyCostPerKWhDOP?: number }): number | undefined {
+  const value = draft.energyCostPerKWhDOP;
+  if (value === undefined || !Number.isFinite(value)) return undefined;
+  return draft.energyRateSource === 'reference' ? Math.round(value * 100) / 100 : value;
+}
+
+/**
+ * Nota de la revisión del borrador bajo «Tarifa de energía» cuando la propuesta se factura por bloques escalonados: tarifa,
+ * resolución, precio medio de la energía en el año (`tariffPricePresentation`, la misma decisión del motor) y qué es el
+ * precio del campo (`fieldDOP`). `null` en otro caso.
+ */
+export function blockValuationNote(rates: UtilityRates, monthlyConsumptionKWh: readonly number[], fieldDOP?: number): string | null {
+  const presentation = tariffPricePresentation(rates, monthlyConsumptionKWh);
+  const tariff = presentation.method === 'block_billing' ? proposalBillingTariff(rates) : undefined;
+  if (!tariff || !hasEnergyBlocks(tariff)) return null;
+  const average = presentation.averageDOPPerKWh;
+  return [
+    `Se valora mes a mes con los bloques oficiales de ${tariff.tariffCode} (${tariff.resolutionCode ?? 'fila guardada'}).`,
+    average !== undefined ? `Precio medio de la energía en el año: RD$${average.toFixed(2)}/kWh (sin cargo fijo).` : '',
+    fieldDOP !== undefined && Number.isFinite(fieldDOP) ? `El campo de arriba (RD$${fieldDOP.toFixed(2)}/kWh) es el precio por bloques del mes promedio y solo sirve de referencia.` : '',
+  ].filter(Boolean).join(' ');
 }
 
 // ── Desglose de la factura mensual estimada ──

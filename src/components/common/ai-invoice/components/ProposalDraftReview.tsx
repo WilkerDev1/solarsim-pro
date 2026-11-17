@@ -4,7 +4,8 @@ import { ProposalCommercialReview } from './ProposalCommercialReview';
 import { ProposalDocumentTextsReview } from './ProposalDocumentTextsReview';
 import type { AIProposalContext, AIProposalIssue } from '../../../../../shared/aiProposal';
 import { resolveAssumption } from '../../../../../shared/assumptions';
-import type { FinancialSummaryResult } from '../../../../types';
+import type { FinancialSummaryResult, UtilityRates } from '../../../../types';
+import { blockValuationNote, draftEnergyRateDisplayDOP } from '../../../simulator/params/sections/rates/tariffPresentation';
 import { AlertOctagon, AlertTriangle, ArrowRight, CheckCircle2, PackageOpen, Plus, Trash2 } from 'lucide-react';
 import type { ExtractedInvoiceData } from '../../../../types/aiInvoice';
 import type { SolarEquipmentItem } from '../../../../types/equipment';
@@ -21,7 +22,7 @@ interface Props {
   matrix: GlobalTariffMatrix;
   context: AIProposalContext;
   production:number[]|null;
-  preview: {financial:FinancialSummaryResult;project?:{specs:unknown}} | null;
+  preview: {financial:FinancialSummaryResult;project?:{specs:unknown;rates?:UtilityRates;monthlyConsumption?:number[]}} | null;
   update: (updates: Partial<ExtractedInvoiceData>) => void;
   /** Avisos vigentes del borrador (validación + conciliación); sólo se presentan. */
   issues?: readonly AIProposalIssue[];
@@ -47,6 +48,9 @@ export function ProposalDraftReview({draft,catalog,matrix,context,preview,produc
   const go=(target:IssueTarget)=>{if(target.tab)setTab(target.tab);requestAnimationFrame(()=>focusReviewAnchor(target.anchor));};
   const tariff = resolveAITariffSelection(matrix,draft.distributor,draft.tariffCode);
   const source = tariff ? getTariffSource(matrix,tariff) : null;
+  // Con facturación por bloques (la misma decisión del motor sobre la propuesta de la vista previa) se explica cómo se valora.
+  const rateDisplay = draftEnergyRateDisplayDOP(draft);
+  const blockNote = preview?.project?.rates ? blockValuationNote(preview.project.rates,preview.project.monthlyConsumption ?? draft.monthlyConsumptionKWh,rateDisplay) : null;
   const setRate = (value:string) => {
     const dop = value === '' ? undefined : Number(value);
     update({energyRateSource:dop===undefined?"reference":"manual",energyCostPerKWhDOP:dop,energyCostPerKWhUSD:dop===undefined ? undefined : dop/resolveAssumption('dopExchangeRate', draft.dopExchangeRate)});
@@ -98,10 +102,11 @@ export function ProposalDraftReview({draft,catalog,matrix,context,preview,produc
         <label>NIC / contrato<input value={draft.nic || ''} onChange={e=>update({nic:e.target.value})}/></label>
         <Field anchor={reviewAnchor.field('distributor')} label="Distribuidora" issues={at(reviewAnchor.field('distributor'))}><select value={draft.distributor || ''} onChange={e=>update({distributor:e.target.value as ExtractedInvoiceData['distributor'],tariffCode:'',energyCostPerKWhDOP:undefined,energyCostPerKWhUSD:undefined,energyRateSource:'reference'})}><option value="">Selecciona distribuidora</option>{Object.keys(matrix.schedules).map(d=><option key={d}>{d}</option>)}</select></Field>
         <Field anchor={reviewAnchor.field('tariffCode')} label="Tarifa" issues={at(reviewAnchor.field('tariffCode'))}><select value={draft.tariffCode || ''} onChange={e=>update({tariffCode:e.target.value,energyCostPerKWhDOP:undefined,energyCostPerKWhUSD:undefined,energyRateSource:'reference'})}><option value="">Selecciona tarifa</option>{Object.values(matrix.schedules[draft.distributor]?.tariffs || {}).map(t=><option key={t.code} value={t.code}>{t.code} · {t.name}</option>)}</select></Field>
-        <Field anchor={reviewAnchor.field('energyRate')} label="Tarifa de energía (RD$/kWh)" issues={at(reviewAnchor.field('energyRate'))}><input type="number" min="0" step="0.0001" value={draft.energyCostPerKWhDOP ?? ''} onChange={e=>setRate(e.target.value)}/></Field>
+        <Field anchor={reviewAnchor.field('energyRate')} label="Tarifa de energía (RD$/kWh)" issues={at(reviewAnchor.field('energyRate'))}><input type="number" min="0" step="0.0001" value={rateDisplay ?? ''} onChange={e=>setRate(e.target.value)}/></Field>
         <Field anchor={reviewAnchor.field('exchange')} label="Cambio (RD$ por USD)" issues={at(reviewAnchor.field('exchange'))}><input type="number" min="1" step="0.01" value={resolveAssumption('dopExchangeRate', draft.dopExchangeRate)} onChange={e=>{const rate=Number(e.target.value);if(rate>0)update({dopExchangeRate:rate,energyCostPerKWhUSD:draft.energyCostPerKWhDOP===undefined?undefined:draft.energyCostPerKWhDOP/rate});}}/></Field>
       </div>
-      {source && <p className="proposal-note">Referencia de catálogo: {source.resolutionCode} · desde {source.effectiveDate}. Confirma que corresponde al período de la factura. Los cargos fijos y de demanda no son tarifa de energía.</p>}
+      {blockNote ? <p className="proposal-note">{blockNote}</p>
+      : source && <p className="proposal-note">Referencia de catálogo: {source.resolutionCode} · desde {source.effectiveDate}. Confirma que corresponde al período de la factura. Los cargos fijos y de demanda no son tarifa de energía.</p>}
     {source?.fieldSources && <p className="proposal-note">Procedencia por campo: {Object.entries(source.fieldSources).map(([field,s])=>`${tariffSourceFieldLabel(field)}: ${s.resolutionCode}`).join(' · ')}</p>}
     </section>
     </div><div role="tabpanel" id="proposal-tab-consumption" aria-labelledby="proposal-label-consumption" hidden={tab!=='consumption'}><ProposalConsumptionReview draft={draft} context={context} production={production} update={update} issues={views}/></div>
