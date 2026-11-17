@@ -9,6 +9,7 @@ import {
 
 import { fieldDisplayValue } from '../components/simulator/params/ui/Field';
 import { FieldMenu, fieldMenuKey } from '../components/simulator/params/ui/FieldMenu';
+import { computeTipPosition } from '../components/simulator/params/ui/infoTipPosition';
 import { commitStepperDraft } from '../components/simulator/params/ui/Stepper';
 import { nextRadioIndex } from '../components/simulator/params/ui/ToggleGroup';
 
@@ -321,10 +322,25 @@ const render = (node: React.ReactElement) => renderToStaticMarkup(node);
   assert.match(html, /aria-describedby="([^"]+)"/);
   const id = html.match(/aria-describedby="([^"]+)"/)![1];
   assert.match(html, new RegExp(`role="tooltip"[^>]*id="${id.replace(/[:]/g, '\\$&')}"|id="${id.replace(/[:]/g, '\\$&')}"[^>]*role="tooltip"`));
-  assert.match(html, /group-hover:visible/);
-  assert.match(html, /group-focus-within:visible/);
-  assert.match(html, /invisible/);
+  assert.match(html, /\bfixed\b/, 'posición fija: no lo recorta el overflow del dock');
+  assert.match(html, /invisible/, 'cerrado por defecto');
   assert.match(html, /Ley 57-07: crédito del 40% sobre equipos en 3 cuotas\.<\/span>/);
+}
+
+// --- InfoTip: posición pura, acotada a la ventana y volteable ---
+{
+  const vp = { width: 1280, height: 800 };
+  const tip = { width: 256, height: 80 };
+  const at = (left: number, top: number) => ({ left, top, right: left + 20, bottom: top + 20 });
+  const mid = computeTipPosition(at(600, 400), tip, vp);
+  assert.deepEqual([mid.left, mid.top, mid.placement], [364, 314, 'top'], 'alineado a la derecha del icono, arriba');
+  assert.equal(computeTipPosition(at(70, 400), tip, vp).left, 8, 'cerca del borde izquierdo: acotado a 8 px');
+  const nearRight = computeTipPosition(at(1270, 400), tip, vp);
+  assert.ok(nearRight.left + tip.width <= vp.width - 8, 'cerca del borde derecho: dentro de la ventana');
+  const nearTop = computeTipPosition(at(600, 20), tip, vp);
+  assert.equal(nearTop.placement, 'bottom', 'sin sitio arriba: se voltea');
+  assert.equal(nearTop.top, 46, 'debajo del icono con 6 px de separación');
+  assert.equal(computeTipPosition(at(10, 10), tip, { width: 200, height: 800 }).left, 8, 'ventana más estrecha que el tooltip');
 }
 
 // --- Dark mode lives in the tokens: no component hardcodes a palette color or reads isDark ---
