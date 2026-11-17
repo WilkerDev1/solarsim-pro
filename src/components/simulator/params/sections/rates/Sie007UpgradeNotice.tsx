@@ -17,6 +17,7 @@ export const Sie007UpgradeNotice: React.FC<Sie007UpgradeNoticeProps> = ({ plan, 
   const chargeText = plan.seedsFactoryCharge
     ? `Se aplicará el cargo de fábrica de ${charge} (${plan.factory.resolutionCode}, ${plan.factory.period}), estimado.`
     : `Se conserva el cargo guardado de ${charge}.`;
+  const descId = React.useId();
   const explanation = [
     SIE007_UPGRADE_NOTICE,
     [
@@ -27,15 +28,17 @@ export const Sie007UpgradeNotice: React.FC<Sie007UpgradeNoticeProps> = ({ plan, 
     ].filter(Boolean).join(' '),
   ].join('\n');
   return (
-    <div data-sie007-upgrade role="note" className="flex items-center gap-1.5">
+    <div data-sie007-upgrade className="flex items-center gap-1.5">
       <button
         type="button"
+        aria-describedby={`${descId}-hint`}
         onClick={() => updateRates(plan.patch)}
         className="flex h-7 cursor-pointer items-center justify-center rounded-md border border-pd-accent bg-transparent px-2.5 text-[12px] font-semibold text-pd-accent"
       >
         Actualizar a SIE-007-2026
       </button>
-      <InfoTip text={explanation} />
+      <span id={`${descId}-hint`} className="sr-only">Cambia la propuesta al régimen SIE-007-2026 (cargo por kWh inyectado); se puede deshacer.</span>
+      <InfoTip label="Más información: actualizar a SIE-007-2026" text={explanation} />
     </div>
   );
 };

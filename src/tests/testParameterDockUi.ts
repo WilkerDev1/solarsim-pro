@@ -315,10 +315,13 @@ const render = (node: React.ReactElement) => renderToStaticMarkup(node);
   assert.doesNotMatch(noBess, /bg-pd-bess/);
 }
 
-// --- InfoTip: icon button whose aria-label is the full text, plus a tooltip described by it ---
+// --- InfoTip: icon button with a short aria-label, tooltip (full text) described by it ---
 {
   const html = render(h(InfoTip, { text: 'Ley 57-07: crédito del 40% sobre equipos en 3 cuotas.' }));
-  assert.match(html, /<button[^>]*aria-label="Ley 57-07: crédito del 40% sobre equipos en 3 cuotas\."/);
+  assert.match(html, /<button[^>]*aria-label="Más información"/, 'nombre accesible corto');
+  assert.doesNotMatch(html, /aria-label="[^"]*Ley 57-07/, 'el texto largo no se repite en el aria-label');
+  assert.match(render(h(InfoTip, { text: 'x', label: 'Más información: Cargo' })), /aria-label="Más información: Cargo"/, 'etiqueta contextual opcional');
+  assert.match(render(h(ParamRow, { label: 'Cargo', htmlFor: 'c', hint: h(InfoTip, { text: 'x' }) }, h('input', { id: 'c' }))), /<label[^>]*>Cargo<\/label>.*role="tooltip"/, 'el ⓘ de ParamRow va junto a la etiqueta, fuera del control');
   assert.match(html, /aria-describedby="([^"]+)"/);
   const id = html.match(/aria-describedby="([^"]+)"/)![1];
   assert.match(html, new RegExp(`role="tooltip"[^>]*id="${id.replace(/[:]/g, '\\$&')}"|id="${id.replace(/[:]/g, '\\$&')}"[^>]*role="tooltip"`));

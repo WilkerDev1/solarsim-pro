@@ -180,7 +180,7 @@ const renderRates = (p: ProjectSimulation, showRegimeSelector = true) =>
   assert.match(html, /RD\$3\.78/, 'menciona el cargo de fábrica que se sembrará');
   assert.match(html, /Aplicar tarifa oficial/, 'menciona que «Aplicar tarifa oficial» existe');
   assert.match(html, /EDESUR/, 'cita el comunicado de EDESUR (en el tooltip)');
-  assert.match(html, /data-sie007-upgrade[^>]*>.{0,200}Actualizar a SIE-007-2026/s, 'botón en una línea compacta');
+  assert.match(html, /data-sie007-upgrade[^>]*>.{0,400}Actualizar a SIE-007-2026/s, 'botón en una línea compacta');
   assert.doesNotMatch(html, /data-sie007-upgrade[^>]*(border|rounded-md border|space-y)/, 'sin recuadro grande');
 }
 assert.doesNotMatch(renderRates(project({ netMeteringRegime: 'sie007_2026', gridUseChargeDOPPerKWh: 3.78 })), /data-sie007-upgrade/, 'SIE-007-2026: sin aviso');

@@ -68,7 +68,11 @@ export const NetMeteringFields: React.FC<NetMeteringFieldsProps> = ({ rates, ass
       {regime === 'sie007_2026' ? (
         <>
           {applies ? (
-            <ParamRow label="Cargo uso de red" htmlFor="pd-rates-grid-charge">
+            <ParamRow
+              label="Cargo uso de red"
+              htmlFor="pd-rates-grid-charge"
+              hint={<InfoTip label="Más información: Cargo uso de red" text={`${GRID_USE_CHARGE_ESTIMATE_NOTICE} ${factory.resolutionCode}, ${factory.period}.\n${chargeTip}`} />}
+            >
               <CommitNumberField
                 id="pd-rates-grid-charge"
                 step="0.01"
@@ -79,8 +83,6 @@ export const NetMeteringFields: React.FC<NetMeteringFieldsProps> = ({ rates, ass
                 value={charge}
                 onCommit={(value) => updateRates({ gridUseChargeDOPPerKWh: value })}
                 right={(
-                  <>
-                  <InfoTip text={`${GRID_USE_CHARGE_ESTIMATE_NOTICE} ${factory.resolutionCode}, ${factory.period}.\n${chargeTip}`} />
                   <FieldMenu
                     ariaLabel={isFactory ? 'Opciones del cargo: valor de fábrica aplicado' : `Opciones del cargo: difiere del de fábrica (RD$${factory.dopPerKWh.toFixed(2)}/kWh)`}
                     attention={!isFactory}
@@ -91,7 +93,6 @@ export const NetMeteringFields: React.FC<NetMeteringFieldsProps> = ({ rates, ass
                       onSelect: () => updateRates({ gridUseChargeDOPPerKWh: factory.dopPerKWh }),
                     }]}
                   />
-                  </>
                 )}
               />
             </ParamRow>
