@@ -99,7 +99,8 @@ const broken = {
 // Contratos del contenedor
 {
   const sidebar = readFileSync('src/components/simulator/sidebar/ParameterSidebar.tsx', 'utf8');
-  assert.match(sidebar, /Math\.max\(sidebarWidth \|\| 380, 380\)/);
+  // El piso de 380 px y la cesión en ventanas estrechas viven en sidebarWidth.ts (testDesktopMultitasking).
+  assert.match(sidebar, /width: parameterSidebarCssWidth\(sidebarWidth\)/);
   assert.match(sidebar, /onMouseDown/);
   for (const f of ['Client', 'Rates', 'Equipment', 'Pricing', 'Financials']) {
     const src = readFileSync(`src/components/simulator/sidebar/${f}ParamsSection.tsx`, 'utf8');

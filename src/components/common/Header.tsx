@@ -55,14 +55,14 @@ export const Header: React.FC = () => {
   return (
     <>
       <header
-        className={`flex justify-between items-center px-6 h-16 w-full shrink-0 z-30 relative transition-colors duration-200 ${
+        className={`flex justify-between items-center gap-3 px-3 lg:px-6 h-16 w-full shrink-0 z-30 relative transition-colors duration-200 ${
           isDark
             ? 'bg-[#18181b] border-b border-[#27272a] text-zinc-100 shadow-md'
             : 'bg-white border-b border-slate-200 text-slate-900 shadow-xs'
         }`}
       >
         {/* Left: Branding & Active Project Context */}
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-6 min-w-0">
           <div
             className="flex items-center gap-2.5 cursor-pointer group"
             onClick={() => setActiveView('dashboard')}
@@ -74,7 +74,7 @@ export const Header: React.FC = () => {
               className="w-8 h-8 object-contain transition-transform duration-200 group-hover:scale-105 select-none shrink-0"
             />
             <h1
-              className={`font-bold text-xl tracking-tight transition-colors text-emerald-950 dark:text-white`}
+              className={`hidden lg:block font-bold text-xl tracking-tight whitespace-nowrap transition-colors text-emerald-950 dark:text-white`}
             >
               SolarSim Pro
             </h1>
@@ -102,7 +102,7 @@ export const Header: React.FC = () => {
         </div>
 
         {/* Right: Navigation Switcher & 3-Dots Action Menu */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           {activeView !== 'dashboard' && (
             <div className="flex items-center gap-2.5">
               {/* View Mode Toggle (Simulador vs Propuesta PDF) */}
@@ -111,7 +111,7 @@ export const Header: React.FC = () => {
               >
                 <button
                   onClick={() => setActiveView('project-hub')}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-2.5 lg:px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                     activeView === 'project-hub'
                       ? isDark
                         ? 'bg-[#27272a] text-white shadow-xs'
@@ -129,7 +129,7 @@ export const Header: React.FC = () => {
                 <button
                   onClick={() => setActiveView('simulator')}
                   aria-current={activeView === 'simulator' ? 'page' : undefined}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-2.5 lg:px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                     activeView === 'simulator'
                       ? isDark
                         ? 'bg-[#27272a] text-white shadow-xs'
@@ -146,7 +146,7 @@ export const Header: React.FC = () => {
                 <button
                   onClick={() => setActiveView('pdf-preview')}
                   aria-current={activeView === 'pdf-preview' ? 'page' : undefined}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-2.5 lg:px-3.5 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
                     activeView === 'pdf-preview'
                       ? isDark
                         ? 'bg-[#27272a] text-white shadow-xs'
@@ -157,7 +157,7 @@ export const Header: React.FC = () => {
                   }`}
                 >
                   <FileText className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>Propuesta PDF</span>
+                  <span><span className="hidden lg:inline">Propuesta </span>PDF</span>
                 </button>
               </div>
 
