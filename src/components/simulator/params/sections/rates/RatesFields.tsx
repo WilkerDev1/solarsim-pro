@@ -162,7 +162,10 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
       </ParamRow>
       {/* Sin red no hay campos de exportación (régimen, retención, cargo): la explicación va como nota. */}
       {offGrid && (
-        <p role="note" data-grid-connection="off_grid" className="m-0 text-xs text-pd-muted">{exportTip}</p>
+        <p role="note" data-grid-connection="off_grid" className="m-0 flex items-center gap-1 text-xs text-pd-muted">
+          <span>Sistema aislado: sin exportación a la red</span>
+          <InfoTip text={exportTip} />
+        </p>
       )}
       {offGrid && (
         <ParamRow label="Alternativa de suministro" htmlFor="pd-rates-supply">
@@ -204,7 +207,10 @@ export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix,
         </div>
       )}
       {offGrid && savingsBasis === 'no_comparison' && (
-        <p role="note" className="m-0 rounded-md border border-pd-field-ro-border px-2.5 py-2 text-xs text-pd-muted">{NO_COMPARISON_NOTE}</p>
+        <p role="note" className="m-0 flex items-center gap-1 text-xs text-pd-muted">
+          <span>Sin comparación de ahorro</span>
+          <InfoTip text={NO_COMPARISON_NOTE} />
+        </p>
       )}
       {/* Sistema aislado: sin inyección no hay régimen, retención ni cargo por uso de la red; no se muestran. */}
       {!offGrid && (

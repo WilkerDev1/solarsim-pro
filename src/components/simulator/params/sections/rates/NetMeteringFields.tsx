@@ -4,7 +4,6 @@ import type { ResolvedAssumptions } from '../../../../../../shared/assumptions';
 import {
   GRID_USE_CHARGE_ESTIMATE_NOTICE,
   MAX_GRID_USE_CHARGE_DOP_PER_KWH,
-  chargeRoundsToZero,
   NET_METERING_REGIMES,
   NET_METERING_REGIME_LABELS,
   factoryGridUseCharge,
@@ -69,7 +68,11 @@ export const NetMeteringFields: React.FC<NetMeteringFieldsProps> = ({ rates, ass
       {regime === 'sie007_2026' ? (
         <>
           {applies ? (
-            <ParamRow label="Cargo uso de red" htmlFor="pd-rates-grid-charge">
+            <ParamRow
+              label="Cargo uso de red"
+              htmlFor="pd-rates-grid-charge"
+              hint={<InfoTip label="Más información: Cargo uso de red" text={`${GRID_USE_CHARGE_ESTIMATE_NOTICE} ${factory.resolutionCode}, ${factory.period}.\n${chargeTip}`} />}
+            >
               <CommitNumberField
                 id="pd-rates-grid-charge"
                 step="0.01"
@@ -95,11 +98,8 @@ export const NetMeteringFields: React.FC<NetMeteringFieldsProps> = ({ rates, ass
             </ParamRow>
           ) : (
             // Inyección cero o tarifa con potencia: no hay cargo, así que no se muestra un campo (ni un 0 editable).
-            <p role="note" data-grid-use-charge="not-applicable" className="m-0 text-xs text-pd-muted">{chargeTip}</p>
-          )}
-          {applies && !chargeRoundsToZero(charge) && (
-            <p role="note" className="m-0 flex items-start gap-1.5 rounded bg-pd-warn-bg px-2 py-1.5 text-[11px] font-medium leading-snug text-pd-warn-text">
-              <span>{GRID_USE_CHARGE_ESTIMATE_NOTICE} {factory.resolutionCode}, {factory.period}.</span>
+            <p role="note" data-grid-use-charge="not-applicable" className="m-0 flex items-center gap-1 text-xs text-pd-muted">
+              <span>Cargo uso de red: no aplica</span>
               <InfoTip text={chargeTip} />
             </p>
           )}

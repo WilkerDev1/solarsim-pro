@@ -173,7 +173,7 @@ const listProps = (kind: EquipmentKind, mode: 'catalog' | 'manual', specs: Parti
   assert.match(panelsCatalog, /aria-label="Agregar modelo de panel"/, 'el «+» del subencabezado');
   assert.match(panelsCatalog, /role="switch"[^>]*aria-checked="true"[^>]*aria-label="Auto-calcular paneles"|aria-label="Auto-calcular paneles"[^>]*role="switch"|role="switch"[^>]*aria-label="Auto-calcular paneles"/);
   assert.match(panelsCatalog, /role="group"[^>]*aria-label="Cantidad de paneles"|aria-label="Cantidad de paneles"[^>]*role="group"/);
-  assert.match(panelsCatalog, /aria-label="Calculando para cubrir el 95%"/, 'la explicación va en un InfoTip');
+  assert.match(panelsCatalog, /role="tooltip"[^>]*>Calculando para cubrir el 95%/, 'la explicación va en un InfoTip');
   assert.match(panelsCatalog, /aria-label="Eliminar panel #2"/, 'el modelo #2 lleva papelera');
   assert.ok(!/aria-label="Eliminar panel #1"/.test(panelsCatalog), 'el principal no se elimina');
   assert.match(panelsCatalog, /Modelo #2/);

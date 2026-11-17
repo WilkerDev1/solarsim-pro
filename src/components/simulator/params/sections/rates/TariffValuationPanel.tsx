@@ -29,12 +29,17 @@ export const TariffValuationPanel: React.FC<TariffValuationPanelProps> = ({ proj
   const breakdown = React.useMemo(() => buildBillBreakdown(project, calculationMode), [project, calculationMode]);
   const assumptions = unverifiedAssumptions(rates);
   const settlement = assumptions.find((item) => item.id === 'annual_settlement_price');
+  const assumptionsTip = [
+    `${UNVERIFIED_ESTIMATE_LABEL}:`,
+    ...assumptions.map((item) => `• ${item.title}: ${item.valueText}. ${item.note}`),
+  ].join('\n');
   const settlementValue = resolveAnnualCreditSettlementDOPPerKWh(rates);
 
   return (
     <div className="space-y-2" data-tariff-valuation={method.method}>
-      <p role="note" className="m-0 text-xs text-pd-muted">
-        <span className="font-semibold text-pd-strong">{method.label}.</span> {method.detail}
+      <p role="note" className="m-0 flex items-center gap-1 text-xs text-pd-muted">
+        <span className="font-semibold text-pd-strong">{method.label}</span>
+        <InfoTip text={method.detail} />
       </p>
 
       {breakdown && (
@@ -88,13 +93,10 @@ export const TariffValuationPanel: React.FC<TariffValuationPanelProps> = ({ proj
       )}
 
       {assumptions.length > 0 && (
-        <ul data-tariff-unverified className="m-0 list-none space-y-1 p-0">
-          {assumptions.map((item) => (
-            <li key={item.id} data-unverified-assumption={item.id} className="rounded bg-pd-warn-bg px-2 py-1.5 text-[11px] leading-snug text-pd-warn-text">
-              <span className="font-semibold">{item.title}: {item.valueText}.</span> {UNVERIFIED_ESTIMATE_LABEL}. {item.note}
-            </li>
-          ))}
-        </ul>
+        <p data-tariff-unverified className="m-0 flex items-center gap-1 text-[11px] text-pd-muted">
+          <span>Supuestos estimados, no verificados con facturas</span>
+          <InfoTip text={assumptionsTip} />
+        </p>
       )}
     </div>
   );
