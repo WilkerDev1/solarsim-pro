@@ -4,13 +4,12 @@
  * nuevas aquí.
  */
 import { resolveAssumptions } from '../../../../../../shared/assumptions';
-import { resolveGridConnection } from '../../../../../../shared/gridConnection';
+import { exportsToGrid, resolveGridConnection } from '../../../../../../shared/gridConnection';
 import { FACTORY_GRID_USE_CHARGES, gridUseChargeApplies, resolveNetMeteringRegime } from '../../../../../../shared/netMetering';
 import {
   DEFAULT_FIXED_CHARGE_TIER_BASIS,
   ENERGY_VALUATION_METHOD_LABELS,
   FACTORY_ANNUAL_CREDIT_SETTLEMENT,
-  MAX_SETTLEMENT_DOP_PER_KWH,
   calculateBillingYear,
   calculateMonthlyBill,
   proposalBillingTariff,
@@ -124,7 +123,9 @@ export interface UnverifiedAssumption {
  */
 export function unverifiedAssumptions(rates: UtilityRates): UnverifiedAssumption[] {
   const items: UnverifiedAssumption[] = [];
-  const tariff = resolveEnergyValuationMethod(rates) === 'block_billing' ? proposalBillingTariff(rates) : undefined;
+  // Sin inyección (inyección cero) no hay neteo, crédito ni liquidación: ningún supuesto tiene efecto.
+  const injects = exportsToGrid(resolveGridConnection(rates));
+  const tariff = injects && resolveEnergyValuationMethod(rates) === 'block_billing' ? proposalBillingTariff(rates) : undefined;
   if (tariff) {
     const settlement = resolveAnnualCreditSettlementDOPPerKWh(rates);
     items.push({
@@ -161,14 +162,6 @@ export function unverifiedAssumptions(rates: UtilityRates): UnverifiedAssumption
     });
   }
   return items;
-}
-
-/** Texto del campo del precio de liquidación → valor acotado; `undefined` si aún no es un número (vacío, «.»): no se guarda. */
-export function parseSettlementInput(text: string): number | undefined {
-  const trimmed = text.trim();
-  if (trimmed === '') return undefined;
-  const value = Number(trimmed.replace(',', '.'));
-  return Number.isFinite(value) ? Math.min(MAX_SETTLEMENT_DOP_PER_KWH, Math.max(0, value)) : undefined;
 }
 
 /** RD$ con separador de miles y dos decimales. */

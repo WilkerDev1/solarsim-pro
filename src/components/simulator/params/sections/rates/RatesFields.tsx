@@ -37,8 +37,6 @@ export interface RatesFieldsProps {
   updateSpecs?: (specs: Partial<SystemSpecs>) => void;
   /** Función de este equipo `netMeteringRegimeSelector` (visible por defecto). */
   showRegimeSelector?: boolean;
-  /** Modo de cálculo energético (`useEnergyCalculationMode`) con el que se estima la factura; por defecto `legacy`. */
-  calculationMode?: EnergyCalculationMode;
 }
 
 const DISTRIBUTORS = ['EDEESTE', 'EDESUR', 'EDENORTE', 'CEPM'].map(value => ({ value, label: value }));
@@ -57,7 +55,9 @@ const parseOptionalNumber = (raw: string): number | undefined => {
   return raw.trim() === '' || !Number.isFinite(value) ? undefined : value;
 };
 
-export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix, projectionEnabled, updateRates, updateSpecs, showRegimeSelector = true, calculationMode = 'legacy' }) => {
+export const RatesFields: React.FC<RatesFieldsProps> = ({ project, tariffMatrix, projectionEnabled, updateRates, updateSpecs, showRegimeSelector = true }) => {
+  // Un solo origen: `projectionEnabled` (modo `self_consumption`) decide también con qué modo se estima la factura.
+  const calculationMode: EnergyCalculationMode = projectionEnabled ? 'self_consumption' : 'legacy';
   const { rates } = project;
   // El valor que se muestra es el que usa el cálculo: supuestos efectivos del proyecto completo (ADR 0003).
   const assumptions = resolveAssumptions(project);

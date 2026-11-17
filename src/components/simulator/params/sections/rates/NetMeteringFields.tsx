@@ -5,14 +5,13 @@ import {
   GRID_USE_CHARGE_ESTIMATE_NOTICE,
   MAX_GRID_USE_CHARGE_DOP_PER_KWH,
   chargeRoundsToZero,
-  parseGridUseChargeInput,
   NET_METERING_REGIMES,
   NET_METERING_REGIME_LABELS,
   factoryGridUseCharge,
   gridUseChargeApplies,
   type NetMeteringRegime,
 } from '../../../../../../shared/netMetering';
-import { Field, FieldMenu, InfoTip, ParamRow, SelectField } from '../../ui';
+import { CommitNumberField, Field, FieldMenu, InfoTip, ParamRow, SelectField } from '../../ui';
 import { exportFeeValue } from './ratesLogic';
 
 export interface NetMeteringFieldsProps {
@@ -63,21 +62,15 @@ export const NetMeteringFields: React.FC<NetMeteringFieldsProps> = ({ rates, ass
         <>
           {applies ? (
             <ParamRow label="Cargo uso de red" htmlFor="pd-rates-grid-charge">
-              <Field
+              <CommitNumberField
                 id="pd-rates-grid-charge"
-                type="number"
                 step="0.01"
                 prefix="RD$"
                 suffix="/kWh"
-                mono
                 min={0}
                 max={MAX_GRID_USE_CHARGE_DOP_PER_KWH}
                 value={charge}
-                onChange={(value) => {
-                  // Vacío o a medio escribir («», «.»): no se guarda nada; al salir del campo se ve el valor guardado.
-                  const parsed = parseGridUseChargeInput(value);
-                  if (parsed !== undefined) updateRates({ gridUseChargeDOPPerKWh: parsed });
-                }}
+                onCommit={(value) => updateRates({ gridUseChargeDOPPerKWh: value })}
                 right={(
                   <FieldMenu
                     ariaLabel={isFactory ? 'Opciones del cargo: valor de fábrica aplicado' : `Opciones del cargo: difiere del de fábrica (RD$${factory.dopPerKWh.toFixed(2)}/kWh)`}

@@ -2,13 +2,12 @@ import React from 'react';
 import type { ProjectSimulation, UtilityRates } from '../../../../../types';
 import type { EnergyCalculationMode } from '../../../../../../shared/applicationFeatures';
 import { MAX_SETTLEMENT_DOP_PER_KWH, resolveAnnualCreditSettlementDOPPerKWh } from '../../../../../../shared/tariffBilling';
-import { Field, InfoTip, ParamRow } from '../../ui';
+import { CommitNumberField, InfoTip, ParamRow } from '../../ui';
 import {
   UNVERIFIED_ESTIMATE_LABEL,
   buildBillBreakdown,
   describeValuationMethod,
   formatDOP,
-  parseSettlementInput,
   unverifiedAssumptions,
 } from './tariffPresentation';
 
@@ -74,21 +73,15 @@ export const TariffValuationPanel: React.FC<TariffValuationPanelProps> = ({ proj
 
       {settlement && (
         <ParamRow label="Liquidación anual" htmlFor="pd-rates-settlement">
-          <Field
+          <CommitNumberField
             id="pd-rates-settlement"
-            type="number"
             step="0.01"
             prefix="RD$"
             suffix="/kWh"
-            mono
             min={0}
             max={MAX_SETTLEMENT_DOP_PER_KWH}
             value={settlementValue}
-            onChange={(value) => {
-              // Vacío o a medio escribir («», «.»): no se guarda nada.
-              const price = parseSettlementInput(value);
-              if (price !== undefined) updateRates({ annualCreditSettlementDOPPerKWh: price });
-            }}
+            onCommit={(price) => updateRates({ annualCreditSettlementDOPPerKWh: price })}
             right={<InfoTip text={settlement.note} />}
           />
         </ParamRow>

@@ -26,7 +26,6 @@ export const RatesParamsSection: React.FC<RatesParamsSectionProps> = ({ project,
       updateRates={updateRates}
       updateSpecs={updateSpecs}
       showRegimeSelector={showRegimeSelector}
-      calculationMode={calculationMode}
     />
   );
 };

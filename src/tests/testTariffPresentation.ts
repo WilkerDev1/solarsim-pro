@@ -10,9 +10,11 @@ import { gridConnectionFields } from '../../shared/gridConnection';
 import { DEFAULT_FIXED_CHARGE_TIER_BASIS, type BillingTariff } from '../../shared/tariffBilling';
 import { DEFAULT_RD_TARIFF_MATRIX } from '../data/rdTariffs';
 import { referenceRatesPatch } from '../components/simulator/params/sections/rates/ratesLogic';
+import { fieldDisplayValue } from '../components/simulator/params/ui/Field';
+import { commitNumberDraft } from '../components/simulator/params/logic/commitNumberDraft';
 import { RatesFields } from '../components/simulator/params/sections/rates/RatesFields';
 import {
-  UNVERIFIED_ESTIMATE_LABEL, buildBillBreakdown, describeValuationMethod, factoryChargeRows, formatDOP, parseSettlementInput, unverifiedAssumptions,
+  UNVERIFIED_ESTIMATE_LABEL, buildBillBreakdown, describeValuationMethod, factoryChargeRows, formatDOP, unverifiedAssumptions,
 } from '../components/simulator/params/sections/rates/tariffPresentation';
 import type { LegacyProjectSpecs, ProjectSimulation, UtilityRates } from '../types';
 
@@ -130,18 +132,21 @@ assert.equal(buildBillBreakdown(project({ ...gridConnectionFields('off_grid') })
   // Solo se listan los que afectan a la propuesta.
   assert.deepEqual(unverifiedAssumptions(project({ energyRateSource: 'manual' }).rates).map((item) => item.id), ['gross_injection_charge'], 'precio escalar: solo el cargo sobre inyección bruta');
   assert.deepEqual(unverifiedAssumptions(project({ netMeteringRegime: 'legacy_retention' }).rates), [], 'régimen anterior: ninguno');
-  assert.deepEqual(unverifiedAssumptions(project({ ...gridConnectionFields('zero_export') }).rates).map((item) => item.id), ['annual_settlement_price', 'fixed_charge_tier_basis', 'net_consumption_blocks'], 'inyección cero: sin cargo sobre inyección');
+  assert.deepEqual(unverifiedAssumptions(project({ ...gridConnectionFields('zero_export') }).rates).map((item) => item.id), [], 'inyección cero: nada se inyecta, ningún supuesto tiene efecto');
   assert.deepEqual(unverifiedAssumptions(project({ ...gridConnectionFields('off_grid') }).rates), [], 'aislado: ninguno');
   const singleRange: BillingTariff = { ...(project().rates.billingTariff as BillingTariff), fixedChargeTiers: undefined };
   assert.ok(!unverifiedAssumptions(project({ billingTariff: singleRange }).rates).some((item) => item.id === 'fixed_charge_tier_basis'), 'sin cargo fijo por rango, el supuesto del rango no aplica');
 }
 
-// 6. Entrada del precio de liquidación: vacío no se guarda; se acota a 0–100; coma decimal.
-assert.equal(parseSettlementInput(''), undefined);
-assert.equal(parseSettlementInput('.'), undefined);
-assert.equal(parseSettlementInput('4,5'), 4.5);
-assert.equal(parseSettlementInput('-3'), 0);
-assert.equal(parseSettlementInput('1000'), 100);
+// 6. Campos numéricos con valor guardado distinto de 0 (liquidación, cargo): `Field` solo no deja vaciarlos; el borrador
+// de `CommitNumberField` sí (se confirma en blur/Enter; vacío o incompleto conserva el valor; el resto se acota).
+assert.equal(fieldDisplayValue('', 3.78, true), 3.78, 'Field solo repone el valor al vaciar: por eso no se usa en estos campos');
+assert.equal(fieldDisplayValue('', '', true), '', 'con el borrador como valor (CommitNumberField) el campo queda vacío');
+assert.equal(commitNumberDraft('', 3.78, { min: 0, max: 100 }), 3.78, 'vacío conserva el valor');
+assert.equal(commitNumberDraft('.', 3.78, { min: 0, max: 100 }), 3.78, 'incompleto conserva el valor');
+assert.equal(commitNumberDraft('4.5', 3.78, { min: 0, max: 100 }), 4.5);
+assert.equal(commitNumberDraft('-3', 3.78, { min: 0, max: 100 }), 0);
+assert.equal(commitNumberDraft('1000', 3.78, { min: 0, max: 100 }), 100);
 assert.equal(formatDOP(1234.5), 'RD$1,234.50');
 
 // 7. Cargos de fábrica para Ajustes: los mismos de `FACTORY_GRID_USE_CHARGES`.
@@ -170,6 +175,7 @@ assert.equal(formatDOP(1234.5), 'RD$1,234.50');
   assert.doesNotMatch(flat, /data-tariff-bill-breakdown/, 'precio escalar: sin desglose');
   assert.doesNotMatch(flat, /pd-rates-settlement/, 'precio escalar: la liquidación no aplica');
 
+  assert.doesNotMatch(render(h(RatesFields, { project: project({ ...gridConnectionFields('zero_export') }), projectionEnabled: false, updateRates: noop, updateSpecs: noop } as never)), /pd-rates-settlement|data-tariff-unverified/, 'inyección cero: sin liquidación ni supuestos');
   const zero = render(h(RatesFields, { project: project({ ...gridConnectionFields('zero_export') }), projectionEnabled: false, updateRates: noop, updateSpecs: noop } as never));
   assert.doesNotMatch(zero, /Cargo sobre inyección bruta/, 'inyección cero: sin cargo sobre inyección');
   assert.match(zero, /no se inyecta energía/, 'inyección cero: la nota explica que no hay cargo');
@@ -185,6 +191,17 @@ assert.equal(formatDOP(1234.5), 'RD$1,234.50');
   const sie = render(h(RatesFields, { project: project(), projectionEnabled: false, updateRates: noop, updateSpecs: noop } as never));
   assert.match(sie, /id="pd-rates-grid-charge"/, 'SIE-007: cargo en RD$/kWh');
   assert.doesNotMatch(sie, /id="pd-rates-export"/, 'SIE-007: sin retención %');
+}
+
+// 9. Un solo origen del modo de cálculo: `projectionEnabled` decide el desglose (autoconsumo físico o legado).
+{
+  const p = project();
+  const totalOf = (mode: 'legacy' | 'self_consumption') => formatDOP(buildBillBreakdown(p, mode)!.totalAfterDOP);
+  assert.notEqual(totalOf('legacy'), totalOf('self_consumption'), 'la prueba distingue los dos modos');
+  const on = render(h(RatesFields, { project: p, projectionEnabled: true, updateRates: noop, updateSpecs: noop } as never));
+  const off = render(h(RatesFields, { project: p, projectionEnabled: false, updateRates: noop, updateSpecs: noop } as never));
+  assert.ok(on.includes(totalOf('self_consumption')), 'proyección activa: desglose del autoconsumo físico');
+  assert.ok(off.includes(totalOf('legacy')), 'proyección inactiva: desglose legado');
 }
 
 console.log('testTariffPresentation: OK');
