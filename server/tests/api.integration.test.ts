@@ -339,7 +339,7 @@ test("feature policy defaults legacy, readers can view, ADMIN saves with CAS and
     "/api/auth/share-authorization",
     admin,
     undefined,
-    { "X-SolarSim-Client": "share-viewer/2.7.5" },
+    { "X-SolarSim-Client": "share-viewer/2.8.0" },
   );
   assert.deepEqual(shareNew.body.featurePolicy, {
     version: 2,
