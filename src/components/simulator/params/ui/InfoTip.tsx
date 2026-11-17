@@ -18,6 +18,24 @@ const CLOSE_DELAY_MS = 150;
  * `position: fixed` (no lo recorta el overflow del dock) acotado a la ventana, y Escape lo cierra sin mover el foco
  * (WCAG 1.4.13). El puntero puede pasar al tooltip: React propaga mouseenter/leave a través del portal y el cierre lleva retardo.
  */
+/** ¿El elemento es visible dentro de la ventana y de todos sus ancestros con scroll/recorte? */
+function isInView(element: HTMLElement): boolean {
+  const rect = element.getBoundingClientRect();
+  let left = 0;
+  let top = 0;
+  let right = window.innerWidth;
+  let bottom = window.innerHeight;
+  for (let node = element.parentElement; node && node !== document.body; node = node.parentElement) {
+    const { overflowX, overflowY } = window.getComputedStyle(node);
+    if (/(auto|scroll|hidden|clip)/.test(overflowX + overflowY)) {
+      const box = node.getBoundingClientRect();
+      left = Math.max(left, box.left); top = Math.max(top, box.top);
+      right = Math.min(right, box.right); bottom = Math.min(bottom, box.bottom);
+    }
+  }
+  return rect.bottom > top && rect.top < bottom && rect.right > left && rect.left < right;
+}
+
 export const InfoTip: React.FC<InfoTipProps> = ({ text, label = 'Más información' }) => {
   const id = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -48,11 +66,21 @@ export const InfoTip: React.FC<InfoTipProps> = ({ text, label = 'Más informaci�
   useEffect(() => {
     if (!open) { setPos(null); return undefined; }
     place();
+    const onScroll = () => {
+      const button = buttonRef.current;
+      // Si el ⓘ sale de la vista (ventana o cualquier contenedor con scroll, como el dock), el tooltip se cierra.
+      if (button && !isInView(button)) setDismissed(true);
+      else place();
+    };
+    // Escape cierra también cuando solo hay puntero (sin foco en el ⓘ). El listener vive solo mientras está abierto.
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') setDismissed(true); };
     window.addEventListener('resize', place);
-    window.addEventListener('scroll', place, true);
+    window.addEventListener('scroll', onScroll, true);
+    document.addEventListener('keydown', onKeyDown);
     return () => {
       window.removeEventListener('resize', place);
-      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('scroll', onScroll, true);
+      document.removeEventListener('keydown', onKeyDown);
     };
   }, [open, place, text]);
 

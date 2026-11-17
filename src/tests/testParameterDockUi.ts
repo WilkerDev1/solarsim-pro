@@ -335,6 +335,9 @@ const render = (node: React.ReactElement) => renderToStaticMarkup(node);
   const source = readFileSync('src/components/simulator/params/ui/InfoTip.tsx', 'utf8');
   assert.match(source, /createPortal\(tooltip, document\.body\)/, 'portal a body');
   assert.match(source, /z-\[1200\]/, 'por encima de menús y barra lateral');
+  assert.match(source, /document\.addEventListener\('keydown'[\s\S]*document\.removeEventListener\('keydown'/, 'Escape a nivel de documento mientras está abierto, con limpieza');
+  assert.match(source, /addEventListener\('scroll', onScroll, true\)[\s\S]*removeEventListener\('scroll', onScroll, true\)/, 'scroll en captura: reposiciona o cierra');
+  assert.match(source, /isInView\(button\)/, 'cierra si el ⓘ sale de la vista');
   assert.match(source, /aria-describedby=\{id\}/, 'el botón sigue describiéndose con el tooltip');
 }
 
