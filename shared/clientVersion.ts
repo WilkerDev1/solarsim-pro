@@ -17,7 +17,7 @@ export const DEFAULT_MIN_CLIENT_VERSION = '2.7.1';
  * a esta versión o posteriores. Debe ser la versión de la release que incluye el cambio; cuando `MIN_CLIENT_VERSION`
  * alcance este valor, la distinción deja de tener efecto.
  */
-export const FEATURE_POLICY_V2_CLIENT_VERSION = '2.7.5';
+export const FEATURE_POLICY_V2_CLIENT_VERSION = '2.8.0';
 
 export interface ClientIdentity {
   name: string;

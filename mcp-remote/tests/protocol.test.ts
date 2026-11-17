@@ -401,7 +401,10 @@ test("tools/call: guarded nunca se ejecuta; validación de esquema; envoltura de
   assert.match(found.body.result.content[0].text, /Ferretería/);
   const apiCall = seen.find((s) => s.url.startsWith("/api/projects"))!;
   assert.equal(apiCall.url, "/api/projects?limit=12&query=ferre");
-  assert.equal(apiCall.headers.get("X-SolarSim-Client"), "mcp-remote/2.7.4");
+  assert.match(
+    apiCall.headers.get("X-SolarSim-Client") ?? "",
+    /^mcp-remote\/\d+\.\d+\.\d+$/,
+  );
   assert.equal(apiCall.headers.get("X-SolarSim-Agent-Tool"), "search_projects");
   assert.equal(apiCall.headers.get("Authorization"), `Bearer ${PAT}`);
 });

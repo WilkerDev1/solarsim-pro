@@ -136,20 +136,20 @@ El orden es el mismo que en la 2.7.3:
 
 Rollback: la imagen 2.7.3 es compatible con la migración 007. La migración solo cambia `created_at`/`updated_at` y no añade tablas ni columnas.
 
-### Próxima versión (2.7.5): régimen SIE-007-2026 y política de funciones con dos claves
+### Versión 2.8.0: régimen SIE-007-2026 y política de funciones con dos claves
 
 Cambia el **contrato** de la política de funciones: pasa de una clave (`selfConsumptionProjection`) a dos (`selfConsumptionProjection`, `netMeteringRegimeSelector`). Sin migración: la columna `feature_settings` no cambia y la lectura completa la clave que falta con su valor por defecto (`netMeteringRegimeSelector: true`).
 
-- **Lectura según la versión del cliente.** `GET /api/organization/features`, la respuesta del PATCH y `featurePolicy` de las autorizaciones de publicación del Worker devuelven la forma de una clave a los clientes anteriores a `FEATURE_POLICY_V2_CLIENT_VERSION` (`shared/clientVersion.ts`, `2.7.5`) y la de dos a esa versión o posteriores (`featureSettingsForClient`). Sin `X-SolarSim-Client` válido se devuelve la de una clave (la que entiende cualquier cliente que no se identifica; en la práctica la puerta de versión mínima ya responde 426 antes). El cliente 2.7.4 valida «exactamente una clave»: si recibiera dos, fallaría la consulta de la política y, con ella, **la publicación web** (que exige la política confirmada); el inicio de sesión y el refresco no leen la política.
+- **Lectura según la versión del cliente.** `GET /api/organization/features`, la respuesta del PATCH y `featurePolicy` de las autorizaciones de publicación del Worker devuelven la forma de una clave a los clientes anteriores a `FEATURE_POLICY_V2_CLIENT_VERSION` (`shared/clientVersion.ts`, `2.8.0`) y la de dos a esa versión o posteriores (`featureSettingsForClient`). Sin `X-SolarSim-Client` válido se devuelve la de una clave (la que entiende cualquier cliente que no se identifica; en la práctica la puerta de versión mínima ya responde 426 antes). El cliente 2.7.4 valida «exactamente una clave»: si recibiera dos, fallaría la consulta de la política y, con ella, **la publicación web** (que exige la política confirmada); el inicio de sesión y el refresco no leen la política.
 - **Guardado.** PATCH solo ADMIN (rol actual en base de datos, `lockOrganizationAdmin`; un rol falso en el JWT da 403) con CAS `baseVersion` (409). Exige la forma completa: un cliente anterior que envía una sola clave recibe 400 y no puede borrar la clave nueva.
-- **Versión mínima.** No hace falta subirla para desplegar: un cliente 2.7.4 sigue funcionando con la API nueva (lee una clave y no puede guardar funciones, 400). Subir `MIN_CLIENT_VERSION` a `2.7.5` es opcional y cuando se decida (actualización obligatoria): al hacerlo, la lectura por versión deja de tener efecto. `FEATURE_POLICY_V2_CLIENT_VERSION` debe coincidir con la versión de la release que incluya este cambio; si la release cambia de número, ajustarlo antes de construir.
+- **Versión mínima.** No hace falta subirla para desplegar: un cliente 2.7.4 sigue funcionando con la API nueva (lee una clave y no puede guardar funciones, 400). Subir `MIN_CLIENT_VERSION` a `2.8.0` es opcional y cuando se decida (actualización obligatoria): al hacerlo, la lectura por versión deja de tener efecto. `FEATURE_POLICY_V2_CLIENT_VERSION` debe coincidir con la versión de la release que incluya este cambio; si la release cambia de número, ajustarlo antes de construir.
 
 Orden (ya no es frágil):
 
-1. Checkpoint y ensayo de restauración. Sin migración nueva: el ensayo termina en `[1..7]`.
+1. Checkpoint y ensayo de restauración. La 008 del MCP remoto ya está en producción: el ensayo termina en `[1..8]`.
 2. **API** y **Worker** de la nueva versión, en cualquier orden. Los clientes 2.7.4 siguen leyendo una clave.
-3. **Release de escritorio** firmada 2.7.5. Con la API anterior también funciona (acepta una clave y completa el resto); solo no puede guardar funciones hasta que la API sea la nueva.
-4. Opcional: subir `MIN_CLIENT_VERSION` a `2.7.5` (y `DEFAULT_MIN_CLIENT_VERSION` en una release posterior) cuando se quiera obligar a actualizar.
+3. **Release de escritorio** firmada 2.8.0. Con la API anterior también funciona (acepta una clave y completa el resto); solo no puede guardar funciones hasta que la API sea la nueva.
+4. Opcional: subir `MIN_CLIENT_VERSION` a `2.8.0` (y `DEFAULT_MIN_CLIENT_VERSION` en una release posterior) cuando se quiera obligar a actualizar.
 
 Rollback: la imagen 2.7.4 es compatible con los datos (normaliza `feature_settings` a una clave e ignora la otra). Si una política se guardó con `netMeteringRegimeSelector: false` y un cliente 2.7.4 la vuelve a guardar con la API anterior, la clave se pierde y vuelve al valor por defecto (visible).
 
