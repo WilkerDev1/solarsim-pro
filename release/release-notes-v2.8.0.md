@@ -66,8 +66,8 @@ Pensadas para el operador. No hay migraciones nuevas aparte de la 008 del MCP re
 3. **Worker (visor) 2.8.0** antes de la release de escritorio o junto con ella.
 4. **API 2.8.0** junto con el cliente: conserva `maxPvPowerSource` de los equipos (#140), por lo que debe desplegarse a la vez que el cliente nuevo.
 5. **Publicar y firmar** la release de escritorio 2.8.0 (borrador, `release:sign`, verificación, subida de assets).
-6. **Subir `MIN_CLIENT_VERSION=2.8.0`** en el `.env` de la API y recrear solo la API. La actualización es obligatoria: aprobada por el responsable porque todavía nadie usa la app. `DEFAULT_MIN_CLIENT_VERSION` no cambia en esta versión.
-7. **mcp-remote 2.8.0** (imagen del CT dedicado) en la misma versión que la API.
+6. **mcp-remote 2.8.0** (imagen del CT dedicado) en la misma versión que la API, **antes** de subir la versión mínima: `mcp-remote` se identifica como `mcp-remote/<versión>` y con la 2.7.4 recibiría 426.
+7. **Subir `MIN_CLIENT_VERSION=2.8.0`** en el `.env` de la API y recrear solo la API. La actualización es obligatoria: aprobada por el responsable porque todavía nadie usa la app. `DEFAULT_MIN_CLIENT_VERSION` no cambia en esta versión.
 
 ## Distribución
 

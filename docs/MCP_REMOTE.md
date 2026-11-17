@@ -107,7 +107,7 @@ Los límites por IP usan la dirección del socket (`shared/clientIp.ts`). Las ca
 
 ## Conectar proveedores
 
-En todos los casos, la dirección es la que muestra Ajustes → Agentes e IA → Acceso remoto (por ejemplo `https://mcp.solarsim.electsun.net/mcp`).
+En todos los casos, la dirección es la que muestra Ajustes → Agentes e IA → Acceso remoto (por ejemplo `https://mcp.electsun.net/mcp`).
 
 - **Claude.ai, Claude Desktop y móvil** (requiere `MCP_OAUTH_ENABLED=true`): Ajustes → Conectores → Añadir conector personalizado → pegar la dirección, sin rellenar las opciones avanzadas. Claude se registra solo (registro dinámico) con la redirección `https://claude.ai/api/mcp/auth_callback` y abre la página de SolarSim para iniciar sesión. En organizaciones Team/Enterprise lo añade quien sea propietario.
 - **ChatGPT** (requiere OAuth): con el modo desarrollador activado, *Settings → Apps* → crear app con la dirección y autenticación OAuth. ChatGPT pide confirmación antes de las herramientas sin `readOnlyHint`. Su documentación indica que usa CIMD o registro dinámico «cuando está configurado»; **no se ha probado contra ChatGPT real** (ver Pendiente).
@@ -124,7 +124,7 @@ API (`server/`, contenedor de la API):
 | Variable | Valor |
 | --- | --- |
 | `MCP_REMOTE_ENABLED` | `true` para activar tokens de agente y rutas de gestión. Ausente = no existe nada de esto |
-| `MCP_REMOTE_URL` | URL canónica del endpoint MCP, p. ej. `https://mcp.solarsim.electsun.net/mcp`. Debe coincidir con `MCP_PUBLIC_URL` del servicio |
+| `MCP_REMOTE_URL` | URL canónica del endpoint MCP, p. ej. `https://mcp.electsun.net/mcp`. Debe coincidir con `MCP_PUBLIC_URL` del servicio |
 | `MCP_OAUTH_ENABLED` | `true` para el servidor de autorización (necesario para ChatGPT y Claude.ai) |
 | `API_PUBLIC_URL` | Emisor OAuth: origen público de la API, sin ruta, p. ej. `https://solarsim.electsun.net` |
 | `TRUSTED_PROXIES`, `CLIENT_IP_HEADER` | Ver [IP del cliente](#ip-del-cliente); vacíos por defecto |

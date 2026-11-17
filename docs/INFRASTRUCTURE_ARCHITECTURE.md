@@ -146,7 +146,7 @@ Cambia el **contrato** de la política de funciones: pasa de una clave (`selfCon
 
 Orden (ya no es frágil):
 
-1. Checkpoint y ensayo de restauración. Sin migración nueva: el ensayo termina en `[1..7]`.
+1. Checkpoint y ensayo de restauración. La 008 del MCP remoto ya está en producción: el ensayo termina en `[1..8]`.
 2. **API** y **Worker** de la nueva versión, en cualquier orden. Los clientes 2.7.4 siguen leyendo una clave.
 3. **Release de escritorio** firmada 2.8.0. Con la API anterior también funciona (acepta una clave y completa el resto); solo no puede guardar funciones hasta que la API sea la nueva.
 4. Opcional: subir `MIN_CLIENT_VERSION` a `2.8.0` (y `DEFAULT_MIN_CLIENT_VERSION` en una release posterior) cuando se quiera obligar a actualizar.
