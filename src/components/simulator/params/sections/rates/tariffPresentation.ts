@@ -15,6 +15,7 @@ import {
   proposalBillingTariff,
   resolveAnnualCreditSettlementDOPPerKWh,
   resolveEnergyValuationMethod,
+  tariffPricePresentation,
   type EnergyValuationMethod,
 } from '../../../../../../shared/tariffBilling';
 import type { EnergyCalculationMode } from '../../../../../../shared/applicationFeatures';
@@ -56,6 +57,18 @@ export function describeValuationMethod(rates: UtilityRates): ValuationMethodVie
   else if (!proposalBillingTariff(rates)) detail = 'La propuesta no guarda la fila de esta tarifa (código desconocido, tarifa en US$ o tarifa cambiada). «Aplicar tarifa oficial» la guarda.';
   else detail = 'Sin procedencia del precio guardada (propuesta anterior): se valora al precio por kWh.';
   return { method, label, detail };
+}
+
+/**
+ * Nota de la revisión del borrador bajo «Tarifa de energía» cuando la propuesta se factura por bloques escalonados: tarifa,
+ * resolución y precio medio resultante (`tariffPricePresentation`, la misma decisión del motor). `null` en otro caso.
+ */
+export function blockValuationNote(rates: UtilityRates, monthlyConsumptionKWh: readonly number[]): string | null {
+  const presentation = tariffPricePresentation(rates, monthlyConsumptionKWh);
+  const tariff = presentation.method === 'block_billing' ? proposalBillingTariff(rates) : undefined;
+  if (!tariff || !hasEnergyBlocks(tariff)) return null;
+  const average = presentation.averageDOPPerKWh;
+  return `Se valora con los bloques oficiales de ${tariff.tariffCode} (${tariff.resolutionCode ?? 'fila guardada'}) y su cargo fijo${average !== undefined ? `: precio medio resultante RD$${average.toFixed(2)}/kWh con el consumo de la propuesta` : ''}. El precio de arriba es solo la referencia del consumo promedio; confirma que la resolución corresponde al período de la factura.`;
 }
 
 // ── Desglose de la factura mensual estimada ──

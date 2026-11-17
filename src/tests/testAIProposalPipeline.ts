@@ -1,9 +1,10 @@
 import {batteryBank,readEquipment} from '../../shared/equipment';
 import assert from 'node:assert/strict';
 import { normalizeProposalDraft, buildProposalRequest, robustParseJson, draftForPrompt, PROPOSAL_JSON_SCHEMA, PROPOSAL_SYSTEM_INSTRUCTION } from '../../shared/aiProposal';
-import { calculateMonthlyBill, resolveEnergyValuationMethod } from '../../shared/tariffBilling';
+import { calculateMonthlyBill, resolveEnergyValuationMethod, tariffPricePresentation } from '../../shared/tariffBilling';
 import { averageBlockEnergyRateDOP } from '../../shared/tariffRules';
-import { issueTier } from '../components/common/ai-invoice/reviewIssues';
+import { issueTarget, issueTier } from '../components/common/ai-invoice/reviewIssues';
+import { blockValuationNote } from '../components/simulator/params/sections/rates/tariffPresentation';
 import { DEFAULT_RD_TARIFF_MATRIX, referenceBillingTariff } from '../data/rdTariffs';
 import { prepareProposalDraftProject } from '../utils/proposalDraftProject';
 import { requestGeminiJson, GeminiRequestError, geminiResponseText, type GeminiTransport } from '../../shared/geminiTransport';
@@ -239,15 +240,37 @@ useSimulationStore.getState().applyExtractedInvoice(normalized,true);assert.stri
   const again=normalizeProposalDraft(stepped,catalog,matrixContext);
   assert.equal(again.energyRateSource,'reference');assert.equal(again.energyCostPerKWhDOP,stepped.energyCostPerKWhDOP);
   assert.deepEqual(codes(again).filter(c=>c.startsWith('invoice_block_rates')),['invoice_block_rates_reference']);
-  // El modelo devuelve en la ronda siguiente el escalar del borrador (sin procedencia): sigue siendo referencia, sin falso aviso.
-  const echoed=normalizeProposalDraft({...invoice,energyCostPerKWhDOP:stepped.energyCostPerKWhDOP,marginalRateDOP:12.89},catalog,matrixContext);
-  assert.equal(echoed.energyRateSource,'reference');assert(!codes(echoed).includes('invoice_block_rates_mismatch'));
+  assert.equal(issueTarget(notice!)?.tab,'client','el aviso informativo se ve en «Cliente y tarifa», junto a la tarifa de energía');
+  // Eco en rondas siguientes: draftForPrompt manda el escalar calculado (origen 'reference') y el esquema no declara la
+  // procedencia, así que el modelo lo devuelve sin ella. Con consumo que cruza bloques (250 kWh/mes → 6.558) no es un precio
+  // de la factura: ni avisos de factura ni marginalRateDOP.
+  const crossing={...invoice,monthlyConsumptionKWh:Array(12).fill(250),energyCostPerKWhDOP:undefined,energyTiers:undefined,fixedChargeDOP:undefined};
+  const round1=normalizeProposalDraft(crossing,catalog,matrixContext);
+  assert.equal(round1.energyRateSource,'reference');assert.equal(round1.energyCostPerKWhDOP!.toFixed(3),'6.558');
+  const roundContext={...matrixContext,currentDraft:round1};
+  const invoiceCodes=(draft:{validationIssues?:{code:string}[]})=>codes(draft).filter(c=>c.startsWith('invoice_block_rates'));
+  const sameConsumption=normalizeProposalDraft({...crossing,energyCostPerKWhDOP:round1.energyCostPerKWhDOP},catalog,roundContext);
+  assert.equal(sameConsumption.energyRateSource,'reference');assert.deepEqual(invoiceCodes(sameConsumption),[],'eco con el mismo consumo: sin avisos de factura');
+  assert.equal(sameConsumption.marginalRateDOP,undefined,'el eco no se guarda como precio observado');
+  const changedConsumption=normalizeProposalDraft({...crossing,monthlyConsumptionKWh:Array(12).fill(279),energyCostPerKWhDOP:round1.energyCostPerKWhDOP},catalog,roundContext);
+  assert.equal(changedConsumption.energyRateSource,'reference');assert.equal(changedConsumption.energyCostPerKWhDOP!.toFixed(3),'6.769','referencia recalculada con el consumo nuevo');
+  assert.deepEqual(invoiceCodes(changedConsumption),[],'eco tras cambiar el consumo: sin falso desajuste');
+  assert.equal(changedConsumption.marginalRateDOP,undefined);
+  // Sin borrador anterior (o con otra tarifa) el mismo número sí es un precio de la factura y se contrasta con los bloques.
+  assert.deepEqual(invoiceCodes(normalizeProposalDraft({...crossing,energyCostPerKWhDOP:round1.energyCostPerKWhDOP},catalog,matrixContext)),['invoice_block_rates_mismatch']);
+  assert.deepEqual(invoiceCodes(normalizeProposalDraft({...crossing,tariffCode:'BTS2',energyCostPerKWhDOP:round1.energyCostPerKWhDOP},catalog,roundContext)),['invoice_block_rates_mismatch']);
   // Propuesta aplicada: guarda la fila y se factura por bloques.
   const savedBase=structuredClone(useSimulationStore.getState().getActiveProject());
   const prepared=prepareProposalDraftProject(savedBase,stepped,DEFAULT_RD_TARIFF_MATRIX,{isNew:true});
   assert.equal(prepared.rates.energyRateSource,'reference');
   assert.deepEqual(prepared.rates.billingTariff,bts1,'la propuesta guarda la fila oficial');
   assert.equal(resolveEnergyValuationMethod(prepared.rates),'block_billing');
+  // Revisión: bajo «Tarifa de energía» se explica la facturación por bloques con el precio medio resultante.
+  const note=blockValuationNote(prepared.rates,prepared.monthlyConsumption)!;
+  assert.match(note,/bloques oficiales de BTS1/);assert.match(note,/SIE-121-2026-TF/);
+  const expectedAverage=tariffPricePresentation(prepared.rates,prepared.monthlyConsumption).averageDOPPerKWh!;
+  assert(note.includes(`RD$${expectedAverage.toFixed(2)}/kWh`),'muestra el precio medio resultante de los bloques');
+  assert.equal(blockValuationNote({...prepared.rates,energyRateSource:'invoice'},prepared.monthlyConsumption),null,'precio único: sin nota de bloques');
   useSimulationStore.setState({tariffMatrix:DEFAULT_RD_TARIFF_MATRIX,syncSettings:{...useSimulationStore.getState().syncSettings,authToken:null,currentUser:null,autoSyncEnabled:false}});
   useSimulationStore.getState().applyExtractedInvoice(stepped,true);
   const applied=useSimulationStore.getState().getActiveProject();

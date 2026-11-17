@@ -268,7 +268,15 @@ export function normalizeProposalDraft(rawDraft: unknown, catalog: SolarEquipmen
   // marginal) y no valora todo el consumo. Salvo precio tecleado en la revisión (`manual`), se valora con la fila oficial
   // (`reference`, que guarda `billingTariff` y factura por bloques) y lo leído de la factura queda como dato observado.
   const officialBlocks:{rateDOP:number}[]|undefined=tariff?.currency!=='USD'&&Array.isArray(tariff?.blocksDOP)&&tariff.blocksDOP.length>1?tariff.blocksDOP:undefined;
-  const invoiceRateDOP=raw.energyRateSource==='reference'||raw.energyRateSource==='manual'?undefined:num(raw.energyCostPerKWhDOP);
+  // Eco: `draftForPrompt` manda al modelo el escalar de referencia que calculó la app y el esquema no declara la procedencia,
+  // así que vuelve sin ella. Si coincide con el del borrador vigente (misma distribuidora y tarifa, origen 'reference'), no
+  // es un precio de la factura: se mantiene la referencia (recalculada con el consumo actual) y no cuenta como observado.
+  const previousDraft:any=context.currentDraft;
+  const echoedReference=raw.energyRateSource===undefined&&previousDraft?.energyRateSource==='reference'&&num(raw.energyCostPerKWhDOP)!==undefined
+    &&num(previousDraft?.energyCostPerKWhDOP)!==undefined&&Math.abs(previousDraft.energyCostPerKWhDOP-raw.energyCostPerKWhDOP)<=0.01
+    &&String(previousDraft?.distributor??'').trim().toUpperCase()===distributor&&tariffMatrixKey(distributor,String(previousDraft?.tariffCode??''))===tariffCode;
+  if(echoedReference){rateDOP=undefined;referenceRate=true;}
+  const invoiceRateDOP=raw.energyRateSource==='reference'||raw.energyRateSource==='manual'||echoedReference?undefined:num(raw.energyCostPerKWhDOP);
   const observedRatesDOP=officialBlocks&&raw.energyRateSource!=='manual'
     ?[...new Set([invoiceRateDOP,num(raw.marginalRateDOP),...(Array.isArray(raw.energyTiers)?raw.energyTiers.map((t:any)=>num(t?.rateDOP)):[])].filter((n):n is number=>n!==undefined&&n>0))]:[];
   const steppedInvoice=observedRatesDOP.length>0;
@@ -293,8 +301,7 @@ export function normalizeProposalDraft(rawDraft: unknown, catalog: SolarEquipmen
     const resolution=str(tariff?.source?.resolutionCode)||str((context.tariffReference as any)?.resolutionCode);
     const label=`${tariffCode}${resolution?` (${resolution})`:''}`;
     const rd=(n:number)=>n.toLocaleString('es-DO',{maximumFractionDigits:4});
-    // Coincide con un bloque oficial, o es el escalar que la app ya calculó con esos bloques (el modelo lo devuelve en la ronda siguiente).
-    const unmatched=observedRatesDOP.filter(rate=>!officialBlocks!.some(block=>Math.abs(block.rateDOP-rate)<=0.01)&&!(rate===invoiceRateDOP&&rateDOP!==undefined&&Math.abs(rateDOP-rate)<=0.01));
+    const unmatched=observedRatesDOP.filter(rate=>!officialBlocks!.some(block=>Math.abs(block.rateDOP-rate)<=0.01));
     if(unmatched.length)issue('invoice_block_rates_mismatch',`La factura muestra ${unmatched.map(rd).join(', ')} RD$/kWh, que no coincide con ningún bloque oficial de ${label}: ${officialBlocks!.map(b=>rd(b.rateDOP)).join(' / ')} RD$/kWh. La propuesta se valora con los bloques oficiales; confirma el período de la factura (puede corresponder a otro pliego).`,'warning');
     else issue('invoice_block_rates_reference',`La factura muestra precios por bloque; la propuesta se valora con los bloques oficiales de ${label}.`,'warning');
   }
