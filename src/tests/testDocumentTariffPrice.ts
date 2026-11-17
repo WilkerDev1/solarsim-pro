@@ -60,5 +60,30 @@ const edited = { customization: { texts: { 'executiveSummary.row3.tariff': 'Mi p
 assert.equal(resolveDocumentText('executiveSummary.row3.tariff', edited, ctx).text, 'Mi precio');
 assert.equal(resolveDocumentText('executiveSummary.row3.tariffBlocksNote', edited, ctx).text, 'Nota propia');
 
+// El documento: render del cuadro resumen en ambos modos y sin consumo.
+const theme = Object.values(PDF_COLOR_THEMES)[0] as never;
+const renderSummary = (rates: Record<string, unknown>, mutate: (s: ReturnType<typeof summaryOf>) => void = () => {}) => {
+  const project = projectWith(rates);
+  const summary = structuredClone(calculateProjectFinancialSummary(project, 'legacy'));
+  mutate(summary);
+  return renderToStaticMarkup(React.createElement(DocumentEditorProvider, {
+    project, summary, currentDateStr: '16/11/2026', mode: 'view', writable: false,
+    children: React.createElement(PDFExecutiveSummaryPage, { project, summary, activeTheme: theme, showHeadersFooters: true, currentDateStr: '16/11/2026', pageNum: 2, totalPages: 12 }),
+  }));
+};
+const blockHtml = renderSummary(blocks);
+assert.ok(blockHtml.includes('data-doc-text="executiveSummary.row3.tariffAverage"') && blockHtml.includes('data-doc-text="executiveSummary.row3.tariffBlocksNote"'));
+assert.ok(!blockHtml.includes('data-doc-text="executiveSummary.row3.tariff"'));
+assert.ok(blockHtml.includes(`RD$ ${(model.tariffPrice.averageDOPPerKWh as number).toFixed(2)}`), 'precio medio impreso');
+const flatHtml = renderSummary({});
+assert.ok(flatHtml.includes('data-doc-text="executiveSummary.row3.tariff"') && !flatHtml.includes('tariffBlocksNote'), 'escalar: como siempre');
+// Por bloques sin consumo (propuesta nueva): sin dato, «—»; nunca el precio escalar residual como si fuera el promedio.
+const scalarDOP = (model.tariffDOP).toFixed(2);
+for (const clear of [(s: ReturnType<typeof summaryOf>) => { s.monthlyBreakdown = []; }, (s: ReturnType<typeof summaryOf>) => { s.monthlyBreakdown.forEach((m) => { m.consumptionKWh = 0; }); }]) {
+  const html = renderSummary(blocks, clear);
+  assert.ok(html.includes('data-doc-text="executiveSummary.row3.tariffAverage"') && html.includes('data-doc-text="executiveSummary.row3.tariffBlocksNote"'));
+  assert.ok(!html.includes(`RD$ ${scalarDOP}`), 'no imprime el precio escalar como promedio');
+  assert.ok(html.includes('font-mono block mt-0.5">—<'), 'imprime «—»');
+}
 
 console.log('Documento: precio de la energía según el método de valoración.');
